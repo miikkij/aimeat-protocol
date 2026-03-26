@@ -289,6 +289,7 @@ Three namespaces exist. **Never confuse them.**
 
 - **Extension** (V8 sandbox): owns `ext:{name}`. Reads owner data via `ctx.memory.getPublic(ctx.caller.gaii, key)`. Fetches external APIs via `ctx.fetch()`.
 - **Cortex** (browser IIFE): reads ext data via `AIMEAT.data.getPublic('ext:name', key)`. Reads/writes user data via `AIMEAT.data.get/set()`. Calls extension actions via `session.fetch('/v1/ext/name/actionId')`.
+- **CRITICAL: Translations and settings are USER data** — cortex reads them via `AIMEAT.data.get('service.i18n.fi')`, NEVER via `getPublic('ext:...')`. The extension init action does NOT need to copy them.
 - **App** (browser): calls cortex public methods ONLY. NEVER calls `callExt`, `readExtMemory`, `/v1/ext/`, or `/v1/memory/ext:` directly.
 
 ### Trust principle
@@ -597,6 +598,18 @@ AIMEAT's architecture is: **CSM defines data shape + rules → Generic APIs hand
 - **Ed25519 sha512Sync:** Must set `ed.etc.sha512Sync` using `node:crypto` for synchronous operations
 - **MultiDiGraph:** If two nodes can have multiple edges (e.g., goal_reached + goal_not_reached), use `MultiDiGraph`, not `DiGraph`
 - **First owner is operator:** The first registered owner automatically gets the `operator` role
+- **BUILD_ID cache busting:** Public JS changes require `pnpm dev` restart — browser caches modules by BUILD_ID
+- **`buildComponentPrompt()` is async** — all call sites must `await` it (generator-detail.js, use-autopilot.js, use-test-execution.js)
+- **Platform UI APIs:** Tabs uses `onChange` (not `onSelect`), DataTable has no `onRowClick`, Input/Select return `{el, getValue()}` objects
+
+### Generator Prompt Template Rules
+
+When modifying generator prompt templates (`public/js/services/generator-prompts-*.js`):
+1. **Verify every API claim** against actual source code in `src/routes/lib-*.ts` and `public/cortex-bundled/*.js`
+2. **Extension data** (watchlist, cache, changes) → `getPublic('ext:name', key)` — correct
+3. **User data** (translations, settings) → `AIMEAT.data.get(key)` — correct
+4. **NEVER tell cortex to read translations from ext: namespace** — they live in owner namespace
+5. **Extension actions must use** `export default async function(ctx, input) { ... }` — the V8 sandbox requires ES module default export
 
 ## Naming Convention — AIMEAT Only
 
