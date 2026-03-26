@@ -317,10 +317,15 @@ For TRANSLATION tests:
 - Label: ${componentLabel}
 - Registered as: ${registeredAs || 'unknown'}
 ${goldenSection}${testSection}
-## Component Code
-\`\`\`
-${componentCode}
-\`\`\`
+## Data Structures (from blueprint — test against THESE shapes)
+${blueprint?.dataModel?.structures ? Object.entries(blueprint.dataModel.structures).map(([name, schema]) =>
+    `### ${name}\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\``
+  ).join('\n\n') : 'No structures defined'}
+
+## Action Contracts (from blueprint — test THESE methods with THESE shapes)
+${blueprint?.dataModel?.actions ? Object.entries(blueprint.dataModel.actions).map(([name, def]) =>
+    `- **${name}**: input=${JSON.stringify(def.input || {})}, output=${def.output?.$ref ? '$ref:' + def.output.$ref : JSON.stringify(def.output || 'any')}`
+  ).join('\n') : 'No actions defined'}
 
 ## Project Context
 Blueprint components:
@@ -340,4 +345,57 @@ ${componentType === 'extension' ? SANDBOX_CONSTRAINTS + '\n\n' : ''}${EXTENSION_
 3. Self-contained async function body
 4. Server tests: return { passed, errors, details }
 5. Browser tests: set window.__testResults = { passed, errors, details }`;
+}
+
+/**
+ * Build a test-first prompt for extensions — generates test BEFORE the extension code.
+ * The test acts as a specification: the extension must pass this test.
+ * @param {object} blueprint - The full blueprint with structures and actions
+ * @param {object} interviewSpec - The interview spec with data sources
+ * @returns {string} Test prompt that produces test code from the contract only
+ */
+export function buildExtensionTestFirstPrompt(blueprint, interviewSpec) {
+  const structures = blueprint?.dataModel?.structures || {};
+  const actions = blueprint?.dataModel?.actions || {};
+  const extActions = Object.entries(actions).filter(([k]) => k.startsWith('ext:'));
+
+  const structuresText = Object.entries(structures).map(([name, schema]) =>
+    `### ${name}\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\``
+  ).join('\n\n');
+
+  const scenariosText = extActions.map(([key, def]) => {
+    const actionId = key.replace('ext:', '');
+    const inputStr = JSON.stringify(def.input || {});
+    const outputRef = def.output?.$ref || 'object';
+    return `- **${actionId}**(${inputStr}) → must return shape matching ${outputRef}`;
+  }).join('\n');
+
+  const testCompany = interviewSpec?.dataSources?.[0]?.sampleEntry;
+  const testEntity = testCompany ? JSON.stringify(testCompany).substring(0, 300) : 'use realistic test data';
+
+  return `${INSTRUCTION_DISCLAIMER}
+Generate TEST CODE for an extension that does not exist yet.
+This test defines WHAT the extension must do — it is a specification.
+
+## Data Structures (the extension must produce data matching these)
+${structuresText}
+
+## Actions to Test
+${scenariosText}
+
+## Test Data Reference
+${testEntity}
+
+## Environment
+Server-side sandbox. Available: callExt(extName, actionId, body), readExtMemory(extName, key).
+callExt returns the action's result (envelope unwrapped). readExtMemory returns the memory value.
+
+## Rules
+- Test each action listed above
+- For actions that call external APIs: check response SHAPE matches the structure, graceful error = PASS
+- For actions that only use memory: assert specific return values
+- The extension name will be provided when the test runs — use a placeholder like 'EXT_NAME'
+- Return ONLY executable JavaScript. No markdown fences.
+- End with: return { passed: boolean, errors: string[], details: string }
+`;
 }
