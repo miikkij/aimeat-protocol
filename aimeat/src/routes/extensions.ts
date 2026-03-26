@@ -10,6 +10,7 @@ import type { ExtensionCtx } from '../services/extension-runtime.js';
 import type { Scheduler } from '../services/scheduler.js';
 import { parse as parseYaml } from 'yaml';
 import { logger } from '../utils/logger.js';
+import { resolveIdentity } from '../utils/gaii.js';
 
 export function extensionsRouter(config: AimeatConfig, storage: Storage, scheduler?: Scheduler, emailService?: import('../services/email.js').EmailService): Router {
   const router = Router();
@@ -772,7 +773,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
     const extName = req.params.extName as string;
     const instanceId = req.params.instanceId as string;
     const actionId = req.params.actionId as string;
-    const callerGaii = req.auth!.sub;
+    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
 
     try {
       // Look up the extension
@@ -1009,7 +1010,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   router.post('/v1/ext/:extName/:actionId', requireAuth(), async (req, res) => {
     const extName = req.params.extName as string;
     const actionId = req.params.actionId as string;
-    const callerGaii = req.auth!.sub;
+    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
 
     try {
       // Look up the extension

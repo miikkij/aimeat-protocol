@@ -17,9 +17,10 @@
  * @version-history
  *   v1.0.0 — 2026-03-22 — Extracted from generator-tab.js (was inline in v6.1.0)
  *   v1.1.0 — 2026-03-24 — Fix useEffect deps (testCode/testResult sync), add trace display
+ *   v1.2.0 — 2026-03-25 — Fix validationResult reset: Register button no longer disappears after validation passes
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -133,6 +134,7 @@ export function ComponentDetail({ component, project, components, projectId, int
   const [registering, setRegistering] = useState(false);
   const [aiRunning, setAiRunning] = useState(false);
   const resultRef = { current: null };
+  const prevCompIdRef = useRef(component.id);
 
   // Test state
   const [testCode, setTestCode] = useState(component.testCode || '');
@@ -140,10 +142,18 @@ export function ComponentDetail({ component, project, components, projectId, int
   const [testResult, setTestResult] = useState(component.testResult || null);
 
   useEffect(() => {
+    const componentSwitched = prevCompIdRef.current !== component.id;
+    prevCompIdRef.current = component.id;
+
     setResult(component.result || '');
     setTestCode(component.testCode || '');
     setTestResult(component.testResult || null);
-    setValidationResult(null);
+    // Only reset validationResult when switching to a different component.
+    // When status changes (e.g. validating→done) within the same component,
+    // keep validationResult so the Register button stays visible.
+    if (componentSwitched) {
+      setValidationResult(null);
+    }
     // Auto-transition to prompt_ready when opening an unstarted component
     if (component.status === 'not_started') {
       const prompt = buildComponentPrompt(

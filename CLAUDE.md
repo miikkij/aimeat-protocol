@@ -270,6 +270,35 @@ if (record.ownerGaii !== req.auth!.sub) { ... }
 
 **Agents are never created implicitly.** Registration/login creates only the owner + GHII profile. Agents connect later through device auth, where the owner explicitly approves each agent and selects its scopes.
 
+## Extension & Cortex Memory Architecture (CRITICAL)
+
+Full guide: `docs/coding-guidelines/extension-memory-architecture.md`
+
+Three namespaces exist. **Never confuse them.**
+
+| Namespace | Who writes | Who reads | Example |
+|-----------|-----------|-----------|---------|
+| **Owner** (`testuser@node-id`) | User via API (auth) | User (auth), extensions (`ctx.memory.getPublic(gaii, key)`) | `i18n.fi`, `settings.config` |
+| **Extension** (`ext:{name}`) | Only the extension (`ctx.memory.set()`) | Anyone (public, no auth) | `ext:prh/watchlist.items` |
+
+### Layer access rules
+
+- **Extension** (V8 sandbox): owns `ext:{name}`. Reads owner data via `ctx.memory.getPublic(ctx.caller.gaii, key)`. Fetches external APIs via `ctx.fetch()`.
+- **Cortex** (browser IIFE): reads ext data via `AIMEAT.data.getPublic('ext:name', key)`. Reads/writes user data via `AIMEAT.data.get/set()`. Calls extension actions via `session.fetch('/v1/ext/name/actionId')`.
+- **App** (browser): calls cortex public methods ONLY. NEVER calls `callExt`, `readExtMemory`, `/v1/ext/`, or `/v1/memory/ext:` directly.
+
+### Trust principle
+
+The extension is sovereign — it decides what to store, in what format, and what to return. Cortex trusts the extension's API contract. App trusts cortex. No layer bypasses the one below it.
+
+### Common mistakes (prevent these)
+
+1. **Wrong callExt path**: `/v1/ext/name/action` (correct), NOT `/v1/extensions/name/actions/action`
+2. **session.fetch returns parsed JSON**: use `resp.data` directly, do NOT call `resp.json()`
+3. **Cortex register API**: `{ libs: { "file.js": code } }`, NOT `{ lib: { filename, code } }`
+4. **Cortex re-activate**: must deactivate first, then activate (idempotent skip if already active)
+5. **Flat translation keys**: generator produces `"tab.search": "Haku"` — `t()` must check flat key before nested path
+
 ## Key Commands
 
 ```bash
