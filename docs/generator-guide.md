@@ -62,12 +62,13 @@ Blueprint
 ┌──────────────────────────────────────────────────┐
 │  DEFINE PHASE                                      │
 │  CSM — data schema + service identity              │
-│  MSM — external API contracts (if needed)          │
+│  MSM — external API contracts (paired w/ extension)│
 ├──────────────────────────────────────────────────┤
 │  SEED PHASE                                        │
 │  Memory — default settings, seed data              │
 │  Translation FI — all UI text in Finnish           │
 │  Translation EN — same keys, English               │
+│  (Storage — initial files/assets, if needed)       │
 ├──────────────────────────────────────────────────┤
 │  CAPABILITY PHASE                                  │
 │  Extension — external API calls, scheduling,       │
@@ -130,7 +131,10 @@ The blueprint translates user requirements into a technical architecture. It rec
 4. App-domain cortex (composes all features + auth + translations)
 5. App (thin shell)
 
-**Extension vs cortex decision** — applies the rule: does this need the server (external API, cron, server-to-server)? If yes → extension. If no → cortex or app. Reading/writing AIMEAT memory, file uploads, board posts, wallet operations, data transformation, UI rendering → all cortex.
+**Scope assignment** — decides which layer handles each requirement:
+- Extension scope: external API calls, scheduled background jobs, server-to-server communication, trusted server-side execution
+- Cortex scope: data access via AIMEAT platform libraries (memory, storage, social, wallet), business logic, data transformation, UI component rendering, composition of other cortex libraries
+- App scope: layout, navigation, responsiveness, user journey, presentation
 
 **Available libraries** — queries what cortex libraries are installed on the node (aimeat-charts, aimeat-ui-nav, etc.) and lists their APIs so components can reference them in `uses` fields.
 
@@ -146,14 +150,13 @@ The blueprint translates user requirements into a technical architecture. It rec
 
 ### Extension — Platform Capability
 
-Adds new capabilities to AIMEAT at the platform level. Runs server-side in a V8 sandbox.
+Adds new capabilities to AIMEAT at the platform level. Runs server-side in a V8 sandbox. Paired with MSM when the external API requires authentication or complex configuration.
 
-**When needed:** External API calls, scheduled background jobs, heavy server-side processing, data that needs trusted execution.
-
-**When NOT needed:** Reading/writing AIMEAT memory, uploading files, posting to boards, managing wallet — cortex can do all of these directly using AIMEAT platform libraries.
+**Scope:** External API calls, scheduled background jobs, heavy server-side processing, data that needs trusted server-side execution, server-to-server communication.
 
 **What it knows:**
-- External API URLs, response formats, sample data
+- MSM contract (if paired — API URLs, auth, endpoints)
+- External API response formats, sample data
 - Memory keys to write and their data shapes
 - Schedules (cron expressions, @activate)
 - V8 sandbox constraints
@@ -190,24 +193,21 @@ Client-side JavaScript library. This is where the intelligence of the applicatio
 - Adds settings management
 - Entry point for the app
 
-### App — Thin UI Shell
+### App — The Application
 
-The application the user sees. Focused on presentation, not logic.
+The application the user interacts with. It can have logic, state, and complex interactions. It uses cortex libraries and AIMEAT platform libraries to deliver the user's use cases.
 
-**What it does:**
-- Loads the app-domain cortex
+**Scope:**
+- Loads the app-domain cortex and any additional libraries needed
 - Sets up navigation (tabs/pages based on use cases)
 - Calls cortex feature components to render into containers
 - Handles responsive layout (mobile + desktop)
 - Handles window resize, orientation changes
 - Shows loading states, error states
 - Runs the user through their use cases
-
-**What it does NOT do:**
-- Data fetching (cortex does this)
-- Business logic (cortex does this)
-- DOM component creation (feature cortex does this)
-- Translation management (cortex does this)
+- Focuses on presentation, responsiveness, and user experience
+- Delegates data access and business logic to cortex
+- Delegates UI component rendering to feature cortex and platform UI cortex libraries
 
 ---
 
