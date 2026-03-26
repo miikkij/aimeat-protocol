@@ -591,12 +591,61 @@ IMPORTANT:
 - NEVER build retry loops — if an API call returns null or fails, show an error message to the user. Do NOT call the same function again automatically.
 - If cortex doesn't have a method you need (e.g., checkWatchlist), show a message that the feature requires the cortex to be updated — do NOT bypass cortex and call extensions directly
 
-### UI CORTEX RULES (if aimeat-ui-* libraries are loaded):
-- NEVER use native alert(), confirm(), or prompt() — use AIMEAT.ui.dialogs.Confirm(), AIMEAT.ui.dialogs.toast(), AIMEAT.ui.dialogs.Modal() instead
-- If aimeat-ui-layout is available, use its layout components (MainDetail, DashboardGrid, Split, etc.) for page structure
-- If aimeat-ui-forms is available, use its form components (Input, Select, Toggle, FormGroup) instead of raw HTML <input>/<select> elements
-- If aimeat-ui-viewers is available, use Grid/List/DataTable/Carousel for data display instead of custom HTML/CSS
-- If aimeat-ui-nav is available, use Tabs/BurgerMenu/Sidebar for navigation instead of custom nav HTML
+### AIMEAT Platform UI Libraries (MUST use these — do NOT reinvent)
+
+These cortex libraries are pre-installed on every AIMEAT node. Load them via <script> tags and use their components instead of writing raw HTML/CSS.
+
+\\\`\\\`\\\`html
+<!-- Load platform UI libraries (add these BEFORE your domain cortex) -->
+<script src="/v1/cortex/aimeat-ui-nav/libs/aimeat-ui-nav.js"></script>
+<script src="/v1/cortex/aimeat-ui-layout/libs/aimeat-ui-layout.js"></script>
+<script src="/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js"></script>
+<script src="/v1/cortex/aimeat-ui-forms/libs/aimeat-ui-forms.js"></script>
+<script src="/v1/cortex/aimeat-ui-dialogs/libs/aimeat-ui-dialogs.js"></script>
+\\\`\\\`\\\`
+
+**Navigation** — \\\`AIMEAT.aimeatUiNav\\\`:
+- \\\`Tabs(container, tabs, onSelect)\\\` — tabbed navigation (USE THIS for app tabs)
+- \\\`Breadcrumbs(container, items)\\\` — breadcrumb trail
+- \\\`Sidebar(container, items, onSelect)\\\` — sidebar navigation
+- \\\`BottomNav(container, items, onSelect)\\\` — mobile bottom navigation
+- \\\`BurgerMenu(container, items, onSelect)\\\` — hamburger menu
+
+**Layout** — \\\`AIMEAT.aimeatUiLayout\\\`:
+- \\\`MainDetail(container, {main, detail})\\\` — list + detail split view
+- \\\`DashboardGrid(container, cards)\\\` — responsive card grid
+- \\\`Split(container, {left, right})\\\` — side-by-side panels
+- \\\`Stacked(container, sections)\\\` — vertical sections
+- \\\`Header(container, {title, actions})\\\` — page header
+- \\\`Footer(container, content)\\\` — page footer
+
+**Data Display** — \\\`AIMEAT.aimeatUiViewers\\\`:
+- \\\`DataTable(container, {columns, rows, onRowClick})\\\` — sortable data table (USE THIS for search results, watchlist)
+- \\\`Timeline(container, events)\\\` — timeline view (USE THIS for change history)
+- \\\`Grid(container, items, renderItem)\\\` — responsive grid
+- \\\`List(container, items, renderItem)\\\` — vertical list
+- \\\`Gallery(container, images)\\\` — image gallery
+- \\\`Carousel(container, slides)\\\` — slideshow
+
+**Forms** — \\\`AIMEAT.aimeatUiForms\\\`:
+- \\\`Input(container, {label, value, onChange})\\\` — text input
+- \\\`Select(container, {label, options, value, onChange})\\\` — dropdown select
+- \\\`Toggle(container, {label, checked, onChange})\\\` — on/off toggle
+- \\\`Checkbox(container, {label, checked, onChange})\\\` — checkbox
+- \\\`FormGroup(container, fields)\\\` — declarative form with validation
+
+**Dialogs** — \\\`AIMEAT.aimeatUiDialogs\\\`:
+- \\\`toast(message, type)\\\` — toast notification (USE THIS, not alert())
+- \\\`Modal(container, {title, content, onClose})\\\` — modal dialog
+- \\\`Confirm({title, message, onConfirm})\\\` — confirmation dialog (USE THIS, not confirm())
+- \\\`Alert({title, message})\\\` — alert dialog (USE THIS, not alert())
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  NEVER use native alert(), confirm(), prompt() — use aimeat-ui-dialogs ║
+║  NEVER build raw HTML tables — use aimeat-ui-viewers DataTable          ║
+║  NEVER build custom tab navigation — use aimeat-ui-nav Tabs            ║
+║  NEVER build raw form inputs — use aimeat-ui-forms Input/Select/Toggle ║
+╚══════════════════════════════════════════════════════════════════════════╝
 `;
     }
 
@@ -625,6 +674,12 @@ async function boot() {
   try {
     await loadScript('/v1/libs/aimeat-auth.js');
     await loadScript('/v1/libs/aimeat-data.js');
+    // Platform UI libraries (pre-installed on every AIMEAT node)
+    await loadScript('/v1/cortex/aimeat-ui-nav/libs/aimeat-ui-nav.js');
+    await loadScript('/v1/cortex/aimeat-ui-layout/libs/aimeat-ui-layout.js');
+    await loadScript('/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js');
+    await loadScript('/v1/cortex/aimeat-ui-forms/libs/aimeat-ui-forms.js');
+    await loadScript('/v1/cortex/aimeat-ui-dialogs/libs/aimeat-ui-dialogs.js');
 ${hasCortex ? '\n' + cortexScriptLoads : ''}
     AIMEAT.auth.mountLoginButton('#auth-container', {
       onLogin: () => startApp(),
