@@ -501,7 +501,9 @@ ${HTML_ENTITY_RULES}`,
       // Extract actual method names from cortex code exports
       const extractedMethods = [];
       for (const lib of cortexLibs) {
-        const camelName = lib.name.replace(/-([a-z])/g, (_, ch) => ch.toUpperCase());
+        // Extract actual LIB_NAME from cortex code (authoritative), fallback to camelCase conversion
+        const libNameMatch = lib.result?.match?.(/const\s+LIB_NAME\s*=\s*['"]([^'"]+)['"]/);
+        const camelName = libNameMatch ? libNameMatch[1] : lib.name.replace(/-([a-z0-9])/g, (_, ch) => ch.toUpperCase());
         const exportsMatch = lib.result?.match?.(/(?:const|let|var)\s+\w*[Ee]xport\w*\s*=\s*\{([\s\S]*?)\}/);
         if (exportsMatch) {
           const methods = exportsMatch[1].split(',').map(m => m.trim().split(':')[0].trim()).filter(Boolean);
@@ -1063,6 +1065,29 @@ const enStrings = await readExtMemory(EXT.collector, 'i18n.en');
 
 Do NOT use AIMEAT.data.get('i18n.fi') — that reads from the CURRENT USER's namespace
 and will fail for users who didn't install the service.
+
+### MANDATORY: t() helper function (MUST use this exact implementation)
+
+Generator produces flat translation keys like \\\`"tab.search": "Haku"\\\`. The t() function
+MUST check flat keys first, then fall back to nested dot-path traversal:
+
+\\\`\\\`\\\`javascript
+function t(key, translations) {
+  if (!key || !translations) return key || '';
+  // Flat key first (e.g., "tab.search" as direct property)
+  if (translations[key] != null && typeof translations[key] !== 'object') return translations[key];
+  // Then nested dot-path traversal
+  var parts = key.split('.'); var val = translations;
+  for (var i = 0; i < parts.length; i++) {
+    if (val == null || typeof val !== 'object') return key;
+    val = val[parts[i]];
+  }
+  return (val != null && typeof val !== 'object') ? val : key;
+}
+\\\`\\\`\\\`
+
+This function is an INTERNAL helper — do NOT export it. Use it in public methods that
+need translated text, e.g., \\\`t('tab.search', fiStrings)\\\`.
 
 ## IMPORTANT: How Settings Work
 

@@ -575,10 +575,28 @@ export async function registerComponent(type, result, session, serviceSlug = '')
         }
         if (Object.keys(libs).length > 0) body.libs = libs;
       }
-      const installResp = await apiPost('/v1/cortex', body);
-      // Auto-activate after install
+      let installResp;
+      try {
+        installResp = await apiPost('/v1/cortex', body);
+      } catch (e) {
+        // If cortex already exists (409 CONFLICT), deactivate + delete + retry install
+        if (e.message?.includes('already installed') || e.message?.includes('409') || e.message?.includes('CONFLICT')) {
+          const existingName = extracted.manifest.match?.(/name:\s*"?([^\s"]+)"?/)?.[1];
+          if (existingName) {
+            try { await apiPost(`/v1/cortex/${encodeURIComponent(existingName)}/deactivate`); } catch { /* ok */ }
+            await apiDelete(`/v1/cortex/${encodeURIComponent(existingName)}`);
+            installResp = await apiPost('/v1/cortex', body);
+          } else {
+            throw e;
+          }
+        } else {
+          throw e;
+        }
+      }
+      // Auto-activate after install — deactivate first to ensure new code takes effect
       const name = installResp?.data?.name || installResp?.data?.extension?.name;
       if (name) {
+        try { await apiPost(`/v1/cortex/${encodeURIComponent(name)}/deactivate`); } catch { /* ok if not yet active */ }
         await apiPost(`/v1/cortex/${encodeURIComponent(name)}/activate`);
       }
       return installResp;

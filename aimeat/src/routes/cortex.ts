@@ -466,7 +466,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Cache-Control', 'no-cache');
     res.send(content);
   });
 
