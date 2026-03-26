@@ -17,5 +17,14 @@
  */
 export { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER, COMPONENT_TEMPLATES } from './generator-prompts-base.js';
 export { buildBlueprintPrompt, buildInterviewPrompt, buildComponentPrompt } from './generator-prompts-build.js';
-export { buildTestPrompt } from './generator-prompts-test.js';
+export { buildTestPrompt, buildExtensionTestFirstPrompt } from './generator-prompts-test.js';
 export { buildBlueprintFixPrompt, buildFixPrompt, buildReflectionPrompt, buildFreshGenerationPrompt, buildImpactPrompt, buildEditPrompt } from './generator-prompts-fix.js';
+// New V5 modules
+export { buildDataCortexPrompt } from './generator-prompts-cortex-data.js';
+export { buildFeatureCortexPrompt } from './generator-prompts-cortex-feature.js';
+export { buildAppDomainCortexPrompt } from './generator-prompts-cortex-app.js';
+export { createBundle, formatBundleForPrompt, formatBundlesForPrompt } from './generator-context-bundle.js';
+export { verifyContract } from './generator-contract.js';
+export { smokeTest } from './generator-smoke.js';
+export { validateSpecQuality } from './generator-validate.js';
+export { reconcileProbe } from './generator-probe-reconcile.js';
