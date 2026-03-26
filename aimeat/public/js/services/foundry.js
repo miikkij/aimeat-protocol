@@ -37,9 +37,114 @@
  *   v4.5.0 — 2026-03-19 — Add writeProjectLog for user-action activity logging; fix apiPatch import
  *   v5.0.0 — 2026-03-20 — Remove agent-related functions (replaced by OpenRouter autopilot)
  *   v5.1.0 — 2026-03-21 — Add saveProjectSettings/getProjectSettings for settings collection step
+ *   v6.0.0 — 2026-03-26 — Add multi-pass data model: PASS_TYPES, MULTI_PASS_TYPES,
+ *     createInitialPasses, createUnitPasses, extractUnitsFromSkeleton, getNextPass,
+ *     isDuplicatePrescription; skeleton/unit/test/reflection storage functions
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
+
+/* ── Pass Data Model ─────────────────────────────────── */
+
+/**
+ * Pass types for the multi-pass pipeline.
+ * Order matters: test → skeleton → units → assembly
+ */
+export const PASS_TYPES = {
+  TEST: 'test',
+  SKELETON: 'skeleton',
+  UNIT: 'unit',
+  ASSEMBLY: 'assembly',
+  REFLECTION: 'reflection',
+};
+
+/**
+ * Component types that use multi-pass generation.
+ * All others use single-shot (same as current generator).
+ */
+export const MULTI_PASS_TYPES = ['extension', 'cortex', 'app'];
+
+/**
+ * Maximum reflection attempts before escalating to user.
+ */
+export const MAX_REFLECTIONS = 3;
+
+/**
+ * Create initial passes array for a component based on its type.
+ * For single-shot types (csm, msm, memory, translation), returns empty array.
+ * For multi-pass types, returns [test, skeleton] — unit passes are added after skeleton is validated.
+ */
+export function createInitialPasses(componentType) {
+  if (!MULTI_PASS_TYPES.includes(componentType)) return [];
+  return [
+    { id: 'test', type: PASS_TYPES.TEST, status: 'pending', attempt: 1 },
+    { id: 'skeleton', type: PASS_TYPES.SKELETON, status: 'pending', attempt: 1 },
+  ];
+}
+
+/**
+ * Create unit passes from a validated skeleton.
+ * Parses the skeleton YAML to extract action/method/view IDs.
+ */
+export function createUnitPasses(skeleton) {
+  const units = extractUnitsFromSkeleton(skeleton);
+  return units.map(unit => ({
+    id: `unit:${unit.id}`,
+    type: PASS_TYPES.UNIT,
+    status: 'pending',
+    attempt: 1,
+    unitId: unit.id,
+    unitLabel: unit.label || unit.id,
+  }));
+}
+
+/**
+ * Extract unit definitions from a skeleton YAML string.
+ * Returns array of { id, label } for each action/method/section/view.
+ */
+export function extractUnitsFromSkeleton(skeletonYaml) {
+  const lines = skeletonYaml.split('\n');
+  const units = [];
+  let currentSection = null;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed === 'actions:') currentSection = 'actions';
+    else if (trimmed === 'methods:') currentSection = 'methods';
+    else if (trimmed === 'sections:') currentSection = 'sections';
+    else if (trimmed === 'views:') currentSection = 'views';
+    else if (trimmed.startsWith('- id: ') && currentSection) {
+      units.push({ id: trimmed.slice(6).trim(), label: trimmed.slice(6).trim() });
+    } else if (trimmed.startsWith('- name: ') && currentSection === 'methods') {
+      units.push({ id: trimmed.slice(8).trim(), label: trimmed.slice(8).trim() });
+    } else if (/^\w/.test(trimmed) && trimmed.endsWith(':') && currentSection) {
+      // New top-level section — stop collecting
+      if (!['actions:', 'methods:', 'sections:', 'views:'].includes(trimmed)) {
+        currentSection = null;
+      }
+    }
+  }
+  return units;
+}
+
+/**
+ * Get the next pending pass for a component.
+ */
+export function getNextPass(passes) {
+  return passes.find(p => p.status === 'pending');
+}
+
+/**
+ * Check if a reflection prescription is a duplicate of the previous one.
+ * Used for loop detection (same action+target twice = stuck).
+ */
+export function isDuplicatePrescription(reflectionHistory, newPrescription) {
+  if (!reflectionHistory || reflectionHistory.length === 0) return false;
+  const prev = reflectionHistory[reflectionHistory.length - 1];
+  return prev.prescription &&
+    prev.prescription.action === newPrescription.action &&
+    prev.prescription.target === newPrescription.target;
+}
 
 /* ── Helpers ─────────────────────────────────────────── */
 
@@ -271,6 +376,170 @@ export async function saveProjectSettings(projectId, values, secretKeys) {
 export async function getProjectSettings(projectId) {
   const res = await apiGet(`/v1/foundry/${projectId}/settings`);
   return res?.data?.values || {};
+}
+
+/* ── Skeleton / Unit / Test / Reflection Storage ─────── */
+
+/**
+ * Save skeleton YAML for a component.
+ */
+export async function saveSkeleton(projectId, componentId, skeletonYaml) {
+  const key = `foundry.${projectId}.component.${componentId}.skeleton`;
+  try {
+    await apiPut(`/v1/memory/${encodeURIComponent(key)}`, {
+      value: skeletonYaml,
+      visibility: 'owner',
+    });
+  } catch (err) {
+    // If PUT fails (key doesn't exist yet), create with POST
+    if (err?.status === 404) {
+      await apiPost('/v1/memory', {
+        key,
+        value: skeletonYaml,
+        visibility: 'owner',
+      });
+    } else {
+      throw err;
+    }
+  }
+}
+
+/**
+ * Load skeleton YAML for a component.
+ */
+export async function loadSkeleton(projectId, componentId) {
+  try {
+    const key = `foundry.${projectId}.component.${componentId}.skeleton`;
+    const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(key)}&owner_scope=true`);
+    const item = (resp?.data?.items || []).find(i => i.key === key);
+    if (!item?.value) return null;
+    return typeof item.value === 'string' ? item.value : JSON.stringify(item.value);
+  } catch { return null; }
+}
+
+/**
+ * Save a unit implementation.
+ */
+export async function saveUnit(projectId, componentId, unitId, code) {
+  const key = `foundry.${projectId}.component.${componentId}.units.${unitId}`;
+  try {
+    await apiPut(`/v1/memory/${encodeURIComponent(key)}`, {
+      value: code,
+      visibility: 'owner',
+    });
+  } catch (err) {
+    if (err?.status === 404) {
+      await apiPost('/v1/memory', {
+        key,
+        value: code,
+        visibility: 'owner',
+      });
+    } else {
+      throw err;
+    }
+  }
+}
+
+/**
+ * Load all unit implementations for a component.
+ * Returns { unitId: code } object.
+ */
+export async function loadUnits(projectId, componentId) {
+  const prefix = `foundry.${projectId}.component.${componentId}.units.`;
+  const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(prefix)}&owner_scope=true`);
+  const items = resp?.data?.items || [];
+  const units = {};
+  for (const item of items) {
+    const unitId = item.key.replace(prefix, '');
+    units[unitId] = typeof item.value === 'string' ? item.value : JSON.stringify(item.value);
+  }
+  return units;
+}
+
+/**
+ * Save pre-generated test code for a component.
+ */
+export async function saveTestCode(projectId, componentId, testCode) {
+  const key = `foundry.${projectId}.component.${componentId}.tests`;
+  try {
+    await apiPut(`/v1/memory/${encodeURIComponent(key)}`, {
+      value: testCode,
+      visibility: 'owner',
+    });
+  } catch (err) {
+    if (err?.status === 404) {
+      await apiPost('/v1/memory', {
+        key,
+        value: testCode,
+        visibility: 'owner',
+      });
+    } else {
+      throw err;
+    }
+  }
+}
+
+/**
+ * Load pre-generated test code.
+ */
+export async function loadTestCode(projectId, componentId) {
+  try {
+    const key = `foundry.${projectId}.component.${componentId}.tests`;
+    const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(key)}&owner_scope=true`);
+    const item = (resp?.data?.items || []).find(i => i.key === key);
+    if (!item?.value) return null;
+    return typeof item.value === 'string' ? item.value : JSON.stringify(item.value);
+  } catch { return null; }
+}
+
+/**
+ * Append a reflection entry to the component's reflection history.
+ */
+export async function appendReflection(projectId, componentId, entry) {
+  const key = `foundry.${projectId}.component.${componentId}.reflection-history`;
+  let history = [];
+  try {
+    const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(key)}&owner_scope=true`);
+    const item = (resp?.data?.items || []).find(i => i.key === key);
+    if (item?.value) {
+      const existing = typeof item.value === 'string' ? JSON.parse(item.value) : item.value;
+      if (Array.isArray(existing)) history = existing;
+    }
+  } catch { /* no history yet */ }
+
+  history.push({ ...entry, timestamp: new Date().toISOString() });
+
+  try {
+    await apiPut(`/v1/memory/${encodeURIComponent(key)}`, {
+      value: history,
+      visibility: 'owner',
+    });
+  } catch (err) {
+    if (err?.status === 404) {
+      await apiPost('/v1/memory', {
+        key,
+        value: history,
+        visibility: 'owner',
+      });
+    } else {
+      throw err;
+    }
+  }
+  return history;
+}
+
+/**
+ * Load reflection history for a component.
+ */
+export async function loadReflectionHistory(projectId, componentId) {
+  try {
+    const key = `foundry.${projectId}.component.${componentId}.reflection-history`;
+    const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(key)}&owner_scope=true`);
+    const item = (resp?.data?.items || []).find(i => i.key === key);
+    if (!item?.value) return [];
+    const val = typeof item.value === 'string' ? JSON.parse(item.value) : item.value;
+    return Array.isArray(val) ? val : [];
+  } catch { return []; }
 }
 
 /* ── Component State ─────────────────────────────────── */
