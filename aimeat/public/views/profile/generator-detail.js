@@ -18,6 +18,7 @@
  *   v1.0.0 — 2026-03-22 — Extracted from generator-tab.js (was inline in v6.1.0)
  *   v1.1.0 — 2026-03-24 — Fix useEffect deps (testCode/testResult sync), add trace display
  *   v1.2.0 — 2026-03-25 — Fix validationResult reset: Register button no longer disappears after validation passes
+ *   v1.3.0 — 2026-03-26 — V5: context bundles on register, explain step before validation
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -32,6 +33,8 @@ import { buildComponentPrompt, buildFixPrompt, buildReflectionPrompt, buildTestP
 import { validateComponent } from '/js/services/generator-validate.js';
 import { verifyContract } from '/js/services/generator-contract.js';
 import { smokeTest } from '/js/services/generator-smoke.js';
+import { createBundle } from '/js/services/generator-context-bundle.js';
+import { buildExplainPrompt } from '/js/services/generator-prompts-fix.js';
 import { runComponentTest, screenshotUrl } from '/js/services/generator-testing.js';
 
 /* ── OpenRouter Autopilot Helpers (shared) ───────────── */
@@ -251,7 +254,9 @@ export function ComponentDetail({ component, project, components, projectId, int
         return;
       }
       const registered = addHistory(component, 'registered', { registeredAs: regName });
-      await saveComponent(projectId, { ...registered, status: 'done', registeredAs: regName });
+      // Create context bundle for downstream prompts (probe results added later if probed)
+      const bundle = createBundle({ ...registered, registeredAs: regName, result }, []);
+      await saveComponent(projectId, { ...registered, status: 'done', registeredAs: regName, contextBundle: bundle });
       // Smoke test after registration — catch load failures early
       const smoke = await smokeTest(component.type, regName, session);
       if (!smoke.passed) {
@@ -388,6 +393,12 @@ export function ComponentDetail({ component, project, components, projectId, int
     : null;
   const fixPrompt = validationResult && !validationResult.valid
     ? buildFixPrompt(prompt, result, validationResult.errors, component.type)
+    : null;
+
+  // Explain prompt — optional step after generation, before validation
+  const bpComp = project.blueprint?.components?.find(c => c.label === component.label || c.id === component.id);
+  const explainPrompt = result.trim() && !validationResult
+    ? buildExplainPrompt(component.type, result, bpComp)
     : null;
 
   // Test prompt for testable component types
@@ -547,6 +558,12 @@ export function ComponentDetail({ component, project, components, projectId, int
           onInput=${e => setResult(e.target.value)}
         />
         <div class="pf-gen-actions">
+          ${explainPrompt && html`
+            <button class="btn-ghost btn-sm" onClick=${() => navigator.clipboard.writeText(explainPrompt)}
+              title="Copy explain prompt — ask AI to describe what it built before validating">
+              Explain
+            </button>
+          `}
           ${workflowStep === 'validate' && html`<${StepArrow} />`}
           <button class="btn-primary btn-sm" onClick=${handleValidate} disabled=${!result.trim()}
             title=${t('profile.generator.validateHint')}>

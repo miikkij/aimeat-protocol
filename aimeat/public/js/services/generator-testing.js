@@ -11,9 +11,13 @@
  *   v1.0.0 — 2026-03-21 — Initial implementation
  *   v2.0.0 — 2026-03-21 — Remove deterministic tests. All tests are AI-generated.
  *     runComponentTest now requires testCode parameter (AI-generated JavaScript).
+ *   v2.1.0 — 2026-03-26 — Re-export reconcileProbe from generator-probe-reconcile.js
  */
 
 import { apiPost } from '/js/api.js';
+
+// Re-export probe reconciliation from its own module
+export { reconcileProbe } from '/js/services/generator-probe-reconcile.js';
 
 /**
  * Execute an AI-generated test for a single component.

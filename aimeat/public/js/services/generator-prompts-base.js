@@ -582,27 +582,17 @@ ${apiSummary}
         }).join('\n');
       })()}
 
-╔══════════════════════════════════════════════════════════════════════════╗
-║  Read the cortex code above CAREFULLY.                                 ║
-║  Use EXACTLY the method names shown (e.g., getItems, getStats).        ║
-║  Use EXACTLY the return value shapes — do NOT invent field names.      ║
-║  If cortex returns { items: [...] }, use .items, NOT .data or .entries. ║
-╚══════════════════════════════════════════════════════════════════════════╝
 ${methodList}
-IMPORTANT:
-- Call \\\`AIMEAT.{libName}.init()\\\` on app start (libName is camelCase of the cortex metadata.name, e.g., \\\`my-domain-lib\\\` → \\\`AIMEAT.myDomainLib.init()\\\`)
-- Use the cortex methods for ALL data access — never call extensions or memory directly
-- The cortex handles authentication, error handling, and data transformation
-- NEVER call cortex internal functions like callExt(), readExtMemory(), writeOwnerMemory() — these are PRIVATE
-- NEVER build retry loops — if an API call returns null or fails, show an error message to the user. Do NOT call the same function again automatically.
-- If cortex doesn't have a method you need (e.g., checkWatchlist), show a message that the feature requires the cortex to be updated — do NOT bypass cortex and call extensions directly
+RULES:
+- Call \\\`AIMEAT.{libName}.init()\\\` on app start (libName is camelCase of cortex name, e.g., \\\`my-domain-lib\\\` → \\\`AIMEAT.myDomainLib.init()\\\`)
+- Use cortex methods for ALL data access — never call extensions or memory directly
+- NEVER call internal functions like callExt(), readExtMemory() — these are PRIVATE
+- NEVER build retry loops — show an error message on failure, do NOT auto-retry
+- Use EXACTLY the method names and return value shapes shown above
 
-### AIMEAT Platform UI Libraries (MUST use these — do NOT reinvent)
-
-These cortex libraries are pre-installed on every AIMEAT node. Load them via <script> tags and use their components instead of writing raw HTML/CSS.
+### AIMEAT Platform UI Libraries (load BEFORE your domain cortex)
 
 \\\`\\\`\\\`html
-<!-- Load platform UI libraries (add these BEFORE your domain cortex) -->
 <script src="/v1/cortex/aimeat-ui-nav/libs/aimeat-ui-nav.js"></script>
 <script src="/v1/cortex/aimeat-ui-layout/libs/aimeat-ui-layout.js"></script>
 <script src="/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js"></script>
@@ -610,48 +600,7 @@ These cortex libraries are pre-installed on every AIMEAT node. Load them via <sc
 <script src="/v1/cortex/aimeat-ui-dialogs/libs/aimeat-ui-dialogs.js"></script>
 \\\`\\\`\\\`
 
-**Navigation** — \\\`AIMEAT['aimeat-ui-nav']\\\`:
-- \\\`Tabs(container, tabs, onSelect)\\\` — tabbed navigation (USE THIS for app tabs)
-- \\\`Breadcrumbs(container, items)\\\` — breadcrumb trail
-- \\\`Sidebar(container, items, onSelect)\\\` — sidebar navigation
-- \\\`BottomNav(container, items, onSelect)\\\` — mobile bottom navigation
-- \\\`BurgerMenu(container, items, onSelect)\\\` — hamburger menu
-
-**Layout** — \\\`AIMEAT['aimeat-ui-layout']\\\`:
-- \\\`MainDetail(container, {main, detail})\\\` — list + detail split view
-- \\\`DashboardGrid(container, cards)\\\` — responsive card grid
-- \\\`Split(container, {left, right})\\\` — side-by-side panels
-- \\\`Stacked(container, sections)\\\` — vertical sections
-- \\\`Header(container, {title, actions})\\\` — page header
-- \\\`Footer(container, content)\\\` — page footer
-
-**Data Display** — \\\`AIMEAT['aimeat-ui-viewers']\\\`:
-- \\\`DataTable(container, {columns, rows, onRowClick})\\\` — sortable data table (USE THIS for search results, watchlist)
-- \\\`Timeline(container, events)\\\` — timeline view (USE THIS for change history)
-- \\\`Grid(container, items, renderItem)\\\` — responsive grid
-- \\\`List(container, items, renderItem)\\\` — vertical list
-- \\\`Gallery(container, images)\\\` — image gallery
-- \\\`Carousel(container, slides)\\\` — slideshow
-
-**Forms** — \\\`AIMEAT['aimeat-ui-forms']\\\`:
-- \\\`Input(container, {label, value, onChange})\\\` — text input
-- \\\`Select(container, {label, options, value, onChange})\\\` — dropdown select
-- \\\`Toggle(container, {label, checked, onChange})\\\` — on/off toggle
-- \\\`Checkbox(container, {label, checked, onChange})\\\` — checkbox
-- \\\`FormGroup(container, fields)\\\` — declarative form with validation
-
-**Dialogs** — \\\`AIMEAT['aimeat-ui-dialogs']\\\`:
-- \\\`toast(message, type)\\\` — toast notification (USE THIS, not alert())
-- \\\`Modal(container, {title, content, onClose})\\\` — modal dialog
-- \\\`Confirm({title, message, onConfirm})\\\` — confirmation dialog (USE THIS, not confirm())
-- \\\`Alert({title, message})\\\` — alert dialog (USE THIS, not alert())
-
-╔══════════════════════════════════════════════════════════════════════════╗
-║  NEVER use native alert(), confirm(), prompt() — use aimeat-ui-dialogs ║
-║  NEVER build raw HTML tables — use aimeat-ui-viewers DataTable          ║
-║  NEVER build custom tab navigation — use aimeat-ui-nav Tabs            ║
-║  NEVER build raw form inputs — use aimeat-ui-forms Input/Select/Toggle ║
-╚══════════════════════════════════════════════════════════════════════════╝
+Use these instead of raw HTML: \\\`Tabs\\\` for navigation, \\\`DataTable\\\` for tables, \\\`Input/Select/Toggle\\\` for forms, \\\`toast/Modal/Confirm\\\` for dialogs (never use native alert/confirm/prompt).
 `;
     }
 
