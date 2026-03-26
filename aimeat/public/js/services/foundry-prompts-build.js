@@ -11,6 +11,10 @@
  * @version-history
  *   v1.0.0 — 2026-03-22 — Extracted from foundry-prompts.js
  *   v1.1.0 — 2026-03-24 — Add API URL usage rules + notes to extension data source details
+ *   v2.0.0 — 2026-03-26 — Add skeleton prompt builders for multi-pass pipeline:
+ *     buildSkeletonPrompt (dispatcher), buildExtensionSkeletonPrompt,
+ *     buildDataCortexSkeletonPrompt, buildFeatureCortexSkeletonPrompt,
+ *     buildAppDomainCortexSkeletonPrompt, buildAppSkeletonPrompt
  */
 
 import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER, COMPONENT_TEMPLATES, EXTENSION_CONSUMPTION_RULES, summarizeExtensionApi, summarizeCortexApi } from './foundry-prompts-base.js';
@@ -1051,4 +1055,344 @@ If these are missing, the app WILL crash with "getTranslations is not a function
   }
 
   return INSTRUCTION_DISCLAIMER + template(label, context);
+}
+
+/* ── Skeleton Prompt Builders (Multi-Pass Pipeline) ──── */
+
+/**
+ * Build skeleton prompt for any multi-pass component type.
+ * Dispatches to the type-specific skeleton builder.
+ */
+export function buildSkeletonPrompt(params) {
+  const type = params.blueprintComponent?.type;
+  const subtype = params.blueprintComponent?.subtype;
+
+  if (type === 'extension') return buildExtensionSkeletonPrompt(params);
+  if (type === 'cortex' && subtype === 'data') return buildDataCortexSkeletonPrompt(params);
+  if (type === 'cortex' && subtype === 'feature') return buildFeatureCortexSkeletonPrompt(params);
+  if (type === 'cortex' && subtype === 'app-domain') return buildAppDomainCortexSkeletonPrompt(params);
+  if (type === 'app') return buildAppSkeletonPrompt(params);
+
+  throw new Error(`No skeleton prompt builder for type=${type} subtype=${subtype}`);
+}
+
+/**
+ * Build the skeleton prompt for an extension component.
+ * Produces a YAML skeleton with action signatures, schemas, memory keys — no implementation.
+ */
+export function buildExtensionSkeletonPrompt({ label, description, blueprint, blueprintComponent, interviewSpec }) {
+  const structures = blueprint.dataModel?.structures || {};
+  const memoryKeys = blueprint.dataModel?.memoryKeys || {};
+  const actions = blueprint.dataModel?.actions || {};
+
+  // Collect data sources relevant to this extension
+  const dataSources = (interviewSpec?.dataSources || []).map(ds => ({
+    name: ds.name,
+    url: ds.url,
+    sampleResponse: ds.sampleResponse || ds.sampleEntry || null,
+    notes: ds.notes || '',
+  }));
+
+  // Collect schedules from blueprint
+  const schedules = blueprintComponent.schedules || [];
+
+  // Collect config keys
+  const configKeys = (blueprint.settings || []).map(s => s.key);
+
+  return `${INSTRUCTION_DISCLAIMER}
+# Task: Generate Extension Skeleton
+
+You are generating a SKELETON for an AIMEAT extension. A skeleton defines the complete structure — action signatures, input/output schemas, memory keys, schedules — with ZERO implementation code.
+
+## Project
+${description}
+
+## Component
+Label: ${label}
+Type: Extension (server-side V8 sandbox)
+
+## Data Sources
+${dataSources.map(ds => `- ${ds.name}: ${ds.url}${ds.sampleResponse ? `\n  Sample response: ${JSON.stringify(ds.sampleResponse, null, 2).slice(0, 2000)}` : ''}${ds.notes ? `\n  Notes: ${ds.notes}` : ''}`).join('\n')}
+
+## Data Model Structures
+${Object.entries(structures).length > 0 ? Object.entries(structures).map(([name, schema]) => `### ${name}\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\``).join('\n\n') : 'No structures defined in blueprint.'}
+
+## Memory Keys This Extension Uses
+${Object.entries(memoryKeys).filter(([, v]) => v.producedBy === blueprintComponent.id || v.consumedBy?.includes(blueprintComponent.id)).map(([key, def]) => `- \`${key}\`: ${def.description || ''} (${def.producedBy === blueprintComponent.id ? 'writes' : 'reads'})`).join('\n') || 'None declared in blueprint.'}
+
+## Actions From Blueprint
+${Object.entries(actions).filter(([, v]) => v.component === blueprintComponent.id).map(([name, def]) => `- \`${name}\`: ${def.description || ''}\n  Input: ${JSON.stringify(def.input || {})}\n  Output: ${JSON.stringify(def.output || {})}`).join('\n\n') || 'None declared — infer from data sources and use cases.'}
+
+## Schedules
+${schedules.length > 0 ? schedules.map(s => `- ${s.action}: ${s.cron} — ${s.description || ''}`).join('\n') : 'None.'}
+
+## Config Keys
+${configKeys.length > 0 ? configKeys.map(k => `- ${k}`).join('\n') : 'None.'}
+
+## Output Format
+
+Produce a YAML skeleton document. Use EXACTLY this structure:
+
+\`\`\`yaml
+component: extension
+name: <kebab-case-name>
+version: 1.0.0
+description: <one-line description>
+
+memory:
+  writes:
+    - key: <memory-key>
+      schema: <inline JSON schema of the value>
+  reads:
+    - key: <memory-key>
+      schema: <inline JSON schema>
+
+actions:
+  - id: <action-id>
+    method: POST
+    path: /<path>
+    input: <JSON schema of input parameters>
+    output: <JSON schema of return value>
+    dataSource: <URL if this action calls an external API>
+    sampleResponse: |
+      <actual JSON from sample data — copy field names exactly>
+    notes: "<any transformation notes>"
+    reads: [<memory-keys-read>]
+    writes: [<memory-keys-written>]
+    schedule: "<cron expression if scheduled>"
+    depends: [<other-action-ids-it-calls>]
+
+config:
+  keys: [<config-memory-keys>]
+
+activate:
+  initCopies: []
+\`\`\`
+
+## CRITICAL RULES
+
+1. **ZERO implementation code.** No function bodies, no ctx calls, no logic. Only signatures and schemas.
+2. **Use EXACT field names from sample responses.** If the API returns \`results\`, write \`results\` not \`companies\`. Copy the field names character-for-character from the sampleResponse.
+3. **Every action from the blueprint must appear.** Do not skip or rename actions.
+4. **Output schemas must match the actual API response structure**, not an idealized version.
+5. **Include sampleResponse verbatim** for every action that calls an external API — this is used for validation.
+`;
+}
+
+/**
+ * Build skeleton prompt for data cortex.
+ */
+export function buildDataCortexSkeletonPrompt({ label, description, blueprint, blueprintComponent, extensionSkeleton, extensionProbes }) {
+  return `${INSTRUCTION_DISCLAIMER}
+# Task: Generate Data Cortex Skeleton
+
+You are generating a SKELETON for an AIMEAT data cortex. A data cortex wraps extension actions into clean JavaScript methods. No UI, no rendering — pure data access.
+
+## Project
+${description}
+
+## Component
+Label: ${label}
+Type: Data Cortex (browser-side IIFE)
+
+## Extension It Wraps
+${extensionSkeleton || 'No extension skeleton available.'}
+
+## Extension Probe Results (Real API Responses)
+${extensionProbes ? Object.entries(extensionProbes).map(([action, result]) => `### ${action}\n\`\`\`json\n${JSON.stringify(result, null, 2).slice(0, 1500)}\n\`\`\``).join('\n\n') : 'No probes available yet.'}
+
+## Output Format
+
+\`\`\`yaml
+component: data-cortex
+name: <kebab-case-name>
+extension: <extension-registered-as-name>
+
+methods:
+  - name: <camelCaseMethodName>
+    params: <JSON schema of parameters>
+    returns: <JSON schema of return value — use EXACT field names from probe results>
+    calls: <extension-action-id>
+  - name: <methodName>
+    returns: <schema>
+    reads: <memory-key>
+\`\`\`
+
+## CRITICAL RULES
+
+1. ZERO implementation code. Only method signatures and schemas.
+2. Return schemas MUST use exact field names from probe results, not invented names.
+3. Every extension action that downstream components need must have a corresponding method.
+`;
+}
+
+/**
+ * Build skeleton prompt for feature cortex.
+ */
+export function buildFeatureCortexSkeletonPrompt({ label, description, blueprint, blueprintComponent, dataCortexSkeleton, dataCortexProbes, interviewSpec }) {
+  const useCase = (interviewSpec?.useCases || []).find(uc =>
+    blueprintComponent.consumes?.some(c => c.includes(uc.name?.toLowerCase?.()))
+  ) || interviewSpec?.useCases?.[0];
+
+  const view = (interviewSpec?.views || []).find(v =>
+    v.name?.toLowerCase?.().includes(blueprintComponent.label?.toLowerCase?.())
+  ) || interviewSpec?.views?.[0];
+
+  return `${INSTRUCTION_DISCLAIMER}
+# Task: Generate Feature Cortex Skeleton
+
+You are generating a SKELETON for an AIMEAT feature cortex. A feature cortex combines data access + UI rendering for one use case. It exports a \`render(container)\` function.
+
+## Project
+${description}
+
+## Component
+Label: ${label}
+Type: Feature Cortex (browser-side IIFE)
+
+## Use Case
+${useCase ? JSON.stringify(useCase, null, 2) : 'Not specified.'}
+
+## View Definition
+${view ? JSON.stringify(view, null, 2) : 'Not specified.'}
+
+## Data Cortex API (upstream)
+${dataCortexSkeleton || 'No data cortex skeleton available.'}
+
+## Data Cortex Probe Results (Real Return Values)
+${dataCortexProbes ? Object.entries(dataCortexProbes).map(([method, result]) => `### ${method}\n\`\`\`json\n${JSON.stringify(result, null, 2).slice(0, 1000)}\n\`\`\``).join('\n\n') : 'No probes available yet.'}
+
+## Output Format
+
+\`\`\`yaml
+component: feature-cortex
+name: <kebab-case-name>
+useCase: "<use case description>"
+view: <view-id>
+
+dataCortex: <data-cortex-name>
+
+sections:
+  - id: <section-id>
+    description: "<what this section renders>"
+    uses:
+      data: [<dataCortexMethodNames>]
+      ui: [<PlatformUIComponents>]
+    translationKeys: [<key1>, <key2>]
+
+exports:
+  - name: render
+    params: { container: HTMLElement }
+\`\`\`
+
+## CRITICAL RULES
+
+1. ZERO implementation code. Only section definitions and dependencies.
+2. Each section should be a self-contained UI area (e.g., search form, results table, detail card).
+3. Translation keys must follow the project's flat dot-notation pattern.
+`;
+}
+
+/**
+ * Build skeleton prompt for app-domain cortex.
+ */
+export function buildAppDomainCortexSkeletonPrompt({ label, description, featureCortexSkeletons, featureCortexProbes }) {
+  return `${INSTRUCTION_DISCLAIMER}
+# Task: Generate App-Domain Cortex Skeleton
+
+You are generating a SKELETON for an AIMEAT app-domain cortex. This is the composition layer: it combines all feature cortex components + auth + i18n + settings.
+
+## Project
+${description}
+
+## Feature Cortex Components
+${featureCortexSkeletons?.map((s, i) => `### Feature ${i + 1}\n${s}`).join('\n\n') || 'No feature cortex skeletons available.'}
+
+## Output Format
+
+\`\`\`yaml
+component: app-domain-cortex
+name: <kebab-case-name>
+
+features:
+  - cortex: <feature-cortex-name>
+    renderTarget: "#<container-id>"
+
+exports:
+  - name: init
+    description: "Auth check, load locale, apply settings"
+  - name: render
+    params: { container: HTMLElement }
+    description: "Render tab navigation, mount features"
+  - name: t
+    params: { key: string }
+    returns: string
+  - name: switchLocale
+    params: { locale: string }
+  - name: getTranslations
+    returns: object
+\`\`\`
+
+## CRITICAL RULES
+
+1. ZERO implementation code.
+2. List ALL feature cortex components that will be composed.
+3. Export names must be exactly: init, render, t, switchLocale, getTranslations.
+`;
+}
+
+/**
+ * Build skeleton prompt for app.
+ */
+export function buildAppSkeletonPrompt({ label, description, blueprint, interviewSpec, appDomainCortexSkeleton, appDomainCortexProbe }) {
+  const views = interviewSpec?.views || [];
+  const style = interviewSpec?.style || {};
+
+  return `${INSTRUCTION_DISCLAIMER}
+# Task: Generate App Skeleton
+
+You are generating a SKELETON for an AIMEAT app. An app is an HTML page that loads the app-domain cortex and renders feature cortex components into containers.
+
+## Project
+${description}
+
+## Views
+${views.map(v => `- ${v.name}: ${v.description || ''}`).join('\n') || 'Not specified.'}
+
+## Style Preferences
+${JSON.stringify(style, null, 2)}
+
+## App-Domain Cortex API
+${appDomainCortexSkeleton || 'Not available.'}
+
+## App-Domain Cortex Probe (Real API Surface)
+${appDomainCortexProbe ? JSON.stringify(appDomainCortexProbe, null, 2).slice(0, 2000) : 'Not available.'}
+
+## Output Format
+
+\`\`\`yaml
+component: app
+name: <App Display Name>
+version: 1.0.0
+
+cortex: <app-domain-cortex-name>
+
+views:
+  - id: <view-id>
+    tab: <translation-key-for-tab-label>
+    feature: <feature-cortex-name>
+    layout: "<layout description>"
+
+navigation: tabs
+auth: required
+locales: [fi, en]
+defaultLocale: fi
+\`\`\`
+
+## CRITICAL RULES
+
+1. ZERO implementation code. Only view definitions and layout descriptions.
+2. Every view from the interview spec must appear.
+3. Tab labels must use translation keys, not hardcoded text.
+`;
 }
