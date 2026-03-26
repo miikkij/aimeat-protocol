@@ -8,7 +8,9 @@
 
 AIMEAT is an open protocol for AI agent infrastructure. A node running AIMEAT provides:
 
-### Platform Libraries (always available, loaded via `<script>`)
+### Available Libraries (usable by any client-side code — cortex or app)
+
+**Core platform libraries** (loaded via `<script src="/v1/libs/...">`)
 | Library | Namespace | What it does |
 |---------|-----------|-------------|
 | aimeat-auth | AIMEAT.auth | Identity, session, login UI, JWT lifecycle, Ed25519 key management |
@@ -19,7 +21,7 @@ AIMEAT is an open protocol for AI agent infrastructure. A node running AIMEAT pr
 | aimeat-work | AIMEAT.work | Actions & work: catalogue, request, inbox, accept, deliver, rate |
 | aimeat-tunnel | AIMEAT.tunnel | Personal node tunnel: WebSocket, heartbeat, mailbox sync |
 
-### Platform Cortex Libraries (pre-installed, loaded via `<script>`)
+**Pre-installed cortex libraries** (loaded via `<script src="/v1/cortex/...">`)
 | Library | Namespace | What it does |
 |---------|-----------|-------------|
 | aimeat-ui-nav | AIMEAT['aimeat-ui-nav'] | Tabs, Breadcrumbs, Sidebar, BottomNav, BurgerMenu |
@@ -30,7 +32,7 @@ AIMEAT is an open protocol for AI agent infrastructure. A node running AIMEAT pr
 | aimeat-charts | AIMEAT.charts | ChartPanel, ChartBuilder (Chart.js wrapper) |
 | aimeat-canvas | AIMEAT.canvas | DrawingCanvas (pen, shapes, text, export) |
 
-Platform cortex libraries register with **kebab-case names**: `AIMEAT['aimeat-ui-nav'].Tabs(...)`, not camelCase.
+All of these are available to both cortex libraries and apps. A cortex can use AIMEAT.data to read/write memory, AIMEAT.storage to upload files, AIMEAT.social to create board posts, and aimeat-ui-viewers to render a DataTable — all in the same library.
 
 ---
 
@@ -53,7 +55,9 @@ Platform cortex libraries register with **kebab-case names**: `AIMEAT['aimeat-ui
 ```
 User Interview
     ↓
-Blueprint (defines components + order + dependencies)
+Blueprint
+    ↓
+(see Section 3b for full blueprint details)
     ↓
 ┌──────────────────────────────────────────────────┐
 │  DEFINE PHASE                                      │
@@ -106,6 +110,35 @@ Blueprint (defines components + order + dependencies)
 │     - Tested via browser (user journey)            │
 └──────────────────────────────────────────────────┘
 ```
+
+---
+
+## 3b. Blueprint — What It Does
+
+The blueprint translates user requirements into a technical architecture. It receives the interview spec + list of available cortex libraries on the node, and produces:
+
+**Component list** — each with ID, type, label, produces, consumes. Every data need is matched by a producer.
+
+**Data pipeline verification** — for each view in the interview, traces the data path: what fields the view needs → where each field comes from (external API, computed, user input) → which component produces it. If a field has no path from source to view, the blueprint adds a component to fill the gap.
+
+**Data model** — JSON Schema for every memory key in the project. Single source of truth. Each entry has: type/properties (JSON Schema), source (static/external/computed/config), producedBy (one component), consumedBy (array of components).
+
+**Cortex-modular architecture** — structures the service in layers:
+1. Extensions at the bottom (external data, scheduling)
+2. Data cortex (unifies extension data + AIMEAT platform data into single interface)
+3. Feature cortex components (self-contained data+UI per use case)
+4. App-domain cortex (composes all features + auth + translations)
+5. App (thin shell)
+
+**Extension vs cortex decision** — applies the rule: does this need the server (external API, cron, server-to-server)? If yes → extension. If no → cortex or app. Reading/writing AIMEAT memory, file uploads, board posts, wallet operations, data transformation, UI rendering → all cortex.
+
+**Available libraries** — queries what cortex libraries are installed on the node (aimeat-charts, aimeat-ui-nav, etc.) and lists their APIs so components can reference them in `uses` fields.
+
+**Phase ordering** — define → seed → capability → cortex (data first, then features, then app-domain) → app.
+
+**Test scenarios** — per component, with concrete inputs, expected outputs, and type classification (memory vs external-api).
+
+**Settings** — inherited from interview spec. Service-level (shared) and user-level (per-user) settings with types, labels, defaults.
 
 ---
 
