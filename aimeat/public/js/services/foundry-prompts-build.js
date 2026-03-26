@@ -15,6 +15,11 @@
  *     buildSkeletonPrompt (dispatcher), buildExtensionSkeletonPrompt,
  *     buildDataCortexSkeletonPrompt, buildFeatureCortexSkeletonPrompt,
  *     buildAppDomainCortexSkeletonPrompt, buildAppSkeletonPrompt
+ *   v3.0.0 — 2026-03-26 — Add unit fill + assembly prompt builders:
+ *     buildExtensionUnitPrompt, buildCortexMethodUnitPrompt,
+ *     buildFeatureCortexSectionPrompt, buildAppViewUnitPrompt,
+ *     buildExtensionAssemblyPrompt, buildCortexAssemblyPrompt,
+ *     buildAppAssemblyPrompt
  */
 
 import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER, COMPONENT_TEMPLATES, EXTENSION_CONSUMPTION_RULES, summarizeExtensionApi, summarizeCortexApi } from './foundry-prompts-base.js';
@@ -1394,5 +1399,440 @@ defaultLocale: fi
 1. ZERO implementation code. Only view definitions and layout descriptions.
 2. Every view from the interview spec must appear.
 3. Tab labels must use translation keys, not hardcoded text.
+`;
+}
+
+/* ── Unit Fill Prompt Builders (Multi-Pass Pipeline) ──── */
+
+/**
+ * Build prompt for implementing a single extension action.
+ * Produces just the handler function body — no manifest, no boilerplate.
+ */
+export function buildExtensionUnitPrompt({ skeleton, unitDef, dataSources, testExcerpt }) {
+  // Pick only the sandbox APIs this action needs
+  const apis = [];
+  if (unitDef.dataSource) apis.push('ctx.fetch(url, { method, headers, body }) → { status, ok, text, headers }. Body is always .text (string) — parse with JSON.parse(resp.text).');
+  if (unitDef.reads?.length || unitDef.writes?.length) {
+    apis.push('ctx.memory.get(key) → value|null. ctx.memory.set(key, value). ctx.memory.search(prefix) → Array<{key,value}>. ctx.memory.delete(key) → boolean.');
+    apis.push('ctx.memory.getPublic(namespace, key) → value|null. Use for owner data: ctx.memory.getPublic(ctx.caller.gaii, key).');
+  }
+  if (unitDef.schedule) apis.push('Scheduled actions run automatically via cron. The handler receives empty input and ctx.');
+
+  // Find the relevant data source
+  const ds = dataSources?.find(d => unitDef.dataSource && d.url === unitDef.dataSource);
+
+  return `${INSTRUCTION_DISCLAIMER}
+# Task: Implement Extension Action — \`${unitDef.id}\`
+
+You are implementing ONE action handler for an AIMEAT extension. Return ONLY the function body.
+
+## Skeleton (full contract — do not deviate)
+\`\`\`yaml
+${typeof skeleton === 'string' ? skeleton : JSON.stringify(skeleton, null, 2)}
+\`\`\`
+
+## This Action's Contract
+- **ID:** ${unitDef.id}
+- **Method:** ${unitDef.method || 'POST'}
+- **Path:** ${unitDef.path || '/' + unitDef.id}
+- **Input:** \`${JSON.stringify(unitDef.input || {})}\`
+- **Output:** \`${JSON.stringify(unitDef.output || {})}\`
+${unitDef.reads?.length ? `- **Reads:** ${unitDef.reads.join(', ')}` : ''}
+${unitDef.writes?.length ? `- **Writes:** ${unitDef.writes.join(', ')}` : ''}
+${unitDef.schedule ? `- **Schedule:** ${unitDef.schedule}` : ''}
+${unitDef.notes ? `- **Notes:** ${unitDef.notes}` : ''}
+${ds ? `
+## Data Source
+- **URL:** ${ds.url}
+- **Sample Response:**
+\`\`\`
+${typeof ds.sampleResponse === 'string' ? ds.sampleResponse.slice(0, 2000) : JSON.stringify(ds.sampleResponse, null, 2).slice(0, 2000)}
+\`\`\`
+${ds.notes ? `- **Notes:** ${ds.notes}` : ''}` : ''}
+
+## Sandbox API (ONLY these — nothing else exists)
+${apis.map(a => `- ${a}`).join('\n')}
+
+${testExcerpt ? `## Test Excerpt (your code must pass this)\n\`\`\`\n${testExcerpt.slice(0, 1500)}\n\`\`\`` : ''}
+
+## Anti-Pattern Checklist
+- NO global fetch — use ctx.fetch
+- NO require/import — sandbox is isolated
+- NO setTimeout/setInterval — not available
+- ALWAYS null-check ctx.memory.get results
+- ALWAYS JSON.parse(resp.text) for fetch responses
+- Use EXACT field names from sample response
+
+## Output Format
+
+Return ONLY the handler function. No YAML, no manifest, no exports:
+
+\`\`\`javascript
+async function handler(input, ctx) {
+  // your implementation here
+}
+\`\`\`
+`;
+}
+
+/**
+ * Build prompt for implementing a single cortex method (data or feature cortex).
+ * Produces just the method function — no IIFE wrapper, no registration.
+ */
+export function buildCortexMethodUnitPrompt({ skeleton, unitDef, extensionProbeResult, componentSubtype }) {
+  const isDataCortex = componentSubtype === 'data';
+
+  // Show the right pattern based on how the method accesses data
+  let accessPattern = '';
+  if (unitDef.calls) {
+    accessPattern = `
+## Extension Call Pattern
+\`\`\`javascript
+// callExt — ALL extension actions are POST, always
+const resp = await session.fetch('/v1/ext/<extension-name>/<action-id>', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(input)
+});
+// resp.data is already parsed JSON — do NOT call resp.json()
+const result = resp.data;
+\`\`\``;
+  } else if (unitDef.reads) {
+    accessPattern = `
+## Memory Read Pattern
+\`\`\`javascript
+const data = await AIMEAT.data.getPublic('ext:<extension-name>', '${unitDef.reads}');
+// ALWAYS null-check: data may be null on first run
+\`\`\``;
+  }
+
+  return `${INSTRUCTION_DISCLAIMER}
+# Task: Implement Cortex Method — \`${unitDef.name}\`
+
+You are implementing ONE method for an AIMEAT ${isDataCortex ? 'data' : 'feature'} cortex. Return ONLY the function.
+
+## Skeleton (full contract)
+\`\`\`yaml
+${typeof skeleton === 'string' ? skeleton : JSON.stringify(skeleton, null, 2)}
+\`\`\`
+
+## This Method's Contract
+- **Name:** ${unitDef.name}
+- **Params:** \`${JSON.stringify(unitDef.params || {})}\`
+- **Returns:** \`${JSON.stringify(unitDef.returns || {})}\`
+${unitDef.calls ? `- **Calls extension action:** ${unitDef.calls}` : ''}
+${unitDef.reads ? `- **Reads memory key:** ${unitDef.reads}` : ''}
+${accessPattern}
+${extensionProbeResult ? `
+## Extension Probe Result (real data — match this shape)
+\`\`\`json
+${JSON.stringify(extensionProbeResult, null, 2).slice(0, 2000)}
+\`\`\`` : ''}
+
+## Output Format
+
+Return ONLY the method function:
+
+\`\`\`javascript
+async function ${unitDef.name}(${unitDef.params ? Object.keys(unitDef.params).join(', ') : ''}) {
+  // your implementation here
+}
+\`\`\`
+`;
+}
+
+/**
+ * Build prompt for implementing a single feature cortex UI section.
+ * Produces the section's render function — one self-contained UI area.
+ */
+export function buildFeatureCortexSectionPrompt({ skeleton, sectionDef, dataCortexProbe, platformUiExample, translationKeys }) {
+  // Show only the platform UI components this section uses
+  let uiExampleText = '';
+  if (platformUiExample && sectionDef.uses?.ui?.length) {
+    uiExampleText = `
+## Platform UI Components (only the ones this section uses)
+${sectionDef.uses.ui.map(comp => {
+    const example = platformUiExample[comp];
+    return example ? `### ${comp}\n\`\`\`javascript\n${example}\n\`\`\`` : `### ${comp}\n(no example available)`;
+  }).join('\n\n')}`;
+  }
+
+  return `${INSTRUCTION_DISCLAIMER}
+# Task: Implement Feature Cortex Section — \`${sectionDef.id}\`
+
+You are implementing ONE UI section for a feature cortex. Return ONLY the section render function.
+
+## Skeleton (full contract)
+\`\`\`yaml
+${typeof skeleton === 'string' ? skeleton : JSON.stringify(skeleton, null, 2)}
+\`\`\`
+
+## This Section's Definition
+- **ID:** ${sectionDef.id}
+- **Description:** ${sectionDef.description || ''}
+- **Data methods used:** ${sectionDef.uses?.data?.join(', ') || 'none'}
+- **UI components used:** ${sectionDef.uses?.ui?.join(', ') || 'none'}
+- **Translation keys:** ${(sectionDef.translationKeys || []).join(', ') || 'none'}
+${dataCortexProbe ? `
+## Data Cortex Probe Results (real data for the methods this section uses)
+${Object.entries(dataCortexProbe).filter(([method]) => sectionDef.uses?.data?.includes(method)).map(([method, result]) => `### ${method}()\n\`\`\`json\n${JSON.stringify(result, null, 2).slice(0, 1000)}\n\`\`\``).join('\n\n')}` : ''}
+${uiExampleText}
+
+## Translation Helper Pattern
+\`\`\`javascript
+// t() is available in scope — use for all user-visible text
+const label = t('${(translationKeys || [])[0] || 'section.title'}');
+\`\`\`
+
+## Output Format
+
+Return ONLY the section render function:
+
+\`\`\`javascript
+function render${sectionDef.id.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join('')}(container, { dataCortex, t }) {
+  // your implementation here
+}
+\`\`\`
+`;
+}
+
+/**
+ * Build prompt for implementing a single app view.
+ * Produces the view's HTML fragment + mount function.
+ */
+export function buildAppViewUnitPrompt({ skeleton, viewDef, featureCortexRenderSpec, translationKeys }) {
+  return `${INSTRUCTION_DISCLAIMER}
+# Task: Implement App View — \`${viewDef.id}\`
+
+You are implementing ONE view for an AIMEAT app. Return the view HTML + mount function.
+
+## Skeleton (full contract)
+\`\`\`yaml
+${typeof skeleton === 'string' ? skeleton : JSON.stringify(skeleton, null, 2)}
+\`\`\`
+
+## This View's Definition
+- **ID:** ${viewDef.id}
+- **Tab label key:** ${viewDef.tab || viewDef.id}
+- **Feature cortex:** ${viewDef.feature || 'none'}
+- **Layout:** ${viewDef.layout || 'default'}
+${translationKeys?.length ? `- **Translation keys:** ${translationKeys.join(', ')}` : ''}
+${featureCortexRenderSpec ? `
+## Feature Cortex Render Spec
+The feature cortex exposes \`render(container)\`. Call it to render the feature into the view container.
+\`\`\`
+${typeof featureCortexRenderSpec === 'string' ? featureCortexRenderSpec.slice(0, 1500) : JSON.stringify(featureCortexRenderSpec, null, 2).slice(0, 1500)}
+\`\`\`` : ''}
+
+## Output Format
+
+Return the view HTML and mount function:
+
+\`\`\`html
+<!-- View: ${viewDef.id} -->
+<div id="view-${viewDef.id}" class="app-view" style="display:none;">
+  <!-- view content -->
+</div>
+\`\`\`
+
+\`\`\`javascript
+function mount${viewDef.id.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join('')}(container, { cortex, t }) {
+  // mount feature cortex into container
+}
+\`\`\`
+`;
+}
+
+/* ── Assembly Prompt Builders (Multi-Pass Pipeline) ──── */
+
+/**
+ * Combine extension skeleton + all unit implementations into final YAML manifest + JS actions.
+ * Assembly is mechanical — no new logic, just combining pieces.
+ */
+export function buildExtensionAssemblyPrompt({ skeleton, units, label }) {
+  return `${INSTRUCTION_DISCLAIMER}
+# Task: Assemble Extension — ${label}
+
+You are ASSEMBLING a complete AIMEAT extension from a skeleton and pre-built unit implementations. This is MECHANICAL assembly — do NOT modify the unit implementations.
+
+## Skeleton (the contract)
+\`\`\`yaml
+${typeof skeleton === 'string' ? skeleton : JSON.stringify(skeleton, null, 2)}
+\`\`\`
+
+## Unit Implementations
+${units.map((u, i) => `### Action: ${u.id} (unit ${i + 1})\n\`\`\`javascript\n${u.code}\n\`\`\``).join('\n\n')}
+
+## Output Format
+
+Produce the complete extension: YAML manifest first, then fenced JS blocks per action.
+
+\`\`\`yaml
+apiVersion: extensions.aimeat.org/v1
+kind: Extension
+metadata:
+  name: <kebab-case-name>
+  version: "1.0.0"
+  description: "<from skeleton>"
+actions:
+  - id: <action-id>
+    display_name: "<label>"
+    description: "<from skeleton>"
+    input: <schema>
+    output: <schema>
+    script: <action-id>.js
+# ... repeat for each action
+schedules: # if any
+  - id: <schedule-id>
+    action: <action-id>
+    cron: "<expression>"
+config: # if any
+  <key>:
+    type: <type>
+\`\`\`
+
+Then one fenced JS block per action:
+
+\`\`\`javascript
+// <action-id>.js
+async function handler(input, ctx) {
+  // EXACT code from the unit implementation above — do NOT modify
+}
+\`\`\`
+
+## CRITICAL RULES
+
+1. **Do NOT modify the unit implementations.** Copy each handler function exactly as provided.
+2. **Use action IDs, schemas, and config from the skeleton.** Do not rename or reorder.
+3. **Every action in the skeleton must appear in the manifest AND have a JS block.**
+4. **Assembly is mechanical.** You are combining pieces, not generating new logic.
+`;
+}
+
+/**
+ * Combine cortex skeleton + all unit implementations into final cortex YAML manifest + JS IIFE.
+ */
+export function buildCortexAssemblyPrompt({ skeleton, units, label, subtype }) {
+  const subtypeLabel = subtype === 'data' ? 'Data Cortex' : subtype === 'feature' ? 'Feature Cortex' : 'App-Domain Cortex';
+
+  return `${INSTRUCTION_DISCLAIMER}
+# Task: Assemble ${subtypeLabel} — ${label}
+
+You are ASSEMBLING a complete AIMEAT cortex library from a skeleton and pre-built unit implementations. This is MECHANICAL assembly — do NOT modify the unit implementations.
+
+## Skeleton (the contract)
+\`\`\`yaml
+${typeof skeleton === 'string' ? skeleton : JSON.stringify(skeleton, null, 2)}
+\`\`\`
+
+## Unit Implementations
+${units.map((u, i) => `### ${u.name || u.id} (unit ${i + 1})\n\`\`\`javascript\n${u.code}\n\`\`\``).join('\n\n')}
+
+## Output Format
+
+Produce the complete cortex: YAML manifest block, then the JS IIFE.
+
+\`\`\`yaml
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: <kebab-case-name>
+  version: "1.0.0"
+  description: "<from skeleton>"
+components:
+  - type: lib
+    filename: <name>.js
+    exports: [<method-names>]
+\`\`\`
+
+\`\`\`javascript
+// <name>.js — ${subtypeLabel} IIFE
+(function() {
+  'use strict';
+  const LIB_NAME = '<camelCaseName>';
+
+  // --- Unit implementations (copied exactly) ---
+  // PASTE each unit function here WITHOUT modification
+
+  // --- Registration ---
+  const exports = { /* all public method names */ };
+  if (!window.AIMEAT) window.AIMEAT = {};
+  window.AIMEAT[LIB_NAME] = exports;
+})();
+\`\`\`
+
+## CRITICAL RULES
+
+1. **Do NOT modify the unit implementations.** Copy each function exactly as provided.
+2. **YAML metadata.name (kebab-case) and JS LIB_NAME (camelCase) must correspond.**
+3. **Every method from the skeleton must appear in the exports object.**
+4. **Assembly is mechanical.** Combine pieces, don't generate new logic.
+`;
+}
+
+/**
+ * Combine app skeleton + all view unit implementations into complete HTML document.
+ */
+export function buildAppAssemblyPrompt({ skeleton, units, label, appDomainCortexName, designSystem }) {
+  return `${INSTRUCTION_DISCLAIMER}
+# Task: Assemble App — ${label}
+
+You are ASSEMBLING a complete AIMEAT app HTML document from a skeleton and pre-built view implementations. This is MECHANICAL assembly — do NOT modify the unit implementations.
+
+## Skeleton (the contract)
+\`\`\`yaml
+${typeof skeleton === 'string' ? skeleton : JSON.stringify(skeleton, null, 2)}
+\`\`\`
+
+## View Implementations
+${units.map((u, i) => `### View: ${u.id} (unit ${i + 1})\n**HTML:**\n\`\`\`html\n${u.html || ''}\n\`\`\`\n**JS:**\n\`\`\`javascript\n${u.code || ''}\n\`\`\``).join('\n\n')}
+
+## App-Domain Cortex
+Name: ${appDomainCortexName || '<from skeleton>'}
+${designSystem ? `\n## Design System\n${designSystem}` : ''}
+
+## Output Format
+
+Produce the complete HTML document:
+
+\`\`\`html
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${label}</title>
+  <!-- AIMEAT App Manifest -->
+  <meta name="aimeat-app" content="true">
+  <style>
+    /* App styles — layout, navigation, responsive */
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <!-- View containers (from unit HTML — copy exactly) -->
+
+  <script src="/v1/cortex/${appDomainCortexName || 'app-domain'}/libs/${appDomainCortexName || 'app-domain'}.js"></script>
+  <script>
+    // Boot sequence
+    (async function() {
+      const cortex = AIMEAT['<camelCaseName>'];
+      await cortex.init();
+
+      // Mount views (from unit JS — copy exactly)
+
+      // Tab navigation wiring
+    })();
+  </script>
+</body>
+</html>
+\`\`\`
+
+## CRITICAL RULES
+
+1. **Do NOT modify the view unit implementations.** Copy HTML and JS exactly as provided.
+2. **Load the app-domain cortex via script tag** before the boot script.
+3. **Every view from the skeleton must appear as a tab/page.**
+4. **Assembly is mechanical.** Combine the pieces into one HTML document.
 `;
 }
