@@ -478,6 +478,39 @@ everyone via \`getPublic('ext:{name}', key)\`.
 ${HTML_ENTITY_RULES}`,
 
   app: (label, context, completedComponents) => {
+    // Extract translation keys from completed translation components
+    const translationComponents = (completedComponents || []).filter(c => c.type === 'translation');
+    let translationKeysSection = '';
+    if (translationComponents.length > 0) {
+      const allKeys = new Set();
+      for (const tc of translationComponents) {
+        try {
+          const parsed = typeof tc.result === 'string' ? JSON.parse(tc.result) : tc.result;
+          // Translation result is { "fi": { "key": "value" } } or { "en": { ... } }
+          const locale = Object.keys(parsed || {})[0];
+          if (locale && parsed[locale]) {
+            for (const key of Object.keys(parsed[locale])) allKeys.add(key);
+          }
+        } catch { /* skip unparseable */ }
+      }
+      if (allKeys.size > 0) {
+        const sorted = [...allKeys].sort();
+        translationKeysSection = `
+## AVAILABLE TRANSLATION KEYS (from registered translation components — use EXACTLY these)
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  Your app MUST use these EXACT keys when calling t(key, translations). ║
+║  Do NOT invent your own keys like "field.name" or "detail.addresses".  ║
+║  The translation components have ALREADY defined these keys.           ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+${sorted.map(k => '- `' + k + '`').join('\n')}
+
+Total: ${sorted.length} keys available. If you need a label, find the closest matching key from this list.
+`;
+      }
+    }
+
     // Check if any cortex libraries are in completed components
     const cortexComponents = (completedComponents || []).filter(c => c.type === 'cortex');
     const hasCortex = cortexComponents.length > 0;
@@ -607,6 +640,7 @@ ${hasCortex ? '\n' + cortexScriptLoads : ''}
 boot();
 \`\`\`
 
+${translationKeysSection}
 ${hasCortex ? cortexInstructions : `### AIMEAT.data API (memory read/write — handles auth and envelope automatically):
 \\\`\\\`\\\`javascript
 // Read YOUR OWN memory key — returns the stored value directly, or null
@@ -757,6 +791,34 @@ Reserve space for it in your layout — do not overlap or hide it:
 - Has a clean, responsive UI with good mobile support
 - Use CSS custom properties for theming where possible
 ${hasCortex ? '- Call cortex init() on app start — it handles everything automatically\n- Focus on UX/UI — the cortex handles data access and initialization' : ''}
+
+## CRITICAL: Rendering API Data — Handle Nested Objects
+
+API responses often contain nested objects instead of plain strings. For example:
+- \`businessId: { value: "3323553-5", registrationDate: "2022-11-07" }\` — access \`.value\`
+- \`euId: { value: "FIFPRO.3323553-5", source: "1" }\` — access \`.value\`
+- \`website: { url: "www.example.com", registrationDate: "..." }\` — access \`.url\`
+- \`names: [{ name: "Company Oy", type: "1" }]\` — access \`[0].name\`
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  NEVER render an object directly as text — it will show [object Object] ║
+║  ALWAYS check: if (typeof val === 'object' && val !== null)             ║
+║  Then access the appropriate sub-field (.value, .url, .name, etc.)      ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+Helper pattern:
+\\\`\\\`\\\`javascript
+function displayValue(val) {
+  if (val == null) return '-';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (val.value) return val.value;  // { value: "..." } pattern
+  if (val.url) return val.url;      // { url: "..." } pattern
+  if (val.name) return val.name;    // { name: "..." } pattern
+  if (Array.isArray(val)) return val.map(displayValue).join(', ');
+  return JSON.stringify(val);        // last resort — never [object Object]
+}
+\\\`\\\`\\\`
 
 ## CRITICAL: Empty-State Handling
 
