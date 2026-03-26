@@ -13,6 +13,7 @@
  *   import { buildFixPrompt, buildImpactPrompt, buildEditPrompt } from '/js/services/foundry-prompts-fix.js';
  * @version-history
  *   v1.0.0 — 2026-03-22 — Extracted from foundry-prompts.js
+ *   v1.1.0 — 2026-03-26 — Add buildFoundryReflectionPrompt for multi-pass pipeline
  */
 
 import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER, NAMESPACE_RULES, SANDBOX_CONSTRAINTS, EXTENSION_CONSUMPTION_RULES, HTML_ENTITY_RULES } from './foundry-prompts-base.js';
@@ -312,4 +313,96 @@ ${upstreamSection}
 - If the change request is unclear, make the minimal change that addresses it
 
 Return the complete modified ${typeLabel} — not a diff, not a partial snippet.`;
+}
+
+/* ── Foundry Reflection Prompt (Multi-Pass Pipeline) ──── */
+
+/**
+ * Build a strategic failure diagnosis prompt for the multi-pass foundry pipeline.
+ * Unlike buildReflectionPrompt (which diagnoses a single component fix), this handles
+ * pipeline-level failures: which pass failed, what upstream data looked like, and what
+ * the prescription should be (retry, modify skeleton, regenerate, escalate).
+ */
+export function buildFoundryReflectionPrompt({ skeleton, testCode, failedOutput, errors, failedPass, reflectionHistory, upstreamProbes }) {
+  // Truncate long values to keep prompt within budget
+  const skeletonText = typeof skeleton === 'string' ? skeleton : JSON.stringify(skeleton, null, 2);
+  const testTruncated = (testCode || '').slice(0, 3000);
+  const outputTruncated = (failedOutput || '').slice(0, 5000);
+
+  // Build reflection history section — show COMPLETE history
+  let historySection = '';
+  if (reflectionHistory && reflectionHistory.length > 0) {
+    historySection = '\n## Previous Attempts (COMPLETE history — study carefully)\n\n';
+    for (const entry of reflectionHistory) {
+      historySection += `### Attempt ${entry.attempt}\n`;
+      historySection += `- **Trigger:** ${entry.trigger || 'unknown'}\n`;
+      historySection += `- **Diagnosis:** ${entry.diagnosis || 'none'}\n`;
+      historySection += `- **Root cause:** ${entry.rootCause || 'unknown'}\n`;
+      historySection += `- **Prescription:** ${entry.prescription || 'none'}\n`;
+      historySection += `- **Outcome:** ${entry.outcome || 'unknown'}\n\n`;
+    }
+    historySection += `You are now on attempt ${reflectionHistory.length + 1}.\n`;
+  }
+
+  // Build upstream probes section
+  let probesSection = '';
+  if (upstreamProbes && Object.keys(upstreamProbes).length > 0) {
+    probesSection = '\n## Upstream Probe Results (real data from earlier passes)\n\n';
+    for (const [name, result] of Object.entries(upstreamProbes)) {
+      probesSection += `### ${name}\n\`\`\`json\n${JSON.stringify(result, null, 2).slice(0, 1500)}\n\`\`\`\n\n`;
+    }
+  }
+
+  return `${INSTRUCTION_DISCLAIMER}
+# Task: Diagnose Pipeline Failure
+
+You are a diagnostic agent for the AIMEAT foundry multi-pass pipeline. A pass has failed. Your job is to DIAGNOSE the root cause and PRESCRIBE a corrective action. Do NOT write code.
+
+## Skeleton (the contract)
+\`\`\`yaml
+${skeletonText}
+\`\`\`
+
+## Pre-Generated Tests (the target)
+\`\`\`
+${testTruncated}
+\`\`\`
+
+## What Failed
+- **Pass:** ${failedPass || 'unknown'}
+- **Errors:**
+${(errors || []).map((e, i) => `  ${i + 1}. ${e}`).join('\n')}
+
+## Failed Output (truncated)
+\`\`\`
+${outputTruncated}
+\`\`\`
+${probesSection}${historySection}
+## Your Task
+
+Analyze the failure and produce a YAML response with this EXACT structure:
+
+\`\`\`yaml
+diagnosis:
+  what_failed: "<which unit/pass/assembly step failed>"
+  why: "<1-2 sentences explaining the symptoms>"
+  root_cause: "<the fundamental reason — data shape mismatch? wrong API field? logic error? skeleton error?>"
+
+prescription:
+  action: <one of: retry_unit, modify_skeleton, modify_test, regenerate_unit, regenerate_assembly, escalate_to_user>
+  target: "<which specific unit/section/action to fix>"
+  change: "<exactly what to change — be specific>"
+  context_for_next_pass: "<any context the next pass needs to succeed>"
+
+history_note: "<1 sentence summary for the reflection log>"
+\`\`\`
+
+## Rules
+
+1. **Never prescribe the same action+target twice.** Check the previous attempts above. If "retry_unit" on "fetch-data" already failed, try "modify_skeleton" or "regenerate_unit" instead.
+2. **Be specific.** "Fix the code" is not a prescription. "Change field name from 'results' to 'companies' in action fetch-data output schema" is.
+3. **Trace the data path.** If a downstream unit fails, check whether upstream probe data matches what the skeleton promised.
+4. **Escalate early.** If 3+ attempts have failed on the same target, prescribe "escalate_to_user" — the human needs to intervene.
+5. **Do NOT write code.** Diagnosis and prescription only.
+`;
 }
