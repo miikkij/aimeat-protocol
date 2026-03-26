@@ -25,8 +25,7 @@ export { buildDataCortexPrompt } from './generator-prompts-cortex-data.js';
 export { buildFeatureCortexPrompt } from './generator-prompts-cortex-feature.js';
 export { buildAppDomainCortexPrompt } from './generator-prompts-cortex-app.js';
 export { createBundle, formatBundleForPrompt, formatBundlesForPrompt } from './generator-context-bundle.js';
-// V5 utility modules (browser-only — safe to re-export since this hub is frontend-only)
-export { verifyContract } from './generator-contract.js';
-export { smokeTest } from './generator-smoke.js';
-export { validateSpecQuality } from './generator-validate.js';
-export { reconcileProbe } from './generator-probe-reconcile.js';
+// V5 utility modules — browser-only (use browser-path imports like /lib/yaml.mjs, /js/api.js)
+// NOT re-exported here because this hub is imported server-side by src/routes/generator.ts.
+// Import directly in browser code: ./generator-contract.js, ./generator-smoke.js,
+// ./generator-validate.js, ./generator-probe-reconcile.js
