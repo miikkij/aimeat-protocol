@@ -52,65 +52,103 @@ All of these are available to both cortex libraries and apps. A cortex can use A
 
 ## 3. How Components Relate
 
-```
-User Interview
-    ↓
-Blueprint
-    ↓
-(see Section 3b for full blueprint details)
-    ↓
-┌──────────────────────────────────────────────────┐
-│  DEFINE PHASE                                      │
-│  CSM — data schema + service identity              │
-│  MSM — external API contracts (paired w/ extension)│
-├──────────────────────────────────────────────────┤
-│  SEED PHASE                                        │
-│  Memory — default settings, seed data              │
-│  Translation FI — all UI text in Finnish           │
-│  Translation EN — same keys, English               │
-│  (Storage — initial files/assets, if needed)       │
-├──────────────────────────────────────────────────┤
-│  CAPABILITY PHASE                                  │
-│  Extension — external API calls, scheduling,       │
-│              background processing                  │
-├──────────────────────────────────────────────────┤
-│  CORTEX PHASE (layered)                            │
-│                                                    │
-│  1. Data cortex (prh-data)                         │
-│     - Wraps extension for external data            │
-│     - Uses AIMEAT.data for internal data           │
-│     - Provides data repository for all other       │
-│       cortex components                            │
-│     - Tested independently                         │
-│                                                    │
-│  2. Feature cortex components (prh-search,         │
-│     prh-settings, prh-comparison, etc.)            │
-│     - Each is a use case from the interview        │
-│     - Uses data cortex for data access             │
-│     - Uses platform UI cortex libs for rendering   │
-│     - Uses AIMEAT platform libs as needed          │
-│     - Includes both data handling AND UI rendering │
-│     - Self-contained: exports render(container)    │
-│     - Tested independently                         │
-│                                                    │
-│  3. App-domain cortex (prh-app-cortex)             │
-│     - Composes all feature cortex components       │
-│     - Adds auth, init, translations                │
-│     - Adds any other installed cortex libs needed  │
-│     - Single entry point for the app               │
-│     - Tested independently                         │
-│                                                    │
-├──────────────────────────────────────────────────┤
-│  APP PHASE                                         │
-│  App — thin UI shell                               │
-│     - Loads app-domain cortex                      │
-│     - Wires up navigation (tabs/routes)            │
-│     - Calls cortex to render each view             │
-│     - Handles responsive layout                    │
-│     - Handles mobile + desktop                     │
-│     - Tested via browser (user journey)            │
-└──────────────────────────────────────────────────┘
-```
+### Phase 0: Interview → Specification
+
+**Requires:** User's description of what they want
+**Produces:** Structured JSON specification
+**Success:** All use cases captured, data sources verified with real sample data, views defined
+
+### Phase 1: Specification → Blueprint
+
+**Requires:** Interview spec + list of active cortex libraries on the node
+**Produces:** Blueprint JSON with components, phases, structures, memoryKeys, actions, test scenarios
+**Success:** Every view's data needs traced to a producer. Structures built from real sampleEntry data. All action inputs/outputs defined with $ref.
+
+### Phase 2: DEFINE
+
+#### 2a. CSM
+**Requires from blueprint:** `structures` (raw source data fields only), service name
+**Requires from interview:** `description`, `locale`
+**Produces:** Registered CSM with data schema and service identity
+**Success:** Validation passes, registered on node
+**Tests:** None (CSM is declarative)
+
+#### 2b. MSM (if external API needs auth)
+**Requires from interview:** `dataSources[]` (URLs, auth type), `externalServices[]` (credentials)
+**Produces:** Registered MSM with API contract
+**Success:** Validation passes, registered on node
+**Tests:** None (MSM is declarative)
+
+### Phase 3: SEED
+
+#### 3a. Memory
+**Requires from blueprint:** `memoryKeys` entries where `producedBy` matches this component, with $ref to structures
+**Requires from interview:** `userSettings[]` with defaults
+**Produces:** Memory keys with initial values
+**Success:** Validation passes, registered, keys readable via API
+**Tests:** None (static seed data)
+
+#### 3b. Translation FI
+**Requires from interview:** `useCases[]`, `views[]` (to know what text is needed)
+**Requires from blueprint:** `structures` property names (for field labels)
+**Produces:** JSON with `"fi"` root key, flat dot-namespaced keys
+**Success:** Validation passes, registered, 50+ keys covering all views and use cases
+**Tests:** None (static content)
+
+#### 3c. Translation EN
+**Requires:** Same as FI, PLUS the registered FI component's actual key list
+**Produces:** JSON with `"en"` root key, exact same keys as FI
+**Success:** Validation passes, registered, key list matches FI 1:1
+**Tests:** None (static content)
+
+### Phase 4: CAPABILITY
+
+#### 4a. Extension
+**Requires from blueprint:** `actions` section (ext:* entries with input/output $ref), `structures`, `memoryKeys` it produces, `schedules`
+**Requires from interview:** `dataSources[]` (URLs, response envelopes, sample entries)
+**Requires from MSM:** API contract (if paired)
+**Requires from previous:** Registered CSM name, registered memory key names
+**Produces:** Registered and activated extension with all actions working
+**Success:** Validation passes → contract verification passes (all blueprint action IDs exist in manifest) → registered → activated → @activate init runs → **mandatory probe all actions** → golden samples captured
+**Tests:** Server-side tests generated from blueprint `actions` definitions + golden samples. Tests verify action return shapes match structures.
+
+### Phase 5: CORTEX (layered — must be in order)
+
+#### 5a. Data Cortex
+**Requires from blueprint:** `actions` (cortex-data entries with $ref), `structures` it returns, `memoryKeys` it reads
+**Requires from extension:** `registeredAs` name, probe golden samples (actual return data)
+**Requires from node:** Available AIMEAT platform libraries (data, storage, social, wallet)
+**Produces:** Registered cortex library exporting data access methods
+**Success:** Validation passes → contract verification (all declared methods exist in exports) → registered → **mandatory probe** (load in browser, call each method, capture actual returns)
+**Tests:** Browser tests verifying each method returns data matching structures. Integration test: data cortex calls extension action → response shape matches.
+
+#### 5b. Feature Cortex (one per use case group)
+**Requires from interview:** The specific `useCases[]` entry + matching `views[]` entry (type, interactions, description)
+**Requires from data cortex:** Probe results (actual method names and return shapes)
+**Requires from blueprint:** `structures` for data this feature handles, `uses` (platform UI cortex libraries)
+**Requires from translations:** Registered translation keys relevant to this feature
+**Requires from node:** Platform UI cortex library APIs with working code examples
+**Produces:** Registered cortex library exporting `render(container)` function
+**Success:** Validation passes → contract verification → registered → **mandatory probe** (load in browser, call render(container), verify DOM elements created)
+**Tests:** Browser tests verifying render() creates expected DOM, data displays correctly, interactions work.
+
+#### 5c. App-Domain Cortex
+**Requires from feature cortex:** All registered feature cortex probe results (method names, render functions)
+**Requires from blueprint:** App component's `consumes[]`
+**Requires from node:** AIMEAT.auth pattern, other installed cortex libraries
+**Produces:** Registered cortex library composing all features + auth + i18n
+**Success:** Validation passes → contract verification → registered → **mandatory probe** (verify init works, all feature renders accessible, translations load)
+**Tests:** Browser tests verifying composition: auth initializes, translations load, each feature render() is callable.
+
+### Phase 6: APP
+
+#### 6a. App
+**Requires from interview:** `useCases[]` (drives navigation), `views[]` (drives layout), `style` (mood, layout, responsive)
+**Requires from app-domain cortex:** Probe results (actual API surface)
+**Requires from translations:** App-level keys only (tab names, page titles)
+**Produces:** Registered HTML app
+**Success:** Validation passes → registered → **browser test** (navigate all views, complete all use cases, verify translations, verify responsive, verify no JS errors)
+**Tests:** Browser user journey test covering every use case from the interview.
 
 ---
 
