@@ -664,7 +664,7 @@ export function validateBlueprint(result) {
     const parsed = JSON.parse(json);
     if (!Array.isArray(parsed.components)) errors.push('Missing "components" array');
     else {
-      const allowedComponentKeys = new Set(['id', 'type', 'label', 'produces', 'consumes', 'schedules', 'uses', 'role']);
+      const allowedComponentKeys = new Set(['id', 'type', 'subtype', 'label', 'produces', 'consumes', 'schedules', 'uses', 'role']);
       parsed.components = parsed.components.map(c => {
         if (!c.id) errors.push(`Component missing "id" field`);
         if (!c.type) errors.push(`Component "${c.id || '?'}" missing "type" field`);
@@ -690,6 +690,7 @@ export function validateBlueprint(result) {
           warnings.push(`Component "${c.id || '?'}" had extra fields stripped: ${extraKeys.join(', ')}`);
         }
         const clean = { id: c.id, type: c.type, label: c.label };
+        if (typeof c.subtype === 'string' && c.type === 'cortex') clean.subtype = c.subtype;
         if (typeof c.role === 'string') clean.role = c.role;
         if (Array.isArray(c.produces)) clean.produces = c.produces;
         if (Array.isArray(c.consumes)) clean.consumes = c.consumes;
@@ -752,27 +753,61 @@ export function validateBlueprint(result) {
       });
     }
 
-    // Validate dataModel if present
+    // Validate dataModel if present — supports both old flat format and new structures/$ref format
     if (parsed.dataModel && typeof parsed.dataModel === 'object') {
       const componentIds = new Set((parsed.components || []).map(c => c.id));
-      for (const [key, schema] of Object.entries(parsed.dataModel)) {
-        if (!schema.type) warnings.push(`dataModel "${key}" missing "type"`);
-        if (!schema.source) warnings.push(`dataModel "${key}" missing "source"`);
-        if (!schema.producedBy) {
-          errors.push(`dataModel "${key}" missing "producedBy"`);
-        } else if (!componentIds.has(schema.producedBy)) {
-          errors.push(`dataModel "${key}" producedBy "${schema.producedBy}" does not match any component`);
+      const dm = parsed.dataModel;
+
+      // New format: has structures + memoryKeys + actions
+      if (dm.structures && typeof dm.structures === 'object') {
+        // Validate structures
+        for (const [name, struct] of Object.entries(dm.structures)) {
+          if (!struct.type) warnings.push(`structure "${name}" missing "type"`);
         }
-        if (!Array.isArray(schema.consumedBy) || schema.consumedBy.length === 0) {
-          warnings.push(`dataModel "${key}" has no consumers`);
-        } else {
-          for (const cid of schema.consumedBy) {
+        // Validate $ref references in memoryKeys
+        if (dm.memoryKeys && typeof dm.memoryKeys === 'object') {
+          for (const [key, schema] of Object.entries(dm.memoryKeys)) {
+            if (schema.$ref && !dm.structures[schema.$ref]) {
+              errors.push(`memoryKey "${key}" references unknown structure "${schema.$ref}"`);
+            }
+            if (schema.items?.$ref && !dm.structures[schema.items.$ref]) {
+              errors.push(`memoryKey "${key}" items references unknown structure "${schema.items.$ref}"`);
+            }
+            if (schema.producedBy && !componentIds.has(schema.producedBy)) {
+              errors.push(`memoryKey "${key}" producedBy "${schema.producedBy}" does not match any component`);
+            }
+          }
+        }
+        // Validate $ref references in actions
+        if (dm.actions && typeof dm.actions === 'object') {
+          for (const [name, action] of Object.entries(dm.actions)) {
+            if (action.output?.$ref && !dm.structures[action.output.$ref]) {
+              errors.push(`action "${name}" output references unknown structure "${action.output.$ref}"`);
+            }
+          }
+        }
+      } else {
+        // Old flat format — backward compatible
+        for (const [key, schema] of Object.entries(dm)) {
+          if (key === 'structures' || key === 'memoryKeys' || key === 'actions') continue;
+          if (!schema.type) warnings.push(`dataModel "${key}" missing "type"`);
+          if (!schema.source) warnings.push(`dataModel "${key}" missing "source"`);
+          if (!schema.producedBy) {
+            errors.push(`dataModel "${key}" missing "producedBy"`);
+          } else if (!componentIds.has(schema.producedBy)) {
+            errors.push(`dataModel "${key}" producedBy "${schema.producedBy}" does not match any component`);
+          }
+          if (!Array.isArray(schema.consumedBy) || schema.consumedBy.length === 0) {
+            warnings.push(`dataModel "${key}" has no consumers`);
+          } else {
+            for (const cid of schema.consumedBy) {
             if (!componentIds.has(cid)) {
               errors.push(`dataModel "${key}" consumedBy "${cid}" does not match any component`);
             }
           }
         }
       }
+      } // end old flat format else
     } else {
       warnings.push('Missing "dataModel" — downstream components will not have schema guidance');
     }

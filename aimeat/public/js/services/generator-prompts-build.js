@@ -72,48 +72,79 @@ The blueprint is a lightweight plan — actual content is generated later per co
 
 Format:
 {
+  "architecture": "cortex-modular",
   "components": [
     { "id": "csm-1", "type": "csm", "label": "Human-readable name", "produces": ["memory:service.schema"], "consumes": [] },
-    { "id": "memory-1", "type": "memory", "label": "Human-readable name", "produces": ["memory:lookup.data"], "consumes": [] },
-    { "id": "memory-2", "type": "memory", "label": "Human-readable name", "produces": ["memory:settings.config"], "consumes": [] },
-    { "id": "translation-1", "type": "translation", "label": "Human-readable name (locale)", "produces": ["memory:i18n.fi"], "consumes": [] },
-    { "id": "ext-1", "type": "extension", "label": "Human-readable name", "produces": ["memory:items.by-date.*", "memory:stats.daily.*"], "consumes": ["memory:lookup.data", "memory:settings.config"], "schedules": [{"action":"init","cron":"@activate"},{"action":"collect","cron":"*/15 * * * *"},{"action":"aggregate","cron":"0 2 * * *"}] },
-    { "id": "cortex-1", "type": "cortex", "label": "Human-readable name", "produces": ["api:getItems", "api:getStats", "api:getSettings"], "consumes": ["memory:items.by-date.*", "memory:lookup.data", "memory:settings.config", "memory:i18n.fi"] },
-    { "id": "app-1", "type": "app", "label": "Human-readable name", "produces": [], "consumes": ["api:getItems", "api:getStats", "api:getSettings"] }
+    { "id": "memory-1", "type": "memory", "label": "Human-readable name", "produces": ["memory:settings.config"], "consumes": [] },
+    { "id": "translation-1", "type": "translation", "label": "Human-readable name (fi)", "produces": ["memory:i18n.fi"], "consumes": [] },
+    { "id": "translation-2", "type": "translation", "label": "Human-readable name (en)", "produces": ["memory:i18n.en"], "consumes": [] },
+    { "id": "ext-1", "type": "extension", "label": "Human-readable name", "produces": ["memory:items.*"], "consumes": ["memory:settings.config"], "schedules": [{"action":"init","cron":"@activate"},{"action":"collect","cron":"0 2 * * *"}] },
+    { "id": "cortex-data", "type": "cortex", "subtype": "data", "label": "Data layer", "produces": ["api:getData", "api:search"], "consumes": ["memory:items.*", "memory:settings.config"], "uses": [] },
+    { "id": "cortex-feature-search", "type": "cortex", "subtype": "feature", "label": "Search feature", "produces": ["ui:searchView"], "consumes": ["api:getData", "api:search"], "uses": ["aimeat-ui-viewers", "aimeat-ui-forms"] },
+    { "id": "cortex-feature-settings", "type": "cortex", "subtype": "feature", "label": "Settings feature", "produces": ["ui:settingsView"], "consumes": ["api:getSettings", "api:saveSettings"], "uses": ["aimeat-ui-forms"] },
+    { "id": "cortex-app", "type": "cortex", "subtype": "app-domain", "label": "App domain", "produces": ["api:init", "api:render"], "consumes": ["ui:searchView", "ui:settingsView"], "uses": ["aimeat-ui-nav"] },
+    { "id": "app-1", "type": "app", "label": "Human-readable name", "produces": [], "consumes": ["api:init", "api:render"] }
   ],
   "phases": [
     { "id": "define", "label": "Define Service", "componentIds": ["csm-1"] },
-    { "id": "seed", "label": "Seed Data", "componentIds": ["memory-1", "memory-2", "translation-1"] },
-    { "id": "logic", "label": "Build Logic", "componentIds": ["ext-1"] },
-    { "id": "connect", "label": "Connect & Integrate", "componentIds": ["cortex-1"] },
-    { "id": "ui", "label": "Build UI", "componentIds": ["app-1"] }
+    { "id": "seed", "label": "Seed Data", "componentIds": ["memory-1", "translation-1", "translation-2"] },
+    { "id": "logic", "label": "Capabilities", "componentIds": ["ext-1"] },
+    { "id": "cortex-data", "label": "Data Layer", "componentIds": ["cortex-data"] },
+    { "id": "cortex-features", "label": "Feature Components", "componentIds": ["cortex-feature-search", "cortex-feature-settings"] },
+    { "id": "cortex-app", "label": "App Domain", "componentIds": ["cortex-app"] },
+    { "id": "ui", "label": "Application", "componentIds": ["app-1"] }
   ],
   "dataModel": {
-    "lookup.data": {
-      "type": "array",
-      "items": { "type": "object", "properties": { "key": { "type": "string" }, "value": { "type": "object" } } },
-      "source": "static",
-      "producedBy": "memory-1",
-      "consumedBy": ["ext-1", "cortex-1"]
+    "structures": {
+      "Item": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "status": { "type": "string" },
+          "createdAt": { "type": "string", "description": "ISO 8601" }
+        }
+      },
+      "SearchResult": {
+        "type": "object",
+        "properties": {
+          "totalResults": { "type": "number" },
+          "items": { "type": "array", "items": { "$ref": "Item" } }
+        }
+      }
     },
-    "settings.config": {
-      "type": "object",
-      "properties": { "refreshMinutes": { "type": "number" }, "defaultLocale": { "type": "string" } },
-      "source": "config",
-      "producedBy": "memory-2",
-      "consumedBy": ["ext-1", "cortex-1"]
+    "memoryKeys": {
+      "settings.config": {
+        "type": "object",
+        "properties": { "locale": { "type": "string" }, "refreshHours": { "type": "number" } },
+        "source": "config",
+        "producedBy": "memory-1",
+        "consumedBy": ["ext-1", "cortex-data"]
+      },
+      "items.data": {
+        "type": "array",
+        "items": { "$ref": "Item" },
+        "source": "external",
+        "producedBy": "ext-1",
+        "consumedBy": ["cortex-data"]
+      }
     },
-    "items.by-date.YYYY-MM-DD": {
-      "type": "array",
-      "items": { "type": "object", "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "timestamp": { "type": "string" } } },
-      "source": "external",
-      "producedBy": "ext-1",
-      "consumedBy": ["cortex-1"]
+    "actions": {
+      "ext:search": { "input": { "query": { "type": "string" } }, "output": { "$ref": "SearchResult" } },
+      "ext:getItem": { "input": { "id": { "type": "string" } }, "output": { "$ref": "Item" } },
+      "cortex:search": { "input": { "query": { "type": "string" } }, "output": { "$ref": "SearchResult" } },
+      "cortex:getItem": { "input": { "id": { "type": "string" } }, "output": { "$ref": "Item" } }
     }
   }
 }
 
-NOTE: The example above uses GENERIC placeholder names (lookup.data, items.by-date, etc.). Replace them with domain-specific names from YOUR project (e.g., products.catalog, events.by-date, sensors.readings). Do NOT copy these placeholder names.
+CRITICAL RULES for the data model:
+- Build "structures" from the interview's sampleEntry data — these are the REAL shapes from the verified API response.
+- Every memory key and every action input/output MUST use "$ref" to reference a structure. This prevents data shape drift between components.
+- Every "$ref" value MUST match a key in the "structures" object.
+- Extension actions and cortex actions that pass through the same data MUST reference the SAME structure.
+
+NOTE: The example above uses GENERIC placeholder names. Replace with domain-specific names from YOUR project. Do NOT copy these placeholder names.
 
 Rules:
 - Component types: csm, msm, extension, app, memory, translation, cortex
@@ -136,15 +167,17 @@ Rules:
 - "consumes": array of data inputs this component reads from
 - Group components into logical phases
 - Include ALL components needed for a complete, working service
-- Cortex components go in a "Connect & Integrate" phase AFTER translations, BEFORE app
-- Cortex libraries are client-side JS that wrap extension APIs into clean domain methods for the app
-- Default to ONE cortex per project unless complexity clearly warrants splitting
+- Cortex components are layered: data cortex phase → feature cortex phase → app-domain cortex phase → app phase
+- Data cortex: pure data access, wraps extension + AIMEAT platform libraries
+- Feature cortex: self-contained data+UI per use case, uses data cortex + platform UI cortex libraries
+- App-domain cortex: composes all features + auth + translations, entry point for app
+- ALWAYS create at least 3 cortex components: one data, one or more feature, one app-domain
 - Only include what's actually needed — don't pad with unnecessary components
 - TRANSLATIONS: Create ONE translation component PER locale. If the spec has locales ["fi", "en"], create translation-1 for fi AND translation-2 for en. NEVER combine multiple locales into one component.
 - MSM: Only create an MSM if the external API requires authentication, API keys, or complex endpoint configuration. Public URLs (RSS feeds, open APIs, open data) do NOT need an MSM — extensions fetch them directly with ctx.fetch().
 - MEMORY: Create memory components for (a) static/seed data provided by the user (lookup tables, reference datasets) and (b) default settings/configuration that the service needs on first run. Pre-populating defaults in memory means the app works immediately without hardcoded fallbacks.
 - MEMORY KEY NAMING: Use consistent namespace prefixes. Standard conventions: "settings.config" for config, "i18n.{locale}" for translations, descriptive namespace for domain data (e.g., "orders.by-date.*", "stats.daily.*", "scores.by-date.*"). Use dot-separated namespaces, not nested objects.
-- CORTEX: Cortex is the middleware between memory and apps. It wraps ALL memory access into clean domain methods: data queries, settings, i18n, computed values. Apps should NEVER read memory directly — they call cortex methods.
+- CORTEX: Cortex is the application's brain. It handles data access, UI rendering, business logic, and composition. It can use AIMEAT platform libraries (data, storage, social, wallet) directly. It can render UI components (like aimeat-charts renders charts). Apps use cortex for everything.
 
 ## dataModel — Domain Data Model (REQUIRED)
 
@@ -225,20 +258,17 @@ Place it in an early phase (before extensions that consume it).
 
 ## Cortex-Modular Architecture
 
-Structure the service using cortex layers, not monolithic apps:
+Structure the service using layered cortex components:
 
-1. **Extensions** at the bottom — fetch external data, handle storage
-2. **Data Cortex** — unifies extension data into a single interface. ALWAYS create when there are extensions.
-3. **UI Cortexes** — self-contained view components (list, detail, settings). Each is a complete functional unit like charts-cortex or drawing-board.
-4. **Admin Cortex** — only if adminAppRecommended in interview spec. Handles settings management, moderation.
-5. **App** — lightweight shell that composes cortexes. No heavy logic, just layout + cortex composition.
-6. **Admin App** — only if admin cortex exists. Uses type "app" with "role": "admin" in component metadata.
+1. **Extensions** at the bottom — external API calls, scheduled background jobs
+2. **Data Cortex** (subtype: "data") — unifies extension data + AIMEAT platform data into a single data access interface. ALWAYS create when there are extensions. Can also use AIMEAT.data, AIMEAT.storage, AIMEAT.social directly.
+3. **Feature Cortex** (subtype: "feature") — one per use case or feature group. Self-contained data+UI module. Uses data cortex for data, platform UI cortex libraries for rendering. Exports render(container). Like aimeat-charts which renders complete chart components.
+4. **App-Domain Cortex** (subtype: "app-domain") — composes all feature cortex components + auth + translations + settings. Single entry point for the app. ALWAYS the last cortex component.
+5. **App** — loads app-domain cortex, wires up navigation, handles responsive layout.
 
-Cortexes can use other cortexes. UI cortexes consume data cortex. Data cortex consumes extensions.
-
-IMPORTANT: Do NOT add user management — AIMEAT handles that already.
-
-Include "architecture": "cortex-modular" at the top level of the output JSON (alongside "components", "phases", "dataModel").
+Cortex components have a "subtype" field: "data", "feature", or "app-domain".
+Cortex phases are ordered: data first, then all features, then app-domain last.
+Feature cortex "uses" field lists platform cortex libraries it needs (aimeat-ui-viewers, aimeat-charts, etc.).
 
 ## Settings
 
