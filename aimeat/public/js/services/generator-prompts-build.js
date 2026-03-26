@@ -896,7 +896,7 @@ If these are missing, the app WILL crash with "getTranslations is not a function
       for (const libName of comp.uses) {
         const camelName = libName.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
         context += `- **${libName}**: Load via \`<script src="/v1/cortex/${libName}/libs/${libName}.js"></script>\`\n`;
-        context += `  Access via \`AIMEAT.${camelName}.*\`\n`;
+        context += `  Access via \`AIMEAT['${libName}'].*\`\n`;
         if (platformApis[libName]) {
           context += `  API: ${platformApis[libName]}\n`;
         }

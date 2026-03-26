@@ -610,14 +610,14 @@ These cortex libraries are pre-installed on every AIMEAT node. Load them via <sc
 <script src="/v1/cortex/aimeat-ui-dialogs/libs/aimeat-ui-dialogs.js"></script>
 \\\`\\\`\\\`
 
-**Navigation** — \\\`AIMEAT.aimeatUiNav\\\`:
+**Navigation** — \\\`AIMEAT['aimeat-ui-nav']\\\`:
 - \\\`Tabs(container, tabs, onSelect)\\\` — tabbed navigation (USE THIS for app tabs)
 - \\\`Breadcrumbs(container, items)\\\` — breadcrumb trail
 - \\\`Sidebar(container, items, onSelect)\\\` — sidebar navigation
 - \\\`BottomNav(container, items, onSelect)\\\` — mobile bottom navigation
 - \\\`BurgerMenu(container, items, onSelect)\\\` — hamburger menu
 
-**Layout** — \\\`AIMEAT.aimeatUiLayout\\\`:
+**Layout** — \\\`AIMEAT['aimeat-ui-layout']\\\`:
 - \\\`MainDetail(container, {main, detail})\\\` — list + detail split view
 - \\\`DashboardGrid(container, cards)\\\` — responsive card grid
 - \\\`Split(container, {left, right})\\\` — side-by-side panels
@@ -625,7 +625,7 @@ These cortex libraries are pre-installed on every AIMEAT node. Load them via <sc
 - \\\`Header(container, {title, actions})\\\` — page header
 - \\\`Footer(container, content)\\\` — page footer
 
-**Data Display** — \\\`AIMEAT.aimeatUiViewers\\\`:
+**Data Display** — \\\`AIMEAT['aimeat-ui-viewers']\\\`:
 - \\\`DataTable(container, {columns, rows, onRowClick})\\\` — sortable data table (USE THIS for search results, watchlist)
 - \\\`Timeline(container, events)\\\` — timeline view (USE THIS for change history)
 - \\\`Grid(container, items, renderItem)\\\` — responsive grid
@@ -633,14 +633,14 @@ These cortex libraries are pre-installed on every AIMEAT node. Load them via <sc
 - \\\`Gallery(container, images)\\\` — image gallery
 - \\\`Carousel(container, slides)\\\` — slideshow
 
-**Forms** — \\\`AIMEAT.aimeatUiForms\\\`:
+**Forms** — \\\`AIMEAT['aimeat-ui-forms']\\\`:
 - \\\`Input(container, {label, value, onChange})\\\` — text input
 - \\\`Select(container, {label, options, value, onChange})\\\` — dropdown select
 - \\\`Toggle(container, {label, checked, onChange})\\\` — on/off toggle
 - \\\`Checkbox(container, {label, checked, onChange})\\\` — checkbox
 - \\\`FormGroup(container, fields)\\\` — declarative form with validation
 
-**Dialogs** — \\\`AIMEAT.aimeatUiDialogs\\\`:
+**Dialogs** — \\\`AIMEAT['aimeat-ui-dialogs']\\\`:
 - \\\`toast(message, type)\\\` — toast notification (USE THIS, not alert())
 - \\\`Modal(container, {title, content, onClose})\\\` — modal dialog
 - \\\`Confirm({title, message, onConfirm})\\\` — confirmation dialog (USE THIS, not confirm())
