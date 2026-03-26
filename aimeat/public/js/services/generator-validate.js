@@ -653,6 +653,56 @@ export function validateInterviewSpec(result) {
   }
 }
 
+/* ── Spec Quality Gate ──────────────────────────────── */
+
+/**
+ * Check interview spec quality before proceeding to blueprint.
+ * No AI needed — just automated checks on the spec data.
+ */
+export function validateSpecQuality(spec) {
+  const warnings = [];
+  const errors = [];
+
+  if (!spec) { errors.push('No specification provided'); return { valid: false, errors, warnings }; }
+
+  // Use cases
+  if (!Array.isArray(spec.useCases) || spec.useCases.length < 2) {
+    warnings.push('Less than 2 use cases defined — consider adding more to get a useful application');
+  }
+
+  // Data sources
+  if (Array.isArray(spec.dataSources)) {
+    for (const ds of spec.dataSources) {
+      if (!ds.url && ds.type !== 'user-input') {
+        warnings.push(`Data source "${ds.name || ds.id}" has no URL`);
+      }
+      if (!ds.sampleEntry && ds.type !== 'user-input' && ds.fallback !== 'defer') {
+        warnings.push(`Data source "${ds.name || ds.id}" has no sampleEntry — structures will be guessed, not verified`);
+      }
+      if (ds.verified === false && !ds.fallback) {
+        errors.push(`Data source "${ds.name || ds.id}" is unverified and has no fallback strategy`);
+      }
+    }
+  }
+
+  // Views
+  if (!Array.isArray(spec.views) || spec.views.length === 0) {
+    warnings.push('No views defined — the blueprint will guess the UI layout');
+  }
+
+  // Locale
+  if (!spec.locale) {
+    warnings.push('No locale set — defaulting to English');
+  }
+
+  // Style
+  if (!spec.style) {
+    warnings.push('No style preferences — the app will use default layout');
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
+}
+
 /* ── Blueprint Validator ─────────────────────────────── */
 
 export function validateBlueprint(result) {
