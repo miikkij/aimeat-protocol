@@ -432,7 +432,7 @@ export function ComponentDetail({ component, project, components, projectId, int
     setTestResult(null);
     // Ensure settings are applied and extension/cortex is activated before testing
     if (component.type === 'extension') {
-      try { await apiPost(`/v1/generator/${projectId}/apply-settings/${encodeURIComponent(component.registeredAs)}`); } catch { /* */ }
+      try { await apiPost(`/v1/foundry/${projectId}/apply-settings/${encodeURIComponent(component.registeredAs)}`); } catch { /* */ }
     }
     if (component.type === 'extension' || component.type === 'cortex') {
       try {
@@ -473,7 +473,7 @@ export function ComponentDetail({ component, project, components, projectId, int
     setTestResult(null);
     // Ensure settings are applied and extension/cortex is activated before testing
     if (component.type === 'extension') {
-      try { await apiPost(`/v1/generator/${projectId}/apply-settings/${encodeURIComponent(component.registeredAs)}`); } catch { /* */ }
+      try { await apiPost(`/v1/foundry/${projectId}/apply-settings/${encodeURIComponent(component.registeredAs)}`); } catch { /* */ }
     }
     if (component.type === 'extension' || component.type === 'cortex') {
       try {

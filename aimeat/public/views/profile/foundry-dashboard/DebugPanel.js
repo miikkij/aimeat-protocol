@@ -37,7 +37,7 @@ export function DebugPanel({ projectId }) {
   async function loadFiles() {
     setLoading(true);
     try {
-      const resp = await apiGet(`/v1/generator/debug/${projectId}/files`);
+      const resp = await apiGet(`/v1/foundry/debug/${projectId}/files`);
       setFiles(resp?.data?.files || []);
     } catch {
       setFiles([]);
@@ -49,7 +49,7 @@ export function DebugPanel({ projectId }) {
     setSelectedFile(path);
     setLoadingFile(true);
     try {
-      const resp = await apiGet(`/v1/generator/debug/${projectId}/file?path=${encodeURIComponent(path)}`);
+      const resp = await apiGet(`/v1/foundry/debug/${projectId}/file?path=${encodeURIComponent(path)}`);
       setFileContent(resp?.data?.content || null);
     } catch {
       setFileContent('(Error loading file)');
@@ -60,7 +60,7 @@ export function DebugPanel({ projectId }) {
   async function handleDelete() {
     if (!confirm('Delete all debug data for this project?')) return;
     try {
-      await apiDelete(`/v1/generator/debug/${projectId}`);
+      await apiDelete(`/v1/foundry/debug/${projectId}`);
       setFiles([]);
       setSelectedFile(null);
       setFileContent(null);
@@ -93,7 +93,7 @@ export function DebugPanel({ projectId }) {
 
       for (const f of sorted) {
         try {
-          const resp = await apiGet(`/v1/generator/debug/${projectId}/file?path=${encodeURIComponent(f)}`);
+          const resp = await apiGet(`/v1/foundry/debug/${projectId}/file?path=${encodeURIComponent(f)}`);
           const content = resp?.data?.content || '(empty)';
           parts.push(`${'='.repeat(60)}`);
           parts.push(`FILE: ${f}`);

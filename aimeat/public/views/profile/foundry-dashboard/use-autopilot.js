@@ -214,7 +214,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
         if ((comp.type === 'extension' || comp.type === 'cortex') && updated.registeredAs) {
           if (comp.type === 'extension') {
             try {
-              await apiPost(`/v1/generator/${projectId}/apply-settings/${encodeURIComponent(updated.registeredAs)}`);
+              await apiPost(`/v1/foundry/${projectId}/apply-settings/${encodeURIComponent(updated.registeredAs)}`);
               await writeProjectLog(projectId, 'settings_applied', { meta: { component: comp.label, registeredAs: updated.registeredAs, by: 'autopilot' } });
             } catch (e) {
               await writeProjectLog(projectId, 'settings_apply_failed', { meta: { component: comp.label, error: e.message, by: 'autopilot' } });
@@ -441,7 +441,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
                     await writeProjectLog(projectId, 'test_fix_reregistered', { meta: { component: comp.label, round: fix + 1, by: 'autopilot' } });
 
                     if (comp.type === 'extension') {
-                      await apiPost(`/v1/generator/${projectId}/apply-settings/${encodeURIComponent(updated.registeredAs)}`);
+                      await apiPost(`/v1/foundry/${projectId}/apply-settings/${encodeURIComponent(updated.registeredAs)}`);
                     }
                     if (comp.type === 'extension' || comp.type === 'cortex') {
                       const actUrl = comp.type === 'extension'

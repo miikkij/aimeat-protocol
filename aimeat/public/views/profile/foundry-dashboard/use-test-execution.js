@@ -94,7 +94,7 @@ export function useTestExecution(core, projectId, orSettings, session, showToast
 
       // Ensure settings are applied and extension/cortex is activated before testing
       if (comp.type === 'extension') {
-        try { await apiPost(`/v1/generator/${projectId}/apply-settings/${encodeURIComponent(comp.registeredAs)}`); } catch { /* */ }
+        try { await apiPost(`/v1/foundry/${projectId}/apply-settings/${encodeURIComponent(comp.registeredAs)}`); } catch { /* */ }
       }
       if (comp.type === 'extension' || comp.type === 'cortex') {
         try {

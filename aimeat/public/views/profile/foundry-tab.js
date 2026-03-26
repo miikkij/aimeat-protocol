@@ -482,7 +482,7 @@ export default function FoundryTab({ session, showToast }) {
   useEffect(() => {
     apiGet('/?format=json').then(resp => {
       const cfg = resp?.data?.config || resp?.data || {};
-      if (cfg.generator?.enabled === false || cfg.generatorEnabled === false) {
+      if (cfg.foundry?.enabled === false || cfg.foundryEnabled === false) {
         setFoundryEnabled(false);
       }
     }).catch(() => {});
