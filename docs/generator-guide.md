@@ -501,6 +501,61 @@ After all components are registered, the app is tested in a browser:
 
 10. **The interview spec is the source of truth.** Use cases, views, style, data sources — everything traces back to what the user said they wanted.
 
+11. **Prompts define goals, not procedures.** Give the AI the scope (what component), the frame (what structures, what libraries are available), and the goal (what this component must achieve). Let the AI figure out the implementation details. Over-specifying with rigid rules produces worse results than a clear goal with room to move.
+
+12. **Services can exist without extensions.** A personal notes app, a board-based discussion, a settings dashboard — these only need cortex + AIMEAT platform libraries. The blueprint should recognize when no external API is needed and skip the extension phase entirely.
+
+---
+
+## 8b. Additional Patterns
+
+### Translation Interpolation
+
+The `t()` function returns raw strings like `"Löytyi ${count} yritystä"`. Something must replace `${count}` with the actual value. The cortex or app needs an interpolation helper:
+
+```javascript
+function t(key, translations, vars) {
+  var str = /* flat key lookup, then dot-path */;
+  if (vars && typeof str === 'string') {
+    Object.keys(vars).forEach(function(k) {
+      str = str.replace('${' + k + '}', vars[k]);
+    });
+  }
+  return str;
+}
+
+// Usage: t('search.results.count', translations, { count: 5 })
+// → "Löytyi 5 yritystä"
+```
+
+This belongs in the cortex `t()` implementation. The translation prompt should document the `${variable}` convention and the cortex prompt should implement the interpolation.
+
+### No-Extension Services
+
+Some services use only AIMEAT internal capabilities:
+- Personal notes → AIMEAT.data for storage, cortex for logic, app for UI
+- Discussion forum → AIMEAT.social for boards, cortex for presentation
+- File gallery → AIMEAT.storage for files, aimeat-ui-viewers for display
+- Dashboard → AIMEAT.data for memory reads, aimeat-charts for visualization
+
+For these, the blueprint produces no extension component. The data cortex uses AIMEAT platform libraries directly instead of wrapping extension actions. The pipeline skips Phase 4 (Capability) entirely.
+
+The blueprint prompt already has the scope assignment logic for this — it checks whether any requirement needs external APIs or scheduling. If none do, no extension is created.
+
+### Write Flows (User-Generated Content)
+
+Services where users create data (not just read):
+- User saves settings → cortex calls `AIMEAT.data.set('settings.config', {...})`
+- User uploads a file → cortex calls `AIMEAT.storage.upload(file)`
+- User posts to a board → cortex calls `AIMEAT.social.post(boardId, content)`
+- User adds to watchlist → cortex calls extension action (because it needs to fetch external data for the snapshot)
+
+The pattern: reads go through data cortex (which reads from extension memory or AIMEAT.data). Writes go through the appropriate layer — AIMEAT platform library for internal data, extension action for operations that need server-side execution.
+
+### Template Packaging
+
+After a service is working, it can be packaged as a template via the "Package as Template" button. This creates a reusable blueprint + component set that other users can install on their nodes. Templates include all component manifests, seed data, and translations — but not user-specific data or API keys.
+
 ---
 
 ## 9. User Journey — Step by Step
