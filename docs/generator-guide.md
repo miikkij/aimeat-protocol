@@ -645,6 +645,175 @@ Prioritized list of changes needed to make the generator work. Only items we can
   Generate from blueprint's produces/consumes graph.
   Files: `generator-prompts-test.js`, `generator-testing.js`
 
+---
+
+## 11. Failure Handling — What Happens When Things Go Wrong
+
+The happy path is: generate → validate → register → probe → test → next. But every step can fail. Here's what to do at each failure point.
+
+### 11.1 Validation Fails
+
+**What happened:** The generated code doesn't pass the validator (bad YAML, missing required fields, wrong structure, anti-patterns detected).
+
+**What the user sees:** Error messages listing what's wrong.
+
+**Remedy:**
+1. The generator builds a **fix prompt** automatically — it includes the original prompt + the generated result + the validation errors
+2. Click **"Copy Prompt"** — the fix prompt is now on clipboard
+3. Paste into AI Chat — the AI sees what went wrong and produces a corrected version
+4. Paste corrected result back → Validate again
+
+**Scope:** Only this component. Nothing downstream is affected because nothing was registered yet.
+
+**Max rounds:** 3 fix attempts. After 3 failures, the generator offers a **fresh generation prompt** — this discards all previous attempts and starts from scratch with a "KNOWN PITFALLS" section listing what went wrong. The AI gets a clean slate with lessons learned.
+
+### 11.2 Contract Verification Fails
+
+**What happened:** The component passed validation (valid syntax/structure) but doesn't match the blueprint contract. Example: blueprint says extension must have action `searchCompanies` but the generated YAML has `searchCompany` (singular).
+
+**What the user sees:** Contract mismatch errors: "Blueprint declares action 'searchCompanies' but generated manifest has 'searchCompany'."
+
+**Remedy:**
+1. Same as validation failure — fix prompt includes the contract mismatches
+2. The fix prompt specifically says: "The blueprint contract requires these exact names: searchCompanies, getCompany, ..." and shows what was generated vs what was expected
+3. AI corrects the names/shapes → paste back → re-validate + re-verify contract
+
+**Scope:** Only this component. The contract is from the blueprint which is unchanged.
+
+### 11.3 Registration Fails
+
+**What happened:** The component passed validation and contract check, but the AIMEAT node rejected it. Common causes: name conflict (409), invalid manifest format the validator didn't catch (400), quota exceeded (413).
+
+**What the user sees:** Registration error from the API.
+
+**Remedy by error type:**
+
+| Error | Cause | Action |
+|-------|-------|--------|
+| 409 CONFLICT | Component with this name already exists | The generator auto-handles: deactivate → delete → re-register. If still fails, user must manually delete the old component via Extensions/Cortex tab |
+| 400 BAD REQUEST | Manifest has issues the validator missed | Treat as validation failure — fix prompt with the API error message |
+| 413 QUOTA EXCEEDED | Too many extensions/cortex installed | User must uninstall unused components first |
+| 500 SERVER ERROR | Server bug | Check server logs, restart server, retry |
+
+**Scope:** Only this component.
+
+### 11.4 Activation Fails
+
+**What happened:** Extension or cortex registered but activation failed. Usually means the init/@activate action crashed.
+
+**What the user sees:** Activation error, possibly with a stack trace.
+
+**Remedy:**
+1. Check server logs for the actual error (usually a runtime crash in the V8 sandbox)
+2. Common causes: `ctx.caller.gaii` not available, memory key doesn't exist yet, `JSON.parse` on already-parsed value, `URLSearchParams` used in V8 sandbox
+3. Fix prompt includes the activation error + the component code
+4. AI fixes the runtime error → paste back → re-validate → re-register → re-activate
+
+**Scope:** Only this component. But if the init action was supposed to copy shared data (translations, settings) to the extension namespace, downstream components (cortex, app) will also fail until init works.
+
+### 11.5 Probe Fails
+
+**What happened:** Component is registered and active, but when probed with test inputs, an action returns an error or unexpected data.
+
+**What the user sees:** Probe results showing which actions failed, with the error response or unexpected output.
+
+**Remedy:**
+1. Probe failure means the component's code has a runtime bug — it compiles but does the wrong thing
+2. Fix prompt includes: the action that failed, the input that was sent, the response that came back, and what was expected (from blueprint's action definitions with $ref structures)
+3. AI fixes the runtime bug → paste → re-validate → re-register → re-activate → re-probe
+
+**Scope:** This component + all downstream components that depend on it. If extension probe fails, data cortex prompt will lack golden samples. If data cortex probe fails, feature cortex won't have verified method signatures.
+
+**Important:** After a probe fix, all previously captured golden samples for this component must be refreshed. The generator should re-probe after re-registration.
+
+### 11.6 Test Fails
+
+**What happened:** Component is registered, activated, probed successfully, but the generated test code reports failures.
+
+**What the user sees:** Test results with errors and a diagnostic trace.
+
+**Two possible causes:**
+
+**A) The component is broken** (test correctly found a bug):
+1. The generator builds a **reflection prompt** — asks the AI to diagnose what went wrong without coding
+2. Click "Copy reflection prompt" → paste into AI Chat → AI explains the root cause
+3. The generator builds a **fix prompt** with: original prompt + component code + test errors + reflection diagnosis
+4. AI produces fixed component → paste → re-validate → re-register → re-probe → re-test
+
+**B) The test is broken** (component works, test has wrong expectations):
+1. If the probe passed but the test fails, the test likely has wrong assertions
+2. The generator can regenerate the test code using updated golden samples from the probe
+3. Click "Copy test prompt" → AI generates new test → paste → run test
+
+**How to tell A from B:** Compare probe results with test assertions. If the probe returned valid data but the test expected a different shape, the test is wrong. If the probe also returned unexpected data, the component is wrong.
+
+**Scope for A:** This component + downstream re-probe + re-test. Same as probe failure.
+**Scope for B:** Only the test code for this component. Nothing else changes.
+
+### 11.7 Browser Test Fails (App)
+
+**What happened:** All components registered and tested, but the app doesn't work in the browser. Missing tabs, broken search, [object Object], raw translation keys, JS errors.
+
+**What the user sees:** A broken app. Console errors. Missing functionality.
+
+**Diagnosis — trace the failure back to its source:**
+
+| Symptom | Likely cause | Fix scope |
+|---------|-------------|-----------|
+| No data / null responses | Data cortex or extension broken | Re-probe extension, then data cortex |
+| Wrong field names / [object Object] | Data shape mismatch — structure $ref not followed | Fix the component that returns wrong shape, re-register, re-probe downstream |
+| Raw translation keys showing | Translation keys don't match what app/cortex uses | Compare translation component keys with cortex/app usage, fix translations or cortex |
+| UI components don't render (Tabs, DataTable) | Platform UI library usage wrong | Fix the feature cortex or app that calls the library — need working examples |
+| JS errors in console | Runtime bug in app or cortex | Read the error, identify which component, fix prompt for that component |
+| Auth errors (401) | Server restarted, JWT expired | Re-login in the app — the auth library should handle this |
+
+**Remedy:**
+1. Identify which layer is broken (extension? data cortex? feature cortex? app?)
+2. Go back to that component in the generator sidebar
+3. Click it to see its current state
+4. Use the fix prompt with the browser error as context
+5. Re-register the fixed component
+6. Re-probe if it's extension or cortex
+7. Re-test
+8. Re-check browser
+
+**Scope:** The broken component + everything downstream. If you fix the data cortex, you may need to re-probe feature cortex components and re-register the app.
+
+### 11.8 Cascade Failures — When Fixing One Component Breaks Another
+
+**What happened:** You fixed extension's searchCompanies return shape, but now the data cortex that was built against the old shape breaks.
+
+**This is the most common and most expensive failure mode.**
+
+**Remedy:**
+1. After fixing any component, re-probe it to get fresh golden samples
+2. Check: do downstream components still reference the correct shapes? (Contract verification against updated probes)
+3. If downstream components reference the old shape, they need regeneration:
+   - Click the downstream component
+   - Click "Refresh prompt" — the prompt rebuilds with the updated context from the fixed component
+   - Click "Copy Prompt" → AI Chat → paste corrected version → validate → re-register → re-probe → re-test
+4. Continue down the dependency chain until all components pass
+
+**The dependency chain is always:** Extension → Data Cortex → Feature Cortex → App-Domain Cortex → App
+
+A fix at the extension level can cascade through everything. A fix at the app level affects only the app.
+
+**Prevention:** This is why structures + $ref and mandatory probes exist. If all components reference the same structure definition, and probes verify actual shapes match, cascade failures are caught early instead of at the app level.
+
+### 11.9 Summary: Failure → Prompt → Paste → Scope
+
+| Failure point | What prompt to copy | Where to paste the AI response | Scope of fix |
+|---------------|--------------------|---------------------------------|-------------|
+| Validation fails | Fix prompt (auto-generated) | Same component's Result textarea | This component only |
+| Contract fails | Fix prompt with contract mismatches | Same component's Result textarea | This component only |
+| Registration fails (409) | Auto-handled (deactivate+delete+retry) | — | This component only |
+| Registration fails (400) | Fix prompt with API error | Same component's Result textarea | This component only |
+| Probe fails | Fix prompt with probe error + expected shape | Same component's Result textarea → re-register | This component + re-probe downstream |
+| Test fails (component bug) | Reflection prompt → then fix prompt | Same component's Result textarea → re-register | This component + re-probe + re-test downstream |
+| Test fails (test bug) | Re-generated test prompt | Test code textarea → re-run test | Test code only |
+| Browser test fails | Fix prompt for the broken layer | That layer's Result textarea → re-register | Broken layer + everything downstream |
+| Cascade failure | Refresh prompt for downstream component | Downstream component's Result textarea → re-register | Each downstream component in dependency order |
+
 ### Excluded (cannot deliver now)
 
 | Item | Why excluded |
