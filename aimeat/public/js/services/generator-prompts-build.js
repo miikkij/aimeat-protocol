@@ -571,6 +571,30 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
     context += `\nBlueprint components: ${blueprint.components.map(c => `${c.id} (${c.type}: ${c.label})`).join(', ')}\n`;
   }
 
+  // Inject interview spec context for app and cortex — use cases, views, style
+  if (interviewSpec && (type === 'app' || type === 'cortex')) {
+    if (interviewSpec.useCases && interviewSpec.useCases.length > 0) {
+      context += '\n## USE CASES (from user interview — the app MUST support ALL of these)\n';
+      for (const uc of interviewSpec.useCases) {
+        context += `- **${uc.title || uc.id}** [${uc.priority || 'must-have'}]: ${uc.description}\n`;
+      }
+      context += '\n';
+    }
+    if (interviewSpec.views && interviewSpec.views.length > 0) {
+      context += '## VIEWS (from user interview — implement these as tabs/pages)\n';
+      for (const v of interviewSpec.views) {
+        context += `- **${v.title}** (${v.type}): ${v.description}`;
+        if (v.interactions?.length) context += ` — interactions: ${v.interactions.join(', ')}`;
+        context += '\n';
+      }
+      context += '\n';
+    }
+    if (interviewSpec.style) {
+      const s = interviewSpec.style;
+      context += `## STYLE: mood=${s.mood || 'professional'}, layout=${s.layout || 'tabbed'}, typography=${s.typography || 'standard'}\n\n`;
+    }
+  }
+
   // Inject relevant dataModel entries — the centralized data contract
   if (blueprint?.dataModel) {
     const componentId = blueprint.components?.find(c => c.label === label)?.id;
