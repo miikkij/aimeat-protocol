@@ -377,3 +377,109 @@ After all components are registered, the app is tested in a browser:
 9. **Prompts carry only what's needed.** Extension prompt knows about V8 sandbox and external APIs. App prompt knows about use cases and cortex API. No component sees information that belongs to another layer.
 
 10. **The interview spec is the source of truth.** Use cases, views, style, data sources — everything traces back to what the user said they wanted.
+
+---
+
+## 9. User Journey — Step by Step
+
+What the user does from clicking "+ New Project" to having a working, tested application. No "Run with AI" — manual copy-paste workflow.
+
+### 9.1 Create Project
+
+1. Click **"+ New Project"** in the Generator tab
+2. Type a description of what you want to build
+3. Click **"Analyze"**
+
+### 9.2 Interview
+
+1. The generator shows the **interview prompt** and a **"Copy Prompt"** button
+2. Click **"Copy Prompt"** — the interview prompt is copied to clipboard
+3. Open your AI Chat (Claude, ChatGPT, Gemini — any AI)
+4. Paste the prompt into the AI Chat
+5. The AI interviews you — asks about use cases, data sources, views, style, settings
+6. Answer the questions until the AI produces a **JSON specification**
+7. Copy the AI's final JSON response
+8. Back in the generator, paste it into the **"Step 2: Paste the JSON Specification"** textarea
+9. Click **"Import Specification"**
+
+### 9.3 Blueprint
+
+1. The generator shows the **blueprint prompt** and a **"Copy Prompt"** button
+2. Click **"Copy Prompt"**
+3. Paste into your AI Chat
+4. The AI analyzes the specification and produces a **JSON blueprint** (components, phases, data model, test scenarios)
+5. Copy the AI's response
+6. Paste into the **"Blueprint JSON"** textarea
+7. Click **"Import Blueprint"**
+
+### 9.4 Settings
+
+1. The generator shows any service settings that need initial values (from the interview)
+2. Review the defaults, adjust if needed
+3. Click **"Save and continue"**
+
+### 9.5 Component Generation (repeat for each component)
+
+The generator shows all components in the sidebar, organized by phase. The first component's prompt is already visible.
+
+**For each component (CSM, MSM, Memory, Translations, Extension, Cortex components, App):**
+
+1. The component's **prompt** is shown in the Prompt section
+2. Click **"Copy Prompt"**
+3. Paste into your AI Chat
+4. The AI generates the component (YAML, JSON, JS, or HTML depending on type)
+5. Copy the AI's response
+6. Paste into the **"Result"** textarea
+7. Click **"Validate"**
+   - If **validation passes**: a green checkmark appears and the **"Register"** button becomes active
+   - If **validation fails**: errors are shown. Click **"Copy Prompt"** again — the prompt now includes the errors as a fix prompt. Paste into AI Chat, get a corrected response, paste back, validate again. (Max 3 rounds before fresh regeneration.)
+8. Click **"Register"** — the component is installed on the node
+9. The generator auto-advances to the next component
+
+**For Extension — after registration:**
+
+10. The extension is activated automatically
+11. The **@activate** init job runs (copies shared data, initializes memory)
+
+**For each component with tests (Extension, Cortex, App):**
+
+12. After registration, a **"Copy test prompt"** button appears in the Test section
+13. Click **"Copy test prompt"**
+14. Paste into your AI Chat
+15. The AI generates test code
+16. Copy the test code
+17. Paste into the **test code textarea**
+18. Click **"Run Test"**
+    - If **test passes**: green checkmark, proceed to next component
+    - If **test fails**: errors and diagnostic trace are shown. The generator may show a **reflection prompt** — copy it, paste into AI Chat for diagnosis. Then use the fix prompt to correct the component or the test. Re-register if the component changed, re-run test.
+19. The generator auto-advances to the next component
+
+### 9.6 Extension Probing (between registration and testing)
+
+1. After the extension is registered and activated, the generator can **probe** each action
+2. Click **"Probe"** (if available) — this calls each extension action with test inputs from the blueprint
+3. The probe captures **golden samples** — real API responses with exact data shapes
+4. These golden samples are fed into the **test prompt** and **cortex prompt** so downstream components know the exact data they'll receive
+
+### 9.7 Final Browser Test (App)
+
+1. After all components are registered and tested, click **"Launch App"**
+2. The app opens in a new tab
+3. Walk through each use case from the interview:
+   - Search for the test company
+   - View company details
+   - Add to watchlist
+   - Check change history
+   - Compare companies
+   - Change settings
+   - Switch language
+4. Verify:
+   - All tabs/views are present
+   - Translations display correctly (no raw keys)
+   - Data loads and renders
+   - Responsive layout works (resize the window)
+   - No JavaScript errors in console
+
+### 9.8 Done
+
+The service is live. All components registered, tested, and working. The user can share the app URL or find it in the app catalog.
