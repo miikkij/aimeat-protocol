@@ -883,9 +883,23 @@ If these are missing, the app WILL crash with "getTranslations is not a function
       context += 'This cortex component should use the following existing cortex libraries.\n';
       context += 'Load them via `<script>` tags in the prompt component and call their API.\n';
       context += 'Do NOT reimplement their functionality.\n\n';
+      // Platform cortex library API reference
+      const platformApis = {
+        'aimeat-ui-nav': 'Tabs(container, tabs, onSelect), Breadcrumbs(container, items), Sidebar(container, items, onSelect), BottomNav(container, items, onSelect), BurgerMenu(container, items, onSelect)',
+        'aimeat-ui-layout': 'MainDetail(container, {main, detail}), DashboardGrid(container, cards), Split(container, {left, right}), Stacked(container, sections), Header(container, {title, actions}), Footer(container, content)',
+        'aimeat-ui-viewers': 'DataTable(container, {columns, rows, onRowClick}), Timeline(container, events), Grid(container, items, renderItem), List(container, items, renderItem), Gallery(container, images), Carousel(container, slides)',
+        'aimeat-ui-forms': 'Input(container, {label, value, onChange}), Select(container, {label, options, value, onChange}), Toggle(container, {label, checked, onChange}), Checkbox(container, {label, checked, onChange}), FormGroup(container, fields)',
+        'aimeat-ui-dialogs': 'toast(message, type), Modal(container, {title, content, onClose}), Confirm({title, message, onConfirm}), Alert({title, message}), ContextMenu(container, items), Dropdown(container, items)',
+        'aimeat-charts': 'ChartPanel(container, {type, data, options}), ChartBuilder(container, config), TYPES (bar, line, pie, doughnut, radar, scatter, bubble)',
+        'aimeat-canvas': 'DrawingCanvas(container, {width, height, tools, onSave})',
+      };
       for (const libName of comp.uses) {
+        const camelName = libName.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
         context += `- **${libName}**: Load via \`<script src="/v1/cortex/${libName}/libs/${libName}.js"></script>\`\n`;
-        context += `  Access via \`AIMEAT.${libName.replace(/-([a-z])/g, (_, c) => c.toUpperCase())}.*\`\n`;
+        context += `  Access via \`AIMEAT.${camelName}.*\`\n`;
+        if (platformApis[libName]) {
+          context += `  API: ${platformApis[libName]}\n`;
+        }
       }
       context += '\n';
     }
