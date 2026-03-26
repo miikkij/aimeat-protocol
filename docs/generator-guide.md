@@ -122,7 +122,69 @@ The blueprint translates user requirements into a technical architecture. It rec
 
 **Data pipeline verification** — for each view in the interview, traces the data path: what fields the view needs → where each field comes from (external API, computed, user input) → which component produces it. If a field has no path from source to view, the blueprint adds a component to fill the gap.
 
-**Data model** — JSON Schema for every memory key in the project. Single source of truth. Each entry has: type/properties (JSON Schema), source (static/external/computed/config), producedBy (one component), consumedBy (array of components).
+**Data model** — the single source of truth for all data shapes in the project. Has three parts:
+
+1. **Structures** — reusable data type definitions, defined once, referenced everywhere via `$ref`. Built from the interview's verified sample data (real API responses). Example:
+
+```json
+"structures": {
+  "Company": {
+    "type": "object",
+    "properties": {
+      "businessId": { "type": "object", "properties": { "value": { "type": "string" } } },
+      "names": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "type": { "type": "string" } } } },
+      "companyForm": { "type": "object" },
+      "mainBusinessLine": { "type": "object" },
+      "website": { "type": "object", "properties": { "url": { "type": "string" } } },
+      "addresses": { "type": "array" },
+      "registeredEntries": { "type": "array" },
+      "status": { "type": "string" },
+      "registrationDate": { "type": "string" },
+      "lastModified": { "type": "string" }
+    }
+  },
+  "WatchlistItem": {
+    "type": "object",
+    "properties": {
+      "businessId": { "type": "string" },
+      "companyName": { "type": "string" },
+      "addedAt": { "type": "string" },
+      "lastSnapshot": { "$ref": "Company" }
+    }
+  },
+  "SearchResult": {
+    "type": "object",
+    "properties": {
+      "totalResults": { "type": "number" },
+      "companies": { "type": "array", "items": { "$ref": "Company" } }
+    }
+  }
+}
+```
+
+2. **Memory keys** — what gets stored, referencing structures:
+
+```json
+"memoryKeys": {
+  "watchlist.items": { "type": "array", "items": { "$ref": "WatchlistItem" }, "producedBy": "ext-1", "consumedBy": ["cortex-data"] },
+  "companies.cache.BUSINESS_ID": { "$ref": "Company", "producedBy": "ext-1", "consumedBy": ["cortex-data"] },
+  "settings.config": { "type": "object", "properties": { "defaultLanguage": { "type": "string" } }, "producedBy": "memory-1", "consumedBy": ["ext-1", "cortex-data"] }
+}
+```
+
+3. **Actions** — what extension and cortex methods accept and return, referencing the same structures:
+
+```json
+"actions": {
+  "ext:searchCompanies": { "input": { "query": "string" }, "output": { "$ref": "SearchResult" } },
+  "ext:getCompany": { "input": { "businessId": "string" }, "output": { "$ref": "Company" } },
+  "ext:addToWatchlist": { "input": { "businessId": "string", "companyName": "string" }, "output": { "status": "string" } },
+  "cortex:searchCompanies": { "input": { "query": "string" }, "output": { "$ref": "SearchResult" } },
+  "cortex:getCompany": { "input": { "businessId": "string" }, "output": { "$ref": "Company" } }
+}
+```
+
+**Why `$ref`:** `Company` is defined once from the real PRH API sample entry. Every component that touches company data — extension stores it, cortex passes it, app renders it — references the same definition. No drift. If `businessId` is `{value: "3323553-5"}` in the structure, every component knows it's an object with a `.value` field, not a plain string.
 
 **Cortex-modular architecture** — structures the service in layers:
 1. Extensions at the bottom (external data, scheduling)
