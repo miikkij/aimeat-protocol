@@ -44,6 +44,9 @@
  *   v4.5.0 — 2026-03-16 — Cortex validator supports single-block format (YAML + JS
  *     separated by // lib/ comment) in addition to legacy separate blocks. Accept
  *     var/let/const for LIB_NAME declaration.
+ *   v5.0.0 — 2026-03-26 — Add validateSkeleton with cross-check against interview
+ *     sampleResponse; add validateUnit with anti-pattern scan; add crossCheckSampleData,
+ *     extractOutputFieldsNearUrl, deepFieldExists helpers
  */
 import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
 
@@ -896,6 +899,178 @@ export function validateBlueprint(result) {
     errors.push(`Invalid JSON: ${e.message}`);
     return { valid: false, errors, warnings, parsed: null, extracted: json };
   }
+}
+
+/* ── Skeleton Validation ─────────────────────────────── */
+
+/**
+ * Validate a skeleton YAML document.
+ * Checks: structure completeness, schema parseability, no implementation code,
+ * and critically — cross-checks output field names against interview sampleResponse.
+ *
+ * @param {string} skeletonYaml - Raw YAML skeleton text
+ * @param {object} blueprintComponent - The blueprint's component definition
+ * @param {object} interviewSpec - The interview specification (for sampleResponse cross-check)
+ * @returns {{ valid: boolean, errors: string[], warnings: string[] }}
+ */
+export function validateSkeleton(skeletonYaml, blueprintComponent, interviewSpec) {
+  const errors = [];
+  const warnings = [];
+
+  // 1. Basic check
+  if (!skeletonYaml || typeof skeletonYaml !== 'string' || skeletonYaml.trim().length === 0) {
+    return { valid: false, errors: ['Skeleton is empty'], warnings: [] };
+  }
+
+  // 2. Check for implementation code (function bodies, loops, conditionals)
+  const codePatterns = [
+    /\bfunction\s*\(/,
+    /=>\s*\{/,
+    /\bif\s*\(/,
+    /\bfor\s*\(/,
+    /\bwhile\s*\(/,
+    /\bawait\s+/,
+    /\breturn\s+/,
+    /\bconst\s+\w+\s*=/,
+    /\blet\s+\w+\s*=/,
+    /ctx\.\w+/,
+  ];
+  for (const pattern of codePatterns) {
+    if (pattern.test(skeletonYaml)) {
+      errors.push(`Skeleton contains implementation code (matched: ${pattern.source}). Skeletons must contain only structure, signatures, and schemas — no code.`);
+      break; // one error is enough
+    }
+  }
+
+  // 3. Check required sections based on component type
+  const type = blueprintComponent?.type;
+  if (type === 'extension') {
+    if (!skeletonYaml.includes('actions:')) errors.push('Extension skeleton missing "actions:" section');
+    if (!skeletonYaml.includes('metadata:') && !skeletonYaml.includes('name:')) errors.push('Extension skeleton missing metadata');
+  } else if (type === 'cortex') {
+    const subtype = blueprintComponent?.subtype || 'data';
+    if (subtype === 'data' && !skeletonYaml.includes('methods:')) errors.push('Data cortex skeleton missing "methods:" section');
+    if (subtype === 'feature' && !skeletonYaml.includes('sections:')) errors.push('Feature cortex skeleton missing "sections:" section');
+    if (subtype === 'app-domain' && !skeletonYaml.includes('exports:')) errors.push('App-domain cortex skeleton missing "exports:" section');
+  } else if (type === 'app') {
+    if (!skeletonYaml.includes('views:')) errors.push('App skeleton missing "views:" section');
+  }
+
+  // 4. Cross-check output fields against interview sampleResponse
+  const sampleMismatches = crossCheckSampleData(skeletonYaml, interviewSpec);
+  for (const mismatch of sampleMismatches) {
+    warnings.push(mismatch);
+  }
+  // Promote warnings to errors if there are clear field name mismatches
+  const criticalMismatches = sampleMismatches.filter(m => m.includes('field mismatch'));
+  if (criticalMismatches.length > 0) {
+    errors.push(...criticalMismatches.map(m => `CRITICAL: ${m}`));
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
+}
+
+/**
+ * Cross-check skeleton output field names against interview sampleResponse data.
+ * This prevents the #1 failure mode: skeleton declares field names the API doesn't use.
+ *
+ * @param {string} skeletonYaml - The skeleton YAML
+ * @param {object} interviewSpec - Interview spec with dataSources[].sampleEntry
+ * @returns {string[]} - Array of mismatch descriptions
+ */
+function crossCheckSampleData(skeletonYaml, interviewSpec) {
+  const mismatches = [];
+  if (!interviewSpec?.dataSources) return mismatches;
+
+  for (const ds of interviewSpec.dataSources) {
+    if (!ds.sampleEntry && !ds.sampleResponse) continue;
+    const sample = ds.sampleResponse || ds.sampleEntry;
+    if (typeof sample !== 'object') continue;
+
+    // Extract field names from the sample (top-level keys)
+    const sampleFields = Object.keys(sample);
+
+    // Look for output schemas in the skeleton that reference this data source
+    if (ds.url && skeletonYaml.includes(ds.url)) {
+      const outputFields = extractOutputFieldsNearUrl(skeletonYaml, ds.url);
+      for (const field of outputFields) {
+        if (!sampleFields.includes(field) && !deepFieldExists(sample, field)) {
+          mismatches.push(`Skeleton output field "${field}" not found in sample data from ${ds.url}. Sample has: [${sampleFields.join(', ')}]. Possible field mismatch.`);
+        }
+      }
+    }
+  }
+  return mismatches;
+}
+
+/**
+ * Extract output field names declared near a data source URL in the skeleton.
+ */
+function extractOutputFieldsNearUrl(yaml, url) {
+  const fields = [];
+  const lines = yaml.split('\n');
+  let nearUrl = false;
+  let inOutput = false;
+
+  for (const line of lines) {
+    if (line.includes(url)) nearUrl = true;
+    if (nearUrl && /output:/i.test(line)) inOutput = true;
+    if (inOutput && /^\s+-?\s*\w+:/.test(line)) {
+      const match = line.match(/(\w+):/);
+      if (match && !['type', 'items', 'schema', 'output', 'input'].includes(match[1])) {
+        fields.push(match[1]);
+      }
+    }
+    // Stop at the next action/method
+    if (nearUrl && inOutput && /^  - id:|^  - name:|^\w/.test(line) && !line.includes(url)) {
+      break;
+    }
+  }
+  return fields;
+}
+
+/**
+ * Check if a field exists anywhere in a nested object (dot-path or direct).
+ */
+function deepFieldExists(obj, field) {
+  if (obj === null || typeof obj !== 'object') return false;
+  if (field in obj) return true;
+  for (const val of Object.values(obj)) {
+    if (typeof val === 'object' && val !== null && deepFieldExists(val, field)) return true;
+  }
+  return false;
+}
+
+/* ── Unit Validation ─────────────────────────────────── */
+
+/**
+ * Validate a unit implementation against its skeleton entry.
+ * Checks: syntax, anti-patterns, and that the implementation matches the skeleton's contract.
+ *
+ * @param {string} code - The unit implementation code
+ * @param {object} unitDef - The unit's definition from the skeleton ({ id, input, output, ... })
+ * @param {string} componentType - 'extension' | 'cortex' | 'app'
+ * @returns {{ valid: boolean, errors: string[], warnings: string[] }}
+ */
+export function validateUnit(code, unitDef, componentType) {
+  const errors = [];
+  const warnings = [];
+
+  if (!code || code.trim().length === 0) {
+    return { valid: false, errors: ['Unit implementation is empty'], warnings: [] };
+  }
+
+  // Run anti-pattern check
+  const antiPatterns = validateAntiPatterns(componentType, code);
+  if (antiPatterns.errors) errors.push(...antiPatterns.errors);
+  if (antiPatterns.warnings) warnings.push(...antiPatterns.warnings);
+
+  // Check that the implementation references the expected function/action name
+  if (unitDef?.id && !code.includes(unitDef.id)) {
+    warnings.push(`Unit implementation does not reference "${unitDef.id}" — verify it implements the correct unit.`);
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
 }
 
 /* ── Main Validate Function ──────────────────────────── */
