@@ -26,17 +26,162 @@
  *   const autopilot = useAutopilot(core, autopilotState, projectId, orSettings, session, testExec, showToast);
  * @version-history
  *   v1.0.0 — 2026-03-22 — Extracted from foundry-tab.js ProjectDashboard
+ *   v2.0.0 — 2026-03-26 — Wire multi-pass flow: runComponentPasses for extension/cortex/app
  */
 import { t } from '/js/i18n.js';
 import { apiPost, apiDelete } from '/js/api.js';
 import {
   loadAllComponents, saveComponent, registerComponent, writeProjectLog, writeDebugArtifact,
+  MULTI_PASS_TYPES, createInitialPasses, createUnitPasses, getNextPass,
+  saveSkeleton, saveUnit, saveTestCode, loadSkeleton, loadUnits, loadTestCode,
+  appendReflection, loadReflectionHistory, isDuplicatePrescription, MAX_REFLECTIONS,
 } from '/js/services/foundry.js';
 import { buildComponentPrompt, buildFixPrompt, buildReflectionPrompt, buildFreshGenerationPrompt, buildTestPrompt } from '/js/services/foundry-prompts.js';
-import { validateComponent } from '/js/services/foundry-validate.js';
+import {
+  buildSkeletonPrompt, buildExtensionUnitPrompt, buildCortexMethodUnitPrompt,
+  buildFeatureCortexSectionPrompt, buildAppViewUnitPrompt,
+  buildExtensionAssemblyPrompt, buildCortexAssemblyPrompt, buildAppAssemblyPrompt,
+} from '/js/services/foundry-prompts-build.js';
+import { buildTestFirstPrompt } from '/js/services/foundry-prompts-test.js';
+import { buildFoundryReflectionPrompt } from '/js/services/foundry-prompts-fix.js';
+import { validateComponent, validateSkeleton, validateUnit } from '/js/services/foundry-validate.js';
 import { runComponentTest, probeExtension } from '/js/services/foundry-testing.js';
 import { createBundle } from '/js/services/foundry-context-bundle.js';
 import { runWithAi, stripCodeblock } from '../foundry-detail.js';
+
+/* ── Multi-Pass Helpers (replicated from foundry-detail.js) ── */
+
+/**
+ * Extract one unit's definition block from skeleton YAML by finding its id.
+ */
+function parseUnitFromSkeleton(skeletonYaml, unitId) {
+  if (!skeletonYaml || !unitId) return { id: unitId, label: unitId };
+  const lines = skeletonYaml.split('\n');
+  let found = false;
+  const block = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if ((trimmed.startsWith('- id: ') && trimmed.slice(6).trim() === unitId) ||
+        (trimmed.startsWith('- name: ') && trimmed.slice(8).trim() === unitId)) {
+      found = true;
+      block.push(line);
+      continue;
+    }
+    if (found) {
+      if (trimmed.startsWith('- ') || (/^\w/.test(trimmed) && trimmed.endsWith(':'))) {
+        break;
+      }
+      block.push(line);
+    }
+  }
+  return { id: unitId, label: unitId, raw: block.join('\n') };
+}
+
+/**
+ * Extract the test section for a specific unit from the full test code.
+ */
+function extractTestForUnit(testCode, unitId) {
+  if (!testCode || !unitId) return '';
+  const regex = new RegExp(`(describe|test|it)\\s*\\(['"](.*?${unitId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*?)['"]`, 'i');
+  const match = testCode.match(regex);
+  if (!match) return '';
+  const idx = testCode.indexOf(match[0]);
+  const start = Math.max(0, testCode.lastIndexOf('\n', idx - 200));
+  const end = Math.min(testCode.length, testCode.indexOf('\n', idx + 500));
+  return testCode.slice(start, end > start ? end : testCode.length).trim();
+}
+
+/**
+ * Parse a reflection response to extract diagnosis and prescription.
+ */
+function parseReflectionPrescription(responseText) {
+  if (!responseText) return null;
+  try {
+    const yamlMatch = responseText.match(/```(?:yaml)?\s*\n([\s\S]*?)```/);
+    const block = yamlMatch ? yamlMatch[1] : responseText;
+    const diagMatch = block.match(/diagnosis:\s*(.+)/);
+    const rootMatch = block.match(/root_cause:\s*(.+)/);
+    const actionMatch = block.match(/action:\s*(.+)/);
+    const targetMatch = block.match(/target:\s*(.+)/);
+    if (diagMatch || actionMatch) {
+      return {
+        diagnosis: diagMatch ? diagMatch[1].trim() : '',
+        rootCause: rootMatch ? rootMatch[1].trim() : '',
+        action: actionMatch ? actionMatch[1].trim() : 'unknown',
+        target: targetMatch ? targetMatch[1].trim() : '',
+      };
+    }
+  } catch { /* parse failed */ }
+  return null;
+}
+
+/**
+ * Generate the prompt for a given pass based on type and context.
+ * Dispatch logic mirrors foundry-detail.js generatePassPrompt().
+ */
+function generatePassPrompt(pass, ctx) {
+  const { component, blueprint, interviewSpec, skeleton, units, testCode, reflectionHistory } = ctx;
+  const bpComp = blueprint?.components?.find(c => c.label === component.label || c.id === component.id);
+
+  switch (pass.type) {
+    case 'test':
+      return buildTestFirstPrompt({
+        componentType: component.type,
+        subtype: bpComp?.subtype,
+        label: component.label,
+        blueprint,
+        blueprintComponent: bpComp,
+        interviewSpec,
+      });
+    case 'skeleton':
+      return buildSkeletonPrompt({
+        componentType: component.type,
+        subtype: bpComp?.subtype,
+        label: component.label,
+        blueprint,
+        blueprintComponent: bpComp,
+        interviewSpec,
+        testCode,
+      });
+    case 'unit': {
+      const unitDef = parseUnitFromSkeleton(skeleton || '', pass.unitId);
+      const testExcerpt = extractTestForUnit(testCode || '', pass.unitId);
+      if (component.type === 'extension') {
+        return buildExtensionUnitPrompt({ skeleton, unitDef, dataSources: bpComp?.dataSources, testExcerpt });
+      } else if (component.type === 'cortex') {
+        const subtype = bpComp?.subtype || 'data';
+        if (subtype === 'feature') {
+          return buildFeatureCortexSectionPrompt({ skeleton, sectionDef: unitDef, dataCortexProbe: null, platformUiExample: null, translationKeys: null });
+        }
+        return buildCortexMethodUnitPrompt({ skeleton, unitDef, extensionProbeResult: null, componentSubtype: subtype });
+      } else if (component.type === 'app') {
+        return buildAppViewUnitPrompt({ skeleton, viewDef: unitDef, featureCortexRenderSpec: null, translationKeys: null });
+      }
+      return '';
+    }
+    case 'assembly': {
+      if (component.type === 'extension') {
+        return buildExtensionAssemblyPrompt({ skeleton, units, label: component.label });
+      } else if (component.type === 'cortex') {
+        return buildCortexAssemblyPrompt({ skeleton, units, label: component.label, subtype: bpComp?.subtype });
+      } else if (component.type === 'app') {
+        return buildAppAssemblyPrompt({ skeleton, units, label: component.label, appDomainCortexName: null, designSystem: null });
+      }
+      return '';
+    }
+    case 'reflection':
+      return buildFoundryReflectionPrompt({
+        skeleton, testCode,
+        failedOutput: pass.failedOutput || '',
+        errors: pass.errors || [],
+        failedPass: pass.failedPass || {},
+        reflectionHistory: reflectionHistory || [],
+        upstreamProbes: null,
+      });
+    default:
+      return '';
+  }
+}
 
 /**
  * @param {Object} core — useDashboardCore return value
@@ -48,6 +193,294 @@ import { runWithAi, stripCodeblock } from '../foundry-detail.js';
  * @param {Function} showToast
  */
 export function useAutopilot(core, autopilotState, projectId, orSettings, session, testExec, showToast) {
+
+  /**
+   * Run all passes for a multi-pass component (extension, cortex, app).
+   * Iterates: test → skeleton → unit(s) → assembly, with reflection on failure.
+   *
+   * @param {Object} comp - The component object
+   * @param {string} cid - Component ID
+   * @param {Object} project - Project object (with blueprint)
+   * @param {Object} interviewSpec - Interview spec
+   * @returns {{ success: boolean, content: string|null, updated: Object }} - Final result
+   */
+  async function runComponentPasses(comp, cid, project, interviewSpec) {
+    const blueprint = project.blueprint;
+    const bpComp = blueprint?.components?.find(c => c.label === comp.label || c.id === comp.id);
+
+    // Initialize passes
+    let passes = createInitialPasses(comp.type);
+    let skeleton = await loadSkeleton(projectId, cid) || '';
+    let testCode = await loadTestCode(projectId, cid) || '';
+    let units = await loadUnits(projectId, cid) || {};
+    let reflectionHistory = await loadReflectionHistory(projectId, cid) || [];
+    let updated = { ...comp };
+
+    // If skeleton already exists, we may have unit passes created already
+    if (skeleton && passes.length >= 2) {
+      // Mark test and skeleton as done if they exist
+      const testPass = passes.find(p => p.type === 'test');
+      if (testPass && testCode) testPass.status = 'validated';
+      const skelPass = passes.find(p => p.type === 'skeleton');
+      if (skelPass && skeleton) {
+        skelPass.status = 'validated';
+        const unitPasses = createUnitPasses(skeleton);
+        // Mark already-completed units
+        for (const up of unitPasses) {
+          if (units[up.unitId]) up.status = 'validated';
+        }
+        passes = [...passes, ...unitPasses];
+        // Add assembly if all units done
+        const allUnitsDone = unitPasses.every(up => up.status === 'validated');
+        if (allUnitsDone && unitPasses.length > 0) {
+          passes.push({ id: 'assembly', type: 'assembly', status: 'pending', attempt: 1 });
+        }
+      }
+    }
+
+    await writeProjectLog(projectId, 'multipass_start', {
+      meta: { component: comp.label, type: comp.type, passCount: passes.length, by: 'autopilot' },
+    });
+
+    // Track the last AI response — used as final assembly content
+    let lastContent = null;
+
+    // Iterate through passes
+    while (true) {
+      if (autopilotState.cancelledRef.current) return { success: false, content: null, updated };
+
+      const nextPass = getNextPass(passes);
+      if (!nextPass) break; // All passes done
+
+      autopilotState.setStep(`${comp.label} — pass: ${nextPass.type}${nextPass.unitId ? ` (${nextPass.unitId})` : ''}`);
+
+      // Build context for prompt generation
+      const ctx = { component: comp, blueprint, interviewSpec, skeleton, units, testCode, reflectionHistory };
+      const prompt = generatePassPrompt(nextPass, ctx);
+
+      if (!prompt) {
+        await writeProjectLog(projectId, 'multipass_empty_prompt', {
+          meta: { component: comp.label, pass: nextPass.id, type: nextPass.type, by: 'autopilot' },
+        });
+        nextPass.status = 'validated'; // skip empty-prompt passes
+        continue;
+      }
+
+      writeDebugArtifact(projectId, cid, `pass-${nextPass.id}-prompt`, prompt);
+
+      // Call AI
+      let content;
+      try {
+        content = await runWithAi(projectId, prompt);
+      } catch (e) {
+        showToast?.(`${comp.label} (${nextPass.id}): ${e.message}`, true);
+        return { success: false, content: null, updated };
+      }
+      if (autopilotState.cancelledRef.current) return { success: false, content: null, updated };
+
+      writeDebugArtifact(projectId, cid, `pass-${nextPass.id}-raw`, content);
+      content = stripCodeblock(content);
+      writeDebugArtifact(projectId, cid, `pass-${nextPass.id}-stripped`, content);
+
+      // Validate based on pass type
+      let validationResult;
+      switch (nextPass.type) {
+        case 'test':
+          // Basic check: non-empty and contains assert/expect/test
+          validationResult = {
+            valid: content.length > 50 && (/assert|expect|test|describe|it\s*\(/.test(content)),
+            errors: content.length <= 50 ? ['Test code too short'] : (!(/assert|expect|test|describe|it\s*\(/.test(content)) ? ['No assertions found in test code'] : []),
+          };
+          break;
+        case 'skeleton':
+          validationResult = validateSkeleton(content, bpComp, interviewSpec);
+          break;
+        case 'unit':
+          validationResult = validateUnit(content, parseUnitFromSkeleton(skeleton, nextPass.unitId), comp.type);
+          break;
+        case 'assembly':
+          validationResult = validateComponent(comp.type, content, blueprint);
+          break;
+        default:
+          validationResult = { valid: true, errors: [] };
+      }
+
+      // Handle validation failure — trigger reflection loop
+      if (!validationResult.valid) {
+        await writeProjectLog(projectId, 'multipass_validation_failed', {
+          meta: { component: comp.label, pass: nextPass.id, type: nextPass.type, errors: validationResult.errors, by: 'autopilot' },
+        });
+
+        let resolved = false;
+        for (let reflectAttempt = 0; reflectAttempt < MAX_REFLECTIONS && !resolved; reflectAttempt++) {
+          if (autopilotState.cancelledRef.current) return { success: false, content: null, updated };
+
+          autopilotState.setStep(`${comp.label} — reflection ${reflectAttempt + 1}/${MAX_REFLECTIONS} for ${nextPass.id}`);
+
+          // Build reflection prompt
+          const reflectionPass = {
+            type: 'reflection',
+            failedOutput: content,
+            errors: validationResult.errors,
+            failedPass: nextPass,
+          };
+          const reflCtx = { component: comp, blueprint, interviewSpec, skeleton, units, testCode, reflectionHistory };
+          const reflPrompt = generatePassPrompt(reflectionPass, reflCtx);
+          writeDebugArtifact(projectId, cid, `pass-${nextPass.id}-reflection-${reflectAttempt + 1}-prompt`, reflPrompt);
+
+          let reflResponse;
+          try {
+            reflResponse = await runWithAi(projectId, reflPrompt);
+          } catch (e) {
+            await writeProjectLog(projectId, 'multipass_reflection_ai_failed', {
+              meta: { component: comp.label, pass: nextPass.id, attempt: reflectAttempt + 1, error: e.message, by: 'autopilot' },
+            });
+            break;
+          }
+          writeDebugArtifact(projectId, cid, `pass-${nextPass.id}-reflection-${reflectAttempt + 1}-response`, reflResponse);
+          reflResponse = stripCodeblock(reflResponse);
+
+          // Parse prescription
+          const prescription = parseReflectionPrescription(reflResponse);
+
+          // Save reflection
+          await appendReflection(projectId, cid, {
+            attempt: reflectAttempt + 1,
+            at: new Date().toISOString(),
+            prescription,
+            passId: nextPass.id,
+          });
+          reflectionHistory = await loadReflectionHistory(projectId, cid);
+
+          // Check for escalation or loop
+          if (prescription?.action === 'escalate_to_user') {
+            await writeProjectLog(projectId, 'multipass_escalated', {
+              meta: { component: comp.label, pass: nextPass.id, diagnosis: prescription.diagnosis, by: 'autopilot' },
+            });
+            showToast?.(`${comp.label}: Reflection escalated — needs manual attention`, true);
+            return { success: false, content: null, updated };
+          }
+          if (isDuplicatePrescription(reflectionHistory.slice(0, -1), prescription)) {
+            await writeProjectLog(projectId, 'multipass_reflection_loop', {
+              meta: { component: comp.label, pass: nextPass.id, attempt: reflectAttempt + 1, by: 'autopilot' },
+            });
+            showToast?.(`${comp.label}: Reflection loop detected for ${nextPass.id}`, true);
+            return { success: false, content: null, updated };
+          }
+
+          // Retry the pass with context from reflection
+          const retryPrompt = prompt + `\n\n--- PREVIOUS ATTEMPT FAILED ---\nErrors: ${validationResult.errors.join('; ')}\nDiagnosis: ${prescription?.diagnosis || reflResponse}\nFix: Regenerate addressing the above issues.\n`;
+          writeDebugArtifact(projectId, cid, `pass-${nextPass.id}-retry-${reflectAttempt + 1}-prompt`, retryPrompt);
+
+          try {
+            content = await runWithAi(projectId, retryPrompt);
+          } catch (e) {
+            showToast?.(`${comp.label} (${nextPass.id} retry): ${e.message}`, true);
+            return { success: false, content: null, updated };
+          }
+          content = stripCodeblock(content);
+          writeDebugArtifact(projectId, cid, `pass-${nextPass.id}-retry-${reflectAttempt + 1}-stripped`, content);
+
+          // Re-validate
+          switch (nextPass.type) {
+            case 'test':
+              validationResult = {
+                valid: content.length > 50 && (/assert|expect|test|describe|it\s*\(/.test(content)),
+                errors: content.length <= 50 ? ['Test code too short'] : (!(/assert|expect|test|describe|it\s*\(/.test(content)) ? ['No assertions found'] : []),
+              };
+              break;
+            case 'skeleton':
+              validationResult = validateSkeleton(content, bpComp, interviewSpec);
+              break;
+            case 'unit':
+              validationResult = validateUnit(content, parseUnitFromSkeleton(skeleton, nextPass.unitId), comp.type);
+              break;
+            case 'assembly':
+              validationResult = validateComponent(comp.type, content, blueprint);
+              break;
+            default:
+              validationResult = { valid: true, errors: [] };
+          }
+
+          if (validationResult.valid) resolved = true;
+        }
+
+        if (!resolved) {
+          showToast?.(`${comp.label}: Failed after ${MAX_REFLECTIONS} reflections on ${nextPass.id}`, true);
+          await writeProjectLog(projectId, 'multipass_gave_up', {
+            meta: { component: comp.label, pass: nextPass.id, maxReflections: MAX_REFLECTIONS, by: 'autopilot' },
+          });
+          return { success: false, content: null, updated };
+        }
+      }
+
+      // Validation passed — save based on pass type
+      switch (nextPass.type) {
+        case 'test':
+          await saveTestCode(projectId, cid, content);
+          testCode = content;
+          break;
+        case 'skeleton':
+          await saveSkeleton(projectId, cid, content);
+          skeleton = content;
+          // Create unit passes from skeleton
+          {
+            const unitPasses = createUnitPasses(skeleton);
+            if (unitPasses.length > 0) {
+              passes.push(...unitPasses);
+              // Add assembly pass after all unit passes
+              passes.push({ id: 'assembly', type: 'assembly', status: 'pending', attempt: 1 });
+            } else {
+              // No units extracted — add assembly directly
+              passes.push({ id: 'assembly', type: 'assembly', status: 'pending', attempt: 1 });
+            }
+          }
+          break;
+        case 'unit':
+          await saveUnit(projectId, cid, nextPass.unitId, content);
+          units[nextPass.unitId] = content;
+          break;
+        case 'assembly':
+          // Assembly produces the final component code — will be returned
+          break;
+      }
+
+      nextPass.status = 'validated';
+      updated = {
+        ...updated,
+        history: [...(updated.history || []), {
+          action: `pass_${nextPass.type}_validated`,
+          at: new Date().toISOString(),
+          by: 'autopilot',
+          passId: nextPass.id,
+        }],
+      };
+      await saveComponent(projectId, updated);
+
+      // Track last content for return value (assembly output is the final result)
+      lastContent = content;
+
+      await writeProjectLog(projectId, 'multipass_pass_done', {
+        meta: { component: comp.label, pass: nextPass.id, type: nextPass.type, by: 'autopilot' },
+      });
+    }
+
+    // All passes done — the last content is from assembly
+    await writeProjectLog(projectId, 'multipass_complete', {
+      meta: { component: comp.label, type: comp.type, totalPasses: passes.length, by: 'autopilot' },
+    });
+
+    // Load final assembly content: it's the last 'content' from the assembly pass
+    // (content variable still holds the last AI response, which is the assembly output)
+    // Verify we have a non-empty result
+    const assemblyPass = passes.find(p => p.type === 'assembly');
+    if (!assemblyPass) {
+      // No assembly was needed (shouldn't happen for multi-pass)
+      return { success: false, content: null, updated };
+    }
+
+    return { success: true, content: lastContent, updated };
+  }
 
   async function handleRunAll() {
     if (!orSettings?.hasApiKey || autopilotState.running) return;
@@ -78,76 +511,109 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
         autopilotState.setStep(comp.label);
         core.setSelectedId(cid);
 
-        // Build prompt
-        const latestComps = await loadAllComponents(projectId);
-        const completedComponents = latestComps.filter(c => c.status === 'done' && c.registeredAs);
-        const prompt = await buildComponentPrompt(
-          comp.type, comp.label,
-          project.description, project.blueprint, completedComponents,
-          interviewSpec,
-        );
-        // Run AI
         let content;
-        try {
-          content = await runWithAi(projectId, prompt);
-        } catch (e) {
-          showToast?.(`${comp.label}: ${e.message}`, true);
-          break;
-        }
-        if (autopilotState.cancelledRef.current) break;
-        // Debug: write full AI exchange — sent prompt, raw response, processed result
-        writeDebugArtifact(projectId, cid, 'prompt', prompt);
-        writeDebugArtifact(projectId, cid, 'ai-raw-response', content);
-        content = stripCodeblock(content);
-        writeDebugArtifact(projectId, cid, 'generated', content);
+        let updated;
+        let vr;
+        let prompt; // original prompt — used by test fix loops
 
-        // Save result
-        let updated = { ...comp, result: content, status: 'validating', prompt,
-          history: [...(comp.history || []), { action: 'ai_response_received', at: new Date().toISOString(), by: 'autopilot' }],
-        };
-        await saveComponent(projectId, updated);
-
-        // Validate
-        let vr = validateComponent(comp.type, content, project.blueprint);
-
-        // Auto-retry if enabled
-        if (!vr.valid && orSettings?.autoRetry) {
-          const max = orSettings.maxRetries || 3;
-          for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
+        // ── Multi-pass vs single-shot dispatch ──
+        if (MULTI_PASS_TYPES.includes(comp.type)) {
+          // Multi-pass flow: test → skeleton → units → assembly
+          const passResult = await runComponentPasses(comp, cid, project, interviewSpec);
+          if (!passResult.success) {
+            // runComponentPasses already logged and toasted — move to next component or stop
+            updated = passResult.updated;
+            await core.loadData();
             if (autopilotState.cancelledRef.current) break;
-            autopilotState.setStep(
-              comp.label + ' - ' + t('profile.foundry.openrouter.retrying').replace('{current}', attempt).replace('{max}', max)
-            );
-            const fixPrompt = buildFixPrompt(prompt, content, vr.errors, comp.type);
-            writeDebugArtifact(projectId, cid, 'fix-prompt-' + attempt, fixPrompt);
-            try {
-              content = await runWithAi(projectId, fixPrompt);
-            } catch (e) {
-              showToast?.(`${comp.label}: ${e.message}`, true);
-              break;
-            }
-            writeDebugArtifact(projectId, cid, 'fix-raw-response-' + attempt, content);
-            content = stripCodeblock(content);
-            vr = validateComponent(comp.type, content, project.blueprint);
+            continue; // skip to next component
           }
-        }
-
-        if (!vr.valid) {
-          updated = { ...updated, result: content, status: 'errors', validationErrors: vr.errors,
-            history: [...updated.history, { action: 'validation_failed', at: new Date().toISOString(), by: 'autopilot', errors: vr.errors }],
+          content = passResult.content;
+          updated = passResult.updated;
+          // Set prompt for test fix loops — use the assembly prompt as representative
+          prompt = `[Multi-pass ${comp.type} component: ${comp.label}] Final assembled code.`;
+          // Validate the final assembly output
+          vr = validateComponent(comp.type, content, project.blueprint);
+          if (!vr.valid) {
+            updated = { ...updated, result: content, status: 'errors', validationErrors: vr.errors,
+              history: [...(updated.history || []), { action: 'assembly_validation_failed', at: new Date().toISOString(), by: 'autopilot', errors: vr.errors }],
+            };
+            await saveComponent(projectId, updated);
+            await core.loadData();
+            showToast?.(t('profile.foundry.openrouter.stepFailed') + ': ' + comp.label, true);
+            break;
+          }
+          // Save final result
+          updated = { ...updated, result: content, status: 'done', validationErrors: [],
+            history: [...(updated.history || []), { action: 'multipass_validation_passed', at: new Date().toISOString(), by: 'autopilot' }],
           };
           await saveComponent(projectId, updated);
-          await core.loadData();
-          showToast?.(t('profile.foundry.openrouter.stepFailed') + ': ' + comp.label, true);
-          break;
-        }
-        if (autopilotState.cancelledRef.current) break;
+        } else {
+          // Single-shot flow (CSM, MSM, Memory, Translation) — existing behavior
+          const latestComps = await loadAllComponents(projectId);
+          const completedComponents = latestComps.filter(c => c.status === 'done' && c.registeredAs);
+          prompt = await buildComponentPrompt(
+            comp.type, comp.label,
+            project.description, project.blueprint, completedComponents,
+            interviewSpec,
+          );
+          try {
+            content = await runWithAi(projectId, prompt);
+          } catch (e) {
+            showToast?.(`${comp.label}: ${e.message}`, true);
+            break;
+          }
+          if (autopilotState.cancelledRef.current) break;
+          writeDebugArtifact(projectId, cid, 'prompt', prompt);
+          writeDebugArtifact(projectId, cid, 'ai-raw-response', content);
+          content = stripCodeblock(content);
+          writeDebugArtifact(projectId, cid, 'generated', content);
 
-        // Validation passed — save and register
-        updated = { ...updated, result: content, status: 'done', validationErrors: [],
-          history: [...updated.history, { action: 'validation_passed', at: new Date().toISOString(), by: 'autopilot' }],
-        };
-        await saveComponent(projectId, updated);
+          updated = { ...comp, result: content, status: 'validating', prompt,
+            history: [...(comp.history || []), { action: 'ai_response_received', at: new Date().toISOString(), by: 'autopilot' }],
+          };
+          await saveComponent(projectId, updated);
+
+          vr = validateComponent(comp.type, content, project.blueprint);
+
+          // Auto-retry if enabled
+          if (!vr.valid && orSettings?.autoRetry) {
+            const max = orSettings.maxRetries || 3;
+            for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
+              if (autopilotState.cancelledRef.current) break;
+              autopilotState.setStep(
+                comp.label + ' - ' + t('profile.foundry.openrouter.retrying').replace('{current}', attempt).replace('{max}', max)
+              );
+              const fixPrompt = buildFixPrompt(prompt, content, vr.errors, comp.type);
+              writeDebugArtifact(projectId, cid, 'fix-prompt-' + attempt, fixPrompt);
+              try {
+                content = await runWithAi(projectId, fixPrompt);
+              } catch (e) {
+                showToast?.(`${comp.label}: ${e.message}`, true);
+                break;
+              }
+              writeDebugArtifact(projectId, cid, 'fix-raw-response-' + attempt, content);
+              content = stripCodeblock(content);
+              vr = validateComponent(comp.type, content, project.blueprint);
+            }
+          }
+
+          if (!vr.valid) {
+            updated = { ...updated, result: content, status: 'errors', validationErrors: vr.errors,
+              history: [...updated.history, { action: 'validation_failed', at: new Date().toISOString(), by: 'autopilot', errors: vr.errors }],
+            };
+            await saveComponent(projectId, updated);
+            await core.loadData();
+            showToast?.(t('profile.foundry.openrouter.stepFailed') + ': ' + comp.label, true);
+            break;
+          }
+          if (autopilotState.cancelledRef.current) break;
+
+          // Validation passed — save and register
+          updated = { ...updated, result: content, status: 'done', validationErrors: [],
+            history: [...updated.history, { action: 'validation_passed', at: new Date().toISOString(), by: 'autopilot' }],
+          };
+          await saveComponent(projectId, updated);
+        }
 
         // Register component
         try {
@@ -171,15 +637,11 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
               const oldName = vr.extracted?.match?.(/name:\s*"?([^\s"]+)/)?.[1] || content?.match?.(/name:\s*"?([^\s"]+)/)?.[1];
               if (oldName) {
                 await writeProjectLog(projectId, 'component_reregistering', { meta: { component: comp.label, oldName, by: 'autopilot' } });
-                try {
-                  const deactUrl = comp.type === 'extension' ? `/v1/extensions/${encodeURIComponent(oldName)}/deactivate` : `/v1/cortex/${encodeURIComponent(oldName)}/deactivate`;
-                  await apiPost(deactUrl).catch(() => {});
-                  const delUrl = comp.type === 'extension' ? `/v1/extensions/${encodeURIComponent(oldName)}` : `/v1/cortex/${encodeURIComponent(oldName)}`;
-                  await apiDelete(delUrl);
-                  resp = await doRegister();
-                } catch (reregErr) {
-                  throw reregErr;
-                }
+                const deactUrl = comp.type === 'extension' ? `/v1/extensions/${encodeURIComponent(oldName)}/deactivate` : `/v1/cortex/${encodeURIComponent(oldName)}/deactivate`;
+                await apiPost(deactUrl).catch(() => {});
+                const delUrl = comp.type === 'extension' ? `/v1/extensions/${encodeURIComponent(oldName)}` : `/v1/cortex/${encodeURIComponent(oldName)}`;
+                await apiDelete(delUrl);
+                resp = await doRegister();
               } else {
                 throw regErr;
               }
