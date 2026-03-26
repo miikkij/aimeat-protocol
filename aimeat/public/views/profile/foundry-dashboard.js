@@ -23,13 +23,14 @@
  *   import { ProjectDashboard } from './foundry-dashboard.js';
  * @version-history
  *   v1.0.0 — 2026-03-22 — Extracted from foundry-tab.js, hook-per-domain architecture
+ *   v1.1.0 — 2026-03-26 — Add PassProgress component for multi-pass workflow sidebar
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { updateProject, deleteProject, getAppLaunchUrl, writeProjectLog } from '/js/services/foundry.js';
+import { updateProject, deleteProject, getAppLaunchUrl, writeProjectLog, MULTI_PASS_TYPES, getNextPass } from '/js/services/foundry.js';
 import { useConfirm } from '/components/Modal.js';
 import { ComponentDetail, TestScopeSelector, TestResultsView } from './foundry-detail.js';
 import { SettingsCollectionView } from './foundry-settings.js';
@@ -49,6 +50,45 @@ import { RemovePanel } from './foundry-dashboard/RemovePanel.js';
 import { EditModePanel } from './foundry-dashboard/EditModePanel.js';
 import { DiagnosticsPanel } from './foundry-dashboard/DiagnosticsPanel.js';
 import { DebugPanel } from './foundry-dashboard/DebugPanel.js';
+
+/* ── Pass Progress (multi-pass sidebar indicator) ──── */
+
+const PASS_STATUS_ICON = {
+  validated: '\u2705',   // ✅
+  failed: '\u274C',      // ❌
+  in_progress: '\uD83D\uDD04', // 🔄
+  prompt_ready: '\uD83D\uDD04', // 🔄
+  pending: '\u2B1C',     // ⬜
+};
+
+const PASS_TYPE_KEY = {
+  test: 'passTest',
+  skeleton: 'passSkeleton',
+  unit: 'passUnit',
+  assembly: 'passAssembly',
+  reflection: 'passReflection',
+};
+
+function PassProgress({ passes, onGenerateNext }) {
+  if (!passes || passes.length === 0) return null;
+  const next = getNextPass(passes);
+  return html`
+    <div class="fnd-pass-progress">
+      <label>${t('profile.foundry.passProgress')}</label>
+      ${passes.map(p => html`
+        <div class="fnd-pass-item fnd-pass-${p.status}">
+          <span class="fnd-pass-icon">${PASS_STATUS_ICON[p.status] || PASS_STATUS_ICON.pending}</span>
+          <span class="fnd-pass-label">${t('profile.foundry.' + (PASS_TYPE_KEY[p.type] || p.type))}${p.unitLabel ? ': ' + p.unitLabel : ''}</span>
+        </div>
+      `)}
+      ${next && onGenerateNext && html`
+        <button class="btn-primary btn-sm fnd-pass-next-btn" onClick=${() => onGenerateNext(next)}>
+          ${t('profile.foundry.generateNextPass')}
+        </button>
+      `}
+    </div>
+  `;
+}
 
 export function ProjectDashboard({ projectId, onBack, session, showToast, orSettings }) {
   // Local UI state
@@ -308,6 +348,9 @@ export function ProjectDashboard({ projectId, onBack, session, showToast, orSett
                       <span class="fnd-type-badge type-${comp.type} ${live ? (live.active ? 'live-active' : live.installed ? 'live-installed' : 'live-missing') : ''}"
                         title=${live?.status || ''}>${comp.type.toUpperCase()}</span>
                     </span>
+                    ${MULTI_PASS_TYPES.includes(comp.type) && comp.passes && comp.passes.length > 0 && selectedId === cid && html`
+                      <${PassProgress} passes=${comp.passes} onGenerateNext=${() => core.setSelectedId(cid)} />
+                    `}
                   </div>
                 `;
               })}

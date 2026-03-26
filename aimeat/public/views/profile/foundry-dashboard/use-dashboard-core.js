@@ -27,12 +27,14 @@
  *   const core = useDashboardCore(projectId, onBack, showToast);
  * @version-history
  *   v1.0.0 — 2026-03-22 — Extracted from foundry-tab.js ProjectDashboard
+ *   v1.1.0 — 2026-03-26 — Enrich multi-pass components with initial passes on load
  */
 import { useState, useEffect } from 'preact/hooks';
 import { t } from '/js/i18n.js';
 import {
   getProject, loadAllComponents, saveComponent, cleanupOldEntries,
   getInterviewSpec, getComponentStatuses, getPendingEdit,
+  createInitialPasses, MULTI_PASS_TYPES,
 } from '/js/services/foundry.js';
 
 /**
@@ -73,7 +75,16 @@ export function useDashboardCore(projectId, onBack, showToast) {
     if (p?.blueprint?.components) {
       const comps = await loadAllComponents(projectId);
       if (comps.length > 0) {
-        setComponents(comps);
+        // Enrich multi-pass components with initial passes if they don't have any
+        let enriched = false;
+        for (const comp of comps) {
+          if (MULTI_PASS_TYPES.includes(comp.type) && (!comp.passes || comp.passes.length === 0)) {
+            comp.passes = createInitialPasses(comp.type);
+            await saveComponent(projectId, comp);
+            enriched = true;
+          }
+        }
+        setComponents(enriched ? [...comps] : comps);
       } else {
         // Blueprint exists but no component records yet — initialize them
         const initialized = [];

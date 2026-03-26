@@ -1298,3 +1298,26 @@
   .fnd-debug-body { grid-template-columns: 1fr; }
   .fnd-debug-tree { border-right: none; border-bottom: 1px solid var(--border); padding-right: 0; padding-bottom: var(--sp-2); max-height: 200px; }
 }
+
+/* ── Pass progress ────────────────────────── */
+.fnd-pass-progress      { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.fnd-pass-item          { display: flex; align-items: center; gap: 8px; font-size: 0.85em; padding: 4px 8px; border-radius: var(--radius-sm); }
+.fnd-pass-pending       { color: var(--text-dim); }
+.fnd-pass-validated     { color: var(--success); }
+.fnd-pass-failed        { color: var(--danger); background: var(--danger-subtle, rgba(220,50,50,0.08)); }
+.fnd-pass-in_progress   { color: var(--primary); }
+.fnd-pass-prompt_ready  { color: var(--warning); }
+.fnd-pass-icon          { width: 20px; text-align: center; }
+.fnd-pass-label         { flex: 1; }
+.fnd-pass-next-btn      { margin-top: 8px; align-self: flex-start; }
+
+/* ── Reflection panel ─────────────────────── */
+.fnd-reflection-panel      { border: 1px solid var(--warning-border, var(--border)); border-radius: var(--radius); padding: var(--sp-4); margin: var(--sp-3) 0; background: var(--warning-subtle, var(--surface)); }
+.fnd-reflection-title      { margin: 0 0 var(--sp-3); font-size: 1.1em; }
+.fnd-reflection-current    { margin-bottom: var(--sp-3); }
+.fnd-reflection-section    { margin-bottom: var(--sp-2); }
+.fnd-reflection-section p  { margin: 4px 0; }
+.fnd-reflection-escalated  { padding: var(--sp-3); background: var(--danger-subtle, rgba(220,50,50,0.08)); border-radius: var(--radius-sm); color: var(--danger); font-weight: 600; }
+.fnd-reflection-history    { margin-top: var(--sp-3); }
+.fnd-reflection-entry      { padding: var(--sp-2); border-bottom: 1px solid var(--border); font-size: 0.85em; }
+.fnd-reflection-attempt    { font-weight: 600; margin-bottom: 4px; }
