@@ -14,6 +14,10 @@
  */
 
 import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER, COMPONENT_TEMPLATES, EXTENSION_CONSUMPTION_RULES, summarizeExtensionApi, summarizeCortexApi } from './generator-prompts-base.js';
+import { buildDataCortexPrompt } from './generator-prompts-cortex-data.js';
+import { buildFeatureCortexPrompt } from './generator-prompts-cortex-feature.js';
+import { buildAppDomainCortexPrompt } from './generator-prompts-cortex-app.js';
+import { createBundle, formatBundlesForPrompt } from './generator-context-bundle.js';
 
 export function buildBlueprintPrompt(description, interviewSpec = null, availableCortexLibs = null) {
   const specContext = interviewSpec ? `
@@ -956,6 +960,40 @@ If these are missing, the app WILL crash with "getTranslations is not a function
         }
       }
       context += '\n';
+    }
+  }
+
+  // Cortex subtype dispatch — use specialized templates for new multi-cortex architecture
+  if (type === 'cortex' && blueprint) {
+    const componentId = blueprint.components?.find(c => c.label === label)?.id;
+    const comp = componentId && blueprint.components.find(c => c.id === componentId);
+    const subtype = comp?.subtype;
+
+    // Build context bundles from completed components
+    const bundles = (completedComponents || []).map(c => createBundle(c, c.probeResults));
+
+    if (subtype === 'data') {
+      return buildDataCortexPrompt(label, projectDescription, blueprint, bundles);
+    }
+    if (subtype === 'feature') {
+      const useCase = interviewSpec?.useCases?.find(uc =>
+        label.toLowerCase().includes(uc.title?.toLowerCase().split(' ')[0] || '___')
+      ) || interviewSpec?.useCases?.[0];
+      const view = interviewSpec?.views?.find(v =>
+        label.toLowerCase().includes(v.title?.toLowerCase().split(' ')[0] || '___')
+      ) || interviewSpec?.views?.[0];
+      const dataCortexBundle = bundles.find(b => b.subtype === 'data');
+      const structures = blueprint?.dataModel?.structures || {};
+      const translationBundle = bundles.find(b => b.type === 'translation');
+      const translationKeys = translationBundle?.keys || [];
+      const usesLibs = comp?.uses || [];
+      return buildFeatureCortexPrompt(label, useCase, view, dataCortexBundle, structures, translationKeys, usesLibs);
+    }
+    if (subtype === 'app-domain') {
+      const featureBundles = bundles.filter(b => b.subtype === 'feature');
+      const dataCortexBundle = bundles.find(b => b.subtype === 'data');
+      const translationBundle = bundles.find(b => b.type === 'translation');
+      return buildAppDomainCortexPrompt(label, projectDescription, featureBundles, dataCortexBundle, translationBundle);
     }
   }
 
