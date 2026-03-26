@@ -395,6 +395,29 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         }
       }
 
+      // Clean ext:{name} namespace memory (data the extension stored)
+      const extNamespace = `ext:${name}`;
+      const extMemoryRecords = await storage.listMemory(extNamespace);
+      for (const record of extMemoryRecords) {
+        await storage.deleteMemory(extNamespace, record.key);
+      }
+      if (extMemoryRecords.length > 0) {
+        logger.info(`Cleaned ${extMemoryRecords.length} memory keys from namespace: ${extNamespace}`);
+      }
+
+      // Clean instance-scoped namespace memory (ext:{name}.{instanceId})
+      const instances = await storage.listExtensionInstances(name);
+      for (const inst of instances) {
+        const instNamespace = `ext:${name}.${inst.id}`;
+        const instMemory = await storage.listMemory(instNamespace);
+        for (const record of instMemory) {
+          await storage.deleteMemory(instNamespace, record.key);
+        }
+        if (instMemory.length > 0) {
+          logger.info(`Cleaned ${instMemory.length} memory keys from instance namespace: ${instNamespace}`);
+        }
+      }
+
       await storage.deleteExtension(name);
       logger.info(`Extension uninstalled: ${name}`, { by: req.auth!.sub });
 
@@ -730,6 +753,16 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         res.status(404).json(error(config.nodeId, 'NOT_FOUND',
           `Instance "${instanceId}" not found for extension "${name}"`));
         return;
+      }
+
+      // Clean ext:{name}.{instanceId} namespace memory
+      const instanceNamespace = `ext:${name}.${instanceId}`;
+      const instanceMemory = await storage.listMemory(instanceNamespace);
+      for (const record of instanceMemory) {
+        await storage.deleteMemory(instanceNamespace, record.key);
+      }
+      if (instanceMemory.length > 0) {
+        logger.info(`Cleaned ${instanceMemory.length} memory keys from namespace: ${instanceNamespace}`);
       }
 
       await storage.deleteExtensionInstance(name, instanceId);
