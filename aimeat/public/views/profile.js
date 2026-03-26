@@ -41,6 +41,7 @@ import KnowledgeTab from './profile/knowledge-tab.js';
 import OrganismsTab from './profile/organisms-tab.js';
 import NotificationsTab from './profile/notifications-tab.js';
 import GeneratorTab from './profile/generator-tab.js';
+import FoundryTab from './profile/foundry-tab.js';
 import PackagesTab from './profile/packages-tab.js';
 
 // Each tab has a minTier: 'new' | 'active' | 'experienced'
@@ -69,6 +70,7 @@ const TABS = [
   { id: 'email',         key: 'profile.tabs.email',          component: EmailTab,          minTier: 'new' },
   { id: 'notifications', key: 'profile.tabs.notifications',  component: NotificationsTab,  minTier: 'active' },
   { id: 'generator',     key: 'profile.generator.tabLabel',  component: GeneratorTab,      minTier: 'active' },
+  { id: 'foundry',       key: 'profile.foundry.tabLabel',    component: FoundryTab,        minTier: 'active' },
   { id: 'packages',      key: 'profile.tabs.packages',       component: PackagesTab,       minTier: 'active' },
 ];
 
