@@ -568,3 +568,89 @@ The generator shows all components in the sidebar, organized by phase. The first
 ### 9.8 Done
 
 The service is live. All components registered, tested, and working. The user can share the app URL or find it in the app catalog.
+
+---
+
+## 10. Implementation Todo (before next pipeline run)
+
+Prioritized list of changes needed to make the generator work. Only items we can code and deploy — no theoretical improvements.
+
+### Priority 1 — Blocks working applications
+
+- [ ] **10.1 Blueprint: structures + $ref + action shapes**
+  Update `buildBlueprintPrompt()` to produce the new data model format with `structures`, `memoryKeys`, and `actions` sections. Structures are built from interview spec's `sampleEntry` data. Actions define input/output with `$ref` to structures. All component prompts reference the same structure definitions.
+  Files: `generator-prompts-build.js`
+
+- [ ] **10.2 Blueprint: multi-cortex architecture**
+  Update `buildBlueprintPrompt()` to produce multiple cortex components: data cortex (always), feature cortex (per use case group), app-domain cortex (always). Update phase ordering. Update `generator-validate.js` to accept multiple cortex components.
+  Files: `generator-prompts-build.js`, `generator-validate.js`
+
+- [ ] **10.3 Platform UI component working examples**
+  Read the source code of each aimeat-ui-* cortex library. Extract one complete working example per component (container creation, parameter shape, rendering, cleanup). Add these examples to the feature cortex prompt and app prompt.
+  Files: `generator-prompts-base.js` (cortex template, app template)
+
+- [ ] **10.4 Component prompts: inject $ref structures**
+  Each component prompt should receive the relevant structures from the blueprint, not just raw JSON Schema. Extension prompt gets structures it produces. Cortex prompt gets structures it consumes and returns. App prompt gets structures it renders.
+  Files: `generator-prompts-build.js`
+
+### Priority 2 — Prevents most integration failures
+
+- [ ] **10.5 Contract verification after generation (Verify phase)**
+  After validation but before registration: machine-compare the generated output against the blueprint contract.
+  - Extension: parse YAML manifest, confirm all declared action IDs exist in JS files
+  - Cortex: parse JS exports object, confirm all methods from blueprint `produces` exist
+  - App: parse HTML, confirm cortex script tags are loaded
+  Add as a step in the validator or as a new post-validation check.
+  Files: `generator-validate.js`
+
+- [ ] **10.6 Mandatory probes at every layer**
+  After registration of extension AND each cortex: execute the component and capture real outputs.
+  - Extension: probe each action with test inputs, capture golden samples (already exists, make mandatory)
+  - Data cortex: load in browser test page, call each exported method, capture return values
+  - Feature cortex: load in browser, call render(), capture DOM structure
+  Package probe results as structured context bundle for the next component's prompt.
+  Files: `generator-detail.js`, `generator-testing.js`, `generator-prompts-build.js`
+
+- [ ] **10.7 Smoke test before full testing**
+  After registration, before running the full test suite: can the component load without errors? Does it export what the blueprint says? Quick check that catches 80% of failures in seconds.
+  Files: `generator-testing.js` or new `generator-smoke.js`
+
+- [ ] **10.8 Tests from blueprint contract, not from implementation**
+  Update `buildTestPrompt()` to generate tests from: blueprint data model (structures + actions) + interview use cases + probe golden samples. Remove or reduce the injection of the component's own source code into the test prompt. The test designer should verify the contract, not transcribe the implementation.
+  Files: `generator-prompts-test.js`
+
+### Priority 3 — Improves quality
+
+- [ ] **10.9 Mandatory reflection before fix attempts**
+  When a component fails validation or testing, always run `buildReflectionPrompt()` first to get an explanation of what went wrong. Feed the reflection into the fix prompt. Currently exists but is optional/underused.
+  Files: `generator-detail.js`
+
+- [ ] **10.10 Structured context bundles between steps**
+  After each successful registration + probe, create a structured summary:
+  ```
+  { name, type, registeredAs, exports: [...], probeResults: [...], memoryKeysWritten: [...] }
+  ```
+  Store in component state. Feed this bundle (not raw source code) into downstream prompts. More reliable than parsing exports from source.
+  Files: `generator-prompts-build.js`, `generator-detail.js`
+
+- [ ] **10.11 Prompt modularization**
+  Split `generator-prompts-base.js` into per-component-type files: `prompts-extension.js`, `prompts-cortex.js`, `prompts-app.js`, `prompts-translation.js`, etc. The current file is too large to maintain.
+  Files: `generator-prompts-base.js` → multiple smaller files
+
+- [ ] **10.12 Integration tests between layers**
+  Add a new test type that tests component boundaries:
+  - Data cortex calls extension action → verify response matches structure
+  - Feature cortex calls data cortex method → verify data shape
+  - App-domain cortex composes feature cortex → verify API surface
+  Generate from blueprint's produces/consumes graph.
+  Files: `generator-prompts-test.js`, `generator-testing.js`
+
+### Excluded (cannot deliver now)
+
+| Item | Why excluded |
+|------|-------------|
+| Episodic memory / learning from past runs | System doesn't learn between runs |
+| Mutation testing | Requires new test infrastructure |
+| Live preview between steps (WebContainer) | Requires browser runtime infrastructure |
+| Dependency-aware rollback | UI doesn't support rolling back to earlier components |
+| AutoFix post-processing | Requires streaming interception of AI output |
