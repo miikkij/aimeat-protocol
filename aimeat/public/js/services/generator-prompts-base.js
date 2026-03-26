@@ -485,7 +485,13 @@ ${HTML_ENTITY_RULES}`,
       const allKeys = new Set();
       for (const tc of translationComponents) {
         try {
-          const parsed = typeof tc.result === 'string' ? JSON.parse(tc.result) : tc.result;
+          let raw = tc.result;
+          // Strip markdown code fences if present
+          if (typeof raw === 'string') {
+            const fenceMatch = raw.match(/```(?:json)?\s*\n([\s\S]*?)```/);
+            if (fenceMatch) raw = fenceMatch[1];
+          }
+          const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
           // Translation result is { "fi": { "key": "value" } } or { "en": { ... } }
           const locale = Object.keys(parsed || {})[0];
           if (locale && parsed[locale]) {
