@@ -24,7 +24,11 @@ export { buildDataCortexPrompt } from './generator-prompts-cortex-data.js';
 export { buildFeatureCortexPrompt } from './generator-prompts-cortex-feature.js';
 export { buildAppDomainCortexPrompt } from './generator-prompts-cortex-app.js';
 export { createBundle, formatBundleForPrompt, formatBundlesForPrompt } from './generator-context-bundle.js';
-export { verifyContract } from './generator-contract.js';
-export { smokeTest } from './generator-smoke.js';
-export { validateSpecQuality } from './generator-validate.js';
-export { reconcileProbe } from './generator-probe-reconcile.js';
+// New V5 utility modules — browser-only, import directly where needed:
+// import { verifyContract } from '/js/services/generator-contract.js';
+// import { smokeTest } from '/js/services/generator-smoke.js';
+// import { validateSpecQuality } from '/js/services/generator-validate.js';
+// import { reconcileProbe } from '/js/services/generator-probe-reconcile.js';
+// import { createBundle } from '/js/services/generator-context-bundle.js';
+// These are NOT re-exported here because some have browser-only dependencies
+// that break server-side import chains.

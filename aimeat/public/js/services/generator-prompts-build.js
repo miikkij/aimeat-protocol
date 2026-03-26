@@ -14,10 +14,24 @@
  */
 
 import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER, COMPONENT_TEMPLATES, EXTENSION_CONSUMPTION_RULES, summarizeExtensionApi, summarizeCortexApi } from './generator-prompts-base.js';
-import { buildDataCortexPrompt } from './generator-prompts-cortex-data.js';
-import { buildFeatureCortexPrompt } from './generator-prompts-cortex-feature.js';
-import { buildAppDomainCortexPrompt } from './generator-prompts-cortex-app.js';
-import { createBundle, formatBundlesForPrompt } from './generator-context-bundle.js';
+
+// Lazy imports for cortex prompt templates — these files import from generator-prompts-base.js
+// which has browser-only dependencies. By using dynamic import(), they only load when actually
+// called in the browser, not when the server imports this module for test infrastructure.
+async function loadCortexPrompts() {
+  const [data, feature, app, bundle] = await Promise.all([
+    import('./generator-prompts-cortex-data.js'),
+    import('./generator-prompts-cortex-feature.js'),
+    import('./generator-prompts-cortex-app.js'),
+    import('./generator-context-bundle.js'),
+  ]);
+  return {
+    buildDataCortexPrompt: data.buildDataCortexPrompt,
+    buildFeatureCortexPrompt: feature.buildFeatureCortexPrompt,
+    buildAppDomainCortexPrompt: app.buildAppDomainCortexPrompt,
+    createBundle: bundle.createBundle,
+  };
+}
 
 export function buildBlueprintPrompt(description, interviewSpec = null, availableCortexLibs = null) {
   const specContext = interviewSpec ? `
@@ -969,8 +983,12 @@ If these are missing, the app WILL crash with "getTranslations is not a function
     const comp = componentId && blueprint.components.find(c => c.id === componentId);
     const subtype = comp?.subtype;
 
-    // Build context bundles from completed components
-    const bundles = (completedComponents || []).map(c => createBundle(c, c.probeResults));
+    // Only use specialized templates if subtype is set (new multi-cortex architecture)
+    if (subtype) {
+      // Return a promise — the caller must await it
+      return (async () => {
+        const { buildDataCortexPrompt, buildFeatureCortexPrompt, buildAppDomainCortexPrompt, createBundle } = await loadCortexPrompts();
+        const bundles = (completedComponents || []).map(c => createBundle(c, c.probeResults));
 
     if (subtype === 'data') {
       return buildDataCortexPrompt(label, projectDescription, blueprint, bundles);
@@ -995,6 +1013,10 @@ If these are missing, the app WILL crash with "getTranslations is not a function
       const translationBundle = bundles.find(b => b.type === 'translation');
       return buildAppDomainCortexPrompt(label, projectDescription, featureBundles, dataCortexBundle, translationBundle);
     }
+    // Fallback for unknown subtype — use generic cortex template
+    return INSTRUCTION_DISCLAIMER + template(label, context, completedComponents);
+      })(); // end async IIFE
+    } // end if (subtype)
   }
 
   // App and cortex templates receive completedComponents for cross-referencing
