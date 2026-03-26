@@ -1565,12 +1565,24 @@ export function summarizeCortexApiForApp(result, probeResults) {
       lines.push(entry.doc.trim());
     }
     lines.push(`async AIMEAT.${libName}.${entry.name}(${entry.params})`);
+
+    // Extract @returns shape from JSDoc for prominent display
+    if (entry.doc) {
+      const returnsMatch = entry.doc.match(/@returns\s+\{([^}]+)\}/);
+      if (returnsMatch) {
+        lines.push(`  ⚠️ RETURNS: ${returnsMatch[1].trim()}`);
+        lines.push(`  Use EXACTLY these field names when accessing the result.`);
+      }
+    }
+
     // Attach real response example from probe if available
     if (probeResults && probeResults.length > 0) {
       const probe = probeResults.find(p => p.action === entry.name);
       if (probe && probe.response) {
-        lines.push(`// Example response (captured from live API):`);
-        lines.push(`// ${JSON.stringify(probe.response).substring(0, 500)}`);
+        const example = JSON.stringify(probe.response, null, 2);
+        const truncated = example.length > 600 ? example.substring(0, 600) + '...' : example;
+        lines.push(`  ACTUAL RESPONSE (from live probe — use these EXACT field names):`);
+        lines.push(`  ${truncated.split('\n').join('\n  ')}`);
       }
     }
     lines.push('');
@@ -1593,8 +1605,13 @@ export function summarizeCortexApiForApp(result, probeResults) {
   }
 
   lines.push('');
-  lines.push('// These are the ONLY methods available. The cortex handles all extension');
-  lines.push('// communication internally. NEVER call callExt(), readExtMemory(), or /v1/ext/ directly.');
+  lines.push('╔══════════════════════════════════════════════════════════════════════════╗');
+  lines.push('║  Use EXACTLY the field names shown in @returns and ACTUAL RESPONSE      ║');
+  lines.push('║  above. If @returns says { companies: Array }, use .companies            ║');
+  lines.push('║  NOT .results, .data, .items, or any other guessed name.                ║');
+  lines.push('║  These are the ONLY methods available. NEVER call callExt(),            ║');
+  lines.push('║  readExtMemory(), or /v1/ext/ directly.                                  ║');
+  lines.push('╚══════════════════════════════════════════════════════════════════════════╝');
 
   return lines.join('\n');
 }
