@@ -1113,3 +1113,45 @@ A fix at the extension level can cascade through everything. A fix at the app le
 | Live preview between steps (WebContainer) | Requires browser runtime infrastructure |
 | Dependency-aware rollback | UI doesn't support rolling back to earlier components |
 | AutoFix post-processing | Requires streaming interception of AI output |
+
+---
+
+## 12. Fallback: Multi-Pass Skeleton Generation
+
+> **Status: NOT APPROVED FOR IMPLEMENTATION.** This approach is only to be used if all Priority 1-3 improvements from Section 10 have been implemented, tested, and the pipeline still fails to produce working applications. Requires explicit approval before starting.
+
+### The idea
+
+Instead of generating a complete component in one AI pass (500+ lines), break it into multiple smaller passes:
+
+1. **Pass 1 — Skeleton:** Generate the component structure: manifest, function stubs, exports, shared helpers. No implementation logic. This IS the contract — it defines signatures, return types, key names.
+
+2. **Pass 2-N — Fill one section at a time:** For each stub function, generate just that function's implementation. The AI sees only the skeleton + the specific requirements for this one function.
+
+3. **Validate after each pass:** After filling in each function, validate that it didn't break the skeleton. Run smoke test.
+
+4. **Same for tests:** Generate test skeleton from blueprint, then fill in one test case at a time.
+
+### Why it could work
+
+- **Smaller context per pass** — less "lost in the middle", AI focuses on one thing
+- **Each pass is independently verifiable** — if action 2 breaks, regenerate only action 2
+- **The skeleton IS the contract** — constrains the AI, prevents signature drift
+- **Partial success is possible** — 4/6 actions working beats 0/6 from full-component failure
+
+### Why we try current approach first
+
+- More round-trips per component (6 passes for extension vs 1)
+- The current single-pass approach works when given clear structures + golden samples + good prompts
+- The Priority 1-3 improvements (structures/$ref, context bundles, probes, contract verification) may be sufficient
+- Multi-pass adds complexity to the generator UI and pipeline flow
+
+### When to activate this fallback
+
+Only after ALL of these are true:
+1. All Priority 1 items (10.1-10.6) are implemented
+2. All Priority 2 items (10.7-10.14) are implemented
+3. A full pipeline run has been completed with all improvements
+4. The pipeline still fails to produce a working application
+5. The failures are traced to "AI generates wrong code despite correct prompt context" (not "prompt is missing information")
+6. Explicit approval given to proceed
