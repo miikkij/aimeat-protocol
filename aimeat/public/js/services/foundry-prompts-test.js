@@ -10,6 +10,8 @@
  * @version-history
  *   v1.0.0 — 2026-03-22 — Extracted from foundry-prompts.js
  *   v2.0.0 — 2026-03-24 — Full rewrite: remove duplication, fix contradictions, single source of truth per concept
+ *   v3.0.0 — 2026-03-26 — Add buildTestFirstPrompt for multi-pass pipeline:
+ *     generates tests from blueprint CONTRACT only, before implementation exists
  */
 
 import { INSTRUCTION_DISCLAIMER, SANDBOX_CONSTRAINTS, EXTENSION_CONSUMPTION_RULES } from './foundry-prompts-base.js';
@@ -397,5 +399,122 @@ callExt returns the action's result (envelope unwrapped). readExtMemory returns 
 - The extension name will be provided when the test runs — use a placeholder like 'EXT_NAME'
 - Return ONLY executable JavaScript. No markdown fences.
 - End with: return { passed: boolean, errors: string[], details: string }
+`;
+}
+
+/* ── Test-First Prompt Builder (Multi-Pass Pipeline) ─── */
+
+/**
+ * Build a test-first prompt that generates tests from the blueprint CONTRACT only.
+ * This prompt NEVER sees implementation code. It sees:
+ * - Blueprint component definition (action/method signatures)
+ * - Blueprint structures (data schemas)
+ * - Interview sample data
+ * - Test environment rules
+ *
+ * The generated tests define what "correct" means BEFORE any code exists.
+ *
+ * @param {object} params
+ * @param {string} params.componentType - 'extension' | 'cortex' | 'app'
+ * @param {string} [params.subtype] - 'data' | 'feature' | 'app-domain' (for cortex)
+ * @param {string} params.label - Component label
+ * @param {object} params.blueprint - Full blueprint
+ * @param {object} params.blueprintComponent - This component's blueprint entry
+ * @param {object} params.interviewSpec - Interview specification
+ * @returns {string} - The prompt text
+ */
+export function buildTestFirstPrompt({ componentType, subtype, label, blueprint, blueprintComponent, interviewSpec }) {
+  const structures = blueprint.dataModel?.structures || {};
+  const actions = blueprint.dataModel?.actions || {};
+  const scenarios = blueprint.testScenarios || [];
+
+  // Collect sample data from interview
+  const sampleData = (interviewSpec?.dataSources || [])
+    .filter(ds => ds.sampleEntry || ds.sampleResponse)
+    .map(ds => ({ name: ds.name, sample: ds.sampleResponse || ds.sampleEntry }));
+
+  const isServerSide = componentType === 'extension';
+  const environment = isServerSide ? 'server' : 'browser';
+
+  let environmentRules = '';
+  if (isServerSide) {
+    environmentRules = `
+## Test Environment: Server-Side (V8 Sandbox)
+
+Tests run in the AIMEAT extension test runner. Available helpers:
+- \`callExt(extName, actionId, body)\` — calls the extension action, returns the action's result (envelope unwrapped)
+- \`readExtMemory(extName, key)\` — reads from ext:{name} namespace, returns value or null
+- \`testFetch(url, opts)\` — raw HTTP call with auth token injected
+
+Your code runs as an async function body. No import/require/export.
+End with: return { passed: boolean, errors: string[], details: string }
+
+${SANDBOX_CONSTRAINTS}`;
+  } else {
+    environmentRules = `
+## Test Environment: Browser
+
+Tests run in a browser page with the AIMEAT platform loaded. Available:
+- \`window.AIMEAT\` — platform namespace with loaded cortex libraries
+- \`session.fetch(url, opts)\` — authenticated fetch
+- DOM APIs: document.createElement, querySelector, etc.
+- The cortex/app component is loaded and accessible
+
+Test format: set window.__testResults = { passed: boolean, errors: string[], details: string }
+
+For CORTEX tests:
+- Access library via: window.AIMEAT.{camelCaseName}
+- Call methods, verify return shapes and data
+- Test with real parameters, assert non-null results
+
+For APP tests:
+- The app HTML is loaded in the page
+- Wait for data to render: await new Promise(r => setTimeout(r, 3000));
+- Check DOM elements exist, verify content renders`;
+  }
+
+  return `${INSTRUCTION_DISCLAIMER}
+# Task: Generate Tests From Contract (Test-First)
+
+You are generating tests BEFORE any implementation code exists. You have NEVER seen the implementation. Your tests define what "correct" means based on the CONTRACT (blueprint signatures + interview sample data).
+
+## Project
+${label}
+
+## Component Being Tested
+Type: ${componentType}${subtype ? ` (${subtype})` : ''}
+
+## Action/Method Signatures (from blueprint)
+${Object.entries(actions)
+    .filter(([, v]) => v.component === blueprintComponent.id)
+    .map(([name, def]) => `### ${name}\n- Input: \`${JSON.stringify(def.input || {})}\`\n- Output: \`${JSON.stringify(def.output || {})}\`\n- Description: ${def.description || 'N/A'}`)
+    .join('\n\n') || 'No actions declared in blueprint.'}
+
+## Data Structures
+${Object.entries(structures).map(([name, schema]) => `### ${name}\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\``).join('\n\n') || 'No structures.'}
+
+## Sample Data (from interview — this is REAL data)
+${sampleData.map(sd => `### ${sd.name}\n\`\`\`json\n${JSON.stringify(sd.sample, null, 2).slice(0, 2000)}\n\`\`\``).join('\n\n') || 'No sample data.'}
+
+## Test Scenarios (from blueprint)
+${scenarios.map((s, i) => `${i + 1}. ${s.description || s}`).join('\n') || 'No specific scenarios — test each action/method.'}
+
+${environmentRules}
+
+## Output
+
+Produce a single code block with the test code. The tests must:
+
+1. **Test each action/method signature** — call it, verify the response has the correct field names and types
+2. **Test with sample data** — if sample data is provided, use it to verify real behavior
+3. **Test error cases** — empty input, missing required fields
+4. **Test data shapes** — verify response objects have the EXACT fields declared in the blueprint structures
+5. **NEVER assume implementation details** — test the public contract only
+
+\`\`\`javascript
+// Tests for: ${label}
+// Generated from: blueprint contract + interview samples
+// This code was generated BEFORE the implementation exists.
+\`\`\`
 `;
 }
