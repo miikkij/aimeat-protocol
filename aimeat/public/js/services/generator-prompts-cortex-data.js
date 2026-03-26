@@ -8,6 +8,7 @@
  *   import { buildDataCortexPrompt } from '/js/services/generator-prompts-cortex-data.js';
  * @version-history
  *   v1.0.0 — 2026-03-26 — Initial data cortex prompt template
+ *   v1.1.0 — 2026-03-26 — Add full cortex YAML manifest format to output section
  */
 
 import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER } from './generator-prompts-base.js';
@@ -90,8 +91,51 @@ This data cortex uses AIMEAT platform libraries directly (no extension needed).
 
 ## Output Format
 
-Single IIFE that registers on window.AIMEAT:
+Return TWO separate, properly tagged code blocks.
+The installer expects them separately — YAML defines the manifest, JS is the library file.
 
+CRITICAL: Use \`\`\`yaml for the manifest and \`\`\`javascript for the library code.
+Do NOT combine them into a single block. Do NOT use an untagged block.
+
+First block — YAML manifest:
+\`\`\`yaml
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: kebab-case-name
+  namespace: community
+  description: "What this data cortex does"
+  author: generator
+  tags: [data, domain-tag]
+  labels:
+    domain: specific-domain
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: prompt
+      name: domain-assistant
+      content: |
+        You are using the {{metadata.name}} cortex library.
+        Node URL: {{node_url}}
+
+        Available API:
+        AIMEAT.yourLib.methodName(params) — Description
+        ...
+
+        To load in an app:
+        <script src="{{node_url}}/v1/cortex/kebab-case-name/libs/kebab-case-name.js"></script>
+
+    - type: lib
+      name: kebab-case-name
+      filename: kebab-case-name.js
+      exports: [methodName, ...]
+      api_surface: |
+        AIMEAT.yourLib.methodName(params) — Description and return type
+        ...
+\`\`\`
+
+Second block — JavaScript library:
 \`\`\`javascript
 (function (AIMEAT) {
   'use strict';
@@ -109,7 +153,5 @@ Single IIFE that registers on window.AIMEAT:
   AIMEAT[LIB_NAME] = exports;
 })(window.AIMEAT || (window.AIMEAT = {}));
 \`\`\`
-
-Return TWO code blocks: \`\`\`yaml for the cortex manifest and \`\`\`javascript for the library.
 `;
 }

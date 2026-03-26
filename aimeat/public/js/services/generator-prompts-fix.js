@@ -36,6 +36,26 @@ ${buildBlueprintPrompt(description, interviewSpec)}`;
  * Build a reflection prompt — asks AI to diagnose the failure WITHOUT writing code.
  * The diagnosis is then fed into the actual fix prompt for better results.
  */
+/**
+ * Build an explain prompt — asks AI to describe what the generated component does.
+ * Run after generation, before validation. Compares against blueprint contract.
+ */
+export function buildExplainPrompt(componentType, generatedResult, blueprintComponent) {
+  const produces = (blueprintComponent?.produces || []).join(', ') || 'none specified';
+  return `You just generated a ${componentType} component. Before we validate it, explain what you built.
+
+## Generated Code (abbreviated)
+${(generatedResult || '').substring(0, 2000)}
+
+## Blueprint Contract
+This component must produce: ${produces}
+
+## Your Task (2-5 sentences, no code)
+1. What does this component export or provide?
+2. What data shapes does it return?
+3. Does it match the blueprint contract above? If not, what's missing?`;
+}
+
 export function buildReflectionPrompt(failedResult, errors, testContext) {
   let prompt = `You are debugging a failed component. Your job is to DIAGNOSE the problem — do NOT write code.
 

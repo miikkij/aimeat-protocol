@@ -878,10 +878,25 @@ window.__testRunning = true;
         ? validation.extracted
         : JSON.stringify(validation.extracted);
 
+      // Merge with existing record to preserve frontend fields (id, label, prompt, history, etc.)
+      const existingValue = (existingRec?.value ?? {}) as Record<string, unknown>;
+      // Resolve label from blueprint if not in existing record
+      const bpComp = blueprint.components?.find((c: { id: string }) => c.id === componentId);
+      const mergedValue = {
+        ...existingValue,
+        id: componentId,
+        label: existingValue.label || bpComp?.label || componentId,
+        type,
+        result: extractedContent,
+        content: extractedContent,
+        status: 'ready',
+        submittedAt: now,
+      };
+
       await storage.setMemory({
         key: `generator.${projectId}.component.${componentId}`,
         ownerGaii: gaii,
-        value: { type, content: extractedContent, status: 'ready', submittedAt: now },
+        value: mergedValue,
         visibility: 'owner',
         version: newVersion,
         tags: ['generator', 'component', type as string],

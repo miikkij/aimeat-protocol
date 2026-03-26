@@ -846,7 +846,7 @@ Reserve space for it in your layout — do not overlap or hide it:
 - DO NOT add manual configuration fields for API URL, Bearer Token, or Instance ID
 - DO NOT use prompt() or manual token entry — the auth library handles everything
 - ALL API paths MUST be relative (start with /) — never use absolute URLs or NODE_URL
-- Use \`window.AIMEAT.auth.getSession()\` to check if logged in; show a "Sign in" message if not
+- Use \`await AIMEAT.auth.login()\` to restore session from storage; if null, show a "Sign in" message. getSession() alone returns null until login() is called.
 - Use vanilla JS (no build step needed)
 - All dates displayed to users should be formatted from ISO 8601 strings (never store display-formatted dates)
 - Has a clean, responsive UI with good mobile support

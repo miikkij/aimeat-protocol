@@ -28,8 +28,10 @@ import { apiPost } from '/js/api.js';
 import {
   saveComponent, registerComponent, reregisterComponent, writeProjectLog, writeDebugArtifact,
 } from '/js/services/generator.js';
-import { buildComponentPrompt, buildFixPrompt, buildTestPrompt } from '/js/services/generator-prompts.js';
+import { buildComponentPrompt, buildFixPrompt, buildReflectionPrompt, buildTestPrompt } from '/js/services/generator-prompts.js';
 import { validateComponent } from '/js/services/generator-validate.js';
+import { verifyContract } from '/js/services/generator-contract.js';
+import { smokeTest } from '/js/services/generator-smoke.js';
 import { runComponentTest, screenshotUrl } from '/js/services/generator-testing.js';
 
 /* ── OpenRouter Autopilot Helpers (shared) ───────────── */
@@ -190,6 +192,16 @@ export function ComponentDetail({ component, project, components, projectId, int
     const vr = validateComponent(component.type, result, project.blueprint);
     setValidationResult(vr);
     if (vr.valid) {
+      // Contract verification — check generated output matches blueprint contract
+      const bpComp = project.blueprint?.components?.find(c => c.label === component.label || c.id === component.id);
+      const cr = verifyContract(component.type, result, bpComp, project.blueprint);
+      if (!cr.valid) {
+        vr.valid = false;
+        vr.errors = [...(vr.errors || []), ...cr.mismatches.map(m => `Contract: ${m}`)];
+        setValidationResult(vr);
+      }
+    }
+    if (vr.valid) {
       const done = addHistory(validating, 'validation_passed');
       await saveComponent(projectId, { ...done, status: 'done', result, validationErrors: [] });
     } else {
@@ -240,7 +252,13 @@ export function ComponentDetail({ component, project, components, projectId, int
       }
       const registered = addHistory(component, 'registered', { registeredAs: regName });
       await saveComponent(projectId, { ...registered, status: 'done', registeredAs: regName });
-      showToast?.(t('profile.generator.componentRegistered').replace('{name}', regName));
+      // Smoke test after registration — catch load failures early
+      const smoke = await smokeTest(component.type, regName, session);
+      if (!smoke.passed) {
+        showToast?.(`Smoke test failed: ${smoke.error}`, true);
+      } else {
+        showToast?.(t('profile.generator.componentRegistered').replace('{name}', regName));
+      }
       window.dispatchEvent(new CustomEvent('aimeat-live-update'));
       await onUpdate();
       // Auto-advance to next component after successful registration
@@ -364,6 +382,10 @@ export function ComponentDetail({ component, project, components, projectId, int
     setAiRunning(false);
   }
 
+  // Mandatory reflection before fix — diagnose first, then fix
+  const reflectionPrompt = validationResult && !validationResult.valid
+    ? buildReflectionPrompt(result, validationResult.errors)
+    : null;
   const fixPrompt = validationResult && !validationResult.valid
     ? buildFixPrompt(prompt, result, validationResult.errors, component.type)
     : null;
@@ -553,11 +575,18 @@ export function ComponentDetail({ component, project, components, projectId, int
           <ul>
             ${validationResult.errors.map(e => html`<li>${e}</li>`)}
           </ul>
+          ${reflectionPrompt && html`
+            <div class="flex-row" style="margin-bottom: 0.5rem">
+              <button class="btn-outline btn-sm" onClick=${() => navigator.clipboard.writeText(reflectionPrompt)}>
+                1. Copy Reflection (diagnose first)
+              </button>
+            </div>
+          `}
           ${fixPrompt && html`
             <div class="flex-row">
               ${workflowStep === 'fix' && html`<${StepArrow} />`}
               <button class="btn-primary btn-sm" onClick=${() => navigator.clipboard.writeText(fixPrompt)}>
-                ${t('profile.generator.copyFixPrompt')}
+                2. ${t('profile.generator.copyFixPrompt')}
               </button>
             </div>
           `}

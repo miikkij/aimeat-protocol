@@ -32,6 +32,7 @@ if (typeof window !== 'undefined') {
       buildFeatureCortexPrompt: feature.buildFeatureCortexPrompt,
       buildAppDomainCortexPrompt: app.buildAppDomainCortexPrompt,
       createBundle: bundle.createBundle,
+      formatBundlesForPrompt: bundle.formatBundlesForPrompt,
     };
   }).catch(() => { /* server-side or import failure — cortex prompts unavailable */ });
 }
@@ -691,27 +692,47 @@ export function buildComponentPrompt(type, label, projectDescription, blueprint,
   }
 
   if (completedComponents && completedComponents.length > 0) {
-    context += '\nAlready completed:\n';
-    for (const c of completedComponents) {
-      context += `- ${c.id} (${c.type}: ${c.label}): registered as "${c.registeredAs}"\n`;
-      // For extensions and cortex: include API summary instead of full code to avoid
-      // prompt bloat that overwhelms the AI. Full code is injected by the cortex/app
-      // template only for the specific components that template needs.
-      if (c.result && c.type === 'extension') {
-        context += `  API summary:\n${summarizeExtensionApi(c.result)}\n`;
-        // Inject probe results — real API responses captured from live execution
-        if (c.probeResults && Array.isArray(c.probeResults) && c.probeResults.length > 0 && (type === 'cortex' || type === 'app' || type === 'extension')) {
-          context += `\n  ## ACTUAL API RESPONSES (captured from live execution of ${c.registeredAs})\n`;
-          context += `  Study these carefully — your code MUST handle these exact data shapes.\n\n`;
-          for (const probe of c.probeResults) {
-            if (probe.status === 200 && probe.response) {
-              context += `  POST /v1/ext/${c.registeredAs}/${probe.action} ${JSON.stringify(probe.input)}\n`;
-              context += `  → ${JSON.stringify(probe.response)}\n\n`;
+    // Use context bundles when available — structured summaries from registration + probe
+    const bundled = completedComponents.filter(c => c.contextBundle);
+    const unbundled = completedComponents.filter(c => !c.contextBundle);
+
+    if (bundled.length > 0) {
+      const { formatBundlesForPrompt } = _cortexModules || {};
+      if (formatBundlesForPrompt) {
+        context += formatBundlesForPrompt(bundled.map(c => c.contextBundle));
+      } else {
+        // Fallback: simple listing if module not loaded
+        context += '\nAlready completed:\n';
+        for (const c of bundled) {
+          const b = c.contextBundle;
+          context += `- ${c.id} (${c.type}: ${c.label}): registered as "${b.registeredAs}"`;
+          if (b.actions) context += ` — actions: ${b.actions.join(', ')}`;
+          if (b.exports) context += ` — exports: ${b.exports.join(', ')}`;
+          context += '\n';
+        }
+      }
+    }
+
+    // Fallback for components without bundles
+    if (unbundled.length > 0) {
+      context += '\nAlready completed:\n';
+      for (const c of unbundled) {
+        context += `- ${c.id} (${c.type}: ${c.label}): registered as "${c.registeredAs}"\n`;
+        if (c.result && c.type === 'extension') {
+          context += `  API summary:\n${summarizeExtensionApi(c.result)}\n`;
+          if (c.probeResults && Array.isArray(c.probeResults) && c.probeResults.length > 0 && (type === 'cortex' || type === 'app' || type === 'extension')) {
+            context += `\n  ## ACTUAL API RESPONSES (captured from live execution of ${c.registeredAs})\n`;
+            context += `  Study these carefully — your code MUST handle these exact data shapes.\n\n`;
+            for (const probe of c.probeResults) {
+              if (probe.status === 200 && probe.response) {
+                context += `  POST /v1/ext/${c.registeredAs}/${probe.action} ${JSON.stringify(probe.input)}\n`;
+                context += `  → ${JSON.stringify(probe.response)}\n\n`;
+              }
             }
           }
+        } else if (c.result && c.type === 'cortex') {
+          context += `  API summary:\n${summarizeCortexApi(c.result)}\n`;
         }
-      } else if (c.result && c.type === 'cortex') {
-        context += `  API summary:\n${summarizeCortexApi(c.result)}\n`;
       }
     }
   }

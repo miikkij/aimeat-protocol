@@ -18,7 +18,7 @@
 export { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER, COMPONENT_TEMPLATES } from './generator-prompts-base.js';
 export { buildBlueprintPrompt, buildInterviewPrompt, buildComponentPrompt } from './generator-prompts-build.js';
 export { buildTestPrompt, buildExtensionTestFirstPrompt } from './generator-prompts-test.js';
-export { buildBlueprintFixPrompt, buildFixPrompt, buildReflectionPrompt, buildFreshGenerationPrompt, buildImpactPrompt, buildEditPrompt } from './generator-prompts-fix.js';
+export { buildBlueprintFixPrompt, buildFixPrompt, buildReflectionPrompt, buildExplainPrompt, buildFreshGenerationPrompt, buildImpactPrompt, buildEditPrompt } from './generator-prompts-fix.js';
 // New V5 modules
 export { buildDataCortexPrompt } from './generator-prompts-cortex-data.js';
 export { buildFeatureCortexPrompt } from './generator-prompts-cortex-feature.js';

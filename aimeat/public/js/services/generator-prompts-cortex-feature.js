@@ -222,7 +222,43 @@ function dv(val) {
 
 ## Output Format
 
-Return TWO code blocks: \`\`\`yaml for the cortex manifest and \`\`\`javascript for the library.
-The library is a single IIFE exporting render(container) and any other public methods.
+Return TWO separate, properly tagged code blocks.
+CRITICAL: Use \`\`\`yaml for the manifest and \`\`\`javascript for the library code.
+
+First block — YAML manifest:
+\`\`\`yaml
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: kebab-case-feature-name
+  namespace: community
+  description: "Feature description"
+  author: generator
+  tags: [feature, domain-tag]
+  labels:
+    domain: specific-domain
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: lib
+      name: kebab-case-feature-name
+      filename: kebab-case-feature-name.js
+      exports: [render]
+      api_surface: |
+        AIMEAT.featureLib.render(container) — Renders the feature UI into the given DOM element
+\`\`\`
+
+Second block — JavaScript library:
+\`\`\`javascript
+(function (AIMEAT) {
+  'use strict';
+  const LIB_NAME = 'featureLib'; // camelCase
+  // ... render(container) implementation
+  var exports = { render: render };
+  if (AIMEAT.register) AIMEAT.register(LIB_NAME, exports);
+  AIMEAT[LIB_NAME] = exports;
+})(window.AIMEAT || (window.AIMEAT = {}));
+\`\`\`
 `;
 }

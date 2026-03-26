@@ -102,7 +102,11 @@ Before adding any new npm package:
 
 Full guide: `docs/coding-guidelines/dependency-management.md`
 
-### Rule 6: ESLint Must Pass
+### Rule 6: Always Use Opus 4.6 for Subagents
+
+All Agent tool calls MUST use `model: "opus"` or omit the model parameter (which inherits the parent model). NEVER set `model: "sonnet"` or `model: "haiku"` for any subagent. The quality difference matters — Sonnet does not follow complex format instructions reliably.
+
+### Rule 7: ESLint Must Pass
 
 All code changes must pass linting:
 

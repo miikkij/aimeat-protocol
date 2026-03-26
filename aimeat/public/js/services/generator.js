@@ -324,6 +324,24 @@ export async function loadAllComponents(projectId) {
   const items = resp?.data?.items || resp?.data?.entries || [];
   return items.map(i => {
     const val = typeof i.value === 'string' ? JSON.parse(i.value) : i.value;
+    // Ensure id is present — extract from memory key if missing (backend submit may omit it)
+    if (!val.id && i.key) {
+      const prefix = `generator.${projectId}.component.`;
+      val.id = i.key.startsWith(prefix) ? i.key.slice(prefix.length) : i.key;
+    }
+    if (!val.label) val.label = val.id;
+    // Map backend 'content' field to frontend 'result' if result is missing
+    if (!val.result && val.content) val.result = val.content;
+    // Reconstruct raw markdown from extracted cortex JSON — the validator expects yaml+js code blocks
+    if (val.result && val.type === 'cortex' && typeof val.result === 'string') {
+      try {
+        const parsed = JSON.parse(val.result);
+        if (parsed.manifest && parsed.libs) {
+          const js = parsed.libs[0]?.code || '';
+          val.result = '```yaml\n' + parsed.manifest + '\n```\n\n```javascript\n' + js + '\n```';
+        }
+      } catch { /* not extracted JSON — already in raw format, leave as-is */ }
+    }
     return { ...val, _version: i.version };
   });
 }

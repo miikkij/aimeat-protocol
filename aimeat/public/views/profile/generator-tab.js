@@ -59,7 +59,7 @@ import {
   writeProjectLog,
 } from '/js/services/generator.js';
 import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildInterviewPrompt } from '/js/services/generator-prompts.js';
-import { validateBlueprint, validateInterviewSpec } from '/js/services/generator-validate.js';
+import { validateBlueprint, validateInterviewSpec, validateSpecQuality } from '/js/services/generator-validate.js';
 import { OpenRouterSettings, SettingsCollectionView } from './generator-settings.js';
 import { runWithAi } from './generator-detail.js';
 import { ProjectDashboard } from './generator-dashboard.js';
@@ -234,6 +234,10 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
             interviewDone: true,
             enhancedDescription: vr.parsed.description,
           });
+          // Spec quality gate — show warnings but allow proceeding
+          const qr = validateSpecQuality(vr.parsed);
+          if (qr.warnings.length > 0) showToast?.(qr.warnings.join('; '), true);
+          if (!qr.valid) { setInterviewErrors(qr.errors); return; }
           showToast?.(t('profile.generator.openrouter.stepComplete'));
           setPhase('blueprint');
         } else {
@@ -260,6 +264,10 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
         interviewDone: true,
         enhancedDescription: vr.parsed.description,
       });
+      // Spec quality gate — show warnings but allow proceeding
+      const qr = validateSpecQuality(vr.parsed);
+      if (qr.warnings.length > 0) showToast?.(qr.warnings.join('; '), true);
+      if (!qr.valid) { setInterviewErrors(qr.errors); return; }
       showToast?.(t('profile.generator.specImported'));
       setPhase('blueprint');
     }

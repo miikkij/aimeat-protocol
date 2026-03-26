@@ -69,11 +69,11 @@ ${translationKeys}
 
 ## Auth Pattern
 \`\`\`javascript
-// Check if user is authenticated
-var session = AIMEAT.auth.getSession();
+// Restore session from storage (MUST call login() first — getSession() alone returns null)
+var session = await AIMEAT.auth.login();
 if (!session) {
-  // Show login prompt or mount auth UI
-  AIMEAT.auth.mountLogin(container);
+  // No stored session — show login button
+  AIMEAT.auth.mountLoginButton(container);
   return { ready: false, authenticated: false };
 }
 \`\`\`
@@ -101,7 +101,47 @@ function t(key, vars) {
 
 ## Output Format
 
-Return TWO code blocks: \`\`\`yaml for the cortex manifest and \`\`\`javascript for the library.
-The library is a single IIFE. It loads and composes the feature cortex components.
+Return TWO separate, properly tagged code blocks.
+CRITICAL: Use \`\`\`yaml for the manifest and \`\`\`javascript for the library code.
+
+First block — YAML manifest:
+\`\`\`yaml
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: kebab-case-app-name
+  namespace: community
+  description: "App-domain cortex description"
+  author: generator
+  tags: [app, domain-tag]
+  labels:
+    domain: specific-domain
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: lib
+      name: kebab-case-app-name
+      filename: kebab-case-app-name.js
+      exports: [init, render, t, switchLocale, getTranslations]
+      api_surface: |
+        AIMEAT.appLib.init() — Initialize auth, load translations. Returns { ready, authenticated }
+        AIMEAT.appLib.render(container) — Render the full application into DOM container
+        AIMEAT.appLib.t(key, vars) — Translate with interpolation
+        AIMEAT.appLib.switchLocale(locale) — Change language and re-render
+        AIMEAT.appLib.getTranslations(locale) — Load translations for locale
+\`\`\`
+
+Second block — JavaScript library:
+\`\`\`javascript
+(function (AIMEAT) {
+  'use strict';
+  const LIB_NAME = 'appLib'; // camelCase
+  // ... init/render implementation
+  var exports = { init, render, t, switchLocale, getTranslations };
+  if (AIMEAT.register) AIMEAT.register(LIB_NAME, exports);
+  AIMEAT[LIB_NAME] = exports;
+})(window.AIMEAT || (window.AIMEAT = {}));
+\`\`\`
 `;
 }

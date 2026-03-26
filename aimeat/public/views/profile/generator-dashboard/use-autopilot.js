@@ -35,6 +35,7 @@ import {
 import { buildComponentPrompt, buildFixPrompt, buildReflectionPrompt, buildFreshGenerationPrompt, buildTestPrompt } from '/js/services/generator-prompts.js';
 import { validateComponent } from '/js/services/generator-validate.js';
 import { runComponentTest, probeExtension } from '/js/services/generator-testing.js';
+import { createBundle } from '/js/services/generator-context-bundle.js';
 import { runWithAi, stripCodeblock } from '../generator-detail.js';
 
 /**
@@ -255,8 +256,9 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
               const probeResp = await probeExtension(projectId, updated.registeredAs, probeScenarios);
               const probeResults = probeResp?.data?.results || [];
 
-              // Save probe results to component data — downstream prompts will inject these
-              updated = { ...updated, probeResults,
+              // Save probe results + context bundle — downstream prompts will inject these
+              const contextBundle = createBundle(updated, probeResults);
+              updated = { ...updated, probeResults, contextBundle,
                 history: [...(updated.history || []), { action: 'extension_probed', at: new Date().toISOString(), by: 'autopilot', probed: probeResults.length }],
               };
               await saveComponent(projectId, updated);
