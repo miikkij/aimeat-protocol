@@ -1,0 +1,366 @@
+```yaml
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: prh-sovellusalue
+  namespace: community
+  description: "PRH Yritystietopalvelu sovellusalue — yhdistää kaikki ominaisuuskomponentit, autentikoinnin ja käännökset"
+  author: generator
+  tags: [app, prh]
+  labels:
+    domain: prh-yritystietopalvelu
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: lib
+      name: prh-sovellusalue
+      filename: prh-sovellusalue.js
+      exports: [init, render, t, switchLocale, getTranslations]
+      api_surface: |
+        AIMEAT.prhSovellusalue.init() — Initialize auth, load translations. Returns { ready, authenticated }
+        AIMEAT.prhSovellusalue.render(container) — Render the full application into DOM container
+        AIMEAT.prhSovellusalue.t(key, vars) — Translate with interpolation
+        AIMEAT.prhSovellusalue.switchLocale(locale) — Change language and re-render
+        AIMEAT.prhSovellusalue.getTranslations(locale) — Load translations for locale
+```
+
+```javascript
+/**
+ * prh-sovellusalue — App-domain cortex for PRH Yritystietopalvelu.
+ *
+ * Composes feature cortex components (prhHaku, prhSeurantalista, prhVertailu),
+ * auth initialization, and translation management into a single entry point.
+ *
+ * Usage:
+ *   <script src="/v1/cortex/prh-sovellusalue/libs/prh-sovellusalue.js"></script>
+ *   <script>
+ *     AIMEAT.prhSovellusalue.init().then(function(r) {
+ *       if (r.ready) AIMEAT.prhSovellusalue.render(document.getElementById('app'));
+ *     });
+ *   </script>
+ */
+(function (AIMEAT) {
+  'use strict';
+
+  var LIB_NAME = 'prhSovellusalue';
+  var translations = {};
+  var currentLocale = 'fi';
+  var currentContainer = null;
+  var activeTab = 'search';
+
+  /* ── CSS ──────────────────────────────────────────────── */
+
+  var stylesInjected = false;
+  var CSS = [
+    '.prh-app-root {',
+    '  font-family: "DM Sans", system-ui, sans-serif;',
+    '  max-width: 960px;',
+    '  margin: 0 auto;',
+    '  padding: 1rem;',
+    '}',
+    '.prh-app-header {',
+    '  display: flex;',
+    '  align-items: center;',
+    '  justify-content: space-between;',
+    '  margin-bottom: 1rem;',
+    '  padding-bottom: 0.75rem;',
+    '  border-bottom: 1px solid var(--border, #E5E7EB);',
+    '}',
+    '.prh-app-title {',
+    '  font-size: 1.25rem;',
+    '  font-weight: 700;',
+    '  color: var(--text, #1A1A2E);',
+    '  margin: 0;',
+    '}',
+    '.prh-app-locale-btn {',
+    '  background: none;',
+    '  border: 1px solid var(--border, #E5E7EB);',
+    '  border-radius: 6px;',
+    '  padding: 0.25rem 0.75rem;',
+    '  font-size: 0.8125rem;',
+    '  font-weight: 500;',
+    '  color: var(--text-dim, #6B7280);',
+    '  cursor: pointer;',
+    '  font-family: inherit;',
+    '  transition: border-color 0.15s, color 0.15s;',
+    '}',
+    '.prh-app-locale-btn:hover {',
+    '  border-color: var(--accent, #E8564A);',
+    '  color: var(--accent, #E8564A);',
+    '}',
+    '.prh-app-tabs {',
+    '  display: flex;',
+    '  overflow-x: auto;',
+    '  gap: 0;',
+    '  border-bottom: 1px solid var(--border, #E5E7EB);',
+    '  margin-bottom: 1rem;',
+    '  scrollbar-width: thin;',
+    '}',
+    '.prh-app-tabs::-webkit-scrollbar { height: 3px }',
+    '.prh-app-tabs::-webkit-scrollbar-thumb { background: var(--border, #E5E7EB); border-radius: 3px }',
+    '.prh-app-tab {',
+    '  position: relative;',
+    '  padding: 0.625rem 1rem;',
+    '  white-space: nowrap;',
+    '  background: none;',
+    '  border: none;',
+    '  cursor: pointer;',
+    '  font-size: 0.875rem;',
+    '  font-weight: 500;',
+    '  color: var(--text-dim, #6B7280);',
+    '  font-family: inherit;',
+    '  transition: color 0.15s;',
+    '}',
+    '.prh-app-tab:hover {',
+    '  color: var(--text, #1A1A2E);',
+    '}',
+    '.prh-app-tab[aria-selected="true"] {',
+    '  color: var(--accent, #E8564A);',
+    '  font-weight: 600;',
+    '}',
+    '.prh-app-tab[aria-selected="true"]::after {',
+    '  content: "";',
+    '  position: absolute;',
+    '  bottom: -1px;',
+    '  left: 0;',
+    '  right: 0;',
+    '  height: 2px;',
+    '  background: var(--accent, #E8564A);',
+    '  border-radius: 2px 2px 0 0;',
+    '}',
+    '.prh-app-content {',
+    '  min-height: 200px;',
+    '}',
+    '.prh-app-loading {',
+    '  display: flex;',
+    '  align-items: center;',
+    '  justify-content: center;',
+    '  padding: 3rem;',
+    '  color: var(--text-dim, #6B7280);',
+    '  font-size: 0.875rem;',
+    '}'
+  ].join('\n');
+
+  function injectStyles() {
+    if (stylesInjected) return;
+    var el = document.createElement('style');
+    el.textContent = CSS;
+    document.head.appendChild(el);
+    stylesInjected = true;
+  }
+
+  /* ── Tab definitions ─────────────────────────────────── */
+
+  var TABS = [
+    { id: 'search',    labelKey: 'tab.search',    icon: '\uD83D\uDD0D' },
+    { id: 'company',   labelKey: 'tab.company',   icon: '\uD83C\uDFE2' },
+    { id: 'watchlist', labelKey: 'tab.watchlist',  icon: '\u2B50' },
+    { id: 'changes',   labelKey: 'tab.changes',   icon: '\uD83D\uDCC5' },
+    { id: 'compare',   labelKey: 'tab.compare',   icon: '\u2696\uFE0F' }
+  ];
+
+  /* ── Translation helpers ─────────────────────────────── */
+
+  function t(key, vars) {
+    var str = translations[key] || key;
+    if (vars) {
+      Object.keys(vars).forEach(function (k) {
+        str = str.replace('${' + k + '}', vars[k]);
+      });
+    }
+    return str;
+  }
+
+  async function loadTranslations(locale) {
+    try {
+      var data = await AIMEAT.data.getPublic('ext:prh-avoindata', 'i18n.' + locale);
+      return data || {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  async function getTranslations(locale) {
+    return await loadTranslations(locale || currentLocale);
+  }
+
+  async function switchLocale(locale) {
+    currentLocale = locale;
+    translations = await loadTranslations(locale);
+    if (currentContainer) {
+      render(currentContainer);
+    }
+  }
+
+  /* ── Init ─────────────────────────────────────────────── */
+
+  async function init() {
+    injectStyles();
+
+    var session = await AIMEAT.auth.login();
+    if (!session) {
+      return { ready: false, authenticated: false };
+    }
+
+    translations = await loadTranslations(currentLocale);
+
+    return { ready: true, authenticated: true };
+  }
+
+  /* ── Render ───────────────────────────────────────────── */
+
+  function render(container) {
+    currentContainer = container;
+    container.innerHTML = '';
+
+    /* Auth guard */
+    var session = AIMEAT.auth.getSession();
+    if (!session) {
+      AIMEAT.auth.mountLoginButton(container);
+      return;
+    }
+
+    /* Root wrapper */
+    var root = document.createElement('div');
+    root.className = 'prh-app-root';
+
+    /* Header */
+    var header = document.createElement('div');
+    header.className = 'prh-app-header';
+
+    var title = document.createElement('h1');
+    title.className = 'prh-app-title';
+    title.textContent = t('app.title', null) !== 'app.title'
+      ? t('app.title')
+      : 'PRH Yritystietopalvelu';
+    header.appendChild(title);
+
+    var localeBtn = document.createElement('button');
+    localeBtn.className = 'prh-app-locale-btn';
+    localeBtn.textContent = currentLocale === 'fi' ? 'EN' : 'FI';
+    localeBtn.addEventListener('click', function () {
+      var next = currentLocale === 'fi' ? 'en' : 'fi';
+      switchLocale(next);
+    });
+    header.appendChild(localeBtn);
+
+    root.appendChild(header);
+
+    /* Tab bar */
+    var tabBar = document.createElement('div');
+    tabBar.className = 'prh-app-tabs';
+    tabBar.setAttribute('role', 'tablist');
+
+    TABS.forEach(function (tab) {
+      var btn = document.createElement('button');
+      btn.className = 'prh-app-tab';
+      btn.setAttribute('role', 'tab');
+      btn.setAttribute('aria-selected', tab.id === activeTab ? 'true' : 'false');
+      btn.setAttribute('data-tab', tab.id);
+      btn.textContent = tab.icon + ' ' + t(tab.labelKey);
+      btn.addEventListener('click', function () {
+        activateTab(tab.id, tabBar, contentArea);
+      });
+      tabBar.appendChild(btn);
+    });
+
+    root.appendChild(tabBar);
+
+    /* Content area */
+    var contentArea = document.createElement('div');
+    contentArea.className = 'prh-app-content';
+    root.appendChild(contentArea);
+
+    container.appendChild(root);
+
+    /* Render active tab content */
+    renderTabContent(activeTab, contentArea);
+  }
+
+  /* ── Tab activation ──────────────────────────────────── */
+
+  function activateTab(tabId, tabBar, contentArea) {
+    activeTab = tabId;
+
+    /* Update aria-selected on tab buttons */
+    var buttons = tabBar.querySelectorAll('.prh-app-tab');
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].setAttribute('aria-selected', buttons[i].getAttribute('data-tab') === tabId ? 'true' : 'false');
+    }
+
+    renderTabContent(tabId, contentArea);
+  }
+
+  function renderTabContent(tabId, contentArea) {
+    contentArea.innerHTML = '';
+
+    switch (tabId) {
+      case 'search':
+        /* Haku — full search interface */
+        if (AIMEAT.prhHaku && typeof AIMEAT.prhHaku.render === 'function') {
+          AIMEAT.prhHaku.render(contentArea);
+        } else {
+          showMissing(contentArea, 'prhHaku');
+        }
+        break;
+
+      case 'company':
+        /* Yrityskortti — sub-view of search; redirect to search tab */
+        if (AIMEAT.prhHaku && typeof AIMEAT.prhHaku.render === 'function') {
+          AIMEAT.prhHaku.render(contentArea);
+        } else {
+          showMissing(contentArea, 'prhHaku');
+        }
+        break;
+
+      case 'watchlist':
+        /* Seurantalista — watchlist management */
+        if (AIMEAT.prhSeurantalista && typeof AIMEAT.prhSeurantalista.render === 'function') {
+          AIMEAT.prhSeurantalista.render(contentArea);
+        } else {
+          showMissing(contentArea, 'prhSeurantalista');
+        }
+        break;
+
+      case 'changes':
+        /* Muutoshistoria — sub-view of watchlist; redirect to watchlist tab */
+        if (AIMEAT.prhSeurantalista && typeof AIMEAT.prhSeurantalista.render === 'function') {
+          AIMEAT.prhSeurantalista.render(contentArea);
+        } else {
+          showMissing(contentArea, 'prhSeurantalista');
+        }
+        break;
+
+      case 'compare':
+        /* Vertailu — company comparison */
+        if (AIMEAT.prhVertailu && typeof AIMEAT.prhVertailu.render === 'function') {
+          AIMEAT.prhVertailu.render(contentArea);
+        } else {
+          showMissing(contentArea, 'prhVertailu');
+        }
+        break;
+
+      default:
+        contentArea.innerHTML = '<div class="prh-app-loading">' + t('error.unknown_tab') + '</div>';
+    }
+  }
+
+  function showMissing(container, componentName) {
+    var msg = document.createElement('div');
+    msg.className = 'prh-app-loading';
+    msg.textContent = t('error.component_not_loaded', { name: componentName });
+    if (msg.textContent === 'error.component_not_loaded') {
+      msg.textContent = 'Komponenttia ' + componentName + ' ei ole ladattu.';
+    }
+    container.appendChild(msg);
+  }
+
+  /* ── Register ─────────────────────────────────────────── */
+
+  var exports = { init: init, render: render, t: t, switchLocale: switchLocale, getTranslations: getTranslations };
+  if (AIMEAT.register) AIMEAT.register(LIB_NAME, exports);
+  AIMEAT[LIB_NAME] = exports;
+
+})(window.AIMEAT || (window.AIMEAT = {}));
+```

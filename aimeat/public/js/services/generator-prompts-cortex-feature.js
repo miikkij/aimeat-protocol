@@ -30,7 +30,7 @@ var tabs = AIMEAT['aimeat-ui-nav'].Tabs({
     { id: 'settings', label: 'Asetukset', icon: '⚙' }
   ],
   active: 'search',  // which tab is active initially
-  onSelect: function(tabId) {
+  onChange: function(tabId) {
     // called when user clicks a tab
     renderTabContent(tabId);
   }
@@ -50,13 +50,11 @@ var table = AIMEAT['aimeat-ui-viewers'].DataTable({
   ],
   sortable: true,
   filterable: true,
-  pageSize: 20,
-  onRowClick: function(row) {
-    // called when user clicks a row
-    showDetail(row);
-  }
+  pageSize: 20
 });
 container.appendChild(table);
+// NOTE: DataTable does NOT have onRowClick. For clickable rows, build your own
+// card list with click handlers, or use the List component with onItemClick.
 \`\`\`
 
 ### Timeline (AIMEAT['aimeat-ui-viewers'].Timeline)
@@ -72,34 +70,36 @@ container.appendChild(timeline);
 
 ### Form components (AIMEAT['aimeat-ui-forms'])
 \`\`\`javascript
-// Text input
+// Text input — returns { el, getValue(), setValue(v), setError(msg), clearError() }
 var nameInput = AIMEAT['aimeat-ui-forms'].Input({
   label: 'Hakusana',
   placeholder: 'Hae nimellä...',
-  value: '',
-  onChange: function(value) { doSearch(value); }
+  type: 'text'
 });
-container.appendChild(nameInput);
+container.appendChild(nameInput.el);
+// Read value: nameInput.getValue()
+// Set value: nameInput.setValue('test')
+// Listen for changes: nameInput.el.querySelector('input').addEventListener('input', function(e) { doSearch(e.target.value); });
 
-// Select dropdown
+// Select dropdown — returns { el, getValue(), setValue(v) }
 var langSelect = AIMEAT['aimeat-ui-forms'].Select({
   label: 'Kieli',
   options: [
     { value: 'fi', label: 'Suomi' },
     { value: 'en', label: 'English' }
-  ],
-  value: 'fi',
-  onChange: function(value) { changeLanguage(value); }
+  ]
 });
-container.appendChild(langSelect);
+container.appendChild(langSelect.el);
+// Read value: langSelect.getValue()
 
-// Toggle switch
+// Toggle switch — returns { el, getValue(), setValue(v) }
+// Toggle HAS onChange callback
 var notifToggle = AIMEAT['aimeat-ui-forms'].Toggle({
   label: 'Ilmoitukset',
   checked: true,
   onChange: function(checked) { saveNotificationPref(checked); }
 });
-container.appendChild(notifToggle);
+container.appendChild(notifToggle.el);
 \`\`\`
 
 ### Dialogs (AIMEAT['aimeat-ui-dialogs'])
@@ -190,6 +190,19 @@ ${dataCortexAPI}
 ${PLATFORM_UI_EXAMPLES}
 
 ${translationSection}
+
+## Loading Translations
+
+Translations are stored in the OWNER namespace (by the translation component).
+Load them with AIMEAT.data.get() — NOT from ext: namespace:
+\`\`\`javascript
+// CORRECT — reads from owner namespace where translation component stored them:
+var translations = await AIMEAT.data.get('SERVICE_NAME.i18n.fi') || {};
+
+// WRONG — ext: namespace does NOT contain translations:
+// var translations = await AIMEAT.data.getPublic('ext:...', 'i18n.fi'); // ← NEVER do this
+\`\`\`
+Replace SERVICE_NAME with the actual service slug (from the CSM/extension name).
 
 ## Translation Helper
 Use a t() function for all user-visible text:

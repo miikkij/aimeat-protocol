@@ -1,0 +1,367 @@
+```yaml
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: prh-seurantalista
+  namespace: community
+  description: "Seurantalista ja muutoshistoria — seuraa yritysten muutoksia PRH:ssa"
+  author: generator
+  tags: [feature, prh, watchlist]
+  labels:
+    domain: prh-yritystietopalvelu
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: lib
+      name: prh-seurantalista
+      filename: prh-seurantalista.js
+      exports: [render]
+      api_surface: |
+        AIMEAT.prhSeurantalista.render(container) — Renders watchlist + change history view
+```
+
+```javascript
+(function (AIMEAT) {
+  'use strict';
+  var LIB_NAME = 'prhSeurantalista';
+  var EXT_NAME = 'prh-avoindata';
+
+  // --- Translation helper ---
+  function t(key, translations, vars) {
+    var text = (translations && translations[key]) || key;
+    if (vars) {
+      Object.keys(vars).forEach(function (k) {
+        text = text.replace(new RegExp('\\$\\{' + k + '\\}', 'g'), vars[k]);
+      });
+    }
+    return text;
+  }
+
+  // --- Display value helper ---
+  function dv(val) {
+    if (val === null || val === undefined) return '—';
+    if (typeof val === 'object') {
+      try { return JSON.stringify(val, null, 2); } catch (e) { return String(val); }
+    }
+    return String(val);
+  }
+
+  // --- Escape HTML ---
+  function esc(str) {
+    var d = document.createElement('div');
+    d.textContent = String(str);
+    return d.innerHTML;
+  }
+
+  // --- Format date ---
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    try {
+      var d = new Date(iso);
+      return d.toLocaleDateString('fi-FI') + ' ' + d.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return String(iso);
+    }
+  }
+
+  // --- CSS injection ---
+  function injectStyles() {
+    if (document.getElementById('prh-seurantalista-styles')) return;
+    var style = document.createElement('style');
+    style.id = 'prh-seurantalista-styles';
+    style.textContent = [
+      '.prh-seurantalista-root { font-family: var(--font-sans, system-ui, sans-serif); }',
+
+      /* Nav tabs */
+      '.prh-seurantalista-nav { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }',
+      '.prh-seurantalista-nav-btn { padding: 0.5rem 1.25rem; border: 1px solid var(--border, #333); background: var(--surface, #1a1a2e); color: var(--text, #e0e0e0); border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: background 0.15s, color 0.15s; }',
+      '.prh-seurantalista-nav-btn:hover { background: var(--bg-dim, #252540); }',
+      '.prh-seurantalista-nav-btn.active { background: var(--accent, #6c5ce7); color: #fff; border-color: var(--accent, #6c5ce7); }',
+
+      /* Loading / error / empty */
+      '.prh-seurantalista-loading { text-align: center; padding: 2rem; color: var(--text-muted, #888); }',
+      '.prh-seurantalista-error { padding: 1rem; background: var(--bg-danger, rgba(220,53,69,0.1)); color: var(--text-danger, #ff6b6b); border-radius: 8px; margin-bottom: 1rem; }',
+      '.prh-seurantalista-empty { text-align: center; padding: 3rem 1rem; color: var(--text-muted, #888); }',
+      '.prh-seurantalista-empty-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }',
+
+      /* Watchlist cards */
+      '.prh-seurantalista-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }',
+      '.prh-seurantalista-card { background: var(--card, #1e1e36); border: 1px solid var(--border, #333); border-radius: 10px; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.5rem; }',
+      '.prh-seurantalista-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; }',
+      '.prh-seurantalista-card-name { font-weight: 600; font-size: 1rem; color: var(--text, #e0e0e0); word-break: break-word; }',
+      '.prh-seurantalista-card-bid { font-size: 0.85rem; color: var(--text-muted, #888); font-family: var(--font-mono, monospace); }',
+      '.prh-seurantalista-card-meta { display: flex; gap: 1rem; align-items: center; font-size: 0.8rem; color: var(--text-muted, #888); }',
+      '.prh-seurantalista-badge { display: inline-flex; align-items: center; justify-content: center; background: var(--accent, #6c5ce7); color: #fff; border-radius: 999px; padding: 0.15rem 0.6rem; font-size: 0.75rem; font-weight: 600; min-width: 1.5rem; }',
+      '.prh-seurantalista-badge.zero { background: var(--surface, #1a1a2e); color: var(--text-muted, #888); }',
+      '.prh-seurantalista-remove-btn { padding: 0.4rem 0.8rem; border: 1px solid var(--border, #333); background: transparent; color: var(--text-danger, #ff6b6b); border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: background 0.15s; align-self: flex-start; margin-top: 0.25rem; }',
+      '.prh-seurantalista-remove-btn:hover { background: var(--bg-danger, rgba(220,53,69,0.15)); }',
+      '.prh-seurantalista-remove-btn:disabled { opacity: 0.5; cursor: not-allowed; }',
+
+      /* Change history timeline */
+      '.prh-seurantalista-timeline { display: flex; flex-direction: column; gap: 0; }',
+      '.prh-seurantalista-tl-item { display: grid; grid-template-columns: 140px 1fr; gap: 1rem; padding: 1rem 0; border-bottom: 1px solid var(--border, #333); }',
+      '.prh-seurantalista-tl-item:last-child { border-bottom: none; }',
+      '.prh-seurantalista-tl-date { font-size: 0.8rem; color: var(--text-muted, #888); padding-top: 0.15rem; }',
+      '.prh-seurantalista-tl-body { display: flex; flex-direction: column; gap: 0.35rem; }',
+      '.prh-seurantalista-tl-company { font-weight: 600; color: var(--text, #e0e0e0); font-size: 0.95rem; }',
+      '.prh-seurantalista-tl-field { font-size: 0.85rem; color: var(--accent, #6c5ce7); }',
+      '.prh-seurantalista-tl-diff { display: flex; gap: 0.5rem; font-size: 0.8rem; flex-wrap: wrap; }',
+      '.prh-seurantalista-tl-old { color: var(--text-danger, #ff6b6b); text-decoration: line-through; }',
+      '.prh-seurantalista-tl-arrow { color: var(--text-muted, #888); }',
+      '.prh-seurantalista-tl-new { color: var(--text-success, #51cf66); }',
+
+      /* Count summary */
+      '.prh-seurantalista-summary { font-size: 0.85rem; color: var(--text-muted, #888); margin-bottom: 1rem; }'
+    ].join('\n');
+    document.head.appendChild(style);
+  }
+
+  // --- Load translations ---
+  async function loadTranslations() {
+    try {
+      var tr = await AIMEAT.data.getPublic('ext:' + EXT_NAME, 'i18n.fi');
+      return tr || {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  // --- Main render ---
+  async function render(container) {
+    if (!container) return;
+    injectStyles();
+
+    var tr = {};
+    var currentView = 'watchlist';
+    var watchlist = [];
+    var changes = [];
+    var loading = true;
+    var errorMsg = '';
+
+    // Default translation keys
+    var defaults = {
+      'watchlist.title': 'Seurantalista',
+      'watchlist.changes': 'Muutoshistoria',
+      'watchlist.empty': 'Ei seurattavia yrityksiä',
+      'watchlist.empty.hint': 'Lisää yrityksiä seurantalistalle yrityshausta.',
+      'watchlist.remove': 'Poista seurannasta',
+      'watchlist.removing': 'Poistetaan...',
+      'watchlist.addedAt': 'Lisätty',
+      'watchlist.changeCount': 'Muutoksia',
+      'watchlist.count': '${count} yritystä seurannassa',
+      'changes.empty': 'Ei havaittuja muutoksia',
+      'changes.empty.hint': 'Muutokset näkyvät kun seurattujen yritysten tiedot päivittyvät PRH:ssa.',
+      'changes.field': 'Muuttunut kenttä',
+      'changes.count': '${count} muutosta havaittu',
+      'loading': 'Ladataan...',
+      'error.load': 'Tietojen lataus epäonnistui'
+    };
+
+    function tt(key, vars) {
+      var merged = Object.assign({}, defaults, tr);
+      return t(key, merged, vars);
+    }
+
+    function renderRoot() {
+      var html = '<div class="prh-seurantalista-root">';
+
+      // Navigation
+      html += '<div class="prh-seurantalista-nav">';
+      html += '<button class="prh-seurantalista-nav-btn' + (currentView === 'watchlist' ? ' active' : '') + '" data-view="watchlist">' + esc(tt('watchlist.title')) + '</button>';
+      html += '<button class="prh-seurantalista-nav-btn' + (currentView === 'changes' ? ' active' : '') + '" data-view="changes">' + esc(tt('watchlist.changes')) + '</button>';
+      html += '</div>';
+
+      // Error
+      if (errorMsg) {
+        html += '<div class="prh-seurantalista-error">' + esc(errorMsg) + '</div>';
+      }
+
+      // Loading
+      if (loading) {
+        html += '<div class="prh-seurantalista-loading">' + esc(tt('loading')) + '</div>';
+        html += '</div>';
+        container.innerHTML = html;
+        bindNavEvents();
+        return;
+      }
+
+      // View content
+      if (currentView === 'watchlist') {
+        html += renderWatchlist();
+      } else {
+        html += renderChanges();
+      }
+
+      html += '</div>';
+      container.innerHTML = html;
+      bindNavEvents();
+      bindCardEvents();
+    }
+
+    function renderWatchlist() {
+      var html = '';
+
+      // Summary
+      html += '<div class="prh-seurantalista-summary">' + esc(tt('watchlist.count', { count: watchlist.length })) + '</div>';
+
+      // Empty state
+      if (!watchlist.length) {
+        html += '<div class="prh-seurantalista-empty">';
+        html += '<div class="prh-seurantalista-empty-icon">&#128269;</div>';
+        html += '<div>' + esc(tt('watchlist.empty')) + '</div>';
+        html += '<div style="margin-top:0.5rem;font-size:0.85rem;">' + esc(tt('watchlist.empty.hint')) + '</div>';
+        html += '</div>';
+        return html;
+      }
+
+      // Cards
+      html += '<div class="prh-seurantalista-cards">';
+      for (var i = 0; i < watchlist.length; i++) {
+        var item = watchlist[i];
+        var changeCount = countChangesFor(item.businessId);
+        var badgeClass = changeCount > 0 ? '' : ' zero';
+
+        html += '<div class="prh-seurantalista-card" data-bid="' + esc(item.businessId) + '">';
+        html += '<div class="prh-seurantalista-card-header">';
+        html += '<div>';
+        html += '<div class="prh-seurantalista-card-name">' + esc(dv(item.companyName || item.name)) + '</div>';
+        html += '<div class="prh-seurantalista-card-bid">' + esc(dv(item.businessId)) + '</div>';
+        html += '</div>';
+        html += '<span class="prh-seurantalista-badge' + badgeClass + '" title="' + esc(tt('watchlist.changeCount')) + '">' + changeCount + '</span>';
+        html += '</div>';
+        html += '<div class="prh-seurantalista-card-meta">';
+        html += '<span>' + esc(tt('watchlist.addedAt')) + ': ' + esc(fmtDate(item.addedAt)) + '</span>';
+        html += '</div>';
+        html += '<button class="prh-seurantalista-remove-btn" data-remove="' + esc(item.businessId) + '">' + esc(tt('watchlist.remove')) + '</button>';
+        html += '</div>';
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function renderChanges() {
+      var html = '';
+
+      // Summary
+      html += '<div class="prh-seurantalista-summary">' + esc(tt('changes.count', { count: changes.length })) + '</div>';
+
+      // Empty state
+      if (!changes.length) {
+        html += '<div class="prh-seurantalista-empty">';
+        html += '<div class="prh-seurantalista-empty-icon">&#128340;</div>';
+        html += '<div>' + esc(tt('changes.empty')) + '</div>';
+        html += '<div style="margin-top:0.5rem;font-size:0.85rem;">' + esc(tt('changes.empty.hint')) + '</div>';
+        html += '</div>';
+        return html;
+      }
+
+      // Sort by date (newest first)
+      var sorted = changes.slice().sort(function (a, b) {
+        return new Date(b.detectedAt || b.timestamp || 0).getTime() - new Date(a.detectedAt || a.timestamp || 0).getTime();
+      });
+
+      html += '<div class="prh-seurantalista-timeline">';
+      for (var i = 0; i < sorted.length; i++) {
+        var ch = sorted[i];
+        html += '<div class="prh-seurantalista-tl-item">';
+        html += '<div class="prh-seurantalista-tl-date">' + esc(fmtDate(ch.detectedAt || ch.timestamp)) + '</div>';
+        html += '<div class="prh-seurantalista-tl-body">';
+        html += '<div class="prh-seurantalista-tl-company">' + esc(dv(ch.companyName || ch.businessId)) + '</div>';
+        html += '<div class="prh-seurantalista-tl-field">' + esc(dv(ch.field || ch.fieldName)) + '</div>';
+        html += '<div class="prh-seurantalista-tl-diff">';
+        html += '<span class="prh-seurantalista-tl-old">' + esc(dv(ch.oldValue)) + '</span>';
+        html += '<span class="prh-seurantalista-tl-arrow">&rarr;</span>';
+        html += '<span class="prh-seurantalista-tl-new">' + esc(dv(ch.newValue)) + '</span>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function countChangesFor(businessId) {
+      var count = 0;
+      for (var i = 0; i < changes.length; i++) {
+        if (changes[i].businessId === businessId) count++;
+      }
+      return count;
+    }
+
+    function bindNavEvents() {
+      var btns = container.querySelectorAll('.prh-seurantalista-nav-btn');
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].addEventListener('click', function (e) {
+          var view = e.currentTarget.getAttribute('data-view');
+          if (view && view !== currentView) {
+            currentView = view;
+            renderRoot();
+          }
+        });
+      }
+    }
+
+    function bindCardEvents() {
+      var removeBtns = container.querySelectorAll('.prh-seurantalista-remove-btn');
+      for (var i = 0; i < removeBtns.length; i++) {
+        removeBtns[i].addEventListener('click', function (e) {
+          var btn = e.currentTarget;
+          var bid = btn.getAttribute('data-remove');
+          if (!bid) return;
+          btn.disabled = true;
+          btn.textContent = tt('watchlist.removing');
+          handleRemove(bid);
+        });
+      }
+    }
+
+    async function handleRemove(businessId) {
+      try {
+        await AIMEAT.prhYritysdata.removeFromWatchlist(businessId);
+        await loadData();
+      } catch (e) {
+        errorMsg = e.message || tt('error.load');
+        renderRoot();
+      }
+    }
+
+    async function loadData() {
+      loading = true;
+      errorMsg = '';
+      renderRoot();
+
+      try {
+        var results = await Promise.all([
+          AIMEAT.prhYritysdata.getWatchlist(),
+          AIMEAT.prhYritysdata.getChanges()
+        ]);
+        watchlist = results[0] || [];
+        changes = results[1] || [];
+      } catch (e) {
+        errorMsg = e.message || tt('error.load');
+        watchlist = [];
+        changes = [];
+      }
+
+      loading = false;
+      renderRoot();
+    }
+
+    // Init
+    (async function init() {
+      try {
+        tr = await loadTranslations();
+      } catch (e) {
+        tr = {};
+      }
+      await loadData();
+    })();
+  }
+
+  // Register
+  var exports = { render: render };
+  if (AIMEAT.register) AIMEAT.register(LIB_NAME, exports);
+  AIMEAT[LIB_NAME] = exports;
+})(window.AIMEAT || (window.AIMEAT = {}));
+```

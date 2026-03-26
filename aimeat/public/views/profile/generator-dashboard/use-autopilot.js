@@ -81,7 +81,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
         // Build prompt
         const latestComps = await loadAllComponents(projectId);
         const completedComponents = latestComps.filter(c => c.status === 'done' && c.registeredAs);
-        const prompt = buildComponentPrompt(
+        const prompt = await buildComponentPrompt(
           comp.type, comp.label,
           project.description, project.blueprint, completedComponents,
           interviewSpec,

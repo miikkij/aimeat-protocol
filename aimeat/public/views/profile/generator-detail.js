@@ -140,6 +140,7 @@ export function ComponentDetail({ component, project, components, projectId, int
   const [aiRunning, setAiRunning] = useState(false);
   const resultRef = { current: null };
   const prevCompIdRef = useRef(component.id);
+  const [generatedPrompt, setGeneratedPrompt] = useState(null);
 
   // Test state
   const [testCode, setTestCode] = useState(component.testCode || '');
@@ -158,28 +159,35 @@ export function ComponentDetail({ component, project, components, projectId, int
     // keep validationResult so the Register button stays visible.
     if (componentSwitched) {
       setValidationResult(null);
+      setGeneratedPrompt(null);
     }
     // Auto-transition to prompt_ready when opening an unstarted component
     if (component.status === 'not_started') {
-      const prompt = buildComponentPrompt(
+      buildComponentPrompt(
         component.type, component.label,
         project.description, project.blueprint,
         components.filter(c => c.status === 'done'),
         interviewSpec,
-      );
-      saveComponent(projectId, {
-        ...component, status: 'prompt_ready', prompt,
-        history: [...(component.history || []), { action: 'prompt_generated', at: new Date().toISOString(), by: 'system' }],
-      }).then(() => onUpdate());
+      ).then(prompt => {
+        saveComponent(projectId, {
+          ...component, status: 'prompt_ready', prompt,
+          history: [...(component.history || []), { action: 'prompt_generated', at: new Date().toISOString(), by: 'system' }],
+        }).then(() => onUpdate());
+      });
+    }
+    // Resolve prompt for display if not already stored on component
+    if (!component.prompt) {
+      const completedComps = components.filter(c => c.status === 'done' && c.registeredAs);
+      buildComponentPrompt(
+        component.type, component.label,
+        project.description, project.blueprint, completedComps,
+        interviewSpec,
+      ).then(p => setGeneratedPrompt(p));
     }
   }, [component.id, component.result, component.status, component.testCode, component.testResult]);
 
   const completedComponents = components.filter(c => c.status === 'done' && c.registeredAs);
-  const prompt = component.prompt || buildComponentPrompt(
-    component.type, component.label,
-    project.description, project.blueprint, completedComponents,
-    interviewSpec,
-  );
+  const prompt = component.prompt || generatedPrompt || '';
 
   // Workflow step for guided UI
   const workflowStep = getWorkflowStep(component, validationResult, result);
@@ -311,7 +319,7 @@ export function ComponentDetail({ component, project, components, projectId, int
   }
 
   async function handleRegeneratePrompt() {
-    const fresh = buildComponentPrompt(
+    const fresh = await buildComponentPrompt(
       component.type, component.label,
       project.description, project.blueprint,
       components.filter(c => c.status === 'done'),
@@ -324,7 +332,7 @@ export function ComponentDetail({ component, project, components, projectId, int
   }
 
   async function handleCopyPrompt() {
-    const fresh = buildComponentPrompt(
+    const fresh = await buildComponentPrompt(
       component.type, component.label,
       project.description, project.blueprint,
       components.filter(c => c.status === 'done'),
@@ -343,7 +351,7 @@ export function ComponentDetail({ component, project, components, projectId, int
     setAiRunning(true);
     try {
       const completedComps = components.filter(c => c.status === 'done' && c.registeredAs);
-      const fresh = buildComponentPrompt(
+      const fresh = await buildComponentPrompt(
         component.type, component.label,
         project.description, project.blueprint, completedComps,
         interviewSpec,

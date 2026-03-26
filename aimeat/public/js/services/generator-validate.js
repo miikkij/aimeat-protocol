@@ -541,8 +541,15 @@ const validators = {
         const exportedMethods = exportsMatch[1].split(',').map(m => m.trim().split(':')[0].trim()).filter(Boolean);
 
         // Cross-check with blueprint produces API methods if available
-        if (blueprint?.components) {
-          const cortexComp = blueprint.components.find(c => c.type === 'cortex');
+        // Match the specific cortex component by metadata.name or subtype
+        if (blueprint?.components && parsed?.metadata?.name) {
+          const metaName = parsed.metadata.name;
+          // Find the blueprint component that matches this cortex by name similarity
+          const cortexComps = blueprint.components.filter(c => c.type === 'cortex');
+          const cortexComp = cortexComps.find(c =>
+            c.id === metaName || c.label?.toLowerCase().includes(metaName.replace(/-/g, ' ')) ||
+            metaName.includes(c.id?.replace('cortex-', ''))
+          ) || (cortexComps.length === 1 ? cortexComps[0] : null);
           if (cortexComp?.produces) {
             const requiredMethods = cortexComp.produces
               .filter(p => p.startsWith('api:'))

@@ -76,10 +76,12 @@ function verifyCortexContract(result, comp, blueprint) {
   const mismatches = [];
   if (!result) return { valid: false, mismatches: ['No result to verify'] };
 
-  // Check that all methods from blueprint produces exist in the exports
+  // Check that all API methods from blueprint produces exist in the exports
+  // Only check api: produces — ui: produces are semantic tags (this component provides a view),
+  // not required exported function names. Feature cortex exports render(), not individual view names.
   const expectedMethods = (comp.produces || [])
-    .filter(p => p.startsWith('api:') || p.startsWith('ui:'))
-    .map(p => p.replace('api:', '').replace('ui:', ''));
+    .filter(p => p.startsWith('api:'))
+    .map(p => p.replace('api:', ''));
 
   for (const method of expectedMethods) {
     // Check if the method name appears in the exports object

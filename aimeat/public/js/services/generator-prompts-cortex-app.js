@@ -73,17 +73,24 @@ ${translationKeys}
 var session = await AIMEAT.auth.login();
 if (!session) {
   // No stored session — show login button
-  AIMEAT.auth.mountLoginButton(container);
+  // mountLoginButton takes a CSS SELECTOR string, not a DOM element
+  // Give the container an ID first, then pass the selector
+  container.id = container.id || 'app-auth';
+  AIMEAT.auth.mountLoginButton('#' + container.id);
   return { ready: false, authenticated: false };
 }
 \`\`\`
 
 ## Translation Pattern
 \`\`\`javascript
-// Load translations from extension namespace
+// Load translations — try service-prefixed key first, then plain key
 async function loadTranslations(locale) {
   try {
-    return await AIMEAT.data.getPublic('ext:EXTENSION_NAME', 'i18n.' + locale) || {};
+    // Translations are stored in the OWNER namespace by the translation component
+    // Key format: SERVICE_PREFIX.i18n.LOCALE (dots throughout)
+    return await AIMEAT.data.get('SERVICE_PREFIX.i18n.' + locale)
+        || await AIMEAT.data.get('i18n.' + locale)
+        || {};
   } catch (e) { return {}; }
 }
 

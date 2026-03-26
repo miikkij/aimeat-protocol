@@ -83,11 +83,26 @@ This data cortex uses AIMEAT platform libraries directly (no extension needed).
 
 ## AIMEAT Platform Libraries Available
 
-- **AIMEAT.data** — get(key), set(key, value), delete(key), list(), search(query), getPublic(namespace, key)
+- **AIMEAT.data** — get(key), set(key, value), delete(key), list(opts), search(query), getPublic(gaii, key), getEntry(key), update(key, value, version)
 - **AIMEAT.storage** — upload(file), download(key), list(), delete(key)
 - **AIMEAT.social** — createBoard(name), post(boardId, content), boards(), posts(boardId)
 - **AIMEAT.wallet** — balance(), transactions()
-- **AIMEAT.auth** — getSession()
+- **AIMEAT.auth** — login(), getSession(), mountLoginButton(container)
+
+## Data Access Rules (CRITICAL — follow precisely)
+
+Two namespaces, two different methods:
+
+1. **Extension runtime data** (watchlist items, cached API results, change logs — data the EXTENSION wrote via ctx.memory.set):
+   → Read with: \`AIMEAT.data.getPublic('ext:EXTENSION_NAME', key)\`
+   → This reads from the extension's own namespace. Public, no auth needed.
+
+2. **Owner/user data** (translations, settings, seed data — data stored by memory/translation components):
+   → Read with: \`AIMEAT.data.get(key)\`
+   → This reads from the CURRENT USER's own namespace. Requires auth session.
+
+NEVER read translations or settings from ext: namespace. They live in the owner namespace.
+NEVER read extension runtime data with data.get() — that reads the wrong namespace.
 
 ## Output Format
 

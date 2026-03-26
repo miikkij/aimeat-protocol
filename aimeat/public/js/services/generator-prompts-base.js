@@ -427,36 +427,24 @@ Schedule entry:
 
 IMPORTANT: @activate actions MUST be idempotent — they will run multiple times (every restart). Always check existing data before overwriting.
 
-### CRITICAL: Copy Shared Data to Extension Namespace
+### Init Action — Initialize Runtime Data Only
 
-The init/@activate action MUST copy shared service data (translations, settings, lookup tables)
-from the OWNER's memory to the extension's OWN memory. This makes the data accessible to ALL users
-of the service, not just the owner who installed it.
+The init/@activate action should initialize extension-owned runtime data (watchlists, caches, logs).
+Do NOT copy translations or settings to the extension namespace — cortex reads those
+directly from the owner namespace via AIMEAT.data.get().
 
-Pattern — add this to the BEGINNING of your init action:
+Pattern:
 \`\`\`javascript
-// Copy shared data from owner namespace to extension namespace (accessible to all users)
-const SHARED_KEYS = ['i18n.fi', 'i18n.en', 'settings.config', 'municipalities.lookup'];
-// Adjust SHARED_KEYS based on what this service's memory/translation components produced
-for (const key of SHARED_KEYS) {
-  const existing = await ctx.memory.get(key);
-  if (!existing) {
-    // Try service-prefixed key first, then plain key
-    const extName = ctx.config?.name || '';
-    const prefixed = extName ? extName + '.' + key : key;
-    const ownerData = await ctx.memory.getPublic(ctx.caller.gaii, prefixed)
-                   || await ctx.memory.getPublic(ctx.caller.gaii, key);
-    if (ownerData) {
-      await ctx.memory.set(key, ownerData);
-      ctx.log.info('Copied shared data to extension namespace', { key });
-    }
-  }
+// Initialize extension runtime data if not already present
+const watchlist = await ctx.memory.get('watchlist.items');
+if (!watchlist) {
+  await ctx.memory.set('watchlist.items', []);
+  ctx.log.info('Initialized empty watchlist');
 }
 \`\`\`
 
-Why: Memory/translation components store data in the OWNER's namespace. Other users cannot read it.
-By copying to \`ext:{name}\` namespace (via \`ctx.memory.set\`), it becomes public and accessible to
-everyone via \`getPublic('ext:{name}', key)\`.
+Only initialize keys that the EXTENSION owns and writes to (runtime data).
+Translations and settings live in the OWNER namespace — the cortex reads them directly.
 
 ## Additional rules
 - \`metadata\` section MUST have: name, version, description, author
@@ -677,14 +665,15 @@ The first argument is the extension's memory owner: \\\`"ext:" + extensionName\\
 Use this for ALL data produced by extensions (collected data, computed stats, caches, etc.).
 \\\`getPublic()\\\` returns the value directly (auto-unwraps), or null if not found.
 
-### Reading TRANSLATIONS (stored in extension namespace, accessible to all users):
-Translations are copied to the extension namespace during init. Read them via \\\`getPublic\\\`:
+### Reading TRANSLATIONS (stored in owner namespace by translation components):
+Translations are stored in the OWNER's namespace by the translation component during registration.
+The key format is: \\\`{service-name}.i18n.{locale}\\\` (e.g. \\\`my-service.i18n.fi\\\`).
 \\\`\\\`\\\`javascript
-// Read translations from extension namespace (works for ALL users):
-const fiStrings = await AIMEAT.data.getPublic('ext:my-extension', 'i18n.fi');
-const enStrings = await AIMEAT.data.getPublic('ext:my-extension', 'i18n.en');
+// Read translations from OWNER namespace (the translation component stored them here):
+const fiStrings = await AIMEAT.data.get('my-service.i18n.fi') || await AIMEAT.data.get('i18n.fi') || {};
+const enStrings = await AIMEAT.data.get('my-service.i18n.en') || await AIMEAT.data.get('i18n.en') || {};
 \\\`\\\`\\\`
-Do NOT use AIMEAT.data.get('i18n.fi') — that reads from the CURRENT USER's namespace and fails for other users.
+Use AIMEAT.data.get() — this reads from the current user's namespace where translations live.
 If a cortex library has a getI18n(locale) method, use that instead (recommended).
 
 ### Calling extension actions (use AIMEAT.auth session for authenticated fetch):
@@ -699,7 +688,7 @@ If a cortex library has a getI18n(locale) method, use that instead (recommended)
 // Helper for extension calls (copy this EXACTLY):
 // ALL extension actions are POST — the backend only has router.post() routes
 async function extCall(extName, actionId, body = {}) {
-  const session = AIMEAT.auth.getSession();
+  const session = await AIMEAT.auth.login();
   if (!session) throw new Error('Not logged in');
   const url = '/v1/ext/' + extName + '/' + actionId;
   const resp = await session.fetch(url, { method: 'POST', body: JSON.stringify(body) });
@@ -1127,16 +1116,16 @@ await writeOwnerMemory('settings.config', { locale: 'fi', notifications: true })
 
 ## IMPORTANT: How Translations Work
 
-Translations are stored in the EXTENSION's memory namespace (copied there during init).
-Read them via readExtMemory — this works for ALL users, not just the service owner:
+Translations are stored in the OWNER namespace by the translation component during registration.
+The key format is: \\\`{service-slug}.i18n.{locale}\\\` (e.g. \\\`prh-yritystietopalvelu.i18n.fi\\\`).
+Read them with AIMEAT.data.get():
 \\\`\\\`\\\`javascript
-// Read translation via extension namespace (accessible to everyone):
-const fiStrings = await readExtMemory(EXT.collector, 'i18n.fi');
-const enStrings = await readExtMemory(EXT.collector, 'i18n.en');
+// Read translations from OWNER namespace (where translation component stored them):
+const fiStrings = await AIMEAT.data.get(SERVICE_SLUG + '.i18n.fi') || {};
+const enStrings = await AIMEAT.data.get(SERVICE_SLUG + '.i18n.en') || {};
 \\\`\\\`\\\`
 
-Do NOT use AIMEAT.data.get('i18n.fi') — that reads from the CURRENT USER's namespace
-and will fail for users who didn't install the service.
+Do NOT use readExtMemory or getPublic('ext:...') for translations — they are NOT in the extension namespace.
 
 ### MANDATORY: t() helper function (MUST use this exact implementation)
 
@@ -1163,18 +1152,14 @@ need translated text, e.g., \\\`t('tab.search', fiStrings)\\\`.
 
 ## IMPORTANT: How Settings Work
 
-Default settings are in the extension namespace (copied during init).
-User-specific settings are in each user's OWN namespace:
+Default settings are stored in the OWNER namespace by the memory component.
+The key is: \\\`{service-slug}.settings.config\\\`.
 \\\`\\\`\\\`javascript
-// Read defaults from extension namespace:
-const defaults = await readExtMemory(EXT.collector, 'settings.config') || {};
-
-// Read user's personal overrides (may be null for new users):
-const userSettings = await readOwnerMemory('settings.config');
-
-// Merge: user overrides win
-const settings = { ...defaults, ...(userSettings || {}) };
+// Read settings from OWNER namespace (where memory component stored them):
+const settings = await AIMEAT.data.get(SERVICE_SLUG + '.settings.config') || {};
 \\\`\\\`\\\`
+
+Do NOT use readExtMemory for settings — they are NOT in the extension namespace.
 
 ## Extension Action Calls (authenticated — internal helper, NOT exported)
 
@@ -1726,10 +1711,9 @@ AIMEAT has TWO types of memory namespaces — understanding this is CRITICAL:
 ║  - You CANNOT PUT to ext:{name} namespace from client — returns 404   ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 
-### Init Copy Pattern
-Extensions MUST copy shared data (translations, settings) from owner namespace to
-extension namespace in their @activate init action. This makes the data accessible
-to ALL users, not just the installing owner.
+### Init Action
+Extensions should initialize runtime data (empty watchlists, caches, logs) in their @activate init action.
+Do NOT copy translations or settings — cortex reads those from the owner namespace directly.
 `.trim();
 
 /**
@@ -1867,9 +1851,10 @@ export const INIT_CONTRACT = `
 ### Extension @activate init
 - Runs on activation AND every server restart
 - MUST be idempotent (check existing data before overwriting)
-- MUST copy shared data from owner namespace to extension namespace (translations, settings)
+- Initialize extension-owned runtime data (watchlists, caches, logs) if not present
 - Should check if data exists and is fresh — skip if already populated
-- Pattern: check → copy shared data → initialize missing keys → return status
+- Do NOT copy translations or settings — cortex reads those from owner namespace directly
+- Pattern: check existing data → initialize missing runtime keys → return status
 
 ### Cortex init()
 - UI readiness check ONLY — NEVER triggers backend logic

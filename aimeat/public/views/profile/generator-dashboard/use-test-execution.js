@@ -193,7 +193,7 @@ export function useTestExecution(core, projectId, orSettings, session, showToast
 
     try {
       const completedComps = core.components.filter(c => c.status === 'done' && c.registeredAs);
-      const originalPrompt = comp.prompt || buildComponentPrompt(
+      const originalPrompt = comp.prompt || await buildComponentPrompt(
         comp.type, comp.label,
         core.project?.description, core.project?.blueprint, completedComps,
         core.interviewSpec,

@@ -1,0 +1,122 @@
+```yaml
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: prh-yritysdata
+  namespace: community
+  description: "PRH-yritystietojen data-kerros — tarjoaa datan hakemisen, seurannan ja vertailun"
+  author: generator
+  tags: [data, prh, yritykset]
+  labels:
+    domain: prh-yritystietopalvelu
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: lib
+      name: prh-yritysdata
+      filename: prh-yritysdata.js
+      exports: [searchCompanies, getCompany, getWatchlist, addToWatchlist, removeFromWatchlist, getChanges, getComparisons, saveComparison, getSettings, saveSettings]
+      api_surface: |
+        AIMEAT.prhYritysdata.searchCompanies(query) — Search companies by name or businessId
+        AIMEAT.prhYritysdata.getCompany(businessId) — Get full company details
+        AIMEAT.prhYritysdata.getWatchlist() — Get watchlist items
+        AIMEAT.prhYritysdata.addToWatchlist(businessId, companyName) — Add to watchlist
+        AIMEAT.prhYritysdata.removeFromWatchlist(businessId) — Remove from watchlist
+        AIMEAT.prhYritysdata.getChanges() — Get change history
+        AIMEAT.prhYritysdata.getComparisons() — Get saved comparisons
+        AIMEAT.prhYritysdata.saveComparison(comparison) — Save a comparison
+        AIMEAT.prhYritysdata.getSettings() — Get user settings
+        AIMEAT.prhYritysdata.saveSettings(settings) — Save user settings
+```
+
+```javascript
+(function (AIMEAT) {
+  'use strict';
+  var LIB_NAME = 'prhYritysdata';
+  var EXT_NAME = 'prh-avoindata';
+
+  // Helper: call extension action
+  async function callExt(actionId, body) {
+    var session = AIMEAT.auth.getSession();
+    if (!session) throw new Error('Not logged in');
+    var url = '/v1/ext/' + EXT_NAME + '/' + actionId;
+    var resp = await session.fetch(url, { method: 'POST', body: JSON.stringify(body || {}) });
+    if (!resp.ok) throw new Error(resp.error?.message || 'Extension call failed');
+    return resp.data;
+  }
+
+  // Helper: read extension memory
+  async function readExtMemory(key) {
+    return AIMEAT.data.getPublic('ext:' + EXT_NAME, key);
+  }
+
+  // Helper: read/write user memory
+  async function getUserData(key) {
+    return AIMEAT.data.get(key);
+  }
+  async function setUserData(key, value) {
+    return AIMEAT.data.set(key, value);
+  }
+
+  // --- Public API ---
+
+  async function searchCompanies(query) {
+    return callExt('searchCompanies', { query: query });
+  }
+
+  async function getCompany(businessId) {
+    return callExt('getCompany', { businessId: businessId });
+  }
+
+  async function getWatchlist() {
+    return (await readExtMemory('watchlist.items')) || [];
+  }
+
+  async function addToWatchlist(businessId, companyName) {
+    return callExt('addToWatchlist', { businessId: businessId, companyName: companyName });
+  }
+
+  async function removeFromWatchlist(businessId) {
+    return callExt('removeFromWatchlist', { businessId: businessId });
+  }
+
+  async function getChanges() {
+    return (await readExtMemory('changes.log')) || [];
+  }
+
+  async function getComparisons() {
+    return (await readExtMemory('comparisons.saved')) || [];
+  }
+
+  async function saveComparison(comparison) {
+    var comparisons = await getComparisons();
+    if (!comparison.id) {
+      comparison.id = 'cmp-' + Date.now();
+    }
+    comparison.savedAt = new Date().toISOString();
+    var idx = comparisons.findIndex(function(c) { return c.id === comparison.id; });
+    if (idx >= 0) {
+      comparisons[idx] = comparison;
+    } else {
+      comparisons.push(comparison);
+    }
+    await setUserData('comparisons.saved', comparisons);
+    return comparison;
+  }
+
+  async function getSettings() {
+    return (await readExtMemory('settings.config')) || { locale: 'fi', cacheHours: 24, maxWatchlistSize: 50 };
+  }
+
+  async function saveSettings(settings) {
+    await setUserData('settings.config', settings);
+    return settings;
+  }
+
+  // Register
+  var exports = { searchCompanies: searchCompanies, getCompany: getCompany, getWatchlist: getWatchlist, addToWatchlist: addToWatchlist, removeFromWatchlist: removeFromWatchlist, getChanges: getChanges, getComparisons: getComparisons, saveComparison: saveComparison, getSettings: getSettings, saveSettings: saveSettings };
+  if (AIMEAT.register) AIMEAT.register(LIB_NAME, exports);
+  AIMEAT[LIB_NAME] = exports;
+})(window.AIMEAT || (window.AIMEAT = {}));
+```
