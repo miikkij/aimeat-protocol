@@ -19,6 +19,8 @@
  *   v1.1.0 — 2026-03-24 — Fix useEffect deps (testCode/testResult sync), add trace display
  *   v1.2.0 — 2026-03-25 — Fix validationResult reset: Register button no longer disappears after validation passes
  *   v1.3.0 — 2026-03-26 — V5: context bundles on register, explain step before validation
+ *   v2.0.0 — 2026-03-26 — Multi-pass workflow: pass-specific prompts, skeleton/unit/assembly flow,
+ *     reflection panel, pass submit handlers, ReflectionPanel component
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -28,14 +30,23 @@ import { t } from '/js/i18n.js';
 import { apiPost } from '/js/api.js';
 import {
   saveComponent, registerComponent, reregisterComponent, writeProjectLog, writeDebugArtifact,
+  getNextPass, MULTI_PASS_TYPES, saveSkeleton, saveUnit, saveTestCode,
+  loadSkeleton, loadUnits, loadTestCode, createUnitPasses, appendReflection,
+  loadReflectionHistory, isDuplicatePrescription, MAX_REFLECTIONS,
 } from '/js/services/foundry.js';
 import { buildComponentPrompt, buildFixPrompt, buildReflectionPrompt, buildTestPrompt } from '/js/services/foundry-prompts.js';
-import { validateComponent } from '/js/services/foundry-validate.js';
+import { validateComponent, validateSkeleton, validateUnit } from '/js/services/foundry-validate.js';
 import { verifyContract } from '/js/services/foundry-contract.js';
 import { smokeTest } from '/js/services/foundry-smoke.js';
 import { createBundle } from '/js/services/foundry-context-bundle.js';
-import { buildExplainPrompt } from '/js/services/foundry-prompts-fix.js';
+import { buildExplainPrompt, buildFoundryReflectionPrompt } from '/js/services/foundry-prompts-fix.js';
 import { runComponentTest, screenshotUrl } from '/js/services/foundry-testing.js';
+import {
+  buildSkeletonPrompt, buildExtensionUnitPrompt, buildCortexMethodUnitPrompt,
+  buildFeatureCortexSectionPrompt, buildAppViewUnitPrompt,
+  buildExtensionAssemblyPrompt, buildCortexAssemblyPrompt, buildAppAssemblyPrompt,
+} from '/js/services/foundry-prompts-build.js';
+import { buildTestFirstPrompt } from '/js/services/foundry-prompts-test.js';
 
 /* ── OpenRouter Autopilot Helpers (shared) ───────────── */
 
@@ -131,6 +142,231 @@ function StepArrow({ direction = 'right' } = {}) {
   </svg>`;
 }
 
+/* ── Multi-Pass Helpers ──────────────────────────────── */
+
+/**
+ * Generate the prompt for the current pass based on pass type and context.
+ */
+function generatePassPrompt(pass, ctx) {
+  const { component, blueprint, interviewSpec, skeleton, units, testCode, reflectionHistory } = ctx;
+  const bpComp = blueprint?.components?.find(c => c.label === component.label || c.id === component.id);
+
+  switch (pass.type) {
+    case 'test':
+      return buildTestFirstPrompt({
+        componentType: component.type,
+        subtype: bpComp?.subtype,
+        label: component.label,
+        blueprint,
+        blueprintComponent: bpComp,
+        interviewSpec,
+      });
+    case 'skeleton':
+      return buildSkeletonPrompt({
+        componentType: component.type,
+        subtype: bpComp?.subtype,
+        label: component.label,
+        blueprint,
+        blueprintComponent: bpComp,
+        interviewSpec,
+        testCode,
+      });
+    case 'unit': {
+      const unitDef = parseUnitFromSkeleton(skeleton || '', pass.unitId);
+      const testExcerpt = extractTestForUnit(testCode || '', pass.unitId);
+      if (component.type === 'extension') {
+        return buildExtensionUnitPrompt({ skeleton, unitDef, dataSources: bpComp?.dataSources, testExcerpt });
+      } else if (component.type === 'cortex') {
+        const subtype = bpComp?.subtype || 'data';
+        if (subtype === 'feature') {
+          return buildFeatureCortexSectionPrompt({ skeleton, sectionDef: unitDef, dataCortexProbe: null, platformUiExample: null, translationKeys: null });
+        }
+        return buildCortexMethodUnitPrompt({ skeleton, unitDef, extensionProbeResult: null, componentSubtype: subtype });
+      } else if (component.type === 'app') {
+        return buildAppViewUnitPrompt({ skeleton, viewDef: unitDef, featureCortexRenderSpec: null, translationKeys: null });
+      }
+      return '';
+    }
+    case 'assembly': {
+      if (component.type === 'extension') {
+        return buildExtensionAssemblyPrompt({ skeleton, units, label: component.label });
+      } else if (component.type === 'cortex') {
+        return buildCortexAssemblyPrompt({ skeleton, units, label: component.label, subtype: bpComp?.subtype });
+      } else if (component.type === 'app') {
+        return buildAppAssemblyPrompt({ skeleton, units, label: component.label, appDomainCortexName: null, designSystem: null });
+      }
+      return '';
+    }
+    case 'reflection':
+      return buildFoundryReflectionPrompt({
+        skeleton, testCode,
+        failedOutput: pass.failedOutput || '',
+        errors: pass.errors || [],
+        failedPass: pass.failedPass || {},
+        reflectionHistory: reflectionHistory || [],
+        upstreamProbes: null,
+      });
+    default:
+      return '';
+  }
+}
+
+/**
+ * Handle saving the response for a pass based on its type.
+ */
+async function handlePassSubmit(projectId, componentId, pass, response, ctx) {
+  switch (pass.type) {
+    case 'test':
+      await saveTestCode(projectId, componentId, response);
+      return { saved: true };
+    case 'skeleton':
+      await saveSkeleton(projectId, componentId, response);
+      return { saved: true };
+    case 'unit':
+      await saveUnit(projectId, componentId, pass.unitId, response);
+      return { saved: true };
+    case 'assembly':
+      // Assembly produces final component code — saved via saveComponent in caller
+      return { saved: true, isFinal: true };
+    case 'reflection': {
+      const prescription = parseReflectionPrescription(response);
+      if (prescription) {
+        await appendReflection(projectId, componentId, {
+          attempt: pass.attempt || 1,
+          at: new Date().toISOString(),
+          prescription,
+        });
+      }
+      return { saved: true, prescription };
+    }
+    default:
+      return { saved: false };
+  }
+}
+
+/**
+ * Extract one unit's definition from skeleton YAML by finding its block.
+ */
+function parseUnitFromSkeleton(skeletonYaml, unitId) {
+  if (!skeletonYaml || !unitId) return { id: unitId, label: unitId };
+  const lines = skeletonYaml.split('\n');
+  let found = false;
+  let block = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if ((trimmed.startsWith('- id: ') && trimmed.slice(6).trim() === unitId) ||
+        (trimmed.startsWith('- name: ') && trimmed.slice(8).trim() === unitId)) {
+      found = true;
+      block.push(line);
+      continue;
+    }
+    if (found) {
+      if (trimmed.startsWith('- ') || (/^\w/.test(trimmed) && trimmed.endsWith(':'))) {
+        break; // next item or section
+      }
+      block.push(line);
+    }
+  }
+  return { id: unitId, label: unitId, raw: block.join('\n') };
+}
+
+/**
+ * Extract the test section for a specific unit from the full test code.
+ */
+function extractTestForUnit(testCode, unitId) {
+  if (!testCode || !unitId) return '';
+  // Look for describe/test blocks mentioning the unit ID
+  const regex = new RegExp(`(describe|test|it)\\s*\\(['"](.*?${unitId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}.*?)['"]`, 'i');
+  const match = testCode.match(regex);
+  if (!match) return '';
+  // Return a window around the match
+  const idx = testCode.indexOf(match[0]);
+  const start = Math.max(0, testCode.lastIndexOf('\n', idx - 200));
+  const end = Math.min(testCode.length, testCode.indexOf('\n', idx + 500));
+  return testCode.slice(start, end > start ? end : testCode.length).trim();
+}
+
+/**
+ * Parse a reflection response to extract diagnosis and prescription.
+ */
+function parseReflectionPrescription(responseText) {
+  if (!responseText) return null;
+  try {
+    // Try to find YAML block with diagnosis/prescription
+    const yamlMatch = responseText.match(/```(?:yaml)?\s*\n([\s\S]*?)```/);
+    const block = yamlMatch ? yamlMatch[1] : responseText;
+    const diagMatch = block.match(/diagnosis:\s*(.+)/);
+    const rootMatch = block.match(/root_cause:\s*(.+)/);
+    const actionMatch = block.match(/action:\s*(.+)/);
+    const targetMatch = block.match(/target:\s*(.+)/);
+    if (diagMatch || actionMatch) {
+      return {
+        diagnosis: diagMatch ? diagMatch[1].trim() : '',
+        rootCause: rootMatch ? rootMatch[1].trim() : '',
+        action: actionMatch ? actionMatch[1].trim() : 'unknown',
+        target: targetMatch ? targetMatch[1].trim() : '',
+      };
+    }
+  } catch { /* parse failed */ }
+  return null;
+}
+
+/* ── ReflectionPanel (Task 18) ──────────────────────── */
+
+function ReflectionPanel({ prescription, reflectionHistory, onExecute }) {
+  const isEscalated = prescription?.action === 'escalate_to_user';
+  const isLoop = prescription && isDuplicatePrescription(reflectionHistory || [], prescription);
+  const atMax = (reflectionHistory || []).length >= MAX_REFLECTIONS;
+
+  return html`
+    <div class="fnd-reflection-panel">
+      <h4 class="fnd-reflection-title">${t('profile.foundry.reflectionHistory')}</h4>
+
+      ${prescription && html`
+        <div class="fnd-reflection-current">
+          <div class="fnd-reflection-section">
+            <strong>${t('profile.foundry.reflectionDiagnosis')}:</strong>
+            <p>${prescription.diagnosis || '—'}</p>
+            ${prescription.rootCause && html`<p>${prescription.rootCause}</p>`}
+          </div>
+          <div class="fnd-reflection-section">
+            <strong>${t('profile.foundry.reflectionPrescription')}:</strong>
+            <p>${prescription.action}${prescription.target ? ' -> ' + prescription.target : ''}</p>
+          </div>
+          ${isEscalated && html`
+            <div class="fnd-reflection-escalated">${t('profile.foundry.escalatedToUser')}</div>
+          `}
+          ${isLoop && html`
+            <div class="fnd-reflection-escalated">${t('profile.foundry.loopDetected')}</div>
+          `}
+          ${atMax && html`
+            <div class="fnd-reflection-escalated">${t('profile.foundry.maxReflections')}</div>
+          `}
+          ${!isEscalated && !isLoop && !atMax && onExecute && html`
+            <button class="btn-primary btn-sm" onClick=${() => onExecute(prescription)}>
+              ${t('profile.foundry.reflectionPrescription')}
+            </button>
+          `}
+        </div>
+      `}
+
+      ${reflectionHistory && reflectionHistory.length > 0 && html`
+        <details class="fnd-reflection-history">
+          <summary>${t('profile.foundry.reflectionHistory')} (${reflectionHistory.length})</summary>
+          ${reflectionHistory.map((entry, i) => html`
+            <div class="fnd-reflection-entry">
+              <div class="fnd-reflection-attempt">#${i + 1} — ${entry.at ? new Date(entry.at).toLocaleString() : ''}</div>
+              ${entry.prescription && html`
+                <p>${entry.prescription.diagnosis || ''} -> ${entry.prescription.action || ''}</p>
+              `}
+            </div>
+          `)}
+        </details>
+      `}
+    </div>
+  `;
+}
+
 /* ── ComponentDetail ─────────────────────────────────── */
 
 export function ComponentDetail({ component, project, components, projectId, interviewSpec, liveStatuses, onUpdate, onAdvance, showToast, session, orSettings }) {
@@ -146,6 +382,43 @@ export function ComponentDetail({ component, project, components, projectId, int
   const [testCode, setTestCode] = useState(component.testCode || '');
   const [testRunning, setTestRunning] = useState(false);
   const [testResult, setTestResult] = useState(component.testResult || null);
+
+  // Multi-pass state
+  const isMultiPass = MULTI_PASS_TYPES.includes(component.type);
+  const [passPrompt, setPassPrompt] = useState('');
+  const [passResponse, setPassResponse] = useState('');
+  const [skeleton, setSkeleton] = useState(null);
+  const [unitMap, setUnitMap] = useState({});
+  const [passTestCode, setPassTestCode] = useState('');
+  const [reflHistory, setReflHistory] = useState([]);
+  const [currentPrescription, setCurrentPrescription] = useState(null);
+
+  // Load multi-pass data when component changes
+  useEffect(() => {
+    if (!isMultiPass) return;
+    loadSkeleton(projectId, component.id).then(s => setSkeleton(s)).catch(() => {});
+    loadUnits(projectId, component.id).then(u => setUnitMap(u || {})).catch(() => {});
+    loadTestCode(projectId, component.id).then(tc => setPassTestCode(tc || '')).catch(() => {});
+    loadReflectionHistory(projectId, component.id).then(h => setReflHistory(h || [])).catch(() => {});
+  }, [component.id, component.status]);
+
+  // Generate pass prompt when current pass changes
+  useEffect(() => {
+    if (!isMultiPass || !component.passes) return;
+    const currentPass = getNextPass(component.passes);
+    if (!currentPass) { setPassPrompt(''); return; }
+    try {
+      const ctx = {
+        component, blueprint: project.blueprint, interviewSpec,
+        skeleton, units: unitMap, testCode: passTestCode, reflectionHistory: reflHistory,
+      };
+      const p = generatePassPrompt(currentPass, ctx);
+      setPassPrompt(typeof p === 'string' ? p : (p || ''));
+    } catch (e) {
+      console.error('[foundry] Pass prompt generation failed:', e);
+      setPassPrompt('');
+    }
+  }, [component.id, component.passes, skeleton, unitMap, passTestCode, reflHistory]);
 
   useEffect(() => {
     const componentSwitched = prevCompIdRef.current !== component.id;
@@ -515,6 +788,59 @@ export function ComponentDetail({ component, project, components, projectId, int
     setTestRunning(false);
   }
 
+  // Multi-pass: current pass and submit handler
+  const currentPass = isMultiPass && component.passes ? getNextPass(component.passes) : null;
+
+  async function handlePassCopy() {
+    if (!passPrompt) return;
+    try {
+      await navigator.clipboard.writeText(passPrompt);
+      showToast?.(t('profile.foundry.promptCopied'));
+    } catch { /* clipboard fallback */ }
+  }
+
+  async function handlePassValidateAndSave() {
+    if (!currentPass || !passResponse.trim()) return;
+    const res = await handlePassSubmit(projectId, component.id, currentPass, passResponse, {
+      component, blueprint: project.blueprint, interviewSpec,
+      skeleton, units: unitMap, testCode: passTestCode, reflectionHistory: reflHistory,
+    });
+
+    // Update pass status
+    const updatedPasses = (component.passes || []).map(p =>
+      p.id === currentPass.id ? { ...p, status: 'validated' } : p
+    );
+
+    // If skeleton pass just completed, create unit passes from the skeleton
+    if (currentPass.type === 'skeleton') {
+      const unitPasses = createUnitPasses(passResponse);
+      updatedPasses.push(...unitPasses);
+      // Add assembly pass after all unit passes
+      updatedPasses.push({ id: 'assembly', type: 'assembly', status: 'pending', attempt: 1 });
+      setSkeleton(passResponse);
+    }
+    if (currentPass.type === 'unit') {
+      setUnitMap(prev => ({ ...prev, [currentPass.unitId]: passResponse }));
+    }
+    if (currentPass.type === 'test') {
+      setPassTestCode(passResponse);
+    }
+    if (currentPass.type === 'reflection' && res.prescription) {
+      setCurrentPrescription(res.prescription);
+      setReflHistory(prev => [...prev, { attempt: currentPass.attempt || 1, at: new Date().toISOString(), prescription: res.prescription }]);
+    }
+
+    // If assembly, save result to component too
+    if (res.isFinal) {
+      setResult(passResponse);
+    }
+
+    const updated = addHistory(component, 'pass_completed', { passId: currentPass.id, passType: currentPass.type });
+    await saveComponent(projectId, { ...updated, passes: updatedPasses });
+    setPassResponse('');
+    onUpdate();
+  }
+
   return html`
     <div class="fnd-component-detail">
       <div class="fnd-comp-header">
@@ -523,7 +849,43 @@ export function ComponentDetail({ component, project, components, projectId, int
         <span class="fnd-status-badge status-${component.status}">${component.status}</span>
       </div>
 
-      <!-- AI Chat Mode -->
+      ${isMultiPass && currentPass ? html`
+        <!-- Multi-Pass Workflow -->
+        <div class="fnd-section">
+          <label>${t('profile.foundry.passProgress')} — ${t('profile.foundry.' + (({'test':'passTest','skeleton':'passSkeleton','unit':'passUnit','assembly':'passAssembly','reflection':'passReflection'})[currentPass.type] || currentPass.type))}${currentPass.unitLabel ? ': ' + currentPass.unitLabel : ''}</label>
+          <pre class="fnd-prompt-box">${passPrompt}</pre>
+          <div class="flex-row-wrap">
+            <button class="btn-outline btn-sm" onClick=${handlePassCopy}>
+              ${t('profile.foundry.copyPrompt')}
+            </button>
+          </div>
+        </div>
+        <div class="fnd-section">
+          <label>${t('profile.foundry.result')}</label>
+          <textarea
+            class="fnd-result-area"
+            rows="12"
+            placeholder=${t('profile.foundry.resultPlaceholder')}
+            value=${passResponse}
+            onInput=${e => setPassResponse(e.target.value)}
+          />
+          <div class="fnd-actions">
+            <button class="btn-primary btn-sm" onClick=${handlePassValidateAndSave}
+              disabled=${!passResponse.trim()}>
+              ${t('profile.foundry.validate')}
+            </button>
+          </div>
+        </div>
+
+        ${currentPrescription && html`
+          <${ReflectionPanel}
+            prescription=${currentPrescription}
+            reflectionHistory=${reflHistory}
+            onExecute=${null}
+          />
+        `}
+      ` : html`
+      <!-- AI Chat Mode (single-shot) -->
       <div class="fnd-section">
         <label>${t('profile.foundry.prompt')}</label>
         <pre class="fnd-prompt-box">${prompt}</pre>
@@ -616,6 +978,7 @@ export function ComponentDetail({ component, project, components, projectId, int
             </div>
           `}
         </div>
+      `}
       `}
 
       <!-- Test Section (for registered testable components) -->
