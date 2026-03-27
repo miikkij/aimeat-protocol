@@ -1096,7 +1096,8 @@ function parseExtensionResult(result) {
 
   // Strategy 1: markdown fences present — use them
   const yamlMatch = text.match(/```yaml\s*\n([\s\S]*?)```/i);
-  const fencedJs = [...text.matchAll(/```javascript\s*\n\/\/\s*(actions\/[\w-]+\.js)\s*\n([\s\S]*?)```/gi)];
+  // Match both "// actions/search.js" and "// search.js" formats
+  const fencedJs = [...text.matchAll(/```javascript\s*\n\/\/\s*(?:actions\/)?([\w-]+\.js)\s*\n([\s\S]*?)```/gi)];
 
   if (yamlMatch && fencedJs.length > 0) {
     const scripts = {};
@@ -1109,7 +1110,8 @@ function parseExtensionResult(result) {
   // Strategy 2: no fences — split on `// actions/filename.js` comment boundaries
   // The YAML manifest is everything before the first `// actions/` line.
   // Each JS file starts at `// actions/filename.js` and ends before the next one.
-  const actionCommentRegex = /^\/\/\s*actions\/([\w-]+\.js)\s*$/gm;
+  // Match both "// actions/search.js" and "// search.js" formats
+  const actionCommentRegex = /^\/\/\s*(?:actions\/)?([\w-]+\.js)\s*$/gm;
   const boundaries = [];
   let m;
   while ((m = actionCommentRegex.exec(text)) !== null) {
