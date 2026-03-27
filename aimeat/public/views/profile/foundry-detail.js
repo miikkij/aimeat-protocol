@@ -169,6 +169,7 @@ function generatePassPrompt(pass, ctx) {
         componentType: component.type,
         subtype: bpComp?.subtype,
         label: component.label,
+        description: interviewSpec?.description || blueprint?.description || '',
         blueprint,
         blueprintComponent: bpComp,
         interviewSpec,
