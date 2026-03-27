@@ -150,6 +150,9 @@ function StepArrow({ direction = 'right' } = {}) {
 function generatePassPrompt(pass, ctx) {
   const { component, blueprint, interviewSpec, skeleton, units, testCode, reflectionHistory } = ctx;
   const bpComp = blueprint?.components?.find(c => c.label === component.label || c.id === component.id);
+  if (!bpComp) {
+    console.warn('[foundry] Blueprint component not found for', component.id, component.label, 'Available:', blueprint?.components?.map(c => c.id + ':' + c.label));
+  }
 
   switch (pass.type) {
     case 'test':

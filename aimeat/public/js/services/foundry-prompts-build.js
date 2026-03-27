@@ -1102,7 +1102,8 @@ export function buildExtensionSkeletonPrompt({ label, description, blueprint, bl
   const schedules = blueprintComponent.schedules || [];
 
   // Collect config keys
-  const configKeys = (blueprint.settings || []).map(s => s.key);
+  const settingsArr = Array.isArray(blueprint.settings) ? blueprint.settings : (blueprint.settings?.user || []);
+  const configKeys = settingsArr.map(s => s.key);
 
   return `${INSTRUCTION_DISCLAIMER}
 # Task: Generate Extension Skeleton
