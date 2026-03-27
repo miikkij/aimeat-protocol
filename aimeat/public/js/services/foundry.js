@@ -385,23 +385,7 @@ export async function getProjectSettings(projectId) {
  */
 export async function saveSkeleton(projectId, componentId, skeletonYaml) {
   const key = `foundry.${projectId}.component.${componentId}.skeleton`;
-  try {
-    await apiPut(`/v1/memory/${encodeURIComponent(key)}`, {
-      value: skeletonYaml,
-      visibility: 'owner',
-    });
-  } catch (err) {
-    // If PUT fails (key doesn't exist yet), create with POST
-    if (err?.status === 404) {
-      await apiPost('/v1/memory', {
-        key,
-        value: skeletonYaml,
-        visibility: 'owner',
-      });
-    } else {
-      throw err;
-    }
-  }
+  await apiPost('/v1/memory', { key, value: skeletonYaml, visibility: 'owner' });
 }
 
 /**
@@ -422,22 +406,7 @@ export async function loadSkeleton(projectId, componentId) {
  */
 export async function saveUnit(projectId, componentId, unitId, code) {
   const key = `foundry.${projectId}.component.${componentId}.units.${unitId}`;
-  try {
-    await apiPut(`/v1/memory/${encodeURIComponent(key)}`, {
-      value: code,
-      visibility: 'owner',
-    });
-  } catch (err) {
-    if (err?.status === 404) {
-      await apiPost('/v1/memory', {
-        key,
-        value: code,
-        visibility: 'owner',
-      });
-    } else {
-      throw err;
-    }
-  }
+  await apiPost('/v1/memory', { key, value: code, visibility: 'owner' });
 }
 
 /**
@@ -461,22 +430,7 @@ export async function loadUnits(projectId, componentId) {
  */
 export async function saveTestCode(projectId, componentId, testCode) {
   const key = `foundry.${projectId}.component.${componentId}.tests`;
-  try {
-    await apiPut(`/v1/memory/${encodeURIComponent(key)}`, {
-      value: testCode,
-      visibility: 'owner',
-    });
-  } catch (err) {
-    if (err?.status === 404) {
-      await apiPost('/v1/memory', {
-        key,
-        value: testCode,
-        visibility: 'owner',
-      });
-    } else {
-      throw err;
-    }
-  }
+  await apiPost('/v1/memory', { key, value: testCode, visibility: 'owner' });
 }
 
 /**
@@ -509,22 +463,7 @@ export async function appendReflection(projectId, componentId, entry) {
 
   history.push({ ...entry, timestamp: new Date().toISOString() });
 
-  try {
-    await apiPut(`/v1/memory/${encodeURIComponent(key)}`, {
-      value: history,
-      visibility: 'owner',
-    });
-  } catch (err) {
-    if (err?.status === 404) {
-      await apiPost('/v1/memory', {
-        key,
-        value: history,
-        visibility: 'owner',
-      });
-    } else {
-      throw err;
-    }
-  }
+  await apiPost('/v1/memory', { key, value: history, visibility: 'owner' });
   return history;
 }
 
