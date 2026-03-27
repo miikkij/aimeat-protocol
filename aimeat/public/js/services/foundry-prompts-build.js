@@ -1339,11 +1339,35 @@ exports:
     returns: object
 \`\`\`
 
+## Translation Loading Pattern
+
+The app-domain cortex MUST load translations from the owner's memory namespace:
+\`\`\`javascript
+// Translations are stored by the translation component in the OWNER namespace
+// Key pattern: i18n.{locale} — loaded via AIMEAT.data.get()
+const translations = await AIMEAT.data.get('i18n.' + locale) || {};
+// If that returns null, try with service prefix:
+// const translations = await AIMEAT.data.get('SERVICE_NAME.i18n.' + locale) || {};
+\`\`\`
+
+The t() function MUST use loaded translations to return human-readable text, NOT raw keys.
+
+## Auth Pattern
+
+\`\`\`javascript
+// Use AIMEAT.auth.login() to restore session — call this in init()
+const session = await AIMEAT.auth.login();
+// If no session, show login UI
+\`\`\`
+
 ## CRITICAL RULES
 
-1. ZERO implementation code.
+1. ZERO implementation code in the skeleton — only structure.
 2. List ALL feature cortex components that will be composed.
 3. Export names must be exactly: init, render, t, switchLocale, getTranslations.
+4. init() MUST load translations via AIMEAT.data.get('i18n.' + locale).
+5. t(key) MUST return the translated string from loaded translations, NOT the raw key.
+6. render() MUST call init() first if translations aren't loaded yet.
 `;
 }
 
@@ -1489,22 +1513,31 @@ export function buildCortexMethodUnitPrompt({ skeleton, unitDef, extensionProbeR
     accessPattern = `
 ## Extension Call Pattern
 \`\`\`javascript
-// callExt — ALL extension actions are POST, always
-const resp = await session.fetch('/v1/ext/<extension-name>/<action-id>', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(input)
-});
-// resp.data is already parsed JSON — do NOT call resp.json()
-const result = resp.data;
-\`\`\``;
+// callExt helper is defined at the top of the IIFE — use it for ALL extension calls
+// It handles POST, JSON headers, response unwrapping, and error handling
+async function callExt(actionId, body) {
+  const resp = await fetch('/v1/ext/' + EXT_NAME + '/' + actionId, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (AIMEAT.auth?.getSession?.()?.token || '') },
+    body: JSON.stringify(body || {})
+  });
+  const json = await resp.json();
+  return json?.data?.result ?? json?.data ?? json;
+}
+
+// Usage in your method:
+const result = await callExt('${unitDef.calls}', { /* input */ });
+\`\`\`
+IMPORTANT: Do NOT use session.fetch — it does not exist in cortex scope. Use the callExt helper above.`;
   } else if (unitDef.reads) {
     accessPattern = `
 ## Memory Read Pattern
 \`\`\`javascript
+// Read extension data from ext: namespace
 const data = await AIMEAT.data.getPublic('ext:<extension-name>', '${unitDef.reads}');
 // ALWAYS null-check: data may be null on first run
-\`\`\``;
+\`\`\`
+IMPORTANT: Do NOT use session.fetch — it does not exist in cortex scope.`;
   }
 
   return `${INSTRUCTION_DISCLAIMER}
@@ -1748,26 +1781,44 @@ components:
 
 \`\`\`javascript
 // <name>.js — ${subtypeLabel} IIFE
-(function() {
+(function (AIMEAT) {
   'use strict';
-  const LIB_NAME = '<camelCaseName>';
+  const LIB_NAME = '<camelCaseName>'; // kebab "my-lib" → camelCase "myLib"
+  const EXT_NAME = '<extension-name>'; // the extension this cortex wraps
+
+  // --- callExt helper (for data cortex — wraps extension HTTP calls) ---
+  async function callExt(actionId, body) {
+    const token = AIMEAT.auth?.getSession?.()?.token || '';
+    const resp = await fetch('/v1/ext/' + EXT_NAME + '/' + actionId, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(body || {})
+    });
+    const json = await resp.json();
+    return json?.data?.result ?? json?.data ?? json;
+  }
 
   // --- Unit implementations (copied exactly) ---
-  // PASTE each unit function here WITHOUT modification
+  // PASTE each unit function here. Replace "session.fetch" calls with "callExt" calls.
 
   // --- Registration ---
   const exports = { /* all public method names */ };
-  if (!window.AIMEAT) window.AIMEAT = {};
-  window.AIMEAT[LIB_NAME] = exports;
-})();
+  if (AIMEAT.register) AIMEAT.register(LIB_NAME, exports);
+  AIMEAT[LIB_NAME] = exports;
+})(window.AIMEAT || (window.AIMEAT = {}));
 \`\`\`
+
+YAML manifest MUST include \`namespace: community\` under metadata.
 
 ## CRITICAL RULES
 
-1. **Do NOT modify the unit implementations.** Copy each function exactly as provided.
-2. **YAML metadata.name (kebab-case) and JS LIB_NAME (camelCase) must correspond.**
-3. **Every method from the skeleton must appear in the exports object.**
-4. **Assembly is mechanical.** Combine pieces, don't generate new logic.
+1. **Do NOT modify the unit implementations** except to replace \`session.fetch\` with \`callExt\`.
+2. **YAML metadata.name (kebab-case) and JS LIB_NAME (camelCase) must correspond.** Example: \`prh-tietokerros\` → \`prhTietokerros\`.
+3. **YAML metadata MUST have namespace: community.**
+4. **Every method from the skeleton must appear in the exports object.**
+5. **Use (function(AIMEAT){...})(window.AIMEAT||(window.AIMEAT={}))** — NOT (function(){...})().
+6. **Must have \`const exports = { ... }\`** — the validator checks for this pattern.
+7. **Assembly is mechanical.** Combine pieces, don't generate new logic.
 `;
 }
 
