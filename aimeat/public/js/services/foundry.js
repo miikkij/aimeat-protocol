@@ -530,7 +530,13 @@ export async function saveComponent(projectId, component) {
 export async function loadAllComponents(projectId) {
   const resp = await apiGet(`/v1/memory?prefix=foundry.${projectId}.component.&owner_scope=true`);
   const items = resp?.data?.items || resp?.data?.entries || [];
-  return items.map(i => {
+  // Filter out sub-keys (skeleton, tests, units, reflection-history) — only load component state records
+  const prefix = `foundry.${projectId}.component.`;
+  const componentItems = items.filter(i => {
+    const suffix = i.key.slice(prefix.length);
+    return !suffix.includes('.');  // component IDs like "ext-1" have no dots; sub-keys like "ext-1.tests" do
+  });
+  return componentItems.map(i => {
     const val = typeof i.value === 'string' ? JSON.parse(i.value) : i.value;
     // Ensure id is present — extract from memory key if missing (backend submit may omit it)
     if (!val.id && i.key) {
