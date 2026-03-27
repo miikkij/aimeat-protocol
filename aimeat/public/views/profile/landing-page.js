@@ -421,6 +421,7 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
               <${MenuItem} icon="\u{1F4AC}" label=${t('profile.tabs.chatSessions')} active=${isOpen('chatsessions')} onClick=${() => open('chatsessions', 'manage-new')} />
               <${MenuItem} icon="\u{1F50C}" label=${t('profile.tabs.extensions')} active=${isOpen('extensions')} onClick=${() => open('extensions', 'manage-new')} />
               <${MenuItem} icon="\u{1F534}" label=${t('profile.generator.tabLabel')} active=${isOpen('generator')} onClick=${() => open('generator', 'manage-new')} />
+              <${MenuItem} icon="\u{1F3ED}" label=${t('profile.foundry.tabLabel')} active=${isOpen('foundry')} onClick=${() => open('foundry', 'manage-new')} />
               <${MenuItem} icon="\u{1F4E6}" label=${t('profile.tabs.packages')} active=${isOpen('packages')} onClick=${() => open('packages', 'manage-new')} />
               <${MenuItem} icon="\u{1F4DA}" label=${t('knowledge.tabLabel')} active=${isOpen('knowledge')} onClick=${() => open('knowledge', 'manage-new')} />
               <${MenuItem} icon="\u{1F4CB}" label=${t('profile.tabs.boards')} active=${isOpen('boards')} onClick=${() => open('boards', 'manage-new')} />
@@ -463,6 +464,7 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
         <${MenuSection} title=${t('profile.landing.menuBuildShare')}>
           <div class="pf-menu-grid">
             <${MenuItem} icon="\u{1F534}" label=${t('profile.generator.tabLabel')} active=${isOpen('generator')} onClick=${() => open('generator', 'build')} />
+            <${MenuItem} icon="\u{1F3ED}" label=${t('profile.foundry.tabLabel')} active=${isOpen('foundry')} onClick=${() => open('foundry', 'build')} />
             <${MenuItem} icon="\u{1F50C}" label=${t('profile.tabs.extensions')} active=${isOpen('extensions')} onClick=${() => open('extensions', 'build')} />
             <${MenuItem} icon="\u{1F3A8}" label=${t('portfolio.tabLabel')} active=${isOpen('portfolio')} onClick=${() => open('portfolio', 'build')} />
             ${isExperienced && html`
