@@ -70,6 +70,32 @@ export const MULTI_PASS_TYPES = ['extension', 'cortex', 'app'];
 export const MAX_REFLECTIONS = 3;
 
 /**
+ * Phase order for components. Components should be generated in this order.
+ * Earlier phases must be completed before later phases start.
+ */
+export const PHASE_ORDER = ['csm', 'memory', 'translation', 'extension', 'cortex', 'app'];
+
+/**
+ * Check if a component can proceed based on phase order.
+ * Returns { ok: true } or { ok: false, missing: [...] } listing unregistered dependencies.
+ */
+export function checkPhaseOrder(componentType, allComponents) {
+  const typeIndex = PHASE_ORDER.indexOf(componentType === 'msm' ? 'csm' : componentType);
+  if (typeIndex <= 0) return { ok: true }; // CSM has no dependencies
+
+  const required = PHASE_ORDER.slice(0, typeIndex);
+  const missing = [];
+  for (const reqType of required) {
+    const comps = allComponents.filter(c => c.type === reqType || (reqType === 'translation' && c.type === 'translation'));
+    const allRegistered = comps.length > 0 && comps.every(c => c.registeredAs || c.status === 'registered');
+    if (!allRegistered && comps.length > 0) {
+      missing.push(...comps.filter(c => !c.registeredAs && c.status !== 'registered').map(c => c.label || c.id));
+    }
+  }
+  return missing.length > 0 ? { ok: false, missing } : { ok: true };
+}
+
+/**
  * Create initial passes array for a component based on its type.
  * For single-shot types (csm, msm, memory, translation), returns empty array.
  * For multi-pass types, returns [test, skeleton] — unit passes are added after skeleton is validated.
@@ -105,22 +131,46 @@ export function createUnitPasses(skeleton) {
 export function extractUnitsFromSkeleton(skeletonYaml) {
   const lines = skeletonYaml.split('\n');
   const units = [];
-  let currentSection = null;
+  // Track which section we're in based on indentation
+  // Collect ALL - id: and - name: entries from actions/methods/sections/views
+  const unitSections = new Set(['actions:', 'methods:', 'sections:', 'views:']);
+  let inUnitSection = false;
+  let sectionIndent = 0;
 
   for (const line of lines) {
     const trimmed = line.trim();
-    if (trimmed === 'actions:') currentSection = 'actions';
-    else if (trimmed === 'methods:') currentSection = 'methods';
-    else if (trimmed === 'sections:') currentSection = 'sections';
-    else if (trimmed === 'views:') currentSection = 'views';
-    else if (trimmed.startsWith('- id: ') && currentSection) {
-      units.push({ id: trimmed.slice(6).trim(), label: trimmed.slice(6).trim() });
-    } else if (trimmed.startsWith('- name: ') && currentSection === 'methods') {
-      units.push({ id: trimmed.slice(8).trim(), label: trimmed.slice(8).trim() });
-    } else if (/^\w/.test(trimmed) && trimmed.endsWith(':') && currentSection) {
-      // New top-level section — stop collecting
-      if (!['actions:', 'methods:', 'sections:', 'views:'].includes(trimmed)) {
-        currentSection = null;
+    if (!trimmed) continue;
+
+    // Detect unit section start (top-level key)
+    if (unitSections.has(trimmed)) {
+      inUnitSection = true;
+      sectionIndent = line.search(/\S/);
+      continue;
+    }
+
+    // If we're in a unit section, check if we've left it
+    if (inUnitSection) {
+      const currentIndent = line.search(/\S/);
+      // A line at same or lesser indent as section header = new top-level section
+      if (currentIndent <= sectionIndent && !trimmed.startsWith('-') && /^\w/.test(trimmed)) {
+        inUnitSection = false;
+        // But check if this is ANOTHER unit section
+        if (unitSections.has(trimmed)) {
+          inUnitSection = true;
+          sectionIndent = currentIndent;
+        }
+        continue;
+      }
+    }
+
+    // Collect units from any active section
+    if (inUnitSection) {
+      if (trimmed.startsWith('- id: ')) {
+        const val = trimmed.slice(6).trim().replace(/["']/g, '');
+        units.push({ id: val, label: val });
+      } else if (trimmed.startsWith('- name: ')) {
+        const val = trimmed.slice(8).trim().replace(/["']/g, '');
+        units.push({ id: val, label: val });
       }
     }
   }
