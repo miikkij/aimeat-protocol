@@ -1,0 +1,252 @@
+{
+  "architecture": {
+    "summary": "PRH Yritystietopalvelu — AIMEAT-palvelu joka hakee yritysten perustiedot PRH:n avoimesta YTJ v3 APIsta. Käyttäjä voi hakea yrityksiä, tarkastella yrityskorttia, seurata yrityksiä, saada muutosilmoituksia, vertailla yrityksiä ja selata muutoshistoriaa.",
+    "locale": "fi",
+    "extensionName": "prh-ytj",
+    "cortexPrefix": "prh",
+    "dataFlow": "App → Cortex (prh) → Extension (prh-ytj) → PRH YTJ v3 API (avoindata.prh.fi)",
+    "updateStrategy": "scheduled-daily + on-demand search",
+    "externalApis": [
+      {
+        "name": "PRH YTJ v3 API",
+        "baseUrl": "https://avoindata.prh.fi/opendata-ytj-api/v3",
+        "auth": "none",
+        "rateLimit": "300 req/min shared"
+      }
+    ]
+  },
+  "dataModel": {
+    "structures": {
+      "PrhCompany": {
+        "type": "object",
+        "description": "PRH:sta haettu yrityksen perustiedot",
+        "properties": {
+          "businessId": { "type": "object", "properties": { "value": { "type": "string" }, "registrationDate": { "type": "string" }, "source": { "type": "string" } } },
+          "euId": { "type": "object", "properties": { "value": { "type": "string" }, "source": { "type": "string" } } },
+          "names": { "type": "array", "items": { "type": "object", "properties": { "name": { "type": "string" }, "type": { "type": "string" }, "registrationDate": { "type": "string" }, "version": { "type": "number" }, "source": { "type": "string" } } } },
+          "mainBusinessLine": { "type": "object", "properties": { "type": { "type": "string" }, "descriptions": { "type": "array", "items": { "type": "object", "properties": { "languageCode": { "type": "string" }, "description": { "type": "string" } } } }, "typeCodeSet": { "type": "string" }, "registrationDate": { "type": "string" }, "source": { "type": "string" } } },
+          "website": { "type": "object", "properties": { "url": { "type": "string" }, "registrationDate": { "type": "string" }, "source": { "type": "string" } } },
+          "companyForms": { "type": "array", "items": { "type": "object", "properties": { "type": { "type": "string" }, "descriptions": { "type": "array", "items": { "type": "object", "properties": { "languageCode": { "type": "string" }, "description": { "type": "string" } } } }, "registrationDate": { "type": "string" }, "version": { "type": "number" }, "source": { "type": "string" } } } },
+          "companySituations": { "type": "array", "items": { "type": "object" } },
+          "registeredEntries": { "type": "array", "items": { "type": "object", "properties": { "type": { "type": "string" }, "descriptions": { "type": "array", "items": { "type": "object", "properties": { "languageCode": { "type": "string" }, "description": { "type": "string" } } } }, "registrationDate": { "type": "string" }, "register": { "type": "string" }, "authority": { "type": "string" } } } },
+          "addresses": { "type": "array", "items": { "type": "object", "properties": { "type": { "type": "number" }, "street": { "type": "string" }, "postCode": { "type": "string" }, "postOffices": { "type": "array", "items": { "type": "object", "properties": { "city": { "type": "string" }, "languageCode": { "type": "string" }, "municipalityCode": { "type": "string" } } } }, "postOfficeBox": { "type": "string" }, "buildingNumber": { "type": "string" }, "entrance": { "type": "string" }, "apartmentNumber": { "type": "string" }, "apartmentIdSuffix": { "type": "string" }, "co": { "type": "string" }, "registrationDate": { "type": "string" }, "source": { "type": "string" } } } },
+          "tradeRegisterStatus": { "type": "string" },
+          "status": { "type": "string" },
+          "registrationDate": { "type": "string" },
+          "lastModified": { "type": "string" }
+        }
+      },
+      "PrhSearchResult": {
+        "type": "object",
+        "description": "PRH API:n hakuvastaus",
+        "properties": {
+          "totalResults": { "type": "number" },
+          "companies": { "type": "array", "items": { "$ref": "PrhCompany" } }
+        }
+      },
+      "WatchlistItem": {
+        "type": "object",
+        "description": "Käyttäjän seurantaan lisäämä yritys",
+        "properties": {
+          "businessId": { "type": "string", "description": "Y-tunnus" },
+          "companyName": { "type": "string", "description": "Yrityksen nimi lisäyshetkellä" },
+          "addedAt": { "type": "string", "description": "ISO 8601 aikaleima" },
+          "lastChecked": { "type": "string", "description": "Viimeisin tarkistusajankohta" },
+          "lastSnapshot": { "$ref": "PrhCompany" }
+        }
+      },
+      "WatchlistData": {
+        "type": "object",
+        "description": "Koko seurantalista",
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "WatchlistItem" } }
+        }
+      },
+      "ChangeEntry": {
+        "type": "object",
+        "description": "Havaittu muutos seuratun yrityksen tiedoissa",
+        "properties": {
+          "businessId": { "type": "string" },
+          "companyName": { "type": "string" },
+          "field": { "type": "string", "description": "Muuttunut kenttä" },
+          "oldValue": { "type": "object", "description": "Edellinen arvo" },
+          "newValue": { "type": "object", "description": "Uusi arvo" },
+          "detectedAt": { "type": "string", "description": "ISO 8601 aikaleima" },
+          "notified": { "type": "boolean" }
+        }
+      },
+      "ChangesData": {
+        "type": "object",
+        "description": "Muutoshistoria",
+        "properties": {
+          "changes": { "type": "array", "items": { "$ref": "ChangeEntry" } }
+        }
+      },
+      "ComparisonEntry": {
+        "type": "object",
+        "description": "Tallennettu yritysvertailu",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "businessIds": { "type": "array", "items": { "type": "string" } },
+          "createdAt": { "type": "string" }
+        }
+      },
+      "ComparisonsData": {
+        "type": "object",
+        "description": "Kaikki vertailut",
+        "properties": {
+          "comparisons": { "type": "array", "items": { "$ref": "ComparisonEntry" } }
+        }
+      }
+    }
+  },
+  "components": [
+    {
+      "id": "csm-1",
+      "type": "csm",
+      "label": "PRH Yritystietopalvelu — palvelumäärittely",
+      "produces": "service manifest: data schemas, consent rules, validation for company data, watchlist, changes, comparisons",
+      "consumes": null
+    },
+    {
+      "id": "ext-1",
+      "type": "extension",
+      "label": "prh-ytj — PRH API -integraatio ja seurantalogiikka",
+      "produces": "ext:prh-ytj/cache.{businessId}, ext:prh-ytj/watchlist.items, ext:prh-ytj/changes.log, ext:prh-ytj/comparisons.list",
+      "consumes": "PRH YTJ v3 API (ctx.fetch)",
+      "actions": [
+        {"id": "search", "description": "Hae yrityksiä PRH APIsta nimellä tai Y-tunnuksella", "input": {"query": "string", "type": "name|businessId"}, "output": {"$ref": "PrhSearchResult"}},
+        {"id": "get-company", "description": "Hae yksittäisen yrityksen kaikki tiedot Y-tunnuksella", "input": {"businessId": "string"}, "output": {"$ref": "PrhCompany"}},
+        {"id": "add-to-watchlist", "description": "Lisää yritys seurantalistalle", "input": {"businessId": "string", "companyName": "string"}, "output": {"$ref": "WatchlistData"}},
+        {"id": "remove-from-watchlist", "description": "Poista yritys seurantalistalta", "input": {"businessId": "string"}, "output": {"$ref": "WatchlistData"}},
+        {"id": "get-watchlist", "description": "Hae seurantalista", "input": {}, "output": {"$ref": "WatchlistData"}},
+        {"id": "check-changes", "description": "Tarkista seurattujen yritysten muutokset PRH APIsta", "input": {}, "output": {"newChanges": "number", "changes": {"$ref": "ChangesData"}}},
+        {"id": "get-changes", "description": "Hae muutoshistoria", "input": {"businessId": "string|null"}, "output": {"$ref": "ChangesData"}},
+        {"id": "save-comparison", "description": "Tallenna yritysvertailu", "input": {"title": "string|null", "businessIds": "array of string"}, "output": {"$ref": "ComparisonsData"}},
+        {"id": "get-comparisons", "description": "Hae tallennetut vertailut", "input": {}, "output": {"$ref": "ComparisonsData"}},
+        {"id": "delete-comparison", "description": "Poista tallennettu vertailu", "input": {"id": "string"}, "output": {"$ref": "ComparisonsData"}}
+      ],
+      "schedules": [
+        {"id": "daily-check", "action": "check-changes", "cron": "0 7 * * *", "description": "Tarkista seurattujen yritysten muutokset kerran päivässä klo 07:00"}
+      ]
+    },
+    {
+      "id": "cortex-1",
+      "type": "cortex",
+      "subtype": "data",
+      "label": "prh-data — PRH-datan luku ja muotoilu",
+      "produces": "domain methods: getCompanyCache, getWatchlist, getChanges, getComparisons, formatAddress, formatBusinessLine, getDescription",
+      "consumes": "ext:prh-ytj memory keys via AIMEAT.data.getPublic",
+      "methods": [
+        {"name": "getCompanyCache", "args": ["businessId"], "returns": "PrhCompany | null", "reads": "ext:prh-ytj/cache.{businessId}"},
+        {"name": "getWatchlist", "args": [], "returns": "WatchlistData", "reads": "ext:prh-ytj/watchlist.items"},
+        {"name": "getChanges", "args": ["businessId?"], "returns": "ChangeEntry[]", "reads": "ext:prh-ytj/changes.log"},
+        {"name": "getComparisons", "args": [], "returns": "ComparisonEntry[]", "reads": "ext:prh-ytj/comparisons.list"},
+        {"name": "formatAddress", "args": ["address", "lang?"], "returns": "string"},
+        {"name": "formatBusinessLine", "args": ["mainBusinessLine", "lang?"], "returns": "string"},
+        {"name": "getDescription", "args": ["descriptions", "lang?"], "returns": "string"},
+        {"name": "isWatched", "args": ["businessId"], "returns": "boolean", "reads": "ext:prh-ytj/watchlist.items"}
+      ]
+    },
+    {
+      "id": "cortex-2",
+      "type": "cortex",
+      "subtype": "feature",
+      "label": "prh-actions — PRH-palvelun toiminnot",
+      "produces": "domain methods: searchCompanies, getCompany, addToWatchlist, removeFromWatchlist, checkChanges, saveComparison, deleteComparison",
+      "consumes": "ext:prh-ytj actions via session.fetch",
+      "methods": [
+        {"name": "searchCompanies", "args": ["query", "type?"], "returns": "PrhSearchResult", "calls": "ext:prh-ytj/search"},
+        {"name": "getCompany", "args": ["businessId"], "returns": "PrhCompany", "calls": "ext:prh-ytj/get-company"},
+        {"name": "addToWatchlist", "args": ["businessId", "companyName"], "returns": "WatchlistData", "calls": "ext:prh-ytj/add-to-watchlist"},
+        {"name": "removeFromWatchlist", "args": ["businessId"], "returns": "WatchlistData", "calls": "ext:prh-ytj/remove-from-watchlist"},
+        {"name": "checkChanges", "args": [], "returns": "{ newChanges, changes }", "calls": "ext:prh-ytj/check-changes"},
+        {"name": "saveComparison", "args": ["title", "businessIds"], "returns": "ComparisonsData", "calls": "ext:prh-ytj/save-comparison"},
+        {"name": "deleteComparison", "args": ["id"], "returns": "ComparisonsData", "calls": "ext:prh-ytj/delete-comparison"}
+      ]
+    },
+    {
+      "id": "cortex-3",
+      "type": "cortex",
+      "subtype": "app-domain",
+      "label": "prh-app — Sovelluslogiikka ja näkymäorkestraatio",
+      "produces": "high-level app methods: showSearch, showCompanyCard, showWatchlist, showChanges, showComparison, compareCompanies",
+      "consumes": "cortex-1 (prh-data), cortex-2 (prh-actions), user settings, translations",
+      "methods": [
+        {"name": "showSearch", "args": ["query", "type?"], "returns": "{ results, totalResults, query }"},
+        {"name": "showCompanyCard", "args": ["businessId"], "returns": "{ company, isWatched, formattedAddress, formattedBusinessLine }"},
+        {"name": "showWatchlist", "args": [], "returns": "{ items, totalCount }"},
+        {"name": "showChanges", "args": ["businessId?"], "returns": "{ changes, groupedByDate }"},
+        {"name": "compareCompanies", "args": ["businessIds"], "returns": "{ companies, fields }"},
+        {"name": "getSettings", "args": [], "returns": "{ defaultLanguage, notificationsEnabled }"}
+      ]
+    },
+    {
+      "id": "app-1",
+      "type": "app",
+      "label": "PRH Yritystietopalvelu — käyttöliittymä",
+      "produces": "HTML/JS app with tabbed navigation: Haku, Yrityskortti, Seuranta, Muutokset, Vertailu",
+      "consumes": "cortex-3 (prh-app), translations, aimeat-ui-dialogs, aimeat-ui-forms, aimeat-ui-layout, aimeat-ui-nav, aimeat-ui-viewers",
+      "views": [
+        {"id": "view-search", "title": "Yrityshaku", "description": "Hakukenttä, tuloslistaus korteilla", "cortexMethods": ["showSearch"], "uiLibs": ["aimeat-ui-forms", "aimeat-ui-layout", "aimeat-ui-viewers"]},
+        {"id": "view-company", "title": "Yrityskortti", "description": "Yrityksen kaikki tiedot", "cortexMethods": ["showCompanyCard", "addToWatchlist"], "uiLibs": ["aimeat-ui-layout", "aimeat-ui-viewers", "aimeat-ui-dialogs"]},
+        {"id": "view-watchlist", "title": "Seurantalista", "description": "Seuratut yritykset", "cortexMethods": ["showWatchlist", "removeFromWatchlist"], "uiLibs": ["aimeat-ui-layout", "aimeat-ui-viewers", "aimeat-ui-dialogs"]},
+        {"id": "view-changes", "title": "Muutoshistoria", "description": "Aikajana muutoksista", "cortexMethods": ["showChanges"], "uiLibs": ["aimeat-ui-viewers", "aimeat-ui-forms", "aimeat-ui-layout"]},
+        {"id": "view-comparison", "title": "Yritysvertailu", "description": "Rinnakkaisnäkymä N yrityksen tiedoista", "cortexMethods": ["compareCompanies", "showSearch", "saveComparison"], "uiLibs": ["aimeat-ui-forms", "aimeat-ui-layout", "aimeat-ui-viewers", "aimeat-ui-dialogs"]}
+      ],
+      "style": {
+        "mood": "data-dense",
+        "primaryColor": "#1a365d",
+        "textColor": "#4a5568",
+        "bgColor": "#f7fafc",
+        "accentColor": "#3182ce",
+        "alertColor": "#dd6b20",
+        "typography": "compact",
+        "layout": "tabbed"
+      }
+    },
+    {
+      "id": "trans-1",
+      "type": "translation",
+      "label": "Käännökset — suomi (fi)",
+      "produces": "service.i18n.fi",
+      "consumes": null,
+      "locale": "fi"
+    },
+    {
+      "id": "trans-2",
+      "type": "translation",
+      "label": "Translations — English (en)",
+      "produces": "service.i18n.en",
+      "consumes": null,
+      "locale": "en"
+    },
+    {
+      "id": "mem-1",
+      "type": "memory",
+      "label": "Extension memory keys — prh-ytj",
+      "produces": "ext:prh-ytj/* namespace",
+      "consumes": null
+    }
+  ],
+  "phases": [
+    {
+      "id": "phase-1",
+      "title": "Perusrakenne ja haku",
+      "description": "CSM, extension (search + get-company), cortex data+actions, käännökset, app hakunäkymä + yrityskortti",
+      "components": ["csm-1", "ext-1", "cortex-1", "cortex-2", "cortex-3", "trans-1", "trans-2", "mem-1", "app-1"]
+    }
+  ],
+  "settings": [
+    {"key": "service.settings.default_language", "type": "select", "options": ["fi", "en"], "default": "fi", "label": {"fi": "Hakutulosten kieli", "en": "Search results language"}},
+    {"key": "service.settings.notifications_enabled", "type": "boolean", "default": true, "label": {"fi": "Push-ilmoitukset muutoksista", "en": "Push notifications for changes"}}
+  ],
+  "testScenarios": [
+    {"id": "test-1", "title": "Yrityksen haku nimellä", "expectedResult": "Hakutuloksissa näkyy Overscale Solutions Oy, Y-tunnus 3323553-5"},
+    {"id": "test-2", "title": "Yrityskortin tarkastelu", "expectedResult": "Yrityskortti näyttää kaikki tiedot: nimi, Y-tunnus, EU-tunniste, yhtiömuoto, toimiala, osoite, verkkosivut"},
+    {"id": "test-3", "title": "Yrityksen lisääminen seurantaan", "expectedResult": "Overscale Solutions Oy näkyy seurantalistalla"},
+    {"id": "test-4", "title": "Yritysvertailu", "expectedResult": "Molemmat yritykset näkyvät rinnakkain vertailutaulukossa"},
+    {"id": "test-5", "title": "Muutoshistorian tarkastelu", "expectedResult": "Muutoshistoria-aikajana näyttää muutokset ryhmiteltynä päivämäärän mukaan"}
+  ]
+}

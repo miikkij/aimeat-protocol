@@ -1,8 +1,15 @@
 # Foundry Pipeline Test — Execution Template
 
-> **Purpose:** Validate that Foundry multi-pass prompts produce correct, registerable output when processed by a fresh AI session with no prior context.
+> **Purpose:** Validate that Foundry multi-pass prompts produce correct, registerable output when processed by an AI with no prior context.
 >
-> **Methodology:** Each pass extracts the prompt from the browser UI and sends it to a fresh Opus 4.6 subagent. The subagent's raw response is pasted back without modification. Validation failures indicate prompt deficiencies, not implementation bugs.
+> **Methodology:** Each pass extracts the prompt from the browser UI, saves it verbatim to a file, processes it inline (same Opus 4.6 session — no subagents), and saves the response to a file. The response is pasted back without modification. Validation failures indicate prompt deficiencies, not implementation bugs.
+>
+> **No subagents.** All processing is done inline to guarantee the model is Opus 4.6. Subagent model selection cannot be verified.
+>
+> **File structure:** All prompts and responses are saved to `docs/testing/run{N}/phase{N}-{name}/`:
+> - `prompt.txt` — exact prompt from Foundry UI (via clipboard)
+> - `response.txt` or `response.json` — exact AI output
+> - Numbered prefixes for multi-pass phases: `01-test-prompt.txt`, `01-test-response.txt`, etc.
 >
 > **Copy this template** before each run and fill in the results.
 
@@ -70,7 +77,7 @@
 
 For each single-shot component (CSM, Memory, Translations):
 
-| # | Component label | Type | Subagent dispatched | Validation | Registered | Notes |
+| # | Component label | Type | Processed inline | Validation | Registered | Notes |
 |---|----------------|------|-------------------|------------|------------|-------|
 | | | | [ ] | PASS/FAIL | YES/NO | |
 | | | | [ ] | PASS/FAIL | YES/NO | |
@@ -93,7 +100,7 @@ For each single-shot component (CSM, Memory, Translations):
 **Component type:** EXTENSION
 
 ### Step 2.1: Test Pass
-- [ ] Snapshot → extract prompt → dispatch **fresh Opus 4.6 subagent** → paste raw response → validate
+- [ ] Copy prompt from UI → save to file → process inline → save response to file → paste into UI → validate
 - [ ] Result: PASS / FAIL
 - **Validation errors:** ___
 
@@ -114,7 +121,7 @@ For each single-shot component (CSM, Memory, Translations):
 
 For EACH unit created by the skeleton:
 
-| Unit # | Unit ID | Subagent dispatched | Validation | Notes |
+| Unit # | Unit ID | Processed inline | Validation | Notes |
 |--------|---------|-------------------|------------|-------|
 | 1 | | [ ] | PASS/FAIL | |
 | 2 | | [ ] | PASS/FAIL | |
@@ -155,11 +162,11 @@ For EACH unit created by the skeleton:
 **Component type:** CORTEX (data)
 
 ### Step 3.1: Test Pass
-- [ ] Fresh subagent → paste → validate
+- [ ] Copy prompt → save to file → process inline → save response → paste → validate
 - [ ] Result: PASS / FAIL
 
 ### Step 3.2: Skeleton Pass
-- [ ] Fresh subagent → paste → validate
+- [ ] Copy prompt → save to file → process inline → save response → paste → validate
 - [ ] Result: PASS / FAIL
 - [ ] Record methods created:
 
@@ -172,7 +179,7 @@ For EACH unit created by the skeleton:
 
 ### Step 3.3–3.N: Method Unit Passes
 
-| Unit # | Method name | Subagent dispatched | Validation | Notes |
+| Unit # | Method name | Processed inline | Validation | Notes |
 |--------|------------|-------------------|------------|-------|
 | 1 | | [ ] | PASS/FAIL | |
 | 2 | | [ ] | PASS/FAIL | |
@@ -183,7 +190,7 @@ For EACH unit created by the skeleton:
 - [ ] Thin wrappers — no business logic duplication
 
 ### Step 3.A: Assembly Pass
-- [ ] Fresh subagent → paste → validate
+- [ ] Copy prompt → save to file → process inline → save response → paste → validate
 - [ ] Result: PASS / FAIL
 - **Critical checks:**
   - [ ] `callExt` uses `session.fetch()` not raw `fetch()`
@@ -214,7 +221,7 @@ Repeat this block for EACH feature cortex component from the blueprint.
 
 **Component type:** CORTEX (feature)
 
-| Step | Pass type | Subagent dispatched | Validation | Notes |
+| Step | Pass type | Processed inline | Validation | Notes |
 |------|-----------|-------------------|------------|-------|
 | Test | Test | [ ] | PASS/FAIL | |
 | Skeleton | Skeleton | [ ] | PASS/FAIL | Sections: ___ |
@@ -248,7 +255,7 @@ Repeat this block for EACH feature cortex component from the blueprint.
 **Component label:** (fill from blueprint)
 **Component type:** CORTEX (app-domain)
 
-| Step | Pass type | Subagent dispatched | Validation | Notes |
+| Step | Pass type | Processed inline | Validation | Notes |
 |------|-----------|-------------------|------------|-------|
 | 5.1 | Test | [ ] | PASS/FAIL | |
 | 5.2 | Skeleton | [ ] | PASS/FAIL | |
@@ -277,7 +284,7 @@ Repeat this block for EACH feature cortex component from the blueprint.
 **Component label:** (fill from blueprint)
 **Component type:** APP
 
-| Step | Pass type | Subagent dispatched | Validation | Notes |
+| Step | Pass type | Processed inline | Validation | Notes |
 |------|-----------|-------------------|------------|-------|
 | 6.1 | Test | [ ] | PASS/FAIL | |
 | 6.2 | Skeleton | [ ] | PASS/FAIL | Views: ___ |
@@ -397,28 +404,23 @@ Any validation failure where the subagent's raw output was rejected = prompt def
 
 ---
 
-## Appendix: Subagent Dispatch Template
+## Appendix: Inline Processing Method
 
-For each pass, the subagent is dispatched with this exact format:
+For each pass:
 
-```
-Agent tool call:
-  description: "Foundry pass: [component-type] [pass-type]"
-  model: "opus"
-  prompt: |
-    You are an AI assistant helping a user build an AIMEAT service.
-    The user has given you a prompt with detailed instructions.
-    Follow the instructions EXACTLY and produce the requested output.
-    Do NOT add explanations, commentary, or markdown outside of what
-    the instructions ask for. Return ONLY the requested output.
+1. Click "Copy Prompt" in the Foundry UI
+2. Save the clipboard content verbatim to `docs/testing/run{N}/phase{N}-{name}/prompt.txt`
+3. Read the saved prompt file
+4. Process it inline (same Opus 4.6 session) — follow the prompt instructions exactly, produce only what is asked
+5. Save the response verbatim to `docs/testing/run{N}/phase{N}-{name}/response.txt`
+6. Paste the response into the Foundry UI textarea
+7. Click Validate
 
-    Here is the prompt:
-    ---
-    [EXTRACTED PROMPT TEXT FROM BROWSER SNAPSHOT]
-    ---
-```
+**No subagents.** Subagent model selection cannot be verified — different models produce structurally different output. All processing must happen in the main session where the model is known.
 
-The subagent's response is used VERBATIM — no editing, no fixing, no "improving".
+**No context leakage.** When processing a prompt, use ONLY the information in the prompt file. Do not inject knowledge from the conversation, previous passes, or memory. The prompt must be self-sufficient — if it isn't, that's a prompt deficiency to record.
+
+The response is used VERBATIM — no editing, no fixing, no "improving".
 If the response fails validation, that failure is recorded as a prompt deficiency.
 
 ## Appendix: Full Run Log
@@ -433,15 +435,17 @@ For EVERY pass, the log records this exact structure:
 ---
 ## [timestamp] Phase X.Y — [Component Label] — [Pass Type]
 
-### Prompt (extracted from Foundry UI)
+### Prompt (copied from Foundry UI, saved to file)
 \```
-[FULL prompt text as shown in the browser — every line, no truncation]
+[FULL prompt text — every line, no truncation]
 \```
+**File:** `docs/testing/run{N}/phase{N}-{name}/{NN}-{pass}-prompt.txt`
 
-### Subagent Response (verbatim, unmodified)
+### Response (verbatim, unmodified)
 \```
-[FULL response from the fresh Opus 4.6 subagent — every line]
+[FULL response — every line, saved to file]
 \```
+**File:** `docs/testing/run{N}/phase{N}-{name}/{NN}-{pass}-response.txt`
 
 ### Validation Result
 - **Status:** PASS / FAIL

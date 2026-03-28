@@ -211,7 +211,7 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
       setAiRunning('interview');
       try {
         const prompt = buildInterviewPrompt(description, getLocale());
-        let content = await runWithAi(project.projectId, prompt);
+        let content = await runWithAi(project.projectId, prompt, null, 'reasoning');
         setInterviewSpec(content);
         // Auto-validate
         let vr = validateInterviewSpec(content);
@@ -220,7 +220,7 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
           for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
             showToast?.(t('profile.foundry.openrouter.retrying').replace('{current}', attempt).replace('{max}', max));
             const correctionPrompt = prompt + '\n\n--- PREVIOUS RESPONSE (HAD ERRORS) ---\n' + content + '\n\n--- VALIDATION ERRORS ---\n' + vr.errors.join('\n') + '\n\nPlease fix these errors and return the corrected response.';
-            content = await runWithAi(project.projectId, correctionPrompt);
+            content = await runWithAi(project.projectId, correctionPrompt, null, 'reasoning');
             setInterviewSpec(content);
             vr = validateInterviewSpec(content);
           }
@@ -348,7 +348,7 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
         }
       } catch { /* proceed without catalog */ }
       const prompt = buildBlueprintPrompt(description, interviewParsed, cortexLibs);
-      let content = await runWithAi(project.projectId, prompt);
+      let content = await runWithAi(project.projectId, prompt, null, 'reasoning');
       setBlueprintResult(content);
       // Auto-validate
       let vr = validateBlueprint(content);
@@ -357,7 +357,7 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
         for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
           showToast?.(t('profile.foundry.openrouter.retrying').replace('{current}', attempt).replace('{max}', max));
           const fixPrompt = buildBlueprintFixPrompt(description, vr.errors, interviewParsed);
-          content = await runWithAi(project.projectId, fixPrompt);
+          content = await runWithAi(project.projectId, fixPrompt, null, 'reasoning');
           setBlueprintResult(content);
           vr = validateBlueprint(content);
         }

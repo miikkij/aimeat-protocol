@@ -27,10 +27,21 @@ export default function GeneratorDebugTab() {
   async function loadProjects() {
     setLoading(true);
     try {
-      const resp = await apiGet('/v1/generator/debug/projects');
-      setProjects(resp?.data?.projects || []);
+      // Load both generator and foundry debug projects
+      const [genResp, foundryResp] = await Promise.all([
+        apiGet('/v1/generator/debug/projects').catch(() => ({ data: { projects: [] } })),
+        apiGet('/v1/foundry/debug/projects').catch(() => ({ data: { projects: [] } })),
+      ]);
+      const genProjects = (genResp?.data?.projects || []).map(p => ({ ...p, source: 'generator' }));
+      const foundryProjects = (foundryResp?.data?.projects || []).map(p => ({ ...p, source: 'foundry' }));
+      setProjects([...foundryProjects, ...genProjects]);
     } catch { setProjects([]); }
     setLoading(false);
+  }
+
+  function getDebugBase(projectId) {
+    const proj = projects.find(p => p.projectId === projectId);
+    return proj?.source === 'foundry' ? '/v1/foundry/debug' : '/v1/generator/debug';
   }
 
   async function selectProject(projectId) {
@@ -38,7 +49,8 @@ export default function GeneratorDebugTab() {
     setSelectedFile(null);
     setFileContent(null);
     try {
-      const resp = await apiGet(`/v1/generator/debug/${projectId}/files`);
+      const base = getDebugBase(projectId);
+      const resp = await apiGet(`${base}/${projectId}/files`);
       setFiles(resp?.data?.files || []);
     } catch { setFiles([]); }
   }
@@ -47,7 +59,8 @@ export default function GeneratorDebugTab() {
     setSelectedFile(path);
     setLoadingFile(true);
     try {
-      const resp = await apiGet(`/v1/generator/debug/${selectedProject}/file?path=${encodeURIComponent(path)}`);
+      const base = getDebugBase(selectedProject);
+      const resp = await apiGet(`${base}/${selectedProject}/file?path=${encodeURIComponent(path)}`);
       setFileContent(resp?.data?.content || null);
     } catch { setFileContent('(Error loading file)'); }
     setLoadingFile(false);
@@ -56,7 +69,8 @@ export default function GeneratorDebugTab() {
   async function handleDeleteProject(projectId) {
     if (!confirm(`Delete all debug data for ${projectId}?`)) return;
     try {
-      await apiDelete(`/v1/generator/debug/${projectId}`);
+      const base = getDebugBase(projectId);
+      await apiDelete(`${base}/${projectId}`);
       setProjects(prev => prev.filter(p => p.projectId !== projectId));
       if (selectedProject === projectId) {
         setSelectedProject(null);
@@ -72,7 +86,8 @@ export default function GeneratorDebugTab() {
   async function handleCopyAll(projId) {
     setCopying(true);
     try {
-      const resp = await apiGet(`/v1/generator/debug/${projId}/files`);
+      const base = getDebugBase(projId);
+      const resp = await apiGet(`${base}/${projId}/files`);
       const allFiles = resp?.data?.files || [];
       const sorted = [...allFiles].sort((a, b) => {
         const order = (f) => {
@@ -88,7 +103,7 @@ export default function GeneratorDebugTab() {
       const loaded = [];
       for (const f of sorted) {
         try {
-          const r = await apiGet(`/v1/generator/debug/${projId}/file?path=${encodeURIComponent(f)}`);
+          const r = await apiGet(`${base}/${projId}/file?path=${encodeURIComponent(f)}`);
           loaded.push({ path: f, content: r?.data?.content || '(empty)' });
         } catch { loaded.push({ path: f, content: '(failed to load)' }); }
       }
@@ -155,7 +170,7 @@ export default function GeneratorDebugTab() {
           ${projects.map(p => html`
             <div class="adm-card adm-card-clickable" onClick=${() => selectProject(p.projectId)}>
               <div class="adm-card-header">
-                <strong>${p.projectId}</strong>
+                <strong>${p.source === 'foundry' ? '🏭 ' : '🔴 '}${p.projectId}</strong>
                 <button class="btn-primary btn-sm" onClick=${e => { e.stopPropagation(); handleCopyAll(p.projectId); }}>
                   ${copying === 'done' ? '\u2705 Copied!' : copying ? '...' : 'Copy All'}
                 </button>

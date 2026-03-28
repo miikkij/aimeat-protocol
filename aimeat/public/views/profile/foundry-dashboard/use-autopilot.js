@@ -268,17 +268,31 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
 
       writeDebugArtifact(projectId, cid, `pass-${nextPass.id}-prompt`, prompt);
 
+      // Determine model role: reasoning for planning passes, execution for code passes
+      const reasoningPasses = ['test', 'skeleton', 'reflection'];
+      const passModelRole = reasoningPasses.includes(nextPass.type) ? 'reasoning' : 'execution';
+
+      await writeProjectLog(projectId, 'multipass_ai_call', {
+        meta: { component: comp.label, pass: nextPass.id, type: nextPass.type, modelRole: passModelRole, promptLength: prompt.length, by: 'autopilot' },
+      });
+
       // Call AI
       let content;
       try {
-        content = await runWithAi(projectId, prompt);
+        content = await runWithAi(projectId, prompt, null, passModelRole);
       } catch (e) {
         showToast?.(`${comp.label} (${nextPass.id}): ${e.message}`, true);
+        await writeProjectLog(projectId, 'multipass_ai_failed', {
+          meta: { component: comp.label, pass: nextPass.id, type: nextPass.type, modelRole: passModelRole, error: e.message, by: 'autopilot' },
+        });
         return { success: false, content: null, updated };
       }
       if (autopilotState.cancelledRef.current) return { success: false, content: null, updated };
 
       writeDebugArtifact(projectId, cid, `pass-${nextPass.id}-raw`, content);
+      await writeProjectLog(projectId, 'multipass_ai_response', {
+        meta: { component: comp.label, pass: nextPass.id, type: nextPass.type, modelRole: passModelRole, responseLength: content.length, by: 'autopilot' },
+      });
       content = stripCodeblock(content);
       writeDebugArtifact(projectId, cid, `pass-${nextPass.id}-stripped`, content);
 
@@ -330,7 +344,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
 
           let reflResponse;
           try {
-            reflResponse = await runWithAi(projectId, reflPrompt);
+            reflResponse = await runWithAi(projectId, reflPrompt, null, 'reasoning');
           } catch (e) {
             await writeProjectLog(projectId, 'multipass_reflection_ai_failed', {
               meta: { component: comp.label, pass: nextPass.id, attempt: reflectAttempt + 1, error: e.message, by: 'autopilot' },
@@ -373,7 +387,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
           writeDebugArtifact(projectId, cid, `pass-${nextPass.id}-retry-${reflectAttempt + 1}-prompt`, retryPrompt);
 
           try {
-            content = await runWithAi(projectId, retryPrompt);
+            content = await runWithAi(projectId, retryPrompt, null, passModelRole);
           } catch (e) {
             showToast?.(`${comp.label} (${nextPass.id} retry): ${e.message}`, true);
             return { success: false, content: null, updated };
@@ -557,7 +571,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
             interviewSpec,
           );
           try {
-            content = await runWithAi(projectId, prompt);
+            content = await runWithAi(projectId, prompt, null, 'execution');
           } catch (e) {
             showToast?.(`${comp.label}: ${e.message}`, true);
             break;
@@ -586,7 +600,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
               const fixPrompt = buildFixPrompt(prompt, content, vr.errors, comp.type);
               writeDebugArtifact(projectId, cid, 'fix-prompt-' + attempt, fixPrompt);
               try {
-                content = await runWithAi(projectId, fixPrompt);
+                content = await runWithAi(projectId, fixPrompt, null, 'execution');
               } catch (e) {
                 showToast?.(`${comp.label}: ${e.message}`, true);
                 break;
@@ -756,7 +770,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
               );
               await writeProjectLog(projectId, 'test_prompt_built', { meta: { component: comp.label, environment: testEnvironment, promptLength: testPromptText.length, by: 'autopilot' } });
               writeDebugArtifact(projectId, cid, 'test-prompt', testPromptText);
-              aiTestCode = await runWithAi(projectId, testPromptText);
+              aiTestCode = await runWithAi(projectId, testPromptText, null, 'reasoning');
               writeDebugArtifact(projectId, cid, 'test-raw-response', aiTestCode);
               aiTestCode = stripCodeblock(aiTestCode);
               writeDebugArtifact(projectId, cid, 'test-code', aiTestCode);
@@ -832,7 +846,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
                   try {
                     const reflectionPrompt = buildReflectionPrompt(content, allErrors, testContext);
                     writeDebugArtifact(projectId, cid, 'test-fix-reflection-' + (fix + 1), reflectionPrompt);
-                    reflectionDiagnosis = await runWithAi(projectId, reflectionPrompt);
+                    reflectionDiagnosis = await runWithAi(projectId, reflectionPrompt, null, 'reasoning');
                     writeDebugArtifact(projectId, cid, 'test-fix-diagnosis-' + (fix + 1), reflectionDiagnosis);
                   } catch (e) {
                     await writeProjectLog(projectId, 'test_fix_reflection_failed', { meta: { component: comp.label, round: fix + 1, error: e.message } });
@@ -855,7 +869,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
                   }
 
                   try {
-                    content = await runWithAi(projectId, fixPrompt);
+                    content = await runWithAi(projectId, fixPrompt, null, 'execution');
                     writeDebugArtifact(projectId, cid, 'test-fix-raw-response-' + (fix + 1), content);
                   } catch (e) {
                     showToast?.(`${comp.label}: ${e.message}`, true);
@@ -922,7 +936,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
                   try {
                     const newTestPrompt = buildTestPrompt(comp.type, content, comp.label, updated.registeredAs, project.blueprint, interviewSpec, testProbeResults);
                     writeDebugArtifact(projectId, cid, 'test-fix-test-prompt-' + (fix + 1), newTestPrompt);
-                    let newTestCode = await runWithAi(projectId, newTestPrompt);
+                    let newTestCode = await runWithAi(projectId, newTestPrompt, null, 'reasoning');
                     writeDebugArtifact(projectId, cid, 'test-fix-test-raw-response-' + (fix + 1), newTestCode);
                     newTestCode = stripCodeblock(newTestCode);
                     aiTestCode = newTestCode;

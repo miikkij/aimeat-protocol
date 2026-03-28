@@ -88,9 +88,11 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
     requireAuth(), requireRole('owner'),
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
-      const { apiKey, model, autoRetry, maxRetries, provider, baseUrl } = req.body as {
+      const { apiKey, model, reasoningModel, executionModel, autoRetry, maxRetries, provider, baseUrl } = req.body as {
         apiKey?: string;
         model?: string;
+        reasoningModel?: string;
+        executionModel?: string;
         autoRetry?: unknown;
         maxRetries?: unknown;
         provider?: string;
@@ -142,6 +144,8 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         baseUrl: effectiveBaseUrl,
       };
       if (model !== undefined) prefs.model = model;
+      if (reasoningModel !== undefined) prefs.reasoningModel = reasoningModel;
+      if (executionModel !== undefined) prefs.executionModel = executionModel;
       if (autoRetry !== undefined) prefs.autoRetry = !!autoRetry;
       if (maxRetries !== undefined) prefs.maxRetries = Math.max(1, Math.min(10, Number(maxRetries) || 3));
 
@@ -165,6 +169,8 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       res.json(success(config.nodeId, {
         hasApiKey: !!(apiKeyRecord?.value as { encrypted?: string })?.encrypted,
         model: prefs.model ?? null,
+        reasoningModel: prefs.reasoningModel ?? null,
+        executionModel: prefs.executionModel ?? null,
         autoRetry: prefs.autoRetry ?? true,
         maxRetries: prefs.maxRetries ?? 3,
         provider: prefs.provider ?? 'openrouter',
@@ -283,11 +289,12 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       res.setTimeout(1_800_000);
 
       const gaii = resolve(req);
-      const { projectId, prompt, systemPrompt, model: modelOverride } = req.body as {
+      const { projectId, prompt, systemPrompt, model: modelOverride, modelRole } = req.body as {
         projectId?: string;
         prompt?: string;
         systemPrompt?: string;
         model?: string;
+        modelRole?: 'reasoning' | 'execution';
       };
 
       // Validate required fields
@@ -325,8 +332,18 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       }
 
       try {
-        const defaultModel = (prefs.model as string) || 'anthropic/claude-sonnet-4';
-        const model = (typeof modelOverride === 'string' && modelOverride) ? modelOverride : defaultModel;
+        // Model selection: explicit override > role-specific model > default model
+        let selectedModel: string;
+        if (typeof modelOverride === 'string' && modelOverride) {
+          selectedModel = modelOverride;
+        } else if (modelRole === 'reasoning' && prefs.reasoningModel) {
+          selectedModel = prefs.reasoningModel as string;
+        } else if (modelRole === 'execution' && prefs.executionModel) {
+          selectedModel = prefs.executionModel as string;
+        } else {
+          selectedModel = (prefs.model as string) || 'anthropic/claude-sonnet-4';
+        }
+        const model = selectedModel;
 
         const result = await complete(decryptedKey, model, prompt, systemPrompt, baseUrl);
         res.json(success(config.nodeId, result));

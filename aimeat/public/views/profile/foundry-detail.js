@@ -77,9 +77,10 @@ export function stripCodeblock(text) {
   return trimmed;
 }
 
-export async function runWithAi(projectId, prompt, systemPrompt = null) {
+export async function runWithAi(projectId, prompt, systemPrompt = null, modelRole = null) {
   const body = { projectId, prompt };
   if (systemPrompt) body.systemPrompt = systemPrompt;
+  if (modelRole) body.modelRole = modelRole;
   // Use direct fetch with 10-minute timeout (apiPost has 30s limit)
   const controller = new AbortController();
   _activeAiController = controller;
@@ -636,7 +637,8 @@ export function ComponentDetail({ component, project, components, projectId, int
         interviewSpec,
       );
       writeDebugArtifact(projectId, component.id, 'prompt', fresh);
-      let content = await runWithAi(projectId, fresh);
+      // Single-shot components use execution model (they produce code/content)
+      let content = await runWithAi(projectId, fresh, null, 'execution');
       writeDebugArtifact(projectId, component.id, 'ai-raw-response', content);
       content = stripCodeblock(content);
       setResult(content);
@@ -650,7 +652,7 @@ export function ComponentDetail({ component, project, components, projectId, int
         for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
           showToast?.(t('profile.foundry.openrouter.retrying').replace('{current}', attempt).replace('{max}', max));
           const fp = buildFixPrompt(fresh, content, vr.errors, component.type);
-          content = await runWithAi(projectId, fp);
+          content = await runWithAi(projectId, fp, null, 'execution');
           setResult(content);
           vr = validateComponent(component.type, content, project.blueprint);
         }
@@ -764,7 +766,7 @@ export function ComponentDetail({ component, project, components, projectId, int
     }
     await writeProjectLog(projectId, 'test_prompt_generating', { meta: { component: component.label, type: component.type, by: 'user-ai' } });
     try {
-      let aiCode = await runWithAi(projectId, currentTestPrompt);
+      let aiCode = await runWithAi(projectId, currentTestPrompt, null, 'reasoning');
       aiCode = stripCodeblock(aiCode);
       setTestCode(aiCode);
       await saveComponent(projectId, { ...component, testCode: aiCode, testPrompt: currentTestPrompt, testEnvironment });

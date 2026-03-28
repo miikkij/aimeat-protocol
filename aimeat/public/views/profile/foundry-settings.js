@@ -25,6 +25,8 @@ export function OpenRouterSettings({ onSettingsChange }) {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
+  const [reasoningModel, setReasoningModel] = useState('');
+  const [executionModel, setExecutionModel] = useState('');
   const [models, setModels] = useState([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [autoRetry, setAutoRetry] = useState(false);
@@ -44,6 +46,8 @@ export function OpenRouterSettings({ onSettingsChange }) {
       if (resp.ok !== false && resp.data) {
         setHasApiKey(!!resp.data.hasApiKey);
         setModel(resp.data.model || '');
+        setReasoningModel(resp.data.reasoningModel || '');
+        setExecutionModel(resp.data.executionModel || '');
         setAutoRetry(!!resp.data.autoRetry);
         setMaxRetries(resp.data.maxRetries || 3);
         setProvider(resp.data.provider || 'openrouter');
@@ -80,7 +84,7 @@ export function OpenRouterSettings({ onSettingsChange }) {
   async function handleSave() {
     setSaving(true);
     try {
-      const body = { model, autoRetry, maxRetries: parseInt(maxRetries) || 3, provider, baseUrl };
+      const body = { model, reasoningModel, executionModel, autoRetry, maxRetries: parseInt(maxRetries) || 3, provider, baseUrl };
       if (apiKey) body.apiKey = apiKey;
       const resp = await apiPut('/v1/openrouter/settings', body);
       if (resp.ok === false) {
@@ -185,16 +189,37 @@ export function OpenRouterSettings({ onSettingsChange }) {
             />
           </div>
 
-          <!-- Model -->
+          <!-- Reasoning Model (blueprints, skeletons, planning) -->
           <div class="fnd-or-field">
-            <label class="fnd-or-label">${t('profile.foundry.openrouter.model')}</label>
+            <label class="fnd-or-label">${t('profile.foundry.openrouter.reasoningModel')}</label>
             ${modelsLoading
               ? html`<span class="fnd-or-loading">${t('profile.loading')}</span>`
               : html`
                 <select
                   class="fnd-or-select"
-                  value=${model}
-                  onChange=${e => setModel(e.target.value)}
+                  value=${reasoningModel}
+                  onChange=${e => setReasoningModel(e.target.value)}
+                  disabled=${!hasApiKey && !apiKey}
+                >
+                  <option value="">${t('profile.foundry.openrouter.modelSelect')}</option>
+                  ${models.map(m => html`
+                    <option value=${m.id}>${m.name || m.id}</option>
+                  `)}
+                </select>
+              `
+            }
+          </div>
+
+          <!-- Execution Model (code, tests, assembly) -->
+          <div class="fnd-or-field">
+            <label class="fnd-or-label">${t('profile.foundry.openrouter.executionModel')}</label>
+            ${modelsLoading
+              ? html`<span class="fnd-or-loading">${t('profile.loading')}</span>`
+              : html`
+                <select
+                  class="fnd-or-select"
+                  value=${executionModel}
+                  onChange=${e => setExecutionModel(e.target.value)}
                   disabled=${!hasApiKey && !apiKey}
                 >
                   <option value="">${t('profile.foundry.openrouter.modelSelect')}</option>
