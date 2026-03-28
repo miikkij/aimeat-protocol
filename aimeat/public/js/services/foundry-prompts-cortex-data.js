@@ -9,6 +9,7 @@
  * @version-history
  *   v1.0.0 — 2026-03-26 — Initial data cortex prompt template
  *   v1.1.0 — 2026-03-26 — Add full cortex YAML manifest format to output section
+ *   v1.2.0 — 2026-03-28 — Add callExt/readExtMemory/readOwnerMemory/dv() helpers, error handling rules
  */
 
 import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER } from './foundry-prompts-base.js';
@@ -155,12 +156,68 @@ Second block — JavaScript library:
 (function (AIMEAT) {
   'use strict';
   const LIB_NAME = 'yourLibName'; // camelCase of metadata.name
+  const EXT_NAME = 'extension-name'; // the extension this cortex wraps
 
-  // Internal helpers (callExt, readExtMemory — private, not exported)
-  // ...
+  // --- callExt helper — uses session.fetch() for proper auth ---
+  // session.fetch() returns ALREADY-PARSED JSON — do NOT call resp.json()
+  // Access resp.ok, resp.data, resp.error directly
+  async function callExt(actionId, body) {
+    try {
+      if (!AIMEAT.auth || !AIMEAT.auth.getSession) {
+        console.warn('[' + LIB_NAME + '] callExt(' + actionId + '): auth not available');
+        return null;
+      }
+      var session = AIMEAT.auth.getSession();
+      if (!session || !session.fetch) {
+        console.warn('[' + LIB_NAME + '] callExt(' + actionId + '): no session — login required');
+        return null;
+      }
+      var resp = await session.fetch('/v1/ext/' + EXT_NAME + '/' + actionId, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+      });
+      if (!resp || !resp.ok) {
+        console.warn('[' + LIB_NAME + '] callExt(' + actionId + '): failed', resp?.error || resp?.status);
+        return null;
+      }
+      return resp.data?.result ?? resp.data ?? null;
+    } catch(e) {
+      console.warn('[' + LIB_NAME + '] callExt(' + actionId + '):', e.message);
+      return null;
+    }
+  }
+
+  // --- readExtMemory — reads extension-owned data from ext: namespace ---
+  async function readExtMemory(key) {
+    try { return await AIMEAT.data.getPublic('ext:' + EXT_NAME, key); }
+    catch(e) { return null; }
+  }
+
+  // --- readOwnerMemory — reads from current user's namespace (translations, settings) ---
+  async function readOwnerMemory(key) {
+    try { return await AIMEAT.data.get(key); }
+    catch(e) { return null; }
+  }
+
+  // --- Nested object display helper ---
+  function dv(val) {
+    if (val == null) return '-';
+    if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') return String(val);
+    if (val.value) return val.value;
+    if (val.url) return val.url;
+    if (val.name) return val.name;
+    if (Array.isArray(val)) return val.map(dv).join(', ');
+    return JSON.stringify(val);
+  }
 
   // Public data access methods
-  async function methodName(params) { ... }
+  // ALWAYS null-check callExt results — it returns null on auth failure or network error
+  async function methodName(params) {
+    var result = await callExt('action-id', { param: params });
+    if (!result) return []; // Return safe fallback, NEVER crash
+    return result;
+  }
 
   // Register
   const exports = { methodName, ... };
@@ -168,5 +225,17 @@ Second block — JavaScript library:
   AIMEAT[LIB_NAME] = exports;
 })(window.AIMEAT || (window.AIMEAT = {}));
 \`\`\`
+
+## Error Handling Rules (CRITICAL)
+
+1. **callExt returns null on error** — EVERY method MUST null-check before using results
+2. **Return safe fallbacks** — empty arrays \`[]\`, empty objects \`{}\`, or default values. NEVER crash.
+3. **On first run, extension data may not exist** — always handle null/empty gracefully
+4. **console.warn on failures** — so developers can diagnose issues in browser console
+5. **NEVER call resp.json()** on session.fetch results — they are already parsed
+
+## No HTML Entities in Code
+
+Your code MUST use real operators (>, <, &&), NOT HTML entities (&gt; &lt; &amp;).
 `;
 }

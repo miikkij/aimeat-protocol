@@ -7,6 +7,7 @@
  *   import { buildFeatureCortexPrompt } from '/js/services/foundry-prompts-cortex-feature.js';
  * @version-history
  *   v1.0.0 — 2026-03-26 — Initial feature cortex prompt template
+ *   v1.1.0 — 2026-03-28 — Inject actual service name into translation loading, add AIMEAT._translations note
  */
 
 import { INSTRUCTION_DISCLAIMER } from './foundry-prompts-base.js';
@@ -197,12 +198,15 @@ Translations are stored in the OWNER namespace (by the translation component).
 Load them with AIMEAT.data.get() — NOT from ext: namespace:
 \`\`\`javascript
 // CORRECT — reads from owner namespace where translation component stored them:
-var translations = await AIMEAT.data.get('SERVICE_NAME.i18n.fi') || {};
+// Try service-prefixed key first, then plain key:
+var translations = await AIMEAT.data.get('${dataCortexBundle?.registeredAs || 'SERVICE_NAME'}.i18n.fi')
+  || await AIMEAT.data.get('i18n.fi') || {};
 
 // WRONG — ext: namespace does NOT contain translations:
 // var translations = await AIMEAT.data.getPublic('ext:...', 'i18n.fi'); // ← NEVER do this
 \`\`\`
-Replace SERVICE_NAME with the actual service slug (from the CSM/extension name).
+
+NOTE: In most apps, the app-domain cortex loads translations during init() and stores them in \`AIMEAT._translations\`. Feature cortexes can access them via \`AIMEAT._translations\` — you don't need to load them again in each feature.
 
 ## Translation Helper
 Use a t() function for all user-visible text:

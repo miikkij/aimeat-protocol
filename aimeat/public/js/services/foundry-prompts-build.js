@@ -20,9 +20,17 @@
  *     buildFeatureCortexSectionPrompt, buildAppViewUnitPrompt,
  *     buildExtensionAssemblyPrompt, buildCortexAssemblyPrompt,
  *     buildAppAssemblyPrompt
+ *   v3.1.0 — 2026-03-28 — Critical prompt fixes from pipeline test:
+ *     - callExt: switched from raw fetch() to session.fetch() for proper auth
+ *     - Extension assembly: added author/method/path fields, export default signature
+ *     - App assembly: added full boot sequence with loadScript, auth, error collector
+ *     - Cortex assembly: added readExtMemory, t(), dv() helpers
+ *     - Feature sections: added default platform UI examples, async data loading pattern
+ *     - App-domain skeleton: added mountLoginButton pattern, dv() helper
+ *     - All assemblies: added HTML_ENTITY_RULES
  */
 
-import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER, COMPONENT_TEMPLATES, EXTENSION_CONSUMPTION_RULES, summarizeExtensionApi, summarizeCortexApi } from './foundry-prompts-base.js';
+import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER, COMPONENT_TEMPLATES, EXTENSION_CONSUMPTION_RULES, HTML_ENTITY_RULES, SANDBOX_CONSTRAINTS, summarizeExtensionApi, summarizeCortexApi } from './foundry-prompts-base.js';
 
 // Cortex prompt modules — eagerly loaded in browser, skipped on server.
 // The modules are cached after first dynamic import.
@@ -1355,9 +1363,30 @@ The t() function MUST use loaded translations to return human-readable text, NOT
 ## Auth Pattern
 
 \`\`\`javascript
-// Use AIMEAT.auth.login() to restore session — call this in init()
-const session = await AIMEAT.auth.login();
-// If no session, show login UI
+// Restore session from storage — MUST call login() first
+// getSession() alone returns null until login() is called
+var session = await AIMEAT.auth.login();
+if (!session) {
+  // No stored session — show login button
+  // mountLoginButton takes a CSS SELECTOR string, NOT a DOM element
+  container.id = container.id || 'app-auth';
+  AIMEAT.auth.mountLoginButton('#' + container.id);
+  return { ready: false, authenticated: false };
+}
+\`\`\`
+
+## Nested Object Helper (MUST include)
+API responses contain nested objects. Include this helper in the IIFE:
+\`\`\`javascript
+function dv(val) {
+  if (val == null) return '-';
+  if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (val.value) return val.value;
+  if (val.url) return val.url;
+  if (val.name) return val.name;
+  if (Array.isArray(val)) return val.map(dv).join(', ');
+  return JSON.stringify(val);
+}
 \`\`\`
 
 ## CRITICAL RULES
@@ -1365,9 +1394,11 @@ const session = await AIMEAT.auth.login();
 1. ZERO implementation code in the skeleton — only structure.
 2. List ALL feature cortex components that will be composed.
 3. Export names must be exactly: init, render, t, switchLocale, getTranslations.
-4. init() MUST load translations via AIMEAT.data.get('i18n.' + locale).
-5. t(key) MUST return the translated string from loaded translations, NOT the raw key.
-6. render() MUST call init() first if translations aren't loaded yet.
+4. init() MUST call AIMEAT.auth.login() first, THEN load translations.
+5. init() MUST load translations via AIMEAT.data.get('SERVICE_PREFIX.i18n.' + locale) with fallback to AIMEAT.data.get('i18n.' + locale).
+6. t(key) MUST return the translated string from loaded translations, NOT the raw key.
+7. render() MUST call init() first if translations aren't loaded yet.
+8. Store translations in AIMEAT._translations so feature cortexes can access them.
 `;
 }
 
@@ -1475,28 +1506,23 @@ ${typeof ds.sampleResponse === 'string' ? ds.sampleResponse.slice(0, 2000) : JSO
 \`\`\`
 ${ds.notes ? `- **Notes:** ${ds.notes}` : ''}` : ''}
 
-## Sandbox API (ONLY these — nothing else exists)
-${apis.map(a => `- ${a}`).join('\n')}
+${SANDBOX_CONSTRAINTS}
 
 ${testExcerpt ? `## Test Excerpt (your code must pass this)\n\`\`\`\n${testExcerpt.slice(0, 1500)}\n\`\`\`` : ''}
 
-## Anti-Pattern Checklist
-- NO global fetch — use ctx.fetch
-- NO require/import — sandbox is isolated
-- NO setTimeout/setInterval — not available
-- ALWAYS null-check ctx.memory.get results
-- ALWAYS JSON.parse(resp.text) for fetch responses
-- Use EXACT field names from sample response
+${HTML_ENTITY_RULES}
 
 ## Output Format
 
-Return ONLY the handler function. No YAML, no manifest, no exports:
+Return ONLY the action function. No YAML, no manifest, no wrapping:
 
 \`\`\`javascript
-async function handler(input, ctx) {
+export default async function(ctx, input) {
   // your implementation here
 }
 \`\`\`
+
+CRITICAL: The function signature MUST be \`export default async function(ctx, input)\` — ctx is the FIRST parameter, input is the SECOND. The V8 sandbox requires this exact format.
 `;
 }
 
@@ -1514,21 +1540,40 @@ export function buildCortexMethodUnitPrompt({ skeleton, unitDef, extensionProbeR
 ## Extension Call Pattern
 \`\`\`javascript
 // callExt helper is defined at the top of the IIFE — use it for ALL extension calls
-// It handles POST, JSON headers, response unwrapping, and error handling
+// It uses AIMEAT.auth session.fetch() for proper auth handling
 async function callExt(actionId, body) {
-  const resp = await fetch('/v1/ext/' + EXT_NAME + '/' + actionId, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (AIMEAT.auth?.getSession?.()?.token || '') },
-    body: JSON.stringify(body || {})
-  });
-  const json = await resp.json();
-  return json?.data?.result ?? json?.data ?? json;
+  try {
+    if (!AIMEAT.auth || !AIMEAT.auth.getSession) {
+      console.warn('[cortex] callExt(' + actionId + '): auth not available');
+      return null;
+    }
+    var session = AIMEAT.auth.getSession();
+    if (!session || !session.fetch) {
+      console.warn('[cortex] callExt(' + actionId + '): no session — login required');
+      return null;
+    }
+    var resp = await session.fetch('/v1/ext/' + EXT_NAME + '/' + actionId, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {})
+    });
+    if (!resp || !resp.ok) {
+      console.warn('[cortex] callExt(' + actionId + '): failed', resp?.error || resp?.status);
+      return null;
+    }
+    return resp.data?.result ?? resp.data ?? null;
+  } catch(e) {
+    console.warn('[cortex] callExt(' + actionId + '):', e.message);
+    return null;
+  }
 }
 
 // Usage in your method:
 const result = await callExt('${unitDef.calls}', { /* input */ });
+// ALWAYS null-check: if (!result) return fallbackValue;
 \`\`\`
-IMPORTANT: Do NOT use session.fetch — it does not exist in cortex scope. Use the callExt helper above.`;
+IMPORTANT: session.fetch() returns ALREADY-PARSED JSON — do NOT call resp.json(). Use resp.data directly.
+IMPORTANT: ALWAYS null-check the result — callExt returns null on auth failure or network error.`;
   } else if (unitDef.reads) {
     accessPattern = `
 ## Memory Read Pattern
@@ -1580,14 +1625,67 @@ async function ${unitDef.name}(${unitDef.params ? Object.keys(unitDef.params).jo
  * Produces the section's render function — one self-contained UI area.
  */
 export function buildFeatureCortexSectionPrompt({ skeleton, sectionDef, dataCortexProbe, platformUiExample, translationKeys }) {
+  // Default platform UI examples for common component types
+  const defaultUiExamples = {
+    input: `var nameInput = AIMEAT['aimeat-ui-forms'].Input({ label: 'Hakusana', placeholder: 'Hae...', type: 'text' });
+container.appendChild(nameInput.el);
+// Read value: nameInput.getValue()
+// Listen: nameInput.el.querySelector('input').addEventListener('input', function(e) { ... });`,
+    button: `var btn = document.createElement('button');
+btn.textContent = t('search.button') || 'Hae';
+btn.onclick = async function() { /* action */ };
+container.appendChild(btn);`,
+    table: `var table = AIMEAT['aimeat-ui-viewers'].DataTable({
+  columns: [{ key: 'name', label: 'Nimi', sortable: true }, { key: 'id', label: 'ID' }],
+  rows: data,
+  sortable: true, filterable: true, pageSize: 20
+});
+container.appendChild(table);
+// NOTE: DataTable does NOT have onRowClick. Build your own card list for clickable rows.`,
+    timeline: `var timeline = AIMEAT['aimeat-ui-viewers'].Timeline({
+  events: changes.map(function(c) {
+    return { date: c.detectedAt, title: c.field, description: (c.oldValue || '-') + ' → ' + (c.newValue || '-') };
+  })
+});
+container.appendChild(timeline);`,
+    list: `// Build a simple list with items
+items.forEach(function(item) {
+  var row = document.createElement('div');
+  row.style.cssText = 'display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #eee;';
+  row.textContent = item.name || item.id;
+  container.appendChild(row);
+});`,
+    card: `var card = document.createElement('div');
+card.style.cssText = 'padding:16px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:8px;';
+card.innerHTML = '<h3>' + title + '</h3><p>' + content + '</p>';
+container.appendChild(card);`,
+    tabs: `var tabs = AIMEAT['aimeat-ui-nav'].Tabs({
+  target: container,
+  tabs: [{ id: 'tab1', label: 'Tab 1' }, { id: 'tab2', label: 'Tab 2' }],
+  active: 'tab1',
+  onChange: function(tabId) { switchTab(tabId); }
+});`,
+    toggle: `var toggle = AIMEAT['aimeat-ui-forms'].Toggle({
+  label: 'Ilmoitukset', checked: true,
+  onChange: function(checked) { savePref(checked); }
+});
+container.appendChild(toggle.el);`,
+    select: `var sel = AIMEAT['aimeat-ui-forms'].Select({
+  label: 'Kieli', options: [{ value: 'fi', label: 'Suomi' }, { value: 'en', label: 'English' }]
+});
+container.appendChild(sel.el);
+// Read value: sel.getValue()`,
+  };
+
   // Show only the platform UI components this section uses
   let uiExampleText = '';
-  if (platformUiExample && sectionDef.uses?.ui?.length) {
+  const uiComponents = sectionDef.uses?.ui || [];
+  if (uiComponents.length > 0) {
     uiExampleText = `
 ## Platform UI Components (only the ones this section uses)
-${sectionDef.uses.ui.map(comp => {
-    const example = platformUiExample[comp];
-    return example ? `### ${comp}\n\`\`\`javascript\n${example}\n\`\`\`` : `### ${comp}\n(no example available)`;
+${uiComponents.map(comp => {
+    const example = platformUiExample?.[comp] || defaultUiExamples[comp];
+    return example ? `### ${comp}\n\`\`\`javascript\n${example}\n\`\`\`` : `### ${comp}\n(use standard DOM creation)`;
   }).join('\n\n')}`;
   }
 
@@ -1615,7 +1713,36 @@ ${uiExampleText}
 ## Translation Helper Pattern
 \`\`\`javascript
 // t() is available in scope — use for all user-visible text
-const label = t('${(translationKeys || [])[0] || 'section.title'}');
+var label = t('${(translationKeys || [])[0] || 'section.title'}');
+\`\`\`
+
+## Async Data Loading Pattern (CRITICAL)
+Data cortex methods return Promises. Handle loading states:
+\`\`\`javascript
+// Show loading state
+container.innerHTML = '<p>Ladataan...</p>';
+// Call data cortex method
+var data = await dataCortex.someMethod();
+// ALWAYS null-check — callExt returns null on auth failure or first run
+if (!data || (Array.isArray(data) && data.length === 0)) {
+  container.innerHTML = '<p>' + (t('empty.key') || 'Ei dataa') + '</p>';
+  return;
+}
+// Now render the data...
+\`\`\`
+
+## Nested Object Helper
+API responses contain nested objects. Use this to safely render values:
+\`\`\`javascript
+function dv(val) {
+  if (val == null) return '-';
+  if (typeof val === 'string' || typeof val === 'number') return String(val);
+  if (val.value) return val.value;
+  if (val.url) return val.url;
+  if (val.name) return val.name;
+  if (Array.isArray(val)) return val.map(dv).join(', ');
+  return JSON.stringify(val);
+}
 \`\`\`
 
 ## Output Format
@@ -1702,44 +1829,56 @@ ${units.map((u, i) => `### Action: ${u.id} (unit ${i + 1})\n\`\`\`javascript\n${
 Produce the complete extension: YAML manifest first, then fenced JS blocks per action.
 
 \`\`\`yaml
-apiVersion: extensions.aimeat.org/v1
-kind: Extension
 metadata:
   name: <kebab-case-name>
   version: "1.0.0"
-  description: "<from skeleton>"
+  description: "<from skeleton — double-quoted, one line>"
+  author: foundry
+  required_apis: [memory]
+  config: {}
+  limits:
+    memory_mb: 128
+    timeout_ms: 30000
+    max_api_calls: 500
 actions:
   - id: <action-id>
-    display_name: "<label>"
     description: "<from skeleton>"
+    method: POST
+    path: /v1/ext/<extension-name>/<action-path-from-skeleton>
+    auth: required
     input: <schema>
     output: <schema>
     script: <action-id>.js
-# ... repeat for each action
-schedules: # if any
+  # ... repeat for EVERY action from the skeleton
+schedules:
   - id: <schedule-id>
     action: <action-id>
     cron: "<expression>"
-config: # if any
-  <key>:
-    type: <type>
+    description: "<what it does>"
+    instance_scope: false
+    input: {}
 \`\`\`
 
-Then one fenced JS block per action:
+Then one fenced JS block per action (use \`// actions/<action-id>.js\` comment):
 
 \`\`\`javascript
-// <action-id>.js
-async function handler(input, ctx) {
+// actions/<action-id>.js
+export default async function(ctx, input) {
   // EXACT code from the unit implementation above — do NOT modify
 }
 \`\`\`
 
 ## CRITICAL RULES
 
-1. **Do NOT modify the unit implementations.** Copy each handler function exactly as provided.
+1. **Do NOT modify the unit implementations.** Copy each action function exactly as provided.
 2. **Use action IDs, schemas, and config from the skeleton.** Do not rename or reorder.
 3. **Every action in the skeleton must appear in the manifest AND have a JS block.**
 4. **Assembly is mechanical.** You are combining pieces, not generating new logic.
+5. **metadata MUST include \`author: foundry\`** — the validator requires this field.
+6. **Every action MUST have \`method: POST\` and \`path: /v1/ext/<name>/<path>\`** — the validator requires these.
+7. **All action JS MUST use \`export default async function(ctx, input)\`** — the V8 sandbox requires ES module default export.
+
+${HTML_ENTITY_RULES}
 `;
 }
 
@@ -1786,20 +1925,59 @@ components:
   const LIB_NAME = '<camelCaseName>'; // kebab "my-lib" → camelCase "myLib"
   const EXT_NAME = '<extension-name>'; // the extension this cortex wraps
 
-  // --- callExt helper (for data cortex — wraps extension HTTP calls) ---
+  // --- callExt helper — uses session.fetch() for proper auth ---
   async function callExt(actionId, body) {
-    const token = AIMEAT.auth?.getSession?.()?.token || '';
-    const resp = await fetch('/v1/ext/' + EXT_NAME + '/' + actionId, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify(body || {})
-    });
-    const json = await resp.json();
-    return json?.data?.result ?? json?.data ?? json;
+    try {
+      if (!AIMEAT.auth || !AIMEAT.auth.getSession) {
+        console.warn('[' + LIB_NAME + '] callExt(' + actionId + '): auth not available');
+        return null;
+      }
+      var session = AIMEAT.auth.getSession();
+      if (!session || !session.fetch) {
+        console.warn('[' + LIB_NAME + '] callExt(' + actionId + '): no active session — login required');
+        return null;
+      }
+      var resp = await session.fetch('/v1/ext/' + EXT_NAME + '/' + actionId, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+      });
+      if (!resp || !resp.ok) {
+        console.warn('[' + LIB_NAME + '] callExt(' + actionId + '): failed', resp?.error || resp?.status);
+        return null;
+      }
+      return resp.data?.result ?? resp.data ?? null;
+    } catch(e) {
+      console.warn('[' + LIB_NAME + '] callExt(' + actionId + '):', e.message);
+      return null;
+    }
+  }
+
+  // --- readExtMemory helper — reads extension-owned data ---
+  async function readExtMemory(key) {
+    try { return await AIMEAT.data.getPublic('ext:' + EXT_NAME, key); }
+    catch(e) { return null; }
+  }
+
+  // --- Translation helper — reads from AIMEAT._translations (set by app-domain cortex init) ---
+  function t(key) {
+    var translations = AIMEAT._translations || {};
+    return translations[key] || '';
+  }
+
+  // --- Nested object display helper ---
+  function dv(val) {
+    if (val == null) return '-';
+    if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') return String(val);
+    if (val.value) return val.value;
+    if (val.url) return val.url;
+    if (val.name) return val.name;
+    if (Array.isArray(val)) return val.map(dv).join(', ');
+    return JSON.stringify(val);
   }
 
   // --- Unit implementations (copied exactly) ---
-  // PASTE each unit function here. Replace "session.fetch" calls with "callExt" calls.
+  // PASTE each unit function here.
 
   // --- Registration ---
   const exports = { /* all public method names */ };
@@ -1812,13 +1990,18 @@ YAML manifest MUST include \`namespace: community\` under metadata.
 
 ## CRITICAL RULES
 
-1. **Do NOT modify the unit implementations** except to replace \`session.fetch\` with \`callExt\`.
+1. **Do NOT modify the unit implementations.**
 2. **YAML metadata.name (kebab-case) and JS LIB_NAME (camelCase) must correspond.** Example: \`prh-tietokerros\` → \`prhTietokerros\`.
 3. **YAML metadata MUST have namespace: community.**
 4. **Every method from the skeleton must appear in the exports object.**
 5. **Use (function(AIMEAT){...})(window.AIMEAT||(window.AIMEAT={}))** — NOT (function(){...})().
 6. **Must have \`const exports = { ... }\`** — the validator checks for this pattern.
 7. **Assembly is mechanical.** Combine pieces, don't generate new logic.
+8. **callExt uses session.fetch()** which returns ALREADY-PARSED JSON. Use \`resp.data\`, NEVER \`resp.json()\`.
+9. **callExt returns null on error** — all methods MUST null-check results before using them.
+10. **ALWAYS handle null from callExt gracefully** — return empty arrays \`[]\` or empty objects \`{}\`, NEVER crash.
+
+${HTML_ENTITY_RULES}
 `;
 }
 
@@ -1845,36 +2028,125 @@ ${designSystem ? `\n## Design System\n${designSystem}` : ''}
 
 ## Output Format
 
-Produce the complete HTML document:
+Produce the complete HTML document. EVERY section below is MANDATORY:
 
 \`\`\`html
+<!-- AIMEAT App Manifest
+name: <kebab-case-name>
+version: 1.0.0
+description: <one-line description>
+entry: index.html
+-->
 <!DOCTYPE html>
 <html lang="fi">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${label}</title>
-  <!-- AIMEAT App Manifest -->
-  <meta name="aimeat-app" content="true">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; connect-src 'self';">
   <style>
-    /* App styles — layout, navigation, responsive */
+    :root {
+      --color-primary: #3b82f6;
+      --color-secondary: #64748b;
+      --color-success: #22c55e;
+      --color-danger: #ef4444;
+      --color-bg: #ffffff;
+      --color-text: #1e293b;
+      --color-text-dim: #64748b;
+      --color-border: #e2e8f0;
+      --radius: 8px;
+      --spacing-sm: 8px;
+      --spacing-md: 16px;
+      --spacing-lg: 24px;
+      --font-sans: system-ui, -apple-system, sans-serif;
+    }
+    body { font-family: var(--font-sans); margin: 0; padding: 0; color: var(--color-text); }
+    #app { max-width: 900px; margin: 0 auto; padding: var(--spacing-md); }
+    /* Add your app styles here */
   </style>
 </head>
 <body>
-  <!-- Navigation -->
-  <!-- View containers (from unit HTML — copy exactly) -->
-
-  <script src="/v1/cortex/${appDomainCortexName || 'app-domain'}/libs/${appDomainCortexName || 'app-domain'}.js"></script>
+  <!-- Error collector — surfaces runtime errors in UI -->
   <script>
-    // Boot sequence
-    (async function() {
-      const cortex = AIMEAT['<camelCaseName>'];
-      await cortex.init();
-
-      // Mount views (from unit JS — copy exactly)
-
-      // Tab navigation wiring
+    (function() {
+      var errors = [];
+      window.onerror = function(msg, src, line) {
+        errors.push({ msg: msg, src: src, line: line, at: new Date().toISOString() });
+        showErrors();
+      };
+      window.addEventListener('unhandledrejection', function(e) {
+        errors.push({ msg: String(e.reason), src: 'promise', line: 0, at: new Date().toISOString() });
+        showErrors();
+      });
+      function showErrors() {
+        var el = document.getElementById('app-errors');
+        if (!el) {
+          el = document.createElement('div');
+          el.id = 'app-errors';
+          el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#1a0000;color:#ff6b6b;font-size:12px;padding:8px;max-height:120px;overflow:auto;z-index:9999;font-family:monospace;border-top:2px solid #f44';
+          document.body.appendChild(el);
+        }
+        el.innerHTML = errors.map(function(e) { return e.at.slice(11,19) + ' ' + e.msg; }).join('<br>');
+      }
     })();
+  </script>
+
+  <div id="auth-container"></div>
+  <!-- View containers (from unit HTML — copy exactly) -->
+  <div id="app"></div>
+
+  <script>
+    // loadScript helper — loads scripts sequentially
+    function loadScript(src) {
+      return new Promise(function(resolve, reject) {
+        var s = document.createElement('script');
+        s.src = src;
+        s.onload = resolve;
+        s.onerror = function() { reject(new Error('Failed to load: ' + src)); };
+        document.head.appendChild(s);
+      });
+    }
+
+    // Boot sequence — MUST load libraries in correct order
+    (async function() {
+      try {
+        // 1. Load AIMEAT platform libraries FIRST
+        await loadScript('/v1/libs/aimeat-auth.js');
+        await loadScript('/v1/libs/aimeat-data.js');
+
+        // 2. Load platform UI libraries
+        await loadScript('/v1/cortex/aimeat-ui-nav/libs/aimeat-ui-nav.js');
+        await loadScript('/v1/cortex/aimeat-ui-layout/libs/aimeat-ui-layout.js');
+        await loadScript('/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js');
+        await loadScript('/v1/cortex/aimeat-ui-forms/libs/aimeat-ui-forms.js');
+        await loadScript('/v1/cortex/aimeat-ui-dialogs/libs/aimeat-ui-dialogs.js');
+
+        // 3. Load domain cortex libraries (data cortex → feature cortexes → app-domain)
+        // ADD ALL cortex script tags here in dependency order
+
+        // 4. Auth: try to restore session
+        AIMEAT.auth.mountLoginButton('#auth-container', {
+          onLogin: function() { startApp(); },
+          onLogout: function() { location.reload(); }
+        });
+        var session = await AIMEAT.auth.login();
+        if (session) startApp();
+
+      } catch(err) {
+        document.getElementById('app').innerHTML =
+          '<div style="padding:2rem;color:#ef4444"><h2>Failed to load</h2><p>' + err.message + '</p></div>';
+      }
+    })();
+
+    async function startApp() {
+      var cortex = AIMEAT['<camelCaseName>'];  // app-domain cortex
+      if (!cortex) {
+        document.getElementById('app').innerHTML = '<p>App cortex not loaded</p>';
+        return;
+      }
+      await cortex.init();
+      cortex.render(document.getElementById('app'));
+    }
   </script>
 </body>
 </html>
@@ -1882,9 +2154,16 @@ Produce the complete HTML document:
 
 ## CRITICAL RULES
 
-1. **Do NOT modify the view unit implementations.** Copy HTML and JS exactly as provided.
-2. **Load the app-domain cortex via script tag** before the boot script.
-3. **Every view from the skeleton must appear as a tab/page.**
-4. **Assembly is mechanical.** Combine the pieces into one HTML document.
+1. **MUST start with \`<!-- AIMEAT App Manifest ... -->\` comment** — the validator checks for this.
+2. **MUST load aimeat-auth.js and aimeat-data.js** before any cortex scripts.
+3. **MUST call AIMEAT.auth.mountLoginButton('#auth-container', ...)** for login UI.
+4. **MUST call AIMEAT.auth.login()** to restore session before starting the app.
+5. **MUST load cortex scripts in dependency order**: data cortex → feature cortexes → app-domain cortex.
+6. **startApp() is called ONLY after successful login** — the cortex init() and render() require auth.
+7. **Do NOT modify the view unit implementations.** Copy HTML and JS exactly as provided.
+8. **Include the error collector script** at the top of body for diagnostics.
+9. **Include CSP meta tag** if loading any CDN scripts.
+
+${HTML_ENTITY_RULES}
 `;
 }
