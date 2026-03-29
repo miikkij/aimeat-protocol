@@ -1,0 +1,261 @@
+/**
+ * @file calibrator.css
+ * @description Styles for Prompt Calibrator views. Uses fnd-cal- prefix.
+ * @version-history
+ *   v1.0.0 — 2026-03-29 — Initial styles
+ */
+
+/* ── List View ── */
+.fnd-cal-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.fnd-cal-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.fnd-cal-card:hover { border-color: var(--accent); }
+.fnd-cal-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+.fnd-cal-card-name { font-weight: 600; font-size: 1rem; }
+.fnd-cal-card-version { font-size: 0.8rem; color: var(--text-dim); }
+.fnd-cal-card-meta { display: flex; gap: 1rem; font-size: 0.8rem; color: var(--text-dim); flex-wrap: wrap; }
+.fnd-cal-card-score {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 0.5rem;
+  overflow: hidden;
+}
+.fnd-cal-card-score-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+/* ── Detail View ── */
+.fnd-cal-detail { display: flex; flex-direction: column; gap: 1.5rem; }
+.fnd-cal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+.fnd-cal-header input {
+  font-size: 1.1rem;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  color: var(--text);
+  flex: 1;
+}
+.fnd-cal-header input:focus { border-color: var(--accent); outline: none; }
+
+/* ── Side-by-side Prompt + Target ── */
+.fnd-cal-editor {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+@media (max-width: 768px) {
+  .fnd-cal-editor { grid-template-columns: 1fr; }
+}
+.fnd-cal-editor-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.fnd-cal-editor-label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.fnd-cal-editor textarea {
+  min-height: 300px;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.75rem;
+  color: var(--text);
+}
+.fnd-cal-editor textarea:focus { border-color: var(--accent); outline: none; }
+.fnd-cal-editor-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ── Version selector ── */
+.fnd-cal-version-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  padding: 0.5rem 0;
+}
+.fnd-cal-version-bar select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
+/* ── Model List ── */
+.fnd-cal-models { display: flex; flex-direction: column; gap: 0.5rem; }
+.fnd-cal-model-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.fnd-cal-model-row select {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  color: var(--text);
+  font-size: 0.85rem;
+  flex: 1;
+  max-width: 300px;
+}
+.fnd-cal-model-label { font-weight: 500; min-width: 120px; }
+.fnd-cal-model-provider { font-size: 0.8rem; color: var(--text-dim); }
+.fnd-cal-model-remove {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0.25rem;
+}
+.fnd-cal-model-remove:hover { color: var(--danger); }
+
+/* ── Run Actions ── */
+.fnd-cal-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  padding: 0.75rem 0;
+}
+
+/* ── Chart ── */
+.fnd-cal-chart {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+}
+.fnd-cal-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+.fnd-cal-chart-title { font-weight: 600; font-size: 0.9rem; }
+.fnd-cal-chart svg { width: 100%; }
+.fnd-cal-chart-legend {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+}
+.fnd-cal-chart-legend-item { display: flex; align-items: center; gap: 0.35rem; }
+.fnd-cal-chart-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* ── Run History ── */
+.fnd-cal-runs { display: flex; flex-direction: column; gap: 0.75rem; }
+.fnd-cal-run {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.fnd-cal-run-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+}
+.fnd-cal-run-header:hover { background: var(--bg-dim); }
+.fnd-cal-run-summary { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+.fnd-cal-run-model { font-weight: 600; }
+.fnd-cal-run-score { font-weight: 600; }
+.fnd-cal-run-score.pass { color: var(--success); }
+.fnd-cal-run-score.mixed { color: var(--warning); }
+.fnd-cal-run-score.fail { color: var(--danger); }
+.fnd-cal-run-time { font-size: 0.8rem; color: var(--text-dim); }
+.fnd-cal-run-dims { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.fnd-cal-dim-badge {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+  font-weight: 500;
+}
+.fnd-cal-dim-badge.pass { background: rgba(34,197,94,0.15); color: var(--success); }
+.fnd-cal-dim-badge.fail { background: rgba(239,68,68,0.15); color: var(--danger); }
+
+.fnd-cal-run-detail {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border);
+}
+.fnd-cal-run-detail pre {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.75rem;
+  font-size: 0.75rem;
+  overflow-x: auto;
+  max-height: 400px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.fnd-cal-run-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* ── Section titles ── */
+.fnd-cal-section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.fnd-cal-section-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-dim);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+.fnd-cal-section-body { padding: 1rem; }
+
+/* ── Collapsible ── */
+.fnd-cal-collapsed .fnd-cal-section-body { display: none; }

@@ -23,6 +23,7 @@ const ALL_SUITES = [
     'test/e2e-auth-lib.ts',
     'test/e2e-board-access.ts',
     'test/e2e-board-ttl.ts',
+    'test/e2e-calibrator.ts',
     'test/e2e-concurrency.ts',
     'test/e2e-disputes.ts',
     'test/e2e-email.ts',

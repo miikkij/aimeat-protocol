@@ -283,6 +283,9 @@ export interface AimeatConfig {
   // Foundry (prompt-driven service builder)
   foundryEnabled: boolean;
 
+  // Prompt Calibrator
+  calibratorEnabled: boolean;
+
   // Cortex Extensions (Manifest-based)
   cortexEnabled: boolean;
   cortexMaxInstalled: number;
@@ -585,6 +588,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     foundryEnabled: process.env.AIMEAT_FOUNDRY_ENABLED
       ? process.env.AIMEAT_FOUNDRY_ENABLED !== 'false'
       : (process.env.AIMEAT_GENERATOR_ENABLED !== 'false'),
+
+    // Prompt Calibrator
+    calibratorEnabled: process.env.AIMEAT_CALIBRATOR_ENABLED !== 'false',
 
     // Cortex Extensions (Manifest-based)
     cortexEnabled: process.env.AIMEAT_CORTEX_ENABLED !== 'false',

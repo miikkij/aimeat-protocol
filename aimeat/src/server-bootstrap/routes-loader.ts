@@ -73,6 +73,7 @@ import { adminPromptsRouter } from '../routes/admin-prompts.js';
 import { statsRouter } from '../routes/stats.js';
 import { generatorRouter } from '../routes/generator.js';
 import { foundryRouter } from '../routes/foundry.js';
+import { calibratorRouter } from '../routes/calibrator.js';
 import { openrouterRouter } from '../routes/openrouter.js';
 
 // Services needed during route mounting
@@ -183,6 +184,9 @@ export function mountRoutes(
   }
   if (config.foundryEnabled) {
     app.use(foundryRouter(config, storage));     // Prompt-driven service builder
+  }
+  if (config.calibratorEnabled) {
+    app.use(calibratorRouter(config, storage));  // Prompt calibration tool
   }
   app.use(openrouterRouter(config, storage));   // OpenRouter AI autopilot
   app.use(csmRouter(config, storage));       // Phase 0.2 — CSM management
