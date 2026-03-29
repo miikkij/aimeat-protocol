@@ -17,6 +17,35 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet, apiPost, apiPut } from '/js/api.js';
+
+/** Call OpenRouter with a specific model — 30 min timeout, bypasses apiPost's 30s limit */
+async function callModel(projectId, prompt, modelId) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 1_800_000);
+  const headers = { 'Content-Type': 'application/json' };
+  const session = window.AIMEAT?.auth?.getSession?.();
+  if (session?.jwt) headers['Authorization'] = 'Bearer ' + session.jwt;
+  try {
+    const raw = await fetch('/v1/openrouter/complete', {
+      method: 'POST', headers,
+      body: JSON.stringify({ projectId, prompt, model: modelId }),
+      signal: controller.signal,
+    });
+    if (!raw.ok) {
+      let msg = `HTTP ${raw.status}`;
+      try { const e = await raw.json(); msg = e.error?.message || msg; } catch {}
+      throw new Error(msg);
+    }
+    const resp = await raw.json();
+    if (resp.ok === false) throw new Error(resp.error?.message || 'OpenRouter error');
+    return resp.data?.content || '';
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error('Request timed out (30 min)');
+    throw e;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 import {
   listProjects, createProject, getProject, updateProject,
   listVersions, getVersion, createVersion,
@@ -524,13 +553,8 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
       if (!model.modelId) continue;
       try {
         const start = Date.now();
-        const genResp = await apiPost('/v1/openrouter/complete', {
-          projectId,
-          prompt: currentVersion.prompt,
-          model: model.modelId,
-        });
+        const output = await callModel(projectId, currentVersion.prompt, model.modelId);
         const durationMs = Date.now() - start;
-        const output = genResp.data?.content || '';
 
         const run = await createRun(projectId, {
           promptVersion: currentVersion.version,
@@ -550,12 +574,7 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
 
             const reasoningModelId = project.reasoningLlm?.modelId;
             if (reasoningModelId) {
-              const analysisResp = await apiPost('/v1/openrouter/complete', {
-                projectId,
-                prompt: analysisPrompt,
-                model: reasoningModelId,
-              });
-              const analysisText = analysisResp.data?.content || '';
+              const analysisText = await callModel(projectId, analysisPrompt, reasoningModelId);
 
               let parsed = null;
               try {
@@ -602,12 +621,7 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
     try {
       const fixPrompt = `Here is a prompt that needs improvement:\n\n---\n${currentVersion.prompt}\n---\n\nApply these proposed fixes:\n${proposals.map((p, i) => `${i + 1}. ${p}`).join('\n')}\n\nReturn ONLY the modified prompt text. Do not add explanations, markdown fences, or commentary. Keep changes generic — do not add project-specific terms.`;
 
-      const resp = await apiPost('/v1/openrouter/complete', {
-        projectId,
-        prompt: fixPrompt,
-        model: reasoningModelId,
-      });
-      const newPrompt = resp.data?.content || '';
+      const newPrompt = await callModel(projectId, fixPrompt, reasoningModelId);
       if (newPrompt) {
         setPrompt(newPrompt);
         setChangelog('Applied proposed fixes: ' + proposals.slice(0, 3).map(p => p.substring(0, 60)).join('; '));
