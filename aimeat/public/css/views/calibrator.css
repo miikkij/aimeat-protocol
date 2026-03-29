@@ -402,6 +402,30 @@
 .fnd-cal-reflection-col { border: 1px solid var(--border); border-radius: 6px; padding: 12px; background: var(--card); }
 .fnd-cal-reflection-col h4 { margin: 0 0 8px; font-size: 0.85rem; color: var(--text-dim); }
 
+/* ── V2: Dimension table ── */
+.fnd-cal-dim-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  margin-top: 8px;
+}
+.fnd-cal-dim-table th {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 2px solid var(--border);
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.fnd-cal-dim-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+.fnd-cal-dim-table tr:last-child td { border-bottom: none; }
+
 /* ── V2: Template section ── */
 .fnd-cal-templates { display: flex; flex-direction: column; gap: 8px; }
 .fnd-cal-template-details {
