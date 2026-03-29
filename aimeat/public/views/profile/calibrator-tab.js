@@ -152,28 +152,28 @@ function LlmConfigEditor({ config, onChange, onRemove, label }) {
   const [sharedKeyExists, setSharedKeyExists] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [collapsed, setCollapsed] = useState(!!config.modelId);
-  const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
-  const provider = config.provider || 'openrouter';
-  const baseUrl = config.baseUrl || '';
-  const modelId = config.modelId || '';
+  // Local draft state — only persisted on Save
+  const [draft, setDraft] = useState({ ...config });
+  useEffect(() => { setDraft({ ...config }); setDirty(false); }, [config.id]);
 
-  // Check shared key on mount + load models
+  const provider = draft.provider || 'openrouter';
+  const baseUrl = draft.baseUrl || '';
+  const modelId = draft.modelId || '';
+
   useEffect(() => {
     (async () => {
       try {
         const resp = await apiGet('/v1/openrouter/settings');
         const hasSharedKey = !!resp.data?.hasApiKey;
         setSharedKeyExists(hasSharedKey);
-        if (hasSharedKey && resp.data?.provider) {
-          // Auto-load models if shared key exists
-          loadModels();
-        }
+        if (hasSharedKey) loadModels();
       } catch { /* no shared settings */ }
     })();
   }, []);
 
-  const hasKey = (config.apiKeyRef === 'shared' && sharedKeyExists) || !!config.hasApiKey;
+  const hasKey = (draft.apiKeyRef === 'shared' && sharedKeyExists) || !!draft.hasApiKey;
 
   async function loadModels() {
     setModelsLoading(true);
@@ -184,10 +184,15 @@ function LlmConfigEditor({ config, onChange, onRemove, label }) {
     setModelsLoading(false);
   }
 
-  function update(fields) {
-    onChange({ ...config, ...fields });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+  function updateDraft(fields) {
+    setDraft(prev => ({ ...prev, ...fields }));
+    setDirty(true);
+  }
+
+  function handleSave() {
+    onChange(draft);
+    setDirty(false);
+    setCollapsed(true);
   }
 
   function handleProviderChange(p) {
@@ -195,7 +200,7 @@ function LlmConfigEditor({ config, onChange, onRemove, label }) {
     if (p === 'lmstudio') { updates.baseUrl = 'http://localhost:1234/v1'; updates.apiKeyRef = null; }
     else if (p === 'openrouter') { updates.baseUrl = 'https://openrouter.ai/api/v1'; updates.apiKeyRef = 'shared'; }
     else { updates.baseUrl = ''; updates.apiKeyRef = null; }
-    update(updates);
+    updateDraft(updates);
   }
 
   async function handleSaveKey() {
@@ -203,7 +208,7 @@ function LlmConfigEditor({ config, onChange, onRemove, label }) {
     try {
       await apiPut('/v1/openrouter/settings', { apiKey: apiKeyInput, provider, baseUrl });
       setSharedKeyExists(true);
-      update({ apiKeyRef: 'shared', hasApiKey: true });
+      updateDraft({ apiKeyRef: 'shared', hasApiKey: true });
       setApiKeyInput('');
       loadModels();
     } catch (e) {
@@ -211,7 +216,7 @@ function LlmConfigEditor({ config, onChange, onRemove, label }) {
     }
   }
 
-  const displayLabel = config.label || modelId || label || t('profile.calibrator.selectModel');
+  const displayLabel = config.label || config.modelId || label || t('profile.calibrator.selectModel');
 
   return html`
     <div class="fnd-cal-model-row" style="flex-direction:column;align-items:stretch;gap:0.5rem;">
@@ -219,7 +224,6 @@ function LlmConfigEditor({ config, onChange, onRemove, label }) {
         <span style="cursor:pointer;font-size:0.8rem;" onClick=${() => setCollapsed(!collapsed)}>${collapsed ? '\u25B6' : '\u25BC'}</span>
         <span class="fnd-cal-model-label" style="flex:1;">${displayLabel}</span>
         <span style="font-size:0.7rem;color:var(--text-dim);">${provider}</span>
-        ${saved && html`<span style="font-size:0.7rem;color:var(--success);">saved</span>`}
         ${onRemove && html`<button class="fnd-cal-model-remove" onClick=${onRemove}>✕</button>`}
       </div>
 
@@ -241,7 +245,7 @@ function LlmConfigEditor({ config, onChange, onRemove, label }) {
           ${provider !== 'openrouter' && html`
             <input type="url" placeholder="Base URL (e.g. http://localhost:1234/v1)"
               value=${baseUrl}
-              onInput=${e => update({ baseUrl: e.target.value })}
+              onInput=${e => updateDraft({ baseUrl: e.target.value })}
               style="padding:0.35rem 0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:0.8rem;"
             />
           `}
@@ -262,7 +266,7 @@ function LlmConfigEditor({ config, onChange, onRemove, label }) {
           `}
           ${hasKey && html`
             <div style="font-size:0.75rem;color:var(--success);">
-              ${config.apiKeyRef === 'shared' ? 'Using shared API key (from OpenRouter settings)' : 'API key configured'}
+              ${draft.apiKeyRef === 'shared' ? 'Using shared API key (from OpenRouter settings)' : 'API key configured'}
             </div>
           `}
 
@@ -271,16 +275,20 @@ function LlmConfigEditor({ config, onChange, onRemove, label }) {
             ? html`<span style="font-size:0.8rem;color:var(--text-dim);">Loading models...</span>`
             : html`
               <select value=${modelId}
-                onChange=${e => {
-                  update({ modelId: e.target.value, label: e.target.selectedOptions[0]?.text || e.target.value });
-                  setCollapsed(true);
-                }}
+                onChange=${e => updateDraft({ modelId: e.target.value, label: e.target.selectedOptions[0]?.text || e.target.value })}
                 style="padding:0.35rem 0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:0.8rem;">
                 <option value="">${t('profile.calibrator.selectModel')}</option>
                 ${models.map(m => html`<option value=${m.id}>${m.name || m.id}</option>`)}
               </select>
             `
           }
+
+          <!-- Save button -->
+          <div style="display:flex;gap:0.5rem;margin-top:0.25rem;">
+            <button class="btn-primary btn-sm" onClick=${handleSave} disabled=${!dirty}>
+              Save settings
+            </button>
+          </div>
         </div>
       `}
     </div>
