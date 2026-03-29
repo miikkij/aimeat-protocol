@@ -23,8 +23,42 @@ import {
   listRuns, getRun, createRun, updateRun,
 } from '/js/services/calibrator.js';
 
-// ── Chart Colors ──
+// ── Constants ──
 const CHART_COLORS = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
+
+const DEFAULT_ANALYSIS_TEMPLATE = `You are analyzing why two AI models produced different outputs from the same prompt.
+
+MODEL A (reference — the target quality) produced:
+{TARGET_OUTPUT}
+
+MODEL B (candidate — {MODEL_NAME}) produced:
+{CANDIDATE_OUTPUT}
+
+The PROMPT given to Model B was:
+{PROMPT_USED}
+
+Compare the two outputs. For each meaningful difference, report:
+
+1. A short dimension NAME (snake_case, reusable across runs — e.g., "feature_count", "label_language", "data_nesting")
+2. CATEGORY: format | structure | data_model | naming | missing | extra
+3. SEVERITY: critical (breaks functionality) | major (wrong but works) | minor (cosmetic)
+4. EXPECTED: what the reference has
+5. ACTUAL: what the candidate produced
+6. PASS: true if candidate matches reference on this dimension, false otherwise
+
+Then, for each failing dimension, suggest a GENERIC prompt modification that would fix it. The fix must:
+- NOT mention any project-specific names, APIs, or domain concepts
+- Work for ANY prompt calibration task, not just this one
+- Be a concrete text addition or change to the prompt
+
+Output format (strict JSON):
+{
+  "dimensions": [
+    { "name": "...", "category": "...", "severity": "...", "expected": "...", "actual": "...", "pass": true/false, "description": "..." }
+  ],
+  "analysis": "Free-text summary of the key differences",
+  "proposals": ["Concrete prompt fix 1", "Concrete prompt fix 2"]
+}`;
 
 // ── Multiline Chart (SVG) ──
 
@@ -115,15 +149,31 @@ function CalibrationChart({ runs, dimensions, versions }) {
 function LlmConfigEditor({ config, onChange, onRemove, label }) {
   const [models, setModels] = useState([]);
   const [modelsLoading, setModelsLoading] = useState(false);
+  const [sharedKeyExists, setSharedKeyExists] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [collapsed, setCollapsed] = useState(!!config.modelId);
+  const [saved, setSaved] = useState(false);
 
   const provider = config.provider || 'openrouter';
   const baseUrl = config.baseUrl || '';
   const modelId = config.modelId || '';
-  const hasKey = config.apiKeyRef === 'shared' || !!config.hasApiKey;
 
-  useEffect(() => { if (hasKey) loadModels(); }, [provider, baseUrl, hasKey]);
+  // Check shared key on mount + load models
+  useEffect(() => {
+    (async () => {
+      try {
+        const resp = await apiGet('/v1/openrouter/settings');
+        const hasSharedKey = !!resp.data?.hasApiKey;
+        setSharedKeyExists(hasSharedKey);
+        if (hasSharedKey && resp.data?.provider) {
+          // Auto-load models if shared key exists
+          loadModels();
+        }
+      } catch { /* no shared settings */ }
+    })();
+  }, []);
+
+  const hasKey = (config.apiKeyRef === 'shared' && sharedKeyExists) || !!config.hasApiKey;
 
   async function loadModels() {
     setModelsLoading(true);
@@ -136,21 +186,23 @@ function LlmConfigEditor({ config, onChange, onRemove, label }) {
 
   function update(fields) {
     onChange({ ...config, ...fields });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
   }
 
   function handleProviderChange(p) {
     const updates = { provider: p };
-    if (p === 'lmstudio') updates.baseUrl = 'http://localhost:1234/v1';
+    if (p === 'lmstudio') { updates.baseUrl = 'http://localhost:1234/v1'; updates.apiKeyRef = null; }
     else if (p === 'openrouter') { updates.baseUrl = 'https://openrouter.ai/api/v1'; updates.apiKeyRef = 'shared'; }
-    else updates.baseUrl = '';
+    else { updates.baseUrl = ''; updates.apiKeyRef = null; }
     update(updates);
   }
 
   async function handleSaveKey() {
     if (!apiKeyInput.trim()) return;
     try {
-      // Save key via shared OpenRouter settings endpoint
       await apiPut('/v1/openrouter/settings', { apiKey: apiKeyInput, provider, baseUrl });
+      setSharedKeyExists(true);
       update({ apiKeyRef: 'shared', hasApiKey: true });
       setApiKeyInput('');
       loadModels();
@@ -163,11 +215,11 @@ function LlmConfigEditor({ config, onChange, onRemove, label }) {
 
   return html`
     <div class="fnd-cal-model-row" style="flex-direction:column;align-items:stretch;gap:0.5rem;">
-      <!-- Header: model name + collapse + remove -->
       <div style="display:flex;align-items:center;gap:0.5rem;">
         <span style="cursor:pointer;font-size:0.8rem;" onClick=${() => setCollapsed(!collapsed)}>${collapsed ? '\u25B6' : '\u25BC'}</span>
         <span class="fnd-cal-model-label" style="flex:1;">${displayLabel}</span>
         <span style="font-size:0.7rem;color:var(--text-dim);">${provider}</span>
+        ${saved && html`<span style="font-size:0.7rem;color:var(--success);">saved</span>`}
         ${onRemove && html`<button class="fnd-cal-model-remove" onClick=${onRemove}>✕</button>`}
       </div>
 
@@ -197,22 +249,32 @@ function LlmConfigEditor({ config, onChange, onRemove, label }) {
           <!-- API Key -->
           ${!hasKey && html`
             <div style="display:flex;gap:0.35rem;">
-              <input type="password" placeholder="API Key" autocomplete="off"
+              <input type="password" placeholder=${provider === 'openrouter' ? 'OpenRouter API Key' : 'API Key'} autocomplete="off"
                 value=${apiKeyInput}
                 onInput=${e => setApiKeyInput(e.target.value)}
+                onKeyDown=${e => e.key === 'Enter' && handleSaveKey()}
                 style="flex:1;padding:0.35rem 0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:0.8rem;"
               />
-              <button class="btn-ghost btn-sm" onClick=${handleSaveKey} disabled=${!apiKeyInput.trim()}>Save key</button>
+              <button class="btn-primary btn-sm" onClick=${handleSaveKey} disabled=${!apiKeyInput.trim()}>
+                ${t('profile.calibrator.save')}
+              </button>
             </div>
           `}
-          ${hasKey && html`<div style="font-size:0.75rem;color:var(--success);">API key configured</div>`}
+          ${hasKey && html`
+            <div style="font-size:0.75rem;color:var(--success);">
+              ${config.apiKeyRef === 'shared' ? 'Using shared API key (from OpenRouter settings)' : 'API key configured'}
+            </div>
+          `}
 
           <!-- Model dropdown -->
           ${modelsLoading
             ? html`<span style="font-size:0.8rem;color:var(--text-dim);">Loading models...</span>`
             : html`
               <select value=${modelId}
-                onChange=${e => update({ modelId: e.target.value, label: e.target.selectedOptions[0]?.text || e.target.value })}
+                onChange=${e => {
+                  update({ modelId: e.target.value, label: e.target.selectedOptions[0]?.text || e.target.value });
+                  setCollapsed(true);
+                }}
                 style="padding:0.35rem 0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:0.8rem;">
                 <option value="">${t('profile.calibrator.selectModel')}</option>
                 ${models.map(m => html`<option value=${m.id}>${m.name || m.id}</option>`)}
@@ -604,9 +666,20 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
           <div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:0.5rem;">${t('profile.calibrator.analysisTemplatePlaceholders')}</div>
           <textarea style="min-height:200px;width:100%;font-family:var(--font-mono);font-size:0.8rem;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:0.75rem;color:var(--text);resize:vertical;"
             value=${analysisTemplate} onInput=${e => setAnalysisTemplate(e.target.value)} />
-          <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
+          <div style="display:flex;gap:0.5rem;margin-top:0.5rem;flex-wrap:wrap;">
             <button class="btn-primary btn-sm" onClick=${handleSaveTemplate}>${t('profile.calibrator.save')}</button>
+            <button class="btn-ghost btn-sm" onClick=${() => { setAnalysisTemplate(DEFAULT_ANALYSIS_TEMPLATE); }}>${t('profile.calibrator.resetTemplate')}</button>
             <button class="btn-ghost btn-sm" onClick=${() => copyToClipboard(analysisTemplate, 'Template')}>${t('profile.calibrator.copy')}</button>
+            ${currentVersion && html`
+              <button class="btn-ghost btn-sm" onClick=${() => {
+                const composed = analysisTemplate
+                  .replace(/\{TARGET_OUTPUT\}/g, currentVersion.targetOutput || '[paste target output here]')
+                  .replace(/\{CANDIDATE_OUTPUT\}/g, '[paste candidate output here]')
+                  .replace(/\{MODEL_NAME\}/g, '[model name]')
+                  .replace(/\{PROMPT_USED\}/g, currentVersion.prompt || '[paste prompt here]');
+                copyToClipboard(composed, 'Composed analysis prompt');
+              }}>${t('profile.calibrator.copyComposed')}</button>
+            `}
           </div>
         </div>
       </div>
