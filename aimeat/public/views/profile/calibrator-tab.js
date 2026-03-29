@@ -16,13 +16,12 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { apiGet, apiPost } from '/js/api.js';
+import { apiGet, apiPost, apiPut } from '/js/api.js';
 import {
   listProjects, createProject, getProject, updateProject,
   listVersions, getVersion, createVersion,
   listRuns, getRun, createRun, updateRun,
 } from '/js/services/calibrator.js';
-import { OpenRouterSettings } from './foundry-settings.js';
 
 // ── Chart Colors ──
 const CHART_COLORS = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
@@ -111,16 +110,117 @@ function CalibrationChart({ runs, dimensions, versions }) {
   `;
 }
 
-// ── Model Selector Row ──
+// ── LLM Config Editor (provider + key + model) ──
 
-function ModelRow({ model, models, onUpdate, onRemove }) {
+function LlmConfigEditor({ config, onChange, onRemove, label }) {
+  const [models, setModels] = useState([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [collapsed, setCollapsed] = useState(!!config.modelId);
+
+  const provider = config.provider || 'openrouter';
+  const baseUrl = config.baseUrl || '';
+  const modelId = config.modelId || '';
+  const hasKey = config.apiKeyRef === 'shared' || !!config.hasApiKey;
+
+  useEffect(() => { if (hasKey) loadModels(); }, [provider, baseUrl, hasKey]);
+
+  async function loadModels() {
+    setModelsLoading(true);
+    try {
+      const resp = await apiGet('/v1/openrouter/models');
+      if (resp.data?.models) setModels(resp.data.models);
+    } catch { setModels([]); }
+    setModelsLoading(false);
+  }
+
+  function update(fields) {
+    onChange({ ...config, ...fields });
+  }
+
+  function handleProviderChange(p) {
+    const updates = { provider: p };
+    if (p === 'lmstudio') updates.baseUrl = 'http://localhost:1234/v1';
+    else if (p === 'openrouter') { updates.baseUrl = 'https://openrouter.ai/api/v1'; updates.apiKeyRef = 'shared'; }
+    else updates.baseUrl = '';
+    update(updates);
+  }
+
+  async function handleSaveKey() {
+    if (!apiKeyInput.trim()) return;
+    try {
+      // Save key via shared OpenRouter settings endpoint
+      await apiPut('/v1/openrouter/settings', { apiKey: apiKeyInput, provider, baseUrl });
+      update({ apiKeyRef: 'shared', hasApiKey: true });
+      setApiKeyInput('');
+      loadModels();
+    } catch (e) {
+      console.warn('Failed to save key:', e.message);
+    }
+  }
+
+  const displayLabel = config.label || modelId || label || t('profile.calibrator.selectModel');
+
   return html`
-    <div class="fnd-cal-model-row">
-      <select value=${model.modelId || ''} onChange=${e => onUpdate({ ...model, modelId: e.target.value, label: e.target.selectedOptions[0]?.text || e.target.value })}>
-        <option value="">${t('profile.calibrator.selectModel')}</option>
-        ${(models || []).map(m => html`<option value=${m.id}>${m.name || m.id}</option>`)}
-      </select>
-      <button class="fnd-cal-model-remove" onClick=${onRemove} title=${t('profile.calibrator.removeModel')}>✕</button>
+    <div class="fnd-cal-model-row" style="flex-direction:column;align-items:stretch;gap:0.5rem;">
+      <!-- Header: model name + collapse + remove -->
+      <div style="display:flex;align-items:center;gap:0.5rem;">
+        <span style="cursor:pointer;font-size:0.8rem;" onClick=${() => setCollapsed(!collapsed)}>${collapsed ? '\u25B6' : '\u25BC'}</span>
+        <span class="fnd-cal-model-label" style="flex:1;">${displayLabel}</span>
+        <span style="font-size:0.7rem;color:var(--text-dim);">${provider}</span>
+        ${onRemove && html`<button class="fnd-cal-model-remove" onClick=${onRemove}>✕</button>`}
+      </div>
+
+      ${!collapsed && html`
+        <div style="display:flex;flex-direction:column;gap:0.5rem;padding-left:1.25rem;">
+          <!-- Provider -->
+          <div style="display:flex;gap:0.75rem;font-size:0.8rem;">
+            ${['openrouter', 'lmstudio', 'custom'].map(p => html`
+              <label style="display:flex;align-items:center;gap:0.25rem;cursor:pointer;">
+                <input type="radio" name=${'provider-' + config.id} value=${p}
+                  checked=${provider === p}
+                  onChange=${() => handleProviderChange(p)} />
+                ${p === 'openrouter' ? 'OpenRouter' : p === 'lmstudio' ? 'LM Studio' : 'Custom'}
+              </label>
+            `)}
+          </div>
+
+          <!-- Base URL (non-openrouter) -->
+          ${provider !== 'openrouter' && html`
+            <input type="url" placeholder="Base URL (e.g. http://localhost:1234/v1)"
+              value=${baseUrl}
+              onInput=${e => update({ baseUrl: e.target.value })}
+              style="padding:0.35rem 0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:0.8rem;"
+            />
+          `}
+
+          <!-- API Key -->
+          ${!hasKey && html`
+            <div style="display:flex;gap:0.35rem;">
+              <input type="password" placeholder="API Key" autocomplete="off"
+                value=${apiKeyInput}
+                onInput=${e => setApiKeyInput(e.target.value)}
+                style="flex:1;padding:0.35rem 0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:0.8rem;"
+              />
+              <button class="btn-ghost btn-sm" onClick=${handleSaveKey} disabled=${!apiKeyInput.trim()}>Save key</button>
+            </div>
+          `}
+          ${hasKey && html`<div style="font-size:0.75rem;color:var(--success);">API key configured</div>`}
+
+          <!-- Model dropdown -->
+          ${modelsLoading
+            ? html`<span style="font-size:0.8rem;color:var(--text-dim);">Loading models...</span>`
+            : html`
+              <select value=${modelId}
+                onChange=${e => update({ modelId: e.target.value, label: e.target.selectedOptions[0]?.text || e.target.value })}
+                style="padding:0.35rem 0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:0.8rem;">
+                <option value="">${t('profile.calibrator.selectModel')}</option>
+                ${models.map(m => html`<option value=${m.id}>${m.name || m.id}</option>`)}
+              </select>
+            `
+          }
+        </div>
+      `}
     </div>
   `;
 }
@@ -216,7 +316,6 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
   const [changelog, setChangelog] = useState('');
   const [analysisTemplate, setAnalysisTemplate] = useState('');
   const [templateCollapsed, setTemplateCollapsed] = useState(true);
-  const [models, setModels] = useState([]);
   const [runs, setRuns] = useState([]);
   const [running, setRunning] = useState(false);
   const [expandedRun, setExpandedRun] = useState(null);
@@ -243,17 +342,9 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
       }
 
       setRuns(await listRuns(projectId));
-      loadModels();
     } catch (e) {
       showToast?.(e.message, true);
     }
-  }
-
-  async function loadModels() {
-    try {
-      const resp = await apiGet('/v1/openrouter/models');
-      setModels(resp.models || []);
-    } catch { setModels([]); }
   }
 
   async function handleSaveVersion() {
@@ -462,12 +553,12 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
       <!-- Reasoning LLM selector -->
       <div class="fnd-cal-section">
         <div class="fnd-cal-section-title">${t('profile.calibrator.reasoningModel')}</div>
-        <div class="fnd-cal-section-body" style="display:flex;gap:0.75rem;align-items:center;">
-          <select value=${project.reasoningLlm?.modelId || ''}
-            onChange=${e => handleUpdateProject({ reasoningLlm: { id: 'reasoning', label: e.target.selectedOptions[0]?.text || '', provider: 'openrouter', baseUrl: 'https://openrouter.ai/api/v1', modelId: e.target.value, apiKeyRef: 'shared', apiKey: null } })}>
-            <option value="">${t('profile.calibrator.selectModel')}</option>
-            ${models.map(m => html`<option value=${m.id}>${m.name || m.id}</option>`)}
-          </select>
+        <div class="fnd-cal-section-body">
+          <${LlmConfigEditor}
+            config=${project.reasoningLlm || { id: 'reasoning', provider: 'openrouter', baseUrl: 'https://openrouter.ai/api/v1', apiKeyRef: 'shared', modelId: '', label: '' }}
+            onChange=${cfg => handleUpdateProject({ reasoningLlm: cfg })}
+            label=${t('profile.calibrator.reasoningModel')}
+          />
         </div>
       </div>
 
@@ -529,10 +620,9 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
         <div class="fnd-cal-section-body">
           <div class="fnd-cal-models">
             ${(project.candidateModels || []).map((m, i) => html`
-              <${ModelRow}
-                model=${m}
-                models=${models}
-                onUpdate=${updated => handleUpdateModel(i, updated)}
+              <${LlmConfigEditor}
+                config=${m}
+                onChange=${updated => handleUpdateModel(i, updated)}
                 onRemove=${() => handleRemoveModel(i)}
               />
             `)}
@@ -637,10 +727,5 @@ export default function CalibratorTab({ session, showToast }) {
     />`;
   }
 
-  return html`
-    <div>
-      <${OpenRouterSettings} />
-      <${ProjectListView} onSelect=${handleSelect} showToast=${showToast} />
-    </div>
-  `;
+  return html`<${ProjectListView} onSelect=${handleSelect} showToast=${showToast} />`;
 }
