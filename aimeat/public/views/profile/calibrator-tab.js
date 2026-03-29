@@ -340,7 +340,7 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
           model: model.modelId,
         });
         const durationMs = Date.now() - start;
-        const output = genResp.content || '';
+        const output = genResp.data?.content || '';
 
         const run = await createRun(projectId, {
           promptVersion: currentVersion.version,
@@ -365,7 +365,7 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
                 prompt: analysisPrompt,
                 model: reasoningModelId,
               });
-              const analysisText = analysisResp.content || '';
+              const analysisText = analysisResp.data?.content || '';
 
               let parsed = null;
               try {
@@ -417,7 +417,7 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
         prompt: fixPrompt,
         model: reasoningModelId,
       });
-      const newPrompt = resp.content || '';
+      const newPrompt = resp.data?.content || '';
       if (newPrompt) {
         setPrompt(newPrompt);
         setChangelog('Applied proposed fixes: ' + proposals.slice(0, 3).map(p => p.substring(0, 60)).join('; '));
