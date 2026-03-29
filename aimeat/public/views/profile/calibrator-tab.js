@@ -545,13 +545,20 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
     navigator.clipboard.writeText(text).then(() => showToast?.(label + ' copied'));
   }
 
+  const [runProgress, setRunProgress] = useState('');
+
   async function handleRunAll(withAnalysis = false) {
     if (!project?.candidateModels?.length || !currentVersion) return;
     setRunning(true);
+    const totalModels = project.candidateModels.filter(m => m.modelId).length;
+    let completed = 0;
 
     for (const model of project.candidateModels) {
       if (!model.modelId) continue;
+      const modelName = model.label || model.modelId;
       try {
+        // Step 1: Generate
+        setRunProgress(`Generating: ${modelName} (${completed + 1}/${totalModels})...`);
         const start = Date.now();
         const output = await callModel(projectId, currentVersion.prompt, model.modelId);
         const durationMs = Date.now() - start;
@@ -559,17 +566,19 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
         const run = await createRun(projectId, {
           promptVersion: currentVersion.version,
           candidateModelId: model.id,
-          candidateModelLabel: model.label || model.modelId,
+          candidateModelLabel: modelName,
           output,
           durationMs,
         });
 
+        // Step 2: Analyze
         if (withAnalysis && output && project.analysisPromptTemplate) {
           try {
+            setRunProgress(`Analyzing: ${modelName} (${completed + 1}/${totalModels})...`);
             const analysisPrompt = project.analysisPromptTemplate
               .replace(/\{TARGET_OUTPUT\}/g, currentVersion.targetOutput || '')
               .replace(/\{CANDIDATE_OUTPUT\}/g, output)
-              .replace(/\{MODEL_NAME\}/g, model.label || model.modelId)
+              .replace(/\{MODEL_NAME\}/g, modelName)
               .replace(/\{PROMPT_USED\}/g, currentVersion.prompt || '');
 
             const reasoningModelId = project.reasoningLlm?.modelId;
@@ -592,18 +601,29 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
                 overallScore: score,
                 analysis: parsed?.analysis || analysisText,
                 proposals: parsed?.proposals || [],
+                // Store logs for debugging
+                logs: {
+                  generationPrompt: currentVersion.prompt,
+                  generationModel: model.modelId,
+                  analysisPrompt,
+                  analysisModel: reasoningModelId,
+                  analysisRawResponse: analysisText,
+                },
               });
             }
           } catch (e) {
-            console.warn('Analysis failed for', model.label, e.message);
+            console.warn('Analysis failed for', modelName, e.message);
           }
         }
+        completed++;
       } catch (e) {
-        console.warn('Run failed for', model.label, e.message);
-        showToast?.(`${model.label}: ${e.message}`, true);
+        console.warn('Run failed for', modelName, e.message);
+        showToast?.(`${modelName}: ${e.message}`, true);
+        completed++;
       }
     }
 
+    setRunProgress('');
     setRuns(await listRuns(projectId));
     const { dimensions: dims } = await getProject(projectId);
     setDimensions(dims || []);
@@ -751,13 +771,16 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
             `)}
           </div>
           ${(project.candidateModels || []).length > 0 && currentVersion ? html`
-            <div class="fnd-cal-actions">
-              <button class="btn-primary" onClick=${() => handleRunAll(false)} disabled=${running}>
-                ${running ? t('profile.calibrator.running') : t('profile.calibrator.runAll')}
-              </button>
-              <button class="btn-primary" onClick=${() => handleRunAll(true)} disabled=${running}>
-                ${running ? t('profile.calibrator.analyzing') : t('profile.calibrator.runAllAnalyze')}
-              </button>
+            <div class="fnd-cal-actions" style="flex-direction:column;align-items:center;gap:0.35rem;">
+              <div style="display:flex;gap:0.5rem;">
+                <button class="btn-primary" onClick=${() => handleRunAll(false)} disabled=${running}>
+                  ${running ? t('profile.calibrator.running') : t('profile.calibrator.runAll')}
+                </button>
+                <button class="btn-primary" onClick=${() => handleRunAll(true)} disabled=${running}>
+                  ${running ? t('profile.calibrator.analyzing') : t('profile.calibrator.runAllAnalyze')}
+                </button>
+              </div>
+              ${runProgress && html`<div style="font-size:0.8rem;color:var(--accent);font-weight:500;">${runProgress}</div>`}
             </div>
           ` : ''}
         </div>
@@ -786,28 +809,82 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
                     </div>
                     <div class="fnd-cal-run-dims">
                       ${(r.dimensions || []).map(d => html`
-                        <span class=${'fnd-cal-dim-badge ' + (d.pass ? 'pass' : 'fail')}>${d.name}</span>
+                        <span class=${'fnd-cal-dim-badge ' + (d.pass ? 'pass' : 'fail')}
+                          title=${d.pass ? `${d.name}: PASS` : `${d.name}: expected "${d.expected}" got "${d.actual}"`}>
+                          ${d.pass ? '\u2713' : '\u2717'} ${d.name}
+                        </span>
                       `)}
                     </div>
                   </div>
                   ${expandedRun === r.runId && expandedRunDetail ? html`
                     <div class="fnd-cal-run-detail">
+                      <!-- Dimension details table -->
+                      ${expandedRunDetail.dimensions?.length ? html`
+                        <div style="margin-bottom:0.75rem;">
+                          <strong>${t('profile.calibrator.dimensions')}</strong>
+                          <table style="width:100%;font-size:0.8rem;border-collapse:collapse;margin-top:0.35rem;">
+                            <thead>
+                              <tr style="text-align:left;border-bottom:1px solid var(--border);">
+                                <th style="padding:0.3rem 0.5rem;"></th>
+                                <th style="padding:0.3rem 0.5rem;">Dimension</th>
+                                <th style="padding:0.3rem 0.5rem;">Expected</th>
+                                <th style="padding:0.3rem 0.5rem;">Actual</th>
+                                <th style="padding:0.3rem 0.5rem;">Severity</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              ${expandedRunDetail.dimensions.map(d => html`
+                                <tr style="border-bottom:1px solid var(--border);">
+                                  <td style="padding:0.3rem 0.5rem;">${d.pass ? html`<span style="color:var(--success);">\u2713</span>` : html`<span style="color:var(--danger);">\u2717</span>`}</td>
+                                  <td style="padding:0.3rem 0.5rem;font-weight:500;" title=${d.description || ''}>${d.name}</td>
+                                  <td style="padding:0.3rem 0.5rem;color:var(--text-dim);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title=${d.expected || ''}>${d.expected || '-'}</td>
+                                  <td style="padding:0.3rem 0.5rem;color:${d.pass ? 'var(--success)' : 'var(--danger)'};max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title=${d.actual || ''}>${d.actual || '-'}</td>
+                                  <td style="padding:0.3rem 0.5rem;font-size:0.7rem;color:var(--text-dim);">${d.severity || ''}</td>
+                                </tr>
+                              `)}
+                            </tbody>
+                          </table>
+                        </div>
+                      ` : ''}
+
+                      <!-- Analysis text -->
                       ${expandedRunDetail.analysis ? html`
                         <div style="margin-bottom:0.75rem;">
                           <strong>${t('profile.calibrator.viewAnalysis')}</strong>
                           <pre>${expandedRunDetail.analysis}</pre>
                         </div>
                       ` : ''}
+
+                      <!-- Proposals -->
                       ${expandedRunDetail.proposals?.length ? html`
                         <div style="margin-bottom:0.75rem;">
                           <strong>${t('profile.calibrator.proposals')}</strong>
                           <ul>${expandedRunDetail.proposals.map(p => html`<li>${p}</li>`)}</ul>
                         </div>
                       ` : ''}
-                      <details>
-                        <summary style="cursor:pointer;font-size:0.85rem;color:var(--text-dim);">${t('profile.calibrator.viewOutput')}</summary>
+
+                      <!-- Logs: prompts sent, raw responses -->
+                      <details style="margin-bottom:0.5rem;">
+                        <summary style="cursor:pointer;font-size:0.85rem;color:var(--text-dim);">${t('profile.calibrator.viewOutput')} (model response)</summary>
                         <pre>${expandedRunDetail.output}</pre>
                       </details>
+                      ${expandedRunDetail.logs ? html`
+                        <details style="margin-bottom:0.5rem;">
+                          <summary style="cursor:pointer;font-size:0.85rem;color:var(--text-dim);">View generation prompt sent to model</summary>
+                          <div style="font-size:0.75rem;color:var(--text-dim);padding:0.25rem 0;">Model: ${expandedRunDetail.logs.generationModel}</div>
+                          <pre>${expandedRunDetail.logs.generationPrompt}</pre>
+                        </details>
+                        <details style="margin-bottom:0.5rem;">
+                          <summary style="cursor:pointer;font-size:0.85rem;color:var(--text-dim);">View analysis prompt sent to reasoning model</summary>
+                          <div style="font-size:0.75rem;color:var(--text-dim);padding:0.25rem 0;">Model: ${expandedRunDetail.logs.analysisModel}</div>
+                          <pre>${expandedRunDetail.logs.analysisPrompt}</pre>
+                        </details>
+                        <details style="margin-bottom:0.5rem;">
+                          <summary style="cursor:pointer;font-size:0.85rem;color:var(--text-dim);">View raw analysis response</summary>
+                          <pre>${expandedRunDetail.logs.analysisRawResponse}</pre>
+                        </details>
+                      ` : ''}
+
                       <div class="fnd-cal-run-actions">
                         ${expandedRunDetail.proposals?.length ? html`
                           <button class="btn-primary btn-sm" onClick=${() => handleApplyFixes(expandedRunDetail.proposals)}>
@@ -817,6 +894,9 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
                         <button class="btn-ghost btn-sm" onClick=${() => copyToClipboard(expandedRunDetail.output, 'Output')}>${t('profile.calibrator.copy')} output</button>
                         ${expandedRunDetail.analysis ? html`
                           <button class="btn-ghost btn-sm" onClick=${() => copyToClipboard(expandedRunDetail.analysis, 'Analysis')}>${t('profile.calibrator.copy')} analysis</button>
+                        ` : ''}
+                        ${expandedRunDetail.logs?.analysisPrompt ? html`
+                          <button class="btn-ghost btn-sm" onClick=${() => copyToClipboard(expandedRunDetail.logs.analysisPrompt, 'Analysis prompt')}>${t('profile.calibrator.copy')} analysis prompt</button>
                         ` : ''}
                       </div>
                     </div>

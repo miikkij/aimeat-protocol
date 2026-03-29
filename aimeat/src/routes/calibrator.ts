@@ -343,10 +343,11 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Run not found.'));
       }
       const run = record.value as Record<string, unknown>;
-      const { dimensions, overallScore, analysis, proposals } = req.body ?? {};
+      const { dimensions, overallScore, analysis, proposals, logs } = req.body ?? {};
       if (dimensions !== undefined) run.dimensions = dimensions;
       if (overallScore !== undefined) run.overallScore = overallScore;
       if (analysis !== undefined) run.analysis = analysis;
+      if (logs !== undefined) run.logs = logs;
       if (proposals !== undefined) run.proposals = proposals;
       await setCalMemory(gaii, `calibrator.${id}.run.${runId}`, run, ['calibrator', 'run']);
 
