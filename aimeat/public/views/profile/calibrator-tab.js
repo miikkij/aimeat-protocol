@@ -273,7 +273,7 @@ function LlmConfigEditor({ config, onChange, onRemove, label }) {
             </div>
           `}
 
-          <!-- Model dropdown -->
+          <!-- Model dropdown + pricing -->
           ${modelsLoading
             ? html`<span style="font-size:0.8rem;color:var(--text-dim);">Loading models...</span>`
             : html`
@@ -281,8 +281,19 @@ function LlmConfigEditor({ config, onChange, onRemove, label }) {
                 onChange=${e => updateDraft({ modelId: e.target.value, label: e.target.selectedOptions[0]?.text || e.target.value })}
                 style="padding:0.35rem 0.5rem;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);font-size:0.8rem;">
                 <option value="">${t('profile.calibrator.selectModel')}</option>
-                ${models.map(m => html`<option value=${m.id}>${m.name || m.id}</option>`)}
+                ${models.map(m => {
+                  const p = m.pricing;
+                  const priceTag = p ? ` — $${(parseFloat(p.prompt) * 1e6).toFixed(2)}/$${(parseFloat(p.completion) * 1e6).toFixed(2)} /M` : '';
+                  return html`<option value=${m.id}>${(m.name || m.id)}${priceTag}</option>`;
+                })}
               </select>
+              ${(() => {
+                const sel = models.find(m => m.id === modelId);
+                if (!sel?.pricing) return null;
+                const inPrice = (parseFloat(sel.pricing.prompt) * 1e6).toFixed(2);
+                const outPrice = (parseFloat(sel.pricing.completion) * 1e6).toFixed(2);
+                return html`<div style="font-size:0.7rem;color:var(--text-dim);">$${inPrice} input / $${outPrice} output per 1M tokens</div>`;
+              })()}
             `
           }
 
