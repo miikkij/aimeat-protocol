@@ -35,30 +35,43 @@ MODEL A (reference — the target quality) produced:
 MODEL B (candidate — {MODEL_NAME}) produced:
 {CANDIDATE_OUTPUT}
 
-The PROMPT given to Model B was:
+The PROMPT given to both models was the same prompt (shown below for context):
 {PROMPT_USED}
 
-Compare the two outputs. For each meaningful difference, report:
+For each difference between A and B, categorize it:
+- FORMAT: output structure differs (fences, blocks, separators)
+- NAMING: identifiers differ (action IDs, variable names, key names)
+- STRUCTURE: component count, feature decomposition, architecture differs
+- DATA_MODEL: data shapes, types, nesting differs
+- MISSING: something in A is absent in B
+- EXTRA: B added something not in A
+- QUALITY: both work but one is better (helper extraction, null checks, etc.)
 
-1. A short dimension NAME (snake_case, reusable across runs — e.g., "feature_count", "label_language", "data_nesting")
-2. CATEGORY: format | structure | data_model | naming | missing | extra
-3. SEVERITY: critical (breaks functionality) | major (wrong but works) | minor (cosmetic)
-4. EXPECTED: what the reference has
-5. ACTUAL: what the candidate produced
-6. PASS: true if candidate matches reference on this dimension, false otherwise
+For each difference where B's output would cause problems, suggest a prompt modification that would guide B to avoid that specific mistake — without showing B what A produced.
 
-Then, for each failing dimension, suggest a GENERIC prompt modification that would fix it. The fix must:
+The fix must:
 - NOT mention any project-specific names, APIs, or domain concepts
 - Work for ANY prompt calibration task, not just this one
 - Be a concrete text addition or change to the prompt
 
-Output format (strict JSON):
+Output as JSON so the system can parse it:
 {
   "dimensions": [
-    { "name": "...", "category": "...", "severity": "...", "expected": "...", "actual": "...", "pass": true/false, "description": "..." }
+    {
+      "name": "short_snake_case_name",
+      "description": "What this dimension measures",
+      "category": "format|structure|data_model|naming|missing|extra|quality",
+      "severity": "critical|major|minor",
+      "expected": "what the reference has",
+      "actual": "what the candidate produced",
+      "pass": true or false
+    }
   ],
-  "analysis": "Free-text summary of the key differences",
-  "proposals": ["Concrete prompt fix 1", "Concrete prompt fix 2"]
+  "analysis": "Detailed free-text analysis of the key differences. Be thorough — explain WHY each difference matters, what would break, and what the root cause likely is (e.g., model copied the example structure instead of deriving from the spec). This should be multiple paragraphs covering all significant gaps.",
+  "proposals": [
+    "Concrete prompt fix 1 — explain what to add/change and where in the prompt",
+    "Concrete prompt fix 2 — explain what to add/change and where in the prompt"
+  ]
 }`;
 
 export function calibratorRouter(config: AimeatConfig, storage: Storage): Router {
