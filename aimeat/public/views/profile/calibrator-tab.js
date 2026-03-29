@@ -22,6 +22,7 @@ import {
   listVersions, getVersion, createVersion,
   listRuns, getRun, createRun, updateRun,
 } from '/js/services/calibrator.js';
+import { OpenRouterSettings } from './foundry-settings.js';
 
 // ── Chart Colors ──
 const CHART_COLORS = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
@@ -636,5 +637,10 @@ export default function CalibratorTab({ session, showToast }) {
     />`;
   }
 
-  return html`<${ProjectListView} onSelect=${handleSelect} showToast=${showToast} />`;
+  return html`
+    <div>
+      <${OpenRouterSettings} />
+      <${ProjectListView} onSelect=${handleSelect} showToast=${showToast} />
+    </div>
+  `;
 }
