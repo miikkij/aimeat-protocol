@@ -1,13 +1,15 @@
 /**
  * @file calibrator-tab.js
- * @description Prompt Calibrator — list and detail views for calibration projects.
+ * @description Prompt Calibrator V2 — list and detail views for calibration projects.
+ *   Uses batch-based 4-step flow: Generation, Analysis, Reflection (dual), Synthesis.
  * @structure
  *   - CalibratorTab (root) — view state machine: list | detail
- *   - ProjectListView — shows all calibration projects
- *   - ProjectDetailView — prompt editor, models, results, chart
+ *   - ProjectListView — project cards with batchCount + score bar
+ *   - ProjectDetailView — 6-section layout for batch-based calibration
  * @version-history
  *   v1.0.0 — 2026-03-29 — Initial implementation
  *   v1.1.0 — 2026-03-29 — Extract LlmConfigEditor and CalibrationChart into separate files
+ *   v2.0.0 — 2026-03-29 — V2 redesign: batch-based 4-step flow, score bars, template sections
  */
 
 import { h } from 'preact';
@@ -15,13 +17,14 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { apiGet, apiPost, apiPut } from '/js/api.js';
+import { apiGet, apiDelete } from '/js/api.js';
 import LlmConfigEditor from '/views/profile/calibrator-llm-editor.js';
 import CalibrationChart from '/views/profile/calibrator-chart.js';
+import BatchCard from '/views/profile/calibrator-batch.js';
 import {
   listProjects, createProject, getProject, updateProject, deleteProject,
   listVersions, getVersion, createVersion,
-  listBatches, getBatch, createBatch, updateBatch, deleteBatch,
+  listBatches, createBatch,
   getTemplateDefaults,
 } from '/js/services/calibrator.js';
 
@@ -61,29 +64,28 @@ function ProjectListView({ onSelect, showToast }) {
 
   return html`
     <div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
-        <h3 style="margin:0;">${t('profile.calibrator.title')}</h3>
-        <label style="font-size:0.8rem;display:flex;align-items:center;gap:0.35rem;cursor:pointer;">
+      <div class="fnd-cal-list-header">
+        <h3 class="fnd-cal-list-title">${t('profile.calibrator.title')}</h3>
+        <label class="fnd-cal-archive-toggle">
           <input type="checkbox" checked=${showArchived} onChange=${e => setShowArchived(e.target.checked)} />
           ${t('profile.calibrator.showArchived')}
         </label>
       </div>
 
-      <div style="display:flex;gap:0.5rem;margin-bottom:1rem;">
-        <input type="text"
+      <div class="fnd-cal-create-bar">
+        <input type="text" class="fnd-cal-create-input"
           placeholder=${t('profile.calibrator.newProjectPlaceholder')}
           value=${newName}
           onInput=${e => setNewName(e.target.value)}
           onKeyDown=${e => e.key === 'Enter' && handleCreate()}
-          style="flex:1;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);"
         />
         <button class="btn-primary" onClick=${handleCreate} disabled=${creating || !newName.trim()}>
           ${creating ? '...' : t('profile.calibrator.newProject')}
         </button>
       </div>
 
-      ${loading ? html`<div style="text-align:center;padding:2rem;color:var(--text-dim);">...</div>` : ''}
-      ${!loading && filtered.length === 0 ? html`<div style="text-align:center;padding:2rem;color:var(--text-dim);">${t('profile.calibrator.empty')}</div>` : ''}
+      ${loading ? html`<div class="fnd-cal-empty">...</div>` : ''}
+      ${!loading && filtered.length === 0 ? html`<div class="fnd-cal-empty">${t('profile.calibrator.empty')}</div>` : ''}
 
       <div class="fnd-cal-list">
         ${filtered.map(p => html`
@@ -93,16 +95,26 @@ function ProjectListView({ onSelect, showToast }) {
               <span class="fnd-cal-card-version">v${p.currentVersion || 0}</span>
             </div>
             <div class="fnd-cal-card-meta">
-              <span>${p.status}</span>
-              <span>${(p.candidateModels || []).length} ${t('profile.calibrator.models')}</span>
+              ${p.status === 'archived' ? html`<span class="fnd-cal-badge-archived">${t('profile.calibrator.archive')}</span>` : ''}
+              <span>${(p.modelCount || 0)} ${t('profile.calibrator.models')}</span>
+              <span>${(p.batchCount || 0)} ${t('profile.calibrator.runs')}</span>
               <span>${new Date(p.createdAt).toLocaleDateString()}</span>
             </div>
+            <div class="fnd-cal-card-score">
+              <div class="fnd-cal-card-score-fill"
+                style=${'width:' + (p.latestAvgScore != null ? p.latestAvgScore : 0) + '%'}>
+              </div>
+            </div>
+            ${p.latestAvgScore != null ? html`
+              <div class="fnd-cal-card-score-text">${p.latestAvgScore}% ${t('profile.calibrator.avgScore')}</div>
+            ` : ''}
           </div>
         `)}
       </div>
     </div>
   `;
 }
+
 
 // ── Detail View ──
 
@@ -115,21 +127,35 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
   const [targetOutput, setTargetOutput] = useState('');
   const [selectedVersion, setSelectedVersion] = useState(null);
   const [changelog, setChangelog] = useState('');
-  const [analysisTemplate, setAnalysisTemplate] = useState('');
-  const [templateCollapsed, setTemplateCollapsed] = useState(true);
-  const [runs, setRuns] = useState([]);
-  const [running, setRunning] = useState(false);
-  const [expandedRun, setExpandedRun] = useState(null);
-  const [expandedRunDetail, setExpandedRunDetail] = useState(null);
+  const [templates, setTemplates] = useState({
+    analysis: '', reflection: '', selfReflection: '', synthesis: '',
+  });
+  const [templateCollapsed, setTemplateCollapsed] = useState({
+    analysis: true, reflection: true, selfReflection: true, synthesis: true,
+  });
+  const [batches, setBatches] = useState([]);
+  const [autoRunBatchId, setAutoRunBatchId] = useState(null);
 
   useEffect(() => { loadProject(); }, [projectId]);
+
+  // SSE live updates
+  useEffect(() => {
+    const handler = () => { reloadBatches(); };
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, []);
 
   async function loadProject() {
     try {
       const { project: proj, dimensions: dims } = await getProject(projectId);
       setProject(proj);
       setDimensions(dims || []);
-      setAnalysisTemplate(proj.analysisPromptTemplate || '');
+      setTemplates({
+        analysis: proj.analysisPromptTemplate || '',
+        reflection: proj.reflectionPromptTemplate || '',
+        selfReflection: proj.selfReflectionPromptTemplate || '',
+        synthesis: proj.synthesisPromptTemplate || '',
+      });
 
       const vers = await listVersions(projectId);
       setVersions(vers);
@@ -142,14 +168,52 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
         setSelectedVersion(ver.version);
       }
 
-      setRuns(await listRuns(projectId));
+      setBatches(await listBatches(projectId));
+
+      // Data migration: clean up old V1 run keys (silently)
+      try {
+        const resp = await apiGet(`/v1/memory?prefix=calibrator.${projectId}.run.&tags=calibrator,run`);
+        const oldRuns = resp?.data?.entries || [];
+        for (const r of oldRuns) {
+          try { await apiDelete(`/v1/memory/${encodeURIComponent(r.key)}`); } catch { /* ignore */ }
+        }
+      } catch { /* ignore migration errors */ }
     } catch (e) {
       showToast?.(e.message, true);
     }
   }
 
+  async function reloadBatches() {
+    try {
+      setBatches(await listBatches(projectId));
+      const { dimensions: d } = await getProject(projectId);
+      setDimensions(d || []);
+    } catch { /* ignore reload errors */ }
+  }
+
+  async function handleUpdateProject(updates) {
+    try {
+      const proj = await updateProject(projectId, updates);
+      setProject(proj);
+    } catch (e) {
+      showToast?.(e.message, true);
+    }
+  }
+
+  const isReadOnly = selectedVersion !== null && selectedVersion !== project?.currentVersion;
+
+  async function handleVersionChange(v) {
+    const vNum = Number(v);
+    setSelectedVersion(vNum);
+    const ver = await getVersion(projectId, vNum);
+    setCurrentVersion(ver);
+    setPrompt(ver.prompt || '');
+    setTargetOutput(ver.targetOutput || '');
+    setChangelog('');
+  }
+
   async function handleSaveVersion() {
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || isReadOnly) return;
     try {
       const ver = await createVersion(projectId, {
         prompt: prompt.trim(),
@@ -158,28 +222,11 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
       });
       setCurrentVersion(ver);
       setSelectedVersion(ver.version);
-      setChangelog('');
       setVersions(await listVersions(projectId));
-      const { project: proj } = await getProject(projectId);
-      setProject(proj);
-      showToast?.('Version ' + ver.version + ' saved');
-    } catch (e) {
-      showToast?.(e.message, true);
-    }
-  }
-
-  async function handleVersionChange(v) {
-    const ver = await getVersion(projectId, v);
-    setCurrentVersion(ver);
-    setPrompt(ver.prompt || '');
-    setTargetOutput(ver.targetOutput || '');
-    setSelectedVersion(ver.version);
-  }
-
-  async function handleUpdateProject(updates) {
-    try {
-      const proj = await updateProject(projectId, updates);
-      setProject(proj);
+      setChangelog('');
+      const updated = await getProject(projectId);
+      setProject(updated.project);
+      showToast?.('Version saved');
     } catch (e) {
       showToast?.(e.message, true);
     }
@@ -210,153 +257,94 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
     handleUpdateProject({ candidateModels: updated });
   }
 
-  async function handleSaveTemplate() {
-    await handleUpdateProject({ analysisPromptTemplate: analysisTemplate });
-    showToast?.('Analysis template saved');
+  async function handleNewRun(runAllSteps = false) {
+    if (!project.currentVersion || !selectedVersion) return;
+    try {
+      const batch = await createBatch(projectId, selectedVersion);
+      setBatches(prev => [batch, ...prev]);
+      if (runAllSteps) {
+        setAutoRunBatchId(batch.batchId);
+      }
+    } catch (e) {
+      showToast?.(e.message, true);
+    }
+  }
+
+  async function handleSaveTemplate(field, value) {
+    const fieldMap = {
+      analysis: 'analysisPromptTemplate',
+      reflection: 'reflectionPromptTemplate',
+      selfReflection: 'selfReflectionPromptTemplate',
+      synthesis: 'synthesisPromptTemplate',
+    };
+    await handleUpdateProject({ [fieldMap[field]]: value });
+    showToast?.('Template saved');
+  }
+
+  async function handleResetTemplate(field) {
+    try {
+      const defaults = await getTemplateDefaults();
+      const defaultMap = {
+        analysis: defaults.analysisPromptTemplate || '',
+        reflection: defaults.reflectionPromptTemplate || '',
+        selfReflection: defaults.selfReflectionPromptTemplate || '',
+        synthesis: defaults.synthesisPromptTemplate || '',
+      };
+      setTemplates(prev => ({ ...prev, [field]: defaultMap[field] }));
+    } catch (e) {
+      showToast?.(e.message, true);
+    }
   }
 
   function copyToClipboard(text, label) {
     navigator.clipboard.writeText(text).then(() => showToast?.(label + ' copied'));
   }
 
-  const [runProgress, setRunProgress] = useState('');
-
-  async function handleRunAll(withAnalysis = false) {
-    if (!project?.candidateModels?.length || !currentVersion) return;
-    setRunning(true);
-    const totalModels = project.candidateModels.filter(m => m.modelId).length;
-    let completed = 0;
-
-    for (const model of project.candidateModels) {
-      if (!model.modelId) continue;
-      const modelName = model.label || model.modelId;
-      try {
-        // Step 1: Generate
-        setRunProgress(`Generating: ${modelName} (${completed + 1}/${totalModels})...`);
-        const start = Date.now();
-        const output = await callModel(projectId, currentVersion.prompt, model.modelId);
-        const durationMs = Date.now() - start;
-
-        const run = await createRun(projectId, {
-          promptVersion: currentVersion.version,
-          candidateModelId: model.id,
-          candidateModelLabel: modelName,
-          output,
-          durationMs,
-        });
-
-        // Step 2: Analyze
-        if (withAnalysis && output && project.analysisPromptTemplate) {
-          try {
-            setRunProgress(`Analyzing: ${modelName} (${completed + 1}/${totalModels})...`);
-            const analysisPrompt = project.analysisPromptTemplate
-              .replace(/\{TARGET_OUTPUT\}/g, currentVersion.targetOutput || '')
-              .replace(/\{CANDIDATE_OUTPUT\}/g, output)
-              .replace(/\{MODEL_NAME\}/g, modelName)
-              .replace(/\{PROMPT_USED\}/g, currentVersion.prompt || '');
-
-            const reasoningModelId = project.reasoningLlm?.modelId;
-            if (reasoningModelId) {
-              const analysisText = await callModel(projectId, analysisPrompt, reasoningModelId);
-
-              let parsed = null;
-              try {
-                const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
-                if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
-              } catch { /* non-JSON analysis is acceptable */ }
-
-              const dims = parsed?.dimensions || [];
-              const score = dims.length > 0
-                ? Math.round((dims.filter(d => d.pass).length / dims.length) * 100)
-                : null;
-
-              await updateRun(projectId, run.runId, {
-                dimensions: dims,
-                overallScore: score,
-                analysis: parsed?.analysis || analysisText,
-                proposals: parsed?.proposals || [],
-                // Store logs for debugging
-                logs: {
-                  generationPrompt: currentVersion.prompt,
-                  generationModel: model.modelId,
-                  analysisPrompt,
-                  analysisModel: reasoningModelId,
-                  analysisRawResponse: analysisText,
-                },
-              });
-            }
-          } catch (e) {
-            console.warn('Analysis failed for', modelName, e.message);
-          }
-        }
-        completed++;
-      } catch (e) {
-        console.warn('Run failed for', modelName, e.message);
-        showToast?.(`${modelName}: ${e.message}`, true);
-        completed++;
-      }
-    }
-
-    setRunProgress('');
-    setRuns(await listRuns(projectId));
-    const { dimensions: dims } = await getProject(projectId);
-    setDimensions(dims || []);
-    setRunning(false);
-    showToast?.('Calibration run complete');
+  async function handleArchive() {
+    await handleUpdateProject({ status: 'archived' });
+    onBack();
   }
 
-  async function handleApplyFixes(proposals) {
-    if (!proposals?.length || !currentVersion) return;
-    const reasoningModelId = project?.reasoningLlm?.modelId;
-    if (!reasoningModelId) {
-      showToast?.('Set a reasoning model first', true);
-      return;
-    }
+  async function handleDelete() {
+    if (!confirm(t('profile.calibrator.deleteConfirm'))) return;
     try {
-      const fixPrompt = `Here is a prompt that needs improvement:\n\n---\n${currentVersion.prompt}\n---\n\nApply these proposed fixes:\n${proposals.map((p, i) => `${i + 1}. ${p}`).join('\n')}\n\nReturn ONLY the modified prompt text. Do not add explanations, markdown fences, or commentary. Keep changes generic — do not add project-specific terms.`;
-
-      const newPrompt = await callModel(projectId, fixPrompt, reasoningModelId);
-      if (newPrompt) {
-        setPrompt(newPrompt);
-        setChangelog('Applied proposed fixes: ' + proposals.slice(0, 3).map(p => p.substring(0, 60)).join('; '));
-        showToast?.('Fixes applied — review and save as new version');
-      }
+      await deleteProject(projectId);
+      onBack();
     } catch (e) {
       showToast?.(e.message, true);
     }
   }
 
-  async function toggleRunDetail(runId) {
-    if (expandedRun === runId) {
-      setExpandedRun(null);
-      setExpandedRunDetail(null);
-      return;
-    }
-    setExpandedRun(runId);
-    try {
-      const detail = await getRun(projectId, runId);
-      setExpandedRunDetail(detail);
-    } catch (e) {
-      showToast?.(e.message, true);
-    }
-  }
+  if (!project) return html`<div class="fnd-cal-empty">...</div>`;
 
-  if (!project) return html`<div style="padding:2rem;text-align:center;color:var(--text-dim);">...</div>`;
+  const hasModels = (project.candidateModels || []).some(m => m.modelId);
+  const hasVersion = !!project.currentVersion;
 
-  const scoreClass = (s) => s >= 80 ? 'pass' : s >= 50 ? 'mixed' : 'fail';
+  // Template configuration: field key, i18n label key, i18n placeholders key
+  const templateConfig = [
+    { field: 'analysis', label: 'profile.calibrator.analysisTemplate', placeholders: 'profile.calibrator.analysisTemplatePlaceholders' },
+    { field: 'reflection', label: 'profile.calibrator.reflectionTemplate', placeholders: 'profile.calibrator.reflectionPlaceholders' },
+    { field: 'selfReflection', label: 'profile.calibrator.selfReflectionTemplate', placeholders: 'profile.calibrator.reflectionPlaceholders' },
+    { field: 'synthesis', label: 'profile.calibrator.synthesisTemplate', placeholders: 'profile.calibrator.synthesisPlaceholders' },
+  ];
 
   return html`
     <div class="fnd-cal-detail">
-      <button class="btn-ghost" onClick=${onBack}>\u2190 ${t('profile.calibrator.back')}</button>
 
+      <!-- Section 1: Header -->
       <div class="fnd-cal-header">
+        <button class="btn-ghost" onClick=${onBack}>\u2190 ${t('profile.calibrator.back')}</button>
         <input type="text" value=${project.name}
           onBlur=${e => handleUpdateProject({ name: e.target.value })}
           onKeyDown=${e => e.key === 'Enter' && e.target.blur()}
         />
+        <div class="fnd-cal-header-actions">
+          <button class="btn-ghost btn-sm" onClick=${handleArchive}>${t('profile.calibrator.archive')}</button>
+          <button class="btn-danger btn-sm" onClick=${handleDelete}>${t('profile.calibrator.delete')}</button>
+        </div>
       </div>
 
-      <!-- Reasoning LLM selector -->
+      <!-- Section 2: Reasoning LLM -->
       <div class="fnd-cal-section">
         <div class="fnd-cal-section-title">${t('profile.calibrator.reasoningModel')}</div>
         <div class="fnd-cal-section-body">
@@ -365,70 +353,93 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
             onChange=${cfg => handleUpdateProject({ reasoningLlm: cfg })}
             label=${t('profile.calibrator.reasoningModel')}
           />
+          ${!project.reasoningLlm?.modelId ? html`
+            <div class="fnd-cal-warning">${t('profile.calibrator.setReasoningModel')}</div>
+          ` : ''}
         </div>
       </div>
 
-      <!-- Prompt + Target (side by side) -->
-      <div class="fnd-cal-editor">
-        <div class="fnd-cal-editor-panel">
-          <div class="fnd-cal-editor-label">${t('profile.calibrator.prompt')} (v${selectedVersion || 0})</div>
-          <textarea value=${prompt} onInput=${e => setPrompt(e.target.value)} />
+      <!-- Section 3: Prompt + Target (side-by-side) -->
+      <div class="fnd-cal-section">
+        <div class="fnd-cal-section-title">${t('profile.calibrator.prompt')} + ${t('profile.calibrator.targetOutput')}</div>
+        <div class="fnd-cal-section-body">
           <div class="fnd-cal-version-bar">
             <span>${t('profile.calibrator.version')}:</span>
-            <select value=${selectedVersion || ''} onChange=${e => handleVersionChange(parseInt(e.target.value))}>
+            <select value=${selectedVersion || ''} onChange=${e => handleVersionChange(e.target.value)}>
               ${versions.map(v => html`<option value=${v.version}>v${v.version} — ${v.changelog || ''}</option>`)}
             </select>
+            ${isReadOnly ? html`<span class="fnd-cal-readonly-badge">read-only</span>` : ''}
           </div>
-          <div class="fnd-cal-editor-actions">
-            <button class="btn-ghost btn-sm" onClick=${() => copyToClipboard(prompt, 'Prompt')}>${t('profile.calibrator.copy')}</button>
+
+          <div class="fnd-cal-editor">
+            <div class="fnd-cal-editor-panel">
+              <div class="fnd-cal-editor-label">${t('profile.calibrator.prompt')} (v${selectedVersion || 0})</div>
+              <textarea value=${prompt} onInput=${e => setPrompt(e.target.value)} disabled=${isReadOnly} />
+              <div class="fnd-cal-editor-actions">
+                <button class="btn-ghost btn-sm" onClick=${() => copyToClipboard(prompt, 'Prompt')}>${t('profile.calibrator.copy')}</button>
+              </div>
+            </div>
+            <div class="fnd-cal-editor-panel">
+              <div class="fnd-cal-editor-label">${t('profile.calibrator.targetOutput')}</div>
+              <textarea value=${targetOutput} onInput=${e => setTargetOutput(e.target.value)} disabled=${isReadOnly} />
+              <div class="fnd-cal-editor-actions">
+                <button class="btn-ghost btn-sm" onClick=${() => copyToClipboard(targetOutput, 'Target')}>${t('profile.calibrator.copy')}</button>
+              </div>
+            </div>
           </div>
-        </div>
-        <div class="fnd-cal-editor-panel">
-          <div class="fnd-cal-editor-label">${t('profile.calibrator.targetOutput')}</div>
-          <textarea value=${targetOutput} onInput=${e => setTargetOutput(e.target.value)} />
-          <div class="fnd-cal-editor-actions">
-            <button class="btn-ghost btn-sm" onClick=${() => copyToClipboard(targetOutput, 'Target')}>${t('profile.calibrator.copy')}</button>
+
+          <div class="fnd-cal-save-version-bar">
+            <input type="text" class="fnd-cal-changelog-input"
+              placeholder=${t('profile.calibrator.changelogPlaceholder')}
+              value=${changelog}
+              onInput=${e => setChangelog(e.target.value)}
+              disabled=${isReadOnly}
+            />
+            <button class="btn-primary btn-sm" onClick=${handleSaveVersion} disabled=${!prompt.trim() || isReadOnly}>
+              ${t('profile.calibrator.saveNewVersion')}
+            </button>
           </div>
         </div>
       </div>
 
-      <!-- Save new version -->
-      <div style="display:flex;gap:0.5rem;align-items:center;">
-        <input type="text" placeholder=${t('profile.calibrator.changelogPlaceholder')} value=${changelog} onInput=${e => setChangelog(e.target.value)}
-          style="flex:1;padding:0.4rem 0.75rem;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text);font-size:0.85rem;" />
-        <button class="btn-primary btn-sm" onClick=${handleSaveVersion} disabled=${!prompt.trim()}>
-          ${t('profile.calibrator.saveNewVersion')}
-        </button>
-      </div>
-
-      <!-- Analysis Template (collapsible) -->
-      <div class=${'fnd-cal-section' + (templateCollapsed ? ' fnd-cal-collapsed' : '')}>
-        <div class="fnd-cal-section-title" onClick=${() => setTemplateCollapsed(!templateCollapsed)}>
-          ${templateCollapsed ? '\u25B6' : '\u25BC'} ${t('profile.calibrator.analysisTemplate')}
-        </div>
+      <!-- Section 4: Prompt Templates (collapsible) -->
+      <div class="fnd-cal-section">
+        <div class="fnd-cal-section-title">${t('profile.calibrator.analysisTemplate')}</div>
         <div class="fnd-cal-section-body">
-          <div style="font-size:0.75rem;color:var(--text-dim);margin-bottom:0.5rem;">${t('profile.calibrator.analysisTemplatePlaceholders')}</div>
-          <textarea style="min-height:200px;width:100%;font-family:var(--font-mono);font-size:0.8rem;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:0.75rem;color:var(--text);resize:vertical;"
-            value=${analysisTemplate} onInput=${e => setAnalysisTemplate(e.target.value)} />
-          <div style="display:flex;gap:0.5rem;margin-top:0.5rem;flex-wrap:wrap;">
-            <button class="btn-primary btn-sm" onClick=${handleSaveTemplate}>${t('profile.calibrator.save')}</button>
-            <button class="btn-ghost btn-sm" onClick=${() => { setAnalysisTemplate(DEFAULT_ANALYSIS_TEMPLATE); }}>${t('profile.calibrator.resetTemplate')}</button>
-            <button class="btn-ghost btn-sm" onClick=${() => copyToClipboard(analysisTemplate, 'Template')}>${t('profile.calibrator.copy')}</button>
-            ${currentVersion && html`
-              <button class="btn-ghost btn-sm" onClick=${() => {
-                const composed = analysisTemplate
-                  .replace(/\{TARGET_OUTPUT\}/g, currentVersion.targetOutput || '[paste target output here]')
-                  .replace(/\{CANDIDATE_OUTPUT\}/g, '[paste candidate output here]')
-                  .replace(/\{MODEL_NAME\}/g, '[model name]')
-                  .replace(/\{PROMPT_USED\}/g, currentVersion.prompt || '[paste prompt here]');
-                copyToClipboard(composed, 'Composed analysis prompt');
-              }}>${t('profile.calibrator.copyComposed')}</button>
-            `}
+          <div class="fnd-cal-templates">
+            ${templateConfig.map(tc => html`
+              <details class="fnd-cal-template-details" open=${!templateCollapsed[tc.field]}
+                onToggle=${e => {
+                  if (e.target === e.currentTarget) {
+                    setTemplateCollapsed(prev => ({ ...prev, [tc.field]: !e.target.open }));
+                  }
+                }}>
+                <summary>${t(tc.label)}</summary>
+                <div class="fnd-cal-template-body">
+                  <div class="fnd-cal-template-hint">${t(tc.placeholders)}</div>
+                  <textarea class="fnd-cal-template-textarea"
+                    value=${templates[tc.field]}
+                    onInput=${e => setTemplates(prev => ({ ...prev, [tc.field]: e.target.value }))}
+                  />
+                  <div class="fnd-cal-template-actions">
+                    <button class="btn-primary btn-sm" onClick=${() => handleSaveTemplate(tc.field, templates[tc.field])}>
+                      ${t('profile.calibrator.save')}
+                    </button>
+                    <button class="btn-ghost btn-sm" onClick=${() => handleResetTemplate(tc.field)}>
+                      ${t('profile.calibrator.resetTemplate')}
+                    </button>
+                    <button class="btn-ghost btn-sm" onClick=${() => copyToClipboard(templates[tc.field], 'Template')}>
+                      ${t('profile.calibrator.copy')}
+                    </button>
+                  </div>
+                </div>
+              </details>
+            `)}
           </div>
         </div>
       </div>
 
-      <!-- Candidate Models -->
+      <!-- Section 5: Candidate Models -->
       <div class="fnd-cal-section">
         <div class="fnd-cal-section-title">
           ${t('profile.calibrator.candidateModels')}
@@ -444,157 +455,59 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
               />
             `)}
           </div>
-          ${(project.candidateModels || []).length > 0 && currentVersion ? html`
-            <div class="fnd-cal-actions" style="flex-direction:column;align-items:center;gap:0.35rem;">
-              <div style="display:flex;gap:0.5rem;">
-                <button class="btn-primary" onClick=${() => handleRunAll(false)} disabled=${running}>
-                  ${running ? t('profile.calibrator.running') : t('profile.calibrator.runAll')}
-                </button>
-                <button class="btn-primary" onClick=${() => handleRunAll(true)} disabled=${running}>
-                  ${running ? t('profile.calibrator.analyzing') : t('profile.calibrator.runAllAnalyze')}
-                </button>
-              </div>
-              ${runProgress && html`<div style="font-size:0.8rem;color:var(--accent);font-weight:500;">${runProgress}</div>`}
-            </div>
-          ` : ''}
+
+          <div class="fnd-cal-actions">
+            ${!hasModels ? html`<div class="fnd-cal-hint">${t('profile.calibrator.addModelsFirst')}</div>` : ''}
+            ${!hasVersion ? html`<div class="fnd-cal-hint">${t('profile.calibrator.saveVersionFirst')}</div>` : ''}
+            ${hasModels && hasVersion ? html`
+              <button class="btn-primary" onClick=${() => handleNewRun(false)}>
+                ${t('profile.calibrator.newRun')}
+              </button>
+              <button class="btn-primary" onClick=${() => handleNewRun(true)}>
+                ${t('profile.calibrator.newRunAllSteps')}
+              </button>
+            ` : ''}
+          </div>
         </div>
       </div>
 
-      <!-- Results: Chart + Run History -->
+      <!-- Section 6: Results -->
       <div class="fnd-cal-section">
         <div class="fnd-cal-section-title">${t('profile.calibrator.results')}</div>
         <div class="fnd-cal-section-body">
-          ${runs.length === 0 ? html`
-            <div style="text-align:center;padding:1rem;color:var(--text-dim);">${t('profile.calibrator.noRuns')}</div>
+          ${batches.length === 0 ? html`
+            <div class="fnd-cal-empty-inline">${t('profile.calibrator.noRuns')}</div>
           ` : html`
-            <${CalibrationChart} runs=${runs} dimensions=${dimensions} versions=${versions} />
+            <${CalibrationChart} batches=${batches} dimensions=${dimensions} />
 
-            <div class="fnd-cal-runs" style="margin-top:1rem;">
-              ${runs.map(r => html`
-                <div class="fnd-cal-run">
-                  <div class="fnd-cal-run-header" onClick=${() => toggleRunDetail(r.runId)}>
-                    <div class="fnd-cal-run-summary">
-                      <span class="fnd-cal-run-model">${r.candidateModelLabel}</span>
-                      <span>v${r.promptVersion}</span>
-                      ${r.overallScore != null ? html`
-                        <span class=${'fnd-cal-run-score ' + scoreClass(r.overallScore)}>${r.overallScore}%</span>
-                      ` : ''}
-                      <span class="fnd-cal-run-time">${((r.durationMs || 0) / 1000).toFixed(1)}s</span>
-                    </div>
-                    <div class="fnd-cal-run-dims">
-                      ${(r.dimensions || []).map(d => html`
-                        <span class=${'fnd-cal-dim-badge ' + (d.pass ? 'pass' : 'fail')}
-                          title=${d.pass ? `${d.name}: PASS` : `${d.name}: expected "${d.expected}" got "${d.actual}"`}>
-                          ${d.pass ? '\u2713' : '\u2717'} ${d.name}
-                        </span>
-                      `)}
-                    </div>
-                  </div>
-                  ${expandedRun === r.runId && expandedRunDetail ? html`
-                    <div class="fnd-cal-run-detail">
-                      <!-- Dimension details table -->
-                      ${expandedRunDetail.dimensions?.length ? html`
-                        <div style="margin-bottom:0.75rem;">
-                          <strong>${t('profile.calibrator.dimensions')}</strong>
-                          <table style="width:100%;font-size:0.8rem;border-collapse:collapse;margin-top:0.35rem;">
-                            <thead>
-                              <tr style="text-align:left;border-bottom:1px solid var(--border);">
-                                <th style="padding:0.3rem 0.5rem;"></th>
-                                <th style="padding:0.3rem 0.5rem;">Dimension</th>
-                                <th style="padding:0.3rem 0.5rem;">Expected</th>
-                                <th style="padding:0.3rem 0.5rem;">Actual</th>
-                                <th style="padding:0.3rem 0.5rem;">Severity</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              ${expandedRunDetail.dimensions.map(d => html`
-                                <tr style="border-bottom:1px solid var(--border);">
-                                  <td style="padding:0.3rem 0.5rem;">${d.pass ? html`<span style="color:var(--success);">\u2713</span>` : html`<span style="color:var(--danger);">\u2717</span>`}</td>
-                                  <td style="padding:0.3rem 0.5rem;font-weight:500;" title=${d.description || ''}>${d.name}</td>
-                                  <td style="padding:0.3rem 0.5rem;color:var(--text-dim);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title=${d.expected || ''}>${d.expected || '-'}</td>
-                                  <td style="padding:0.3rem 0.5rem;color:${d.pass ? 'var(--success)' : 'var(--danger)'};max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title=${d.actual || ''}>${d.actual || '-'}</td>
-                                  <td style="padding:0.3rem 0.5rem;font-size:0.7rem;color:var(--text-dim);">${d.severity || ''}</td>
-                                </tr>
-                              `)}
-                            </tbody>
-                          </table>
-                        </div>
-                      ` : ''}
-
-                      <!-- Analysis text -->
-                      ${expandedRunDetail.analysis ? html`
-                        <div style="margin-bottom:0.75rem;">
-                          <strong>${t('profile.calibrator.viewAnalysis')}</strong>
-                          <pre>${expandedRunDetail.analysis}</pre>
-                        </div>
-                      ` : ''}
-
-                      <!-- Proposals -->
-                      ${expandedRunDetail.proposals?.length ? html`
-                        <div style="margin-bottom:0.75rem;">
-                          <strong>${t('profile.calibrator.proposals')}</strong>
-                          <ul>${expandedRunDetail.proposals.map(p => html`<li>${p}</li>`)}</ul>
-                        </div>
-                      ` : ''}
-
-                      <!-- Logs: prompts sent, raw responses -->
-                      <details style="margin-bottom:0.5rem;">
-                        <summary style="cursor:pointer;font-size:0.85rem;color:var(--text-dim);">${t('profile.calibrator.viewOutput')} (model response)</summary>
-                        <pre>${expandedRunDetail.output}</pre>
-                      </details>
-                      ${expandedRunDetail.logs ? html`
-                        <details style="margin-bottom:0.5rem;">
-                          <summary style="cursor:pointer;font-size:0.85rem;color:var(--text-dim);">View generation prompt sent to model</summary>
-                          <div style="font-size:0.75rem;color:var(--text-dim);padding:0.25rem 0;">Model: ${expandedRunDetail.logs.generationModel}</div>
-                          <pre>${expandedRunDetail.logs.generationPrompt}</pre>
-                        </details>
-                        <details style="margin-bottom:0.5rem;">
-                          <summary style="cursor:pointer;font-size:0.85rem;color:var(--text-dim);">View analysis prompt sent to reasoning model</summary>
-                          <div style="font-size:0.75rem;color:var(--text-dim);padding:0.25rem 0;">Model: ${expandedRunDetail.logs.analysisModel}</div>
-                          <pre>${expandedRunDetail.logs.analysisPrompt}</pre>
-                        </details>
-                        <details style="margin-bottom:0.5rem;">
-                          <summary style="cursor:pointer;font-size:0.85rem;color:var(--text-dim);">View raw analysis response</summary>
-                          <pre>${expandedRunDetail.logs.analysisRawResponse}</pre>
-                        </details>
-                      ` : ''}
-
-                      <div class="fnd-cal-run-actions">
-                        ${expandedRunDetail.proposals?.length ? html`
-                          <button class="btn-primary btn-sm" onClick=${() => handleApplyFixes(expandedRunDetail.proposals)}>
-                            ${t('profile.calibrator.applyFixes')}
-                          </button>
-                        ` : ''}
-                        <button class="btn-ghost btn-sm" onClick=${() => copyToClipboard(expandedRunDetail.output, 'Output')}>${t('profile.calibrator.copy')} output</button>
-                        ${expandedRunDetail.analysis ? html`
-                          <button class="btn-ghost btn-sm" onClick=${() => copyToClipboard(expandedRunDetail.analysis, 'Analysis')}>${t('profile.calibrator.copy')} analysis</button>
-                        ` : ''}
-                        ${expandedRunDetail.logs?.analysisPrompt ? html`
-                          <button class="btn-ghost btn-sm" onClick=${() => copyToClipboard(expandedRunDetail.logs.analysisPrompt, 'Analysis prompt')}>${t('profile.calibrator.copy')} analysis prompt</button>
-                        ` : ''}
-                      </div>
-                    </div>
-                  ` : ''}
-                </div>
+            <div class="fnd-cal-runs">
+              ${batches.map((b, i) => html`
+                <${BatchCard}
+                  batchSummary=${b}
+                  index=${batches.length - i}
+                  projectId=${projectId}
+                  project=${project}
+                  currentVersion=${currentVersion}
+                  onUpdate=${() => reloadBatches()}
+                  showToast=${showToast}
+                  autoRunAll=${b.batchId === autoRunBatchId}
+                />
               `)}
             </div>
           `}
         </div>
       </div>
+
     </div>
   `;
 }
+
 
 // ── Root Component ──
 
 export default function CalibratorTab({ session, showToast }) {
   const [view, setView] = useState('list');
   const [activeProjectId, setActiveProjectId] = useState(null);
-
-  function handleSelect(projectId) {
-    setActiveProjectId(projectId);
-    setView('detail');
-  }
 
   if (view === 'detail' && activeProjectId) {
     return html`<${ProjectDetailView}
@@ -603,6 +516,8 @@ export default function CalibratorTab({ session, showToast }) {
       showToast=${showToast}
     />`;
   }
-
-  return html`<${ProjectListView} onSelect=${handleSelect} showToast=${showToast} />`;
+  return html`<${ProjectListView}
+    onSelect=${id => { setActiveProjectId(id); setView('detail'); }}
+    showToast=${showToast}
+  />`;
 }

@@ -4,9 +4,42 @@
  * @version-history
  *   v1.0.0 — 2026-03-29 — Initial styles
  *   v2.0.0 — 2026-03-29 — V2: batch, step, paste, progress, synthesis, reflection styles
+ *   v2.1.0 — 2026-03-29 — V2 tab rewrite: list header, create bar, empty states, template details, warning, hints
  */
 
 /* ── List View ── */
+.fnd-cal-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.fnd-cal-list-title { margin: 0; }
+.fnd-cal-archive-toggle {
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+.fnd-cal-create-bar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.fnd-cal-create-input {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+}
+.fnd-cal-empty {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-dim);
+}
 .fnd-cal-list { display: flex; flex-direction: column; gap: 0.75rem; }
 .fnd-cal-card {
   background: var(--card);
@@ -34,6 +67,19 @@
   border-radius: 2px;
   transition: width 0.3s;
 }
+.fnd-cal-card-score-text {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-top: 0.25rem;
+}
+.fnd-cal-badge-archived {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  background: var(--bg-dim);
+  color: var(--text-dim);
+  font-weight: 500;
+}
 
 /* ── Detail View ── */
 .fnd-cal-detail { display: flex; flex-direction: column; gap: 1.5rem; }
@@ -53,6 +99,7 @@
   flex: 1;
 }
 .fnd-cal-header input:focus { border-color: var(--accent); outline: none; }
+.fnd-cal-header-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
 
 /* ── Side-by-side Prompt + Target ── */
 .fnd-cal-editor {
@@ -111,6 +158,49 @@
   padding: 0.25rem 0.5rem;
   color: var(--text);
   font-size: 0.85rem;
+}
+.fnd-cal-readonly-badge {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 3px;
+  background: var(--bg-dim);
+  color: var(--text-dim);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.fnd-cal-save-version-bar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.75rem;
+}
+.fnd-cal-changelog-input {
+  flex: 1;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+.fnd-cal-warning {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--warning);
+  background: var(--bg-dim);
+  border-radius: 0 4px 4px 0;
+  font-size: 0.85rem;
+  color: var(--warning);
+}
+.fnd-cal-hint {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+.fnd-cal-empty-inline {
+  text-align: center;
+  padding: 1rem;
+  color: var(--text-dim);
 }
 
 /* ── Model List ── */
@@ -314,3 +404,44 @@
 
 /* ── V2: Template section ── */
 .fnd-cal-templates { display: flex; flex-direction: column; gap: 8px; }
+.fnd-cal-template-details {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.fnd-cal-template-details summary {
+  padding: 0.6rem 0.75rem;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  background: var(--card);
+}
+.fnd-cal-template-details summary:hover { background: var(--bg-dim); }
+.fnd-cal-template-details[open] summary {
+  border-bottom: 1px solid var(--border);
+}
+.fnd-cal-template-body { padding: 0.75rem; }
+.fnd-cal-template-hint {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-bottom: 0.5rem;
+}
+.fnd-cal-template-textarea {
+  width: 100%;
+  min-height: 200px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.75rem;
+  color: var(--text);
+  resize: vertical;
+}
+.fnd-cal-template-textarea:focus { border-color: var(--accent); outline: none; }
+.fnd-cal-template-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
