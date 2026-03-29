@@ -3,6 +3,7 @@
  * @description Styles for Prompt Calibrator views. Uses fnd-cal- prefix.
  * @version-history
  *   v1.0.0 — 2026-03-29 — Initial styles
+ *   v2.0.0 — 2026-03-29 — V2: batch, step, paste, progress, synthesis, reflection styles
  */
 
 /* ── List View ── */
@@ -259,3 +260,57 @@
 
 /* ── Collapsible ── */
 .fnd-cal-collapsed .fnd-cal-section-body { display: none; }
+
+/* ── V2: Batch card ── */
+.fnd-cal-batch { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+.fnd-cal-batch-header { padding: 12px 16px; cursor: pointer; display: flex; align-items: center; gap: 12px; background: var(--card); }
+.fnd-cal-batch-header:hover { background: var(--bg-dim); }
+.fnd-cal-batch-meta { display: flex; gap: 8px; align-items: center; font-size: 0.85rem; color: var(--text-dim); }
+.fnd-cal-batch-scores { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.fnd-cal-batch-detail { padding: 16px; border-top: 1px solid var(--border); background: var(--surface); }
+
+/* ── V2: Step sections inside expanded batch ── */
+.fnd-cal-step { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 12px; }
+.fnd-cal-step summary { padding: 10px 14px; cursor: pointer; font-weight: 600; font-size: 0.9rem; background: var(--card); border-radius: 6px; }
+.fnd-cal-step summary:hover { background: var(--bg-dim); }
+.fnd-cal-step[open] summary { border-radius: 6px 6px 0 0; border-bottom: 1px solid var(--border); }
+.fnd-cal-step-body { padding: 14px; }
+.fnd-cal-step-model { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.fnd-cal-step-model:last-child { border-bottom: none; }
+.fnd-cal-step-actions { display: flex; gap: 8px; padding-top: 12px; margin-top: 12px; border-top: 1px solid var(--border); }
+
+/* ── V2: Paste-back textarea ── */
+.fnd-cal-paste { margin-top: 8px; }
+.fnd-cal-paste textarea { width: 100%; min-height: 120px; font-family: var(--font-mono); font-size: 0.85rem; padding: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); color: var(--text); resize: vertical; }
+.fnd-cal-paste-actions { display: flex; gap: 8px; margin-top: 6px; }
+
+/* ── V2: Progress indicator ── */
+.fnd-cal-progress { padding: 8px 14px; font-size: 0.85rem; color: var(--accent); font-weight: 500; display: flex; align-items: center; gap: 8px; }
+.fnd-cal-progress::before { content: ''; display: inline-block; width: 12px; height: 12px; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: fnd-cal-spin 0.8s linear infinite; }
+@keyframes fnd-cal-spin { to { transform: rotate(360deg); } }
+
+/* ── V2: Synthesis / Options ── */
+.fnd-cal-synthesis { padding: 14px; }
+.fnd-cal-proposal-card { border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; background: var(--card); }
+.fnd-cal-proposal-card .fnd-cal-proposal-sources { font-size: 0.8rem; color: var(--text-dim); margin-top: 4px; }
+.fnd-cal-proposal-card .fnd-cal-proposal-impact { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+.fnd-cal-proposal-impact.high { background: var(--success); color: #fff; }
+.fnd-cal-proposal-impact.medium { background: var(--warning); color: #000; }
+.fnd-cal-proposal-impact.low { background: var(--bg-dim); color: var(--text-dim); }
+.fnd-cal-options { margin-top: 16px; }
+.fnd-cal-option { border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; margin-bottom: 8px; cursor: pointer; background: var(--card); display: flex; align-items: flex-start; gap: 10px; }
+.fnd-cal-option:hover { border-color: var(--accent); }
+.fnd-cal-option.selected { border-color: var(--accent); background: var(--bg-dim); }
+.fnd-cal-option input[type="radio"] { margin-top: 3px; }
+.fnd-cal-option-label { font-weight: 600; }
+.fnd-cal-option-impact { font-size: 0.85rem; color: var(--text-dim); margin-top: 2px; }
+.fnd-cal-recommendation { margin-top: 12px; padding: 12px 16px; border-left: 3px solid var(--accent); background: var(--bg-dim); border-radius: 0 6px 6px 0; font-size: 0.9rem; }
+
+/* ── V2: Reflection dual columns ── */
+.fnd-cal-reflection-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 768px) { .fnd-cal-reflection-cols { grid-template-columns: 1fr; } }
+.fnd-cal-reflection-col { border: 1px solid var(--border); border-radius: 6px; padding: 12px; background: var(--card); }
+.fnd-cal-reflection-col h4 { margin: 0 0 8px; font-size: 0.85rem; color: var(--text-dim); }
+
+/* ── V2: Template section ── */
+.fnd-cal-templates { display: flex; flex-direction: column; gap: 8px; }
