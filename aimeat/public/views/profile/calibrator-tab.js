@@ -189,10 +189,13 @@ function LlmConfigEditor({ config, onChange, onRemove, label }) {
     setDirty(true);
   }
 
+  const [saveMsg, setSaveMsg] = useState(false);
+
   function handleSave() {
     onChange(draft);
     setDirty(false);
-    setCollapsed(true);
+    setSaveMsg(true);
+    setTimeout(() => setSaveMsg(false), 3000);
   }
 
   function handleProviderChange(p) {
@@ -284,10 +287,11 @@ function LlmConfigEditor({ config, onChange, onRemove, label }) {
           }
 
           <!-- Save button -->
-          <div style="display:flex;gap:0.5rem;margin-top:0.25rem;">
+          <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.25rem;">
             <button class="btn-primary btn-sm" onClick=${handleSave} disabled=${!dirty}>
               Save settings
             </button>
+            ${saveMsg && html`<span style="font-size:0.8rem;color:var(--success);">Settings saved</span>`}
           </div>
         </div>
       `}
