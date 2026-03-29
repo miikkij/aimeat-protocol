@@ -4,10 +4,12 @@
  * @structure
  *   - Project CRUD: listProjects, createProject, getProject, updateProject, deleteProject
  *   - Versions: listVersions, getVersion, createVersion
- *   - Runs: listRuns, getRun, createRun, updateRun
+ *   - Batches: listBatches, getBatch, createBatch, updateBatch, deleteBatch
+ *   - Templates: getTemplateDefaults
  * @version-history
  *   v1.0.0 — 2026-03-29 — Initial implementation
  *   v1.0.1 — 2026-03-29 — Fix: access resp.data (AIMEAT envelope)
+ *   v2.0.0 — 2026-03-29 — V2: batch functions replace run functions, add template defaults
  */
 
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
@@ -57,29 +59,39 @@ export async function createVersion(projectId, { prompt, targetOutput, changelog
   return resp.data?.version;
 }
 
-// ── Runs ──
+// ── Templates ──
 
-export async function listRuns(projectId, filters = {}) {
-  let url = `${BASE}/${projectId}/runs`;
+export async function getTemplateDefaults() {
+  const resp = await apiGet('/v1/calibrator/templates');
+  return resp.data || {};
+}
+
+// ── Batches ──
+
+export async function listBatches(projectId, filters = {}) {
+  let url = `${BASE}/${projectId}/batches`;
   const params = [];
   if (filters.version) params.push(`version=${filters.version}`);
-  if (filters.model) params.push(`model=${encodeURIComponent(filters.model)}`);
   if (params.length) url += '?' + params.join('&');
   const resp = await apiGet(url);
-  return resp.data?.runs || [];
+  return resp.data?.batches || [];
 }
 
-export async function getRun(projectId, runId) {
-  const resp = await apiGet(`${BASE}/${projectId}/runs/${runId}`);
-  return resp.data?.run;
+export async function getBatch(projectId, batchId) {
+  const resp = await apiGet(`${BASE}/${projectId}/batches/${batchId}`);
+  return resp.data?.batch;
 }
 
-export async function createRun(projectId, data) {
-  const resp = await apiPost(`${BASE}/${projectId}/runs`, data);
-  return resp.data?.run;
+export async function createBatch(projectId, promptVersion) {
+  const resp = await apiPost(`${BASE}/${projectId}/batches`, { promptVersion });
+  return resp.data?.batch;
 }
 
-export async function updateRun(projectId, runId, data) {
-  const resp = await apiPut(`${BASE}/${projectId}/runs/${runId}`, data);
-  return resp.data?.run;
+export async function updateBatch(projectId, batchId, data) {
+  const resp = await apiPut(`${BASE}/${projectId}/batches/${batchId}`, data);
+  return resp.data?.batch;
+}
+
+export async function deleteBatch(projectId, batchId) {
+  return await apiDelete(`${BASE}/${projectId}/batches/${batchId}`);
 }
