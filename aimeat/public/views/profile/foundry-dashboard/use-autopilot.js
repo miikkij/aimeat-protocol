@@ -160,12 +160,16 @@ function generatePassPrompt(pass, ctx) {
       return '';
     }
     case 'assembly': {
+      // Convert unitMap {id: code} to array [{id, code}] for assembly prompt builders
+      const unitsArr = units && typeof units === 'object' && !Array.isArray(units)
+        ? Object.entries(units).map(([id, code]) => ({ id, code }))
+        : (Array.isArray(units) ? units : []);
       if (component.type === 'extension') {
-        return buildExtensionAssemblyPrompt({ skeleton, units, label: component.label });
+        return buildExtensionAssemblyPrompt({ skeleton, units: unitsArr, label: component.label });
       } else if (component.type === 'cortex') {
-        return buildCortexAssemblyPrompt({ skeleton, units, label: component.label, subtype: bpComp?.subtype });
+        return buildCortexAssemblyPrompt({ skeleton, units: unitsArr, label: component.label, subtype: bpComp?.subtype });
       } else if (component.type === 'app') {
-        return buildAppAssemblyPrompt({ skeleton, units, label: component.label, appDomainCortexName: null, designSystem: null });
+        return buildAppAssemblyPrompt({ skeleton, units: unitsArr, label: component.label, appDomainCortexName: null, designSystem: null });
       }
       return '';
     }

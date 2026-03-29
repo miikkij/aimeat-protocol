@@ -268,7 +268,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       }
 
       try {
-        const model = (prefs.model as string) || 'openai/gpt-4o-mini';
+        const model = (prefs.reasoningModel as string) || (prefs.executionModel as string) || (prefs.model as string) || 'openai/gpt-4o-mini';
         await complete(decryptedKey, model, 'Reply with exactly: OK', undefined, baseUrl);
         res.json(success(config.nodeId, { ok: true, model }));
       } catch (e) {
@@ -305,8 +305,9 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         return res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'prompt is required.'));
       }
 
-      // Verify project ownership
-      const projectRecord = await storage.getMemory(gaii, `generator.${projectId}.project`);
+      // Verify project ownership (check both generator and foundry namespaces)
+      const projectRecord = await storage.getMemory(gaii, `generator.${projectId}.project`)
+        || await storage.getMemory(gaii, `foundry.${projectId}.project`);
       if (!projectRecord) {
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found or not owned by you.'));
       }
@@ -341,7 +342,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         } else if (modelRole === 'execution' && prefs.executionModel) {
           selectedModel = prefs.executionModel as string;
         } else {
-          selectedModel = (prefs.model as string) || 'anthropic/claude-sonnet-4';
+          selectedModel = (prefs.model as string) || (prefs.reasoningModel as string) || (prefs.executionModel as string) || 'anthropic/claude-sonnet-4';
         }
         const model = selectedModel;
 

@@ -71,21 +71,14 @@ const PASS_TYPE_KEY = {
 
 function PassProgress({ passes, onGenerateNext }) {
   if (!passes || passes.length === 0) return null;
-  const next = getNextPass(passes);
+  const done = passes.filter(p => p.status === 'validated').length;
+  const total = passes.length;
   return html`
-    <div class="fnd-pass-progress">
-      <label>${t('profile.foundry.passProgress')}</label>
-      ${passes.map(p => html`
-        <div class="fnd-pass-item fnd-pass-${p.status}">
-          <span class="fnd-pass-icon">${PASS_STATUS_ICON[p.status] || PASS_STATUS_ICON.pending}</span>
-          <span class="fnd-pass-label">${t('profile.foundry.' + (PASS_TYPE_KEY[p.type] || p.type))}${p.unitLabel ? ': ' + p.unitLabel : ''}</span>
-        </div>
-      `)}
-      ${next && onGenerateNext && html`
-        <button class="btn-primary btn-sm fnd-pass-next-btn" onClick=${() => onGenerateNext(next)}>
-          ${t('profile.foundry.generateNextPass')}
-        </button>
-      `}
+    <div class="fnd-pass-progress-compact">
+      <span class="fnd-pass-dots">
+        ${passes.map(p => html`<span class="fnd-pass-dot fnd-pass-dot-${p.status}" title=${(PASS_TYPE_KEY[p.type] ? t('profile.foundry.' + PASS_TYPE_KEY[p.type]) : p.type) + (p.unitLabel ? ': ' + p.unitLabel : '')}></span>`)}
+      </span>
+      <span class="fnd-pass-count">${done}/${total}</span>
     </div>
   `;
 }

@@ -1299,7 +1299,18 @@
   .fnd-debug-tree { border-right: none; border-bottom: 1px solid var(--border); padding-right: 0; padding-bottom: var(--sp-2); max-height: 200px; }
 }
 
-/* ── Pass progress ────────────────────────── */
+/* ── Pass progress (compact sidebar dots) ──── */
+.fnd-pass-progress-compact { display: flex; align-items: center; gap: 6px; margin: 4px 0 0 0; }
+.fnd-pass-dots          { display: flex; gap: 3px; align-items: center; flex-wrap: wrap; }
+.fnd-pass-dot           { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.fnd-pass-dot-pending   { background: var(--border); }
+.fnd-pass-dot-validated { background: var(--success); }
+.fnd-pass-dot-failed    { background: var(--danger); }
+.fnd-pass-dot-in_progress { background: var(--primary); }
+.fnd-pass-dot-prompt_ready { background: var(--warning); }
+.fnd-pass-count         { font-size: 0.75em; color: var(--text-dim); white-space: nowrap; }
+
+/* ── Pass progress (detail panel full view) ── */
 .fnd-pass-progress      { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
 .fnd-pass-item          { display: flex; align-items: center; gap: 8px; font-size: 0.85em; padding: 4px 8px; border-radius: var(--radius-sm); }
 .fnd-pass-pending       { color: var(--text-dim); }

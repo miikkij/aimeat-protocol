@@ -1,15 +1,8 @@
 # Foundry Pipeline Test — Execution Template
 
-> **Purpose:** Validate that Foundry multi-pass prompts produce correct, registerable output when processed by an AI with no prior context.
+> **Purpose:** Validate that Foundry multi-pass prompts produce correct, registerable output when processed by AI via OpenRouter.
 >
-> **Methodology:** Each pass extracts the prompt from the browser UI, saves it verbatim to a file, processes it inline (same Opus 4.6 session — no subagents), and saves the response to a file. The response is pasted back without modification. Validation failures indicate prompt deficiencies, not implementation bugs.
->
-> **No subagents.** All processing is done inline to guarantee the model is Opus 4.6. Subagent model selection cannot be verified.
->
-> **File structure:** All prompts and responses are saved to `docs/testing/run{N}/phase{N}-{name}/`:
-> - `prompt.txt` — exact prompt from Foundry UI (via clipboard)
-> - `response.txt` or `response.json` — exact AI output
-> - Numbered prefixes for multi-pass phases: `01-test-prompt.txt`, `01-test-response.txt`, etc.
+> **Methodology:** The Foundry autopilot drives the entire pipeline automatically via OpenRouter API. Two models are configured: a reasoning model for planning/architecture passes and an execution model for code generation passes. All prompts, responses, and results are logged to disk and viewable in the Admin Dashboard → Generator Debug tab.
 >
 > **Copy this template** before each run and fill in the results.
 
@@ -23,28 +16,32 @@
 | **Project description** | |
 | **Interview JSON source** | |
 | **Prompt files version** | (git commit hash) |
+| **Reasoning model** | (e.g. qwen/qwen3.5-397b-a17b) |
+| **Execution model** | (e.g. qwen/qwen3-coder-plus) |
 | **Previous run issues** | |
 
 ---
 
 ## Pre-Flight Checklist
 
-### Step 0.1: Stop any running dev server
-- [ ] Kill existing pnpm dev process if running
-- **Why:** BUILD_ID must refresh to pick up changed prompt JS files
-
-### Step 0.2: Start fresh dev server
-- [ ] Run `pnpm dev` from project root
+### Step 0.1: Start dev server
+- [ ] Run `pnpm dev` from project root (uses MongoDB — data persists)
 - [ ] Verify server running on port 40050
+
+### Step 0.2: Configure OpenRouter
+- [ ] Open Foundry → OpenRouter Settings
+- [ ] API key configured (green dot visible)
+- [ ] Reasoning model selected
+- [ ] Execution model selected
+- [ ] Auto-retry enabled, max retries set
+- [ ] Click "Test connection" — success
 
 ### Step 0.3: Open browser and login
 - [ ] Navigate to `http://localhost:40050/v1/profile`
 - [ ] Verify logged in as testuser
-- **Result:** ___
 
 ### Step 0.4: Clean up old project (if exists)
 - [ ] Open Foundry → delete previous test project if present
-- **Result:** ___
 
 ### Step 0.5: Record git state
 - [ ] `git log --oneline -1`
@@ -52,7 +49,7 @@
 
 ---
 
-## Phase 1: Create Project + Single-Shot Components
+## Phase 1: Create Project + Import Spec + Blueprint
 
 ### Step 1.1: Create new Foundry project
 - [ ] Click "+ New Project", paste project description
@@ -63,301 +60,135 @@
 - **Result:** ___
 
 ### Step 1.3: Import blueprint
-- [ ] Blueprint generated/imported, component list visible
+- [ ] Paste blueprint JSON (from verified AI Chat run or generate via OpenRouter)
 - **Total components:** ___
-- **Component list:** (fill in what the blueprint produces)
+- **Component list:**
 
-| # | Label | Type | Multi-pass? |
-|---|-------|------|-------------|
-| 1 | | | |
-| 2 | | | |
-| ... | | | |
-
-### Steps 1.4–1.N: Register single-shot components
-
-For each single-shot component (CSM, Memory, Translations):
-
-| # | Component label | Type | Processed inline | Validation | Registered | Notes |
-|---|----------------|------|-------------------|------------|------------|-------|
-| | | | [ ] | PASS/FAIL | YES/NO | |
-| | | | [ ] | PASS/FAIL | YES/NO | |
-| | | | [ ] | PASS/FAIL | YES/NO | |
-| | | | [ ] | PASS/FAIL | YES/NO | |
-
-### Phase 1 Summary
-| Metric | Value |
-|--------|-------|
-| Components registered | / |
-| Dashboard shows | |
-| Validation failures | |
-| Time taken | |
+| # | Label | Type | Subtype | Model role |
+|---|-------|------|---------|------------|
+| 1 | | | | reasoning/execution |
+| 2 | | | | |
+| ... | | | | |
 
 ---
 
-## Phase 2: Extension Multi-Pass Pipeline
+## Phase 2: Run Autopilot
 
-**Component label:** (fill from blueprint)
-**Component type:** EXTENSION
+### Step 2.1: Start single-shot components
+- [ ] Click each single-shot component (CSM, Memory, Translations)
+- [ ] Click "Run with AI" for each — uses execution model
+- [ ] Validate and register each
 
-### Step 2.1: Test Pass
-- [ ] Copy prompt from UI → save to file → process inline → save response to file → paste into UI → validate
-- [ ] Result: PASS / FAIL
-- **Validation errors:** ___
+| # | Component | Type | AI result | Validation | Registered |
+|---|-----------|------|-----------|------------|------------|
+| 1 | | CSM | | PASS/FAIL | YES/NO |
+| 2 | | Memory | | PASS/FAIL | YES/NO |
+| 3 | | Translation (fi) | | PASS/FAIL | YES/NO |
+| 4 | | Translation (en) | | PASS/FAIL | YES/NO |
 
-### Step 2.2: Skeleton Pass
-- [ ] Same method
-- [ ] Result: PASS / FAIL
-- [ ] Record units created from skeleton:
+### Step 2.2: Run multi-pass components via autopilot
+- [ ] Click the Extension component → autopilot runs all passes automatically
+- [ ] Monitor progress in the Foundry UI
+- [ ] Repeat for each multi-pass component in order:
+  1. Extension
+  2. Data Cortex
+  3. Feature Cortexes (all)
+  4. App-Domain Cortex
+  5. App
 
-| # | Unit ID | Unit label |
-|---|---------|-----------|
-| 1 | | |
-| 2 | | |
-| ... | | |
+**Model routing per pass type:**
 
-**Total units:** ___
+| Pass type | Model role | Model used |
+|-----------|-----------|------------|
+| Test | reasoning | |
+| Skeleton | reasoning | |
+| Reflection | reasoning | |
+| Unit (code) | execution | |
+| Assembly | execution | |
+| Fix/retry | execution | |
 
-### Step 2.3–2.N: Unit Passes
+### Step 2.3: Monitor progress
 
-For EACH unit created by the skeleton:
+For each component, record:
 
-| Unit # | Unit ID | Processed inline | Validation | Notes |
-|--------|---------|-------------------|------------|-------|
-| 1 | | [ ] | PASS/FAIL | |
-| 2 | | [ ] | PASS/FAIL | |
-| ... | | [ ] | PASS/FAIL | |
-
-**Key quality checks (sample from subagent responses):**
-- [ ] Used correct function signature per component type
-- [ ] No forbidden APIs (global fetch, require, URLSearchParams)
-- [ ] Null-checks on data access
-
-### Step 2.A: Assembly Pass
-- [ ] Dispatch fresh subagent → paste → validate
-- [ ] Result: PASS / FAIL
-- **Critical checks:**
-  - [ ] Output has required metadata fields for this component type
-  - [ ] All units present in assembled output
-  - [ ] Correct registration patterns
-- **Validation errors:** ___
-
-### Step 2.R: Registration
-- [ ] Register button → click → dashboard updated
-- **Dashboard shows:** ___
-
-### Phase 2 Summary
-| Metric | Value |
-|--------|-------|
-| Total passes | / |
-| First-try validations | / |
-| Failures | |
-| Time taken | |
-| Prompt deficiencies found | |
+| Component | Passes | First-try | Retries | Registered | Notes |
+|-----------|--------|-----------|---------|------------|-------|
+| Extension | /  | / | | YES/NO | |
+| Data Cortex | / | / | | YES/NO | |
+| Feature: Search | / | / | | YES/NO | |
+| Feature: Detail | / | / | | YES/NO | |
+| Feature: Watchlist | / | / | | YES/NO | |
+| Feature: Changes | / | / | | YES/NO | |
+| Feature: Comparison | / | / | | YES/NO | |
+| Feature: Settings | / | / | | YES/NO | |
+| App-Domain Cortex | / | / | | YES/NO | |
+| App | / | / | | YES/NO | |
 
 ---
 
-## Phase 3: Data Cortex Multi-Pass Pipeline
+## Phase 3: Verification
 
-**Component label:** (fill from blueprint)
-**Component type:** CORTEX (data)
-
-### Step 3.1: Test Pass
-- [ ] Copy prompt → save to file → process inline → save response → paste → validate
-- [ ] Result: PASS / FAIL
-
-### Step 3.2: Skeleton Pass
-- [ ] Copy prompt → save to file → process inline → save response → paste → validate
-- [ ] Result: PASS / FAIL
-- [ ] Record methods created:
-
-| # | Method name |
-|---|------------|
-| 1 | |
-| ... | |
-
-**Total methods:** ___
-
-### Step 3.3–3.N: Method Unit Passes
-
-| Unit # | Method name | Processed inline | Validation | Notes |
-|--------|------------|-------------------|------------|-------|
-| 1 | | [ ] | PASS/FAIL | |
-| 2 | | [ ] | PASS/FAIL | |
-| ... | | [ ] | PASS/FAIL | |
-
-**Key quality checks:**
-- [ ] Uses `callExt` helper (not raw fetch or session.fetch directly)
-- [ ] Thin wrappers — no business logic duplication
-
-### Step 3.A: Assembly Pass
-- [ ] Copy prompt → save to file → process inline → save response → paste → validate
-- [ ] Result: PASS / FAIL
-- **Critical checks:**
-  - [ ] `callExt` uses `session.fetch()` not raw `fetch()`
-  - [ ] `callExt` has `console.warn` on failures
-  - [ ] `const exports = {...}` present
-  - [ ] `namespace: community` in YAML
-  - [ ] IIFE pattern correct
-- **Validation errors:** ___
-
-### Step 3.R: Registration
-- **Dashboard shows:** ___
-
-### Phase 3 Summary
-| Metric | Value |
-|--------|-------|
-| Total passes | / |
-| First-try validations | / |
-| Failures | |
-| Time taken | |
-
----
-
-## Phase 4: Feature Cortexes
-
-Repeat this block for EACH feature cortex component from the blueprint.
-
-### Phase 4.[X]: Feature Cortex "[label]"
-
-**Component type:** CORTEX (feature)
-
-| Step | Pass type | Processed inline | Validation | Notes |
-|------|-----------|-------------------|------------|-------|
-| Test | Test | [ ] | PASS/FAIL | |
-| Skeleton | Skeleton | [ ] | PASS/FAIL | Sections: ___ |
-| Section 1 | Unit | [ ] | PASS/FAIL | |
-| Section 2 | Unit | [ ] | PASS/FAIL | |
-| ... | Unit | [ ] | PASS/FAIL | |
-| Assembly | Assembly | [ ] | PASS/FAIL | |
-| Register | — | [ ] | — | Dashboard: ___ |
-
-**Key quality checks:**
-- [ ] Assembly has `t()` reading `AIMEAT._translations`
-- [ ] Assembly has `dv()` helper
-- [ ] Sections handle null data gracefully
-- [ ] `namespace: community` in YAML
-
----
-
-### Phase 4 Summary (all feature cortexes combined)
-| Metric | Value |
-|--------|-------|
-| Feature cortexes registered | / |
-| Total passes across all | |
-| First-try validations | |
-| Failures | |
-| Time taken | |
-
----
-
-## Phase 5: App-Domain Cortex
-
-**Component label:** (fill from blueprint)
-**Component type:** CORTEX (app-domain)
-
-| Step | Pass type | Processed inline | Validation | Notes |
-|------|-----------|-------------------|------------|-------|
-| 5.1 | Test | [ ] | PASS/FAIL | |
-| 5.2 | Skeleton | [ ] | PASS/FAIL | |
-| 5.3 | Assembly | [ ] | PASS/FAIL | |
-| 5.4 | Register | — | [ ] | Dashboard: ___ |
-
-**Key checks:**
-- [ ] `init()` calls `AIMEAT.auth.login()` first
-- [ ] Loads translations with service-prefix fallback
-- [ ] Stores in `AIMEAT._translations`
-- [ ] `render()` creates navigation + mounts feature cortexes
-- [ ] `mountLoginButton` for unauthenticated users
-- [ ] `callExt` uses `session.fetch()` with `console.warn`
-
-### Phase 5 Summary
-| Metric | Value |
-|--------|-------|
-| Passes | / |
-| First-try validations | / |
-| Issues | |
-
----
-
-## Phase 6: App
-
-**Component label:** (fill from blueprint)
-**Component type:** APP
-
-| Step | Pass type | Processed inline | Validation | Notes |
-|------|-----------|-------------------|------------|-------|
-| 6.1 | Test | [ ] | PASS/FAIL | |
-| 6.2 | Skeleton | [ ] | PASS/FAIL | Views: ___ |
-| 6.3+ | View units | [ ] each | PASS/FAIL | |
-| 6.A | Assembly | [ ] | PASS/FAIL | |
-| 6.R | Register | — | [ ] | Dashboard: ___ |
-
-**Key checks for Assembly output:**
-- [ ] Starts with `<!-- AIMEAT App Manifest ... -->` comment
-- [ ] Loads `aimeat-auth.js` and `aimeat-data.js` via `loadScript()`
-- [ ] Loads platform UI libraries
-- [ ] Loads cortex scripts in dependency order
-- [ ] `AIMEAT.auth.mountLoginButton('#auth-container', {...})`
-- [ ] `AIMEAT.auth.login()` before `startApp()`
-- [ ] `startApp()` calls `cortex.init()` then `cortex.render()`
-- [ ] Error collector script present
-- [ ] CSP meta tag present
-
-### Phase 6 Summary
-| Metric | Value |
-|--------|-------|
-| Passes | / |
-| First-try validations | / |
-| Dashboard shows | "N registered / N active" + "Launch App" |
-| Issues | |
-
----
-
-## Phase 7: Verification
-
-### Step 7.1: Launch the app
+### Step 3.1: Launch the app
 - [ ] Click "Launch App" on Foundry dashboard
-- [ ] Snapshot the app page
 - [ ] Check console for errors
 - **Console errors:** ___
 
-### Step 7.2: Auth check
+### Step 3.2: Auth check
 - [ ] App shows logged-in state (not login button only)
 - [ ] No 401 errors in console
 - **Auth status:** ___
 
-### Step 7.3: Translation check
-- [ ] UI shows translated text (not raw keys like "search.placeholder")
-- [ ] Title/heading shows localized text
+### Step 3.3: Translation check
+- [ ] UI shows translated text (not raw keys)
 - **Translation status:** ___
 
-### Step 7.4: Core functionality
-- [ ] Primary use case works (e.g., search returns results)
+### Step 3.4: Core functionality
+- [ ] Search returns results (test with "Overscale Solutions")
 - [ ] Results display correctly (no [object Object])
-- [ ] Detail view renders with real data
+- [ ] Company detail card renders with real data
+- [ ] Add to watchlist works
 - **Functionality status:** ___
 
-### Step 7.5: Navigation
+### Step 3.5: Navigation
 - [ ] All tabs/views are accessible
 - [ ] No crashes on tab switch
 - **Navigation status:** ___
 
-### Step 7.6: Empty state handling
+### Step 3.6: Empty state handling
 - [ ] Views with no data show friendly messages (not crashes)
-- [ ] No `.forEach is not a function` or similar type errors
 - **Empty states:** ___
 
-### Phase 7 Summary
+### Phase 3 Summary
 | Check | Status |
 |-------|--------|
 | App loads without crash | |
 | Auth works (no 401s) | |
 | Translations visible | |
-| Primary use case works | |
+| Search returns real data | |
+| Company detail card works | |
+| Watchlist add/remove works | |
 | Navigation works | |
 | Empty states handled | |
 | No [object Object] in UI | |
 | No console errors | |
+
+---
+
+## Phase 4: Review Debug Logs
+
+### Step 4.1: Open Admin Dashboard
+- [ ] Navigate to Admin Dashboard → Generator Debug tab
+- [ ] Find the Foundry project (🏭 icon)
+- [ ] Click "Copy All" to get the complete log
+
+### Step 4.2: Review key artifacts
+For each component, check:
+- [ ] Prompt was sent correctly (correct model role)
+- [ ] Response follows prompt format
+- [ ] Validation result matches expectations
+
+### Step 4.3: Save debug log
+- [ ] Copy full debug output to `docs/testing/run{N}/debug-log.txt`
 
 ---
 
@@ -370,33 +201,43 @@ Repeat this block for EACH feature cortex component from the blueprint.
 | Total components registered | / |
 | Total passes executed | |
 | First-try validation rate | % |
-| Validation failures | |
+| Retries needed | |
 | Manual fixes needed (should be 0) | |
 | App functional | YES / NO |
 | Total time | |
+| Reasoning model cost | $ |
+| Execution model cost | $ |
+
+### Model Performance
+
+| Model | Role | Passes | Success rate | Avg response time | Notes |
+|-------|------|--------|-------------|-------------------|-------|
+| | Reasoning | | % | | |
+| | Execution | | % | | |
 
 ### Prompt Deficiencies Found
 
-Any validation failure where the subagent's raw output was rejected = prompt deficiency.
+Any validation failure = prompt deficiency.
 
-| # | Phase | Pass type | Prompt function | Issue | Severity |
-|---|-------|-----------|----------------|-------|----------|
-| 1 | | | | | |
-| 2 | | | | | |
+| # | Phase | Pass type | Model | Prompt function | Issue | Severity |
+|---|-------|-----------|-------|----------------|-------|----------|
+| 1 | | | | | | |
+| 2 | | | | | | |
 
 ### Comparison to Previous Run
 
 | Aspect | Previous run | This run |
 |--------|-------------|----------|
-| Extension assembly validation | | |
-| App assembly validation | | |
+| Extension assembly | | |
+| App assembly | | |
 | Auth in launched app | | |
-| Translations in launched app | | |
+| Translations | | |
 | Empty state crashes | | |
-| Console errors in launched app | | |
-| First-try validation rate | | |
+| Console errors | | |
+| First-try rate | | |
+| Total cost | | |
 
-### Recommendations for Next Iteration
+### Recommendations
 
 1.
 2.
@@ -404,93 +245,60 @@ Any validation failure where the subagent's raw output was rejected = prompt def
 
 ---
 
-## Appendix: Inline Processing Method
+## Appendix: Model Routing
 
-For each pass:
+| Pass type | Model role | Rationale |
+|-----------|-----------|-----------|
+| Interview generation | reasoning | Requires understanding requirements, asking right questions |
+| Blueprint generation | reasoning | Architecture decisions, component planning |
+| Blueprint fix | reasoning | Analyzing structural errors |
+| Test-first | reasoning | Designing test contracts from specifications |
+| Skeleton | reasoning | Defining structure, interfaces, data flow |
+| Reflection/diagnosis | reasoning | Analyzing failures, proposing fixes |
+| Test regeneration | reasoning | Redesigning tests based on failures |
+| Unit (code) | execution | Implementing one function/section per spec |
+| Assembly | execution | Mechanical combination of units into IIFE |
+| Single-shot components | execution | Generating CSM/Memory/Translation content |
+| Fix/retry on validation | execution | Fixing code based on error messages |
 
-1. Click "Copy Prompt" in the Foundry UI
-2. Save the clipboard content verbatim to `docs/testing/run{N}/phase{N}-{name}/prompt.txt`
-3. Read the saved prompt file
-4. Process it inline (same Opus 4.6 session) — follow the prompt instructions exactly, produce only what is asked
-5. Save the response verbatim to `docs/testing/run{N}/phase{N}-{name}/response.txt`
-6. Paste the response into the Foundry UI textarea
-7. Click Validate
+## Appendix: Debug Artifacts
 
-**No subagents.** Subagent model selection cannot be verified — different models produce structurally different output. All processing must happen in the main session where the model is known.
+All prompts and responses are saved to disk automatically by `writeDebugArtifact()`. View them in:
+- **Admin Dashboard** → Generator Debug tab → select Foundry project (🏭)
+- **On disk** at `aimeat/debug/foundry-{projectId}/`
 
-**No context leakage.** When processing a prompt, use ONLY the information in the prompt file. Do not inject knowledge from the conversation, previous passes, or memory. The prompt must be self-sufficient — if it isn't, that's a prompt deficiency to record.
+Each component gets:
+- `pass-{id}-prompt` — the full prompt sent to AI
+- `pass-{id}-raw` — raw AI response
+- `pass-{id}-stripped` — response with code fences removed
+- `pass-{id}-reflection-{N}-prompt` — reflection prompt (on failure)
+- `pass-{id}-reflection-{N}-response` — reflection diagnosis
+- `pass-{id}-retry-{N}-prompt` — retry prompt
+- `pass-{id}-retry-{N}-stripped` — retry response
 
-The response is used VERBATIM — no editing, no fixing, no "improving".
-If the response fails validation, that failure is recorded as a prompt deficiency.
-
-## Appendix: Full Run Log
-
-During execution, every step is appended to a separate log file:
-
-**Log file:** `docs/testing/foundry-pipeline-log-YYYY-MM-DD.md`
-
-For EVERY pass, the log records this exact structure:
-
-```markdown
----
-## [timestamp] Phase X.Y — [Component Label] — [Pass Type]
-
-### Prompt (copied from Foundry UI, saved to file)
-\```
-[FULL prompt text — every line, no truncation]
-\```
-**File:** `docs/testing/run{N}/phase{N}-{name}/{NN}-{pass}-prompt.txt`
-
-### Response (verbatim, unmodified)
-\```
-[FULL response — every line, saved to file]
-\```
-**File:** `docs/testing/run{N}/phase{N}-{name}/{NN}-{pass}-response.txt`
-
-### Validation Result
-- **Status:** PASS / FAIL
-- **Errors (if any):**
-  - [error message 1]
-  - [error message 2]
-
-### Registration Result (if applicable)
-- **Status:** SUCCESS / FAILED / N/A
-- **Dashboard after:** "X registered / Y active"
-- **Component registered as:** [name]
-
-### Quality Assessment
-- **Function signature correct:** YES / NO / N/A
-- **Auth pattern correct:** YES / NO / N/A
-- **Null-checks present:** YES / NO / N/A
-- **Meaningful test coverage (for test passes):** YES / NO — [explain what it tests vs what it should test]
-- **Notes:** [any observations about the generated code quality]
----
-```
-
-This log is the primary artifact for post-run analysis. It allows reviewing:
-1. Whether each prompt contained sufficient instructions
-2. Whether the subagent followed those instructions
-3. Whether validation caught real issues or false positives
-4. Whether tests actually verify meaningful behavior
-5. The exact code that was generated and registered
+Project log entries include `modelRole` field showing which model was used for each AI call.
 
 ## Appendix: Known Prompt Functions Under Test
 
-| Component type | Pass | Prompt function |
-|---------------|------|-----------------|
-| Extension | Skeleton | `buildExtensionSkeletonPrompt` |
-| Extension | Unit | `buildExtensionUnitPrompt` |
-| Extension | Assembly | `buildExtensionAssemblyPrompt` |
-| Cortex (data) | Skeleton | `buildDataCortexSkeletonPrompt` |
-| Cortex (data) | Unit | `buildCortexMethodUnitPrompt` |
-| Cortex (data) | Assembly | `buildCortexAssemblyPrompt` |
-| Cortex (feature) | Skeleton | `buildFeatureCortexSkeletonPrompt` |
-| Cortex (feature) | Unit | `buildFeatureCortexSectionPrompt` |
-| Cortex (feature) | Assembly | `buildCortexAssemblyPrompt` |
-| Cortex (app-domain) | Skeleton | `buildAppDomainCortexSkeletonPrompt` |
-| Cortex (app-domain) | Assembly | `buildCortexAssemblyPrompt` |
-| App | Skeleton | `buildAppSkeletonPrompt` |
-| App | Unit | `buildAppViewUnitPrompt` |
-| App | Assembly | `buildAppAssemblyPrompt` |
-| All types | Test | `buildTestFirstPrompt` |
-| All types | Single-shot | `buildComponentPrompt` → `COMPONENT_TEMPLATES.*` |
+| Component type | Pass | Prompt function | Model role |
+|---------------|------|-----------------|------------|
+| Extension | Test | `buildTestFirstPrompt` | reasoning |
+| Extension | Skeleton | `buildExtensionSkeletonPrompt` | reasoning |
+| Extension | Unit | `buildExtensionUnitPrompt` | execution |
+| Extension | Assembly | `buildExtensionAssemblyPrompt` | execution |
+| Cortex (data) | Test | `buildTestFirstPrompt` | reasoning |
+| Cortex (data) | Skeleton | `buildDataCortexSkeletonPrompt` | reasoning |
+| Cortex (data) | Unit | `buildCortexMethodUnitPrompt` | execution |
+| Cortex (data) | Assembly | `buildCortexAssemblyPrompt` | execution |
+| Cortex (feature) | Test | `buildTestFirstPrompt` | reasoning |
+| Cortex (feature) | Skeleton | `buildFeatureCortexSkeletonPrompt` | reasoning |
+| Cortex (feature) | Unit | `buildFeatureCortexSectionPrompt` | execution |
+| Cortex (feature) | Assembly | `buildCortexAssemblyPrompt` | execution |
+| Cortex (app-domain) | Test | `buildTestFirstPrompt` | reasoning |
+| Cortex (app-domain) | Skeleton | `buildAppDomainCortexSkeletonPrompt` | reasoning |
+| Cortex (app-domain) | Assembly | `buildCortexAssemblyPrompt` | execution |
+| App | Test | `buildTestFirstPrompt` | reasoning |
+| App | Skeleton | `buildAppSkeletonPrompt` | reasoning |
+| App | Unit | `buildAppViewUnitPrompt` | execution |
+| App | Assembly | `buildAppAssemblyPrompt` | execution |
+| All types | Single-shot | `buildComponentPrompt` | execution |

@@ -64,6 +64,10 @@ ${JSON.stringify(interviewSpec, null, 2)}
 \`\`\`
 
 Use the specification above to determine the exact components needed. The data sources, entities, views, and constraints have been validated with the user.
+
+CRITICAL — Data shape fidelity: If the specification includes a sampleEntry, your dataModel structures MUST match its EXACT nested shape. If a field in sampleEntry is an object (e.g., businessId: { value: "123", registrationDate: "2025-01-01" }), model it as type "object" with those exact properties — do NOT flatten it to type "string". Copy the structure from sampleEntry, do not simplify it.
+
+CRITICAL — Feature count: Count the distinct views/screens described in the specification (e.g., search, detail, watchlist, changes, comparison, settings). Each one becomes its OWN feature cortex component. If the spec describes 6 views, you MUST create 6 feature cortexes — not fewer.
 ` : '';
 
   // Build cortex catalog if available
@@ -99,41 +103,216 @@ The generated cortex should load the used library via <script> and call its API 
 
   return `${INSTRUCTION_DISCLAIMER}${AIMEAT_CONTEXT}
 
+# Your Task
+
 The user wants to create this service:
 ---
 ${description}
 ---
 ${specContext}${langNote}${cortexCatalog}
-Analyze this request and produce a JSON blueprint listing ALL components needed.
+Analyze this request and produce a JSON blueprint — a lightweight plan that lists all components needed to build this service. Actual code and content are generated later, per component.
 
-CRITICAL: Return ONLY a JSON object with "architecture", "components", "phases", "dataModel", and optionally "settings" and "testScenarios". Nothing else.
-Each component has these fields: "id", "type", "label", "produces", "consumes". Extension components may also have "schedules".
-Do NOT include manifest content, code, HTML, translations, or any implementation details.
-The blueprint is a lightweight plan — actual content is generated later per component.
+Return ONLY a raw JSON object. NO markdown fences (\`\`\`json). NO explanatory text before or after. The output must parse as valid JSON directly.
 
-Format:
+---
+
+# Step 1: Understand the Architecture
+
+Every AIMEAT service follows a layered architecture called "cortex-modular". Read each layer bottom-to-top — each layer depends only on the layer below it.
+
+**Layer 1 — Foundation** (runs first, no dependencies)
+  - \`csm\` — service schema definition
+  - \`memory\` — pre-loaded settings and static data
+  - \`translation\` — one component per locale (fi, en, etc.)
+
+**Layer 2 — Extension** (server-side only)
+  - Fetches data from external APIs via \`ctx.fetch()\`
+  - Runs scheduled background jobs (cron)
+  - Stores results in memory via \`ctx.memory.set()\`
+  - ONLY for work that REQUIRES the server. If a browser can do it, it does NOT belong here.
+
+**Layer 3 — Cortex** (client-side, layered into three subtypes)
+  - **data** — reads extension memory + platform APIs, exposes a clean domain API
+  - **feature** — one per UI feature (search, detail, settings, etc.), self-contained data+UI
+  - **app-domain** — composes all features + auth + translations, single entry point
+
+**Layer 4 — App** (client-side)
+  - Loads app-domain cortex, wires navigation, handles layout
+
+The blueprint declares components in this order. Phases group them into build stages that match these layers.
+
+---
+
+# Step 2: Decide What Components You Need
+
+Walk through these questions in order:
+
+**2a. What data does the service need?**
+- External API data → create an \`extension\` component
+- User-provided static data (lookup tables, reference sets) → create a \`memory\` component
+- Default settings/config → create a \`memory\` component
+- Translations → create one \`translation\` per locale
+
+**2b. What does the extension do?**
+Only create extension actions for server-required work:
+- Fetching from external APIs (CORS, auth, server-to-server) → YES
+- Scheduled background jobs (nightly data collection) → YES
+- Filtering, sorting, computing, exporting → NO (cortex or app does this)
+- Reading/writing settings or preferences → NO (cortex wraps memory)
+
+**2c. What features does the UI have?**
+Every distinct user-facing capability described in the specification MUST become its own feature cortex component. One view = one feature cortex. Do NOT merge or consolidate features.
+
+Count the views in the spec: if it mentions search, detail view, watchlist, change history, comparison, and settings — that is 6 separate feature cortexes, not 3 or 4. Create ALL of them.
+
+WRONG: "cortex-feature-search" that produces ["ui:searchView", "ui:detailView"]
+CORRECT: separate "cortex-feature-search" and "cortex-feature-detail"
+
+If the service has user-configurable settings (language, notifications, preferences), you MUST include a Settings feature cortex.
+
+**2d. Verify the data pipeline.**
+For each feature, trace: what data does it display → where does that data come from → which component produces it? Every field must have a path from source to screen. If a field has no path, add the component that produces it.
+
+---
+
+# Step 3: Build the JSON
+
+The output has these top-level keys: "architecture", "components", "phases", "dataModel", and optionally "settings" and "testScenarios".
+
+## 3a. Components
+
+Each component is an object with: "id", "type", "label", "produces", "consumes".
+
+**ID format:** \`{short-type}-{number}\` or \`cortex-{subtype}\` / \`cortex-feature-{name}\`.
+  Examples: csm-1, memory-1, ext-1, cortex-data, cortex-feature-search, cortex-app, app-1
+  The "id" prefix can be short (\`ext-1\`) but "type" MUST be the full name (\`"extension"\`, not \`"ext"\`).
+
+**Component types and their fields:**
+
+\`csm\` — service schema. Produces: ["memory:service.schema"]. Consumes: [].
+
+\`memory\` — pre-loaded data. Produces: ["memory:{key}"]. Consumes: [].
+  Create one for default settings (\`settings.config\`) and one per static dataset.
+
+\`translation\` — one per locale. NEVER combine locales.
+  translation-1 produces ["memory:i18n.fi"], translation-2 produces ["memory:i18n.en"].
+
+\`extension\` — server-side logic. May have "schedules" field.
+  Produces: ["memory:{key}"] for each data it stores.
+  Consumes: ["memory:settings.config"] if it reads settings.
+  Schedules: array of { "action": "actionName", "cron": "expression" }
+    - "@activate" — runs on activation + every restart. Use for init/bootstrap. Must be idempotent.
+    - Cron: exactly 5 fields. "0 2 * * *" (daily 02:00), "*/15 * * * *" (every 15 min).
+      WRONG: "/15 * * * *" (missing asterisk), "0 2 * *" (4 fields).
+  If no scheduled actions, omit "schedules" entirely.
+
+\`cortex\` — has additional "subtype" and "uses" fields.
+  subtype "data": produces ["api:methodName"], consumes ["memory:..."]
+  subtype "feature": produces ["ui:viewName"], consumes ["api:..."], uses: ["aimeat-ui-viewers", ...]
+  subtype "app-domain": produces ["api:init", "api:render"], consumes all ui:* views
+
+\`app\` — final application. Produces: []. Consumes: ["api:init", "api:render"].
+
+\`msm\` — ONLY for APIs requiring authentication/API keys. Public APIs do NOT need one.
+
+**Produces/consumes format:**
+  Memory: "memory:{namespace}.{key}" — e.g., "memory:watchlist.items", "memory:changes.log"
+  API: "api:{methodName}" — e.g., "api:searchCompanies", "api:getSettings"
+  UI: "ui:{viewName}" — e.g., "ui:searchView", "ui:settingsView"
+  Every "consumes" entry must match a "produces" entry in another component.
+
+## 3b. Phases
+
+Group components into ordered build stages. Always use this structure:
+
+  { "id": "define",          "componentIds": ["csm-1"] }
+  { "id": "seed",            "componentIds": ["memory-1", "translation-1", "translation-2"] }
+  { "id": "logic",           "componentIds": ["ext-1"] }
+  { "id": "cortex-data",     "componentIds": ["cortex-data"] }
+  { "id": "cortex-features", "componentIds": ["cortex-feature-*", ...all features...] }
+  { "id": "cortex-app",      "componentIds": ["cortex-app"] }
+  { "id": "ui",              "componentIds": ["app-1"] }
+
+## 3c. Data Model
+
+The "dataModel" has three sections: "structures", "memoryKeys", and "actions".
+
+**structures** — JSON Schema definitions for every domain entity. These are the single source of truth.
+  - Build from the interview's sampleEntry data — model the EXACT shapes from the verified API response.
+  - If the API returns a nested object (e.g., businessId: { value, registrationDate, source }), model it as type "object" with those properties. Do NOT flatten to type "string".
+  - All property names use English camelCase: "defaultLanguage", NOT "default_language".
+  - Use "$ref" to reference structures from memoryKeys and actions. Every "$ref" must match a key in "structures".
+
+**memoryKeys** — one entry per memory key. Each has: type, properties/items, source, producedBy, consumedBy.
+  - "source": "static" (user data), "external" (API-fetched), "computed" (calculated), "config" (settings)
+  - "producedBy": exactly ONE component ID
+  - "consumedBy": array of component IDs that read this key
+  - Standard key names: "settings.config", "i18n.fi", "i18n.en", then domain-specific: "watchlist.items", "changes.log", "comparisons.saved"
+  - Do NOT invent custom namespace prefixes (no "prh.settings", no "app.config" — use "settings.config")
+
+**actions** — extension and cortex actions with input/output schemas. Use "$ref" to reference structures.
+  - Extension actions: "ext:actionName"
+  - Cortex actions: "cortex:methodName"
+  - Extension and cortex actions passing the same data MUST reference the SAME structure.
+
+## 3d. Settings (optional)
+
+If the InterviewSpec has settings, include them:
+
+"settings": {
+  "service": [/* from interviewSpec.externalServices[].requiredSettings */],
+  "user": [/* from interviewSpec.userSettings — carry over key, type, label, default */]
+}
+
+User setting keys MUST use camelCase: "defaultLanguage", NOT "default_language".
+Do not invent settings not in the InterviewSpec. If no settings, omit this section.
+
+## 3e. Test Scenarios (optional but recommended)
+
+For each component that produces data:
+
+"testScenarios": [{
+  "component": "ext-1",
+  "scenarios": [
+    { "action": "init", "input": {}, "expect": "Initializes memory structures", "type": "memory" },
+    { "action": "search", "input": { "query": "Overscale" }, "expect": "Returns companies from API", "type": "external-api" }
+  ]
+}]
+
+Types: "memory" (ctx.memory only, assert exact values) vs "external-api" (ctx.fetch, check shape only — API may be down).
+Use real example values, not placeholders. Test the happy path.
+
+---
+
+# Full Example
+
+IMPORTANT: This example shows a MINIMAL blueprint with only 3 features. YOUR blueprint will likely have MORE features — one per distinct view or capability described in the specification. If the spec describes 6 views, create 6 feature cortexes. Do NOT limit yourself to the example's feature count.
+
+NOTE: Labels in this example use the spec's language. YOUR labels must also match YOUR spec's language. JSON keys stay in English.
+
 {
   "architecture": "cortex-modular",
   "components": [
-    { "id": "csm-1", "type": "csm", "label": "Human-readable name", "produces": ["memory:service.schema"], "consumes": [] },
-    { "id": "memory-1", "type": "memory", "label": "Human-readable name", "produces": ["memory:settings.config"], "consumes": [] },
-    { "id": "translation-1", "type": "translation", "label": "Human-readable name (fi)", "produces": ["memory:i18n.fi"], "consumes": [] },
-    { "id": "translation-2", "type": "translation", "label": "Human-readable name (en)", "produces": ["memory:i18n.en"], "consumes": [] },
-    { "id": "ext-1", "type": "extension", "label": "Human-readable name", "produces": ["memory:items.*"], "consumes": ["memory:settings.config"], "schedules": [{"action":"init","cron":"@activate"},{"action":"collect","cron":"0 2 * * *"}] },
-    { "id": "cortex-data", "type": "cortex", "subtype": "data", "label": "Data layer", "produces": ["api:getData", "api:search"], "consumes": ["memory:items.*", "memory:settings.config"], "uses": [] },
-    { "id": "cortex-feature-search", "type": "cortex", "subtype": "feature", "label": "Search feature", "produces": ["ui:searchView"], "consumes": ["api:getData", "api:search"], "uses": ["aimeat-ui-viewers", "aimeat-ui-forms"] },
-    { "id": "cortex-feature-settings", "type": "cortex", "subtype": "feature", "label": "Settings feature", "produces": ["ui:settingsView"], "consumes": ["api:getSettings", "api:saveSettings"], "uses": ["aimeat-ui-forms"] },
-    { "id": "cortex-app", "type": "cortex", "subtype": "app-domain", "label": "App domain", "produces": ["api:init", "api:render"], "consumes": ["ui:searchView", "ui:settingsView"], "uses": ["aimeat-ui-nav"] },
-    { "id": "app-1", "type": "app", "label": "Human-readable name", "produces": [], "consumes": ["api:init", "api:render"] }
+    { "id": "csm-1", "type": "csm", "label": "Palvelun skeema", "produces": ["memory:service.schema"], "consumes": [] },
+    { "id": "memory-1", "type": "memory", "label": "Oletusasetukset", "produces": ["memory:settings.config"], "consumes": [] },
+    { "id": "translation-1", "type": "translation", "label": "Käännökset (fi)", "produces": ["memory:i18n.fi"], "consumes": [] },
+    { "id": "translation-2", "type": "translation", "label": "Käännökset (en)", "produces": ["memory:i18n.en"], "consumes": [] },
+    { "id": "ext-1", "type": "extension", "label": "Tietojen haku", "produces": ["memory:items.data"], "consumes": ["memory:settings.config"], "schedules": [{"action":"init","cron":"@activate"},{"action":"collect","cron":"0 2 * * *"}] },
+    { "id": "cortex-data", "type": "cortex", "subtype": "data", "label": "Tietokerros", "produces": ["api:getItem", "api:search", "api:getSettings", "api:saveSettings"], "consumes": ["memory:items.data", "memory:settings.config"], "uses": [] },
+    { "id": "cortex-feature-search", "type": "cortex", "subtype": "feature", "label": "Haku", "produces": ["ui:searchView"], "consumes": ["api:search"], "uses": ["aimeat-ui-viewers", "aimeat-ui-forms"] },
+    { "id": "cortex-feature-detail", "type": "cortex", "subtype": "feature", "label": "Tiedot", "produces": ["ui:detailView"], "consumes": ["api:getItem"], "uses": ["aimeat-ui-viewers"] },
+    { "id": "cortex-feature-settings", "type": "cortex", "subtype": "feature", "label": "Asetukset", "produces": ["ui:settingsView"], "consumes": ["api:getSettings", "api:saveSettings"], "uses": ["aimeat-ui-forms"] },
+    { "id": "cortex-app", "type": "cortex", "subtype": "app-domain", "label": "Sovelluskehys", "produces": ["api:init", "api:render"], "consumes": ["ui:searchView", "ui:detailView", "ui:settingsView"], "uses": ["aimeat-ui-nav"] },
+    { "id": "app-1", "type": "app", "label": "Sovellus", "produces": [], "consumes": ["api:init", "api:render"] }
   ],
   "phases": [
-    { "id": "define", "label": "Define Service", "componentIds": ["csm-1"] },
-    { "id": "seed", "label": "Seed Data", "componentIds": ["memory-1", "translation-1", "translation-2"] },
-    { "id": "logic", "label": "Capabilities", "componentIds": ["ext-1"] },
-    { "id": "cortex-data", "label": "Data Layer", "componentIds": ["cortex-data"] },
-    { "id": "cortex-features", "label": "Feature Components", "componentIds": ["cortex-feature-search", "cortex-feature-settings"] },
-    { "id": "cortex-app", "label": "App Domain", "componentIds": ["cortex-app"] },
-    { "id": "ui", "label": "Application", "componentIds": ["app-1"] }
+    { "id": "define", "label": "Määrittely", "componentIds": ["csm-1"] },
+    { "id": "seed", "label": "Perustiedot", "componentIds": ["memory-1", "translation-1", "translation-2"] },
+    { "id": "logic", "label": "Taustalogiikka", "componentIds": ["ext-1"] },
+    { "id": "cortex-data", "label": "Tietokerros", "componentIds": ["cortex-data"] },
+    { "id": "cortex-features", "label": "Ominaisuudet", "componentIds": ["cortex-feature-search", "cortex-feature-detail", "cortex-feature-settings"] },
+    { "id": "cortex-app", "label": "Sovelluskehys", "componentIds": ["cortex-app"] },
+    { "id": "ui", "label": "Käyttöliittymä", "componentIds": ["app-1"] }
   ],
   "dataModel": {
     "structures": {
@@ -179,182 +358,21 @@ Format:
   }
 }
 
-CRITICAL RULES for the data model:
-- Build "structures" from the interview's sampleEntry data — these are the REAL shapes from the verified API response.
-- Every memory key and every action input/output MUST use "$ref" to reference a structure. This prevents data shape drift between components.
-- Every "$ref" value MUST match a key in the "structures" object.
-- Extension actions and cortex actions that pass through the same data MUST reference the SAME structure.
+---
 
-NOTE: The example above uses GENERIC placeholder names. Replace with domain-specific names from YOUR project. Do NOT copy these placeholder names.
+# Pre-Generation Checklist
 
-Rules:
-- Component types: csm, msm, extension, app, memory, translation, cortex
-- IDs use format: {type}-{number} (e.g., csm-1, ext-1, app-1). ID prefixes can be short (ext-1) but the "type" field MUST be the full name: "extension" (not "ext").
-- Each component object has these fields: "id", "type", "label", "produces", "consumes"
-- Extension components may also have "schedules": array of { "action": "action-id", "cron": "cron-expression" }
-- Valid cron values: standard 5-field cron syntax OR the special value "@activate"
-- CRITICAL: cron expressions MUST have exactly 5 fields separated by spaces.
-  CORRECT examples (copy these exactly):
-    "0 2 * * *"       ← every day at 02:00
-    "*/15 * * * *"    ← every 15 minutes (note: ASTERISK-SLASH-15, not just /15)
-    "10 2 * * *"      ← every day at 02:10
-  WRONG: "/15 * * * *" (missing leading asterisk), "0 2 * *" (only 4 fields)
-  Every asterisk character (*) is REQUIRED — do NOT omit them.
-- "@activate" means: runs on extension activation AND on every server restart. Use for init/bootstrap jobs that populate initial data, verify data integrity, or recover from missed scheduled runs. These MUST be idempotent (safe to run repeatedly).
-- Use "schedules" for any work that must happen automatically without a browser (data collection, nightly aggregation, periodic computation)
-- If an extension collects or computes data, it SHOULD have an "@activate" init job that checks for stale/missing data and populates it — this solves the cold-start problem (empty data after first install or server restart)
-- If an extension has NO scheduled actions, omit the "schedules" field entirely
-- "produces": array of data outputs (format: "memory:namespace.*" for memory, "api:methodName" for cortex/app)
-- "consumes": array of data inputs this component reads from
-- Group components into logical phases
-- Include ALL components needed for a complete, working service
-- Cortex components are layered: data cortex phase → feature cortex phase → app-domain cortex phase → app phase
-- Data cortex: pure data access, wraps extension + AIMEAT platform libraries
-- Feature cortex: self-contained data+UI per use case, uses data cortex + platform UI cortex libraries
-- App-domain cortex: composes all features + auth + translations, entry point for app
-- ALWAYS create at least 3 cortex components: one data, one or more feature, one app-domain
-- Only include what's actually needed — don't pad with unnecessary components
-- TRANSLATIONS: Create ONE translation component PER locale. If the spec has locales ["fi", "en"], create translation-1 for fi AND translation-2 for en. NEVER combine multiple locales into one component.
-- MSM: Only create an MSM if the external API requires authentication, API keys, or complex endpoint configuration. Public URLs (RSS feeds, open APIs, open data) do NOT need an MSM — extensions fetch them directly with ctx.fetch().
-- MEMORY: Create memory components for (a) static/seed data provided by the user (lookup tables, reference datasets) and (b) default settings/configuration that the service needs on first run. Pre-populating defaults in memory means the app works immediately without hardcoded fallbacks.
-- MEMORY KEY NAMING: Use consistent namespace prefixes. Standard conventions: "settings.config" for config, "i18n.{locale}" for translations, descriptive namespace for domain data (e.g., "orders.by-date.*", "stats.daily.*", "scores.by-date.*"). Use dot-separated namespaces, not nested objects.
-- CORTEX: Cortex is the application's brain. It handles data access, UI rendering, business logic, and composition. It can use AIMEAT platform libraries (data, storage, social, wallet) directly. It can render UI components (like aimeat-charts renders charts). Apps use cortex for everything.
-
-## dataModel — Domain Data Model (REQUIRED)
-
-The dataModel is a JSON Schema based map of EVERY memory key in the project. It is the single source of truth — all components reference it to know exact data shapes.
-
-Rules for dataModel:
-- One entry per memory key pattern (use YYYY-MM-DD for date-bucketed keys)
-- Each entry uses JSON Schema (draft 2020-12): type, properties, items, enum, description
-- "source": one of "static" (user-provided data), "external" (fetched from API/feed), "computed" (calculated by extension), "config" (default settings)
-- "producedBy": exactly ONE component ID that writes this key
-- "consumedBy": array of component IDs that read this key
-- Every memory key referenced in produces/consumes MUST have a dataModel entry
-- Prefer fewer, larger keys. A lookup table or dataset should be ONE key (array/object), not split per entry.
-- Include i18n keys (i18n.fi, i18n.en) with source "static" and translation component as producer
-- CRITICAL: If the interview provides static data in a specific format (e.g., array of {key, value} pairs), the dataModel schema MUST match that exact format. Do NOT redesign the data shape — the memory component will store it as-is.
-- Enum values: use consistent naming across all components. For computed enums (trends, levels, statuses), use lowercase English: "rising"/"falling"/"steady" for trends, "low"/"medium"/"high"/"critical" for levels. If source data uses locale-specific values, keep those as-is in storage — do NOT translate them. Store what the source provides.
-- Field names inside stored objects MUST use English camelCase (e.g., "itemCount", "categoryBreakdown", "statusSplit"). This applies even if the source data uses different naming.
-
-## Data Pipeline Verification (do this BEFORE listing components)
-
-For each VIEW in the spec, trace the data path:
-1. What fields does this view need to render?
-2. Where does each field come from? (external source, computed, user input)
-3. Does the source provide this field directly, or does a component need to transform/enrich it?
-4. If a field has no clear path from source to view, add a component that produces it.
-
-Example: A view needs enriched data. If the source only provides raw identifiers,
-the blueprint must include a component that enriches them (e.g., resolving IDs to names, adding computed scores).
-
-## Component Dependencies
-
-Each component MUST declare what it produces and consumes:
-- Extensions produce memory keys (e.g., "memory:items.by-date.*")
-- Cortex libraries produce API methods (e.g., "api:getItems") and consume memory keys
-- Apps consume API methods or memory keys
-- Every "consumes" entry must be matched by a "produces" entry in another component
-
-## CRITICAL: Extension vs Cortex vs App — Decision Framework
-
-### The One Rule: EXTENSION = SERVER-ONLY WORK
-An extension MUST do something that a browser CANNOT do. If a browser can do it, it MUST NOT be an extension.
-
-**Use extension when ALL of these are true:**
-1. The work REQUIRES the server (external API behind CORS/auth, scheduled cron, server-to-server calls)
-2. The work must happen even when NO browser is open
-3. There is no way to achieve it with client-side JS + AIMEAT.data API
-
-**Scheduled work ALWAYS belongs to the extension** — the extension manifest declares \`schedules\` entries and AIMEAT's built-in scheduler runs them automatically. The cortex and app NEVER schedule or trigger recurring background work.
-
-**Everything else is cortex or app:**
-- Reading/filtering/transforming data already in memory → cortex
-- User preferences, settings, i18n → cortex (wraps memory reads/writes into clean methods)
-- Computed/derived values (math, sorting, grouping, statistics) → cortex
-- Export/download generation (CSV, JSON, PDF) → app (browser generates the file)
-- Display formatting, UI logic → app (calls cortex methods, never reads memory directly)
-
-### Quick Test (apply to EVERY proposed extension)
-Ask: "Does this action fetch from an external server or run on a schedule?"
-- YES → extension ✓
-- NO → it should be cortex (data logic) or app (UI/interaction) ✗
-
-### Static Data → Memory Component
-If a dataSource has type "user-input" with a "staticData" array, you MUST create a memory component for it.
-This memory component will pre-load the static data into memory so extensions and cortex can read it.
-The memory component's "produces" should reflect the memory key pattern (e.g., "memory:catalog.data").
-Place it in an early phase (before extensions that consume it).
-
-### Common Mistakes to Avoid
-- Do NOT create an "export" extension — apps generate files client-side
-- Do NOT create a "settings" extension — settings go in a memory component (defaults) and cortex (read/write methods)
-- Do NOT create a "query" or "filter" extension — cortex reads memory directly
-- Do NOT create a "compute" extension for math/stats — cortex/app does client-side math
-
-### How They Work Together
-- Extension: fetches external data → stores in memory (scheduled, server-side)
-- Cortex: reads extension memory → transforms → exposes clean domain API (client-side library)
-- App: calls cortex methods → renders UI → handles user interaction (client-side HTML/JS)
-
-## Cortex-Modular Architecture
-
-Structure the service using layered cortex components:
-
-1. **Extensions** at the bottom — external API calls, scheduled background jobs
-2. **Data Cortex** (subtype: "data") — unifies extension data + AIMEAT platform data into a single data access interface. ALWAYS create when there are extensions. Can also use AIMEAT.data, AIMEAT.storage, AIMEAT.social directly.
-3. **Feature Cortex** (subtype: "feature") — one per use case or feature group. Self-contained data+UI module. Uses data cortex for data, platform UI cortex libraries for rendering. Exports render(container). Like aimeat-charts which renders complete chart components.
-4. **App-Domain Cortex** (subtype: "app-domain") — composes all feature cortex components + auth + translations + settings. Single entry point for the app. ALWAYS the last cortex component.
-5. **App** — loads app-domain cortex, wires up navigation, handles responsive layout.
-
-Cortex components have a "subtype" field: "data", "feature", or "app-domain".
-Cortex phases are ordered: data first, then all features, then app-domain last.
-Feature cortex "uses" field lists platform cortex libraries it needs (aimeat-ui-viewers, aimeat-charts, etc.).
-
-## Settings
-
-Inherit settings from the InterviewSpec (if provided):
-
-"settings": {
-  "service": [/* from interviewSpec.externalServices[].requiredSettings — add "sharing" ("shared" or "per-user") from the parent externalService's sharingModel, and "required": true/false based on whether the service can function without it */],
-  "user": [/* from interviewSpec.userSettings — carry over key, type, label, default */]
-}
-
-Each service setting gets a "sharing" field ("shared" or "per-user") from the InterviewSpec's externalServices.
-Add "required": true/false based on whether the service can function without it.
-The blueprint may refine defaults but must not invent new settings not in the InterviewSpec.
-If no InterviewSpec is provided or it has no settings, omit the "settings" field.
-
-## Test Scenarios
-
-For each component that produces data, generate test scenarios:
-
-"testScenarios": [
-  {
-    "component": "component-id",
-    "scenarios": [
-      {
-        "action": "action-name",
-        "input": { "key": "value" },
-        "expect": "natural language description of expected result",
-        "type": "memory | external-api"
-      }
-    ]
-  }
-]
-
-IMPORTANT — classify each scenario's "type":
-- "memory": action uses ONLY ctx.memory (no ctx.fetch to external URLs). Tests MUST assert specific return values.
-- "external-api": action calls ctx.fetch to a third-party API. Tests check response SHAPE only (has data OR error message), because the external API may be down or rate-limited. Graceful error handling is correct behavior.
-
-Examples:
-  { "action": "init", "input": {}, "expect": "Initializes data structures", "type": "memory" }
-  { "action": "search", "input": { "query": "test" }, "expect": "Returns matching items from external API", "type": "external-api" }
-  { "action": "removeItem", "input": { "id": "abc-123" }, "expect": "Removes entry from memory", "type": "memory" }
-
-Be concrete: use real-world example values (e.g., symbol "AAPL" for stock data, city "Helsinki" for weather).
-Test the happy path — the test system handles error paths.
-Include testScenarios at the top level of the output JSON (alongside "components", "phases", "dataModel").`;
+Before generating, verify:
+- [ ] Each feature has its own cortex component (not merged)
+- [ ] Settings feature cortex exists if user has configurable preferences
+- [ ] Every "consumes" matches a "produces" in another component
+- [ ] Data structures match the interview's sampleEntry shapes exactly (nested objects stay nested)
+- [ ] All property names use camelCase (not snake_case)
+- [ ] Memory keys use standard names: "settings.config", "i18n.{locale}", "{domain}.{key}"
+- [ ] Memory keys do NOT have custom prefixes (no "prh.settings" — just "settings.config")
+- [ ] Extension actions are only for server-required work (API calls, cron jobs)
+- [ ] Cron expressions have exactly 5 fields
+- [ ] Translation components: one per locale, never combined`;
 }
 
 /* ── Interview Prompt ──────────────────────────────────── */

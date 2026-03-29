@@ -403,7 +403,25 @@ export function ComponentDetail({ component, project, components, projectId, int
   // Load multi-pass data when component changes
   useEffect(() => {
     if (!isMultiPass) return;
-    loadSkeleton(projectId, component.id).then(s => setSkeleton(s)).catch(() => {});
+    loadSkeleton(projectId, component.id).then(s => {
+      setSkeleton(s);
+      // Show the latest accumulated state in the Result area
+      if (component.result) {
+        setPassResponse(component.result);
+      } else if (s) {
+        // Show skeleton if no final result yet
+        loadUnits(projectId, component.id).then(u => {
+          const unitMap = u || {};
+          const unitCount = Object.keys(unitMap).length;
+          if (unitCount > 0) {
+            // Show skeleton + unit count summary
+            setPassResponse(`[Skeleton + ${unitCount} units completed]\n\n${s}`);
+          } else {
+            setPassResponse(s);
+          }
+        }).catch(() => setPassResponse(s));
+      }
+    }).catch(() => {});
     loadUnits(projectId, component.id).then(u => setUnitMap(u || {})).catch(() => {});
     loadTestCode(projectId, component.id).then(tc => setPassTestCode(tc || '')).catch(() => {});
     loadReflectionHistory(projectId, component.id).then(h => setReflHistory(h || [])).catch(() => {});
@@ -807,6 +825,24 @@ export function ComponentDetail({ component, project, components, projectId, int
     } catch { /* clipboard fallback */ }
   }
 
+  async function handlePassRunWithAi() {
+    if (!currentPass || !passPrompt) return;
+    setAiRunning(true);
+    try {
+      const reasoningPasses = ['test', 'skeleton', 'reflection'];
+      const passModelRole = reasoningPasses.includes(currentPass.type) ? 'reasoning' : 'execution';
+      writeDebugArtifact(projectId, component.id, `pass-${currentPass.id}-prompt`, passPrompt);
+      let content = await runWithAi(projectId, passPrompt, null, passModelRole);
+      writeDebugArtifact(projectId, component.id, `pass-${currentPass.id}-raw`, content);
+      content = stripCodeblock(content);
+      setPassResponse(content);
+      showToast?.(t('profile.foundry.openrouter.stepComplete'));
+    } catch (e) {
+      showToast?.(e.message, true);
+    }
+    setAiRunning(false);
+  }
+
   async function handlePassValidateAndSave() {
     if (!currentPass || !passResponse.trim()) return;
     const res = await handlePassSubmit(projectId, component.id, currentPass, passResponse, {
@@ -845,7 +881,7 @@ export function ComponentDetail({ component, project, components, projectId, int
 
     const updated = addHistory(component, 'pass_completed', { passId: currentPass.id, passType: currentPass.type });
     await saveComponent(projectId, { ...updated, passes: updatedPasses });
-    setPassResponse('');
+    // Don't clear passResponse — let the useEffect reload it with the latest state
     onUpdate();
   }
 
@@ -866,6 +902,15 @@ export function ComponentDetail({ component, project, components, projectId, int
             <button class="btn-outline btn-sm" onClick=${handlePassCopy}>
               ${t('profile.foundry.copyPrompt')}
             </button>
+            ${orSettings?.hasApiKey && html`
+              <button class="btn-outline btn-sm fnd-or-run-btn ${aiRunning ? 'fnd-or-running' : ''}"
+                onClick=${handlePassRunWithAi}
+                disabled=${aiRunning}>
+                ${aiRunning
+                  ? html`<span class="fnd-or-spinner"></span> ${t('profile.foundry.openrouter.waiting')}`
+                  : t('profile.foundry.openrouter.runWithAi')}
+              </button>
+            `}
           </div>
         </div>
         <div class="fnd-section">
