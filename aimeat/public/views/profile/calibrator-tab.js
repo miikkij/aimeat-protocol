@@ -186,8 +186,19 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
   async function reloadBatches() {
     try {
       setBatches(await listBatches(projectId));
-      const { dimensions: d } = await getProject(projectId);
+      const { project: p, dimensions: d } = await getProject(projectId);
+      setProject(p);
       setDimensions(d || []);
+      // Reload versions in case apply-selected created a new one
+      const vers = await listVersions(projectId);
+      setVersions(vers);
+      if (p.currentVersion > 0 && p.currentVersion !== selectedVersion) {
+        const v = await getVersion(projectId, p.currentVersion);
+        setCurrentVersion(v);
+        setPrompt(v.prompt || '');
+        setTargetOutput(v.targetOutput || '');
+        setSelectedVersion(p.currentVersion);
+      }
     } catch { /* ignore reload errors */ }
   }
 

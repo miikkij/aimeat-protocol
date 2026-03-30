@@ -33,12 +33,12 @@ import { emitChange } from '../services/event-bus.js';
 
 const DEFAULT_ANALYSIS_TEMPLATE = `You are evaluating whether a candidate AI model's output is STRUCTURALLY CORRECT compared to a reference output.
 
-IMPORTANT: Do NOT compare text line-by-line or diff word-by-word. Focus ONLY on structural correctness:
-- Does the output have the right top-level structure and required sections?
-- Are the right types and counts of components/elements present?
-- Do data relationships and dependencies form valid chains?
-- Are required fields present with correct types?
-- Does the architecture match the expected pattern?
+CRITICAL RULES:
+- Focus ONLY on structural correctness — does the output WORK, not whether it looks identical
+- Ignore ALL cosmetic differences: label text, descriptions, key ordering, naming style, whitespace
+- Limit to 5-8 dimensions maximum — only the ones that actually matter for correctness
+- A dimension PASSES if the candidate achieves the structural goal, even if the specific implementation differs
+- Be GENEROUS with passing — if the structure is functionally equivalent, it passes
 
 REFERENCE OUTPUT (the structurally correct target):
 {TARGET_OUTPUT}
@@ -46,45 +46,35 @@ REFERENCE OUTPUT (the structurally correct target):
 CANDIDATE OUTPUT (produced by {MODEL_NAME}):
 {CANDIDATE_OUTPUT}
 
-THE PROMPT that was given (for context — understand what was asked):
+THE PROMPT that was given (for context):
 {PROMPT_USED}
 
-Evaluate the candidate on these structural dimensions. For each dimension, determine if the candidate's STRUCTURE is correct — ignore cosmetic differences like label text, description wording, key ordering, or minor naming variations.
+Evaluate ONLY these structural aspects (skip any that don't apply):
+1. TOP-LEVEL STRUCTURE: Does it have the required top-level keys/sections? (critical)
+2. COMPONENT COUNT: Does it have the right number and types of major elements? (critical)
+3. DATA PIPELINE: Do data flows form valid chains (producer → consumer)? (critical)
+4. REQUIRED SECTIONS: Are all mandatory sections present? (major)
+5. DATA MODEL: Are data structures defined with correct types? (major)
+6. NO UNNECESSARY EXTRAS: Did the candidate add things that shouldn't be there? (major)
+7. RELATIONSHIPS: Are cross-references and dependencies valid? (minor)
+8. CONFIGURATION: Are settings, schedules, and config correct? (minor)
 
-Categories:
-- STRUCTURE: top-level architecture, component count, section presence
-- DATA_MODEL: data shapes, types, required fields, relationships between data
-- MISSING: structurally required elements absent from candidate
-- EXTRA: candidate added structural elements not in the reference (unnecessary complexity)
-- QUALITY: structure is present but poorly designed (e.g., wrong patterns, broken chains)
-
-Severity guide:
-- critical: Would break the system — missing required structure, broken data chains, wrong architecture
-- major: Would cause problems — wrong data types, missing important fields, unnecessary components
-- minor: Suboptimal but works — naming differences, minor structural variations, cosmetic issues
-
-Do NOT create dimensions for:
-- Different label text or descriptions (cosmetic)
-- Different key ordering in JSON (irrelevant)
-- Minor naming variations that don't affect functionality
-- Whitespace, formatting, or comment differences
-
-Output as JSON:
+Output as JSON with 5-8 dimensions:
 {
   "dimensions": [
     {
       "name": "short_snake_case_name",
-      "description": "What structural aspect this measures",
+      "description": "What this measures",
       "category": "structure|data_model|missing|extra|quality",
       "severity": "critical|major|minor",
-      "expected": "what the reference structure has",
-      "actual": "what the candidate structure has",
+      "expected": "brief: what reference has",
+      "actual": "brief: what candidate has",
       "pass": true or false
     }
   ],
-  "analysis": "Multi-paragraph analysis of structural correctness. Focus on: Does the candidate's architecture work? Are data pipelines valid? Are component relationships correct? What structural patterns are wrong vs right?",
+  "analysis": "2-3 paragraph analysis. What works well? What's structurally broken? What's the most impactful fix?",
   "proposals": [
-    "Concrete prompt fix — what to add/change in the INSTRUCTIONS to prevent this structural error"
+    "Concrete GENERIC prompt fix — what to add/change to prevent this structural error in any similar prompt"
   ]
 }`;
 
@@ -326,9 +316,9 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       // Backfill missing or outdated template fields
       const project = record.value as Record<string, unknown>;
       let needsSave = false;
-      // Update analysis template if it contains the old line-by-line comparison approach
+      // Update analysis template if it contains old versions (line-by-line or verbose structural)
       const analysisStr = (project.analysisPromptTemplate as string) || '';
-      if (!analysisStr || analysisStr.includes('For each difference between A and B')) {
+      if (!analysisStr || analysisStr.includes('For each difference between A and B') || analysisStr.includes('Do NOT create dimensions for')) {
         project.analysisPromptTemplate = DEFAULT_ANALYSIS_TEMPLATE; needsSave = true;
       }
       if (!project.reflectionPromptTemplate) { project.reflectionPromptTemplate = DEFAULT_REFLECTION_TEMPLATE; needsSave = true; }

@@ -198,30 +198,31 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
     if (!chain) setRunning(true);
 
     const models = [...(d.models || [])];
-    for (let i = 0; i < models.length; i++) {
-      const m = { ...models[i] };
-      const candidate = candidates.find(c => c.id === m.modelId);
-      if (!candidate || !candidate.modelId) {
-        m.step1_generation = { status: 'error', output: null, durationMs: 0, error: 'No matching candidate model found', promptSent: currentVersion.prompt };
-        models[i] = m;
-        continue;
-      }
-      setProgress(`${t('profile.calibrator.step1')}: ${t('profile.calibrator.generating')} — ${m.modelLabel} (${i + 1}/${models.length})...`);
-      const start = Date.now();
-      try {
-        const output = await callModel(projectId, currentVersion.prompt, candidate.modelId);
-        m.step1_generation = { status: 'done', output, durationMs: Date.now() - start, error: null, promptSent: currentVersion.prompt };
-      } catch (e) {
-        m.step1_generation = { status: 'error', output: null, durationMs: Date.now() - start, error: e.message, promptSent: currentVersion.prompt };
-      }
-      // Clear dependent steps
-      m.step2_analysis = { ...PENDING_ANALYSIS };
-      m.step3_reflection = { ...PENDING_REFLECTION };
-      models[i] = m;
-    }
+    setProgress(`${t('profile.calibrator.step1')}: ${t('profile.calibrator.generating')} — ${models.length} ${t('profile.calibrator.models')} (parallel)...`);
 
-    const updated = await updateBatch(projectId, d.batchId, { models, status: 'generated', step4_synthesis: { ...PENDING_SYNTHESIS } });
-    const result = updated || { ...d, models, status: 'generated', step4_synthesis: { ...PENDING_SYNTHESIS } };
+    // Run all models in parallel
+    const results = await Promise.allSettled(models.map(async (m, i) => {
+      const copy = { ...m };
+      const candidate = candidates.find(c => c.id === copy.modelId);
+      if (!candidate || !candidate.modelId) {
+        copy.step1_generation = { status: 'error', output: null, durationMs: 0, error: 'No matching candidate model found', promptSent: currentVersion.prompt };
+      } else {
+        const start = Date.now();
+        try {
+          const output = await callModel(projectId, currentVersion.prompt, candidate.modelId);
+          copy.step1_generation = { status: 'done', output, durationMs: Date.now() - start, error: null, promptSent: currentVersion.prompt };
+        } catch (e) {
+          copy.step1_generation = { status: 'error', output: null, durationMs: Date.now() - start, error: e.message, promptSent: currentVersion.prompt };
+        }
+      }
+      copy.step2_analysis = { ...PENDING_ANALYSIS };
+      copy.step3_reflection = { ...PENDING_REFLECTION };
+      return copy;
+    }));
+
+    const updatedModels = results.map((r, i) => r.status === 'fulfilled' ? r.value : models[i]);
+    const updated = await updateBatch(projectId, d.batchId, { models: updatedModels, status: 'generated', step4_synthesis: { ...PENDING_SYNTHESIS } });
+    const result = updated || { ...d, models: updatedModels, status: 'generated', step4_synthesis: { ...PENDING_SYNTHESIS } };
     setDetail(result);
     if (!chain) { setRunning(false); setProgress(''); }
     onUpdate?.();
@@ -236,17 +237,18 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
     if (!chain) setRunning(true);
 
     const models = [...(d.models || [])];
-    let analyzed = 0;
-    for (let i = 0; i < models.length; i++) {
-      const m = { ...models[i] };
-      if (m.step1_generation?.status !== 'done') continue;
-      analyzed++;
-      setProgress(`${t('profile.calibrator.step2')}: ${t('profile.calibrator.analyzing')} — ${m.modelLabel} (${analyzed}/${models.length})...`);
+    const eligible = models.filter(m => m.step1_generation?.status === 'done');
+    setProgress(`${t('profile.calibrator.step2')}: ${t('profile.calibrator.analyzing')} — ${eligible.length} ${t('profile.calibrator.models')} (parallel)...`);
+
+    // Run analysis in parallel for all models that have Step 1 output
+    const results = await Promise.allSettled(models.map(async (m) => {
+      const copy = { ...m };
+      if (copy.step1_generation?.status !== 'done') return copy;
 
       const composed = (project.analysisPromptTemplate || '')
         .replace(/\{TARGET_OUTPUT\}/g, currentVersion.targetOutput || '')
-        .replace(/\{CANDIDATE_OUTPUT\}/g, m.step1_generation.output || '')
-        .replace(/\{MODEL_NAME\}/g, m.modelLabel || '')
+        .replace(/\{CANDIDATE_OUTPUT\}/g, copy.step1_generation.output || '')
+        .replace(/\{MODEL_NAME\}/g, copy.modelLabel || '')
         .replace(/\{PROMPT_USED\}/g, currentVersion.prompt || '');
 
       try {
@@ -254,17 +256,17 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
         const parsed = extractJson(raw);
         const dims = parsed?.dimensions || [];
         const score = computeWeightedScore(dims);
-        m.step2_analysis = { status: 'done', dimensions: dims, overallScore: score, analysis: parsed?.analysis || raw, error: null, promptSent: composed, rawResponse: raw };
+        copy.step2_analysis = { status: 'done', dimensions: dims, overallScore: score, analysis: parsed?.analysis || raw, error: null, promptSent: composed, rawResponse: raw };
       } catch (e) {
-        m.step2_analysis = { status: 'error', dimensions: [], overallScore: null, analysis: null, error: e.message, promptSent: composed, rawResponse: null };
+        copy.step2_analysis = { status: 'error', dimensions: [], overallScore: null, analysis: null, error: e.message, promptSent: composed, rawResponse: null };
       }
-      // Clear step 3
-      m.step3_reflection = { ...PENDING_REFLECTION };
-      models[i] = m;
-    }
+      copy.step3_reflection = { ...PENDING_REFLECTION };
+      return copy;
+    }));
 
-    const updated = await updateBatch(projectId, d.batchId, { models, status: 'analyzed', step4_synthesis: { ...PENDING_SYNTHESIS } });
-    const result = updated || { ...d, models, status: 'analyzed', step4_synthesis: { ...PENDING_SYNTHESIS } };
+    const updatedModels = results.map((r, i) => r.status === 'fulfilled' ? r.value : models[i]);
+    const updated = await updateBatch(projectId, d.batchId, { models: updatedModels, status: 'analyzed', step4_synthesis: { ...PENDING_SYNTHESIS } });
+    const result = updated || { ...d, models: updatedModels, status: 'analyzed', step4_synthesis: { ...PENDING_SYNTHESIS } };
     setDetail(result);
     if (!chain) { setRunning(false); setProgress(''); }
     onUpdate?.();
@@ -487,8 +489,9 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
         targetOutput: currentVersion.targetOutput || '',
         changelog: `Applied ${selectedProposals.length} proposals (option ${selectedOption})`,
       });
-      showToast?.('New version created');
-      onUpdate?.();
+      showToast?.(`New version created (${elapsed}s) — reload to see it in the version dropdown`);
+      // Force full page reload so version dropdown and project state refresh
+      setTimeout(() => onUpdate?.(), 500);
     } catch (e) {
       showToast?.(e.message, true);
     }
