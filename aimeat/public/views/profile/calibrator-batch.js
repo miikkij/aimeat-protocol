@@ -17,6 +17,19 @@
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
+
+/** Weighted score: critical=3, major=2, minor=1. Returns 0-100 or null. */
+function computeWeightedScore(dims) {
+  if (!dims || dims.length === 0) return null;
+  const weights = { critical: 3, major: 2, minor: 1 };
+  let totalWeight = 0, passedWeight = 0;
+  for (const d of dims) {
+    const w = weights[d.severity] || 1;
+    totalWeight += w;
+    if (d.pass) passedWeight += w;
+  }
+  return totalWeight > 0 ? Math.round((passedWeight / totalWeight) * 100) : null;
+}
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -215,7 +228,7 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
         const raw = await callModel(projectId, composed, project.reasoningLlm.modelId);
         const parsed = extractJson(raw);
         const dims = parsed?.dimensions || [];
-        const score = dims.length > 0 ? Math.round((dims.filter(d2 => d2.pass).length / dims.length) * 100) : null;
+        const score = computeWeightedScore(dims);
         m.step2_analysis = { status: 'done', dimensions: dims, overallScore: score, analysis: parsed?.analysis || raw, error: null, promptSent: composed, rawResponse: raw };
       } catch (e) {
         m.step2_analysis = { status: 'error', dimensions: [], overallScore: null, analysis: null, error: e.message, promptSent: composed, rawResponse: null };
@@ -480,7 +493,7 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
     if (!detail) return;
     const parsed = extractJson(text);
     const dims = parsed?.dimensions || [];
-    const score = dims.length > 0 ? Math.round((dims.filter(d2 => d2.pass).length / dims.length) * 100) : null;
+    const score = computeWeightedScore(dims);
     const models = [...detail.models];
     models[modelIndex] = {
       ...models[modelIndex],

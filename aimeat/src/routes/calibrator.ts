@@ -31,50 +31,60 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 
-const DEFAULT_ANALYSIS_TEMPLATE = `You are analyzing why two AI models produced different outputs from the same prompt.
+const DEFAULT_ANALYSIS_TEMPLATE = `You are evaluating whether a candidate AI model's output is STRUCTURALLY CORRECT compared to a reference output.
 
-MODEL A (reference — the target quality) produced:
+IMPORTANT: Do NOT compare text line-by-line or diff word-by-word. Focus ONLY on structural correctness:
+- Does the output have the right top-level structure and required sections?
+- Are the right types and counts of components/elements present?
+- Do data relationships and dependencies form valid chains?
+- Are required fields present with correct types?
+- Does the architecture match the expected pattern?
+
+REFERENCE OUTPUT (the structurally correct target):
 {TARGET_OUTPUT}
 
-MODEL B (candidate — {MODEL_NAME}) produced:
+CANDIDATE OUTPUT (produced by {MODEL_NAME}):
 {CANDIDATE_OUTPUT}
 
-The PROMPT given to both models was the same prompt (shown below for context):
+THE PROMPT that was given (for context — understand what was asked):
 {PROMPT_USED}
 
-For each difference between A and B, categorize it:
-- FORMAT: output structure differs (fences, blocks, separators)
-- NAMING: identifiers differ (action IDs, variable names, key names)
-- STRUCTURE: component count, feature decomposition, architecture differs
-- DATA_MODEL: data shapes, types, nesting differs
-- MISSING: something in A is absent in B
-- EXTRA: B added something not in A
-- QUALITY: both work but one is better (helper extraction, null checks, etc.)
+Evaluate the candidate on these structural dimensions. For each dimension, determine if the candidate's STRUCTURE is correct — ignore cosmetic differences like label text, description wording, key ordering, or minor naming variations.
 
-For each difference where B's output would cause problems, suggest a prompt modification that would guide B to avoid that specific mistake — without showing B what A produced.
+Categories:
+- STRUCTURE: top-level architecture, component count, section presence
+- DATA_MODEL: data shapes, types, required fields, relationships between data
+- MISSING: structurally required elements absent from candidate
+- EXTRA: candidate added structural elements not in the reference (unnecessary complexity)
+- QUALITY: structure is present but poorly designed (e.g., wrong patterns, broken chains)
 
-The fix must:
-- NOT mention any project-specific names, APIs, or domain concepts
-- Work for ANY prompt calibration task, not just this one
-- Be a concrete text addition or change to the prompt
+Severity guide:
+- critical: Would break the system — missing required structure, broken data chains, wrong architecture
+- major: Would cause problems — wrong data types, missing important fields, unnecessary components
+- minor: Suboptimal but works — naming differences, minor structural variations, cosmetic issues
 
-Output as JSON so the system can parse it:
+Do NOT create dimensions for:
+- Different label text or descriptions (cosmetic)
+- Different key ordering in JSON (irrelevant)
+- Minor naming variations that don't affect functionality
+- Whitespace, formatting, or comment differences
+
+Output as JSON:
 {
   "dimensions": [
     {
       "name": "short_snake_case_name",
-      "description": "What this dimension measures",
-      "category": "format|structure|data_model|naming|missing|extra|quality",
+      "description": "What structural aspect this measures",
+      "category": "structure|data_model|missing|extra|quality",
       "severity": "critical|major|minor",
-      "expected": "what the reference has",
-      "actual": "what the candidate produced",
+      "expected": "what the reference structure has",
+      "actual": "what the candidate structure has",
       "pass": true or false
     }
   ],
-  "analysis": "Detailed free-text analysis of the key differences. Be thorough — explain WHY each difference matters, what would break, and what the root cause likely is (e.g., model copied the example structure instead of deriving from the spec). This should be multiple paragraphs covering all significant gaps.",
+  "analysis": "Multi-paragraph analysis of structural correctness. Focus on: Does the candidate's architecture work? Are data pipelines valid? Are component relationships correct? What structural patterns are wrong vs right?",
   "proposals": [
-    "Concrete prompt fix 1 — explain what to add/change and where in the prompt",
-    "Concrete prompt fix 2 — explain what to add/change and where in the prompt"
+    "Concrete prompt fix — what to add/change in the INSTRUCTIONS to prevent this structural error"
   ]
 }`;
 
