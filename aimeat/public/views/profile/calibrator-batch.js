@@ -38,30 +38,54 @@ import { getBatch, updateBatch, createVersion } from '/js/services/calibrator.js
 
 // ── Helpers ──
 
-async function callModel(projectId, prompt, modelId) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 1_800_000); // 30 min
-  const headers = { 'Content-Type': 'application/json' };
-  const session = window.AIMEAT?.auth?.getSession?.();
-  if (session?.jwt) headers['Authorization'] = 'Bearer ' + session.jwt;
-  try {
-    const raw = await fetch('/v1/openrouter/complete', {
-      method: 'POST', headers,
-      body: JSON.stringify({ projectId, prompt, model: modelId }),
-      signal: controller.signal,
-    });
-    if (!raw.ok) {
-      let msg = `HTTP ${raw.status}`;
-      try { const e = await raw.json(); msg = e.error?.message || msg; } catch { /* ignore */ }
-      throw new Error(msg);
-    }
-    const resp = await raw.json();
-    if (resp.ok === false) throw new Error(resp.error?.message || 'OpenRouter error');
-    return resp.data?.content || '';
-  } catch (e) {
-    if (e.name === 'AbortError') throw new Error('Request timed out (30 min)');
-    throw e;
-  } finally { clearTimeout(timeoutId); }
+async function callModel(projectId, prompt, modelId, retries = 1) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1_800_000); // 30 min
+    const headers = { 'Content-Type': 'application/json' };
+    const session = window.AIMEAT?.auth?.getSession?.();
+    if (session?.jwt) headers['Authorization'] = 'Bearer ' + session.jwt;
+    try {
+      const raw = await fetch('/v1/openrouter/complete', {
+        method: 'POST', headers,
+        body: JSON.stringify({ projectId, prompt, model: modelId }),
+        signal: controller.signal,
+      });
+      if (!raw.ok) {
+        let msg = `HTTP ${raw.status}`;
+        try { const e = await raw.json(); msg = e.error?.message || msg; } catch { /* ignore */ }
+        // Retry on 502/503/429
+        if (attempt < retries && (raw.status === 502 || raw.status === 503 || raw.status === 429)) {
+          console.warn(`callModel retry ${attempt + 1}/${retries}: ${msg}`);
+          await new Promise(r => setTimeout(r, 3000)); // wait 3s before retry
+          continue;
+        }
+        throw new Error(msg);
+      }
+      const resp = await raw.json();
+      if (resp.ok === false) throw new Error(resp.error?.message || 'OpenRouter error');
+      const content = resp.data?.content || '';
+      // Empty response = model didn't run properly. Retry if possible.
+      if (!content && attempt < retries) {
+        console.warn(`callModel retry ${attempt + 1}/${retries}: empty response from ${modelId}`);
+        await new Promise(r => setTimeout(r, 3000));
+        continue;
+      }
+      if (!content) {
+        throw new Error(`Model returned empty response (${modelId}). This usually means OpenRouter failed to route the request. Try again.`);
+      }
+      return content;
+    } catch (e) {
+      if (e.name === 'AbortError') throw new Error('Request timed out (30 min)');
+      // Retry on network errors
+      if (attempt < retries && e.name === 'TypeError') {
+        console.warn(`callModel retry ${attempt + 1}/${retries}: network error`);
+        await new Promise(r => setTimeout(r, 3000));
+        continue;
+      }
+      throw e;
+    } finally { clearTimeout(timeoutId); }
+  }
 }
 
 function extractJson(text) {

@@ -68,7 +68,15 @@ export async function complete(
     const data = await resp.json() as {
       choices?: Array<{ message?: { content?: string } }>;
       model?: string;
+      error?: { message?: string; code?: number };
     };
+
+    // Check for error in response body (OpenRouter sometimes returns 200 with error)
+    if (data.error) {
+      const err = new Error(`OpenRouter error: ${data.error.message || JSON.stringify(data.error)}`) as Error & { status: number };
+      err.status = data.error.code || 502;
+      throw err;
+    }
 
     const content = data.choices?.[0]?.message?.content ?? '';
     return { content, model: data.model ?? model };
