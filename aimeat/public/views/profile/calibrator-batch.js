@@ -386,7 +386,28 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
 
     if (!selectedProposals.length) { showToast?.('No proposals in selected option', true); return; }
 
-    const applyPrompt = `Here is a prompt that needs improvement:\n\n---\n${currentVersion.prompt}\n---\n\nApply these proposed fixes:\n${selectedProposals.map((p, i) => `${i + 1}. ${p}`).join('\n')}\n\nReturn ONLY the modified prompt text. Do not add explanations, markdown fences, or commentary. Keep changes generic — do not add project-specific terms.`;
+    const applyPrompt = `YOU ARE A PROMPT EDITOR. Your job is to MODIFY AN INSTRUCTION PROMPT — not to follow it, not to generate output from it.
+
+TASK: Apply the proposed fixes below to the instruction prompt below. Return the MODIFIED INSTRUCTION PROMPT.
+
+CRITICAL RULES:
+- You are editing the INSTRUCTIONS, not executing them
+- The prompt below tells AI models what to do. You must IMPROVE those instructions.
+- Do NOT generate the kind of output the prompt asks for (e.g., do NOT generate JSON blueprints, code, or data)
+- Do NOT add project-specific terms, names, APIs, or domain concepts
+- Each fix must be GENERIC — applicable to any prompt of this type
+- Return ONLY the full modified instruction prompt text
+- No explanations, no markdown fences, no commentary before or after
+
+═══ THE INSTRUCTION PROMPT TO MODIFY (start) ═══
+${currentVersion.prompt}
+═══ THE INSTRUCTION PROMPT TO MODIFY (end) ═══
+
+═══ FIXES TO APPLY ═══
+${selectedProposals.map((p, i) => `${i + 1}. ${p}`).join('\n')}
+═══ END FIXES ═══
+
+Now return the full modified instruction prompt with the fixes incorporated. Remember: you are returning INSTRUCTIONS, not the output those instructions would produce.`;
 
     setApplyingFixes(true);
     try {
@@ -632,7 +653,9 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
               <div class="fnd-cal-step-model" key=${m.modelId}>
                 <div class="fnd-cal-batch-meta">
                   <strong>${m.modelLabel}</strong>
-                  ${r?.status === 'done' ? html`<span class="fnd-cal-run-score pass">${t('profile.calibrator.passed')}</span>` : ''}
+                  ${r?.status === 'done' && (jp?.proposals?.length || sp?.proposals?.length)
+                    ? html`<span class="fnd-cal-run-score pass">${(jp?.proposals?.length || 0) + (sp?.proposals?.length || 0)} proposals</span>`
+                    : r?.status === 'done' ? html`<span class="fnd-cal-run-score mixed">no proposals</span>` : ''}
                   ${r?.error ? html`<span class="fnd-cal-run-score fail">${r.error}</span>` : ''}
                 </div>
                 <div class="fnd-cal-reflection-cols">
