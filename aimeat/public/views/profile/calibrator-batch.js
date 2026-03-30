@@ -412,8 +412,20 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
     setApplyingFixes(true);
     try {
       const improved = await callModel(projectId, applyPrompt, project.reasoningLlm.modelId);
+      const trimmed = (improved || '').trim();
+      if (!trimmed || trimmed.length < 100) {
+        showToast?.('Model returned empty or too-short response. Try a more capable reasoning model.', true);
+        setApplyingFixes(false);
+        return;
+      }
+      // Sanity check: the result should look like instructions, not JSON output
+      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        showToast?.('Model returned JSON output instead of a modified prompt. Try again or use a more capable model.', true);
+        setApplyingFixes(false);
+        return;
+      }
       await createVersion(projectId, {
-        prompt: improved.trim(),
+        prompt: trimmed,
         targetOutput: currentVersion.targetOutput || '',
         changelog: `Applied ${selectedProposals.length} proposals (option ${selectedOption})`,
       });
