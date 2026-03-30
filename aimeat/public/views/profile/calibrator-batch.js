@@ -134,6 +134,7 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
   const [progress, setProgress] = useState('');
   const [selectedOption, setSelectedOption] = useState('B');
   const [applyingFixes, setApplyingFixes] = useState(false);
+  const [applyElapsed, setApplyElapsed] = useState(0);
 
   const hasReasoningModel = !!project?.reasoningLlm?.modelId;
   const candidates = project?.candidateModels || [];
@@ -435,18 +436,22 @@ ${selectedProposals.map((p, i) => `${i + 1}. ${p}`).join('\n')}
 Now return the full modified instruction prompt with the fixes incorporated. Remember: you are returning INSTRUCTIONS, not the output those instructions would produce.`;
 
     setApplyingFixes(true);
+    setApplyElapsed(0);
+    const applyStart = Date.now();
+    const applyTimer = setInterval(() => setApplyElapsed(Math.floor((Date.now() - applyStart) / 1000)), 1000);
     try {
       const improved = await callModel(projectId, applyPrompt, project.reasoningLlm.modelId);
       const trimmed = (improved || '').trim();
+      const elapsed = ((Date.now() - applyStart) / 1000).toFixed(0);
       if (!trimmed || trimmed.length < 100) {
-        showToast?.('Model returned empty or too-short response. Try a more capable reasoning model.', true);
-        setApplyingFixes(false);
+        showToast?.(`Model returned empty or too-short response after ${elapsed}s. The model may have timed out — try again or use a more capable reasoning model.`, true);
+        clearInterval(applyTimer); setApplyingFixes(false);
         return;
       }
       // Sanity check: the result should look like instructions, not JSON output
       if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-        showToast?.('Model returned JSON output instead of a modified prompt. Try again or use a more capable model.', true);
-        setApplyingFixes(false);
+        showToast?.(`Model returned JSON output instead of a modified prompt (${elapsed}s). Try again or use a more capable model.`, true);
+        clearInterval(applyTimer); setApplyingFixes(false);
         return;
       }
       await createVersion(projectId, {
@@ -459,7 +464,7 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
     } catch (e) {
       showToast?.(e.message, true);
     }
-    setApplyingFixes(false);
+    clearInterval(applyTimer); setApplyingFixes(false);
   }
 
   // ── Copy prompt + selected proposals ──
@@ -810,6 +815,11 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
                 ${t('profile.calibrator.copyPromptAndProposals')}
               </button>
             </div>
+            ${applyingFixes ? html`
+              <div class="fnd-cal-progress">
+                ${t('profile.calibrator.applyingFixes')} ${applyElapsed}s — ${applyElapsed > 30 ? 'Large prompts take time. Do not close the browser.' : 'Rewriting prompt with selected proposals...'}
+              </div>
+            ` : ''}
           ` : ''}
 
           <!-- Collapsible prompt/response -->
