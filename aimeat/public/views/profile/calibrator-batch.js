@@ -472,12 +472,16 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
         clearInterval(applyTimer); setApplyingFixes(false);
         return;
       }
-      // Sanity check: the result should look like instructions, not JSON output
-      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-        showToast?.(`Model returned JSON output instead of a modified prompt (${elapsed}s). Try again or use a more capable model.`, true);
-        clearInterval(applyTimer); setApplyingFixes(false);
-        return;
-      }
+      // Sanity check: if the result is ONLY a JSON object (no text before/after), it's likely wrong
+      // But prompts that contain JSON examples are fine — only reject pure JSON with no instructions
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (typeof parsed === 'object' && parsed.architecture) {
+          showToast?.(`Model returned blueprint JSON instead of a modified prompt (${elapsed}s). Try again.`, true);
+          clearInterval(applyTimer); setApplyingFixes(false);
+          return;
+        }
+      } catch { /* not pure JSON — good, it's a prompt */ }
       await createVersion(projectId, {
         prompt: trimmed,
         targetOutput: currentVersion.targetOutput || '',
