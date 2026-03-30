@@ -313,9 +313,18 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       if (!record) {
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Calibration project not found.'));
       }
+      // Backfill missing template fields for pre-V2 projects
+      const project = record.value as Record<string, unknown>;
+      let needsSave = false;
+      if (!project.reflectionPromptTemplate) { project.reflectionPromptTemplate = DEFAULT_REFLECTION_TEMPLATE; needsSave = true; }
+      if (!project.selfReflectionPromptTemplate) { project.selfReflectionPromptTemplate = DEFAULT_SELF_REFLECTION_TEMPLATE; needsSave = true; }
+      if (!project.synthesisPromptTemplate) { project.synthesisPromptTemplate = DEFAULT_SYNTHESIS_TEMPLATE; needsSave = true; }
+      if (needsSave) {
+        await setCalMemory(gaii, `calibrator.${id}.project`, project, ['calibrator', 'project']);
+      }
       const dimRecord = await storage.getMemory(gaii, `calibrator.${id}.dimensions`);
       res.json(success(config.nodeId, {
-        project: record.value,
+        project,
         dimensions: dimRecord?.value ?? [],
       }));
     }

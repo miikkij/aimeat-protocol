@@ -638,11 +638,12 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
                   <!-- Judge column -->
                   <div class="fnd-cal-reflection-col">
                     <h4>${t('profile.calibrator.step3a')}</h4>
+                    ${jp?.error ? html`<div class="fnd-cal-hint" style="color:var(--danger)">Error: ${jp.error}</div>` : ''}
                     ${jp?.proposals?.length > 0 ? html`
                       <ol>
                         ${jp.proposals.map(p => html`<li>${typeof p === 'string' ? p : p.text || JSON.stringify(p)}</li>`)}
                       </ol>
-                    ` : html`<div class="fnd-cal-hint">${t('profile.calibrator.noRuns')}</div>`}
+                    ` : !jp?.error ? html`<div class="fnd-cal-hint">No proposals</div>` : ''}
                     ${jp?.reasoning ? html`<div class="fnd-cal-hint">${jp.reasoning}</div>` : ''}
                     ${jp?.promptSent ? html`<${CollapsiblePre} label=${t('profile.calibrator.viewPromptSent')} text=${jp.promptSent} />` : ''}
                     ${jp?.rawResponse ? html`<${CollapsiblePre} label=${t('profile.calibrator.viewRawResponse')} text=${jp.rawResponse} />` : ''}
@@ -651,11 +652,12 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
                   <!-- Self column -->
                   <div class="fnd-cal-reflection-col">
                     <h4>${t('profile.calibrator.step3b')}</h4>
+                    ${sp?.error ? html`<div class="fnd-cal-hint" style="color:var(--danger)">Error: ${sp.error}</div>` : ''}
                     ${sp?.proposals?.length > 0 ? html`
                       <ol>
                         ${sp.proposals.map(p => html`<li>${typeof p === 'string' ? p : p.text || JSON.stringify(p)}</li>`)}
                       </ol>
-                    ` : html`<div class="fnd-cal-hint">${t('profile.calibrator.noRuns')}</div>`}
+                    ` : !sp?.error ? html`<div class="fnd-cal-hint">No proposals</div>` : ''}
                     ${sp?.reasoning ? html`<div class="fnd-cal-hint">${sp.reasoning}</div>` : ''}
                     ${sp?.promptSent ? html`<${CollapsiblePre} label=${t('profile.calibrator.viewPromptSent')} text=${sp.promptSent} />` : ''}
                     ${sp?.rawResponse ? html`<${CollapsiblePre} label=${t('profile.calibrator.viewRawResponse')} text=${sp.rawResponse} />` : ''}
@@ -688,7 +690,8 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
       <details class="fnd-cal-step" open=${hasSynthesis}>
         <summary>${t('profile.calibrator.step4')}</summary>
         <div class="fnd-cal-step-body">
-          ${synth?.error ? html`<div class="fnd-cal-warning">${synth.error}</div>` : ''}
+          ${synth?.error ? html`<div class="fnd-cal-warning" style="color:var(--danger)">Error: ${synth.error}</div>` : ''}
+          ${synth?.status === 'error' && synth?.analysis ? html`<div class="fnd-cal-hint" style="color:var(--danger)">${synth.analysis}</div>` : ''}
 
           <!-- Grouped proposals -->
           ${synth?.groupedProposals?.length > 0 ? html`

@@ -10,9 +10,8 @@ These rules MUST be followed at all times during development. They override any 
 
 When any major feature, bugfix, or structural change is completed:
 
-1. **Run E2E tests on both persistent backends:**
+1. **Run E2E tests on both persistent backends** (from project root):
    ```bash
-   cd aimeat
    pnpm test:e2e:mongodb
    pnpm test:e2e:sqlite
    ```
@@ -29,9 +28,8 @@ Full guide: `docs/coding-guidelines/testing-requirements.md`
 
 When frontend work is **finished** (a view, component, or feature is done — not mid-development):
 
-1. **Run Playwright browser tests:**
+1. **Run Playwright browser tests** (from project root):
    ```bash
-   cd aimeat
    # All Playwright tests (starts server automatically):
    pnpm test:playwright:mongodb
 
@@ -108,10 +106,9 @@ All Agent tool calls MUST use `model: "opus"` or omit the model parameter (which
 
 ### Rule 7: ESLint Must Pass
 
-All code changes must pass linting:
+All code changes must pass linting (from project root):
 
 ```bash
-cd aimeat
 pnpm lint
 ```
 
@@ -307,8 +304,8 @@ The extension is sovereign — it decides what to store, in what format, and wha
 ## Key Commands
 
 ```bash
-# All commands from aimeat/ directory
-cd aimeat
+# All commands from PROJECT ROOT (not aimeat/ subfolder)
+# Root package.json proxies all scripts to aimeat/
 
 # Dev server (auto-reload)
 pnpm dev
