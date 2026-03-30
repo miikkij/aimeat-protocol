@@ -50,11 +50,15 @@ export async function complete(
     headers['X-Title'] = 'AIMEAT Generator';
   }
 
+  const requestBody = { model, messages };
+  const bodyStr = JSON.stringify(requestBody);
+  console.log(`[openrouter] Sending: model=${model}, bodyLen=${bodyStr.length}, msgCount=${messages.length}, userMsgLen=${messages[messages.length - 1]?.content?.length || 0}`);
+
   try {
     const resp = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ model, messages }),
+      body: bodyStr,
       signal: controller.signal,
     });
 
@@ -66,10 +70,13 @@ export async function complete(
     }
 
     const data = await resp.json() as {
-      choices?: Array<{ message?: { content?: string } }>;
+      choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
       model?: string;
       error?: { message?: string; code?: number };
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
+
+    console.log(`[openrouter] Response: status=${resp.status}, model=${data.model}, choices=${data.choices?.length || 0}, finish=${data.choices?.[0]?.finish_reason}, promptTokens=${data.usage?.prompt_tokens}, completionTokens=${data.usage?.completion_tokens}, hasError=${!!data.error}`);
 
     // Check for error in response body (OpenRouter sometimes returns 200 with error)
     if (data.error) {
@@ -79,6 +86,9 @@ export async function complete(
     }
 
     const content = data.choices?.[0]?.message?.content ?? '';
+    if (!content) {
+      console.warn(`[openrouter] EMPTY CONTENT: model=${model}, finish_reason=${data.choices?.[0]?.finish_reason}, raw=${JSON.stringify(data).slice(0, 500)}`);
+    }
     return { content, model: data.model ?? model };
   } finally {
     clearTimeout(timeout);

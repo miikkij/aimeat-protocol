@@ -347,7 +347,9 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         }
         const model = selectedModel;
 
+        console.log(`[calibrator] OpenRouter call: model=${model}, promptLen=${prompt.length}, baseUrl=${baseUrl}`);
         const result = await complete(decryptedKey, model, prompt, systemPrompt, baseUrl);
+        console.log(`[calibrator] OpenRouter result: model=${result.model}, contentLen=${result.content.length}`);
         res.json(success(config.nodeId, result));
       } catch (e) {
         const status = (e as { status?: number }).status;
