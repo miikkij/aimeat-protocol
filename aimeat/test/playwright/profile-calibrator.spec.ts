@@ -409,10 +409,9 @@ test.describe('Calibrator — Step 3 Reflection', () => {
     await page.waitForTimeout(500);
     await expect(page.locator('.fnd-cal-batch-detail').first()).toBeVisible({ timeout: 5_000 });
 
-    // Open Step 3 details
+    // Open Step 3 details (use > summary for direct child only, avoiding nested summaries)
     const step3 = page.locator('.fnd-cal-step').nth(2);
-    const step3Summary = step3.locator('summary');
-    await step3Summary.click();
+    await step3.locator(':scope > summary').click();
     await page.waitForTimeout(300);
 
     // Dual reflection columns exist
@@ -448,10 +447,9 @@ test.describe('Calibrator — Step 4 Synthesis', () => {
     await page.waitForTimeout(500);
     await expect(page.locator('.fnd-cal-batch-detail').first()).toBeVisible({ timeout: 5_000 });
 
-    // Open Step 4 details
+    // Step 4 is already open (data has synthesis status 'done', so open=${true})
+    // Just locate it — don't click summary (that would close it)
     const step4 = page.locator('.fnd-cal-step').nth(3);
-    const step4Summary = step4.locator('summary');
-    await step4Summary.click();
     await page.waitForTimeout(300);
 
     // Grouped proposals are visible
@@ -469,9 +467,10 @@ test.describe('Calibrator — Step 4 Synthesis', () => {
     const radioCount = await radios.count();
     expect(radioCount).toBeGreaterThanOrEqual(2);
 
-    // Recommendation text is visible
+    // Recommendation text is visible (scroll into view first — may be below fold)
     const recommendation = step4.locator('.fnd-cal-recommendation');
-    await expect(recommendation).toBeVisible();
+    await recommendation.scrollIntoViewIfNeeded();
+    await expect(recommendation).toBeVisible({ timeout: 5_000 });
     const recText = await recommendation.textContent();
     expect(recText).toContain('Recommendation');
     expect(recText).toContain('Option A');

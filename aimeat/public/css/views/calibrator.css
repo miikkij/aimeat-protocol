@@ -426,6 +426,10 @@
 }
 .fnd-cal-dim-table tr:last-child td { border-bottom: none; }
 
+/* ── V2: Collapsible pre blocks (inside steps) ── */
+.fnd-cal-collapsible { margin-top: 4px; }
+.fnd-cal-collapsible summary { padding: 4px 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-dim); }
+
 /* ── V2: Template section ── */
 .fnd-cal-templates { display: flex; flex-direction: column; gap: 8px; }
 .fnd-cal-template-details {

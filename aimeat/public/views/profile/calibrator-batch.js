@@ -102,7 +102,7 @@ function PasteBack({ label, onSave }) {
 function CollapsiblePre({ label, text }) {
   if (!text) return null;
   return html`
-    <details class="fnd-cal-step">
+    <details class="fnd-cal-collapsible">
       <summary>${label}</summary>
       <div class="fnd-cal-run-detail">
         <pre>${text}</pre>
