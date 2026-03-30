@@ -371,7 +371,19 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
 
   async function handleApplySelected() {
     const synth = detail?.step4_synthesis;
-    if (!synth?.options || !currentVersion || !hasReasoningModel) return;
+    if (!synth?.options || !hasReasoningModel) return;
+
+    // Use the prompt from the batch's own version, not the parent's currently selected version
+    const batchVersion = detail?.promptVersion || batchSummary?.promptVersion;
+    let batchPrompt = currentVersion?.prompt || '';
+    if (batchVersion) {
+      try {
+        const { getVersion } = await import('/js/services/calibrator.js');
+        const ver = await getVersion(projectId, batchVersion);
+        if (ver?.prompt) batchPrompt = ver.prompt;
+      } catch {}
+    }
+    if (!batchPrompt) { showToast?.('Could not load prompt for this batch\'s version', true); return; }
 
     const opt = synth.options[selectedOption] || synth.options.B || synth.options.A;
     if (!opt) { showToast?.('No option found', true); return; }
@@ -400,7 +412,7 @@ CRITICAL RULES:
 - No explanations, no markdown fences, no commentary before or after
 
 ═══ THE INSTRUCTION PROMPT TO MODIFY (start) ═══
-${currentVersion.prompt}
+${batchPrompt}
 ═══ THE INSTRUCTION PROMPT TO MODIFY (end) ═══
 
 ═══ FIXES TO APPLY ═══
