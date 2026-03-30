@@ -323,9 +323,14 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       if (!record) {
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Calibration project not found.'));
       }
-      // Backfill missing template fields for pre-V2 projects
+      // Backfill missing or outdated template fields
       const project = record.value as Record<string, unknown>;
       let needsSave = false;
+      // Update analysis template if it contains the old line-by-line comparison approach
+      const analysisStr = (project.analysisPromptTemplate as string) || '';
+      if (!analysisStr || analysisStr.includes('For each difference between A and B')) {
+        project.analysisPromptTemplate = DEFAULT_ANALYSIS_TEMPLATE; needsSave = true;
+      }
       if (!project.reflectionPromptTemplate) { project.reflectionPromptTemplate = DEFAULT_REFLECTION_TEMPLATE; needsSave = true; }
       if (!project.selfReflectionPromptTemplate) { project.selfReflectionPromptTemplate = DEFAULT_SELF_REFLECTION_TEMPLATE; needsSave = true; }
       if (!project.synthesisPromptTemplate) { project.synthesisPromptTemplate = DEFAULT_SYNTHESIS_TEMPLATE; needsSave = true; }
