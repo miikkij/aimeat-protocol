@@ -379,8 +379,9 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
     const proposalIds = opt.proposalIds || opt.proposals || [];
     const allProposals = synth.groupedProposals || [];
     const selectedProposals = proposalIds.map(id => {
-      const p = allProposals.find(gp => gp.id === id || gp.proposalId === id);
-      return p ? (p.text || p.proposal || JSON.stringify(p)) : id;
+      // proposalIds are array indices into groupedProposals
+      const p = typeof id === 'number' ? allProposals[id] : allProposals.find(gp => gp.id === id || gp.proposalId === id);
+      return p ? (p.text || p.proposal || JSON.stringify(p)) : null;
     }).filter(Boolean);
 
     if (!selectedProposals.length) { showToast?.('No proposals in selected option', true); return; }
