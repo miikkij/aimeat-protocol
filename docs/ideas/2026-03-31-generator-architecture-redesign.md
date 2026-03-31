@@ -47,6 +47,8 @@ EXTENSIONS + AIMEAT BASE (memory, storage, boards, wallet, consent...)
 
 **Apps** — Perspective: USER EXPERIENCE. "I compose cortexes into a working application with look, feel, and navigation." An app knows what cortexes are available and their APIs. It does NOT know about extensions directly — it only talks through cortexes. It handles layout, styling, routing, and user interaction.
 
+**Business/domain logic** — WHERE DOES IT LIVE? The current generator has no clear home for domain rules (validation, computed values, workflows, constraints like "a company can only be on the watchlist once"). This logic gets scattered across extensions, cortexes, and apps randomly. The research session must determine where business logic belongs. The likely answer is inside the cortex layer (specifically the data cortex), since it sits between extensions (raw data) and apps (UI) — but this needs to be explicitly designed, not left ambiguous.
+
 **The generation system MUST maintain these separate perspectives.** The moment an extension prompt mentions "the app needs..." or a cortex prompt references extension internals, the separation is broken.
 
 ## What This Research Session Must Do
