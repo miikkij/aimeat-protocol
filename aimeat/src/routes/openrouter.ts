@@ -289,12 +289,15 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       res.setTimeout(1_800_000);
 
       const gaii = resolve(req);
-      const { projectId, prompt, systemPrompt, model: modelOverride, modelRole } = req.body as {
+      const { projectId, prompt, systemPrompt, model: modelOverride, modelRole, temperature, top_p, max_tokens } = req.body as {
         projectId?: string;
         prompt?: string;
         systemPrompt?: string;
         model?: string;
         modelRole?: 'reasoning' | 'execution';
+        temperature?: number;
+        top_p?: number;
+        max_tokens?: number;
       };
 
       // Validate required fields
@@ -347,8 +350,9 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         }
         const model = selectedModel;
 
-        console.log(`[calibrator] OpenRouter call: model=${model}, promptLen=${prompt.length}, baseUrl=${baseUrl}`);
-        const result = await complete(decryptedKey, model, prompt, systemPrompt, baseUrl);
+        const options = { temperature, top_p, max_tokens };
+        console.log(`[calibrator] OpenRouter call: model=${model}, promptLen=${prompt.length}, baseUrl=${baseUrl}, temp=${temperature ?? 'default'}`);
+        const result = await complete(decryptedKey, model, prompt, systemPrompt, baseUrl, options);
         console.log(`[calibrator] OpenRouter result: model=${result.model}, contentLen=${result.content.length}`);
         res.json(success(config.nodeId, result));
       } catch (e) {

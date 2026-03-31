@@ -38,7 +38,7 @@ import { getBatch, updateBatch, createVersion } from '/js/services/calibrator.js
 
 // ── Helpers ──
 
-async function callModel(projectId, prompt, modelId, retries = 1) {
+async function callModel(projectId, prompt, modelId, { retries = 1, temperature } = {}) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 1_800_000); // 30 min
@@ -46,9 +46,11 @@ async function callModel(projectId, prompt, modelId, retries = 1) {
     const session = window.AIMEAT?.auth?.getSession?.();
     if (session?.jwt) headers['Authorization'] = 'Bearer ' + session.jwt;
     try {
+      const body = { projectId, prompt, model: modelId };
+      if (temperature !== undefined) body.temperature = temperature;
       const raw = await fetch('/v1/openrouter/complete', {
         method: 'POST', headers,
-        body: JSON.stringify({ projectId, prompt, model: modelId }),
+        body: JSON.stringify(body),
         signal: controller.signal,
       });
       if (!raw.ok) {
@@ -209,7 +211,8 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
       } else {
         const start = Date.now();
         try {
-          const output = await callModel(projectId, currentVersion.prompt, candidate.modelId);
+          // Step 1: Generation — some creativity but follow the spec
+          const output = await callModel(projectId, currentVersion.prompt, candidate.modelId, { temperature: 0.3 });
           copy.step1_generation = { status: 'done', output, durationMs: Date.now() - start, error: null, promptSent: currentVersion.prompt };
         } catch (e) {
           copy.step1_generation = { status: 'error', output: null, durationMs: Date.now() - start, error: e.message, promptSent: currentVersion.prompt };
@@ -252,7 +255,8 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
         .replace(/\{PROMPT_USED\}/g, currentVersion.prompt || '');
 
       try {
-        const raw = await callModel(projectId, composed, project.reasoningLlm.modelId);
+        // Step 2: Analysis — deterministic, follow analysis template strictly
+        const raw = await callModel(projectId, composed, project.reasoningLlm.modelId, { temperature: 0.1 });
         const parsed = extractJson(raw);
         const dims = parsed?.dimensions || [];
         const score = computeWeightedScore(dims);
@@ -299,7 +303,8 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
 
       let judgeProposals = { proposals: [], reasoning: '', promptSent: judgeComposed, rawResponse: null };
       try {
-        const raw = await callModel(projectId, judgeComposed, project.reasoningLlm.modelId);
+        // Step 3a: Judge reflection — focused proposals, low randomness
+        const raw = await callModel(projectId, judgeComposed, project.reasoningLlm.modelId, { temperature: 0.2 });
         const parsed = extractJson(raw);
         judgeProposals = { proposals: parsed?.proposals || [], reasoning: parsed?.reasoning || raw, promptSent: judgeComposed, rawResponse: raw };
       } catch (e) {
@@ -318,7 +323,8 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
       let selfProposals = { proposals: [], reasoning: '', promptSent: selfComposed, rawResponse: null };
       const selfModelId = candidate?.modelId || project.reasoningLlm.modelId;
       try {
-        const raw = await callModel(projectId, selfComposed, selfModelId);
+        // Step 3b: Self-reflection — candidate reflects on own output
+        const raw = await callModel(projectId, selfComposed, selfModelId, { temperature: 0.2 });
         const parsed = extractJson(raw);
         selfProposals = { proposals: parsed?.proposals || [], reasoning: parsed?.reasoning || raw, promptSent: selfComposed, rawResponse: raw };
       } catch (e) {
@@ -363,7 +369,8 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
 
     let synthesis = { ...PENDING_SYNTHESIS };
     try {
-      const raw = await callModel(projectId, composed, project.reasoningLlm.modelId);
+      // Step 4: Synthesis — deterministic grouping and scoring
+      const raw = await callModel(projectId, composed, project.reasoningLlm.modelId, { temperature: 0.1 });
       const parsed = extractJson(raw);
       synthesis = {
         status: 'done',
@@ -466,7 +473,8 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
     const applyStart = Date.now();
     const applyTimer = setInterval(() => setApplyElapsed(Math.floor((Date.now() - applyStart) / 1000)), 1000);
     try {
-      const improved = await callModel(projectId, applyPrompt, project.reasoningLlm.modelId);
+      // Apply: precise instruction following, minimal creativity
+      const improved = await callModel(projectId, applyPrompt, project.reasoningLlm.modelId, { temperature: 0.1 });
       const trimmed = (improved || '').trim();
       const elapsed = ((Date.now() - applyStart) / 1000).toFixed(0);
       if (!trimmed || trimmed.length < 100) {

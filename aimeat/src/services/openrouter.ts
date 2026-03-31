@@ -28,12 +28,21 @@ const TIMEOUT_MS = 1_800_000; // 30 minutes
 /**
  * Call an OpenAI-compatible chat completions API.
  */
+export interface CompletionOptions {
+  temperature?: number;
+  top_p?: number;
+  max_tokens?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
+}
+
 export async function complete(
   apiKey: string | undefined,
   model: string,
   prompt: string,
   systemPrompt?: string,
   baseUrl: string = OPENROUTER_BASE,
+  options?: CompletionOptions,
 ): Promise<OpenRouterCompletionResult> {
   const messages: Array<{ role: string; content: string }> = [];
   if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
@@ -50,7 +59,12 @@ export async function complete(
     headers['X-Title'] = 'AIMEAT Generator';
   }
 
-  const requestBody = { model, messages };
+  const requestBody: Record<string, unknown> = { model, messages };
+  if (options?.temperature !== undefined) requestBody.temperature = options.temperature;
+  if (options?.top_p !== undefined) requestBody.top_p = options.top_p;
+  if (options?.max_tokens !== undefined) requestBody.max_tokens = options.max_tokens;
+  if (options?.frequency_penalty !== undefined) requestBody.frequency_penalty = options.frequency_penalty;
+  if (options?.presence_penalty !== undefined) requestBody.presence_penalty = options.presence_penalty;
   const bodyStr = JSON.stringify(requestBody);
   console.log(`[openrouter] Sending: model=${model}, bodyLen=${bodyStr.length}, msgCount=${messages.length}, userMsgLen=${messages[messages.length - 1]?.content?.length || 0}`);
 
