@@ -621,8 +621,16 @@ export async function buildComponentPrompt(type, label, projectDescription, blue
   const template = COMPONENT_TEMPLATES[type];
   if (!template) throw new Error(`No template for type: ${type}`);
 
-  let context = `Project: ${projectDescription}\n`;
-  if (blueprint) {
+  // Extensions are PROJECT-AGNOSTIC when they have a spec — they describe a platform capability,
+  // not a component of a specific project. Other component types still get the project context.
+  let context = '';
+  if (type === 'extension') {
+    // Extension context is minimal — spec provides the contract, data sources provide the details
+    context += `Generate an AIMEAT platform extension.\n`;
+  } else {
+    context += `Project: ${projectDescription}\n`;
+  }
+  if (blueprint && type !== 'extension') {
     context += `\nBlueprint components: ${blueprint.components.map(c => `${c.id} (${c.type}: ${c.label})`).join(', ')}\n`;
   }
 
