@@ -166,6 +166,31 @@ export default function LlmConfigEditor({ config, onChange, onRemove, label }) {
             `
           }
 
+          <!-- Parameters: temperature, top_p, max_tokens -->
+          <div class="fnd-cal-model-params">
+            <label class="fnd-cal-model-param">
+              <span>Temperature</span>
+              <input type="number" min="0" max="2" step="0.1"
+                value=${draft.temperature ?? ''}
+                placeholder="0.3"
+                onInput=${e => updateDraft({ temperature: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+            </label>
+            <label class="fnd-cal-model-param">
+              <span>Top P</span>
+              <input type="number" min="0" max="1" step="0.05"
+                value=${draft.top_p ?? ''}
+                placeholder="1.0"
+                onInput=${e => updateDraft({ top_p: e.target.value === '' ? undefined : parseFloat(e.target.value) })} />
+            </label>
+            <label class="fnd-cal-model-param">
+              <span>Max tokens</span>
+              <input type="number" min="100" max="128000" step="100"
+                value=${draft.max_tokens ?? ''}
+                placeholder="auto"
+                onInput=${e => updateDraft({ max_tokens: e.target.value === '' ? undefined : parseInt(e.target.value) })} />
+            </label>
+          </div>
+
           <!-- Save button -->
           <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.25rem;">
             <button class="btn-primary btn-sm" onClick=${handleSave} disabled=${!dirty}>

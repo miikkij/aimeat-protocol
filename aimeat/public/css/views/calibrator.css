@@ -430,6 +430,11 @@
 .fnd-cal-collapsible { margin-top: 4px; }
 .fnd-cal-collapsible summary { padding: 4px 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-dim); }
 
+/* ── V2: Model parameter controls ── */
+.fnd-cal-model-params { display: flex; gap: 12px; flex-wrap: wrap; }
+.fnd-cal-model-param { display: flex; flex-direction: column; gap: 2px; font-size: 0.75rem; color: var(--text-dim); }
+.fnd-cal-model-param input { width: 80px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--text); font-size: 0.8rem; }
+
 /* ── V2: Template section ── */
 .fnd-cal-templates { display: flex; flex-direction: column; gap: 8px; }
 .fnd-cal-template-details {

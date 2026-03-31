@@ -38,7 +38,7 @@ import { getBatch, updateBatch, createVersion } from '/js/services/calibrator.js
 
 // ── Helpers ──
 
-async function callModel(projectId, prompt, modelId, { retries = 1, temperature } = {}) {
+async function callModel(projectId, prompt, modelId, { retries = 1, temperature, top_p, max_tokens } = {}) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 1_800_000); // 30 min
@@ -48,6 +48,8 @@ async function callModel(projectId, prompt, modelId, { retries = 1, temperature 
     try {
       const body = { projectId, prompt, model: modelId };
       if (temperature !== undefined) body.temperature = temperature;
+      if (top_p !== undefined) body.top_p = top_p;
+      if (max_tokens !== undefined) body.max_tokens = max_tokens;
       const raw = await fetch('/v1/openrouter/complete', {
         method: 'POST', headers,
         body: JSON.stringify(body),
@@ -214,8 +216,8 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
       } else {
         const start = Date.now();
         try {
-          // Step 1: Generation — some creativity but follow the spec
-          const output = await callModel(projectId, currentVersion.prompt, candidate.modelId, { temperature: 0.3 });
+          // Step 1: Generation — use model's configured temperature, or default 0.3
+          const output = await callModel(projectId, currentVersion.prompt, candidate.modelId, { temperature: candidate.temperature ?? 0.3, top_p: candidate.top_p, max_tokens: candidate.max_tokens });
           copy.step1_generation = { status: 'done', output, durationMs: Date.now() - start, error: null, promptSent: currentVersion.prompt };
         } catch (e) {
           copy.step1_generation = { status: 'error', output: null, durationMs: Date.now() - start, error: e.message, promptSent: currentVersion.prompt };
@@ -389,7 +391,8 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
       synthesis = { ...PENDING_SYNTHESIS, status: 'error', error: e.message, promptSent: composed };
     }
 
-    const updated = await updateBatch(projectId, d.batchId, { status: 'synthesized', step4_synthesis: synthesis });
+    // Always include models in the final update so batch list shows correct scores
+    const updated = await updateBatch(projectId, d.batchId, { models: d.models, status: 'synthesized', step4_synthesis: synthesis });
     const result = updated || { ...d, status: 'synthesized', step4_synthesis: synthesis };
     setDetail(result);
     if (!chain) { setRunning(false); setProgress(''); }
