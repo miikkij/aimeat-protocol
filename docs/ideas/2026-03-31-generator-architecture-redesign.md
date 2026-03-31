@@ -31,21 +31,34 @@ The current system treats everything as one monolithic project:
 AIMEAT has a clear layered architecture that the generator should respect:
 
 ```
-APP (look & feel, navigation, user interaction)
+APP (thin shell — navigation, layout, styling)
   ↓ uses
-CORTEXES (domain components — data, features, app-domain)
+APP-DOMAIN CORTEX (business logic, view composition, workflows, orchestration)
+  ↓ uses
+COMPONENTS (reusable UI pieces — search, card, timeline, table, badge...)
+  + DATA CORTEX (callExt, AIMEAT base APIs, error/loading/caching)
+  + SHARED CORTEXES (charts, forms, nav, dialogs, viewers...)
   ↓ uses
 EXTENSIONS + AIMEAT BASE (memory, storage, boards, wallet, consent...)
-  + SHARED CORTEXES (charts, forms, nav, dialogs, viewers...)
 ```
+
+- **Components** are self-contained, reusable UI pieces (CompanyCard, WatchlistBadge, ChangeTimeline, CompanySearch). Each handles its own rendering, uses the data layer, exposes a clean interface.
+- **App-domain cortex** composes components into views and pages, manages navigation, passes data between components, enforces business rules. It decides WHAT to show and WHEN.
+- **Components** decide HOW to render.
+- **Data cortex** handles WHERE data comes from.
+- The current "one feature cortex per view" approach is wrong — it creates monolithic views that each reinvent common patterns. Components are the building blocks instead.
 
 **Each layer has its OWN perspective — this is critical for the redesign:**
 
 **Extensions** — Perspective: PLATFORM EXPANSION. "I am bringing a new capability to the AIMEAT platform." An extension knows NOTHING about any specific app or cortex that might use it. It only knows: what external data source or service am I connecting? What actions do I expose? What data do I store in memory? How do I schedule background work? A PRH company data extension is a platform capability — useful for ANY app, not designed for one.
 
-**Cortexes** — Perspective: REUSABLE COMPONENT. "I am a domain component that provides a coherent API over extensions + AIMEAT base capabilities." A data cortex calls extensions via `callExt` (NOT by reading extension memory directly), uses AIMEAT base APIs (memory, storage, boards, wallet) for its own needs, and provides a clean data interface with proper error states, loading states, and caching. It abstracts away WHERE data comes from. Feature cortexes provide UI components. App-domain cortex owns business logic and orchestrates everything. Cortexes can use other cortexes (charts, forms, viewers). They do NOT know what app will consume them.
+**Data Cortex** — Perspective: DATA ACCESS LAYER. "I provide a coherent API over extensions + AIMEAT base capabilities." Calls extensions via `callExt` (NOT by reading extension memory directly). Uses AIMEAT base APIs (memory, storage, boards, wallet) for its own needs. Provides clean data interface with proper error states, loading states, and caching. Abstracts away WHERE data comes from. Does NOT contain business logic — just data access.
 
-**Apps** — Perspective: USER EXPERIENCE. "I compose cortexes into a working application with look, feel, and navigation." An app knows what cortexes are available and their APIs. It does NOT know about extensions directly — it only talks through cortexes. It handles layout, styling, routing, and user interaction.
+**Components** — Perspective: REUSABLE UI PIECES. "I am a self-contained building block that renders one thing well." A CompanyCard, a WatchlistBadge, a ChangeTimeline, a SearchInput. Each uses the data layer, handles its own rendering, and exposes a clean interface. Components do NOT know about each other or about page-level layout — they are composed by the app-domain cortex. Components can use shared cortexes (charts, forms, viewers, dialogs).
+
+**App-Domain Cortex** — Perspective: BUSINESS LOGIC + ORCHESTRATION. "I own the use cases, compose components into views, enforce business rules, and manage workflows." Decides WHAT to show and WHEN. Handles navigation between views. Passes data between components. Validates inputs. Manages state transitions. This is where all domain intelligence lives.
+
+**Apps** — Perspective: THIN SHELL. "I am just navigation, layout, and styling." An app loads the app-domain cortex and provides the visual frame — header, sidebar, theme, responsive layout. It does NOT contain logic, data access, or component composition. It delegates everything to the app-domain cortex.
 
 **Business/domain logic** — WHERE DOES IT LIVE? The current generator has no clear home for domain rules (validation, computed values, workflows, constraints like "a company can only be on the watchlist once"). This logic gets scattered across extensions, cortexes, and apps randomly. The answer is the **app-domain cortex** — NOT the data cortex (which is just a data access layer that fetches/stores/transforms). The app-domain cortex owns use cases, orchestrates workflows, enforces business rules, and composes features. The data cortex stays dumb. The research session should validate this and ensure the generation architecture makes the app-domain cortex the explicit home for all business logic.
 
