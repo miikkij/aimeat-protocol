@@ -14,6 +14,7 @@
  */
 
 import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER, COMPONENT_TEMPLATES, EXTENSION_CONSUMPTION_RULES, summarizeExtensionApi, summarizeCortexApi } from './generator-prompts-base.js';
+import { formatSpecForPrompt } from './generator-specs.js';
 
 // Cortex prompt modules — eagerly loaded in browser, skipped on server.
 // The modules are cached after first dynamic import.
@@ -694,46 +695,67 @@ export async function buildComponentPrompt(type, label, projectDescription, blue
   }
 
   if (completedComponents && completedComponents.length > 0) {
-    // Use context bundles when available — structured summaries from registration + probe
-    const bundled = completedComponents.filter(c => c.contextBundle);
-    const unbundled = completedComponents.filter(c => !c.contextBundle);
+    // ── SPEC-DRIVEN: prefer specs over regex-extracted summaries ──
+    // Specs are formal JSON contracts with exact types and examples.
+    // They replace summarizeExtensionApi() / summarizeCortexApi() which use lossy regex extraction.
+    const withSpecs = completedComponents.filter(c => c.spec);
+    const withoutSpecs = completedComponents.filter(c => !c.spec);
 
-    if (bundled.length > 0) {
-      const { formatBundlesForPrompt } = _cortexModules || {};
-      if (formatBundlesForPrompt) {
-        context += formatBundlesForPrompt(bundled.map(c => c.contextBundle));
-      } else {
-        // Fallback: simple listing if module not loaded
-        context += '\nAlready completed:\n';
-        for (const c of bundled) {
-          const b = c.contextBundle;
-          context += `- ${c.id} (${c.type}: ${c.label}): registered as "${b.registeredAs}"`;
-          if (b.actions) context += ` — actions: ${b.actions.join(', ')}`;
-          if (b.exports) context += ` — exports: ${b.exports.join(', ')}`;
-          context += '\n';
-        }
+    // Inject specs from upstream completed components
+    for (const c of withSpecs) {
+      if (c.type === 'extension') {
+        context += formatSpecForPrompt(c.spec, `Extension Spec: ${c.spec.name}`);
+      } else if (c.type === 'cortex' && (c.subtype === 'data' || c.spec?.wrapsExtension)) {
+        context += formatSpecForPrompt(c.spec, `Data API Spec: ${c.spec.name}`);
+      } else if (c.type === 'cortex' && (c.subtype === 'component' || c.spec?.render)) {
+        context += formatSpecForPrompt(c.spec, `Component Spec: ${c.spec.name}`);
+      } else if (c.type === 'cortex' && (c.subtype === 'app-domain' || c.spec?.viewComposition)) {
+        context += formatSpecForPrompt(c.spec, `App-Domain Spec: ${c.spec.name}`);
       }
     }
 
-    // Fallback for components without bundles
-    if (unbundled.length > 0) {
-      context += '\nAlready completed:\n';
-      for (const c of unbundled) {
-        context += `- ${c.id} (${c.type}: ${c.label}): registered as "${c.registeredAs}"\n`;
-        if (c.result && c.type === 'extension') {
-          context += `  API summary:\n${summarizeExtensionApi(c.result)}\n`;
-          if (c.probeResults && Array.isArray(c.probeResults) && c.probeResults.length > 0 && (type === 'cortex' || type === 'app' || type === 'extension')) {
-            context += `\n  ## ACTUAL API RESPONSES (captured from live execution of ${c.registeredAs})\n`;
-            context += `  Study these carefully — your code MUST handle these exact data shapes.\n\n`;
-            for (const probe of c.probeResults) {
-              if (probe.status === 200 && probe.response) {
-                context += `  POST /v1/ext/${c.registeredAs}/${probe.action} ${JSON.stringify(probe.input)}\n`;
-                context += `  → ${JSON.stringify(probe.response)}\n\n`;
+    // Fallback: for components without specs, use existing bundle/summary approach
+    // This covers CSM, memory, translation, and any legacy components
+    if (withoutSpecs.length > 0) {
+      const bundled = withoutSpecs.filter(c => c.contextBundle);
+      const unbundled = withoutSpecs.filter(c => !c.contextBundle);
+
+      if (bundled.length > 0) {
+        const { formatBundlesForPrompt } = _cortexModules || {};
+        if (formatBundlesForPrompt) {
+          context += formatBundlesForPrompt(bundled.map(c => c.contextBundle));
+        } else {
+          context += '\nAlready completed:\n';
+          for (const c of bundled) {
+            const b = c.contextBundle;
+            context += `- ${c.id} (${c.type}: ${c.label}): registered as "${b.registeredAs}"`;
+            if (b.actions) context += ` — actions: ${b.actions.join(', ')}`;
+            if (b.exports) context += ` — exports: ${b.exports.join(', ')}`;
+            context += '\n';
+          }
+        }
+      }
+
+      if (unbundled.length > 0) {
+        context += '\nAlready completed:\n';
+        for (const c of unbundled) {
+          context += `- ${c.id} (${c.type}: ${c.label}): registered as "${c.registeredAs}"\n`;
+          // Fallback to regex summaries for components without specs (legacy path)
+          if (c.result && c.type === 'extension') {
+            context += `  API summary:\n${summarizeExtensionApi(c.result)}\n`;
+            if (c.probeResults && Array.isArray(c.probeResults) && c.probeResults.length > 0 && (type === 'cortex' || type === 'app' || type === 'extension')) {
+              context += `\n  ## ACTUAL API RESPONSES (captured from live execution of ${c.registeredAs})\n`;
+              context += `  Study these carefully — your code MUST handle these exact data shapes.\n\n`;
+              for (const probe of c.probeResults) {
+                if (probe.status === 200 && probe.response) {
+                  context += `  POST /v1/ext/${c.registeredAs}/${probe.action} ${JSON.stringify(probe.input)}\n`;
+                  context += `  → ${JSON.stringify(probe.response)}\n\n`;
+                }
               }
             }
+          } else if (c.result && c.type === 'cortex') {
+            context += `  API summary:\n${summarizeCortexApi(c.result)}\n`;
           }
-        } else if (c.result && c.type === 'cortex') {
-          context += `  API summary:\n${summarizeCortexApi(c.result)}\n`;
         }
       }
     }
