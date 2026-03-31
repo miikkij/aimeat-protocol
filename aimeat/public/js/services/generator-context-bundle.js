@@ -23,6 +23,12 @@ export function createBundle(component, probeResults) {
     registeredAs: component.registeredAs,
   };
 
+  // Include spec if available — formal contract for downstream consumers
+  // Specs replace regex-extracted summaries with exact types and examples
+  if (component.spec) {
+    bundle.spec = component.spec;
+  }
+
   if (component.type === 'extension') {
     // Extract action IDs from the result (YAML manifest)
     const actionIds = [];

@@ -1457,7 +1457,9 @@ export function extractCodeBlocks(text) {
   return blocks.length > 0 ? blocks.join('\n\n') : text;
 }
 
+/** @deprecated Use component.spec (formal JSON contract) instead of regex-extracted summaries. */
 export function summarizeExtensionApi(result) {
+  console.warn('[DEPRECATED] summarizeExtensionApi — use component.spec instead. See generator-specs.js.');
   if (!result) return '  (no code available)\n';
   const lines = typeof result === 'string' ? result.split('\n') : [];
   const summary = [];
@@ -1523,6 +1525,7 @@ export function summarizeExtensionApi(result) {
 /**
  * Summarize cortex code into a compact API reference (public methods).
  */
+/** @deprecated Use component.spec (formal JSON contract) instead of regex-extracted summaries. */
 export function summarizeCortexApi(result) {
   if (!result) return '  (no code available)\n';
   const summary = [];
@@ -1568,6 +1571,7 @@ export function summarizeCortexApi(result) {
  * Shows ONLY public methods with parameters and return types.
  * Never exposes internal functions (callExt, readExtMemory, etc.).
  */
+/** @deprecated Use component.spec (formal JSON contract) instead of regex-extracted summaries. */
 export function summarizeCortexApiForApp(result, probeResults) {
   if (!result) return '  (no API info available)';
 

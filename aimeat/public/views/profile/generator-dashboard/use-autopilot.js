@@ -427,10 +427,18 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
               testProbeResults = extComp?.probeResults || null;
             }
             try {
-              testPromptText = buildTestPrompt(
-                comp.type, content, comp.label, updated.registeredAs,
-                project.blueprint, interviewSpec, testProbeResults
-              );
+              // ── Prefer spec-based tests when component has a spec ──
+              if (updated.spec && comp.type === 'extension') {
+                testPromptText = buildExtensionTestFromSpec(updated.spec, updated.registeredAs);
+              } else if (updated.spec && comp.type === 'cortex' && (comp.subtype === 'data' || updated.spec?.wrapsExtension)) {
+                testPromptText = buildDataCortexTestFromSpec(updated.spec);
+              } else {
+                // Fallback to existing test prompt for components without specs
+                testPromptText = buildTestPrompt(
+                  comp.type, content, comp.label, updated.registeredAs,
+                  project.blueprint, interviewSpec, testProbeResults
+                );
+              }
               await writeProjectLog(projectId, 'test_prompt_built', { meta: { component: comp.label, environment: testEnvironment, promptLength: testPromptText.length, by: 'autopilot' } });
               writeDebugArtifact(projectId, cid, 'test-prompt', testPromptText);
               aiTestCode = await runWithAi(projectId, testPromptText);
