@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document is a brief for a dedicated Claude Code session (terminal, not VSCode) to research and design a new generator architecture for AIMEAT. The current generator/foundry/calibrator system has fundamental design flaws that limit output quality regardless of prompt calibration.
+This document is a brief for a dedicated Claude session to research and design a new generator architecture for AIMEAT. The current generator/foundry/calibrator system has fundamental design flaws that limit output quality regardless of prompt calibration.
 
 **Do NOT start implementing anything.** This is research and analysis only. The output should be a design document with options, trade-offs, and a recommended approach.
 
@@ -79,7 +79,9 @@ Read and analyze the current implementation comprehensively:
 - How do cortexes compose with each other?
 - What is a cortex's public API?
 
-**Existing working examples** — Look at the PRH extensions (`ext:prh-yritystieto`, `ext:prh-api-integration`) and their cortexes. These are REAL working examples. What patterns do they use that the generator should replicate?
+**Hand-built reference implementations** — The PRH extensions (`ext:prh-yritystieto`, `ext:prh-api-integration`) and their cortexes were built manually, NOT by the generator. Study them as examples of what GOOD extensions and cortexes look like from a platform perspective. Compare their structure to what the generator currently tries to produce. The gap between hand-built quality and generator output is exactly what we need to close.
+
+**Generator output history** — The generator and foundry have NOT produced a single fully working app end-to-end. Assess why by looking at actual generated outputs if any are saved, and by analyzing where the generation pipeline breaks down.
 
 ### Phase 2: Web Research
 
