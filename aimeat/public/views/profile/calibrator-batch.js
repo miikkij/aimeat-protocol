@@ -181,11 +181,14 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
 
   // ── Auto-run on mount ──
 
+  const autoRunTriggered = useState(false);
   useEffect(() => {
-    if (autoRunAll && !running) {
+    if (autoRunAll && !autoRunTriggered[0] && !running) {
+      autoRunTriggered[1](true);
       (async () => {
         setExpanded(true);
         const d = await loadDetail();
+        if (!d) { console.error('autoRunAll: failed to load batch detail'); return; }
         setDetail(d);
         await handleRunAllSteps(d);
       })();

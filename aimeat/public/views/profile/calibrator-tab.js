@@ -274,7 +274,8 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
       const batch = await createBatch(projectId, selectedVersion);
       setBatches(prev => [batch, ...prev]);
       if (runAllSteps) {
-        setAutoRunBatchId(batch.batchId);
+        // Use a unique timestamp to force useEffect to re-fire even for consecutive clicks
+        setAutoRunBatchId(batch.batchId + ':' + Date.now());
       }
     } catch (e) {
       showToast?.(e.message, true);
@@ -501,7 +502,7 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
                   currentVersion=${currentVersion}
                   onUpdate=${() => reloadBatches()}
                   showToast=${showToast}
-                  autoRunAll=${b.batchId === autoRunBatchId}
+                  autoRunAll=${autoRunBatchId && autoRunBatchId.startsWith(b.batchId)}
                 />
               `)}
             </div>
