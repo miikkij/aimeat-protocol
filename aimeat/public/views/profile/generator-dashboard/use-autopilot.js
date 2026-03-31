@@ -37,6 +37,18 @@ import { validateComponent } from '/js/services/generator-validate.js';
 import { runComponentTest, probeExtension } from '/js/services/generator-testing.js';
 import { createBundle } from '/js/services/generator-context-bundle.js';
 import { runWithAi, stripCodeblock } from '../generator-detail.js';
+// ── Spec-driven pipeline imports ──
+import {
+  buildExtensionSpecPrompt, buildDataApiSpecPrompt, buildComponentSpecPrompt,
+  buildAppDomainSpecPrompt, formatSpecForPrompt,
+} from '/js/services/generator-specs.js';
+import {
+  validateExtensionSpec, validateDataApiSpec, validateComponentSpec,
+  validateAppDomainSpec, validateSpecAgainstProbe,
+} from '/js/services/generator-spec-validate.js';
+import {
+  buildExtensionTestFromSpec, buildDataCortexTestFromSpec, buildIntegrationTest,
+} from '/js/services/generator-spec-tests.js';
 
 /**
  * @param {Object} core — useDashboardCore return value
@@ -48,6 +60,103 @@ import { runWithAi, stripCodeblock } from '../generator-detail.js';
  * @param {Function} showToast
  */
 export function useAutopilot(core, autopilotState, projectId, orSettings, session, testExec, showToast) {
+
+  // ── Spec generation helper ──
+  // Generates a spec for a component. Spec is generated BEFORE code — spec is king.
+  // Returns parsed JSON spec or null on failure.
+  async function generateSpec(comp, project, interviewSpec) {
+    const blueprint = project.blueprint;
+    const bpComp = blueprint?.components?.find(c => c.label === comp.label);
+    if (!bpComp) return null;
+
+    let specPrompt = null;
+    let validatorFn = null;
+
+    if (comp.type === 'extension') {
+      specPrompt = buildExtensionSpecPrompt({ blueprint, blueprintComponent: bpComp, interviewSpec });
+      validatorFn = validateExtensionSpec;
+    } else if (comp.type === 'cortex' && (bpComp.subtype === 'data' || comp.label?.toLowerCase().includes('data'))) {
+      const allComps = await loadAllComponents(projectId);
+      const extComp = allComps.find(c => c.type === 'extension' && c.spec);
+      if (!extComp?.spec) { showToast?.(`${comp.label}: No extension spec found — generate extension first`, true); return null; }
+      specPrompt = buildDataApiSpecPrompt({ extensionSpec: extComp.spec, blueprint });
+      validatorFn = validateDataApiSpec;
+    } else if (comp.type === 'cortex' && (bpComp.subtype === 'component' || bpComp.id?.startsWith('component-'))) {
+      const allComps = await loadAllComponents(projectId);
+      const dataCortex = allComps.find(c => c.type === 'cortex' && c.spec && (c.subtype === 'data' || c.label?.toLowerCase().includes('data')));
+      if (!dataCortex?.spec) { showToast?.(`${comp.label}: No data API spec found — generate data cortex first`, true); return null; }
+      const translationKeys = allComps
+        .filter(c => c.type === 'translation' && c.contextBundle?.keys)
+        .flatMap(c => c.contextBundle.keys);
+      const viewDef = interviewSpec?.views?.find(v =>
+        comp.label.toLowerCase().includes((v.title || '').toLowerCase())
+      );
+      specPrompt = buildComponentSpecPrompt({ dataApiSpec: dataCortex.spec, componentLabel: comp.label, viewDefinition: viewDef, translationKeys });
+      validatorFn = validateComponentSpec;
+    } else if (comp.type === 'cortex' && (bpComp.subtype === 'app-domain' || bpComp.id?.startsWith('cortex-app'))) {
+      const allComps = await loadAllComponents(projectId);
+      const dataCortex = allComps.find(c => c.type === 'cortex' && c.spec && (c.subtype === 'data' || c.label?.toLowerCase().includes('data')));
+      const componentSpecs = allComps
+        .filter(c => c.spec && (c.subtype === 'component' || c.id?.startsWith?.('component-')))
+        .map(c => c.spec);
+      const translationKeys = allComps
+        .filter(c => c.type === 'translation' && c.contextBundle?.keys)
+        .flatMap(c => c.contextBundle.keys);
+      if (!dataCortex?.spec) { showToast?.(`${comp.label}: No data API spec found`, true); return null; }
+      specPrompt = buildAppDomainSpecPrompt({
+        componentSpecs, dataApiSpec: dataCortex.spec,
+        useCases: interviewSpec?.useCases, translationKeys, views: interviewSpec?.views,
+      });
+      validatorFn = validateAppDomainSpec;
+    }
+
+    if (!specPrompt) return null; // CSM, memory, translation don't need specs
+
+    autopilotState.setStep(comp.label + ' — generating spec...');
+    const cid = bpComp.id || comp.id;
+    writeDebugArtifact(projectId, cid, 'spec-prompt', specPrompt);
+    await writeProjectLog(projectId, 'spec_generating', { meta: { component: comp.label, type: comp.type, by: 'autopilot' } });
+
+    let specRaw;
+    try {
+      specRaw = await runWithAi(projectId, specPrompt);
+    } catch (e) {
+      showToast?.(`${comp.label}: Spec generation failed: ${e.message}`, true);
+      await writeProjectLog(projectId, 'spec_generation_failed', { meta: { component: comp.label, error: e.message, by: 'autopilot' } });
+      return null;
+    }
+    writeDebugArtifact(projectId, cid, 'spec-raw-response', specRaw);
+
+    // Parse JSON — strip markdown fences if present
+    let specText = specRaw.trim();
+    const fenceMatch = specText.match(/```(?:json)?\s*\n([\s\S]*?)```/);
+    if (fenceMatch) specText = fenceMatch[1].trim();
+
+    let spec;
+    try {
+      spec = JSON.parse(specText);
+    } catch (e) {
+      showToast?.(`${comp.label}: Spec JSON parse failed`, true);
+      writeDebugArtifact(projectId, cid, 'spec-parse-error', e.message + '\n\n' + specText);
+      await writeProjectLog(projectId, 'spec_parse_failed', { meta: { component: comp.label, error: e.message, by: 'autopilot' } });
+      return null;
+    }
+
+    // Validate spec structure
+    if (validatorFn) {
+      const sv = validatorFn(spec);
+      if (!sv.valid) {
+        showToast?.(`${comp.label}: Spec validation failed: ${sv.errors[0]}`, true);
+        writeDebugArtifact(projectId, cid, 'spec-validation-errors', sv.errors.join('\n'));
+        await writeProjectLog(projectId, 'spec_validation_failed', { meta: { component: comp.label, errors: sv.errors, by: 'autopilot' } });
+        return null;
+      }
+    }
+
+    writeDebugArtifact(projectId, cid, 'spec', JSON.stringify(spec, null, 2));
+    await writeProjectLog(projectId, 'spec_generated', { meta: { component: comp.label, specName: spec.name, actions: spec.actions?.length || spec.methods?.length || 0, by: 'autopilot' } });
+    return spec;
+  }
 
   async function handleRunAll() {
     if (!orSettings?.hasApiKey || autopilotState.running) return;
@@ -78,7 +187,19 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
         autopilotState.setStep(comp.label);
         core.setSelectedId(cid);
 
-        // Build prompt
+        // ── SPEC GENERATION (before code — spec is king) ──
+        const specTypes = ['extension', 'cortex'];
+        let spec = null;
+        if (specTypes.includes(comp.type)) {
+          spec = await generateSpec(comp, project, interviewSpec);
+          if (spec && !autopilotState.cancelledRef.current) {
+            comp = { ...comp, spec };
+            await saveComponent(projectId, comp);
+          }
+        }
+        if (autopilotState.cancelledRef.current) break;
+
+        // Build prompt — spec flows as context if available
         const latestComps = await loadAllComponents(projectId);
         const completedComponents = latestComps.filter(c => c.status === 'done' && c.registeredAs);
         const prompt = await buildComponentPrompt(
@@ -264,6 +385,24 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
               await saveComponent(projectId, updated);
               writeDebugArtifact(projectId, comp.id || bpComp?.id || 'ext', 'probe-results', JSON.stringify(probeResults, null, 2));
               await writeProjectLog(projectId, 'extension_probe_complete', { meta: { component: comp.label, results: probeResults.length, by: 'autopilot' } });
+
+              // ── SPEC-VS-PROBE VALIDATION — spec is king ──
+              if (updated.spec && probeResults.length > 0) {
+                const specProbeResult = validateSpecAgainstProbe(updated.spec, probeResults);
+                writeDebugArtifact(projectId, comp.id || bpComp?.id || 'ext', 'spec-vs-probe', JSON.stringify(specProbeResult, null, 2));
+                if (!specProbeResult.valid) {
+                  await writeProjectLog(projectId, 'spec_probe_mismatch', {
+                    meta: { component: comp.label, mismatches: specProbeResult.mismatches.map(m => m.message), by: 'autopilot' },
+                  });
+                  showToast?.(`${comp.label}: Probe doesn't match spec — code may need regeneration`, true);
+                  // Log each mismatch for debugging
+                  for (const m of specProbeResult.mismatches) {
+                    console.warn(`[spec-vs-probe] ${m.message}`);
+                  }
+                } else {
+                  await writeProjectLog(projectId, 'spec_probe_validated', { meta: { component: comp.label, by: 'autopilot' } });
+                }
+              }
             }
           } catch (e) {
             await writeProjectLog(projectId, 'extension_probe_failed', { meta: { component: comp.label, error: e.message, by: 'autopilot' } });
