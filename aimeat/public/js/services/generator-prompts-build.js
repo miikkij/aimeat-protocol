@@ -105,9 +105,9 @@ Format:
     { "id": "translation-2", "type": "translation", "label": "Human-readable name (en)", "produces": ["memory:i18n.en"], "consumes": [] },
     { "id": "ext-1", "type": "extension", "label": "Human-readable name", "produces": ["memory:items.*"], "consumes": ["memory:settings.config"], "schedules": [{"action":"init","cron":"@activate"},{"action":"collect","cron":"0 2 * * *"}] },
     { "id": "cortex-data", "type": "cortex", "subtype": "data", "label": "Data layer", "produces": ["api:getData", "api:search"], "consumes": ["memory:items.*", "memory:settings.config"], "uses": [] },
-    { "id": "cortex-feature-search", "type": "cortex", "subtype": "feature", "label": "Search feature", "produces": ["ui:searchView"], "consumes": ["api:getData", "api:search"], "uses": ["aimeat-ui-viewers", "aimeat-ui-forms"] },
-    { "id": "cortex-feature-settings", "type": "cortex", "subtype": "feature", "label": "Settings feature", "produces": ["ui:settingsView"], "consumes": ["api:getSettings", "api:saveSettings"], "uses": ["aimeat-ui-forms"] },
-    { "id": "cortex-app", "type": "cortex", "subtype": "app-domain", "label": "App domain", "produces": ["api:init", "api:render"], "consumes": ["ui:searchView", "ui:settingsView"], "uses": ["aimeat-ui-nav"] },
+    { "id": "component-item-card", "type": "cortex", "subtype": "component", "label": "Item Card", "produces": ["ui:item-card"], "consumes": ["api:getData"], "uses": ["aimeat-ui-viewers"] },
+    { "id": "component-search-input", "type": "cortex", "subtype": "component", "label": "Search Input", "produces": ["ui:search-input"], "consumes": ["api:search"], "uses": ["aimeat-ui-forms"] },
+    { "id": "cortex-app", "type": "cortex", "subtype": "app-domain", "label": "App domain", "produces": ["api:init", "api:render"], "consumes": ["ui:item-card", "ui:search-input"], "uses": ["aimeat-ui-nav"] },
     { "id": "app-1", "type": "app", "label": "Human-readable name", "produces": [], "consumes": ["api:init", "api:render"] }
   ],
   "phases": [
@@ -115,7 +115,7 @@ Format:
     { "id": "seed", "label": "Seed Data", "componentIds": ["memory-1", "translation-1", "translation-2"] },
     { "id": "logic", "label": "Capabilities", "componentIds": ["ext-1"] },
     { "id": "cortex-data", "label": "Data Layer", "componentIds": ["cortex-data"] },
-    { "id": "cortex-features", "label": "Feature Components", "componentIds": ["cortex-feature-search", "cortex-feature-settings"] },
+    { "id": "components", "label": "UI Components", "componentIds": ["component-item-card", "component-search-input"] },
     { "id": "cortex-app", "label": "App Domain", "componentIds": ["cortex-app"] },
     { "id": "ui", "label": "Application", "componentIds": ["app-1"] }
   ],
@@ -285,15 +285,34 @@ Place it in an early phase (before extensions that consume it).
 
 Structure the service using layered cortex components:
 
-1. **Extensions** at the bottom — external API calls, scheduled background jobs
-2. **Data Cortex** (subtype: "data") — unifies extension data + AIMEAT platform data into a single data access interface. ALWAYS create when there are extensions. Can also use AIMEAT.data, AIMEAT.storage, AIMEAT.social directly.
-3. **Feature Cortex** (subtype: "feature") — one per use case or feature group. Self-contained data+UI module. Uses data cortex for data, platform UI cortex libraries for rendering. Exports render(container). Like aimeat-charts which renders complete chart components.
-4. **App-Domain Cortex** (subtype: "app-domain") — composes all feature cortex components + auth + translations + settings. Single entry point for the app. ALWAYS the last cortex component.
-5. **App** — loads app-domain cortex, wires up navigation, handles responsive layout.
+1. **Extensions** at the bottom — external API calls, scheduled background jobs. Project-agnostic platform capabilities.
+2. **Data Cortex** (subtype: "data") — wraps extension actions + AIMEAT platform data into clean async methods. ALWAYS create when there are extensions. Pure data access — no UI.
+3. **Components** (subtype: "component") — REUSABLE UI PIECES. Each component renders ONE thing well: a card, a badge, a timeline, a search input. Components are composed by the app-domain cortex into views. They are NOT monolithic feature views.
+4. **App-Domain Cortex** (subtype: "app-domain") — composes components into views, manages navigation, auth, translations, and business logic. Single entry point for the app. ALWAYS the last cortex component.
+5. **App** — loads app-domain cortex, calls init() and render(). Thin shell.
 
-Cortex components have a "subtype" field: "data", "feature", or "app-domain".
-Cortex phases are ordered: data first, then all features, then app-domain last.
-Feature cortex "uses" field lists platform cortex libraries it needs (aimeat-ui-viewers, aimeat-charts, etc.).
+## Component Decomposition (CRITICAL — read this carefully)
+
+Instead of creating ONE cortex per view (monolithic "feature cortex"), identify REUSABLE UI COMPONENTS:
+
+WRONG — monolithic feature cortexes that each reinvent common patterns:
+  { "id": "cortex-search", "type": "cortex", "subtype": "feature", "label": "Search Feature Cortex" }
+  { "id": "cortex-watchlist", "type": "cortex", "subtype": "feature", "label": "Watchlist Feature Cortex" }
+
+CORRECT — reusable components composed by app-domain cortex:
+  { "id": "cortex-data", "type": "cortex", "subtype": "data", "label": "Data Cortex" }
+  { "id": "component-company-card", "type": "cortex", "subtype": "component", "label": "Company Card" }
+  { "id": "component-search-input", "type": "cortex", "subtype": "component", "label": "Search Input" }
+  { "id": "component-watchlist-badge", "type": "cortex", "subtype": "component", "label": "Watchlist Badge" }
+  { "id": "component-change-timeline", "type": "cortex", "subtype": "component", "label": "Change Timeline" }
+  { "id": "cortex-app-domain", "type": "cortex", "subtype": "app-domain", "label": "App Domain" }
+
+Each component renders ONE thing well. The app-domain cortex composes them into views and pages.
+Ask: "Would this UI piece be useful in a different view or a different app?" If yes → component.
+
+Cortex components have a "subtype" field: "data", "component", or "app-domain".
+Cortex phases are ordered: data first, then all components, then app-domain last.
+Component "uses" field lists platform cortex libraries it needs (aimeat-ui-viewers, aimeat-charts, etc.).
 
 ## Settings
 
@@ -1050,7 +1069,7 @@ If these are missing, the app WILL crash with "getTranslations is not a function
     if (subtype === 'data') {
       return buildDataCortexPrompt(label, projectDescription, blueprint, bundles);
     }
-    if (subtype === 'feature') {
+    if (subtype === 'feature' || subtype === 'component') {
       const useCase = interviewSpec?.useCases?.find(uc =>
         label.toLowerCase().includes(uc.title?.toLowerCase().split(' ')[0] || '___')
       ) || interviewSpec?.useCases?.[0];
@@ -1065,7 +1084,7 @@ If these are missing, the app WILL crash with "getTranslations is not a function
       return buildFeatureCortexPrompt(label, useCase, view, dataCortexBundle, structures, translationKeys, usesLibs);
     }
     if (subtype === 'app-domain') {
-      const featureBundles = bundles.filter(b => b.subtype === 'feature');
+      const featureBundles = bundles.filter(b => b.subtype === 'feature' || b.subtype === 'component');
       const dataCortexBundle = bundles.find(b => b.subtype === 'data');
       const translationBundle = bundles.find(b => b.type === 'translation');
       return buildAppDomainCortexPrompt(label, projectDescription, featureBundles, dataCortexBundle, translationBundle);
