@@ -39,11 +39,15 @@ EXTENSIONS + AIMEAT BASE (memory, storage, boards, wallet, consent...)
   + SHARED CORTEXES (charts, forms, nav, dialogs, viewers...)
 ```
 
-**Extensions** are platform capabilities — they bring external data/services into AIMEAT. They exist independently of any app. A PRH company data extension is useful for ANY app that wants Finnish company data, not just one specific monitoring dashboard.
+**Each layer has its OWN perspective — this is critical for the redesign:**
 
-**Cortexes** are reusable domain components — they wrap extensions + AIMEAT base APIs into clean interfaces. They can use other cortexes. They provide both data access and UI features.
+**Extensions** — Perspective: PLATFORM EXPANSION. "I am bringing a new capability to the AIMEAT platform." An extension knows NOTHING about any specific app or cortex that might use it. It only knows: what external data source or service am I connecting? What actions do I expose? What data do I store in memory? How do I schedule background work? A PRH company data extension is a platform capability — useful for ANY app, not designed for one.
 
-**Apps** are thin shells — they compose cortexes into a user experience with navigation, layout, and styling.
+**Cortexes** — Perspective: REUSABLE COMPONENT. "I am a domain component that wraps extensions + AIMEAT base capabilities into something easy to use." A cortex knows what extensions are available (their contracts/APIs) and what AIMEAT platform features exist (memory, storage, boards, etc). It provides clean methods and optionally UI. It can use other cortexes (charts, forms, viewers). It does NOT know what app will consume it.
+
+**Apps** — Perspective: USER EXPERIENCE. "I compose cortexes into a working application with look, feel, and navigation." An app knows what cortexes are available and their APIs. It does NOT know about extensions directly — it only talks through cortexes. It handles layout, styling, routing, and user interaction.
+
+**The generation system MUST maintain these separate perspectives.** The moment an extension prompt mentions "the app needs..." or a cortex prompt references extension internals, the separation is broken.
 
 ## What This Research Session Must Do
 
@@ -78,10 +82,6 @@ Read and analyze the current implementation comprehensively:
 - What does a cortex component actually provide?
 - How do cortexes compose with each other?
 - What is a cortex's public API?
-
-**Hand-built reference implementations** — The PRH extensions (`ext:prh-yritystieto`, `ext:prh-api-integration`) and their cortexes were built manually, NOT by the generator. Study them as examples of what GOOD extensions and cortexes look like from a platform perspective. Compare their structure to what the generator currently tries to produce. The gap between hand-built quality and generator output is exactly what we need to close.
-
-**Generator output history** — The generator and foundry have NOT produced a single fully working app end-to-end. Assess why by looking at actual generated outputs if any are saved, and by analyzing where the generation pipeline breaks down.
 
 ### Phase 2: Web Research
 
