@@ -18,6 +18,7 @@ import { getEncryptionKey } from './encryption.js';
 import { decrypt } from './encryption.js';
 import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
+import { GeneratorDebugWriter } from './generator-debug.js';
 
 const log = { info: (m: string) => logger.info(m), warn: (m: string) => logger.warn(m), error: (m: string) => logger.error(m) };
 
@@ -201,6 +202,16 @@ export async function runAutopilot(
     emitChange('memory');
   }
 
+  // ── Debug artifact writer ──
+  const debug = new GeneratorDebugWriter(projectId);
+
+  // Write project metadata at start
+  debug.writeProjectMeta(
+    { projectId, name: project.name, description: project.description },
+    interviewSpec,
+    blueprint,
+  ).catch(() => {});
+
   // ── Main loop ──
   try {
     for (const cid of phaseOrder) {
@@ -261,13 +272,16 @@ export async function runAutopilot(
 
             if (specPrompt) {
               log.info(`[${cid}] Generating spec for ${compLabel}`);
+              debug.writeArtifact(cid, 'spec-prompt', specPrompt).catch(() => {});
               const specRaw = await callLLM(specPrompt);
+              debug.writeArtifact(cid, 'spec-raw-response', specRaw).catch(() => {});
               let specText = specRaw.trim();
               const fenceMatch = specText.match(/```(?:json)?\s*\n([\s\S]*?)```/);
               if (fenceMatch) specText = fenceMatch[1].trim();
 
               try {
                 spec = JSON.parse(specText) as Record<string, unknown>;
+                debug.writeArtifact(cid, 'spec', JSON.stringify(spec, null, 2)).catch(() => {});
                 log.info(`[${cid}] Spec generated: ${spec.name as string}`);
               } catch {
                 log.warn(`[${cid}] Spec JSON parse failed — continuing without spec`);
@@ -328,8 +342,11 @@ export async function runAutopilot(
         } as unknown as PromptRuntimeData);
 
         log.info(`[${cid}] Calling OpenRouter for ${compLabel} (prompt: ${(prompt as string).length} chars)`);
+        debug.writeComponentPrompt(cid, prompt as string).catch(() => {});
         let content = await callLLM(prompt as string);
+        debug.writeArtifact(cid, 'ai-raw-response', content).catch(() => {});
         content = stripCodeblock(content);
+        debug.writeComponentGenerated(cid, content).catch(() => {});
 
         // ── VALIDATE ──
         let vr = validateComponent(compType, content, blueprint as unknown as Blueprint);

@@ -30,6 +30,7 @@ import { apiPost, apiGet } from '/js/api.js';
 export function useAutopilot(core, autopilotState, projectId, orSettings, session, testExec, showToast) {
 
   let pollInterval = null;
+  let lastSeenResults = 0; // Track how many component results we've toasted
 
   /** Start the server-side autopilot and begin polling for status */
   async function handleRunAll() {
@@ -58,6 +59,17 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
             const progress = status.progress || {};
             const step = `${status.currentComponent} (${progress.completed || 0}/${progress.total || '?'})`;
             autopilotState.setStep(step);
+          }
+
+          // Show toast for each new component result
+          const results = status.componentResults || [];
+          if (results.length > lastSeenResults) {
+            for (let i = lastSeenResults; i < results.length; i++) {
+              const r = results[i];
+              const isError = r.status === 'error' || r.status === 'validation_failed' || r.status === 'registration_failed';
+              showToast?.(`${r.label}: ${r.status}${r.error ? ' — ' + r.error : ''}`, isError);
+            }
+            lastSeenResults = results.length;
           }
 
           // Refresh component list to show latest registrations
