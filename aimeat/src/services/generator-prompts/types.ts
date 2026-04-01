@@ -173,4 +173,10 @@ export interface PromptRuntimeData {
   errors?: string[];
   /** Extension name (for test prompts) */
   extensionName?: string;
+  /** Test failure context (for fix prompts) — errors, trace, dependency results */
+  testContext?: Record<string, unknown>;
+  /** Previous fix attempts (for fix prompts) — round, diagnosis, errors per round */
+  previousAttempts?: Array<Record<string, unknown>>;
+  /** Reflection diagnosis text (for fix prompts) — root cause analysis from diagnostic step */
+  reflectionDiagnosis?: string;
 }

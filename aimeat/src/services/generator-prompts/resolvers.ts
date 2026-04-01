@@ -551,10 +551,52 @@ function resolveFix(data: PromptRuntimeData, fragments: Record<string, string>):
     errors: (data.errors || []).map((e, i) => `${i + 1}. ${e}`).join('\n'),
     component_type: ct,
     type_constraints: typeConstraints,
-    test_context: '',
-    previous_attempts: '',
-    reflection_diagnosis: '',
+    // These are populated when the autopilot passes them in PromptRuntimeData.
+    // The browser buildFixPrompt() builds these from testContext, previousAttempts, reflectionDiagnosis params.
+    // The autopilot currently passes errors but not test traces — these enable it when it does.
+    test_context: data.testContext ? buildTestContextSection(data.testContext) : '',
+    previous_attempts: data.previousAttempts ? buildPreviousAttemptsSection(data.previousAttempts) : '',
+    reflection_diagnosis: data.reflectionDiagnosis ? `\n\n## ROOT CAUSE ANALYSIS (from diagnostic step)\n\n${data.reflectionDiagnosis}\n\nApply this analysis precisely when fixing the code.\n` : '',
   };
+}
+
+// Match browser buildTestContextSection() from fix.js lines 173-199
+function buildTestContextSection(testContext: Record<string, unknown>): string {
+  let section = '\n\n## Test Failure Context\n';
+  const errors = testContext.errors as string[] | undefined;
+  if (errors) section += 'Test errors:\n' + errors.join('\n') + '\n';
+  const trace = testContext.trace as Array<Record<string, string>> | undefined;
+  if (trace && trace.length > 0) {
+    section += '\n## ACTUAL API RESPONSES (diagnostic trace)\n';
+    section += 'These are the real responses from every API call during the test.\n';
+    section += 'Study these carefully to understand the actual data shapes before fixing.\n\n';
+    for (const t of trace) {
+      section += `[${t.status}] ${t.fn}(${t.args})\n  → ${t.result}\n\n`;
+    }
+  }
+  const depResults = testContext.dependencyResults as Array<Record<string, string>> | undefined;
+  if (depResults) {
+    section += '\nDependency test results (these passed):\n';
+    for (const dep of depResults) section += `- ${dep.componentId}: ${dep.status}\n`;
+  }
+  const bpComp = testContext.blueprintComponent as Record<string, unknown> | undefined;
+  if (bpComp) {
+    section += `\nBlueprint component spec:\n- type: ${bpComp.type}, produces: ${((bpComp.produces as string[]) || []).join(', ')}, consumes: ${((bpComp.consumes as string[]) || []).join(', ')}\n`;
+  }
+  return section;
+}
+
+// Match browser buildFixPrompt() previousAttempts section from fix.js lines 101-110
+function buildPreviousAttemptsSection(attempts: Array<Record<string, unknown>>): string {
+  if (!attempts || attempts.length === 0) return '';
+  let section = '\n\n## PREVIOUS FIX ATTEMPTS (DO NOT repeat these approaches)\n\n';
+  for (const attempt of attempts) {
+    section += `### Round ${attempt.round}\n`;
+    if (attempt.diagnosis) section += `Diagnosis: ${attempt.diagnosis}\n`;
+    section += `Errors after this round: ${((attempt.errors as string[]) || []).join('; ')}\n\n`;
+  }
+  section += `You are now on round ${attempts.length + 1}. You MUST try a FUNDAMENTALLY different approach than the previous rounds.\n`;
+  return section;
 }
 
 function resolveTestExtensionSpec(data: PromptRuntimeData): Vars {
@@ -578,16 +620,33 @@ function resolveTestExtensionSpec(data: PromptRuntimeData): Vars {
     }
   }
 
-  // Test scenarios from blueprint
+  // Test scenarios from blueprint — match browser buildTestPrompt() lines 59-103
   const bpComp = bp.components?.find(c => c.type === 'extension');
   let testScenarios = '';
+
+  // Memory keys this extension writes (for cleanup instructions) — browser lines 44-47, 67-71
+  const memoryProduces = (bpComp?.produces || [])
+    .filter((p: string) => p.startsWith('memory:'))
+    .map((p: string) => p.replace('memory:', ''));
+
   if (bp.testScenarios && bpComp) {
     const scenarios = (bp.testScenarios || []).filter(ts => ts.component === bpComp.id).flatMap(ts => ts.scenarios || []);
+
+    // State cleanup section — browser lines 67-71
+    if (memoryProduces.length > 0) {
+      testScenarios += `\n## State to Clean Up at Start\nThe extension writes to: ${memoryProduces.map(k => '`' + k + '`').join(', ')}\nBefore the first test scenario, clean stale data using the extension's OWN remove/delete actions via callExt.\nRead lists with readExtMemory, call remove for each item, then call init.\n`;
+    }
+
     if (scenarios.length > 0) {
-      testScenarios = '\n## Test Scenarios (from blueprint)\n\n' +
+      testScenarios += '\n## Test Scenarios (from blueprint)\n\n' +
         scenarios.map((s, i) => `${i + 1}. ${s.action}${s.type === 'external-api' ? ' [EXTERNAL API]' : ' [MEMORY]'}\n   Input: ${JSON.stringify(s.input)}\n   Expected: ${s.expect}`).join('\n\n') +
         '\n\nTest EVERY scenario above.\nFor [EXTERNAL API]: check response shape only, do NOT assert specific values. Graceful error = PASS.\nFor [MEMORY]: assert return values match what the action code returns on success.\n';
     }
+  }
+
+  // Golden samples extra guidance — browser lines 121-123
+  if (goldenSamples) {
+    goldenSamples += 'For example, if the response has `item: { id: "abc", name: "Test" }`, assert `result.item.id`, NOT `result.item === "abc"`.\n';
   }
 
   // Structures and action contracts from blueprint
@@ -598,7 +657,14 @@ function resolveTestExtensionSpec(data: PromptRuntimeData): Vars {
     ? Object.entries(bp.dataModel.actions).map(([name, def]) => `- **${name}**: input=${JSON.stringify(def.input || {})}, output=${(def.output as Record<string, unknown>)?.$ref ? '$ref:' + (def.output as Record<string, unknown>).$ref : JSON.stringify((def as Record<string, unknown>).output || 'any')}`).join('\n')
     : 'No actions defined';
 
+  // Project context — browser lines 48-55: blueprint components + use cases from interview
   const bpComponents = bp.components?.map(c => `- ${c.id} (${c.type}): ${c.label}`).join('\n') || '';
+  const useCases = data.interviewSpec?.useCases
+    ? (data.interviewSpec.useCases as Array<Record<string, string>>).map((uc, i) => {
+        if (typeof uc === 'string') return `${i + 1}. ${uc}`;
+        return `${i + 1}. ${uc.description || uc.title || JSON.stringify(uc)}`;
+      }).join('\n')
+    : 'No use cases specified';
 
   return {
     extension_name: extName,
@@ -606,7 +672,7 @@ function resolveTestExtensionSpec(data: PromptRuntimeData): Vars {
     test_scenarios: testScenarios,
     structures,
     action_contracts: actionContracts,
-    project_context: `## Project Context\nBlueprint components:\n${bpComponents}`,
+    project_context: `## Project Context\nBlueprint components:\n${bpComponents}\n\nUse cases from interview:\n${useCases}`,
   };
 }
 
@@ -655,7 +721,22 @@ function resolveTestCortexSpec(data: PromptRuntimeData): Vars {
     ? Object.entries(bp.dataModel.actions).map(([name, def]) => `- **${name}**: input=${JSON.stringify(def.input || {})}, output=${(def.output as Record<string, unknown>)?.$ref ? '$ref:' + (def.output as Record<string, unknown>).$ref : JSON.stringify((def as Record<string, unknown>).output || 'any')}`).join('\n')
     : 'No actions defined';
 
+  // APP test instructions — browser lines 228-235
+  // The browser cortex test env doc includes app test instructions at the end
+  const appApis = bpComp ? (bpComp.consumes || []).filter((p: string) => p.startsWith('api:')).map((p: string) => p.replace('api:', '')) : [];
+  let appTestBlock = '';
+  if (appApis.length > 0) {
+    appTestBlock = `\n## App APIs (verify they work in the UI)\n${appApis.map((a: string) => `- ${a}`).join('\n')}\n`;
+  }
+
+  // Project context with use cases — browser lines 48-55
   const bpComponents = bp.components?.map(c => `- ${c.id} (${c.type}): ${c.label}`).join('\n') || '';
+  const useCases = data.interviewSpec?.useCases
+    ? (data.interviewSpec.useCases as Array<Record<string, string>>).map((uc, i) => {
+        if (typeof uc === 'string') return `${i + 1}. ${uc}`;
+        return `${i + 1}. ${uc.description || uc.title || JSON.stringify(uc)}`;
+      }).join('\n')
+    : 'No use cases specified';
 
   return {
     lib_name: libName,
@@ -664,8 +745,8 @@ function resolveTestCortexSpec(data: PromptRuntimeData): Vars {
     test_scenarios: testScenarios,
     structures,
     action_contracts: actionContracts,
-    project_context: `## Project Context\nBlueprint components:\n${bpComponents}`,
-    cortex_methods: cortexMethods,
+    project_context: `## Project Context\nBlueprint components:\n${bpComponents}\n\nUse cases from interview:\n${useCases}`,
+    cortex_methods: cortexMethods + appTestBlock,
   };
 }
 
