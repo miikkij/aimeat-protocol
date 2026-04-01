@@ -17,8 +17,18 @@ import { type AimeatConfig } from '../config.js';
 import { complete as openrouterComplete } from './openrouter.js';
 import { getEncryptionKey } from './encryption.js';
 import { decrypt } from './encryption.js';
-import { emitChange } from '../event-bus.js';
+import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
+
+// Logger wrapper — accepts both winston-style (msg, meta) and pino-style (meta, msg)
+const log = {
+  info: (a: string | Record<string, unknown>, b?: string | Record<string, unknown>) =>
+    typeof a === 'string' ? logger.info(a, b as Record<string, unknown>) : logger.info(b as string || JSON.stringify(a)),
+  warn: (a: string | Record<string, unknown>, b?: string | Record<string, unknown>) =>
+    typeof a === 'string' ? logger.warn(a, b as Record<string, unknown>) : logger.warn(b as string || JSON.stringify(a)),
+  error: (a: string | Record<string, unknown>, b?: string | Record<string, unknown>) =>
+    typeof a === 'string' ? logger.error(a, b as Record<string, unknown>) : logger.error(b as string || JSON.stringify(a)),
+};
 
 // ── Prompt builders — imported from public JS (pure ESM, no browser deps) ──
 // These are the SAME files the browser uses. They're pure functions.
@@ -162,7 +172,7 @@ export async function runAutopilot(
   config: AimeatConfig,
   storage: Storage,
 ): Promise<void> {
-  const log = logger.child({ service: 'autopilot', projectId });
+  // Logger is the module-level winston wrapper defined above
 
   if (isAutopilotRunning(projectId)) {
     throw new Error('Autopilot already running for this project');
@@ -270,7 +280,7 @@ export async function runAutopilot(
         }
       }
     } catch (e) {
-      log.warn({ err: e, componentId: comp.id }, 'saveComp failed — retrying with fresh version');
+      log.warn(`saveComp failed for ${comp.id as string} — retrying: ${(e as Error).message}`);
       const rec = await storage.getMemory(ownerGhii, key);
       if (rec) {
         await storage.setMemory({ ...rec, value: data, version: (rec.version ?? 1) + 1, updatedAt: new Date().toISOString() });
@@ -298,7 +308,7 @@ export async function runAutopilot(
       const compLabel = (comp.label as string) || cid;
       const compType = (comp.type as string) || 'unknown';
       updateStatus({ currentComponent: compLabel });
-      log.info({ componentId: cid, type: compType }, `Processing: ${compLabel}`);
+      log.info(`[${cid}] Processing: ${compLabel} (${compType})`);
 
       try {
         // ── SPEC GENERATION ──
@@ -336,7 +346,7 @@ export async function runAutopilot(
             }
 
             if (specPrompt) {
-              log.info({ componentId: cid }, `Generating spec for ${compLabel}`);
+              log.info(`[${cid}] Generating spec for ${compLabel}`);
               const specRaw = await callLLM(specPrompt);
               let specText = specRaw.trim();
               const fenceMatch = specText.match(/```(?:json)?\s*\n([\s\S]*?)```/);
@@ -344,9 +354,9 @@ export async function runAutopilot(
 
               try {
                 spec = JSON.parse(specText) as Record<string, unknown>;
-                log.info({ componentId: cid, specName: spec.name }, `Spec generated: ${spec.name}`);
+                log.info(`[${cid}] Spec generated: ${spec.name as string}`);
               } catch {
-                log.warn({ componentId: cid }, 'Spec JSON parse failed — continuing without spec');
+                log.warn(`[${cid}] Spec JSON parse failed — continuing without spec`);
                 spec = null;
               }
 
@@ -368,7 +378,7 @@ export async function runAutopilot(
         if (entry.cancelFlag) break;
 
         // ── CODE GENERATION ──
-        log.info({ componentId: cid }, `Building code prompt for ${compLabel}`);
+        log.info(`[${cid}] Building code prompt for ${compLabel}`);
         const freshComps = await loadComponents();
         const completedComponents = freshComps.filter(c => c.status === 'done' && c.registeredAs);
         const prompt = await modules.buildComponentPrompt(
@@ -377,7 +387,7 @@ export async function runAutopilot(
           interviewSpec,
         );
 
-        log.info({ componentId: cid, promptLen: (prompt as string).length }, `Calling OpenRouter for ${compLabel}`);
+        log.info(`[${cid}] Calling OpenRouter for ${compLabel} (prompt: ${(prompt as string).length} chars)`);
         let content = await callLLM(prompt as string);
         content = modules.stripCodeblock(content);
 
@@ -388,7 +398,7 @@ export async function runAutopilot(
         if (!vr.valid) {
           const maxRetries = 3;
           for (let attempt = 1; attempt <= maxRetries && !vr.valid && !entry.cancelFlag; attempt++) {
-            log.info({ componentId: cid, attempt }, `Retry ${attempt}/${maxRetries} for ${compLabel}`);
+            log.info(`[${cid}] Retry ${attempt}/${maxRetries} for ${compLabel}`);
             const fixPrompt = modules.buildFixPrompt(prompt as string, content, vr.errors, compType);
             content = await callLLM(fixPrompt);
             content = modules.stripCodeblock(content);
@@ -397,7 +407,7 @@ export async function runAutopilot(
         }
 
         if (!vr.valid) {
-          log.warn({ componentId: cid, errors: vr.errors }, `Validation failed for ${compLabel} — skipping`);
+          log.warn(`[${cid}] Validation failed for ${compLabel} — skipping: ${vr.errors[0]}`);
           comp = { ...comp, result: content, status: 'errors', validationErrors: vr.errors };
           await saveComp(comp);
           entry.status.progress.failed++;
@@ -406,7 +416,7 @@ export async function runAutopilot(
         }
 
         // ── REGISTER ──
-        log.info({ componentId: cid }, `Registering ${compLabel}`);
+        log.info(`[${cid}] Registering ${compLabel}`);
         comp = { ...comp, result: content, status: 'done', validationErrors: [] };
         await saveComp(comp);
 
@@ -496,10 +506,10 @@ export async function runAutopilot(
           const regName = comp.registeredAs || extractRegisteredName(compType, content, vr);
           comp = { ...comp, registeredAs: regName, contextBundle: modules.createBundle({ ...comp, registeredAs: regName }, []) };
           await saveComp(comp);
-          log.info({ componentId: cid, registeredAs: regName }, `Registered: ${compLabel}`);
+          log.info(`[${cid}] Registered: ${compLabel} as ${regName as string}`);
 
         } catch (regErr) {
-          log.warn({ componentId: cid, err: regErr }, `Registration failed for ${compLabel} — skipping`);
+          log.warn(`[${cid}] Registration failed for ${compLabel}: ${(regErr as Error).message}`);
           entry.status.progress.failed++;
           entry.status.componentResults.push({ id: cid, label: compLabel, status: 'registration_failed', error: (regErr as Error).message });
           continue;
@@ -510,9 +520,9 @@ export async function runAutopilot(
           try {
             await internalFetch(config, `/v1/generator/${projectId}/apply-settings/${encodeURIComponent(comp.registeredAs as string)}`, jwt, { method: 'POST' });
             await internalFetch(config, `/v1/extensions/${encodeURIComponent(comp.registeredAs as string)}/activate`, jwt, { method: 'POST' });
-            log.info({ componentId: cid }, `Activated extension: ${comp.registeredAs}`);
+            log.info(`[${cid}] Activated extension: ${comp.registeredAs as string}`);
           } catch (e) {
-            log.warn({ componentId: cid, err: e }, 'Extension activation failed');
+            log.warn(`[${cid}] Extension activation failed: ${(e as Error).message}`);
           }
 
           // ── PROBE ──
@@ -525,17 +535,17 @@ export async function runAutopilot(
             const contextBundle = modules.createBundle({ ...comp, registeredAs: comp.registeredAs }, probeResults);
             comp = { ...comp, probeResults, contextBundle };
             await saveComp(comp);
-            log.info({ componentId: cid, probed: probeResults.length }, `Probed extension: ${probeResults.length} actions`);
+            log.info(`[${cid}] Probed extension: ${probeResults.length} actions`);
 
             // Spec-vs-probe validation
             if (comp.spec && probeResults.length > 0) {
               const sv = modules.validateSpecAgainstProbe(comp.spec, probeResults);
               if (!sv.valid) {
-                log.warn({ componentId: cid, mismatches: sv.mismatches }, 'Spec-vs-probe mismatch');
+                log.warn(`[${cid}] Spec-vs-probe mismatch: ${(sv.mismatches as Array<{message: string}>).map(m => m.message).join('; ')}`);
               }
             }
           } catch (e) {
-            log.warn({ componentId: cid, err: e }, 'Extension probe failed');
+            log.warn(`[${cid}] Extension probe failed: ${(e as Error).message}`);
           }
         }
 
@@ -556,7 +566,7 @@ export async function runAutopilot(
               testPromptText = modules.buildTestPrompt(compType, content, compLabel, comp.registeredAs, blueprint, interviewSpec, comp.probeResults || null);
             }
 
-            log.info({ componentId: cid }, `Generating test for ${compLabel}`);
+            log.info(`[${cid}] Generating test for ${compLabel}`);
             let testCode = await callLLM(testPromptText);
             testCode = modules.stripCodeblock(testCode);
 
@@ -569,10 +579,10 @@ export async function runAutopilot(
             if (testResult) {
               comp = { ...comp, testCode, testResult };
               await saveComp(comp);
-              log.info({ componentId: cid, passed: testResult.status === 'passed' }, `Test: ${testResult.status}`);
+              log.info(`[${cid}] Test: ${testResult.status as string}`);
             }
           } catch (e) {
-            log.warn({ componentId: cid, err: e }, 'Test execution failed');
+            log.warn(`[${cid}] Test execution failed: ${(e as Error).message}`);
           }
         }
 
@@ -581,7 +591,7 @@ export async function runAutopilot(
         emitChange('memory');
 
       } catch (componentErr) {
-        log.error({ componentId: cid, err: componentErr }, `Uncaught error processing ${compLabel}`);
+        log.error(`[${cid}] Uncaught error processing ${compLabel}: ${(componentErr as Error).message}`);
         entry.status.progress.failed++;
         entry.status.componentResults.push({ id: cid, label: compLabel, status: 'error', error: (componentErr as Error).message });
         // Continue to next component
@@ -592,10 +602,10 @@ export async function runAutopilot(
       status: entry.cancelFlag ? 'cancelled' : 'completed',
       currentComponent: null,
     });
-    log.info({ progress: entry.status.progress }, 'Autopilot finished');
+    log.info(`Autopilot finished: ${entry.status.progress.completed} completed, ${entry.status.progress.failed} failed, ${entry.status.progress.skipped} skipped`);
 
   } catch (fatalErr) {
-    log.error({ err: fatalErr }, 'Autopilot fatal error');
+    log.error(`Autopilot fatal error: ${(fatalErr as Error).message}`);
     updateStatus({ status: 'failed', currentComponent: null });
   } finally {
     // Keep status for 1 hour, then clean up
