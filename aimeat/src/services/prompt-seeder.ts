@@ -56,7 +56,7 @@ export async function seedSystemPrompts(storage: Storage): Promise<void> {
         logger.info(`Generator prompt "${seed.id}" content updated (was version 1, never edited)`);
       }
 
-      await storage.upsertSystemPrompt(metaUpdate);
+      await storage.upsertSystemPrompt(metaUpdate as unknown as import('../storage/interface.js').SystemPromptRecord);
       updated++;
     }
   }
