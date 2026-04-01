@@ -181,7 +181,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
         if (autopilotState.cancelledRef.current) break;
         // IMPORTANT: always fetch fresh state from API, not from closure (which is stale after loadData)
         const freshComps = await loadAllComponents(projectId);
-        const comp = freshComps.find(c => c.id === cid);
+        let comp = freshComps.find(c => c.id === cid);
         if (!comp || comp.registeredAs) continue; // skip already registered
 
         autopilotState.setStep(comp.label);
@@ -375,7 +375,7 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
           showToast?.(`${comp.label}: Registration failed: ${errMsg}`, true);
           await writeProjectLog(projectId, 'component_registration_failed', { meta: { component: comp.label, type: comp.type, error: errMsg, by: 'autopilot' } });
           await core.loadData();
-          break;
+          continue; // Skip to next component — don't break the entire pipeline
         }
 
         await core.loadData();
