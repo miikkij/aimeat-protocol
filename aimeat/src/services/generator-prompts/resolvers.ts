@@ -722,11 +722,16 @@ function resolveTestCortexSpec(data: PromptRuntimeData): Vars {
     : 'No actions defined';
 
   // APP test instructions — browser lines 228-235
-  // The browser cortex test env doc includes app test instructions at the end
   const appApis = bpComp ? (bpComp.consumes || []).filter((p: string) => p.startsWith('api:')).map((p: string) => p.replace('api:', '')) : [];
-  let appTestBlock = '';
+  let appTestBlock = `\nFor APP tests:
+- The app is already loaded on the test page
+- Authentication IS available
+- Wait for data to render: await new Promise(r => setTimeout(r, 3000));
+- Check DOM elements, click buttons, verify results
+- Verify actual content renders (not translation keys like "search.title")
+- Verify API calls return real data visible in the UI\n`;
   if (appApis.length > 0) {
-    appTestBlock = `\n## App APIs (verify they work in the UI)\n${appApis.map((a: string) => `- ${a}`).join('\n')}\n`;
+    appTestBlock += `\n## App APIs (verify they work in the UI)\n${appApis.map((a: string) => `- ${a}`).join('\n')}\n`;
   }
 
   // Project context with use cases — browser lines 48-55
