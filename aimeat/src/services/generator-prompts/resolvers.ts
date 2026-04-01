@@ -452,35 +452,68 @@ Total: ${sorted.length} keys available. If you need a label, find the closest ma
   if (hasCortex) {
     cortexOrApiSection = cortexInstructions;
   } else {
-    // Non-cortex path: show AIMEAT.data API, extension calling, translations
+    // Non-cortex path — verbatim from browser base.js lines 642-703
     cortexOrApiSection = `### AIMEAT.data API (memory read/write — handles auth and envelope automatically):
 \`\`\`javascript
+// Read YOUR OWN memory key — returns the stored value directly, or null
 const myData = await AIMEAT.data.get('my.settings');
+
+// Write a memory key (your own namespace)
 await AIMEAT.data.set('my.key', { count: 42 });
+
+// Delete your own memory key
 await AIMEAT.data.delete('my.key');
 \`\`\`
 
 ### Reading EXTENSION-produced data (CRITICAL — most apps need this):
 Extensions store data in their OWN namespace (\`ext:{extension-name}\`).
+To read data that an extension wrote, use \`getPublic()\`:
 \`\`\`javascript
+// WRONG — this reads YOUR memory, not the extension's:
+const data = await AIMEAT.data.get('items.by-date.__index');  // returns null!
+
 // CORRECT — read from the extension's namespace:
-const data = await AIMEAT.data.getPublic('ext:my-extension', 'items.by-date.__index');
+const data = await AIMEAT.data.getPublic('ext:my-collector-extension', 'items.by-date.__index');
 \`\`\`
+The first argument is the extension's memory owner: \`"ext:" + extensionName\` (the \`name\` field from the extension manifest metadata).
+Use this for ALL data produced by extensions (collected data, computed stats, caches, etc.).
+\`getPublic()\` returns the value directly (auto-unwraps), or null if not found.
 
-### Reading TRANSLATIONS:
+### Reading TRANSLATIONS (stored in owner namespace by translation components):
+Translations are stored in the OWNER's namespace by the translation component during registration.
+The key format is: \`{service-name}.i18n.{locale}\` (e.g. \`my-service.i18n.fi\`).
 \`\`\`javascript
+// Read translations from OWNER namespace (the translation component stored them here):
 const fiStrings = await AIMEAT.data.get('my-service.i18n.fi') || await AIMEAT.data.get('i18n.fi') || {};
+const enStrings = await AIMEAT.data.get('my-service.i18n.en') || await AIMEAT.data.get('i18n.en') || {};
 \`\`\`
+Use AIMEAT.data.get() — this reads from the current user's namespace where translations live.
+If a cortex library has a getI18n(locale) method, use that instead (recommended).
 
-### Calling extension actions:
+### Calling extension actions (use AIMEAT.auth session for authenticated fetch):
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  CRITICAL: session.fetch() returns ALREADY-PARSED JSON, not Response.  ║
+║  Do NOT call resp.json() — it will crash with "not a function".        ║
+║  Access resp.ok, resp.data, resp.error directly.                       ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
 \`\`\`javascript
+// Helper for extension calls (copy this EXACTLY):
+// ALL extension actions are POST — the backend only has router.post() routes
 async function extCall(extName, actionId, body = {}) {
   const session = await AIMEAT.auth.login();
   if (!session) throw new Error('Not logged in');
-  const resp = await session.fetch('/v1/ext/' + extName + '/' + actionId, { method: 'POST', body: JSON.stringify(body) });
+  const url = '/v1/ext/' + extName + '/' + actionId;
+  const resp = await session.fetch(url, { method: 'POST', body: JSON.stringify(body) });
+  // resp is ALREADY parsed JSON — never call resp.json()
   if (!resp.ok) throw new Error(resp.error?.message || 'Extension call failed');
-  return resp.data;
+  return resp.data;  // unwrapped payload
 }
+
+// Usage:
+const results = await extCall('my-extension', 'search', { query: 'test' });
+const detail = await extCall('my-extension', 'getDetail', { id: 'abc-123' });
 \`\`\``;
   }
 
@@ -498,16 +531,19 @@ async function extCall(extName, actionId, body = {}) {
   };
 }
 
-function resolveFix(data: PromptRuntimeData): Vars {
-  // Match browser buildFixPrompt() — type-specific constraints
+function resolveFix(data: PromptRuntimeData, fragments: Record<string, string>): Vars {
+  // Match browser buildFixPrompt() — inject ACTUAL fragment content, not references
   const ct = data.componentType || '';
+  const sc = fragments.sandbox_constraints || '';
+  const nr = fragments.namespace_rules || '';
+  const ecr = fragments.extension_consumption_rules || '';
   let typeConstraints = '';
   if (ct === 'extension') {
-    typeConstraints = '{{sandbox_constraints}}\n\n{{namespace_rules}}\n';
+    typeConstraints = `\n${sc}\n\n${nr}\n`;
   } else if (ct === 'cortex') {
-    typeConstraints = '{{namespace_rules}}\n\n{{extension_consumption_rules}}\n\nCORTEX CONSTRAINTS (browser IIFE):\n- Must be a single IIFE registering on window.AIMEAT\n- YAML metadata.name (kebab-case) and JS LIB_NAME (camelCase) must match\n- Every readExtMemory/getPublic call must be null-checked\n';
+    typeConstraints = `\n${nr}\n\n${ecr}\n\nCORTEX CONSTRAINTS (browser IIFE):\n- Must be a single IIFE registering on window.AIMEAT\n- YAML metadata.name (kebab-case) and JS LIB_NAME (camelCase) must match\n- Every readExtMemory/getPublic call must be null-checked\n`;
   } else if (ct === 'app') {
-    typeConstraints = '{{namespace_rules}}\n\nAPP CONSTRAINTS (browser HTML):\n- Include CSP meta tag if using CDN scripts\n- Use AIMEAT.auth for login, AIMEAT.data for memory access\n- Call cortex init() before accessing data\n- Handle empty state gracefully (no data on first run)\n';
+    typeConstraints = `\n${nr}\n\nAPP CONSTRAINTS (browser HTML):\n- Include CSP meta tag if using CDN scripts\n- Use AIMEAT.auth for login, AIMEAT.data for memory access\n- Call cortex init() before accessing data\n- Handle empty state gracefully (no data on first run)\n`;
   }
   return {
     original_prompt: data.originalPrompt || '',

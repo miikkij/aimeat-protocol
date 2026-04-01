@@ -46,7 +46,8 @@ Extensions run in an ISOLATED V8 sandbox with ONLY this API (no Node.js, no glob
     ║  IMPORTANT: ctx.memory.get() ONLY reads from the extension's OWN namespace. ║
     ║  Data stored by memory components (seed data, settings, translations) lives  ║
     ║  in the OWNER's namespace — use ctx.memory.getPublic(ctx.caller.gaii, key)  ║
-    ║  to access it. ctx.caller.gaii is the caller's GHII identity.               ║
+    ║  to access it. ctx.caller.gaii is the caller's GHII identity               ║
+║  (e.g. "testuser@node-id").                                                ║
     ╚═══════════════════════════════════════════════════════════════════════════════╝
   ctx.fetch(url, { method, headers, body }) → { status, ok, text, headers }
     Use ctx.fetch for ALL HTTP requests. Global fetch() is NOT available.
