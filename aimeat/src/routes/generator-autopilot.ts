@@ -44,7 +44,7 @@ export function generatorAutopilotRouter(config: AimeatConfig, storage: Storage)
       // Start autopilot in background — don't await, return immediately
       runAutopilot(projectId, ownerGhii, ownerName, jwt, config, storage)
         .catch(err => {
-          logger.error({ err, projectId }, 'Autopilot crashed');
+          logger.error(`Autopilot crashed for ${projectId}: ${err.message}`);
         });
 
       res.json(success(config.nodeId, { started: true, projectId }));
