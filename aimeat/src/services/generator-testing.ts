@@ -126,9 +126,44 @@ export async function executeHttpTest(
 ): Promise<{ passed: boolean; errors: string[]; details?: string; trace?: TraceEntry[] }> {
   // Diagnostic trace — records every helper call with input/output
   const trace: TraceEntry[] = [];
+  /** Extract the shape/schema of a JSON value — keeps structure, replaces values with types.
+   *  Array: shows first element's shape + length. Object: shows all keys with value types.
+   *  Example: {companies: [{name: "Oy", id: "123"}]} → {companies: [{name: "string", id: "string"}], _length: 50}
+   */
+  const extractShape = (v: unknown, depth = 0): unknown => {
+    if (v === null || v === undefined) return null;
+    if (typeof v === 'string') return v.length > 80 ? 'string(' + v.length + ')' : v;
+    if (typeof v === 'number' || typeof v === 'boolean') return v;
+    if (Array.isArray(v)) {
+      if (v.length === 0) return [];
+      // Show shape of first element + array length
+      return depth < 3 ? [extractShape(v[0], depth + 1), '...(' + v.length + ' items)'] : ['...(' + v.length + ' items)'];
+    }
+    if (typeof v === 'object') {
+      const obj: Record<string, unknown> = {};
+      const entries = Object.entries(v as Record<string, unknown>);
+      for (const [key, val] of entries.slice(0, depth < 2 ? 20 : 8)) {
+        obj[key] = depth < 3 ? extractShape(val, depth + 1) : typeof val;
+      }
+      if (entries.length > (depth < 2 ? 20 : 8)) obj['...'] = `${entries.length - (depth < 2 ? 20 : 8)} more keys`;
+      return obj;
+    }
+    return typeof v;
+  };
+
   const trunc = (v: unknown): string => {
+    if (v === null || v === undefined) return 'null';
     const s = typeof v === 'string' ? v : JSON.stringify(v);
-    return s ?? 'null';
+    if (!s) return 'null';
+    // Small responses: return as-is
+    if (s.length <= 1000) return s;
+    // Large responses: extract shape instead of dumping raw data
+    try {
+      const parsed = typeof v === 'string' ? JSON.parse(v) : v;
+      return JSON.stringify(extractShape(parsed), null, 2) + '\n[shape extracted from ' + s.length + ' chars]';
+    } catch {
+      return s.slice(0, 1000) + '... [truncated, ' + s.length + ' chars]';
+    }
   };
 
   try {
