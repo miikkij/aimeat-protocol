@@ -11,8 +11,6 @@
  *   v1.0.0 — 2026-04-01 — Initial backend autopilot
  */
 
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { type Storage } from '../storage/interface.js';
 import { type AimeatConfig } from '../config.js';
 import { complete as openrouterComplete } from './openrouter.js';
@@ -21,103 +19,14 @@ import { decrypt } from './encryption.js';
 import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
 
-// Logger wrapper — accepts both winston-style (msg, meta) and pino-style (meta, msg)
-const log = {
-  info: (a: string | Record<string, unknown>, b?: string | Record<string, unknown>) =>
-    typeof a === 'string' ? logger.info(a, b as Record<string, unknown>) : logger.info(b as string || JSON.stringify(a)),
-  warn: (a: string | Record<string, unknown>, b?: string | Record<string, unknown>) =>
-    typeof a === 'string' ? logger.warn(a, b as Record<string, unknown>) : logger.warn(b as string || JSON.stringify(a)),
-  error: (a: string | Record<string, unknown>, b?: string | Record<string, unknown>) =>
-    typeof a === 'string' ? logger.error(a, b as Record<string, unknown>) : logger.error(b as string || JSON.stringify(a)),
-};
+const log = { info: (m: string) => logger.info(m), warn: (m: string) => logger.warn(m), error: (m: string) => logger.error(m) };
 
-// ── Prompt builders — imported from public JS (pure ESM, no browser deps) ──
-// These are the SAME files the browser uses. They're pure functions.
-const PROMPT_DIR = join(import.meta.dirname, '..', '..', 'public', 'js', 'services');
-
-let promptModules: {
-  buildComponentPrompt: (...args: unknown[]) => Promise<string>;
-  buildBlueprintPrompt: (...args: unknown[]) => string;
-  buildFixPrompt: (...args: unknown[]) => string;
-  buildTestPrompt: (...args: unknown[]) => string;
-  buildExtensionSpecPrompt: (params: Record<string, unknown>) => string;
-  buildDataApiSpecPrompt: (params: Record<string, unknown>) => string;
-  buildComponentSpecPrompt: (params: Record<string, unknown>) => string;
-  buildAppDomainSpecPrompt: (params: Record<string, unknown>) => string;
-  formatSpecForPrompt: (spec: unknown, label: string) => string;
-  validateComponent: (type: string, result: string, blueprint?: unknown) => { valid: boolean; errors: string[]; extracted?: unknown };
-  validateExtensionSpec: (spec: unknown) => { valid: boolean; errors: string[] };
-  validateDataApiSpec: (spec: unknown) => { valid: boolean; errors: string[] };
-  validateSpecAgainstProbe: (spec: unknown, probes: unknown[]) => { valid: boolean; mismatches: unknown[] };
-  buildExtensionTestFromSpec: (spec: unknown, name: string) => string;
-  buildDataCortexTestFromSpec: (spec: unknown) => string;
-  createBundle: (component: unknown, probeResults: unknown[]) => unknown;
-  stripCodeblock: (text: string) => string;
-} | null = null;
-
-/** Load prompt builder modules from public/js/services/ (one-time, cached) */
-async function loadPromptModules() {
-  if (promptModules) return promptModules;
-
-  // On Windows, dynamic import() requires file:// URLs, not raw paths
-  const toUrl = (file: string) => pathToFileURL(join(PROMPT_DIR, file)).href;
-
-  const [
-    promptsBuild, promptsBase, promptsFix, promptsTest,
-    specs, specValidate, specTests,
-    validate, contextBundle,
-    cortexData, cortexFeature, cortexApp,
-  ] = await Promise.all([
-    import(toUrl('generator-prompts-build.js')),
-    import(toUrl('generator-prompts-base.js')),
-    import(toUrl('generator-prompts-fix.js')),
-    import(toUrl('generator-prompts-test.js')),
-    import(toUrl('generator-specs.js')),
-    import(toUrl('generator-spec-validate.js')),
-    import(toUrl('generator-spec-tests.js')),
-    import(toUrl('generator-validate.js')),
-    import(toUrl('generator-context-bundle.js')),
-    import(toUrl('generator-prompts-cortex-data.js')),
-    import(toUrl('generator-prompts-cortex-feature.js')),
-    import(toUrl('generator-prompts-cortex-app.js')),
-  ]);
-
-  // Inject cortex modules into the build module (it lazy-loads them behind typeof window guard)
-  if (promptsBuild._setCortexModules) {
-    promptsBuild._setCortexModules({
-      buildDataCortexPrompt: cortexData.buildDataCortexPrompt,
-      buildFeatureCortexPrompt: cortexFeature.buildFeatureCortexPrompt,
-      buildAppDomainCortexPrompt: cortexApp.buildAppDomainCortexPrompt,
-      createBundle: contextBundle.createBundle,
-      formatBundlesForPrompt: contextBundle.formatBundlesForPrompt,
-    });
-  }
-
-  promptModules = {
-    buildComponentPrompt: promptsBuild.buildComponentPrompt,
-    buildBlueprintPrompt: promptsBuild.buildBlueprintPrompt,
-    buildFixPrompt: promptsFix.buildFixPrompt,
-    buildTestPrompt: promptsTest.buildTestPrompt,
-    buildExtensionSpecPrompt: specs.buildExtensionSpecPrompt,
-    buildDataApiSpecPrompt: specs.buildDataApiSpecPrompt,
-    buildComponentSpecPrompt: specs.buildComponentSpecPrompt,
-    buildAppDomainSpecPrompt: specs.buildAppDomainSpecPrompt,
-    formatSpecForPrompt: specs.formatSpecForPrompt,
-    validateComponent: validate.validateComponent,
-    validateExtensionSpec: specValidate.validateExtensionSpec,
-    validateDataApiSpec: specValidate.validateDataApiSpec,
-    validateSpecAgainstProbe: specValidate.validateSpecAgainstProbe,
-    buildExtensionTestFromSpec: specTests.buildExtensionTestFromSpec,
-    buildDataCortexTestFromSpec: specTests.buildDataCortexTestFromSpec,
-    createBundle: contextBundle.createBundle,
-    stripCodeblock: promptsBuild.stripCodeblock || ((t: string) => {
-      // Inline fallback — strip markdown fences
-      const m = t.trim().match(/^```[^\n]*\n([\s\S]*?)```\s*$/);
-      return m ? m[1].trim() : t.trim();
-    }),
-  };
-  return promptModules;
-}
+// ── Clean TypeScript imports from src/services/generator-prompts/ ──
+// No browser imports, no pathToFileURL hacks, no dynamic import()
+import { buildPrompt, stripCodeblock, createBundle } from './generator-prompts/index.js';
+import { validateComponent } from './generator-prompts/validate.js';
+import { validateExtensionSpec, validateDataApiSpec, validateSpecAgainstProbe } from './generator-prompts/spec-validate.js';
+import type { PromptRuntimeData, ComponentState, ProbeResult, Blueprint, InterviewSpec } from './generator-prompts/types.js';
 
 // ── Autopilot state ──
 
@@ -182,8 +91,7 @@ export async function runAutopilot(
     throw new Error('Autopilot already running for this project');
   }
 
-  const modules = await loadPromptModules();
-  if (!modules) throw new Error('Failed to load prompt modules');
+  // Prompt modules are now TypeScript imports — no async loading needed
 
   // Read project data
   const projectRec = await storage.getMemory(ownerGhii, `generator.${projectId}.project`);
@@ -325,16 +233,16 @@ export async function runAutopilot(
             let specPrompt: string | null = null;
 
             if (compType === 'extension') {
-              specPrompt = modules.buildExtensionSpecPrompt({ blueprint, blueprintComponent: bpComp, interviewSpec });
+              specPrompt = await buildPrompt(storage, 'gen-extension-spec', { blueprint, blueprintComponent: bpComp, interviewSpec } as unknown as PromptRuntimeData);
             } else if ((bpComp.subtype as string) === 'data') {
               const extComp = comps.find(c => c.type === 'extension' && c.spec);
-              if (extComp?.spec) specPrompt = modules.buildDataApiSpecPrompt({ extensionSpec: extComp.spec, blueprint });
+              if (extComp?.spec) specPrompt = await buildPrompt(storage, 'gen-data-api-spec', { blueprint, extensionSpec: extComp.spec as Record<string, unknown> } as unknown as PromptRuntimeData);
             } else if ((bpComp.subtype as string) === 'component' || (bpComp.id as string)?.startsWith('component-')) {
               const dataCortex = comps.find(c => c.type === 'cortex' && c.spec && ((c.subtype as string) === 'data'));
               if (dataCortex?.spec) {
                 const translationKeys = comps.filter(c => c.type === 'translation' && (c as Record<string, unknown>).contextBundle)
                   .flatMap(c => ((c as Record<string, unknown>).contextBundle as Record<string, unknown>)?.keys as string[] || []);
-                specPrompt = modules.buildComponentSpecPrompt({ dataApiSpec: dataCortex.spec, componentLabel: compLabel, translationKeys });
+                specPrompt = await buildPrompt(storage, 'gen-component-spec', { blueprint, dataApiSpec: dataCortex.spec as Record<string, unknown>, componentLabel: compLabel, translationKeys } as unknown as PromptRuntimeData);
               }
             } else if ((bpComp.subtype as string) === 'app-domain') {
               const dataCortex = comps.find(c => c.type === 'cortex' && c.spec && ((c.subtype as string) === 'data'));
@@ -342,10 +250,12 @@ export async function runAutopilot(
               const translationKeys = comps.filter(c => c.type === 'translation' && (c as Record<string, unknown>).contextBundle)
                 .flatMap(c => ((c as Record<string, unknown>).contextBundle as Record<string, unknown>)?.keys as string[] || []);
               if (dataCortex?.spec) {
-                specPrompt = modules.buildAppDomainSpecPrompt({
-                  componentSpecs, dataApiSpec: dataCortex.spec,
-                  useCases: interviewSpec?.useCases, translationKeys, views: interviewSpec?.views,
-                });
+                specPrompt = await buildPrompt(storage, 'gen-app-domain-spec', {
+                  blueprint, componentSpecs: componentSpecs as Array<Record<string, unknown>>,
+                  dataApiSpec: dataCortex.spec as Record<string, unknown>,
+                  useCases: interviewSpec?.useCases as unknown[], translationKeys,
+                  views: interviewSpec?.views as unknown[],
+                } as unknown as PromptRuntimeData);
               }
             }
 
@@ -385,28 +295,54 @@ export async function runAutopilot(
         log.info(`[${cid}] Building code prompt for ${compLabel}`);
         const freshComps = await loadComponents();
         const completedComponents = freshComps.filter(c => c.status === 'done' && c.registeredAs);
-        const prompt = await modules.buildComponentPrompt(
-          compType, compLabel,
-          project.description, blueprint, completedComponents,
-          interviewSpec,
-        );
+        // Map component type to the appropriate DB prompt ID
+        const promptIdMap: Record<string, string> = {
+          csm: 'gen-csm', memory: 'gen-memory', translation: 'gen-translation',
+          extension: 'gen-extension-code', app: 'gen-app',
+        };
+        let promptId = promptIdMap[compType];
+        // Cortex subtypes
+        if (compType === 'cortex') {
+          const bpC = (blueprint.components as Array<Record<string, unknown>>)?.find((c: Record<string, unknown>) => c.label === compLabel);
+          const sub = (bpC?.subtype as string) || '';
+          if (sub === 'data') promptId = 'gen-cortex-data';
+          else if (sub === 'component' || (bpC?.id as string)?.startsWith('component-')) promptId = 'gen-cortex-component';
+          else if (sub === 'app-domain') promptId = 'gen-cortex-app-domain';
+          else promptId = 'gen-cortex-component'; // default
+        }
+        if (!promptId) promptId = 'gen-extension-code'; // fallback
+
+        const prompt = await buildPrompt(storage, promptId, {
+          blueprint: blueprint as unknown as Blueprint,
+          interviewSpec: interviewSpec as unknown as InterviewSpec,
+          componentLabel: compLabel,
+          componentType: compType,
+          completedComponents: completedComponents as unknown as ComponentState[],
+          selfSpec: comp.spec as Record<string, unknown> | undefined,
+          projectDescription: project.description as string,
+          blueprintComponent: ((blueprint.components as Array<Record<string, unknown>>) || []).find((c: Record<string, unknown>) => c.label === compLabel) as unknown as undefined,
+          extensionSpec: completedComponents.find(c => (c as Record<string, unknown>).type === 'extension' && (c as Record<string, unknown>).spec)?.spec as Record<string, unknown> | undefined,
+          dataApiSpec: completedComponents.find(c => (c as Record<string, unknown>).subtype === 'data' && (c as Record<string, unknown>).spec)?.spec as Record<string, unknown> | undefined,
+          translationKeys: completedComponents.filter(c => (c as Record<string, unknown>).type === 'translation' && ((c as Record<string, unknown>).contextBundle as Record<string, unknown>)?.keys)
+            .flatMap(c => (((c as Record<string, unknown>).contextBundle as Record<string, unknown>)?.keys as string[]) || []),
+        } as unknown as PromptRuntimeData);
 
         log.info(`[${cid}] Calling OpenRouter for ${compLabel} (prompt: ${(prompt as string).length} chars)`);
         let content = await callLLM(prompt as string);
-        content = modules.stripCodeblock(content);
+        content = stripCodeblock(content);
 
         // ── VALIDATE ──
-        let vr = modules.validateComponent(compType, content, blueprint);
+        let vr = validateComponent(compType, content, blueprint as unknown as Blueprint);
 
         // Auto-retry on validation failure
         if (!vr.valid) {
           const maxRetries = 3;
           for (let attempt = 1; attempt <= maxRetries && !vr.valid && !entry.cancelFlag; attempt++) {
             log.info(`[${cid}] Retry ${attempt}/${maxRetries} for ${compLabel}`);
-            const fixPrompt = modules.buildFixPrompt(prompt as string, content, vr.errors, compType);
+            const fixPrompt = await buildPrompt(storage, 'gen-fix', { blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec, originalPrompt: prompt, code: content, errors: vr.errors, componentType: compType } as unknown as PromptRuntimeData);
             content = await callLLM(fixPrompt);
-            content = modules.stripCodeblock(content);
-            vr = modules.validateComponent(compType, content, blueprint);
+            content = stripCodeblock(content);
+            vr = validateComponent(compType, content, blueprint as unknown as Blueprint);
           }
         }
 
@@ -508,7 +444,7 @@ export async function runAutopilot(
 
           // Determine registered name
           const regName = comp.registeredAs || extractRegisteredName(compType, content, vr);
-          comp = { ...comp, registeredAs: regName, contextBundle: modules.createBundle({ ...comp, registeredAs: regName }, []) };
+          comp = { ...comp, registeredAs: regName, contextBundle: createBundle({ ...comp, registeredAs: regName } as unknown as ComponentState, []) };
           await saveComp(comp);
           log.info(`[${cid}] Registered: ${compLabel} as ${regName as string}`);
 
@@ -536,14 +472,14 @@ export async function runAutopilot(
               body: { extensionName: comp.registeredAs, scenarios: buildProbeScenarios(blueprint, comp, content) },
             });
             const probeResults = ((probeResp.data as Record<string, unknown>)?.results as unknown[]) || [];
-            const contextBundle = modules.createBundle({ ...comp, registeredAs: comp.registeredAs }, probeResults);
+            const contextBundle = createBundle({ ...comp, registeredAs: comp.registeredAs as string } as unknown as ComponentState, probeResults as unknown as ProbeResult[]);
             comp = { ...comp, probeResults, contextBundle };
             await saveComp(comp);
             log.info(`[${cid}] Probed extension: ${probeResults.length} actions`);
 
             // Spec-vs-probe validation
             if (comp.spec && probeResults.length > 0) {
-              const sv = modules.validateSpecAgainstProbe(comp.spec, probeResults);
+              const sv = validateSpecAgainstProbe(comp.spec as Record<string, unknown>, probeResults as unknown as ProbeResult[]);
               if (!sv.valid) {
                 log.warn(`[${cid}] Spec-vs-probe mismatch: ${(sv.mismatches as Array<{message: string}>).map(m => m.message).join('; ')}`);
               }
@@ -563,16 +499,27 @@ export async function runAutopilot(
           try {
             let testPromptText: string;
             if (comp.spec && compType === 'extension') {
-              testPromptText = modules.buildExtensionTestFromSpec(comp.spec, comp.registeredAs as string);
+              testPromptText = await buildPrompt(storage, 'gen-test-extension-spec', {
+                blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec,
+                selfSpec: comp.spec as Record<string, unknown>, extensionName: comp.registeredAs as string,
+              } as unknown as PromptRuntimeData);
             } else if (comp.spec && compType === 'cortex' && (comp.spec as Record<string, unknown>).wrapsExtension) {
-              testPromptText = modules.buildDataCortexTestFromSpec(comp.spec);
+              testPromptText = await buildPrompt(storage, 'gen-test-cortex-spec', {
+                blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec,
+                selfSpec: comp.spec as Record<string, unknown>,
+              } as unknown as PromptRuntimeData);
             } else {
-              testPromptText = modules.buildTestPrompt(compType, content, compLabel, comp.registeredAs, blueprint, interviewSpec, comp.probeResults || null);
+              // Fallback — for components without specs, use a generic test prompt
+              testPromptText = await buildPrompt(storage, 'gen-test-extension-spec', {
+                blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec,
+                selfSpec: comp.spec as Record<string, unknown>,
+                extensionName: comp.registeredAs as string,
+              } as unknown as PromptRuntimeData);
             }
 
             log.info(`[${cid}] Generating test for ${compLabel}`);
             let testCode = await callLLM(testPromptText);
-            testCode = modules.stripCodeblock(testCode);
+            testCode = stripCodeblock(testCode);
 
             const testEnvironment = (compType === 'cortex' || compType === 'app') ? 'browser' : 'server';
             const testResp = await internalFetch(config, `/v1/generator/${projectId}/test/${cid}`, jwt, {
