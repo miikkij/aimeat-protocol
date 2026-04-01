@@ -17,8 +17,12 @@ export function stripCodeblock(text: string): string {
   const fenceCount = (trimmed.match(/^```/gm) || []).length;
 
   if (fenceCount === 2) {
+    // Try strict match (fence at start and end)
     const match = trimmed.match(/^```[^\n]*\n([\s\S]*?)```\s*$/);
     if (match) return match[1].trim();
+    // Fallback: fence may be preceded by explanation text — extract content of the code block
+    const looseMatch = trimmed.match(/```[^\n]*\n([\s\S]*?)```/);
+    if (looseMatch) return looseMatch[1].trim();
   }
 
   if (fenceCount > 2) {
