@@ -747,6 +747,25 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
 ${scripts.join('\n')}
 
 <script nonce="${nonce}">
+// Ensure AIMEAT namespace aliases exist — cortex IIFEs register under different paths
+// and generated code may use any of them
+(function() {
+  if (!window.AIMEAT) window.AIMEAT = {};
+  if (!window.AIMEAT.ui) window.AIMEAT.ui = {};
+  // Alias bundled cortex names to AIMEAT.ui.* paths if not already set
+  var aliases = {
+    'aimeat-ui-forms': 'forms', 'aimeat-ui-nav': 'nav', 'aimeat-ui-layout': 'layout',
+    'aimeat-ui-viewers': 'viewers', 'aimeat-ui-dialogs': 'dialogs',
+  };
+  for (var full in aliases) {
+    var short = aliases[full];
+    if (AIMEAT[full] && !AIMEAT.ui[short]) AIMEAT.ui[short] = AIMEAT[full];
+    if (AIMEAT.ui[short] && !AIMEAT[full]) AIMEAT[full] = AIMEAT.ui[short];
+  }
+})();
+</script>
+
+<script nonce="${nonce}">
 // Test runner
 window.__testResults = null;
 window.__testRunning = true;

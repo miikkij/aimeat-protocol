@@ -27,7 +27,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiPost } from '/js/api.js';
 import {
-  saveComponent, registerComponent, reregisterComponent, writeProjectLog, writeDebugArtifact,
+  saveComponent, saveSpec, registerComponent, reregisterComponent, writeProjectLog, writeDebugArtifact,
 } from '/js/services/generator.js';
 import { buildComponentPrompt, buildFixPrompt, buildReflectionPrompt, buildTestPrompt } from '/js/services/generator-prompts.js';
 import { validateComponent } from '/js/services/generator-validate.js';
@@ -54,12 +54,35 @@ export function stripCodeblock(text) {
     if (match) return match[1].trim();
   }
   if (fenceCount > 2) {
-    // Multiple code blocks inside (e.g., cortex: ```yaml + ```javascript)
+    // Multiple code blocks inside (e.g., cortex: ```yaml + ```javascript, or extension: ```yaml + ```js per action)
     // Check if the ENTIRE response is wrapped in an OUTER fence (AI sometimes does this)
-    // Pattern: ```\n```yaml\n...\n```\n```javascript\n...\n```\n```
     const outerMatch = trimmed.match(/^```\s*\n([\s\S]*)\n```\s*$/);
     if (outerMatch) return outerMatch[1].trim();
-    // Otherwise: multiple blocks ARE the content — don't strip anything
+
+    // Extension multi-block pattern: ```yaml\n...\n``` followed by one or more ```javascript\n...\n```
+    // Combine into single text: YAML content + JS content separated by // actions/... markers
+    const blocks = [];
+    const blockRegex = /```(\w*)\s*\n([\s\S]*?)```/g;
+    let match;
+    while ((match = blockRegex.exec(trimmed)) !== null) {
+      blocks.push({ lang: match[1], content: match[2].trim() });
+    }
+    if (blocks.length >= 2) {
+      const yamlBlock = blocks.find(b => b.lang === 'yaml' || b.lang === 'yml');
+      const jsBlocks = blocks.filter(b => b.lang === 'javascript' || b.lang === 'js' || b.lang === '');
+      if (yamlBlock && jsBlocks.length > 0) {
+        // Check if JS blocks already have // actions/ markers — if so, combine cleanly
+        const hasActionMarkers = jsBlocks.some(b => /^\/\/\s*actions\//m.test(b.content));
+        if (hasActionMarkers) {
+          // Extension format: YAML manifest + action files with // actions/ markers
+          return yamlBlock.content + '\n' + jsBlocks.map(b => b.content).join('\n');
+        }
+      }
+      // Generic multi-block: combine all blocks
+      return blocks.map(b => b.content).join('\n\n');
+    }
+
+    // Fallback: return with fences — the validator can handle them
     return trimmed;
   }
   // No fences or unparseable — return as-is
@@ -264,7 +287,13 @@ export function ComponentDetail({ component, project, components, projectId, int
       const registered = addHistory(component, 'registered', { registeredAs: regName });
       // Create context bundle for downstream prompts (probe results added later if probed)
       const bundle = createBundle({ ...registered, registeredAs: regName, result }, []);
-      await saveComponent(projectId, { ...registered, status: 'done', registeredAs: regName, contextBundle: bundle });
+      // Preserve spec from earlier spec-generation step (if it exists on the component)
+      const compWithSpec = component.spec ? { ...registered, spec: component.spec } : registered;
+      await saveComponent(projectId, { ...compWithSpec, status: 'done', registeredAs: regName, contextBundle: bundle });
+      // Save spec independently — survives future component state overwrites
+      if (component.spec && component.id) {
+        await saveSpec(projectId, component.id, component.spec).catch(() => {});
+      }
       // Smoke test after registration — catch load failures early
       const smoke = await smokeTest(component.type, regName, session);
       if (!smoke.passed) {

@@ -263,7 +263,9 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
           await saveComponent(projectId, updated);
           await core.loadData();
           showToast?.(t('profile.generator.openrouter.stepFailed') + ': ' + comp.label, true);
-          break;
+          // Skip to next component — don't break the entire pipeline
+          await writeProjectLog(projectId, 'component_skipped', { meta: { component: comp.label, reason: 'validation_failed_after_retries', by: 'autopilot' } });
+          continue;
         }
         if (autopilotState.cancelledRef.current) break;
 
@@ -658,7 +660,8 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
                   await saveComponent(projectId, updated);
                   await writeProjectLog(projectId, 'component_test_gave_up', { meta: { component: comp.label, maxRounds: MAX_FIX, by: 'autopilot' } });
                   showToast?.(`${comp.label}: ${t('profile.generator.test_fix_round')} ${MAX_FIX}`, true);
-                  break;
+                  // Skip to next component — don't break the entire pipeline.
+                  // The component IS registered, just its test failed. Downstream may still work.
                 }
 
                 await core.loadData();
