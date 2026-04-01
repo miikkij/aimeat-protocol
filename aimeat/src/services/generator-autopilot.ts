@@ -433,7 +433,8 @@ export async function runAutopilot(
             const serviceSlug = (extComp?.registeredAs as string) || ((csmComp?.registeredAs as string) || '').split('/').pop() || '';
 
             if (compType === 'memory') {
-              const entries = typeof content === 'string' ? JSON.parse(content) : content;
+              const stripped = typeof content === 'string' ? stripCodeblock(content) : content;
+              const entries = typeof stripped === 'string' ? JSON.parse(stripped) : stripped;
               for (const [rawKey, value] of Object.entries(entries)) {
                 const key = (serviceSlug && !rawKey.startsWith(serviceSlug + '.')) ? `${serviceSlug}.${rawKey}` : rawKey;
                 await storage.setMemory({
@@ -445,7 +446,8 @@ export async function runAutopilot(
             }
 
             if (compType === 'translation') {
-              const translations = typeof content === 'string' ? JSON.parse(content) : content;
+              const stripped = typeof content === 'string' ? stripCodeblock(content) : content;
+              const translations = typeof stripped === 'string' ? JSON.parse(stripped) : stripped;
               for (const [locale, strings] of Object.entries(translations)) {
                 if (locale && typeof strings === 'object') {
                   const key = serviceSlug ? `${serviceSlug}.i18n.${locale}` : `i18n.${locale}`;
@@ -591,6 +593,28 @@ function extractRegisteredName(type: string, content: string, vr: { extracted?: 
   if (type === 'csm' || type === 'msm') {
     const nameMatch = (typeof content === 'string' ? content : '').match(/name:\s*"?([^\s"]+)"?/);
     return nameMatch?.[1] || null;
+  }
+  if (type === 'memory') {
+    // Memory content is JSON object — return the first key name as the registered name
+    try {
+      const stripped = stripCodeblock(typeof content === 'string' ? content : '');
+      const parsed = JSON.parse(stripped);
+      const keys = Object.keys(parsed);
+      return keys.length > 0 ? `memory:${keys[0]}` : 'memory';
+    } catch {
+      return 'memory';
+    }
+  }
+  if (type === 'translation') {
+    // Translation content is { locale: { key: value } } — return i18n-{locale} for the first locale
+    try {
+      const stripped = stripCodeblock(typeof content === 'string' ? content : '');
+      const parsed = JSON.parse(stripped);
+      const locales = Object.keys(parsed);
+      return locales.length > 0 ? `i18n-${locales[0]}` : 'translation';
+    } catch {
+      return 'translation';
+    }
   }
   return null;
 }

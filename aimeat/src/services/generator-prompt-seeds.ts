@@ -834,6 +834,576 @@ Return ONLY executable JavaScript. No markdown fences.`,
     usedIn: ['generator-autopilot'],
   },
 
+  // ═══════════════════════════════════════════════════════════════════
+  // Cortex code generation — data, component, app-domain subtypes
+  // ═══════════════════════════════════════════════════════════════════
+
+  {
+    id: 'gen-cortex-data',
+    group: 'generator',
+    name: 'Data Cortex Generator',
+    description: 'Data cortex IIFE — wraps extension into clean data access methods.',
+    content: `{{disclaimer}}
+
+Create a Data Cortex library for: {{label}}
+
+## Goal
+
+Build a client-side JavaScript library (IIFE) that provides data access methods.
+This is the DATA LAYER — pure data access, no UI rendering.
+Other cortex components will use this library to get and modify data.
+
+## Structures (shared data types — use these exact shapes)
+
+{{structures}}
+
+{{extension_spec}}
+
+## AIMEAT Platform Libraries Available
+
+- **AIMEAT.data** — get(key), set(key, value), delete(key), list(opts), search(query), getPublic(gaii, key), getEntry(key), update(key, value, version)
+- **AIMEAT.storage** — upload(file), download(key), list(), delete(key)
+- **AIMEAT.auth** — login(), getSession(), mountLoginButton(container)
+
+## Data Access Rules (CRITICAL — follow precisely)
+
+Two namespaces, two different methods:
+
+1. **Extension runtime data** (watchlist items, cached API results, change logs — data the EXTENSION wrote via ctx.memory.set):
+   → Read with: \`AIMEAT.data.getPublic('ext:EXTENSION_NAME', key)\`
+   → This reads from the extension's own namespace. Public, no auth needed.
+
+2. **Owner/user data** (translations, settings, seed data — data stored by memory/translation components):
+   → Read with: \`AIMEAT.data.get(key)\`
+   → This reads from the CURRENT USER's own namespace. Requires auth session.
+
+NEVER read translations or settings from ext: namespace. They live in the owner namespace.
+NEVER read extension runtime data with data.get() — that reads the wrong namespace.
+
+## Output Format
+
+Return TWO separate, properly tagged code blocks.
+CRITICAL: Use \\\`\\\`\\\`yaml for the manifest and \\\`\\\`\\\`javascript for the library code.
+
+First block — YAML manifest:
+\\\`\\\`\\\`yaml
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: kebab-case-name
+  namespace: community
+  description: "What this data cortex does"
+  author: generator
+  tags: [data, domain-tag]
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: prompt
+      name: domain-assistant
+      content: |
+        You are using the {{metadata.name}} cortex library.
+        Node URL: {{node_url}}
+    - type: lib
+      name: kebab-case-name
+      filename: kebab-case-name.js
+      exports: [methodName, ...]
+      api_surface: |
+        AIMEAT.yourLib.methodName(params) — Description and return type
+\\\`\\\`\\\`
+
+Second block — JavaScript library:
+\\\`\\\`\\\`javascript
+(function (AIMEAT) {
+  'use strict';
+  const LIB_NAME = 'yourLibName'; // camelCase of metadata.name
+  // Public data access methods
+  async function methodName(params) { ... }
+  // Register
+  const exports = { methodName, ... };
+  if (AIMEAT.register) AIMEAT.register(LIB_NAME, exports);
+  AIMEAT[LIB_NAME] = exports;
+})(window.AIMEAT || (window.AIMEAT = {}));
+\\\`\\\`\\\`
+
+session.fetch returns ALREADY-PARSED JSON — use resp.data, never resp.json().
+
+{{completed_context}}`,
+    variables: ['disclaimer', 'label', 'extension_spec', 'structures', 'completed_context'],
+    usedIn: ['generator-autopilot', 'generator-ui'],
+  },
+
+  {
+    id: 'gen-cortex-component',
+    group: 'generator',
+    name: 'Feature Cortex Generator',
+    description: 'Feature cortex IIFE — self-contained UI module with render(container).',
+    content: `{{disclaimer}}
+
+Create a Feature Cortex component for: {{label}}
+
+## Goal
+
+Build a self-contained feature module (data + UI) as a cortex IIFE.
+It must export a \`render(container)\` function that:
+1. Creates all DOM elements for this feature
+2. Fetches data from the data cortex
+3. Renders the data using platform UI components
+4. Handles user interactions
+5. Uses translation keys for all visible text
+
+Think of it like aimeat-charts: ChartPanel({ target: container, ... }) creates a complete chart.
+Your render(container) creates a complete feature view.
+
+{{data_api_spec}}
+
+## Platform UI Cortex Libraries — Working Examples
+
+All components take an options object. They return a DOM element you append to your container.
+
+### Tabs (AIMEAT['aimeat-ui-nav'].Tabs)
+\\\`\\\`\\\`javascript
+var tabs = AIMEAT['aimeat-ui-nav'].Tabs({
+  target: container,
+  tabs: [
+    { id: 'search', label: 'Haku', icon: '🔍' },
+    { id: 'watchlist', label: 'Seuranta', icon: '⭐' }
+  ],
+  active: 'search',
+  onChange: function(tabId) { renderTabContent(tabId); }
+});
+\\\`\\\`\\\`
+
+### DataTable (AIMEAT['aimeat-ui-viewers'].DataTable)
+\\\`\\\`\\\`javascript
+var table = AIMEAT['aimeat-ui-viewers'].DataTable({
+  columns: [
+    { key: 'name', label: 'Nimi', sortable: true },
+    { key: 'businessId', label: 'Y-tunnus' }
+  ],
+  rows: dataRows,
+  sortable: true,
+  filterable: true,
+  pageSize: 20
+});
+container.appendChild(table);
+// NOTE: DataTable does NOT have onRowClick.
+\\\`\\\`\\\`
+
+### Timeline (AIMEAT['aimeat-ui-viewers'].Timeline)
+\\\`\\\`\\\`javascript
+var timeline = AIMEAT['aimeat-ui-viewers'].Timeline({
+  events: [{ date: '2026-03-26', title: 'Change', description: 'Details' }]
+});
+container.appendChild(timeline);
+\\\`\\\`\\\`
+
+### Form components (AIMEAT['aimeat-ui-forms'])
+\\\`\\\`\\\`javascript
+var nameInput = AIMEAT['aimeat-ui-forms'].Input({ label: 'Hakusana', placeholder: 'Hae...', type: 'text' });
+container.appendChild(nameInput.el);
+// Read: nameInput.getValue(), Set: nameInput.setValue('test')
+
+var langSelect = AIMEAT['aimeat-ui-forms'].Select({
+  label: 'Kieli',
+  options: [{ value: 'fi', label: 'Suomi' }, { value: 'en', label: 'English' }]
+});
+container.appendChild(langSelect.el);
+
+var toggle = AIMEAT['aimeat-ui-forms'].Toggle({
+  label: 'Ilmoitukset', checked: true,
+  onChange: function(checked) { savePref(checked); }
+});
+container.appendChild(toggle.el);
+\\\`\\\`\\\`
+
+### Dialogs (AIMEAT['aimeat-ui-dialogs'])
+\\\`\\\`\\\`javascript
+AIMEAT['aimeat-ui-dialogs'].toast('Saved!', 'success');
+var confirmed = await AIMEAT['aimeat-ui-dialogs'].Confirm({ title: 'Delete?', message: 'Are you sure?', confirmLabel: 'Delete', cancelLabel: 'Cancel' });
+var modal = AIMEAT['aimeat-ui-dialogs'].Modal({ title: 'Details', content: detailElement, width: 'lg' });
+\\\`\\\`\\\`
+
+## Translation Keys
+{{translation_keys}}
+
+## Loading Translations
+
+Translations are stored in the OWNER namespace (by the translation component).
+Load with AIMEAT.data.get() — NOT from ext: namespace:
+\\\`\\\`\\\`javascript
+var translations = await AIMEAT.data.get('SERVICE_NAME.i18n.fi') || {};
+\\\`\\\`\\\`
+
+## Translation Helper
+\\\`\\\`\\\`javascript
+function t(key, translations, vars) {
+  if (!key || !translations) return key || '';
+  var str = translations[key] != null ? translations[key] : key;
+  if (vars && typeof str === 'string') {
+    Object.keys(vars).forEach(function(k) { str = str.replace('$\{' + k + '}', vars[k]); });
+  }
+  return str;
+}
+\\\`\\\`\\\`
+
+## Nested Object Helper
+\\\`\\\`\\\`javascript
+function dv(val) {
+  if (val == null) return '-';
+  if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (val.value) return val.value;
+  if (val.url) return val.url;
+  if (val.name) return val.name;
+  if (Array.isArray(val)) return val.map(dv).join(', ');
+  return JSON.stringify(val);
+}
+\\\`\\\`\\\`
+
+## Output Format
+
+Return TWO separate, properly tagged code blocks.
+CRITICAL: Use \\\`\\\`\\\`yaml for the manifest and \\\`\\\`\\\`javascript for the library code.
+
+First block — YAML manifest:
+\\\`\\\`\\\`yaml
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: kebab-case-feature-name
+  namespace: community
+  description: "Feature description"
+  author: generator
+  tags: [feature, domain-tag]
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: lib
+      name: kebab-case-feature-name
+      filename: kebab-case-feature-name.js
+      exports: [render]
+      api_surface: |
+        AIMEAT.featureLib.render(container) — Renders the feature UI into the given DOM element
+\\\`\\\`\\\`
+
+Second block — JavaScript library:
+\\\`\\\`\\\`javascript
+(function (AIMEAT) {
+  'use strict';
+  const LIB_NAME = 'featureLib'; // camelCase
+  // ... render(container) implementation
+  var exports = { render: render };
+  if (AIMEAT.register) AIMEAT.register(LIB_NAME, exports);
+  AIMEAT[LIB_NAME] = exports;
+})(window.AIMEAT || (window.AIMEAT = {}));
+\\\`\\\`\\\`
+
+{{completed_context}}`,
+    variables: ['disclaimer', 'label', 'data_api_spec', 'translation_keys', 'view_context', 'completed_context'],
+    usedIn: ['generator-autopilot', 'generator-ui'],
+  },
+
+  {
+    id: 'gen-cortex-app-domain',
+    group: 'generator',
+    name: 'App-Domain Cortex Generator',
+    description: 'App-domain cortex — composition layer combining all features + auth + translations.',
+    content: `{{disclaimer}}
+
+Create an App-Domain Cortex for: {{label}}
+
+## Goal
+
+Build the top-level cortex library that the APP will use. It composes:
+1. All feature cortex components (renders them into containers)
+2. Auth initialization (AIMEAT.auth)
+3. Translation loading and management
+4. Settings management
+5. Navigation support
+
+The app loads ONLY this cortex. This cortex provides everything the app needs.
+
+## Feature Cortex Components (compose these)
+{{component_specs}}
+
+## Data Cortex
+{{data_api_spec}}
+
+## Translation Keys Available
+{{translation_keys}}
+
+## Methods to Export
+
+- **init()** — Initialize auth, load translations, check data readiness. Returns { ready: boolean, authenticated: boolean }.
+- **render(container)** — Render the full application UI into the container. Sets up navigation, renders feature views.
+- **getTranslations(locale)** — Load translation strings for a locale. Returns the translation object.
+- **t(key, vars)** — Translate a key with optional variable interpolation. Uses loaded translations.
+- **switchLocale(locale)** — Change language, reload translations, re-render.
+
+## Auth Pattern
+\\\`\\\`\\\`javascript
+var session = await AIMEAT.auth.login();
+if (!session) {
+  container.id = container.id || 'app-auth';
+  AIMEAT.auth.mountLoginButton('#' + container.id);
+  return { ready: false, authenticated: false };
+}
+\\\`\\\`\\\`
+
+## Translation Pattern
+\\\`\\\`\\\`javascript
+async function loadTranslations(locale) {
+  try {
+    return await AIMEAT.data.get('SERVICE_PREFIX.i18n.' + locale)
+        || await AIMEAT.data.get('i18n.' + locale)
+        || {};
+  } catch (e) { return {}; }
+}
+
+function t(key, vars) {
+  var str = translations[key] || key;
+  if (vars) {
+    Object.keys(vars).forEach(function(k) { str = str.replace('$\{' + k + '}', vars[k]); });
+  }
+  return str;
+}
+\\\`\\\`\\\`
+
+## Output Format
+
+Return TWO separate, properly tagged code blocks.
+CRITICAL: Use \\\`\\\`\\\`yaml for the manifest and \\\`\\\`\\\`javascript for the library code.
+
+First block — YAML manifest:
+\\\`\\\`\\\`yaml
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: kebab-case-app-name
+  namespace: community
+  description: "App-domain cortex description"
+  author: generator
+  tags: [app, domain-tag]
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: lib
+      name: kebab-case-app-name
+      filename: kebab-case-app-name.js
+      exports: [init, render, t, switchLocale, getTranslations]
+      api_surface: |
+        AIMEAT.appLib.init() — Initialize auth, load translations. Returns { ready, authenticated }
+        AIMEAT.appLib.render(container) — Render the full application into DOM container
+        AIMEAT.appLib.t(key, vars) — Translate with interpolation
+        AIMEAT.appLib.switchLocale(locale) — Change language and re-render
+        AIMEAT.appLib.getTranslations(locale) — Load translations for locale
+\\\`\\\`\\\`
+
+Second block — JavaScript library:
+\\\`\\\`\\\`javascript
+(function (AIMEAT) {
+  'use strict';
+  const LIB_NAME = 'appLib'; // camelCase
+  var exports = { init, render, t, switchLocale, getTranslations };
+  if (AIMEAT.register) AIMEAT.register(LIB_NAME, exports);
+  AIMEAT[LIB_NAME] = exports;
+})(window.AIMEAT || (window.AIMEAT = {}));
+\\\`\\\`\\\`
+
+{{completed_context}}`,
+    variables: ['disclaimer', 'label', 'component_specs', 'data_api_spec', 'use_cases', 'translation_keys', 'completed_context'],
+    usedIn: ['generator-autopilot', 'generator-ui'],
+  },
+
+  {
+    id: 'gen-app',
+    group: 'generator',
+    name: 'App HTML Generator',
+    description: 'Complete HTML app — loads cortex libraries, handles auth, renders UI.',
+    content: `{{context}}
+
+Create an AIMEAT App (HTML/JS) for: {{label}}
+
+Style: {{style}}
+
+{{app_domain_spec}}
+
+## CRITICAL: Authentication & API Calls
+
+The app runs on the SAME ORIGIN as the AIMEAT node. Use relative API paths (e.g., "/v1/ext/..."), NOT absolute URLs.
+
+### Library setup (copy this exactly — load BOTH libraries):
+\\\`\\\`\\\`javascript
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function boot() {
+  try {
+    await loadScript('/v1/libs/aimeat-auth.js');
+    await loadScript('/v1/libs/aimeat-data.js');
+    await loadScript('/v1/cortex/aimeat-ui-nav/libs/aimeat-ui-nav.js');
+    await loadScript('/v1/cortex/aimeat-ui-layout/libs/aimeat-ui-layout.js');
+    await loadScript('/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js');
+    await loadScript('/v1/cortex/aimeat-ui-forms/libs/aimeat-ui-forms.js');
+    await loadScript('/v1/cortex/aimeat-ui-dialogs/libs/aimeat-ui-dialogs.js');
+    // Load domain cortex libraries here
+    AIMEAT.auth.mountLoginButton('#auth-container', {
+      onLogin: () => startApp(),
+      onLogout: () => location.reload(),
+    });
+    AIMEAT.auth.login().then(session => { if (session) startApp(); }).catch(() => {});
+  } catch (err) {
+    document.body.innerHTML = '<div style="padding:2rem;color:#ef4444;font-family:system-ui">'
+      + '<h2>Failed to load application</h2><p>' + err.message + '</p></div>';
+  }
+}
+boot();
+\\\`\\\`\\\`
+
+## Translation Keys Available
+{{translation_keys}}
+
+### Reading TRANSLATIONS (stored in owner namespace by translation components):
+\\\`\\\`\\\`javascript
+const fiStrings = await AIMEAT.data.get('my-service.i18n.fi') || await AIMEAT.data.get('i18n.fi') || {};
+\\\`\\\`\\\`
+
+## CDN Libraries & Design Resources
+
+| Library | Script Tag | Use for |
+|---------|-----------|---------|
+| Leaflet | \`<script src="https://unpkg.com/leaflet@1/dist/leaflet.js"></script>\` + CSS | Maps |
+| Chart.js | \`<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>\` | Charts |
+
+### CSP (Content Security Policy) — the app HTML MUST include a meta tag
+\\\`\\\`\\\`html
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net;
+  style-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://fonts.googleapis.com;
+  img-src 'self' data: https: blob:;
+  font-src 'self' https://fonts.gstatic.com;
+  connect-src 'self' https://*.tile.openstreetmap.org;
+">
+\\\`\\\`\\\`
+
+## CSS Design System
+
+Use CSS custom properties for ALL styling:
+\\\`\\\`\\\`css
+:root {
+  --color-primary: #3b82f6;
+  --color-secondary: #64748b;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-bg: #ffffff;
+  --color-bg-card: #f8fafc;
+  --color-text: #1e293b;
+  --color-text-dim: #64748b;
+  --color-border: #e2e8f0;
+  --radius: 8px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --font-sans: system-ui, -apple-system, sans-serif;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
+  --transition: 150ms ease;
+}
+\\\`\\\`\\\`
+Customize the palette based on the project domain and style preferences.
+
+## Auth UI Layout
+\\\`\\\`\\\`html
+<body>
+  <div id="auth-container"></div>
+  <header><!-- your app header --></header>
+  <main id="app"><!-- your content --></main>
+</body>
+\\\`\\\`\\\`
+
+## Rules
+- DO NOT add manual configuration fields for API URL or Bearer Token
+- ALL API paths MUST be relative (start with /)
+- Use \`await AIMEAT.auth.login()\` to restore session; if null, show "Sign in"
+- Vanilla JS, no build step
+- Clean, responsive UI with good mobile support
+- Call cortex init() on app start if cortex libraries are loaded
+
+## CRITICAL: Rendering API Data — Handle Nested Objects
+\\\`\\\`\\\`javascript
+function displayValue(val) {
+  if (val == null) return '-';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (val.value) return val.value;
+  if (val.url) return val.url;
+  if (val.name) return val.name;
+  if (Array.isArray(val)) return val.map(displayValue).join(', ');
+  return JSON.stringify(val);
+}
+\\\`\\\`\\\`
+
+## CRITICAL: Empty-State Handling
+On first run, extension data does NOT exist yet. Show a friendly empty state.
+NEVER crash on null/undefined data.
+
+## Built-in Error Collector
+\\\`\\\`\\\`javascript
+(function() {
+  var errors = [];
+  window.onerror = function(msg, src, line, col) {
+    errors.push({ msg: msg, src: src, line: line, col: col, at: new Date().toISOString() });
+    showErrors();
+  };
+  window.addEventListener('unhandledrejection', function(e) {
+    errors.push({ msg: String(e.reason), src: 'promise', line: 0, col: 0, at: new Date().toISOString() });
+    showErrors();
+  });
+  function showErrors() {
+    var el = document.getElementById('app-errors');
+    if (!el) { el = document.createElement('div'); el.id = 'app-errors'; el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#1a0000;color:#ff6b6b;font-size:12px;padding:8px 12px;max-height:120px;overflow:auto;z-index:9999;font-family:monospace;border-top:2px solid #ff4444'; document.body.appendChild(el); }
+    el.innerHTML = errors.map(function(e) { return e.at.slice(11,19) + ' ' + e.msg + ' (' + e.src + ':' + e.line + ')'; }).join('<br>');
+  }
+})();
+\\\`\\\`\\\`
+
+{{html_entity_rules}}
+
+Return a complete HTML file with an app manifest comment at the top:
+\\\`\\\`\\\`html
+<!-- AIMEAT App Manifest
+name: kebab-case-name
+version: 1.0.0
+description: What this app does
+entry: index.html
+-->
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>App Name</title></head>
+<body>
+  <div id="auth-container"></div>
+  <div id="app"></div>
+  <script>
+    // Error collector + auth setup + API helper + app logic
+  </script>
+</body>
+</html>
+\\\`\\\`\\\``,
+    variables: ['context', 'label', 'app_domain_spec', 'style', 'translation_keys', 'html_entity_rules'],
+    usedIn: ['generator-autopilot', 'generator-ui'],
+  },
+
   {
     id: 'gen-test-cortex-spec',
     group: 'generator',
