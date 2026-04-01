@@ -40,7 +40,7 @@ export async function seedSystemPrompts(storage: Storage): Promise<void> {
       inserted++;
     } else {
       // Update metadata (usedIn, variables, name, description, group)
-      const metaUpdate: Record<string, unknown> = {
+      const metaUpdate = {
         ...existing,
         group: seed.group,
         name: seed.name,
@@ -52,11 +52,11 @@ export async function seedSystemPrompts(storage: Storage): Promise<void> {
       // For generator prompts at version 1 (never edited by admin): also update content.
       // This allows fixing seed content bugs without requiring manual "Reset to factory default".
       if (seed.group === 'generator' && existing.version === 1 && existing.content !== seed.content) {
-        (metaUpdate as { content: string }).content = seed.content;
+        metaUpdate.content = seed.content;
         logger.info(`Generator prompt "${seed.id}" content updated (was version 1, never edited)`);
       }
 
-      await storage.upsertSystemPrompt(metaUpdate as typeof existing);
+      await storage.upsertSystemPrompt(metaUpdate);
       updated++;
     }
   }
