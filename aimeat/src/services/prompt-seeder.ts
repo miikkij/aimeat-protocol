@@ -49,11 +49,12 @@ export async function seedSystemPrompts(storage: Storage): Promise<void> {
         usedIn: seed.usedIn,
       };
 
-      // For generator prompts at version 1 (never edited by admin): also update content.
-      // This allows fixing seed content bugs without requiring manual "Reset to factory default".
-      if (seed.group === 'generator' && existing.version === 1 && existing.content !== seed.content) {
+      // For generator prompts never edited by admin: also update content.
+      // updatedBy === 'system' means no human touched it — safe to overwrite with improved seed.
+      // Once an admin edits (updatedBy !== 'system'), their edits are preserved.
+      if (seed.group === 'generator' && existing.updatedBy === 'system' && existing.content !== seed.content) {
         metaUpdate.content = seed.content;
-        logger.info(`Generator prompt "${seed.id}" content updated (was version 1, never edited)`);
+        logger.info(`Generator prompt "${seed.id}" content updated (was system-managed, never edited by admin)`);
       }
 
       await storage.upsertSystemPrompt(metaUpdate as unknown as import('../storage/interface.js').SystemPromptRecord);
