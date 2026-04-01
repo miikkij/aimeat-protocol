@@ -187,11 +187,15 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
         autopilotState.setStep(comp.label);
         core.setSelectedId(cid);
 
+        try { // Per-component catch-all — no uncaught error should kill the loop
+
         // ── SPEC GENERATION (before code — spec is king) ──
         const specTypes = ['extension', 'cortex'];
         let spec = null;
         if (specTypes.includes(comp.type)) {
+          console.log(`[autopilot] ${comp.label}: starting spec generation, cancelled=${autopilotState.cancelledRef.current}`);
           spec = await generateSpec(comp, project, interviewSpec);
+          console.log(`[autopilot] ${comp.label}: spec generation done, spec=${!!spec}, cancelled=${autopilotState.cancelledRef.current}`);
           if (spec && !autopilotState.cancelledRef.current) {
             comp = { ...comp, spec };
             try {
@@ -220,8 +224,14 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
             }
           }
         }
-        if (autopilotState.cancelledRef.current) break;
+        console.log(`[autopilot] ${comp.label}: spec phase done, cancelled=${autopilotState.cancelledRef.current}, spec=${!!spec}`);
+        if (autopilotState.cancelledRef.current) {
+          console.warn(`[autopilot] ${comp.label}: CANCELLED after spec — this is why the autopilot stops!`);
+          await writeProjectLog(projectId, 'autopilot_cancelled_after_spec', { meta: { component: comp.label, by: 'autopilot' } });
+          break;
+        }
 
+        console.log(`[autopilot] ${comp.label}: building code prompt...`);
         // Build prompt — spec flows as context if available
         let prompt;
         try {
@@ -709,6 +719,15 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
               showToast?.(`${comp.label}: Test error: ${e.message}`, true);
             }
           }
+        }
+
+        } catch (componentErr) {
+          // Per-component catch-all — prevents ANY uncaught error from killing the loop
+          console.error(`[autopilot] UNCAUGHT ERROR in ${comp?.label || cid}:`, componentErr);
+          writeDebugArtifact(projectId, cid, 'component-loop-error', (componentErr?.message || String(componentErr)) + '\n\nStack: ' + (componentErr?.stack || 'N/A'));
+          await writeProjectLog(projectId, 'component_uncaught_error', { meta: { component: comp?.label || cid, error: componentErr?.message, by: 'autopilot' } }).catch(() => {});
+          showToast?.(`${comp?.label || cid}: Unexpected error: ${componentErr?.message}`, true);
+          // Continue to next component
         }
       }
     } catch (e) {
