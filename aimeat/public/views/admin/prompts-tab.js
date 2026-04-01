@@ -235,19 +235,22 @@ export default function PromptsTab({ data, reload }) {
       ? html`<${Empty} text=${t('dashboard.promptsEmpty')} />`
       : Object.entries(groups).map(([g, items]) => html`
         <details class="adm-card adm-mb-sm" open>
-          <summary class="adm-prompt-group-header" style="display:flex;align-items:center;gap:8px">
-            <span style="flex:1">${t('dashboard.' + (GROUP_NAMES[g] || g))} (${items.length})</span>
-            <button class="btn-ghost" style="font-size:12px;padding:2px 8px" onClick=${async (e) => {
-              e.preventDefault(); e.stopPropagation();
-              if (!await confirm(t('dashboard.promptsResetGroupConfirm', { group: t('dashboard.' + (GROUP_NAMES[g] || g)) }) || 'Reset all prompts in this group to factory defaults?')) return;
+          <summary class="adm-prompt-group-header">
+            ${t('dashboard.' + (GROUP_NAMES[g] || g))} (${items.length})
+          </summary>
+          <div style="text-align:right;padding:4px 8px">
+            <button class="btn-danger" style="font-size:12px;padding:4px 12px" onClick=${async () => {
+              if (!await confirm(t('dashboard.promptsResetGroupConfirm') || 'Reset all prompts in this group to factory defaults?')) return;
               try {
+                setLoading(true);
                 await resetPromptGroup(g);
                 const res = await getSystemPrompts();
                 setPrompts(res.data.prompts || []);
+                setLoading(false);
                 window.showToast?.('Group reset to factory defaults');
-              } catch (err) { window.showToast?.(err.message, true); }
+              } catch (err) { setLoading(false); window.showToast?.(err.message, true); }
             }}>${t('dashboard.promptsResetGroup') || 'Reset Group'}</button>
-          </summary>
+          </div>
           ${items.map(p => html`
             <div class="adm-hrow" style="cursor:pointer" onClick=${() => openEdit(p.id)}>
               <div style="flex:1">
