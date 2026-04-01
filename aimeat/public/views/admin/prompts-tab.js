@@ -240,16 +240,18 @@ export default function PromptsTab({ data, reload }) {
           </summary>
           <div style="text-align:right;padding:4px 8px">
             <button class="btn-danger" style="font-size:12px;padding:4px 12px" onClick=${async () => {
-              if (!await confirm(t('dashboard.promptsResetGroupConfirm') || 'Reset all prompts in this group to factory defaults?')) return;
+              console.log('[prompts] Reset group clicked:', g);
               try {
-                setLoading(true);
-                await resetPromptGroup(g);
+                const resp = await resetPromptGroup(g);
+                console.log('[prompts] Reset response:', resp);
                 const res = await getSystemPrompts();
                 setPrompts(res.data.prompts || []);
-                setLoading(false);
                 window.showToast?.('Group reset to factory defaults');
-              } catch (err) { setLoading(false); window.showToast?.(err.message, true); }
-            }}>${t('dashboard.promptsResetGroup') || 'Reset Group'}</button>
+              } catch (err) {
+                console.error('[prompts] Reset failed:', err);
+                window.showToast?.(err.message, true);
+              }
+            }}>${t('dashboard.promptsResetGroup') || 'Palauta ryhmä'}</button>
           </div>
           ${items.map(p => html`
             <div class="adm-hrow" style="cursor:pointer" onClick=${() => openEdit(p.id)}>
