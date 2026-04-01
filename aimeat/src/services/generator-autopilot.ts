@@ -254,7 +254,7 @@ export async function runAutopilot(
 
       // Phase gate: only process types enabled for this run.
       // Phase 1: csm, memory, translation only. Extension and beyond are disabled until Phase 1 is verified.
-      const ENABLED_TYPES = ['csm', 'memory', 'translation'];
+      const ENABLED_TYPES = ['csm', 'memory', 'translation', 'extension'];
       if (!ENABLED_TYPES.includes(compType)) {
         log.info(`[${cid}] Phase gate: ${compType} not enabled yet — stopping pipeline after Phase 1`);
         entry.status.componentResults.push({ id: cid, label: compLabel, status: 'phase_gated' });
