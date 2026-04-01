@@ -170,6 +170,8 @@ const validVars = new Set([
   'use_case', 'view_section', 'data_cortex_api', 'translation_section',
   'feature_apis', 'data_cortex_section',
   'project_context', 'cortex_or_api_section', 'cortex_rules',
+  // Cortex template variables — pass through to LLM output, not resolved by prompt system
+  'node_url',
 ]);
 
 for (const seed of GENERATOR_PROMPT_SEEDS) {
@@ -197,7 +199,7 @@ if (cortexDataSeed) {
   assert(resolved.includes('Test Data Layer'), 'gen-cortex-data: label value present');
   assert(resolved.includes('Project: Finnish company monitor'), 'gen-cortex-data: project_description present');
   assert(resolved.includes('Methods to Export'), 'gen-cortex-data: has Methods to Export section');
-  const remaining = resolved.match(/\{\{(\w+)\}\}/g) || [];
+  const remaining = (resolved.match(/\{\{(\w+)\}\}/g) || []).filter(v => v !== '{{node_url}}');
   assert(remaining.length === 0, `gen-cortex-data: no unresolved vars`, remaining.length > 0 ? remaining.join(', ') : undefined);
 }
 
