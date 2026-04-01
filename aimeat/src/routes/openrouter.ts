@@ -26,6 +26,7 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
+import { logger } from '../utils/logger.js';
 import { complete, listModels } from '../services/openrouter.js';
 
 function validateProviderUrl(url: string): string | null {
@@ -367,9 +368,9 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
           top_p: top_p ?? (typeof prefs.top_p === 'number' ? prefs.top_p : undefined),
           max_tokens: max_tokens ?? (typeof prefs.max_tokens === 'number' ? prefs.max_tokens : undefined),
         };
-        console.log(`[openrouter] call: model=${model}, promptLen=${prompt.length}, baseUrl=${baseUrl}, temp=${options.temperature ?? 'default'}, top_p=${options.top_p ?? 'default'}, max_tokens=${options.max_tokens ?? 'default'}`);
+        logger.info(`[openrouter] call: model=${model}, promptLen=${prompt.length}, temp=${options.temperature ?? 'default'}, top_p=${options.top_p ?? 'default'}, max_tokens=${options.max_tokens ?? 'default'}`);
         const result = await complete(decryptedKey, model, prompt, systemPrompt, baseUrl, options);
-        console.log(`[openrouter] result: model=${result.model}, contentLen=${result.content.length}`);
+        logger.info(`[openrouter] result: model=${result.model}, contentLen=${result.content.length}`);
         res.json(success(config.nodeId, result));
       } catch (e) {
         const status = (e as { status?: number }).status;

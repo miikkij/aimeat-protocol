@@ -93,8 +93,14 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
             await core.loadData();
           }
         } catch (pollErr) {
-          // Network error during poll — don't crash, just retry next interval
+          // Network error or rate limit during poll — stop polling if repeated failures
           console.warn('[autopilot] Poll failed:', pollErr.message);
+          if (pollErr.message?.includes('429') || pollErr.message?.includes('Too Many')) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+            autopilotState.finish();
+            showToast?.('Polling stopped (rate limited). Autopilot may still be running on server — refresh to check.', true);
+          }
         }
       }, 3000);
 
@@ -105,16 +111,19 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
 
   /** Cancel the running autopilot on the server */
   async function handleCancel() {
-    try {
-      await apiPost(`/v1/generator/${projectId}/autopilot/cancel`);
-    } catch {
-      // Best effort — server may already be stopped
-    }
+    // Stop polling FIRST — prevents 429 storms if cancel API is slow or rate-limited
     if (pollInterval) {
       clearInterval(pollInterval);
       pollInterval = null;
     }
     autopilotState.cancel();
+
+    // Then tell the server to stop (best effort — server may already be stopped)
+    try {
+      await apiPost(`/v1/generator/${projectId}/autopilot/cancel`);
+    } catch {
+      // Ignore — polling is already stopped, UI is already in cancelled state
+    }
   }
 
   // Override the cancel ref to use our cancel function

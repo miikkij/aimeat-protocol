@@ -8,6 +8,7 @@
  *   v1.0.0 — 2026-03-20 — Initial implementation
  *   v1.1.0 — 2026-03-21 — Made provider-agnostic with baseUrl parameter; apiKey optional
  */
+import { logger } from '../utils/logger.js';
 
 export interface OpenRouterCompletionResult {
   content: string;
@@ -66,7 +67,7 @@ export async function complete(
   if (options?.frequency_penalty !== undefined) requestBody.frequency_penalty = options.frequency_penalty;
   if (options?.presence_penalty !== undefined) requestBody.presence_penalty = options.presence_penalty;
   const bodyStr = JSON.stringify(requestBody);
-  console.log(`[openrouter] Sending: model=${model}, bodyLen=${bodyStr.length}, msgCount=${messages.length}, userMsgLen=${messages[messages.length - 1]?.content?.length || 0}`);
+  logger.info(`[openrouter] Sending: model=${model}, temp=${requestBody.temperature ?? 'default'}, top_p=${requestBody.top_p ?? 'default'}, max_tokens=${requestBody.max_tokens ?? 'default'}, bodyLen=${bodyStr.length}, userMsgLen=${messages[messages.length - 1]?.content?.length || 0}`);
 
   try {
     const resp = await fetch(`${baseUrl}/chat/completions`, {
@@ -90,7 +91,7 @@ export async function complete(
       usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
 
-    console.log(`[openrouter] Response: status=${resp.status}, model=${data.model}, choices=${data.choices?.length || 0}, finish=${data.choices?.[0]?.finish_reason}, promptTokens=${data.usage?.prompt_tokens}, completionTokens=${data.usage?.completion_tokens}, hasError=${!!data.error}`);
+    logger.info(`[openrouter] Response: status=${resp.status}, model=${data.model}, choices=${data.choices?.length || 0}, finish=${data.choices?.[0]?.finish_reason}, promptTokens=${data.usage?.prompt_tokens}, completionTokens=${data.usage?.completion_tokens}, hasError=${!!data.error}`);
 
     // Check for error in response body (OpenRouter sometimes returns 200 with error)
     if (data.error) {
