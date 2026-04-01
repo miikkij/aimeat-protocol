@@ -49,12 +49,12 @@ export async function seedSystemPrompts(storage: Storage): Promise<void> {
         usedIn: seed.usedIn,
       };
 
-      // For generator prompts never edited by admin: also update content.
-      // updatedBy === 'system' means no human touched it — safe to overwrite with improved seed.
-      // Once an admin edits (updatedBy !== 'system'), their edits are preserved.
-      if (seed.group === 'generator' && existing.updatedBy === 'system' && existing.content !== seed.content) {
+      // Always update generator prompt content from seeds.
+      // These prompts are code — they must match the source code version.
+      // Admin edits are preserved in version history and can be restored.
+      if (seed.group === 'generator' && existing.content !== seed.content) {
         metaUpdate.content = seed.content;
-        logger.info(`Generator prompt "${seed.id}" content updated (was system-managed, never edited by admin)`);
+        logger.info(`Generator prompt "${seed.id}" content synced from seed`);
       }
 
       await storage.upsertSystemPrompt(metaUpdate as unknown as import('../storage/interface.js').SystemPromptRecord);
