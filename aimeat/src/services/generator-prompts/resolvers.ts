@@ -206,7 +206,7 @@ function resolveAppDomainSpec(data: PromptRuntimeData): Vars {
 function resolveSimpleComponent(data: PromptRuntimeData): Vars {
   return {
     label: data.componentLabel || '',
-    context: buildContextString(data),
+    component_context: buildContextString(data),
   };
 }
 
@@ -226,7 +226,8 @@ function resolveTranslation(data: PromptRuntimeData): Vars {
 function resolveExtensionCode(data: PromptRuntimeData): Vars {
   return {
     label: data.componentLabel || '',
-    context: buildContextString(data),
+    // Don't set 'context' here — it's the AIMEAT_CONTEXT fragment, injected by index.ts
+    // Extension-specific data goes into spec_section + completed_context
     spec_section: data.selfSpec ? formatSpec(data.selfSpec, 'YOUR SPEC — implement this contract exactly') : '',
     completed_context: formatCompletedContext(data.completedComponents),
   };

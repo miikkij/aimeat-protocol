@@ -1,10 +1,12 @@
 /**
  * @file generator-prompt-seeds.ts
- * @description Generator-specific prompt seed entries for the SystemPromptRecord database.
- *   These templates are editable from the admin dashboard after seeding.
+ * @description Generator prompt seeds — EXACT content from the original browser JS files.
+ *   These templates are the SAME text that produced working output in V7/V8 pipeline tests.
+ *   DO NOT summarize, rewrite, or "improve" these. They are calibrated.
  *   Variables use {{name}} syntax, resolved by resolvers.ts at runtime.
  * @version-history
- *   v1.0.0 — 2026-04-01 — Initial generator prompt seeds
+ *   v1.0.0 — 2026-04-01 — Initial seeds (summaries — BROKEN)
+ *   v2.0.0 — 2026-04-01 — Replaced with EXACT original content from generator-prompts-base.js
  */
 
 import type { PromptSeedEntry } from './prompt-defaults.js';
@@ -12,14 +14,14 @@ import type { PromptSeedEntry } from './prompt-defaults.js';
 export const GENERATOR_PROMPT_SEEDS: PromptSeedEntry[] = [
 
   // ═══════════════════════════════════════════════════════════════════
-  // Shared Fragments — building blocks used by multiple prompts
+  // Shared Fragments — EXACT text from generator-prompts-base.js
   // ═══════════════════════════════════════════════════════════════════
 
   {
     id: 'gen-context',
     group: 'generator',
     name: 'AIMEAT Context',
-    description: 'Shared preamble describing AIMEAT building blocks, extension sandbox API, and data standards. Injected into most generator prompts via {{context}}.',
+    description: 'Shared preamble — building blocks, extension sandbox API, data standards. Injected into all prompts via {{context}}.',
     content: `You are helping create an AIMEAT service. AIMEAT is an AI agent infrastructure protocol.
 
 Available building blocks:
@@ -32,22 +34,41 @@ Available building blocks:
 - Cortex: Client-side JS domain library (IIFE on AIMEAT namespace). Wraps extension APIs and memory reads into clean domain methods for apps.
 
 Extensions run in an ISOLATED V8 sandbox with ONLY this API (no Node.js, no global fetch, no setTimeout, no require, no import):
-  ctx.memory.get(key) → value or null (ALWAYS null-check before using)
+  ctx.memory.get(key) → value or null (ALWAYS null-check before using: \`|| []\` or \`|| {}\`)
   ctx.memory.set(key, value) → void
-  ctx.memory.search(prefix) → Array<{ key, value }>
+  ctx.memory.search(prefix) → Array<{ key, value }> (NOT plain strings!)
   ctx.memory.delete(key) → boolean
-  ctx.memory.getPublic(namespace, key) → value or null (read from DIFFERENT namespace)
+  ctx.memory.getPublic(namespace, key) → value or null (read data from a DIFFERENT namespace)
+    Use this to read: (a) another extension's public data, (b) the OWNER's shared data (memory components, translations, settings).
+    Example — read another extension's data: await ctx.memory.getPublic('ext:other-ext', 'some.key')
+    Example — read owner's shared data: await ctx.memory.getPublic(ctx.caller.gaii, 'lookup.data')
+    ╔═══════════════════════════════════════════════════════════════════════════════╗
+    ║  IMPORTANT: ctx.memory.get() ONLY reads from the extension's OWN namespace. ║
+    ║  Data stored by memory components (seed data, settings, translations) lives  ║
+    ║  in the OWNER's namespace — use ctx.memory.getPublic(ctx.caller.gaii, key)  ║
+    ║  to access it. ctx.caller.gaii is the caller's GHII identity.               ║
+    ╚═══════════════════════════════════════════════════════════════════════════════╝
   ctx.fetch(url, { method, headers, body }) → { status, ok, text, headers }
+    Use ctx.fetch for ALL HTTP requests. Global fetch() is NOT available.
+    Response body is always .text (string) — parse JSON with JSON.parse(resp.text).
+    Encoding is handled automatically — the runtime detects charset from: (1) Content-Type header,
+    (2) XML prolog encoding attribute, (3) HTML meta charset tag. Falls back to UTF-8.
+    You always get correct Unicode text — no manual decoding needed, even for ISO-8859-1 feeds.
   ctx.wallet.consume(amount, reason), ctx.wallet.getBalance()
   ctx.consent.check(gaii, scope), ctx.consent.require(gaii, scope)
   ctx.trust.getScore(gaii)
   ctx.caller = { gaii, owner, roles }
-  ctx.config = extension config object
+  ctx.config = extension config object (from manifest config section)
+  ctx.instance = { id, config } (when called via instance endpoint)
   ctx.log.info/warn/error(msg, data)
 
-AIMEAT Data Standards:
-  Dates/times: ISO 8601 ONLY. Memory keys: lowercase dot-namespaced. IDs: URL-safe kebab-case.
-  Locale codes: BCP 47. Coordinates: WGS84 decimal degrees. Currency: integers (morsels).`,
+AIMEAT Data Standards (MUST follow in ALL components):
+  Dates/times: ISO 8601 ONLY — "2026-03-14T13:00:00.000Z". NEVER store RFC 2822 ("Sat, 14 Mar ..."), Unix timestamps, or locale-formatted dates. Convert all dates to ISO before storing.
+  Memory keys: lowercase dot-namespaced — "items.by-date.2026-03-14". Dates in keys MUST use YYYY-MM-DD.
+  IDs: URL-safe strings (kebab-case or hex hashes). No spaces, no special characters.
+  Locale codes: BCP 47 — "fi", "en", "fi-FI", "en-US".
+  Coordinates: { latitude: number, longitude: number } — WGS84 decimal degrees.
+  Currency/amounts: integers (no floats) — morsels are whole numbers.`,
     variables: [],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
@@ -66,30 +87,416 @@ AIMEAT Data Standards:
     id: 'gen-sandbox-constraints',
     group: 'generator',
     name: 'V8 Sandbox Constraints',
-    description: 'Rules for extension code — what IS and IS NOT available in the V8 sandbox.',
-    content: `## V8 Sandbox — What is NOT available
-NONE of these work: require, import (except export default), Buffer, process, fs, path, crypto, URL, URLSearchParams, TextEncoder, TextDecoder, fetch (use ctx.fetch), Headers, Request, Response, FormData, Blob, atob, btoa, AbortController, structuredClone, performance, console (use ctx.log), setTimeout, setInterval.
+    description: 'EXACT sandbox rules from generator-prompts-base.js SANDBOX_CONSTRAINTS constant.',
+    content: `## V8 Sandbox Environment
 
-## What IS available
-Standard JavaScript: JSON, Math, Date, RegExp, Promise, async/await, String, Array, Object, Map, Set, encodeURIComponent, decodeURIComponent, parseInt, parseFloat, Number, isNaN, isFinite, Error.
+╔══════════════════════════════════════════════════════════════════════════╗
+║  This is a BARE V8 JavaScript engine — NOT Node.js, NOT a browser.     ║
+║  Only ECMAScript built-in objects and the ctx API exist.                ║
+║  The ONLY way to interact with the outside world is through ctx.       ║
+╚══════════════════════════════════════════════════════════════════════════╝
 
-## Critical memory API rules
-ctx.memory.get() returns the VALUE directly (already parsed), or null. NEVER use JSON.parse on it.
-ctx.memory.search() returns Array<{key, value}> — NOT plain strings.
-Always null-check: const data = await ctx.memory.get("key") || [];`,
+### What IS available (ECMAScript built-ins):
+JSON, Math, Date, RegExp, Promise, async/await, String, Array, Object,
+Map, Set, WeakMap, WeakSet, Symbol, Proxy, Reflect,
+encodeURIComponent, decodeURIComponent, parseInt, parseFloat, isNaN, isFinite
+
+### What is NOT available:
+
+**Node.js APIs** — no require, no import, no Buffer, no process, no fs, no path, no crypto
+**Web APIs** — no URLSearchParams, no URL, no TextEncoder, no TextDecoder,
+  no Headers, no Request, no Response, no FormData, no Blob, no File,
+  no AbortController, no atob, no btoa, no structuredClone, no crypto (Web Crypto),
+  no queueMicrotask, no performance
+**Browser APIs** — no document, no window, no fetch (use ctx.fetch), no navigator
+**Timers** — no setTimeout, no setInterval, no setImmediate
+**Console** — no console.log (use ctx.log.info/warn/error)
+**Modules** — no require(), no import (except export default for action entry point)
+
+### URL construction (URLSearchParams is NOT available):
+\`\`\`
+WRONG:  const params = new URLSearchParams(); params.set('name', query);
+WRONG:  const url = new URL(baseUrl); url.searchParams.set('name', query);
+RIGHT:  const url = baseUrl + '?name=' + encodeURIComponent(query);
+RIGHT:  const url = baseUrl + '?name=' + encodeURIComponent(query) + '&id=' + encodeURIComponent(id);
+\`\`\`
+
+### The ctx API — ONLY these properties exist:
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  ctx.memory (get/set/search/delete/getPublic)                          ║
+║  ctx.fetch(url, opts) → { ok, status, text, headers }                  ║
+║  ctx.wallet (consume/getBalance)                                        ║
+║  ctx.consent (check/require)                                            ║
+║  ctx.trust (getScore)                                                   ║
+║  ctx.caller (gaii/owner/roles)                                          ║
+║  ctx.config (extension config object)                                   ║
+║  ctx.log (info/warn/error)                                              ║
+║  ctx.notify(message, {title?, priority?, channel?}) → boolean           ║
+║  ctx.email(to, subject, body) → boolean (requires SMTP configured)      ║
+║  ctx.instance (id/config — only for instance-scoped actions)            ║
+║  NOTHING ELSE. Do NOT invent methods that are not listed here.          ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+### Actions are INDEPENDENT — CANNOT call each other
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  Each action is a SEPARATE function. Actions CANNOT call each other.   ║
+║  There is NO ctx.otherAction() or ctx.callAction() method.             ║
+║  Writing ctx.getCompany() or ctx.searchItems() will CRASH with:        ║
+║    "ctx.getCompany is not a function"                                  ║
+║                                                                        ║
+║  If multiple actions need the same logic, define a HELPER FUNCTION     ║
+║  above the action exports and duplicate it in each script file.        ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+### ctx.memory.get — returns PARSED value, NOT string
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  NEVER WRITE: JSON.parse(await ctx.memory.get(...))                    ║
+║  The value is ALREADY PARSED. JSON.parse on it will CRASH.             ║
+║  CORRECT: const data = await ctx.memory.get("key") || [];              ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+### ctx.fetch — returns { ok, status, text, headers }
+- text is a RAW string — parse JSON with JSON.parse(resp.text)
+- Encoding auto-detected (Content-Type, XML prolog, HTML meta)
+- You always get Unicode text — no manual decoding needed`,
+    variables: [],
+    usedIn: ['generator-autopilot'],
+  },
+
+  {
+    id: 'gen-namespace-rules',
+    group: 'generator',
+    name: 'Namespace Rules',
+    description: 'EXACT namespace rules from generator-prompts-base.js NAMESPACE_RULES constant.',
+    content: `## AIMEAT Namespace Rules
+
+AIMEAT has TWO types of memory namespaces — understanding this is CRITICAL:
+
+1. **Owner namespace** — where the human user's data lives
+   - Memory components (seed data, lookup tables) store here
+   - Translation components store here (i18n.fi, i18n.en)
+   - Settings components store here (settings.config)
+   - Accessible via: ctx.memory.getPublic(ctx.caller.gaii, key) [from extension]
+   - Accessible via: /v1/memory/{key} [from HTTP with owner's JWT]
+
+2. **Extension namespace** (\`ext:{name}\`) — where extension runtime data lives
+   - Extension writes here via ctx.memory.set(key, value)
+   - Accessible to ALL users via: ctx.memory.getPublic('ext:{name}', key)
+   - Accessible via: readExtMemory(name, key) [from cortex/app]
+   - NOT accessible via /v1/memory/{key} (that reads owner namespace!)
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  Extension ctx.memory.get(key) ONLY reads from ext:{name} namespace.  ║
+║  Seed data (memory components), settings, translations live in the     ║
+║  OWNER's namespace — use ctx.memory.getPublic(ctx.caller.gaii, key). ║
+║                                                                        ║
+║  From OUTSIDE (cortex, app, tests):                                    ║
+║  - Read extension data: getPublic('ext:{name}', key) or readExtMemory ║
+║  - Read owner data: /v1/memory/{key} or AIMEAT.data.get(key)          ║
+║  - Write extension data: call an extension ACTION (callExt)            ║
+║  - You CANNOT PUT to ext:{name} namespace from client — returns 404   ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+### Init Action
+Extensions should initialize runtime data (empty watchlists, caches, logs) in their @activate init action.
+Do NOT copy translations or settings — cortex reads those from the owner namespace directly.`,
+    variables: [],
+    usedIn: ['generator-autopilot'],
+  },
+
+  {
+    id: 'gen-html-entity-rules',
+    group: 'generator',
+    name: 'HTML Entity Rules',
+    description: 'EXACT HTML entity rules from generator-prompts-base.js HTML_ENTITY_RULES constant.',
+    content: `## No HTML Entities in Code
+
+╔════════════════════════════════════════════════════════════════════╗
+║  Your code MUST use real operators, NOT HTML entities.             ║
+║  The V8 sandbox executes raw JS — HTML entities are syntax errors. ║
+╚════════════════════════════════════════════════════════════════════╝
+
+WRONG (crashes):  const gt = a =&gt; a &gt; 0 &amp;&amp; b;
+CORRECT:          const gt = a => a > 0 && b;
+
+Check your ENTIRE output. If you see &gt; &lt; &amp; &quot; &#39; anywhere
+in code, replace them with > < & " ' respectively.`,
+    variables: [],
+    usedIn: ['generator-autopilot'],
+  },
+
+  {
+    id: 'gen-extension-consumption-rules',
+    group: 'generator',
+    name: 'Extension Consumption Rules',
+    description: 'EXACT extension consumption rules from generator-prompts-base.js EXTENSION_CONSUMPTION_RULES constant.',
+    content: `## How to Consume Extensions (callExt / readExtMemory pattern)
+
+Extensions expose TWO interfaces to the outside world:
+
+### 1. Call actions via HTTP POST
+  POST /v1/ext/{extensionName}/{actionId}
+  Body: JSON input
+  Response: { ok: true, data: { ...action return value... } }
+
+  - ALL actions use POST (even if manifest says GET — the route is POST-only)
+  - The {actionId} is the action's "id" field from the YAML manifest
+  - r.body.ok is the AIMEAT envelope — ALWAYS true even when the action fails
+  - Check r.body.data for the ACTUAL result (success data OR error message)
+
+### 2. Read extension memory via getPublic
+  Extension data lives in ext:{name} namespace.
+  Read it: getPublic('ext:{name}', key) or readExtMemory(name, key)
+
+  NEVER read extension data via /v1/memory/{key} — that reads the OWNER's
+  namespace, not the extension's. You'll get null.
+
+### Testing extensions — use callExt and readExtMemory
+  The test sandbox provides callExt() and readExtMemory() — the SAME helpers
+  that cortex uses in production. Use these instead of raw testFetch:
+
+  callExt('ext-name', 'actionId', { input })  → action's return value (unwrapped)
+  readExtMemory('ext-name', 'key')              → value from ext:{name} namespace
+
+  DO NOT use testFetch for extension actions — use callExt.
+  DO NOT use /v1/memory/ to read extension data — use readExtMemory.
+  DO NOT create custom getMemory/setMemory helpers.
+
+### Action types for testing
+  - [MEMORY] actions: use ONLY ctx.memory (no external API). Tests MUST assert specific return values.
+  - [EXTERNAL API] actions: call ctx.fetch to third-party URLs. Tests check response SHAPE only
+    (has data fields OR error message), because the external API may be down/rate-limited.
+    Graceful error handling is correct behavior — only FAIL on HTTP 500 (extension crashed).`,
     variables: [],
     usedIn: ['generator-autopilot'],
   },
 
   // ═══════════════════════════════════════════════════════════════════
-  // Spec Generation Prompts
+  // Component Templates — EXACT text from COMPONENT_TEMPLATES in generator-prompts-base.js
+  // The ${AIMEAT_CONTEXT} is replaced by {{context}}, ${label} by {{label}}, ${context} by {{component_context}}
+  // ═══════════════════════════════════════════════════════════════════
+
+  {
+    id: 'gen-csm',
+    group: 'generator',
+    name: 'CSM Generator',
+    description: 'EXACT CSM template from COMPONENT_TEMPLATES.csm in generator-prompts-base.js.',
+    content: `{{context}}
+
+Create a CSM (Community Service Manifest) YAML for: {{label}}
+
+{{component_context}}
+
+## YAML STRING RULES (read this FIRST — violations cause parse errors)
+
+Every string value MUST be on ONE line wrapped in double quotes. No exceptions.
+NEVER use > or | (block scalars). NEVER leave strings unquoted.
+
+WRONG — will crash the parser:
+  description: > This is a multi-line folded string
+  description: This has (parens) and special: chars
+  description: |
+    This is a literal block
+
+CORRECT — always do this:
+  description: "This has (parens) and special: chars all on one line"
+
+## Structure
+
+Return ONLY valid YAML in a yaml code block. Copy this structure EXACTLY:
+\`\`\`yaml
+csm: "1.0"
+service:
+  name: kebab-case-name
+  type: directory
+  description: "What this service does — keep on ONE line in double quotes"
+  version: "1.0"
+schema_mode: open
+data_schema:
+  required:
+    fieldName:
+      type: string
+    anotherField:
+      type: number
+  optional:
+    optionalField:
+      type: string
+      enum: [value1, value2]
+consent_requirements:
+  visibility_default: public
+  requires_consent: false
+  consent_purpose: "Why consent is needed"
+  data_retention: "365_days"
+moderation:
+  flags_enabled: true
+  auto_hide_threshold: 5
+  appeals_enabled: false
+ui_hints:
+  list_view: [fieldName, anotherField]
+  detail_view: [fieldName, anotherField, optionalField]
+  search_fields: [fieldName]
+\`\`\`
+
+## Additional rules
+- data_schema.required and data_schema.optional are MAPS (fieldName: {type: ...}), NOT arrays (- name: ...)
+- data_schema.required MUST have at least one field
+- Field types: string, number, integer, boolean, array, object
+- All date/time fields MUST be type: string with description mentioning ISO 8601 format
+- service.name: concise kebab-case identifier, 1-3 words. Use the project's own name when it has one. Do NOT invent generic abbreviations or add redundant suffixes like "-service" or "-monitor".
+- ONLY include fields that exist in the raw source data. Computed/derived values (aggregates, scores, trends, risk levels, statistics) are calculated by extensions and stored in separate memory keys — they do NOT belong in the CSM data_schema.
+- Avoid redundant fields. If the source provides a unique identifier (e.g. guid), do not add a second id field. If a value is always the same (e.g. single data source), do not include it as a field.`,
+    variables: ['context', 'label', 'component_context'],
+    usedIn: ['generator-autopilot', 'generator-ui'],
+  },
+
+  {
+    id: 'gen-memory',
+    group: 'generator',
+    name: 'Memory Generator',
+    description: 'EXACT memory template from COMPONENT_TEMPLATES.memory in generator-prompts-base.js.',
+    content: `{{context}}
+
+Define memory structure for: {{label}}
+
+{{component_context}}
+
+## Memory Key Conventions
+
+AIMEAT memory uses dot-namespaced keys with a standard metadata pattern:
+
+- \`namespace.__meta\` — describes the namespace (version, key format, description)
+- \`namespace.__index\` — lightweight index for fast lookups (list of dates, counts, rankings)
+- \`namespace.__config\` — configuration for the namespace (TTLs, thresholds, weights)
+- \`namespace.YYYY-MM-DD\` — date-bucketed data (one key per day)
+- \`namespace.item-id\` — individual items
+
+Values are JSON objects — a single value can hold arrays, nested objects, and large datasets (up to several MB). There is NO reason to split a dataset across multiple keys when it logically belongs together.
+
+## Rules
+- All keys MUST be lowercase with dots as namespace separators
+- Date-bucketed keys MUST use YYYY-MM-DD format: "items.by-date.2026-03-14"
+- All date/time values inside objects MUST be ISO 8601: "2026-03-14T13:00:00.000Z"
+- Include __meta with version and description for every namespace
+- Include __index if consumers need to discover which keys exist (e.g., list of dates with data)
+- Keep __index lightweight — just key names, counts, and pointers. NOT full data copies.
+- Use arrays for ordered collections within a bucket (e.g., entries per day)
+- Use meaningful field names that match the CSM data_schema where applicable
+- PREFER fewer, larger keys over many small keys. A lookup table, reference dataset, or configuration object should be ONE key containing the full data structure (object or array), NOT split into one key per entry. For example, a list of 300 items should be ONE key "catalog.data" containing the full array — NOT 300 separate keys.
+
+Return a JSON object where keys are memory key names and values are the initial/template data:
+\`\`\`json
+{
+  "namespace.__meta": {
+    "version": "1.0",
+    "description": "What this namespace stores",
+    "keyFormat": "namespace.YYYY-MM-DD"
+  },
+  "namespace.__index": {
+    "dates": [],
+    "totalItems": 0,
+    "lastUpdated": ""
+  },
+  "namespace.YYYY-MM-DD": {
+    "date": "YYYY-MM-DD",
+    "items": []
+  }
+}
+\`\`\``,
+    variables: ['context', 'label', 'component_context'],
+    usedIn: ['generator-autopilot', 'generator-ui'],
+  },
+
+  {
+    id: 'gen-translation',
+    group: 'generator',
+    name: 'Translation Generator',
+    description: 'EXACT translation template from COMPONENT_TEMPLATES.translation in generator-prompts-base.js.',
+    content: `{{context}}
+
+Create translations for: {{label}}
+
+{{component_context}}
+
+## Translation Key Conventions
+
+- Keys use dot-namespaced paths matching the UI structure: "app.list.title", "app.filters.status"
+- Group by UI section: "app.nav.*", "app.map.*", "app.filters.*", "app.stats.*"
+- Include domain-specific terms: categories, statuses, types relevant to the project
+- Use interpolation with \${variable} syntax for dynamic values: "Found \${count} items"
+
+## CRITICAL: Generate ONLY the locale indicated by the label
+
+Each translation component covers ONE locale. The label tells you which one:
+- "Finnish (fi) Strings" → generate ONLY Finnish translations under the "fi" root key
+- "English (en) Strings" → generate ONLY English translations under the "en" root key
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  NEVER generate both locales in one component.                         ║
+║  If the label says "Finnish", output ONLY { "fi": { ... } }.           ║
+║  If the label says "English", output ONLY { "en": { ... } }.           ║
+║  The other locale is handled by a SEPARATE component in the blueprint. ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+## Rules
+- The root key MUST match the locale in the label: "en" for English, "fi" for Finnish
+- NEVER include the other locale — it will be generated in its own component
+- Finnish translations must be natural Finnish with correct characters (ä, ö, å) — not machine-translated
+- Include ALL text that appears in the UI — labels, buttons, tooltips, empty states, error messages
+- Keep keys consistent with what the App component will reference
+- Use plural-aware keys where needed: "item.one" / "item.many"
+- Both locale components MUST use the SAME key structure — the app uses the same keys for both
+
+Return JSON with translations for the SINGLE locale from the label:
+
+Example — if label is "Finnish (fi) Strings":
+\`\`\`json
+{
+  "fi": {
+    "app.title": "Sovelluksen nimi",
+    "app.nav.home": "Etusivu",
+    "app.filters.status": "Tila",
+    "app.filters.all": "Kaikki",
+    "app.empty": "Tietoja ei löytynyt",
+    "app.error": "Jokin meni pieleen",
+    "domain.type.example_category": "Esimerkkikategoria",
+    "domain.status.active": "Aktiivinen"
+  }
+}
+\`\`\`
+
+Example — if label is "English (en) Strings":
+\`\`\`json
+{
+  "en": {
+    "app.title": "App Title",
+    "app.nav.home": "Home",
+    "app.filters.status": "Status",
+    "app.filters.all": "All",
+    "app.empty": "No data found",
+    "app.error": "Something went wrong",
+    "domain.type.example_category": "Example Category",
+    "domain.status.active": "Active"
+  }
+}
+\`\`\`
+
+{{matching_keys_section}}`,
+    variables: ['context', 'label', 'component_context', 'matching_keys_section'],
+    usedIn: ['generator-autopilot', 'generator-ui'],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Spec Generation Prompts — kept from v1 (these were already correct)
   // ═══════════════════════════════════════════════════════════════════
 
   {
     id: 'gen-extension-spec',
     group: 'generator',
     name: 'Extension Spec Generator',
-    description: 'Generates the formal JSON contract for an extension — actions, memory keys, schedules, config — with exact types and real examples from the data source.',
+    description: 'Generates formal JSON contract for an extension — actions, memory keys, schedules, config.',
     content: `{{disclaimer}}
 
 # Task: Generate Extension Spec
@@ -167,7 +574,7 @@ Return ONLY valid JSON. No markdown fences, no explanation text.
     id: 'gen-data-api-spec',
     group: 'generator',
     name: 'Data API Spec Generator',
-    description: 'Generates the data cortex spec — method signatures wrapping extension actions.',
+    description: 'Generates data cortex spec — method signatures wrapping extension actions.',
     content: `{{disclaimer}}
 
 # Task: Generate Data API Spec
@@ -191,7 +598,7 @@ Return ONLY valid JSON:
   "methods": [
     { "name": "<method>", "description": "<what>", "params": "<type>", "returns": "Promise<type>",
       "example": "const r = await AIMEAT.<libName>.<name>(<args>);",
-      "returnsExample": <from extension spec>,
+      "returnsExample": "<from extension spec>",
       "errorBehavior": "Returns null on failure" }
   ],
   "translationAccess": "getTranslations(locale) → Promise<object>",
@@ -211,7 +618,7 @@ Return ONLY valid JSON:
     id: 'gen-component-spec',
     group: 'generator',
     name: 'Component Spec Generator',
-    description: 'Generates a reusable UI component spec — render signature, props, data access.',
+    description: 'Generates reusable UI component spec — render signature, props, data access.',
     content: `{{disclaimer}}
 
 # Task: Generate Component Spec
@@ -256,7 +663,7 @@ Return ONLY valid JSON:
     id: 'gen-app-domain-spec',
     group: 'generator',
     name: 'App-Domain Spec Generator',
-    description: 'Generates the app-domain cortex spec — composes components, manages navigation.',
+    description: 'Generates app-domain cortex spec — composes components, manages navigation.',
     content: `{{disclaimer}}
 
 # Task: Generate App-Domain Cortex Spec
@@ -302,14 +709,14 @@ Return ONLY valid JSON:
   },
 
   // ═══════════════════════════════════════════════════════════════════
-  // Code Generation Prompts
+  // Code generation — extension code template uses {{context}}, {{label}}, {{spec_section}}
   // ═══════════════════════════════════════════════════════════════════
 
   {
     id: 'gen-extension-code',
     group: 'generator',
     name: 'Extension Code Generator',
-    description: 'Generates the full extension (YAML manifest + JS action files) from spec + data sources.',
+    description: 'Full extension code template — YAML manifest + JS action files.',
     content: `{{disclaimer}}
 
 {{context}}
@@ -320,100 +727,49 @@ Create an AIMEAT Extension for: {{label}}
 
 {{sandbox_constraints}}
 
-## ctx.memory API — CRITICAL
+{{namespace_rules}}
 
-ctx.memory.get() returns the VALUE directly (already parsed), or null. NEVER use JSON.parse() on it.
-ctx.memory.set(key, value) stores any JSON-serializable value.
-ctx.memory.search(prefix) returns Array<{key, value}> — NOT strings.
-ctx.memory.getPublic(namespace, key) reads from ANY namespace (public only).
+## ctx.memory API — CRITICAL details
 
-Owner data (seed data, settings, translations): use ctx.memory.getPublic(ctx.caller.gaii, key)
+### ctx.memory.get(key) — WILL CRASH if you use JSON.parse()
 
-## Output format — SINGLE code block
+ctx.memory.get() returns the VALUE directly (already a JS object/array/value), or null.
+It is NOT a string. Calling JSON.parse() on it will CRASH with "null is not valid JSON".
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  NEVER WRITE: JSON.parse(await ctx.memory.get(...))                    ║
+║  NEVER WRITE: JSON.parse(ctx.memory.get(...))                          ║
+║  NEVER WRITE: const x = JSON.parse(someMemoryValue)                   ║
+║  These ALL crash. The value is ALREADY PARSED.                          ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+CORRECT:
+  const data = await ctx.memory.get("my.key");
+  if (!data) return { error: "No data found" };
+
+### ctx.memory.search(prefix) returns objects, NOT strings
+  const results = await ctx.memory.search("prefix.");
+  for (const entry of results) {
+    const key = entry.key;    // string
+    const value = entry.value; // already parsed
+  }
+
+## Output format — SINGLE block
 
 Return YAML manifest + all JS files in ONE block, separated by // actions/filename.js comments.
 
 ## Rules
 - metadata: name, version, description, author required
-- actions: each needs id, method, path, script
-- Each script: export default async function(ctx, input) { ... }
+- actions array MUST NOT be empty
+- Each action script: export default async function(ctx, input) { ... }
 - NEVER call JSON.parse on ctx.memory.get results
 - Always null-check memory values
 - Each action is INDEPENDENT — no cross-file references
 
+{{html_entity_rules}}
+
 {{completed_context}}`,
-    variables: ['disclaimer', 'context', 'label', 'spec_section', 'sandbox_constraints', 'completed_context'],
-    usedIn: ['generator-autopilot', 'generator-ui'],
-  },
-
-  {
-    id: 'gen-csm',
-    group: 'generator',
-    name: 'CSM Generator',
-    description: 'Generates a Community Service Manifest YAML — data schema, consent, moderation.',
-    content: `{{disclaimer}}
-
-{{context}}
-
-Create a CSM (Community Service Manifest) YAML for: {{label}}
-
-## YAML STRING RULES
-Every string value MUST be on ONE line wrapped in double quotes. No block scalars (> or |).
-
-## Structure
-Return ONLY valid YAML with: csm, service (name, type, description, version), schema_mode, data_schema (required, optional), consent_requirements, moderation, ui_hints.
-
-## Rules
-- data_schema fields are MAPS not arrays
-- Only include fields from raw source data, not computed values
-- service.name: concise kebab-case`,
-    variables: ['disclaimer', 'context', 'label'],
-    usedIn: ['generator-autopilot', 'generator-ui'],
-  },
-
-  {
-    id: 'gen-memory',
-    group: 'generator',
-    name: 'Memory Generator',
-    description: 'Generates seed memory data — key-value pairs with indexes and metadata.',
-    content: `{{disclaimer}}
-
-{{context}}
-
-Define memory structure for: {{label}}
-
-## Memory Key Conventions
-- namespace.__meta — version, key format, description
-- namespace.__index — lightweight index for fast lookups
-- namespace.YYYY-MM-DD — date-bucketed data
-- Prefer fewer, larger keys over many small keys
-
-Return a JSON object where keys are memory key names and values are initial data.`,
-    variables: ['disclaimer', 'context', 'label'],
-    usedIn: ['generator-autopilot', 'generator-ui'],
-  },
-
-  {
-    id: 'gen-translation',
-    group: 'generator',
-    name: 'Translation Generator',
-    description: 'Generates per-locale i18n strings — one locale per component.',
-    content: `{{disclaimer}}
-
-{{context}}
-
-Create translations for: {{label}}
-
-## Rules
-- Generate ONLY the locale indicated by the label (Finnish OR English, not both)
-- Keys use dot-namespaced paths: "app.nav.home", "app.filters.status"
-- Finnish must be natural Finnish with correct ä, ö, å
-- Include ALL text: labels, buttons, tooltips, empty states, errors
-
-{{matching_keys_section}}
-
-Return JSON with translations for the SINGLE locale from the label.`,
-    variables: ['disclaimer', 'context', 'label', 'matching_keys_section'],
+    variables: ['disclaimer', 'context', 'label', 'spec_section', 'sandbox_constraints', 'namespace_rules', 'html_entity_rules', 'completed_context'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
 
@@ -421,7 +777,7 @@ Return JSON with translations for the SINGLE locale from the label.`,
     id: 'gen-fix',
     group: 'generator',
     name: 'Fix Prompt',
-    description: 'Prompt for fixing validation/test failures — includes original prompt, code, and errors.',
+    description: 'Fix validation/test failures — includes original prompt, code, and errors.',
     content: `{{disclaimer}}
 
 The following code was generated but has errors. Fix them.
@@ -444,15 +800,11 @@ The following code was generated but has errors. Fix them.
     usedIn: ['generator-autopilot'],
   },
 
-  // ═══════════════════════════════════════════════════════════════════
-  // Test Generation Prompts
-  // ═══════════════════════════════════════════════════════════════════
-
   {
     id: 'gen-test-extension-spec',
     group: 'generator',
     name: 'Extension Test (from Spec)',
-    description: 'Generates test code from the extension spec — asserts exact field names from spec examples.',
+    description: 'Test code from extension spec — asserts exact field names from spec examples.',
     content: `{{disclaimer}}
 
 # Task: Generate Extension Test From Spec
@@ -486,7 +838,7 @@ Return ONLY executable JavaScript. No markdown fences.`,
     id: 'gen-test-cortex-spec',
     group: 'generator',
     name: 'Data Cortex Test (from Spec)',
-    description: 'Generates test code from the data API spec — tests each method via AIMEAT global.',
+    description: 'Test code from data API spec — tests each method via AIMEAT global.',
     content: `{{disclaimer}}
 
 # Task: Generate Data Cortex Test From Spec
