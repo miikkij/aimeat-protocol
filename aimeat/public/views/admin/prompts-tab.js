@@ -240,15 +240,16 @@ export default function PromptsTab({ data, reload }) {
           </summary>
           <div style="text-align:right;padding:4px 8px">
             <button class="btn-danger" style="font-size:12px;padding:4px 12px" onClick=${async () => {
-              console.log('[prompts] Reset group clicked:', g);
+              if (!await confirm(t('dashboard.promptsResetGroupConfirm') || 'Reset all prompts in this group to factory defaults?')) return;
               try {
-                const resp = await resetPromptGroup(g);
-                console.log('[prompts] Reset response:', resp);
+                setLoading(true);
+                await resetPromptGroup(g);
                 const res = await getSystemPrompts();
                 setPrompts(res.data.prompts || []);
-                window.showToast?.('Group reset to factory defaults');
+                setLoading(false);
+                window.showToast?.(t('dashboard.promptsResetAllDone') || 'Group reset to factory defaults');
               } catch (err) {
-                console.error('[prompts] Reset failed:', err);
+                setLoading(false);
                 window.showToast?.(err.message, true);
               }
             }}>${t('dashboard.promptsResetGroup') || 'Palauta ryhmä'}</button>
