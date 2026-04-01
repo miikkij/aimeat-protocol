@@ -722,8 +722,6 @@ Return ONLY valid JSON:
 
 Create an AIMEAT Extension for: {{label}}
 
-{{spec_section}}
-
 ## YAML STRING RULES (read this FIRST — violations cause parse errors)
 
 Every string value MUST be on ONE line wrapped in double quotes. No exceptions.
@@ -991,6 +989,10 @@ Translations and settings live in the OWNER namespace — the cortex reads them 
   Common pattern: \\\`const data = await ctx.memory.getPublic(ctx.caller.gaii, "lookup.data") || [];\\\`
 
 {{html_entity_rules}}
+
+## NOW: Implement this spec
+
+{{spec_section}}
 
 {{completed_context}}`,
     variables: ['context', 'label', 'spec_section', 'sandbox_constraints', 'html_entity_rules', 'completed_context'],
