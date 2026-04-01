@@ -499,40 +499,137 @@ async function extCall(extName, actionId, body = {}) {
 }
 
 function resolveFix(data: PromptRuntimeData): Vars {
+  // Match browser buildFixPrompt() — type-specific constraints
+  const ct = data.componentType || '';
+  let typeConstraints = '';
+  if (ct === 'extension') {
+    typeConstraints = '{{sandbox_constraints}}\n\n{{namespace_rules}}\n';
+  } else if (ct === 'cortex') {
+    typeConstraints = '{{namespace_rules}}\n\n{{extension_consumption_rules}}\n\nCORTEX CONSTRAINTS (browser IIFE):\n- Must be a single IIFE registering on window.AIMEAT\n- YAML metadata.name (kebab-case) and JS LIB_NAME (camelCase) must match\n- Every readExtMemory/getPublic call must be null-checked\n';
+  } else if (ct === 'app') {
+    typeConstraints = '{{namespace_rules}}\n\nAPP CONSTRAINTS (browser HTML):\n- Include CSP meta tag if using CDN scripts\n- Use AIMEAT.auth for login, AIMEAT.data for memory access\n- Call cortex init() before accessing data\n- Handle empty state gracefully (no data on first run)\n';
+  }
   return {
     original_prompt: data.originalPrompt || '',
     code: data.code || '',
-    errors: (data.errors || []).join('\n'),
-    component_type: data.componentType || '',
+    errors: (data.errors || []).map((e, i) => `${i + 1}. ${e}`).join('\n'),
+    component_type: ct,
+    type_constraints: typeConstraints,
+    test_context: '',
+    previous_attempts: '',
+    reflection_diagnosis: '',
   };
 }
 
 function resolveTestExtensionSpec(data: PromptRuntimeData): Vars {
-  if (!data.selfSpec) return { spec_actions: '', extension_name: '' };
-  const spec = data.selfSpec as Record<string, unknown>;
-  const actions = (spec.actions || []) as Array<Record<string, unknown>>;
+  // Match browser buildTestPrompt() — golden samples, scenarios, structures, contracts
+  const bp = data.blueprint;
+  const spec = data.selfSpec as Record<string, unknown> | undefined;
+  const extName = data.extensionName || (spec?.name as string) || '';
+
+  // Golden samples from probe results
+  const probes = (data.completedComponents || [])
+    .find(c => c.type === 'extension')?.probeResults as Array<Record<string, unknown>> | undefined;
+  let goldenSamples = '';
+  if (probes && probes.length > 0) {
+    const successful = probes.filter(p => (p.status as number) === 200 && p.response);
+    if (successful.length > 0) {
+      goldenSamples = '\n## GOLDEN SAMPLES — Real API responses (use these as test reference)\n\nThese are ACTUAL responses captured from the live extension. Your test assertions\nMUST match these data shapes. Do NOT invent field names — use exactly what you see here.\n\n';
+      for (const p of successful) {
+        goldenSamples += `### ${p.action}(${JSON.stringify(p.input)})\n\`\`\`json\n${JSON.stringify(p.response, null, 2)}\n\`\`\`\n\n`;
+      }
+      goldenSamples += 'When writing assertions, reference the EXACT field names from the golden samples above.\n';
+    }
+  }
+
+  // Test scenarios from blueprint
+  const bpComp = bp.components?.find(c => c.type === 'extension');
+  let testScenarios = '';
+  if (bp.testScenarios && bpComp) {
+    const scenarios = (bp.testScenarios || []).filter(ts => ts.component === bpComp.id).flatMap(ts => ts.scenarios || []);
+    if (scenarios.length > 0) {
+      testScenarios = '\n## Test Scenarios (from blueprint)\n\n' +
+        scenarios.map((s, i) => `${i + 1}. ${s.action}${s.type === 'external-api' ? ' [EXTERNAL API]' : ' [MEMORY]'}\n   Input: ${JSON.stringify(s.input)}\n   Expected: ${s.expect}`).join('\n\n') +
+        '\n\nTest EVERY scenario above.\nFor [EXTERNAL API]: check response shape only, do NOT assert specific values. Graceful error = PASS.\nFor [MEMORY]: assert return values match what the action code returns on success.\n';
+    }
+  }
+
+  // Structures and action contracts from blueprint
+  const structures = bp.dataModel?.structures
+    ? Object.entries(bp.dataModel.structures).map(([name, schema]) => `### ${name}\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\``).join('\n\n')
+    : 'No structures defined';
+  const actionContracts = bp.dataModel?.actions
+    ? Object.entries(bp.dataModel.actions).map(([name, def]) => `- **${name}**: input=${JSON.stringify(def.input || {})}, output=${(def.output as Record<string, unknown>)?.$ref ? '$ref:' + (def.output as Record<string, unknown>).$ref : JSON.stringify((def as Record<string, unknown>).output || 'any')}`).join('\n')
+    : 'No actions defined';
+
+  const bpComponents = bp.components?.map(c => `- ${c.id} (${c.type}): ${c.label}`).join('\n') || '';
+
   return {
-    extension_name: data.extensionName || (spec.name as string) || '',
-    spec_actions: actions.map(a => {
-      const example = a.example as Record<string, unknown> | undefined;
-      return `### Action: \`${a.id}\`\n- Call: \`callExt('${data.extensionName}', '${a.id}', ${JSON.stringify(example?.input || {})})\`\n- Expected output: ${JSON.stringify(Object.keys((example?.output || {}) as Record<string, unknown>))}\n\`\`\`json\n${JSON.stringify(example?.output || {}, null, 2)}\n\`\`\``;
-    }).join('\n\n'),
-    memory_keys: ((spec.memoryKeys || []) as Array<Record<string, string>>)
-      .map(mk => `- \`${mk.key}\` (${mk.type}): ${mk.description}`)
-      .join('\n') || 'None.',
+    extension_name: extName,
+    golden_samples: goldenSamples,
+    test_scenarios: testScenarios,
+    structures,
+    action_contracts: actionContracts,
+    project_context: `## Project Context\nBlueprint components:\n${bpComponents}`,
   };
 }
 
 function resolveTestCortexSpec(data: PromptRuntimeData): Vars {
-  if (!data.selfSpec) return { spec_methods: '', lib_name: '' };
-  const spec = data.selfSpec as Record<string, unknown>;
-  const methods = (spec.methods || []) as Array<Record<string, unknown>>;
+  // Match browser buildTestPrompt() for cortex — golden samples, methods, structures
+  const bp = data.blueprint;
+  const spec = data.selfSpec as Record<string, unknown> | undefined;
+  const libName = (spec?.libName as string) || '';
+  const wrapsExt = (spec?.wrapsExtension as string) || '';
+
+  // Golden samples from probes
+  const probes = (data.completedComponents || [])
+    .find(c => c.type === 'extension')?.probeResults as Array<Record<string, unknown>> | undefined;
+  let goldenSamples = '';
+  if (probes && probes.length > 0) {
+    const successful = probes.filter(p => (p.status as number) === 200 && p.response);
+    if (successful.length > 0) {
+      goldenSamples = '\n## GOLDEN SAMPLES — Real API responses\n\n';
+      for (const p of successful) goldenSamples += `### ${p.action}(${JSON.stringify(p.input)})\n\`\`\`json\n${JSON.stringify(p.response, null, 2)}\n\`\`\`\n\n`;
+    }
+  }
+
+  // Cortex methods from blueprint
+  const bpComp = bp.components?.find(c => c.label === data.componentLabel);
+  let cortexMethods = '';
+  if (bpComp) {
+    const methods = (bpComp.produces || []).filter((p: string) => p.startsWith('api:')).map((p: string) => p.replace('api:', ''));
+    if (methods.length > 0) cortexMethods = `\n## Cortex Methods to Test (from blueprint — test ALL)\n${methods.map((m: string) => `- ${m}()`).join('\n')}\n`;
+  }
+
+  // Test scenarios
+  let testScenarios = '';
+  if (bp.testScenarios && bpComp) {
+    const scenarios = (bp.testScenarios || []).filter(ts => ts.component === bpComp.id).flatMap(ts => ts.scenarios || []);
+    if (scenarios.length > 0) {
+      testScenarios = '\n## Test Scenarios (from blueprint — test EXACTLY these)\n\n' +
+        scenarios.map((s, i) => `${i + 1}. Call ${s.action}(${JSON.stringify(s.input)})\n   Expected: ${s.expect}`).join('\n\n') +
+        '\n\nTest EVERY scenario above.\n';
+    }
+  }
+
+  const structures = bp.dataModel?.structures
+    ? Object.entries(bp.dataModel.structures).map(([name, schema]) => `### ${name}\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\``).join('\n\n')
+    : 'No structures defined';
+  const actionContracts = bp.dataModel?.actions
+    ? Object.entries(bp.dataModel.actions).map(([name, def]) => `- **${name}**: input=${JSON.stringify(def.input || {})}, output=${(def.output as Record<string, unknown>)?.$ref ? '$ref:' + (def.output as Record<string, unknown>).$ref : JSON.stringify((def as Record<string, unknown>).output || 'any')}`).join('\n')
+    : 'No actions defined';
+
+  const bpComponents = bp.components?.map(c => `- ${c.id} (${c.type}): ${c.label}`).join('\n') || '';
+
   return {
-    lib_name: (spec.libName as string) || '',
-    wraps_extension: (spec.wrapsExtension as string) || '',
-    spec_methods: methods.map(m => {
-      return `### Method: \`${m.name}\`\n- Returns: ${m.returns}\n- Example: ${m.example}\n\`\`\`json\n${JSON.stringify(m.returnsExample ?? 'see spec', null, 2)}\n\`\`\``;
-    }).join('\n\n'),
+    lib_name: libName,
+    wraps_extension: wrapsExt,
+    golden_samples: goldenSamples,
+    test_scenarios: testScenarios,
+    structures,
+    action_contracts: actionContracts,
+    project_context: `## Project Context\nBlueprint components:\n${bpComponents}`,
+    cortex_methods: cortexMethods,
   };
 }
 

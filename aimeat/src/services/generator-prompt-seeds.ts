@@ -717,17 +717,22 @@ Return ONLY valid JSON:
     group: 'generator',
     name: 'Extension Code Generator',
     description: 'Full extension code template — YAML manifest + JS action files.',
-    content: `{{disclaimer}}
-
-{{context}}
+    content: `{{context}}
 
 Create an AIMEAT Extension for: {{label}}
 
 {{spec_section}}
 
-{{sandbox_constraints}}
+## YAML STRING RULES (read this FIRST — violations cause parse errors)
 
-{{namespace_rules}}
+Every string value MUST be on ONE line wrapped in double quotes. No exceptions.
+NEVER use > or | (block scalars). NEVER leave strings unquoted.
+
+WRONG: description: > This is a folded string
+WRONG: description: This has (parens) and colons: here
+CORRECT: description: "This has (parens) and colons: here — all on one line"
+
+{{sandbox_constraints}}
 
 ## ctx.memory API — CRITICAL details
 
@@ -743,33 +748,251 @@ It is NOT a string. Calling JSON.parse() on it will CRASH with "null is not vali
 ║  These ALL crash. The value is ALREADY PARSED.                          ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 
+WRONG (CRASHES EVERY TIME):
+  const data = JSON.parse(await ctx.memory.get("my.key"));  // "undefined" is not valid JSON
+
 CORRECT:
   const data = await ctx.memory.get("my.key");
   if (!data) return { error: "No data found" };
+  // data is already a JS object/array/value — use it directly
 
-### ctx.memory.search(prefix) returns objects, NOT strings
+### ctx.memory.get() returns null when key does not exist — ALWAYS null-check!
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  ALWAYS check the return value before using it.                         ║
+║  Arrays and objects from memory may be null on first run.              ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+WRONG (CRASHES on first run when no data exists yet):
+  const index = await ctx.memory.get("items.__index");
+  index.some(...)     // Cannot read properties of null (reading 'some')
+  index.push(...)     // Cannot read properties of null (reading 'push')
+  index.length        // Cannot read properties of null (reading 'length')
+
+CORRECT:
+  const index = await ctx.memory.get("items.__index") || [];
+  index.some(...)     // works — falls back to empty array
+
+CORRECT (for objects):
+  const stats = await ctx.memory.get("daily.stats") || {};
+  stats.count = (stats.count || 0) + 1;
+
+### ctx.memory.set(key, value) stores any JSON-serializable value
+  await ctx.memory.set("items.2026-03-14", { entries: [...], count: 5 });
+
+### ctx.memory.search(prefix) returns objects, NOT strings — returns ALL matching keys (no pagination)
+WARNING: search() loads ALL matching keys into memory at once. If your prefix matches thousands of keys, the V8 sandbox may run out of memory. Use specific prefixes (e.g., "items.by-date.2026-03-14" not "items.")
+
+WRONG:
+  const keys = await ctx.memory.search("prefix.");
+  for (const key of keys) { await ctx.memory.get(key); }  // ERROR: key is {key,value} not string
+
+CORRECT:
   const results = await ctx.memory.search("prefix.");
   for (const entry of results) {
     const key = entry.key;    // string
-    const value = entry.value; // already parsed
+    const value = entry.value; // the stored value — already parsed, NOT a string
   }
 
-## Output format — SINGLE block
+## Output format — SINGLE block, copy-paste friendly
 
-Return YAML manifest + all JS files in ONE block, separated by // actions/filename.js comments.
+Return EVERYTHING in ONE code block. The YAML manifest first, then all JavaScript files separated by // actions/filename.js comments. The user will copy-paste the entire response at once.
 
-## Rules
-- metadata: name, version, description, author required
-- actions array MUST NOT be empty
-- Each action script: export default async function(ctx, input) { ... }
-- NEVER call JSON.parse on ctx.memory.get results
-- Always null-check memory values
-- Each action is INDEPENDENT — no cross-file references
+\\\`\\\`\\\`
+metadata:
+  name: kebab-case-name
+  version: "1.0.0"
+  description: "What this extension does — one line, double quoted"
+  author: generator
+required_apis: [memory]
+config: {}
+limits:
+  memory_mb: 128
+  timeout_ms: 30000
+  max_api_calls: 500
+actions:
+  - id: first-action
+    description: "What this action does"
+    method: POST
+    path: /v1/ext/{name}/first-action
+    auth: required
+    input: {}
+    output: {}
+    script: first-action.js
+  - id: second-action
+    description: "Another action"
+    method: POST
+    path: /v1/ext/{name}/second-action
+    auth: required
+    input:
+      type: object
+      properties:
+        name:
+          type: string
+      required: [name]
+    output:
+      type: object
+    script: second-action.js
+schedules: []
+
+YAML actions format — EVERY action MUST have "- id:" as the FIRST key:
+  CORRECT: - id: myAction        (id: is explicit key)
+  WRONG:   - myAction            (bare value — causes YAML parse error)
+  WRONG:   - myAction:           (colon after name — causes YAML parse error)
+NEVER omit "id:" from any action entry. This is the #1 cause of validation failures.
+// actions/action-id.js
+export default async function(ctx, input) {
+  // ── Reading from EXTERNAL APIs (ctx.fetch) ──
+  // ctx.fetch() returns { ok, status, text, headers } — text is a RAW string, parse it yourself
+  // Encoding is auto-detected (Content-Type header, XML prolog, HTML meta) — you get Unicode text
+  const resp = await ctx.fetch('https://example.com/api');
+  if (!resp.ok) {
+    ctx.log.error('API request failed', { status: resp.status });
+    return { error: 'Request failed with status ' + resp.status };
+  }
+  const data = JSON.parse(resp.text);  // ← correct: resp.text IS a string (for JSON APIs)
+  // For XML/RSS: resp.text is already decoded Unicode — parse with regex or string methods
+
+  // ── Reading from EXTENSION'S OWN MEMORY (ctx.memory.get) ──
+  // ctx.memory.get() returns a JS value directly — NEVER use JSON.parse
+  const stored = await ctx.memory.get("my.key");
+  if (!stored) return { items: [] };  // ← stored is already an object, or null
+
+  // ── Reading OWNER'S SHARED DATA (memory components, settings, translations) ──
+  // Data stored by memory-1, memory-2 etc. lives in the OWNER's namespace, NOT the extension's.
+  // Use getPublic(ctx.caller.gaii, key) to read it:
+  const lookup = await ctx.memory.getPublic(ctx.caller.gaii, "lookup.data") || [];
+  const settings = await ctx.memory.getPublic(ctx.caller.gaii, "settings.config") || {};
+
+  // ── Writing to EXTENSION'S OWN MEMORY ──
+  await ctx.memory.set("results.today", { items: data.results, fetchedAt: new Date().toISOString() });
+
+  return { result: stored };
+}
+\\\`\\\`\\\`
+
+CRITICAL: Do NOT use separate code blocks. Put YAML manifest and ALL JavaScript files in ONE block.
+Each JavaScript file MUST start with a comment line: // actions/{filename}.js
+
+## Action path — instance vs non-instance
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  Most extensions are SINGLE-INSTANCE (no :instanceId in path).          ║
+║  Use: /v1/ext/{name}/action-id                                          ║
+║  NEVER add :instanceId unless the blueprint explicitly requires          ║
+║  multi-instance support (e.g., per-store, per-tenant separation).       ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+- Default (single-instance): \\\`path: /v1/ext/{name}/action-id\\\`
+- Multi-instance (only if needed): \\\`path: /v1/ext/{name}/:instanceId/action-id\\\`
+
+## Scheduled Jobs (schedules section)
+
+Extensions can declare recurring background jobs via \\\`schedules\\\` in the manifest.
+AIMEAT's built-in scheduler runs these automatically — no browser needed.
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  If the blueprint has "schedules" for this extension, you MUST include  ║
+║  a schedules section in the YAML manifest. This is the ONLY way to     ║
+║  register recurring jobs — cortex and apps CANNOT schedule work.       ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+Format:
+\\\`\\\`\\\`yaml
+schedules:
+  - id: unique-job-id
+    action: action-id-from-actions-list
+    cron: "*/15 * * * *"
+    description: "What this scheduled job does"
+    instance_scope: false
+    input: {}
+\\\`\\\`\\\`
+
+Rules:
+- \\\`action\\\` MUST reference an existing action id from the \\\`actions\\\` array
+- \\\`cron\\\` uses standard 5-field cron syntax (minute hour day-of-month month day-of-week) OR the special value \\\`@activate\\\`
+- \\\`@activate\\\` trigger: runs when the extension is activated AND on every server restart. Use for init/bootstrap jobs.
+- \\\`instance_scope: false\\\` for single-instance extensions (most cases)
+- \\\`input\\\` is optional static input passed to the action on each run
+- Common patterns: \\\`@activate\\\` (init/bootstrap), \\\`*/15 * * * *\\\` (every 15 min), \\\`0 2 * * *\\\` (daily at 02:00), \\\`0 */6 * * *\\\` (every 6 hours)
+- If a nightly job depends on data from a periodic job (e.g., aggregation needs fresh data), schedule it AFTER the last periodic run (e.g., collection at */15, aggregation at 02:00)
+- If the blueprint has no "schedules" for this extension, set \\\`schedules: []\\\`
+
+### @activate Init Pattern
+
+If the extension collects or computes data, add an \\\`@activate\\\` scheduled job that:
+1. Checks if data exists and is fresh (not stale)
+2. If missing or stale, runs the init/collection logic
+3. If data is already fresh, does nothing (returns early)
+
+This solves the cold-start problem: after first activation or a server restart, the extension's data is immediately populated instead of waiting for the next cron tick.
+
+Example @activate action script pattern:
+\\\`\\\`\\\`javascript
+// Check if data already exists and is recent
+const lastRun = await ctx.memory.get('last-ingest-timestamp');
+if (lastRun) {
+  const age = Date.now() - new Date(lastRun).getTime();
+  if (age < 15 * 60 * 1000) return; // Data is fresh (< 15 min), skip
+}
+// Data is missing or stale — run the init/collection logic
+// ... fetch data, store in memory ...
+await ctx.memory.set('last-ingest-timestamp', new Date().toISOString());
+\\\`\\\`\\\`
+
+Schedule entry:
+\\\`\\\`\\\`yaml
+  - id: init-data
+    action: init
+    cron: "@activate"
+    description: "Initialize/refresh data on activation and server restart"
+    instance_scope: false
+    input: {}
+\\\`\\\`\\\`
+
+IMPORTANT: @activate actions MUST be idempotent — they will run multiple times (every restart). Always check existing data before overwriting.
+
+### Init Action — Initialize Runtime Data Only
+
+The init/@activate action should initialize extension-owned runtime data (watchlists, caches, logs).
+Do NOT copy translations or settings to the extension namespace — cortex reads those
+directly from the owner namespace via AIMEAT.data.get().
+
+Pattern:
+\\\`\\\`\\\`javascript
+// Initialize extension runtime data if not already present
+const watchlist = await ctx.memory.get('watchlist.items');
+if (!watchlist) {
+  await ctx.memory.set('watchlist.items', []);
+  ctx.log.info('Initialized empty watchlist');
+}
+\\\`\\\`\\\`
+
+Only initialize keys that the EXTENSION owns and writes to (runtime data).
+Translations and settings live in the OWNER namespace — the cortex reads them directly.
+
+## Additional rules
+- \\\`metadata\\\` section MUST have: name, version, description, author
+- \\\`actions\\\` array MUST NOT be empty — each action needs: id, method, path, script
+- Each action's \\\`script\\\` field value must match a \\\`// actions/{script}\\\` comment below the YAML
+- \\\`limits.timeout_ms\\\`: use 30000 for extensions that call external APIs, 5000 for memory-only
+- \\\`limits.max_api_calls\\\`: use 500 for data collectors (many memory writes per run), 100 for simple actions
+- All helper functions must be defined INSIDE the same script file — no imports, no cross-file references
+- If two actions need the same helper (e.g., date parsing, data normalization), DUPLICATE the helper in BOTH script files — copy it exactly, do NOT refactor into a shared module
+- NEVER reference functions from another action's script — each script runs in its own ISOLATED V8 sandbox scope
+- When duplicating helpers across actions, keep them IDENTICAL — if you fix a bug in one copy, fix it in all copies
+- NEVER call JSON.parse() on ctx.memory.get() results — they are already parsed JS values
+- Always check for undefined/null before using memory values — on first run, NOTHING exists yet
+- Always convert dates to ISO 8601 before storing in memory
+- OWNER DATA: seed data (memory components), settings, and translations are in the OWNER's namespace.
+  Use \\\`ctx.memory.getPublic(ctx.caller.gaii, key)\\\` to read them — NOT \\\`ctx.memory.get(key)\\\`.
+  \\\`ctx.memory.get()\\\` only reads from the extension's own \\\`ext:{name}\\\` namespace.
+  Common pattern: \\\`const data = await ctx.memory.getPublic(ctx.caller.gaii, "lookup.data") || [];\\\`
 
 {{html_entity_rules}}
 
 {{completed_context}}`,
-    variables: ['disclaimer', 'context', 'label', 'spec_section', 'sandbox_constraints', 'namespace_rules', 'html_entity_rules', 'completed_context'],
+    variables: ['context', 'label', 'spec_section', 'sandbox_constraints', 'html_entity_rules', 'completed_context'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
 
@@ -777,26 +1000,22 @@ Return YAML manifest + all JS files in ONE block, separated by // actions/filena
     id: 'gen-fix',
     group: 'generator',
     name: 'Fix Prompt',
-    description: 'Fix validation/test failures — includes original prompt, code, and errors.',
-    content: `{{disclaimer}}
+    description: 'Fix validation/test failures — type-specific constraints, previous attempts, test context.',
+    content: `{{disclaimer}}The following result had validation errors. Fix ONLY the errors listed below.
 
-The following code was generated but has errors. Fix them.
-
-## Original prompt (what was requested):
+{{html_entity_rules}}
+{{type_constraints}}
+ORIGINAL PROMPT:
 {{original_prompt}}
 
-## Generated code (has errors):
+FAILED RESULT:
 {{code}}
 
-## Errors to fix:
+ERRORS:
 {{errors}}
-
-## Rules
-- Fix ONLY the listed errors
-- Do NOT change working parts
-- Return the COMPLETE fixed code, not just the changed parts
-- Same output format as the original prompt`,
-    variables: ['disclaimer', 'original_prompt', 'code', 'errors', 'component_type'],
+{{test_context}}{{previous_attempts}}{{reflection_diagnosis}}
+Return the corrected result in the same format as the original.`,
+    variables: ['disclaimer', 'original_prompt', 'code', 'errors', 'component_type', 'type_constraints', 'html_entity_rules', 'test_context', 'previous_attempts', 'reflection_diagnosis'],
     usedIn: ['generator-autopilot'],
   },
 
@@ -805,32 +1024,96 @@ The following code was generated but has errors. Fix them.
     group: 'generator',
     name: 'Extension Test (from Spec)',
     description: 'Test code from extension spec — asserts exact field names from spec examples.',
-    content: `{{disclaimer}}
+    content: `{{disclaimer}}You are generating TEST CODE for a component in an AIMEAT service.
 
-# Task: Generate Extension Test From Spec
+## Component Under Test
+- Type: extension
+- Label: {{extension_name}}
+- Registered as: {{extension_name}}
+{{golden_samples}}{{test_scenarios}}
+## Data Structures (from blueprint — test against THESE shapes)
+{{structures}}
 
-Test that the extension matches its SPEC CONTRACT. If the test fails, the CODE is wrong — not the spec.
+## Action Contracts (from blueprint — test THESE methods with THESE shapes)
+{{action_contracts}}
 
-## Extension: {{extension_name}}
+{{project_context}}
 
-## Actions to Test
-{{spec_actions}}
+## Test Environment: Server-side sandbox (new Function)
 
-## Memory Keys to Verify
-{{memory_keys}}
+CRITICAL SANDBOX RULES — violating ANY will crash the test:
+- NO import/require/export statements
+- You are inside an async function body. Just write sequential code.
+- Available variables: testFetch, baseUrl, callExt, readExtMemory
+- No Node.js APIs, no fs, no path, no process
 
-## Environment: Server-side sandbox
-Helpers: callExt(extName, actionId, body), readExtMemory(extName, key)
-End with: return { passed: boolean, errors: string[], details: string }
+Available helpers:
 
-## Rules
-- Assert EXACT field names from the spec
-- For external APIs: check shape, not specific values
-- For memory writes: read back and verify
-- Test must be idempotent
+  // LOW-LEVEL: raw HTTP call (use only for memory/translation tests, NOT for extensions)
+  const resp = await testFetch(url, { method, body, headers });
+  // resp = { status, ok, body }. Auth token injected automatically.
 
-Return ONLY executable JavaScript. No markdown fences.`,
-    variables: ['disclaimer', 'extension_name', 'spec_actions', 'memory_keys'],
+  // HIGH-LEVEL: call extension action (PREFERRED for extension tests)
+  const result = await callExt('ext-name', 'actionId', { key: 'value' });
+  // Returns action's return value directly (envelope unwrapped)
+
+  // HIGH-LEVEL: read extension memory
+  const data = await readExtMemory('ext-name', 'memory.key');
+  // Returns value from ext:{name} namespace, or null
+
+Your code MUST end with: return { passed: boolean, errors: string[], details: string }
+
+## Test Idempotency
+Tests MUST work on every run — first run or re-run after previous failure.
+Before the first scenario, clean stale data using the extension's OWN actions:
+  1. Read lists with readExtMemory
+  2. Call remove/delete actions for each existing item
+  3. Call init
+
+## JavaScript Pitfalls
+- NEVER compare arrays/objects with === or !== (\\\`value !== []\\\` is ALWAYS true). Use \\\`Array.isArray(v) && v.length === 0\\\`.
+- Check null with \\\`=== null\\\`, not \\\`== null\\\`.
+
+## Example (server-side extension test)
+\\\`\\\`\\\`
+const errors = [];
+
+// CLEANUP: remove stale data via extension actions
+const existing = await readExtMemory('{{extension_name}}', 'items.list');
+if (existing && Array.isArray(existing)) {
+  for (const item of existing) {
+    await callExt('{{extension_name}}', 'removeItem', { id: item.id });
+  }
+}
+
+// [MEMORY] init
+const r0 = await callExt('{{extension_name}}', 'init', {});
+if (!r0) errors.push('init: no response');
+else if (r0.error) errors.push('init: ' + r0.error);
+
+// [EXTERNAL API] — check shape only
+const r1 = await callExt('{{extension_name}}', 'fetchData', { query: 'test' });
+if (r1 === null) errors.push('fetchData: no response at all');
+
+// [MEMORY] error handling
+const r2 = await callExt('{{extension_name}}', 'addItem', {});
+if (r2 === null) errors.push('addItem(empty): no response');
+else if (!r2.error) errors.push('addItem(empty): no error for invalid input');
+
+return { passed: errors.length === 0, errors, details: 'Tested N actions' };
+\\\`\\\`\\\`
+
+## Platform Rules
+{{sandbox_constraints}}
+
+{{extension_consumption_rules}}
+
+## Output Rules
+1. Return ONLY executable JavaScript code — NO markdown fences, NO explanation text
+2. NO import/require/export — sandbox environment
+3. Self-contained async function body
+4. End with: return { passed, errors, details }`,
+    variables: ['disclaimer', 'extension_name', 'golden_samples', 'test_scenarios', 'structures', 'action_contracts', 'project_context', 'sandbox_constraints', 'extension_consumption_rules'],
     usedIn: ['generator-autopilot'],
   },
 
@@ -1543,32 +1826,132 @@ entry: index.html
   {
     id: 'gen-test-cortex-spec',
     group: 'generator',
-    name: 'Data Cortex Test (from Spec)',
-    description: 'Test code from data API spec — tests each method via AIMEAT global.',
-    content: `{{disclaimer}}
+    name: 'Cortex Test (from Spec)',
+    description: 'Browser-side cortex test — 6-step quality pattern, golden samples, full example.',
+    content: `{{disclaimer}}You are generating TEST CODE for a component in an AIMEAT service.
 
-# Task: Generate Data Cortex Test From Spec
+## Component Under Test
+- Type: cortex
+- Label: {{lib_name}}
+- Registered as: {{wraps_extension}}
+{{golden_samples}}{{test_scenarios}}
+## Data Structures (from blueprint — test against THESE shapes)
+{{structures}}
 
-Test that cortex methods match their spec contracts.
+## Action Contracts (from blueprint — test THESE methods with THESE shapes)
+{{action_contracts}}
 
-## Cortex: AIMEAT.{{lib_name}}
-Wraps: {{wraps_extension}}
+{{project_context}}
 
-## Methods to Test
-{{spec_methods}}
+## Test Environment: Browser (page.evaluate sandbox)
 
-## Environment: Browser (page.evaluate sandbox)
-Access: window.AIMEAT.{{lib_name}}
-Auth IS available.
-Set results: window.__testResults = { passed, errors, details }
+CRITICAL SANDBOX RULES — violating ANY will crash the test:
+- NO import/require/export statements
+- Your code runs inside page.evaluate() in a real browser page
+- You have access to: window, document, fetch, DOM APIs
+- Set results on: window.__testResults = { passed: boolean, errors: string[], details: string }
 
-## Rules
-- Assert EXACT field names from spec
-- Methods return null on failure (not throw)
-- For arrays: assert Array.isArray and length > 0
+For CORTEX tests:
+- The cortex library is already loaded on the test page
+- Access it via: window.AIMEAT.{{lib_name}}
+- Authentication IS available — session.fetch() works
 
-Return ONLY executable JavaScript. No markdown fences.`,
-    variables: ['disclaimer', 'lib_name', 'wraps_extension', 'spec_methods'],
+## QUALITY REQUIREMENTS (MANDATORY)
+
+Every test MUST follow this pattern for EVERY API call:
+
+1. **Call** — invoke the method with real, meaningful parameters
+2. **Log** — log the FULL response: \\\`log('method returned: ' + JSON.stringify(result))\\\`
+3. **Assert not null** — \\\`if (result === null) fail('method: got null')\\\`
+4. **Assert shape** — check specific field names and types from the cortex code
+5. **Assert values** — for external APIs, verify arrays have length > 0, objects have expected fields
+6. **Verify side effects** — after writes, READ BACK and check the data is there
+
+NEVER do this:
+\\\`\\\`\\\`
+if (result === null) log('returned null (expected without auth)');  // WRONG — auth IS available
+\\\`\\\`\\\`
+
+ALWAYS do this:
+\\\`\\\`\\\`
+if (result === null) fail('method: returned null — should return data');
+if (!result.items) fail('method: missing items field');
+if (!Array.isArray(result.items)) fail('method: items should be array');
+log('method returned: ' + JSON.stringify(result));
+\\\`\\\`\\\`
+
+## CORTEX TEST EXAMPLE (follow this pattern exactly)
+
+\\\`\\\`\\\`javascript
+const lib = window.AIMEAT.myDomainLib;
+if (!lib) { fail('Library not loaded'); window.__testResults = results; return; }
+
+// 1. INIT — verify readiness
+const initResult = await lib.init();
+log('init returned: ' + JSON.stringify(initResult));
+if (!initResult) fail('init: returned null');
+else if (typeof initResult.ready !== 'boolean') fail('init: missing ready field');
+else pass('init: ready=' + initResult.ready);
+
+// 2. SEARCH — verify real API data comes back
+const searchResult = await lib.search('test query');
+log('search returned: ' + JSON.stringify(searchResult));
+if (!searchResult) fail('search: returned null');
+else if (!Array.isArray(searchResult.items)) fail('search: items should be array');
+else if (searchResult.items.length === 0) fail('search: got empty results for known query');
+else pass('search: got ' + searchResult.items.length + ' results');
+
+// 3. WRITE — add item, then READ BACK to verify
+const addResult = await lib.addItem('test-id', 'Test Name');
+log('addItem returned: ' + JSON.stringify(addResult));
+if (!addResult) fail('addItem: returned null');
+else if (!addResult.success) fail('addItem: success not true');
+
+// 3b. READ BACK — verify the item was actually saved
+const listAfterAdd = await lib.getItems();
+log('getItems after add: ' + JSON.stringify(listAfterAdd));
+if (!listAfterAdd || !listAfterAdd.items) fail('getItems: returned null after add');
+else {
+  const found = listAfterAdd.items.find(i => i.id === 'test-id');
+  if (!found) fail('addItem: item not found in list after add');
+  else pass('addItem: item persisted and readable');
+}
+
+// 4. DELETE — remove item, then READ BACK to verify
+const removeResult = await lib.removeItem('test-id');
+log('removeItem returned: ' + JSON.stringify(removeResult));
+if (!removeResult) fail('removeItem: returned null');
+
+// 4b. READ BACK — verify removal
+const listAfterRemove = await lib.getItems();
+log('getItems after remove: ' + JSON.stringify(listAfterRemove));
+if (listAfterRemove && listAfterRemove.items) {
+  const stillThere = listAfterRemove.items.find(i => i.id === 'test-id');
+  if (stillThere) fail('removeItem: item still in list after remove');
+  else pass('removeItem: item removed successfully');
+}
+
+// 5. ERROR HANDLING — test with invalid input
+const badResult = await lib.getItem(null);
+log('getItem(null) returned: ' + JSON.stringify(badResult));
+// Should return null or error, not crash
+pass('getItem(null): handled gracefully');
+
+window.__testResults = results;
+\\\`\\\`\\\`
+
+Apply this EXACT pattern to the component under test. Use the actual method names and field names from the component code.
+{{cortex_methods}}
+
+## Platform Rules
+{{extension_consumption_rules}}
+
+## Output Rules
+1. Return ONLY executable JavaScript code — NO markdown fences, NO explanation text
+2. NO import/require/export — sandbox environment
+3. Self-contained async function body
+4. Set window.__testResults = { passed, errors, details }`,
+    variables: ['disclaimer', 'lib_name', 'wraps_extension', 'golden_samples', 'test_scenarios', 'structures', 'action_contracts', 'project_context', 'cortex_methods', 'extension_consumption_rules'],
     usedIn: ['generator-autopilot'],
   },
 

@@ -170,6 +170,11 @@ const validVars = new Set([
   'use_case', 'view_section', 'data_cortex_api', 'translation_section',
   'feature_apis', 'data_cortex_section',
   'project_context', 'cortex_or_api_section', 'cortex_rules',
+  // Fix prompt variables
+  'type_constraints', 'test_context', 'previous_attempts', 'reflection_diagnosis',
+  // Test prompt variables
+  'golden_samples', 'test_scenarios', 'action_contracts',
+  'cortex_methods',
   // Cortex template variables — pass through to LLM output, not resolved by prompt system
   'node_url',
 ]);
