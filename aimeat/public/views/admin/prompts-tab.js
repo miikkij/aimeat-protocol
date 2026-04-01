@@ -239,19 +239,24 @@ export default function PromptsTab({ data, reload }) {
             ${t('dashboard.' + (GROUP_NAMES[g] || g))} (${items.length})
           </summary>
           <div style="text-align:right;padding:4px 8px">
-            <button class="btn-danger" style="font-size:12px;padding:4px 12px" onClick=${async () => {
-              if (!await confirm(t('dashboard.promptsResetGroupConfirm') || 'Reset all prompts in this group to factory defaults?')) return;
-              try {
-                setLoading(true);
-                await resetPromptGroup(g);
-                const res = await getSystemPrompts();
-                setPrompts(res.data.prompts || []);
-                setLoading(false);
-                window.showToast?.(t('dashboard.promptsResetAllDone') || 'Group reset to factory defaults');
-              } catch (err) {
-                setLoading(false);
-                window.showToast?.(err.message, true);
-              }
+            <button class="btn-danger" style="font-size:12px;padding:4px 12px" onClick=${() => {
+              confirm(
+                t('dashboard.promptsResetGroupConfirm') || 'Reset all prompts in this group to factory defaults?',
+                async () => {
+                  try {
+                    setLoading(true);
+                    await resetPromptGroup(g);
+                    const res = await getSystemPrompts();
+                    setPrompts(res.data.prompts || []);
+                    setLoading(false);
+                    window.showToast?.(t('dashboard.promptsResetAllDone') || 'Group reset to factory defaults');
+                  } catch (err) {
+                    setLoading(false);
+                    window.showToast?.(err.message, true);
+                  }
+                },
+                { danger: true }
+              );
             }}>${t('dashboard.promptsResetGroup') || 'Palauta ryhmä'}</button>
           </div>
           ${items.map(p => html`
