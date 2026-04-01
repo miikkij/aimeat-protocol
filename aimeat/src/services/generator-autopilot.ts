@@ -568,6 +568,7 @@ export async function runAutopilot(
         }
 
         // ── TEST ──
+        let testPassed = true; // assume passed unless test runs and fails
         if (['extension', 'cortex'].includes(compType) && comp.registeredAs) {
           try {
             let testPromptText: string;
@@ -760,8 +761,22 @@ export async function runAutopilot(
             }
 
           } catch (e) {
-            log.warn(`[${cid}] Test execution failed: ${(e as Error).message}`);
+            log.error(`[${cid}] Test execution failed: ${(e as Error).message}`);
           }
+
+          // Check final test status
+          const finalTestResult = comp.testResult as Record<string, unknown> | undefined;
+          if (finalTestResult && finalTestResult.status === 'failed') {
+            testPassed = false;
+          }
+        }
+
+        if (!testPassed) {
+          const testErrors = ((comp.testResult as Record<string, unknown>)?.errors as string[]) || [];
+          log.error(`[${cid}] Test failed after all fix rounds — STOPPING pipeline: ${testErrors[0] || 'test failed'}`);
+          entry.status.progress.failed++;
+          entry.status.componentResults.push({ id: cid, label: compLabel, status: 'test_failed', error: testErrors[0] || 'Test failed after all fix rounds' });
+          break;
         }
 
         entry.status.progress.completed++;
