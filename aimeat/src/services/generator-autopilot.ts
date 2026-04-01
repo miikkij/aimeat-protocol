@@ -12,6 +12,7 @@
  */
 
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { type Storage } from '../storage/interface.js';
 import { type AimeatConfig } from '../config.js';
 import { complete as openrouterComplete } from './openrouter.js';
@@ -58,24 +59,27 @@ let promptModules: {
 async function loadPromptModules() {
   if (promptModules) return promptModules;
 
+  // On Windows, dynamic import() requires file:// URLs, not raw paths
+  const toUrl = (file: string) => pathToFileURL(join(PROMPT_DIR, file)).href;
+
   const [
     promptsBuild, promptsBase, promptsFix, promptsTest,
     specs, specValidate, specTests,
     validate, contextBundle,
     cortexData, cortexFeature, cortexApp,
   ] = await Promise.all([
-    import(join(PROMPT_DIR, 'generator-prompts-build.js')),
-    import(join(PROMPT_DIR, 'generator-prompts-base.js')),
-    import(join(PROMPT_DIR, 'generator-prompts-fix.js')),
-    import(join(PROMPT_DIR, 'generator-prompts-test.js')),
-    import(join(PROMPT_DIR, 'generator-specs.js')),
-    import(join(PROMPT_DIR, 'generator-spec-validate.js')),
-    import(join(PROMPT_DIR, 'generator-spec-tests.js')),
-    import(join(PROMPT_DIR, 'generator-validate.js')),
-    import(join(PROMPT_DIR, 'generator-context-bundle.js')),
-    import(join(PROMPT_DIR, 'generator-prompts-cortex-data.js')),
-    import(join(PROMPT_DIR, 'generator-prompts-cortex-feature.js')),
-    import(join(PROMPT_DIR, 'generator-prompts-cortex-app.js')),
+    import(toUrl('generator-prompts-build.js')),
+    import(toUrl('generator-prompts-base.js')),
+    import(toUrl('generator-prompts-fix.js')),
+    import(toUrl('generator-prompts-test.js')),
+    import(toUrl('generator-specs.js')),
+    import(toUrl('generator-spec-validate.js')),
+    import(toUrl('generator-spec-tests.js')),
+    import(toUrl('generator-validate.js')),
+    import(toUrl('generator-context-bundle.js')),
+    import(toUrl('generator-prompts-cortex-data.js')),
+    import(toUrl('generator-prompts-cortex-feature.js')),
+    import(toUrl('generator-prompts-cortex-app.js')),
   ]);
 
   // Inject cortex modules into the build module (it lazy-loads them behind typeof window guard)
