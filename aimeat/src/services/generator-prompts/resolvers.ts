@@ -234,32 +234,126 @@ function resolveExtensionCode(data: PromptRuntimeData): Vars {
 }
 
 function resolveCortexData(data: PromptRuntimeData): Vars {
+  // Match browser buildDataCortexPrompt() — produce same variable content
+  const bp = data.blueprint;
+  const actions = bp.dataModel?.actions || {};
+  const cortexActions = Object.entries(actions)
+    .filter(([key]) => key.startsWith('cortex:'))
+    .map(([key, def]) => ({ method: key.replace('cortex:', ''), ...def }));
+
+  const methodsExport = cortexActions.length > 0
+    ? cortexActions.map(a => {
+        const inputKeys = Object.keys((a as Record<string, unknown>).input as Record<string, unknown> || {}).join(', ');
+        const outputRef = ((a as Record<string, unknown>).output as Record<string, string>)?.$ref || JSON.stringify((a as Record<string, unknown>).output || 'any');
+        return `- **${a.method}**(${inputKeys}) → returns ${outputRef}`;
+      }).join('\n')
+    : 'Infer from extension actions and data model.';
+
+  // Build extension section matching browser: name, actions, probe results, callExt hint
+  const extComp = (data.completedComponents || []).find(c => c.type === 'extension');
+  const extBundle = extComp?.contextBundle;
+  let extensionSection: string;
+  if (extBundle) {
+    const probes = (extBundle.probeResults || extComp?.probeResults || []) as Array<Record<string, unknown>>;
+    extensionSection = `\n## Extension (this cortex wraps it)\n\nExtension name: ${extBundle.registeredAs || ''}\nActions: ${(extBundle.actions || []).join(', ') || 'none'}\n`;
+    if (probes.length > 0) {
+      extensionSection += '\n### Actual responses from live probes:\n';
+      for (const p of probes) extensionSection += `${p.action}(${JSON.stringify(p.input)}) → ${JSON.stringify(p.response).substring(0, 500)}\n`;
+    }
+    extensionSection += `\nUse callExt('${extBundle.registeredAs || ''}', actionId, body) for extension calls.\nsession.fetch returns ALREADY-PARSED JSON — use resp.data, never resp.json().\n`;
+  } else {
+    extensionSection = '\n## No Extension\n\nThis data cortex uses AIMEAT platform libraries directly (no extension needed).\n';
+  }
+
   return {
     label: data.componentLabel || '',
-    extension_spec: data.extensionSpec ? formatSpec(data.extensionSpec, 'Extension Spec') : '',
-    structures: formatStructures(data.blueprint.dataModel?.structures),
-    completed_context: formatCompletedContext(data.completedComponents),
+    project_description: data.projectDescription || '',
+    structures: formatStructures(bp.dataModel?.structures),
+    methods_to_export: methodsExport,
+    extension_section: extensionSection,
   };
 }
 
 function resolveCortexComponent(data: PromptRuntimeData): Vars {
+  // Match browser buildFeatureCortexPrompt() — use case, view, structures, data cortex API
+  const interview = data.interviewSpec;
+  const bpComp = data.blueprintComponent;
+  const labelLower = (data.componentLabel || '').toLowerCase();
+
+  // Use case
+  let useCase = 'No specific use case provided';
+  if (interview?.useCases) {
+    const match = (interview.useCases as Array<Record<string, string>>).find(u =>
+      labelLower.includes((u.title || '').toLowerCase().split(' ')[0]));
+    if (match) useCase = `**${match.title}** [${match.priority || 'medium'}]: ${match.description || ''}`;
+  }
+
+  // View
+  let viewSection = 'No specific view provided';
+  if (interview?.views) {
+    const match = (interview.views as Array<Record<string, unknown>>).find(v =>
+      labelLower.includes(((v.title as string) || '').toLowerCase().split(' ')[0]));
+    if (match) {
+      viewSection = `**${match.title}** (${match.type || 'page'}): ${match.description || ''}`;
+      if (Array.isArray(match.interactions)) viewSection += `\nInteractions: ${(match.interactions as string[]).join(', ')}`;
+    }
+  }
+
+  // Structures
+  const structures = data.blueprint.dataModel?.structures || {};
+  const structuresText = Object.entries(structures).map(([name, schema]) =>
+    `**${name}**: ${JSON.stringify(schema, null, 2)}`).join('\n\n') || 'See data cortex API for available data.';
+
+  // Data cortex API with probe results
+  const dataCortex = (data.completedComponents || []).find(c => c.type === 'cortex' && c.subtype === 'data');
+  const dcBundle = dataCortex?.contextBundle;
+  let dataCortexApi = '';
+  if (dcBundle) {
+    dataCortexApi = `\n## Data Cortex API (use this for all data access)\n\nAccess via: AIMEAT.${dcBundle.libName || dcBundle.registeredAs || ''}\nMethods: ${(dcBundle.exports || []).join(', ')}\n`;
+    const probes = (dcBundle.probeResults || dataCortex?.probeResults || []) as Array<Record<string, unknown>>;
+    for (const p of probes) dataCortexApi += `${p.method || p.action}(${JSON.stringify(p.input || {})}) → ${JSON.stringify(p.response).substring(0, 400)}\n`;
+  }
+
+  // Translation
+  const tk = data.translationKeys || [];
+  const translationSection = tk.length > 0
+    ? `\n## Translation Keys (use these exact keys)\n\n${tk.map(k => '- `' + k + '`').join('\n')}\n`
+    : '';
+
   return {
     label: data.componentLabel || '',
-    data_api_spec: data.dataApiSpec ? formatSpec(data.dataApiSpec, 'Data API Spec') : '',
-    translation_keys: (data.translationKeys || []).slice(0, 30).map(k => `\`${k}\``).join(', '),
-    view_context: data.viewDefinition ? JSON.stringify(data.viewDefinition) : '',
-    completed_context: formatCompletedContext(data.completedComponents),
+    use_case: useCase,
+    view_section: viewSection,
+    structures: structuresText,
+    data_cortex_api: dataCortexApi,
+    translation_section: translationSection,
   };
 }
 
 function resolveCortexAppDomain(data: PromptRuntimeData): Vars {
+  // Match browser buildAppDomainCortexPrompt() — feature APIs, data cortex, translation keys
+  const featureComps = (data.completedComponents || []).filter(c =>
+    c.type === 'cortex' && (c.subtype === 'component' || c.subtype === 'feature'));
+  const featureApis = featureComps.map(c => {
+    const b = c.contextBundle;
+    return `\n### ${b?.name || c.label}\nRegistered as: ${b?.registeredAs || c.registeredAs || ''}\nAccess via: AIMEAT.${b?.libName || c.registeredAs || ''}\nExports: ${(b?.exports || []).join(', ')}\n`;
+  }).join('\n');
+
+  const dataCortex = (data.completedComponents || []).find(c => c.type === 'cortex' && c.subtype === 'data');
+  const dcBundle = dataCortex?.contextBundle;
+  const dataCortexSection = dcBundle
+    ? `\nAccess via: AIMEAT.${dcBundle.libName || dcBundle.registeredAs || ''}\nMethods: ${(dcBundle.exports || []).join(', ')}\n`
+    : 'No data cortex available';
+
+  const translationComp = (data.completedComponents || []).find(c => c.type === 'translation' && c.contextBundle?.keys);
+  const translationKeys = translationComp?.contextBundle?.keys?.slice(0, 30).join(', ') || 'none available';
+
   return {
     label: data.componentLabel || '',
-    component_specs: (data.componentSpecs || []).map(cs => formatSpec(cs, `Component: ${(cs as Record<string, string>).name}`)).join('\n'),
-    data_api_spec: data.dataApiSpec ? formatSpec(data.dataApiSpec, 'Data API Spec') : '',
-    use_cases: formatUseCases(data.useCases),
-    translation_keys: (data.translationKeys || []).join(', '),
-    completed_context: formatCompletedContext(data.completedComponents),
+    project_description: data.projectDescription || '',
+    feature_apis: featureApis,
+    data_cortex_section: dataCortexSection,
+    translation_keys: translationKeys,
   };
 }
 
@@ -352,12 +446,54 @@ Total: ${sorted.length} keys available. If you need a label, find the closest ma
 `;
   }
 
+  // Build the conditional cortex-or-api section (browser has hasCortex conditional)
+  const hasCortex = cortexComponents.length > 0;
+  let cortexOrApiSection: string;
+  if (hasCortex) {
+    cortexOrApiSection = cortexInstructions;
+  } else {
+    // Non-cortex path: show AIMEAT.data API, extension calling, translations
+    cortexOrApiSection = `### AIMEAT.data API (memory read/write — handles auth and envelope automatically):
+\`\`\`javascript
+const myData = await AIMEAT.data.get('my.settings');
+await AIMEAT.data.set('my.key', { count: 42 });
+await AIMEAT.data.delete('my.key');
+\`\`\`
+
+### Reading EXTENSION-produced data (CRITICAL — most apps need this):
+Extensions store data in their OWN namespace (\`ext:{extension-name}\`).
+\`\`\`javascript
+// CORRECT — read from the extension's namespace:
+const data = await AIMEAT.data.getPublic('ext:my-extension', 'items.by-date.__index');
+\`\`\`
+
+### Reading TRANSLATIONS:
+\`\`\`javascript
+const fiStrings = await AIMEAT.data.get('my-service.i18n.fi') || await AIMEAT.data.get('i18n.fi') || {};
+\`\`\`
+
+### Calling extension actions:
+\`\`\`javascript
+async function extCall(extName, actionId, body = {}) {
+  const session = await AIMEAT.auth.login();
+  if (!session) throw new Error('Not logged in');
+  const resp = await session.fetch('/v1/ext/' + extName + '/' + actionId, { method: 'POST', body: JSON.stringify(body) });
+  if (!resp.ok) throw new Error(resp.error?.message || 'Extension call failed');
+  return resp.data;
+}
+\`\`\``;
+  }
+
+  // Build project context (description + completed component info)
+  let projectContext = data.projectDescription || '';
+  if (appDomainSpec) projectContext += formatSpec(appDomainSpec, 'App-Domain Cortex Spec');
+
   return {
     label: data.componentLabel || '',
-    app_domain_spec: appDomainSpec ? formatSpec(appDomainSpec, 'App-Domain Cortex Spec') : '',
-    style: data.interviewSpec?.style ? `mood=${data.interviewSpec.style.mood || 'professional'}, layout=${data.interviewSpec.style.layout || 'tabbed'}` : 'professional',
+    project_context: projectContext,
     cortex_script_loads: cortexScriptLoads,
-    cortex_instructions: cortexInstructions,
+    cortex_or_api_section: cortexOrApiSection,
+    cortex_rules: hasCortex ? '- Call cortex init() on app start — it handles everything automatically\n- Focus on UX/UI — the cortex handles data access and initialization' : '',
     translation_keys_section: translationKeysSection,
   };
 }

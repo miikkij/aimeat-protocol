@@ -836,6 +836,8 @@ Return ONLY executable JavaScript. No markdown fences.`,
 
   // ═══════════════════════════════════════════════════════════════════
   // Cortex code generation — data, component, app-domain subtypes
+  // Verbatim copies from public/js/services/generator-prompts-cortex-*.js
+  // and generator-prompts-base.js app template. ${var} → {{var}}.
   // ═══════════════════════════════════════════════════════════════════
 
   {
@@ -844,8 +846,9 @@ Return ONLY executable JavaScript. No markdown fences.`,
     name: 'Data Cortex Generator',
     description: 'Data cortex IIFE — wraps extension into clean data access methods.',
     content: `{{disclaimer}}
-
 Create a Data Cortex library for: {{label}}
+
+Project: {{project_description}}
 
 ## Goal
 
@@ -857,12 +860,18 @@ Other cortex components will use this library to get and modify data.
 
 {{structures}}
 
-{{extension_spec}}
+## Methods to Export
+
+{{methods_to_export}}
+
+{{extension_section}}
 
 ## AIMEAT Platform Libraries Available
 
 - **AIMEAT.data** — get(key), set(key, value), delete(key), list(opts), search(query), getPublic(gaii, key), getEntry(key), update(key, value, version)
 - **AIMEAT.storage** — upload(file), download(key), list(), delete(key)
+- **AIMEAT.social** — createBoard(name), post(boardId, content), boards(), posts(boardId)
+- **AIMEAT.wallet** — balance(), transactions()
 - **AIMEAT.auth** — login(), getSession(), mountLoginButton(container)
 
 ## Data Access Rules (CRITICAL — follow precisely)
@@ -870,11 +879,11 @@ Other cortex components will use this library to get and modify data.
 Two namespaces, two different methods:
 
 1. **Extension runtime data** (watchlist items, cached API results, change logs — data the EXTENSION wrote via ctx.memory.set):
-   → Read with: \`AIMEAT.data.getPublic('ext:EXTENSION_NAME', key)\`
+   → Read with: \\\`AIMEAT.data.getPublic('ext:EXTENSION_NAME', key)\\\`
    → This reads from the extension's own namespace. Public, no auth needed.
 
 2. **Owner/user data** (translations, settings, seed data — data stored by memory/translation components):
-   → Read with: \`AIMEAT.data.get(key)\`
+   → Read with: \\\`AIMEAT.data.get(key)\\\`
    → This reads from the CURRENT USER's own namespace. Requires auth session.
 
 NEVER read translations or settings from ext: namespace. They live in the owner namespace.
@@ -883,7 +892,10 @@ NEVER read extension runtime data with data.get() — that reads the wrong names
 ## Output Format
 
 Return TWO separate, properly tagged code blocks.
+The installer expects them separately — YAML defines the manifest, JS is the library file.
+
 CRITICAL: Use \\\`\\\`\\\`yaml for the manifest and \\\`\\\`\\\`javascript for the library code.
+Do NOT combine them into a single block. Do NOT use an untagged block.
 
 First block — YAML manifest:
 \\\`\\\`\\\`yaml
@@ -895,6 +907,8 @@ metadata:
   description: "What this data cortex does"
   author: generator
   tags: [data, domain-tag]
+  labels:
+    domain: specific-domain
 spec:
   version: "1.0.0"
   license: MIT
@@ -905,6 +919,7 @@ spec:
       exports: [methodName, ...]
       api_surface: |
         AIMEAT.yourLib.methodName(params) — Description and return type
+        ...
 \\\`\\\`\\\`
 
 Second block — JavaScript library:
@@ -912,19 +927,20 @@ Second block — JavaScript library:
 (function (AIMEAT) {
   'use strict';
   const LIB_NAME = 'yourLibName'; // camelCase of metadata.name
+
+  // Internal helpers (callExt, readExtMemory — private, not exported)
+  // ...
+
   // Public data access methods
   async function methodName(params) { ... }
+
   // Register
   const exports = { methodName, ... };
   if (AIMEAT.register) AIMEAT.register(LIB_NAME, exports);
   AIMEAT[LIB_NAME] = exports;
 })(window.AIMEAT || (window.AIMEAT = {}));
-\\\`\\\`\\\`
-
-session.fetch returns ALREADY-PARSED JSON — use resp.data, never resp.json().
-
-{{completed_context}}`,
-    variables: ['disclaimer', 'label', 'extension_spec', 'structures', 'completed_context'],
+\\\`\\\`\\\``,
+    variables: ['disclaimer', 'label', 'project_description', 'structures', 'methods_to_export', 'extension_section'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
 
@@ -934,23 +950,31 @@ session.fetch returns ALREADY-PARSED JSON — use resp.data, never resp.json().
     name: 'Feature Cortex Generator',
     description: 'Feature cortex IIFE — self-contained UI module with render(container).',
     content: `{{disclaimer}}
-
 Create a Feature Cortex component for: {{label}}
+
+## Use Case
+{{use_case}}
+
+## View
+{{view_section}}
 
 ## Goal
 
 Build a self-contained feature module (data + UI) as a cortex IIFE.
-It must export a \`render(container)\` function that:
+It must export a \\\`render(container)\\\` function that:
 1. Creates all DOM elements for this feature
 2. Fetches data from the data cortex
 3. Renders the data using platform UI components
 4. Handles user interactions
 5. Uses translation keys for all visible text
 
-Think of it like aimeat-charts: ChartPanel({ target: container, ... }) creates a complete chart.
-Your render(container) creates a complete feature view.
+Think of it like aimeat-charts: \\\`ChartPanel({ target: container, ... })\\\` creates a complete chart.
+Your \\\`render(container)\\\` creates a complete feature view.
 
-{{data_api_spec}}
+## Data Structures
+{{structures}}
+
+{{data_cortex_api}}
 
 ## Platform UI Cortex Libraries — Working Examples
 
@@ -959,13 +983,17 @@ All components take an options object. They return a DOM element you append to y
 ### Tabs (AIMEAT['aimeat-ui-nav'].Tabs)
 \\\`\\\`\\\`javascript
 var tabs = AIMEAT['aimeat-ui-nav'].Tabs({
-  target: container,
+  target: container,  // DOM element or CSS selector string
   tabs: [
     { id: 'search', label: 'Haku', icon: '🔍' },
-    { id: 'watchlist', label: 'Seuranta', icon: '⭐' }
+    { id: 'watchlist', label: 'Seuranta', icon: '⭐' },
+    { id: 'settings', label: 'Asetukset', icon: '⚙' }
   ],
-  active: 'search',
-  onChange: function(tabId) { renderTabContent(tabId); }
+  active: 'search',  // which tab is active initially
+  onChange: function(tabId) {
+    // called when user clicks a tab
+    renderTabContent(tabId);
+  }
 });
 \\\`\\\`\\\`
 
@@ -974,75 +1002,121 @@ var tabs = AIMEAT['aimeat-ui-nav'].Tabs({
 var table = AIMEAT['aimeat-ui-viewers'].DataTable({
   columns: [
     { key: 'name', label: 'Nimi', sortable: true },
-    { key: 'businessId', label: 'Y-tunnus' }
+    { key: 'businessId', label: 'Y-tunnus' },
+    { key: 'status', label: 'Tila' }
   ],
-  rows: dataRows,
+  rows: [
+    { name: 'Overscale Solutions Oy', businessId: '3323553-5', status: 'Active' }
+  ],
   sortable: true,
   filterable: true,
   pageSize: 20
 });
 container.appendChild(table);
-// NOTE: DataTable does NOT have onRowClick.
+// NOTE: DataTable does NOT have onRowClick. For clickable rows, build your own
+// card list with click handlers, or use the List component with onItemClick.
 \\\`\\\`\\\`
 
 ### Timeline (AIMEAT['aimeat-ui-viewers'].Timeline)
 \\\`\\\`\\\`javascript
 var timeline = AIMEAT['aimeat-ui-viewers'].Timeline({
-  events: [{ date: '2026-03-26', title: 'Change', description: 'Details' }]
+  events: [
+    { date: '2026-03-26', title: 'Osoite muuttui', description: 'Vanha: Mannerheimintie 1 → Uusi: Pohjantie 8' },
+    { date: '2026-03-20', title: 'Toimiala päivittyi', description: 'Uusi: Ohjelmistojen suunnittelu' }
+  ]
 });
 container.appendChild(timeline);
 \\\`\\\`\\\`
 
 ### Form components (AIMEAT['aimeat-ui-forms'])
 \\\`\\\`\\\`javascript
-var nameInput = AIMEAT['aimeat-ui-forms'].Input({ label: 'Hakusana', placeholder: 'Hae...', type: 'text' });
+// Text input — returns { el, getValue(), setValue(v), setError(msg), clearError() }
+var nameInput = AIMEAT['aimeat-ui-forms'].Input({
+  label: 'Hakusana',
+  placeholder: 'Hae nimellä...',
+  type: 'text'
+});
 container.appendChild(nameInput.el);
-// Read: nameInput.getValue(), Set: nameInput.setValue('test')
+// Read value: nameInput.getValue()
+// Set value: nameInput.setValue('test')
+// Listen for changes: nameInput.el.querySelector('input').addEventListener('input', function(e) { doSearch(e.target.value); });
 
+// Select dropdown — returns { el, getValue(), setValue(v) }
 var langSelect = AIMEAT['aimeat-ui-forms'].Select({
   label: 'Kieli',
-  options: [{ value: 'fi', label: 'Suomi' }, { value: 'en', label: 'English' }]
+  options: [
+    { value: 'fi', label: 'Suomi' },
+    { value: 'en', label: 'English' }
+  ]
 });
 container.appendChild(langSelect.el);
+// Read value: langSelect.getValue()
 
-var toggle = AIMEAT['aimeat-ui-forms'].Toggle({
-  label: 'Ilmoitukset', checked: true,
-  onChange: function(checked) { savePref(checked); }
+// Toggle switch — returns { el, getValue(), setValue(v) }
+// Toggle HAS onChange callback
+var notifToggle = AIMEAT['aimeat-ui-forms'].Toggle({
+  label: 'Ilmoitukset',
+  checked: true,
+  onChange: function(checked) { saveNotificationPref(checked); }
 });
-container.appendChild(toggle.el);
+container.appendChild(notifToggle.el);
 \\\`\\\`\\\`
 
 ### Dialogs (AIMEAT['aimeat-ui-dialogs'])
 \\\`\\\`\\\`javascript
-AIMEAT['aimeat-ui-dialogs'].toast('Saved!', 'success');
-var confirmed = await AIMEAT['aimeat-ui-dialogs'].Confirm({ title: 'Delete?', message: 'Are you sure?', confirmLabel: 'Delete', cancelLabel: 'Cancel' });
-var modal = AIMEAT['aimeat-ui-dialogs'].Modal({ title: 'Details', content: detailElement, width: 'lg' });
+// Toast notification
+AIMEAT['aimeat-ui-dialogs'].toast('Tallennettu!', 'success');
+AIMEAT['aimeat-ui-dialogs'].toast('Virhe tapahtui', 'error');
+
+// Confirm dialog (returns Promise)
+var confirmed = await AIMEAT['aimeat-ui-dialogs'].Confirm({
+  title: 'Poista yritys?',
+  message: 'Haluatko varmasti poistaa yrityksen seurannasta?',
+  confirmLabel: 'Poista',
+  cancelLabel: 'Peruuta'
+});
+if (confirmed) { removeFromWatchlist(id); }
+
+// Modal
+var modal = AIMEAT['aimeat-ui-dialogs'].Modal({
+  title: 'Yrityksen tiedot',
+  content: detailElement,  // DOM element
+  width: 'lg'  // 'sm', 'md', 'lg'
+});
 \\\`\\\`\\\`
 
-## Translation Keys
-{{translation_keys}}
+{{translation_section}}
 
 ## Loading Translations
 
 Translations are stored in the OWNER namespace (by the translation component).
-Load with AIMEAT.data.get() — NOT from ext: namespace:
+Load them with AIMEAT.data.get() — NOT from ext: namespace:
 \\\`\\\`\\\`javascript
+// CORRECT — reads from owner namespace where translation component stored them:
 var translations = await AIMEAT.data.get('SERVICE_NAME.i18n.fi') || {};
+
+// WRONG — ext: namespace does NOT contain translations:
+// var translations = await AIMEAT.data.getPublic('ext:...', 'i18n.fi'); // ← NEVER do this
 \\\`\\\`\\\`
+Replace SERVICE_NAME with the actual service slug (from the CSM/extension name).
 
 ## Translation Helper
+Use a t() function for all user-visible text:
 \\\`\\\`\\\`javascript
 function t(key, translations, vars) {
   if (!key || !translations) return key || '';
   var str = translations[key] != null ? translations[key] : key;
   if (vars && typeof str === 'string') {
-    Object.keys(vars).forEach(function(k) { str = str.replace('$\{' + k + '}', vars[k]); });
+    Object.keys(vars).forEach(function(k) {
+      str = str.replace('$\\{' + k + '}', vars[k]);
+    });
   }
   return str;
 }
 \\\`\\\`\\\`
 
 ## Nested Object Helper
+API responses contain nested objects. Use this to safely render values:
 \\\`\\\`\\\`javascript
 function dv(val) {
   if (val == null) return '-';
@@ -1070,6 +1144,8 @@ metadata:
   description: "Feature description"
   author: generator
   tags: [feature, domain-tag]
+  labels:
+    domain: specific-domain
 spec:
   version: "1.0.0"
   license: MIT
@@ -1092,10 +1168,8 @@ Second block — JavaScript library:
   if (AIMEAT.register) AIMEAT.register(LIB_NAME, exports);
   AIMEAT[LIB_NAME] = exports;
 })(window.AIMEAT || (window.AIMEAT = {}));
-\\\`\\\`\\\`
-
-{{completed_context}}`,
-    variables: ['disclaimer', 'label', 'data_api_spec', 'translation_keys', 'view_context', 'completed_context'],
+\\\`\\\`\\\``,
+    variables: ['disclaimer', 'label', 'use_case', 'view_section', 'structures', 'data_cortex_api', 'translation_section'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
 
@@ -1105,8 +1179,9 @@ Second block — JavaScript library:
     name: 'App-Domain Cortex Generator',
     description: 'App-domain cortex — composition layer combining all features + auth + translations.',
     content: `{{disclaimer}}
-
 Create an App-Domain Cortex for: {{label}}
+
+Project: {{project_description}}
 
 ## Goal
 
@@ -1120,10 +1195,10 @@ Build the top-level cortex library that the APP will use. It composes:
 The app loads ONLY this cortex. This cortex provides everything the app needs.
 
 ## Feature Cortex Components (compose these)
-{{component_specs}}
+{{feature_apis}}
 
 ## Data Cortex
-{{data_api_spec}}
+{{data_cortex_section}}
 
 ## Translation Keys Available
 {{translation_keys}}
@@ -1138,8 +1213,12 @@ The app loads ONLY this cortex. This cortex provides everything the app needs.
 
 ## Auth Pattern
 \\\`\\\`\\\`javascript
+// Restore session from storage (MUST call login() first — getSession() alone returns null)
 var session = await AIMEAT.auth.login();
 if (!session) {
+  // No stored session — show login button
+  // mountLoginButton takes a CSS SELECTOR string, not a DOM element
+  // Give the container an ID first, then pass the selector
   container.id = container.id || 'app-auth';
   AIMEAT.auth.mountLoginButton('#' + container.id);
   return { ready: false, authenticated: false };
@@ -1148,18 +1227,24 @@ if (!session) {
 
 ## Translation Pattern
 \\\`\\\`\\\`javascript
+// Load translations — try service-prefixed key first, then plain key
 async function loadTranslations(locale) {
   try {
+    // Translations are stored in the OWNER namespace by the translation component
+    // Key format: SERVICE_PREFIX.i18n.LOCALE (dots throughout)
     return await AIMEAT.data.get('SERVICE_PREFIX.i18n.' + locale)
         || await AIMEAT.data.get('i18n.' + locale)
         || {};
   } catch (e) { return {}; }
 }
 
+// Translate with interpolation
 function t(key, vars) {
   var str = translations[key] || key;
   if (vars) {
-    Object.keys(vars).forEach(function(k) { str = str.replace('$\{' + k + '}', vars[k]); });
+    Object.keys(vars).forEach(function(k) {
+      str = str.replace('$\\{' + k + '}', vars[k]);
+    });
   }
   return str;
 }
@@ -1180,6 +1265,8 @@ metadata:
   description: "App-domain cortex description"
   author: generator
   tags: [app, domain-tag]
+  labels:
+    domain: specific-domain
 spec:
   version: "1.0.0"
   license: MIT
@@ -1201,14 +1288,13 @@ Second block — JavaScript library:
 (function (AIMEAT) {
   'use strict';
   const LIB_NAME = 'appLib'; // camelCase
+  // ... init/render implementation
   var exports = { init, render, t, switchLocale, getTranslations };
   if (AIMEAT.register) AIMEAT.register(LIB_NAME, exports);
   AIMEAT[LIB_NAME] = exports;
 })(window.AIMEAT || (window.AIMEAT = {}));
-\\\`\\\`\\\`
-
-{{completed_context}}`,
-    variables: ['disclaimer', 'label', 'component_specs', 'data_api_spec', 'use_cases', 'translation_keys', 'completed_context'],
+\\\`\\\`\\\``,
+    variables: ['disclaimer', 'label', 'project_description', 'feature_apis', 'data_cortex_section', 'translation_keys'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
 
@@ -1221,9 +1307,7 @@ Second block — JavaScript library:
 
 Create an AIMEAT App (HTML/JS) for: {{label}}
 
-Style: {{style}}
-
-{{app_domain_spec}}
+{{project_context}}
 
 ## CRITICAL: Authentication & API Calls
 
@@ -1250,7 +1334,6 @@ async function boot() {
     await loadScript('/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js');
     await loadScript('/v1/cortex/aimeat-ui-forms/libs/aimeat-ui-forms.js');
     await loadScript('/v1/cortex/aimeat-ui-dialogs/libs/aimeat-ui-dialogs.js');
-    // Load domain cortex libraries here (added by resolver)
 {{cortex_script_loads}}
     AIMEAT.auth.mountLoginButton('#auth-container', {
       onLogin: () => startApp(),
@@ -1267,71 +1350,7 @@ boot();
 \\\`\\\`\\\`
 
 {{translation_keys_section}}
-
-{{cortex_instructions}}
-
-### AIMEAT.data API (memory read/write — handles auth and envelope automatically):
-\\\`\\\`\\\`javascript
-// Read YOUR OWN memory key — returns the stored value directly, or null
-const myData = await AIMEAT.data.get('my.settings');
-
-// Write a memory key (your own namespace)
-await AIMEAT.data.set('my.key', { count: 42 });
-
-// Delete your own memory key
-await AIMEAT.data.delete('my.key');
-\\\`\\\`\\\`
-
-### Reading EXTENSION-produced data (CRITICAL — most apps need this):
-Extensions store data in their OWN namespace (\`ext:{extension-name}\`).
-To read data that an extension wrote, use \`getPublic()\`:
-\\\`\\\`\\\`javascript
-// WRONG — this reads YOUR memory, not the extension's:
-const data = await AIMEAT.data.get('items.by-date.__index');  // returns null!
-
-// CORRECT — read from the extension's namespace:
-const data = await AIMEAT.data.getPublic('ext:my-collector-extension', 'items.by-date.__index');
-\\\`\\\`\\\`
-The first argument is the extension's memory owner: \`"ext:" + extensionName\` (the \`name\` field from the extension manifest metadata).
-Use this for ALL data produced by extensions (collected data, computed stats, caches, etc.).
-\`getPublic()\` returns the value directly (auto-unwraps), or null if not found.
-
-### Reading TRANSLATIONS (stored in owner namespace by translation components):
-Translations are stored in the OWNER's namespace by the translation component during registration.
-The key format is: \`{service-name}.i18n.{locale}\` (e.g. \`my-service.i18n.fi\`).
-\\\`\\\`\\\`javascript
-// Read translations from OWNER namespace (the translation component stored them here):
-const fiStrings = await AIMEAT.data.get('my-service.i18n.fi') || await AIMEAT.data.get('i18n.fi') || {};
-const enStrings = await AIMEAT.data.get('my-service.i18n.en') || await AIMEAT.data.get('i18n.en') || {};
-\\\`\\\`\\\`
-Use AIMEAT.data.get() — this reads from the current user's namespace where translations live.
-If a cortex library has a getI18n(locale) method, use that instead (recommended).
-
-### Calling extension actions (use AIMEAT.auth session for authenticated fetch):
-
-\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557
-\u2551  CRITICAL: session.fetch() returns ALREADY-PARSED JSON, not Response.  \u2551
-\u2551  Do NOT call resp.json() \u2014 it will crash with "not a function".        \u2551
-\u2551  Access resp.ok, resp.data, resp.error directly.                       \u2551
-\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D
-
-\\\`\\\`\\\`javascript
-// Helper for extension calls (copy this EXACTLY):
-// ALL extension actions are POST — the backend only has router.post() routes
-async function extCall(extName, actionId, body = {}) {
-  const session = await AIMEAT.auth.login();
-  if (!session) throw new Error('Not logged in');
-  const url = '/v1/ext/' + extName + '/' + actionId;
-  const resp = await session.fetch(url, { method: 'POST', body: JSON.stringify(body) });
-  // resp is ALREADY parsed JSON — never call resp.json()
-  if (!resp.ok) throw new Error(resp.error?.message || 'Extension call failed');
-  return resp.data;  // unwrapped payload
-}
-
-// Usage:
-const results = await extCall('my-extension', 'search', { query: 'test' });
-const detail = await extCall('my-extension', 'getDetail', { id: 'abc-123' });
-\\\`\\\`\\\`
+{{cortex_or_api_section}}
 
 ## CDN Libraries & Design Resources
 
@@ -1339,14 +1358,14 @@ The AIMEAT app catalog allows external CDN scripts. Available libraries:
 
 | Library | Script Tag | Use for |
 |---------|-----------|---------|
-| Leaflet | \`<script src="https://unpkg.com/leaflet@1/dist/leaflet.js"></script>\` + CSS link: \`<link rel="stylesheet" href="https://unpkg.com/leaflet@1/dist/leaflet.css">\` | Maps, markers, geospatial |
-| Chart.js | \`<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>\` | Bar, line, pie, radar charts |
-| Motion | \`<script src="https://cdn.jsdelivr.net/npm/motion@11/dist/motion.js"></script>\` | Animations via \`Motion.animate(el, {x: 100}, {duration: 0.5})\` |
-| Phaser 3 | \`<script src="https://cdn.jsdelivr.net/npm/[email protected]/dist/phaser.min.js"></script>\` | Games, interactive canvas, physics |
+| Leaflet | \\\`<script src="https://unpkg.com/leaflet@1/dist/leaflet.js"></script>\\\` + CSS link: \\\`<link rel="stylesheet" href="https://unpkg.com/leaflet@1/dist/leaflet.css">\\\` | Maps, markers, geospatial |
+| Chart.js | \\\`<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>\\\` | Bar, line, pie, radar charts |
+| Motion | \\\`<script src="https://cdn.jsdelivr.net/npm/motion@11/dist/motion.js"></script>\\\` | Animations via \\\`Motion.animate(el, {x: 100}, {duration: 0.5})\\\` |
+| Phaser 3 | \\\`<script src="https://cdn.jsdelivr.net/npm/[email protected]/dist/phaser.min.js"></script>\\\` | Games, interactive canvas, physics |
 
 ### CSP (Content Security Policy) — the app HTML MUST include a meta tag
 
-AIMEAT enforces CSP headers. If your app loads CDN scripts/styles, you MUST add a \`<meta>\` tag:
+AIMEAT enforces CSP headers. If your app loads CDN scripts/styles, you MUST add a \\\`<meta>\\\` tag:
 \\\`\\\`\\\`html
 <meta http-equiv="Content-Security-Policy" content="
   default-src 'self';
@@ -1360,7 +1379,7 @@ AIMEAT enforces CSP headers. If your app loads CDN scripts/styles, you MUST add 
 Only include CDN domains you actually use. Without this tag, CDN scripts will be BLOCKED silently.
 
 IMPORTANT: If your app uses Leaflet or any map library that loads tiles from external servers,
-you MUST add the tile server domain to \`connect-src\`. For OpenStreetMap: \`https://*.tile.openstreetmap.org\`.
+you MUST add the tile server domain to \\\`connect-src\\\`. For OpenStreetMap: \\\`https://*.tile.openstreetmap.org\\\`.
 Without this, the map will appear but tiles will be blocked and it shows a grey/empty map.
 
 For UI inspiration, reference uiverse.io for fancy buttons, cards, toggles, and loaders (CSS-only patterns).
@@ -1415,27 +1434,26 @@ Reserve space for it in your layout — do not overlap or hide it:
 - DO NOT add manual configuration fields for API URL, Bearer Token, or Instance ID
 - DO NOT use prompt() or manual token entry — the auth library handles everything
 - ALL API paths MUST be relative (start with /) — never use absolute URLs or NODE_URL
-- Use \`await AIMEAT.auth.login()\` to restore session from storage; if null, show a "Sign in" message. getSession() alone returns null until login() is called.
+- Use \\\`await AIMEAT.auth.login()\\\` to restore session from storage; if null, show a "Sign in" message. getSession() alone returns null until login() is called.
 - Use vanilla JS (no build step needed)
 - All dates displayed to users should be formatted from ISO 8601 strings (never store display-formatted dates)
 - Has a clean, responsive UI with good mobile support
 - Use CSS custom properties for theming where possible
-- Call cortex init() on app start if cortex libraries are loaded — it handles everything automatically
-- Focus on UX/UI — the cortex handles data access and initialization
+{{cortex_rules}}
 
 ## CRITICAL: Rendering API Data — Handle Nested Objects
 
 API responses often contain nested objects instead of plain strings. For example:
-- \`businessId: { value: "3323553-5", registrationDate: "2022-11-07" }\` — access \`.value\`
-- \`euId: { value: "FIFPRO.3323553-5", source: "1" }\` — access \`.value\`
-- \`website: { url: "www.example.com", registrationDate: "..." }\` — access \`.url\`
-- \`names: [{ name: "Company Oy", type: "1" }]\` — access \`[0].name\`
+- \\\`businessId: { value: "3323553-5", registrationDate: "2022-11-07" }\\\` — access \\\`.value\\\`
+- \\\`euId: { value: "FIFPRO.3323553-5", source: "1" }\\\` — access \\\`.value\\\`
+- \\\`website: { url: "www.example.com", registrationDate: "..." }\\\` — access \\\`.url\\\`
+- \\\`names: [{ name: "Company Oy", type: "1" }]\\\` — access \\\`[0].name\\\`
 
-\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557
-\u2551  NEVER render an object directly as text \u2014 it will show [object Object] \u2551
-\u2551  ALWAYS check: if (typeof val === 'object' && val !== null)             \u2551
-\u2551  Then access the appropriate sub-field (.value, .url, .name, etc.)      \u2551
-\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D
+╔══════════════════════════════════════════════════════════════════════════╗
+║  NEVER render an object directly as text — it will show [object Object] ║
+║  ALWAYS check: if (typeof val === 'object' && val !== null)             ║
+║  Then access the appropriate sub-field (.value, .url, .name, etc.)      ║
+╚══════════════════════════════════════════════════════════════════════════╝
 
 Helper pattern:
 \\\`\\\`\\\`javascript
@@ -1505,7 +1523,7 @@ entry: index.html
 </body>
 </html>
 \\\`\\\`\\\``,
-    variables: ['context', 'label', 'app_domain_spec', 'style', 'translation_keys_section', 'cortex_script_loads', 'cortex_instructions', 'html_entity_rules'],
+    variables: ['context', 'label', 'project_context', 'cortex_script_loads', 'translation_keys_section', 'cortex_or_api_section', 'cortex_rules', 'html_entity_rules'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
 

@@ -165,6 +165,11 @@ const validVars = new Set([
   'lib_name', 'wraps_extension', 'spec_methods',
   'app_domain_spec', 'style',
   'cortex_script_loads', 'cortex_instructions', 'translation_keys_section',
+  // New variables from verbatim browser prompt copy
+  'project_description', 'methods_to_export', 'extension_section',
+  'use_case', 'view_section', 'data_cortex_api', 'translation_section',
+  'feature_apis', 'data_cortex_section',
+  'project_context', 'cortex_or_api_section', 'cortex_rules',
 ]);
 
 for (const seed of GENERATOR_PROMPT_SEEDS) {
@@ -182,15 +187,16 @@ if (cortexDataSeed) {
   const resolved = substituteVariables(cortexDataSeed.content, {
     disclaimer: '[DISCLAIMER]',
     label: 'Test Data Layer',
-    extension_spec: '## Extension Spec\nname: test-ext',
+    project_description: 'Finnish company monitor',
     structures: '### Company\n```json\n{"name":"string"}\n```',
-    completed_context: '(none)',
+    methods_to_export: '- **search**(query) → returns Company[]',
+    extension_section: '## Extension\nname: prh-ytj',
   });
   assert(!resolved.includes('{{disclaimer}}'), 'gen-cortex-data: disclaimer resolved');
   assert(!resolved.includes('{{label}}'), 'gen-cortex-data: label resolved');
-  assert(!resolved.includes('{{extension_spec}}'), 'gen-cortex-data: extension_spec resolved');
   assert(resolved.includes('Test Data Layer'), 'gen-cortex-data: label value present');
-  // Check no {{word}} remains (except metadata.name which has a dot and won't match)
+  assert(resolved.includes('Project: Finnish company monitor'), 'gen-cortex-data: project_description present');
+  assert(resolved.includes('Methods to Export'), 'gen-cortex-data: has Methods to Export section');
   const remaining = resolved.match(/\{\{(\w+)\}\}/g) || [];
   assert(remaining.length === 0, `gen-cortex-data: no unresolved vars`, remaining.length > 0 ? remaining.join(', ') : undefined);
 }
@@ -200,11 +206,17 @@ if (cortexCompSeed) {
   const resolved = substituteVariables(cortexCompSeed.content, {
     disclaimer: '[DISCLAIMER]',
     label: 'Search Feature',
-    data_api_spec: '## Data API\nmethod: search',
-    translation_keys: '`search.title`, `search.button`',
-    view_context: 'search view',
-    completed_context: '',
+    use_case: '**Company Search** [high]: Search PRH registry',
+    view_section: '**Search View** (page): Search and results',
+    structures: '**Company**: {"name":"string"}',
+    data_cortex_api: '## Data Cortex API\nAIMEAT.prhData.search()',
+    translation_section: '## Translation Keys\n- `search.title`',
   });
+  assert(resolved.includes('Use Case'), 'gen-cortex-component: has Use Case section');
+  assert(resolved.includes('View'), 'gen-cortex-component: has View section');
+  assert(resolved.includes('Data Structures'), 'gen-cortex-component: has Data Structures section');
+  assert(resolved.includes('DataTable does NOT have onRowClick'), 'gen-cortex-component: has full DataTable note');
+  assert(resolved.includes('NEVER do this'), 'gen-cortex-component: has WRONG translation example');
   const remaining = resolved.match(/\{\{(\w+)\}\}/g) || [];
   assert(remaining.length === 0, `gen-cortex-component: no unresolved vars`, remaining.length > 0 ? remaining.join(', ') : undefined);
 }
@@ -214,12 +226,13 @@ if (appDomainSeed) {
   const resolved = substituteVariables(appDomainSeed.content, {
     disclaimer: '[DISCLAIMER]',
     label: 'App Domain',
-    component_specs: '## Search\n## Watchlist',
-    data_api_spec: '## Data API',
-    use_cases: '1. Search companies',
-    translation_keys: '`app.title`',
-    completed_context: '',
+    project_description: 'Finnish company monitor',
+    feature_apis: '### Search\nRegistered as: search-feature',
+    data_cortex_section: 'AIMEAT.prhData\nMethods: search, getCompany',
+    translation_keys: '`app.title`, `search.button`',
   });
+  assert(resolved.includes('Project: Finnish company monitor'), 'gen-cortex-app-domain: has project_description');
+  assert(resolved.includes('mountLoginButton'), 'gen-cortex-app-domain: has auth pattern');
   const remaining = resolved.match(/\{\{(\w+)\}\}/g) || [];
   assert(remaining.length === 0, `gen-cortex-app-domain: no unresolved vars`, remaining.length > 0 ? remaining.join(', ') : undefined);
 }
@@ -229,11 +242,11 @@ if (appSeed) {
   const resolved = substituteVariables(appSeed.content, {
     context: '[AIMEAT CONTEXT]',
     label: 'PRH App',
-    app_domain_spec: '## App Domain Spec',
-    style: 'professional',
-    translation_keys_section: '## Translation keys\n- `app.title`',
+    project_context: '## App Domain Spec',
     cortex_script_loads: '    await loadScript(\'/v1/cortex/prh-data/libs/prh-data.js\');',
-    cortex_instructions: '## CORTEX\nUse AIMEAT.prhData.search()',
+    translation_keys_section: '## Translation keys\n- `app.title`',
+    cortex_or_api_section: '## CORTEX\nUse AIMEAT.prhData.search()',
+    cortex_rules: '- Call cortex init()',
     html_entity_rules: '[HTML ENTITY RULES]',
   });
   const remaining = resolved.match(/\{\{(\w+)\}\}/g) || [];
