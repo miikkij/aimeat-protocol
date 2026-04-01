@@ -45,7 +45,7 @@
  *     separated by // lib/ comment) in addition to legacy separate blocks. Accept
  *     var/let/const for LIB_NAME declaration.
  */
-import { parse as parseYaml, stringify as stringifyYaml } from '/lib/yaml.mjs';
+import { parse as parseYaml, stringify as stringifyYaml } from '../../lib/yaml.mjs';
 
 /* ── Helpers ─────────────────────────────────────────── */
 
