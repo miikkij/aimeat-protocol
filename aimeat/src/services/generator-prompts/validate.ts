@@ -100,6 +100,14 @@ function preCleanYaml(text: string): string {
   // e.g. "  - refreshQuotes\n    description:" → "  - id: refreshQuotes\n    description:"
   // Only match lines under "actions:" where the list item is a bare word followed by description on next line
   s = s.replace(/^(\s+- )([a-zA-Z][\w-]*)\n(\s+description:)/gm, '$1id: $2\n$3');
+  // Fix common AI mistake: inline type descriptions with curly braces break YAML
+  // e.g. "financials: array of { businessId: string, ... }" → quote the whole value
+  // Match: `key: something { ... }` where the braces contain colons (which breaks YAML flow mapping)
+  s = s.replace(/^(\s+\w[\w.]*:\s*)(.+\{[^}]*:[^}]*\}.*)$/gm, (_match, prefix, value) => {
+    // Only quote if not already quoted
+    if (value.startsWith('"') || value.startsWith("'")) return _match;
+    return `${prefix}"${value.replace(/"/g, '\\"')}"`;
+  });
   return s;
 }
 
@@ -352,6 +360,13 @@ const validators: Record<string, ValidatorFn> = {
       if (!Array.isArray(p.actions) || (p.actions as unknown[]).length === 0) {
         errors.push('actions array is required and must not be empty');
       } else {
+        // Auto-assign script fields from action IDs if missing
+        // Common LLM pattern: YAML actions without script: field + bare JS code after YAML
+        for (const action of p.actions as Array<Record<string, unknown>>) {
+          if (!action.script && action.id) {
+            action.script = `actions/${action.id as string}.js`;
+          }
+        }
         for (const action of p.actions as Array<Record<string, unknown>>) {
           const pfx = `action "${action?.id || '?'}"`;
           if (!action?.id) errors.push(`${pfx}: missing id`);
@@ -379,10 +394,11 @@ const validators: Record<string, ValidatorFn> = {
       }
     }
 
-    // Check for action scripts — look for fenced JS blocks OR unfenced // actions/file.js comments
+    // Check for action scripts — look for fenced JS blocks, // actions/file.js comments, OR bare export default blocks
     const fencedJs = result.match(/```javascript[\s\S]*?```/gi) || [];
     const unfencedJs = result.match(/^\/\/\s*actions\/[\w-]+\.js\s*$/gm) || [];
-    const jsBlockCount = Math.max(fencedJs.length, unfencedJs.length);
+    const bareExportDefaults = result.match(/^export\s+default\s+async\s+function/gm) || [];
+    const jsBlockCount = Math.max(fencedJs.length, unfencedJs.length, bareExportDefaults.length);
     const actions = (parsed as Record<string, unknown>)?.actions;
     const actionCount = Array.isArray(actions) ? (actions as unknown[]).length : 0;
     if (actionCount > 0 && jsBlockCount === 0) {
