@@ -53,8 +53,9 @@ import { topologicalSort, executeHttpTest, executePlaywrightTest, isPlaywrightAv
 import type { TestReport, TestResult } from '../services/generator-testing.js';
 import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
-// @ts-ignore — frontend ESM module, no .d.ts
-import { buildComponentPrompt, buildBlueprintPrompt } from '../../public/js/services/generator-prompts.js';
+// DB-backed prompt builder — reads templates from SystemPromptRecord
+import { buildPrompt } from '../services/generator-prompts/index.js';
+import type { PromptRuntimeData, Blueprint, InterviewSpec, ComponentState } from '../services/generator-prompts/types.js';
 import { GeneratorDebugWriter } from '../services/generator-debug.js';
 
 export function generatorRouter(config: AimeatConfig, storage: Storage): Router {
@@ -1163,15 +1164,29 @@ window.__testRunning = true;
         })
         .map(r => r.value);
 
-      // Build the same prompt that UI shows to users
-      const prompt = buildComponentPrompt(
-        component.type,
-        component.label,
-        project.description || '',
-        blueprint,
-        completedComponents,
-        interviewSpec,
-      );
+      // Build prompt from DB templates — same source of truth as autopilot
+      const promptIdMap: Record<string, string> = {
+        csm: 'gen-csm', memory: 'gen-memory', translation: 'gen-translation',
+        extension: 'gen-extension-code', app: 'gen-app',
+      };
+      let promptId = promptIdMap[component.type];
+      if (component.type === 'cortex') {
+        const sub = (component as Record<string, unknown>).subtype as string || '';
+        if (sub === 'data') promptId = 'gen-cortex-data';
+        else if (sub === 'component') promptId = 'gen-cortex-component';
+        else if (sub === 'app-domain') promptId = 'gen-cortex-app-domain';
+        else promptId = 'gen-cortex-component';
+      }
+      if (!promptId) promptId = 'gen-extension-code';
+
+      const prompt = await buildPrompt(storage, promptId, {
+        blueprint: blueprint as unknown as Blueprint,
+        interviewSpec: interviewSpec as unknown as InterviewSpec,
+        componentLabel: component.label,
+        componentType: component.type,
+        completedComponents: completedComponents as unknown as ComponentState[],
+        projectDescription: project.description || '',
+      } as unknown as PromptRuntimeData);
 
       res.json(success(config.nodeId, {
         componentId,
@@ -1203,7 +1218,9 @@ window.__testRunning = true;
       const project = projectRec.value as { description?: string };
       const interviewSpec = interviewRec?.value ?? null;
 
-      const prompt = buildBlueprintPrompt(project.description || '', interviewSpec);
+      // Blueprint prompt — TODO: move to DB seed 'gen-blueprint'
+      // For now, use a simple template since the browser still builds this prompt locally
+      const prompt = `Generate a blueprint JSON for: ${project.description || ''}\n\nInterview spec provided separately.`;
 
       res.json(success(config.nodeId, { prompt }));
     }
