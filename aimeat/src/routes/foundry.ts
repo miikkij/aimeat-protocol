@@ -636,17 +636,46 @@ export function foundryRouter(config: AimeatConfig, storage: Storage): Router {
       const nonce = res.locals.cspNonce as string;
       const scripts: string[] = [];
       if (compType === 'cortex' && registeredAs) {
+        // Load ALL project cortex dependencies BEFORE the component under test.
+        // Component cortexes depend on data cortex + platform UI cortexes.
+        const allComps = await storage.listMemory(ownerGhii(req), { prefix: `foundry.${projectId}.component.`, visibility: 'owner' });
+        const platformCortexes = ['aimeat-ui-nav', 'aimeat-ui-layout', 'aimeat-ui-viewers', 'aimeat-ui-forms', 'aimeat-ui-dialogs', 'aimeat-charts'];
+        for (const pc of platformCortexes) {
+          scripts.push(`<script nonce="${nonce}" src="/v1/cortex/${pc}/libs/${pc}.js"></script>`);
+        }
+        const projectCortexes: Array<{ name: string; subtype: string }> = [];
+        for (const rec of allComps) {
+          const val = rec.value as Record<string, unknown>;
+          if (val.type === 'cortex' && val.registeredAs && val.registeredAs !== registeredAs) {
+            projectCortexes.push({ name: val.registeredAs as string, subtype: (val.subtype as string) || '' });
+          }
+        }
+        projectCortexes.sort((a, b) => (a.subtype === 'data' ? -1 : b.subtype === 'data' ? 1 : 0));
+        for (const pc of projectCortexes) {
+          scripts.push(`<script nonce="${nonce}" src="/v1/cortex/${pc.name}/libs/${pc.name}.js"></script>`);
+        }
         scripts.push(`<script nonce="${nonce}" src="/v1/cortex/${registeredAs}/libs/${registeredAs}.js"></script>`);
       }
       // App tests need the same cortex libraries the app uses
-      // Load all cortex libs that belong to this project
       if (compType === 'app') {
+        const platformCortexes = ['aimeat-ui-nav', 'aimeat-ui-layout', 'aimeat-ui-viewers', 'aimeat-ui-forms', 'aimeat-ui-dialogs', 'aimeat-charts'];
+        for (const pc of platformCortexes) {
+          scripts.push(`<script nonce="${nonce}" src="/v1/cortex/${pc}/libs/${pc}.js"></script>`);
+        }
         const allComps = await storage.listMemory(ownerGhii(req), { prefix: `foundry.${projectId}.component.`, visibility: 'owner' });
+        const cortexes: Array<{ name: string; subtype: string }> = [];
         for (const rec of allComps) {
           const val = rec.value as Record<string, unknown>;
           if (val.type === 'cortex' && val.registeredAs) {
-            scripts.push(`<script nonce="${nonce}" src="/v1/cortex/${val.registeredAs}/libs/${val.registeredAs}.js"></script>`);
+            cortexes.push({ name: val.registeredAs as string, subtype: (val.subtype as string) || '' });
           }
+        }
+        cortexes.sort((a, b) => {
+          const order = { data: 0, component: 1, feature: 1, 'app-domain': 2 };
+          return (order[a.subtype as keyof typeof order] ?? 1) - (order[b.subtype as keyof typeof order] ?? 1);
+        });
+        for (const c of cortexes) {
+          scripts.push(`<script nonce="${nonce}" src="/v1/cortex/${c.name}/libs/${c.name}.js"></script>`);
         }
       }
 

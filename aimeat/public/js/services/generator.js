@@ -322,6 +322,21 @@ export async function saveComponent(projectId, component) {
 export async function loadAllComponents(projectId) {
   const resp = await apiGet(`/v1/memory?prefix=generator.${projectId}.component.&owner_scope=true`);
   const items = resp?.data?.items || resp?.data?.entries || [];
+
+  // Load specs separately — they're stored in their own keys so they survive component state overwrites
+  const specResp = await apiGet(`/v1/memory?prefix=generator.${projectId}.spec.&owner_scope=true`);
+  const specItems = specResp?.data?.items || specResp?.data?.entries || [];
+  const specMap = {};
+  for (const si of specItems) {
+    const specPrefix = `generator.${projectId}.spec.`;
+    const compId = si.key.startsWith(specPrefix) ? si.key.slice(specPrefix.length) : null;
+    if (compId) {
+      try {
+        specMap[compId] = typeof si.value === 'string' ? JSON.parse(si.value) : si.value;
+      } catch { /* skip unparseable specs */ }
+    }
+  }
+
   return items.map(i => {
     const val = typeof i.value === 'string' ? JSON.parse(i.value) : i.value;
     // Ensure id is present — extract from memory key if missing (backend submit may omit it)
@@ -342,8 +357,37 @@ export async function loadAllComponents(projectId) {
         }
       } catch { /* not extracted JSON — already in raw format, leave as-is */ }
     }
+    // Merge spec from separate storage — spec survives component state overwrites
+    if (!val.spec && specMap[val.id]) {
+      val.spec = specMap[val.id];
+    }
     return { ...val, _version: i.version };
   });
+}
+
+/**
+ * Save a spec to its own memory key — independent of the component data.
+ * Specs are king: they must survive component state overwrites (manual registration,
+ * validation retries, code regeneration).
+ *
+ * @param {string} projectId
+ * @param {string} componentId
+ * @param {object} spec - The spec JSON
+ */
+export async function saveSpec(projectId, componentId, spec) {
+  const key = `generator.${projectId}.spec.${componentId}`;
+  try {
+    await apiPost('/v1/memory', { key, value: spec, visibility: 'owner' });
+  } catch (err) {
+    // If key already exists, update it
+    if (err?.status === 409 || err?.code === 'ALREADY_EXISTS') {
+      const fresh = await apiGet(`/v1/memory/${key}`);
+      const version = fresh?.data?.version ?? 1;
+      await apiPut(`/v1/memory/${key}`, { value: spec, visibility: 'owner', version });
+    } else {
+      throw err;
+    }
+  }
 }
 
 /* ── Agent Queue ─────────────────────────────────────── */

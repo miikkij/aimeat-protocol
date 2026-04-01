@@ -30,7 +30,7 @@
 import { t } from '/js/i18n.js';
 import { apiPost, apiDelete } from '/js/api.js';
 import {
-  loadAllComponents, saveComponent, registerComponent, writeProjectLog, writeDebugArtifact,
+  loadAllComponents, saveComponent, saveSpec, registerComponent, writeProjectLog, writeDebugArtifact,
 } from '/js/services/generator.js';
 import { buildComponentPrompt, buildFixPrompt, buildReflectionPrompt, buildFreshGenerationPrompt, buildTestPrompt } from '/js/services/generator-prompts.js';
 import { validateComponent } from '/js/services/generator-validate.js';
@@ -195,6 +195,9 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
           if (spec && !autopilotState.cancelledRef.current) {
             comp = { ...comp, spec };
             await saveComponent(projectId, comp);
+            // Save spec independently — survives component state overwrites (manual registration, etc.)
+            const bpComp = project.blueprint?.components?.find(c => c.label === comp.label);
+            await saveSpec(projectId, bpComp?.id || comp.id, spec);
           }
         }
         if (autopilotState.cancelledRef.current) break;
