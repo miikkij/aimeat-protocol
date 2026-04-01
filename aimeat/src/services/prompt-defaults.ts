@@ -31,6 +31,9 @@ export interface PromptSeedEntry {
   usedIn: string[];
 }
 
+// Generator-specific seeds are in a separate file to keep this file manageable
+import { GENERATOR_PROMPT_SEEDS } from './generator-prompt-seeds.js';
+
 export const PROMPT_SEEDS: PromptSeedEntry[] = [
 
   // ═══════════════════════════════════════════════════════════════════
@@ -1706,5 +1709,10 @@ This uses micro-memory — small key-value storage accessible via GET parameters
     variables: ['node_url'],
     usedIn: ['/v1/portal/prompts/platform-browse'],
   },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Generator prompts — imported from separate file
+  // ═══════════════════════════════════════════════════════════════════
+  ...GENERATOR_PROMPT_SEEDS,
 
 ];

@@ -17,6 +17,7 @@ const GROUP_NAMES = {
   portal: 'promptsGroupPortal',
   knowledge: 'promptsGroupKnowledge',
   platform: 'promptsGroupPlatform',
+  generator: 'promptsGroupGenerator',
 };
 
 export default function PromptsTab({ data, reload }) {

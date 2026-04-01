@@ -3382,6 +3382,7 @@
     "promptsGroupPortal": "Portal",
     "promptsGroupKnowledge": "Knowledge",
     "promptsGroupPlatform": "Platform",
+    "promptsGroupGenerator": "Generator",
     "promptsEdit": "Edit Prompt",
     "promptsContent": "Content",
     "promptsLocales": "Locale Overrides",
