@@ -16,10 +16,15 @@
 import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER, COMPONENT_TEMPLATES, EXTENSION_CONSUMPTION_RULES, summarizeExtensionApi, summarizeCortexApi } from './generator-prompts-base.js';
 import { formatSpecForPrompt } from './generator-specs.js';
 
-// Cortex prompt modules — eagerly loaded in browser, skipped on server.
+// Cortex prompt modules — eagerly loaded in browser, injected by server.
 // The modules are cached after first dynamic import.
 let _cortexModules = null;
 let _cortexModulesPromise = null;
+
+/** Server-side injection point for cortex modules (called by generator-autopilot.ts) */
+export function _setCortexModules(modules) {
+  _cortexModules = modules;
+}
 
 // Pre-load cortex modules in background — awaited in buildComponentPrompt if needed
 if (typeof window !== 'undefined') {
