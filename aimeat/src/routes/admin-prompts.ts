@@ -9,6 +9,35 @@ import { seedSystemPrompts } from '../services/prompt-seeder.js';
 export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
+  // POST /v1/admin/prompts/reset-group/:group — reset all prompts in a group to factory defaults
+  router.post('/v1/admin/prompts/reset-group/:group', requireAuth(), requireRole('operator'), async (req, res) => {
+    const group = req.params['group'] as string;
+    const seeds = PROMPT_SEEDS.filter(s => s.group === group);
+    if (seeds.length === 0) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No factory defaults for group "${group}"`));
+      return;
+    }
+    const now = new Date().toISOString();
+    const owner = req.auth!.owner;
+    let resetCount = 0;
+    for (const seed of seeds) {
+      const existing = await storage.getSystemPrompt(seed.id);
+      const newVersion = existing ? existing.version + 1 : 1;
+      await storage.upsertSystemPrompt({
+        id: seed.id, group: seed.group, name: seed.name, description: seed.description,
+        content: seed.content, active: true, variables: seed.variables, usedIn: seed.usedIn,
+        version: newVersion, updatedAt: now, updatedBy: owner,
+      });
+      await storage.createSystemPromptVersion({
+        promptId: seed.id, version: newVersion, content: seed.content,
+        changedBy: owner, changedAt: now, changeNote: `Reset group "${group}" to factory defaults`,
+      });
+      resetCount++;
+    }
+    const prompts = await storage.listSystemPrompts({ group });
+    res.json(success(config.nodeId, { prompts, resetCount, group }));
+  });
+
   // POST /v1/admin/prompts/reset-all — reset ALL prompts to factory defaults, clear version histories
   router.post('/v1/admin/prompts/reset-all', requireAuth(), requireRole('operator'), async (req, res) => {
     await storage.deleteAllSystemPrompts();
