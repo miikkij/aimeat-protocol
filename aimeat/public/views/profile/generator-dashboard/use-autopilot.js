@@ -196,8 +196,14 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
             comp = { ...comp, spec };
             await saveComponent(projectId, comp);
             // Save spec independently — survives component state overwrites (manual registration, etc.)
-            const bpComp = project.blueprint?.components?.find(c => c.label === comp.label);
-            await saveSpec(projectId, bpComp?.id || comp.id, spec);
+            try {
+              const bpComp = project.blueprint?.components?.find(c => c.label === comp.label);
+              await saveSpec(projectId, bpComp?.id || comp.id, spec);
+            } catch (specSaveErr) {
+              // Don't let spec persistence failure stop the pipeline
+              console.warn('[autopilot] saveSpec failed:', specSaveErr.message);
+              await writeProjectLog(projectId, 'spec_save_failed', { meta: { component: comp.label, error: specSaveErr.message, by: 'autopilot' } });
+            }
           }
         }
         if (autopilotState.cancelledRef.current) break;
@@ -215,8 +221,13 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
         try {
           content = await runWithAi(projectId, prompt);
         } catch (e) {
-          showToast?.(`${comp.label}: ${e.message}`, true);
-          break;
+          showToast?.(`${comp.label}: AI generation failed: ${e.message}`, true);
+          await writeProjectLog(projectId, 'component_ai_failed', { meta: { component: comp.label, type: comp.type, error: e.message, by: 'autopilot' } });
+          // Write whatever prompt we had to debug artifacts for diagnosis
+          writeDebugArtifact(projectId, cid, 'prompt', prompt);
+          writeDebugArtifact(projectId, cid, 'ai-error', e.message + '\n\nStack: ' + (e.stack || 'N/A'));
+          // Skip to next component — don't break the entire pipeline
+          continue;
         }
         if (autopilotState.cancelledRef.current) break;
         // Debug: write full AI exchange — sent prompt, raw response, processed result
