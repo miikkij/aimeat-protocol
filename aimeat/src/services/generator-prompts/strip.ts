@@ -50,6 +50,12 @@ export function stripCodeblock(text: string): string {
       return blocks.map(b => b.content).join('\n\n');
     }
 
+    // Fallback for odd fence count: ```yaml\n...YAML...\n```\n...unfenced JS...\n```
+    // Common LLM pattern: YAML wrapped in fences, JS unfenced, stray closing fence
+    // Strip all ``` lines and return the content
+    const stripped = trimmed.replace(/^```\w*\s*$/gm, '').trim();
+    if (stripped !== trimmed) return stripped;
+
     return trimmed;
   }
 
