@@ -54,7 +54,8 @@ export async function seedSystemPrompts(storage: Storage): Promise<void> {
       // Admin edits are preserved in version history and can be restored.
       if (seed.group === 'generator' && existing.content !== seed.content) {
         metaUpdate.content = seed.content;
-        logger.info(`Generator prompt "${seed.id}" content synced from seed`);
+        metaUpdate.updatedAt = new Date().toISOString();
+        logger.info(`Generator prompt "${seed.id}" content synced from seed (${seed.content.length} chars)`);
       }
 
       await storage.upsertSystemPrompt(metaUpdate as unknown as import('../storage/interface.js').SystemPromptRecord);
