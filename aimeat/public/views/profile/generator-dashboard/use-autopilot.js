@@ -194,13 +194,27 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
           spec = await generateSpec(comp, project, interviewSpec);
           if (spec && !autopilotState.cancelledRef.current) {
             comp = { ...comp, spec };
-            await saveComponent(projectId, comp);
-            // Save spec independently — survives component state overwrites (manual registration, etc.)
+            try {
+              await saveComponent(projectId, comp);
+            } catch (savErr) {
+              // 409 version conflict on spec save — retry with fresh version
+              console.warn('[autopilot] saveComponent after spec failed:', savErr.message, '— retrying with fresh data');
+              try {
+                const freshComps2 = await loadAllComponents(projectId);
+                const freshComp = freshComps2.find(c => c.id === cid);
+                if (freshComp) {
+                  comp = { ...freshComp, spec };
+                  await saveComponent(projectId, comp);
+                }
+              } catch (retryErr) {
+                console.warn('[autopilot] saveComponent retry also failed:', retryErr.message);
+              }
+            }
+            // Save spec independently — survives component state overwrites
             try {
               const bpComp = project.blueprint?.components?.find(c => c.label === comp.label);
               await saveSpec(projectId, bpComp?.id || comp.id, spec);
             } catch (specSaveErr) {
-              // Don't let spec persistence failure stop the pipeline
               console.warn('[autopilot] saveSpec failed:', specSaveErr.message);
               await writeProjectLog(projectId, 'spec_save_failed', { meta: { component: comp.label, error: specSaveErr.message, by: 'autopilot' } });
             }
@@ -209,13 +223,22 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
         if (autopilotState.cancelledRef.current) break;
 
         // Build prompt — spec flows as context if available
-        const latestComps = await loadAllComponents(projectId);
-        const completedComponents = latestComps.filter(c => c.status === 'done' && c.registeredAs);
-        const prompt = await buildComponentPrompt(
-          comp.type, comp.label,
-          project.description, project.blueprint, completedComponents,
-          interviewSpec,
-        );
+        let prompt;
+        try {
+          const latestComps = await loadAllComponents(projectId);
+          const completedComponents = latestComps.filter(c => c.status === 'done' && c.registeredAs);
+          prompt = await buildComponentPrompt(
+            comp.type, comp.label,
+            project.description, project.blueprint, completedComponents,
+            interviewSpec,
+          );
+        } catch (promptErr) {
+          // If prompt building fails (module load error, missing data), skip this component
+          showToast?.(`${comp.label}: Prompt build failed: ${promptErr.message}`, true);
+          await writeProjectLog(projectId, 'component_prompt_failed', { meta: { component: comp.label, type: comp.type, error: promptErr.message, by: 'autopilot' } });
+          writeDebugArtifact(projectId, cid, 'prompt-build-error', promptErr.message + '\n\nStack: ' + (promptErr.stack || 'N/A'));
+          continue;
+        }
         // Run AI
         let content;
         try {
