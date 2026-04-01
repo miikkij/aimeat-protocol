@@ -360,6 +360,21 @@ export function ComponentDetail({ component, project, components, projectId, int
     onUpdate();
   }
 
+  async function handleResetComponent() {
+    if (!confirm('Reset this component? All generated code, test results, and registration will be cleared.')) return;
+    try {
+      const resp = await session.fetch(`/v1/generator/${projectId}/components/${component.id}/reset`, { method: 'POST' });
+      if (resp.ok) {
+        showToast?.('Component reset — ready for regeneration');
+        onUpdate();
+      } else {
+        showToast?.('Reset failed: ' + (resp.error?.message || 'Unknown error'), true);
+      }
+    } catch (e) {
+      showToast?.('Reset failed: ' + e.message, true);
+    }
+  }
+
   async function handleCopyPrompt() {
     const fresh = await buildComponentPrompt(
       component.type, component.label,
@@ -619,6 +634,10 @@ export function ComponentDetail({ component, project, components, projectId, int
               ${registering ? '...' : (t('profile.generator.reregister'))}
             </button>
           `}
+          <button class="btn-ghost btn-sm" onClick=${handleResetComponent}
+            title="Reset this component to empty state for regeneration">
+            ↺ Reset
+          </button>
         </div>
       </div>
 

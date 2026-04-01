@@ -226,11 +226,22 @@ function resolveTranslation(data: PromptRuntimeData): Vars {
 }
 
 function resolveExtensionCode(data: PromptRuntimeData): Vars {
+  // Build explicit required action IDs from blueprint (prevents LLM from renaming them)
+  let requiredActions = '';
+  if (data.blueprint.testScenarios) {
+    const bpComp = data.blueprint.components?.find(c => c.type === 'extension');
+    if (bpComp) {
+      const actionIds = (data.blueprint.testScenarios || [])
+        .filter(ts => ts.component === bpComp.id)
+        .flatMap(ts => (ts.scenarios || []).map(s => s.action));
+      if (actionIds.length > 0) {
+        requiredActions = `\n## REQUIRED ACTION IDs (from blueprint — use these EXACT names)\n\n╔══════════════════════════════════════════════════════════════════════════╗\n║  Your actions array MUST use these EXACT id values. Do NOT rename them. ║\n╚══════════════════════════════════════════════════════════════════════════╝\n\n${actionIds.map(id => `- id: ${id}`).join('\n')}\n`;
+      }
+    }
+  }
   return {
     label: data.componentLabel || '',
-    // Don't set 'context' here — it's the AIMEAT_CONTEXT fragment, injected by index.ts
-    // Extension-specific data goes into spec_section + completed_context
-    spec_section: data.selfSpec ? formatSpec(data.selfSpec, 'YOUR SPEC — implement this contract exactly') : '',
+    spec_section: (data.selfSpec ? formatSpec(data.selfSpec, 'YOUR SPEC — implement this contract exactly') : '') + requiredActions,
     completed_context: formatCompletedContext(data.completedComponents),
   };
 }

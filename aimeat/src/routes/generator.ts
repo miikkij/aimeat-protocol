@@ -1030,6 +1030,55 @@ window.__testRunning = true;
     }
   );
 
+  // POST /v1/generator/:projectId/components/:componentId/reset — reset a component to empty state for regeneration
+  router.post('/v1/generator/:projectId/components/:componentId/reset',
+    requireAuth(),
+    requireRole('owner'),
+    async (req, res) => {
+      const gaii = ownerGhii(req);
+      const projectId = req.params['projectId'] as string;
+      const componentId = req.params['componentId'] as string;
+
+      const rec = await storage.getMemory(gaii, `generator.${projectId}.component.${componentId}`);
+      if (!rec) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Component not found'));
+        return;
+      }
+
+      const comp = rec.value as Record<string, unknown>;
+      const now = new Date().toISOString();
+
+      // Clear all generated content, keep only blueprint-derived fields (id, type, label, subtype)
+      const reset = {
+        id: comp.id,
+        type: comp.type,
+        label: comp.label,
+        subtype: comp.subtype,
+        status: 'pending',
+        // Clear generated fields
+        result: undefined,
+        spec: undefined,
+        registeredAs: undefined,
+        contextBundle: undefined,
+        testCode: undefined,
+        testResult: undefined,
+        validationErrors: undefined,
+        probeResults: undefined,
+        history: [...((comp.history as unknown[]) || []), { action: 'reset', at: now, by: 'user' }],
+      };
+
+      await storage.setMemory({
+        ...rec,
+        value: reset,
+        version: (rec.version ?? 1) + 1,
+        updatedAt: now,
+      });
+
+      emitChange('memory');
+      res.json(success(config.nodeId, { reset: true, componentId }));
+    }
+  );
+
   // POST /v1/generator/:projectId/log — write log entry to memory
   router.post('/v1/generator/:projectId/log',
     requireAuth(),
