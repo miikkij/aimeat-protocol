@@ -39,15 +39,24 @@ export async function seedSystemPrompts(storage: Storage): Promise<void> {
       });
       inserted++;
     } else {
-      // Update metadata only (usedIn, variables, name, description, group)
-      await storage.upsertSystemPrompt({
+      // Update metadata (usedIn, variables, name, description, group)
+      const metaUpdate: Record<string, unknown> = {
         ...existing,
         group: seed.group,
         name: seed.name,
         description: seed.description,
         variables: seed.variables,
         usedIn: seed.usedIn,
-      });
+      };
+
+      // For generator prompts at version 1 (never edited by admin): also update content.
+      // This allows fixing seed content bugs without requiring manual "Reset to factory default".
+      if (seed.group === 'generator' && existing.version === 1 && existing.content !== seed.content) {
+        (metaUpdate as { content: string }).content = seed.content;
+        logger.info(`Generator prompt "${seed.id}" content updated (was version 1, never edited)`);
+      }
+
+      await storage.upsertSystemPrompt(metaUpdate as typeof existing);
       updated++;
     }
   }
