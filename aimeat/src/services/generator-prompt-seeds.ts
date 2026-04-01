@@ -899,11 +899,6 @@ spec:
   version: "1.0.0"
   license: MIT
   components:
-    - type: prompt
-      name: domain-assistant
-      content: |
-        You are using the {{metadata.name}} cortex library.
-        Node URL: {{node_url}}
     - type: lib
       name: kebab-case-name
       filename: kebab-case-name.js

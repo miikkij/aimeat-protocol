@@ -72,7 +72,17 @@ async function internalFetch(config: AimeatConfig, path: string, jwt: string, op
   if (opts.body) fetchOpts.body = JSON.stringify(opts.body);
 
   const resp = await fetch(url, fetchOpts);
-  const json = await resp.json() as Record<string, unknown>;
+  const text = await resp.text();
+  let json: Record<string, unknown>;
+  try {
+    json = JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    log.error(`internalFetch ${opts.method || 'GET'} ${path} — non-JSON response (${resp.status}): ${text.slice(0, 500)}`);
+    return { ok: false, status: resp.status, data: null, error: { message: `Non-JSON response: ${text.slice(0, 200)}` } };
+  }
+  if (!resp.ok) {
+    log.warn(`internalFetch ${opts.method || 'GET'} ${path} — ${resp.status}: ${JSON.stringify(json.error || json).slice(0, 300)}`);
+  }
   return { ok: resp.ok, status: resp.status, data: json.data, error: json.error };
 }
 
@@ -380,15 +390,20 @@ export async function runAutopilot(
         // Use internal HTTP to register — reuses all existing validation/registration logic
         try {
           // Submit content first
-          await internalFetch(config, `/v1/generator/${projectId}/components/${cid}/submit`, jwt, {
+          const submitResp = await internalFetch(config, `/v1/generator/${projectId}/components/${cid}/submit`, jwt, {
             method: 'POST',
             body: { content, type: compType },
           });
+          if (!submitResp.ok) {
+            log.warn(`[${cid}] Submit failed (${submitResp.status}): ${JSON.stringify(submitResp.error)}`);
+            throw new Error(`Submit failed: ${JSON.stringify(submitResp.error)}`);
+          }
 
           // For types that have catalogue registration (CSM, MSM, Extension, App)
           if (['csm', 'msm', 'extension', 'app'].includes(compType)) {
             const regResp = await internalFetch(config, `/v1/generator/${projectId}/components/${cid}/register`, jwt, { method: 'POST' });
             if (!regResp.ok) {
+              log.warn(`[${cid}] Register failed (${regResp.status}): ${JSON.stringify(regResp.error)}`);
               throw new Error(`Registration failed: ${JSON.stringify(regResp.error)}`);
             }
           }
