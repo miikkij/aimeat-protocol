@@ -12,6 +12,7 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.2.0 — 2026-04-01 — Add temperature/top_p/max_tokens model parameters
  *   v1.1.0 — 2026-03-21 — Add provider type (openrouter/lmstudio/custom) support
  *   v1.0.0 — 2026-03-20 — Initial implementation
  */
@@ -88,7 +89,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
     requireAuth(), requireRole('owner'),
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
-      const { apiKey, model, reasoningModel, executionModel, autoRetry, maxRetries, provider, baseUrl } = req.body as {
+      const { apiKey, model, reasoningModel, executionModel, autoRetry, maxRetries, provider, baseUrl, temperature, top_p, max_tokens } = req.body as {
         apiKey?: string;
         model?: string;
         reasoningModel?: string;
@@ -97,6 +98,9 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         maxRetries?: unknown;
         provider?: string;
         baseUrl?: string;
+        temperature?: number;
+        top_p?: number;
+        max_tokens?: number;
       };
 
       // Resolve provider type
@@ -148,6 +152,10 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       if (executionModel !== undefined) prefs.executionModel = executionModel;
       if (autoRetry !== undefined) prefs.autoRetry = !!autoRetry;
       if (maxRetries !== undefined) prefs.maxRetries = Math.max(1, Math.min(10, Number(maxRetries) || 3));
+      // null = clear (use model default), number = set explicit value, undefined = don't change
+      if (temperature !== undefined) prefs.temperature = (temperature === null || isNaN(Number(temperature))) ? null : Math.max(0, Math.min(2, Number(temperature)));
+      if (top_p !== undefined) prefs.top_p = (top_p === null || isNaN(Number(top_p))) ? null : Math.max(0, Math.min(1, Number(top_p)));
+      if (max_tokens !== undefined) prefs.max_tokens = (max_tokens === null || isNaN(Number(max_tokens))) ? null : Math.max(1, Math.min(128000, Math.floor(Number(max_tokens))));
 
       await upsertMemory(gaii, 'openrouter.settings', prefs, ['openrouter', 'settings']);
 
@@ -175,6 +183,9 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         maxRetries: prefs.maxRetries ?? 3,
         provider: prefs.provider ?? 'openrouter',
         baseUrl: prefs.baseUrl ?? DEFAULT_BASE_URLS.openrouter,
+        temperature: prefs.temperature ?? null,
+        top_p: prefs.top_p ?? null,
+        max_tokens: prefs.max_tokens ?? null,
       }));
     });
 
@@ -350,10 +361,15 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         }
         const model = selectedModel;
 
-        const options = { temperature, top_p, max_tokens };
-        console.log(`[calibrator] OpenRouter call: model=${model}, promptLen=${prompt.length}, baseUrl=${baseUrl}, temp=${temperature ?? 'default'}`);
+        // Use per-request overrides, falling back to stored settings defaults (null = not set)
+        const options = {
+          temperature: temperature ?? (typeof prefs.temperature === 'number' ? prefs.temperature : undefined),
+          top_p: top_p ?? (typeof prefs.top_p === 'number' ? prefs.top_p : undefined),
+          max_tokens: max_tokens ?? (typeof prefs.max_tokens === 'number' ? prefs.max_tokens : undefined),
+        };
+        console.log(`[openrouter] call: model=${model}, promptLen=${prompt.length}, baseUrl=${baseUrl}, temp=${options.temperature ?? 'default'}, top_p=${options.top_p ?? 'default'}, max_tokens=${options.max_tokens ?? 'default'}`);
         const result = await complete(decryptedKey, model, prompt, systemPrompt, baseUrl, options);
-        console.log(`[calibrator] OpenRouter result: model=${result.model}, contentLen=${result.content.length}`);
+        console.log(`[openrouter] result: model=${result.model}, contentLen=${result.content.length}`);
         res.json(success(config.nodeId, result));
       } catch (e) {
         const status = (e as { status?: number }).status;

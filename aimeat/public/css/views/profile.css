@@ -956,6 +956,8 @@
 }
 .pf-gen-or-input:focus { outline: none; border-color: var(--accent, #E8564A); box-shadow: 0 0 0 3px rgba(232, 86, 74, 0.1); }
 .pf-gen-or-input-sm { max-width: 100px; }
+.pf-gen-or-param-row { display: flex; align-items: center; gap: 10px; }
+.pf-gen-or-param-hint { font-size: 0.8em; color: var(--text-dim, #888); white-space: nowrap; }
 .pf-gen-or-select {
   width: 100%;
   padding: 8px 12px;

@@ -8,6 +8,7 @@
  * @usage
  *   import { OpenRouterSettings, SettingsCollectionView } from './generator-settings.js';
  * @version-history
+ *   v1.1.0 — 2026-04-01 — Add temperature, top_p, max_tokens model parameter fields
  *   v1.0.0 — 2026-03-22 — Extracted from generator-tab.js (was inline in v5.1.0+)
  */
 import { h } from 'preact';
@@ -31,6 +32,9 @@ export function OpenRouterSettings({ onSettingsChange }) {
   const [maxRetries, setMaxRetries] = useState(3);
   const [provider, setProvider] = useState('openrouter');
   const [baseUrl, setBaseUrl] = useState('');
+  const [temperature, setTemperature] = useState('');
+  const [topP, setTopP] = useState('');
+  const [maxTokens, setMaxTokens] = useState('');
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState(null); // { text, error }
@@ -48,6 +52,9 @@ export function OpenRouterSettings({ onSettingsChange }) {
         setMaxRetries(resp.data.maxRetries || 3);
         setProvider(resp.data.provider || 'openrouter');
         setBaseUrl(resp.data.baseUrl || '');
+        if (resp.data.temperature != null) setTemperature(String(resp.data.temperature));
+        if (resp.data.top_p != null) setTopP(String(resp.data.top_p));
+        if (resp.data.max_tokens != null) setMaxTokens(String(resp.data.max_tokens));
         if (resp.data.hasApiKey) loadModels();
       }
     } catch { /* no settings yet */ }
@@ -81,6 +88,9 @@ export function OpenRouterSettings({ onSettingsChange }) {
     setSaving(true);
     try {
       const body = { model, autoRetry, maxRetries: parseInt(maxRetries) || 3, provider, baseUrl };
+      body.temperature = temperature !== '' ? parseFloat(temperature) : null;
+      body.top_p = topP !== '' ? parseFloat(topP) : null;
+      body.max_tokens = maxTokens !== '' ? parseInt(maxTokens) : null;
       if (apiKey) body.apiKey = apiKey;
       const resp = await apiPut('/v1/openrouter/settings', body);
       if (resp.ok === false) {
@@ -122,6 +132,9 @@ export function OpenRouterSettings({ onSettingsChange }) {
       setModels([]);
       setAutoRetry(false);
       setMaxRetries(3);
+      setTemperature('');
+      setTopP('');
+      setMaxTokens('');
       showMsg(t('profile.generator.openrouter.delete'));
     } catch (e) {
       showMsg(e.message, true);
@@ -232,6 +245,58 @@ export function OpenRouterSettings({ onSettingsChange }) {
               />
             </div>
           `}
+
+          <!-- Model Parameters -->
+          <div class="pf-gen-or-field">
+            <label class="pf-gen-or-label">${t('profile.generator.openrouter.temperature')}</label>
+            <div class="pf-gen-or-param-row">
+              <input
+                type="number"
+                class="pf-gen-or-input pf-gen-or-input-sm"
+                min="0"
+                max="2"
+                step="0.1"
+                placeholder="default"
+                value=${temperature}
+                onInput=${e => setTemperature(e.target.value)}
+              />
+              <span class="pf-gen-or-param-hint">${t('profile.generator.openrouter.temperature_hint')}</span>
+            </div>
+          </div>
+
+          <div class="pf-gen-or-field">
+            <label class="pf-gen-or-label">${t('profile.generator.openrouter.topP')}</label>
+            <div class="pf-gen-or-param-row">
+              <input
+                type="number"
+                class="pf-gen-or-input pf-gen-or-input-sm"
+                min="0"
+                max="1"
+                step="0.05"
+                placeholder="default"
+                value=${topP}
+                onInput=${e => setTopP(e.target.value)}
+              />
+              <span class="pf-gen-or-param-hint">${t('profile.generator.openrouter.topP_hint')}</span>
+            </div>
+          </div>
+
+          <div class="pf-gen-or-field">
+            <label class="pf-gen-or-label">${t('profile.generator.openrouter.maxTokens')}</label>
+            <div class="pf-gen-or-param-row">
+              <input
+                type="number"
+                class="pf-gen-or-input pf-gen-or-input-sm"
+                min="256"
+                max="128000"
+                step="256"
+                placeholder="default"
+                value=${maxTokens}
+                onInput=${e => setMaxTokens(e.target.value)}
+              />
+              <span class="pf-gen-or-param-hint">${t('profile.generator.openrouter.maxTokens_hint')}</span>
+            </div>
+          </div>
 
           <!-- Message -->
           ${message && html`
