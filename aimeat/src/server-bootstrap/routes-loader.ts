@@ -72,6 +72,7 @@ import { adminExtensionsRouter } from '../routes/admin-extensions.js';
 import { adminPromptsRouter } from '../routes/admin-prompts.js';
 import { statsRouter } from '../routes/stats.js';
 import { generatorRouter } from '../routes/generator.js';
+import { generatorAutopilotRouter } from '../routes/generator-autopilot.js';
 import { foundryRouter } from '../routes/foundry.js';
 import { calibratorRouter } from '../routes/calibrator.js';
 import { openrouterRouter } from '../routes/openrouter.js';
@@ -181,6 +182,7 @@ export function mountRoutes(
   app.use(memoryRouter(config, storage, stats, notifyDirectoryChange, peers));
   if (config.generatorEnabled) {
     app.use(generatorRouter(config, storage));   // Agent-driven service generator
+    app.use(generatorAutopilotRouter(config, storage)); // Backend autopilot for generator
   }
   if (config.foundryEnabled) {
     app.use(foundryRouter(config, storage));     // Prompt-driven service builder
