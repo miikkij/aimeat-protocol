@@ -573,7 +573,10 @@ function resolveFreshGeneration(data: PromptRuntimeData): Vars {
   const trace = (data.testContext?.trace as Array<Record<string, string>>) || [];
   if (trace.length > 0) {
     testTrace = '\n\n## ACTUAL API RESPONSES (use these exact data shapes)\n\n';
-    for (const t of trace) testTrace += `[${t.status}] ${t.fn}(${t.args})\n  → ${t.result}\n\n`;
+    for (const t of trace) {
+      const result = t.result && t.result.length > 2000 ? t.result.slice(0, 2000) + '... [truncated]' : t.result;
+      testTrace += `[${t.status}] ${t.fn}(${t.args})\n  → ${result}\n\n`;
+    }
   }
   return {
     original_prompt: data.originalPrompt || '',
@@ -622,7 +625,9 @@ function buildTestContextSection(testContext: Record<string, unknown>): string {
     section += 'These are the real responses from every API call during the test.\n';
     section += 'Study these carefully to understand the actual data shapes before fixing.\n\n';
     for (const t of trace) {
-      section += `[${t.status}] ${t.fn}(${t.args})\n  → ${t.result}\n\n`;
+      // Truncate large responses (PRH API can return 200KB+ for search results)
+      const result = t.result && t.result.length > 2000 ? t.result.slice(0, 2000) + '... [truncated]' : t.result;
+      section += `[${t.status}] ${t.fn}(${t.args})\n  → ${result}\n\n`;
     }
   }
   const depResults = testContext.dependencyResults as Array<Record<string, string>> | undefined;
