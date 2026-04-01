@@ -19,6 +19,7 @@ import { decrypt } from './encryption.js';
 import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
 import { GeneratorDebugWriter } from './generator-debug.js';
+import { issueJWT } from '../auth/jwt.js';
 
 const log = { info: (m: string) => logger.info(m), warn: (m: string) => logger.warn(m), error: (m: string) => logger.error(m) };
 
@@ -92,7 +93,7 @@ export async function runAutopilot(
   projectId: string,
   ownerGhii: string,
   ownerName: string,
-  jwt: string,
+  _jwt: string,
   config: AimeatConfig,
   storage: Storage,
 ): Promise<void> {
@@ -102,7 +103,17 @@ export async function runAutopilot(
     throw new Error('Autopilot already running for this project');
   }
 
-  // Prompt modules are now TypeScript imports — no async loading needed
+  // Mint our own internal JWT — don't depend on the browser's token.
+  // The frontend JWT could expire or get revoked during long-running pipelines.
+  // 4-hour TTL, owner role, wildcard scopes — this is a trusted server-side process.
+  const jwt = await issueJWT({
+    sub: ownerName,
+    owner: ownerName,
+    node: config.nodeId,
+    roles: ['owner'],
+    scopes: ['*'],
+  }, 4 * 60 * 60); // 4 hours
+  log.info(`Autopilot minted internal JWT for ${ownerName} (4h TTL)`);
 
   // Read project data
   const projectRec = await storage.getMemory(ownerGhii, `generator.${projectId}.project`);
