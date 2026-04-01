@@ -164,6 +164,7 @@ const validVars = new Set([
   'extension_name', 'spec_actions',
   'lib_name', 'wraps_extension', 'spec_methods',
   'app_domain_spec', 'style',
+  'cortex_script_loads', 'cortex_instructions', 'translation_keys_section',
 ]);
 
 for (const seed of GENERATOR_PROMPT_SEEDS) {
@@ -230,7 +231,9 @@ if (appSeed) {
     label: 'PRH App',
     app_domain_spec: '## App Domain Spec',
     style: 'professional',
-    translation_keys: '`app.title`',
+    translation_keys_section: '## Translation keys\n- `app.title`',
+    cortex_script_loads: '    await loadScript(\'/v1/cortex/prh-data/libs/prh-data.js\');',
+    cortex_instructions: '## CORTEX\nUse AIMEAT.prhData.search()',
     html_entity_rules: '[HTML ENTITY RULES]',
   });
   const remaining = resolved.match(/\{\{(\w+)\}\}/g) || [];

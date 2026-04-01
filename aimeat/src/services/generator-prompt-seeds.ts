@@ -1231,6 +1231,7 @@ The app runs on the SAME ORIGIN as the AIMEAT node. Use relative API paths (e.g.
 
 ### Library setup (copy this exactly — load BOTH libraries):
 \\\`\\\`\\\`javascript
+// Load AIMEAT libraries — auth handles login/JWT, data handles memory API
 function loadScript(src) {
   return new Promise((resolve, reject) => {
     const s = document.createElement('script');
@@ -1243,12 +1244,14 @@ async function boot() {
   try {
     await loadScript('/v1/libs/aimeat-auth.js');
     await loadScript('/v1/libs/aimeat-data.js');
+    // Platform UI libraries (pre-installed on every AIMEAT node)
     await loadScript('/v1/cortex/aimeat-ui-nav/libs/aimeat-ui-nav.js');
     await loadScript('/v1/cortex/aimeat-ui-layout/libs/aimeat-ui-layout.js');
     await loadScript('/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js');
     await loadScript('/v1/cortex/aimeat-ui-forms/libs/aimeat-ui-forms.js');
     await loadScript('/v1/cortex/aimeat-ui-dialogs/libs/aimeat-ui-dialogs.js');
-    // Load domain cortex libraries here
+    // Load domain cortex libraries here (added by resolver)
+{{cortex_script_loads}}
     AIMEAT.auth.mountLoginButton('#auth-container', {
       onLogin: () => startApp(),
       onLogout: () => location.reload(),
@@ -1256,28 +1259,94 @@ async function boot() {
     AIMEAT.auth.login().then(session => { if (session) startApp(); }).catch(() => {});
   } catch (err) {
     document.body.innerHTML = '<div style="padding:2rem;color:#ef4444;font-family:system-ui">'
-      + '<h2>Failed to load application</h2><p>' + err.message + '</p></div>';
+      + '<h2>Failed to load application</h2><p>' + err.message + '</p>'
+      + '<p>Make sure the AIMEAT node is running and accessible.</p></div>';
   }
 }
 boot();
 \\\`\\\`\\\`
 
-## Translation Keys Available
-{{translation_keys}}
+{{translation_keys_section}}
+
+{{cortex_instructions}}
+
+### AIMEAT.data API (memory read/write — handles auth and envelope automatically):
+\\\`\\\`\\\`javascript
+// Read YOUR OWN memory key — returns the stored value directly, or null
+const myData = await AIMEAT.data.get('my.settings');
+
+// Write a memory key (your own namespace)
+await AIMEAT.data.set('my.key', { count: 42 });
+
+// Delete your own memory key
+await AIMEAT.data.delete('my.key');
+\\\`\\\`\\\`
+
+### Reading EXTENSION-produced data (CRITICAL — most apps need this):
+Extensions store data in their OWN namespace (\`ext:{extension-name}\`).
+To read data that an extension wrote, use \`getPublic()\`:
+\\\`\\\`\\\`javascript
+// WRONG — this reads YOUR memory, not the extension's:
+const data = await AIMEAT.data.get('items.by-date.__index');  // returns null!
+
+// CORRECT — read from the extension's namespace:
+const data = await AIMEAT.data.getPublic('ext:my-collector-extension', 'items.by-date.__index');
+\\\`\\\`\\\`
+The first argument is the extension's memory owner: \`"ext:" + extensionName\` (the \`name\` field from the extension manifest metadata).
+Use this for ALL data produced by extensions (collected data, computed stats, caches, etc.).
+\`getPublic()\` returns the value directly (auto-unwraps), or null if not found.
 
 ### Reading TRANSLATIONS (stored in owner namespace by translation components):
+Translations are stored in the OWNER's namespace by the translation component during registration.
+The key format is: \`{service-name}.i18n.{locale}\` (e.g. \`my-service.i18n.fi\`).
 \\\`\\\`\\\`javascript
+// Read translations from OWNER namespace (the translation component stored them here):
 const fiStrings = await AIMEAT.data.get('my-service.i18n.fi') || await AIMEAT.data.get('i18n.fi') || {};
+const enStrings = await AIMEAT.data.get('my-service.i18n.en') || await AIMEAT.data.get('i18n.en') || {};
+\\\`\\\`\\\`
+Use AIMEAT.data.get() — this reads from the current user's namespace where translations live.
+If a cortex library has a getI18n(locale) method, use that instead (recommended).
+
+### Calling extension actions (use AIMEAT.auth session for authenticated fetch):
+
+\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557
+\u2551  CRITICAL: session.fetch() returns ALREADY-PARSED JSON, not Response.  \u2551
+\u2551  Do NOT call resp.json() \u2014 it will crash with "not a function".        \u2551
+\u2551  Access resp.ok, resp.data, resp.error directly.                       \u2551
+\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D
+
+\\\`\\\`\\\`javascript
+// Helper for extension calls (copy this EXACTLY):
+// ALL extension actions are POST — the backend only has router.post() routes
+async function extCall(extName, actionId, body = {}) {
+  const session = await AIMEAT.auth.login();
+  if (!session) throw new Error('Not logged in');
+  const url = '/v1/ext/' + extName + '/' + actionId;
+  const resp = await session.fetch(url, { method: 'POST', body: JSON.stringify(body) });
+  // resp is ALREADY parsed JSON — never call resp.json()
+  if (!resp.ok) throw new Error(resp.error?.message || 'Extension call failed');
+  return resp.data;  // unwrapped payload
+}
+
+// Usage:
+const results = await extCall('my-extension', 'search', { query: 'test' });
+const detail = await extCall('my-extension', 'getDetail', { id: 'abc-123' });
 \\\`\\\`\\\`
 
 ## CDN Libraries & Design Resources
 
+The AIMEAT app catalog allows external CDN scripts. Available libraries:
+
 | Library | Script Tag | Use for |
 |---------|-----------|---------|
-| Leaflet | \`<script src="https://unpkg.com/leaflet@1/dist/leaflet.js"></script>\` + CSS | Maps |
-| Chart.js | \`<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>\` | Charts |
+| Leaflet | \`<script src="https://unpkg.com/leaflet@1/dist/leaflet.js"></script>\` + CSS link: \`<link rel="stylesheet" href="https://unpkg.com/leaflet@1/dist/leaflet.css">\` | Maps, markers, geospatial |
+| Chart.js | \`<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>\` | Bar, line, pie, radar charts |
+| Motion | \`<script src="https://cdn.jsdelivr.net/npm/motion@11/dist/motion.js"></script>\` | Animations via \`Motion.animate(el, {x: 100}, {duration: 0.5})\` |
+| Phaser 3 | \`<script src="https://cdn.jsdelivr.net/npm/[email protected]/dist/phaser.min.js"></script>\` | Games, interactive canvas, physics |
 
 ### CSP (Content Security Policy) — the app HTML MUST include a meta tag
+
+AIMEAT enforces CSP headers. If your app loads CDN scripts/styles, you MUST add a \`<meta>\` tag:
 \\\`\\\`\\\`html
 <meta http-equiv="Content-Security-Policy" content="
   default-src 'self';
@@ -1285,16 +1354,23 @@ const fiStrings = await AIMEAT.data.get('my-service.i18n.fi') || await AIMEAT.da
   style-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://fonts.googleapis.com;
   img-src 'self' data: https: blob:;
   font-src 'self' https://fonts.gstatic.com;
-  connect-src 'self' https://*.tile.openstreetmap.org;
+  connect-src 'self' https://*.tile.openstreetmap.org https://cdn.jsdelivr.net https://unpkg.com;
 ">
 \\\`\\\`\\\`
+Only include CDN domains you actually use. Without this tag, CDN scripts will be BLOCKED silently.
+
+IMPORTANT: If your app uses Leaflet or any map library that loads tiles from external servers,
+you MUST add the tile server domain to \`connect-src\`. For OpenStreetMap: \`https://*.tile.openstreetmap.org\`.
+Without this, the map will appear but tiles will be blocked and it shows a grey/empty map.
+
+For UI inspiration, reference uiverse.io for fancy buttons, cards, toggles, and loaders (CSS-only patterns).
 
 ## CSS Design System
 
-Use CSS custom properties for ALL styling:
+Use CSS custom properties for ALL styling. Define a theme at the top, then use var() everywhere:
 \\\`\\\`\\\`css
 :root {
-  --color-primary: #3b82f6;
+  --color-primary: #3b82f6;      /* main action color — customize per project */
   --color-secondary: #64748b;
   --color-success: #22c55e;
   --color-warning: #f59e0b;
@@ -1305,56 +1381,88 @@ Use CSS custom properties for ALL styling:
   --color-text-dim: #64748b;
   --color-border: #e2e8f0;
   --radius: 8px;
+  --radius-lg: 12px;
   --spacing-xs: 4px;
   --spacing-sm: 8px;
   --spacing-md: 16px;
   --spacing-lg: 24px;
   --spacing-xl: 32px;
   --font-sans: system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
   --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
   --transition: 150ms ease;
 }
 \\\`\\\`\\\`
-Customize the palette based on the project domain and style preferences.
+
+NEVER use hardcoded hex colors in component styles. Always use var(--color-*).
+Customize the palette based on the project's domain and the style preferences from the spec.
 
 ## Auth UI Layout
+
+The #auth-container renders a login button and session bar at the top of the page.
+Reserve space for it in your layout — do not overlap or hide it:
 \\\`\\\`\\\`html
 <body>
-  <div id="auth-container"></div>
+  <div id="auth-container"></div>  <!-- AIMEAT login/session UI — always at top -->
   <header><!-- your app header --></header>
   <main id="app"><!-- your content --></main>
 </body>
 \\\`\\\`\\\`
 
 ## Rules
-- DO NOT add manual configuration fields for API URL or Bearer Token
-- ALL API paths MUST be relative (start with /)
-- Use \`await AIMEAT.auth.login()\` to restore session; if null, show "Sign in"
-- Vanilla JS, no build step
-- Clean, responsive UI with good mobile support
-- Call cortex init() on app start if cortex libraries are loaded
+- DO NOT add manual configuration fields for API URL, Bearer Token, or Instance ID
+- DO NOT use prompt() or manual token entry — the auth library handles everything
+- ALL API paths MUST be relative (start with /) — never use absolute URLs or NODE_URL
+- Use \`await AIMEAT.auth.login()\` to restore session from storage; if null, show a "Sign in" message. getSession() alone returns null until login() is called.
+- Use vanilla JS (no build step needed)
+- All dates displayed to users should be formatted from ISO 8601 strings (never store display-formatted dates)
+- Has a clean, responsive UI with good mobile support
+- Use CSS custom properties for theming where possible
+- Call cortex init() on app start if cortex libraries are loaded — it handles everything automatically
+- Focus on UX/UI — the cortex handles data access and initialization
 
 ## CRITICAL: Rendering API Data — Handle Nested Objects
+
+API responses often contain nested objects instead of plain strings. For example:
+- \`businessId: { value: "3323553-5", registrationDate: "2022-11-07" }\` — access \`.value\`
+- \`euId: { value: "FIFPRO.3323553-5", source: "1" }\` — access \`.value\`
+- \`website: { url: "www.example.com", registrationDate: "..." }\` — access \`.url\`
+- \`names: [{ name: "Company Oy", type: "1" }]\` — access \`[0].name\`
+
+\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557
+\u2551  NEVER render an object directly as text \u2014 it will show [object Object] \u2551
+\u2551  ALWAYS check: if (typeof val === 'object' && val !== null)             \u2551
+\u2551  Then access the appropriate sub-field (.value, .url, .name, etc.)      \u2551
+\u255A\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255D
+
+Helper pattern:
 \\\`\\\`\\\`javascript
 function displayValue(val) {
   if (val == null) return '-';
   if (typeof val === 'string') return val;
   if (typeof val === 'number' || typeof val === 'boolean') return String(val);
-  if (val.value) return val.value;
-  if (val.url) return val.url;
-  if (val.name) return val.name;
+  if (val.value) return val.value;  // { value: "..." } pattern
+  if (val.url) return val.url;      // { url: "..." } pattern
+  if (val.name) return val.name;    // { name: "..." } pattern
   if (Array.isArray(val)) return val.map(displayValue).join(', ');
-  return JSON.stringify(val);
+  return JSON.stringify(val);        // last resort — never [object Object]
 }
 \\\`\\\`\\\`
 
 ## CRITICAL: Empty-State Handling
-On first run, extension data does NOT exist yet. Show a friendly empty state.
-NEVER crash on null/undefined data.
 
-## Built-in Error Collector
+On first run, extension data does NOT exist yet. The app MUST show a friendly empty state:
+- Check every data response for null/empty before rendering
+- Show helpful messages: "No data yet — extensions will collect data on their next scheduled run"
+- NEVER crash on null/undefined data — always provide fallback UI
+
+## Built-in Error Collector (diagnostics)
+
+Add this error collector at the TOP of your main <script>, before any other code:
 \\\`\\\`\\\`javascript
+// Error collector — surfaces runtime errors in the UI for diagnostics
 (function() {
   var errors = [];
   window.onerror = function(msg, src, line, col) {
@@ -1372,10 +1480,12 @@ NEVER crash on null/undefined data.
   }
 })();
 \\\`\\\`\\\`
+This lets users see runtime errors without opening the browser console.
 
 {{html_entity_rules}}
 
 Return a complete HTML file with an app manifest comment at the top:
+
 \\\`\\\`\\\`html
 <!-- AIMEAT App Manifest
 name: kebab-case-name
@@ -1390,12 +1500,12 @@ entry: index.html
   <div id="auth-container"></div>
   <div id="app"></div>
   <script>
-    // Error collector + auth setup + API helper + app logic
+    // Auth setup + API helper + app logic here
   </script>
 </body>
 </html>
 \\\`\\\`\\\``,
-    variables: ['context', 'label', 'app_domain_spec', 'style', 'translation_keys', 'html_entity_rules'],
+    variables: ['context', 'label', 'app_domain_spec', 'style', 'translation_keys_section', 'cortex_script_loads', 'cortex_instructions', 'html_entity_rules'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
 

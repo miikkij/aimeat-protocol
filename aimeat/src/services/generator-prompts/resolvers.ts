@@ -264,15 +264,101 @@ function resolveCortexAppDomain(data: PromptRuntimeData): Vars {
 }
 
 function resolveApp(data: PromptRuntimeData): Vars {
-  // App gets ONLY the app-domain spec — nothing else
   const appDomainSpec = (data.completedComponents || [])
     .find(c => c.subtype === 'app-domain' && c.spec)?.spec;
+
+  // Build cortex script loads and instructions (matches browser buildComponentPrompt logic)
+  const cortexComponents = (data.completedComponents || []).filter(c => c.type === 'cortex');
+  let cortexScriptLoads = '';
+  let cortexInstructions = '';
+
+  if (cortexComponents.length > 0) {
+    const cortexLibs = cortexComponents.map(c => {
+      const libName = c.registeredAs || c.label;
+      return { name: libName, label: c.label, result: c.result };
+    });
+
+    cortexScriptLoads = cortexLibs.map(lib =>
+      `    await loadScript('/v1/cortex/${lib.name}/libs/${lib.name}.js');`
+    ).join('\n');
+
+    // Extract method names from cortex code
+    const extractedMethods: string[] = [];
+    for (const lib of cortexLibs) {
+      const libNameMatch = (lib.result as string)?.match?.(/const\s+LIB_NAME\s*=\s*['"]([^'"]+)['"]/);
+      const camelName = libNameMatch ? libNameMatch[1] : lib.name.replace(/-([a-z0-9])/g, (_: string, ch: string) => ch.toUpperCase());
+      const exportsMatch = (lib.result as string)?.match?.(/(?:const|let|var)\s+\w*[Ee]xport\w*\s*=\s*\{([\s\S]*?)\}/);
+      if (exportsMatch) {
+        const methods = exportsMatch[1].split(',').map((m: string) => m.trim().split(':')[0].trim()).filter(Boolean);
+        for (const m of methods) {
+          extractedMethods.push(`- \`AIMEAT.${camelName}.${m}()\``);
+        }
+      }
+    }
+
+    cortexInstructions = `
+## CORTEX LIBRARIES (use these — do NOT call extensions or memory directly)
+
+This project has Cortex libraries that wrap all extension APIs into clean domain methods.
+Load them via <script> tags and use their API.
+
+${cortexLibs.map(lib => `### ${lib.label}
+Load: \`<script src="/v1/cortex/${lib.name}/libs/${lib.name}.js"></script>\`
+`).join('\n')}
+
+${extractedMethods.length > 0 ? `### AVAILABLE CORTEX METHODS (extracted from actual code — use ONLY these):
+${extractedMethods.join('\n')}
+
+Do NOT call any method not in this list. Do NOT rename these methods.` : ''}
+
+RULES:
+- Call \`AIMEAT.{libName}.init()\` on app start (libName is camelCase of cortex name)
+- Use cortex methods for ALL data access — never call extensions or memory directly
+- NEVER call internal functions like callExt(), readExtMemory() — these are PRIVATE
+- NEVER build retry loops — show an error message on failure, do NOT auto-retry
+- Use EXACTLY the method names and return value shapes shown above
+
+### AIMEAT Platform UI Libraries (load BEFORE your domain cortex)
+
+\`\`\`html
+<script src="/v1/cortex/aimeat-ui-nav/libs/aimeat-ui-nav.js"></script>
+<script src="/v1/cortex/aimeat-ui-layout/libs/aimeat-ui-layout.js"></script>
+<script src="/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js"></script>
+<script src="/v1/cortex/aimeat-ui-forms/libs/aimeat-ui-forms.js"></script>
+<script src="/v1/cortex/aimeat-ui-dialogs/libs/aimeat-ui-dialogs.js"></script>
+\`\`\`
+
+Use these instead of raw HTML: \`Tabs\` for navigation, \`DataTable\` for tables, \`Input/Select/Toggle\` for forms, \`toast/Modal/Confirm\` for dialogs (never use native alert/confirm/prompt).
+`;
+  }
+
+  // Build translation keys section
+  const translationKeys = data.translationKeys || [];
+  let translationKeysSection = '';
+  if (translationKeys.length > 0) {
+    const sorted = [...translationKeys].sort();
+    translationKeysSection = `
+## AVAILABLE TRANSLATION KEYS (from registered translation components — use EXACTLY these)
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  Your app MUST use these EXACT keys when calling t(key, translations). ║
+║  Do NOT invent your own keys like "field.name" or "detail.addresses".  ║
+║  The translation components have ALREADY defined these keys.           ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+${sorted.map(k => '- \`' + k + '\`').join('\n')}
+
+Total: ${sorted.length} keys available. If you need a label, find the closest matching key from this list.
+`;
+  }
 
   return {
     label: data.componentLabel || '',
     app_domain_spec: appDomainSpec ? formatSpec(appDomainSpec, 'App-Domain Cortex Spec') : '',
     style: data.interviewSpec?.style ? `mood=${data.interviewSpec.style.mood || 'professional'}, layout=${data.interviewSpec.style.layout || 'tabbed'}` : 'professional',
-    translation_keys: (data.translationKeys || []).slice(0, 30).map(k => `\`${k}\``).join(', '),
+    cortex_script_loads: cortexScriptLoads,
+    cortex_instructions: cortexInstructions,
+    translation_keys_section: translationKeysSection,
   };
 }
 
