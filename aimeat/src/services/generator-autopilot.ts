@@ -385,12 +385,12 @@ export async function runAutopilot(
         }
 
         if (!vr.valid) {
-          log.warn(`[${cid}] Validation failed for ${compLabel} — skipping: ${vr.errors[0]}`);
+          log.error(`[${cid}] Validation failed for ${compLabel} — STOPPING pipeline: ${vr.errors[0]}`);
           comp = { ...comp, result: content, status: 'errors', validationErrors: vr.errors };
           await saveComp(comp);
           entry.status.progress.failed++;
           entry.status.componentResults.push({ id: cid, label: compLabel, status: 'validation_failed', error: vr.errors[0] });
-          continue;
+          break; // STOP — downstream components depend on this one
         }
 
         // ── REGISTER ──
@@ -494,10 +494,10 @@ export async function runAutopilot(
           log.info(`[${cid}] Registered: ${compLabel} as ${regName as string}`);
 
         } catch (regErr) {
-          log.warn(`[${cid}] Registration failed for ${compLabel}: ${(regErr as Error).message}`);
+          log.error(`[${cid}] Registration failed for ${compLabel} — STOPPING pipeline: ${(regErr as Error).message}`);
           entry.status.progress.failed++;
           entry.status.componentResults.push({ id: cid, label: compLabel, status: 'registration_failed', error: (regErr as Error).message });
-          continue;
+          break; // STOP — downstream components depend on this one
         }
 
         // ── ACTIVATE EXTENSION ──
@@ -587,10 +587,10 @@ export async function runAutopilot(
         emitChange('memory');
 
       } catch (componentErr) {
-        log.error(`[${cid}] Uncaught error processing ${compLabel}: ${(componentErr as Error).message}`);
+        log.error(`[${cid}] Uncaught error processing ${compLabel} — STOPPING pipeline: ${(componentErr as Error).message}`);
         entry.status.progress.failed++;
         entry.status.componentResults.push({ id: cid, label: compLabel, status: 'error', error: (componentErr as Error).message });
-        // Continue to next component
+        break; // STOP — don't continue with broken state
       }
     }
 

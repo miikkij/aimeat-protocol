@@ -99,9 +99,10 @@ export async function buildPrompt(
   // 5. Substitute and return
   const result = substituteVariables(record.content, allVars);
 
-  // Warn if unresolved variables remain
-  const unresolved = result.match(/\{\{[a-z_]+\}\}/g);
-  if (unresolved && unresolved.length > 0) {
+  // Warn if unresolved variables remain (except known cortex template vars that pass through)
+  const cortexPassThrough = new Set(['{{node_url}}', '{{metadata.name}}']);
+  const unresolved = (result.match(/\{\{[a-z_]+\}\}/g) || []).filter(v => !cortexPassThrough.has(v));
+  if (unresolved.length > 0) {
     logger.warn(`Prompt "${promptId}" has unresolved variables: ${unresolved.join(', ')}`);
   }
 

@@ -151,12 +151,23 @@ export async function registerExtension(content: string, ownerName: string, owne
     jsBlocks.push(match[1]!.trim());
   }
 
-  // Also handle unfenced format "// actions/<name>.js\n<code>" used by some generator outputs
-  const unfencedRegex = /^\/\/\s*actions\/([\w-]+\.js)\s*\n([\s\S]*?)(?=^\/\/\s*actions\/|$)/gm;
+  // Also handle unfenced format "// actions/<name>.js\n<code>" used by some generator outputs.
+  // Split by action markers instead of regex — the old regex used `$` with `m` flag which
+  // matched end-of-line instead of end-of-string, truncating each script to ~1 line.
   const unfencedBlocks: Array<{ name: string; code: string }> = [];
+  const actionMarkerRegex = /^\/\/\s*actions\/([\w-]+\.js)\s*$/gm;
+  const markers: Array<{ name: string; index: number }> = [];
   let um: RegExpExecArray | null;
-  while ((um = unfencedRegex.exec(content)) !== null) {
-    unfencedBlocks.push({ name: um[1]!, code: um[2]!.trim() });
+  while ((um = actionMarkerRegex.exec(content)) !== null) {
+    markers.push({ name: um[1]!, index: um.index + um[0].length });
+  }
+  for (let i = 0; i < markers.length; i++) {
+    const start = markers[i]!.index;
+    const end = i + 1 < markers.length
+      ? content.lastIndexOf('\n', content.indexOf(`// actions/${markers[i + 1]!.name}`, start))
+      : content.length;
+    const code = content.slice(start, end).trim();
+    if (code) unfencedBlocks.push({ name: markers[i]!.name, code });
   }
 
   // Extract just the YAML part (everything before the first JS block or comment)
