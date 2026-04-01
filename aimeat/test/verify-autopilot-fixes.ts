@@ -172,6 +172,8 @@ const validVars = new Set([
   'project_context', 'cortex_or_api_section', 'cortex_rules',
   // Fix prompt variables
   'type_constraints', 'test_context', 'previous_attempts', 'reflection_diagnosis',
+  // Reflection + fresh generation variables
+  'failed_code', 'pitfalls', 'test_trace',
   // Test prompt variables
   'golden_samples', 'test_scenarios', 'action_contracts',
   'cortex_methods',

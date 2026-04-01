@@ -314,6 +314,15 @@ export async function runAutopilot(
                 spec = JSON.parse(specText) as Record<string, unknown>;
                 debug.writeArtifact(cid, 'spec', JSON.stringify(spec, null, 2)).catch(() => {});
                 log.info(`[${cid}] Spec generated: ${spec.name as string}`);
+
+                // Validate spec structure (was imported but never called before)
+                if (compType === 'extension') {
+                  const sv = validateExtensionSpec(spec);
+                  if (!sv.valid) {
+                    log.warn(`[${cid}] Spec validation issues: ${sv.errors.join('; ')}`);
+                    // Don't reject — spec is still usable, just warn about missing fields
+                  }
+                }
               } catch {
                 log.warn(`[${cid}] Spec JSON parse failed — continuing without spec`);
                 spec = null;
@@ -532,6 +541,15 @@ export async function runAutopilot(
             await saveComp(comp);
             log.info(`[${cid}] Probed extension: ${probeResults.length} actions`);
 
+            // Check if ALL probes failed — means extension code is fundamentally broken
+            const probeFailCount = probeResults.filter((p: unknown) => (p as Record<string, unknown>).status !== 200).length;
+            if (probeResults.length > 0 && probeFailCount === probeResults.length) {
+              log.error(`[${cid}] ALL ${probeResults.length} probe actions failed — extension code is broken, STOPPING`);
+              entry.status.progress.failed++;
+              entry.status.componentResults.push({ id: cid, label: compLabel, status: 'probe_all_failed', error: `All ${probeResults.length} actions returned errors` });
+              break; // STOP — downstream components need working extension
+            }
+
             // Spec-vs-probe validation
             if (comp.spec && probeResults.length > 0) {
               const sv = validateSpecAgainstProbe(comp.spec as Record<string, unknown>, probeResults as unknown as ProbeResult[]);
@@ -581,12 +599,166 @@ export async function runAutopilot(
               method: 'POST',
               body: { testCode, environment: testEnvironment },
             });
-            const testResult = (testResp.data as Record<string, unknown>)?.result as Record<string, unknown>;
+            let testResult = (testResp.data as Record<string, unknown>)?.result as Record<string, unknown>;
             if (testResult) {
               comp = { ...comp, testCode, testResult };
               await saveComp(comp);
               log.info(`[${cid}] Test: ${testResult.status as string}`);
             }
+
+            // ── TEST→REFLECT→FIX→RE-REGISTER→RE-TEST cycle ──
+            // Matches browser flow: generator-detail.js handleFixFromTest
+            const maxTestFixRounds = 2;
+            let testFixRound = 0;
+            const previousAttempts: Array<Record<string, unknown>> = [];
+
+            while (testResult && testResult.status === 'failed' && testFixRound < maxTestFixRounds && !entry.cancelFlag) {
+              testFixRound++;
+              log.info(`[${cid}] Test failed — starting reflect+fix round ${testFixRound}/${maxTestFixRounds}`);
+
+              // Step 1: REFLECT — diagnose the failure (no code, just analysis)
+              let reflectionDiagnosis = '';
+              try {
+                const reflectionPrompt = await buildPrompt(storage, 'gen-reflection', {
+                  blueprint: blueprint as unknown as Blueprint,
+                  interviewSpec: interviewSpec as unknown as InterviewSpec,
+                  code: content,
+                  errors: (testResult.errors as string[]) || [],
+                  testContext: testResult as Record<string, unknown>,
+                } as unknown as PromptRuntimeData);
+                reflectionDiagnosis = await callLLM(reflectionPrompt);
+                log.info(`[${cid}] Reflection: ${reflectionDiagnosis.slice(0, 200)}`);
+              } catch (e) {
+                log.warn(`[${cid}] Reflection failed: ${(e as Error).message}`);
+              }
+
+              previousAttempts.push({
+                round: testFixRound,
+                diagnosis: reflectionDiagnosis.slice(0, 500),
+                errors: (testResult.errors as string[]) || [],
+              });
+
+              // Step 2: FIX — regenerate extension code with test context + diagnosis
+              const fixPrompt = await buildPrompt(storage, 'gen-fix', {
+                blueprint: blueprint as unknown as Blueprint,
+                interviewSpec: interviewSpec as unknown as InterviewSpec,
+                originalPrompt: prompt as string,
+                code: content,
+                errors: (testResult.errors as string[]) || [],
+                componentType: compType,
+                testContext: testResult as Record<string, unknown>,
+                previousAttempts,
+                reflectionDiagnosis,
+              } as unknown as PromptRuntimeData);
+              let fixedContent = await callLLM(fixPrompt);
+              fixedContent = stripCodeblock(fixedContent);
+
+              // Step 3: VALIDATE the fix
+              let fixVr = validateComponent(compType, fixedContent, blueprint as unknown as Blueprint);
+              if (!fixVr.valid) {
+                log.warn(`[${cid}] Fix round ${testFixRound} validation failed: ${fixVr.errors[0]}`);
+                // One more try
+                const fixPrompt2 = await buildPrompt(storage, 'gen-fix', {
+                  blueprint: blueprint as unknown as Blueprint,
+                  interviewSpec: interviewSpec as unknown as InterviewSpec,
+                  originalPrompt: prompt as string,
+                  code: fixedContent,
+                  errors: fixVr.errors,
+                  componentType: compType,
+                } as unknown as PromptRuntimeData);
+                fixedContent = await callLLM(fixPrompt2);
+                fixedContent = stripCodeblock(fixedContent);
+                fixVr = validateComponent(compType, fixedContent, blueprint as unknown as Blueprint);
+              }
+
+              if (!fixVr.valid) {
+                log.warn(`[${cid}] Fix round ${testFixRound} still invalid — skipping re-register`);
+                continue;
+              }
+
+              // Step 4: RE-REGISTER
+              content = fixedContent;
+              comp = { ...comp, result: content, status: 'done', validationErrors: [] };
+              await saveComp(comp);
+              try {
+                await internalFetch(config, `/v1/generator/${projectId}/components/${cid}/submit`, jwt, {
+                  method: 'POST', body: { content, type: compType },
+                });
+                if (['csm', 'msm', 'extension', 'app'].includes(compType)) {
+                  await internalFetch(config, `/v1/generator/${projectId}/components/${cid}/register`, jwt, { method: 'POST' });
+                }
+                if (compType === 'extension' && comp.registeredAs) {
+                  await internalFetch(config, `/v1/extensions/${encodeURIComponent(comp.registeredAs as string)}/activate`, jwt, { method: 'POST' });
+                }
+                log.info(`[${cid}] Re-registered after fix round ${testFixRound}`);
+              } catch (e) {
+                log.warn(`[${cid}] Re-registration failed: ${(e as Error).message}`);
+                break;
+              }
+
+              // Step 5: RE-TEST with the same test code
+              try {
+                const reTestResp = await internalFetch(config, `/v1/generator/${projectId}/test/${cid}`, jwt, {
+                  method: 'POST', body: { testCode, environment: testEnvironment },
+                });
+                testResult = (reTestResp.data as Record<string, unknown>)?.result as Record<string, unknown>;
+                if (testResult) {
+                  comp = { ...comp, testResult };
+                  await saveComp(comp);
+                  log.info(`[${cid}] Re-test round ${testFixRound}: ${testResult.status as string}`);
+                }
+              } catch (e) {
+                log.warn(`[${cid}] Re-test failed: ${(e as Error).message}`);
+                break;
+              }
+            }
+
+            // Final round: fresh generation if still failing
+            if (testResult && testResult.status === 'failed' && !entry.cancelFlag) {
+              log.info(`[${cid}] All fix rounds exhausted — trying fresh generation`);
+              try {
+                const freshPrompt = await buildPrompt(storage, 'gen-fresh-generation', {
+                  blueprint: blueprint as unknown as Blueprint,
+                  interviewSpec: interviewSpec as unknown as InterviewSpec,
+                  originalPrompt: prompt as string,
+                  previousAttempts,
+                  testContext: testResult as Record<string, unknown>,
+                } as unknown as PromptRuntimeData);
+                let freshContent = await callLLM(freshPrompt);
+                freshContent = stripCodeblock(freshContent);
+                const freshVr = validateComponent(compType, freshContent, blueprint as unknown as Blueprint);
+                if (freshVr.valid) {
+                  content = freshContent;
+                  comp = { ...comp, result: content, status: 'done' };
+                  await saveComp(comp);
+                  // Re-register fresh
+                  await internalFetch(config, `/v1/generator/${projectId}/components/${cid}/submit`, jwt, {
+                    method: 'POST', body: { content, type: compType },
+                  });
+                  if (['csm', 'msm', 'extension', 'app'].includes(compType)) {
+                    await internalFetch(config, `/v1/generator/${projectId}/components/${cid}/register`, jwt, { method: 'POST' });
+                  }
+                  if (compType === 'extension' && comp.registeredAs) {
+                    await internalFetch(config, `/v1/extensions/${encodeURIComponent(comp.registeredAs as string)}/activate`, jwt, { method: 'POST' });
+                  }
+                  log.info(`[${cid}] Fresh generation registered — re-testing`);
+                  const reTestResp = await internalFetch(config, `/v1/generator/${projectId}/test/${cid}`, jwt, {
+                    method: 'POST', body: { testCode, environment: testEnvironment },
+                  });
+                  testResult = (reTestResp.data as Record<string, unknown>)?.result as Record<string, unknown>;
+                  if (testResult) {
+                    comp = { ...comp, testResult };
+                    await saveComp(comp);
+                    log.info(`[${cid}] Fresh generation test: ${testResult.status as string}`);
+                  }
+                } else {
+                  log.warn(`[${cid}] Fresh generation validation failed: ${freshVr.errors[0]}`);
+                }
+              } catch (e) {
+                log.warn(`[${cid}] Fresh generation failed: ${(e as Error).message}`);
+              }
+            }
+
           } catch (e) {
             log.warn(`[${cid}] Test execution failed: ${(e as Error).message}`);
           }

@@ -43,6 +43,8 @@ export async function resolvePromptVars(
     'gen-cortex-component': resolveCortexComponent,
     'gen-cortex-app-domain': resolveCortexAppDomain,
     'gen-app': resolveApp,
+    'gen-reflection': resolveReflection,
+    'gen-fresh-generation': resolveFreshGeneration,
     'gen-fix': resolveFix,
     'gen-test-extension-spec': resolveTestExtensionSpec,
     'gen-test-cortex-spec': resolveTestCortexSpec,
@@ -528,6 +530,44 @@ const detail = await extCall('my-extension', 'getDetail', { id: 'abc-123' });
     cortex_or_api_section: cortexOrApiSection,
     cortex_rules: hasCortex ? '- Call cortex init() on app start — it handles everything automatically\n- Focus on UX/UI — the cortex handles data access and initialization' : '',
     translation_keys_section: translationKeysSection,
+  };
+}
+
+function resolveReflection(data: PromptRuntimeData): Vars {
+  // Match browser buildReflectionPrompt() from fix.js lines 59-78
+  const errors = (data.errors || []).map((e, i) => `${i + 1}. ${e}`).join('\n');
+  const testCtx = data.testContext ? buildTestContextSection(data.testContext) : '';
+  return {
+    failed_code: data.code || '',
+    errors,
+    test_context: testCtx,
+  };
+}
+
+function resolveFreshGeneration(data: PromptRuntimeData): Vars {
+  // Match browser buildFreshGenerationPrompt() from fix.js lines 139-170
+  let pitfalls = '';
+  if (data.previousAttempts && data.previousAttempts.length > 0) {
+    pitfalls = '\n\n## KNOWN PITFALLS (from previous failed attempts — AVOID ALL of these)\n\n';
+    const seen = new Set<string>();
+    for (const attempt of data.previousAttempts) {
+      const diag = attempt.diagnosis as string | undefined;
+      if (diag && !seen.has(diag)) { pitfalls += `- ${diag}\n`; seen.add(diag); }
+      for (const err of (attempt.errors as string[]) || []) {
+        if (!seen.has(err)) { pitfalls += `- Error to avoid: ${err}\n`; seen.add(err); }
+      }
+    }
+  }
+  let testTrace = '';
+  const trace = (data.testContext?.trace as Array<Record<string, string>>) || [];
+  if (trace.length > 0) {
+    testTrace = '\n\n## ACTUAL API RESPONSES (use these exact data shapes)\n\n';
+    for (const t of trace) testTrace += `[${t.status}] ${t.fn}(${t.args})\n  → ${t.result}\n\n`;
+  }
+  return {
+    original_prompt: data.originalPrompt || '',
+    pitfalls,
+    test_trace: testTrace,
   };
 }
 

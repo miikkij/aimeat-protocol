@@ -997,6 +997,49 @@ Translations and settings live in the OWNER namespace — the cortex reads them 
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
 
+  // ═══════════════════════════════════════════════════════════════════
+  // Reflection + Fresh generation — verbatim from generator-prompts-fix.js
+  // ═══════════════════════════════════════════════════════════════════
+
+  {
+    id: 'gen-reflection',
+    group: 'generator',
+    name: 'Reflection Diagnosis',
+    description: 'Diagnose failure without writing code — root cause analysis for fix prompts.',
+    content: `You are debugging a failed component. Your job is to DIAGNOSE the problem — do NOT write code.
+
+## Failed Code
+{{failed_code}}
+
+## Errors
+{{errors}}
+{{test_context}}
+
+## Your Task
+
+Analyze the errors and the ACTUAL API RESPONSES above. In 2-5 sentences, explain:
+1. What is the ROOT CAUSE of each error?
+2. What specific data shapes or field names does the code assume vs what the API actually returns?
+3. What specific lines or patterns in the code need to change?
+
+Be precise — reference exact field names from the API responses. Do NOT write code.`,
+    variables: ['failed_code', 'errors', 'test_context'],
+    usedIn: ['generator-autopilot'],
+  },
+
+  {
+    id: 'gen-fresh-generation',
+    group: 'generator',
+    name: 'Fresh Generation (Final Round)',
+    description: 'Regenerate from scratch with pitfalls from all previous rounds — no broken code shown.',
+    content: `{{original_prompt}}
+{{pitfalls}}{{test_trace}}
+IMPORTANT: This is a fresh generation. Do NOT reference any previous code.
+Study the ACTUAL API RESPONSES above carefully and match those exact data shapes.`,
+    variables: ['original_prompt', 'pitfalls', 'test_trace'],
+    usedIn: ['generator-autopilot'],
+  },
+
   {
     id: 'gen-fix',
     group: 'generator',
