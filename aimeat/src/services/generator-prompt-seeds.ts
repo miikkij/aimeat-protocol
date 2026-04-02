@@ -857,6 +857,15 @@ export default async function(ctx, input) {
   const data = JSON.parse(resp.text);  // ← correct: resp.text IS a string (for JSON APIs)
   // For XML/RSS: resp.text is already decoded Unicode — parse with regex or string methods
 
+  // ── IMPORTANT: API call patterns ──
+  // Use the EXACT base URL from the spec's dataSources section.
+  // Most open data APIs use QUERY PARAMETERS for all lookups:
+  //   CORRECT: baseUrl + '?businessId=' + encodeURIComponent(id)
+  //   WRONG:   baseUrl + '/' + id   ← path params often return 400/404
+  // Check the data source notes for the supported parameter names.
+  // If the data source URL ends with a collection name (e.g. /companies),
+  // it is a SEARCH endpoint — use query params, NOT path params.
+
   // ── Reading from EXTENSION'S OWN MEMORY (ctx.memory.get) ──
   // ctx.memory.get() returns a JS value directly — NEVER use JSON.parse
   const stored = await ctx.memory.get("my.key");
