@@ -190,7 +190,7 @@ Rules:
 - Component types: csm, msm, extension, app, memory, translation, cortex
 - IDs use format: {type}-{number} (e.g., csm-1, ext-1, app-1). ID prefixes can be short (ext-1) but the "type" field MUST be the full name: "extension" (not "ext").
 - Each component object has these fields: "id", "type", "label", "produces", "consumes"
-- Extension components may also have "schedules": array of { "action": "action-id", "cron": "cron-expression" }
+- Extension components may also have "schedules": array of { "action": "actionId", "cron": "cron-expression" }
 - Valid cron values: standard 5-field cron syntax OR the special value "@activate"
 - CRITICAL: cron expressions MUST have exactly 5 fields separated by spaces.
   CORRECT examples (copy these exactly):

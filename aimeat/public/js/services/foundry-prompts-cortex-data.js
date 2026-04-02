@@ -214,7 +214,7 @@ Second block — JavaScript library:
   // Public data access methods
   // ALWAYS null-check callExt results — it returns null on auth failure or network error
   async function methodName(params) {
-    var result = await callExt('action-id', { param: params });
+    var result = await callExt('myAction', { param: params });
     if (!result) return []; // Return safe fallback, NEVER crash
     return result;
   }

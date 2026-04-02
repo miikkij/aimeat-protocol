@@ -168,7 +168,7 @@ auth:
   param_name: ""
   env_var: ""
 actions:
-  - id: action-id
+  - id: actionId
     display_name: "Human Readable Action Name"
     description: "What this action does"
     endpoint:
@@ -316,7 +316,7 @@ YAML actions format — EVERY action MUST have "- id:" as the FIRST key:
   WRONG:   - myAction            (bare value — causes YAML parse error)
   WRONG:   - myAction:           (colon after name — causes YAML parse error)
 NEVER omit "id:" from any action entry. This is the #1 cause of validation failures.
-// actions/action-id.js
+// actions/myAction.js
 export default async function(ctx, input) {
   // ── Reading from EXTERNAL APIs (ctx.fetch) ──
   // ctx.fetch() returns { ok, status, text, headers } — text is a RAW string, parse it yourself
@@ -354,13 +354,13 @@ Each JavaScript file MUST start with a comment line: // actions/{filename}.js
 
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║  Most extensions are SINGLE-INSTANCE (no :instanceId in path).          ║
-║  Use: /v1/ext/{name}/action-id                                          ║
+║  Use: /v1/ext/{name}/actionId                                          ║
 ║  NEVER add :instanceId unless the blueprint explicitly requires          ║
 ║  multi-instance support (e.g., per-store, per-tenant separation).       ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 
-- Default (single-instance): \`path: /v1/ext/{name}/action-id\`
-- Multi-instance (only if needed): \`path: /v1/ext/{name}/:instanceId/action-id\`
+- Default (single-instance): \`path: /v1/ext/{name}/actionId\`
+- Multi-instance (only if needed): \`path: /v1/ext/{name}/:instanceId/actionId\`
 
 ## Scheduled Jobs (schedules section)
 
@@ -377,7 +377,7 @@ Format:
 \`\`\`yaml
 schedules:
   - id: unique-job-id
-    action: action-id-from-actions-list
+    action: actionId
     cron: "*/15 * * * *"
     description: "What this scheduled job does"
     instance_scope: false

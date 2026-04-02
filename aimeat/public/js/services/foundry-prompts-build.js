@@ -1180,7 +1180,7 @@ memory:
       schema: <inline JSON schema>
 
 actions:
-  - id: <action-id>
+  - id: <actionId>
     method: POST
     path: /<path>
     input: <JSON schema of input parameters>
@@ -1192,7 +1192,7 @@ actions:
     reads: [<memory-keys-read>]
     writes: [<memory-keys-written>]
     schedule: "<cron expression if scheduled>"
-    depends: [<other-action-ids-it-calls>]
+    depends: [<otherActionIds>]
 
 config:
   keys: [<config-memory-keys>]
@@ -1244,7 +1244,7 @@ methods:
   - name: <camelCaseMethodName>
     params: <JSON schema of parameters>
     returns: <JSON schema of return value — use EXACT field names from probe results>
-    calls: <extension-action-id>
+    calls: <extensionActionId>
   - name: <methodName>
     returns: <schema>
     reads: <memory-key>
@@ -1859,28 +1859,28 @@ metadata:
     timeout_ms: 30000
     max_api_calls: 500
 actions:
-  - id: <action-id>
+  - id: <actionId>
     description: "<from skeleton>"
     method: POST
     path: /v1/ext/<extension-name>/<action-path-from-skeleton>
     auth: required
     input: <schema>
     output: <schema>
-    script: <action-id>.js
+    script: <actionId>.js
   # ... repeat for EVERY action from the skeleton
 schedules:
   - id: <schedule-id>
-    action: <action-id>
+    action: <actionId>
     cron: "<expression>"
     description: "<what it does>"
     instance_scope: false
     input: {}
 \`\`\`
 
-Then one fenced JS block per action (use \`// actions/<action-id>.js\` comment):
+Then one fenced JS block per action (use \`// actions/<actionId>.js\` comment):
 
 \`\`\`javascript
-// actions/<action-id>.js
+// actions/<actionId>.js
 export default async function(ctx, input) {
   // EXACT code from the unit implementation above — do NOT modify
 }

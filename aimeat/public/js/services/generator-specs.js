@@ -118,10 +118,10 @@ Return ONLY valid JSON. No markdown fences, no explanation text.
   "description": "<one-line: what this extension provides as a platform capability>",
   "actions": [
     {
-      "id": "<action-id>",
+      "id": "<actionId>",
       "description": "<what this action does>",
       "method": "POST",
-      "path": "/v1/ext/<name>/<action-id>",
+      "path": "/v1/ext/<name>/<actionId>",
       "input": { "<param>": "<type and description>" },
       "output": { "<field>": "<type>" },
       "example": {
@@ -140,7 +140,7 @@ Return ONLY valid JSON. No markdown fences, no explanation text.
     }
   ],
   "schedules": [
-    { "id": "<id>", "action": "<action-id>", "cron": "<cron or @activate>", "description": "<what>" }
+    { "id": "<id>", "action": "<actionId>", "cron": "<cron or @activate>", "description": "<what>" }
   ],
   "config": {
     "<key>": "<type — description>"

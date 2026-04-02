@@ -541,10 +541,10 @@ Return ONLY valid JSON. No markdown fences, no explanation text.
   "description": "<one-line: what this extension provides>",
   "actions": [
     {
-      "id": "<action-id>",
+      "id": "<actionId>",
       "description": "<what this action does>",
       "method": "POST",
-      "path": "/v1/ext/<name>/<action-id>",
+      "path": "/v1/ext/<name>/<actionId>",
       "input": { "<param>": "<type and description>" },
       "output": { "<field>": "<type>" },
       "example": {
@@ -558,7 +558,7 @@ Return ONLY valid JSON. No markdown fences, no explanation text.
     { "key": "<key>", "type": "<TypeScript type>", "description": "<what>", "example": "<value>" }
   ],
   "schedules": [
-    { "id": "<id>", "action": "<action-id>", "cron": "<expression>", "description": "<what>" }
+    { "id": "<id>", "action": "<actionId>", "cron": "<expression>", "description": "<what>" }
   ],
   "config": { "<key>": "<type — description>" },
   "dataSources": [
@@ -866,7 +866,7 @@ YAML actions format — EVERY action MUST have "- id:" as the FIRST key:
   WRONG:   - myAction            (bare value — causes YAML parse error)
   WRONG:   - myAction:           (colon after name — causes YAML parse error)
 NEVER omit "id:" from any action entry. This is the #1 cause of validation failures.
-// actions/action-id.js
+// actions/myAction.js
 export default async function(ctx, input) {
   // ── Reading from EXTERNAL APIs (ctx.fetch) ──
   // ctx.fetch() returns { ok, status, text, headers } — text is a RAW string, parse it yourself
@@ -913,13 +913,13 @@ Each JavaScript file MUST start with a comment line: // actions/{filename}.js
 
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║  Most extensions are SINGLE-INSTANCE (no :instanceId in path).          ║
-║  Use: /v1/ext/{name}/action-id                                          ║
+║  Use: /v1/ext/{name}/actionId                                            ║
 ║  NEVER add :instanceId unless the blueprint explicitly requires          ║
 ║  multi-instance support (e.g., per-store, per-tenant separation).       ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 
-- Default (single-instance): \\\`path: /v1/ext/{name}/action-id\\\`
-- Multi-instance (only if needed): \\\`path: /v1/ext/{name}/:instanceId/action-id\\\`
+- Default (single-instance): \\\`path: /v1/ext/{name}/actionId\\\`
+- Multi-instance (only if needed): \\\`path: /v1/ext/{name}/:instanceId/actionId\\\`
 
 ## Scheduled Jobs (schedules section)
 
@@ -936,7 +936,7 @@ Format:
 \\\`\\\`\\\`yaml
 schedules:
   - id: unique-job-id
-    action: action-id-from-actions-list
+    action: actionId
     cron: "*/15 * * * *"
     description: "What this scheduled job does"
     instance_scope: false
@@ -2174,7 +2174,7 @@ Rules:
 - Component types: csm, msm, extension, app, memory, translation, cortex
 - IDs use format: {type}-{number} (e.g., csm-1, ext-1, app-1). ID prefixes can be short (ext-1) but the "type" field MUST be the full name: "extension" (not "ext").
 - Each component object has these fields: "id", "type", "label", "produces", "consumes"
-- Extension components may also have "schedules": array of { "action": "action-id", "cron": "cron-expression" }
+- Extension components may also have "schedules": array of { "action": "actionId", "cron": "cron-expression" }
 - Valid cron values: standard 5-field cron syntax OR the special value "@activate"
 - CRITICAL: cron expressions MUST have exactly 5 fields separated by spaces.
   CORRECT examples (copy these exactly):
