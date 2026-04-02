@@ -1221,6 +1221,8 @@ Create a Data Cortex library for: {{label}}
 
 Project: {{project_description}}
 
+{{spec_section}}
+
 ## Goal
 
 Build a client-side JavaScript library (IIFE) that provides data access methods.
@@ -1354,7 +1356,7 @@ Second block — JavaScript library:
   AIMEAT[LIB_NAME] = exports;
 })(window.AIMEAT || (window.AIMEAT = {}));
 \\\`\\\`\\\``,
-    variables: ['disclaimer', 'label', 'project_description', 'structures', 'methods_to_export', 'extension_section'],
+    variables: ['disclaimer', 'label', 'project_description', 'spec_section', 'structures', 'methods_to_export', 'extension_section'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
 

@@ -301,12 +301,22 @@ function resolveCortexData(data: PromptRuntimeData): Vars {
     extensionSection = '\n## No Extension\n\nThis data cortex uses AIMEAT platform libraries directly (no extension needed).\n';
   }
 
+  // Inject spec name and libName so the code uses the EXACT names from the spec
+  const spec = data.selfSpec as Record<string, unknown> | undefined;
+  const specName = (spec?.name as string) || '';
+  const specLibName = (spec?.libName as string) || '';
+  let specSection = '';
+  if (spec) {
+    specSection = `\n## YOUR SPEC — use these EXACT names\n\n╔══════════════════════════════════════════════════════════════════════════╗\n║  metadata.name MUST be: ${specName}                                     \n║  LIB_NAME MUST be: ${specLibName}                                       \n║  These come from the spec. Do NOT use the component label as the name. ║\n╚══════════════════════════════════════════════════════════════════════════╝\n\nFull spec:\n\`\`\`json\n${JSON.stringify(spec, null, 2).slice(0, 3000)}\n\`\`\`\n`;
+  }
+
   return {
     label: data.componentLabel || warnFallback('gen-cortex-data', 'label', ''),
     project_description: data.projectDescription || warnFallback('gen-cortex-data', 'project_description', ''),
     structures: formatStructures(bp.dataModel?.structures),
     methods_to_export: methodsExport,
     extension_section: extensionSection,
+    spec_section: specSection,
   };
 }
 
