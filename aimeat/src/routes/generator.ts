@@ -402,10 +402,21 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       logger.info(`[generator-test] ${statusIcon} ${compLabel} (${compType}): ${result.status}${result.errors.length > 0 ? ' — ' + result.errors.length + ' errors' : ''}`, {
         projectId, componentId, environment: env, errors: result.errors.slice(0, 3),
       });
-      // Log trace for failed tests — shows every callExt/readExtMemory call with results and extracted shapes
+      // Log trace for failed tests — shows every callExt/readExtMemory call with extracted shapes
       if (result.status === 'failed' && result.trace && result.trace.length > 0) {
         for (const t of result.trace) {
-          logger.info(`[generator-test]   [${t.status}] ${t.fn}(${t.args}) → ${t.result}`);
+          const resultStr = t.result || 'null';
+          // If shape was extracted, log just the shape on one line
+          const shapeMatch = resultStr.match(/\[shape extracted from (\d+) chars\]/);
+          if (shapeMatch) {
+            // Extract the JSON shape (everything before the [shape extracted...] marker)
+            const shapeJson = resultStr.slice(0, resultStr.indexOf('\n[shape extracted')).trim();
+            // Log compact: fn → shape (one line)
+            const compactShape = shapeJson.replace(/\s+/g, ' ').slice(0, 500);
+            logger.info(`[generator-test]   [${t.status}] ${t.fn}(${t.args.slice(0, 60)}) → SHAPE: ${compactShape} [from ${shapeMatch[1]} chars]`);
+          } else {
+            logger.info(`[generator-test]   [${t.status}] ${t.fn}(${t.args.slice(0, 60)}) → ${resultStr.slice(0, 300)}`);
+          }
         }
       }
 

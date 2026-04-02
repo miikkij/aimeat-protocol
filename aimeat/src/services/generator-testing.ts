@@ -160,7 +160,8 @@ export async function executeHttpTest(
     // Large responses: extract shape instead of dumping raw data
     try {
       const parsed = typeof v === 'string' ? JSON.parse(v) : v;
-      return JSON.stringify(extractShape(parsed), null, 2) + '\n[shape extracted from ' + s.length + ' chars]';
+      const shape = JSON.stringify(extractShape(parsed), null, 2);
+      return shape + '\n[shape extracted from ' + s.length + ' chars]';
     } catch {
       return s.slice(0, 1000) + '... [truncated, ' + s.length + ' chars]';
     }
