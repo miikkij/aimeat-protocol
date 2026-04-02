@@ -402,10 +402,10 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       logger.info(`[generator-test] ${statusIcon} ${compLabel} (${compType}): ${result.status}${result.errors.length > 0 ? ' — ' + result.errors.length + ' errors' : ''}`, {
         projectId, componentId, environment: env, errors: result.errors.slice(0, 3),
       });
-      // Log trace for failed tests — shows every callExt/readExtMemory call with results
+      // Log trace for failed tests — shows every callExt/readExtMemory call with results and extracted shapes
       if (result.status === 'failed' && result.trace && result.trace.length > 0) {
         for (const t of result.trace) {
-          logger.info(`[generator-test]   ${t.fn}(${t.args}) → [${t.status}] ${t.result}`);
+          logger.info(`[generator-test]   [${t.status}] ${t.fn}(${t.args}) → ${t.result}`);
         }
       }
 
