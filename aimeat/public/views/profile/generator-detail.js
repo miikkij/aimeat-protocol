@@ -31,6 +31,7 @@ import {
 } from '/js/services/generator.js';
 import { buildComponentPrompt, buildFixPrompt, buildReflectionPrompt, buildTestPrompt } from '/js/services/generator-prompts.js';
 import { validateComponent } from '/js/services/generator-validate.js';
+import { validateExtensionSpec, validateDataApiSpec } from '/js/services/generator-spec-validate.js';
 import { verifyContract } from '/js/services/generator-contract.js';
 import { smokeTest } from '/js/services/generator-smoke.js';
 import { createBundle } from '/js/services/generator-context-bundle.js';
@@ -170,6 +171,7 @@ export function ComponentDetail({ component, project, components, projectId, int
   const [specPrompt, setSpecPrompt] = useState('');
   const [specResult, setSpecResult] = useState(component.spec ? JSON.stringify(component.spec, null, 2) : '');
   const [specAiRunning, setSpecAiRunning] = useState(false);
+  const [specValidation, setSpecValidation] = useState(null); // { valid, errors }
 
   // Test state
   const [testCode, setTestCode] = useState(component.testCode || '');
@@ -622,25 +624,67 @@ export function ComponentDetail({ component, project, components, projectId, int
             rows="8"
             placeholder="Paste the spec JSON here (from AI response)"
             value=${specResult}
-            onInput=${e => setSpecResult(e.target.value)}
+            onInput=${e => { setSpecResult(e.target.value); setSpecValidation(null); }}
           />
           <div class="pf-gen-actions">
-            <button class="btn-primary btn-sm" onClick=${async () => {
+            <button class="btn-primary btn-sm" onClick=${() => {
               try {
                 const parsed = JSON.parse(specResult);
-                await saveSpec(projectId, component.id, parsed);
-                showToast?.('Spec saved');
-                onUpdate();
+                // Validate spec structure
+                const sv = component.type === 'extension' ? validateExtensionSpec(parsed) : validateDataApiSpec(parsed);
+                // Also check blueprint action IDs
+                const bp = project?.blueprint;
+                if (bp && component.type === 'extension') {
+                  const specActionIds = new Set((parsed.actions || []).map(a => a.id));
+                  const bpActions = Object.keys(bp.dataModel?.actions || {})
+                    .filter(k => k.startsWith('ext:'))
+                    .map(k => k.replace('ext:', '').replace(/^[^/]+\//, ''));
+                  for (const expected of bpActions) {
+                    if (!specActionIds.has(expected)) {
+                      sv.valid = false;
+                      sv.errors.push('Blueprint declares action "' + expected + '" but it is missing from the spec');
+                    }
+                  }
+                }
+                setSpecValidation(sv);
+                if (sv.valid) showToast?.('Spec validation passed');
+                else showToast?.('Spec validation failed: ' + sv.errors[0], true);
               } catch (e) {
+                setSpecValidation({ valid: false, errors: ['Invalid JSON: ' + e.message] });
                 showToast?.('Invalid JSON: ' + e.message, true);
               }
             }} disabled=${!specResult.trim()}>
-              Save Spec
+              Validate Spec
             </button>
+            ${specValidation?.valid && html`
+              <button class="btn-success btn-sm" onClick=${async () => {
+                try {
+                  const parsed = JSON.parse(specResult);
+                  await saveSpec(projectId, component.id, parsed);
+                  showToast?.('Spec saved');
+                  onUpdate();
+                } catch (e) {
+                  showToast?.('Save failed: ' + e.message, true);
+                }
+              }}>
+                Save Spec
+              </button>
+            `}
             ${component.spec && html`
               <span class="text-caption" style="color:var(--success,#22c55e)">✓ Spec saved</span>
             `}
           </div>
+          ${specValidation && !specValidation.valid && html`
+            <div class="pf-gen-validation-errors">
+              <strong>Spec Validation Errors</strong>
+              <ul>${specValidation.errors.map(e => html`<li>${e}</li>`)}</ul>
+            </div>
+          `}
+          ${specValidation?.valid && html`
+            <div class="pf-gen-validation-passed">
+              <strong>✓ Spec Valid</strong>
+            </div>
+          `}
         </div>
       `}
 
