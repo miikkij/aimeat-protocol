@@ -527,9 +527,11 @@ export function ComponentDetail({ component, project, components, projectId, int
       const resp = await runComponentTest(projectId, component.id, testCode, testEnvironment);
       const tr = resp?.data?.result || resp?.result;
       setTestResult(tr);
-      // Save test code and result to component
+      // Save test code and result to component (strip trace to stay under memory size limit)
+      const trForStorage = tr ? { ...tr } : tr;
+      if (trForStorage?.trace) delete trForStorage.trace;
       await saveComponent(projectId, {
-        ...component, testCode, testPrompt: currentTestPrompt, testEnvironment, testResult: tr,
+        ...component, testCode, testPrompt: currentTestPrompt, testEnvironment, testResult: trForStorage,
         history: [...(component.history || []), { action: 'test_' + (tr?.status || 'unknown'), at: new Date().toISOString(), by: 'user', errors: tr?.errors }],
       });
       if (tr?.status === 'passed') {
@@ -576,8 +578,10 @@ export function ComponentDetail({ component, project, components, projectId, int
       const resp = await runComponentTest(projectId, component.id, aiCode, testEnvironment);
       const tr = resp?.data?.result || resp?.result;
       setTestResult(tr);
+      const trForStorage2 = tr ? { ...tr } : tr;
+      if (trForStorage2?.trace) delete trForStorage2.trace;
       await saveComponent(projectId, {
-        ...component, testCode: aiCode, testPrompt: currentTestPrompt, testEnvironment, testResult: tr,
+        ...component, testCode: aiCode, testPrompt: currentTestPrompt, testEnvironment, testResult: trForStorage2,
         history: [...(component.history || []), { action: 'test_' + (tr?.status || 'unknown'), at: new Date().toISOString(), by: 'user-ai', errors: tr?.errors }],
       });
       if (tr?.status === 'passed') {
