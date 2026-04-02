@@ -165,6 +165,12 @@ export function ComponentDetail({ component, project, components, projectId, int
   const prevCompIdRef = useRef(component.id);
   const [generatedPrompt, setGeneratedPrompt] = useState(null);
 
+  // Spec state (for extension and cortex types)
+  const hasSpec = ['extension', 'cortex'].includes(component.type);
+  const [specPrompt, setSpecPrompt] = useState('');
+  const [specResult, setSpecResult] = useState(component.spec ? JSON.stringify(component.spec, null, 2) : '');
+  const [specAiRunning, setSpecAiRunning] = useState(false);
+
   // Test state
   const [testCode, setTestCode] = useState(component.testCode || '');
   const [testRunning, setTestRunning] = useState(false);
@@ -206,6 +212,19 @@ export function ComponentDetail({ component, project, components, projectId, int
         project.description, project.blueprint, completedComps,
         interviewSpec,
       ).then(p => setGeneratedPrompt(p));
+    }
+    // Load spec prompt for extension/cortex types
+    if (hasSpec && !specPrompt) {
+      const s = session || window.AIMEAT?.auth?.getSession?.();
+      if (s) {
+        s.fetch(`/v1/generator/${projectId}/prompts/${component.id}?type=spec`).then(resp => {
+          if (resp.ok && resp.data?.prompt) setSpecPrompt(resp.data.prompt);
+        }).catch(() => {});
+      }
+    }
+    // Load existing spec result
+    if (component.spec && !specResult) {
+      setSpecResult(JSON.stringify(component.spec, null, 2));
     }
   }, [component.id, component.result, component.status, component.testCode, component.testResult]);
 
@@ -567,7 +586,65 @@ export function ComponentDetail({ component, project, components, projectId, int
         <span class="pf-gen-status-badge status-${component.status}">${component.status}</span>
       </div>
 
-      <!-- AI Chat Mode -->
+      <!-- SPEC (extension and cortex only) -->
+      ${hasSpec && html`
+        <div class="pf-gen-section">
+          <label>SPEC PROMPT</label>
+          <pre class="pf-gen-prompt-box" style="max-height:200px;overflow:auto;font-size:11px">${specPrompt || 'Loading spec prompt...'}</pre>
+          <div class="flex-row-wrap">
+            <button class="btn-outline btn-sm" onClick=${() => navigator.clipboard.writeText(specPrompt).then(() => showToast?.('Spec prompt copied'))}>
+              Copy Spec Prompt
+            </button>
+            ${orSettings?.hasApiKey && html`
+              <button class="btn-outline btn-sm pf-gen-or-run-btn ${specAiRunning ? 'pf-gen-or-running' : ''}"
+                onClick=${async () => {
+                  if (!specPrompt) return;
+                  setSpecAiRunning(true);
+                  try {
+                    const aiResult = await runWithAi(projectId, specPrompt);
+                    setSpecResult(aiResult);
+                    showToast?.('Spec generated');
+                  } catch (e) {
+                    showToast?.('Spec generation failed: ' + e.message, true);
+                  }
+                  setSpecAiRunning(false);
+                }}
+                disabled=${specAiRunning || !specPrompt}>
+                ${specAiRunning ? html`<span class="pf-gen-or-spinner"></span> Generating...` : 'Run with AI'}
+              </button>
+            `}
+          </div>
+        </div>
+        <div class="pf-gen-section">
+          <label>SPEC RESULT</label>
+          <textarea
+            class="pf-gen-result-area"
+            rows="8"
+            placeholder="Paste the spec JSON here (from AI response)"
+            value=${specResult}
+            onInput=${e => setSpecResult(e.target.value)}
+          />
+          <div class="pf-gen-actions">
+            <button class="btn-primary btn-sm" onClick=${async () => {
+              try {
+                const parsed = JSON.parse(specResult);
+                await saveSpec(projectId, component.id, parsed);
+                showToast?.('Spec saved');
+                onUpdate();
+              } catch (e) {
+                showToast?.('Invalid JSON: ' + e.message, true);
+              }
+            }} disabled=${!specResult.trim()}>
+              Save Spec
+            </button>
+            ${component.spec && html`
+              <span class="text-caption" style="color:var(--success,#22c55e)">✓ Spec saved</span>
+            `}
+          </div>
+        </div>
+      `}
+
+      <!-- CODE PROMPT (AI Chat Mode) -->
       <div class="pf-gen-section">
         <label>${t('profile.generator.prompt')}</label>
         <pre class="pf-gen-prompt-box">${prompt}</pre>

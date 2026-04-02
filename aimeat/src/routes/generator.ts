@@ -1224,28 +1224,53 @@ window.__testRunning = true;
         })
         .map(r => r.value);
 
-      // Build prompt from DB templates — same source of truth as autopilot
-      const promptIdMap: Record<string, string> = {
-        csm: 'gen-csm', memory: 'gen-memory', translation: 'gen-translation',
-        extension: 'gen-extension-code', app: 'gen-app',
-      };
-      let promptId = promptIdMap[component.type];
-      if (component.type === 'cortex') {
-        const sub = (component as Record<string, unknown>).subtype as string || '';
-        if (sub === 'data') promptId = 'gen-cortex-data';
-        else if (sub === 'component') promptId = 'gen-cortex-component';
-        else if (sub === 'app-domain') promptId = 'gen-cortex-app-domain';
-        else promptId = 'gen-cortex-component';
+      // Determine prompt type — code (default) or spec
+      const promptType = (req.query.type as string) || 'code';
+
+      let promptId: string;
+      if (promptType === 'spec') {
+        // Spec prompt — only for extension and cortex
+        if (component.type === 'extension') promptId = 'gen-extension-spec';
+        else if (component.type === 'cortex') {
+          const sub = (component as Record<string, unknown>).subtype as string || '';
+          if (sub === 'data') promptId = 'gen-data-api-spec';
+          else if (sub === 'component') promptId = 'gen-component-spec';
+          else if (sub === 'app-domain') promptId = 'gen-app-domain-spec';
+          else promptId = 'gen-component-spec';
+        } else {
+          res.status(400).json(error(config.nodeId, 'NO_SPEC', `Component type "${component.type}" does not use specs`));
+          return;
+        }
+      } else {
+        // Code prompt
+        const promptIdMap: Record<string, string> = {
+          csm: 'gen-csm', memory: 'gen-memory', translation: 'gen-translation',
+          extension: 'gen-extension-code', app: 'gen-app',
+        };
+        promptId = promptIdMap[component.type];
+        if (component.type === 'cortex') {
+          const sub = (component as Record<string, unknown>).subtype as string || '';
+          if (sub === 'data') promptId = 'gen-cortex-data';
+          else if (sub === 'component') promptId = 'gen-cortex-component';
+          else if (sub === 'app-domain') promptId = 'gen-cortex-app-domain';
+          else promptId = 'gen-cortex-component';
+        }
+        if (!promptId) promptId = 'gen-extension-code';
       }
-      if (!promptId) promptId = 'gen-extension-code';
+
+      // Load extension spec if available (for code prompts that reference it)
+      const specRec = await storage.getMemory(gaii, `generator.${projectId}.spec.${componentId}`);
+      const selfSpec = specRec?.value as Record<string, unknown> | undefined;
 
       const prompt = await buildPrompt(storage, promptId, {
         blueprint: blueprint as unknown as Blueprint,
         interviewSpec: interviewSpec as unknown as InterviewSpec,
+        blueprintComponent: component,
         componentLabel: component.label,
         componentType: component.type,
         completedComponents: completedComponents as unknown as ComponentState[],
         projectDescription: project.description || '',
+        selfSpec,
       } as unknown as PromptRuntimeData);
 
       res.json(success(config.nodeId, {
