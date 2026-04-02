@@ -262,12 +262,25 @@ export async function runAutopilot(
       const compType = (comp.type as string) || 'unknown';
 
       // Phase gate: only process types enabled for this run.
-      // Phase 1: csm, memory, translation only. Extension and beyond are disabled until Phase 1 is verified.
-      const ENABLED_TYPES = ['csm', 'memory', 'translation', 'extension'];
+      // Enable one phase at a time. Verify each before enabling the next.
+      const ENABLED_TYPES = ['csm', 'memory', 'translation', 'extension', 'cortex'];
+      // Cortex subtype gate: only cortex-data for now
+      const ENABLED_CORTEX_SUBTYPES = ['data'];
       if (!ENABLED_TYPES.includes(compType)) {
-        alog.info(`[${cid}] Phase gate: ${compType} not enabled yet — stopping pipeline after Phase 1`);
+        alog.info(`[${cid}] Phase gate: ${compType} not enabled yet — stopping pipeline`);
         entry.status.componentResults.push({ id: cid, label: compLabel, status: 'phase_gated' });
         break;
+      }
+
+      // Cortex subtype gate
+      if (compType === 'cortex') {
+        const bpC = ((blueprint.components as Array<Record<string, unknown>>) || []).find((c: Record<string, unknown>) => c.label === compLabel);
+        const sub = (bpC?.subtype as string) || '';
+        if (!ENABLED_CORTEX_SUBTYPES.includes(sub)) {
+          alog.info(`[${cid}] Cortex subtype gate: ${sub} not enabled yet — stopping pipeline (enabled: ${ENABLED_CORTEX_SUBTYPES.join(', ')})`);
+          entry.status.componentResults.push({ id: cid, label: compLabel, status: 'phase_gated' });
+          break;
+        }
       }
 
       updateStatus({ currentComponent: compLabel });
