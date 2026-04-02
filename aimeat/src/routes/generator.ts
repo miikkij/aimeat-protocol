@@ -1228,7 +1228,15 @@ window.__testRunning = true;
       const promptType = (req.query.type as string) || 'code';
 
       let promptId: string;
-      if (promptType === 'spec') {
+      if (promptType === 'test') {
+        // Test prompt
+        if (component.type === 'extension') promptId = 'gen-test-extension-spec';
+        else if (component.type === 'cortex') promptId = 'gen-test-cortex-spec';
+        else {
+          res.status(400).json(error(config.nodeId, 'NO_TEST', `Component type "${component.type}" does not use test prompts`));
+          return;
+        }
+      } else if (promptType === 'spec') {
         // Spec prompt — only for extension and cortex
         if (component.type === 'extension') promptId = 'gen-extension-spec';
         else if (component.type === 'cortex') {

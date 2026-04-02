@@ -472,9 +472,18 @@ export function ComponentDetail({ component, project, components, projectId, int
   const testableTypes = ['extension', 'cortex', 'app'];
   const isTestable = testableTypes.includes(component.type) && component.registeredAs;
   const testEnvironment = (component.type === 'cortex' || component.type === 'app') ? 'browser' : 'server';
-  const currentTestPrompt = isTestable
-    ? buildTestPrompt(component.type, component.result || result, component.label, component.registeredAs, project.blueprint, interviewSpec)
-    : null;
+  const [currentTestPrompt, setCurrentTestPrompt] = useState(null);
+
+  // Load test prompt from backend when component is testable
+  useEffect(() => {
+    if (isTestable) {
+      loadPromptFromBackend(projectId, component.id, 'test')
+        .then(p => setCurrentTestPrompt(p))
+        .catch(() => setCurrentTestPrompt(null));
+    } else {
+      setCurrentTestPrompt(null);
+    }
+  }, [component.id, component.registeredAs]);
 
   async function handleCopyTestPrompt() {
     if (!currentTestPrompt) return;
