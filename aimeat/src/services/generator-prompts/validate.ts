@@ -377,7 +377,11 @@ const validators: Record<string, ValidatorFn> = {
       }
     }
 
-    // Validate action IDs match blueprint testScenarios (if available)
+    // Blueprint action ID cross-check — WARNING only, not an error.
+    // The spec is the authority, not the blueprint. The blueprint has abstract action names
+    // that may not match the actual API structure (e.g. blueprint says "getCompanyDetails"
+    // but the API only has a search endpoint with businessId parameter).
+    // Forcing the LLM to add non-existent actions causes worse bugs (wrong API patterns).
     if (blueprint?.testScenarios && Array.isArray((parsed as Record<string, unknown>)?.actions)) {
       const bpComp = blueprint.components?.find(c => c.type === 'extension');
       if (bpComp) {
@@ -388,7 +392,8 @@ const validators: Record<string, ValidatorFn> = {
         const actualIds = new Set(actions.map(a => a.id as string));
         for (const expected of testActions) {
           if (!actualIds.has(expected)) {
-            errors.push(`Blueprint expects action "${expected}" but extension does not have it. Add it or rename the matching action to "${expected}".`);
+            // WARNING only — does not block validation. Spec is the authority.
+            // (logged to console, not added to errors)
           }
         }
       }

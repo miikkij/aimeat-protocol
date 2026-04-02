@@ -680,27 +680,40 @@ function resolveTestExtensionSpec(data: PromptRuntimeData): Vars {
     }
   }
 
-  // Test scenarios from blueprint — match browser buildTestPrompt() lines 59-103
+  // Test scenarios — prefer SPEC actions over blueprint scenarios.
+  // Blueprint scenarios have abstract input shapes (e.g. {query, type}) that don't match
+  // the actual extension input schema (e.g. {name, businessId}). The spec is authoritative.
   const bpComp = bp.components?.find(c => c.type === 'extension');
   let testScenarios = '';
 
-  // Memory keys this extension writes (for cleanup instructions) — browser lines 44-47, 67-71
+  // Memory keys for cleanup instructions
   const memoryProduces = (bpComp?.produces || [])
     .filter((p: string) => p.startsWith('memory:'))
     .map((p: string) => p.replace('memory:', ''));
 
-  if (bp.testScenarios && bpComp) {
+  if (memoryProduces.length > 0) {
+    testScenarios += `\n## State to Clean Up at Start\nThe extension writes to: ${memoryProduces.map(k => '`' + k + '`').join(', ')}\nBefore the first test scenario, clean stale data using the extension's OWN remove/delete actions via callExt.\nRead lists with readExtMemory, call remove for each item, then call init.\n`;
+  }
+
+  // Build scenarios from the SPEC (has correct action IDs and input schemas)
+  const specObj = data.selfSpec as Record<string, unknown> | undefined;
+  const specActions = (specObj?.actions || []) as Array<Record<string, unknown>>;
+
+  if (specActions.length > 0) {
+    testScenarios += '\n## Test Scenarios (from extension spec — use THESE exact action IDs and input shapes)\n\n';
+    testScenarios += specActions.map((a, i) => {
+      const example = a.example as Record<string, unknown> | undefined;
+      const inputStr = example?.input ? JSON.stringify(example.input) : JSON.stringify(a.input || {});
+      return `${i + 1}. **${a.id}** — ${a.description || ''}\n   Input: ${inputStr}\n   Expected output fields: ${JSON.stringify(a.output || {})}`;
+    }).join('\n\n');
+    testScenarios += '\n\nTest EVERY action above using the EXACT input from the spec examples.\nFor actions that call external APIs: check response shape (has the right fields). A single graceful error is OK, but if ALL external API actions return errors, FAIL the test.\nFor memory-only actions: assert return values match the spec output shape.\n';
+  } else if (bp.testScenarios && bpComp) {
+    // Fallback: use blueprint scenarios if no spec available
     const scenarios = (bp.testScenarios || []).filter(ts => ts.component === bpComp.id).flatMap(ts => ts.scenarios || []);
-
-    // State cleanup section — browser lines 67-71
-    if (memoryProduces.length > 0) {
-      testScenarios += `\n## State to Clean Up at Start\nThe extension writes to: ${memoryProduces.map(k => '`' + k + '`').join(', ')}\nBefore the first test scenario, clean stale data using the extension's OWN remove/delete actions via callExt.\nRead lists with readExtMemory, call remove for each item, then call init.\n`;
-    }
-
     if (scenarios.length > 0) {
       testScenarios += '\n## Test Scenarios (from blueprint)\n\n' +
         scenarios.map((s, i) => `${i + 1}. ${s.action}${s.type === 'external-api' ? ' [EXTERNAL API]' : ' [MEMORY]'}\n   Input: ${JSON.stringify(s.input)}\n   Expected: ${s.expect}`).join('\n\n') +
-        '\n\nTest EVERY scenario above.\nFor [EXTERNAL API]: check response shape (has the right fields). A single graceful error is OK, but if ALL external API actions return errors, FAIL the test — the extension is broken.\nFor [MEMORY]: assert return values match what the action code returns on success.\n';
+        '\n\nTest EVERY scenario above.\nFor [EXTERNAL API]: check response shape. A single graceful error is OK, but if ALL fail, FAIL the test.\nFor [MEMORY]: assert return values match what the action code returns on success.\n';
     }
   }
 

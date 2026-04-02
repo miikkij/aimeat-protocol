@@ -724,6 +724,8 @@ export async function runAutopilot(
                   await internalFetch(config, `/v1/extensions/${encodeURIComponent(comp.registeredAs as string)}/activate`, jwt, { method: 'POST' });
                 }
                 alog.info(`[${cid}] Re-registered after fix round ${testFixRound}`);
+                // Update debug artifacts with the actual registered code
+                debug.writeComponentGenerated(cid, content).catch(() => {});
               } catch (e) {
                 alog.warn(`[${cid}] Re-registration failed: ${(e as Error).message}`);
                 break;
@@ -890,15 +892,22 @@ function extractRegisteredName(type: string, content: string, vr: { extracted?: 
 }
 
 function buildProbeScenarios(blueprint: Record<string, unknown>, comp: Record<string, unknown>, content: string): Array<{ action: string; input: Record<string, unknown> }> {
-  const bpComp = ((blueprint.components as Array<Record<string, unknown>>) || []).find((c: Record<string, unknown>) => c.label === comp.label);
-  const bpScenarios = ((blueprint.testScenarios as Array<Record<string, unknown>>) || [])
-    .filter((ts: Record<string, unknown>) => ts.component === bpComp?.id)
-    .flatMap((ts: Record<string, unknown>) => (ts.scenarios as Array<{ action: string; input: Record<string, unknown> }>) || []);
-
-  if (bpScenarios.length > 0) {
-    return bpScenarios.map(s => ({ action: s.action, input: s.input || {} }));
+  // Prefer SPEC actions — they have correct IDs and example inputs matching the actual API.
+  // Blueprint scenarios have abstract inputs (e.g. {query, type}) that don't match the extension.
+  const spec = comp.spec as Record<string, unknown> | undefined;
+  if (spec) {
+    const specActions = (spec.actions || []) as Array<Record<string, unknown>>;
+    if (specActions.length > 0) {
+      return specActions
+        .filter(a => a.id && a.example)
+        .map(a => ({
+          action: a.id as string,
+          input: ((a.example as Record<string, unknown>)?.input as Record<string, unknown>) || {},
+        }));
+    }
   }
-  // Fallback: extract action names from YAML
+
+  // Fallback: extract action names from YAML content
   const actionMatches = [...content.matchAll(/- id:\s*"?([^\s"]+)/g)];
   return actionMatches.map(m => ({ action: m[1], input: {} }));
 }
