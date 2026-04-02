@@ -266,6 +266,232 @@ assert(freshVars.pitfalls?.includes('wrong API URL'), 'fresh: pitfalls has diagn
 assert(freshVars.pitfalls?.includes('missing action'), 'fresh: pitfalls has diagnosis from round 2');
 assert(freshVars.test_trace?.includes('ACTUAL API RESPONSES'), 'fresh: test_trace has content');
 
+// ═══ gen-data-api-spec resolver (cortex-data spec) ═══
+console.log('\n═══ gen-data-api-spec resolver ═══');
+
+// Simulate extension spec that would be available when cortex-data spec is generated
+const fakeExtSpec = {
+  name: 'prh-ytj',
+  actions: expectedActions.map(id => ({ id, description: 'test', method: 'POST', path: `/v1/ext/prh-ytj/${id}`, input: {}, output: {} })),
+};
+
+const dataApiSpecVars = await resolvePromptVars(
+  null as any,
+  'gen-data-api-spec',
+  {
+    blueprint,
+    extensionSpec: fakeExtSpec,
+  } as unknown as PromptRuntimeData,
+  {}
+);
+
+assert(
+  (dataApiSpecVars.extension_spec?.length || 0) > 100,
+  'extension_spec has real content (extension spec JSON)',
+  `${dataApiSpecVars.extension_spec?.length || 0} chars`
+);
+
+assert(
+  dataApiSpecVars.extension_spec?.includes('prh-ytj') || false,
+  'extension_spec contains extension name'
+);
+
+assert(
+  dataApiSpecVars.structures !== 'No structures defined.' && (dataApiSpecVars.structures?.length || 0) > 50,
+  'structures has real content',
+  `${dataApiSpecVars.structures?.length || 0} chars`
+);
+
+// ═══ gen-cortex-data resolver ═══
+console.log('\n═══ gen-cortex-data resolver ═══');
+
+// Create fake completedComponents with extension probeResults (like autopilot passes)
+const fakeCompletedComps = [{
+  type: 'extension',
+  registeredAs: 'prh-ytj',
+  contextBundle: {
+    registeredAs: 'prh-ytj',
+    actions: ['searchCompanies', 'getCompanyDetails', 'addToWatchlist'],
+    probeResults: [
+      { action: 'searchCompanies', input: { name: 'test' }, status: 200, response: { totalResults: 1, companies: [{ businessId: '3323553-5' }] } },
+    ],
+  },
+  probeResults: [
+    { action: 'searchCompanies', input: { name: 'test' }, status: 200, response: { totalResults: 1, companies: [{ businessId: '3323553-5' }] } },
+  ],
+}];
+
+const cortexDataVars = await resolvePromptVars(
+  null as any,
+  'gen-cortex-data',
+  {
+    blueprint,
+    interviewSpec,
+    componentLabel: 'Tietokerros - PRH datan käsittely',
+    projectDescription: 'PRH company data monitor',
+    completedComponents: fakeCompletedComps,
+  } as unknown as PromptRuntimeData,
+  {}
+);
+
+// label must have content
+assert(
+  (cortexDataVars.label?.length || 0) > 0,
+  'label has content',
+  cortexDataVars.label || 'EMPTY'
+);
+
+// project_description must have content
+assert(
+  (cortexDataVars.project_description?.length || 0) > 0,
+  'project_description has content',
+  cortexDataVars.project_description || 'EMPTY'
+);
+
+// structures must have real content
+assert(
+  cortexDataVars.structures !== 'No structures defined.' && (cortexDataVars.structures?.length || 0) > 50,
+  'structures has real content (NOT fallback)',
+  `${cortexDataVars.structures?.length || 0} chars`
+);
+
+// methods_to_export must NOT be the fallback string
+assert(
+  cortexDataVars.methods_to_export !== 'Infer from extension actions and data model.',
+  'methods_to_export is NOT fallback',
+  cortexDataVars.methods_to_export?.slice(0, 100)
+);
+
+// methods_to_export must contain cortex: actions from blueprint
+const expectedCortexMethods = ['searchCompanies', 'getCompany', 'getWatchlist', 'getChanges', 'getComparisons'];
+for (const method of expectedCortexMethods) {
+  assert(
+    cortexDataVars.methods_to_export?.includes(method) || false,
+    `methods_to_export contains "${method}"`,
+    cortexDataVars.methods_to_export?.includes(method) ? undefined : 'MISSING from prompt'
+  );
+}
+
+// extension_section must contain the extension name and probe data
+assert(
+  cortexDataVars.extension_section?.includes('prh-ytj') || false,
+  'extension_section contains extension name "prh-ytj"'
+);
+
+assert(
+  cortexDataVars.extension_section?.includes('callExt') || false,
+  'extension_section contains callExt usage hint'
+);
+
+assert(
+  cortexDataVars.extension_section?.includes('searchCompanies') || false,
+  'extension_section contains probe action "searchCompanies"'
+);
+
+// extension_section must NOT be the "No Extension" fallback
+assert(
+  !cortexDataVars.extension_section?.includes('No Extension'),
+  'extension_section is NOT the "No Extension" fallback'
+);
+
+// ═══ gen-cortex-data WITHOUT completedComponents (edge case) ═══
+console.log('\n═══ gen-cortex-data WITHOUT extension (edge case) ═══');
+
+const cortexDataNoExtVars = await resolvePromptVars(
+  null as any,
+  'gen-cortex-data',
+  {
+    blueprint,
+    interviewSpec,
+    componentLabel: 'Tietokerros - PRH datan käsittely',
+    projectDescription: 'PRH company data monitor',
+    completedComponents: [],
+  } as unknown as PromptRuntimeData,
+  {}
+);
+
+// Without extension, extension_section should say "No Extension"
+assert(
+  cortexDataNoExtVars.extension_section?.includes('No Extension') || false,
+  'extension_section falls back to "No Extension" when no extension available'
+);
+
+// methods_to_export should still have cortex: methods from blueprint
+assert(
+  cortexDataNoExtVars.methods_to_export !== 'Infer from extension actions and data model.',
+  'methods_to_export has cortex methods even without extension',
+  cortexDataNoExtVars.methods_to_export?.slice(0, 100)
+);
+
+// ═══ gen-test-cortex-spec resolver ═══
+console.log('\n═══ gen-test-cortex-spec resolver ═══');
+
+const fakeCortexSpec = {
+  name: 'prh-data',
+  libName: 'prhData',
+  wrapsExtension: 'prh-ytj',
+  methods: ['searchCompanies', 'getCompany', 'getWatchlist'],
+};
+
+const cortexTestVars = await resolvePromptVars(
+  null as any,
+  'gen-test-cortex-spec',
+  {
+    blueprint,
+    interviewSpec,
+    componentLabel: 'Tietokerros - PRH datan käsittely',
+    selfSpec: fakeCortexSpec,
+    completedComponents: fakeCompletedComps,
+  } as unknown as PromptRuntimeData,
+  {}
+);
+
+assert(
+  cortexTestVars.lib_name === 'prhData',
+  'lib_name has correct value',
+  cortexTestVars.lib_name || 'EMPTY'
+);
+
+assert(
+  cortexTestVars.wraps_extension === 'prh-ytj',
+  'wraps_extension has correct value',
+  cortexTestVars.wraps_extension || 'EMPTY'
+);
+
+assert(
+  (cortexTestVars.golden_samples?.length || 0) > 50,
+  'golden_samples has probe data',
+  `${cortexTestVars.golden_samples?.length || 0} chars`
+);
+
+assert(
+  cortexTestVars.golden_samples?.includes('searchCompanies') || false,
+  'golden_samples contains probe action'
+);
+
+assert(
+  (cortexTestVars.structures?.length || 0) > 50,
+  'structures has content',
+  `${cortexTestVars.structures?.length || 0} chars`
+);
+
+assert(
+  (cortexTestVars.action_contracts?.length || 0) > 50,
+  'action_contracts has content',
+  `${cortexTestVars.action_contracts?.length || 0} chars`
+);
+
+assert(
+  cortexTestVars.project_context?.includes('Blueprint components') || false,
+  'project_context has blueprint components'
+);
+
+assert(
+  (cortexTestVars.cortex_methods?.length || 0) > 0,
+  'cortex_methods has content',
+  cortexTestVars.cortex_methods?.slice(0, 100) || 'EMPTY'
+);
+
 // ═══ Summary ═══
 console.log(`\n${'═'.repeat(50)}`);
 console.log(`  PASSED: ${passed}  FAILED: ${failed}`);

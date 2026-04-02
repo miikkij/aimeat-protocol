@@ -1226,11 +1226,12 @@ window.__testRunning = true;
       }
 
       // Load completed components for context
+      // Include 'done' status — autopilot uses 'done' while UI uses 'registered'/'ready'
       const allComponentRecords = await storage.listMemory(gaii, { prefix: `generator.${projectId}.component.` });
       const completedComponents = allComponentRecords
         .filter(r => {
-          const val = r.value as { status?: string };
-          return val.status === 'registered' || val.status === 'ready';
+          const val = r.value as { status?: string; registeredAs?: string };
+          return (val.status === 'registered' || val.status === 'ready' || val.status === 'done') && val.registeredAs;
         })
         .map(r => r.value);
 
@@ -1280,6 +1281,29 @@ window.__testRunning = true;
       const specRec = await storage.getMemory(gaii, `generator.${projectId}.spec.${componentId}`);
       const selfSpec = specRec?.value as Record<string, unknown> | undefined;
 
+      // Load extension spec for cortex prompts that need it (gen-data-api-spec, gen-cortex-data)
+      let extensionSpec: Record<string, unknown> | undefined;
+      let dataApiSpec: Record<string, unknown> | undefined;
+      if (component.type === 'cortex') {
+        // Find extension component ID from blueprint
+        const extBpComp = blueprint.components.find((c: { type: string }) => c.type === 'extension');
+        if (extBpComp) {
+          const extSpecRec = await storage.getMemory(gaii, `generator.${projectId}.spec.${extBpComp.id}`);
+          extensionSpec = extSpecRec?.value as Record<string, unknown> | undefined;
+        }
+        // Find data-cortex spec for component/app-domain spec prompts
+        const dataCortexBp = blueprint.components.find((c: { type: string; subtype?: string }) => c.type === 'cortex' && (c as Record<string, unknown>).subtype === 'data');
+        if (dataCortexBp && dataCortexBp.id !== componentId) {
+          const dataSpecRec = await storage.getMemory(gaii, `generator.${projectId}.spec.${dataCortexBp.id}`);
+          dataApiSpec = dataSpecRec?.value as Record<string, unknown> | undefined;
+        }
+      }
+
+      // Gather translation keys for cortex component/app-domain prompts
+      const translationKeys = (completedComponents as Array<Record<string, unknown>>)
+        .filter(c => c.type === 'translation' && (c.contextBundle as Record<string, unknown>)?.keys)
+        .flatMap(c => ((c.contextBundle as Record<string, unknown>)?.keys as string[]) || []);
+
       const prompt = await buildPrompt(storage, promptId, {
         blueprint: blueprint as unknown as Blueprint,
         interviewSpec: interviewSpec as unknown as InterviewSpec,
@@ -1289,6 +1313,9 @@ window.__testRunning = true;
         completedComponents: completedComponents as unknown as ComponentState[],
         projectDescription: project.description || '',
         selfSpec,
+        extensionSpec,
+        dataApiSpec,
+        translationKeys,
       } as unknown as PromptRuntimeData);
 
       res.json(success(config.nodeId, {

@@ -36,7 +36,7 @@ import { validateExtensionSpec, validateDataApiSpec } from '/js/services/generat
 import { verifyContract } from '/js/services/generator-contract.js';
 import { smokeTest } from '/js/services/generator-smoke.js';
 import { createBundle } from '/js/services/generator-context-bundle.js';
-import { buildExplainPrompt } from '/js/services/generator-prompts-fix.js';
+import { buildExplainPrompt, buildReflectionPrompt, buildFixPrompt } from '/js/services/generator-prompts-fix.js';
 import { runComponentTest, screenshotUrl } from '/js/services/generator-testing.js';
 
 /* ── OpenRouter Autopilot Helpers (shared) ───────────── */
@@ -430,7 +430,8 @@ export function ComponentDetail({ component, project, components, projectId, int
       writeDebugArtifact(projectId, component.id, 'prompt', fresh);
       let content = await runWithAi(projectId, fresh);
       writeDebugArtifact(projectId, component.id, 'ai-raw-response', content);
-      content = stripCodeblock(content);
+      // Cortex validator needs fenced blocks (```yaml + ```javascript) to extract manifest+libs
+      if (component.type !== 'cortex') content = stripCodeblock(content);
       setResult(content);
 
       // Validate

@@ -794,10 +794,10 @@ ${hasCortex ? '- Call cortex init() on app start — it handles everything autom
 ## CRITICAL: Rendering API Data — Handle Nested Objects
 
 API responses often contain nested objects instead of plain strings. For example:
-- \`businessId: { value: "3323553-5", registrationDate: "2022-11-07" }\` — access \`.value\`
-- \`euId: { value: "FIFPRO.3323553-5", source: "1" }\` — access \`.value\`
+- \`itemId: { value: "12345", registrationDate: "2024-01-15" }\` — access \`.value\`
+- \`identifier: { value: "ID-12345", source: "1" }\` — access \`.value\`
 - \`website: { url: "www.example.com", registrationDate: "..." }\` — access \`.url\`
-- \`names: [{ name: "Company Oy", type: "1" }]\` — access \`[0].name\`
+- \`names: [{ name: "Example Item", type: "1" }]\` — access \`[0].name\`
 
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║  NEVER render an object directly as text — it will show [object Object] ║
@@ -1117,7 +1117,7 @@ await writeOwnerMemory('settings.config', { locale: 'fi', notifications: true })
 ## IMPORTANT: How Translations Work
 
 Translations are stored in the OWNER namespace by the translation component during registration.
-The key format is: \\\`{service-slug}.i18n.{locale}\\\` (e.g. \\\`prh-yritystietopalvelu.i18n.fi\\\`).
+The key format is: \\\`{service-slug}.i18n.{locale}\\\` (e.g. \\\`my-service.i18n.fi\\\`).
 Read them with AIMEAT.data.get():
 \\\`\\\`\\\`javascript
 // Read translations from OWNER namespace (where translation component stored them):

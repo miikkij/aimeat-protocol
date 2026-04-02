@@ -42,12 +42,12 @@ var tabs = AIMEAT['aimeat-ui-nav'].Tabs({
 \`\`\`javascript
 var table = AIMEAT['aimeat-ui-viewers'].DataTable({
   columns: [
-    { key: 'name', label: 'Nimi', sortable: true },
-    { key: 'businessId', label: 'Y-tunnus' },
-    { key: 'status', label: 'Tila' }
+    { key: 'name', label: 'Name', sortable: true },
+    { key: 'id', label: 'ID' },
+    { key: 'status', label: 'Status' }
   ],
   rows: [
-    { name: 'Overscale Solutions Oy', businessId: '3323553-5', status: 'Active' }
+    { name: 'Example Item', id: 'item-001', status: 'Active' }
   ],
   sortable: true,
   filterable: true,

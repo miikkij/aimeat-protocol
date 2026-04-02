@@ -271,7 +271,7 @@ function resolveCortexData(data: PromptRuntimeData): Vars {
         const outputRef = ((a as Record<string, unknown>).output as Record<string, string>)?.$ref || JSON.stringify((a as Record<string, unknown>).output || 'any');
         return `- **${a.method}**(${inputKeys}) → returns ${outputRef}`;
       }).join('\n')
-    : 'Infer from extension actions and data model.';
+    : warnFallback('gen-cortex-data', 'methods_to_export', 'Infer from extension actions and data model.');
 
   // Build extension section matching browser: name, actions, probe results, callExt hint
   const extComp = (data.completedComponents || []).find(c => c.type === 'extension');
@@ -290,8 +290,8 @@ function resolveCortexData(data: PromptRuntimeData): Vars {
   }
 
   return {
-    label: data.componentLabel || '',
-    project_description: data.projectDescription || '',
+    label: data.componentLabel || warnFallback('gen-cortex-data', 'label', ''),
+    project_description: data.projectDescription || warnFallback('gen-cortex-data', 'project_description', ''),
     structures: formatStructures(bp.dataModel?.structures),
     methods_to_export: methodsExport,
     extension_section: extensionSection,

@@ -156,11 +156,38 @@ Second block — JavaScript library:
 (function (AIMEAT) {
   'use strict';
   const LIB_NAME = 'yourLibName'; // camelCase of metadata.name
+  const EXT_NAME = 'extension-name'; // kebab-case extension name from the extension section above
 
-  // Internal helpers (callExt, readExtMemory — private, not exported)
-  // ...
+  // ── EXACT callExt implementation — DO NOT MODIFY THIS PATTERN ──
+  // URL pattern is ALWAYS: /v1/ext/{extensionName}/{actionId}
+  // session.fetch returns ALREADY-PARSED JSON — use resp.data directly, NEVER resp.json()
+  async function callExt(actionId, body) {
+    var resp = AIMEAT.session.fetch('/v1/ext/' + EXT_NAME + '/' + actionId, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {})
+    });
+    resp = await resp;
+    return resp.data;
+  }
 
-  // Public data access methods
+  // ── EXACT readExtMemory implementation — DO NOT MODIFY THIS PATTERN ──
+  async function readExtMemory(key) {
+    return await AIMEAT.data.getPublic('ext:' + EXT_NAME, key);
+  }
+
+  // ── Public data access methods ──
+  // CRITICAL: Every method takes a SINGLE OBJECT parameter and destructures it.
+  // This matches the spec contract. The test will call: lib.methodName({ key: value })
+  // Example:
+  //   async function doSomething(params) {
+  //     var id = params.id;
+  //     var filter = params.filter || 'all';
+  //     return await callExt('doSomething', { id: id, filter: filter });
+  //   }
+  // NEVER use positional parameters like methodName(a, b) — always methodName(params).
+  // Method names in exports MUST match the blueprint "produces: api:XXX" names EXACTLY.
+
   async function methodName(params) { ... }
 
   // Register

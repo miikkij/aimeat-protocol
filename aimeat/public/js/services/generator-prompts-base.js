@@ -1117,7 +1117,7 @@ await writeOwnerMemory('settings.config', { locale: 'fi', notifications: true })
 ## IMPORTANT: How Translations Work
 
 Translations are stored in the OWNER namespace by the translation component during registration.
-The key format is: \\\`{service-slug}.i18n.{locale}\\\` (e.g. \\\`prh-yritystietopalvelu.i18n.fi\\\`).
+The key format is: \\\`{service-slug}.i18n.{locale}\\\` (e.g. \\\`my-service.i18n.fi\\\`).
 Read them with AIMEAT.data.get():
 \\\`\\\`\\\`javascript
 // Read translations from OWNER namespace (where translation component stored them):

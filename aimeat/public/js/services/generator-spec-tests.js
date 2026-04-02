@@ -131,7 +131,7 @@ export function buildDataCortexTestFromSpec(spec) {
         const name = p.split(':')[0].trim();
         if (name === 'query' || name === 'search') return "'test'";
         if (name === 'locale') return "'fi'";
-        if (name === 'businessId' || name === 'id') return "'3323553-5'";
+        if (name === 'businessId' || name === 'id') return "'test-id-001'";
         if (name === 'item' || name === 'data') return "{}";
         return 'null';
       }).join(', ');

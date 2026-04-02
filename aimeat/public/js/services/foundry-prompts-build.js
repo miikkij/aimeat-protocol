@@ -275,7 +275,7 @@ For each component that produces data:
   "component": "ext-1",
   "scenarios": [
     { "action": "init", "input": {}, "expect": "Initializes memory structures", "type": "memory" },
-    { "action": "search", "input": { "query": "Overscale" }, "expect": "Returns companies from API", "type": "external-api" }
+    { "action": "search", "input": { "query": "test" }, "expect": "Returns results from API", "type": "external-api" }
   ]
 }]
 

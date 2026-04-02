@@ -416,7 +416,11 @@ export async function runAutopilot(
         debug.writeComponentPrompt(cid, prompt as string).catch(() => {});
         let content = await callLLM(prompt as string);
         debug.writeArtifact(cid, 'ai-raw-response', content).catch(() => {});
-        content = stripCodeblock(content);
+        // Cortex validator needs the fenced blocks (```yaml + ```javascript) to extract manifest+libs.
+        // stripCodeblock would remove them, making the validator unable to parse the format.
+        if (compType !== 'cortex') {
+          content = stripCodeblock(content);
+        }
         debug.writeComponentGenerated(cid, content).catch(() => {});
 
         // ── VALIDATE ──
@@ -429,7 +433,7 @@ export async function runAutopilot(
             alog.info(`[${cid}] Retry ${attempt}/${maxRetries} for ${compLabel}`);
             const fixPrompt = await buildPrompt(storage, 'gen-fix', { blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec, originalPrompt: prompt, code: content, errors: vr.errors, componentType: compType } as unknown as PromptRuntimeData);
             content = await callLLM(fixPrompt);
-            content = stripCodeblock(content);
+            if (compType !== 'cortex') content = stripCodeblock(content);
             vr = validateComponent(compType, content, blueprint as unknown as Blueprint);
           }
         }
@@ -710,7 +714,7 @@ export async function runAutopilot(
                 reflectionDiagnosis,
               } as unknown as PromptRuntimeData);
               let fixedContent = await callLLM(fixPrompt);
-              fixedContent = stripCodeblock(fixedContent);
+              if (compType !== 'cortex') fixedContent = stripCodeblock(fixedContent);
 
               // Step 3: VALIDATE the fix
               let fixVr = validateComponent(compType, fixedContent, blueprint as unknown as Blueprint);
@@ -726,7 +730,7 @@ export async function runAutopilot(
                   componentType: compType,
                 } as unknown as PromptRuntimeData);
                 fixedContent = await callLLM(fixPrompt2);
-                fixedContent = stripCodeblock(fixedContent);
+                if (compType !== 'cortex') fixedContent = stripCodeblock(fixedContent);
                 fixVr = validateComponent(compType, fixedContent, blueprint as unknown as Blueprint);
               }
 
@@ -748,6 +752,26 @@ export async function runAutopilot(
                 }
                 if (compType === 'extension' && comp.registeredAs) {
                   await internalFetch(config, `/v1/extensions/${encodeURIComponent(comp.registeredAs as string)}/activate`, jwt, { method: 'POST' });
+                }
+                // Cortex re-registration: validate to extract manifest+libs, then re-register via cortex API
+                if (compType === 'cortex') {
+                  const reVr = validateComponent('cortex', content, blueprint as unknown as Blueprint);
+                  const extracted = reVr.extracted as { manifest: string; libs: Array<{ filename: string; code: string }> } | undefined;
+                  if (extracted?.manifest) {
+                    const libs: Record<string, string> = {};
+                    for (const lib of (extracted.libs || [])) { if (lib.filename && lib.code) libs[lib.filename] = lib.code; }
+                    const nameMatch = extracted.manifest.match(/name:\s*"?([^\s"]+)"?/);
+                    if (nameMatch) {
+                      await internalFetch(config, `/v1/cortex/${encodeURIComponent(nameMatch[1])}/deactivate`, jwt, { method: 'POST' }).catch(() => {});
+                      await internalFetch(config, `/v1/cortex/${encodeURIComponent(nameMatch[1])}`, jwt, { method: 'DELETE' }).catch(() => {});
+                    }
+                    await internalFetch(config, '/v1/cortex', jwt, {
+                      method: 'POST', body: { manifest: extracted.manifest, ...(Object.keys(libs).length > 0 ? { libs } : {}) },
+                    });
+                    if (nameMatch) {
+                      await internalFetch(config, `/v1/cortex/${encodeURIComponent(nameMatch[1])}/activate`, jwt, { method: 'POST' });
+                    }
+                  }
                 }
                 alog.info(`[${cid}] Re-registered after fix round ${testFixRound}`);
                 // Update debug artifacts with the actual registered code
@@ -793,7 +817,7 @@ export async function runAutopilot(
                   testContext: testResult as Record<string, unknown>,
                 } as unknown as PromptRuntimeData);
                 let freshContent = await callLLM(freshPrompt);
-                freshContent = stripCodeblock(freshContent);
+                if (compType !== 'cortex') freshContent = stripCodeblock(freshContent);
                 const freshVr = validateComponent(compType, freshContent, blueprint as unknown as Blueprint);
                 if (freshVr.valid) {
                   content = freshContent;
@@ -808,6 +832,25 @@ export async function runAutopilot(
                   }
                   if (compType === 'extension' && comp.registeredAs) {
                     await internalFetch(config, `/v1/extensions/${encodeURIComponent(comp.registeredAs as string)}/activate`, jwt, { method: 'POST' });
+                  }
+                  // Cortex fresh re-registration
+                  if (compType === 'cortex') {
+                    const freshExtracted = freshVr.extracted as { manifest: string; libs: Array<{ filename: string; code: string }> } | undefined;
+                    if (freshExtracted?.manifest) {
+                      const libs: Record<string, string> = {};
+                      for (const lib of (freshExtracted.libs || [])) { if (lib.filename && lib.code) libs[lib.filename] = lib.code; }
+                      const nameMatch = freshExtracted.manifest.match(/name:\s*"?([^\s"]+)"?/);
+                      if (nameMatch) {
+                        await internalFetch(config, `/v1/cortex/${encodeURIComponent(nameMatch[1])}/deactivate`, jwt, { method: 'POST' }).catch(() => {});
+                        await internalFetch(config, `/v1/cortex/${encodeURIComponent(nameMatch[1])}`, jwt, { method: 'DELETE' }).catch(() => {});
+                      }
+                      await internalFetch(config, '/v1/cortex', jwt, {
+                        method: 'POST', body: { manifest: freshExtracted.manifest, ...(Object.keys(libs).length > 0 ? { libs } : {}) },
+                      });
+                      if (nameMatch) {
+                        await internalFetch(config, `/v1/cortex/${encodeURIComponent(nameMatch[1])}/activate`, jwt, { method: 'POST' });
+                      }
+                    }
                   }
                   alog.info(`[${cid}] Fresh generation registered — re-testing`);
                   const reTestResp = await internalFetch(config, `/v1/generator/${projectId}/test/${cid}`, jwt, {
