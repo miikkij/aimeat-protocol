@@ -2017,6 +2017,12 @@ log('method returned: ' + JSON.stringify(result));
 ## CORTEX TEST EXAMPLE (follow this pattern exactly)
 
 \\\`\\\`\\\`javascript
+// ALWAYS declare results and helpers FIRST, before any checks
+const results = { passed: false, errors: [], details: '' };
+const log = (msg) => { results.details += msg + '\\n'; };
+const fail = (msg) => { results.errors.push(msg); log('FAIL: ' + msg); };
+const pass = (msg) => { log('PASS: ' + msg); };
+
 const lib = window.AIMEAT.myDomainLib;
 if (!lib) { fail('Library not loaded'); window.__testResults = results; return; }
 
