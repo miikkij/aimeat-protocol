@@ -300,7 +300,19 @@ export function ProjectDashboard({ projectId, onBack, session, showToast, orSett
         <div class="pf-gen-sidebar">
           ${phases.map(phase => html`
             <div class="pf-gen-phase-group">
-              <div class="pf-gen-phase-label">${phase.label}</div>
+              <div class="pf-gen-phase-label">
+                ${phase.label}
+                <button class="btn-ghost btn-xs" style="margin-left:auto;font-size:11px;opacity:0.6" onClick=${async (e) => {
+                  e.stopPropagation();
+                  if (!confirm('Reset all components in "' + phase.label + '"? Generated code, specs, and registrations will be cleared.')) return;
+                  const s = session || window.AIMEAT?.auth?.getSession?.();
+                  if (!s) return;
+                  for (const cid of (phase.componentIds || [])) {
+                    await s.fetch('/v1/generator/' + project.projectId + '/components/' + cid + '/reset', { method: 'POST' }).catch(() => {});
+                  }
+                  core.loadData?.();
+                }} title="Reset all components in this phase">↺</button>
+              </div>
               ${(phase.componentIds || []).map(cid => {
                 const comp = components.find(c => c.id === cid) || { id: cid, label: cid, type: '?', status: 'not_started' };
                 const live = liveStatuses[cid];
