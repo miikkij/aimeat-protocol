@@ -66,7 +66,8 @@ Extensions run in an ISOLATED V8 sandbox with ONLY this API (no Node.js, no glob
 AIMEAT Data Standards (MUST follow in ALL components):
   Dates/times: ISO 8601 ONLY — "2026-03-14T13:00:00.000Z". NEVER store RFC 2822 ("Sat, 14 Mar ..."), Unix timestamps, or locale-formatted dates. Convert all dates to ISO before storing.
   Memory keys: lowercase dot-namespaced — "items.by-date.2026-03-14". Dates in keys MUST use YYYY-MM-DD.
-  IDs: URL-safe strings (kebab-case or hex hashes). No spaces, no special characters.
+  Resource IDs: URL-safe strings (kebab-case or hex hashes). No spaces, no special characters.
+  Action IDs: camelCase — "getItems", "addToWatchlist", "checkChanges". NEVER kebab-case for actions.
   Locale codes: BCP 47 — "fi", "en", "fi-FI", "en-US".
   Coordinates: { latitude: number, longitude: number } — WGS84 decimal degrees.
   Currency/amounts: integers (no floats) — morsels are whole numbers.`,
