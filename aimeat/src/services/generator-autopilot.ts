@@ -226,6 +226,15 @@ export async function runAutopilot(
   // ── Debug artifact writer ──
   const debug = new GeneratorDebugWriter(projectId);
 
+  // Autopilot log lines — written to both terminal AND project debug dir
+  const autopilotLog: string[] = [];
+  const alog = {
+    info: (m: string) => { log.info(m); autopilotLog.push(`[INFO] ${new Date().toISOString()} ${m}`); },
+    warn: (m: string) => { log.warn(m); autopilotLog.push(`[WARN] ${new Date().toISOString()} ${m}`); },
+    error: (m: string) => { log.error(m); autopilotLog.push(`[ERROR] ${new Date().toISOString()} ${m}`); },
+    flush: () => debug.writeArtifact('_autopilot', 'terminal-log', autopilotLog.join('\n')).catch(() => {}),
+  };
+
   // Write project metadata at start
   debug.writeProjectMeta(
     { projectId, name: project.name, description: project.description },
@@ -256,13 +265,13 @@ export async function runAutopilot(
       // Phase 1: csm, memory, translation only. Extension and beyond are disabled until Phase 1 is verified.
       const ENABLED_TYPES = ['csm', 'memory', 'translation', 'extension'];
       if (!ENABLED_TYPES.includes(compType)) {
-        log.info(`[${cid}] Phase gate: ${compType} not enabled yet — stopping pipeline after Phase 1`);
+        alog.info(`[${cid}] Phase gate: ${compType} not enabled yet — stopping pipeline after Phase 1`);
         entry.status.componentResults.push({ id: cid, label: compLabel, status: 'phase_gated' });
         break;
       }
 
       updateStatus({ currentComponent: compLabel });
-      log.info(`[${cid}] Processing: ${compLabel} (${compType})`);
+      alog.info(`[${cid}] Processing: ${compLabel} (${compType})`);
 
       try {
         // ── SPEC GENERATION ──
@@ -302,7 +311,7 @@ export async function runAutopilot(
             }
 
             if (specPrompt) {
-              log.info(`[${cid}] Generating spec for ${compLabel}`);
+              alog.info(`[${cid}] Generating spec for ${compLabel}`);
               debug.writeArtifact(cid, 'spec-prompt', specPrompt).catch(() => {});
               const specRaw = await callLLM(specPrompt);
               debug.writeArtifact(cid, 'spec-raw-response', specRaw).catch(() => {});
@@ -313,18 +322,18 @@ export async function runAutopilot(
               try {
                 spec = JSON.parse(specText) as Record<string, unknown>;
                 debug.writeArtifact(cid, 'spec', JSON.stringify(spec, null, 2)).catch(() => {});
-                log.info(`[${cid}] Spec generated: ${spec.name as string}`);
+                alog.info(`[${cid}] Spec generated: ${spec.name as string}`);
 
                 // Validate spec structure (was imported but never called before)
                 if (compType === 'extension') {
                   const sv = validateExtensionSpec(spec);
                   if (!sv.valid) {
-                    log.warn(`[${cid}] Spec validation issues: ${sv.errors.join('; ')}`);
+                    alog.warn(`[${cid}] Spec validation issues: ${sv.errors.join('; ')}`);
                     // Don't reject — spec is still usable, just warn about missing fields
                   }
                 }
               } catch {
-                log.warn(`[${cid}] Spec JSON parse failed — continuing without spec`);
+                alog.warn(`[${cid}] Spec JSON parse failed — continuing without spec`);
                 spec = null;
               }
 
@@ -346,7 +355,7 @@ export async function runAutopilot(
         if (entry.cancelFlag) break;
 
         // ── CODE GENERATION ──
-        log.info(`[${cid}] Building code prompt for ${compLabel}`);
+        alog.info(`[${cid}] Building code prompt for ${compLabel}`);
         const freshComps = await loadComponents();
         const completedComponents = freshComps.filter(c => c.status === 'done' && c.registeredAs);
         // Map component type to the appropriate DB prompt ID
@@ -381,7 +390,7 @@ export async function runAutopilot(
             .flatMap(c => (((c as Record<string, unknown>).contextBundle as Record<string, unknown>)?.keys as string[]) || []),
         } as unknown as PromptRuntimeData);
 
-        log.info(`[${cid}] Calling OpenRouter for ${compLabel} (prompt: ${(prompt as string).length} chars)`);
+        alog.info(`[${cid}] Calling OpenRouter for ${compLabel} (prompt: ${(prompt as string).length} chars)`);
         debug.writeComponentPrompt(cid, prompt as string).catch(() => {});
         let content = await callLLM(prompt as string);
         debug.writeArtifact(cid, 'ai-raw-response', content).catch(() => {});
@@ -395,7 +404,7 @@ export async function runAutopilot(
         if (!vr.valid) {
           const maxRetries = 3;
           for (let attempt = 1; attempt <= maxRetries && !vr.valid && !entry.cancelFlag; attempt++) {
-            log.info(`[${cid}] Retry ${attempt}/${maxRetries} for ${compLabel}`);
+            alog.info(`[${cid}] Retry ${attempt}/${maxRetries} for ${compLabel}`);
             const fixPrompt = await buildPrompt(storage, 'gen-fix', { blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec, originalPrompt: prompt, code: content, errors: vr.errors, componentType: compType } as unknown as PromptRuntimeData);
             content = await callLLM(fixPrompt);
             content = stripCodeblock(content);
@@ -404,7 +413,7 @@ export async function runAutopilot(
         }
 
         if (!vr.valid) {
-          log.error(`[${cid}] Validation failed for ${compLabel} — STOPPING pipeline: ${vr.errors[0]}`);
+          alog.error(`[${cid}] Validation failed for ${compLabel} — STOPPING pipeline: ${vr.errors[0]}`);
           comp = { ...comp, result: content, status: 'errors', validationErrors: vr.errors };
           await saveComp(comp);
           entry.status.progress.failed++;
@@ -413,7 +422,7 @@ export async function runAutopilot(
         }
 
         // ── REGISTER ──
-        log.info(`[${cid}] Registering ${compLabel}`);
+        alog.info(`[${cid}] Registering ${compLabel}`);
         comp = { ...comp, result: content, status: 'done', validationErrors: [] };
         await saveComp(comp);
 
@@ -425,7 +434,7 @@ export async function runAutopilot(
             body: { content, type: compType },
           });
           if (!submitResp.ok) {
-            log.warn(`[${cid}] Submit failed (${submitResp.status}): ${JSON.stringify(submitResp.error)}`);
+            alog.warn(`[${cid}] Submit failed (${submitResp.status}): ${JSON.stringify(submitResp.error)}`);
             throw new Error(`Submit failed: ${JSON.stringify(submitResp.error)}`);
           }
 
@@ -433,7 +442,7 @@ export async function runAutopilot(
           if (['csm', 'msm', 'extension', 'app'].includes(compType)) {
             const regResp = await internalFetch(config, `/v1/generator/${projectId}/components/${cid}/register`, jwt, { method: 'POST' });
             if (!regResp.ok) {
-              log.warn(`[${cid}] Register failed (${regResp.status}): ${JSON.stringify(regResp.error)}`);
+              alog.warn(`[${cid}] Register failed (${regResp.status}): ${JSON.stringify(regResp.error)}`);
               throw new Error(`Registration failed: ${JSON.stringify(regResp.error)}`);
             }
           }
@@ -510,10 +519,10 @@ export async function runAutopilot(
           const regName = comp.registeredAs || extractRegisteredName(compType, content, vr);
           comp = { ...comp, registeredAs: regName, contextBundle: createBundle({ ...comp, registeredAs: regName } as unknown as ComponentState, []) };
           await saveComp(comp);
-          log.info(`[${cid}] Registered: ${compLabel} as ${regName as string}`);
+          alog.info(`[${cid}] Registered: ${compLabel} as ${regName as string}`);
 
         } catch (regErr) {
-          log.error(`[${cid}] Registration failed for ${compLabel} — STOPPING pipeline: ${(regErr as Error).message}`);
+          alog.error(`[${cid}] Registration failed for ${compLabel} — STOPPING pipeline: ${(regErr as Error).message}`);
           entry.status.progress.failed++;
           entry.status.componentResults.push({ id: cid, label: compLabel, status: 'registration_failed', error: (regErr as Error).message });
           break; // STOP — downstream components depend on this one
@@ -524,9 +533,9 @@ export async function runAutopilot(
           try {
             await internalFetch(config, `/v1/generator/${projectId}/apply-settings/${encodeURIComponent(comp.registeredAs as string)}`, jwt, { method: 'POST' });
             await internalFetch(config, `/v1/extensions/${encodeURIComponent(comp.registeredAs as string)}/activate`, jwt, { method: 'POST' });
-            log.info(`[${cid}] Activated extension: ${comp.registeredAs as string}`);
+            alog.info(`[${cid}] Activated extension: ${comp.registeredAs as string}`);
           } catch (e) {
-            log.warn(`[${cid}] Extension activation failed: ${(e as Error).message}`);
+            alog.warn(`[${cid}] Extension activation failed: ${(e as Error).message}`);
           }
 
           // ── PROBE ──
@@ -539,12 +548,12 @@ export async function runAutopilot(
             const contextBundle = createBundle({ ...comp, registeredAs: comp.registeredAs as string } as unknown as ComponentState, probeResults as unknown as ProbeResult[]);
             comp = { ...comp, probeResults, contextBundle };
             await saveComp(comp);
-            log.info(`[${cid}] Probed extension: ${probeResults.length} actions`);
+            alog.info(`[${cid}] Probed extension: ${probeResults.length} actions`);
 
             // Check if ALL probes failed — means extension code is fundamentally broken
             const probeFailCount = probeResults.filter((p: unknown) => (p as Record<string, unknown>).status !== 200).length;
             if (probeResults.length > 0 && probeFailCount === probeResults.length) {
-              log.error(`[${cid}] ALL ${probeResults.length} probe actions failed — extension code is broken, STOPPING`);
+              alog.error(`[${cid}] ALL ${probeResults.length} probe actions failed — extension code is broken, STOPPING`);
               entry.status.progress.failed++;
               entry.status.componentResults.push({ id: cid, label: compLabel, status: 'probe_all_failed', error: `All ${probeResults.length} actions returned errors` });
               break; // STOP — downstream components need working extension
@@ -554,11 +563,11 @@ export async function runAutopilot(
             if (comp.spec && probeResults.length > 0) {
               const sv = validateSpecAgainstProbe(comp.spec as Record<string, unknown>, probeResults as unknown as ProbeResult[]);
               if (!sv.valid) {
-                log.warn(`[${cid}] Spec-vs-probe mismatch: ${(sv.mismatches as Array<{message: string}>).map(m => m.message).join('; ')}`);
+                alog.warn(`[${cid}] Spec-vs-probe mismatch: ${(sv.mismatches as Array<{message: string}>).map(m => m.message).join('; ')}`);
               }
             }
           } catch (e) {
-            log.warn(`[${cid}] Extension probe failed: ${(e as Error).message}`);
+            alog.warn(`[${cid}] Extension probe failed: ${(e as Error).message}`);
           }
         }
 
@@ -595,7 +604,7 @@ export async function runAutopilot(
               } as unknown as PromptRuntimeData);
             }
 
-            log.info(`[${cid}] Generating test for ${compLabel}`);
+            alog.info(`[${cid}] Generating test for ${compLabel}`);
             let testCode = await callLLM(testPromptText);
             testCode = stripCodeblock(testCode);
 
@@ -611,10 +620,10 @@ export async function runAutopilot(
               const testErrors = (testResult.errors as string[]) || [];
               const testTrace = (testResult.trace as Array<Record<string, string>>) || [];
               if (testResult.status === 'passed') {
-                log.info(`[${cid}] ✅ Test PASSED`);
+                alog.info(`[${cid}] ✅ Test PASSED`);
               } else {
-                log.error(`[${cid}] ❌ Test FAILED — ${testErrors.length} errors:`);
-                for (const e of testErrors) log.error(`[${cid}]   - ${e}`);
+                alog.error(`[${cid}] ❌ Test FAILED — ${testErrors.length} errors:`);
+                for (const e of testErrors) alog.error(`[${cid}]   - ${e}`);
               }
               // Log trace with shapes
               for (const t of testTrace) {
@@ -622,9 +631,9 @@ export async function runAutopilot(
                 const shapeMatch = resultStr.match(/\[shape extracted from (\d+) chars\]/);
                 if (shapeMatch) {
                   const shapeJson = resultStr.slice(0, resultStr.indexOf('\n[shape extracted')).trim().replace(/\s+/g, ' ').slice(0, 500);
-                  log.info(`[${cid}]   [${t.status}] ${t.fn}(${(t.args || '').slice(0, 60)}) → SHAPE: ${shapeJson} [from ${shapeMatch[1]} chars]`);
+                  alog.info(`[${cid}]   [${t.status}] ${t.fn}(${(t.args || '').slice(0, 60)}) → SHAPE: ${shapeJson} [from ${shapeMatch[1]} chars]`);
                 } else {
-                  log.info(`[${cid}]   [${t.status}] ${t.fn}(${(t.args || '').slice(0, 60)}) → ${resultStr.slice(0, 300)}`);
+                  alog.info(`[${cid}]   [${t.status}] ${t.fn}(${(t.args || '').slice(0, 60)}) → ${resultStr.slice(0, 300)}`);
                 }
               }
             }
@@ -637,7 +646,7 @@ export async function runAutopilot(
 
             while (testResult && testResult.status === 'failed' && testFixRound < maxTestFixRounds && !entry.cancelFlag) {
               testFixRound++;
-              log.info(`[${cid}] Test failed — starting reflect+fix round ${testFixRound}/${maxTestFixRounds}`);
+              alog.info(`[${cid}] Test failed — starting reflect+fix round ${testFixRound}/${maxTestFixRounds}`);
 
               // Step 1: REFLECT — diagnose the failure (no code, just analysis)
               let reflectionDiagnosis = '';
@@ -651,9 +660,9 @@ export async function runAutopilot(
                   testContext: testResult as Record<string, unknown>,
                 } as unknown as PromptRuntimeData);
                 reflectionDiagnosis = await callLLM(reflectionPrompt);
-                log.info(`[${cid}] Reflection: ${reflectionDiagnosis.slice(0, 200)}`);
+                alog.info(`[${cid}] Reflection: ${reflectionDiagnosis.slice(0, 200)}`);
               } catch (e) {
-                log.warn(`[${cid}] Reflection failed: ${(e as Error).message}`);
+                alog.warn(`[${cid}] Reflection failed: ${(e as Error).message}`);
               }
 
               previousAttempts.push({
@@ -680,7 +689,7 @@ export async function runAutopilot(
               // Step 3: VALIDATE the fix
               let fixVr = validateComponent(compType, fixedContent, blueprint as unknown as Blueprint);
               if (!fixVr.valid) {
-                log.warn(`[${cid}] Fix round ${testFixRound} validation failed: ${fixVr.errors[0]}`);
+                alog.warn(`[${cid}] Fix round ${testFixRound} validation failed: ${fixVr.errors[0]}`);
                 // One more try
                 const fixPrompt2 = await buildPrompt(storage, 'gen-fix', {
                   blueprint: blueprint as unknown as Blueprint,
@@ -696,7 +705,7 @@ export async function runAutopilot(
               }
 
               if (!fixVr.valid) {
-                log.warn(`[${cid}] Fix round ${testFixRound} still invalid — skipping re-register`);
+                alog.warn(`[${cid}] Fix round ${testFixRound} still invalid — skipping re-register`);
                 continue;
               }
 
@@ -714,9 +723,9 @@ export async function runAutopilot(
                 if (compType === 'extension' && comp.registeredAs) {
                   await internalFetch(config, `/v1/extensions/${encodeURIComponent(comp.registeredAs as string)}/activate`, jwt, { method: 'POST' });
                 }
-                log.info(`[${cid}] Re-registered after fix round ${testFixRound}`);
+                alog.info(`[${cid}] Re-registered after fix round ${testFixRound}`);
               } catch (e) {
-                log.warn(`[${cid}] Re-registration failed: ${(e as Error).message}`);
+                alog.warn(`[${cid}] Re-registration failed: ${(e as Error).message}`);
                 break;
               }
 
@@ -731,21 +740,21 @@ export async function runAutopilot(
                   await saveComp(comp);
                   const reTestErrors = (testResult.errors as string[]) || [];
                   if (testResult.status === 'passed') {
-                    log.info(`[${cid}] ✅ Re-test round ${testFixRound}: PASSED`);
+                    alog.info(`[${cid}] ✅ Re-test round ${testFixRound}: PASSED`);
                   } else {
-                    log.error(`[${cid}] ❌ Re-test round ${testFixRound}: FAILED — ${reTestErrors.length} errors:`);
-                    for (const e of reTestErrors) log.error(`[${cid}]   - ${e}`);
+                    alog.error(`[${cid}] ❌ Re-test round ${testFixRound}: FAILED — ${reTestErrors.length} errors:`);
+                    for (const e of reTestErrors) alog.error(`[${cid}]   - ${e}`);
                   }
                 }
               } catch (e) {
-                log.warn(`[${cid}] Re-test failed: ${(e as Error).message}`);
+                alog.warn(`[${cid}] Re-test failed: ${(e as Error).message}`);
                 break;
               }
             }
 
             // Final round: fresh generation if still failing
             if (testResult && testResult.status === 'failed' && !entry.cancelFlag) {
-              log.info(`[${cid}] All fix rounds exhausted — trying fresh generation`);
+              alog.info(`[${cid}] All fix rounds exhausted — trying fresh generation`);
               try {
                 const freshPrompt = await buildPrompt(storage, 'gen-fresh-generation', {
                   blueprint: blueprint as unknown as Blueprint,
@@ -771,7 +780,7 @@ export async function runAutopilot(
                   if (compType === 'extension' && comp.registeredAs) {
                     await internalFetch(config, `/v1/extensions/${encodeURIComponent(comp.registeredAs as string)}/activate`, jwt, { method: 'POST' });
                   }
-                  log.info(`[${cid}] Fresh generation registered — re-testing`);
+                  alog.info(`[${cid}] Fresh generation registered — re-testing`);
                   const reTestResp = await internalFetch(config, `/v1/generator/${projectId}/test/${cid}`, jwt, {
                     method: 'POST', body: { testCode, environment: testEnvironment },
                   });
@@ -779,18 +788,18 @@ export async function runAutopilot(
                   if (testResult) {
                     comp = { ...comp, testResult };
                     await saveComp(comp);
-                    log.info(`[${cid}] Fresh generation test: ${testResult.status as string}`);
+                    alog.info(`[${cid}] Fresh generation test: ${testResult.status as string}`);
                   }
                 } else {
-                  log.warn(`[${cid}] Fresh generation validation failed: ${freshVr.errors[0]}`);
+                  alog.warn(`[${cid}] Fresh generation validation failed: ${freshVr.errors[0]}`);
                 }
               } catch (e) {
-                log.warn(`[${cid}] Fresh generation failed: ${(e as Error).message}`);
+                alog.warn(`[${cid}] Fresh generation failed: ${(e as Error).message}`);
               }
             }
 
           } catch (e) {
-            log.error(`[${cid}] Test execution failed: ${(e as Error).message}`);
+            alog.error(`[${cid}] Test execution failed: ${(e as Error).message}`);
           }
 
           // Check final test status
@@ -802,7 +811,7 @@ export async function runAutopilot(
 
         if (!testPassed) {
           const testErrors = ((comp.testResult as Record<string, unknown>)?.errors as string[]) || [];
-          log.error(`[${cid}] Test failed after all fix rounds — STOPPING pipeline: ${testErrors[0] || 'test failed'}`);
+          alog.error(`[${cid}] Test failed after all fix rounds — STOPPING pipeline: ${testErrors[0] || 'test failed'}`);
           entry.status.progress.failed++;
           entry.status.componentResults.push({ id: cid, label: compLabel, status: 'test_failed', error: testErrors[0] || 'Test failed after all fix rounds' });
           break;
@@ -813,7 +822,7 @@ export async function runAutopilot(
         emitChange('memory');
 
       } catch (componentErr) {
-        log.error(`[${cid}] Uncaught error processing ${compLabel} — STOPPING pipeline: ${(componentErr as Error).message}`);
+        alog.error(`[${cid}] Uncaught error processing ${compLabel} — STOPPING pipeline: ${(componentErr as Error).message}`);
         entry.status.progress.failed++;
         entry.status.componentResults.push({ id: cid, label: compLabel, status: 'error', error: (componentErr as Error).message });
         break; // STOP — don't continue with broken state
@@ -825,18 +834,20 @@ export async function runAutopilot(
       currentComponent: null,
     });
     // Final summary with per-component status
-    log.info(`\n${'═'.repeat(60)}`);
-    log.info(`AUTOPILOT ${entry.status.progress.failed > 0 ? 'FAILED' : 'COMPLETED'}: ${entry.status.progress.completed} completed, ${entry.status.progress.failed} failed, ${entry.status.progress.skipped} skipped`);
+    alog.info(`\n${'═'.repeat(60)}`);
+    alog.info(`AUTOPILOT ${entry.status.progress.failed > 0 ? 'FAILED' : 'COMPLETED'}: ${entry.status.progress.completed} completed, ${entry.status.progress.failed} failed, ${entry.status.progress.skipped} skipped`);
     for (const cr of entry.status.componentResults) {
       const icon = cr.status === 'completed' || cr.status === 'already_registered' ? '✅' : cr.status === 'phase_gated' ? '⏸️' : '❌';
-      log.info(`  ${icon} ${cr.label} — ${cr.status}${cr.error ? ': ' + cr.error : ''}`);
+      alog.info(`  ${icon} ${cr.label} — ${cr.status}${cr.error ? ': ' + cr.error : ''}`);
     }
-    log.info(`${'═'.repeat(60)}\n`);
+    alog.info(`${'═'.repeat(60)}\n`);
 
   } catch (fatalErr) {
-    log.error(`Autopilot fatal error: ${(fatalErr as Error).message}`);
+    alog.error(`Autopilot fatal error: ${(fatalErr as Error).message}`);
     updateStatus({ status: 'failed', currentComponent: null });
   } finally {
+    // Save complete autopilot terminal log to project debug directory
+    alog.flush();
     // Keep status for 1 hour, then clean up
     setTimeout(() => runningAutopilots.delete(projectId), 60 * 60 * 1000);
   }
