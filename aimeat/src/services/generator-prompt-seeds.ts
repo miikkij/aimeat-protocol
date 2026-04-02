@@ -1943,17 +1943,35 @@ entry: index.html
     group: 'generator',
     name: 'Cortex Test (from Spec)',
     description: 'Browser-side cortex test — 6-step quality pattern, golden samples, full example.',
-    content: `{{disclaimer}}You are generating TEST CODE for a component in an AIMEAT service.
+    content: `{{disclaimer}}You are generating TEST CODE for a CORTEX LIBRARY in an AIMEAT service.
 
 ## Component Under Test
 - Type: cortex
 - Label: {{lib_name}}
 - Registered as: {{wraps_extension}}
+
+{{cortex_methods}}
+
+## CRITICAL: What to Test and What NOT to Test
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  Test ONLY the cortex library methods listed above.                     ║
+║  Access them via: window.AIMEAT.{{lib_name}}.methodName(params)         ║
+║                                                                         ║
+║  Do NOT call init(), checkChanges(), or any scheduled/bootstrap actions. ║
+║  Do NOT use callExt(), readExtMemory(), or testFetch() — these do NOT   ║
+║  exist in the browser test page.                                        ║
+║  Do NOT call extension actions directly — only call cortex methods.     ║
+║                                                                         ║
+║  Every method takes a SINGLE OBJECT parameter: lib.search({query: '...'})║
+║  NEVER use positional params: lib.search('...') is WRONG.              ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
 {{golden_samples}}{{test_scenarios}}
 ## Data Structures (from blueprint — test against THESE shapes)
 {{structures}}
 
-## Action Contracts (from blueprint — test THESE methods with THESE shapes)
+## Cortex Action Contracts (test THESE methods with THESE shapes)
 {{action_contracts}}
 
 {{project_context}}
@@ -1975,7 +1993,7 @@ For CORTEX tests:
 
 Every test MUST follow this pattern for EVERY API call:
 
-1. **Call** — invoke the method with real, meaningful parameters
+1. **Call** — invoke the method with real, meaningful parameters as an OBJECT: \\\`lib.methodName({key: value})\\\`
 2. **Log** — log the FULL response: \\\`log('method returned: ' + JSON.stringify(result))\\\`
 3. **Assert not null** — \\\`if (result === null) fail('method: got null')\\\`
 4. **Assert shape** — check specific field names and types from the cortex code
@@ -2001,72 +2019,61 @@ log('method returned: ' + JSON.stringify(result));
 const lib = window.AIMEAT.myDomainLib;
 if (!lib) { fail('Library not loaded'); window.__testResults = results; return; }
 
-// 1. INIT — verify readiness
-const initResult = await lib.init();
-log('init returned: ' + JSON.stringify(initResult));
-if (!initResult) fail('init: returned null');
-else if (typeof initResult.ready !== 'boolean') fail('init: missing ready field');
-else pass('init: ready=' + initResult.ready);
-
-// 2. SEARCH — verify real API data comes back
-const searchResult = await lib.search('test query');
+// 1. SEARCH — verify real API data comes back (object params!)
+const searchResult = await lib.search({query: 'test'});
 log('search returned: ' + JSON.stringify(searchResult));
 if (!searchResult) fail('search: returned null');
 else if (!Array.isArray(searchResult.items)) fail('search: items should be array');
 else if (searchResult.items.length === 0) fail('search: got empty results for known query');
 else pass('search: got ' + searchResult.items.length + ' results');
 
+// 2. GET — verify single item retrieval
+const item = await lib.getItem({id: searchResult.items[0].id});
+log('getItem returned: ' + JSON.stringify(item));
+if (!item) fail('getItem: returned null');
+else pass('getItem: returned item');
+
 // 3. WRITE — add item, then READ BACK to verify
-const addResult = await lib.addItem('test-id', 'Test Name');
+const addResult = await lib.addItem({id: 'test-id', name: 'Test Name'});
 log('addItem returned: ' + JSON.stringify(addResult));
 if (!addResult) fail('addItem: returned null');
-else if (!addResult.success) fail('addItem: success not true');
+else pass('addItem: succeeded');
 
 // 3b. READ BACK — verify the item was actually saved
 const listAfterAdd = await lib.getItems();
 log('getItems after add: ' + JSON.stringify(listAfterAdd));
-if (!listAfterAdd || !listAfterAdd.items) fail('getItems: returned null after add');
+if (!listAfterAdd || !Array.isArray(listAfterAdd)) fail('getItems: returned null after add');
 else {
-  const found = listAfterAdd.items.find(i => i.id === 'test-id');
+  const found = listAfterAdd.find(i => i.id === 'test-id');
   if (!found) fail('addItem: item not found in list after add');
   else pass('addItem: item persisted and readable');
 }
 
 // 4. DELETE — remove item, then READ BACK to verify
-const removeResult = await lib.removeItem('test-id');
+const removeResult = await lib.removeItem({id: 'test-id'});
 log('removeItem returned: ' + JSON.stringify(removeResult));
 if (!removeResult) fail('removeItem: returned null');
 
 // 4b. READ BACK — verify removal
 const listAfterRemove = await lib.getItems();
 log('getItems after remove: ' + JSON.stringify(listAfterRemove));
-if (listAfterRemove && listAfterRemove.items) {
-  const stillThere = listAfterRemove.items.find(i => i.id === 'test-id');
+if (listAfterRemove && Array.isArray(listAfterRemove)) {
+  const stillThere = listAfterRemove.find(i => i.id === 'test-id');
   if (stillThere) fail('removeItem: item still in list after remove');
   else pass('removeItem: item removed successfully');
 }
-
-// 5. ERROR HANDLING — test with invalid input
-const badResult = await lib.getItem(null);
-log('getItem(null) returned: ' + JSON.stringify(badResult));
-// Should return null or error, not crash
-pass('getItem(null): handled gracefully');
 
 window.__testResults = results;
 \\\`\\\`\\\`
 
 Apply this EXACT pattern to the component under test. Use the actual method names and field names from the component code.
-{{cortex_methods}}
-
-## Platform Rules
-{{extension_consumption_rules}}
 
 ## Output Rules
 1. Return ONLY executable JavaScript code — NO markdown fences, NO explanation text
 2. NO import/require/export — sandbox environment
 3. Self-contained async function body
 4. Set window.__testResults = { passed, errors, details }`,
-    variables: ['disclaimer', 'lib_name', 'wraps_extension', 'golden_samples', 'test_scenarios', 'structures', 'action_contracts', 'project_context', 'cortex_methods', 'extension_consumption_rules'],
+    variables: ['disclaimer', 'lib_name', 'wraps_extension', 'golden_samples', 'test_scenarios', 'structures', 'action_contracts', 'project_context', 'cortex_methods'],
     usedIn: ['generator-autopilot'],
   },
 
