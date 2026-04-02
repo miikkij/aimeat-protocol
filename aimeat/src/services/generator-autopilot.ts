@@ -576,11 +576,14 @@ export async function runAutopilot(
               testPromptText = await buildPrompt(storage, 'gen-test-extension-spec', {
                 blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec,
                 selfSpec: comp.spec as Record<string, unknown>, extensionName: comp.registeredAs as string,
+                completedComponents: [comp] as unknown as ComponentState[], // pass current comp with probeResults for golden samples
               } as unknown as PromptRuntimeData);
             } else if (comp.spec && compType === 'cortex' && (comp.spec as Record<string, unknown>).wrapsExtension) {
+              const freshCompsForTest = await loadComponents();
               testPromptText = await buildPrompt(storage, 'gen-test-cortex-spec', {
                 blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec,
                 selfSpec: comp.spec as Record<string, unknown>,
+                completedComponents: freshCompsForTest.filter(c => c.registeredAs) as unknown as ComponentState[],
               } as unknown as PromptRuntimeData);
             } else {
               // Fallback — for components without specs, use a generic test prompt
@@ -588,6 +591,7 @@ export async function runAutopilot(
                 blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec,
                 selfSpec: comp.spec as Record<string, unknown>,
                 extensionName: comp.registeredAs as string,
+                completedComponents: [comp] as unknown as ComponentState[],
               } as unknown as PromptRuntimeData);
             }
 
