@@ -150,21 +150,21 @@ export function ProjectDashboard({ projectId, onBack, session, showToast, orSett
         </p>
       `}
 
-      <!-- Blueprint & Interview Spec (always visible so user can inspect) -->
-      ${project?.blueprint && html`
-        <details class="pf-gen-data-viewer mb-half">
-          <summary class="text-caption" style="cursor:pointer;user-select:none;font-weight:600">
-            📋 Blueprint (${(project.blueprint.components || []).length} components, ${(project.blueprint.testScenarios || []).length} test scenarios)
-          </summary>
-          <pre class="pf-gen-data-pre">${JSON.stringify(project.blueprint, null, 2)}</pre>
-        </details>
-      `}
+      <!-- Interview Spec & Blueprint (always visible so user can inspect) -->
       ${interviewSpec && html`
         <details class="pf-gen-data-viewer mb-half">
           <summary class="text-caption" style="cursor:pointer;user-select:none;font-weight:600">
             📝 Interview Spec (${(interviewSpec.dataSources || []).length} data sources, ${(interviewSpec.useCases || []).length} use cases)
           </summary>
           <pre class="pf-gen-data-pre">${JSON.stringify(interviewSpec, null, 2)}</pre>
+        </details>
+      `}
+      ${project?.blueprint && html`
+        <details class="pf-gen-data-viewer mb-half">
+          <summary class="text-caption" style="cursor:pointer;user-select:none;font-weight:600">
+            📋 Blueprint (${(project.blueprint.components || []).length} components, ${(project.blueprint.testScenarios || []).length} test scenarios)
+          </summary>
+          <pre class="pf-gen-data-pre">${JSON.stringify(project.blueprint, null, 2)}</pre>
         </details>
       `}
 
