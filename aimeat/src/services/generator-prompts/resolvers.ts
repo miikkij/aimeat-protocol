@@ -779,38 +779,37 @@ function resolveTestExtensionSpec(data: PromptRuntimeData): Vars {
 }
 
 function resolveTestCortexSpec(data: PromptRuntimeData): Vars {
-  // Match browser buildTestPrompt() for cortex — golden samples, methods, structures
   const bp = data.blueprint;
   const spec = data.selfSpec as Record<string, unknown> | undefined;
   const libName = (spec?.libName as string) || '';
   const wrapsExt = (spec?.wrapsExtension as string) || '';
 
-  // Golden samples from probes
+  // Cortex methods from blueprint — this is the DEFINITIVE list of what to test
+  const bpComp = bp.components?.find(c => c.label === data.componentLabel);
+  let cortexMethods = '';
+  if (bpComp) {
+    const methods = (bpComp.produces || []).filter((p: string) => p.startsWith('api:')).map((p: string) => p.replace('api:', ''));
+    if (methods.length > 0) cortexMethods = `\n## Cortex Methods to Test (from blueprint — test ALL of these and NOTHING ELSE)\n${methods.map((m: string) => `- ${m}(params)`).join('\n')}\n\nTest ONLY these methods via window.AIMEAT.${libName}. Do NOT call init(), checkChanges(), or any scheduled/bootstrap actions — those are server-only extension jobs, not cortex library methods.\n`;
+  }
+
+  // Golden samples from probes — labeled as EXTENSION responses for context
   const probes = (data.completedComponents || [])
     .find(c => c.type === 'extension')?.probeResults as Array<Record<string, unknown>> | undefined;
   let goldenSamples = '';
   if (probes && probes.length > 0) {
     const successful = probes.filter(p => (p.status as number) === 200 && p.response);
     if (successful.length > 0) {
-      goldenSamples = '\n## GOLDEN SAMPLES — Real API responses\n\n';
+      goldenSamples = '\n## GOLDEN SAMPLES — Real responses from the EXTENSION that the cortex wraps\n\nThese show what the extension returns. The cortex methods call these internally.\nUse these to understand the data shapes, but test the CORTEX methods listed above, not the extension actions.\n\n';
       for (const p of successful) goldenSamples += `### ${p.action}(${JSON.stringify(p.input)})\n\`\`\`json\n${JSON.stringify(p.response, null, 2)}\n\`\`\`\n\n`;
     }
   }
 
-  // Cortex methods from blueprint
-  const bpComp = bp.components?.find(c => c.label === data.componentLabel);
-  let cortexMethods = '';
-  if (bpComp) {
-    const methods = (bpComp.produces || []).filter((p: string) => p.startsWith('api:')).map((p: string) => p.replace('api:', ''));
-    if (methods.length > 0) cortexMethods = `\n## Cortex Methods to Test (from blueprint — test ALL)\n${methods.map((m: string) => `- ${m}()`).join('\n')}\n`;
-  }
-
-  // Test scenarios
+  // Test scenarios from blueprint (if any exist for this cortex component)
   let testScenarios = '';
   if (bp.testScenarios && bpComp) {
     const scenarios = (bp.testScenarios || []).filter(ts => ts.component === bpComp.id).flatMap(ts => ts.scenarios || []);
     if (scenarios.length > 0) {
-      testScenarios = '\n## Test Scenarios (from blueprint — test EXACTLY these)\n\n' +
+      testScenarios = '\n## Test Scenarios (from blueprint)\n\n' +
         scenarios.map((s, i) => `${i + 1}. Call ${s.action}(${JSON.stringify(s.input)})\n   Expected: ${s.expect}`).join('\n\n') +
         '\n\nTest EVERY scenario above.\n';
     }
@@ -819,24 +818,33 @@ function resolveTestCortexSpec(data: PromptRuntimeData): Vars {
   const structures = bp.dataModel?.structures
     ? Object.entries(bp.dataModel.structures).map(([name, schema]) => `### ${name}\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\``).join('\n\n')
     : 'No structures defined';
+
+  // FIX #2: Filter action contracts to cortex: only — extension actions confuse the LLM into testing them directly
   const actionContracts = bp.dataModel?.actions
-    ? Object.entries(bp.dataModel.actions).map(([name, def]) => `- **${name}**: input=${JSON.stringify(def.input || {})}, output=${(def.output as Record<string, unknown>)?.$ref ? '$ref:' + (def.output as Record<string, unknown>).$ref : JSON.stringify((def as Record<string, unknown>).output || 'any')}`).join('\n')
+    ? Object.entries(bp.dataModel.actions)
+        .filter(([name]) => name.startsWith('cortex:'))
+        .map(([name, def]) => `- **${name}**: input=${JSON.stringify(def.input || {})}, output=${(def.output as Record<string, unknown>)?.$ref ? '$ref:' + (def.output as Record<string, unknown>).$ref : JSON.stringify((def as Record<string, unknown>).output || 'any')}`)
+        .join('\n')
     : 'No actions defined';
 
-  // APP test instructions — browser lines 228-235
-  const appApis = bpComp ? (bpComp.consumes || []).filter((p: string) => p.startsWith('api:')).map((p: string) => p.replace('api:', '')) : [];
-  let appTestBlock = `\nFor APP tests:
+  // FIX #6: Only include APP test block for app-domain cortex, not data cortex
+  const subtype = bpComp?.subtype as string || '';
+  let appTestBlock = '';
+  if (subtype === 'app-domain') {
+    const appApis = bpComp ? (bpComp.consumes || []).filter((p: string) => p.startsWith('api:')).map((p: string) => p.replace('api:', '')) : [];
+    appTestBlock = `\nFor APP tests:
 - The app is already loaded on the test page
 - Authentication IS available
 - Wait for data to render: await new Promise(r => setTimeout(r, 3000));
 - Check DOM elements, click buttons, verify results
 - Verify actual content renders (not translation keys like "search.title")
 - Verify API calls return real data visible in the UI\n`;
-  if (appApis.length > 0) {
-    appTestBlock += `\n## App APIs (verify they work in the UI)\n${appApis.map((a: string) => `- ${a}`).join('\n')}\n`;
+    if (appApis.length > 0) {
+      appTestBlock += `\n## App APIs (verify they work in the UI)\n${appApis.map((a: string) => `- ${a}`).join('\n')}\n`;
+    }
   }
 
-  // Project context with use cases — browser lines 48-55
+  // Project context
   const bpComponents = bp.components?.map(c => `- ${c.id} (${c.type}): ${c.label}`).join('\n') || '';
   const useCases = data.interviewSpec?.useCases
     ? (data.interviewSpec.useCases as Array<Record<string, string>>).map((uc, i) => {
