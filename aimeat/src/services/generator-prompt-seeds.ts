@@ -570,7 +570,8 @@ Return ONLY valid JSON. No markdown fences, no explanation text.
 2. Every action MUST have an "example" with real data from the interview's sample entries.
 3. Extension name describes the PLATFORM CAPABILITY: "prh-ytj", not "company-monitor-extension".
 4. Do NOT mention any app, cortex, UI, or project.
-5. The "dataSources" section MUST include the EXACT base URLs from the Data Sources section above. The code generator needs these URLs to implement the extension. Copy them character-for-character.`,
+5. The "dataSources" section MUST include the EXACT base URLs from the Data Sources section above. The code generator needs these URLs to implement the extension. Copy them character-for-character.
+6. Action IDs MUST be camelCase: "searchCompanies", NOT "search-companies". This is the coding standard.`,
     variables: ['disclaimer', 'data_sources', 'blueprint_actions', 'structures', 'memory_keys', 'schedules', 'config_keys'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
@@ -980,6 +981,7 @@ Translations and settings live in the OWNER namespace — the cortex reads them 
 - Each action's \\\`script\\\` field value must match a \\\`// actions/{script}\\\` comment below the YAML
 - \\\`limits.timeout_ms\\\`: use 30000 for extensions that call external APIs, 5000 for memory-only
 - \\\`limits.max_api_calls\\\`: use 500 for data collectors (many memory writes per run), 100 for simple actions
+- Action IDs MUST be camelCase: \\\`searchCompanies\\\`, NOT \\\`search-companies\\\`. The ID appears in URLs and YAML — camelCase is the standard.
 - All helper functions must be defined INSIDE the same script file — no imports, no cross-file references
 - If two actions need the same helper (e.g., date parsing, data normalization), DUPLICATE the helper in BOTH script files — copy it exactly, do NOT refactor into a shared module
 - NEVER reference functions from another action's script — each script runs in its own ISOLATED V8 sandbox scope
