@@ -608,6 +608,12 @@ When modifying generator prompt templates (`public/js/services/generator-prompts
 4. **NEVER tell cortex to read translations from ext: namespace** — they live in owner namespace
 5. **Extension actions must use** `export default async function(ctx, input) { ... }` — the V8 sandbox requires ES module default export
 
+### Generator Pipeline — Known Phase 4/5 Bugs
+
+Before enabling component cortex, app-domain cortex, or app phases, fix these bugs documented in `docs/superpowers/plans/2026-04-02-phase3-cortex-checklist.md`:
+- **Component/app-domain cortex test uses wrong prompt** — `generator-autopilot.ts` line ~618 checks `wrapsExtension` (only data cortex has it), so component and app-domain cortexes fall through to the extension test prompt (server-side, wrong environment). Fix: check `compType === 'cortex'` instead.
+- **App not tested** — `generator-autopilot.ts` line ~609 only tests extension and cortex, app is skipped entirely. Fix: add `'app'` to the test gate.
+
 ## Naming Convention — AIMEAT Only
 
 **Never use `MEAT` as a standalone prefix.** The project has been fully renamed to `AIMEAT`:
