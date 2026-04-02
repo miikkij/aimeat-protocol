@@ -58,7 +58,16 @@ import {
   saveInterviewSpec, getInterviewSpec,
   writeProjectLog,
 } from '/js/services/generator.js';
-import { buildBlueprintPrompt, buildBlueprintFixPrompt, buildInterviewPrompt } from '/js/services/generator-prompts.js';
+import { buildBlueprintFixPrompt } from '/js/services/generator-prompts.js';
+
+/** Load blueprint or interview prompt from backend (DB seeds — single source of truth) */
+async function loadGeneratorPrompt(projectId, type = 'blueprint', locale = 'en') {
+  const s = window.AIMEAT?.auth?.getSession?.();
+  if (!s) throw new Error('Not authenticated');
+  const resp = await s.fetch(`/v1/generator/${projectId}/prompts?type=${type}&locale=${locale}`);
+  if (!resp.ok) throw new Error(resp.error?.message || 'Failed to load prompt');
+  return resp.data?.prompt || '';
+}
 import { validateBlueprint, validateInterviewSpec, validateSpecQuality } from '/js/services/generator-validate.js';
 import { OpenRouterSettings, SettingsCollectionView } from './generator-settings.js';
 import { runWithAi } from './generator-detail.js';
@@ -157,19 +166,13 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
   }
 
   async function handleCopyBlueprintPrompt() {
-    // Fetch installed cortex libraries for the catalog
-    let cortexLibs = null;
     try {
-      const resp = await apiGet('/v1/cortex');
-      if (resp.ok !== false && resp.data?.extensions) {
-        cortexLibs = resp.data.extensions
-          .filter(e => e.status === 'active')
-          .map(e => ({ name: e.name, description: e.description, components: e.components }));
-      }
-    } catch { /* proceed without catalog */ }
-    const prompt = buildBlueprintPrompt(description, interviewParsed, cortexLibs);
-    navigator.clipboard.writeText(prompt).catch(() => {});
-    showToast?.(t('profile.generator.blueprintPromptCopied'));
+      const prompt = await loadGeneratorPrompt(project.projectId, 'blueprint');
+      navigator.clipboard.writeText(prompt).catch(() => {});
+      showToast?.(t('profile.generator.blueprintPromptCopied'));
+    } catch (e) {
+      showToast?.(e.message, true);
+    }
   }
 
   async function handleSubmitBlueprint() {
@@ -200,17 +203,21 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
   }
 
   if (phase === 'interview') {
-    function handleCopyInterviewPrompt() {
-      const prompt = buildInterviewPrompt(description, getLocale());
-      navigator.clipboard.writeText(prompt).catch(() => {});
-      showToast?.(t('profile.generator.interviewPromptCopied'));
+    async function handleCopyInterviewPrompt() {
+      try {
+        const prompt = await loadGeneratorPrompt(project.projectId, 'interview', getLocale());
+        navigator.clipboard.writeText(prompt).catch(() => {});
+        showToast?.(t('profile.generator.interviewPromptCopied'));
+      } catch (e) {
+        showToast?.(e.message, true);
+      }
     }
 
     async function handleRunInterviewAi() {
       if (!project) return;
       setAiRunning('interview');
       try {
-        const prompt = buildInterviewPrompt(description, getLocale());
+        const prompt = await loadGeneratorPrompt(project.projectId, 'interview', getLocale());
         let content = await runWithAi(project.projectId, prompt);
         setInterviewSpec(content);
         // Auto-validate
@@ -338,16 +345,7 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
     if (!project) return;
     setAiRunning('blueprint');
     try {
-      let cortexLibs = null;
-      try {
-        const resp = await apiGet('/v1/cortex');
-        if (resp.ok !== false && resp.data?.extensions) {
-          cortexLibs = resp.data.extensions
-            .filter(e => e.status === 'active')
-            .map(e => ({ name: e.name, description: e.description, components: e.components }));
-        }
-      } catch { /* proceed without catalog */ }
-      const prompt = buildBlueprintPrompt(description, interviewParsed, cortexLibs);
+      const prompt = await loadGeneratorPrompt(project.projectId, 'blueprint');
       let content = await runWithAi(project.projectId, prompt);
       setBlueprintResult(content);
       // Auto-validate

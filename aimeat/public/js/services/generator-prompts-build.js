@@ -115,7 +115,7 @@ Format:
     { "id": "translation-1", "type": "translation", "label": "Human-readable name (fi)", "produces": ["memory:i18n.fi"], "consumes": [] },
     { "id": "translation-2", "type": "translation", "label": "Human-readable name (en)", "produces": ["memory:i18n.en"], "consumes": [] },
     { "id": "ext-1", "type": "extension", "label": "Human-readable name", "produces": ["memory:items.*"], "consumes": ["memory:settings.config"], "schedules": [{"action":"init","cron":"@activate"},{"action":"collect","cron":"0 2 * * *"}] },
-    { "id": "cortex-data", "type": "cortex", "subtype": "data", "label": "Data layer", "produces": ["api:getData", "api:search"], "consumes": ["memory:items.*", "memory:settings.config"], "uses": [] },
+    { "id": "cortex-data", "type": "cortex", "subtype": "data", "label": "Data layer", "produces": ["api:getData", "api:search", "api:addItem", "api:removeItem"], "consumes": ["memory:items.*", "memory:settings.config"], "uses": [] },
     { "id": "component-item-card", "type": "cortex", "subtype": "component", "label": "Item Card", "produces": ["ui:item-card"], "consumes": ["api:getData"], "uses": ["aimeat-ui-viewers"] },
     { "id": "component-search-input", "type": "cortex", "subtype": "component", "label": "Search Input", "produces": ["ui:search-input"], "consumes": ["api:search"], "uses": ["aimeat-ui-forms"] },
     { "id": "cortex-app", "type": "cortex", "subtype": "app-domain", "label": "App domain", "produces": ["api:init", "api:render"], "consumes": ["ui:item-card", "ui:search-input"], "uses": ["aimeat-ui-nav"] },
@@ -168,8 +168,12 @@ Format:
     "actions": {
       "ext:search": { "input": { "query": { "type": "string" } }, "output": { "$ref": "SearchResult" } },
       "ext:getItem": { "input": { "id": { "type": "string" } }, "output": { "$ref": "Item" } },
+      "ext:addItem": { "input": { "id": { "type": "string" }, "name": { "type": "string" } }, "output": { "$ref": "Item" } },
+      "ext:removeItem": { "input": { "id": { "type": "string" } }, "output": { "type": "boolean" } },
       "cortex:search": { "input": { "query": { "type": "string" } }, "output": { "$ref": "SearchResult" } },
-      "cortex:getItem": { "input": { "id": { "type": "string" } }, "output": { "$ref": "Item" } }
+      "cortex:getItem": { "input": { "id": { "type": "string" } }, "output": { "$ref": "Item" } },
+      "cortex:addItem": { "input": { "id": { "type": "string" }, "name": { "type": "string" } }, "output": { "$ref": "Item" } },
+      "cortex:removeItem": { "input": { "id": { "type": "string" } }, "output": { "type": "boolean" } }
     }
   }
 }
@@ -204,7 +208,7 @@ Rules:
 - Group components into logical phases
 - Include ALL components needed for a complete, working service
 - Cortex components are layered: data cortex phase → feature cortex phase → app-domain cortex phase → app phase
-- Data cortex: pure data access, wraps extension + AIMEAT platform libraries
+- Data cortex: ALL data operations (reads AND writes), wraps extension + AIMEAT platform libraries. Every extension action must have a corresponding cortex api: method — the data cortex is the ONLY gateway, UI components never call the extension directly
 - Feature cortex: self-contained data+UI per use case, uses data cortex + platform UI cortex libraries
 - App-domain cortex: composes all features + auth + translations, entry point for app
 - ALWAYS create at least 3 cortex components: one data, one or more feature, one app-domain
@@ -234,14 +238,22 @@ Rules for dataModel:
 
 ## Data Pipeline Verification (do this BEFORE listing components)
 
-For each VIEW in the spec, trace the data path:
+### Step 1: Trace RENDER paths (what data does each view display?)
+For each VIEW in the spec:
 1. What fields does this view need to render?
 2. Where does each field come from? (external source, computed, user input)
 3. Does the source provide this field directly, or does a component need to transform/enrich it?
 4. If a field has no clear path from source to view, add a component that produces it.
 
-Example: A view needs enriched data. If the source only provides raw identifiers,
-the blueprint must include a component that enriches them (e.g., resolving IDs to names, adding computed scores).
+### Step 2: Trace USER ACTION paths (what can the user DO?)
+For each USE CASE in the spec:
+1. What actions can the user take? (add, remove, save, update, delete, submit)
+2. For each action, trace the full path: UI component → cortex-data → extension action
+3. Does cortex-data produce an api: method for this action? If not, add it.
+4. Does the UI component consume that api: method? If not, add it to consumes.
+5. If an extension has a write action but no cortex api: method exposes it, the user cannot reach it — this is a gap.
+
+Both reads AND writes must have complete paths from UI to extension. If a use case says "add item to list", there must be an api:addItem in cortex-data AND the relevant UI component must consume it.
 
 ## Component Dependencies
 

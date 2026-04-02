@@ -432,7 +432,9 @@ export async function runAutopilot(
           for (let attempt = 1; attempt <= maxRetries && !vr.valid && !entry.cancelFlag; attempt++) {
             alog.info(`[${cid}] Retry ${attempt}/${maxRetries} for ${compLabel}`);
             const fixPrompt = await buildPrompt(storage, 'gen-fix', { blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec, originalPrompt: prompt, code: content, errors: vr.errors, componentType: compType } as unknown as PromptRuntimeData);
+            debug.writeArtifact(cid, `validation-fix-${attempt}-prompt`, fixPrompt).catch(() => {});
             content = await callLLM(fixPrompt);
+            debug.writeArtifact(cid, `validation-fix-${attempt}-response`, content).catch(() => {});
             if (compType !== 'cortex') content = stripCodeblock(content);
             vr = validateComponent(compType, content, blueprint as unknown as Blueprint);
           }
@@ -631,7 +633,9 @@ export async function runAutopilot(
             }
 
             alog.info(`[${cid}] Generating test for ${compLabel}`);
+            debug.writeArtifact(cid, 'test-prompt', testPromptText).catch(() => {});
             let testCode = await callLLM(testPromptText);
+            debug.writeArtifact(cid, 'test-raw-response', testCode).catch(() => {});
             testCode = stripCodeblock(testCode);
 
             const testEnvironment = (compType === 'cortex' || compType === 'app') ? 'browser' : 'server';
@@ -689,7 +693,9 @@ export async function runAutopilot(
                   errors: (testResult.errors as string[]) || [],
                   testContext: testResult as Record<string, unknown>,
                 } as unknown as PromptRuntimeData);
+                debug.writeArtifact(cid, `test-fix-${testFixRound}-reflection-prompt`, reflectionPrompt).catch(() => {});
                 reflectionDiagnosis = await callLLM(reflectionPrompt);
+                debug.writeArtifact(cid, `test-fix-${testFixRound}-reflection-response`, reflectionDiagnosis).catch(() => {});
                 alog.info(`[${cid}] Reflection: ${reflectionDiagnosis.slice(0, 200)}`);
               } catch (e) {
                 alog.warn(`[${cid}] Reflection failed: ${(e as Error).message}`);
@@ -713,7 +719,9 @@ export async function runAutopilot(
                 previousAttempts,
                 reflectionDiagnosis,
               } as unknown as PromptRuntimeData);
+              debug.writeArtifact(cid, `test-fix-${testFixRound}-fix-prompt`, fixPrompt).catch(() => {});
               let fixedContent = await callLLM(fixPrompt);
+              debug.writeArtifact(cid, `test-fix-${testFixRound}-fix-response`, fixedContent).catch(() => {});
               if (compType !== 'cortex') fixedContent = stripCodeblock(fixedContent);
 
               // Step 3: VALIDATE the fix
@@ -729,7 +737,9 @@ export async function runAutopilot(
                   errors: fixVr.errors,
                   componentType: compType,
                 } as unknown as PromptRuntimeData);
+                debug.writeArtifact(cid, `test-fix-${testFixRound}-refix-prompt`, fixPrompt2).catch(() => {});
                 fixedContent = await callLLM(fixPrompt2);
+                debug.writeArtifact(cid, `test-fix-${testFixRound}-refix-response`, fixedContent).catch(() => {});
                 if (compType !== 'cortex') fixedContent = stripCodeblock(fixedContent);
                 fixVr = validateComponent(compType, fixedContent, blueprint as unknown as Blueprint);
               }
@@ -816,7 +826,9 @@ export async function runAutopilot(
                   previousAttempts,
                   testContext: testResult as Record<string, unknown>,
                 } as unknown as PromptRuntimeData);
+                debug.writeArtifact(cid, 'fresh-generation-prompt', freshPrompt).catch(() => {});
                 let freshContent = await callLLM(freshPrompt);
+                debug.writeArtifact(cid, 'fresh-generation-response', freshContent).catch(() => {});
                 if (compType !== 'cortex') freshContent = stripCodeblock(freshContent);
                 const freshVr = validateComponent(compType, freshContent, blueprint as unknown as Blueprint);
                 if (freshVr.valid) {

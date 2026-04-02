@@ -302,6 +302,22 @@ assert(
   `${dataApiSpecVars.structures?.length || 0} chars`
 );
 
+// blueprint_methods must list the blueprint's produces: api:* method names
+assert(
+  dataApiSpecVars.blueprint_methods !== 'No api: methods found in blueprint.',
+  'blueprint_methods is NOT fallback',
+  dataApiSpecVars.blueprint_methods?.slice(0, 100)
+);
+
+// Must contain all 5 blueprint cortex-data methods
+const expectedBlueprintMethods = ['searchCompanies', 'getCompany', 'getWatchlist', 'getChanges', 'getComparisons'];
+for (const method of expectedBlueprintMethods) {
+  assert(
+    dataApiSpecVars.blueprint_methods?.includes(method) || false,
+    `blueprint_methods contains "${method}"`,
+  );
+}
+
 // ═══ gen-cortex-data resolver ═══
 console.log('\n═══ gen-cortex-data resolver ═══');
 

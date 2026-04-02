@@ -752,6 +752,8 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
   // Override getSession synchronously — before aimeat-data.js loads
   var origGetSession = AIMEAT.auth.getSession.bind(AIMEAT.auth);
   AIMEAT.auth.getSession = function() { return session || origGetSession(); };
+  // Also set AIMEAT.session directly — cortex IIFEs use AIMEAT.session.fetch()
+  AIMEAT.session = session;
 })();
 </script>
 <script nonce="${nonce}" src="/v1/libs/aimeat-data.js"></script>
@@ -1348,9 +1350,36 @@ window.__testRunning = true;
       const project = projectRec.value as { description?: string };
       const interviewSpec = interviewRec?.value ?? null;
 
-      // Blueprint prompt — TODO: move to DB seed 'gen-blueprint'
-      // For now, use a simple template since the browser still builds this prompt locally
-      const prompt = `Generate a blueprint JSON for: ${project.description || ''}\n\nInterview spec provided separately.`;
+      const promptType = (req.query.type as string) || 'blueprint';
+
+      if (promptType === 'interview') {
+        // Interview prompt — gen-interview from DB
+        const prompt = await buildPrompt(storage, 'gen-interview', {
+          projectDescription: project.description || '',
+          locale: (req.query.locale as string) || (interviewSpec as Record<string, unknown>)?.locale as string || 'en',
+        } as unknown as PromptRuntimeData);
+        res.json(success(config.nodeId, { prompt }));
+        return;
+      }
+
+      // Blueprint prompt — gen-blueprint from DB
+      // Load cortex catalog for available libraries
+      let cortexCatalog: Array<Record<string, unknown>> = [];
+      try {
+        const cortexResp = await fetch(`http://localhost:${config.port}/v1/cortex`, {
+          headers: { 'Authorization': req.headers.authorization || '' },
+        });
+        const cortexJson = await cortexResp.json() as { data?: Array<Record<string, unknown>> };
+        cortexCatalog = (cortexJson.data || []).filter((c: Record<string, unknown>) =>
+          c.active && ((c.components as Array<Record<string, unknown>>) || []).some((comp: Record<string, unknown>) => comp.type === 'lib')
+        );
+      } catch { /* cortex catalog optional */ }
+
+      const prompt = await buildPrompt(storage, 'gen-blueprint', {
+        projectDescription: project.description || '',
+        interviewSpec,
+        cortexCatalog,
+      } as unknown as PromptRuntimeData);
 
       res.json(success(config.nodeId, { prompt }));
     }
