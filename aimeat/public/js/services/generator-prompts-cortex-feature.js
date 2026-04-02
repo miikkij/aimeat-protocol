@@ -1,5 +1,6 @@
 /**
  * @file generator-prompts-cortex-feature.js
+ * @deprecated DEPRECATED — kept as backup/reference. Prompts now served from database seeds.
  * @description Prompt template for generating feature cortex components.
  *   Feature cortex = one use case, data + UI combined. Self-contained module
  *   that exports render(container). Like aimeat-charts exports ChartPanel.

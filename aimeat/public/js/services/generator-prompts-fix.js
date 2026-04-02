@@ -1,5 +1,6 @@
 /**
  * @file generator-prompts-fix.js
+ * @deprecated DEPRECATED — kept as backup/reference. Prompts now served from database seeds.
  * @description Fix, edit, and impact analysis prompts for the service generator —
  *   retry prompts for validation failures, targeted edit prompts, and change
  *   impact analysis prompts.

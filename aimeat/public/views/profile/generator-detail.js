@@ -29,7 +29,8 @@ import { apiPost } from '/js/api.js';
 import {
   saveComponent, saveSpec, registerComponent, reregisterComponent, writeProjectLog, writeDebugArtifact,
 } from '/js/services/generator.js';
-import { buildComponentPrompt, buildFixPrompt, buildReflectionPrompt, buildTestPrompt } from '/js/services/generator-prompts.js';
+// DEPRECATED: browser-side prompt builders no longer used. Prompts loaded from database via API.
+// import { buildComponentPrompt, buildFixPrompt, buildReflectionPrompt, buildTestPrompt } from '/js/services/generator-prompts.js';
 import { validateComponent } from '/js/services/generator-validate.js';
 import { validateExtensionSpec, validateDataApiSpec } from '/js/services/generator-spec-validate.js';
 import { verifyContract } from '/js/services/generator-contract.js';
@@ -128,6 +129,24 @@ export function cancelAiRequest() {
   if (_activeAiController) _activeAiController.abort();
 }
 
+/* ── Prompt Loading (from database via API — single source of truth) ── */
+
+/**
+ * Load a component prompt from the database via the backend API.
+ * Replaces the old browser-side buildComponentPrompt() which used local JS templates.
+ * @param {string} projectId
+ * @param {string} componentId
+ * @param {'code'|'spec'|'test'} type - prompt type
+ * @returns {Promise<string>} the prompt text
+ */
+async function loadPromptFromBackend(projectId, componentId, type = 'code') {
+  const s = window.AIMEAT?.auth?.getSession?.();
+  if (!s) throw new Error('Not authenticated');
+  const resp = await s.fetch(`/v1/generator/${projectId}/prompts/${componentId}?type=${type}`);
+  if (!resp.ok) throw new Error(resp.error?.message || 'Failed to load prompt');
+  return resp.data?.prompt || '';
+}
+
 /* ── Workflow Helpers ─────────────────────────────────── */
 
 export function getWorkflowStep(component, validationResult, result) {
@@ -194,12 +213,7 @@ export function ComponentDetail({ component, project, components, projectId, int
     }
     // Auto-transition to prompt_ready when opening an unstarted component
     if (component.status === 'not_started') {
-      buildComponentPrompt(
-        component.type, component.label,
-        project.description, project.blueprint,
-        components.filter(c => c.status === 'done'),
-        interviewSpec,
-      ).then(prompt => {
+      loadPromptFromBackend(projectId, component.id, 'code').then(prompt => {
         saveComponent(projectId, {
           ...component, status: 'prompt_ready', prompt,
           history: [...(component.history || []), { action: 'prompt_generated', at: new Date().toISOString(), by: 'system' }],
@@ -208,21 +222,15 @@ export function ComponentDetail({ component, project, components, projectId, int
     }
     // Resolve prompt for display if not already stored on component
     if (!component.prompt) {
-      const completedComps = components.filter(c => c.status === 'done' && c.registeredAs);
-      buildComponentPrompt(
-        component.type, component.label,
-        project.description, project.blueprint, completedComps,
-        interviewSpec,
-      ).then(p => setGeneratedPrompt(p));
+      loadPromptFromBackend(projectId, component.id, 'code')
+        .then(p => setGeneratedPrompt(p))
+        .catch(() => {}); // silently fail if not ready
     }
     // Load spec prompt for extension/cortex types
     if (hasSpec && !specPrompt) {
-      const s = session || window.AIMEAT?.auth?.getSession?.();
-      if (s) {
-        s.fetch(`/v1/generator/${projectId}/prompts/${component.id}?type=spec`).then(resp => {
-          if (resp.ok && resp.data?.prompt) setSpecPrompt(resp.data.prompt);
-        }).catch(() => {});
-      }
+      loadPromptFromBackend(projectId, component.id, 'spec')
+        .then(p => setSpecPrompt(p))
+        .catch(() => {});
     }
     // Load existing spec result
     if (component.spec && !specResult) {
@@ -369,12 +377,7 @@ export function ComponentDetail({ component, project, components, projectId, int
   }
 
   async function handleRegeneratePrompt() {
-    const fresh = await buildComponentPrompt(
-      component.type, component.label,
-      project.description, project.blueprint,
-      components.filter(c => c.status === 'done'),
-      interviewSpec,
-    );
+    const fresh = await loadPromptFromBackend(projectId, component.id, 'code');
     const updated = addHistory(component, 'prompt_regenerated');
     await saveComponent(projectId, { ...updated, status: 'prompt_ready', prompt: fresh });
     showToast?.(t('profile.generator.promptRegenerated'));
@@ -397,12 +400,7 @@ export function ComponentDetail({ component, project, components, projectId, int
   }
 
   async function handleCopyPrompt() {
-    const fresh = await buildComponentPrompt(
-      component.type, component.label,
-      project.description, project.blueprint,
-      components.filter(c => c.status === 'done'),
-      interviewSpec,
-    );
+    const fresh = await loadPromptFromBackend(projectId, component.id, 'code');
     try {
       await navigator.clipboard.writeText(fresh);
       const updated = addHistory(component, 'prompt_copied');
@@ -416,11 +414,7 @@ export function ComponentDetail({ component, project, components, projectId, int
     setAiRunning(true);
     try {
       const completedComps = components.filter(c => c.status === 'done' && c.registeredAs);
-      const fresh = await buildComponentPrompt(
-        component.type, component.label,
-        project.description, project.blueprint, completedComps,
-        interviewSpec,
-      );
+      const fresh = await loadPromptFromBackend(projectId, component.id, 'code');
       writeDebugArtifact(projectId, component.id, 'prompt', fresh);
       let content = await runWithAi(projectId, fresh);
       writeDebugArtifact(projectId, component.id, 'ai-raw-response', content);

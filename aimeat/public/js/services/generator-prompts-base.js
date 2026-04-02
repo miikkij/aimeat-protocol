@@ -1,5 +1,6 @@
 /**
  * @file generator-prompts-base.js
+ * @deprecated DEPRECATED — kept as backup/reference. Prompts now served from database seeds.
  * @description Base constants and helpers for generator prompts — shared context,
  *   instruction disclaimer, per-type component templates, and API summary helpers.
  * @structure

@@ -1,16 +1,22 @@
 /**
  * @file generator-prompts-build.js
- * @description Build prompts for the service generator — blueprint analysis,
- *   structured interview, and per-component-type generation prompts.
+ * @description DEPRECATED — kept as backup/reference only.
+ *   Prompts are now served from the database via GET /v1/generator/:projectId/prompts/:componentId.
+ *   The database seeds (generator-prompt-seeds.ts) are the single source of truth.
+ *   This file is no longer called by the generator UI for code/spec prompts.
+ *   Blueprint and interview prompts may still use this file until they are migrated.
+ *
  * @structure
  *   - buildBlueprintPrompt: produces blueprint generation prompt
  *   - buildInterviewPrompt: produces requirements interview conductor prompt
- *   - buildComponentPrompt: per-type component generation prompt dispatcher
+ *   - buildComponentPrompt: per-type component generation prompt dispatcher (DEPRECATED — use API)
  * @usage
- *   import { buildBlueprintPrompt, buildInterviewPrompt, buildComponentPrompt } from '/js/services/generator-prompts-build.js';
+ *   // OLD (deprecated): import { buildComponentPrompt } from '/js/services/generator-prompts-build.js';
+ *   // NEW: session.fetch('/v1/generator/${projectId}/prompts/${componentId}')
  * @version-history
  *   v1.0.0 — 2026-03-22 — Extracted from generator-prompts.js
  *   v1.1.0 — 2026-03-24 — Add API URL usage rules + notes to extension data source details
+ *   v2.0.0 — 2026-04-02 — DEPRECATED: prompts now served from database. File kept as backup.
  */
 
 import { AIMEAT_CONTEXT, INSTRUCTION_DISCLAIMER, COMPONENT_TEMPLATES, EXTENSION_CONSUMPTION_RULES, summarizeExtensionApi, summarizeCortexApi } from './generator-prompts-base.js';

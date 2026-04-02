@@ -1,5 +1,6 @@
 /**
  * @file generator-prompts-test.js
+ * @deprecated DEPRECATED — kept as backup/reference. Prompts now served from database seeds.
  * @description Test prompt generation for the service generator — produces executable
  *   test code prompts for server-side (extension, memory, translation, msm) and
  *   browser-side (cortex, app) component types.

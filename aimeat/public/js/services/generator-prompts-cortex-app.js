@@ -1,5 +1,6 @@
 /**
  * @file generator-prompts-cortex-app.js
+ * @deprecated DEPRECATED — kept as backup/reference. Prompts now served from database seeds.
  * @description Prompt template for generating app-domain cortex components.
  *   App-domain cortex = composition layer. Combines all feature cortex components
  *   + auth + translations + settings into a single entry point for the app.

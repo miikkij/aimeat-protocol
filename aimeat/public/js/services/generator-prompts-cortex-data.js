@@ -1,5 +1,6 @@
 /**
  * @file generator-prompts-cortex-data.js
+ * @deprecated DEPRECATED — kept as backup/reference. Prompts now served from database seeds.
  * @description Prompt template for generating data cortex components.
  *   Data cortex is the data repository layer — wraps extension actions for
  *   external data, uses AIMEAT platform libraries for internal data.
