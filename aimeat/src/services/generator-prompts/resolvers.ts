@@ -12,6 +12,14 @@
  */
 
 import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+
+/** Log a loud warning when a resolver variable falls back to a default value.
+ *  This means the blueprint/interview data is missing or the filter didn't match. */
+function warnFallback(promptId: string, varName: string, fallbackValue: string): string {
+  logger.error(`[RESOLVER FALLBACK] ⚠️⚠️⚠️ ${promptId} → {{${varName}}} used FALLBACK: "${fallbackValue.slice(0, 80)}" — DATA IS MISSING, PROMPT WILL BE DEGRADED`);
+  return fallbackValue;
+}
 import type {
   PromptRuntimeData, Blueprint, BlueprintComponent, InterviewSpec,
   ComponentState, DataSource,
@@ -61,7 +69,7 @@ export async function resolvePromptVars(
 // ── Helper functions ──
 
 function formatDataSources(dataSources: DataSource[] | undefined): string {
-  if (!dataSources || dataSources.length === 0) return 'No data sources specified.';
+  if (!dataSources || dataSources.length === 0) return warnFallback('helper', 'data_sources', 'No data sources specified.');
   return dataSources.map(ds => {
     const lines: string[] = [`- **${ds.name}**: ${ds.url || 'user-input'}`];
     if (ds.responseEnvelope) {
@@ -80,7 +88,7 @@ function formatDataSources(dataSources: DataSource[] | undefined): string {
 }
 
 function formatStructures(structures: Record<string, unknown> | undefined): string {
-  if (!structures || Object.keys(structures).length === 0) return 'No structures defined.';
+  if (!structures || Object.keys(structures).length === 0) return warnFallback('helper', 'structures', 'No structures defined.');
   return Object.entries(structures).map(([name, schema]) =>
     `### ${name}\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\``
   ).join('\n\n');
@@ -163,9 +171,9 @@ function resolveExtensionSpec(data: PromptRuntimeData): Vars {
 
   return {
     data_sources: formatDataSources(interview?.dataSources),
-    blueprint_actions: compActions || 'Infer from data sources.',
+    blueprint_actions: compActions || warnFallback('gen-extension-spec', 'blueprint_actions', 'Infer from data sources.'),
     structures: formatStructures(bp.dataModel?.structures),
-    memory_keys: compMemoryKeys || 'Infer from actions.',
+    memory_keys: compMemoryKeys || warnFallback('gen-extension-spec', 'memory_keys', 'Infer from actions.'),
     schedules: schedules.length > 0
       ? schedules.map(s => `- ${s.action}: ${s.cron} — ${s.description || ''}`).join('\n')
       : 'None. Add @activate init if the extension needs initialization.',

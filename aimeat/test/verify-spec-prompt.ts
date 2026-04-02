@@ -190,6 +190,82 @@ assert(
   'project_context has use cases'
 );
 
+// ═══ gen-reflection resolver ═══
+console.log('\n═══ gen-reflection resolver ═══');
+
+const reflVars = await resolvePromptVars(
+  null as any,
+  'gen-reflection',
+  {
+    blueprint,
+    interviewSpec,
+    code: 'export default async function(ctx, input) { return {}; }',
+    selfSpec: fakeSpec,
+    errors: ['test error 1', 'test error 2'],
+    testContext: { errors: ['test failed'], trace: [{ fn: 'callExt', args: 'prh-ytj/search({})', result: '{"ok":true}', status: '200' }] },
+  } as unknown as PromptRuntimeData,
+  {}
+);
+
+assert((reflVars.failed_code?.length || 0) > 10, 'reflection: failed_code has content');
+assert(reflVars.errors?.includes('1. test error 1'), 'reflection: errors formatted with numbers');
+assert((reflVars.spec_contract?.length || 0) > 50, 'reflection: spec_contract has content');
+assert(reflVars.test_context?.includes('ACTUAL API RESPONSES'), 'reflection: test_context has trace');
+
+// ═══ gen-fix resolver ═══
+console.log('\n═══ gen-fix resolver ═══');
+
+const fixVars = await resolvePromptVars(
+  null as any,
+  'gen-fix',
+  {
+    blueprint,
+    interviewSpec,
+    originalPrompt: 'Create an extension...',
+    code: 'export default async function(ctx, input) { return {}; }',
+    errors: ['missing action getCompanyDetails'],
+    componentType: 'extension',
+    testContext: { errors: ['test failed'], trace: [] },
+    previousAttempts: [{ round: 1, diagnosis: 'wrong API URL', errors: ['400 from API'] }],
+    reflectionDiagnosis: 'The code uses path params but API needs query params',
+  } as unknown as PromptRuntimeData,
+  { sandbox_constraints: 'SANDBOX RULES HERE', namespace_rules: 'NAMESPACE RULES HERE', extension_consumption_rules: 'EXT RULES HERE' }
+);
+
+assert((fixVars.original_prompt?.length || 0) > 5, 'fix: original_prompt has content');
+assert((fixVars.code?.length || 0) > 5, 'fix: code has content');
+assert(fixVars.errors?.includes('1. missing action'), 'fix: errors formatted');
+assert(fixVars.type_constraints?.includes('SANDBOX RULES'), 'fix: type_constraints has sandbox for extension');
+assert(fixVars.test_context?.includes('Test Failure Context'), 'fix: test_context has content');
+assert(fixVars.previous_attempts?.includes('PREVIOUS FIX ATTEMPTS'), 'fix: previous_attempts has content');
+assert(fixVars.previous_attempts?.includes('wrong API URL'), 'fix: previous_attempts has diagnosis');
+assert(fixVars.reflection_diagnosis?.includes('ROOT CAUSE ANALYSIS'), 'fix: reflection_diagnosis has content');
+
+// ═══ gen-fresh-generation resolver ═══
+console.log('\n═══ gen-fresh-generation resolver ═══');
+
+const freshVars = await resolvePromptVars(
+  null as any,
+  'gen-fresh-generation',
+  {
+    blueprint,
+    interviewSpec,
+    originalPrompt: 'Create an extension...',
+    previousAttempts: [
+      { round: 1, diagnosis: 'wrong API URL', errors: ['400 from API'] },
+      { round: 2, diagnosis: 'missing action', errors: ['getCompanyDetails not found'] },
+    ],
+    testContext: { trace: [{ fn: 'callExt', args: 'test', result: '{"ok":true}', status: '200' }] },
+  } as unknown as PromptRuntimeData,
+  {}
+);
+
+assert((freshVars.original_prompt?.length || 0) > 5, 'fresh: original_prompt has content');
+assert(freshVars.pitfalls?.includes('KNOWN PITFALLS'), 'fresh: pitfalls has content');
+assert(freshVars.pitfalls?.includes('wrong API URL'), 'fresh: pitfalls has diagnosis from round 1');
+assert(freshVars.pitfalls?.includes('missing action'), 'fresh: pitfalls has diagnosis from round 2');
+assert(freshVars.test_trace?.includes('ACTUAL API RESPONSES'), 'fresh: test_trace has content');
+
 // ═══ Summary ═══
 console.log(`\n${'═'.repeat(50)}`);
 console.log(`  PASSED: ${passed}  FAILED: ${failed}`);
