@@ -548,8 +548,12 @@ function resolveReflection(data: PromptRuntimeData): Vars {
   // Match browser buildReflectionPrompt() from fix.js lines 59-78
   const errors = (data.errors || []).map((e, i) => `${i + 1}. ${e}`).join('\n');
   const testCtx = data.testContext ? buildTestContextSection(data.testContext) : '';
+  const specContract = data.selfSpec
+    ? `\`\`\`json\n${JSON.stringify(data.selfSpec, null, 2).slice(0, 3000)}\n\`\`\``
+    : 'No spec available';
   return {
     failed_code: data.code || '',
+    spec_contract: specContract,
     errors,
     test_context: testCtx,
   };
@@ -717,9 +721,15 @@ function resolveTestExtensionSpec(data: PromptRuntimeData): Vars {
       }).join('\n')
     : 'No use cases specified';
 
+  // Extension spec — gives the test the ACTUAL contracted action IDs (not just blueprint guesses)
+  const extensionSpec = data.selfSpec
+    ? `\n## Extension Spec (actual contract — use THESE action IDs)\n\n\`\`\`json\n${JSON.stringify(data.selfSpec, null, 2).slice(0, 3000)}\n\`\`\`\n`
+    : '';
+
   return {
     extension_name: extName,
     golden_samples: goldenSamples,
+    extension_spec: extensionSpec,
     test_scenarios: testScenarios,
     structures,
     action_contracts: actionContracts,

@@ -815,18 +815,18 @@ limits:
   timeout_ms: 30000
   max_api_calls: 500
 actions:
-  - id: first-action
+  - id: firstAction
     description: "What this action does"
     method: POST
-    path: /v1/ext/{name}/first-action
+    path: /v1/ext/{name}/firstAction
     auth: required
     input: {}
     output: {}
-    script: first-action.js
-  - id: second-action
+    script: firstAction.js
+  - id: secondAction
     description: "Another action"
     method: POST
-    path: /v1/ext/{name}/second-action
+    path: /v1/ext/{name}/secondAction
     auth: required
     input:
       type: object
@@ -836,7 +836,7 @@ actions:
       required: [name]
     output:
       type: object
-    script: second-action.js
+    script: secondAction.js
 schedules: []
 
 YAML actions format — EVERY action MUST have "- id:" as the FIRST key:
@@ -1019,6 +1019,9 @@ Translations and settings live in the OWNER namespace — the cortex reads them 
 ## Failed Code
 {{failed_code}}
 
+## Spec Contract (the code was supposed to implement this)
+{{spec_contract}}
+
 ## Errors
 {{errors}}
 {{test_context}}
@@ -1082,7 +1085,8 @@ Return the corrected result in the same format as the original.`,
 - Type: extension
 - Label: {{extension_name}}
 - Registered as: {{extension_name}}
-{{golden_samples}}{{test_scenarios}}
+{{golden_samples}}{{extension_spec}}
+{{test_scenarios}}
 ## Data Structures (from blueprint — test against THESE shapes)
 {{structures}}
 

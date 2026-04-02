@@ -628,6 +628,7 @@ export async function runAutopilot(
                   blueprint: blueprint as unknown as Blueprint,
                   interviewSpec: interviewSpec as unknown as InterviewSpec,
                   code: content,
+                  selfSpec: comp.spec as Record<string, unknown> | undefined,
                   errors: (testResult.errors as string[]) || [],
                   testContext: testResult as Record<string, unknown>,
                 } as unknown as PromptRuntimeData);

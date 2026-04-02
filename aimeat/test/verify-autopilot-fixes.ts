@@ -173,7 +173,9 @@ const validVars = new Set([
   // Fix prompt variables
   'type_constraints', 'test_context', 'previous_attempts', 'reflection_diagnosis',
   // Reflection + fresh generation variables
-  'failed_code', 'pitfalls', 'test_trace',
+  'failed_code', 'pitfalls', 'test_trace', 'spec_contract',
+  // Test prompt extension spec
+  'extension_spec',
   // Test prompt variables
   'golden_samples', 'test_scenarios', 'action_contracts',
   'cortex_methods',
