@@ -1085,6 +1085,16 @@ window.__testRunning = true;
         updatedAt: now,
       });
 
+      // Also delete the separate spec record if it exists
+      try {
+        await storage.deleteMemory(gaii, `generator.${projectId}.spec.${componentId}`);
+      } catch { /* may not exist */ }
+
+      // Also delete the prompt record if stored
+      try {
+        await storage.deleteMemory(gaii, `generator.${projectId}.prompt.${componentId}`);
+      } catch { /* may not exist */ }
+
       emitChange('memory');
       res.json(success(config.nodeId, { reset: true, componentId }));
     }

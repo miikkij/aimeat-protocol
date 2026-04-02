@@ -385,10 +385,22 @@ export function ComponentDetail({ component, project, components, projectId, int
   }
 
   async function handleResetComponent() {
-    if (!confirm('Reset this component? All generated code, test results, and registration will be cleared.')) return;
+    if (!confirm('Reset this component? Spec, code, test results, and registration will all be cleared.')) return;
     try {
-      const resp = await session.fetch(`/v1/generator/${projectId}/components/${component.id}/reset`, { method: 'POST' });
+      const s = session || window.AIMEAT?.auth?.getSession?.();
+      if (!s) return;
+      const resp = await s.fetch(`/v1/generator/${projectId}/components/${component.id}/reset`, { method: 'POST' });
       if (resp.ok) {
+        // Clear all local state
+        setResult('');
+        setValidationResult(null);
+        setSpecResult('');
+        setSpecPrompt('');
+        setSpecValidation(null);
+        setGeneratedPrompt(null);
+        setTestCode('');
+        setTestResult(null);
+        setCurrentTestPrompt(null);
         showToast?.('Component reset — ready for regeneration');
         onUpdate();
       } else {
