@@ -353,6 +353,18 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       const compType = (compVal.type as string) || 'unknown';
       const registeredAs = compVal.registeredAs as string || componentId;
 
+      // Save testCode to component record BEFORE running the test.
+      // The browser test page reads testCode from the component record (GET /test-page/).
+      // Without this, the test page gets stale/empty testCode and the test fails.
+      if (compRec) {
+        await storage.setMemory({
+          ...compRec,
+          value: { ...compVal, testCode: testCode as string },
+          version: (compRec.version ?? 1) + 1,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
       const token = (req.headers.authorization ?? '').replace('Bearer ', '');
       const baseUrl = `http://localhost:${config.port}`;
 
