@@ -678,6 +678,42 @@ export function ComponentDetail({ component, project, components, projectId, int
             <div class="pf-gen-validation-errors">
               <strong>Spec Validation Errors</strong>
               <ul>${specValidation.errors.map(e => html`<li>${e}</li>`)}</ul>
+              <div class="flex-row-wrap" style="margin-top:8px">
+                <button class="btn-outline btn-sm" onClick=${() => {
+                  const fixPrompt = 'Fix the following spec JSON. It has validation errors.\n\n'
+                    + '## Errors\n' + specValidation.errors.map((e, i) => (i + 1) + '. ' + e).join('\n')
+                    + '\n\n## Current Spec\n```json\n' + specResult + '\n```\n\n'
+                    + '## Rules\n- Fix ONLY the listed errors\n- Do NOT remove existing actions\n- Return the COMPLETE fixed JSON';
+                  navigator.clipboard.writeText(fixPrompt);
+                  showToast?.('Fix prompt copied');
+                }}>
+                  Copy Fix Prompt
+                </button>
+                ${orSettings?.hasApiKey && html`
+                  <button class="btn-outline btn-sm pf-gen-or-run-btn ${specAiRunning ? 'pf-gen-or-running' : ''}"
+                    onClick=${async () => {
+                      const fixPrompt = 'Fix the following spec JSON. It has validation errors.\n\n'
+                        + '## Errors\n' + specValidation.errors.map((e, i) => (i + 1) + '. ' + e).join('\n')
+                        + '\n\n## Current Spec\n```json\n' + specResult + '\n```\n\n'
+                        + '## Rules\n- Fix ONLY the listed errors\n- Do NOT remove existing actions\n- Return the COMPLETE fixed JSON';
+                      setSpecAiRunning(true);
+                      try {
+                        const fixed = await runWithAi(projectId, fixPrompt);
+                        // Strip code fences if present
+                        const cleaned = fixed.replace(/^\`\`\`json?\s*\n?/m, '').replace(/\n?\`\`\`\s*$/m, '').trim();
+                        setSpecResult(cleaned);
+                        setSpecValidation(null);
+                        showToast?.('Fixed spec received — click Validate Spec');
+                      } catch (e) {
+                        showToast?.('Fix failed: ' + e.message, true);
+                      }
+                      setSpecAiRunning(false);
+                    }}
+                    disabled=${specAiRunning}>
+                    ${specAiRunning ? html`<span class="pf-gen-or-spinner"></span> Fixing...` : 'Fix with AI'}
+                  </button>
+                `}
+              </div>
             </div>
           `}
           ${specValidation?.valid && html`
