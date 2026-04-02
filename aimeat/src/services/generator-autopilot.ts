@@ -322,14 +322,23 @@ export async function runAutopilot(
               try {
                 spec = JSON.parse(specText) as Record<string, unknown>;
                 debug.writeArtifact(cid, 'spec', JSON.stringify(spec, null, 2)).catch(() => {});
-                alog.info(`[${cid}] Spec generated: ${spec.name as string}`);
+                alog.info(`[${cid}] Spec generated: ${(spec as Record<string, unknown>).name as string}`);
 
-                // Validate spec structure (was imported but never called before)
+                // Validate spec structure
                 if (compType === 'extension') {
                   const sv = validateExtensionSpec(spec);
                   if (!sv.valid) {
                     alog.warn(`[${cid}] Spec validation issues: ${sv.errors.join('; ')}`);
-                    // Don't reject — spec is still usable, just warn about missing fields
+                  }
+
+                  // Validate spec has ALL blueprint actions
+                  const specActionIds = new Set(((spec.actions || []) as Array<Record<string, unknown>>).map(a => a.id as string));
+                  const bpActions = Object.keys((blueprint as Record<string, unknown>).dataModel ? ((blueprint as Record<string, unknown>).dataModel as Record<string, unknown>).actions as Record<string, unknown> || {} : {})
+                    .filter(k => k.startsWith('ext:'))
+                    .map(k => k.replace('ext:', '').replace(/^[^/]+\//, ''));
+                  const missingActions = bpActions.filter(a => !specActionIds.has(a));
+                  if (missingActions.length > 0) {
+                    alog.warn(`[${cid}] Spec missing blueprint actions: ${missingActions.join(', ')} — spec will be used but code validator will flag these`);
                   }
                 }
               } catch {

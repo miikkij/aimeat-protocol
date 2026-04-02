@@ -510,7 +510,14 @@ This extension is a PLATFORM CAPABILITY — it knows nothing about any app, cort
 ## Data Sources
 {{data_sources}}
 
-## Actions From Blueprint
+## Actions From Blueprint (MUST use these EXACT action IDs)
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  Your spec MUST include ALL actions listed below with the EXACT IDs.   ║
+║  Do NOT rename them. Do NOT drop any. Do NOT merge them.               ║
+║  The blueprint is the contract — every action must appear in your spec. ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
 {{blueprint_actions}}
 
 ## Data Structures
