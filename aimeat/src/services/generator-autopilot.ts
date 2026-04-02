@@ -608,7 +608,25 @@ export async function runAutopilot(
             if (testResult) {
               comp = { ...comp, testCode, testResult };
               await saveComp(comp);
-              log.info(`[${cid}] Test: ${testResult.status as string}`);
+              const testErrors = (testResult.errors as string[]) || [];
+              const testTrace = (testResult.trace as Array<Record<string, string>>) || [];
+              if (testResult.status === 'passed') {
+                log.info(`[${cid}] ✅ Test PASSED`);
+              } else {
+                log.error(`[${cid}] ❌ Test FAILED — ${testErrors.length} errors:`);
+                for (const e of testErrors) log.error(`[${cid}]   - ${e}`);
+              }
+              // Log trace with shapes
+              for (const t of testTrace) {
+                const resultStr = t.result || 'null';
+                const shapeMatch = resultStr.match(/\[shape extracted from (\d+) chars\]/);
+                if (shapeMatch) {
+                  const shapeJson = resultStr.slice(0, resultStr.indexOf('\n[shape extracted')).trim().replace(/\s+/g, ' ').slice(0, 500);
+                  log.info(`[${cid}]   [${t.status}] ${t.fn}(${(t.args || '').slice(0, 60)}) → SHAPE: ${shapeJson} [from ${shapeMatch[1]} chars]`);
+                } else {
+                  log.info(`[${cid}]   [${t.status}] ${t.fn}(${(t.args || '').slice(0, 60)}) → ${resultStr.slice(0, 300)}`);
+                }
+              }
             }
 
             // ── TEST→REFLECT→FIX→RE-REGISTER→RE-TEST cycle ──
@@ -711,7 +729,13 @@ export async function runAutopilot(
                 if (testResult) {
                   comp = { ...comp, testResult };
                   await saveComp(comp);
-                  log.info(`[${cid}] Re-test round ${testFixRound}: ${testResult.status as string}`);
+                  const reTestErrors = (testResult.errors as string[]) || [];
+                  if (testResult.status === 'passed') {
+                    log.info(`[${cid}] ✅ Re-test round ${testFixRound}: PASSED`);
+                  } else {
+                    log.error(`[${cid}] ❌ Re-test round ${testFixRound}: FAILED — ${reTestErrors.length} errors:`);
+                    for (const e of reTestErrors) log.error(`[${cid}]   - ${e}`);
+                  }
                 }
               } catch (e) {
                 log.warn(`[${cid}] Re-test failed: ${(e as Error).message}`);
@@ -797,10 +821,17 @@ export async function runAutopilot(
     }
 
     updateStatus({
-      status: entry.cancelFlag ? 'cancelled' : 'completed',
+      status: entry.cancelFlag ? 'cancelled' : (entry.status.progress.failed > 0 ? 'failed' : 'completed'),
       currentComponent: null,
     });
-    log.info(`Autopilot finished: ${entry.status.progress.completed} completed, ${entry.status.progress.failed} failed, ${entry.status.progress.skipped} skipped`);
+    // Final summary with per-component status
+    log.info(`\n${'═'.repeat(60)}`);
+    log.info(`AUTOPILOT ${entry.status.progress.failed > 0 ? 'FAILED' : 'COMPLETED'}: ${entry.status.progress.completed} completed, ${entry.status.progress.failed} failed, ${entry.status.progress.skipped} skipped`);
+    for (const cr of entry.status.componentResults) {
+      const icon = cr.status === 'completed' || cr.status === 'already_registered' ? '✅' : cr.status === 'phase_gated' ? '⏸️' : '❌';
+      log.info(`  ${icon} ${cr.label} — ${cr.status}${cr.error ? ': ' + cr.error : ''}`);
+    }
+    log.info(`${'═'.repeat(60)}\n`);
 
   } catch (fatalErr) {
     log.error(`Autopilot fatal error: ${(fatalErr as Error).message}`);
