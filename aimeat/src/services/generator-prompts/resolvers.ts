@@ -141,9 +141,12 @@ function resolveExtensionSpec(data: PromptRuntimeData): Vars {
   const actions = bp.dataModel?.actions || {};
   const memoryKeys = bp.dataModel?.memoryKeys || {};
 
+  // Filter actions by component field OR by key prefix (ext: for extensions, cortex: for cortex)
+  // Blueprint generator sometimes doesn't populate the component field, so we fall back to prefix matching
+  const compPrefix = bpComp?.type === 'extension' ? 'ext:' : bpComp?.type === 'cortex' ? 'cortex:' : '';
   const compActions = Object.entries(actions)
-    .filter(([, v]) => v.component === bpComp?.id)
-    .map(([name, def]) => `- **${name.replace(/^ext:/, '').replace(/^[^/]+\//, '')}**: ${def.description || ''}\n  Input: \`${JSON.stringify(def.input || {})}\`\n  Output: \`${JSON.stringify(def.output || {})}`)
+    .filter(([key, v]) => v.component === bpComp?.id || (compPrefix && key.startsWith(compPrefix)))
+    .map(([name, def]) => `- **${name.replace(/^ext:/, '').replace(/^cortex:/, '').replace(/^[^/]+\//, '')}**: ${def.description || ''}\n  Input: \`${JSON.stringify(def.input || {})}\`\n  Output: \`${JSON.stringify(def.output || {})}`)
     .join('\n');
 
   const compMemoryKeys = Object.entries(memoryKeys)
