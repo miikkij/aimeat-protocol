@@ -624,7 +624,11 @@ export async function runAutopilot(
             });
             let testResult = (testResp.data as Record<string, unknown>)?.result as Record<string, unknown>;
             if (testResult) {
-              comp = { ...comp, testCode, testResult };
+              // Store test result WITHOUT full trace (trace can be 100KB+, exceeds memory value limit)
+              // Trace is already saved in debug artifacts and terminal log
+              const testResultForStorage = { ...testResult };
+              delete (testResultForStorage as Record<string, unknown>).trace;
+              comp = { ...comp, testCode, testResult: testResultForStorage };
               await saveComp(comp);
               const testErrors = (testResult.errors as string[]) || [];
               const testTrace = (testResult.trace as Array<Record<string, string>>) || [];
@@ -747,7 +751,8 @@ export async function runAutopilot(
                 });
                 testResult = (reTestResp.data as Record<string, unknown>)?.result as Record<string, unknown>;
                 if (testResult) {
-                  comp = { ...comp, testResult };
+                  const reTestForStorage = { ...testResult }; delete (reTestForStorage as Record<string, unknown>).trace;
+                  comp = { ...comp, testResult: reTestForStorage };
                   await saveComp(comp);
                   const reTestErrors = (testResult.errors as string[]) || [];
                   if (testResult.status === 'passed') {
@@ -797,7 +802,8 @@ export async function runAutopilot(
                   });
                   testResult = (reTestResp.data as Record<string, unknown>)?.result as Record<string, unknown>;
                   if (testResult) {
-                    comp = { ...comp, testResult };
+                    const freshTestForStorage = { ...testResult }; delete (freshTestForStorage as Record<string, unknown>).trace;
+                    comp = { ...comp, testResult: freshTestForStorage };
                     await saveComp(comp);
                     alog.info(`[${cid}] Fresh generation test: ${testResult.status as string}`);
                   }
