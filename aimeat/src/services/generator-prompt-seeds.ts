@@ -144,8 +144,8 @@ RIGHT:  const url = baseUrl + '?name=' + encodeURIComponent(query) + '&id=' + en
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║  Each action is a SEPARATE function. Actions CANNOT call each other.   ║
 ║  There is NO ctx.otherAction() or ctx.callAction() method.             ║
-║  Writing ctx.getCompany() or ctx.searchItems() will CRASH with:        ║
-║    "ctx.getCompany is not a function"                                  ║
+║  Writing ctx.getData() or ctx.otherAction() will CRASH with:           ║
+║    "ctx.getData is not a function"                                     ║
 ║                                                                        ║
 ║  If multiple actions need the same logic, define a HELPER FUNCTION     ║
 ║  above the action exports and duplicate it in each script file.        ║
@@ -575,10 +575,10 @@ Return ONLY valid JSON. No markdown fences, no explanation text.
 ## CRITICAL RULES
 1. Use EXACT field names from data source sample entries. Copy character-for-character.
 2. Every action MUST have an "example" with real data from the interview's sample entries.
-3. Extension name describes the PLATFORM CAPABILITY: "prh-ytj", not "company-monitor-extension".
+3. Extension name describes the PLATFORM CAPABILITY: e.g. "weather-data", not "weather-monitor-extension".
 4. Do NOT mention any app, cortex, UI, or project.
 5. The "dataSources" section MUST include the EXACT base URLs from the Data Sources section above. The code generator needs these URLs to implement the extension. Copy them character-for-character.
-6. Action IDs MUST be camelCase: "searchCompanies", NOT "search-companies". This is the coding standard.`,
+6. Action IDs MUST be camelCase: "getItems", NOT "get-items". This is the coding standard.`,
     variables: ['disclaimer', 'data_sources', 'blueprint_actions', 'structures', 'memory_keys', 'schedules', 'config_keys'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
@@ -619,7 +619,7 @@ Return ONLY valid JSON:
 }
 
 ## Rules
-1. One method per extension action. Clean names (searchCompanies, not extSearchCompanies).
+1. One method per extension action. Clean names (getItems, not extGetItems).
 2. Return types MUST match extension spec output exactly.
 3. Include getTranslations and getSettings — read from owner namespace.
 4. All methods return null on failure. No exceptions.`,
@@ -997,7 +997,7 @@ Translations and settings live in the OWNER namespace — the cortex reads them 
 - Each action's \\\`script\\\` field value must match a \\\`// actions/{script}\\\` comment below the YAML
 - \\\`limits.timeout_ms\\\`: use 30000 for extensions that call external APIs, 5000 for memory-only
 - \\\`limits.max_api_calls\\\`: use 500 for data collectors (many memory writes per run), 100 for simple actions
-- Action IDs MUST be camelCase: \\\`searchCompanies\\\`, NOT \\\`search-companies\\\`. The ID appears in URLs and YAML — camelCase is the standard.
+- Action IDs MUST be camelCase: \\\`getItems\\\`, NOT \\\`get-items\\\`. The ID appears in URLs and YAML — camelCase is the standard.
 - All helper functions must be defined INSIDE the same script file — no imports, no cross-file references
 - If two actions need the same helper (e.g., date parsing, data normalization), DUPLICATE the helper in BOTH script files — copy it exactly, do NOT refactor into a shared module
 - NEVER reference functions from another action's script — each script runs in its own ISOLATED V8 sandbox scope
@@ -1369,13 +1369,11 @@ var tabs = AIMEAT['aimeat-ui-nav'].Tabs({
 \\\`\\\`\\\`javascript
 var table = AIMEAT['aimeat-ui-viewers'].DataTable({
   columns: [
-    { key: 'name', label: 'Nimi', sortable: true },
-    { key: 'businessId', label: 'Y-tunnus' },
-    { key: 'status', label: 'Tila' }
+    { key: 'name', label: 'Name', sortable: true },
+    { key: 'id', label: 'ID' },
+    { key: 'status', label: 'Status' }
   ],
-  rows: [
-    { name: 'Overscale Solutions Oy', businessId: '3323553-5', status: 'Active' }
-  ],
+  rows: dataRows,  // array of objects matching the column keys
   sortable: true,
   filterable: true,
   pageSize: 20
@@ -1438,12 +1436,12 @@ AIMEAT['aimeat-ui-dialogs'].toast('Virhe tapahtui', 'error');
 
 // Confirm dialog (returns Promise)
 var confirmed = await AIMEAT['aimeat-ui-dialogs'].Confirm({
-  title: 'Poista yritys?',
-  message: 'Haluatko varmasti poistaa yrityksen seurannasta?',
+  title: 'Poista kohde?',
+  message: 'Haluatko varmasti poistaa tämän?',
   confirmLabel: 'Poista',
   cancelLabel: 'Peruuta'
 });
-if (confirmed) { removeFromWatchlist(id); }
+if (confirmed) { deleteItem(id); }
 
 // Modal
 var modal = AIMEAT['aimeat-ui-dialogs'].Modal({
@@ -1812,10 +1810,9 @@ Reserve space for it in your layout — do not overlap or hide it:
 ## CRITICAL: Rendering API Data — Handle Nested Objects
 
 API responses often contain nested objects instead of plain strings. For example:
-- \\\`businessId: { value: "3323553-5", registrationDate: "2022-11-07" }\\\` — access \\\`.value\\\`
-- \\\`euId: { value: "FIFPRO.3323553-5", source: "1" }\\\` — access \\\`.value\\\`
-- \\\`website: { url: "www.example.com", registrationDate: "..." }\\\` — access \\\`.url\\\`
-- \\\`names: [{ name: "Company Oy", type: "1" }]\\\` — access \\\`[0].name\\\`
+- \\\`id: { value: "123", createdAt: "2026-01-01" }\\\` — access \\\`.value\\\`
+- \\\`link: { url: "https://example.com", label: "More" }\\\` — access \\\`.url\\\`
+- \\\`items: [{ name: "First", type: "A" }]\\\` — access \\\`[0].name\\\`
 
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║  NEVER render an object directly as text — it will show [object Object] ║

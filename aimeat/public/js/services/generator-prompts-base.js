@@ -794,10 +794,9 @@ ${hasCortex ? '- Call cortex init() on app start — it handles everything autom
 ## CRITICAL: Rendering API Data — Handle Nested Objects
 
 API responses often contain nested objects instead of plain strings. For example:
-- \`businessId: { value: "3323553-5", registrationDate: "2022-11-07" }\` — access \`.value\`
-- \`euId: { value: "FIFPRO.3323553-5", source: "1" }\` — access \`.value\`
-- \`website: { url: "www.example.com", registrationDate: "..." }\` — access \`.url\`
-- \`names: [{ name: "Company Oy", type: "1" }]\` — access \`[0].name\`
+- \`id: { value: "123", createdAt: "2026-01-01" }\` — access \`.value\`
+- \`link: { url: "https://example.com", label: "More" }\` — access \`.url\`
+- \`items: [{ name: "First", type: "A" }]\` — access \`[0].name\`
 
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║  NEVER render an object directly as text — it will show [object Object] ║

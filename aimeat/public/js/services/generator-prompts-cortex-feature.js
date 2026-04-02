@@ -41,13 +41,11 @@ var tabs = AIMEAT['aimeat-ui-nav'].Tabs({
 \`\`\`javascript
 var table = AIMEAT['aimeat-ui-viewers'].DataTable({
   columns: [
-    { key: 'name', label: 'Nimi', sortable: true },
-    { key: 'businessId', label: 'Y-tunnus' },
-    { key: 'status', label: 'Tila' }
+    { key: 'name', label: 'Name', sortable: true },
+    { key: 'id', label: 'ID' },
+    { key: 'status', label: 'Status' }
   ],
-  rows: [
-    { name: 'Overscale Solutions Oy', businessId: '3323553-5', status: 'Active' }
-  ],
+  rows: dataRows,  // array of objects matching the column keys
   sortable: true,
   filterable: true,
   pageSize: 20
@@ -110,12 +108,12 @@ AIMEAT['aimeat-ui-dialogs'].toast('Virhe tapahtui', 'error');
 
 // Confirm dialog (returns Promise)
 var confirmed = await AIMEAT['aimeat-ui-dialogs'].Confirm({
-  title: 'Poista yritys?',
-  message: 'Haluatko varmasti poistaa yrityksen seurannasta?',
+  title: 'Poista kohde?',
+  message: 'Haluatko varmasti poistaa tämän?',
   confirmLabel: 'Poista',
   cancelLabel: 'Peruuta'
 });
-if (confirmed) { removeFromWatchlist(id); }
+if (confirmed) { deleteItem(id); }
 
 // Modal
 var modal = AIMEAT['aimeat-ui-dialogs'].Modal({
