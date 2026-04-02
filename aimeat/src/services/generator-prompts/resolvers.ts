@@ -669,7 +669,12 @@ function resolveTestExtensionSpec(data: PromptRuntimeData): Vars {
     if (successful.length > 0) {
       goldenSamples = '\n## GOLDEN SAMPLES — Real API responses (use these as test reference)\n\nThese are ACTUAL responses captured from the live extension. Your test assertions\nMUST match these data shapes. Do NOT invent field names — use exactly what you see here.\n\n';
       for (const p of successful) {
-        goldenSamples += `### ${p.action}(${JSON.stringify(p.input)})\n\`\`\`json\n${JSON.stringify(p.response, null, 2)}\n\`\`\`\n\n`;
+        // Truncate large responses to 2KB — show structure, not full data
+        let responseStr = JSON.stringify(p.response, null, 2);
+        if (responseStr.length > 2000) {
+          responseStr = responseStr.slice(0, 2000) + '\n... [truncated, ' + responseStr.length + ' chars total]';
+        }
+        goldenSamples += `### ${p.action}(${JSON.stringify(p.input)})\n\`\`\`json\n${responseStr}\n\`\`\`\n\n`;
       }
       goldenSamples += 'When writing assertions, reference the EXACT field names from the golden samples above.\n';
     }
@@ -695,7 +700,7 @@ function resolveTestExtensionSpec(data: PromptRuntimeData): Vars {
     if (scenarios.length > 0) {
       testScenarios += '\n## Test Scenarios (from blueprint)\n\n' +
         scenarios.map((s, i) => `${i + 1}. ${s.action}${s.type === 'external-api' ? ' [EXTERNAL API]' : ' [MEMORY]'}\n   Input: ${JSON.stringify(s.input)}\n   Expected: ${s.expect}`).join('\n\n') +
-        '\n\nTest EVERY scenario above.\nFor [EXTERNAL API]: check response shape only, do NOT assert specific values. Graceful error = PASS.\nFor [MEMORY]: assert return values match what the action code returns on success.\n';
+        '\n\nTest EVERY scenario above.\nFor [EXTERNAL API]: check response shape (has the right fields). A single graceful error is OK, but if ALL external API actions return errors, FAIL the test — the extension is broken.\nFor [MEMORY]: assert return values match what the action code returns on success.\n';
     }
   }
 
@@ -752,7 +757,11 @@ function resolveTestCortexSpec(data: PromptRuntimeData): Vars {
     const successful = probes.filter(p => (p.status as number) === 200 && p.response);
     if (successful.length > 0) {
       goldenSamples = '\n## GOLDEN SAMPLES — Real API responses\n\n';
-      for (const p of successful) goldenSamples += `### ${p.action}(${JSON.stringify(p.input)})\n\`\`\`json\n${JSON.stringify(p.response, null, 2)}\n\`\`\`\n\n`;
+      for (const p of successful) {
+        let rStr = JSON.stringify(p.response, null, 2);
+        if (rStr.length > 2000) rStr = rStr.slice(0, 2000) + '\n... [truncated, ' + rStr.length + ' chars total]';
+        goldenSamples += `### ${p.action}(${JSON.stringify(p.input)})\n\`\`\`json\n${rStr}\n\`\`\`\n\n`;
+      }
     }
   }
 

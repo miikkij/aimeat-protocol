@@ -270,7 +270,7 @@ Extensions expose TWO interfaces to the outside world:
   - [MEMORY] actions: use ONLY ctx.memory (no external API). Tests MUST assert specific return values.
   - [EXTERNAL API] actions: call ctx.fetch to third-party URLs. Tests check response SHAPE only
     (has data fields OR error message), because the external API may be down/rate-limited.
-    Graceful error handling is correct behavior — only FAIL on HTTP 500 (extension crashed).`,
+    A single graceful error is OK (API may be rate-limited), but if ALL external API actions return errors, FAIL — the extension is broken.`,
     variables: [],
     usedIn: ['generator-autopilot'],
   },
