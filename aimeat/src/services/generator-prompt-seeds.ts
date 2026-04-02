@@ -554,6 +554,9 @@ Return ONLY valid JSON. No markdown fences, no explanation text.
     { "id": "<id>", "action": "<action-id>", "cron": "<expression>", "description": "<what>" }
   ],
   "config": { "<key>": "<type — description>" },
+  "dataSources": [
+    { "name": "<name>", "baseUrl": "<EXACT base URL from the data source above>", "notes": "<any important API details>" }
+  ],
   "usage": {
     "callPattern": "POST /v1/ext/<name>/<actionId> with JSON body",
     "authRequired": true,
@@ -566,7 +569,8 @@ Return ONLY valid JSON. No markdown fences, no explanation text.
 1. Use EXACT field names from data source sample entries. Copy character-for-character.
 2. Every action MUST have an "example" with real data from the interview's sample entries.
 3. Extension name describes the PLATFORM CAPABILITY: "prh-ytj", not "company-monitor-extension".
-4. Do NOT mention any app, cortex, UI, or project.`,
+4. Do NOT mention any app, cortex, UI, or project.
+5. The "dataSources" section MUST include the EXACT base URLs from the Data Sources section above. The code generator needs these URLs to implement the extension. Copy them character-for-character.`,
     variables: ['disclaimer', 'data_sources', 'blueprint_actions', 'structures', 'memory_keys', 'schedules', 'config_keys'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
