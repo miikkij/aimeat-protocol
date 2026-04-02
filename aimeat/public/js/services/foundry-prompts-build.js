@@ -2009,7 +2009,7 @@ YAML manifest MUST include \`namespace: community\` under metadata.
 ## CRITICAL RULES
 
 1. **Do NOT modify the unit implementations.**
-2. **YAML metadata.name (kebab-case) and JS LIB_NAME (camelCase) must correspond.** Example: \`prh-tietokerros\` → \`prhTietokerros\`.
+2. **YAML metadata.name (kebab-case) and JS LIB_NAME (camelCase) must correspond.** Example: \`my-data-layer\` → \`myDataLayer\`.
 3. **YAML metadata MUST have namespace: community.**
 4. **Every method from the skeleton must appear in the exports object.**
 5. **Use (function(AIMEAT){...})(window.AIMEAT||(window.AIMEAT={}))** — NOT (function(){...})().

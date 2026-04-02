@@ -158,7 +158,7 @@ Return ONLY valid JSON. No markdown fences, no explanation text.
 1. Use EXACT field names from the data source sample entries. If the API returns "totalResults" and "companies", write those — not "total" and "results". Copy character-for-character.
 2. Every action MUST have an "example" with real data from the interview's sample entries.
 3. The "output" types must match the example — if example has { companies: [...] }, output must have "companies".
-4. Extension name describes the PLATFORM CAPABILITY: "prh-ytj" (PRH company data), not "company-monitor-extension".
+4. Extension name describes the PLATFORM CAPABILITY: "weather-data" (weather data), not "weather-monitor-extension".
 5. Do NOT mention any app, cortex, UI, or project. This spec describes a standalone platform capability.
 6. Memory key types must be precise enough to generate tests: "Array<{ businessId: string, addedAt: string }>" not "array".
 `;
@@ -193,8 +193,8 @@ ${Object.entries(structures).length > 0 ? `## Data Structures\n${Object.entries(
 Return ONLY valid JSON. No markdown fences, no explanation.
 
 {
-  "name": "<kebab-case cortex name, e.g. prh-data>",
-  "libName": "<camelCase — apps access via AIMEAT.<libName>, e.g. prhData>",
+  "name": "<kebab-case cortex name, e.g. weather-data>",
+  "libName": "<camelCase — apps access via AIMEAT.<libName>, e.g. weatherData>",
   "description": "<one-line: what data API this provides>",
   "wrapsExtension": "<extension name from spec above>",
   "methods": [
@@ -320,8 +320,8 @@ ${translationKeys?.slice(0, 20).map(k => `\`${k}\``).join(', ')}${translationKey
 Return ONLY valid JSON. No markdown fences, no explanation.
 
 {
-  "name": "<kebab-case, e.g. prh-app-domain>",
-  "libName": "<camelCase, e.g. prhApp>",
+  "name": "<kebab-case, e.g. my-app-domain>",
+  "libName": "<camelCase, e.g. myApp>",
   "description": "<one-line>",
   "methods": {
     "init": "async () → { session, translations, settings } — call after auth on app boot",

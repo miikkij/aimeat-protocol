@@ -162,12 +162,11 @@ Second block — JavaScript library:
   // URL pattern is ALWAYS: /v1/ext/{extensionName}/{actionId}
   // session.fetch returns ALREADY-PARSED JSON — use resp.data directly, NEVER resp.json()
   async function callExt(actionId, body) {
-    var resp = AIMEAT.session.fetch('/v1/ext/' + EXT_NAME + '/' + actionId, {
+    var resp = await AIMEAT.session.fetch('/v1/ext/' + EXT_NAME + '/' + actionId, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body || {})
     });
-    resp = await resp;
     return resp.data;
   }
 
