@@ -360,7 +360,7 @@ For each component that produces data, generate test scenarios:
     "component": "component-id",
     "scenarios": [
       {
-        "action": "action-name",
+        "action": "actionName",
         "input": { "key": "value" },
         "expect": "natural language description of expected result",
         "type": "memory | external-api"

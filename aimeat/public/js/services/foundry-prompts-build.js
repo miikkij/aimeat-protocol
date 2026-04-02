@@ -1862,7 +1862,7 @@ actions:
   - id: <actionId>
     description: "<from skeleton>"
     method: POST
-    path: /v1/ext/<extension-name>/<action-path-from-skeleton>
+    path: /v1/ext/<extensionName>/<actionId>
     auth: required
     input: <schema>
     output: <schema>
