@@ -536,7 +536,7 @@
 /* Sidebar */
 .pf-gen-sidebar { width: 220px; flex-shrink: 0; }
 .pf-gen-phase-group { margin-bottom: 12px; }
-.pf-gen-phase-label { font-size: 0.75em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 4px; padding-left: 8px; display: flex; align-items: center; }
+.pf-gen-phase-label { font-size: 0.75em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 4px; padding-left: 8px; }
 
 .pf-gen-comp-item {
   padding: 6px 10px; font-size: 0.85em; border-left: 3px solid var(--border);

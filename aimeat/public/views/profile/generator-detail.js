@@ -589,6 +589,8 @@ export function ComponentDetail({ component, project, components, projectId, int
         <h4>${component.label}</h4>
         <span class="pf-gen-type-badge type-${component.type}">${component.type.toUpperCase()}</span>
         <span class="pf-gen-status-badge status-${component.status}">${component.status}</span>
+        <button class="btn-ghost btn-xs" style="margin-left:auto" onClick=${handleResetComponent}
+          title="Reset this component — clears spec, code, test, registration">↺ Reset</button>
       </div>
 
       <!-- SPEC (extension and cortex only) -->
@@ -794,10 +796,6 @@ export function ComponentDetail({ component, project, components, projectId, int
               ${registering ? '...' : (t('profile.generator.reregister'))}
             </button>
           `}
-          <button class="btn-ghost btn-sm" onClick=${handleResetComponent}
-            title="Reset this component to empty state for regeneration">
-            ↺ Reset
-          </button>
         </div>
       </div>
 

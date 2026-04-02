@@ -342,7 +342,9 @@ const validators = {
       }
     }
 
-    // Validate action IDs match blueprint testScenarios (if available)
+    // Blueprint action ID cross-check — WARNING only, not an error.
+    // The spec is the authority. Blueprint has abstract action names
+    // that may not match the actual API structure.
     if (blueprint?.testScenarios && Array.isArray(parsed?.actions)) {
       const bpComp = blueprint.components?.find(c => c.type === 'extension');
       if (bpComp) {
@@ -352,7 +354,7 @@ const validators = {
         const actualIds = new Set(parsed.actions.map(a => a.id));
         for (const expected of testActions) {
           if (!actualIds.has(expected)) {
-            errors.push(`Blueprint expects action "${expected}" but extension does not have it. Add it or rename the matching action to "${expected}".`);
+            console.warn(`[validator] Blueprint expects "${expected}" but extension has: ${[...actualIds].join(', ')}`);
           }
         }
       }
