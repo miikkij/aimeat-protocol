@@ -620,6 +620,7 @@ export async function runAutopilot(
               testPromptText = await buildPrompt(storage, 'gen-test-cortex-spec', {
                 blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec,
                 selfSpec: comp.spec as Record<string, unknown>,
+                componentLabel: compLabel,
                 completedComponents: freshCompsForTest.filter(c => c.registeredAs) as unknown as ComponentState[],
               } as unknown as PromptRuntimeData);
             } else {
@@ -770,16 +771,29 @@ export async function runAutopilot(
                   if (extracted?.manifest) {
                     const libs: Record<string, string> = {};
                     for (const lib of (extracted.libs || [])) { if (lib.filename && lib.code) libs[lib.filename] = lib.code; }
-                    const nameMatch = extracted.manifest.match(/name:\s*"?([^\s"]+)"?/);
-                    if (nameMatch) {
-                      await internalFetch(config, `/v1/cortex/${encodeURIComponent(nameMatch[1])}/deactivate`, jwt, { method: 'POST' }).catch(() => {});
-                      await internalFetch(config, `/v1/cortex/${encodeURIComponent(nameMatch[1])}`, jwt, { method: 'DELETE' }).catch(() => {});
+                    const newName = extracted.manifest.match(/name:\s*"?([^\s"]+)"?/)?.[1];
+                    // Deactivate+delete OLD cortex name if it changed
+                    const oldName = comp.registeredAs as string | undefined;
+                    if (oldName && oldName !== newName) {
+                      await internalFetch(config, `/v1/cortex/${encodeURIComponent(oldName)}/deactivate`, jwt, { method: 'POST' }).catch(() => {});
+                      await internalFetch(config, `/v1/cortex/${encodeURIComponent(oldName)}`, jwt, { method: 'DELETE' }).catch(() => {});
+                    }
+                    // Deactivate+delete new name too (may exist from previous attempt)
+                    if (newName) {
+                      await internalFetch(config, `/v1/cortex/${encodeURIComponent(newName)}/deactivate`, jwt, { method: 'POST' }).catch(() => {});
+                      await internalFetch(config, `/v1/cortex/${encodeURIComponent(newName)}`, jwt, { method: 'DELETE' }).catch(() => {});
                     }
                     await internalFetch(config, '/v1/cortex', jwt, {
                       method: 'POST', body: { manifest: extracted.manifest, ...(Object.keys(libs).length > 0 ? { libs } : {}) },
                     });
-                    if (nameMatch) {
-                      await internalFetch(config, `/v1/cortex/${encodeURIComponent(nameMatch[1])}/activate`, jwt, { method: 'POST' });
+                    if (newName) {
+                      await internalFetch(config, `/v1/cortex/${encodeURIComponent(newName)}/activate`, jwt, { method: 'POST' });
+                      // Update registeredAs if name changed
+                      if (newName !== oldName) {
+                        comp = { ...comp, registeredAs: newName };
+                        await saveComp(comp);
+                        alog.info(`[${cid}] Cortex name changed: ${oldName} → ${newName}`);
+                      }
                     }
                   }
                 }
@@ -851,16 +865,26 @@ export async function runAutopilot(
                     if (freshExtracted?.manifest) {
                       const libs: Record<string, string> = {};
                       for (const lib of (freshExtracted.libs || [])) { if (lib.filename && lib.code) libs[lib.filename] = lib.code; }
-                      const nameMatch = freshExtracted.manifest.match(/name:\s*"?([^\s"]+)"?/);
-                      if (nameMatch) {
-                        await internalFetch(config, `/v1/cortex/${encodeURIComponent(nameMatch[1])}/deactivate`, jwt, { method: 'POST' }).catch(() => {});
-                        await internalFetch(config, `/v1/cortex/${encodeURIComponent(nameMatch[1])}`, jwt, { method: 'DELETE' }).catch(() => {});
+                      const newName = freshExtracted.manifest.match(/name:\s*"?([^\s"]+)"?/)?.[1];
+                      const oldName = comp.registeredAs as string | undefined;
+                      if (oldName && oldName !== newName) {
+                        await internalFetch(config, `/v1/cortex/${encodeURIComponent(oldName)}/deactivate`, jwt, { method: 'POST' }).catch(() => {});
+                        await internalFetch(config, `/v1/cortex/${encodeURIComponent(oldName)}`, jwt, { method: 'DELETE' }).catch(() => {});
+                      }
+                      if (newName) {
+                        await internalFetch(config, `/v1/cortex/${encodeURIComponent(newName)}/deactivate`, jwt, { method: 'POST' }).catch(() => {});
+                        await internalFetch(config, `/v1/cortex/${encodeURIComponent(newName)}`, jwt, { method: 'DELETE' }).catch(() => {});
                       }
                       await internalFetch(config, '/v1/cortex', jwt, {
                         method: 'POST', body: { manifest: freshExtracted.manifest, ...(Object.keys(libs).length > 0 ? { libs } : {}) },
                       });
-                      if (nameMatch) {
-                        await internalFetch(config, `/v1/cortex/${encodeURIComponent(nameMatch[1])}/activate`, jwt, { method: 'POST' });
+                      if (newName) {
+                        await internalFetch(config, `/v1/cortex/${encodeURIComponent(newName)}/activate`, jwt, { method: 'POST' });
+                        if (newName !== oldName) {
+                          comp = { ...comp, registeredAs: newName };
+                          await saveComp(comp);
+                          alog.info(`[${cid}] Cortex name changed: ${oldName} → ${newName}`);
+                        }
                       }
                     }
                   }
