@@ -1054,6 +1054,28 @@
 @keyframes pf-gen-or-spin {
   to { transform: rotate(360deg); }
 }
+.pf-gen-data-viewer {
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: var(--card, #FFFFFF);
+}
+.pf-gen-data-viewer summary {
+  color: var(--text-dim, #6B7280);
+  font-size: 13px;
+}
+.pf-gen-data-pre {
+  max-height: 400px;
+  overflow: auto;
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 8px 0 0 0;
+  padding: 8px;
+  background: var(--bg-dim, #F9FAFB);
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 .pf-gen-or-run-all-bar {
   display: flex;
   align-items: center;
