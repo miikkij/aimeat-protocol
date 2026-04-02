@@ -1199,7 +1199,7 @@ return { passed: errors.length === 0, errors, details: 'Tested N actions' };
 ## Output Rules
 1. Return ONLY executable JavaScript code — NO markdown fences, NO explanation text
 2. NO import/require/export — sandbox environment
-3. Self-contained async function body
+3. Your code runs INSIDE an existing async function. Write sequential statements starting with variable declarations. The runtime already provides the async wrapper.
 4. End with: return { passed, errors, details }`,
     variables: ['disclaimer', 'extension_name', 'golden_samples', 'test_scenarios', 'structures', 'action_contracts', 'project_context', 'sandbox_constraints', 'extension_consumption_rules'],
     usedIn: ['generator-autopilot'],
@@ -2072,8 +2072,8 @@ Apply this EXACT pattern to the component under test. Use the actual method name
 ## Output Rules
 1. Return ONLY executable JavaScript code — NO markdown fences, NO explanation text
 2. NO import/require/export — sandbox environment
-3. Self-contained async function body
-4. Set window.__testResults = { passed, errors, details }`,
+3. Your code runs INSIDE an existing async function. Write sequential statements starting with variable declarations. The runtime already provides the async wrapper — write bare statements like \\\`const results = {...};\\\` not \\\`(async () => {...})()\\\`
+4. Set window.__testResults = { passed, errors, details } as the LAST statement`,
     variables: ['disclaimer', 'lib_name', 'wraps_extension', 'golden_samples', 'test_scenarios', 'structures', 'action_contracts', 'project_context', 'cortex_methods'],
     usedIn: ['generator-autopilot'],
   },
