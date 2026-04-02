@@ -757,11 +757,7 @@ function resolveTestCortexSpec(data: PromptRuntimeData): Vars {
     const successful = probes.filter(p => (p.status as number) === 200 && p.response);
     if (successful.length > 0) {
       goldenSamples = '\n## GOLDEN SAMPLES — Real API responses\n\n';
-      for (const p of successful) {
-        let rStr = JSON.stringify(p.response, null, 2);
-        if (rStr.length > 2000) rStr = rStr.slice(0, 2000) + '\n... [truncated, ' + rStr.length + ' chars total]';
-        goldenSamples += `### ${p.action}(${JSON.stringify(p.input)})\n\`\`\`json\n${rStr}\n\`\`\`\n\n`;
-      }
+      for (const p of successful) goldenSamples += `### ${p.action}(${JSON.stringify(p.input)})\n\`\`\`json\n${JSON.stringify(p.response, null, 2)}\n\`\`\`\n\n`;
     }
   }
 
