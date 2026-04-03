@@ -704,7 +704,7 @@ export function ComponentDetail({ component, project, components, projectId, int
                 Save Spec
               </button>
             `}
-            ${component.spec && html`
+            ${component.spec && specResult && html`
               <span class="text-caption" style="color:var(--success,#22c55e)">✓ Spec saved</span>
             `}
           </div>
