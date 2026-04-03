@@ -248,14 +248,22 @@ export async function runAutopilot(
       if (entry.cancelFlag) break;
 
       const comps = await loadComponents();
-      // Enrich with subtype from blueprint (not stored in component records)
+      // Enrich with subtype from blueprint and auto-fix stored records
       const bpComps = (blueprint.components as Array<Record<string, unknown>>) || [];
       for (const fc of comps) {
         if (!fc.subtype) {
           const bpc = bpComps.find(b => b.label === fc.label || b.id === fc.id);
           if (bpc?.subtype) {
             fc.subtype = bpc.subtype;
-            alog.warn(`[${fc.id}] ⚠️ SUBTYPE MISSING from stored component — enriched from blueprint as "${bpc.subtype}". Re-create project to fix permanently.`);
+            alog.warn(`[${fc.id}] ⚠️ SUBTYPE MISSING — auto-fixing to "${bpc.subtype}"`);
+            // Permanently fix the stored record
+            const key = `generator.${projectId}.component.${fc.id as string}`;
+            const rec = await storage.getMemory(ownerGhii, key);
+            if (rec) {
+              const val = rec.value as Record<string, unknown>;
+              val.subtype = bpc.subtype;
+              await storage.setMemory({ ...rec, value: val, version: (rec.version ?? 1) + 1, updatedAt: new Date().toISOString() }).catch(() => {});
+            }
           }
         }
       }
@@ -411,7 +419,7 @@ export async function runAutopilot(
             const bpc = bpComponents.find(b => b.label === fc.label || b.id === fc.id);
             if (bpc?.subtype) {
               fc.subtype = bpc.subtype;
-              alog.warn(`[${fc.id}] ⚠️ SUBTYPE MISSING from stored component — enriched from blueprint as "${bpc.subtype}". Re-create project to fix permanently.`);
+              alog.warn(`[${fc.id}] ⚠️ SUBTYPE MISSING from stored component — enriched from blueprint as "${bpc.subtype}". Run will auto-fix this component record.`);
             }
           }
         }
@@ -655,7 +663,7 @@ export async function runAutopilot(
                   const bpc = bpCompsForTest.find(b => b.label === fc.label || b.id === fc.id);
                   if (bpc?.subtype) {
                     fc.subtype = bpc.subtype;
-                    alog.warn(`[${fc.id}] ⚠️ SUBTYPE MISSING from stored component — enriched from blueprint as "${bpc.subtype}". Re-create project to fix permanently.`);
+                    alog.warn(`[${fc.id}] ⚠️ SUBTYPE MISSING from stored component — enriched from blueprint as "${bpc.subtype}". Run will auto-fix this component record.`);
                   }
                 }
               }
