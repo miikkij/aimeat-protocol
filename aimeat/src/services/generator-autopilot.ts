@@ -27,7 +27,7 @@ const log = { info: (m: string) => logger.info(m), warn: (m: string) => logger.w
 // No browser imports, no pathToFileURL hacks, no dynamic import()
 import { buildPrompt, stripCodeblock, createBundle } from './generator-prompts/index.js';
 import { validateComponent } from './generator-prompts/validate.js';
-import { validateExtensionSpec, validateDataApiSpec, validateSpecAgainstProbe } from './generator-prompts/spec-validate.js';
+import { validateExtensionSpec, validateDataApiSpec, validateComponentSpec, validateAppDomainSpec, validateSpecAgainstProbe } from './generator-prompts/spec-validate.js';
 import type { PromptRuntimeData, ComponentState, ProbeResult, Blueprint, InterviewSpec } from './generator-prompts/types.js';
 
 // ── Autopilot state ──
@@ -345,7 +345,7 @@ export async function runAutopilot(
                 debug.writeArtifact(cid, 'spec', JSON.stringify(spec, null, 2)).catch(() => {});
                 alog.info(`[${cid}] Spec generated: ${(spec as Record<string, unknown>).name as string}`);
 
-                // Validate spec structure
+                // Validate spec structure — per component type
                 if (compType === 'extension') {
                   const sv = validateExtensionSpec(spec);
                   if (!sv.valid) {
@@ -360,6 +360,20 @@ export async function runAutopilot(
                   const missingActions = bpActions.filter(a => !specActionIds.has(a));
                   if (missingActions.length > 0) {
                     alog.warn(`[${cid}] Spec missing blueprint actions: ${missingActions.join(', ')} — spec will be used but code validator will flag these`);
+                  }
+                } else if (compType === 'cortex') {
+                  const sub = (bpComp?.subtype as string) || '';
+                  const sv = sub === 'data' ? validateDataApiSpec(spec)
+                    : sub === 'component' ? validateComponentSpec(spec)
+                    : sub === 'app-domain' ? validateAppDomainSpec(spec)
+                    : { valid: true, errors: [] as string[] };
+                  if (!sv.valid) {
+                    alog.warn(`[${cid}] Spec validation issues: ${sv.errors.join('; ')}`);
+                    // If name is non-ASCII, reject the spec entirely — it will break registration and tests
+                    if (sv.errors.some(e => e.includes('ASCII'))) {
+                      alog.error(`[${cid}] Spec has non-ASCII name — rejecting. Will retry without spec.`);
+                      spec = null;
+                    }
                   }
                 }
               } catch {

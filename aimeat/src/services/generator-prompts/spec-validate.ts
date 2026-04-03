@@ -36,6 +36,20 @@ interface SpecMismatch {
   message: string;
 }
 
+/** Validate spec name is ASCII kebab-case and libName is ASCII camelCase */
+function validateSpecNames(spec: Record<string, unknown>, errors: string[]): void {
+  if (spec.name && typeof spec.name === 'string') {
+    if (!/^[a-z][a-z0-9-]*$/.test(spec.name)) {
+      errors.push(`spec.name "${spec.name}" must be ASCII lowercase kebab-case (a-z, 0-9, hyphens). Non-ASCII characters like ä, ö, å must be transliterated (ä→a, ö→o, å→a).`);
+    }
+  }
+  if (spec.libName && typeof spec.libName === 'string') {
+    if (!/^[a-zA-Z][a-zA-Z0-9]*$/.test(spec.libName)) {
+      errors.push(`spec.libName "${spec.libName}" must be ASCII camelCase (a-z, A-Z, 0-9). Non-ASCII characters must be transliterated.`);
+    }
+  }
+}
+
 export function validateExtensionSpec(spec: Record<string, unknown> | null): ValidationResult {
   const errors: string[] = [];
   if (!spec) return { valid: false, errors: ['Spec is null or undefined'] };
@@ -74,6 +88,7 @@ export function validateDataApiSpec(spec: Record<string, unknown> | null): Valid
 
   if (!spec.name) errors.push('Missing spec.name');
   if (!spec.libName) errors.push('Missing spec.libName');
+  validateSpecNames(spec, errors);
   if (!spec.wrapsExtension) errors.push('Missing spec.wrapsExtension');
 
   const methods = spec.methods as SpecMethod[] | undefined;
@@ -99,6 +114,7 @@ export function validateComponentSpec(spec: Record<string, unknown> | null): Val
 
   if (!spec.name) errors.push('Missing spec.name');
   if (!spec.libName) errors.push('Missing spec.libName');
+  validateSpecNames(spec, errors);
   if (!spec.purpose) errors.push('Missing spec.purpose');
   const render = spec.render as Record<string, unknown> | undefined;
   if (!render) errors.push('Missing spec.render');
@@ -114,6 +130,7 @@ export function validateAppDomainSpec(spec: Record<string, unknown> | null): Val
 
   if (!spec.name) errors.push('Missing spec.name');
   if (!spec.libName) errors.push('Missing spec.libName');
+  validateSpecNames(spec, errors);
   const methods = spec.methods as Record<string, unknown> | undefined;
   if (!methods) errors.push('Missing spec.methods');
   if (methods && !methods.init) errors.push('Missing spec.methods.init');
