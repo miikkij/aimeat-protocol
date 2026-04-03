@@ -2054,81 +2054,26 @@ CRITICAL SANDBOX RULES:
 The component library AND the data cortex library are both loaded on the test page.
 Authentication IS available — the data cortex methods work.
 
-## How to Test a UI Component
+## Working Test Template
 
-1. Get real data from the DATA CORTEX (it's loaded on the page)
-2. Create a container element
-3. Call lib.render(container, props) with the real data
-4. Check that DOM elements were created
-5. Check text content is real data (not placeholder or translation keys)
-6. Check that buttons/links exist
+Below is a WORKING test with pre-filled values. The scaffolding is correct — do NOT rewrite it.
 
-## EXAMPLE (follow this pattern)
+ADAPT only the sections marked with // ADAPT:
+1. Data fetch — call the right data cortex method with real params
+2. Render props — pass the right props to render()
+3. DOM checks — verify component-specific content appears
+
+You MAY modify other parts if needed, but do NOT remove:
+- window.__testResults assignment
+- window.__renderSnapshot capture
+- The 3-second async wait
+- The results/log/fail/pass scaffolding
 
 \\\`\\\`\\\`javascript
-const results = { passed: false, errors: [], details: '' };
-const log = (msg) => { results.details += msg + '\\n'; };
-const fail = (msg) => { results.errors.push(msg); log('FAIL: ' + msg); };
-const pass = (msg) => { log('PASS: ' + msg); };
-
-const lib = window.AIMEAT.myComponentLib;
-if (!lib) { fail('Library not loaded'); window.__testResults = results; return; }
-if (typeof lib.render !== 'function') { fail('render is not a function'); window.__testResults = results; return; }
-
-// 1. GET REAL DATA from the data cortex (object params!)
-const dataCortex = window.AIMEAT.myDataLib;
-if (!dataCortex) { fail('Data cortex not loaded'); window.__testResults = results; return; }
-
-const item = await dataCortex.getItem({id: 'test-id'});
-log('Got data: ' + JSON.stringify(item));
-if (!item) { fail('Could not get test data from data cortex'); window.__testResults = results; return; }
-
-// 2. CREATE CONTAINER and RENDER
-const container = document.createElement('div');
-document.body.appendChild(container);
-
-const result = lib.render(container, {
-  data: item,
-  locale: 'fi',
-  translations: {},
-  onAction: (id) => log('Action callback: ' + id)
-});
-
-// 3. WAIT FOR ASYNC RENDER — components fetch data internally, DOM populates async
-await new Promise(r => setTimeout(r, 3000));
-
-// 4. CHECK DOM OUTPUT
-log('Container HTML length: ' + container.innerHTML.length);
-if (container.innerHTML.length < 50) fail('render: container is nearly empty after 3s wait');
-else pass('render: produced HTML content');
-
-// 5. CHECK REAL DATA IN DOM — use textContent to verify rendered data
-const text = container.textContent || '';
-log('Container text (first 200): ' + text.substring(0, 200));
-
-// NOTE: Data cortex returns NESTED objects. Check the spec for exact field paths.
-// Example: company.businessId.value (not company.businessId), company.names[0].name (not company.name)
-if (text.length > 50) pass('render: has substantial text content');
-else fail('render: text content is too short (' + text.length + ' chars)');
-
-// 6. SNAPSHOT — capture the rendered state for screenshots BEFORE cleanup
-window.__renderSnapshot = container.innerHTML;
-
-// 7. CHECK DESTROY
-if (result && typeof result.destroy === 'function') {
-  result.destroy();
-  pass('destroy: function exists and called without error');
-} else {
-  log('Note: no destroy function returned');
-}
-
-if (results.errors.length === 0) results.passed = true;
-window.__testResults = results;
+{{test_template}}
 \\\`\\\`\\\`
 
-Test the ACTUAL component. Use REAL data from the data cortex. Check the DOM output.
-CRITICAL: Components render ASYNCHRONOUSLY. After calling render(), WAIT 3 seconds before checking the DOM.
-CRITICAL: The data cortex returns NESTED objects (see Methods and Return Shapes above). Check textContent for the actual rendered text, not for raw data field values.
+Return the ADAPTED version of this template. Keep all scaffolding intact.
 
 ## Output Rules
 1. Return ONLY executable JavaScript code — NO markdown fences, NO explanation text
@@ -2136,7 +2081,7 @@ CRITICAL: The data cortex returns NESTED objects (see Methods and Return Shapes 
 3. Your code runs INSIDE an existing async function. Write sequential statements starting with variable declarations.
 4. BEFORE calling destroy(), capture the rendered HTML: window.__renderSnapshot = container.innerHTML;
 5. Set window.__testResults = { passed, errors, details } as the LAST statement`,
-    variables: ['disclaimer', 'component_label', 'registered_as', 'lib_name', 'spec_section', 'data_cortex_info', 'project_context'],
+    variables: ['disclaimer', 'component_label', 'registered_as', 'lib_name', 'spec_section', 'data_cortex_info', 'project_context', 'test_template'],
     usedIn: ['generator-autopilot'],
   },
 
@@ -2181,66 +2126,17 @@ CRITICAL SANDBOX RULES:
 ALL cortex libraries (data, components, app-domain) are loaded on the test page.
 Authentication IS available.
 
-## How to Test an App-Domain Cortex
+## Working Test Template
 
-1. Call init() — check it returns without error
-2. Create a container and call render(container)
-3. Check that the container has meaningful DOM content
-4. Check that navigation elements exist (tabs, sidebar, etc.)
-5. Verify the app didn't crash on render
+Below is a WORKING test with pre-filled values. ADAPT only the sections marked // ADAPT.
 
-## EXAMPLE
+Do NOT remove: window.__testResults, window.__renderSnapshot, results scaffolding, async waits.
 
 \\\`\\\`\\\`javascript
-const results = { passed: false, errors: [], details: '' };
-const log = (msg) => { results.details += msg + '\\n'; };
-const fail = (msg) => { results.errors.push(msg); log('FAIL: ' + msg); };
-const pass = (msg) => { log('PASS: ' + msg); };
-
-const lib = window.AIMEAT.myAppDomainLib;
-if (!lib) { fail('Library not loaded'); window.__testResults = results; return; }
-
-// 1. TEST INIT
-log('Testing init...');
-try {
-  const initResult = await lib.init();
-  log('init returned: ' + JSON.stringify(initResult));
-  if (initResult === null || initResult === undefined) fail('init: returned null');
-  else pass('init: completed successfully');
-} catch (e) {
-  fail('init: threw error: ' + e.message);
-}
-
-// 2. TEST RENDER
-log('Testing render...');
-const container = document.createElement('div');
-container.style.width = '1024px';
-container.style.height = '768px';
-document.body.appendChild(container);
-
-try {
-  lib.render(container);
-  // Wait for async rendering
-  await new Promise(r => setTimeout(r, 2000));
-
-  log('Container HTML length: ' + container.innerHTML.length);
-  if (container.innerHTML.length < 100) fail('render: container is nearly empty');
-  else pass('render: produced HTML content (' + container.innerHTML.length + ' chars)');
-
-  // Check for navigation elements
-  const hasNav = container.querySelector('nav') || container.querySelector('[class*=nav]') || container.querySelector('[class*=tab]');
-  if (hasNav) pass('render: navigation elements found');
-  else log('Note: no nav/tab elements found (may use different pattern)');
-
-} catch (e) {
-  fail('render: threw error: ' + e.message);
-}
-
-if (results.errors.length === 0) results.passed = true;
-window.__testResults = results;
+{{test_template}}
 \\\`\\\`\\\`
 
-Test the ACTUAL component. Check that init() and render() work without crashing.
+Return the ADAPTED version of this template. Keep all scaffolding intact.
 
 ## Output Rules
 1. Return ONLY executable JavaScript code — NO markdown fences, NO explanation text
@@ -2248,7 +2144,7 @@ Test the ACTUAL component. Check that init() and render() work without crashing.
 3. Your code runs INSIDE an existing async function. Write sequential statements starting with variable declarations.
 4. BEFORE cleanup, capture rendered HTML: window.__renderSnapshot = container.innerHTML;
 5. Set window.__testResults = { passed, errors, details } as the LAST statement`,
-    variables: ['disclaimer', 'component_label', 'registered_as', 'lib_name', 'spec_section', 'feature_components', 'data_cortex_info', 'project_context'],
+    variables: ['disclaimer', 'component_label', 'registered_as', 'lib_name', 'spec_section', 'feature_components', 'data_cortex_info', 'project_context', 'test_template'],
     usedIn: ['generator-autopilot'],
   },
 
