@@ -236,7 +236,7 @@ export function ComponentDetail({ component, project, components, projectId, int
     if (hasSpec && !specPrompt) {
       loadPromptFromBackend(projectId, component.id, 'spec')
         .then(p => setSpecPrompt(p))
-        .catch(() => {});
+        .catch(e => console.warn('Spec prompt load failed:', e.message));
     }
     // Load existing spec result
     if (component.spec && !specResult) {
@@ -412,7 +412,7 @@ export function ComponentDetail({ component, project, components, projectId, int
         if (hasSpec) {
           loadPromptFromBackend(projectId, component.id, 'spec')
             .then(p => setSpecPrompt(p))
-            .catch(() => {});
+            .catch(e => console.warn('Spec prompt reload after reset failed:', e.message));
         }
         onUpdate();
       } else {
