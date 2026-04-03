@@ -1247,7 +1247,15 @@ window.__testRunning = true;
           const val = r.value as { status?: string; registeredAs?: string };
           return (val.status === 'registered' || val.status === 'ready' || val.status === 'done') && val.registeredAs;
         })
-        .map(r => r.value);
+        .map(r => {
+          // Enrich with subtype from blueprint (not stored in component records)
+          const val = r.value as Record<string, unknown>;
+          if (!val.subtype && blueprint?.components) {
+            const bpc = blueprint.components.find((c: { id: string; label: string }) => c.label === val.label || c.id === val.id);
+            if (bpc && (bpc as Record<string, unknown>).subtype) val.subtype = (bpc as Record<string, unknown>).subtype;
+          }
+          return val;
+        });
 
       // Determine prompt type — code (default) or spec
       const promptType = (req.query.type as string) || 'code';
