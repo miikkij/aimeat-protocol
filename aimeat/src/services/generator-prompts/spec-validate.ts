@@ -69,6 +69,7 @@ export function validateExtensionSpec(spec: Record<string, unknown> | null): Val
       if (!a.method) errors.push(`${prefix} (${a.id || '?'}): missing method`);
       if (!a.path) errors.push(`${prefix} (${a.id || '?'}): missing path`);
       if (!a.output || typeof a.output !== 'object') errors.push(`${prefix} (${a.id || '?'}): missing or invalid output`);
+      else if ((a.output as Record<string, unknown>)['$ref']) errors.push(`${prefix} (${a.id || '?'}): output uses $ref "${(a.output as Record<string, unknown>)['$ref']}" — must expand to actual field names and types, never use $ref`);
       if (!a.example) {
         errors.push(`${prefix} (${a.id || '?'}): missing example`);
       } else {

@@ -579,7 +579,8 @@ Return ONLY valid JSON. No markdown fences, no explanation text.
 3. Extension name describes the PLATFORM CAPABILITY: e.g. "weather-data", not "weather-monitor-extension".
 4. Do NOT mention any app, cortex, UI, or project.
 5. The "dataSources" section MUST include the EXACT base URLs from the Data Sources section above. The code generator needs these URLs to implement the extension. Copy them character-for-character.
-6. Action IDs MUST be camelCase: "getItems", NOT "get-items". This is the coding standard.`,
+6. Action IDs MUST be camelCase: "getItems", NOT "get-items". This is the coding standard.
+7. The "output" field MUST list actual field names and types — NEVER use "$ref". Expand all references into concrete field descriptions. The test generator needs real field names to write assertions.`,
     variables: ['disclaimer', 'data_sources', 'blueprint_actions', 'structures', 'memory_keys', 'schedules', 'config_keys'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
