@@ -738,8 +738,11 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       }
 
       const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Test: ${registeredAs}</title></head>
-<body>
+<html><head><meta charset="utf-8"><title>Test: ${registeredAs}</title>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-base-100 p-4">
 <h1>Testing: ${registeredAs} (${compType})</h1>
 <pre id="log"></pre>
 <div id="result"></div>

@@ -667,6 +667,17 @@ Design a REUSABLE UI COMPONENT — renders one thing well, composed by app-domai
 ## Translation Keys
 {{translation_keys}}
 
+## UI Components (daisyUI)
+
+Choose daisyUI components for this feature's UI. The code generator uses your choices.
+
+**Data display**: table, card, stat, carousel, timeline, chat, collapse
+**Forms**: input, textarea, select, checkbox, radio, toggle, range, file-input
+**Actions**: button (btn), dropdown, swap
+**Feedback**: alert, badge, loading, progress, tooltip, toast
+**Layout**: tabs, accordion, drawer, modal, hero, divider
+**Navigation**: navbar, menu, breadcrumbs, pagination, steps
+
 ## Output Format
 Return ONLY valid JSON:
 {
@@ -679,7 +690,12 @@ Return ONLY valid JSON:
     "returns": "{ el: HTMLElement, destroy(): void, update(props): void }"
   },
   "dataAccess": ["<data API methods used>"],
-  "example": "<usage showing render() with realistic props>"
+  "example": "<usage showing render() with realistic props>",
+  "ui": {
+    "layout": "<primary container: card | hero | none>",
+    "components": ["<daisyUI component names>"],
+    "navigation": "<tabs | menu | steps | breadcrumbs | none>"
+  }
 }
 
 ## Rules
@@ -687,7 +703,8 @@ Return ONLY valid JSON:
 2. Component receives locale + translations as props.
 3. Keep props minimal.
 4. name and libName MUST be ASCII only (a-z, 0-9, hyphens for name, camelCase for libName). Transliterate non-ASCII: ä→a, ö→o, å→a, ü→u.
-5. The component loads translations internally via AIMEAT.data.get() — the translations prop is optional and can be omitted from the example.`,
+5. The component loads translations internally via AIMEAT.data.get() — the translations prop is optional and can be omitted from the example.
+6. ui.components: list daisyUI component names this feature uses. Code generator includes class reference for ONLY these.`,
     variables: ['disclaimer', 'component_label', 'view_context', 'data_api_spec', 'translation_keys'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
@@ -720,6 +737,14 @@ Design the top-level composition layer — composes components into views, manag
 ## Translation Keys
 {{translation_keys}}
 
+## App Shell (daisyUI)
+
+Choose layout and navigation for the app shell.
+
+**Layout**: drawer (sidebar+content), navbar+content, hero+sections
+**Navigation**: tabs, menu, breadcrumbs, steps, bottom-navigation, navbar
+**Feedback**: modal, toast, alert
+
 ## Output Format
 Return ONLY valid JSON:
 {
@@ -735,11 +760,14 @@ Return ONLY valid JSON:
   "navigation": "<sidebar | tabs>",
   "viewComposition": { "<view>": ["<components>"] },
   "scriptDependencies": ["<ordered script URLs>"],
-  "example": "await AIMEAT.<libName>.init(); AIMEAT.<libName>.render(el);"
+  "example": "await AIMEAT.<libName>.init(); AIMEAT.<libName>.render(el);",
+  "appShell": "<drawer | navbar | tabs>",
+  "navStyle": "<tabs | menu | breadcrumbs | steps>"
 }
 
 ## Rules
-1. name and libName MUST be ASCII only (a-z, 0-9, hyphens for name, camelCase for libName). Transliterate non-ASCII: ä→a, ö→o, å→a, ü→u.`,
+1. name and libName MUST be ASCII only (a-z, 0-9, hyphens for name, camelCase for libName). Transliterate non-ASCII: ä→a, ö→o, å→a, ü→u.
+2. appShell and navStyle: choose daisyUI layout patterns from the list above.`,
     variables: ['disclaimer', 'component_specs', 'data_api_spec', 'use_cases', 'views', 'translation_keys'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
@@ -1386,9 +1414,9 @@ Create a Feature Cortex component for: {{label}}
 
 Build a self-contained feature module (data + UI) as a cortex IIFE.
 It must export a \\\`render(container)\\\` function that:
-1. Creates all DOM elements for this feature
+1. Renders UI using daisyUI CSS classes — semantic HTML with class names like "card", "table", "btn"
 2. Fetches data from the data cortex
-3. Renders the data using platform UI components
+3. Uses daisyUI components for all visual elements — do NOT build raw unstyled HTML
 4. Handles user interactions
 5. Uses translation keys for all visible text
 
@@ -1400,112 +1428,7 @@ Your \\\`render(container)\\\` creates a complete feature view.
 
 {{data_cortex_api}}
 
-## Platform UI Cortex Libraries — Working Examples
-
-All components take an options object. They return a DOM element you append to your container.
-
-### Tabs (AIMEAT['aimeat-ui-nav'].Tabs)
-\\\`\\\`\\\`javascript
-var tabs = AIMEAT['aimeat-ui-nav'].Tabs({
-  target: container,  // DOM element or CSS selector string
-  tabs: [
-    { id: 'search', label: 'Haku', icon: '🔍' },
-    { id: 'watchlist', label: 'Seuranta', icon: '⭐' },
-    { id: 'settings', label: 'Asetukset', icon: '⚙' }
-  ],
-  active: 'search',  // which tab is active initially
-  onChange: function(tabId) {
-    // called when user clicks a tab
-    renderTabContent(tabId);
-  }
-});
-\\\`\\\`\\\`
-
-### DataTable (AIMEAT['aimeat-ui-viewers'].DataTable)
-\\\`\\\`\\\`javascript
-var table = AIMEAT['aimeat-ui-viewers'].DataTable({
-  columns: [
-    { key: 'name', label: 'Name', sortable: true },
-    { key: 'id', label: 'ID' },
-    { key: 'status', label: 'Status' }
-  ],
-  rows: dataRows,  // array of objects matching the column keys
-  sortable: true,
-  filterable: true,
-  pageSize: 20
-});
-container.appendChild(table);
-// NOTE: DataTable does NOT have onRowClick. For clickable rows, build your own
-// card list with click handlers, or use the List component with onItemClick.
-\\\`\\\`\\\`
-
-### Timeline (AIMEAT['aimeat-ui-viewers'].Timeline)
-\\\`\\\`\\\`javascript
-var timeline = AIMEAT['aimeat-ui-viewers'].Timeline({
-  events: [
-    { date: '2026-03-26', title: 'Osoite muuttui', description: 'Vanha: Mannerheimintie 1 → Uusi: Pohjantie 8' },
-    { date: '2026-03-20', title: 'Toimiala päivittyi', description: 'Uusi: Ohjelmistojen suunnittelu' }
-  ]
-});
-container.appendChild(timeline);
-\\\`\\\`\\\`
-
-### Form components (AIMEAT['aimeat-ui-forms'])
-\\\`\\\`\\\`javascript
-// Text input — returns { el, getValue(), setValue(v), setError(msg), clearError() }
-var nameInput = AIMEAT['aimeat-ui-forms'].Input({
-  label: 'Hakusana',
-  placeholder: 'Hae nimellä...',
-  type: 'text'
-});
-container.appendChild(nameInput.el);
-// Read value: nameInput.getValue()
-// Set value: nameInput.setValue('test')
-// Listen for changes: nameInput.el.querySelector('input').addEventListener('input', function(e) { doSearch(e.target.value); });
-
-// Select dropdown — returns { el, getValue(), setValue(v) }
-var langSelect = AIMEAT['aimeat-ui-forms'].Select({
-  label: 'Kieli',
-  options: [
-    { value: 'fi', label: 'Suomi' },
-    { value: 'en', label: 'English' }
-  ]
-});
-container.appendChild(langSelect.el);
-// Read value: langSelect.getValue()
-
-// Toggle switch — returns { el, getValue(), setValue(v) }
-// Toggle HAS onChange callback
-var notifToggle = AIMEAT['aimeat-ui-forms'].Toggle({
-  label: 'Ilmoitukset',
-  checked: true,
-  onChange: function(checked) { saveNotificationPref(checked); }
-});
-container.appendChild(notifToggle.el);
-\\\`\\\`\\\`
-
-### Dialogs (AIMEAT['aimeat-ui-dialogs'])
-\\\`\\\`\\\`javascript
-// Toast notification
-AIMEAT['aimeat-ui-dialogs'].toast('Tallennettu!', 'success');
-AIMEAT['aimeat-ui-dialogs'].toast('Virhe tapahtui', 'error');
-
-// Confirm dialog (returns Promise)
-var confirmed = await AIMEAT['aimeat-ui-dialogs'].Confirm({
-  title: 'Poista kohde?',
-  message: 'Haluatko varmasti poistaa tämän?',
-  confirmLabel: 'Poista',
-  cancelLabel: 'Peruuta'
-});
-if (confirmed) { deleteItem(id); }
-
-// Modal
-var modal = AIMEAT['aimeat-ui-dialogs'].Modal({
-  title: 'Yrityksen tiedot',
-  content: detailElement,  // DOM element
-  width: 'lg'  // 'sm', 'md', 'lg'
-});
-\\\`\\\`\\\`
+{{platform_ui_section}}
 
 {{translation_section}}
 
@@ -1584,13 +1507,15 @@ Second block — JavaScript library:
 (function (AIMEAT) {
   'use strict';
   const LIB_NAME = 'featureLib'; // camelCase
+  // Use daisyUI classes for all UI: class="card", class="table", class="btn", etc.
+  // DaisyUI + Tailwind CSS is loaded on the page.
   // ... render(container) implementation
   var exports = { render: render };
   if (AIMEAT.register) AIMEAT.register(LIB_NAME, exports);
   AIMEAT[LIB_NAME] = exports;
 })(window.AIMEAT || (window.AIMEAT = {}));
 \\\`\\\`\\\``,
-    variables: ['disclaimer', 'label', 'spec_section', 'use_case', 'view_section', 'structures', 'data_cortex_api', 'translation_section', 'service_slug'],
+    variables: ['disclaimer', 'label', 'spec_section', 'use_case', 'view_section', 'structures', 'data_cortex_api', 'translation_section', 'service_slug', 'platform_ui_section'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
 
@@ -1619,6 +1544,8 @@ The app loads ONLY this cortex. This cortex provides everything the app needs.
 
 ## Feature Cortex Components (compose these)
 {{feature_apis}}
+
+{{platform_layout_section}}
 
 ## Data Cortex
 {{data_cortex_section}}
@@ -1654,8 +1581,8 @@ if (!session) {
 async function loadTranslations(locale) {
   try {
     // Translations are stored in the OWNER namespace by the translation component
-    // Key format: SERVICE_PREFIX.i18n.LOCALE (dots throughout)
-    return await AIMEAT.data.get('SERVICE_PREFIX.i18n.' + locale)
+    // Key format: {{service_slug}}.i18n.LOCALE (dots throughout)
+    return await AIMEAT.data.get('{{service_slug}}.i18n.' + locale)
         || await AIMEAT.data.get('i18n.' + locale)
         || {};
   } catch (e) { return {}; }
@@ -1717,7 +1644,7 @@ Second block — JavaScript library:
   AIMEAT[LIB_NAME] = exports;
 })(window.AIMEAT || (window.AIMEAT = {}));
 \\\`\\\`\\\``,
-    variables: ['disclaimer', 'label', 'project_description', 'spec_section', 'feature_apis', 'data_cortex_section', 'translation_keys'],
+    variables: ['disclaimer', 'label', 'project_description', 'spec_section', 'feature_apis', 'data_cortex_section', 'translation_keys', 'service_slug', 'platform_layout_section'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
 
@@ -1751,12 +1678,8 @@ async function boot() {
   try {
     await loadScript('/v1/libs/aimeat-auth.js');
     await loadScript('/v1/libs/aimeat-data.js');
-    // Platform UI libraries (pre-installed on every AIMEAT node)
-    await loadScript('/v1/cortex/aimeat-ui-nav/libs/aimeat-ui-nav.js');
-    await loadScript('/v1/cortex/aimeat-ui-layout/libs/aimeat-ui-layout.js');
-    await loadScript('/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js');
-    await loadScript('/v1/cortex/aimeat-ui-forms/libs/aimeat-ui-forms.js');
-    await loadScript('/v1/cortex/aimeat-ui-dialogs/libs/aimeat-ui-dialogs.js');
+    // DaisyUI + Tailwind CSS are loaded via <link>/<script> tags in the HTML <head>.
+    // No script loading needed for UI — just use daisyUI CSS classes in your HTML.
 {{cortex_script_loads}}
     AIMEAT.auth.mountLoginButton('#auth-container', {
       onLogin: () => startApp(),
@@ -1781,6 +1704,7 @@ The AIMEAT app catalog allows external CDN scripts. Available libraries:
 
 | Library | Script Tag | Use for |
 |---------|-----------|---------|
+| DaisyUI + Tailwind | \\\`<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet">\\\` + \\\`<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>\\\` | UI components via CSS classes (ALWAYS include) |
 | Leaflet | \\\`<script src="https://unpkg.com/leaflet@1/dist/leaflet.js"></script>\\\` + CSS link: \\\`<link rel="stylesheet" href="https://unpkg.com/leaflet@1/dist/leaflet.css">\\\` | Maps, markers, geospatial |
 | Chart.js | \\\`<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>\\\` | Bar, line, pie, radar charts |
 | Motion | \\\`<script src="https://cdn.jsdelivr.net/npm/motion@11/dist/motion.js"></script>\\\` | Animations via \\\`Motion.animate(el, {x: 100}, {duration: 0.5})\\\` |
