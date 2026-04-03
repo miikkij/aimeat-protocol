@@ -326,16 +326,17 @@ function resolveCortexComponent(data: PromptRuntimeData): Vars {
   const bpComp = data.blueprintComponent;
   const labelLower = (data.componentLabel || '').toLowerCase();
 
-  // Use case
-  let useCase = 'No specific use case provided';
+  // Use case — match by blueprint component's consumes or by label keywords
+  let useCase = '';
   if (interview?.useCases) {
     const match = (interview.useCases as Array<Record<string, string>>).find(u =>
       labelLower.includes((u.title || '').toLowerCase().split(' ')[0]));
     if (match) useCase = `**${match.title}** [${match.priority || 'medium'}]: ${match.description || ''}`;
   }
+  if (!useCase) useCase = warnFallback('gen-cortex-component', 'use_case', 'No specific use case provided');
 
   // View
-  let viewSection = 'No specific view provided';
+  let viewSection = '';
   if (interview?.views) {
     const match = (interview.views as Array<Record<string, unknown>>).find(v =>
       labelLower.includes(((v.title as string) || '').toLowerCase().split(' ')[0]));
@@ -344,6 +345,7 @@ function resolveCortexComponent(data: PromptRuntimeData): Vars {
       if (Array.isArray(match.interactions)) viewSection += `\nInteractions: ${(match.interactions as string[]).join(', ')}`;
     }
   }
+  if (!viewSection) viewSection = warnFallback('gen-cortex-component', 'view_section', 'No specific view provided');
 
   // Structures
   const structures = data.blueprint.dataModel?.structures || {};
@@ -358,6 +360,8 @@ function resolveCortexComponent(data: PromptRuntimeData): Vars {
     dataCortexApi = `\n## Data Cortex API (use this for all data access)\n\nAccess via: AIMEAT.${dcBundle.libName || dcBundle.registeredAs || ''}\nMethods: ${(dcBundle.exports || []).join(', ')}\n`;
     const probes = (dcBundle.probeResults || dataCortex?.probeResults || []) as Array<Record<string, unknown>>;
     for (const p of probes) dataCortexApi += `${p.method || p.action}(${JSON.stringify(p.input || {})}) → ${JSON.stringify(p.response).substring(0, 400)}\n`;
+  } else {
+    dataCortexApi = warnFallback('gen-cortex-component', 'data_cortex_api', 'No data cortex API available — data cortex may not be registered yet.');
   }
 
   // Translation

@@ -248,6 +248,14 @@ export async function runAutopilot(
       if (entry.cancelFlag) break;
 
       const comps = await loadComponents();
+      // Enrich with subtype from blueprint (not stored in component records)
+      const bpComps = (blueprint.components as Array<Record<string, unknown>>) || [];
+      for (const fc of comps) {
+        if (!fc.subtype) {
+          const bpc = bpComps.find(b => b.label === fc.label || b.id === fc.id);
+          if (bpc?.subtype) fc.subtype = bpc.subtype;
+        }
+      }
       let comp = comps.find(c => c.id === cid);
       if (!comp || comp.registeredAs) {
         // Already registered — mark as completed and skip
@@ -379,6 +387,14 @@ export async function runAutopilot(
         // ── CODE GENERATION ──
         alog.info(`[${cid}] Building code prompt for ${compLabel}`);
         const freshComps = await loadComponents();
+        // Enrich stored components with subtype from blueprint (subtype is not stored in component records)
+        const bpComponents = (blueprint.components as Array<Record<string, unknown>>) || [];
+        for (const fc of freshComps) {
+          if (!fc.subtype) {
+            const bpc = bpComponents.find(b => b.label === fc.label || b.id === fc.id);
+            if (bpc?.subtype) fc.subtype = bpc.subtype;
+          }
+        }
         const completedComponents = freshComps.filter(c => c.status === 'done' && c.registeredAs);
         // Map component type to the appropriate DB prompt ID
         const promptIdMap: Record<string, string> = {
