@@ -22,6 +22,9 @@ const HELP_PROMPT_RAW = (() => {
 
 const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90" fill="red">♥</text></svg>`;
 
+/** Load llms.txt template once at startup */
+const LLMS_TEMPLATE = readFileSync(resolve(__dirname, '../../public/llms-template.txt'), 'utf-8');
+
 export function bootstrapRouter(
   config: AimeatConfig,
   storage: Storage,
@@ -57,6 +60,13 @@ export function bootstrapRouter(
 
   router.get('/favicon.svg', (_req, res) => {
     res.type('image/svg+xml').send(FAVICON_SVG);
+  });
+
+  router.get('/llms.txt', (_req, res) => {
+    const content = LLMS_TEMPLATE
+      .replaceAll('{{BASE_URL}}', config.baseUrl)
+      .replaceAll('{{NODE_ID}}', config.nodeId);
+    res.type('text/plain; charset=utf-8').send(content);
   });
 
   router.get('/', async (_req, res) => {
