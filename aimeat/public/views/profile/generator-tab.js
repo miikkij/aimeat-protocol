@@ -190,7 +190,7 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
       for (const comp of vr.parsed.components) {
         if (existingIds.has(comp.id)) continue; // don't overwrite existing progress
         await saveComponent(project.projectId, {
-          id: comp.id, type: comp.type, label: comp.label,
+          id: comp.id, type: comp.type, subtype: comp.subtype || null, label: comp.label,
           status: 'not_started', prompt: null, result: null,
           validationErrors: [], registeredAs: null, history: [],
           _version: 0,
@@ -369,7 +369,7 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
         for (const comp of vr.parsed.components) {
           if (existingIds.has(comp.id)) continue;
           await saveComponent(project.projectId, {
-            id: comp.id, type: comp.type, label: comp.label,
+            id: comp.id, type: comp.type, subtype: comp.subtype || null, label: comp.label,
             status: 'not_started', prompt: null, result: null,
             validationErrors: [], registeredAs: null, history: [],
             _version: 0,

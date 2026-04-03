@@ -406,7 +406,7 @@ function resolveCortexAppDomain(data: PromptRuntimeData): Vars {
   const dcBundle = dataCortex?.contextBundle;
   const dataCortexSection = dcBundle
     ? `\nAccess via: AIMEAT.${dcBundle.libName || dcBundle.registeredAs || ''}\nMethods: ${(dcBundle.exports || []).join(', ')}\n`
-    : 'No data cortex available';
+    : warnFallback('gen-cortex-app-domain', 'data_cortex_section', 'No data cortex available');
 
   const translationComp = (data.completedComponents || []).find(c => c.type === 'translation' && c.contextBundle?.keys);
   const translationKeys = translationComp?.contextBundle?.keys?.slice(0, 30).join(', ') || 'none available';
@@ -1018,7 +1018,7 @@ function resolveTestCortexAppDomain(data: PromptRuntimeData): Vars {
   if (dcBundle) {
     dataCortexInfo = `window.AIMEAT.${dcBundle.libName || dcBundle.registeredAs || ''} — methods: ${(dcBundle.exports || []).join(', ')}`;
   } else {
-    dataCortexInfo = 'No data cortex available.';
+    dataCortexInfo = warnFallback('gen-test-cortex-app-domain', 'data_cortex_info', 'No data cortex available.');
   }
 
   // Project context
