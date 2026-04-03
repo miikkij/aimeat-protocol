@@ -370,6 +370,15 @@ function resolveCortexComponent(data: PromptRuntimeData): Vars {
     ? `\n## Translation Keys (use these exact keys)\n\n${tk.map(k => '- `' + k + '`').join('\n')}\n`
     : '';
 
+  // Inject spec name/libName (same pattern as data cortex)
+  const spec = data.selfSpec as Record<string, unknown> | undefined;
+  let specSection = '';
+  if (spec) {
+    const specName = (spec.name as string) || '';
+    const specLibName = (spec.libName as string) || '';
+    specSection = `\n## YOUR SPEC — use these EXACT names\n\n╔══════════════════════════════════════════════════════════════════════════╗\n║  metadata.name MUST be: ${specName}                                     \n║  LIB_NAME MUST be: ${specLibName}                                       \n║  These come from the spec. Do NOT use placeholder names like featureLib.║\n╚══════════════════════════════════════════════════════════════════════════╝\n\nFull spec:\n\`\`\`json\n${JSON.stringify(spec, null, 2).slice(0, 3000)}\n\`\`\`\n`;
+  }
+
   return {
     label: data.componentLabel || '',
     use_case: useCase,
@@ -377,6 +386,7 @@ function resolveCortexComponent(data: PromptRuntimeData): Vars {
     structures: structuresText,
     data_cortex_api: dataCortexApi,
     translation_section: translationSection,
+    spec_section: specSection,
   };
 }
 
@@ -398,12 +408,22 @@ function resolveCortexAppDomain(data: PromptRuntimeData): Vars {
   const translationComp = (data.completedComponents || []).find(c => c.type === 'translation' && c.contextBundle?.keys);
   const translationKeys = translationComp?.contextBundle?.keys?.slice(0, 30).join(', ') || 'none available';
 
+  // Inject spec name/libName (same pattern as data cortex and component cortex)
+  const spec = data.selfSpec as Record<string, unknown> | undefined;
+  let specSection = '';
+  if (spec) {
+    const specName = (spec.name as string) || '';
+    const specLibName = (spec.libName as string) || '';
+    specSection = `\n## YOUR SPEC — use these EXACT names\n\n╔══════════════════════════════════════════════════════════════════════════╗\n║  metadata.name MUST be: ${specName}                                     \n║  LIB_NAME MUST be: ${specLibName}                                       \n║  These come from the spec. Do NOT use placeholder names like appLib.    ║\n╚══════════════════════════════════════════════════════════════════════════╝\n\nFull spec:\n\`\`\`json\n${JSON.stringify(spec, null, 2).slice(0, 3000)}\n\`\`\`\n`;
+  }
+
   return {
     label: data.componentLabel || '',
     project_description: data.projectDescription || '',
     feature_apis: featureApis,
     data_cortex_section: dataCortexSection,
     translation_keys: translationKeys,
+    spec_section: specSection,
   };
 }
 

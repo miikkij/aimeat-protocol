@@ -1367,6 +1367,8 @@ Second block — JavaScript library:
     content: `{{disclaimer}}
 Create a Feature Cortex component for: {{label}}
 
+{{spec_section}}
+
 ## Use Case
 {{use_case}}
 
@@ -1582,7 +1584,7 @@ Second block — JavaScript library:
   AIMEAT[LIB_NAME] = exports;
 })(window.AIMEAT || (window.AIMEAT = {}));
 \\\`\\\`\\\``,
-    variables: ['disclaimer', 'label', 'use_case', 'view_section', 'structures', 'data_cortex_api', 'translation_section'],
+    variables: ['disclaimer', 'label', 'spec_section', 'use_case', 'view_section', 'structures', 'data_cortex_api', 'translation_section'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
 
@@ -1595,6 +1597,8 @@ Second block — JavaScript library:
 Create an App-Domain Cortex for: {{label}}
 
 Project: {{project_description}}
+
+{{spec_section}}
 
 ## Goal
 
@@ -1707,7 +1711,7 @@ Second block — JavaScript library:
   AIMEAT[LIB_NAME] = exports;
 })(window.AIMEAT || (window.AIMEAT = {}));
 \\\`\\\`\\\``,
-    variables: ['disclaimer', 'label', 'project_description', 'feature_apis', 'data_cortex_section', 'translation_keys'],
+    variables: ['disclaimer', 'label', 'project_description', 'spec_section', 'feature_apis', 'data_cortex_section', 'translation_keys'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
 
