@@ -975,12 +975,30 @@ function resolveTestCortexComponent(data: PromptRuntimeData): Vars {
     specSection = `\n## Component Spec\n\`\`\`json\n${JSON.stringify(spec, null, 2).slice(0, 3000)}\n\`\`\`\n`;
   }
 
-  // Data cortex info — so the test can fetch real data
+  // Data cortex info — inject SPEC with returnsExamples so the test knows the exact data shapes
   const dataCortex = (data.completedComponents || []).find(c => c.type === 'cortex' && c.subtype === 'data');
   const dcBundle = dataCortex?.contextBundle;
+  const dcSpec = dataCortex?.spec as Record<string, unknown> | undefined;
   let dataCortexInfo = '';
-  if (dcBundle) {
-    dataCortexInfo = `\nThe data cortex is loaded at: window.AIMEAT.${dcBundle.libName || dcBundle.registeredAs || ''}\nAvailable methods: ${(dcBundle.exports || []).join(', ')}\nUse it to get REAL data for testing the component's render() function.\n`;
+  if (dcBundle || dcSpec) {
+    const libName2 = (dcSpec?.libName as string) || dcBundle?.libName || dcBundle?.registeredAs || '';
+    dataCortexInfo = `\nThe data cortex is loaded at: window.AIMEAT.${libName2}\n`;
+    dataCortexInfo += `\nIMPORTANT: All data cortex methods take a SINGLE OBJECT parameter: dataCortex.getCompany({businessId: '3323553-5'})\nNEVER pass plain strings: dataCortex.getCompany('3323553-5') is WRONG.\n`;
+
+    // Inject method return shapes from spec
+    const methods = (dcSpec?.methods as Array<Record<string, unknown>>) || [];
+    if (methods.length > 0) {
+      dataCortexInfo += '\n### Data Cortex Methods and Return Shapes\n\n';
+      for (const m of methods) {
+        dataCortexInfo += `**${m.name}(${m.params || ''})** → ${m.returns || 'unknown'}\n`;
+        if (m.returnsExample) {
+          const example = typeof m.returnsExample === 'string' ? m.returnsExample : JSON.stringify(m.returnsExample, null, 2);
+          dataCortexInfo += `\`\`\`json\n${example.substring(0, 400)}\n\`\`\`\n`;
+        }
+        dataCortexInfo += '\n';
+      }
+      dataCortexInfo += 'CRITICAL: Data has NESTED OBJECTS. businessId is {value: "..."} NOT a plain string. names is [{name: "..."}] NOT a string array.\nUse: company.businessId.value, company.names[0].name\n';
+    }
   } else {
     dataCortexInfo = warnFallback('gen-test-cortex-component', 'data_cortex_info', 'No data cortex available on test page.');
   }
