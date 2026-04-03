@@ -750,7 +750,7 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
     <span class="text-xs opacity-50">Testing: ${registeredAs}</span>
   </div>
   <div class="flex-none gap-2">
-    <span id="header-auth" class="text-sm badge badge-ghost">${req.auth!.owner}</span>
+    <span id="header-auth"></span>
   </div>
 </nav>
 <!-- App area — app-domain.render() targets this -->
@@ -794,10 +794,16 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
   // Override auth methods — test page has a real JWT, make all auth paths work
   AIMEAT.auth.getSession = function() { return session; };
   AIMEAT.auth.login = async function() { return session; };
-  AIMEAT.auth.logout = async function() { console.log('logout called (test page — no-op)'); };
-  AIMEAT.auth.mountLoginButton = function() { console.log('mountLoginButton called (test page — already logged in)'); };
+  AIMEAT.auth.logout = async function() { location.reload(); };
   // Also set AIMEAT.session directly — cortex IIFEs use AIMEAT.session.fetch()
   AIMEAT.session = session;
+  // Mount the real golden sign-in/logout button in header
+  // mountLoginButton is NOT overridden — it uses the real auth library UI
+  setTimeout(function() {
+    if (AIMEAT.auth.mountLoginButton) {
+      AIMEAT.auth.mountLoginButton('#header-auth');
+    }
+  }, 100);
 })();
 </script>
 <script nonce="${nonce}" src="/v1/libs/aimeat-data.js"></script>

@@ -1757,7 +1757,11 @@ entry: index.html
 
       // Try to restore session
       var session = await AIMEAT.auth.login();
-      if (session) startApp();
+      if (session) {
+        // CRITICAL: Set AIMEAT.session so cortex libraries can use session.fetch()
+        AIMEAT.session = session;
+        startApp();
+      }
 
       // Show morsel balance
       if (session) {

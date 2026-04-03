@@ -522,11 +522,13 @@ export async function runAutopilot(
 
           // For types that have catalogue registration (CSM, MSM, Extension, App)
           if (['csm', 'msm', 'extension', 'app'].includes(compType)) {
+            alog.info(`[${cid}] Calling register endpoint for ${compType}...`);
             const regResp = await internalFetch(config, `/v1/generator/${projectId}/components/${cid}/register`, jwt, { method: 'POST' });
             if (!regResp.ok) {
-              alog.warn(`[${cid}] Register failed (${regResp.status}): ${JSON.stringify(regResp.error)}`);
+              alog.error(`[${cid}] ❌ Register FAILED (${regResp.status}): ${JSON.stringify(regResp.error)}`);
               throw new Error(`Registration failed: ${JSON.stringify(regResp.error)}`);
             }
+            alog.info(`[${cid}] ✅ Register succeeded for ${compType}`);
           }
 
           // For cortex: use the cortex API directly

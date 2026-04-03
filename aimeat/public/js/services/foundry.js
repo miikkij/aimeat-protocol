@@ -1136,7 +1136,8 @@ export function getAppLaunchUrl(components, session) {
   const appComp = components.find(c => c.type === 'app' && c.registeredAs);
   if (!appComp) return null;
   const owner = session?.owner || '';
-  return `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(appComp.registeredAs)}?mode=inline`;
+  const filename = appComp.registeredAs.endsWith('.html') ? appComp.registeredAs : appComp.registeredAs + '.html';
+  return `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}?mode=inline`;
 }
 
 /* ── Extension Result Parser ─────────────────────────── */
