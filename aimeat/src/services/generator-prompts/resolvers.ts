@@ -355,14 +355,30 @@ function resolveCortexComponent(data: PromptRuntimeData): Vars {
   const structuresText = Object.entries(structures).map(([name, schema]) =>
     `**${name}**: ${JSON.stringify(schema, null, 2)}`).join('\n\n') || 'See data cortex API for available data.';
 
-  // Data cortex API with probe results
+  // Data cortex API — inject the SPEC with returnsExamples showing exact data shapes
   const dataCortex = (data.completedComponents || []).find(c => c.type === 'cortex' && c.subtype === 'data');
   const dcBundle = dataCortex?.contextBundle;
+  const dcSpec = dataCortex?.spec as Record<string, unknown> | undefined;
   let dataCortexApi = '';
-  if (dcBundle) {
-    dataCortexApi = `\n## Data Cortex API (use this for all data access)\n\nAccess via: AIMEAT.${dcBundle.libName || dcBundle.registeredAs || ''}\nMethods: ${(dcBundle.exports || []).join(', ')}\n`;
-    const probes = (dcBundle.probeResults || dataCortex?.probeResults || []) as Array<Record<string, unknown>>;
-    for (const p of probes) dataCortexApi += `${p.method || p.action}(${JSON.stringify(p.input || {})}) → ${JSON.stringify(p.response).substring(0, 400)}\n`;
+  if (dcBundle || dcSpec) {
+    const libName = (dcSpec?.libName as string) || dcBundle?.libName || dcBundle?.registeredAs || '';
+    dataCortexApi = `\n## Data Cortex API (use this for ALL data access)\n\nAccess via: AIMEAT.${libName}\n`;
+
+    // Inject method signatures WITH returnsExamples from the data cortex spec
+    const methods = (dcSpec?.methods as Array<Record<string, unknown>>) || [];
+    if (methods.length > 0) {
+      dataCortexApi += '\n### Methods and Return Values\n\n';
+      for (const m of methods) {
+        dataCortexApi += `**AIMEAT.${libName}.${m.name}(${m.params || ''})** → ${m.returns || 'unknown'}\n`;
+        if (m.returnsExample) {
+          const example = typeof m.returnsExample === 'string' ? m.returnsExample : JSON.stringify(m.returnsExample, null, 2);
+          dataCortexApi += `\`\`\`json\n${example.substring(0, 600)}\n\`\`\`\n`;
+        }
+        dataCortexApi += '\n';
+      }
+    } else {
+      dataCortexApi += `Methods: ${(dcBundle?.exports || []).join(', ')}\n`;
+    }
   } else {
     dataCortexApi = warnFallback('gen-cortex-component', 'data_cortex_api', 'No data cortex API available — data cortex may not be registered yet.');
   }
