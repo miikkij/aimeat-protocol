@@ -210,6 +210,10 @@ export function ComponentDetail({ component, project, components, projectId, int
     if (componentSwitched) {
       setValidationResult(null);
       setGeneratedPrompt(null);
+      setSpecResult(component.spec ? JSON.stringify(component.spec, null, 2) : '');
+      setSpecPrompt('');
+      setSpecValidation(null);
+      setCurrentTestPrompt(null);
     }
     // Auto-transition to prompt_ready when opening an unstarted component
     if (component.status === 'not_started') {
