@@ -609,22 +609,23 @@ export async function runAutopilot(
         if (['extension', 'cortex'].includes(compType) && comp.registeredAs) {
           try {
             let testPromptText: string;
-            if (comp.spec && compType === 'extension') {
+            if (compType === 'cortex') {
+              // ALL cortex subtypes use browser test prompt — data, component, app-domain
+              const freshCompsForTest = await loadComponents();
+              testPromptText = await buildPrompt(storage, 'gen-test-cortex-spec', {
+                blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec,
+                selfSpec: comp.spec as Record<string, unknown> | undefined,
+                componentLabel: compLabel,
+                completedComponents: freshCompsForTest.filter(c => c.registeredAs) as unknown as ComponentState[],
+              } as unknown as PromptRuntimeData);
+            } else if (comp.spec && compType === 'extension') {
               testPromptText = await buildPrompt(storage, 'gen-test-extension-spec', {
                 blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec,
                 selfSpec: comp.spec as Record<string, unknown>, extensionName: comp.registeredAs as string,
                 completedComponents: [comp] as unknown as ComponentState[], // pass current comp with probeResults for golden samples
               } as unknown as PromptRuntimeData);
-            } else if (comp.spec && compType === 'cortex') {
-              const freshCompsForTest = await loadComponents();
-              testPromptText = await buildPrompt(storage, 'gen-test-cortex-spec', {
-                blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec,
-                selfSpec: comp.spec as Record<string, unknown>,
-                componentLabel: compLabel,
-                completedComponents: freshCompsForTest.filter(c => c.registeredAs) as unknown as ComponentState[],
-              } as unknown as PromptRuntimeData);
             } else {
-              // Fallback — for components without specs, use a generic test prompt
+              // Fallback — extension without spec
               testPromptText = await buildPrompt(storage, 'gen-test-extension-spec', {
                 blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec,
                 selfSpec: comp.spec as Record<string, unknown>,
