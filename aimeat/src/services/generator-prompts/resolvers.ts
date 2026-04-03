@@ -398,6 +398,11 @@ function resolveCortexComponent(data: PromptRuntimeData): Vars {
     specSection = `\n## YOUR SPEC — use these EXACT names\n\n╔══════════════════════════════════════════════════════════════════════════╗\n║  metadata.name MUST be: ${specName}                                     \n║  LIB_NAME MUST be: ${specLibName}                                       \n║  These come from the spec. Do NOT use placeholder names like featureLib.║\n╚══════════════════════════════════════════════════════════════════════════╝\n\nFull spec:\n\`\`\`json\n${JSON.stringify(spec, null, 2).slice(0, 3000)}\n\`\`\`\n`;
   }
 
+  // Service slug for translation loading — from extension or CSM
+  const extComp = (data.completedComponents || []).find(c => c.type === 'extension' && c.registeredAs);
+  const csmComp = (data.completedComponents || []).find(c => c.type === 'csm' && c.registeredAs);
+  const serviceSlug = (extComp?.registeredAs as string) || ((csmComp?.registeredAs as string) || '').split('/').pop() || 'service';
+
   return {
     label: data.componentLabel || '',
     use_case: useCase,
@@ -406,6 +411,7 @@ function resolveCortexComponent(data: PromptRuntimeData): Vars {
     data_cortex_api: dataCortexApi,
     translation_section: translationSection,
     spec_section: specSection,
+    service_slug: serviceSlug,
   };
 }
 

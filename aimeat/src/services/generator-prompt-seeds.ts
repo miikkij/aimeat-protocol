@@ -686,7 +686,8 @@ Return ONLY valid JSON:
 1. Props include callbacks for interactions (onSelect, onAdd) — component doesn't navigate.
 2. Component receives locale + translations as props.
 3. Keep props minimal.
-4. name and libName MUST be ASCII only (a-z, 0-9, hyphens for name, camelCase for libName). Transliterate non-ASCII: ä→a, ö→o, å→a, ü→u.`,
+4. name and libName MUST be ASCII only (a-z, 0-9, hyphens for name, camelCase for libName). Transliterate non-ASCII: ä→a, ö→o, å→a, ü→u.
+5. The component loads translations internally via AIMEAT.data.get() — the translations prop is optional and can be omitted from the example.`,
     variables: ['disclaimer', 'component_label', 'view_context', 'data_api_spec', 'translation_keys'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
@@ -1511,15 +1512,14 @@ var modal = AIMEAT['aimeat-ui-dialogs'].Modal({
 ## Loading Translations
 
 Translations are stored in the OWNER namespace (by the translation component).
-Load them with AIMEAT.data.get() — NOT from ext: namespace:
+The service slug for this project is: {{service_slug}}
+Load translations inside your render() function BEFORE rendering any text:
 \\\`\\\`\\\`javascript
-// CORRECT — reads from owner namespace where translation component stored them:
-var translations = await AIMEAT.data.get('SERVICE_NAME.i18n.fi') || {};
-
-// WRONG — ext: namespace does NOT contain translations:
-// var translations = await AIMEAT.data.getPublic('ext:...', 'i18n.fi'); // ← NEVER do this
+// Load translations FIRST — call this at the start of render()
+var translations = await AIMEAT.data.get('{{service_slug}}.i18n.' + locale) || {};
 \\\`\\\`\\\`
-Replace SERVICE_NAME with the actual service slug (from the CSM/extension name).
+NEVER use empty translations {}. ALWAYS load them with the call above.
+NEVER read from ext: namespace — translations are in the OWNER namespace.
 
 ## Translation Helper
 Use a t() function for all user-visible text:
@@ -1590,7 +1590,7 @@ Second block — JavaScript library:
   AIMEAT[LIB_NAME] = exports;
 })(window.AIMEAT || (window.AIMEAT = {}));
 \\\`\\\`\\\``,
-    variables: ['disclaimer', 'label', 'spec_section', 'use_case', 'view_section', 'structures', 'data_cortex_api', 'translation_section'],
+    variables: ['disclaimer', 'label', 'spec_section', 'use_case', 'view_section', 'structures', 'data_cortex_api', 'translation_section', 'service_slug'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
 
