@@ -282,7 +282,7 @@ export async function runAutopilot(
 
       // Phase gate: only process types enabled for this run.
       // Enable one phase at a time. Verify each before enabling the next.
-      const ENABLED_TYPES = ['csm', 'memory', 'translation', 'extension', 'cortex'];
+      const ENABLED_TYPES = ['csm', 'memory', 'translation', 'extension', 'cortex', 'app'];
       // Cortex subtype gate: only cortex-data for now
       const ENABLED_CORTEX_SUBTYPES = ['data', 'component', 'app-domain'];
       if (!ENABLED_TYPES.includes(compType)) {
@@ -307,7 +307,7 @@ export async function runAutopilot(
 
       try {
         // ── SPEC GENERATION ──
-        const specTypes = ['extension', 'cortex'];
+        const specTypes = ['extension', 'cortex', 'app'];
         let spec: Record<string, unknown> | null = null;
 
         if (specTypes.includes(compType)) {
@@ -338,6 +338,16 @@ export async function runAutopilot(
                   dataApiSpec: dataCortex.spec as Record<string, unknown>,
                   useCases: interviewSpec?.useCases as unknown[], translationKeys,
                   views: interviewSpec?.views as unknown[],
+                } as unknown as PromptRuntimeData);
+              }
+            } else if (compType === 'app') {
+              const appDomainComp = comps.find(c => c.type === 'cortex' && c.spec && ((c.subtype as string) === 'app-domain'));
+              if (appDomainComp) {
+                const allCortexes = comps.filter(c => c.type === 'cortex' && c.registeredAs);
+                specPrompt = await buildPrompt(storage, 'gen-app-spec', {
+                  blueprint, componentLabel: compLabel,
+                  projectDescription: project.description as string,
+                  completedComponents: allCortexes as unknown as ComponentState[],
                 } as unknown as PromptRuntimeData);
               }
             }
@@ -650,7 +660,7 @@ export async function runAutopilot(
 
         // ── TEST ──
         let testPassed = true; // assume passed unless test runs and fails
-        if (['extension', 'cortex'].includes(compType) && comp.registeredAs) {
+        if (['extension', 'cortex', 'app'].includes(compType) && comp.registeredAs) {
           try {
             let testPromptText: string;
             if (compType === 'cortex') {
@@ -678,6 +688,16 @@ export async function runAutopilot(
                 componentLabel: compLabel,
                 componentType: compType,
                 completedComponents: freshCompsForTest.filter(c => c.registeredAs) as unknown as ComponentState[],
+              } as unknown as PromptRuntimeData);
+            } else if (compType === 'app') {
+              // App test — uses gen-app test prompt (browser-based, loads all cortexes)
+              const freshCompsForApp = await loadComponents();
+              testPromptText = await buildPrompt(storage, 'gen-test-app', {
+                blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec,
+                selfSpec: comp.spec as Record<string, unknown> | undefined,
+                componentLabel: compLabel,
+                componentType: compType,
+                completedComponents: freshCompsForApp.filter(c => c.registeredAs) as unknown as ComponentState[],
               } as unknown as PromptRuntimeData);
             } else if (comp.spec && compType === 'extension') {
               testPromptText = await buildPrompt(storage, 'gen-test-extension-spec', {
@@ -1056,6 +1076,11 @@ function extractRegisteredName(type: string, content: string, vr: { extracted?: 
     } catch {
       return 'translation';
     }
+  }
+  if (type === 'app') {
+    // App content is HTML with manifest comment: <!-- AIMEAT App Manifest\nname: kebab-case-name -->
+    const nameMatch = (typeof content === 'string' ? content : '').match(/name:\s*([^\n\r]+)/);
+    return nameMatch?.[1]?.trim() || 'app';
   }
   return null;
 }

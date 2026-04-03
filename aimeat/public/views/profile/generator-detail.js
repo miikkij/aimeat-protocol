@@ -186,7 +186,7 @@ export function ComponentDetail({ component, project, components, projectId, int
   const [generatedPrompt, setGeneratedPrompt] = useState(null);
 
   // Spec state (for extension and cortex types)
-  const hasSpec = ['extension', 'cortex'].includes(component.type);
+  const hasSpec = ['extension', 'cortex', 'app'].includes(component.type);
   const [specPrompt, setSpecPrompt] = useState('');
   const [specResult, setSpecResult] = useState(component.spec ? JSON.stringify(component.spec, null, 2) : '');
   const [specAiRunning, setSpecAiRunning] = useState(false);

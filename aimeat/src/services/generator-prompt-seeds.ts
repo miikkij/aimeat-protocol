@@ -1633,18 +1633,15 @@ spec:
         AIMEAT.appLib.getTranslations(locale) — Load translations for locale
 \\\`\\\`\\\`
 
-Second block — JavaScript library:
+Second block — JavaScript library. ADAPT this working template — change view definitions, component names, navigation labels to match the spec. Keep the structure intact.
 \\\`\\\`\\\`javascript
-(function (AIMEAT) {
-  'use strict';
-  const LIB_NAME = 'appLib'; // camelCase
-  // ... init/render implementation
-  var exports = { init, render, t, switchLocale, getTranslations };
-  if (AIMEAT.register) AIMEAT.register(LIB_NAME, exports);
-  AIMEAT[LIB_NAME] = exports;
-})(window.AIMEAT || (window.AIMEAT = {}));
-\\\`\\\`\\\``,
-    variables: ['disclaimer', 'label', 'project_description', 'spec_section', 'feature_apis', 'data_cortex_section', 'translation_keys', 'service_slug', 'platform_layout_section'],
+{{app_domain_template}}
+\\\`\\\`\\\`
+
+CRITICAL: The header (AIMEAT logo, sign in) is NOT your responsibility. It is provided by the page shell.
+Your render(container) receives a div#app — render your navigation + views INTO that container.
+Use ONLY the EXACT translation keys from the Translation Keys section. Do NOT invent shortened keys like "nav.search" — use "app.nav.search".`,
+    variables: ['disclaimer', 'label', 'project_description', 'spec_section', 'feature_apis', 'data_cortex_section', 'translation_keys', 'service_slug', 'platform_layout_section', 'app_domain_template'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
 
@@ -1652,224 +1649,158 @@ Second block — JavaScript library:
     id: 'gen-app',
     group: 'generator',
     name: 'App HTML Generator',
-    description: 'Complete HTML app — loads cortex libraries, handles auth, renders UI.',
+    description: 'Complete HTML app — loads cortex libraries via app-domain cortex.',
     content: `{{context}}
 
-Create an AIMEAT App (HTML/JS) for: {{label}}
+Create an AIMEAT App (HTML page) for: {{label}}
 
 {{project_context}}
 
-## CRITICAL: Authentication & API Calls
+## Architecture
 
-The app runs on the SAME ORIGIN as the AIMEAT node. Use relative API paths (e.g., "/v1/ext/..."), NOT absolute URLs.
+The app is a simple HTML page that:
+1. Loads DaisyUI + Tailwind CSS (styling)
+2. Loads AIMEAT auth + data libraries
+3. Loads all cortex libraries (data, components, app-domain)
+4. Has an AIMEAT header (logo + morselit + sign in) — FIXED, not part of app logic
+5. Has a div#app where the app-domain cortex renders
 
-### Library setup (copy this exactly — load BOTH libraries):
-\\\`\\\`\\\`javascript
-// Load AIMEAT libraries — auth handles login/JWT, data handles memory API
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = src; s.onload = resolve; s.onerror = reject;
-    document.head.appendChild(s);
-  });
-}
+The app-domain cortex handles ALL application logic (views, navigation, translations).
+The app page just loads libraries and calls init() + render().
 
-async function boot() {
-  try {
-    await loadScript('/v1/libs/aimeat-auth.js');
-    await loadScript('/v1/libs/aimeat-data.js');
-    // DaisyUI + Tailwind CSS are loaded via <link>/<script> tags in the HTML <head>.
-    // No script loading needed for UI — just use daisyUI CSS classes in your HTML.
-{{cortex_script_loads}}
-    AIMEAT.auth.mountLoginButton('#auth-container', {
-      onLogin: () => startApp(),
-      onLogout: () => location.reload(),
-    });
-    AIMEAT.auth.login().then(session => { if (session) startApp(); }).catch(() => {});
-  } catch (err) {
-    document.body.innerHTML = '<div style="padding:2rem;color:#ef4444;font-family:system-ui">'
-      + '<h2>Failed to load application</h2><p>' + err.message + '</p>'
-      + '<p>Make sure the AIMEAT node is running and accessible.</p></div>';
-  }
-}
-boot();
-\\\`\\\`\\\`
-
-{{translation_keys_section}}
 {{cortex_or_api_section}}
 
-## CDN Libraries & Design Resources
+## Output: Complete HTML file
 
-The AIMEAT app catalog allows external CDN scripts. Available libraries:
-
-| Library | Script Tag | Use for |
-|---------|-----------|---------|
-| DaisyUI + Tailwind | \\\`<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet">\\\` + \\\`<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>\\\` | UI components via CSS classes (ALWAYS include) |
-| Leaflet | \\\`<script src="https://unpkg.com/leaflet@1/dist/leaflet.js"></script>\\\` + CSS link: \\\`<link rel="stylesheet" href="https://unpkg.com/leaflet@1/dist/leaflet.css">\\\` | Maps, markers, geospatial |
-| Chart.js | \\\`<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>\\\` | Bar, line, pie, radar charts |
-| Motion | \\\`<script src="https://cdn.jsdelivr.net/npm/motion@11/dist/motion.js"></script>\\\` | Animations via \\\`Motion.animate(el, {x: 100}, {duration: 0.5})\\\` |
-| Phaser 3 | \\\`<script src="https://cdn.jsdelivr.net/npm/[email protected]/dist/phaser.min.js"></script>\\\` | Games, interactive canvas, physics |
-
-### CSP (Content Security Policy) — the app HTML MUST include a meta tag
-
-AIMEAT enforces CSP headers. If your app loads CDN scripts/styles, you MUST add a \\\`<meta>\\\` tag:
-\\\`\\\`\\\`html
-<meta http-equiv="Content-Security-Policy" content="
-  default-src 'self';
-  script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net;
-  style-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://fonts.googleapis.com;
-  img-src 'self' data: https: blob:;
-  font-src 'self' https://fonts.gstatic.com;
-  connect-src 'self' https://*.tile.openstreetmap.org https://cdn.jsdelivr.net https://unpkg.com;
-">
-\\\`\\\`\\\`
-Only include CDN domains you actually use. Without this tag, CDN scripts will be BLOCKED silently.
-
-IMPORTANT: If your app uses Leaflet or any map library that loads tiles from external servers,
-you MUST add the tile server domain to \\\`connect-src\\\`. For OpenStreetMap: \\\`https://*.tile.openstreetmap.org\\\`.
-Without this, the map will appear but tiles will be blocked and it shows a grey/empty map.
-
-For UI inspiration, reference uiverse.io for fancy buttons, cards, toggles, and loaders (CSS-only patterns).
-
-## CSS Design System
-
-Use CSS custom properties for ALL styling. Define a theme at the top, then use var() everywhere:
-\\\`\\\`\\\`css
-:root {
-  --color-primary: #3b82f6;      /* main action color — customize per project */
-  --color-secondary: #64748b;
-  --color-success: #22c55e;
-  --color-warning: #f59e0b;
-  --color-danger: #ef4444;
-  --color-bg: #ffffff;
-  --color-bg-card: #f8fafc;
-  --color-text: #1e293b;
-  --color-text-dim: #64748b;
-  --color-border: #e2e8f0;
-  --radius: 8px;
-  --radius-lg: 12px;
-  --spacing-xs: 4px;
-  --spacing-sm: 8px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
-  --spacing-xl: 32px;
-  --font-sans: system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
-  --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
-  --transition: 150ms ease;
-}
-\\\`\\\`\\\`
-
-NEVER use hardcoded hex colors in component styles. Always use var(--color-*).
-Customize the palette based on the project's domain and the style preferences from the spec.
-
-## Auth UI Layout
-
-The #auth-container renders a login button and session bar at the top of the page.
-Reserve space for it in your layout — do not overlap or hide it:
-\\\`\\\`\\\`html
-<body>
-  <div id="auth-container"></div>  <!-- AIMEAT login/session UI — always at top -->
-  <header><!-- your app header --></header>
-  <main id="app"><!-- your content --></main>
-</body>
-\\\`\\\`\\\`
-
-## Rules
-- DO NOT add manual configuration fields for API URL, Bearer Token, or Instance ID
-- DO NOT use prompt() or manual token entry — the auth library handles everything
-- ALL API paths MUST be relative (start with /) — never use absolute URLs or NODE_URL
-- Use \\\`await AIMEAT.auth.login()\\\` to restore session from storage; if null, show a "Sign in" message. getSession() alone returns null until login() is called.
-- Use vanilla JS (no build step needed)
-- All dates displayed to users should be formatted from ISO 8601 strings (never store display-formatted dates)
-- Has a clean, responsive UI with good mobile support
-- Use CSS custom properties for theming where possible
-{{cortex_rules}}
-
-## CRITICAL: Rendering API Data — Handle Nested Objects
-
-API responses often contain nested objects instead of plain strings. For example:
-- \\\`id: { value: "123", createdAt: "2026-01-01" }\\\` — access \\\`.value\\\`
-- \\\`link: { url: "https://example.com", label: "More" }\\\` — access \\\`.url\\\`
-- \\\`items: [{ name: "First", type: "A" }]\\\` — access \\\`[0].name\\\`
-
-╔══════════════════════════════════════════════════════════════════════════╗
-║  NEVER render an object directly as text — it will show [object Object] ║
-║  ALWAYS check: if (typeof val === 'object' && val !== null)             ║
-║  Then access the appropriate sub-field (.value, .url, .name, etc.)      ║
-╚══════════════════════════════════════════════════════════════════════════╝
-
-Helper pattern:
-\\\`\\\`\\\`javascript
-function displayValue(val) {
-  if (val == null) return '-';
-  if (typeof val === 'string') return val;
-  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
-  if (val.value) return val.value;  // { value: "..." } pattern
-  if (val.url) return val.url;      // { url: "..." } pattern
-  if (val.name) return val.name;    // { name: "..." } pattern
-  if (Array.isArray(val)) return val.map(displayValue).join(', ');
-  return JSON.stringify(val);        // last resort — never [object Object]
-}
-\\\`\\\`\\\`
-
-## CRITICAL: Empty-State Handling
-
-On first run, extension data does NOT exist yet. The app MUST show a friendly empty state:
-- Check every data response for null/empty before rendering
-- Show helpful messages: "No data yet — extensions will collect data on their next scheduled run"
-- NEVER crash on null/undefined data — always provide fallback UI
-
-## Built-in Error Collector (diagnostics)
-
-Add this error collector at the TOP of your main <script>, before any other code:
-\\\`\\\`\\\`javascript
-// Error collector — surfaces runtime errors in the UI for diagnostics
-(function() {
-  var errors = [];
-  window.onerror = function(msg, src, line, col) {
-    errors.push({ msg: msg, src: src, line: line, col: col, at: new Date().toISOString() });
-    showErrors();
-  };
-  window.addEventListener('unhandledrejection', function(e) {
-    errors.push({ msg: String(e.reason), src: 'promise', line: 0, col: 0, at: new Date().toISOString() });
-    showErrors();
-  });
-  function showErrors() {
-    var el = document.getElementById('app-errors');
-    if (!el) { el = document.createElement('div'); el.id = 'app-errors'; el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#1a0000;color:#ff6b6b;font-size:12px;padding:8px 12px;max-height:120px;overflow:auto;z-index:9999;font-family:monospace;border-top:2px solid #ff4444'; document.body.appendChild(el); }
-    el.innerHTML = errors.map(function(e) { return e.at.slice(11,19) + ' ' + e.msg + ' (' + e.src + ':' + e.line + ')'; }).join('<br>');
-  }
-})();
-\\\`\\\`\\\`
-This lets users see runtime errors without opening the browser console.
-
-{{html_entity_rules}}
-
-Return a complete HTML file with an app manifest comment at the top:
+Return a complete HTML file using this EXACT structure. ADAPT only the marked sections.
 
 \\\`\\\`\\\`html
 <!-- AIMEAT App Manifest
-name: kebab-case-name
+name: {{app_name}}
 version: 1.0.0
-description: What this app does
+description: {{app_description}}
 entry: index.html
 -->
 <!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>App Name</title></head>
-<body>
-  <div id="auth-container"></div>
-  <div id="app"></div>
+<html lang="{{app_locale}}" data-theme="{{app_theme}}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{app_title}}</title>
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+    style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+    img-src 'self' data: https: blob:;
+    connect-src 'self';
+  ">
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"><\/script>
+</head>
+<body class="bg-base-100 min-h-screen flex flex-col">
+
+  <!-- AIMEAT Header — DO NOT MODIFY -->
+  <nav class="navbar bg-base-200 shadow-sm px-4">
+    <div class="flex-1 gap-4">
+      <span class="text-lg font-bold">AIME<span style="color:#E8564A">&#9829;</span>AT</span>
+      <span id="morsel-display" class="text-xs opacity-60"></span>
+    </div>
+    <div class="flex-none gap-2">
+      <span id="header-auth"></span>
+    </div>
+  </nav>
+
+  <!-- App area — app-domain cortex renders here -->
+  <div id="app" class="flex-1"></div>
+
+  <!-- Error collector (diagnostics) -->
   <script>
-    // Auth setup + API helper + app logic here
-  </script>
+  (function() {
+    var errors = [];
+    window.onerror = function(msg, src, line) {
+      errors.push(new Date().toISOString().slice(11,19) + ' ' + msg + ' (' + src + ':' + line + ')');
+      showErrors();
+    };
+    window.addEventListener('unhandledrejection', function(e) {
+      errors.push(new Date().toISOString().slice(11,19) + ' ' + String(e.reason));
+      showErrors();
+    });
+    function showErrors() {
+      var el = document.getElementById('app-errors');
+      if (!el) { el = document.createElement('div'); el.id = 'app-errors'; el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#1a0000;color:#ff6b6b;font-size:12px;padding:8px 12px;max-height:120px;overflow:auto;z-index:9999;font-family:monospace;border-top:2px solid #ff4444'; document.body.appendChild(el); }
+      el.innerHTML = errors.join('<br>');
+    }
+  })();
+  <\/script>
+
+  <!-- Load AIMEAT libraries -->
+  <script>
+  function loadScript(src) {
+    return new Promise(function(resolve, reject) {
+      var s = document.createElement('script');
+      s.src = src; s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  async function boot() {
+    try {
+      await loadScript('/v1/libs/aimeat-auth.js');
+      await loadScript('/v1/libs/aimeat-data.js');
+{{cortex_script_loads}}
+
+      // Mount sign-in button in header
+      AIMEAT.auth.mountLoginButton('#header-auth', {
+        onLogin: function() { startApp(); },
+        onLogout: function() { location.reload(); }
+      });
+
+      // Try to restore session
+      var session = await AIMEAT.auth.login();
+      if (session) startApp();
+
+      // Show morsel balance
+      if (session) {
+        try {
+          var wallet = await session.fetch('/v1/wallet');
+          if (wallet && wallet.data) {
+            document.getElementById('morsel-display').textContent = wallet.data.balance + ' morsels';
+          }
+        } catch(e) {}
+      }
+    } catch (err) {
+      document.getElementById('app').innerHTML =
+        '<div class="alert alert-error m-4"><span>Failed to load: ' + err.message + '</span></div>';
+    }
+  }
+
+  function startApp() {
+    var appLib = AIMEAT.{{app_domain_lib}};
+    if (!appLib) {
+      document.getElementById('app').innerHTML =
+        '<div class="alert alert-error m-4"><span>App-domain cortex not loaded</span></div>';
+      return;
+    }
+    appLib.init().then(function() {
+      appLib.render(document.getElementById('app'));
+    });
+  }
+
+  boot();
+  <\/script>
 </body>
 </html>
-\\\`\\\`\\\``,
-    variables: ['context', 'label', 'project_context', 'cortex_script_loads', 'translation_keys_section', 'cortex_or_api_section', 'cortex_rules', 'html_entity_rules'],
+\\\`\\\`\\\`
+
+## Rules
+- DO NOT modify the AIMEAT header — it is fixed
+- DO NOT add manual token/URL configuration — auth library handles everything
+- ALL API paths MUST be relative (start with /)
+- Use vanilla JS (no build step)
+- The app-domain cortex handles ALL application logic — the HTML page just loads libraries and boots
+{{cortex_rules}}
+{{html_entity_rules}}`,
+    variables: ['context', 'label', 'project_context', 'cortex_script_loads', 'cortex_or_api_section', 'cortex_rules', 'html_entity_rules', 'app_name', 'app_description', 'app_title', 'app_domain_lib', 'app_locale', 'app_theme'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
 
@@ -2145,6 +2076,83 @@ Return the ADAPTED version of this template. Keep all scaffolding intact.
 4. BEFORE cleanup, capture rendered HTML: window.__renderSnapshot = container.innerHTML;
 5. Set window.__testResults = { passed, errors, details } as the LAST statement`,
     variables: ['disclaimer', 'component_label', 'registered_as', 'lib_name', 'spec_section', 'feature_components', 'data_cortex_info', 'project_context', 'test_template'],
+    usedIn: ['generator-autopilot'],
+  },
+
+  // ── App spec prompt ──
+
+  {
+    id: 'gen-app-spec',
+    group: 'generator',
+    name: 'App Spec Generator',
+    description: 'Generates app spec — defines app shell, dependencies, theme, locale.',
+    content: `{{disclaimer}}
+
+# Task: Generate App Spec
+
+Define the configuration for an AIMEAT App (HTML page).
+
+## App: {{component_label}}
+{{project_description}}
+
+## Available Cortex Libraries
+{{cortex_dependencies}}
+
+## Output Format
+Return ONLY valid JSON:
+{
+  "name": "<kebab-case app name>",
+  "title": "<human-readable title>",
+  "description": "<one-line description>",
+  "appDomainLib": "<camelCase JS lib name of the app-domain cortex — copy EXACTLY from the list above>",
+  "cortexDependencies": ["<ordered list of cortex registeredAs names to load via script tags>"],
+  "daisyTheme": "<light | dark | cupcake | business | forest | etc.>",
+  "locale": "<default locale: fi | en | etc.>"
+}
+
+## Rules
+1. name MUST be ASCII kebab-case.
+2. appDomainLib: find the app-domain cortex in the list above, copy its JS lib name EXACTLY.
+3. cortexDependencies: list ALL cortex registeredAs names. Order: data first, components, app-domain last.
+4. daisyTheme: pick a daisyUI theme. "light" is safe default.`,
+    variables: ['disclaimer', 'component_label', 'project_description', 'cortex_dependencies'],
+    usedIn: ['generator-autopilot', 'generator-ui'],
+  },
+
+  // ── App test prompt ──
+
+  {
+    id: 'gen-test-app',
+    group: 'generator',
+    name: 'App Test (HTML page)',
+    description: 'Browser-side test for generated HTML apps — tests page loads, auth works, UI renders.',
+    content: `{{disclaimer}}You are generating TEST CODE for an AIMEAT APP (HTML page).
+
+## App Under Test
+- Label: {{component_label}}
+- Type: app (HTML page)
+
+{{project_context}}
+
+## Test Environment: Browser (page.evaluate sandbox)
+
+The app HTML page is loaded in a browser. All cortex libraries are available.
+Authentication IS available — the user is logged in.
+
+## Working Test Template
+
+\\\`\\\`\\\`javascript
+{{test_template}}
+\\\`\\\`\\\`
+
+Keep the template AS-IS. Do NOT add checks for individual components (hakukentta, yrityskortti, etc.) — those have their own tests. This test ONLY verifies that the app shell loads and renders.
+
+## Output Rules
+1. Return ONLY executable JavaScript code — NO markdown fences
+2. NO import/require/export — sandbox environment
+3. Do NOT test individual component rendering — only test init(), render(), and overall DOM output
+4. Set window.__testResults as the LAST statement`,
+    variables: ['disclaimer', 'component_label', 'project_context', 'test_template'],
     usedIn: ['generator-autopilot'],
   },
 

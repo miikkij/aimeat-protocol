@@ -742,10 +742,24 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
 <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
-<body class="bg-base-100 p-4">
-<h1>Testing: ${registeredAs} (${compType})</h1>
-<pre id="log"></pre>
+<body class="bg-base-100 min-h-screen flex flex-col">
+<!-- AIMEAT Header — same structure as spa.html -->
+<nav class="navbar bg-base-200 shadow-sm px-4">
+  <div class="flex-1 gap-4">
+    <span class="text-lg font-bold">AIME<span style="color:#E8564A">\u2665</span>AT</span>
+    <span class="text-xs opacity-50">Testing: ${registeredAs}</span>
+  </div>
+  <div class="flex-none gap-2">
+    <span id="header-auth" class="text-sm badge badge-ghost">${req.auth!.owner}</span>
+  </div>
+</nav>
+<!-- App area — app-domain.render() targets this -->
+<div id="app" class="flex-1"></div>
+<!-- Test infrastructure (hidden during visual testing) -->
+<details class="p-2 bg-base-200 mt-auto"><summary class="text-xs cursor-pointer">Test log</summary>
+<pre id="log" class="text-xs"></pre>
 <div id="result"></div>
+</details>
 
 <script nonce="${nonce}" src="/v1/libs/aimeat-auth.js"></script>
 <script nonce="${nonce}">
@@ -1352,7 +1366,13 @@ window.__renderSnapshot = null; // Set by test code to capture rendered state
       if (promptType === 'test') {
         // Test prompt
         if (component.type === 'extension') promptId = 'gen-test-extension-spec';
-        else if (component.type === 'cortex') promptId = 'gen-test-cortex-spec';
+        else if (component.type === 'cortex') {
+          const sub = (component as Record<string, unknown>).subtype as string || '';
+          if (sub === 'component') promptId = 'gen-test-cortex-component';
+          else if (sub === 'app-domain') promptId = 'gen-test-cortex-app-domain';
+          else promptId = 'gen-test-cortex-spec';
+        }
+        else if (component.type === 'app') promptId = 'gen-test-app';
         else {
           res.status(400).json(error(config.nodeId, 'NO_TEST', `Component type "${component.type}" does not use test prompts`));
           return;
@@ -1366,6 +1386,8 @@ window.__renderSnapshot = null; // Set by test code to capture rendered state
           else if (sub === 'component') promptId = 'gen-component-spec';
           else if (sub === 'app-domain') promptId = 'gen-app-domain-spec';
           else promptId = 'gen-component-spec';
+        } else if (component.type === 'app') {
+          promptId = 'gen-app-spec';
         } else {
           res.status(400).json(error(config.nodeId, 'NO_SPEC', `Component type "${component.type}" does not use specs`));
           return;
@@ -1414,19 +1436,27 @@ window.__renderSnapshot = null; // Set by test code to capture rendered state
         .filter(c => c.type === 'translation' && (c.contextBundle as Record<string, unknown>)?.keys)
         .flatMap(c => ((c.contextBundle as Record<string, unknown>)?.keys as string[]) || []);
 
-      const prompt = await buildPrompt(storage, promptId, {
-        blueprint: blueprint as unknown as Blueprint,
-        interviewSpec: interviewSpec as unknown as InterviewSpec,
-        blueprintComponent: component,
-        componentLabel: component.label,
-        componentType: component.type,
-        completedComponents: completedComponents as unknown as ComponentState[],
-        projectDescription: project.description || '',
-        selfSpec,
-        extensionSpec,
-        dataApiSpec,
-        translationKeys,
-      } as unknown as PromptRuntimeData);
+      let prompt: string;
+      try {
+        prompt = await buildPrompt(storage, promptId, {
+          blueprint: blueprint as unknown as Blueprint,
+          interviewSpec: interviewSpec as unknown as InterviewSpec,
+          blueprintComponent: component,
+          componentLabel: component.label,
+          componentType: component.type,
+          completedComponents: completedComponents as unknown as ComponentState[],
+          projectDescription: project.description || '',
+          selfSpec,
+          extensionSpec,
+          dataApiSpec,
+          translationKeys,
+        } as unknown as PromptRuntimeData);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.error(`[generator] buildPrompt FAILED for ${promptId}: ${msg}`);
+        res.status(500).json(error(config.nodeId, 'PROMPT_BUILD_FAILED', `Failed to build prompt "${promptId}": ${msg}`));
+        return;
+      }
 
       res.json(success(config.nodeId, {
         componentId,

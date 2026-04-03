@@ -108,6 +108,7 @@ export async function resolvePromptVars(
     'gen-cortex-data': resolveCortexData,
     'gen-cortex-component': resolveCortexComponent,
     'gen-cortex-app-domain': resolveCortexAppDomain,
+    'gen-app-spec': resolveAppSpec,
     'gen-app': resolveApp,
     'gen-reflection': resolveReflection,
     'gen-fresh-generation': resolveFreshGeneration,
@@ -116,6 +117,7 @@ export async function resolvePromptVars(
     'gen-test-cortex-spec': resolveTestCortexSpec,
     'gen-test-cortex-component': resolveTestCortexComponent,
     'gen-test-cortex-app-domain': resolveTestCortexAppDomain,
+    'gen-test-app': resolveTestApp,
     'gen-blueprint': resolveBlueprint,
     'gen-interview': resolveInterview,
   };
@@ -531,6 +533,137 @@ function resolveCortexAppDomain(data: PromptRuntimeData): Vars {
     platformLayoutSection += 'Combine with Tailwind utilities: `p-4`, `flex`, `grid`, `gap-4`, `w-full`, etc.\n';
   }
 
+  // Build app-domain code template from spec
+  const specName = (spec?.name as string) || 'app';
+  const specLibName = (spec?.libName as string) || 'app';
+  const views = (spec?.views as string[]) || [];
+  const viewComp = (spec?.viewComposition as Record<string, string[]>) || {};
+  // Build nav items — use view ID as placeholder label.
+  // LLM MUST replace these with the correct app.nav.* translation keys from the Translation Keys section.
+  const navItems = views.map(v => {
+    return `    { id: '${v}', label: t('app.nav.TODO_REPLACE_WITH_CORRECT_KEY'), icon: '' } // ADAPT: use correct app.nav.* key for "${v}"`;
+  }).join(',\n');
+  const viewCases = views.map(v => {
+    const comps = viewComp[v] || [];
+    const renderCalls = comps.map(c =>
+      `      var c_${c.replace(/-/g, '_')} = document.createElement('div');\n      c_${c.replace(/-/g, '_')}.className = 'mb-4';\n      viewEl.appendChild(c_${c.replace(/-/g, '_')});\n      if (AIMEAT.${c} && AIMEAT.${c}.render) AIMEAT.${c}.render(c_${c.replace(/-/g, '_')}, { locale: currentLocale, translations: translations });`
+    ).join('\n');
+    return `    case '${v}':\n${renderCalls}\n      break;`;
+  }).join('\n');
+
+  const appDomainTemplate = `(function (AIMEAT) {
+  'use strict';
+  var LIB_NAME = '${specLibName}';
+  var currentLocale = 'fi';
+  var translations = {};
+  var currentView = '${views[0] || 'home'}';
+  var appContainer = null;
+
+  // ── Init: auth + translations + settings ──
+  async function init() {
+    var session = await AIMEAT.auth.login();
+    translations = await getTranslations(currentLocale);
+    var settings = {};
+    try { settings = await AIMEAT.data.get('${serviceSlug}.settings') || {}; } catch(e) {}
+    return { session: session, translations: translations, settings: settings };
+  }
+
+  // ── Render: navigation + view area ──
+  function render(container) {
+    appContainer = container;
+    container.innerHTML = '';
+    container.className = 'flex flex-col h-full';
+
+    // Navigation — ADAPT: change tabs/menu/sidebar per spec navStyle
+    var navEl = document.createElement('div');
+    navEl.innerHTML = buildNavigation();
+    container.appendChild(navEl);
+
+    // View container
+    var viewEl = document.createElement('div');
+    viewEl.id = 'view-content';
+    viewEl.className = 'flex-1 p-4';
+    container.appendChild(viewEl);
+
+    // Setup nav click handlers
+    navEl.querySelectorAll('[data-view]').forEach(function(el) {
+      el.addEventListener('click', function(e) {
+        e.preventDefault();
+        navigateTo(el.getAttribute('data-view'));
+      });
+    });
+
+    renderView(currentView);
+  }
+
+  // ── Navigation builder ──
+  function buildNavigation() {
+    var items = [
+${navItems}
+    ];
+    // ADAPT: change navigation style (tabs/menu/sidebar) to match spec
+    return '<div role="tablist" class="tabs tabs-bordered mb-4">' +
+      items.map(function(item) {
+        var active = item.id === currentView ? ' tab-active' : '';
+        return '<a role="tab" class="tab' + active + '" data-view="' + item.id + '">' +
+          (item.icon ? item.icon + ' ' : '') + item.label + '</a>';
+      }).join('') + '</div>';
+  }
+
+  // ── View rendering — ADAPT: add component-specific props ──
+  function renderView(viewId) {
+    currentView = viewId;
+    var viewEl = document.getElementById('view-content');
+    if (!viewEl) return;
+    viewEl.innerHTML = '';
+
+    switch (viewId) {
+${viewCases}
+    default:
+      viewEl.innerHTML = '<div class="alert alert-info"><span>' + t('app.empty') + '</span></div>';
+    }
+
+    // Update nav active state
+    if (appContainer) {
+      appContainer.querySelectorAll('[data-view]').forEach(function(el) {
+        if (el.getAttribute('data-view') === viewId) el.classList.add('tab-active');
+        else el.classList.remove('tab-active');
+      });
+    }
+  }
+
+  function navigateTo(viewId) { renderView(viewId); }
+
+  // ── Translation ──
+  async function getTranslations(locale) {
+    try {
+      return await AIMEAT.data.get('${serviceSlug}.i18n.' + locale)
+          || await AIMEAT.data.get('i18n.' + locale)
+          || {};
+    } catch (e) { return {}; }
+  }
+
+  function t(key, vars) {
+    var str = translations[key] || key;
+    if (vars) {
+      Object.keys(vars).forEach(function(k) {
+        str = str.replace('$' + '{' + k + '}', vars[k]);
+      });
+    }
+    return str;
+  }
+
+  async function switchLocale(locale) {
+    currentLocale = locale;
+    translations = await getTranslations(locale);
+    if (appContainer) render(appContainer);
+  }
+
+  var exports = { init: init, render: render, t: t, switchLocale: switchLocale, getTranslations: getTranslations };
+  if (AIMEAT.register) AIMEAT.register(LIB_NAME, exports);
+  AIMEAT[LIB_NAME] = exports;
+})(window.AIMEAT || (window.AIMEAT = {}));`;
+
   return {
     label: data.componentLabel || '',
     project_description: data.projectDescription || '',
@@ -540,29 +673,58 @@ function resolveCortexAppDomain(data: PromptRuntimeData): Vars {
     spec_section: specSection,
     service_slug: serviceSlug,
     platform_layout_section: platformLayoutSection,
+    app_domain_template: appDomainTemplate,
+  };
+}
+
+function resolveAppSpec(data: PromptRuntimeData): Vars {
+  // App spec is simple — name, theme, locale. All cortex info comes from blueprint.
+  const bp = data.blueprint;
+  const comps = data.completedComponents || [];
+
+  // List all registered cortexes with their specs
+  const cortexes = comps.filter(c => c.type === 'cortex' && c.registeredAs);
+  const cortexList = cortexes.map(c => {
+    const sp = c.spec as Record<string, unknown> | undefined;
+    return `- ${c.registeredAs} (${c.subtype || c.type})${sp?.libName ? ` — libName: ${sp.libName}` : ''}`;
+  }).join('\n') || 'No cortex dependencies';
+
+  return {
+    component_label: data.componentLabel || '',
+    project_description: data.projectDescription || '',
+    cortex_dependencies: cortexList,
   };
 }
 
 function resolveApp(data: PromptRuntimeData): Vars {
-  const appDomainSpec = (data.completedComponents || [])
-    .find(c => c.subtype === 'app-domain' && c.spec)?.spec;
+  // Find app-domain cortex — try subtype first, then fall back to spec.methods check
+  const appDomainComp2 = (data.completedComponents || [])
+    .find(c => c.type === 'cortex' && (c.subtype === 'app-domain' || (c.spec as Record<string, unknown>)?.methods) && c.registeredAs);
+  const appDomainSpec = appDomainComp2?.spec as Record<string, unknown> | undefined;
 
-  // Build cortex script loads and instructions (matches browser buildComponentPrompt logic)
+  // Build cortex script loads — prefer app spec's cortexDependencies if available
+  const appSpec = data.selfSpec as Record<string, unknown> | undefined;
+  const specDeps = appSpec?.cortexDependencies as string[] | undefined;
   const cortexComponents = (data.completedComponents || []).filter(c => c.type === 'cortex');
   let cortexScriptLoads = '';
   let cortexInstructions = '';
 
-  if (cortexComponents.length > 0) {
-    const cortexLibs = cortexComponents.map(c => {
-      const libName = c.registeredAs || c.label;
-      return { name: libName, label: c.label, result: c.result };
-    });
+  const cortexLibs = cortexComponents.map(c => {
+    const libName = c.registeredAs || c.label;
+    return { name: libName, label: c.label, result: c.result };
+  });
 
+  if (specDeps && specDeps.length > 0) {
+    cortexScriptLoads = specDeps.map(name =>
+      `    await loadScript('/v1/cortex/${name}/libs/${name}.js');`
+    ).join('\n');
+  } else if (cortexLibs.length > 0) {
     cortexScriptLoads = cortexLibs.map(lib =>
       `    await loadScript('/v1/cortex/${lib.name}/libs/${lib.name}.js');`
     ).join('\n');
+  }
 
-    // Extract method names from cortex code
+  if (cortexLibs.length > 0) {
     const extractedMethods: string[] = [];
     for (const lib of cortexLibs) {
       const libNameMatch = (lib.result as string)?.match?.(/const\s+LIB_NAME\s*=\s*['"]([^'"]+)['"]/);
@@ -598,17 +760,11 @@ RULES:
 - NEVER build retry loops — show an error message on failure, do NOT auto-retry
 - Use EXACTLY the method names and return value shapes shown above
 
-### AIMEAT Platform UI Libraries (load BEFORE your domain cortex)
+### UI Styling
 
-\`\`\`html
-<script src="/v1/cortex/aimeat-ui-nav/libs/aimeat-ui-nav.js"></script>
-<script src="/v1/cortex/aimeat-ui-layout/libs/aimeat-ui-layout.js"></script>
-<script src="/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js"></script>
-<script src="/v1/cortex/aimeat-ui-forms/libs/aimeat-ui-forms.js"></script>
-<script src="/v1/cortex/aimeat-ui-dialogs/libs/aimeat-ui-dialogs.js"></script>
-\`\`\`
-
-Use these instead of raw HTML: \`Tabs\` for navigation, \`DataTable\` for tables, \`Input/Select/Toggle\` for forms, \`toast/Modal/Confirm\` for dialogs (never use native alert/confirm/prompt).
+DaisyUI + Tailwind CSS are loaded via CDN in the HTML head.
+Use daisyUI CSS classes for all UI components: \`class="card"\`, \`class="table"\`, \`class="btn"\`, \`class="tabs"\`, etc.
+Do NOT load aimeat-ui-* libraries — use daisyUI instead.
 `;
   }
 
@@ -707,13 +863,35 @@ const detail = await extCall('my-extension', 'getDetail', { id: 'abc-123' });
   let projectContext = data.projectDescription || '';
   if (appDomainSpec) projectContext += formatSpec(appDomainSpec, 'App-Domain Cortex Spec');
 
+  // App-domain cortex lib name — from app's OWN spec, then fallback
+  // appSpec already declared at top of resolveApp
+  const appDomainLib = (appSpec?.appDomainLib as string)
+    || ((appDomainSpec as Record<string, unknown>)?.libName as string)
+    || (appDomainComp2?.contextBundle?.libName as string)
+    || ((appDomainComp2?.registeredAs as string) || 'app').replace(/-([a-z0-9])/g, (_: string, ch: string) => ch.toUpperCase());
+  if (!appSpec?.appDomainLib) logger.error(`[resolveApp] ⚠️ App spec missing appDomainLib — using fallback: ${appDomainLib}`);
+
+  // App metadata — from spec or blueprint
+  const bp = data.blueprint;
+  const appComp = bp.components?.find(c => c.type === 'app');
+  const appName = (appSpec?.name as string) || ((appComp?.label as string) || data.componentLabel || 'app').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const appTitle = (appSpec?.title as string) || (appComp?.label as string) || data.componentLabel || 'AIMEAT App';
+  const appDescription = (appSpec?.description as string) || data.projectDescription || '';
+  const appLocale = (appSpec?.locale as string) || 'fi';
+  const appTheme = (appSpec?.daisyTheme as string) || 'light';
+
   return {
     label: data.componentLabel || '',
     project_context: projectContext,
     cortex_script_loads: cortexScriptLoads,
     cortex_or_api_section: cortexOrApiSection,
     cortex_rules: hasCortex ? '- Call cortex init() on app start — it handles everything automatically\n- Focus on UX/UI — the cortex handles data access and initialization' : '',
-    translation_keys_section: translationKeysSection,
+    app_name: appName,
+    app_title: appTitle,
+    app_description: appDescription,
+    app_domain_lib: appDomainLib,
+    app_locale: appLocale,
+    app_theme: appTheme,
   };
 }
 
@@ -1352,6 +1530,91 @@ window.__testResults = results;`;
     spec_section: specSection,
     feature_components: featureComponents,
     data_cortex_info: dataCortexInfo,
+    project_context: `## Project Context\nBlueprint components:\n${bpComponents}`,
+    test_template: testTemplate,
+  };
+}
+
+// ── App test resolver ──
+
+function resolveTestApp(data: PromptRuntimeData): Vars {
+  const bp = data.blueprint;
+  const bpComponents = bp.components?.map(c => `- ${c.id} (${c.type}): ${c.label}`).join('\n') || '';
+
+  // App-domain lib name — from app's OWN spec first, then fallback
+  const appSpec = data.selfSpec as Record<string, unknown> | undefined;
+  const appDomain = (data.completedComponents || []).find(c => c.type === 'cortex' && (c.subtype === 'app-domain' || (c.spec as Record<string, unknown>)?.methods) && c.registeredAs);
+  const appDomainSpec2 = appDomain?.spec as Record<string, unknown> | undefined;
+  const appLibName = (appSpec?.appDomainLib as string)
+    || (appDomainSpec2?.libName as string)
+    || (appDomain?.contextBundle?.libName as string)
+    || ((appDomain?.registeredAs as string) || 'app').replace(/-([a-z0-9])/g, (_: string, ch: string) => ch.toUpperCase());
+  if (!appSpec?.appDomainLib) logger.error(`[resolveTestApp] ⚠️ App spec missing appDomainLib — using fallback: ${appLibName}`);
+
+  const testTemplate = `// ── Test scaffolding (do not remove) ──
+const results = { passed: false, errors: [], details: '' };
+const log = (msg) => { results.details += msg + '\\n'; };
+const fail = (msg) => { results.errors.push(msg); log('FAIL: ' + msg); };
+const pass = (msg) => { log('PASS: ' + msg); };
+
+// ── Check app-domain cortex ──
+const appLib = window.AIMEAT.${appLibName};
+if (!appLib) { fail('App-domain library ${appLibName} not loaded'); window.__testResults = results; return; }
+pass('App-domain library loaded');
+
+// ── Init ──
+try {
+  const initResult = await appLib.init();
+  log('init returned: ' + JSON.stringify(initResult).substring(0, 200));
+  pass('init: completed');
+} catch (e) {
+  fail('init threw: ' + e.message);
+}
+
+// ── Render into #app ──
+const appEl = document.getElementById('app') || document.createElement('div');
+if (!appEl.id) { appEl.id = 'app'; document.body.appendChild(appEl); }
+
+try {
+  await appLib.render(appEl);
+} catch (e) {
+  fail('render threw: ' + e.message);
+}
+
+// ── Wait for async DOM (do not remove) ──
+await new Promise(r => setTimeout(r, 3000));
+
+// ── Check content ──
+log('App HTML length: ' + appEl.innerHTML.length);
+if (appEl.innerHTML.length < 100) fail('render: app container nearly empty');
+else pass('render: produced HTML content');
+
+const text = appEl.textContent || '';
+log('App text (first 300): ' + text.substring(0, 300));
+if (text.length > 50) pass('render: has text content');
+else fail('render: no text content');
+
+// ── Check daisyUI ──
+const hasDaisyUI = appEl.querySelector('[class*="card"], [class*="table"], [class*="btn"], [class*="tabs"], [class*="menu"], [class*="drawer"]');
+if (hasDaisyUI) pass('render: uses daisyUI components');
+else log('Note: no daisyUI classes detected');
+
+// ── Check navigation ──
+const hasNav = appEl.querySelector('[class*="tabs"], [class*="menu"], [class*="drawer"], [data-view], nav');
+if (hasNav) pass('render: navigation present');
+else log('Note: no navigation found');
+
+// ── Check text content (do NOT test individual components — they have their own tests) ──
+
+// ── Snapshot (do not remove) ──
+window.__renderSnapshot = appEl.innerHTML;
+
+// ── Cleanup (do not remove) ──
+if (results.errors.length === 0) results.passed = true;
+window.__testResults = results;`;
+
+  return {
+    component_label: data.componentLabel || '',
     project_context: `## Project Context\nBlueprint components:\n${bpComponents}`,
     test_template: testTemplate,
   };
