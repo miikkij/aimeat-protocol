@@ -207,7 +207,9 @@ export function ComponentDetail({ component, project, components, projectId, int
     // Only reset validationResult when switching to a different component.
     // When status changes (e.g. validating→done) within the same component,
     // keep validationResult so the Register button stays visible.
-    if (componentSwitched) {
+    // Reset state on component switch OR component reset (status goes back to pending/not_started)
+    const wasReset = !componentSwitched && (component.status === 'pending' || component.status === 'not_started') && !component.result;
+    if (componentSwitched || wasReset) {
       setValidationResult(null);
       setGeneratedPrompt(null);
       setSpecResult(component.spec ? JSON.stringify(component.spec, null, 2) : '');
