@@ -265,7 +265,7 @@ export async function runAutopilot(
       // Enable one phase at a time. Verify each before enabling the next.
       const ENABLED_TYPES = ['csm', 'memory', 'translation', 'extension', 'cortex'];
       // Cortex subtype gate: only cortex-data for now
-      const ENABLED_CORTEX_SUBTYPES = ['data'];
+      const ENABLED_CORTEX_SUBTYPES = ['data', 'component', 'app-domain'];
       if (!ENABLED_TYPES.includes(compType)) {
         alog.info(`[${cid}] Phase gate: ${compType} not enabled yet — stopping pipeline`);
         entry.status.componentResults.push({ id: cid, label: compLabel, status: 'phase_gated' });
@@ -615,7 +615,7 @@ export async function runAutopilot(
                 selfSpec: comp.spec as Record<string, unknown>, extensionName: comp.registeredAs as string,
                 completedComponents: [comp] as unknown as ComponentState[], // pass current comp with probeResults for golden samples
               } as unknown as PromptRuntimeData);
-            } else if (comp.spec && compType === 'cortex' && (comp.spec as Record<string, unknown>).wrapsExtension) {
+            } else if (comp.spec && compType === 'cortex') {
               const freshCompsForTest = await loadComponents();
               testPromptText = await buildPrompt(storage, 'gen-test-cortex-spec', {
                 blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec,
