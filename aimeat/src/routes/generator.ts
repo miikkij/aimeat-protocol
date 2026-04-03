@@ -1252,7 +1252,10 @@ window.__testRunning = true;
           const val = r.value as Record<string, unknown>;
           if (!val.subtype && blueprint?.components) {
             const bpc = blueprint.components.find((c: { id: string; label: string }) => c.label === val.label || c.id === val.id);
-            if (bpc && (bpc as Record<string, unknown>).subtype) val.subtype = (bpc as Record<string, unknown>).subtype;
+            if (bpc && (bpc as Record<string, unknown>).subtype) {
+              val.subtype = (bpc as Record<string, unknown>).subtype;
+              logger.warn(`⚠️ SUBTYPE MISSING from stored component "${val.id || val.label}" — enriched from blueprint as "${(bpc as Record<string, unknown>).subtype}". Re-create project to fix.`);
+            }
           }
           return val;
         });

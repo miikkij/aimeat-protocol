@@ -253,7 +253,10 @@ export async function runAutopilot(
       for (const fc of comps) {
         if (!fc.subtype) {
           const bpc = bpComps.find(b => b.label === fc.label || b.id === fc.id);
-          if (bpc?.subtype) fc.subtype = bpc.subtype;
+          if (bpc?.subtype) {
+            fc.subtype = bpc.subtype;
+            alog.warn(`[${fc.id}] ⚠️ SUBTYPE MISSING from stored component — enriched from blueprint as "${bpc.subtype}". Re-create project to fix permanently.`);
+          }
         }
       }
       let comp = comps.find(c => c.id === cid);
@@ -406,7 +409,10 @@ export async function runAutopilot(
         for (const fc of freshComps) {
           if (!fc.subtype) {
             const bpc = bpComponents.find(b => b.label === fc.label || b.id === fc.id);
-            if (bpc?.subtype) fc.subtype = bpc.subtype;
+            if (bpc?.subtype) {
+              fc.subtype = bpc.subtype;
+              alog.warn(`[${fc.id}] ⚠️ SUBTYPE MISSING from stored component — enriched from blueprint as "${bpc.subtype}". Re-create project to fix permanently.`);
+            }
           }
         }
         const completedComponents = freshComps.filter(c => c.status === 'done' && c.registeredAs);
@@ -647,7 +653,10 @@ export async function runAutopilot(
               for (const fc of freshCompsForTest) {
                 if (!fc.subtype) {
                   const bpc = bpCompsForTest.find(b => b.label === fc.label || b.id === fc.id);
-                  if (bpc?.subtype) fc.subtype = bpc.subtype;
+                  if (bpc?.subtype) {
+                    fc.subtype = bpc.subtype;
+                    alog.warn(`[${fc.id}] ⚠️ SUBTYPE MISSING from stored component — enriched from blueprint as "${bpc.subtype}". Re-create project to fix permanently.`);
+                  }
                 }
               }
               const bpC = bpCompsForTest.find((c: Record<string, unknown>) => c.label === compLabel);
