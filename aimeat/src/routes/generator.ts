@@ -397,6 +397,19 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
       const compLabel = (compVal.label as string) || componentId;
       await debugWriter.writeTestCode(componentId, testCode as string);
       await debugWriter.writeTestResult(componentId, result as unknown as Record<string, unknown>);
+      // Copy screenshots to debug folder so they're visible alongside other artifacts
+      if (result.screenshots && result.screenshots.length > 0) {
+        const { screenshotDir: getScreenDir } = await import('../services/generator-testing.js');
+        const { copyFile } = await import('node:fs/promises');
+        const srcDir = getScreenDir(projectId);
+        for (const ss of result.screenshots as string[]) {
+          try {
+            const src = `${srcDir}/${ss}`;
+            const dest = `data/debug/generator/${projectId}/components/${componentId}/${ss}`;
+            await copyFile(src, dest).catch(() => {});
+          } catch { /* screenshot copy optional */ }
+        }
+      }
       await debugWriter.appendLog({
         event: 'test_executed',
         componentId,
@@ -795,6 +808,7 @@ ${scripts.join('\n')}
 // Test runner
 window.__testResults = null;
 window.__testRunning = true;
+window.__renderSnapshot = null; // Set by test code to capture rendered state
 (async function() {
   try {
     ${testCode}
@@ -806,6 +820,17 @@ window.__testRunning = true;
     window.__testRunning = false;
     if (!window.__testResults) {
       window.__testResults = { passed: false, errors: ['Test did not complete'] };
+    }
+    // Show rendered component snapshot (if captured by test) BEFORE showing results
+    if (window.__renderSnapshot) {
+      var snapDiv = document.createElement('div');
+      snapDiv.id = 'render-snapshot';
+      snapDiv.style.border = '2px solid #ccc';
+      snapDiv.style.padding = '16px';
+      snapDiv.style.margin = '16px 0';
+      snapDiv.style.background = '#fff';
+      snapDiv.innerHTML = '<h3 style="margin:0 0 8px">Rendered Component</h3>' + window.__renderSnapshot;
+      document.body.appendChild(snapDiv);
     }
     // Show results in DOM
     var el = document.getElementById('result');

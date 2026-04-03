@@ -2179,7 +2179,10 @@ else pass('render: produced HTML content');
 if (container.textContent.includes(item.name || item.title)) pass('render: displays item name');
 else fail('render: item name not found in rendered output');
 
-// 5. CHECK DESTROY
+// 5. SNAPSHOT — capture the rendered state for screenshots BEFORE cleanup
+window.__renderSnapshot = container.innerHTML;
+
+// 6. CHECK DESTROY
 if (result && typeof result.destroy === 'function') {
   result.destroy();
   pass('destroy: function exists and called without error');
@@ -2197,7 +2200,8 @@ Test the ACTUAL component. Use REAL data from the data cortex. Check the DOM out
 1. Return ONLY executable JavaScript code — NO markdown fences, NO explanation text
 2. NO import/require/export — sandbox environment
 3. Your code runs INSIDE an existing async function. Write sequential statements starting with variable declarations.
-4. Set window.__testResults = { passed, errors, details } as the LAST statement`,
+4. BEFORE calling destroy(), capture the rendered HTML: window.__renderSnapshot = container.innerHTML;
+5. Set window.__testResults = { passed, errors, details } as the LAST statement`,
     variables: ['disclaimer', 'component_label', 'registered_as', 'lib_name', 'spec_section', 'data_cortex_info', 'project_context'],
     usedIn: ['generator-autopilot'],
   },
@@ -2308,7 +2312,8 @@ Test the ACTUAL component. Check that init() and render() work without crashing.
 1. Return ONLY executable JavaScript code — NO markdown fences, NO explanation text
 2. NO import/require/export — sandbox environment
 3. Your code runs INSIDE an existing async function. Write sequential statements starting with variable declarations.
-4. Set window.__testResults = { passed, errors, details } as the LAST statement`,
+4. BEFORE cleanup, capture rendered HTML: window.__renderSnapshot = container.innerHTML;
+5. Set window.__testResults = { passed, errors, details } as the LAST statement`,
     variables: ['disclaimer', 'component_label', 'registered_as', 'lib_name', 'spec_section', 'feature_components', 'data_cortex_info', 'project_context'],
     usedIn: ['generator-autopilot'],
   },
