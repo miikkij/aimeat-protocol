@@ -777,9 +777,11 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
     },
     async refresh() { return this; }
   };
-  // Override getSession synchronously — before aimeat-data.js loads
-  var origGetSession = AIMEAT.auth.getSession.bind(AIMEAT.auth);
-  AIMEAT.auth.getSession = function() { return session || origGetSession(); };
+  // Override auth methods — test page has a real JWT, make all auth paths work
+  AIMEAT.auth.getSession = function() { return session; };
+  AIMEAT.auth.login = async function() { return session; };
+  AIMEAT.auth.logout = async function() { console.log('logout called (test page — no-op)'); };
+  AIMEAT.auth.mountLoginButton = function() { console.log('mountLoginButton called (test page — already logged in)'); };
   // Also set AIMEAT.session directly — cortex IIFEs use AIMEAT.session.fetch()
   AIMEAT.session = session;
 })();
