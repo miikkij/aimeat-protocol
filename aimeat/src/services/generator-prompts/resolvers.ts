@@ -56,6 +56,8 @@ export async function resolvePromptVars(
     'gen-fix': resolveFix,
     'gen-test-extension-spec': resolveTestExtensionSpec,
     'gen-test-cortex-spec': resolveTestCortexSpec,
+    'gen-test-cortex-component': resolveTestCortexComponent,
+    'gen-test-cortex-app-domain': resolveTestCortexAppDomain,
     'gen-blueprint': resolveBlueprint,
     'gen-interview': resolveInterview,
   };
@@ -942,6 +944,95 @@ function buildContextString(data: PromptRuntimeData): string {
   }
 
   return context;
+}
+
+// ── Component cortex test resolver ──
+
+function resolveTestCortexComponent(data: PromptRuntimeData): Vars {
+  const bp = data.blueprint;
+  const spec = data.selfSpec as Record<string, unknown> | undefined;
+  const libName = (spec?.libName as string) || (spec?.name as string) || '';
+
+  // Spec section
+  let specSection = '';
+  if (spec) {
+    specSection = `\n## Component Spec\n\`\`\`json\n${JSON.stringify(spec, null, 2).slice(0, 3000)}\n\`\`\`\n`;
+  }
+
+  // Data cortex info — so the test can fetch real data
+  const dataCortex = (data.completedComponents || []).find(c => c.type === 'cortex' && c.subtype === 'data');
+  const dcBundle = dataCortex?.contextBundle;
+  let dataCortexInfo = '';
+  if (dcBundle) {
+    dataCortexInfo = `\nThe data cortex is loaded at: window.AIMEAT.${dcBundle.libName || dcBundle.registeredAs || ''}\nAvailable methods: ${(dcBundle.exports || []).join(', ')}\nUse it to get REAL data for testing the component's render() function.\n`;
+  } else {
+    dataCortexInfo = warnFallback('gen-test-cortex-component', 'data_cortex_info', 'No data cortex available on test page.');
+  }
+
+  // Project context
+  const bpComponents = bp.components?.map(c => `- ${c.id} (${c.type}): ${c.label}`).join('\n') || '';
+  const useCases = data.interviewSpec?.useCases
+    ? (data.interviewSpec.useCases as Array<Record<string, string>>).map((uc, i) => {
+        if (typeof uc === 'string') return `${i + 1}. ${uc}`;
+        return `${i + 1}. ${uc.description || uc.title || JSON.stringify(uc)}`;
+      }).join('\n')
+    : 'No use cases specified';
+
+  return {
+    component_label: data.componentLabel || '',
+    registered_as: (dataCortex?.registeredAs as string) || '',
+    lib_name: libName,
+    spec_section: specSection,
+    data_cortex_info: dataCortexInfo,
+    project_context: `## Project Context\nBlueprint components:\n${bpComponents}\n\nUse cases:\n${useCases}`,
+  };
+}
+
+// ── App-domain cortex test resolver ──
+
+function resolveTestCortexAppDomain(data: PromptRuntimeData): Vars {
+  const bp = data.blueprint;
+  const spec = data.selfSpec as Record<string, unknown> | undefined;
+  const libName = (spec?.libName as string) || (spec?.name as string) || '';
+
+  // Spec section
+  let specSection = '';
+  if (spec) {
+    specSection = `\n## App-Domain Spec\n\`\`\`json\n${JSON.stringify(spec, null, 2).slice(0, 3000)}\n\`\`\`\n`;
+  }
+
+  // Feature components
+  const featureComps = (data.completedComponents || []).filter(c =>
+    c.type === 'cortex' && (c.subtype === 'component' || c.subtype === 'feature'));
+  const featureComponents = featureComps.length > 0
+    ? featureComps.map(c => {
+        const b = c.contextBundle;
+        return `- ${b?.name || c.label}: AIMEAT.${b?.libName || c.registeredAs || ''} (exports: ${(b?.exports || []).join(', ')})`;
+      }).join('\n')
+    : 'No feature components registered yet.';
+
+  // Data cortex info
+  const dataCortex = (data.completedComponents || []).find(c => c.type === 'cortex' && c.subtype === 'data');
+  const dcBundle = dataCortex?.contextBundle;
+  let dataCortexInfo = '';
+  if (dcBundle) {
+    dataCortexInfo = `window.AIMEAT.${dcBundle.libName || dcBundle.registeredAs || ''} — methods: ${(dcBundle.exports || []).join(', ')}`;
+  } else {
+    dataCortexInfo = 'No data cortex available.';
+  }
+
+  // Project context
+  const bpComponents = bp.components?.map(c => `- ${c.id} (${c.type}): ${c.label}`).join('\n') || '';
+
+  return {
+    component_label: data.componentLabel || '',
+    registered_as: (spec?.name as string) || '',
+    lib_name: libName,
+    spec_section: specSection,
+    feature_components: featureComponents,
+    data_cortex_info: dataCortexInfo,
+    project_context: `## Project Context\nBlueprint components:\n${bpComponents}`,
+  };
 }
 
 // ── Blueprint & Interview resolvers ──

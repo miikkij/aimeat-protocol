@@ -626,12 +626,26 @@ export async function runAutopilot(
           try {
             let testPromptText: string;
             if (compType === 'cortex') {
-              // ALL cortex subtypes use browser test prompt — data, component, app-domain
+              // Route to subtype-specific test prompt
               const freshCompsForTest = await loadComponents();
-              testPromptText = await buildPrompt(storage, 'gen-test-cortex-spec', {
+              // Enrich with subtype from blueprint
+              const bpCompsForTest = (blueprint.components as Array<Record<string, unknown>>) || [];
+              for (const fc of freshCompsForTest) {
+                if (!fc.subtype) {
+                  const bpc = bpCompsForTest.find(b => b.label === fc.label || b.id === fc.id);
+                  if (bpc?.subtype) fc.subtype = bpc.subtype;
+                }
+              }
+              const bpC = bpCompsForTest.find((c: Record<string, unknown>) => c.label === compLabel);
+              const cortexSubtype = (bpC?.subtype as string) || (comp.subtype as string) || 'data';
+              const testPromptId = cortexSubtype === 'component' ? 'gen-test-cortex-component'
+                : cortexSubtype === 'app-domain' ? 'gen-test-cortex-app-domain'
+                : 'gen-test-cortex-spec'; // data cortex
+              testPromptText = await buildPrompt(storage, testPromptId, {
                 blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec,
                 selfSpec: comp.spec as Record<string, unknown> | undefined,
                 componentLabel: compLabel,
+                componentType: compType,
                 completedComponents: freshCompsForTest.filter(c => c.registeredAs) as unknown as ComponentState[],
               } as unknown as PromptRuntimeData);
             } else if (comp.spec && compType === 'extension') {

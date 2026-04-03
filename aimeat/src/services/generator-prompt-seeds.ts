@@ -2088,6 +2088,225 @@ Apply this EXACT pattern to the component under test. Use the actual method name
     usedIn: ['generator-autopilot'],
   },
 
+  {
+    id: 'gen-test-cortex-component',
+    group: 'generator',
+    name: 'Component Cortex Test (render)',
+    description: 'Browser-side test for component cortexes — tests render(), DOM output, interactions.',
+    content: `{{disclaimer}}You are generating TEST CODE for a UI COMPONENT CORTEX in an AIMEAT service.
+
+## Component Under Test
+- Type: cortex (component)
+- Label: {{component_label}}
+- Registered as: {{registered_as}}
+- Library: window.AIMEAT.{{lib_name}}
+
+## What This Component Does
+This is a UI COMPONENT — it exports render(container, props) that creates DOM elements.
+It does NOT export data methods like searchCompanies or getWatchlist.
+Those belong to the DATA CORTEX (a separate library).
+
+{{spec_section}}
+
+## Data Cortex Available on Test Page
+{{data_cortex_info}}
+
+{{project_context}}
+
+## Test Environment: Browser (page.evaluate sandbox)
+
+CRITICAL SANDBOX RULES:
+- NO import/require/export statements
+- Your code runs inside page.evaluate() in a real browser page
+- You have access to: window, document, fetch, DOM APIs
+- Set results on: window.__testResults = { passed: boolean, errors: string[], details: string }
+
+The component library AND the data cortex library are both loaded on the test page.
+Authentication IS available — the data cortex methods work.
+
+## How to Test a UI Component
+
+1. Get real data from the DATA CORTEX (it's loaded on the page)
+2. Create a container element
+3. Call lib.render(container, props) with the real data
+4. Check that DOM elements were created
+5. Check text content is real data (not placeholder or translation keys)
+6. Check that buttons/links exist
+
+## EXAMPLE (follow this pattern)
+
+\\\`\\\`\\\`javascript
+const results = { passed: false, errors: [], details: '' };
+const log = (msg) => { results.details += msg + '\\n'; };
+const fail = (msg) => { results.errors.push(msg); log('FAIL: ' + msg); };
+const pass = (msg) => { log('PASS: ' + msg); };
+
+const lib = window.AIMEAT.myComponentLib;
+if (!lib) { fail('Library not loaded'); window.__testResults = results; return; }
+if (typeof lib.render !== 'function') { fail('render is not a function'); window.__testResults = results; return; }
+
+// 1. GET REAL DATA from the data cortex
+const dataCortex = window.AIMEAT.myDataLib;
+if (!dataCortex) { fail('Data cortex not loaded'); window.__testResults = results; return; }
+
+const item = await dataCortex.getItem({id: 'test-id'});
+log('Got data: ' + JSON.stringify(item));
+if (!item) { fail('Could not get test data from data cortex'); window.__testResults = results; return; }
+
+// 2. CREATE CONTAINER and RENDER
+const container = document.createElement('div');
+document.body.appendChild(container);
+
+const result = lib.render(container, {
+  data: item,
+  locale: 'fi',
+  translations: {},
+  onAction: (id) => log('Action callback: ' + id)
+});
+
+// 3. CHECK DOM OUTPUT
+log('Container HTML length: ' + container.innerHTML.length);
+if (container.innerHTML.length < 50) fail('render: container is nearly empty');
+else pass('render: produced HTML content');
+
+// 4. CHECK REAL DATA IN DOM
+if (container.textContent.includes(item.name || item.title)) pass('render: displays item name');
+else fail('render: item name not found in rendered output');
+
+// 5. CHECK DESTROY
+if (result && typeof result.destroy === 'function') {
+  result.destroy();
+  pass('destroy: function exists and called without error');
+} else {
+  log('Note: no destroy function returned');
+}
+
+if (results.errors.length === 0) results.passed = true;
+window.__testResults = results;
+\\\`\\\`\\\`
+
+Test the ACTUAL component. Use REAL data from the data cortex. Check the DOM output.
+
+## Output Rules
+1. Return ONLY executable JavaScript code — NO markdown fences, NO explanation text
+2. NO import/require/export — sandbox environment
+3. Your code runs INSIDE an existing async function. Write sequential statements starting with variable declarations.
+4. Set window.__testResults = { passed, errors, details } as the LAST statement`,
+    variables: ['disclaimer', 'component_label', 'registered_as', 'lib_name', 'spec_section', 'data_cortex_info', 'project_context'],
+    usedIn: ['generator-autopilot'],
+  },
+
+  {
+    id: 'gen-test-cortex-app-domain',
+    group: 'generator',
+    name: 'App-Domain Cortex Test (init + render)',
+    description: 'Browser-side test for app-domain cortex — tests init(), render(), navigation.',
+    content: `{{disclaimer}}You are generating TEST CODE for an APP-DOMAIN CORTEX in an AIMEAT service.
+
+## Component Under Test
+- Type: cortex (app-domain)
+- Label: {{component_label}}
+- Registered as: {{registered_as}}
+- Library: window.AIMEAT.{{lib_name}}
+
+## What This Component Does
+This is the APP-DOMAIN CORTEX — the top-level composition layer. It exports:
+- init() — initializes auth, loads translations, returns readiness status
+- render(container) — renders the full application UI with navigation
+
+It composes all feature component cortexes into a complete application.
+
+{{spec_section}}
+
+## Feature Components Available
+{{feature_components}}
+
+## Data Cortex Available
+{{data_cortex_info}}
+
+{{project_context}}
+
+## Test Environment: Browser (page.evaluate sandbox)
+
+CRITICAL SANDBOX RULES:
+- NO import/require/export statements
+- Your code runs inside page.evaluate() in a real browser page
+- You have access to: window, document, fetch, DOM APIs
+- Set results on: window.__testResults = { passed: boolean, errors: string[], details: string }
+
+ALL cortex libraries (data, components, app-domain) are loaded on the test page.
+Authentication IS available.
+
+## How to Test an App-Domain Cortex
+
+1. Call init() — check it returns without error
+2. Create a container and call render(container)
+3. Check that the container has meaningful DOM content
+4. Check that navigation elements exist (tabs, sidebar, etc.)
+5. Verify the app didn't crash on render
+
+## EXAMPLE
+
+\\\`\\\`\\\`javascript
+const results = { passed: false, errors: [], details: '' };
+const log = (msg) => { results.details += msg + '\\n'; };
+const fail = (msg) => { results.errors.push(msg); log('FAIL: ' + msg); };
+const pass = (msg) => { log('PASS: ' + msg); };
+
+const lib = window.AIMEAT.myAppDomainLib;
+if (!lib) { fail('Library not loaded'); window.__testResults = results; return; }
+
+// 1. TEST INIT
+log('Testing init...');
+try {
+  const initResult = await lib.init();
+  log('init returned: ' + JSON.stringify(initResult));
+  if (initResult === null || initResult === undefined) fail('init: returned null');
+  else pass('init: completed successfully');
+} catch (e) {
+  fail('init: threw error: ' + e.message);
+}
+
+// 2. TEST RENDER
+log('Testing render...');
+const container = document.createElement('div');
+container.style.width = '1024px';
+container.style.height = '768px';
+document.body.appendChild(container);
+
+try {
+  lib.render(container);
+  // Wait for async rendering
+  await new Promise(r => setTimeout(r, 2000));
+
+  log('Container HTML length: ' + container.innerHTML.length);
+  if (container.innerHTML.length < 100) fail('render: container is nearly empty');
+  else pass('render: produced HTML content (' + container.innerHTML.length + ' chars)');
+
+  // Check for navigation elements
+  const hasNav = container.querySelector('nav') || container.querySelector('[class*=nav]') || container.querySelector('[class*=tab]');
+  if (hasNav) pass('render: navigation elements found');
+  else log('Note: no nav/tab elements found (may use different pattern)');
+
+} catch (e) {
+  fail('render: threw error: ' + e.message);
+}
+
+if (results.errors.length === 0) results.passed = true;
+window.__testResults = results;
+\\\`\\\`\\\`
+
+Test the ACTUAL component. Check that init() and render() work without crashing.
+
+## Output Rules
+1. Return ONLY executable JavaScript code — NO markdown fences, NO explanation text
+2. NO import/require/export — sandbox environment
+3. Your code runs INSIDE an existing async function. Write sequential statements starting with variable declarations.
+4. Set window.__testResults = { passed, errors, details } as the LAST statement`,
+    variables: ['disclaimer', 'component_label', 'registered_as', 'lib_name', 'spec_section', 'feature_components', 'data_cortex_info', 'project_context'],
+    usedIn: ['generator-autopilot'],
+  },
+
   // ── Blueprint & Interview prompts (migrated from browser JS) ──
 
   {
