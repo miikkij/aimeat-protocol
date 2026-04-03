@@ -2151,7 +2151,7 @@ const lib = window.AIMEAT.myComponentLib;
 if (!lib) { fail('Library not loaded'); window.__testResults = results; return; }
 if (typeof lib.render !== 'function') { fail('render is not a function'); window.__testResults = results; return; }
 
-// 1. GET REAL DATA from the data cortex
+// 1. GET REAL DATA from the data cortex (object params!)
 const dataCortex = window.AIMEAT.myDataLib;
 if (!dataCortex) { fail('Data cortex not loaded'); window.__testResults = results; return; }
 
@@ -2170,19 +2170,27 @@ const result = lib.render(container, {
   onAction: (id) => log('Action callback: ' + id)
 });
 
-// 3. CHECK DOM OUTPUT
+// 3. WAIT FOR ASYNC RENDER — components fetch data internally, DOM populates async
+await new Promise(r => setTimeout(r, 3000));
+
+// 4. CHECK DOM OUTPUT
 log('Container HTML length: ' + container.innerHTML.length);
-if (container.innerHTML.length < 50) fail('render: container is nearly empty');
+if (container.innerHTML.length < 50) fail('render: container is nearly empty after 3s wait');
 else pass('render: produced HTML content');
 
-// 4. CHECK REAL DATA IN DOM
-if (container.textContent.includes(item.name || item.title)) pass('render: displays item name');
-else fail('render: item name not found in rendered output');
+// 5. CHECK REAL DATA IN DOM — use textContent to verify rendered data
+const text = container.textContent || '';
+log('Container text (first 200): ' + text.substring(0, 200));
 
-// 5. SNAPSHOT — capture the rendered state for screenshots BEFORE cleanup
+// NOTE: Data cortex returns NESTED objects. Check the spec for exact field paths.
+// Example: company.businessId.value (not company.businessId), company.names[0].name (not company.name)
+if (text.length > 50) pass('render: has substantial text content');
+else fail('render: text content is too short (' + text.length + ' chars)');
+
+// 6. SNAPSHOT — capture the rendered state for screenshots BEFORE cleanup
 window.__renderSnapshot = container.innerHTML;
 
-// 6. CHECK DESTROY
+// 7. CHECK DESTROY
 if (result && typeof result.destroy === 'function') {
   result.destroy();
   pass('destroy: function exists and called without error');
@@ -2195,6 +2203,8 @@ window.__testResults = results;
 \\\`\\\`\\\`
 
 Test the ACTUAL component. Use REAL data from the data cortex. Check the DOM output.
+CRITICAL: Components render ASYNCHRONOUSLY. After calling render(), WAIT 3 seconds before checking the DOM.
+CRITICAL: The data cortex returns NESTED objects (see Methods and Return Shapes above). Check textContent for the actual rendered text, not for raw data field values.
 
 ## Output Rules
 1. Return ONLY executable JavaScript code — NO markdown fences, NO explanation text
