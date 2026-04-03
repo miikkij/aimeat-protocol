@@ -638,7 +638,8 @@ create a method named "getItems" that internally calls the extension's "fetchAll
 2. Return types MUST match extension spec output exactly.
 3. Include getTranslations and getSettings — read from owner namespace.
 4. All methods return null on failure. No exceptions.
-5. params field MUST be an object type (e.g. "{ query: string, type: string }"), NEVER positional parameters.`,
+5. params field MUST be an object type (e.g. "{ query: string, type: string }"), NEVER positional parameters.
+6. name and libName MUST be ASCII only (a-z, 0-9, hyphens for name, camelCase for libName). Transliterate non-ASCII: ä→a, ö→o, å→a, ü→u.`,
     variables: ['disclaimer', 'extension_spec', 'structures', 'blueprint_methods'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
@@ -683,7 +684,8 @@ Return ONLY valid JSON:
 ## Rules
 1. Props include callbacks for interactions (onSelect, onAdd) — component doesn't navigate.
 2. Component receives locale + translations as props.
-3. Keep props minimal.`,
+3. Keep props minimal.
+4. name and libName MUST be ASCII only (a-z, 0-9, hyphens for name, camelCase for libName). Transliterate non-ASCII: ä→a, ö→o, å→a, ü→u.`,
     variables: ['disclaimer', 'component_label', 'view_context', 'data_api_spec', 'translation_keys'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
@@ -732,7 +734,10 @@ Return ONLY valid JSON:
   "viewComposition": { "<view>": ["<components>"] },
   "scriptDependencies": ["<ordered script URLs>"],
   "example": "await AIMEAT.<libName>.init(); AIMEAT.<libName>.render(el);"
-}`,
+}
+
+## Rules
+1. name and libName MUST be ASCII only (a-z, 0-9, hyphens for name, camelCase for libName). Transliterate non-ASCII: ä→a, ö→o, å→a, ü→u.`,
     variables: ['disclaimer', 'component_specs', 'data_api_spec', 'use_cases', 'views', 'translation_keys'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
