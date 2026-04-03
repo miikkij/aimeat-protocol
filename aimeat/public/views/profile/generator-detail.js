@@ -408,6 +408,12 @@ export function ComponentDetail({ component, project, components, projectId, int
         setTestResult(null);
         setCurrentTestPrompt(null);
         showToast?.('Component reset — ready for regeneration');
+        // Reload spec prompt immediately after reset
+        if (hasSpec) {
+          loadPromptFromBackend(projectId, component.id, 'spec')
+            .then(p => setSpecPrompt(p))
+            .catch(() => {});
+        }
         onUpdate();
       } else {
         showToast?.('Reset failed: ' + (resp.error?.message || 'Unknown error'), true);
