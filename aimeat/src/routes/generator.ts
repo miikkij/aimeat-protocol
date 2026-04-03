@@ -1054,11 +1054,66 @@ window.__renderSnapshot = null; // Set by test code to capture rendered state
           case 'msm': await registerMsm(component.content, ownerName, storage); break;
           case 'extension': await registerExtension(component.content, ownerName, regGhii, storage, config.maxExtensionsPerOwner); break;
           case 'app': await registerApp(component.content, ownerName, regGhii, storage); break;
-          case 'memory':
-          case 'translation':
-          case 'cortex':
-            // No catalogue registration needed — stored in generator memory keys only
+          case 'cortex': {
+            // Register cortex: POST manifest+libs, then deactivate+activate
+            const cortexContent = component.content;
+            const manifestMatch = cortexContent.match(/```yaml\n([\s\S]*?)```/);
+            const jsMatch = cortexContent.match(/```javascript\n([\s\S]*?)```/);
+            if (manifestMatch) {
+              const manifest = manifestMatch[1].trim();
+              const nameMatch = manifest.match(/name:\s*"?([^\s"]+)"?/);
+              const cortexName = nameMatch?.[1] || '';
+              const libs: Record<string, string> = {};
+              if (jsMatch && cortexName) {
+                libs[`${cortexName}.js`] = jsMatch[1].trim();
+              }
+              const jwt = (req.headers.authorization ?? '').replace('Bearer ', '');
+              const baseUrl = `http://localhost:${config.port}`;
+              const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt}` };
+              // Register (or re-register: deactivate → delete → register)
+              const regResp = await fetch(`${baseUrl}/v1/cortex`, { method: 'POST', headers, body: JSON.stringify({ manifest, ...( Object.keys(libs).length > 0 ? { libs } : {}) }) });
+              if (!regResp.ok && cortexName) {
+                await fetch(`${baseUrl}/v1/cortex/${encodeURIComponent(cortexName)}/deactivate`, { method: 'POST', headers }).catch(() => {});
+                await fetch(`${baseUrl}/v1/cortex/${encodeURIComponent(cortexName)}`, { method: 'DELETE', headers }).catch(() => {});
+                await fetch(`${baseUrl}/v1/cortex`, { method: 'POST', headers, body: JSON.stringify({ manifest, ...(Object.keys(libs).length > 0 ? { libs } : {}) }) });
+              }
+              // Activate
+              if (cortexName) {
+                await fetch(`${baseUrl}/v1/cortex/${encodeURIComponent(cortexName)}/deactivate`, { method: 'POST', headers }).catch(() => {});
+                await fetch(`${baseUrl}/v1/cortex/${encodeURIComponent(cortexName)}/activate`, { method: 'POST', headers });
+              }
+            }
             break;
+          }
+          case 'memory':
+          case 'translation': {
+            // Write data to actual memory keys so AIMEAT.data.get() can read them.
+            const projComps = await storage.listMemory(regGhii, { prefix: `generator.${projectId}.component.`, visibility: 'owner' });
+            const extReg = projComps.find(r => (r.value as Record<string, unknown>).type === 'extension' && (r.value as Record<string, unknown>).registeredAs);
+            const slug = (extReg?.value as Record<string, unknown>)?.registeredAs as string || '';
+            try {
+              const raw = component.content;
+              const clean = typeof raw === 'string' ? raw.replace(/^```\w*\n?/, '').replace(/\n?```$/, '').trim() : raw;
+              const parsed = typeof clean === 'string' ? JSON.parse(clean) : clean;
+              const now = new Date().toISOString();
+              if (component.type === 'translation') {
+                for (const [locale, strings] of Object.entries(parsed)) {
+                  if (locale && typeof strings === 'object' && strings !== null) {
+                    const memKey = slug ? `${slug}.i18n.${locale}` : `i18n.${locale}`;
+                    await storage.setMemory({ key: memKey, ownerGaii: regGhii, value: strings as Record<string, unknown>, visibility: 'public', version: 1, tags: ['generator', 'translation'], ttlHours: null, createdAt: now, updatedAt: now });
+                  }
+                }
+              } else {
+                for (const [rawKey, value] of Object.entries(parsed)) {
+                  const memKey = (slug && !rawKey.startsWith(slug + '.')) ? `${slug}.${rawKey}` : rawKey;
+                  await storage.setMemory({ key: memKey, ownerGaii: regGhii, value: value as Record<string, unknown>, visibility: 'public', version: 1, tags: ['generator', 'memory'], ttlHours: null, createdAt: now, updatedAt: now });
+                }
+              }
+            } catch (e) {
+              console.error(`[generator] Failed to store ${component.type} in memory:`, e);
+            }
+            break;
+          }
           default:
             res.status(400).json(error(config.nodeId, 'UNSUPPORTED_TYPE', `Registration not supported for type: ${component.type as string}`));
             return;
