@@ -326,26 +326,27 @@ function resolveCortexComponent(data: PromptRuntimeData): Vars {
   const bpComp = data.blueprintComponent;
   const labelLower = (data.componentLabel || '').toLowerCase();
 
-  // Use case — match by blueprint component's consumes or by label keywords
+  // Use cases — pass ALL use cases so the LLM can pick the relevant one
+  // (Label matching doesn't work when labels are in a different language than use case titles)
   let useCase = '';
-  if (interview?.useCases) {
-    const match = (interview.useCases as Array<Record<string, string>>).find(u =>
-      labelLower.includes((u.title || '').toLowerCase().split(' ')[0]));
-    if (match) useCase = `**${match.title}** [${match.priority || 'medium'}]: ${match.description || ''}`;
+  if (interview?.useCases && (interview.useCases as unknown[]).length > 0) {
+    useCase = (interview.useCases as Array<Record<string, string>>)
+      .map(u => `- **${u.title}** [${u.priority || 'medium'}]: ${u.description || ''}`)
+      .join('\n');
   }
-  if (!useCase) useCase = warnFallback('gen-cortex-component', 'use_case', 'No specific use case provided');
+  if (!useCase) useCase = warnFallback('gen-cortex-component', 'use_case', 'No use cases provided');
 
-  // View
+  // Views — pass ALL views
   let viewSection = '';
-  if (interview?.views) {
-    const match = (interview.views as Array<Record<string, unknown>>).find(v =>
-      labelLower.includes(((v.title as string) || '').toLowerCase().split(' ')[0]));
-    if (match) {
-      viewSection = `**${match.title}** (${match.type || 'page'}): ${match.description || ''}`;
-      if (Array.isArray(match.interactions)) viewSection += `\nInteractions: ${(match.interactions as string[]).join(', ')}`;
-    }
+  if (interview?.views && (interview.views as unknown[]).length > 0) {
+    viewSection = (interview.views as Array<Record<string, unknown>>)
+      .map(v => {
+        let line = `- **${v.title}** (${v.type || 'page'}): ${v.description || ''}`;
+        if (Array.isArray(v.interactions)) line += ` [${(v.interactions as string[]).join(', ')}]`;
+        return line;
+      }).join('\n');
   }
-  if (!viewSection) viewSection = warnFallback('gen-cortex-component', 'view_section', 'No specific view provided');
+  if (!viewSection) viewSection = warnFallback('gen-cortex-component', 'view_section', 'No views provided');
 
   // Structures
   const structures = data.blueprint.dataModel?.structures || {};
