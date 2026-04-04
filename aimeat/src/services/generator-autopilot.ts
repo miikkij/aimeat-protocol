@@ -282,7 +282,7 @@ export async function runAutopilot(
 
       // Phase gate: only process types enabled for this run.
       // Enable one phase at a time. Verify each before enabling the next.
-      const ENABLED_TYPES = ['csm', 'memory', 'translation', 'extension', 'cortex', 'app'];
+      const ENABLED_TYPES = ['csm', 'memory', 'translation', 'extension', 'cortex']; // Phase gate: stop after cortex — app gated
       // Cortex subtype gate: only cortex-data for now
       const ENABLED_CORTEX_SUBTYPES = ['data', 'component', 'app-domain'];
       if (!ENABLED_TYPES.includes(compType)) {
@@ -566,21 +566,29 @@ export async function runAutopilot(
 
           // For memory/translation: store in memory directly
           if (compType === 'memory' || compType === 'translation') {
-            const extComp = freshComps.find(c => c.type === 'extension' && c.registeredAs);
-            const csmComp = freshComps.find(c => c.type === 'csm' && c.registeredAs);
-            const serviceSlug = (extComp?.registeredAs as string) || ((csmComp?.registeredAs as string) || '').split('/').pop() || '';
+            // service_slug comes from blueprint — the single source of truth
+            const serviceSlug = (blueprint as Record<string, unknown>).service_slug as string;
+            if (!serviceSlug) {
+              throw new Error(`Blueprint missing "service_slug" — cannot namespace memory keys. Regenerate blueprint with service_slug field.`);
+            }
+
+            alog.info(`[${cid}] serviceSlug="${serviceSlug}" (from blueprint.service_slug)`);
 
             if (compType === 'memory') {
               const stripped = typeof content === 'string' ? stripCodeblock(content) : content;
               const entries = typeof stripped === 'string' ? JSON.parse(stripped) : stripped;
+              const rawKeys = Object.keys(entries);
               for (const [rawKey, value] of Object.entries(entries)) {
-                const key = (serviceSlug && !rawKey.startsWith(serviceSlug + '.')) ? `${serviceSlug}.${rawKey}` : rawKey;
+                const key = rawKey.startsWith(serviceSlug + '.') ? rawKey : `${serviceSlug}.${rawKey}`;
+                alog.info(`[${cid}] Memory key: "${rawKey}" → stored as "${key}" (owner: ${ownerGhii})`);
                 await storage.setMemory({
                   key, ownerGaii: ownerGhii, value, visibility: 'public',
                   version: 1, tags: ['generator', 'memory'], ttlHours: null,
                   createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
                 });
               }
+              alog.info(`[${cid}] Memory: ${rawKeys.length} keys stored with prefix "${serviceSlug}"`);
+              debug.writeComponentArtifact(cid, 'memory-keys', rawKeys.map(k => `${k} → ${serviceSlug}.${k}`).join('\n')).catch(() => {});
             }
 
             if (compType === 'translation') {
@@ -588,7 +596,9 @@ export async function runAutopilot(
               const translations = typeof stripped === 'string' ? JSON.parse(stripped) : stripped;
               for (const [locale, strings] of Object.entries(translations)) {
                 if (locale && typeof strings === 'object') {
-                  const key = serviceSlug ? `${serviceSlug}.i18n.${locale}` : `i18n.${locale}`;
+                  const key = `${serviceSlug}.i18n.${locale}`;
+                  const keyCount = Object.keys(strings as object).length;
+                  alog.info(`[${cid}] Translation: locale="${locale}" → stored as "${key}" (${keyCount} keys, owner: ${ownerGhii})`);
                   await storage.setMemory({
                     key, ownerGaii: ownerGhii, value: strings, visibility: 'public',
                     version: 1, tags: ['generator', 'translation'], ttlHours: null,
@@ -596,11 +606,17 @@ export async function runAutopilot(
                   });
                 }
               }
+              debug.writeComponentArtifact(cid, 'translation-keys', Object.keys(translations).map(l => `${l} → ${serviceSlug}.i18n.${l}`).join('\n')).catch(() => {});
             }
           }
 
-          // Determine registered name
-          const regName = comp.registeredAs || extractRegisteredName(compType, content, vr);
+          // Determine registered name — memory/translation include serviceSlug prefix to match stored keys
+          let regName = comp.registeredAs || extractRegisteredName(compType, content, vr);
+          if ((compType === 'memory' || compType === 'translation') && regName) {
+            const slug = (blueprint as Record<string, unknown>).service_slug as string;
+            if (!slug) throw new Error(`Blueprint missing "service_slug" — cannot determine registered name for ${compLabel}`);
+            if (!(regName as string).startsWith(slug + '.')) regName = `${slug}.${regName as string}`;
+          }
           comp = { ...comp, registeredAs: regName, contextBundle: createBundle({ ...comp, registeredAs: regName } as unknown as ComponentState, []) };
           await saveComp(comp);
           alog.info(`[${cid}] Registered: ${compLabel} as ${regName as string}`);
@@ -1069,12 +1085,12 @@ function extractRegisteredName(type: string, content: string, vr: { extracted?: 
     }
   }
   if (type === 'translation') {
-    // Translation content is { locale: { key: value } } — return i18n-{locale} for the first locale
+    // Translation content is { locale: { key: value } } — return i18n.{locale} matching the stored memory key
     try {
       const stripped = stripCodeblock(typeof content === 'string' ? content : '');
       const parsed = JSON.parse(stripped);
       const locales = Object.keys(parsed);
-      return locales.length > 0 ? `i18n-${locales[0]}` : 'translation';
+      return locales.length > 0 ? `i18n.${locales[0]}` : 'translation';
     } catch {
       return 'translation';
     }

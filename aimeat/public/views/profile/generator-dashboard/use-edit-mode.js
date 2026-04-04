@@ -191,7 +191,8 @@ export function useEditMode(core, autopilotState, projectId, orSettings, session
         await saveComponent(projectId, { ...updated, status: 'done', result: content, validationErrors: [] });
 
         try {
-          const serviceSlug = core.components.find(c => c.type === 'csm' && c.registeredAs)?.registeredAs?.split('/')?.pop() || '';
+          const serviceSlug = core.project?.blueprint?.service_slug;
+          if (!serviceSlug) throw new Error('Blueprint missing "service_slug" — cannot register component. Regenerate blueprint.');
           if (comp.type === 'cortex') {
             const cortexVr = validateComponent('cortex', content, core.project?.blueprint);
             await registerComponent('cortex', cortexVr.extracted, session, serviceSlug);
@@ -267,7 +268,8 @@ export function useEditMode(core, autopilotState, projectId, orSettings, session
 
       const updated = addHistory(comp, 'edited', { by: 'autopilot', change: suggestedChange });
       await saveComponent(projectId, { ...updated, status: 'done', result: content, validationErrors: [] });
-      const serviceSlug = core.components.find(c => c.type === 'csm' && c.registeredAs)?.registeredAs?.split('/')?.pop() || '';
+      const serviceSlug = core.project?.blueprint?.service_slug;
+      if (!serviceSlug) throw new Error('Blueprint missing "service_slug" — cannot register component. Regenerate blueprint.');
       if (comp.type === 'cortex') {
         const cortexVr = validateComponent('cortex', content, core.project?.blueprint);
         await registerComponent('cortex', cortexVr.extracted, session, serviceSlug);

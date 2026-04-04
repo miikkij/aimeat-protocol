@@ -741,6 +741,13 @@ export function validateBlueprint(result: string): BlueprintValidationResult {
   try {
     const parsed = JSON.parse(json) as Record<string, unknown>;
 
+    // service_slug is REQUIRED — it namespaces all memory keys, translations, and cortex naming
+    if (!parsed.service_slug || typeof parsed.service_slug !== 'string') {
+      errors.push('Missing "service_slug" field — required for memory key namespacing. Must be a kebab-case string (e.g., "company-registry").');
+    } else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(parsed.service_slug as string)) {
+      errors.push(`Invalid "service_slug": "${parsed.service_slug}" — must be kebab-case (lowercase letters, numbers, hyphens only)`);
+    }
+
     if (!Array.isArray(parsed.components)) {
       errors.push('Missing "components" array');
     } else {

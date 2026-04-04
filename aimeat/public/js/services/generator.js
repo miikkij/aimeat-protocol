@@ -146,22 +146,13 @@ export async function deleteProject(projectId, session) {
   }
 
   // Phase 2: Clean translation memory keys — only delete this project's locale keys
-  // registeredAs format: "halytyskartta.i18n-fi" or "i18n-fi" (legacy)
+  // registeredAs format: "yritystietopalvelu.i18n.fi" (service_slug from blueprint)
   const translationComps = components.filter(c => c.type === 'translation' && c.registeredAs);
-  const extComp = components.find(c => c.type === 'extension' && c.registeredAs);
-  const csmComp = components.find(c => c.type === 'csm' && c.registeredAs);
-  const slug = extComp?.registeredAs || csmComp?.registeredAs?.split('/')?.pop() || '';
   for (const comp of translationComps) {
     const name = comp.registeredAs;
     if (name) {
-      // Try service-prefixed key first, then legacy format
-      const locale = name.replace(/^.*i18n-/, '');
-      const prefixedKey = slug ? `${slug}.i18n.${locale}` : `i18n.${locale}`;
-      try { await apiDelete(`/v1/memory/${encodeURIComponent(prefixedKey)}`); } catch { /* best effort */ }
-      // Also try legacy unprefixed key
-      if (slug) {
-        try { await apiDelete(`/v1/memory/${encodeURIComponent(`i18n.${locale}`)}`); } catch { /* best effort */ }
-      }
+      // registeredAs IS the memory key (e.g., "yritystietopalvelu.i18n.fi")
+      try { await apiDelete(`/v1/memory/${encodeURIComponent(name)}`); } catch { /* best effort */ }
     }
   }
 
@@ -621,7 +612,7 @@ export async function registerComponent(type, result, session, serviceSlug = '')
         }
       }
       const prefix = serviceSlug ? `${serviceSlug}.` : '';
-      return { ok: true, data: { locales, name: `${prefix}i18n-${locales.join('-')}` } };
+      return { ok: true, data: { locales, name: `${prefix}i18n.${locales.join('.')}` } };
     }
     case 'cortex': {
       // Cortex result contains YAML manifest + optional JS lib code (pre-extracted by validator)
@@ -826,19 +817,8 @@ export async function removeComponents(projectId, componentIds, includeMemory, s
       } else if (comp.type === 'msm') {
         await apiDelete(`/v1/msm/${encodeURIComponent(name)}`);
       } else if (comp.type === 'translation') {
-        // Translation keys stored as {service}.i18n.{locale} or legacy i18n.{locale}
-        const locale = name.replace(/^.*i18n-/, '');
-        if (locale) {
-          // Find service slug from sibling extension/csm
-          const extSibling = comps.find(c => c.type === 'extension' && c.registeredAs);
-          const csmSibling = comps.find(c => c.type === 'csm' && c.registeredAs);
-          const svcSlug = extSibling?.registeredAs || csmSibling?.registeredAs?.split('/')?.pop() || '';
-          const memKey = svcSlug ? `${svcSlug}.i18n.${locale}` : `i18n.${locale}`;
-          try { await apiDelete(`/v1/memory/${encodeURIComponent(memKey)}`); } catch { /* best effort */ }
-          if (svcSlug) {
-            try { await apiDelete(`/v1/memory/${encodeURIComponent(`i18n.${locale}`)}`); } catch { /* best effort */ }
-          }
-        }
+        // registeredAs IS the memory key (e.g., "yritystietopalvelu.i18n.fi")
+        try { await apiDelete(`/v1/memory/${encodeURIComponent(name)}`); } catch { /* best effort */ }
       }
       removed.push(name);
       // Clear registeredAs in component state

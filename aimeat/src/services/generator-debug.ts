@@ -94,6 +94,14 @@ export class GeneratorDebugWriter {
     );
   }
 
+  /** Write a named artifact for a component (e.g., memory-keys, translation-keys) */
+  async writeComponentArtifact(componentId: string, name: string, content: string): Promise<void> {
+    await this.safeWrite(
+      join(this.projectPath, 'components', componentId, `${name}.txt`),
+      content,
+    );
+  }
+
   /** Write validation result */
   async writeValidation(componentId: string, result: Record<string, unknown>): Promise<void> {
     await this.safeWrite(

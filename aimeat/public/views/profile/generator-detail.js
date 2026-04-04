@@ -283,12 +283,13 @@ export function ComponentDetail({ component, project, components, projectId, int
   async function handleRegister() {
     setRegistering(true);
     try {
-      // Derive service slug from extension name or CSM for service-prefixed keys
-      const extComp = components.find(c => c.type === 'extension' && c.registeredAs);
-      const csmComp = components.find(c => c.type === 'csm' && c.registeredAs);
-      const serviceSlug = extComp?.registeredAs
-        || csmComp?.registeredAs?.split('/')?.pop()
-        || '';
+      // service_slug from blueprint — the single source of truth for namespacing
+      const serviceSlug = project?.blueprint?.service_slug;
+      if (!serviceSlug) {
+        showToast?.('Blueprint missing "service_slug" — cannot register component. Regenerate blueprint.', true);
+        setRegistering(false);
+        return;
+      }
 
       let resp;
       if (component.type === 'cortex') {
@@ -310,7 +311,7 @@ export function ComponentDetail({ component, project, components, projectId, int
         || d.filename                       // App: { data: { filename } }
         || d.name                           // Cortex/Translation: { data: { name } }
         || d.id
-        || (d.locales ? `i18n-${d.locales.join('-')}` : null) // Translation fallback
+        || (d.locales ? `i18n.${d.locales.join('.')}` : null) // Translation fallback
         || (d.keys?.length ? `memory:${d.keys[d.keys.length - 1]}` : null)   // Memory: use last key name (e.g. "memory:municipalities.data")
         || null;
       if (!regName) {
@@ -350,9 +351,13 @@ export function ComponentDetail({ component, project, components, projectId, int
   async function handleReregister() {
     setRegistering(true);
     try {
-      const extComp = components.find(c => c.type === 'extension' && c.registeredAs);
-      const csmComp = components.find(c => c.type === 'csm' && c.registeredAs);
-      const serviceSlug = extComp?.registeredAs || csmComp?.registeredAs?.split('/')?.pop() || '';
+      // service_slug from blueprint — the single source of truth for namespacing
+      const serviceSlug = project?.blueprint?.service_slug;
+      if (!serviceSlug) {
+        showToast?.('Blueprint missing "service_slug" — cannot re-register. Regenerate blueprint.', true);
+        setRegistering(false);
+        return;
+      }
 
       // Re-validate current result before re-registering
       const vr = validateComponent(component.type, component.result || result, project.blueprint);
@@ -366,7 +371,7 @@ export function ComponentDetail({ component, project, components, projectId, int
       const d = resp?.data || {};
       const regName = d.csm?.name || d.integration?.name || d.extension?.name
         || d.filename || d.name || d.id
-        || (d.locales ? `i18n-${d.locales.join('-')}` : null)
+        || (d.locales ? `i18n.${d.locales.join('.')}` : null)
         || (d.keys?.length ? `memory:${d.keys[d.keys.length - 1]}` : null)
         || component.registeredAs;
       const updated = { ...component, status: 'done', registeredAs: regName,

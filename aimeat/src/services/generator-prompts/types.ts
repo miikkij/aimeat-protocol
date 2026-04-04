@@ -37,6 +37,7 @@ export interface BlueprintDataModel {
 
 /** Full blueprint */
 export interface Blueprint {
+  service_slug: string;
   architecture?: string;
   components: BlueprintComponent[];
   phases: Array<{ id: string; label?: string; componentIds: string[] }>;

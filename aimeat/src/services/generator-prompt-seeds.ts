@@ -2176,13 +2176,15 @@ The user wants to create this service:
 {{interview_spec_section}}{{language_note}}{{cortex_catalog}}
 Analyze this request and produce a JSON blueprint listing ALL components needed.
 
-CRITICAL: Return ONLY a JSON object with "architecture", "components", "phases", "dataModel", and optionally "settings" and "testScenarios". Nothing else.
+CRITICAL: Return ONLY a JSON object with "service_slug", "architecture", "components", "phases", "dataModel", and optionally "settings" and "testScenarios". Nothing else.
+"service_slug" is a kebab-case identifier for this service (e.g., "company-registry", "weather-monitor"). ALL components use this SAME slug for memory keys, translation keys, and cortex naming. Derive it from the project name.
 Each component has these fields: "id", "type", "label", "produces", "consumes". Extension components may also have "schedules".
 Do NOT include manifest content, code, HTML, translations, or any implementation details.
 The blueprint is a lightweight plan — actual content is generated later per component.
 
 Format:
 {
+  "service_slug": "my-service",
   "architecture": "cortex-modular",
   "components": [
     { "id": "csm-1", "type": "csm", "label": "Human-readable name", "produces": ["memory:service.schema"], "consumes": [] },

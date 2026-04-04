@@ -458,10 +458,9 @@ function resolveCortexComponent(data: PromptRuntimeData): Vars {
     specSection = `\n## YOUR SPEC — use these EXACT names\n\n╔══════════════════════════════════════════════════════════════════════════╗\n║  metadata.name MUST be: ${specName}                                     \n║  LIB_NAME MUST be: ${specLibName}                                       \n║  These come from the spec. Do NOT use placeholder names like featureLib.║\n╚══════════════════════════════════════════════════════════════════════════╝\n\nFull spec:\n\`\`\`json\n${JSON.stringify(spec, null, 2).slice(0, 3000)}\n\`\`\`\n`;
   }
 
-  // Service slug for translation loading — from extension or CSM
-  const extComp = (data.completedComponents || []).find(c => c.type === 'extension' && c.registeredAs);
-  const csmComp = (data.completedComponents || []).find(c => c.type === 'csm' && c.registeredAs);
-  const serviceSlug = (extComp?.registeredAs as string) || ((csmComp?.registeredAs as string) || '').split('/').pop() || 'service';
+  // Service slug from blueprint — the single source of truth for namespacing
+  const serviceSlug = data.blueprint.service_slug;
+  if (!serviceSlug) throw new Error('Blueprint missing "service_slug" — cannot build cortex-component prompt. Regenerate blueprint.');
 
   // DaisyUI section — from spec's ui.components or full fallback
   const uiSpec = spec?.ui as Record<string, unknown> | undefined;
@@ -510,10 +509,9 @@ function resolveCortexAppDomain(data: PromptRuntimeData): Vars {
     specSection = `\n## YOUR SPEC — use these EXACT names\n\n╔══════════════════════════════════════════════════════════════════════════╗\n║  metadata.name MUST be: ${specName}                                     \n║  LIB_NAME MUST be: ${specLibName}                                       \n║  These come from the spec. Do NOT use placeholder names like appLib.    ║\n╚══════════════════════════════════════════════════════════════════════════╝\n\nFull spec:\n\`\`\`json\n${JSON.stringify(spec, null, 2).slice(0, 3000)}\n\`\`\`\n`;
   }
 
-  // Service slug for translation loading
-  const extComp = (data.completedComponents || []).find(c => c.type === 'extension' && c.registeredAs);
-  const csmComp = (data.completedComponents || []).find(c => c.type === 'csm' && c.registeredAs);
-  const serviceSlug = (extComp?.registeredAs as string) || ((csmComp?.registeredAs as string) || '').split('/').pop() || 'service';
+  // Service slug from blueprint — the single source of truth for namespacing
+  const serviceSlug = data.blueprint.service_slug;
+  if (!serviceSlug) throw new Error('Blueprint missing "service_slug" — cannot build cortex-app-domain prompt. Regenerate blueprint.');
 
   // DaisyUI layout section from spec's appShell/navStyle
   const appShell = (spec?.appShell as string) || '';
@@ -1287,9 +1285,9 @@ function resolveTestCortexComponent(data: PromptRuntimeData): Vars {
       }).join('\n')
     : 'No use cases specified';
 
-  // Service slug for translation loading
-  const extComp2 = (data.completedComponents || []).find(c => c.type === 'extension' && c.registeredAs);
-  const serviceSlug2 = (extComp2?.registeredAs as string) || 'service';
+  // Service slug from blueprint — the single source of truth for namespacing
+  const serviceSlug2 = data.blueprint.service_slug;
+  if (!serviceSlug2) throw new Error('Blueprint missing "service_slug" — cannot build app prompt. Regenerate blueprint.');
 
   // Data cortex lib name and first method for template
   const dcLibName = (dcSpec?.libName as string) || dcBundle?.libName || dcBundle?.registeredAs || 'dataCortex';

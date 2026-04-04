@@ -1113,9 +1113,14 @@ window.__renderSnapshot = null; // Set by test code to capture rendered state
           case 'memory':
           case 'translation': {
             // Write data to actual memory keys so AIMEAT.data.get() can read them.
-            const projComps = await storage.listMemory(regGhii, { prefix: `generator.${projectId}.component.`, visibility: 'owner' });
-            const extReg = projComps.find(r => (r.value as Record<string, unknown>).type === 'extension' && (r.value as Record<string, unknown>).registeredAs);
-            const slug = (extReg?.value as Record<string, unknown>)?.registeredAs as string || '';
+            // service_slug from blueprint — the single source of truth for namespacing
+            const projectRec2 = await storage.getMemory(gaii, `generator.${projectId}.project`);
+            const blueprint2 = (projectRec2?.value as Record<string, unknown>)?.blueprint as Record<string, unknown> | undefined;
+            const slug = (blueprint2?.service_slug as string) || '';
+            if (!slug) {
+              res.status(400).json(error(config.nodeId, 'NO_SERVICE_SLUG', 'Blueprint missing "service_slug" — cannot namespace memory keys. Regenerate blueprint.'));
+              return;
+            }
             try {
               const raw = component.content;
               const clean = typeof raw === 'string' ? raw.replace(/^```\w*\n?/, '').replace(/\n?```$/, '').trim() : raw;
@@ -1124,13 +1129,13 @@ window.__renderSnapshot = null; // Set by test code to capture rendered state
               if (component.type === 'translation') {
                 for (const [locale, strings] of Object.entries(parsed)) {
                   if (locale && typeof strings === 'object' && strings !== null) {
-                    const memKey = slug ? `${slug}.i18n.${locale}` : `i18n.${locale}`;
+                    const memKey = `${slug}.i18n.${locale}`;
                     await storage.setMemory({ key: memKey, ownerGaii: regGhii, value: strings as Record<string, unknown>, visibility: 'public', version: 1, tags: ['generator', 'translation'], ttlHours: null, createdAt: now, updatedAt: now });
                   }
                 }
               } else {
                 for (const [rawKey, value] of Object.entries(parsed)) {
-                  const memKey = (slug && !rawKey.startsWith(slug + '.')) ? `${slug}.${rawKey}` : rawKey;
+                  const memKey = rawKey.startsWith(slug + '.') ? rawKey : `${slug}.${rawKey}`;
                   await storage.setMemory({ key: memKey, ownerGaii: regGhii, value: value as Record<string, unknown>, visibility: 'public', version: 1, tags: ['generator', 'memory'], ttlHours: null, createdAt: now, updatedAt: now });
                 }
               }
