@@ -39,7 +39,7 @@ export function createAgent(db: Database.Database, agent: AgentRecord): AgentRec
     );
     return agent;
   } catch (err: unknown) {
-    if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('NAME_TAKEN');
+    if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('NAME_TAKEN', { cause: err });
     throw err;
   }
 }

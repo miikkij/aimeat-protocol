@@ -1470,7 +1470,7 @@ export class MongoStorage implements Storage {
             });
             return this.toGHIIRecord(row);
         } catch (e: any) {
-            if (e?.code === 'P2002') throw new Error('GHII_TAKEN');
+            if (e?.code === 'P2002') throw new Error('GHII_TAKEN', { cause: e });
             throw e;
         }
     }
@@ -1635,7 +1635,7 @@ export class MongoStorage implements Storage {
             data: { id: item.id, personalNodeId: item.personalNodeId, type: item.type, fromGaii: item.fromGaii, toGaii: item.toGaii, payload: item.payload, sizeBytes: item.sizeBytes, retentionDays: item.retentionDays, expiresAt: new Date(item.expiresAt), createdAt: new Date(item.createdAt) },
         });
         // Update personal node mailbox usage
-        try { await this.prisma.personalNode.update({ where: { id: item.personalNodeId }, data: { mailboxUsedBytes: { increment: item.sizeBytes } } }); } catch {}
+        try { await this.prisma.personalNode.update({ where: { id: item.personalNodeId }, data: { mailboxUsedBytes: { increment: item.sizeBytes } } }); } catch { /* best-effort */ }
         return item;
     }
 
@@ -1659,7 +1659,7 @@ export class MongoStorage implements Storage {
             const item = await this.prisma.mailboxItem.findUnique({ where: { id } });
             if (!item) return false;
             await this.prisma.mailboxItem.delete({ where: { id } });
-            try { await this.prisma.personalNode.update({ where: { id: item.personalNodeId }, data: { mailboxUsedBytes: { decrement: item.sizeBytes } } }); } catch {}
+            try { await this.prisma.personalNode.update({ where: { id: item.personalNodeId }, data: { mailboxUsedBytes: { decrement: item.sizeBytes } } }); } catch { /* best-effort */ }
             return true;
         } catch { return false; }
     }
@@ -1667,7 +1667,7 @@ export class MongoStorage implements Storage {
     async deleteMailboxItemsByNode(personalNodeId: string): Promise<number> {
         this.ensureReady();
         const result = await this.prisma.mailboxItem.deleteMany({ where: { personalNodeId } });
-        try { await this.prisma.personalNode.update({ where: { id: personalNodeId }, data: { mailboxUsedBytes: 0 } }); } catch {}
+        try { await this.prisma.personalNode.update({ where: { id: personalNodeId }, data: { mailboxUsedBytes: 0 } }); } catch { /* best-effort */ }
         return result.count;
     }
 
@@ -1687,7 +1687,7 @@ export class MongoStorage implements Storage {
             nodeBytes.set(item.personalNodeId, (nodeBytes.get(item.personalNodeId) ?? 0) + item.sizeBytes);
         }
         for (const [nodeId, bytes] of nodeBytes) {
-            try { await this.prisma.personalNode.update({ where: { id: nodeId }, data: { mailboxUsedBytes: { decrement: bytes } } }); } catch {}
+            try { await this.prisma.personalNode.update({ where: { id: nodeId }, data: { mailboxUsedBytes: { decrement: bytes } } }); } catch { /* best-effort */ }
         }
         const result = await this.prisma.mailboxItem.deleteMany({ where: { expiresAt: { lt: new Date() } } });
         return result.count;
@@ -1743,8 +1743,8 @@ export class MongoStorage implements Storage {
     async deleteSchema(keyPattern: string): Promise<boolean> {
         this.ensureReady();
         let deleted = false;
-        try { await this.prisma.schemaLock.delete({ where: { applyTo_keyPattern: { applyTo: 'exact', keyPattern } } }); deleted = true; } catch {}
-        try { await this.prisma.schemaLock.delete({ where: { applyTo_keyPattern: { applyTo: 'prefix', keyPattern } } }); deleted = true; } catch {}
+        try { await this.prisma.schemaLock.delete({ where: { applyTo_keyPattern: { applyTo: 'exact', keyPattern } } }); deleted = true; } catch { /* best-effort */ }
+        try { await this.prisma.schemaLock.delete({ where: { applyTo_keyPattern: { applyTo: 'prefix', keyPattern } } }); deleted = true; } catch { /* best-effort */ }
         return deleted;
     }
 
@@ -2180,7 +2180,7 @@ export class MongoStorage implements Storage {
         if (opts?.type) where.type = opts.type;
         if (opts?.visibility) where.visibility = opts.visibility;
         // city and interest filtering done post-query (JSON field)
-        let rows = await this.prisma.organism.findMany({ where, orderBy: { createdAt: 'desc' } });
+        const rows = await this.prisma.organism.findMany({ where, orderBy: { createdAt: 'desc' } });
         let results = rows.map((r: any) => this.toOrganismRecord(r));
         if (opts?.city) results = results.filter((o: any) => o.location?.city?.toLowerCase() === opts.city!.toLowerCase());
         if (opts?.interest) results = results.filter((o: any) => o.interests.some((i: string) => i.toLowerCase() === opts.interest!.toLowerCase()));
@@ -2210,14 +2210,14 @@ export class MongoStorage implements Storage {
         await this.prisma.organismMembership.deleteMany({ where: { organismId: id } });
         await this.prisma.joinRequest.deleteMany({ where: { organismId: id } });
         // Cascade: delete organism reputation
-        try { await this.prisma.organismReputation.delete({ where: { organismId: id } }); } catch {}
+        try { await this.prisma.organismReputation.delete({ where: { organismId: id } }); } catch { /* best-effort */ }
 
         if (org) {
             try {
                 await this.prisma.boardPost.deleteMany({ where: { boardId: org.boardId } });
                 await this.prisma.boardSubscription.deleteMany({ where: { boardId: org.boardId } });
                 await this.prisma.board.delete({ where: { boardId: org.boardId } });
-            } catch {}
+            } catch { /* best-effort */ }
             await this.prisma.memory.deleteMany({ where: { ownerGaii: org.memoryNamespace } });
         }
         try { await this.prisma.organism.delete({ where: { id } }); return true; } catch { return false; }
@@ -2384,7 +2384,7 @@ export class MongoStorage implements Storage {
             if (opts?.minPrice !== undefined) where.priceMorsels.gte = opts.minPrice;
             if (opts?.maxPrice !== undefined) where.priceMorsels.lte = opts.maxPrice;
         }
-        let rows = await this.prisma.listing.findMany({ where, orderBy: { createdAt: 'desc' } });
+        const rows = await this.prisma.listing.findMany({ where, orderBy: { createdAt: 'desc' } });
         let results = rows.map((r: any) => this.toListingRecord(r));
         // city filtering post-query (JSON field)
         if (opts?.city) results = results.filter((l: any) => l.location?.city?.toLowerCase() === opts.city!.toLowerCase());
@@ -4311,7 +4311,7 @@ export class MongoStorage implements Storage {
             return this.toPackageRecord(row);
         } catch (e: any) {
             if (e.code === 'P2002') {
-                throw new Error('PACKAGE_EXISTS');
+                throw new Error('PACKAGE_EXISTS', { cause: e });
             }
             throw e;
         }

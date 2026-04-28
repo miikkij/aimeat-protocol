@@ -41,10 +41,10 @@ import { ManifestSchema } from '../schemas/knowledge-package.js';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-/* eslint-disable @typescript-eslint/no-require-imports */
+ 
 const ajvPkg = require('ajv');
 const formatsPkg = require('ajv-formats');
-/* eslint-enable @typescript-eslint/no-require-imports */
+ 
 const AjvClass = ajvPkg.default ?? ajvPkg;
 const addFormats = formatsPkg.default ?? formatsPkg;
 

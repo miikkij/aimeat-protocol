@@ -40,7 +40,7 @@ import { topologicalSort, executeHttpTest, executePlaywrightTest, isPlaywrightAv
 import type { TestReport, TestResult } from '../services/foundry-testing.js';
 import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
-// @ts-ignore — frontend ESM module, no .d.ts
+// @ts-expect-error — frontend ESM module, no .d.ts
 import { buildComponentPrompt, buildBlueprintPrompt } from '../../public/js/services/generator-prompts.js';
 import { FoundryDebugWriter } from '../services/foundry-debug.js';
 

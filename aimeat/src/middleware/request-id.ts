@@ -4,6 +4,7 @@ import { requestContext } from '../utils/logger.js';
 import type { RequestContext } from '../utils/logger.js';
 
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       requestId?: string;

@@ -101,7 +101,7 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
 
         // SECURITY: Verify signature with provided public key
         const messageToVerify = `${node_id}${node_url}${timestamp}`;
-        let valid = false;
+        let valid: boolean;
         try {
             valid = await verify(public_key, messageToVerify, signature);
         } catch {
@@ -378,7 +378,7 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
             // SECURITY: Verify heartbeat signature if peer has a public key
             if (peer.publicKey && signature) {
                 const messageToVerify = `${from_node_id}${timestamp}`;
-                let valid = false;
+                let valid: boolean;
                 try {
                     valid = await verify(peer.publicKey, messageToVerify, signature);
                 } catch {

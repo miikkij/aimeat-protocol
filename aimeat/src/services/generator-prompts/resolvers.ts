@@ -419,7 +419,7 @@ function resolveCortexComponent(data: PromptRuntimeData): Vars {
   const dataCortex = (data.completedComponents || []).find(c => c.type === 'cortex' && c.subtype === 'data');
   const dcBundle = dataCortex?.contextBundle;
   const dcSpec = dataCortex?.spec as Record<string, unknown> | undefined;
-  let dataCortexApi = '';
+  let dataCortexApi: string;
   if (dcBundle || dcSpec) {
     const libName = (dcSpec?.libName as string) || dcBundle?.libName || dcBundle?.registeredAs || '';
     dataCortexApi = `\n## Data Cortex API (use this for ALL data access)\n\nAccess via: AIMEAT.${libName}\n`;
@@ -780,7 +780,7 @@ Do NOT load aimeat-ui-* libraries — use daisyUI instead.
 ║  The translation components have ALREADY defined these keys.           ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 
-${sorted.map(k => '- \`' + k + '\`').join('\n')}
+${sorted.map(k => '- `' + k + '`').join('\n')}
 
 Total: ${sorted.length} keys available. If you need a label, find the closest matching key from this list.
 `;
@@ -1252,7 +1252,7 @@ function resolveTestCortexComponent(data: PromptRuntimeData): Vars {
   const dataCortex = (data.completedComponents || []).find(c => c.type === 'cortex' && c.subtype === 'data');
   const dcBundle = dataCortex?.contextBundle;
   const dcSpec = dataCortex?.spec as Record<string, unknown> | undefined;
-  let dataCortexInfo = '';
+  let dataCortexInfo: string;
   if (dcBundle || dcSpec) {
     const libName2 = (dcSpec?.libName as string) || dcBundle?.libName || dcBundle?.registeredAs || '';
     dataCortexInfo = `\nThe data cortex is loaded at: window.AIMEAT.${libName2}\n`;
@@ -1425,7 +1425,7 @@ function resolveTestCortexAppDomain(data: PromptRuntimeData): Vars {
   // Data cortex info
   const dataCortex = (data.completedComponents || []).find(c => c.type === 'cortex' && c.subtype === 'data');
   const dcBundle = dataCortex?.contextBundle;
-  let dataCortexInfo = '';
+  let dataCortexInfo: string;
   if (dcBundle) {
     dataCortexInfo = `window.AIMEAT.${dcBundle.libName || dcBundle.registeredAs || ''} — methods: ${(dcBundle.exports || []).join(', ')}`;
   } else {

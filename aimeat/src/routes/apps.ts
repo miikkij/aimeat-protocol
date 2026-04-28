@@ -53,7 +53,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         }));
 
         // Federated peer apps (H1 + H2)
-        let peerApps: Record<string, unknown>[] = [];
+        const peerApps: Record<string, unknown>[] = [];
         if (req.query.include_peers === 'true' && peers.size > 0) {
             const activePeers = Array.from(peers.values()).filter(p => p.status === 'active');
             const queryParams = new URLSearchParams();

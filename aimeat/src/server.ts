@@ -109,7 +109,7 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   const services = await initializeServices(config, storage);
 
   // ── Middleware Guards (maintenance, relay/mirror, first-run wizard) ──
-  let invalidateHasOwnersCache = () => { /* no-op initially */ };
+  const invalidateHasOwnersCache = () => { /* no-op initially */ };
   const guards = setupGuards(app, config, storage,
     { get: () => services.maintenanceCache },
     invalidateHasOwnersCache,

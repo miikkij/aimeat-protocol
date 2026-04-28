@@ -1695,7 +1695,7 @@ entry: index.html
     connect-src 'self';
   ">
   <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"><\/script>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
 <body class="bg-base-100 min-h-screen flex flex-col">
 
@@ -1731,7 +1731,7 @@ entry: index.html
       el.innerHTML = errors.join('<br>');
     }
   })();
-  <\/script>
+  </script>
 
   <!-- Load AIMEAT libraries -->
   <script>
@@ -1791,7 +1791,7 @@ entry: index.html
   }
 
   boot();
-  <\/script>
+  </script>
 </body>
 </html>
 \\\`\\\`\\\`

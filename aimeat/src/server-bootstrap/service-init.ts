@@ -126,7 +126,7 @@ export async function initializeServices(
   });
 
   // Realtime manager forward-declaration (initialized after route mounting)
-  let realtimeManager: RealtimeManager | null = null;
+  const realtimeManager: RealtimeManager | null = null;
 
   // Personal Node tunnel manager (operator-side)
   let tunnelManager: TunnelManager | null = null;
@@ -168,7 +168,7 @@ async function setupAnonymousIdentity(config: AimeatConfig, storage: Storage): P
 
   try {
     // Create anonymous owner if doesn't exist
-    let owner = await storage.getOwner(ANON_OWNER);
+    const owner = await storage.getOwner(ANON_OWNER);
     if (!owner) {
       const kp = await generateKeyPair();
       await storage.createOwner({
@@ -182,7 +182,7 @@ async function setupAnonymousIdentity(config: AimeatConfig, storage: Storage): P
     }
 
     // Create anonymous agent if doesn't exist
-    let agent = await storage.getAgent(ANON_GAII);
+    const agent = await storage.getAgent(ANON_GAII);
     if (!agent) {
       const kp = await generateKeyPair();
       await storage.createAgent({

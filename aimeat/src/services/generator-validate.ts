@@ -892,11 +892,6 @@ export function validateBlueprint(result: string): BlueprintValidationResult {
       }
     }
 
-    // Preserve new top-level blueprint fields
-    if (parsed.settings) parsed.settings = parsed.settings;
-    if (parsed.testScenarios) parsed.testScenarios = parsed.testScenarios;
-    if (parsed.architecture) parsed.architecture = parsed.architecture;
-
     return { valid: errors.length === 0, errors, warnings, parsed, extracted: json };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

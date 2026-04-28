@@ -119,7 +119,7 @@ async function startServer(): Promise<ChildProcess> {
     child.stderr?.on('data', () => { }); // drain
 
     // Wait for server ready
-    const maxWait = 15_000;
+    const maxWait = 60_000;
     const start = Date.now();
     while (Date.now() - start < maxWait) {
         try {

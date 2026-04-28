@@ -4,9 +4,9 @@ import { createCipheriv, createDecipheriv, randomBytes, createHash, timingSafeEq
 
 // CJS-ESM interop for qrcode
 const require = createRequire(import.meta.url);
-/* eslint-disable @typescript-eslint/no-require-imports */
+ 
 const QRCode = require('qrcode') as { toDataURL: (text: string) => Promise<string> };
-/* eslint-enable @typescript-eslint/no-require-imports */
+ 
 
 // ── TOTP Configuration ──
 

@@ -143,7 +143,7 @@ export async function auditDataAccess(
  */
 export async function expireConsents(storage: Storage): Promise<number> {
   const now = new Date().toISOString();
-  let expiredCount = 0;
+  const expiredCount = 0;
 
   // List all active consents across all users
   // Since we don't have a listAll, we iterate through all consents
@@ -154,8 +154,6 @@ export async function expireConsents(storage: Storage): Promise<number> {
   // Note: In the current in-memory implementation, findMatchingConsents
   // already marks expired consents. This function provides an explicit
   // batch expiration for cleanup.
-  expiredCount; // placeholder — the auto-expire happens in findMatchingConsents
-
   return expiredCount;
 }
 

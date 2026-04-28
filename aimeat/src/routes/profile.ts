@@ -21,7 +21,7 @@ function profileHtml(config: AimeatConfig, locale: string, translations: Record<
 <title>${sanitize(translations['profile.title'] || 'My Profile')} \u2014 AIMEAT ${sanitize(config.nodeId)}</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <script>var T = ${JSON.stringify(translations)};</script>
-<script src="${sanitize(config.baseUrl)}/v1/libs/aimeat-auth.js"><\/script>
+<script src="${sanitize(config.baseUrl)}/v1/libs/aimeat-auth.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0f0a14;--card:rgba(30,20,40,.85);--card2:rgba(60,30,60,.7);--text:#f0e6f6;--muted:#c4a6d0;--accent:#ff6b9d;--accent2:#c44569;--border:rgba(255,107,157,.25);--success:#22c55e;--warn:#f59e0b;--danger:#ef4444;--radius:12px;--love1:#ff6b9d;--love2:#c44569;--love3:#ff8a80;--love4:#f48fb1;--love5:#880e4f}
@@ -2028,7 +2028,7 @@ async function detachNode(nodeId) {
   }
 }
 
-<\/script>
+</script>
 </body>
 </html>`;
 }

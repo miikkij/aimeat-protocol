@@ -77,7 +77,7 @@ function sanitizeJson(text: string): string {
   // Strip markdown backslash escaping: \[ \] \{ \} \( \) \* \_ \` \| \~ \#
   s = s.replace(/\\([[\]{}()*_`|~#])/g, '$1');
   s = s.replace(/,\s*([}\]])/g, '$1');
-  s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+  s = s.replace(/\u200B/g, '').replace(/\u200C/g, '').replace(/\u200D/g, '').replace(/\uFEFF/g, '');
   return s;
 }
 
@@ -95,7 +95,7 @@ function preCleanYaml(text: string): string {
   s = s.replace(/\\\[/g, '[').replace(/\\\]/g, ']');
   s = s.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
   // Remove zero-width unicode
-  s = s.replace(/[\u200B\u200C\u200D\uFEFF]/g, '');
+  s = s.replace(/\u200B/g, '').replace(/\u200C/g, '').replace(/\u200D/g, '').replace(/\uFEFF/g, '');
   // Fix common AI mistake: action list items missing "id:" key
   // e.g. "  - refreshQuotes\n    description:" → "  - id: refreshQuotes\n    description:"
   // Only match lines under "actions:" where the list item is a bare word followed by description on next line
@@ -232,7 +232,7 @@ export function validateAntiPatterns(type: string, code: string): AntiPatternRes
         .replace(/\/(?:[^/\\]|\\.)+\/[gimsuy]*/g, '//'); // remove regex literals
       if (!/&gt;|&lt;|&amp;[a-z]|&quot;/.test(stripped)) return false;
       // Flag lines with entities in code context
-      return /[=(){}\[\];]/.test(line);
+      return /[=(){}[\];]/.test(line);
     });
     if (entityLines.length > 0) {
       errors.push(`HTML entities found in code (${entityLines.length} lines) — use => not =&gt;, && not &amp;&amp;, etc. This crashes the V8 sandbox.`);
@@ -940,11 +940,6 @@ export function validateBlueprint(result: string): BlueprintValidationResult {
         }
       }
     }
-
-    // Preserve new top-level blueprint fields
-    if (parsed.settings) parsed.settings = parsed.settings;
-    if (parsed.testScenarios) parsed.testScenarios = parsed.testScenarios;
-    if (parsed.architecture) parsed.architecture = parsed.architecture;
 
     return { valid: errors.length === 0, errors, warnings, parsed, extracted: json };
   } catch (e) {

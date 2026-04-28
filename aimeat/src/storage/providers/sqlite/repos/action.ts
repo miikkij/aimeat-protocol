@@ -39,7 +39,7 @@ export function createAction(db: Database.Database, action: ActionRecord): Actio
     );
     return action;
   } catch (err: unknown) {
-    if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('ACTION_EXISTS');
+    if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('ACTION_EXISTS', { cause: err });
     throw err;
   }
 }

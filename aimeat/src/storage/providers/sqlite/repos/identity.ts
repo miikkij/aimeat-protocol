@@ -78,7 +78,7 @@ export function createGHII(db: Database.Database, record: GHIIRecord): GHIIRecor
     );
     return record;
   } catch (err: unknown) {
-    if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('GHII_TAKEN');
+    if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('GHII_TAKEN', { cause: err });
     throw err;
   }
 }
@@ -189,7 +189,7 @@ export function createChatInstance(db: Database.Database, record: ChatInstanceRe
     );
     return record;
   } catch (err: unknown) {
-    if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('CHAT_INSTANCE_EXISTS');
+    if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('CHAT_INSTANCE_EXISTS', { cause: err });
     throw err;
   }
 }

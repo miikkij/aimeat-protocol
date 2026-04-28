@@ -50,7 +50,7 @@ export function createCsm(db: Database.Database, record: CsmRecord): CsmRecord {
     );
     return record;
   } catch (err: unknown) {
-    if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('CSM_NAME_TAKEN');
+    if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('CSM_NAME_TAKEN', { cause: err });
     throw err;
   }
 }
@@ -106,7 +106,7 @@ export function createMsm(db: Database.Database, record: MsmRecord): MsmRecord {
     );
     return record;
   } catch (err: unknown) {
-    if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('MSM_NAME_TAKEN');
+    if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('MSM_NAME_TAKEN', { cause: err });
     throw err;
   }
 }

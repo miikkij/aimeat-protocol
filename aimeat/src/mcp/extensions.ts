@@ -202,7 +202,7 @@ export function registerExtensionsTools(
                     const buf = await resp.arrayBuffer();
                     const ct = resp.headers.get('content-type') || '';
                     const ctCharsetMatch = /charset=([^\s;]+)/i.exec(ct);
-                    let charset = ctCharsetMatch ? ctCharsetMatch[1].toLowerCase() : 'utf-8';
+                    const charset = ctCharsetMatch ? ctCharsetMatch[1].toLowerCase() : 'utf-8';
                     const decoder = new TextDecoder(charset === 'utf8' ? 'utf-8' : charset);
                     const text = decoder.decode(buf);
                     const headers: Record<string, string> = {};

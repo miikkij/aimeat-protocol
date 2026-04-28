@@ -78,7 +78,7 @@ export class SqliteStorage implements Storage {
       );
       return owner;
     } catch (err: unknown) {
-      if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('NAME_TAKEN');
+      if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('NAME_TAKEN', { cause: err });
       throw err;
     }
   }
@@ -240,7 +240,7 @@ export class SqliteStorage implements Storage {
       );
       return agent;
     } catch (err: unknown) {
-      if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('NAME_TAKEN');
+      if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('NAME_TAKEN', { cause: err });
       throw err;
     }
   }
@@ -612,7 +612,7 @@ export class SqliteStorage implements Storage {
       );
       return action;
     } catch (err: unknown) {
-      if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('ACTION_EXISTS');
+      if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('ACTION_EXISTS', { cause: err });
       throw err;
     }
   }
@@ -623,7 +623,7 @@ export class SqliteStorage implements Storage {
   }
 
   async listActions(opts?: { search?: string; category?: string }): Promise<ActionRecord[]> {
-    let rows = this.db.prepare('SELECT * FROM actions').all() as Record<string, unknown>[];
+    const rows = this.db.prepare('SELECT * FROM actions').all() as Record<string, unknown>[];
     let results = rows.map(r => this.deserializeAction(r));
     if (opts?.category) {
       results = results.filter(a => a.category === opts.category);
@@ -1472,7 +1472,7 @@ export class SqliteStorage implements Storage {
       );
       return record;
     } catch (err: unknown) {
-      if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('GHII_TAKEN');
+      if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('GHII_TAKEN', { cause: err });
       throw err;
     }
   }
@@ -1609,7 +1609,7 @@ export class SqliteStorage implements Storage {
       );
       return record;
     } catch (err: unknown) {
-      if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('CHAT_INSTANCE_EXISTS');
+      if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('CHAT_INSTANCE_EXISTS', { cause: err });
       throw err;
     }
   }
@@ -2195,7 +2195,7 @@ export class SqliteStorage implements Storage {
       );
       return record;
     } catch (err: unknown) {
-      if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('CSM_NAME_TAKEN');
+      if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('CSM_NAME_TAKEN', { cause: err });
       throw err;
     }
   }
@@ -2268,7 +2268,7 @@ export class SqliteStorage implements Storage {
       );
       return record;
     } catch (err: unknown) {
-      if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('MSM_NAME_TAKEN');
+      if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('MSM_NAME_TAKEN', { cause: err });
       throw err;
     }
   }
@@ -3261,7 +3261,7 @@ export class SqliteStorage implements Storage {
   }
 
   async listSiteChangeLog(limit: number, cursor?: string): Promise<SiteChangeLogEntry[]> {
-    let sql = 'SELECT * FROM site_changelog ORDER BY changedAt DESC';
+    const sql = 'SELECT * FROM site_changelog ORDER BY changedAt DESC';
     const params: unknown[] = [];
 
     const allRows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
@@ -3301,7 +3301,7 @@ export class SqliteStorage implements Storage {
       return record;
     } catch (err: unknown) {
       if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) {
-        throw new Error(`Extension "${record.name}" already exists`);
+        throw new Error(`Extension "${record.name}" already exists`, { cause: err });
       }
       throw err;
     }
@@ -4113,7 +4113,7 @@ export class SqliteStorage implements Storage {
       return record;
     } catch (err: unknown) {
       if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) {
-        throw new Error(`Scheduled job "${record.id}" already exists`);
+        throw new Error(`Scheduled job "${record.id}" already exists`, { cause: err });
       }
       throw err;
     }
@@ -4280,7 +4280,7 @@ export class SqliteStorage implements Storage {
       return record;
     } catch (err: unknown) {
       if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) {
-        throw new Error(`Extension instance "${record.id}" already exists for "${record.extensionName}"`);
+        throw new Error(`Extension instance "${record.id}" already exists for "${record.extensionName}"`, { cause: err });
       }
       throw err;
     }
@@ -4779,7 +4779,7 @@ export class SqliteStorage implements Storage {
       );
     } catch (e: any) {
       if (e.message?.includes('UNIQUE constraint failed')) {
-        throw new Error('PACKAGE_EXISTS');
+        throw new Error('PACKAGE_EXISTS', { cause: e });
       }
       throw e;
     }
