@@ -4,7 +4,6 @@ build/
 .env
 .env.local
 .env.developer.override
-pnpm-lock.yaml
 package-lock.json
 yarn.lock
 .DS_Store
