@@ -137,8 +137,7 @@ async function resetMongodb() {
     return;
   }
 
-  const prismaModule = await import('@prisma/client');
-  const PrismaClient = prismaModule.PrismaClient ?? (prismaModule as any).default.PrismaClient;
+  const { PrismaClient } = await import('@prisma/client');
   const prisma = new PrismaClient({ datasourceUrl: dbUrl });
   await prisma.$connect();
 
