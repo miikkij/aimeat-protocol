@@ -38,9 +38,9 @@ The tools that exist today (as of April 2026) each solve a piece of the problem,
 | | Persistent memory | Cross-user sharing | Federation | Economy | Work queue + escrow | Apps & packages | License |
 |---|---|---|---|---|---|---|---|
 | **MemPalace** | verbatim, hierarchical | — | — | — | — | — | MIT |
-| **MCP** | tool context only | — | — | — | — | — | Apache 2.0 |
+| **MCP** | tool context only | — | — | — | — | — | MIT |
 | **A2A** | session artifacts | task delegation | — | — | task lifecycle | — | Apache 2.0 |
-| **ANP** | — | messaging | P2P / DID | — | — | — | MIT |
+| **ANP** | — | messaging | P2P / DID | — | — | — | Apache 2.0 |
 | **ACP** | stateful messages | — | — | — | — | — | Apache 2.0 |
 | **Paperclip** | — | — | — | budget control | — | — | MIT |
 | **Mem0 / Letta** | per deployment | — | — | — | — | — | Apache 2.0 |
@@ -51,9 +51,9 @@ The tools that exist today (as of April 2026) each solve a piece of the problem,
 
 Most of these tools are single-user or single-deployment. They help your agents work better, but don't solve cross-boundary sharing. AIMEAT doesn't compete with them — it complements them:
 
-- **MemPalace** (Milla Jovovich & Ben Sigman, April 2026) — viral open-source single-agent memory. Verbatim recall, Memory Palace hierarchy, runs fully local. Excellent for what one agent remembers. AIMEAT adds the network layer: federation, sharing, economy, and discovery across users and nodes.
+- **MemPalace** (50k+ stars, 2026) — viral open-source single-agent memory. Verbatim recall, Memory Palace hierarchy (wings → rooms → drawers), runs fully local. 96.6% recall on LongMemEval. Excellent for what one agent remembers. AIMEAT adds the network layer: federation, sharing, economy, and discovery across users and nodes.
 - **MCP** (Anthropic → Linux Foundation) — tool-calling standard. AIMEAT uses it natively — 50 built-in MCP tools. MCP is how chat-based AIs (Claude Pro, ChatGPT Plus) access AIMEAT nodes as full agents.
-- **A2A** (Google → Linux Foundation, v1.0 April 2026) — the standard for agent-to-agent task delegation (150+ organizations). Session-scoped. AIMEAT adds persistent identity, cross-node memory exchange, and economic settlement beyond the session.
+- **A2A** (Google → Linux Foundation, v1.0 March 2026) — the emerging standard for agent-to-agent task delegation. Session-scoped. AIMEAT adds persistent identity, cross-node memory exchange, and economic settlement beyond the session.
 - **ANP** (Agent Network Protocol) — decentralized agent networking via P2P and DIDs ("HTTP of the Agentic Web"). Good vision, still maturing. AIMEAT takes a different approach: HTTP-based bilateral federation with built-in memory exchange and work queues.
 - **ACP** — stateful agent messaging, partially merged into A2A.
 - **Paperclip** — orchestration layer (goal hierarchy, budgets, governance). Decides what agents do. AIMEAT stores what they know and share. Complementary layers.
