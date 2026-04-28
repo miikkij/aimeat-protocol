@@ -1,6 +1,6 @@
 #!/bin/bash
-SRC="/mnt/e/dev/GitHub/JM001/assets/Gemini_Generated_Image_3esbtn3esbtn3esb.png"
-OUT="/mnt/e/dev/GitHub/JM001/assets/platforms_transparent.png"
+SRC="$(cd "$(dirname "$0")/.." && pwd)/assets/Gemini_Generated_Image_3esbtn3esbtn3esb.png"
+OUT="$(cd "$(dirname "$0")/.." && pwd)/assets/platforms_transparent.png"
 BG_COLOR="#F904F7"
 
 echo "Step 1: Creating per-channel difference masks"

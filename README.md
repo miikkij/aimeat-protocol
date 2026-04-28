@@ -49,7 +49,7 @@ You need these installed on your computer:
 
 | Software | Version | How to install |
 |----------|---------|----------------|
-| **Node.js** | 22 or newer | [nodejs.org](https://nodejs.org/) — download the LTS version |
+| **Node.js** | 24 or newer | [nodejs.org](https://nodejs.org/) — download the latest version |
 | **pnpm** | 10 or newer | Run `npm install -g pnpm` after installing Node.js |
 | **MongoDB** | 6+ (optional) | [mongodb.com](https://www.mongodb.com/try/download/community) — only needed if you want data to persist |
 
@@ -276,7 +276,7 @@ node --import tsx test/run-e2e-ci.ts --test=micro-memory
 ## Repository Structure
 
 ```
-AIMEAT/
+aimeat-protocol/
 ├── README.md                              <- you are here
 ├── CLAUDE.md                              # AI assistant instructions
 ├── openapi.yaml                           # OpenAPI 3.1 spec (75 paths, 88 ops, 41 schemas)

@@ -37,7 +37,7 @@ foreach ($t in $tests) {
 
     # Start fresh server
     $serverJob = Start-Job -ScriptBlock {
-        Set-Location "e:\dev\GitHub\JM001\aimeat"
+        Set-Location $PSScriptRoot\..
         $env:AIMEAT_PORT = "40251"
         $env:AIMEAT_RL_GLOBAL = "10000"
         $env:AIMEAT_RL_AUTH = "1000"

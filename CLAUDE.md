@@ -1,4 +1,4 @@
-# CLAUDE.md — AI Assistant Instructions for JM001 / AIMEAT
+# CLAUDE.md — AI Assistant Instructions for AIMEAT
 
 ---
 

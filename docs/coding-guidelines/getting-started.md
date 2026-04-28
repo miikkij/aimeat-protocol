@@ -15,8 +15,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/<org>/JM001.git
-cd JM001/aimeat
+git clone https://github.com/miikkij/aimeat-protocol.git
+cd aimeat-protocol/aimeat
 
 # Install dependencies
 pnpm install
@@ -105,7 +105,7 @@ pnpm build
 ## Project Structure Overview
 
 ```
-JM001/
+aimeat-protocol/
 ├── CLAUDE.md                    # AI assistant instructions
 ├── openapi.yaml                 # API specification (75 paths, 88 operations)
 ├── docs/

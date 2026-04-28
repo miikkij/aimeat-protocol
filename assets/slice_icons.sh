@@ -2,8 +2,8 @@
 # Slice the 2048x2048 transparent grid into 9 individual platform icons
 # Grid is 3x3, each cell is 682x682 (2048/3 ≈ 682.67, we'll use crop+repage)
 
-SRC="/mnt/e/dev/GitHub/JM001/assets/platforms_transparent.png"
-OUTDIR="/mnt/e/dev/GitHub/JM001/aimeat/public/img/platforms"
+SRC="$(cd "$(dirname "$0")/.." && pwd)/assets/platforms_transparent.png"
+OUTDIR="$(cd "$(dirname "$0")/.." && pwd)/aimeat/public/img/platforms"
 
 mkdir -p "$OUTDIR"
 

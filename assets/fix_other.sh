@@ -1,6 +1,6 @@
 #!/bin/bash
-SRC="/mnt/e/dev/GitHub/JM001/assets/platforms_transparent.png"
-OUT="/mnt/e/dev/GitHub/JM001/aimeat/public/img/platforms/other.png"
+SRC="$(cd "$(dirname "$0")/.." && pwd)/assets/platforms_transparent.png"
+OUT="$(cd "$(dirname "$0")/.." && pwd)/aimeat/public/img/platforms/other.png"
 
 echo "Re-extracting other cell"
 convert "$SRC" -crop 684x684+1364+1364 +repage /tmp/other_raw.png
