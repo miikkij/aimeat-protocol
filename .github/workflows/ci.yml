@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [24.x]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+          cache-dependency-path: aimeat/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: aimeat
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        working-directory: aimeat
+        run: pnpm lint
+
+      - name: Type check
+        working-directory: aimeat
+        run: pnpm typecheck
+
+      - name: Build
+        working-directory: aimeat
+        run: pnpm build
+
+      - name: E2E tests (memory backend)
+        working-directory: aimeat
+        run: node --env-file=.env.test.memory --import tsx test/run-e2e-ci.ts --all

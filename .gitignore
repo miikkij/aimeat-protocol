@@ -60,3 +60,14 @@ Desktop.ini
 # OpenMemory - IDE/Assistant specific rules
 .github\instructions\openmemory.instructions.md
 AGENTS.md
+
+# Development artifacts (never commit)
+*.development.json
+aimeat/data/debug/
+generator_phase*.txt
+debug_*.md
+debug_*.txt
+generatorrest.txt
+generatorinterview.txt
+jounis_ideas.md
+github_optics.md

@@ -1,5 +1,8 @@
 # AIME AT
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/miikkij/aimeat-protocol/actions/workflows/ci.yml/badge.svg)](https://github.com/miikkij/aimeat-protocol/actions/workflows/ci.yml)
+
 ## AI Memory Exchange and Action Transfer
 
 **Love what you build, share what you know.**
@@ -54,8 +57,8 @@ You need these installed on your computer:
 
 ```bash
 # 1. Download the code
-git clone https://github.com/miikkij/AIMEAT.git
-cd AIMEAT/aimeat
+git clone https://github.com/miikkij/aimeat-protocol.git
+cd aimeat-protocol/aimeat
 
 # 2. Install dependencies
 pnpm install
@@ -296,7 +299,7 @@ AIMEAT/
 │   ├── src/
 │   │   ├── index.ts                       # CLI + server entrypoint
 │   │   ├── server.ts                      # Express app factory, route mounting
-│   │   ├── config.ts                      # MeatConfig + env loader
+│   │   ├── config.ts                      # AimeatConfig + env loader
 │   │   ├── i18n.ts                        # Internationalization (en/fi)
 │   │   ├── auth/
 │   │   │   ├── jwt.ts                     # EdDSA JWT signing/verification (jose)

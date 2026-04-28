@@ -86,7 +86,6 @@
   },
   "keywords": [
     "aimeat",
-    "meat",
     "ai",
     "protocol",
     "federation",
@@ -95,6 +94,14 @@
   ],
   "author": "Jouni Miikki (Overscale Solutions Oy)",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/miikkij/aimeat-protocol.git"
+  },
+  "homepage": "https://github.com/miikkij/aimeat-protocol",
+  "bugs": {
+    "url": "https://github.com/miikkij/aimeat-protocol/issues"
+  },
   "packageManager": "pnpm@10.27.0",
   "dependencies": {
     "@clack/prompts": "^1.0.1",
