@@ -104,7 +104,8 @@ if (flagReset) {
   console.log('');
   console.log('  Step 1: Dropping AIMEAT collections...');
   try {
-    const { PrismaClient } = await import('@prisma/client');
+    const prismaModule = await import('@prisma/client');
+    const PrismaClient = prismaModule.PrismaClient ?? (prismaModule as any).default.PrismaClient;
     const prisma = new PrismaClient({ datasourceUrl: dbUrl });
     await prisma.$connect();
 
@@ -158,8 +159,9 @@ try {
 
 console.log('  Step 4: Verifying connection...');
 try {
-  const { PrismaClient } = await import('@prisma/client');
-  const prisma = new PrismaClient({ datasourceUrl: dbUrl });
+  const prismaModule2 = await import('@prisma/client');
+  const PrismaClient2 = prismaModule2.PrismaClient ?? (prismaModule2 as any).default.PrismaClient;
+  const prisma = new PrismaClient2({ datasourceUrl: dbUrl });
   await prisma.$connect();
 
   const ownerCount = await prisma.owner.count();

@@ -80,7 +80,8 @@ export class MongoStorage implements Storage {
     }
 
     private async init(databaseUrl: string) {
-        const { PrismaClient } = await import('@prisma/client');
+        const prismaModule = await import('@prisma/client');
+        const PrismaClient = prismaModule.PrismaClient ?? (prismaModule as any).default.PrismaClient;
         this.prisma = new PrismaClient({ datasourceUrl: databaseUrl });
         await this.prisma.$connect();
     }
