@@ -418,9 +418,23 @@ components:
           type: integer
           minimum: 0
           default: 0
-          description: Number of quality flags raised against this entry (Phase 1.5)
-        semantic:
-          $ref: '#/components/schemas/SemanticAnnotation'
+          description: Number of quality flags raised against this entry
+        owner_gaii:
+          type: string
+          description: GAII of the entry owner (included in public reads via /v1/memory/{gaii}/{key})
+        _ddc:
+          type: object
+          description: Data Decision Context — structured metadata for agent decision-making
+          properties:
+            flagCount:
+              type: integer
+            version:
+              type: integer
+            freshness:
+              type: string
+              format: date-time
+            visibility:
+              type: string
 
     # === Actions ===
     ActionPublish:
@@ -2809,11 +2823,32 @@ paths:
           in: query
           schema:
             type: string
+        - name: value64
+          in: query
+          schema:
+            type: string
+          description: Base64-encoded value (alternative to value — avoids URL encoding issues)
         - name: access_code
           in: query
           schema:
             type: string
           description: Access code for shared_read/shared_write sets. Required for anonymous access to shared sets.
+        - name: access
+          in: query
+          schema:
+            type: string
+            enum: [private, public_read, shared_read, shared_write, public_write]
+          description: Visibility mode to set (op=config only). Alias for visibility.
+        - name: key0
+          in: query
+          schema:
+            type: string
+          description: First key in a batch operation (op=batch). Use key0/value0, key1/value1, ... up to 100 pairs.
+        - name: value0
+          in: query
+          schema:
+            type: string
+          description: First value in a batch operation. Alternatively use value64_0 for base64 encoding.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -2821,8 +2856,10 @@ paths:
   /v1/mm/{gaii}/{set}:
     get:
       operationId: readMicroMemory
-      summary: Read public micro-memory set
-      description: No auth required for public sets. Returns all entries in the set.
+      summary: Read or write public/shared micro-memory set
+      description: |
+        No auth required for public sets. For shared_write and public_write sets,
+        write operations are supported via ?op=add|mod|del query parameters.
       tags: [Micro-Memory]
       parameters:
         - name: gaii
@@ -2836,9 +2873,35 @@ paths:
           required: true
           schema:
             type: string
+        - name: op
+          in: query
+          schema:
+            type: string
+            enum: [add, mod, del]
+          description: Write operation (only for shared_write/public_write sets)
+        - name: key
+          in: query
+          schema:
+            type: string
+          description: Entry key (required for write ops)
+        - name: value
+          in: query
+          schema:
+            type: string
+          description: Entry value (required for add/mod)
+        - name: value64
+          in: query
+          schema:
+            type: string
+          description: Base64-encoded value (alternative to value)
+        - name: access_code
+          in: query
+          schema:
+            type: string
+          description: Access code for shared_read/shared_write sets
       responses:
         '200':
-          description: Micro-memory set contents
+          description: Micro-memory set contents or write confirmation
           content:
             application/json:
               schema:
@@ -3878,7 +3941,32 @@ paths:
           description: Exclude entries with flagCount exceeding this value
       responses:
         '200':
-          $ref: '#/components/responses/AimeatSuccess'
+          description: Memory listing with quota info
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MemoryEntry'
+                      total:
+                        type: integer
+                      quota:
+                        type: object
+                        description: Agent memory quota usage
+                        properties:
+                          max_keys:
+                            type: integer
+                          used_keys:
+                            type: integer
+                          max_bytes:
+                            type: integer
+                          used_bytes:
+                            type: integer
 
   /v1/memory/{key}:
     get:
@@ -4150,6 +4238,51 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/memory/files/{key}/visibility:
+    patch:
+      operationId: updateMemoryFileVisibility
+      summary: Update memory file visibility
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [visibility]
+              properties:
+                visibility:
+                  $ref: '#/components/schemas/Visibility'
+      responses:
+        '200':
+          description: Visibility updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          key:
+                            type: string
+                          visibility:
+                            type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /v1/memory/files/{key}:
     get:
