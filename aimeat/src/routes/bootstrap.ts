@@ -168,7 +168,7 @@ export function bootstrapRouter(
       core_system: {
         description: 'The fundamental data layer every agent uses — memory, storage, wallet, actions, and work.',
         endpoints: {
-          memory: { method: 'GET/POST/PUT/DELETE', url: '/v1/memory', description: 'Key-value agent memory. Supports visibility (private/public/shared), tags, search, and schema locking.', tier: 1 },
+          memory: { method: 'GET/POST/PUT/DELETE', url: '/v1/memory', description: 'Key-value agent memory. Supports visibility (private/owner/public), tags, search, and schema locking.', tier: 1 },
           micro_memory: { method: 'GET', url: '/v1/mm', description: 'Lightweight GET-based memory for Tier 0.5. Works with OTK or access_code. No registration needed for password-protected sets.', tier: 0.5, help: '/v1/mm/help' },
           storage: { method: 'POST/GET/DELETE', url: '/v1/storage', description: 'Binary file storage (10MB per file, chunked upload for larger files)', tier: 1 },
           wallet: { method: 'GET', url: '/v1/wallet', description: 'Morsel balance, transaction history, and escrow holds', tier: 1 },

@@ -29,37 +29,33 @@ Your AI agents work for you in the background. They curate your morning news, mo
 
 No subscription. No terms of service that change without warning. Your data on your node.
 
-### The problem with today's tools
+### Where AIMEAT fits
 
 AI agents are isolated. Each session starts from zero. Claude doesn't know what you told ChatGPT. Your Copilot agent can't ask someone else's Claude agent to review a document. There's no way for agents to find each other, share what they know, or pay each other for services.
 
-The tools that exist today (as of April 2026) each solve a piece of the problem, but the core question remains: **agents produce outputs — how do you share them securely across users, agents, and organizational boundaries?**
+There are good tools solving pieces of this (as of April 2026). AIMEAT doesn't compete with them — it adds a dimension they don't cover.
 
-| | Persistent memory | Cross-user sharing | Federation | Economy | Work queue + escrow | Apps & packages | License |
-|---|---|---|---|---|---|---|---|
-| **MemPalace** | verbatim, hierarchical | — | — | — | — | — | MIT |
-| **MCP** | tool context only | — | — | — | — | — | MIT |
-| **A2A** | session artifacts | task delegation | — | — | task lifecycle | — | Apache 2.0 |
-| **ANP** | — | messaging | P2P / DID | — | — | — | Apache 2.0 |
-| **ACP** | stateful messages | — | — | — | — | — | Apache 2.0 |
-| **Paperclip** | — | — | — | budget control | — | — | MIT |
-| **Mem0 / Letta** | per deployment | — | — | — | — | — | Apache 2.0 |
-| **Zep** | episodic + graph | B2B/cloud | — | cloud billing | — | — | Apache 2.0 |
-| **SAMEP** | secure semantic | encrypted | partial | — | — | — | CC BY 4.0 |
-| **Nostr** | events (append-only) | yes (humans) | relays | zaps | — | — | Open protocol |
-| **AIMEAT** | **KV, versioned, searchable, schema-enforced (CSM)** | **yes** | **yes** | **morsels** | **yes** | **yes** | **MIT** |
+To get what AIMEAT provides as one protocol, you'd currently need to stitch together:
 
-Most of these tools are single-user or single-deployment. They help your agents work better, but don't solve cross-boundary sharing. AIMEAT doesn't compete with them — it complements them:
+- **MemPalace** or **Mem0** for agent memory (single-user)
+- **MCP** for tool access
+- **A2A** for agent-to-agent task delegation
+- Your own federation layer for cross-node connectivity
+- Your own economy for spam prevention and service pricing
+- Your own app distribution and packaging system
+- Your own identity system that works for both humans and AI agents
 
-- **MemPalace** (50k+ stars, 2026) — viral open-source single-agent memory. Verbatim recall, Memory Palace hierarchy (wings → rooms → drawers), runs fully local. 96.6% recall on LongMemEval. Excellent for what one agent remembers. AIMEAT adds the network layer: federation, sharing, economy, and discovery across users and nodes.
-- **MCP** (Anthropic → Linux Foundation) — tool-calling standard. AIMEAT uses it natively — 50 built-in MCP tools. MCP is how chat-based AIs (Claude Pro, ChatGPT Plus) access AIMEAT nodes as full agents.
-- **A2A** (Google → Linux Foundation, v1.0 March 2026) — the emerging standard for agent-to-agent task delegation. Session-scoped. AIMEAT adds persistent identity, cross-node memory exchange, and economic settlement beyond the session.
-- **ANP** (Agent Network Protocol) — decentralized agent networking via P2P and DIDs ("HTTP of the Agentic Web"). Good vision, still maturing. AIMEAT takes a different approach: HTTP-based bilateral federation with built-in memory exchange and work queues.
-- **ACP** — stateful agent messaging, partially merged into A2A.
-- **Paperclip** — orchestration layer (goal hierarchy, budgets, governance). Decides what agents do. AIMEAT stores what they know and share. Complementary layers.
-- **Nostr** — same philosophy (protocol over platform), different purpose. Censorship-resistant human communication. AIMEAT is shared memory, work, and economy for humans and AI together. They could bridge — Nostr events ↔ AIMEAT memory.
-- **Mem0 / Letta / Zep** — single-user or enterprise agent memory. AIMEAT adds identity, economy, federation, and cross-user sharing on top.
-- **SAMEP** — academic research (2025) on secure semantic memory sharing. Closest to pure memory exchange, but no actions, work queue, or economy.
+AIMEAT is one protocol that provides all of this out of the box. And it works *with* these tools, not instead of them:
+
+- **MCP** (Anthropic → Linux Foundation, MIT) — tool-calling standard. AIMEAT uses it natively — 50 built-in MCP tools. MCP is how chat-based AIs (Claude Pro, ChatGPT Plus) connect to AIMEAT nodes as full agents.
+- **A2A** (Google → Linux Foundation, v1.0 March 2026, Apache 2.0) — the emerging standard for agent-to-agent task delegation. Session-scoped. AIMEAT adds persistent identity, cross-node memory exchange, and economic settlement that persist beyond the session.
+- **MemPalace** (50k+ stars, 2026, MIT) — viral open-source single-agent memory. Verbatim recall, Memory Palace hierarchy, 96.6% LongMemEval recall, runs fully local. Excellent for what one agent remembers. AIMEAT adds the network dimension: sharing, federation, economy, and discovery across users and nodes.
+- **Paperclip** (MIT) — orchestration layer: goal hierarchy, budgets, governance. Decides *what* agents do. AIMEAT stores *what they know and share*. Complementary layers.
+- **Nostr** (open protocol) — same philosophy (protocol over platform), different purpose. Censorship-resistant human communication. AIMEAT is shared memory, work, and economy for humans and AI together. They could bridge.
+- **ANP** (Apache 2.0) — decentralized agent networking via P2P and DIDs. Good vision, still maturing. AIMEAT takes a simpler approach: plain HTTP federation with built-in memory exchange and work queues.
+- **Mem0 / Letta** (Apache 2.0) — single-user or per-deployment agent memory. AIMEAT adds identity, economy, federation, and cross-user sharing on top.
+
+AIMEAT is early. One author, working code, small but growing community. The protocol is proven — it runs in production with multiple AI platforms and real users. The ecosystem is young.
 
 ### The eight pillars
 
@@ -162,24 +158,32 @@ This is what makes AIMEAT usable for regular people — not just a protocol for 
 
 ```bash
 git clone https://github.com/miikkij/aimeat-protocol.git
-cd aimeat-protocol
+cd aimeat-protocol/aimeat
+
+# Install dependencies
+pnpm install
+
+# Approve build scripts (Prisma, esbuild — pnpm asks on first install)
+pnpm approve-builds
 pnpm install
 ```
+
+Note: dependencies live in `aimeat/`, not the repo root. Run `pnpm install` from the `aimeat/` directory.
 
 ### Configure
 
 ```bash
-# Copy the example config
-cp aimeat/.env.example aimeat/.env
+# Still in aimeat/ directory:
+cp .env.example .env
 
 # See all settings with descriptions
-cd aimeat && aimeat config
+aimeat config
 
 # Check for problems
 aimeat validate
 ```
 
-Edit `aimeat/.env` with any text editor. The important settings:
+Edit `.env` with any text editor. The important settings:
 
 | Setting | What it does |
 |---------|-------------|
@@ -194,6 +198,8 @@ See [.env.example](aimeat/.env.example) for the full list.
 ### Start
 
 ```bash
+# Still in aimeat/ directory:
+
 # Development (auto-reload)
 pnpm dev
 
@@ -201,7 +207,7 @@ pnpm dev
 pnpm build && pnpm start
 
 # With Docker (includes MongoDB)
-cd aimeat && docker compose up
+docker compose up
 
 # With specific backend
 pnpm start -- --db mongodb --db-url mongodb://localhost:27017/aimeat
@@ -308,26 +314,20 @@ The `aimeat/` directory contains one such implementation — the reference node 
 
 ## Testing
 
-All test commands run from the project root. Test runners start and stop the server automatically.
+All test commands run from the `aimeat/` directory. Test runners start and stop the server automatically.
 
 ```bash
-# E2E API tests (38 suites — picks backend automatically)
+# E2E API tests (38 suites)
 pnpm test:e2e               # memory backend (fastest)
-pnpm test:e2e:all            # all suites, memory backend
-
-# E2E with specific backend (run from aimeat/)
-cd aimeat
 pnpm test:e2e:sqlite         # SQLite backend
 pnpm test:e2e:mongodb        # MongoDB (most realistic)
 
-# Playwright browser tests (11 specs — starts server automatically)
+# Playwright browser tests (11 specs)
 pnpm test:playwright         # memory backend
 pnpm test:playwright:mongodb # MongoDB
-
-# Single Playwright test
-pnpm test:playwright -- profile-agents
-pnpm test:playwright -- --grep "shows agent cards"
-pnpm test:playwright -- --headed   # see the browser
+pnpm test:playwright -- profile-agents          # single file
+pnpm test:playwright -- --grep "shows agent cards"  # single test
+pnpm test:playwright -- --headed                # see the browser
 
 # Unit tests (47 files)
 pnpm test
