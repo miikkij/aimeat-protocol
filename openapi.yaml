@@ -992,7 +992,7 @@ components:
             type: string
         visibility:
           type: string
-          enum: [private, public]
+          enum: [private, public_read, shared_read, shared_write, public_write]
 
     # === Trust ===
     TrustProfile:
@@ -3805,8 +3805,19 @@ paths:
             schema:
               $ref: '#/components/schemas/MemoryWrite'
       responses:
+        '200':
+          description: Memory updated (key already existed — upsert)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MemoryEntry'
         '201':
-          description: Memory written
+          description: Memory created (new key)
           content:
             application/json:
               schema:
@@ -3843,12 +3854,28 @@ paths:
           schema:
             type: string
           description: Comma-separated tag filter
+        - name: prefix
+          in: query
+          schema:
+            type: string
+          description: Filter keys by prefix (e.g. "shared:" returns all shared:* keys)
+        - name: agent
+          in: query
+          schema:
+            type: string
+          description: GAII of a specific agent to list memory for (owner sessions only)
+        - name: owner_scope
+          in: query
+          schema:
+            type: string
+            enum: ['true', 'false']
+          description: When true, list memory across all owner's agents (owner sessions only)
         - name: max_flags
           in: query
           schema:
             type: integer
             minimum: 0
-          description: Exclude entries with flagCount exceeding this value (Phase 1.5 data quality filter)
+          description: Exclude entries with flagCount exceeding this value
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -3857,7 +3884,7 @@ paths:
     get:
       operationId: readMemory
       summary: Read memory
-      description: Read a specific memory entry. Public entries require no auth.
+      description: Read a specific memory entry by key. Requires authentication. For unauthenticated public reads, use GET /v1/memory/{gaii}/{key} instead.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -3900,14 +3927,23 @@ paths:
         content:
           application/json:
             schema:
-              allOf:
-                - $ref: '#/components/schemas/MemoryWrite'
-                - type: object
-                  required: [version]
-                  properties:
-                    version:
-                      type: integer
-                      description: Expected current version (optimistic lock)
+              type: object
+              required: [version]
+              properties:
+                value:
+                  description: New value (optional — omit to update only visibility/tags)
+                visibility:
+                  $ref: '#/components/schemas/Visibility'
+                tags:
+                  type: array
+                  items:
+                    type: string
+                ttl_hours:
+                  type: integer
+                  nullable: true
+                version:
+                  type: integer
+                  description: Expected current version (optimistic lock)
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -4084,11 +4120,11 @@ paths:
           application/json:
             schema:
               type: object
-              required: [key, data, mime_type]
+              required: [key, content, mime_type]
               properties:
                 key:
                   type: string
-                data:
+                content:
                   type: string
                   description: Base64-encoded file content
                 mime_type:
@@ -4098,9 +4134,7 @@ paths:
                   items:
                     type: string
                 visibility:
-                  type: string
-                  enum: [private, public, shared]
-                  default: private
+                  $ref: '#/components/schemas/Visibility'
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
