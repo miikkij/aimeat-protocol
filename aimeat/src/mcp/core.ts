@@ -193,12 +193,12 @@ export function registerCoreTools(
     // ── Tool 4: aimeat_memory_write ──
     mcp.tool(
         'aimeat_memory_write',
-        'Write a memory entry (creates or updates)',
+        'Write a memory entry (creates or updates). Value can be any JSON: string, number, boolean, object, or array.',
         {
-            key: z.string(),
-            value: z.any(),
-            visibility: z.enum(['private', 'owner', 'public']).optional(),
-            tags: z.array(z.string()).optional(),
+            key: z.string().describe('Memory key (hierarchical, slash-separated)'),
+            value: z.union([z.string(), z.number(), z.boolean(), z.record(z.string(), z.unknown()), z.array(z.unknown())]).describe('The value to store — any JSON type'),
+            visibility: z.enum(['private', 'owner', 'public']).default('private').describe('private = only you, owner = all your agents, public = anyone'),
+            tags: z.array(z.string()).default([]).describe('Optional tags for filtering'),
         },
         async ({ key, value, visibility, tags }) => {
             const existing = await storage.getMemory(agentGaii, key);
@@ -206,8 +206,8 @@ export function registerCoreTools(
                 key,
                 ownerGaii: agentGaii,
                 value,
-                visibility: visibility ?? 'private',
-                tags: tags ?? [],
+                visibility,
+                tags,
                 ttlHours: null,
                 version: existing ? existing.version + 1 : 1,
                 createdAt: existing?.createdAt ?? new Date().toISOString(),
@@ -218,7 +218,7 @@ export function registerCoreTools(
             return {
                 content: [{
                     type: 'text' as const,
-                    text: JSON.stringify({ key: record.key, version: record.version, written: true }, null, 2),
+                    text: JSON.stringify({ key: record.key, version: record.version, visibility: record.visibility, tags: record.tags, written: true }, null, 2),
                 }],
             };
         },
