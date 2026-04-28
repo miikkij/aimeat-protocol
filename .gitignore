@@ -70,3 +70,35 @@ generatorrest.txt
 generatorinterview.txt
 jounis_ideas.md
 github_optics.md
+
+# Test output files
+*-results.txt
+test-output.txt
+test-results-*.txt
+
+# Site verification tokens
+BingSiteAuth.xml
+google*.html
+
+# Certificates and keys (never commit)
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Data exports
+*.sql
+*.dump
+
+# Binary docs (use .md instead)
+*.docx
+
+# Business strategy (private)
+docs/businessfinland/
