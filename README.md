@@ -33,27 +33,33 @@ No subscription. No terms of service that change without warning. Your data on y
 
 AI agents are isolated. Each session starts from zero. Claude doesn't know what you told ChatGPT. Your Copilot agent can't ask someone else's Claude agent to review a document. There's no way for agents to find each other, share what they know, or pay each other for services.
 
-The tools that exist today each solve a piece of the problem — internally:
+The tools that exist today (as of April 2026) each solve a piece of the problem, but the core question remains: **agents produce outputs — how do you share them securely across users, agents, and organizational boundaries?**
 
-| | Internal agent work | Sharing across users | Federation | Economy | Apps & packages | Human + AI together |
-|---|---|---|---|---|---|---|
-| MCP | tool calls | — | — | — | — | — |
-| Paperclip | orchestration, budgets | — | — | budget control | — | — |
-| CrewAI / LangChain | team workflows | — | — | — | — | — |
-| Mem0 / Letta | memory | — | — | — | — | — |
-| A2A | messaging | within session | — | — | — | — |
-| Nostr | — | yes (humans) | relays | zaps | — | — |
-| **AIMEAT** | memory + work queue | **yes** | **yes** | **morsels** | **yes** | **yes** |
+| | Persistent memory | Cross-user sharing | Federation | Economy | Work queue + escrow | Apps & packages | License |
+|---|---|---|---|---|---|---|---|
+| **MemPalace** | verbatim, hierarchical | — | — | — | — | — | MIT |
+| **MCP** | tool context only | — | — | — | — | — | Apache 2.0 |
+| **A2A** | session artifacts | task delegation | — | — | task lifecycle | — | Apache 2.0 |
+| **ANP** | — | messaging | P2P / DID | — | — | — | MIT |
+| **ACP** | stateful messages | — | — | — | — | — | Apache 2.0 |
+| **Paperclip** | — | — | — | budget control | — | — | MIT |
+| **Mem0 / Letta** | per deployment | — | — | — | — | — | Apache 2.0 |
+| **Zep** | episodic + graph | B2B/cloud | — | cloud billing | — | — | Apache 2.0 |
+| **SAMEP** | secure semantic | encrypted | partial | — | — | — | CC BY 4.0 |
+| **Nostr** | events (append-only) | yes (humans) | relays | zaps | — | — | Open protocol |
+| **AIMEAT** | **KV, versioned, searchable, schema-enforced (CSM)** | **yes** | **yes** | **morsels** | **yes** | **yes** | **MIT** |
 
-Every tool in that list helps agents work better alone — within one user's setup, within one organization, within one session. None of them solve how agents and people **share, discover each other, and collaborate across boundaries**.
+Most of these tools are single-user or single-deployment. They help your agents work better, but don't solve cross-boundary sharing. AIMEAT doesn't compete with them — it complements them:
 
-AIMEAT does. And it doesn't compete with any of them — it complements them:
-
-- **MCP** — AIMEAT uses it. 50 built-in MCP tools. MCP is how chat-based AIs (Claude Pro, ChatGPT Plus) access AIMEAT nodes as full agents.
-- **Paperclip** — Orchestration on top, AIMEAT as the memory and identity layer underneath. Complementary.
-- **Nostr** — Same philosophy (protocol over platform), different purpose. Nostr is censorship-resistant human communication. AIMEAT is shared memory, work, and economy for humans and AI together. They could bridge.
-- **Mem0 / Letta** — Single-user agent memory. AIMEAT adds identity, economy, federation, and sharing on top.
-- **A2A** — Session-scoped agent messaging. AIMEAT adds persistent identity, cross-node routing, and economic settlement.
+- **MemPalace** (Milla Jovovich & Ben Sigman, April 2026) — viral open-source single-agent memory. Verbatim recall, Memory Palace hierarchy, runs fully local. Excellent for what one agent remembers. AIMEAT adds the network layer: federation, sharing, economy, and discovery across users and nodes.
+- **MCP** (Anthropic → Linux Foundation) — tool-calling standard. AIMEAT uses it natively — 50 built-in MCP tools. MCP is how chat-based AIs (Claude Pro, ChatGPT Plus) access AIMEAT nodes as full agents.
+- **A2A** (Google → Linux Foundation, v1.0 April 2026) — the standard for agent-to-agent task delegation (150+ organizations). Session-scoped. AIMEAT adds persistent identity, cross-node memory exchange, and economic settlement beyond the session.
+- **ANP** (Agent Network Protocol) — decentralized agent networking via P2P and DIDs ("HTTP of the Agentic Web"). Good vision, still maturing. AIMEAT takes a different approach: HTTP-based bilateral federation with built-in memory exchange and work queues.
+- **ACP** — stateful agent messaging, partially merged into A2A.
+- **Paperclip** — orchestration layer (goal hierarchy, budgets, governance). Decides what agents do. AIMEAT stores what they know and share. Complementary layers.
+- **Nostr** — same philosophy (protocol over platform), different purpose. Censorship-resistant human communication. AIMEAT is shared memory, work, and economy for humans and AI together. They could bridge — Nostr events ↔ AIMEAT memory.
+- **Mem0 / Letta / Zep** — single-user or enterprise agent memory. AIMEAT adds identity, economy, federation, and cross-user sharing on top.
+- **SAMEP** — academic research (2025) on secure semantic memory sharing. Closest to pure memory exchange, but no actions, work queue, or economy.
 
 ### The eight pillars
 
@@ -67,6 +73,8 @@ AIMEAT is pure protocol. It provides exactly eight pillars of infrastructure:
 6. **Notification Boards** — structured communication channels
 7. **Federation** — bilateral peering between independently operated nodes
 8. **Observability** — metrics, health, and operational monitoring
+
+**CSM (Community Service Manifest)** lets you define the minimum data model for any service — what fields, what types, what validation rules. A hobby directory, a marketplace, a digital signage system — each declares its schema, and the protocol enforces it. You don't just store arbitrary data, you define the shape of data that apps and agents must follow.
 
 Everything else — semantic search, file processing, translation, image generation, code review — is an ACTION that AI agents provide to each other on the network. The network is the plugin system.
 
@@ -237,7 +245,9 @@ aimeat --version         Show version
 
 ## Reference Implementation
 
-The `aimeat/` directory contains a Node.js reference implementation.
+AIMEAT is an open protocol — the [RFC v3.0](docs/AIMEAT-RFC-v3.0-full.md) defines the standard, and **anyone can build their own implementation** in any language. If your implementation handles HTTP requests and follows the spec, it's a valid AIMEAT node.
+
+The `aimeat/` directory contains one such implementation — the reference node written in Node.js. It implements everything in the RFC and goes significantly further: human identity (GHII), TOTP 2FA, V8-sandboxed extensions, a generator pipeline, push notifications, WebRTC, an app marketplace, a 34-tab admin dashboard, and more. The [Implementation Guide v3.0](docs/AIMEAT-IO-Implementation-Guide-v3.0.md) documents all 39 chapters of functionality beyond the protocol spec.
 
 ### Tech stack
 
