@@ -284,7 +284,7 @@ Three namespaces exist. **Never confuse them.**
 
 ### Layer access rules
 
-- **Extension** (V8 sandbox): owns `ext:{name}`. Reads owner data via `ctx.memory.getPublic(ctx.caller.gaii, key)`. Fetches external APIs via `ctx.fetch()`.
+- **Extension** (WASM sandbox): owns `ext:{name}`. Reads owner data via `ctx.memory.getPublic(ctx.caller.gaii, key)`. Fetches external APIs via `ctx.fetch()`.
 - **Cortex** (browser IIFE): reads ext data via `AIMEAT.data.getPublic('ext:name', key)`. Reads/writes user data via `AIMEAT.data.get/set()`. Calls extension actions via `session.fetch('/v1/ext/name/actionId')`.
 - **CRITICAL: Translations and settings are USER data** — cortex reads them via `AIMEAT.data.get('service.i18n.fi')`, NEVER via `getPublic('ext:...')`. The extension init action does NOT need to copy them.
 - **App** (browser): calls cortex public methods ONLY. NEVER calls `callExt`, `readExtMemory`, `/v1/ext/`, or `/v1/memory/ext:` directly.
@@ -606,7 +606,7 @@ When modifying generator prompt templates (`public/js/services/generator-prompts
 2. **Extension data** (watchlist, cache, changes) → `getPublic('ext:name', key)` — correct
 3. **User data** (translations, settings) → `AIMEAT.data.get(key)` — correct
 4. **NEVER tell cortex to read translations from ext: namespace** — they live in owner namespace
-5. **Extension actions must use** `export default async function(ctx, input) { ... }` — the V8 sandbox requires ES module default export
+5. **Extension actions must use** `export default async function(ctx, input) { ... }` — the sandbox requires ES module default export
 
 ### Generator Pipeline — Known Phase 4/5 Bugs
 

@@ -60,7 +60,7 @@ Everything else (semantic search, file processing, translation, image generation
 ```
 ┌──────────────────────────────────────────────────────────┐
 │  Applications & Packages                                 │
-│  (apps, V8 extensions, cortex manifests, templates)      │
+│  (apps, sandboxed extensions, cortex manifests, templates)│
 ├──────────────────────────────────────────────────────────┤
 │  Layer 5: Federation                                     │
 │  Peering, sync, relay routing, trust                     │
@@ -86,7 +86,7 @@ Layers 1-2 are mandatory. Layers 3-5 are recommended but optional for specialize
 This is what makes AIMEAT usable for non-developers:
 
 - **Apps** - self-contained HTML apps built by AI, running in the browser
-- **Extensions** - server-side logic in a secure V8 sandbox
+- **Extensions** - server-side logic in a secure WASM sandbox
 - **Cortex** - shared UI components and glue between apps and extensions
 - **Packages** - versioned bundles that can be installed with one click
 - **Templates** - published packages others can browse, install, and rate
@@ -139,7 +139,7 @@ If the AI understands the bootstrap response, everything works. Admin dashboard 
 
 ## Reference Implementation
 
-The `aimeat/` directory contains a full reference implementation in TypeScript (Express 5.2, Node 24). It implements the entire RFC and adds production features: GHII human identities, TOTP 2FA, V8 extensions, package marketplace, push notifications, WebRTC, and a comprehensive admin UI.
+The `aimeat/` directory contains a full reference implementation in TypeScript (Express 5.2, Node 24). It implements the entire RFC and adds production features: GHII human identities, TOTP 2FA, sandboxed extensions, package marketplace, push notifications, WebRTC, and a comprehensive admin UI.
 
 Three storage backends: in-memory (fast dev), SQLite (personal nodes), MongoDB (production).
 
