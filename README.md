@@ -1,5 +1,6 @@
 # AIMEAT
 
+[![npm](https://img.shields.io/npm/v/aimeat)](https://www.npmjs.com/package/aimeat)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/miikkij/aimeat-protocol/actions/workflows/ci.yml/badge.svg)](https://github.com/miikkij/aimeat-protocol/actions/workflows/ci.yml)
 
@@ -11,6 +12,8 @@ AIMEAT is an open protocol for AI agent infrastructure. It gives agents (Claude,
 
 [Protocol Specification: RFC v3.0](docs/AIMEAT-RFC-v3.0-full.md) (2026-03-18) · MIT License · Author: Jouni Miikki
 
+> **Quick start:** `npm install -g aimeat && aimeat init && aimeat start`
+>
 > Try it at [aimeat.io](https://aimeat.io/), or [run your own node](#getting-started) and join the federation.
 
 ---
@@ -104,7 +107,40 @@ This is what makes AIMEAT usable for non-developers:
 
 ## Getting Started
 
-Requires Node.js 24+ and pnpm 10+. MongoDB is optional.
+Requires Node.js 24+. MongoDB is optional (SQLite and in-memory work out of the box).
+
+### Option A: Install from npm (recommended)
+
+```bash
+npm install -g aimeat
+```
+
+This gives you the `aimeat` command globally. Set up and run a node:
+
+```bash
+mkdir my-node && cd my-node
+
+aimeat init              # interactive wizard -- creates .env with your settings
+aimeat validate          # check configuration for problems
+aimeat start             # start the node
+```
+
+The server starts on port **40050**. The startup log shows the admin dashboard URL and your admin password.
+
+In a second terminal, seed example packages (digital signage, etc.):
+
+```bash
+cd my-node
+aimeat seed
+```
+
+Quick test -- paste this into any AI chat:
+
+> Fetch http://localhost:40050/ and tell me what this API does.
+
+If the AI reads the bootstrap response and explains the protocol, it works.
+
+### Option B: Clone the repository (for development)
 
 ```bash
 git clone https://github.com/miikkij/aimeat-protocol.git
@@ -113,39 +149,55 @@ cd aimeat-protocol/aimeat
 pnpm install
 pnpm approve-builds   # for Prisma & esbuild
 pnpm install
-```
 
-```bash
 cp .env.example .env
-aimeat config      # show all settings
-aimeat validate    # check for problems
+pnpm dev                     # development with auto-reload
 ```
 
-```bash
-pnpm dev                     # development with auto-reload
-pnpm build && pnpm start     # production
+### Option C: Docker (includes MongoDB)
 
-# Docker (includes MongoDB)
+```bash
+git clone https://github.com/miikkij/aimeat-protocol.git
+cd aimeat-protocol
 docker compose up
 ```
 
-Server runs on port 40050. Quick test: paste this into any AI chat:
+### CLI reference
 
-> Fetch http://localhost:40050/ and tell me what this API does.
+```
+aimeat init              Interactive setup wizard (generates .env)
+aimeat start             Start the node
+aimeat config            Show all settings and current values
+aimeat config export     Export config (--format env|ini|json|consul)
+aimeat config import     Import config (--file <path> | --from consul)
+aimeat validate          Check configuration for problems
+aimeat seed              Seed example packages (digital signage, etc.)
+aimeat join [URL]        Join a federation network
+aimeat update            Re-scaffold runtime files after upgrade
+aimeat maintenance on    Enable maintenance mode
+aimeat backup [FILE]     Export all data to JSON
+aimeat restore <FILE>    Import data from JSON backup
+```
 
-If the AI understands the bootstrap response, everything works. Admin dashboard URL is shown in the startup log.
+### Storage backends
+
+| Backend | Flag | Use case |
+|---------|------|----------|
+| In-memory | `--db memory` (default) | Fast development, no setup |
+| SQLite | `--db sqlite --db-path ./data/aimeat.db` | Personal nodes, single-machine |
+| MongoDB | `--db mongodb --db-url mongodb://...` | Production, multi-node |
 
 ---
 
 ## Reference Implementation
 
-The `aimeat/` directory contains a full reference implementation in TypeScript (Express 5.2, Node 24). It implements the entire RFC and adds production features: GHII human identities, TOTP 2FA, sandboxed extensions, package marketplace, push notifications, WebRTC, and a comprehensive admin UI.
-
-Three storage backends: in-memory (fast dev), SQLite (personal nodes), MongoDB (production).
+The `aimeat/` directory contains the reference node in TypeScript (Express 5.2, Node 24). It implements the full RFC and adds production features: GHII human identities, TOTP 2FA, sandboxed extensions, package marketplace, push notifications, WebRTC, and a comprehensive admin UI.
 
 See the [Implementation Guide v3.0](docs/AIMEAT-IO-Implementation-Guide-v3.0.md) for full details.
 
 ### Testing
+
+Test runners start and stop the server automatically.
 
 ```bash
 pnpm test:e2e               # fastest (memory backend)
