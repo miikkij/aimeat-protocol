@@ -71,7 +71,7 @@ describe('executeExtensionAction', () => {
 
         await expect(
             executeExtensionAction(script, makeCtx(), {}, defaultLimits({ timeoutMs: 200 })),
-        ).rejects.toThrow(/timed out/i);
+        ).rejects.toThrow(/timed out|interrupted/i);
     });
 
     it('does not expose Node.js globals (process, require)', async () => {

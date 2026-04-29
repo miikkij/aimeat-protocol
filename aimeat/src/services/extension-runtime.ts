@@ -390,7 +390,13 @@ export async function executeExtensionAction(
         const evalResult = vm.evalCode(fullScript);
         const promiseHandle = vm.unwrapResult(evalResult);
 
-        const resolvedResult = await vm.resolvePromise(promiseHandle);
+        // resolvePromise registers a .then() inside the guest VM.
+        // executePendingJobs flushes the microtask queue so the callback fires.
+        // Order matters: register first, flush second, then await.
+        const resolveP = vm.resolvePromise(promiseHandle);
+        runtime.executePendingJobs();
+
+        const resolvedResult = await resolveP;
         promiseHandle.dispose();
 
         const resultHandle = vm.unwrapResult(resolvedResult);
