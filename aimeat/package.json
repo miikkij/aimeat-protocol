@@ -1,6 +1,6 @@
 {
   "name": "aimeat",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "AIME AT — AI Memory Exchange and Action Transfer — reference implementation",
   "type": "module",
   "main": "dist/src/index.js",
@@ -12,7 +12,9 @@
   },
   "files": [
     "dist/",
-    "prisma/"
+    "prisma/",
+    "docs/AIMEAT_Help_Prompt.md",
+    "docs/csm-examples/"
   ],
   "scripts": {
     "dev": "tsx scripts/kill-port.ts && node --env-file=.env --import tsx src/index.ts start",
