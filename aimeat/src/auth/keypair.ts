@@ -1,12 +1,4 @@
 import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-
-// noble/ed25519 v2+ requires setting the sha512 sync function
-(ed.etc as any).sha512Sync = (...m: Uint8Array[]) => {
-  const hash = createHash('sha512');
-  for (const chunk of m) hash.update(chunk);
-  return new Uint8Array(hash.digest());
-};
 
 export interface KeyPair {
   publicKey: string;   // base64
