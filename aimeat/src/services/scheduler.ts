@@ -1,7 +1,7 @@
 /**
  * @file scheduler.ts
  * @description Internal Scheduler System for AIMEAT — centralized cron-based job scheduler.
- *   Both core services and V8 sandbox extensions register jobs here.
+ *   Both core services and sandboxed extensions register jobs here.
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history

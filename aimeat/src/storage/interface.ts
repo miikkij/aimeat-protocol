@@ -756,7 +756,7 @@ export interface SiteChangeLogEntry {
   changedAt: string;
 }
 
-// ── Node Extensions (V8 Isolates) ──────────────────────────────────
+// ── Node Extensions (Sandboxed) ────────────────────────────────────
 
 export interface ExtensionRecord {
   name: string;                        // Unique name: "marketplace-behaviors"

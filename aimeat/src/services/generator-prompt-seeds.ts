@@ -33,7 +33,7 @@ Available building blocks:
 - Translation: Per-locale i18n strings.
 - Cortex: Client-side JS domain library (IIFE on AIMEAT namespace). Wraps extension APIs and memory reads into clean domain methods for apps.
 
-Extensions run in an ISOLATED V8 sandbox with ONLY this API (no Node.js, no global fetch, no setTimeout, no require, no import):
+Extensions run in an ISOLATED WASM sandbox with ONLY this API (no Node.js, no global fetch, no setTimeout, no require, no import):
   ctx.memory.get(key) → value or null (ALWAYS null-check before using: \`|| []\` or \`|| {}\`)
   ctx.memory.set(key, value) → void
   ctx.memory.search(prefix) → Array<{ key, value }> (NOT plain strings!)
@@ -88,12 +88,12 @@ AIMEAT Data Standards (MUST follow in ALL components):
   {
     id: 'gen-sandbox-constraints',
     group: 'generator',
-    name: 'V8 Sandbox Constraints',
+    name: 'Sandbox Constraints',
     description: 'EXACT sandbox rules from generator-prompts-base.js SANDBOX_CONSTRAINTS constant.',
-    content: `## V8 Sandbox Environment
+    content: `## Sandbox Environment
 
 ╔══════════════════════════════════════════════════════════════════════════╗
-║  This is a BARE V8 JavaScript engine — NOT Node.js, NOT a browser.     ║
+║  This is a BARE QuickJS engine — NOT Node.js, NOT a browser.           ║
 ║  Only ECMAScript built-in objects and the ctx API exist.                ║
 ║  The ONLY way to interact with the outside world is through ctx.       ║
 ╚══════════════════════════════════════════════════════════════════════════╝
@@ -218,7 +218,7 @@ Do NOT copy translations or settings — cortex reads those from the owner names
 
 ╔════════════════════════════════════════════════════════════════════╗
 ║  Your code MUST use real operators, NOT HTML entities.             ║
-║  The V8 sandbox executes raw JS — HTML entities are syntax errors. ║
+║  The sandbox executes raw JS — HTML entities are syntax errors.    ║
 ╚════════════════════════════════════════════════════════════════════╝
 
 WRONG (crashes):  const gt = a =&gt; a &gt; 0 &amp;&amp; b;
@@ -843,7 +843,7 @@ CORRECT (for objects):
   await ctx.memory.set("items.2026-03-14", { entries: [...], count: 5 });
 
 ### ctx.memory.search(prefix) returns objects, NOT strings — returns ALL matching keys (no pagination)
-WARNING: search() loads ALL matching keys into memory at once. If your prefix matches thousands of keys, the V8 sandbox may run out of memory. Use specific prefixes (e.g., "items.by-date.2026-03-14" not "items.")
+WARNING: search() loads ALL matching keys into memory at once. If your prefix matches thousands of keys, the sandbox may run out of memory. Use specific prefixes (e.g., "items.by-date.2026-03-14" not "items.")
 
 WRONG:
   const keys = await ctx.memory.search("prefix.");
@@ -1051,7 +1051,7 @@ Translations and settings live in the OWNER namespace — the cortex reads them 
 - Action IDs MUST be camelCase: \\\`getItems\\\`, NOT \\\`get-items\\\`. The ID appears in URLs and YAML — camelCase is the standard.
 - All helper functions must be defined INSIDE the same script file — no imports, no cross-file references
 - If two actions need the same helper (e.g., date parsing, data normalization), DUPLICATE the helper in BOTH script files — copy it exactly, do NOT refactor into a shared module
-- NEVER reference functions from another action's script — each script runs in its own ISOLATED V8 sandbox scope
+- NEVER reference functions from another action's script — each script runs in its own ISOLATED sandbox scope
 - When duplicating helpers across actions, keep them IDENTICAL — if you fix a bug in one copy, fix it in all copies
 - NEVER call JSON.parse() on ctx.memory.get() results — they are already parsed JS values
 - Always check for undefined/null before using memory values — on first run, NOTHING exists yet

@@ -414,10 +414,10 @@ function generateEnvContent(settings: Record<string, string>): string {
       ],
     },
     {
-      title: 'Node Extensions (V8 Isolates)',
+      title: 'Node Extensions (Sandboxed)',
       vars: [
-        { key: 'AIMEAT_EXTENSIONS_ENABLED', comment: 'Enable V8 isolate extension system' },
-        { key: 'AIMEAT_EXT_MAX_MEMORY_MB', comment: 'Max memory per extension isolate (MB)' },
+        { key: 'AIMEAT_EXTENSIONS_ENABLED', comment: 'Enable sandboxed extension system' },
+        { key: 'AIMEAT_EXT_MAX_MEMORY_MB', comment: 'Max memory per extension sandbox (MB)' },
         { key: 'AIMEAT_EXT_TIMEOUT_MS', comment: 'Extension execution timeout (ms)' },
       ],
     },

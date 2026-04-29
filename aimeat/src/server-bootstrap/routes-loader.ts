@@ -297,7 +297,7 @@ export function mountRoutes(
   app.use(libsRouter(config, storage));
   app.use(appsRouter(config, storage, peers));
   app.use(appStoreRouter(config, storage));
-  // Node Extensions (V8 Isolates)
+  // Node Extensions (Sandboxed)
   if (config.extensionsEnabled) {
     app.use(extensionsRouter(config, storage, scheduler, emailService));
     logger.info('Extension system enabled');

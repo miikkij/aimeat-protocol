@@ -268,7 +268,7 @@ export interface AimeatConfig {
   metricsEnabled: boolean;
   metricsAccess: 'public' | 'authenticated' | 'operator';
 
-  // Node Extensions (V8 Isolates)
+  // Node Extensions (Sandboxed)
   extensionsEnabled: boolean;
   extensionMaxMemoryMb: number;
   extensionTimeoutMs: number;
@@ -572,7 +572,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     defaultAgentScopes: (process.env.AIMEAT_DEFAULT_AGENT_SCOPES ?? 'memory:read,memory:write,memory:delete,catalogue:read').split(',').map(s => s.trim()),
     maxAgentScopes: (process.env.AIMEAT_MAX_AGENT_SCOPES ?? '*').split(',').map(s => s.trim()),
 
-    // Node Extensions (V8 Isolates)
+    // Node Extensions (Sandboxed)
     extensionsEnabled: process.env.AIMEAT_EXTENSIONS_ENABLED !== 'false',
     extensionMaxMemoryMb: parseInt(process.env.AIMEAT_EXT_MAX_MEMORY_MB ?? '64', 10),
     extensionTimeoutMs: parseInt(process.env.AIMEAT_EXT_TIMEOUT_MS ?? '5000', 10),

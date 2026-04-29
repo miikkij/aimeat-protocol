@@ -199,25 +199,25 @@ export function validateAntiPatterns(type: string, code: string): AntiPatternRes
     if (/=\s*(await\s+)?ctx\.memory\.get\s*\([^)]+\)\s*;[\s\S]{0,100}JSON\.parse\s*\(\s*\w+\s*\)/m.test(code)) {
       warnings.push('Suspicious: variable from ctx.memory.get() passed to JSON.parse() — memory values are already parsed.');
     }
-    // require() — not available in V8 sandbox
+    // require() — not available in sandbox
     if (/\brequire\s*\(/m.test(code)) {
-      errors.push('CRASH: require() is not available in the V8 sandbox. All code must be self-contained.');
+      errors.push('CRASH: require() is not available in the sandbox. All code must be self-contained.');
     }
     // import ... from (but allow export default)
     if (/\bimport\s+.+\s+from\s+/m.test(code)) {
-      errors.push('CRASH: import...from is not available in the V8 sandbox. Only "export default" is allowed.');
+      errors.push('CRASH: import...from is not available in the sandbox. Only "export default" is allowed.');
     }
     // global fetch() without ctx prefix
     if (/(?<!ctx\.)fetch\s*\(/m.test(code) && !/function\s+fetch/m.test(code)) {
-      warnings.push('Suspicious: fetch() called without ctx prefix — use ctx.fetch() in the V8 sandbox. Global fetch is not available.');
+      warnings.push('Suspicious: fetch() called without ctx prefix — use ctx.fetch() in the sandbox. Global fetch is not available.');
     }
     // console.log — not available
     if (/\bconsole\.(log|warn|error|info)\s*\(/m.test(code)) {
-      warnings.push('console.log is not available in the V8 sandbox. Use ctx.log.info/warn/error() instead.');
+      warnings.push('console.log is not available in the sandbox. Use ctx.log.info/warn/error() instead.');
     }
     // setTimeout/setInterval — not available
     if (/\b(setTimeout|setInterval|setImmediate)\s*\(/m.test(code)) {
-      errors.push('CRASH: setTimeout/setInterval/setImmediate are not available in the V8 sandbox.');
+      errors.push('CRASH: setTimeout/setInterval/setImmediate are not available in the sandbox.');
     }
   }
 
@@ -240,7 +240,7 @@ export function validateAntiPatterns(type: string, code: string): AntiPatternRes
       return /[=(){}[\];]/.test(line);
     });
     if (entityLines.length > 0) {
-      errors.push(`HTML entities found in code (${entityLines.length} lines) — use => not =&gt;, && not &amp;&amp;, etc. This crashes the V8 sandbox.`);
+      errors.push(`HTML entities found in code (${entityLines.length} lines) — use => not =&gt;, && not &amp;&amp;, etc. This crashes the sandbox.`);
     }
   }
 

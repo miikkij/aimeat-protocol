@@ -1009,7 +1009,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         },
       };
 
-      // Execute the action in the V8 isolate sandbox
+      // Execute the action in the sandbox
       // Use the higher of stored vs config limits so admin can raise limits without reinstalling
       const limits = {
         memoryMb: Math.max(ext.limits.memoryMb, config.extensionMaxMemoryMb),
@@ -1234,7 +1234,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         },
       };
 
-      // Execute the action in the V8 isolate sandbox
+      // Execute the action in the sandbox
       // Use the higher of stored vs config limits so admin can raise limits without reinstalling
       const limits = {
         memoryMb: Math.max(ext.limits.memoryMb, config.extensionMaxMemoryMb),

@@ -212,7 +212,7 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
         },
         {
           envVar: 'AIMEAT_EXTENSIONS_ENABLED',
-          description: 'Enable V8 isolate extension system',
+          description: 'Enable sandboxed extension system',
           value: config.extensionsEnabled ? 'true' : 'false',
           defaultVal: 'true',
         },
@@ -1005,11 +1005,11 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
       ],
     },
     {
-      title: 'Node Extensions (V8 Isolates)',
+      title: 'Node Extensions (Sandboxed)',
       entries: [
         {
           envVar: 'AIMEAT_EXTENSIONS_ENABLED',
-          description: 'Enable V8 isolate extension system',
+          description: 'Enable sandboxed extension system',
           value: config.extensionsEnabled ? 'true' : 'false',
           defaultVal: 'true',
         },
