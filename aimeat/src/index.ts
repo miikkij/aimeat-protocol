@@ -46,6 +46,7 @@ USAGE
   aimeat maintenance on [MSG]    Enable maintenance mode (optional message)
   aimeat maintenance off         Disable maintenance mode
   aimeat maintenance             Show maintenance status
+  aimeat seed                    Seed example packages (digital signage, etc.)
   aimeat backup  [FILE]          Export all data to JSON
   aimeat restore <FILE>          Import data from JSON backup
 
@@ -321,6 +322,39 @@ if (subcommand === 'config') {
       server.close();
     }
   });
+} else if (subcommand === 'seed') {
+  const baseUrl = `http://localhost:${config.port}`;
+  const adminPw = config.adminPassword ?? '';
+  console.log('\n=== AIMEAT Example Package Seeder ===\n');
+  console.log(`  Server: ${baseUrl}`);
+  try {
+    const probe = await fetch(`${baseUrl}/v1/health`);
+    if (!probe.ok) throw new Error(`HTTP ${probe.status}`);
+  } catch {
+    console.error(`\n  Server not reachable at ${baseUrl}`);
+    console.error('  Start the server first: aimeat start\n');
+    process.exit(1);
+  }
+  if (!adminPw) {
+    console.error('\n  AIMEAT_ADMIN_PASSWORD not found in .env or environment.\n');
+    process.exit(1);
+  }
+  console.log('  Seeding example packages via admin API...\n');
+  const seedResp = await fetch(`${baseUrl}/v1/admin/seed-examples`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPw },
+  });
+  const seedData = await seedResp.json() as { ok: boolean; data?: { seeded?: Array<{ name: string; templateId: string; packageGroupId: string }> }; error?: { message?: string } };
+  if (!seedData.ok) {
+    console.error(`  Failed: ${seedData.error?.message ?? JSON.stringify(seedData)}`);
+    process.exit(1);
+  }
+  for (const pkg of seedData.data?.seeded ?? []) {
+    const status = pkg.templateId === '(already exists)' ? 'already exists' : 'created';
+    console.log(`  ${status === 'created' ? '+' : '='} ${pkg.name} (${status})`);
+  }
+  console.log('\n  Done!\n');
+  process.exit(0);
 } else if (subcommand === 'start' || subcommand === 'serve') {
   // Start the server
   // Auto-generate admin password if not set
