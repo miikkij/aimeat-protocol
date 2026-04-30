@@ -88,6 +88,38 @@ await test('GET / bootstrap', async () => {
     const { body } = await json('/');
     assert(body.ok === true, 'ok');
     assert(body.protocol === 'aimeat', `protocol: ${body.protocol}`);
+
+    const d = body.data;
+    assert(d.for_ai_assistants, 'missing for_ai_assistants');
+    assert(d.for_ai_assistants.context, 'missing for_ai_assistants.context');
+    assert(d.for_ai_assistants.paths, 'missing for_ai_assistants.paths');
+    assert(d.for_ai_assistants.paths.build_an_app, 'missing build_an_app path');
+    assert(d.for_ai_assistants.paths.explore, 'missing explore path');
+    assert(d.for_ai_assistants.paths.register_and_start, 'missing register_and_start path');
+
+    assert(d.for_ai_agents, 'missing for_ai_agents');
+    assert(d.for_ai_agents.context, 'missing for_ai_agents.context');
+    assert(d.for_ai_agents.first_step, 'missing for_ai_agents.first_step');
+    assert(d.for_ai_agents.connection_flow, 'missing for_ai_agents.connection_flow');
+    assert(d.for_ai_agents.after_connection, 'missing for_ai_agents.after_connection');
+    assert(d.for_ai_agents.after_connection.paths.collaborate_with_agents, 'missing collaborate_with_agents path');
+
+    assert(d.getting_started, 'missing getting_started (backward compat)');
+    assert(d.core_system, 'missing core_system');
+    assert(d.this_node, 'missing this_node');
+});
+
+await test('GET /llms.txt — contains builder guide', async () => {
+    const res = await fetch(`${BASE}/llms.txt`);
+    assert(res.status === 200, `status ${res.status}`);
+    const text = await res.text();
+    assert(text.includes('## What is AIMEAT'), 'missing "What is AIMEAT" section');
+    assert(text.includes('## What You Can Build'), 'missing "What You Can Build" section');
+    assert(text.includes('## Two Ways to Start'), 'missing "Two Ways to Start" section');
+    assert(text.includes('## Core Capabilities'), 'missing "Core Capabilities" section');
+    assert(text.includes('## Core Concepts'), 'missing existing "Core Concepts" section');
+    assert(text.includes('POST'), 'missing request examples');
+    assert(text.includes('/v1/memory'), 'missing memory endpoint');
 });
 
 await test('GET /.well-known/aimeat', async () => {
