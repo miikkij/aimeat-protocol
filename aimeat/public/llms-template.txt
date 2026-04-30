@@ -221,12 +221,26 @@ entry: index.html
       if (session) startApp(session);
     }
 
-    function startApp(session) {
-      // session.fetch(url, opts) makes authenticated API calls
-      // session.fetch returns ALREADY-PARSED JSON, not Response
-      // All API paths must be relative (start with /)
+    async function startApp(session) {
+      // Use AIMEAT.data for memory operations (preferred over session.fetch):
+      // AIMEAT.data.set(key, value, opts) — write a memory entry
+      // AIMEAT.data.get(key) — read value (returns null if not found)
+      // AIMEAT.data.delete(key) — delete entry
+      // AIMEAT.data.search(query) — search across keys and values
+      // AIMEAT.data.list() — list all keys
+      // AIMEAT.data.getPublic(gaii, key) — read another user's public data
+
+      // Example: load saved data or initialize
+      let notes = await AIMEAT.data.get('my-app.notes') || [];
       const app = document.getElementById('app');
       app.innerHTML = '<h2>Welcome!</h2>';
+
+      // Save data
+      // await AIMEAT.data.set('my-app.notes', notes, { visibility: 'private' });
+
+      // For lower-level calls: session.fetch(url, opts)
+      // Returns ALREADY-PARSED JSON, not Response. Do NOT call .json() on it.
+      // All API paths must be relative (start with /)
     }
 
     boot();
@@ -262,20 +276,36 @@ async function boot() {
   if (session) startApp(session);
 }
 
-function startApp(session) {
-  const rt = new AimeatRealtime({
-    url: location.origin,
-    token: session.jwt,
-    room: 'my-room-name',
+async function startApp(session) {
+  // Constructor takes positional args: (baseUrl, token)
+  const rt = new AimeatRealtime(location.origin, session.jwt);
+
+  // Create or find a room
+  let rooms = await rt.listRooms({ app_type: 'my-app' });
+  let room;
+  if (rooms.length > 0) {
+    room = rooms[0];
+  } else {
+    room = await rt.createRoom({ app_type: 'my-app', name: 'My Room', is_public: true });
+  }
+
+  // Connect to the room (roomId, nickname)
+  rt.connect(room.id, session.owner || 'anonymous');
+
+  // 'joined' fires when you enter the room, gives your peerId + existing peers
+  rt.on('joined', (msg) => {
+    console.log('My peerId:', msg.peerId);
+    console.log('Peers already in room:', msg.peers);
   });
 
-  rt.on('open', () => console.log('Connected to room'));
+  // 'broadcast' fires when any peer sends data, payload is in msg.payload
   rt.on('broadcast', (msg) => {
-    // msg.from = sender identity, msg.data = payload
-    handleMessage(msg);
+    // msg.from = sender peerId, msg.payload = the data
+    handleMessage(msg.payload);
   });
-  rt.on('peer-joined', (peer) => console.log('Peer joined:', peer));
-  rt.on('peer-left', (peer) => console.log('Peer left:', peer));
+
+  rt.on('peer-joined', (msg) => console.log('Peer joined:', msg.nick, msg.peerId));
+  rt.on('peer-left', (msg) => console.log('Peer left:', msg.peerId));
 
   // Send data to all peers in the room
   rt.broadcast({ type: 'chat', text: 'Hello!' });
@@ -308,7 +338,8 @@ function startApp(session) {
   // Upload a file (from canvas, input, or drag & drop)
   async function uploadFile(file) {
     const result = await AIMEAT.storage.upload(file);
-    // result.data.id = file ID, result.data.url = public URL
+    // result.id = file ID, result.key = filename
+    // Optional: upload(file, { key: 'my-name', visibility: 'public' })
     return result;
   }
 
