@@ -25,6 +25,7 @@ const LIBRARIES = [
   ['aimeat-auth', '/v1/libs/aimeat-auth.js', '—', 'Identity, registration, login, JWT, session management'],
   ['aimeat-data', '/v1/libs/aimeat-data.js', 'aimeat-auth', 'Memory key-value storage, search, micro-memory'],
   ['aimeat-storage', '/v1/libs/aimeat-storage.js', 'aimeat-auth', 'Binary file upload/download, drag & drop'],
+  ['AimeatRealtime', '/lib/realtime.js', 'aimeat-auth', 'WebSocket P2P rooms, WebRTC data channels, Yjs CRDT'],
   ['aimeat-social', '/v1/libs/aimeat-social.js', 'aimeat-auth', 'Boards, posts, reactions, replies'],
   ['aimeat-wallet', '/v1/libs/aimeat-wallet.js', 'aimeat-auth', 'Balance, transactions, morsel economy'],
   ['aimeat-work', '/v1/libs/aimeat-work.js', 'aimeat-auth', 'Action catalogue, work requests, deliveries'],
@@ -117,25 +118,171 @@ const EXAMPLE_PROMPTS = [
 /* ── Markdown generator ──────────────────────── */
 
 function generateMarkdown(nodeUrl) {
-  let md = `# AIMEAT App Builder\n\n`;
-  md += `You are an AIMEAT app builder. Your job is to help the user create a self-contained HTML application that connects to an AIMEAT node.\n\n`;
-  md += `## Your Process\n\n`;
-  md += `1. Ask the user what they want to build (free-form description)\n`;
-  md += `2. Ask what data/features the app needs (memory, files, boards, wallet, etc.)\n`;
-  md += `3. Ask about the look & feel (or offer sensible defaults)\n`;
-  md += `4. Build a single HTML+CSS+JS file that works\n\n`;
-  md += `Keep the interview light — 3-4 questions max. If the user already described everything clearly, skip straight to building.\n\n`;
-  md += `## Node Details\n\n`;
-  md += `- **Node URL:** \`${nodeUrl}\`\n- **Protocol Version:** 1.2\n- **Generated:** ${new Date().toISOString().split('T')[0]}\n\n---\n\n`;
+  const S = '`';  // backtick helper
+  const SS = '```'; // triple backtick helper
+  let md = '';
 
-  md += `## Available Client Libraries\n\nLoad via \`<script>\` tags — served from the node, zero CORS issues.\n\n`;
-  md += `| Library | URL | Depends On | Purpose |\n|---------|-----|-----------|--------|\n`;
-  for (const [name, url, dep, desc] of LIBRARIES) {
-    md += `| **${name}** | \`${nodeUrl}${url}\` | ${dep} | ${desc} |\n`;
-  }
+  // ── Header ──
+  md += `# AIMEAT App Builder\n\n`;
+  md += `You are helping a human user build a single-file HTML app on an AIMEAT node.\n`;
+  md += `Ask what they want to build, then produce the HTML using the starter template and SDK libraries below.\n`;
+  md += `Do not ask about deployment, cortex, extensions, CSM, or architecture.\n\n`;
+  md += `- **Node URL:** ${S}${nodeUrl}${S}\n`;
+  md += `- **Generated:** ${new Date().toISOString().split('T')[0]}\n\n`;
 
-  md += `\n## Quick Start Template\n\n\`\`\`html\n<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>My AIMEAT App</title>\n  <script src="${nodeUrl}/v1/libs/aimeat-auth.js"><` + `/script>\n</head>\n<body>\n  <h1>My App</h1>\n  <div id="login"></div>\n  <div id="content" style="display:none"></div>\n  <script>\n    AIMEAT.auth.mountLoginButton('#login', {\n      onLogin: function(session) {\n        document.getElementById('content').style.display = 'block';\n        startApp(session);\n      },\n      onLogout: function() {\n        document.getElementById('content').style.display = 'none';\n      }\n    });\n    async function startApp(session) {\n      var data = await session.fetch('/v1/memory');\n      console.log('My memories:', data);\n    }\n  <` + `/script>\n</body>\n</html>\n\`\`\`\n\n`;
+  // ── Starter Template ──
+  md += `## Starter Template (use for every app)\n\n`;
+  md += `${SS}html\n`;
+  md += `<!-- AIMEAT App Manifest\nname: my-app\nversion: 1.0.0\ndescription: What this app does\nentry: index.html\n-->\n`;
+  md += `<!DOCTYPE html>\n<html lang="en">\n<head>\n`;
+  md += `  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n`;
+  md += `  <title>App Name</title>\n`;
+  md += `  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" />\n`;
+  md += `  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"><` + `/script>\n`;
+  md += `</head>\n<body class="bg-base-100 min-h-screen flex flex-col">\n`;
+  md += `  <nav class="navbar bg-base-200 shadow-sm px-4">\n`;
+  md += `    <div class="flex-1"><span class="text-lg font-bold">App Name</span></div>\n`;
+  md += `    <div class="flex-none"><span id="header-auth"></span></div>\n`;
+  md += `  </nav>\n  <div id="app" class="flex-1 p-4">Loading...</div>\n  <script>\n`;
+  md += `    function loadScript(src) {\n`;
+  md += `      return new Promise((resolve, reject) => {\n`;
+  md += `        const s = document.createElement('script');\n`;
+  md += `        s.src = src; s.onload = resolve; s.onerror = reject;\n`;
+  md += `        document.head.appendChild(s);\n      });\n    }\n`;
+  md += `    async function boot() {\n`;
+  md += `      await loadScript('/v1/libs/aimeat-auth.js');\n`;
+  md += `      await loadScript('/v1/libs/aimeat-data.js');\n`;
+  md += `      // Add more as needed:\n`;
+  md += `      // await loadScript('/v1/libs/aimeat-storage.js');  // file uploads\n`;
+  md += `      // await loadScript('/lib/realtime.js');             // multiplayer P2P\n\n`;
+  md += `      AIMEAT.auth.mountLoginButton('#header-auth', {\n`;
+  md += `        onLogin: (session) => startApp(session),\n`;
+  md += `        onLogout: () => location.reload(),\n      });\n`;
+  md += `      const session = await AIMEAT.auth.login();\n`;
+  md += `      if (session) startApp(session);\n    }\n`;
+  md += `    async function startApp(session) {\n`;
+  md += `      // YOUR APP CODE HERE\n`;
+  md += `      document.getElementById('app').innerHTML = '<h2>Hello!</h2>';\n    }\n`;
+  md += `    boot();\n  <` + `/script>\n</body>\n</html>\n`;
+  md += `${SS}\n\n`;
 
+  // ── SDK Libraries ──
+  md += `## SDK Libraries\n\nLoad via ${S}loadScript()${S} in boot(). All paths are relative (start with /).\n\n`;
+  md += `| Library | Load with | Use for |\n|---------|-----------|--------|\n`;
+  md += `| aimeat-auth | Always loaded | Login bar, session |\n`;
+  md += `| aimeat-data | Always loaded | ${S}AIMEAT.data.get/set/search/list/delete${S} |\n`;
+  md += `| aimeat-storage | ${S}loadScript('/v1/libs/aimeat-storage.js')${S} | ${S}AIMEAT.storage.upload/download/list${S} |\n`;
+  md += `| AimeatRealtime | ${S}loadScript('/lib/realtime.js')${S} | P2P rooms, multiplayer, chat |\n`;
+  md += `| aimeat-social | ${S}loadScript('/v1/libs/aimeat-social.js')${S} | Discussion boards |\n`;
+  md += `| aimeat-wallet | ${S}loadScript('/v1/libs/aimeat-wallet.js')${S} | Morsel balance display |\n`;
+  md += `| aimeat-work | ${S}loadScript('/v1/libs/aimeat-work.js')${S} | Actions, work queue |\n\n`;
+
+  // ── SDK API Reference ──
+  md += `## SDK API Reference\n\n`;
+
+  md += `### AIMEAT.data (Memory)\n${SS}javascript\n`;
+  md += `await AIMEAT.data.set(key, value, { visibility: 'private' }) // write\n`;
+  md += `await AIMEAT.data.get(key)               // read value (null if not found)\n`;
+  md += `await AIMEAT.data.getEntry(key)          // read full entry with metadata\n`;
+  md += `await AIMEAT.data.update(key, value, version) // optimistic locking update\n`;
+  md += `await AIMEAT.data.delete(key)            // delete\n`;
+  md += `await AIMEAT.data.list()                 // list all keys\n`;
+  md += `await AIMEAT.data.search(query)          // full-text search\n`;
+  md += `await AIMEAT.data.getPublic(gaii, key)   // read another user's public data\n`;
+  md += `${SS}\n\n`;
+
+  md += `### AIMEAT.storage (Files)\n${SS}javascript\n`;
+  md += `await AIMEAT.storage.upload(file)        // upload File or Blob\n`;
+  md += `await AIMEAT.storage.upload(base64, { key, mime_type }) // upload base64\n`;
+  md += `await AIMEAT.storage.download(key)       // download as Blob\n`;
+  md += `await AIMEAT.storage.list()              // list all files\n`;
+  md += `await AIMEAT.storage.delete(key)         // delete file\n`;
+  md += `await AIMEAT.storage.meta(key)           // HEAD request for metadata\n`;
+  md += `await AIMEAT.storage.dropZone(el, { onUpload }) // drag & drop helper\n`;
+  md += `${SS}\n\n`;
+
+  md += `**Storage auth gotcha:** ALL /v1/storage endpoints require authentication.\n`;
+  md += `${S}<img src="/v1/storage/key">${S} will return 401. To display images:\n`;
+  md += `${SS}javascript\n`;
+  md += `async function loadImage(key) {\n`;
+  md += `  const res = await fetch('/v1/storage/' + encodeURIComponent(key), {\n`;
+  md += `    headers: { 'Authorization': 'Bearer ' + session.jwt },\n  });\n`;
+  md += `  const blob = await res.blob();\n`;
+  md += `  return URL.createObjectURL(blob); // use as img.src\n}\n`;
+  md += `${SS}\n\n`;
+
+  md += `### AimeatRealtime (P2P / Multiplayer)\n${SS}javascript\n`;
+  md += `const rt = new AimeatRealtime(location.origin, session.jwt); // positional args\n\n`;
+  md += `const room = await rt.createRoom({\n  app_type: 'my-app', name: 'Room', is_public: true,\n});\n\n`;
+  md += `// Register handlers BEFORE connect()\n`;
+  md += `rt.on('joined', (msg) => { /* msg.peerId, msg.peers */ });\n`;
+  md += `rt.on('broadcast', (msg) => { /* msg.from, msg.payload */ });\n`;
+  md += `rt.on('peer-joined', (msg) => { /* msg.nick, msg.peerId */ });\n`;
+  md += `rt.on('peer-left', (msg) => { /* msg.peerId */ });\n`;
+  md += `rt.on('close', (msg) => { /* msg.code, msg.reason */ });\n\n`;
+  md += `rt.connect(room.id, 'nickname');\n`;
+  md += `rt.broadcast({ type: 'chat', text: 'Hello' });\n`;
+  md += `${SS}\n\n`;
+
+  md += `**Realtime throttling (critical):** Do NOT call ${S}rt.broadcast()${S} on every\n`;
+  md += `pointermove/mousemove. The WebSocket will be rate-limited and silently closed.\n`;
+  md += `Batch events into ~30ms intervals:\n`;
+  md += `${SS}javascript\nconst FLUSH_MS = 30;\nlet pending = [], flushTimer = null;\n`;
+  md += `function queueBroadcast(data) {\n  pending.push(data);\n  if (!flushTimer) {\n`;
+  md += `    flushTimer = setTimeout(() => {\n      if (pending.length) rt.broadcast({ type: 'batch', items: pending });\n`;
+  md += `      pending = []; flushTimer = null;\n    }, FLUSH_MS);\n  }\n}\n${SS}\n\n`;
+
+  md += `**Auto-reconnect on close:**\n${SS}javascript\n`;
+  md += `let reconnectDelay = 500;\nrt.on('close', (msg) => {\n`;
+  md += `  if (leftIntentionally) return;\n  setTimeout(() => {\n`;
+  md += `    rt.connect(room.id, nickname);\n    reconnectDelay = Math.min(reconnectDelay * 2, 8000);\n`;
+  md += `  }, reconnectDelay);\n});\nrt.on('joined', () => { reconnectDelay = 500; });\n${SS}\n\n`;
+
+  md += `### AIMEAT.social (Boards)\n${SS}javascript\n`;
+  md += `await AIMEAT.social.createBoard({ name, visibility, description })\n`;
+  md += `await AIMEAT.social.listBoards()\n`;
+  md += `await AIMEAT.social.post(boardId, { content })\n`;
+  md += `await AIMEAT.social.listPosts(boardId)\n`;
+  md += `await AIMEAT.social.react(boardId, postId, emoji)  // endpoint: /react\n`;
+  md += `await AIMEAT.social.reply(boardId, postId, { content })\n`;
+  md += `await AIMEAT.social.subscribe(boardId)\n`;
+  md += `${SS}\n\n`;
+
+  md += `### AIMEAT.wallet\n${SS}javascript\n`;
+  md += `await AIMEAT.wallet.balance()       // { balance, in_escrow, available }\n`;
+  md += `await AIMEAT.wallet.transactions()  // list transactions\n`;
+  md += `${SS}\n\n`;
+
+  md += `### AIMEAT.auth\n${SS}javascript\n`;
+  md += `AIMEAT.auth.mountLoginButton('#el', { onLogin, onLogout }) // login bar\n`;
+  md += `await AIMEAT.auth.login()           // restore session (null if not logged in)\n`;
+  md += `await AIMEAT.auth.register(name, pw) // register new account\n`;
+  md += `await AIMEAT.auth.loginWithPassword(name, pw)\n`;
+  md += `AIMEAT.auth.logout()\n`;
+  md += `AIMEAT.auth.getSession()            // current session (sync)\n`;
+  md += `// session.fetch(path, opts) returns parsed JSON, NOT Response\n`;
+  md += `// session.jwt, session.owner, session.ghii\n`;
+  md += `${SS}\n\n`;
+
+  // ── Data Layer Guide ──
+  md += `## Choosing the Right Data Layer\n\n`;
+  md += `Most apps only need **Memory + Storage**:\n`;
+  md += `- **Memory** (${S}AIMEAT.data${S}): Any JSON data. Visibility: private/owner/public.\n`;
+  md += `- **Storage** (${S}AIMEAT.storage${S}): Files (images, audio, video). Requires auth even for public files.\n\n`;
+  md += `Use **Boards** only for discussion/notification features (threaded posts with replies and reactions).\n`;
+  md += `Do NOT use Boards for general data sharing. Memory + Storage is simpler and more flexible.\n\n`;
+
+  // ── Key Rules ──
+  md += `## Key Rules\n\n`;
+  md += `- ${S}session.fetch()${S} returns already-parsed JSON. Do NOT call ${S}.json()${S} on it.\n`;
+  md += `- All API paths must be relative (start with ${S}/${S}), never absolute URLs.\n`;
+  md += `- Do NOT add manual token entry or API URL fields. Auth lib handles everything.\n`;
+  md += `- Storage images: fetch with auth, convert to blob, use ${S}URL.createObjectURL()${S} as src.\n`;
+  md += `- Realtime: register ${S}rt.on()${S} handlers BEFORE ${S}rt.connect()${S}.\n`;
+  md += `- Realtime: throttle high-frequency events to ~30ms batches.\n`;
+  md += `- ${S}AimeatRealtime${S} constructor takes positional args: ${S}(baseUrl, token)${S}, NOT an options object.\n\n`;
+
+  // ── REST API Endpoints ──
   md += `## REST API Endpoints\n\n`;
   for (const sec of API_SECTIONS) {
     md += `### ${sec.title}\n\n| Method | Path | Auth | Description |\n|--------|------|------|-------------|\n`;
@@ -143,35 +290,48 @@ function generateMarkdown(nodeUrl) {
     md += '\n';
   }
 
-  md += `## Key Concepts\n\n`;
-  md += `- **Owner** — A registered human or organization with a master key pair\n`;
-  md += `- **Agent** — An AI identity under an owner with its own key pair and memory\n`;
-  md += `- **GAII** — Global Agent Instance Identifier: \`agent-name#owner@node-id\`\n`;
-  md += `- **Morsels** — Simple tokens that flow between agents when they help each other\n`;
-  md += `- **Visibility** — private (only you), shared (your agents), public (everyone)\n\n`;
+  // ── Request/Response Examples ──
+  md += `## API Request/Response Examples\n\n`;
 
-  md += `## Design Guidelines\n\n`;
-  md += `\`\`\`css\n:root {\n  --bg: #0f0a14;\n  --card: rgba(30, 20, 40, 0.85);\n  --text: #f0e6f6;\n  --muted: #c4a6d0;\n  --accent: #E8564A;\n  --border: rgba(232, 86, 74, 0.15);\n  --success: #22c55e;\n  --radius: 12px;\n}\nbody {\n  font-family: system-ui, -apple-system, sans-serif;\n  background: var(--bg);\n  color: var(--text);\n  margin: 0;\n  min-height: 100vh;\n}\n\`\`\`\n\n`;
+  md += `### Write Memory\n${SS}\nPOST /v1/memory\nAuthorization: Bearer <jwt>\nContent-Type: application/json\n\n`;
+  md += `{ "key": "my-app.notes", "value": { "items": ["note1"] }, "visibility": "private" }\n${SS}\n`;
+  md += `Response 201:\n${SS}json\n{ "ok": true, "data": { "key": "my-app.notes", "visibility": "private", "version": 1 } }\n${SS}\n\n`;
 
-  md += `## Self-Download Pattern\n\n\`\`\`javascript\nfunction downloadSelf() {\n  var html = document.documentElement.outerHTML;\n  var blob = new Blob(['<!DOCTYPE html>' + html], { type: 'text/html' });\n  var a = document.createElement('a');\n  a.href = URL.createObjectURL(blob);\n  a.download = 'my-app.html';\n  a.click();\n}\n\`\`\`\n\n`;
+  md += `### Read Memory\n${SS}\nGET /v1/memory/my-app.notes\nAuthorization: Bearer <jwt>\n${SS}\n`;
+  md += `Response 200:\n${SS}json\n{ "ok": true, "data": { "key": "my-app.notes", "value": { "items": ["note1"] }, "visibility": "private", "version": 1 } }\n${SS}\n\n`;
 
+  md += `### List Memory Keys\n${SS}\nGET /v1/memory\nAuthorization: Bearer <jwt>\n${SS}\n`;
+  md += `Response 200:\n${SS}json\n{ "ok": true, "data": { "keys": ["my-app.notes", "my-app.settings"] } }\n${SS}\n\n`;
+
+  md += `### Upload File\n${SS}\nPOST /v1/storage\nAuthorization: Bearer <jwt>\nContent-Type: application/json\n\n`;
+  md += `{ "key": "photo.png", "data": "<base64>", "mime_type": "image/png", "visibility": "private" }\n${SS}\n`;
+  md += `Response 201:\n${SS}json\n{ "ok": true, "data": { "key": "photo.png", "size": 1024 } }\n${SS}\n\n`;
+
+  md += `### List Files\n${SS}\nGET /v1/storage\nAuthorization: Bearer <jwt>\n${SS}\n`;
+  md += `Response 200:\n${SS}json\n{ "ok": true, "data": { "files": [{ "key": "photo.png", "size": 1024, "mime_type": "image/png" }] } }\n${SS}\n\n`;
+
+  md += `### Get Wallet Balance\n${SS}\nGET /v1/wallet\nAuthorization: Bearer <jwt>\n${SS}\n`;
+  md += `Response 200:\n${SS}json\n{ "ok": true, "data": { "balance": 100, "in_escrow": 0, "available": 100, "daily_allowance": { "amount": 50, "accumulation_cap": 500 }, "lifetime": { "welcome_bonus": 100 } } }\n${SS}\n\n`;
+
+  // ── Limitations ──
   md += `## Limitations\n\n| Resource | Limit |\n|----------|-------|\n`;
   for (const [r, l] of LIMITS) md += `| ${r} | ${l} |\n`;
 
+  // ── Example Prompts ──
   md += `\n## Example Prompts\n\n`;
   for (const [title, prompt] of EXAMPLE_PROMPTS) {
     md += `### ${title}\n> "${prompt}"\n\n`;
   }
 
+  // ── Output Requirements ──
   md += `## Output Requirements\n\n`;
   md += `Produce a SINGLE HTML file containing:\n`;
-  md += `- All CSS in a \`<style>\` tag\n`;
-  md += `- All JavaScript in \`<script>\` tags\n`;
-  md += `- The aimeat-auth library loaded via \`<script src="${nodeUrl}/v1/libs/aimeat-auth.js">\`\n`;
-  md += `- Additional libraries as needed\n`;
-  md += `- Login/logout UI via \`AIMEAT.auth.mountLoginButton()\`\n`;
+  md += `- DaisyUI + Tailwind for styling (CDN links in template)\n`;
+  md += `- The aimeat-auth library loaded via ${S}loadScript('/v1/libs/aimeat-auth.js')${S}\n`;
+  md += `- Login bar via ${S}AIMEAT.auth.mountLoginButton('#header-auth', { onLogin, onLogout })${S}\n`;
+  md += `- Additional libraries as needed via ${S}loadScript()${S}\n`;
+  md += `- All API paths relative (start with /)\n`;
   md += `- Responsive design (mobile-first)\n`;
-  md += `- The self-download button pattern\n`;
 
   return md;
 }
