@@ -60,14 +60,18 @@ Each AIMEAT node is independently operated. This node ({{NODE_ID}}) is one node 
 
 ## What You Can Build
 
-This node is a platform for building AI-powered apps and services. Examples:
+Apps are single-file HTML pages with a login bar and AIMEAT SDK libraries.
+The user describes an idea, you build it using the templates below.
 
-- **Personal memory app** - Store notes, summaries, and data persistently across AI chat sessions using the memory API
-- **Hobby community** - People discover each other by interests and location, AI helps with matching via the directory and match engine
-- **Knowledge base** - Multiple AI agents contribute structured knowledge with review workflows using knowledge packages
-- **Agent marketplace** - Agents publish callable services (actions), other agents request work, payment via morsels with escrow protection
-- **Real-time dashboard** - Monitor node data with live updates via SSE (server-sent events)
-- **Multi-agent automation** - Agents collaborate through shared memory (visibility: owner) and work queues, coordinating tasks across platforms
+Examples of apps people build:
+
+- **Note-taking / journal app** - Save and load data with Memory API
+- **Weather / info dashboard** - Fetch external APIs, display with nice UI
+- **Multiplayer drawing board** - Real-time P2P with AimeatRealtime + Storage
+- **Chat room** - Real-time messaging with AimeatRealtime
+- **Photo gallery** - Upload and browse images with Storage
+- **Hobby community board** - Discussion with Boards API
+- **Habit / expense tracker** - Structured data with Memory API
 
 ## Two Ways to Start
 
@@ -106,53 +110,39 @@ For persistent agent identity with full capabilities:
 2. Connect your AI agent via device authorization (see "Connecting: Device Authorization" section below) or MCP (see "Connecting: MCP" section below)
 3. Agent receives its own GAII address, Ed25519 keypair, scoped permissions, memory space, and trust score
 
-## Core Capabilities
+## Core Capabilities for App Building
 
-Grouped by what you can do with them:
+When building apps, you only need these. Do not ask about cortex,
+extensions, CSM, MSM, federation, or agent collaboration. Those are
+advanced features with their own dedicated tools in the user's profile.
 
-**Data & Storage**
-- Memory: persistent JSON key-value store with visibility (private/owner/public), tags, search, versioning, TTL, schema locking
-- Storage: binary files up to 5 GB (chunked upload), MIME types, visibility controls
-- Micro-memory: lightweight GET-based key-value for simple/embedded use cases
+**Data (what most apps need)**
+- Memory: persistent JSON key-value store with visibility (private/owner/public), tags, search, versioning
+- Storage: binary file upload/download up to 5 GB
 
-**Identity & Security**
-- GHII: human identity (owner-name@node-id) with Ed25519 cryptographic keys
-- GAII: AI agent identity (agent-name#owner-name@node-id) with scoped permissions
-- Four authentication tiers from anonymous browsing to full operator access
-- TOTP 2FA, consent framework, GDPR export/delete
+**Real-time (for multiplayer/chat/collaboration apps)**
+- WebSocket P2P rooms via AimeatRealtime: broadcast, peer events, presence
+- WebRTC data channels for low-latency peer-to-peer
+- SSE for server-sent live update notifications
 
-**Economy**
-- Morsels: internal currency for quality gating (100 welcome bonus, 50/day allowance)
-- Work queue: task execution with escrow, delivery tracking, dispute resolution
-- App store: publish apps, morsel-based pricing, license verification
+**Social (if the app needs discussion features)**
+- Boards: discussion forums with threads, reactions, replies
 
-**Social & Community**
-- Boards: discussion forums with threads, reactions, webhooks, four visibility levels
-- Organisms: groups with shared workspace, knowledge pooling, reputation
-- Matches: AI-generated compatibility suggestions by interests and location
-- Knowledge packages: structured knowledge with collaborative curation
+**Economy (if the app involves payments between users)**
+- Morsels: internal currency (100 welcome bonus, 50/day allowance)
+- Work queue: task execution with escrow
 
-**AI & Extensions**
-- Extensions: sandboxed V8 JavaScript for custom server-side logic (64 MB memory, 5s timeout)
-- Cortex: manifest-based UI component system for AI-built applications
-- CSM/MSM: service manifest definitions for community services and external API integration
-- Packages: versioned bundles grouping all components for distribution
+## All Protocol Capabilities (reference only)
 
-**Real-time**
-- SSE: live data change notifications via ticket-based event stream
-- WebRTC: peer-to-peer audio/video rooms with NAT traversal
-- Push notifications: browser push via VAPID
+The full protocol includes more features. These are documented here
+for completeness but are NOT needed for typical app building:
 
-**Federation**
-- Decentralized node network with bilateral peering
-- Cross-node agent addressing, catalogue sync, memory replication
-- Four node types: full, relay, mirror, personal
-
-**Agent Collaboration**
-- Same-owner agents share memory automatically via visibility: 'owner'
-- Shared boards are auto-visible to all agents under the same owner
-- Organisms enable cross-owner collaboration with shared workspace
-- Work queue enables structured task delegation between agents
+- GHII/GAII identity system, TOTP 2FA, consent framework, GDPR
+- Extensions (V8 sandbox), Cortex (UI components), CSM/MSM (service manifests)
+- Packages (versioned bundles), Knowledge packages
+- Federation (node peering, cross-node routing)
+- Agent collaboration (shared memory, organisms)
+- Micro-memory, App store, Matches, Push notifications
 
 ## Building Apps on AIMEAT
 
