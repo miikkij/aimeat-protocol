@@ -7,6 +7,8 @@ import { aimeatSocialLib } from './lib-social.js';
 import { aimeatWalletLib } from './lib-wallet.js';
 import { aimeatWorkLib } from './lib-work.js';
 import { aimeatTunnelLib } from './lib-tunnel.js';
+import { aimeatAudioLib } from './lib-audio.js';
+import { aimeatSpeechLib } from './lib-speech.js';
 
 /**
  * Serves helper JavaScript libraries at /v1/libs/*
@@ -49,6 +51,16 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   // GET /v1/libs/aimeat-tunnel.js — Personal node tunnel client
   router.get('/v1/libs/aimeat-tunnel.js', (_req, res) => {
     res.type('application/javascript').send(aimeatTunnelLib(config));
+  });
+
+  // GET /v1/libs/aimeat-audio.js — Audio engine library
+  router.get('/v1/libs/aimeat-audio.js', (_req, res) => {
+    res.type('application/javascript').send(aimeatAudioLib(config));
+  });
+
+  // GET /v1/libs/aimeat-speech.js — Speech library
+  router.get('/v1/libs/aimeat-speech.js', (_req, res) => {
+    res.type('application/javascript').send(aimeatSpeechLib(config));
   });
 
   // GET /v1/libs/ — List available libraries
@@ -111,6 +123,20 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
           include: `<script src="${config.baseUrl}/v1/libs/aimeat-tunnel.js"></script>`,
           requires: 'aimeat-auth',
         },
+        {
+          name: 'aimeat-audio',
+          url: '/v1/libs/aimeat-audio.js',
+          description: 'Audio engine: 6 built-in instruments (piano, guitar, bass, drums, flute, synth), custom synth builder, sample loader, soundboard, realtime bridge',
+          size_estimate: '~60KB',
+          include: `<script src="${config.baseUrl}/v1/libs/aimeat-audio.js"></script>`,
+        },
+        {
+          name: 'aimeat-speech',
+          url: '/v1/libs/aimeat-speech.js',
+          description: 'Speech: text-to-speech, speech-to-text, voice commands, pluggable providers (ElevenLabs, Whisper, etc.)',
+          size_estimate: '~15KB',
+          include: `<script src="${config.baseUrl}/v1/libs/aimeat-speech.js"></script>`,
+        },
       ],
     });
   });
@@ -130,6 +156,8 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
 <script src="/v1/libs/aimeat-wallet.js"></script>
 <script src="/v1/libs/aimeat-work.js"></script>
 <script src="/v1/libs/aimeat-tunnel.js"></script>
+<script src="/v1/libs/aimeat-audio.js"></script>
+<script src="/v1/libs/aimeat-speech.js"></script>
 </head>
 <body>
 <h1 id="title">AIMEAT Test Harness</h1>
@@ -140,7 +168,7 @@ window.tlog = function(msg) {
   window.__testLog.push(msg);
   document.getElementById('log').textContent = window.__testLog.join('\\n');
 };
-window.tlog('Libraries loaded: auth=' + !!AIMEAT.auth + ' data=' + !!AIMEAT.data + ' storage=' + !!AIMEAT.storage + ' social=' + !!AIMEAT.social + ' wallet=' + !!AIMEAT.wallet + ' work=' + !!AIMEAT.work + ' tunnel=' + !!AIMEAT.tunnel);
+window.tlog('Libraries loaded: auth=' + !!AIMEAT.auth + ' data=' + !!AIMEAT.data + ' storage=' + !!AIMEAT.storage + ' social=' + !!AIMEAT.social + ' wallet=' + !!AIMEAT.wallet + ' work=' + !!AIMEAT.work + ' tunnel=' + !!AIMEAT.tunnel + ' audio=' + !!AIMEAT.audio + ' speech=' + !!AIMEAT.speech);
 window.__ready = true;
 </script>
 </body></html>`);
