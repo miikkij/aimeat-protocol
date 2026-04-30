@@ -45,6 +45,13 @@
   session.fetch() returns already-parsed JSON, do NOT call .json() on it.
   All API paths must be relative (start with /), never absolute URLs.
 
+Pick the right starter template based on app type:
+- Standard: /v1/libs/aimeat-auth.js + /v1/libs/aimeat-data.js (most apps)
+- Realtime: Standard + /lib/realtime.js (multiplayer, chat, collaboration)
+- Storage: Standard + /v1/libs/aimeat-storage.js (drawing, photos, files)
+- Audio: Standard + /v1/libs/aimeat-audio.js (music, instruments, sound effects)
+- Speech: Standard + /v1/libs/aimeat-speech.js (voice control, TTS, STT)
+
   PATH 2: Explore (no auth needed)
   GET /v1/catalogue, GET /v1/stats, GET /v1/apps, GET /v1/boards
 

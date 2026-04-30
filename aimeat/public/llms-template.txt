@@ -210,6 +210,8 @@ The node serves browser-ready JavaScript libraries. Load them via `<script src="
 | aimeat-wallet | `/v1/libs/aimeat-wallet.js` | Morsel balance, transactions, UI badge |
 | aimeat-work | `/v1/libs/aimeat-work.js` | Actions, work requests, inbox, deliver, rate |
 | AimeatRealtime | `/lib/realtime.js` | WebSocket P2P rooms, WebRTC data channels, Yjs CRDT |
+| aimeat-audio | `/v1/libs/aimeat-audio.js` | Audio: 6 instruments, custom synth, soundboard, sample loader |
+| aimeat-speech | `/v1/libs/aimeat-speech.js` | Speech: TTS, STT, voice commands, pluggable providers |
 
 ### Standard App Template
 
@@ -574,6 +576,68 @@ rt.disconnect()
 await rt.connectPeer(peerId)   // establish data channel
 rt.sendToPeer(peerId, data)
 rt.on('peer-data', handler)    // { peerId, data }
+```
+
+**AIMEAT.audio** (`/v1/libs/aimeat-audio.js`):
+```javascript
+AIMEAT.audio.play('piano', 'C4')                // play a note (synth)
+AIMEAT.audio.play('guitar', 'E2', { duration: 0.5, velocity: 0.8 })
+AIMEAT.audio.play('drums', 'kick')              // drum hits by name
+AIMEAT.audio.play('synth', 'C4', { wave: 'sawtooth', filter: 800 })
+AIMEAT.audio.stop('piano', 'C4')                // stop note
+AIMEAT.audio.stop('piano')                      // stop instrument
+AIMEAT.audio.stop()                             // stop all
+AIMEAT.audio.master.volume = 0.7                // master volume 0-1
+AIMEAT.audio.master.mute = true                 // mute/unmute
+AIMEAT.audio.instruments                        // list available
+// Soundboard (audio file playback):
+await AIMEAT.audio.soundboard.load('sfx', '/sounds/boom.mp3')
+AIMEAT.audio.soundboard.play('sfx', { volume: 0.5 })
+await AIMEAT.audio.soundboard.loadAll({ a: 'a.mp3', b: 'b.mp3' })
+// Sample upgrade (real recorded sounds):
+await AIMEAT.audio.loadSamples('piano')         // from /lib/samples/piano/
+AIMEAT.audio.hasSamples('piano')                // true after loading
+// Custom synth:
+const laser = AIMEAT.audio.synth({
+  name: 'laser', oscillators: [{ wave: 'sawtooth' }],
+  envelope: { attack: 0.01, decay: 0.1, sustain: 0, release: 0.05 },
+  filter: { type: 'lowpass', frequency: 2000 },
+  pitchEnvelope: { start: 2000, end: 200, time: 0.15 },
+  effects: [{ type: 'distortion', amount: 0.4 }]
+})
+// Realtime bridge (auto-play incoming note events):
+AIMEAT.audio.connectRealtime(rt)
+rt.broadcast({ instrument: 'piano', note: 'C4', velocity: 0.8 })
+// Built-in instruments: piano, guitar, bass, drums, flute, synth
+// Drum hits: kick, snare, hihat, hihat-open, crash, ride,
+//   tom-high, tom-mid, tom-low, clap, cowbell
+// Notes: C4, F#3, Bb5 (scientific pitch, A0-C8)
+// Effects: reverb, delay, distortion, chorus, tremolo, filter
+```
+
+**AIMEAT.speech** (`/v1/libs/aimeat-speech.js`):
+```javascript
+AIMEAT.speech.say('Hello world')                // speak text (TTS)
+AIMEAT.speech.say('Tervetuloa', { lang: 'fi-FI', rate: 1.2, pitch: 1.0 })
+AIMEAT.speech.stop()                            // stop speaking
+AIMEAT.speech.speaking                          // true/false
+AIMEAT.speech.voices()                          // list available voices
+AIMEAT.speech.voices({ lang: 'fi' })            // filter by language
+const r = await AIMEAT.speech.listen()          // one-shot STT
+// r = { text: 'Hello', confidence: 0.92, lang: 'en-US' }
+AIMEAT.speech.listen({ continuous: true, lang: 'fi-FI' })
+AIMEAT.speech.on('result', ({ text, final }) => { ... })
+AIMEAT.speech.stopListening()
+AIMEAT.speech.listening                         // true/false
+AIMEAT.speech.supported                         // { tts: true, stt: true }
+// Voice commands:
+AIMEAT.speech.listen({ continuous: true, commands: {
+  'play *instrument': (inst) => AIMEAT.audio.play(inst, 'C4'),
+  'stop': () => AIMEAT.audio.stop(),
+}})
+// Pluggable providers:
+AIMEAT.speech.use('tts', { name: 'elevenlabs', say: async (text, opts) => blob })
+AIMEAT.speech.use('stt', { name: 'whisper', listen: async (audioBlob, opts) => result })
 ```
 
 ## Core Concepts
