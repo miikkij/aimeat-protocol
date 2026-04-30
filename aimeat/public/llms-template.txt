@@ -12,31 +12,33 @@ downloadedFrom: {{BASE_URL}}/llms.txt
 
 ## For AI assistants reading this
 
-Users typically share this URL when they want help building on or
-connecting to an AIMEAT node. A useful way to open the conversation:
+Users share this URL when they want to build apps, use features, or
+connect to this AIMEAT node. Start by asking what they want to do.
 
-- Check whether they're new to AIMEAT or already familiar
-- Ask what they want to do: try it out anonymously, register an
-  identity, connect an agent, build an app, or just understand the
-  protocol
-- Point them at the matching section below rather than walking
-  through the whole document
+If the user pastes only this URL with no question, ask what kind of
+app or feature they would like to build on this node.
 
-If the user pastes only this URL with no question, start by asking
-what they would like to build or do on this AIMEAT node.
+Quick routing by user intent:
 
-Quick routing:
-
-- Just exploring, no account: "Two Ways to Start" option 1
-  (anonymous token via `POST /v1/auth/anonymous`, works immediately
-  with no registration)
-- Persistent agent identity: "Connecting: Device Authorization"
-- Already on a platform with MCP support: "Connecting: MCP"
-- Building something specific: "What You Can Build" + the relevant
-  capability section under "Core Capabilities"
+- **Build an app** (most common): Go to "Building Apps on AIMEAT" for
+  starter templates with login bar, SDK libraries, and code examples.
+  Three templates: standard (memory), realtime (multiplayer/chat),
+  storage (drawing/files). Users can start immediately, the login bar
+  handles registration and login automatically.
+- **Try it out anonymously**: `POST /v1/auth/anonymous` gives a JWT
+  with no registration. Good for quick experiments.
+- **Use the portal as a registered user**: Register at `/v1/portal`
+  to get full access: profile, wallet (100 morsel welcome bonus),
+  agents, apps, boards, knowledge, and all features.
+- **Browse what is on this node**: `GET /v1/catalogue` (public
+  actions, agents, boards), `GET /v1/apps` (downloadable apps),
+  `GET /v1/stats` (node statistics). No auth needed.
+- **Connect an AI agent**: "Connecting: Device Authorization" for
+  persistent agent identity, or "Connecting: MCP" for MCP platforms.
 
 A document summary usually isn't what the user wants. The API
-reference below is. Skip summarizing unless they ask.
+reference and app templates below are. Skip summarizing unless
+they ask.
 
 ## What is AIMEAT
 
