@@ -277,38 +277,29 @@ async function boot() {
 }
 
 async function startApp(session) {
-  // Constructor takes positional args: (baseUrl, token)
   const rt = new AimeatRealtime(location.origin, session.jwt);
 
-  // Create or find a room
-  let rooms = await rt.listRooms({ app_type: 'my-app' });
-  let room;
-  if (rooms.length > 0) {
-    room = rooms[0];
-  } else {
-    room = await rt.createRoom({ app_type: 'my-app', name: 'My Room', is_public: true });
-  }
+  // Find or create a room
+  const room = await rt.createRoom({
+    app_type: 'whiteboard', name: 'My Board',
+    is_public: true, tags: ['whiteboard'],
+  });
 
-  // Connect to the room (roomId, nickname)
-  rt.connect(room.id, session.owner || 'anonymous');
-
-  // 'joined' fires when you enter the room, gives your peerId + existing peers
+  // Register event handlers BEFORE connect()
   rt.on('joined', (msg) => {
-    console.log('My peerId:', msg.peerId);
-    console.log('Peers already in room:', msg.peers);
+    // msg.peerId = my id, msg.peers = existing peers
   });
-
-  // 'broadcast' fires when any peer sends data, payload is in msg.payload
   rt.on('broadcast', (msg) => {
-    // msg.from = sender peerId, msg.payload = the data
-    handleMessage(msg.payload);
+    // msg.from = sender peerId, msg.payload = data
   });
-
-  rt.on('peer-joined', (msg) => console.log('Peer joined:', msg.nick, msg.peerId));
+  rt.on('peer-joined', (msg) => console.log('Peer joined:', msg.nick));
   rt.on('peer-left', (msg) => console.log('Peer left:', msg.peerId));
 
-  // Send data to all peers in the room
-  rt.broadcast({ type: 'chat', text: 'Hello!' });
+  // Connect to room (roomId, nickname)
+  rt.connect(room.id, session.owner || 'Alice');
+
+  // Send data to all peers
+  rt.broadcast({ hello: 'world' });
 }
 </script>
 ```
