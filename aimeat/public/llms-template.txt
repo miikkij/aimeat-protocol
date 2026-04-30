@@ -294,6 +294,7 @@ async function startApp(session) {
   });
   rt.on('peer-joined', (msg) => console.log('Peer joined:', msg.nick));
   rt.on('peer-left', (msg) => console.log('Peer left:', msg.peerId));
+  rt.on('close', (msg) => console.warn('Connection closed:', msg.code, msg.reason));
 
   // Connect to room (roomId, nickname)
   rt.connect(room.id, session.owner || 'Alice');
@@ -301,6 +302,55 @@ async function startApp(session) {
   // Send data to all peers
   rt.broadcast({ hello: 'world' });
 }
+</script>
+```
+
+**Throttling high-frequency events (critical for drawing, mouse tracking, games):**
+
+Do NOT call `rt.broadcast()` on every `pointermove`, `mousemove`, or animation frame.
+The WebSocket will be rate-limited by the node and silently closed. The `_send()` method
+drops messages when the socket is not open, so no error appears in the console.
+
+Instead, batch events into a flush interval (~30ms = ~33 messages/sec max):
+
+```javascript
+const FLUSH_MS = 30;
+let pending = [];
+let flushTimer = null;
+
+function queueBroadcast(data) {
+  pending.push(data);
+  if (!flushTimer) {
+    flushTimer = setTimeout(() => {
+      if (pending.length > 0) {
+        rt.broadcast({ type: 'batch', items: pending });
+        pending = [];
+      }
+      flushTimer = null;
+    }, FLUSH_MS);
+  }
+}
+
+// In pointermove handler: render locally immediately, queue for network
+canvas.addEventListener('pointermove', (e) => {
+  drawLocally(e.offsetX, e.offsetY);           // instant local feedback
+  queueBroadcast({ x: e.offsetX, y: e.offsetY }); // batched network send
+});
+```
+
+Auto-reconnect on unexpected close:
+
+```javascript
+let reconnectDelay = 500;
+rt.on('close', (msg) => {
+  if (leftIntentionally) return;
+  console.warn('Reconnecting in', reconnectDelay, 'ms (code:', msg.code, ')');
+  setTimeout(() => {
+    rt.connect(room.id, session.owner || 'Alice');
+    reconnectDelay = Math.min(reconnectDelay * 2, 8000);
+  }, reconnectDelay);
+});
+rt.on('joined', () => { reconnectDelay = 500; }); // reset on success
 </script>
 ```
 
