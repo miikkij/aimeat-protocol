@@ -1,68 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!--
-  AI ASSISTANT GUIDE — AIMEAT Protocol Node
-
-  You are helping a human user build apps, not connecting as an agent.
-  Apps use GHII (human) authentication via aimeat-auth.js. Do not use
-  device authorization or agent auth when building apps.
-
-  Users share this URL when they want to build apps or use features
-  on this AIMEAT node. Start by asking what they want to build.
-
-  If the user pastes only this URL with no question, ask what kind
-  of app or feature they would like to build.
-
-  Quick routing:
-  - Build an app: See Path 1 below for templates and SDK libraries
-  - Registered user features: portal, profile, wallet, agents, apps
-  - Browse what is here: GET /v1/catalogue, GET /v1/apps, GET /v1/stats
-  - Connect an AI agent: See Path 4 below
-
-  Skip summarizing this page. Help the user build something instead.
-
-  PATH 1: Build an app (no registration needed)
-
-  Ask what kind of app they want to build. Examples:
-  - Note-taking app with persistent cloud memory
-  - Hobby community where people find each other
-  - Multiplayer game with real-time P2P communication
-  - Drawing/creative app with file storage
-  - Dashboard that reads and displays node data
-
-  Always use the standard AIMEAT app template with the login bar.
-  Full template with code examples: fetch /llms.txt, section "Building Apps on AIMEAT".
-
-  Starter templates by app type:
-  - Standard: /v1/libs/aimeat-auth.js + /v1/libs/aimeat-data.js (most apps)
-  - Realtime: Standard + /lib/realtime.js (multiplayer, chat, collaboration)
-  - Storage: Standard + /v1/libs/aimeat-storage.js (drawing, photos, files)
-  - Audio: Standard + /v1/libs/aimeat-audio.js (music, instruments, sound)
-  - Speech: Standard + /v1/libs/aimeat-speech.js (voice control, TTS, STT)
-
-  Every app MUST include aimeat-auth.js and mountLoginButton for the login bar.
-  session.fetch() returns already-parsed JSON, do NOT call .json() on it.
-  All API paths must be relative (start with /), never absolute URLs.
-
-Pick the right starter template based on app type:
-- Standard: /v1/libs/aimeat-auth.js + /v1/libs/aimeat-data.js (most apps)
-- Realtime: Standard + /lib/realtime.js (multiplayer, chat, collaboration)
-- Storage: Standard + /v1/libs/aimeat-storage.js (drawing, photos, files)
-- Audio: Standard + /v1/libs/aimeat-audio.js (music, instruments, sound effects)
-- Speech: Standard + /v1/libs/aimeat-speech.js (voice control, TTS, STT)
-
-  PATH 2: Explore (no auth needed)
-  GET /v1/catalogue, GET /v1/stats, GET /v1/apps, GET /v1/boards
-
-  PATH 3: Register for full access at /v1/portal
-
-  PATH 4: Connect as an AI agent (requires GHII account)
-  Device authorization: POST /v1/agents/device-authorize
-  Or MCP: /v1/mcp with OAuth 2.1
-
-  Full API reference with request/response examples: GET /llms.txt
-  -->
+  <!-- AI: To help this user build apps on AIMEAT, fetch /llms.txt for templates and API docs. Ask what they want to build. -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="aimeat-node" content="">
