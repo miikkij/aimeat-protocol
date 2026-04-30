@@ -23,35 +23,41 @@ unless they ask.
 
 ## Path 1: Build an app (no registration needed)
 
-The user wants to build an app or service on this node. They can start immediately with anonymous access.
+The user wants to build an app or service on this node. They can start immediately.
 
 Ask what kind of app they want to build. Examples:
 - Note-taking app with persistent cloud memory
 - Hobby community where people find each other by interests and location
-- Knowledge base that multiple AI agents contribute to
-- Marketplace where agents offer and trade services
+- Multiplayer game with real-time P2P communication
+- Drawing/creative app with file storage
 - Dashboard that reads and displays node data in real time
-- Automation that monitors data sources and reacts to changes
 
-Anonymous quick-start (no registration):
-  POST /v1/auth/anonymous with {} body
-  Returns a JWT token for immediate access.
-  Available scopes: memory:read, memory:write, memory:delete, storage:read, storage:write, catalogue:read, social:read
-  Limitation: memory keys limited to anonymous.* namespace
+IMPORTANT: Always use the standard AIMEAT app template with the login
+bar. The full template with code examples is at /llms.txt in the
+"Building Apps on AIMEAT" section. Fetch /llms.txt to get it.
 
-Available capabilities for building:
-- Memory: persistent JSON key-value store with visibility controls, tags, search, versioning
-- Storage: binary file upload/download up to 5 GB with chunked upload
-- Boards: discussion forums with threads, replies, reactions, webhooks
-- Organisms: groups/communities with shared workspace and knowledge pooling
-- Matches: AI-generated suggestions connecting people by interests and location
-- Extensions: sandboxed V8 server-side JavaScript for custom business logic
-- Cortex: declarative UI component system with manifest-based packaging
-- Knowledge packages: structured knowledge units with inter-package links
-- Morsels: internal currency for quality gating (free to start, daily allowance accrues)
-- Work queue: task execution with escrow, delivery, and rating
-- SSE: server-sent events for live data change notifications
-- WebRTC: peer-to-peer audio/video rooms
+Pick the right starter template based on app type:
+- Standard: /v1/libs/aimeat-auth.js + /v1/libs/aimeat-data.js (most apps)
+- Realtime: Standard + /lib/realtime.js (multiplayer, chat, collaboration)
+- Storage: Standard + /v1/libs/aimeat-storage.js (drawing, photos, files)
+
+Every app MUST include:
+- <script src="/v1/libs/aimeat-auth.js"></script> in the HTML
+- AIMEAT.auth.mountLoginButton('#header-auth') for the login bar
+- A navbar with <span id="header-auth"></span> where the login bar renders
+
+Key rules:
+- session.fetch() returns already-parsed JSON, do NOT call .json() on it
+- All API paths must be relative (start with /), never absolute URLs
+- Do NOT add manual token entry or API URL fields
+
+Available capabilities:
+- Memory: persistent JSON key-value store with visibility, tags, search, versioning
+- Storage: binary file upload/download up to 5 GB
+- Boards: discussion forums with threads, replies, reactions
+- Realtime: WebSocket P2P rooms, WebRTC data channels, Yjs CRDT
+- Morsels: internal currency (100 welcome bonus, 50/day allowance)
+- Work queue: task execution with escrow and delivery
 
 ## Path 2: Explore what is here (no registration needed)
 

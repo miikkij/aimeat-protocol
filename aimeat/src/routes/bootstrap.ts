@@ -163,6 +163,29 @@ export function bootstrapRouter(
               available_scopes: ['memory:read', 'memory:write', 'memory:delete', 'storage:read', 'storage:write', 'catalogue:read', 'social:read'],
               limitation: 'Memory keys limited to anonymous.* namespace',
             },
+            app_building: {
+              note: 'When building an app, always use the standard template with the AIMEAT login bar. See the "Building Apps on AIMEAT" section in /llms.txt for full templates and SDK documentation.',
+              sdk_libraries: [
+                `${base}/v1/libs/aimeat-auth.js - login UI, session management (required for all apps)`,
+                `${base}/v1/libs/aimeat-data.js - memory API: get, set, search`,
+                `${base}/v1/libs/aimeat-storage.js - file upload/download`,
+                `${base}/v1/libs/aimeat-social.js - boards: create, post, react`,
+                `${base}/v1/libs/aimeat-wallet.js - morsel balance, transactions`,
+                `${base}/v1/libs/aimeat-work.js - actions, work requests`,
+                `${base}/lib/realtime.js - WebSocket P2P rooms, WebRTC, Yjs CRDT`,
+              ],
+              starter_templates: {
+                standard: 'Login bar + aimeat-auth.js + aimeat-data.js. For most apps.',
+                realtime: 'Standard + /lib/realtime.js. For multiplayer games, live collaboration, chat.',
+                storage: 'Standard + aimeat-storage.js. For drawing apps, file managers, galleries.',
+              },
+              key_rules: [
+                'Always include the AIMEAT login bar via AIMEAT.auth.mountLoginButton()',
+                'session.fetch() returns already-parsed JSON, do NOT call .json() on it',
+                'All API paths must be relative (start with /), never absolute URLs',
+                'Do NOT add manual token entry fields, the auth library handles everything',
+              ],
+            },
           },
           explore: {
             description: 'User wants to see what is on this node before committing',
