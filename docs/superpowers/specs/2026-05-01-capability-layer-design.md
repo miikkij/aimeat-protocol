@@ -287,27 +287,153 @@ POST /v1/capabilities/:id/invoke
 ### Invoke proxy routing
 
 The proxy determines where to forward based on `source.type`.
+All callable capabilities return sync results through the same interface.
 
 | source.type | callable | Invoke behavior | Notes |
 |-------------|----------|----------------|-------|
-| `extension` | true | `POST /v1/ext/:extName/:actionId` | Sync, WASM sandbox, result returned immediately |
-| `manual` | true | HTTP POST to `webhookUrl` | Sync, user-provided endpoint, must return `{ result }` |
-| `action` | false | Returns 400 NOT_CALLABLE | Actions use the async work queue. Usage field explains: "POST /v1/work/request" |
-| `cortex` | false | Returns 400 NOT_CALLABLE | Cortex is a loadable capability. Usage field explains how to load its libraries. |
+| `extension` | true | `POST /v1/ext/:extName/:actionId` | Server-side WASM sandbox |
+| `manual` | true | HTTP POST to `webhookUrl` | User-provided endpoint, must return `{ result }` |
+| `cortex` | true | Export function invocation (see below) | Client-side or server-side depending on caller |
+| `action` | false | Returns 400 NOT_CALLABLE | Actions use the async work queue |
 | `app` | false | Returns 400 NOT_CALLABLE | Usage field explains how to access the app |
 
-### Capability types explained
+### Cortex invoke: two execution modes
 
-**Callable capabilities** (invoke via API, sync result):
-- **Extensions**: Server-side WASM sandbox. Call and get result immediately.
-- **Manual webhooks**: User-provided HTTP endpoint. Call and get result immediately.
+Cortex capabilities are callable through the same `invoke()` interface
+as extensions and webhooks. The execution mode depends on who is calling.
 
-**Loadable capabilities** (load in browser, use as library):
-- **Cortex modules**: Bundle schemas, prompts, libraries, seed data, and ontologies
-  into a coherent capability package. Apps load cortex JavaScript libraries via
-  `loadScript('/v1/cortex/:name/libs/:file')` and use them directly. A cortex
-  can encapsulate complex logic involving memory, storage, and realtime operations
-  so that the app does not need to interact with those systems directly.
+**Mode 1: Client-side invoke (browser apps via SDK)**
+
+When `AIMEAT.capabilities.invoke('cortex:recipe-manager:search', { query: 'pasta' })`
+is called from a browser app:
+
+1. SDK checks: this is a cortex capability with exports
+2. SDK loads the cortex library if not already loaded (via loadScript)
+3. SDK calls the exported function directly in the browser
+4. SDK returns the result
+
+No server round-trip. The cortex code runs in the user's browser
+with access to `AIMEAT.data`, `AIMEAT.storage`, etc. through the
+already-loaded SDK libraries.
+
+**Mode 2: Server-side invoke (MCP / REST API)**
+
+When `POST /v1/capabilities/:id/invoke` is called from an API client
+or MCP tool (Claude Code, Copilot, custom agent):
+
+1. Server loads the cortex library source code
+2. Server executes in a WASM sandbox (same QuickJS isolate as extensions)
+3. Server returns the result
+
+This enables MCP/API callers to use cortex capabilities without a browser.
+
+**Server-side cortex execution: security requirements**
+
+Server-side cortex invoke runs UNTRUSTED USER CODE. This requires
+the same security model as extensions, plus additional hardening
+because cortex code was originally designed for browsers, not servers.
+
+Mandatory security constraints:
+
+| Constraint | Value | Why |
+|-----------|-------|-----|
+| Memory limit | 64 MB per invocation | Prevent memory exhaustion |
+| CPU timeout | 5 seconds per invocation | Prevent infinite loops |
+| API call limit | 50 calls per invocation | Prevent API flooding |
+| Network access | None (no fetch, no WebSocket) | Cortex code must only use ctx.memory/ctx.storage APIs |
+| File system | None | WASM sandbox has no FS access |
+| Global scope | Isolated per invocation | No state leaks between calls |
+
+Sandbox API surface (what the cortex code CAN access server-side):
+
+| API | Provides | Scoped to |
+|-----|----------|-----------|
+| `ctx.memory.get(key)` | Read memory | Caller's identity only |
+| `ctx.memory.set(key, value, opts)` | Write memory | Caller's identity only |
+| `ctx.memory.search(query)` | Search memory | Caller's visible data only |
+| `ctx.memory.getPublic(gaii, key)` | Read public memory | Public data only |
+| `ctx.storage.upload(data, opts)` | Upload file | Caller's quota |
+| `ctx.storage.download(key)` | Download file | Caller's files + public |
+| `ctx.storage.list()` | List files | Caller's files only |
+| `ctx.caller` | Identity info | Read-only: gaii, owner, roles |
+| `ctx.log(msg)` | Logging | Captured, not printed |
+
+What the cortex code CANNOT access server-side:
+
+- `fetch()`, `XMLHttpRequest`, `WebSocket` - no outbound network
+- `process`, `require`, `import` - no Node.js APIs
+- Other users' private memory or storage
+- The AIMEAT configuration or internal state
+- Other capabilities or extensions (no lateral movement)
+- DOM APIs (`document`, `window`) - no browser environment
+
+Additional protections:
+
+- **Input validation**: invoke proxy validates input against the
+  capability's `inputSchema` BEFORE passing to the sandbox. Malformed
+  input never reaches the cortex code.
+- **Output validation**: result is validated against `outputSchema`.
+  If the cortex returns unexpected data, the invoke returns an error
+  instead of passing potentially malicious output to the caller.
+- **Rate limiting**: per-capability rate limit (configurable, default
+  60 invocations per minute per caller). Prevents abuse of
+  computationally expensive capabilities.
+- **Audit logging**: every server-side cortex invoke is logged with
+  caller identity, input hash, duration, and success/error status.
+  Operator can review in admin dashboard.
+- **Operator kill switch**: operator can disable any capability
+  instantly via override. Disabled capabilities return 403 on invoke.
+- **No state between invocations**: each server-side invoke gets a
+  fresh sandbox. No global variables, caches, or timers persist.
+  The only persistence is through explicit ctx.memory/ctx.storage calls.
+
+**Browser vs server capability matrix:**
+
+| Aspect | Browser (Mode 1) | Server (Mode 2) |
+|--------|-----------------|-----------------|
+| Execution | Direct JS in page | WASM sandbox (QuickJS) |
+| Data access | Via loaded SDK libs | Via ctx.memory/ctx.storage |
+| Network | Full (fetch, WS) | None |
+| DOM | Available | Not available |
+| Performance | Fast (no sandbox overhead) | Slower (sandbox init ~10ms) |
+| Security model | Same-origin browser sandbox | Strict WASM isolation |
+| Who uses it | Browser apps | MCP, REST API, agents |
+
+### Direct use still available
+
+The invoke interface is the **recommended** way to use capabilities
+because it works the same everywhere. But direct use remains available
+for apps that need more control:
+
+```javascript
+// Option A: Smart invoke (recommended, works for everything)
+const result = await AIMEAT.capabilities.invoke('cortex:recipe-manager:search', { query: 'pasta' });
+
+// Option B: Direct use (more control, browser only)
+await loadScript('/v1/cortex/recipe-manager/libs/recipe-manager.js');
+const result = await RecipeManager.search({ query: 'pasta' });
+```
+
+Option A is simpler and portable. Option B gives access to the full
+library API including functions that may not be exposed as capability
+exports.
+
+### Capability types summary
+
+**Callable capabilities** (invoke via unified interface, sync result):
+- **Extensions**: Server-side WASM sandbox. Always server-side.
+- **Manual webhooks**: HTTP POST to user endpoint. Always server-side.
+- **Cortex exports**: Client-side in browser, server-side WASM for API/MCP callers.
+
+**Discoverable capabilities** (use via other APIs):
+- **Actions**: Async work queue. Discovery only, invoke via work queue API.
+- **Apps**: Discovery only, access via download URL.
+
+**Not aggregated:**
+- **SDK libraries**: Infrastructure, always available, documented in /v1/libs.
+
+Cortex modules are the most versatile: they provide loadable libraries
+for direct use AND callable exports through the unified invoke interface.
 
   Examples of cortex capabilities:
   - `aimeat-charts`: data visualization (bar, line, pie charts)
@@ -503,11 +629,15 @@ A background job scans existing systems and creates/updates capability records a
    - cost: from action pricing
    - usage: "Use the work queue: POST /v1/work/request with { action_id: '...', provider_gaii: '...', input: {...} }"
 
-3. List all active cortex modules -> create one capability per cortex
-   - id: "cortex:{name}"
+3. List all active cortex modules -> create one capability per exported function
+   - id: "cortex:{name}:{exportName}"  (e.g. "cortex:recipe-manager:search")
    - source: { type: "cortex", ref: "cortex:{name}", version: cortex.version }
-   - callable: false
-   - usage: "Load via <script src='/v1/cortex/{name}/libs/{file}'>"
+   - callable: true
+   - exports: populated from cortex manifest lib components + API surface annotations
+   - usage: "await AIMEAT.capabilities.invoke('cortex:{name}:{export}', input)"
+   - dependencies: from cortex manifest required_apis + lib dependencies
+   Note: also create a parent entry "cortex:{name}" (callable: false) that
+   lists all exports and serves as an overview of the whole cortex module.
 
 4. SDK libraries are NOT aggregated. They are documented in
    GET /v1/libs and llms.txt. They are infrastructure, not capabilities.
