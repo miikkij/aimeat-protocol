@@ -75,6 +75,29 @@ interface CapabilityRecord {
     output: object;
   }>;
 
+  // For loadable capabilities (cortex): what functions/classes does the library expose?
+  // This tells AI exactly what code it can write after loading the library.
+  exports: Array<{
+    name: string;                // function or class name, e.g. "applyBevel"
+    description: string;         // what it does
+    inputSchema: JSONSchema;     // what it accepts (full schema, never abbreviated)
+    outputSchema: JSONSchema;    // what it returns (full schema)
+    example: { input: object; output: object } | null;
+  }> | null;                     // null for callable/discoverable capabilities (they use top-level inputSchema/outputSchema)
+
+  // Dependencies: what other capabilities or SDK libraries must be loaded first
+  dependencies: Array<{
+    type: 'sdk' | 'capability';
+    id: string;                  // e.g. "aimeat-data", "cortex:aimeat-canvas", "ext:physics:collider"
+    required: boolean;           // true = must have, false = optional enhancement
+  }>;
+  // Load order: dependencies must be loaded before this capability.
+  // The SDK library / app template should load in this order:
+  // 1. aimeat-auth.js (always first)
+  // 2. SDK dependencies (aimeat-data, aimeat-storage, etc.)
+  // 3. Capability dependencies (other cortex modules, etc.)
+  // 4. This capability's library
+
   // Manual source invocation target (only for source.type === 'manual' && callable === true)
   webhookUrl: string | null;     // HTTP POST target, must accept { input } and return { result }
 
@@ -796,34 +819,101 @@ checks `authRequired` against the agent's auth level.
 ### Path 3: Cortex as a capability package
 
 Cortex modules deserve special attention because they are the richest
-type of capability. A cortex bundles everything an app domain needs:
+type of capability. A cortex bundles everything an app domain needs.
+
+The capability layer does not "invoke" a cortex. Instead, it **describes**
+what the cortex provides (functions, schemas, dependencies) so that AI
+tools and developers can write correct code without reading the cortex
+source.
 
 ```
-Example: "recipe-manager" cortex capability
+Example capability entry for "recipe-manager" cortex:
 
-What it provides:
-- Schema: locks memory keys "recipes.*" to a recipe JSON schema
-- Prompt: AI instructions for generating recipe data
-- Library: recipe-manager.js with functions like:
-    RecipeManager.create(recipe)
-    RecipeManager.search(query)
-    RecipeManager.share(recipeId, visibility)
-    RecipeManager.import(externalUrl)
-- Seed data: 10 starter recipes
-- Ontology: food categories, cooking methods, dietary tags
+{
+  id: "cortex:recipe-manager",
+  name: "Recipe Manager",
+  summary: "Full recipe management: create, search, share, import",
+  source: { type: "cortex", ref: "cortex:recipe-manager", version: "1.2.0" },
+  callable: false,
+  usage: "await loadScript('/v1/cortex/recipe-manager/libs/recipe-manager.js')",
+  
+  exports: [
+    {
+      name: "RecipeManager.create",
+      description: "Create a new recipe and store it in memory",
+      inputSchema: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          ingredients: { type: "array", items: { type: "object", properties: {
+            name: { type: "string" }, amount: { type: "string" }
+          }}},
+          steps: { type: "array", items: { type: "string" } },
+          tags: { type: "array", items: { type: "string" } }
+        },
+        required: ["title", "ingredients", "steps"]
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          key: { type: "string", description: "Memory key where recipe is stored" },
+          created_at: { type: "string", format: "date-time" }
+        }
+      },
+      example: {
+        input: { title: "Pasta Carbonara", ingredients: [{ name: "spaghetti", amount: "400g" }], steps: ["Boil pasta..."], tags: ["italian", "pasta"] },
+        output: { id: "rec-abc123", key: "recipes.rec-abc123", created_at: "2026-05-01T12:00:00Z" }
+      }
+    },
+    {
+      name: "RecipeManager.search",
+      description: "Search recipes by text query or tags",
+      inputSchema: { type: "object", properties: { query: { type: "string" }, tags: { type: "array", items: { type: "string" } } } },
+      outputSchema: { type: "array", items: { type: "object", properties: { id: { type: "string" }, title: { type: "string" }, tags: { type: "array" } } } },
+      example: { input: { query: "pasta" }, output: [{ id: "rec-abc123", title: "Pasta Carbonara", tags: ["italian", "pasta"] }] }
+    }
+  ],
 
-How an app uses it:
-1. Discover: AIMEAT.capabilities.get('cortex:recipe-manager')
-2. Load: await loadScript('/v1/cortex/recipe-manager/libs/recipe-manager.js')
-3. Use: const results = await RecipeManager.search('pasta')
+  dependencies: [
+    { type: "sdk", id: "aimeat-data", required: true },
+    { type: "sdk", id: "aimeat-storage", required: false }
+  ],
 
-The app doesn't need to know about memory keys, schemas, or data
-structure. The cortex handles everything internally.
+  whenToUse: "Use when your app needs recipe management. Handles all storage, search, and sharing internally.",
+  whenNotToUse: "Not needed if you just want to store raw JSON data. Use AIMEAT.data directly for simple key-value storage."
+}
 ```
 
-This is the power of cortex capabilities: they abstract entire domains
-into a single loadable package. The capability layer makes them discoverable
-and their usage self-documenting.
+**What the AI does with this:**
+
+1. Reads the capability: sees exports, schemas, dependencies
+2. Knows to load aimeat-data first, then the cortex library
+3. Writes app code using the exact function signatures from exports
+4. Knows the exact shape of inputs and outputs, no guessing
+
+```javascript
+async function startApp(session) {
+  // Dependencies first (from capability.dependencies)
+  await loadScript('/v1/libs/aimeat-data.js');
+  
+  // Then the cortex library (from capability.usage)
+  await loadScript('/v1/cortex/recipe-manager/libs/recipe-manager.js');
+
+  // Use the exported functions (from capability.exports)
+  const recipes = await RecipeManager.search({ query: 'pasta' });
+  const newRecipe = await RecipeManager.create({
+    title: 'My Recipe',
+    ingredients: [{ name: 'flour', amount: '500g' }],
+    steps: ['Mix ingredients', 'Bake at 200C'],
+    tags: ['baking'],
+  });
+}
+```
+
+The app does not interact with memory or storage directly.
+The cortex handles that internally. The capability metadata
+tells the AI everything it needs to write correct code.
 
 ### What capabilities are NOT
 
