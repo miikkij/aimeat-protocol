@@ -37,7 +37,10 @@ interface CapabilityRecord {
   ownerGhii: string;             // who created/owns this
   visibility: 'private' | 'owner' | 'public';
   scope: 'local';                // federation scope added later ('local' | 'federation')
-  status: 'draft' | 'active' | 'disabled';
+  status: 'draft' | 'pending_review' | 'active' | 'deprecated' | 'rejected' | 'disabled';
+  rejectionReason: string | null;    // operator's reason when status = 'rejected'
+  deprecationMessage: string | null; // reason/migration guide when status = 'deprecated'
+  replacedBy: string | null;         // capability ID of the successor, if deprecated
 
   // Source tracking (what underlying system provides this)
   source: {
@@ -90,7 +93,11 @@ interface CapabilityRecord {
     type: 'sdk' | 'capability';
     id: string;                  // e.g. "aimeat-data", "cortex:aimeat-canvas", "ext:physics:collider"
     required: boolean;           // true = must have, false = optional enhancement
+    minVersion: string | null;   // semver constraint, e.g. ">=1.2.0". null = any version.
   }>;
+  // Schema change detection: hash of inputSchema + outputSchema.
+  // When this changes, dependent capabilities are notified.
+  schemaHash: string;            // SHA-256 of JSON.stringify(inputSchema) + JSON.stringify(outputSchema)
   // Load order: dependencies must be loaded before this capability.
   // The SDK library / app template should load in this order:
   // 1. aimeat-auth.js (always first)
@@ -100,10 +107,26 @@ interface CapabilityRecord {
 
   // Manual source invocation target (only for source.type === 'manual' && callable === true)
   webhookUrl: string | null;     // HTTP POST target, must accept { input } and return { result }
+                                 // Domain must be on operator's allowlist if node.capabilities.webhooks === 'allowlist_only'
 
   // Economy and trust
   cost: { morsels: number; perUnit?: string } | null;
   trustRequired: number | null;
+
+  // Trust signals (builds over time, helps users evaluate safety)
+  trust: {
+    operatorReviewed: boolean;   // operator has explicitly reviewed and approved
+    reviewedAt: string | null;
+    vouchCount: number;          // number of users who vouched for this capability
+    publisherTrustScore: number; // owner's trust score at time of last review
+    codeAudited: boolean;        // operator has audited the source code
+    auditNotes: string | null;   // operator's audit notes (visible to users)
+  };
+
+  // Privacy: which input fields contain sensitive data and should not be logged
+  redactedFields: string[];      // JSON paths to redact in logs, e.g. ["text", "personal.email"]
+                                 // When set, CapabilityLogEntry.input stores redacted copy
+                                 // When empty, full input is logged (default for non-sensitive capabilities)
 
   // Operator override (enrichment without modifying the source system)
   operatorOverride: {
@@ -287,22 +310,23 @@ POST /v1/capabilities/:id/invoke
 ### Invoke proxy routing
 
 The proxy determines where to forward based on `source.type`.
-All callable capabilities return sync results through the same interface.
 
-| source.type | callable | Invoke behavior | Notes |
-|-------------|----------|----------------|-------|
-| `extension` | true | `POST /v1/ext/:extName/:actionId` | Server-side WASM sandbox |
-| `manual` | true | HTTP POST to `webhookUrl` | User-provided endpoint, must return `{ result }` |
-| `cortex` | true | Export function invocation (see below) | Client-side or server-side depending on caller |
-| `action` | false | Returns 400 NOT_CALLABLE | Actions use the async work queue |
-| `app` | false | Returns 400 NOT_CALLABLE | Usage field explains how to access the app |
+| source.type | callable | Invoke behavior | Who can invoke |
+|-------------|----------|----------------|----------------|
+| `extension` | true | `POST /v1/ext/:extName/:actionId` | Everyone (server-side WASM sandbox) |
+| `manual` | true | HTTP POST to `webhookUrl` | Everyone (server-side HTTP call) |
+| `cortex` | true | Client-side JS execution | Browser apps only (via SDK) |
+| `action` | false | Returns 400 NOT_CALLABLE | N/A, use work queue API |
+| `app` | false | Returns 400 NOT_CALLABLE | N/A, access via download URL |
 
-### Cortex invoke: two execution modes
+### Cortex invoke: browser-only
 
-Cortex capabilities are callable through the same `invoke()` interface
-as extensions and webhooks. The execution mode depends on who is calling.
+**IMPORTANT: Cortex modules are browser-only by design.** The AIMEAT
+architecture explicitly states "No server-side execution" for cortex.
+Cortex code uses browser APIs (DOM, fetch, localStorage) and SDK
+libraries (AIMEAT.data, AIMEAT.storage) that are browser-side.
 
-**Mode 1: Client-side invoke (browser apps via SDK)**
+**Browser invoke (via SDK):**
 
 When `AIMEAT.capabilities.invoke('cortex:recipe-manager:search', { query: 'pasta' })`
 is called from a browser app:
@@ -313,100 +337,52 @@ is called from a browser app:
 4. SDK returns the result
 
 No server round-trip. The cortex code runs in the user's browser
-with access to `AIMEAT.data`, `AIMEAT.storage`, etc. through the
+with access to AIMEAT.data, AIMEAT.storage, etc. through the
 already-loaded SDK libraries.
 
-**Mode 2: Server-side invoke (MCP / REST API)**
+**API/MCP callers (agents):**
 
 When `POST /v1/capabilities/:id/invoke` is called from an API client
-or MCP tool (Claude Code, Copilot, custom agent):
+or MCP tool for a cortex capability, the server returns:
 
-1. Server loads the cortex library source code
-2. Server executes in a WASM sandbox (same QuickJS isolate as extensions)
-3. Server returns the result
+```json
+{
+  "ok": false,
+  "error": {
+    "code": "BROWSER_ONLY",
+    "message": "This capability is browser-only. Use it in an AIMEAT app, not via API."
+  }
+}
+```
 
-This enables MCP/API callers to use cortex capabilities without a browser.
+MCP tool `aimeat_capabilities_invoke` returns the same error for cortex.
+The capability metadata (exports, schemas, examples) is still fully
+visible via `aimeat_capabilities_get` so the agent knows what the
+cortex does, even if it cannot invoke it directly.
 
-**Server-side cortex execution: security requirements**
+### What agents use vs what apps use
 
-Server-side cortex invoke runs UNTRUSTED USER CODE. This requires
-the same security model as extensions, plus additional hardening
-because cortex code was originally designed for browsers, not servers.
+| Feature | Browser apps (GHII) | AI agents (GAII) |
+|---------|--------------------|--------------------|
+| Memory, Storage, Boards | SDK libraries (AIMEAT.data, etc.) | REST API (/v1/memory, etc.) |
+| Extensions | Capability invoke (via SDK) | Capability invoke (via API/MCP) |
+| Manual webhooks | Capability invoke (via SDK) | Capability invoke (via API/MCP) |
+| Cortex modules | Capability invoke (via SDK) or loadScript | NOT available, browser-only |
+| Actions (work queue) | REST API or AIMEAT.work SDK | REST API or MCP tools |
+| Realtime P2P | AimeatRealtime (browser WebSocket) | NOT available, browser-only |
 
-Mandatory security constraints:
-
-| Constraint | Value | Why |
-|-----------|-------|-----|
-| Memory limit | 64 MB per invocation | Prevent memory exhaustion |
-| CPU timeout | 5 seconds per invocation | Prevent infinite loops |
-| API call limit | 50 calls per invocation | Prevent API flooding |
-| Network access | None (no fetch, no WebSocket) | Cortex code must only use ctx.memory/ctx.storage APIs |
-| File system | None | WASM sandbox has no FS access |
-| Global scope | Isolated per invocation | No state leaks between calls |
-
-Sandbox API surface (what the cortex code CAN access server-side):
-
-| API | Provides | Scoped to |
-|-----|----------|-----------|
-| `ctx.memory.get(key)` | Read memory | Caller's identity only |
-| `ctx.memory.set(key, value, opts)` | Write memory | Caller's identity only |
-| `ctx.memory.search(query)` | Search memory | Caller's visible data only |
-| `ctx.memory.getPublic(gaii, key)` | Read public memory | Public data only |
-| `ctx.storage.upload(data, opts)` | Upload file | Caller's quota |
-| `ctx.storage.download(key)` | Download file | Caller's files + public |
-| `ctx.storage.list()` | List files | Caller's files only |
-| `ctx.caller` | Identity info | Read-only: gaii, owner, roles |
-| `ctx.log(msg)` | Logging | Captured, not printed |
-
-What the cortex code CANNOT access server-side:
-
-- `fetch()`, `XMLHttpRequest`, `WebSocket` - no outbound network
-- `process`, `require`, `import` - no Node.js APIs
-- Other users' private memory or storage
-- The AIMEAT configuration or internal state
-- Other capabilities or extensions (no lateral movement)
-- DOM APIs (`document`, `window`) - no browser environment
-
-Additional protections:
-
-- **Input validation**: invoke proxy validates input against the
-  capability's `inputSchema` BEFORE passing to the sandbox. Malformed
-  input never reaches the cortex code.
-- **Output validation**: result is validated against `outputSchema`.
-  If the cortex returns unexpected data, the invoke returns an error
-  instead of passing potentially malicious output to the caller.
-- **Rate limiting**: per-capability rate limit (configurable, default
-  60 invocations per minute per caller). Prevents abuse of
-  computationally expensive capabilities.
-- **Audit logging**: every server-side cortex invoke is logged with
-  caller identity, input hash, duration, and success/error status.
-  Operator can review in admin dashboard.
-- **Operator kill switch**: operator can disable any capability
-  instantly via override. Disabled capabilities return 403 on invoke.
-- **No state between invocations**: each server-side invoke gets a
-  fresh sandbox. No global variables, caches, or timers persist.
-  The only persistence is through explicit ctx.memory/ctx.storage calls.
-
-**Browser vs server capability matrix:**
-
-| Aspect | Browser (Mode 1) | Server (Mode 2) |
-|--------|-----------------|-----------------|
-| Execution | Direct JS in page | WASM sandbox (QuickJS) |
-| Data access | Via loaded SDK libs | Via ctx.memory/ctx.storage |
-| Network | Full (fetch, WS) | None |
-| DOM | Available | Not available |
-| Performance | Fast (no sandbox overhead) | Slower (sandbox init ~10ms) |
-| Security model | Same-origin browser sandbox | Strict WASM isolation |
-| Who uses it | Browser apps | MCP, REST API, agents |
+Agents operate through the REST API and MCP tools. They can invoke
+extensions and manual webhooks through the capability layer, and use
+memory/storage/boards/work through the existing API. They do not use
+browser-only features (cortex, realtime P2P, SDK libraries).
 
 ### Direct use still available
 
-The invoke interface is the **recommended** way to use capabilities
-because it works the same everywhere. But direct use remains available
-for apps that need more control:
+For browser apps, the invoke interface is the **recommended** way to
+use capabilities. But direct use remains available for more control:
 
 ```javascript
-// Option A: Smart invoke (recommended, works for everything)
+// Option A: Smart invoke (recommended)
 const result = await AIMEAT.capabilities.invoke('cortex:recipe-manager:search', { query: 'pasta' });
 
 // Option B: Direct use (more control, browser only)
@@ -414,26 +390,24 @@ await loadScript('/v1/cortex/recipe-manager/libs/recipe-manager.js');
 const result = await RecipeManager.search({ query: 'pasta' });
 ```
 
-Option A is simpler and portable. Option B gives access to the full
-library API including functions that may not be exposed as capability
-exports.
+Option A is simpler. Option B gives access to the full library API
+including functions that may not be exposed as capability exports.
 
 ### Capability types summary
 
-**Callable capabilities** (invoke via unified interface, sync result):
-- **Extensions**: Server-side WASM sandbox. Always server-side.
-- **Manual webhooks**: HTTP POST to user endpoint. Always server-side.
-- **Cortex exports**: Client-side in browser, server-side WASM for API/MCP callers.
+**Callable everywhere** (invoke via API, MCP, or SDK):
+- **Extensions**: Server-side WASM sandbox.
+- **Manual webhooks**: Server-side HTTP POST.
 
-**Discoverable capabilities** (use via other APIs):
+**Callable in browser only** (invoke via SDK only):
+- **Cortex exports**: Client-side JS in the user's browser. Not available to agents via API/MCP.
+
+**Discoverable only** (not callable, use other APIs):
 - **Actions**: Async work queue. Discovery only, invoke via work queue API.
 - **Apps**: Discovery only, access via download URL.
 
 **Not aggregated:**
 - **SDK libraries**: Infrastructure, always available, documented in /v1/libs.
-
-Cortex modules are the most versatile: they provide loadable libraries
-for direct use AND callable exports through the unified invoke interface.
 
   Examples of cortex capabilities:
   - `aimeat-charts`: data visualization (bar, line, pie charts)
@@ -757,64 +731,507 @@ New tab in the user profile, showing only the user's own capabilities.
 
 ---
 
-## 8. Storage Layer
+## 8. Operator Configuration
 
-### New storage interface methods
+Three node-level config settings control who can publish capabilities.
 
-```typescript
-// CRUD
-createCapability(record: CapabilityRecord): Promise<void>
-getCapability(id: string): Promise<CapabilityRecord | null>
-updateCapability(id: string, updates: Partial<CapabilityRecord>): Promise<void>
-deleteCapability(id: string): Promise<void>
+### Publishing policy
 
-// Discovery
-listCapabilities(filters: {
-  ownerGhii?: string;
-  visibility?: string;
-  status?: string;
-  sourceType?: string;
-  callable?: boolean;
-  authRequired?: string;
-  tags?: string[];
-  search?: string;
-  page?: number;
-  perPage?: number;
-}): Promise<{ capabilities: CapabilityRecord[]; total: number }>
-
-// Stats
-incrementCapabilityStats(id: string, success: boolean, durationMs: number, error?: string): Promise<void>
-
-// Logs
-addCapabilityLog(entry: CapabilityLogEntry): Promise<void>
-listCapabilityLogs(id: string, filters: { status?: string; page?: number; perPage?: number }): Promise<{ logs: CapabilityLogEntry[]; total: number }>
-
-// Operator
-setCapabilityOverride(id: string, override: CapabilityRecord['operatorOverride']): Promise<void>
+```
+node.capabilities.publishing = 'disabled' | 'self_only' | 'moderated' | 'open'
 ```
 
-Both SQLite and MongoDB backends must implement these methods.
+| Value | Behavior |
+|-------|----------|
+| `disabled` | Only operator can create capabilities. Aggregator still creates from extensions/actions/cortex automatically. Users cannot create manual capabilities. **Default for new nodes.** |
+| `self_only` | Users can create capabilities with `visibility: private` only. Cannot publish `public`. Good for development/sandbox. |
+| `moderated` | Users can create public capabilities but they enter `status: pending_review`. Operator approves or rejects. Status becomes `active` or `rejected` (with reason). |
+| `open` | Users can publish directly. Operator can still disable via override after the fact. |
+
+### Publisher restrictions
+
+```
+node.capabilities.publishers = 'all_users' | 'trusted_only' | 'allowlist'
+```
+
+| Value | Behavior |
+|-------|----------|
+| `all_users` | Any registered user can publish (subject to publishing policy) |
+| `trusted_only` | Only users with `trustScore >= node.capabilities.minPublisherTrust` (default: 50) |
+| `allowlist` | Only GHII identities explicitly listed in `node.capabilities.publisherAllowlist` |
+
+### Webhook domain control
+
+```
+node.capabilities.webhooks = 'disabled' | 'allowlist_only' | 'open'
+```
+
+| Value | Behavior |
+|-------|----------|
+| `disabled` | No manual webhook capabilities allowed. Eliminates the proxy abuse vector entirely. **Default.** |
+| `allowlist_only` | Webhook URL domain must be on `node.capabilities.webhookDomainAllowlist`. Operator explicitly permits specific domains. |
+| `open` | Any webhook URL accepted. Only for trusted environments. |
+
+This prevents the node from becoming a free traffic forwarder. A public
+capability with a webhook the owner controls could make the node an
+outbound proxy. Domain allowlisting stops this.
+
+### Moderation flow
+
+When `publishing = 'moderated'`:
+
+1. User creates capability with `visibility: public`
+2. System sets `status: pending_review` (not `active`)
+3. Capability appears in admin dashboard under "Pending Review" filter
+4. Operator reviews: checks code, schemas, webhook URL, description
+5. Operator clicks Approve (`status: active`) or Reject (`status: rejected`, adds `rejectionReason`)
+6. User sees status in their profile tab:
+   - `pending_review`: "Waiting for operator approval"
+   - `rejected`: shows operator's reason, user can edit and resubmit
+7. Resubmission resets status to `pending_review`
+
+---
+
+## 9. Webhook Security
+
+Manual webhook capabilities are the primary attack surface. Additional
+protections beyond the domain allowlist:
+
+### Request limits
+
+The node's existing rate limiting middleware (`rate-limit.ts`) already
+handles per-caller rate limiting with role-based multipliers (operator
+10x, owner 2x, agent 1x, anonymous 0.5x). Capability invoke endpoints
+use this automatically. No new per-caller rate limiting needed.
+
+Additional webhook-specific limits (these are about outbound egress,
+which the existing rate limiter does not cover):
+
+| Limit | Default | Why |
+|-------|---------|-----|
+| Request body size | 1 MB | Prevent oversized payloads to webhook |
+| Response body size | 10 MB | Prevent memory exhaustion from large responses |
+| Response timeout | 10 seconds | Prevent slow-loris style resource holding |
+| Rate limit per webhook domain | 300/min total | Prevent single-domain flooding (egress) |
+
+### Request signing
+
+The invoke proxy signs outbound webhook requests so the webhook
+endpoint can verify they came from this AIMEAT node:
+
+```
+POST <webhookUrl>
+Content-Type: application/json
+X-AIMEAT-Node: <nodeId>
+X-AIMEAT-Signature: <Ed25519 signature of body>
+X-AIMEAT-Timestamp: <ISO 8601>
+
+{ "input": { ... }, "caller": "<callerGhii>", "capability": "<capabilityId>" }
+```
+
+### Egress restrictions
+
+- Webhook URLs must use HTTPS (no HTTP)
+- No loopback addresses (127.0.0.1, ::1, localhost)
+- No private network ranges (10.x, 172.16-31.x, 192.168.x)
+- No metadata endpoints (169.254.169.254)
+
+---
+
+## 10. Stats Architecture
+
+### Write contention problem
+
+The current design writes stats to `CapabilityRecord.stats` on every
+invoke. For popular capabilities, this becomes a write contention hotspot.
+
+### Solution: append-only log with periodic rollup
+
+Instead of updating CapabilityRecord on every invoke:
+
+1. **Each invoke appends to a stats buffer** (in-memory queue)
+2. **Periodic rollup job** (every 60 seconds) aggregates the buffer
+   and updates `CapabilityRecord.stats` in a single write
+3. **CapabilityLogEntry** stores individual invocations for the
+   detail log (operator dashboard)
+
+This means `stats` on the record may be up to 60 seconds stale,
+which is acceptable for dashboard display. The individual log
+entries are real-time.
+
+### Stats buffer implementation
+
+```typescript
+// In-memory during normal operation
+const statsBuffer: Map<string, { success: number, error: number, totalMs: number, lastError: string | null }>;
+
+// Flushed to storage every 60 seconds by the scheduler
+function flushStatsBuffer(): void {
+  for (const [capId, delta] of statsBuffer) {
+    storage.incrementCapabilityStats(capId, delta);
+  }
+  statsBuffer.clear();
+}
+```
+
+---
+
+## 11. PII Protection in Logs
+
+### Problem
+
+`CapabilityLogEntry.input` stores the full input payload. For a
+"translate" capability, input might contain private text. For a
+"profile-lookup" capability, input might contain personal identifiers.
+Default-on full input logging is a privacy risk.
+
+### Solution: per-capability redaction policy
+
+Each capability declares `redactedFields: string[]` listing JSON paths
+that contain sensitive data:
+
+```json
+{
+  "id": "translate-text",
+  "redactedFields": ["text", "personal.email"],
+  ...
+}
+```
+
+### Logging behavior
+
+| redactedFields | What is logged |
+|----------------|---------------|
+| `[]` (empty) | Full input logged (default for non-sensitive capabilities) |
+| `["text"]` | Input logged with `text` field replaced by `"[REDACTED]"` |
+| `["*"]` | Only input hash logged, no field values. For maximally sensitive capabilities. |
+
+### Error logging exception
+
+When `status: error`, the full input (unredacted) is logged regardless
+of redaction policy. This is necessary for debugging. Error logs are
+visible only to the capability owner and the operator, never to the
+public. Error logs are auto-deleted after 7 days (configurable).
+
+---
+
+## 12. Storage Layer
+
+Follows the same patterns as all existing AIMEAT storage domains:
+repository interface in `interface.ts`, SQLite implementation in
+`providers/sqlite/repos/`, MongoDB implementation in `providers/mongodb/repos/`.
+
+### Repository interface: CapabilityRepository
+
+Add to `src/storage/repositories/capability.repository.ts` and include
+in the `Storage` intersection type in `interface.ts`.
+
+```typescript
+export interface CapabilityRepository {
+  // CRUD
+  createCapability(record: CapabilityRecord): Promise<CapabilityRecord>;
+  getCapability(id: string): Promise<CapabilityRecord | null>;
+  updateCapability(id: string, updates: Partial<CapabilityRecord>): Promise<CapabilityRecord | null>;
+  deleteCapability(id: string): Promise<boolean>;
+
+  // Discovery
+  listCapabilities(filters: {
+    ownerGhii?: string;
+    visibility?: string;
+    status?: string;
+    sourceType?: string;
+    callable?: boolean;
+    authRequired?: string;
+    tags?: string[];
+    search?: string;
+    page?: number;
+    perPage?: number;
+  }): Promise<{ capabilities: CapabilityRecord[]; total: number }>;
+
+  // Owner-scoped list
+  listCapabilitiesByOwner(ownerGhii: string): Promise<CapabilityRecord[]>;
+
+  // Source-based lookup (for aggregator)
+  getCapabilityBySourceRef(sourceRef: string): Promise<CapabilityRecord | null>;
+  listCapabilitiesBySourceType(sourceType: string): Promise<CapabilityRecord[]>;
+
+  // Stats (batch update from stats buffer)
+  incrementCapabilityStats(id: string, delta: {
+    success: number; error: number; totalMs: number; lastError?: string;
+  }): Promise<void>;
+
+  // Logs
+  addCapabilityLog(entry: CapabilityLogEntry): Promise<void>;
+  listCapabilityLogs(capabilityId: string, filters: {
+    status?: 'success' | 'error';
+    page?: number;
+    perPage?: number;
+  }): Promise<{ logs: CapabilityLogEntry[]; total: number }>;
+  deleteCapabilityLogsBefore(before: string): Promise<number>; // cleanup job
+
+  // Operator override
+  setCapabilityOverride(id: string, override: CapabilityRecord['operatorOverride']): Promise<void>;
+
+  // Trust signals
+  setCapabilityTrust(id: string, trust: Partial<CapabilityRecord['trust']>): Promise<void>;
+  incrementVouchCount(id: string): Promise<void>;
+}
+```
 
 ### CapabilityLogEntry
 
 ```typescript
 interface CapabilityLogEntry {
-  id: string;
+  id: string;                    // UUID
   capabilityId: string;
   callerGhii: string;
-  input: object;
+  input: object;                 // redacted per capability.redactedFields
   status: 'success' | 'error';
   durationMs: number;
   error: string | null;
-  timestamp: string;
+  timestamp: string;             // ISO 8601
 }
 ```
 
-Log retention: configurable, default 30 days. Background job cleans old entries.
+### SQLite schema
+
+Add to `providers/sqlite/schema.ts`:
+
+```sql
+CREATE TABLE IF NOT EXISTS capabilities (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  summary     TEXT NOT NULL DEFAULT '',
+  ownerGhii   TEXT NOT NULL,
+  visibility  TEXT NOT NULL DEFAULT 'private',
+  scope       TEXT NOT NULL DEFAULT 'local',
+  status      TEXT NOT NULL DEFAULT 'draft',
+  rejectionReason TEXT,
+  sourceType  TEXT NOT NULL,
+  sourceRef   TEXT NOT NULL,
+  sourceVersion TEXT NOT NULL DEFAULT '',
+  authRequired TEXT NOT NULL DEFAULT 'registered',
+  callable    INTEGER NOT NULL DEFAULT 0,
+  inputSchema TEXT DEFAULT '{}',
+  outputSchema TEXT DEFAULT '{}',
+  exports     TEXT DEFAULT '[]',
+  usage       TEXT NOT NULL DEFAULT '',
+  whenToUse   TEXT NOT NULL DEFAULT '',
+  whenNotToUse TEXT NOT NULL DEFAULT '',
+  examples    TEXT NOT NULL DEFAULT '[]',
+  dependencies TEXT NOT NULL DEFAULT '[]',
+  schemaHash  TEXT NOT NULL DEFAULT '',
+  webhookUrl  TEXT,
+  cost        TEXT,
+  trustRequired REAL,
+  trust       TEXT NOT NULL DEFAULT '{}',
+  redactedFields TEXT NOT NULL DEFAULT '[]',
+  operatorOverride TEXT,
+  stats       TEXT NOT NULL DEFAULT '{"totalInvocations":0,"successCount":0,"errorCount":0,"lastInvokedAt":null,"avgResponseMs":0,"lastError":null}',
+  tags        TEXT NOT NULL DEFAULT '[]',
+  createdAt   TEXT NOT NULL,
+  updatedAt   TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_capabilities_owner ON capabilities(ownerGhii);
+CREATE INDEX IF NOT EXISTS idx_capabilities_source ON capabilities(sourceType, sourceRef);
+CREATE INDEX IF NOT EXISTS idx_capabilities_status ON capabilities(status);
+CREATE INDEX IF NOT EXISTS idx_capabilities_visibility ON capabilities(visibility);
+
+CREATE TABLE IF NOT EXISTS capability_logs (
+  id            TEXT PRIMARY KEY,
+  capabilityId  TEXT NOT NULL,
+  callerGhii    TEXT NOT NULL,
+  input         TEXT NOT NULL DEFAULT '{}',
+  status        TEXT NOT NULL,
+  durationMs    INTEGER NOT NULL DEFAULT 0,
+  error         TEXT,
+  timestamp     TEXT NOT NULL,
+  FOREIGN KEY (capabilityId) REFERENCES capabilities(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_capability_logs_cap ON capability_logs(capabilityId, timestamp);
+CREATE INDEX IF NOT EXISTS idx_capability_logs_status ON capability_logs(capabilityId, status);
+```
+
+### SQLite implementation
+
+File: `providers/sqlite/repos/capability.ts`
+
+Follows the same pattern as `repos/action.ts` and `repos/community.ts`:
+- `deserializeCapability(row)` helper: JSON.parse for complex fields (inputSchema, outputSchema, exports, examples, dependencies, cost, trust, operatorOverride, stats, tags, redactedFields)
+- Plain exported functions: `createCapability(db, record)`, `getCapability(db, id)`, etc.
+- `listCapabilities` fetches all matching rows, applies search filter in JS (case-insensitive on name, summary, tags), paginates with `.slice()`
+
+### MongoDB implementation
+
+File: `providers/mongodb/repos/capability.ts`
+
+Same interface, using the Prisma schema. Collection: `capabilities`. Log collection: `capabilityLogs`.
+- Filters map to Prisma `where` clauses
+- Search uses `$regex` on name and summary fields
+- Stats increment uses `$inc` operator
+- Log cleanup uses `deleteMany` with timestamp filter
+
+Both implementations must pass the same test suite.
+
+Log retention: configurable via `node.capabilities.logRetentionDays` (default 30).
+Background cleanup job runs daily, deletes logs older than retention period.
 
 ---
 
-## 9. Files to Create/Modify
+## 12b. Testing
+
+### Unit tests: `test/unit/capability-storage.test.ts`
+
+Vitest, in-memory SQLite. Follows the same pattern as `unit/extension-storage.test.ts`.
+
+```typescript
+import { describe, it, expect, beforeEach } from 'vitest';
+import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
+
+function makeCapability(overrides: Partial<CapabilityRecord> = {}): CapabilityRecord {
+  return {
+    id: 'test-cap-' + Math.random().toString(36).slice(2, 8),
+    name: 'Test Capability',
+    summary: 'A test capability',
+    ownerGhii: 'testuser@test-node',
+    visibility: 'public',
+    scope: 'local',
+    status: 'active',
+    rejectionReason: null,
+    source: { type: 'manual', ref: 'manual', version: '1.0.0' },
+    authRequired: 'registered',
+    callable: true,
+    inputSchema: { type: 'object', properties: { q: { type: 'string' } } },
+    outputSchema: { type: 'object', properties: { result: { type: 'string' } } },
+    exports: null,
+    usage: 'await AIMEAT.capabilities.invoke("test-cap", { q: "hello" })',
+    whenToUse: 'When testing',
+    whenNotToUse: 'In production',
+    examples: [{ description: 'Basic', input: { q: 'hello' }, output: { result: 'world' } }],
+    dependencies: [],
+    schemaHash: 'abc123',
+    webhookUrl: null,
+    cost: null,
+    trustRequired: null,
+    trust: { operatorReviewed: false, reviewedAt: null, vouchCount: 0, publisherTrustScore: 0, codeAudited: false, auditNotes: null },
+    redactedFields: [],
+    operatorOverride: null,
+    stats: { totalInvocations: 0, successCount: 0, errorCount: 0, lastInvokedAt: null, avgResponseMs: 0, lastError: null },
+    tags: ['test'],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    ...overrides,
+  };
+}
+
+describe('CapabilityRepository', () => {
+  let storage: SqliteStorage;
+  beforeEach(() => { storage = new SqliteStorage(':memory:'); });
+
+  it('create and retrieve', async () => { ... });
+  it('get returns null for non-existent', async () => { ... });
+  it('list with filters (visibility, status, sourceType, callable, tags, search)', async () => { ... });
+  it('list by owner', async () => { ... });
+  it('update and verify persisted', async () => { ... });
+  it('update non-existent returns null', async () => { ... });
+  it('delete', async () => { ... });
+  it('delete non-existent returns false', async () => { ... });
+  it('getBySourceRef', async () => { ... });
+  it('incrementStats', async () => { ... });
+  it('addLog and listLogs', async () => { ... });
+  it('deleteLogsBefore', async () => { ... });
+  it('setOverride', async () => { ... });
+  it('setTrust and incrementVouch', async () => { ... });
+});
+```
+
+### E2E test: `test/e2e-capabilities.ts`
+
+Standalone script, same boilerplate as other E2E files. Tests the full
+HTTP lifecycle against a live server.
+
+```
+Phase 0 -- Setup
+  Register owner, authenticate, register agent, authenticate agent.
+
+Phase 1 -- Manual Capability CRUD
+  POST /v1/capabilities (create manual capability, visibility: private)
+  GET /v1/capabilities/:id (verify created)
+  PUT /v1/capabilities/:id (update summary)
+  GET /v1/capabilities (list, verify appears)
+  GET /v1/capabilities (search by name)
+  GET /v1/capabilities (filter by callable, authRequired, tags)
+  DELETE /v1/capabilities/:id (delete)
+  GET /v1/capabilities/:id (verify 404)
+
+Phase 2 -- Visibility and Auth
+  Create public capability
+  Verify anonymous can see it in list (GET /v1/capabilities without auth)
+  Create private capability
+  Verify anonymous cannot see it
+  Verify owner can see it
+  Test authRequired enforcement on invoke
+
+Phase 3 -- Extension Capability Invoke
+  Install and activate a test extension
+  Wait for aggregator to create capability
+  GET /v1/capabilities (verify extension appears as callable)
+  POST /v1/capabilities/:id/invoke (invoke extension via capability)
+  Verify result matches direct extension call
+  Test ?mode=raw returns original response
+
+Phase 4 -- Manual Webhook Invoke
+  Create manual capability with webhookUrl (use a test echo endpoint)
+  POST /v1/capabilities/:id/invoke
+  Verify result from webhook
+
+Phase 5 -- Cortex Capability Invoke
+  Install and activate a test cortex with exports
+  Wait for aggregator to create capability
+  POST /v1/capabilities/:id/invoke (invoke cortex export)
+  Verify result
+
+Phase 6 -- Stats and Logging
+  Invoke a capability multiple times
+  GET /v1/capabilities/:id (verify stats updated)
+  GET /v1/admin/capabilities/:id/logs (verify logs recorded)
+
+Phase 7 -- Operator Override
+  PUT /v1/admin/capabilities/:id/override (disable a capability)
+  POST /v1/capabilities/:id/invoke (verify 403)
+  PUT /v1/admin/capabilities/:id/override (re-enable)
+  POST /v1/capabilities/:id/invoke (verify works again)
+
+Phase 8 -- Moderation Flow (if publishing=moderated)
+  Create capability with visibility: public
+  Verify status is pending_review
+  Verify not in public list
+  PUT /v1/admin/capabilities/:id/override (approve -> active)
+  Verify appears in public list
+
+Phase 9 -- Capability Test Endpoint
+  Create manual webhook capability (status: draft)
+  POST /v1/capabilities/:id/test (dry-run invoke)
+  Verify result and schema validation report
+
+Phase 10 -- Cleanup
+  Delete test owner (cascade)
+
+Summary: print pass/fail counts, exit code.
+```
+
+### E2E test coverage for both backends
+
+The test suite runs on both SQLite and MongoDB via the existing
+`pnpm test:e2e:sqlite` and `pnpm test:e2e:mongodb` commands.
+The test runner (`test/run-e2e-ci.ts`) automatically discovers
+new `e2e-*.ts` files.
+
+---
+
+## 13. Files to Create/Modify
 
 ### New files
 
@@ -854,7 +1271,7 @@ Extensions, actions, cortex, packages, SDK libraries, and MCP core tools remain 
 
 ---
 
-## 10. Usage Patterns
+## 14. Usage Patterns
 
 Two distinct paths for using capabilities, depending on who is consuming them.
 
@@ -1059,19 +1476,800 @@ Capabilities are for:
 
 ---
 
-## 11. Success Criteria
+## 15. Creating Capabilities: End-to-End Guides
 
-(renumbered from 10)
+These guides cover the full path from idea to working capability,
+including ALL components that need to be created. They serve as
+templates for AI chats and VS Code / Claude Code to follow.
+
+Two delivery methods:
+- **AI chat**: AI produces all code/manifests, user copy-pastes into AIMEAT portal
+- **VS Code / Claude Code**: pushes components directly via MCP or API
+
+### Path A: Extension-based capability
+
+For capabilities that need to call external APIs or run server-side logic.
+
+**Example: weather-allergy-fi (weather + pollen + forecast for Finland)**
+
+**Step 1: Write the extension manifest (YAML)**
+
+```yaml
+metadata:
+  name: weather-allergy-fi
+  version: 1.0.0
+  description: Weather, pollen levels, and forecast for Finnish locations
+  author: myuser
+  license: MIT
+
+required_apis:
+  - memory
+
+actions:
+  - id: get-current
+    description: Get current weather and pollen for a location
+    method: POST
+    path: /get-current
+    auth: authenticated
+    input:
+      location:
+        type: string
+        required: true
+        description: City name or district (e.g. "Tapiola", "Helsinki")
+      include_forecast:
+        type: boolean
+        default: true
+      forecast_days:
+        type: number
+        default: 3
+    output:
+      current:
+        type: object
+        description: Current weather conditions
+      allergy:
+        type: object
+        description: Pollen levels by species
+      forecast:
+        type: array
+        description: Daily forecast entries
+      location:
+        type: object
+        description: Resolved location with coordinates
+    script: actions/get-current.js
+
+  - id: list-locations
+    description: List all available locations
+    method: POST
+    path: /list-locations
+    auth: authenticated
+    output:
+      locations:
+        type: array
+    script: actions/list-locations.js
+
+config:
+  openweathermap_api_key:
+    type: string
+    description: OpenWeatherMap API key (stored securely, never exposed to clients)
+  pollen_api_url:
+    type: string
+    default: https://pollen-api.example.com/finland
+    description: Pollen data API base URL
+
+schedules:
+  - id: refresh-weather
+    cron: "*/10 * * * *"
+    action: refresh-all
+    description: Refresh weather data for all locations every 10 minutes
+    input: {}
+
+limits:
+  memory_mb: 32
+  timeout_ms: 5000
+  max_api_calls: 10
+```
+
+Note: API keys are stored in extension config (`ctx.config.openweathermap_api_key`),
+never hardcoded in scripts. The operator sets config values during installation
+or via the admin dashboard. Extension scheduling (`schedules`) uses the
+node's existing background job scheduler for periodic data refresh.
+
+**Step 2: Write the extension scripts**
+
+`actions/get-current.js`:
+```javascript
+export default async function(ctx, input) {
+  const { location, include_forecast = true, forecast_days = 3 } = input;
+
+  // API key from secure extension config (set by operator, never in code)
+  const apiKey = ctx.config.openweathermap_api_key;
+  const pollenUrl = ctx.config.pollen_api_url;
+
+  // Fetch weather from external API
+  const weatherRes = await ctx.fetch(
+    `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(location)},FI&units=metric&appid=${apiKey}`
+  );
+  const weather = await weatherRes.json();
+
+  // Fetch pollen data
+  const pollenRes = await ctx.fetch(`${pollenUrl}/current`);
+  const pollen = await pollenRes.json();
+
+  const result = {
+    current: {
+      temperature: weather.main.temp,
+      humidity: weather.main.humidity,
+      wind_speed: weather.wind.speed,
+      description: weather.weather[0].description,
+    },
+    allergy: {
+      birch: pollen.birch || 'unknown',
+      grass: pollen.grass || 'unknown',
+      alder: pollen.alder || 'unknown',
+      source: pollen.source,
+      date: pollen.date,
+    },
+    location: {
+      name: weather.name,
+      lat: weather.coord.lat,
+      lon: weather.coord.lon,
+    },
+  };
+
+  if (include_forecast) {
+    const forecastRes = await ctx.fetch(
+      `https://api.openweathermap.org/data/2.5/forecast/daily?q=${encodeURIComponent(location)},FI&cnt=${forecast_days}&units=metric&appid=${apiKey}`
+    );
+    const fc = await forecastRes.json();
+    result.forecast = fc.list.map(day => ({
+      date: new Date(day.dt * 1000).toISOString().split('T')[0],
+      temp_min: day.temp.min,
+      temp_max: day.temp.max,
+      description: day.weather[0].description,
+    }));
+  }
+
+  // Cache in memory for other capabilities to read
+  await ctx.memory.set(`weather.current.${location.toLowerCase()}`, result.current);
+
+  return result;
+}
+```
+
+`actions/list-locations.js`:
+```javascript
+export default async function(ctx) {
+  const keys = await ctx.memory.list();
+  const locations = keys
+    .filter(k => k.startsWith('weather.current.'))
+    .map(k => k.replace('weather.current.', ''));
+  return { locations };
+}
+```
+
+**Step 3: Register the extension**
+
+Via AI chat (user copy-pastes):
+```
+POST /v1/extensions
+Body: { "manifest": "<YAML above>", "scripts": { "actions/get-current.js": "<JS above>", "actions/list-locations.js": "<JS above>" } }
+```
+
+Via Claude Code / MCP:
+```
+aimeat_extension_invoke is not needed - use direct API:
+session.fetch('/v1/extensions', { method: 'POST', body: JSON.stringify({ manifest, scripts }) })
+```
+
+**Step 4: Activate**
+
+```
+POST /v1/extensions/weather-allergy-fi/activate
+```
+
+**Step 5: Capability auto-appears**
+
+The aggregator creates:
+- `ext:weather-allergy-fi:get-current` (callable: true)
+- `ext:weather-allergy-fi:list-locations` (callable: true)
+
+**Step 6: Enrich the capability (optional)**
+
+```
+PUT /v1/capabilities/ext:weather-allergy-fi:get-current
+Body: {
+  "whenToUse": "Use when your app needs weather and pollen data for Finnish locations.",
+  "whenNotToUse": "Does not work outside Finland. Data is not real-time, cached for 10 minutes.",
+  "examples": [
+    {
+      "description": "Weather and pollen for Tapiola",
+      "input": { "location": "Tapiola", "include_forecast": true, "forecast_days": 3 },
+      "output": {
+        "current": { "temperature": 14, "humidity": 65, "wind_speed": 3.2, "description": "partly cloudy" },
+        "allergy": { "birch": "moderate", "grass": "none", "alder": "low", "source": "Turun yliopisto", "date": "2026-05-01" },
+        "forecast": [
+          { "date": "2026-05-02", "temp_min": 8, "temp_max": 16, "description": "sunny" }
+        ],
+        "location": { "name": "Tapiola, Espoo", "lat": 60.18, "lon": 24.80 }
+      }
+    }
+  ],
+  "tags": ["weather", "allergy", "pollen", "forecast", "finland"]
+}
+```
+
+**Result: capability is live and discoverable.**
+
+---
+
+### Path B: Manual webhook capability
+
+For users who have their own server/API they want to expose as a capability.
+
+**Example: same weather-allergy data from own server**
+
+**Step 1: Have a webhook endpoint**
+
+The user's server at `https://my-server.com/api/weather-allergy` accepts:
+```
+POST https://my-server.com/api/weather-allergy
+Content-Type: application/json
+Body: { "input": { "location": "Tapiola" }, "caller": "user@node", "capability": "weather-allergy-fi" }
+Response: { "result": { "current": { ... }, "allergy": { ... }, "forecast": [...] } }
+```
+
+**Step 2: Create the capability with full schemas**
+
+```
+POST /v1/capabilities
+Body: {
+  "id": "weather-allergy-fi",
+  "name": "Weather, Allergy & Forecast (Finland)",
+  "summary": "Current weather, pollen levels, and forecast for Finnish locations",
+  "source": { "type": "manual", "ref": "manual", "version": "1.0.0" },
+  "callable": true,
+  "webhookUrl": "https://my-server.com/api/weather-allergy",
+  "authRequired": "registered",
+  "visibility": "public",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "location": {
+        "type": "string",
+        "description": "Finnish city or district name (e.g. 'Tapiola', 'Helsinki')"
+      },
+      "include_forecast": { "type": "boolean", "default": true },
+      "forecast_days": { "type": "integer", "default": 3, "minimum": 1, "maximum": 7 }
+    },
+    "required": ["location"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "current": {
+        "type": "object",
+        "properties": {
+          "temperature": { "type": "number", "description": "Celsius" },
+          "humidity": { "type": "number", "description": "0-100%" },
+          "wind_speed": { "type": "number", "description": "m/s" },
+          "description": { "type": "string" }
+        }
+      },
+      "allergy": {
+        "type": "object",
+        "properties": {
+          "birch": { "type": "string", "enum": ["none","low","moderate","high","very_high"] },
+          "grass": { "type": "string", "enum": ["none","low","moderate","high","very_high"] },
+          "alder": { "type": "string", "enum": ["none","low","moderate","high","very_high"] },
+          "source": { "type": "string" },
+          "date": { "type": "string", "format": "date" }
+        }
+      },
+      "forecast": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "date": { "type": "string", "format": "date" },
+            "temp_min": { "type": "number" },
+            "temp_max": { "type": "number" },
+            "description": { "type": "string" },
+            "pollen_trend": { "type": "string", "enum": ["decreasing","stable","increasing"] }
+          }
+        }
+      },
+      "location": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "lat": { "type": "number" },
+          "lon": { "type": "number" }
+        }
+      }
+    }
+  },
+  "whenToUse": "Use when your app needs weather and pollen data for Finnish locations.",
+  "whenNotToUse": "Does not work outside Finland.",
+  "examples": [
+    {
+      "description": "Weather and pollen for Tapiola",
+      "input": { "location": "Tapiola", "include_forecast": true, "forecast_days": 3 },
+      "output": {
+        "current": { "temperature": 14, "humidity": 65, "wind_speed": 3.2, "description": "partly cloudy" },
+        "allergy": { "birch": "moderate", "grass": "none", "alder": "low", "source": "Turun yliopisto", "date": "2026-05-01" },
+        "forecast": [{ "date": "2026-05-02", "temp_min": 8, "temp_max": 16, "description": "sunny", "pollen_trend": "increasing" }],
+        "location": { "name": "Tapiola, Espoo", "lat": 60.18, "lon": 24.80 }
+      }
+    }
+  ],
+  "tags": ["weather", "allergy", "pollen", "forecast", "finland"]
+}
+```
+
+**Step 3: Test before publishing**
+
+```
+POST /v1/capabilities/weather-allergy-fi/test
+Body: { "input": { "location": "Tapiola" } }
+Response: { "status": "success", "result": { ... }, "validated": true, "validation_errors": [] }
+```
+
+**Step 4: Activate**
+
+If node is moderated: status goes to `pending_review`, operator approves.
+If node is open: set `status: active` via PUT.
+
+**Result: capability is live. No extension, no cortex, just a webhook.**
+
+---
+
+### Path C: Cortex + Memory (AIMEAT-native, no external APIs)
+
+The most AIMEAT-native approach. Data lives in memory, cortex library
+provides the interface. No external dependencies.
+
+**Example: weather-allergy data stored in AIMEAT memory**
+
+**Step 1: Design the memory key structure**
+
+```
+Memory keys:
+  weather.current.<location-slug>     -> WeatherCurrent object
+  weather.forecast.<location-slug>    -> WeatherForecast[] array
+  pollen.latest.<city-slug>           -> PollenData object
+  weather.locations                   -> string[] list of available location slugs
+```
+
+**Step 2: Write the cortex manifest (YAML)**
+
+```yaml
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+
+metadata:
+  name: weather-allergy
+  namespace: weather
+  description: Weather, pollen, and forecast data from AIMEAT memory
+  author: myuser
+  tags: [weather, allergy, pollen, forecast, finland]
+  visibility: public
+
+spec:
+  version: 1.0.0
+  license: MIT
+  description: Provides WeatherAllergy library for reading weather and pollen data from memory
+
+  components:
+    - type: schema
+      name: weather-current
+      key_pattern: "weather.current.*"
+      apply_to: prefix
+      schema:
+        type: object
+        properties:
+          temperature: { type: number }
+          humidity: { type: number }
+          wind_speed: { type: number }
+          description: { type: string }
+          updated_at: { type: string, format: date-time }
+        required: [temperature, humidity, wind_speed]
+
+    - type: schema
+      name: weather-forecast
+      key_pattern: "weather.forecast.*"
+      apply_to: prefix
+      schema:
+        type: array
+        items:
+          type: object
+          properties:
+            date: { type: string, format: date }
+            temp_min: { type: number }
+            temp_max: { type: number }
+            description: { type: string }
+            pollen_trend: { type: string, enum: [decreasing, stable, increasing] }
+
+    - type: schema
+      name: pollen-latest
+      key_pattern: "pollen.latest.*"
+      apply_to: prefix
+      schema:
+        type: object
+        properties:
+          birch: { type: string, enum: [none, low, moderate, high, very_high] }
+          grass: { type: string, enum: [none, low, moderate, high, very_high] }
+          alder: { type: string, enum: [none, low, moderate, high, very_high] }
+          source: { type: string }
+          date: { type: string, format: date }
+
+    - type: seed-data
+      entries:
+        - key: weather.locations
+          value: ["helsinki", "espoo-tapiola", "tampere", "turku"]
+        - key: weather.current.helsinki
+          value: { temperature: 13, humidity: 70, wind_speed: 4.1, description: "cloudy", updated_at: "2026-05-01T12:00:00Z" }
+        - key: pollen.latest.helsinki
+          value: { birch: "moderate", grass: "none", alder: "low", source: "Turun yliopisto", date: "2026-05-01" }
+
+    - type: lib
+      name: weather-allergy.js
+      filename: weather-allergy.js
+      exports: [WeatherAllergy]
+      api_surface: "WeatherAllergy.getCurrent(location), WeatherAllergy.getForecast(location, days), WeatherAllergy.listLocations(), WeatherAllergy.getAllergyLevel(location)"
+```
+
+**Step 3: Write the cortex library**
+
+`weather-allergy.js`:
+```javascript
+(function(global) {
+  'use strict';
+
+  function normalize(location) {
+    return location.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  }
+
+  function resolveCity(location) {
+    const slug = normalize(location);
+    // Map districts to cities for pollen data
+    const cityMap = {
+      'tapiola': 'espoo', 'leppavaara': 'espoo', 'matinkyla': 'espoo',
+      'kallio': 'helsinki', 'kamppi': 'helsinki', 'sodernaes': 'helsinki',
+    };
+    return cityMap[slug] || slug.split('-')[0] || slug;
+  }
+
+  const WeatherAllergy = {
+    async getCurrent(location) {
+      const slug = normalize(location);
+      const [weather, pollen] = await Promise.all([
+        AIMEAT.data.get('weather.current.' + slug),
+        AIMEAT.data.get('pollen.latest.' + resolveCity(location)),
+      ]);
+      if (!weather) return null;
+      return {
+        current: weather,
+        allergy: pollen || { birch: 'unknown', grass: 'unknown', alder: 'unknown' },
+        location: { name: location, slug },
+      };
+    },
+
+    async getForecast(location, days) {
+      const slug = normalize(location);
+      const forecast = await AIMEAT.data.get('weather.forecast.' + slug);
+      if (!forecast) return [];
+      return days ? forecast.slice(0, days) : forecast;
+    },
+
+    async listLocations() {
+      const locations = await AIMEAT.data.get('weather.locations');
+      return locations || [];
+    },
+
+    async getAllergyLevel(location) {
+      const pollen = await AIMEAT.data.get('pollen.latest.' + resolveCity(location));
+      return pollen || null;
+    },
+  };
+
+  global.WeatherAllergy = WeatherAllergy;
+  if (global.AIMEAT) global.AIMEAT.WeatherAllergy = WeatherAllergy;
+})(typeof window !== 'undefined' ? window : globalThis);
+```
+
+**Step 4: Register the cortex**
+
+Via AI chat (user copy-pastes):
+```
+POST /v1/cortex
+Body: { "manifest": "<YAML above>", "libs": { "weather-allergy.js": "<JS above>" } }
+```
+
+Via Claude Code / MCP:
+```javascript
+session.fetch('/v1/cortex', {
+  method: 'POST',
+  body: JSON.stringify({ manifest: yamlString, libs: { 'weather-allergy.js': jsSource } }),
+});
+```
+
+**Step 5: Activate**
+
+```
+POST /v1/cortex/weather-allergy/activate
+```
+
+This:
+- Locks memory schemas for `weather.current.*`, `weather.forecast.*`, `pollen.latest.*`
+- Writes seed data (initial weather entries)
+- Serves `weather-allergy.js` at `/v1/cortex/weather-allergy/libs/weather-allergy.js`
+
+**Step 6: Capability auto-appears**
+
+The aggregator creates capabilities from the cortex exports:
+- `cortex:weather-allergy:getCurrent` (callable in browser)
+- `cortex:weather-allergy:getForecast` (callable in browser)
+- `cortex:weather-allergy:listLocations` (callable in browser)
+- `cortex:weather-allergy:getAllergyLevel` (callable in browser)
+
+Each with full inputSchema/outputSchema from the cortex manifest.
+
+**Step 7: Keep data fresh**
+
+The cortex provides the interface, but someone must update the data.
+Options:
+- **Extension cron job**: a separate extension runs every 10 minutes,
+  fetches weather APIs, writes to `weather.current.*` memory keys
+- **Agent**: an AI agent runs periodically and updates the data
+- **Manual**: user updates via portal or API
+- **External webhook**: external service POSTs to `/v1/memory` via API
+
+The capability works regardless of how data is updated. Cortex reads
+whatever is in memory.
+
+**Result: cortex + memory capability. No external API at call time.
+Data is cached in AIMEAT, library provides clean interface.**
+
+---
+
+### How AI tools create these
+
+**AI chat (Claude, ChatGPT, Gemini):**
+
+1. User says "I want a weather + allergy capability"
+2. AI reads capability list to check if one already exists
+3. If not, AI asks which path (external API? own server? memory-based?)
+4. AI produces all artifacts:
+   - Path A: extension YAML + JS scripts
+   - Path B: webhook endpoint spec + capability JSON
+   - Path C: cortex YAML + JS library + seed data
+5. User copy-pastes into AIMEAT portal:
+   - Profile > Extensions > Install (for Path A)
+   - Profile > Capabilities > Create (for Path B)
+   - Profile > Cortex > Install (for Path C)
+
+**VS Code / Claude Code (via MCP):**
+
+1. AI discovers existing capabilities: `aimeat_capabilities_list`
+2. If creating new, AI writes all artifacts as files in the project
+3. AI pushes directly via MCP or API:
+   - `session.fetch('/v1/extensions', { method: 'POST', body: ... })` (Path A)
+   - `session.fetch('/v1/capabilities', { method: 'POST', body: ... })` (Path B)
+   - `session.fetch('/v1/cortex', { method: 'POST', body: ... })` (Path C)
+4. AI activates:
+   - `session.fetch('/v1/extensions/weather-allergy-fi/activate', { method: 'POST' })`
+   - or `session.fetch('/v1/cortex/weather-allergy/activate', { method: 'POST' })`
+5. Capability is live, no copy-paste needed
+
+**Key difference:** Claude Code / MCP can do everything without the
+user leaving the editor. AI chat requires the user to copy-paste
+artifacts into the AIMEAT portal.
+
+---
+
+## 16. Client-Side Telemetry
+
+### Problem
+
+Browser-side cortex invoke has two paths:
+- **Option A** (`AIMEAT.capabilities.invoke()`): goes through the SDK, can record stats
+- **Option B** (direct `RecipeManager.search()`): bypasses everything, server never knows
+
+If Option B is used, `stats.totalInvocations` undercounts and the
+operator dashboard shows incorrect usage data.
+
+### Solution
+
+The SDK `AIMEAT.capabilities.invoke()` sends a telemetry ping to the
+server after each client-side cortex invocation:
+
+```
+POST /v1/capabilities/:id/telemetry
+Authorization: Bearer <jwt>
+Body: { "duration_ms": 45, "status": "success" }
+```
+
+This is fire-and-forget (no await, no error handling). It records:
+- Invocation count
+- Duration
+- Success/error status
+
+It does NOT send the input payload (privacy). The server increments
+stats via the same stats buffer used for server-side invocations.
+
+Option B (direct use) does not generate telemetry. This is documented:
+"Direct use does not record usage statistics. Use
+`AIMEAT.capabilities.invoke()` if stats tracking matters."
+
+The telemetry endpoint is lightweight: no response body needed,
+no logging of input, just a stats counter increment.
+
+---
+
+## 17. Vouching Mechanism
+
+### Endpoints
+
+```
+POST /v1/capabilities/:id/vouch
+  Authorization: Bearer <jwt> (registered user)
+  Body: { "comment": "Works great for my weather app" }  // optional
+  Response 200: { "ok": true, "data": { "vouchCount": 42 } }
+
+  Rules:
+  - One vouch per (capability, user) pair
+  - Cannot vouch for your own capability
+  - Must be registered user (not anonymous)
+
+DELETE /v1/capabilities/:id/vouch
+  Authorization: Bearer <jwt>
+  Response 200: { "ok": true, "data": { "vouchCount": 41 } }
+```
+
+### Storage
+
+New table:
+
+```sql
+CREATE TABLE IF NOT EXISTS capability_vouches (
+  capabilityId TEXT NOT NULL,
+  userGhii     TEXT NOT NULL,
+  comment      TEXT,
+  createdAt    TEXT NOT NULL,
+  PRIMARY KEY (capabilityId, userGhii),
+  FOREIGN KEY (capabilityId) REFERENCES capabilities(id) ON DELETE CASCADE
+);
+```
+
+Repository methods:
+
+```typescript
+vouchCapability(capabilityId: string, userGhii: string, comment?: string): Promise<number>; // returns new count
+unvouchCapability(capabilityId: string, userGhii: string): Promise<number>; // returns new count
+hasVouched(capabilityId: string, userGhii: string): Promise<boolean>;
+listVouches(capabilityId: string): Promise<Array<{ userGhii: string; comment?: string; createdAt: string }>>;
+```
+
+`vouchCapability` increments `trust.vouchCount` on the CapabilityRecord.
+`unvouchCapability` decrements it. Both are atomic.
+
+### UI
+
+**Capability detail (public view):**
+- Shows vouch count with a "Vouch" button (if not own capability, not already vouched)
+- Shows list of vouchers with optional comments
+
+**Profile capabilities tab:**
+- Shows vouch count per capability the user owns
+
+**Admin dashboard:**
+- Shows vouch count in the list and detail views
+- Can see who vouched (with comments)
+
+---
+
+## 18. Additional Items (v1 scope)
+
+### Capability lifecycle
+
+```
+draft -> pending_review -> active -> deprecated -> disabled
+                       \-> rejected (can resubmit -> pending_review)
+```
+
+- `deprecated`: capability still works but shows a deprecation message
+  and points to `replacedBy` if set. Discovery results include
+  `deprecated: true` flag. Apps using the capability see a console
+  warning. Operator or owner sets this status.
+- `disabled`: capability no longer invokable. Returns 410 GONE.
+
+### Per-user invoke quota
+
+Configurable per-capability limit on how many times a single user
+can invoke per time window. Uses the same rate-limit middleware pattern.
+
+```
+node.capabilities.defaultInvokeQuota = { max: 100, windowMs: 3600000 }  // 100/hour default
+```
+
+Capability owners can override for their own capabilities:
+```
+invokeQuota: { max: 10, windowMs: 60000 }  // 10/min for expensive capabilities
+```
+
+### Anonymous access to public capabilities
+
+Public capabilities with `authRequired: 'none'` are visible in
+`GET /v1/capabilities` without any authentication. This includes
+listing and reading detail, but NOT invoking (invoke always
+requires at least an anonymous token).
+
+Public capabilities with `authRequired: 'anonymous'` can be both
+seen and invoked with just an anonymous token.
+
+### Cost/morsel billing in invoke proxy
+
+When a capability has `cost.morsels > 0`, the invoke proxy:
+
+1. Checks caller's morsel balance before forwarding
+2. Debits the cost from the caller's GHII balance (same as work queue)
+3. Credits to the capability owner's GHII balance
+4. Network fee applies (same percentage as work queue)
+5. If balance insufficient, returns 402 with clear message
+
+This reuses the existing `storage.debitBalance()` and `creditBalance()`
+methods. No new billing infrastructure needed.
+
+For `cost.perUnit`, the proxy calculates total cost based on the
+response (e.g., per 1000 tokens processed). The capability's output
+must include a `_usage` field for per-unit billing:
+```json
+{ "result": { ... }, "_usage": { "units": 2500 } }
+```
+
+### Reference to existing AIMEAT features used
+
+The capability layer builds on these existing systems (not reinvented):
+
+| Feature | Where it's used in capabilities |
+|---------|--------------------------------|
+| Rate limiting middleware | Per-endpoint invoke rate limits |
+| Extension sandbox (QuickJS WASM) | Server-side extension invoke |
+| Extension config (`ctx.config`) | Secure API key storage |
+| Extension schedules (`schedules[]`) | Cron-based data refresh |
+| Storage debitBalance/creditBalance | Morsel billing on invoke |
+| Trust scoring | trustRequired threshold checks |
+| Consent framework | Future: per-capability consent rules |
+
+---
+
+## 19. Success Criteria
 
 1. `GET /v1/capabilities` returns a unified list aggregated from extensions, actions, and cortex (not SDK libraries)
 2. `POST /v1/capabilities/:id/invoke` successfully proxies to extensions (sync) and manual webhooks (sync)
-3. Non-callable capabilities (actions, cortex, apps) return clear usage instructions instead of errors
+3. Non-callable capabilities (actions, apps) return clear usage instructions instead of errors
 4. Actions appear as discoverable capabilities with `callable: false` and usage pointing to work queue API
-5. Operator can see all capabilities, override visibility, and view logs in admin dashboard
-6. Registered user can create, manage, test, and publish their own capabilities in profile
-7. `aimeat-capabilities.js` SDK works in browser apps
-8. MCP tools allow Claude Code / Copilot to list, get, and invoke capabilities
-9. Auth level enforcement works: clear error messages guide users to the right auth path
-10. Automatic aggregation runs on startup and on system changes, tracks source versions
-11. Statistics and error logs are collected for every invoke call
-12. Manual capabilities can be tested before publishing via `/test` endpoint with schema validation
+5. Cortex exports are callable through invoke() in browser only (client-side). API/MCP returns BROWSER_ONLY error with clear message.
+6. Operator can see all capabilities, override visibility, and view logs in admin dashboard
+7. Registered user can create, manage, test, and publish their own capabilities in profile
+8. `aimeat-capabilities.js` SDK works in browser apps
+9. MCP tools allow Claude Code / Copilot to list, get, and invoke capabilities
+10. Auth level enforcement works: clear error messages guide users to the right auth path
+11. Automatic aggregation runs on startup and on system changes, tracks source versions with schemaHash change detection
+12. Statistics use append-only buffer with periodic rollup (no write contention on popular capabilities)
+13. Manual capabilities can be tested before publishing via `/test` endpoint with schema validation
+14. Operator publishing policy (`disabled`/`self_only`/`moderated`/`open`) controls who can publish
+15. Moderated flow: pending_review -> operator approve/reject -> active/rejected with reason
+16. Webhook domain allowlisting prevents open proxy abuse
+17. Webhook requests signed with node's Ed25519 key, no private network egress
+18. PII protection: per-capability redactedFields, full input only on errors (auto-deleted 7 days)
+19. Trust signals on capabilities: operatorReviewed, vouchCount, codeAudited
+20. Dependency version constraints with minVersion and schemaHash change notifications
+21. Client-side cortex invoke sends telemetry ping (fire-and-forget, no input, just count + duration)
+22. Vouching: POST/DELETE /v1/capabilities/:id/vouch, one per user, cannot vouch own capability
+23. Deprecated status with deprecationMessage and replacedBy pointer
+24. Per-user invoke quota using existing rate-limit middleware pattern
+25. Anonymous users can see public capabilities but invoke requires at least anonymous token
+26. Morsel billing on invoke: debit caller, credit owner, network fee applied
+27. Extension config (ctx.config) used for secure API key storage, never hardcoded
+28. Extension schedules used for periodic data refresh (existing scheduler integration)
