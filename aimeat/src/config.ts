@@ -308,6 +308,15 @@ export interface AimeatConfig {
   portfolioMaxSizeKb: number;
   portfolioMaxImages: number;
 
+  // Capabilities
+  capabilityPublishing: 'disabled' | 'self_only' | 'moderated' | 'open';
+  capabilityPublishers: 'all_users' | 'trusted_only' | 'allowlist';
+  capabilityMinPublisherTrust: number;
+  capabilityPublisherAllowlist: string[];
+  capabilityWebhooks: 'disabled' | 'allowlist_only' | 'open';
+  capabilityWebhookDomainAllowlist: string[];
+  capabilityLogRetentionDays: number;
+
   // CORS
   corsAllowedOrigins: string[];
 
@@ -615,6 +624,14 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     portfolioMaxImages: parseInt(process.env.AIMEAT_PORTFOLIO_MAX_IMAGES ?? '20', 10),
 
     // CORS
+    capabilityPublishing: (process.env.AIMEAT_CAPABILITY_PUBLISHING ?? 'disabled') as 'disabled' | 'self_only' | 'moderated' | 'open',
+    capabilityPublishers: (process.env.AIMEAT_CAPABILITY_PUBLISHERS ?? 'all_users') as 'all_users' | 'trusted_only' | 'allowlist',
+    capabilityMinPublisherTrust: parseInt(process.env.AIMEAT_CAPABILITY_MIN_PUBLISHER_TRUST ?? '50', 10),
+    capabilityPublisherAllowlist: (process.env.AIMEAT_CAPABILITY_PUBLISHER_ALLOWLIST ?? '').split(',').map(s => s.trim()).filter(Boolean),
+    capabilityWebhooks: (process.env.AIMEAT_CAPABILITY_WEBHOOKS ?? 'disabled') as 'disabled' | 'allowlist_only' | 'open',
+    capabilityWebhookDomainAllowlist: (process.env.AIMEAT_CAPABILITY_WEBHOOK_DOMAIN_ALLOWLIST ?? '').split(',').map(s => s.trim()).filter(Boolean),
+    capabilityLogRetentionDays: parseInt(process.env.AIMEAT_CAPABILITY_LOG_RETENTION_DAYS ?? '30', 10),
+
     corsAllowedOrigins: (process.env.AIMEAT_CORS_ALLOWED_ORIGINS ?? '*').split(',').map(s => s.trim()).filter(Boolean),
 
     // Consul

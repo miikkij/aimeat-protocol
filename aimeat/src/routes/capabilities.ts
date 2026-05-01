@@ -12,6 +12,25 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
 
+function redactInput(input: Record<string, unknown>, redactedFields: string[]): Record<string, unknown> {
+  if (!redactedFields.length) return input;
+  if (redactedFields.includes('*')) return { _redacted: true, _hash: createHash('sha256').update(JSON.stringify(input)).digest('hex').slice(0, 16) };
+  const copy = JSON.parse(JSON.stringify(input));
+  for (const field of redactedFields) {
+    const parts = field.split('.');
+    let obj = copy;
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (obj && typeof obj === 'object' && parts[i] in obj) obj = obj[parts[i]] as any;
+      else { obj = null as any; break; }
+    }
+    if (obj && typeof obj === 'object') {
+      const last = parts[parts.length - 1];
+      if (last in obj) (obj as any)[last] = '[REDACTED]';
+    }
+  }
+  return copy;
+}
+
 export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const resolve = (req: any) => resolveIdentity(req.auth!, config.nodeId);
@@ -57,9 +76,43 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     const body = req.body;
     const now = new Date().toISOString();
 
+    // ── Publishing policy enforcement ──
+    const isOperator = req.auth!.roles.includes('operator');
+    if (!isOperator) {
+      if (config.capabilityPublishing === 'disabled') {
+        return res.status(403).json(error(config.nodeId, 'PUBLISHING_DISABLED', 'Only the operator can create capabilities on this node'));
+      }
+      if (config.capabilityPublishing === 'self_only' && body.visibility === 'public') {
+        return res.status(403).json(error(config.nodeId, 'PUBLIC_DISABLED', 'Public capabilities require operator approval. Use visibility: private'));
+      }
+    }
+
+    // Webhook domain allowlist
+    if (body.webhookUrl && body.source?.type === 'manual') {
+      if (config.capabilityWebhooks === 'disabled') {
+        return res.status(403).json(error(config.nodeId, 'WEBHOOKS_DISABLED', 'Webhook capabilities are disabled on this node'));
+      }
+      if (config.capabilityWebhooks === 'allowlist_only') {
+        try {
+          const domain = new URL(body.webhookUrl).hostname;
+          if (!config.capabilityWebhookDomainAllowlist.includes(domain)) {
+            return res.status(403).json(error(config.nodeId, 'WEBHOOK_DOMAIN_NOT_ALLOWED', `Domain '${domain}' is not on the webhook allowlist`));
+          }
+        } catch {
+          return res.status(400).json(error(config.nodeId, 'INVALID_WEBHOOK_URL', 'Invalid webhook URL'));
+        }
+      }
+    }
+
     const schemaHash = createHash('sha256')
       .update(JSON.stringify(body.inputSchema ?? {}) + JSON.stringify(body.outputSchema ?? {}))
       .digest('hex').slice(0, 16);
+
+    // Moderation: if publishing=moderated and visibility=public, set pending_review
+    let initialStatus = body.status || 'draft';
+    if (!isOperator && config.capabilityPublishing === 'moderated' && body.visibility === 'public') {
+      initialStatus = 'pending_review';
+    }
 
     const record: CapabilityRecord = {
       id: body.id || randomUUID(),
@@ -68,7 +121,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
       ownerGhii: gaii,
       visibility: body.visibility || 'private',
       scope: 'local',
-      status: body.status || 'draft',
+      status: initialStatus as CapabilityRecord['status'],
       rejectionReason: null,
       deprecationMessage: null,
       replacedBy: null,
@@ -156,9 +209,10 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
         success: 1, error: 0, totalMs: result.duration_ms,
       }).catch(() => {});
 
+      const logInput = redactInput(input, cap.redactedFields);
       storage.addCapabilityLog({
         id: randomUUID(), capabilityId: cap.id, callerGhii,
-        input, status: 'success', durationMs: result.duration_ms,
+        input: logInput, status: 'success', durationMs: result.duration_ms,
         error: null, timestamp: new Date().toISOString(),
       }).catch(() => {});
 
@@ -171,6 +225,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
         success: 0, error: 1, totalMs: 0, lastError: err.message,
       }).catch(() => {});
 
+      // On error, log full input for debugging (regardless of redaction)
       storage.addCapabilityLog({
         id: randomUUID(), capabilityId: cap.id, callerGhii,
         input, status: 'error', durationMs: 0,
@@ -192,6 +247,50 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
       storage.incrementCapabilityStats(capId, { success: 0, error: 1, totalMs: duration_ms || 0, lastError: req.body.error }).catch(() => {});
     }
     res.status(204).end();
+  });
+
+  // ── Vouching ──
+
+  router.post('/v1/capabilities/:id/vouch', requireAuth(), requireRole('owner'), async (req, res) => {
+    const cap = await storage.getCapability(req.params.id as string);
+    if (!cap) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
+    const callerGhii = resolve(req);
+    if (cap.ownerGhii === callerGhii) {
+      return res.status(400).json(error(config.nodeId, 'CANNOT_VOUCH_OWN', 'Cannot vouch for your own capability'));
+    }
+    await storage.incrementVouchCount(req.params.id as string);
+    const updated = await storage.getCapability(req.params.id as string);
+    res.json(success(config.nodeId, { vouchCount: updated?.trust.vouchCount ?? 0 }));
+  });
+
+  router.delete('/v1/capabilities/:id/vouch', requireAuth(), requireRole('owner'), async (req, res) => {
+    const cap = await storage.getCapability(req.params.id as string);
+    if (!cap) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
+    await storage.decrementVouchCount(req.params.id as string);
+    const updated = await storage.getCapability(req.params.id as string);
+    res.json(success(config.nodeId, { vouchCount: updated?.trust.vouchCount ?? 0 }));
+  });
+
+  // ── Test (dry-run invoke for manual webhook capabilities) ──
+
+  router.post('/v1/capabilities/:id/test', requireAuth(), requireRole('owner'), async (req, res) => {
+    const cap = await storage.getCapability(req.params.id as string);
+    if (!cap) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
+    if (cap.ownerGhii !== resolve(req) && !req.auth!.roles.includes('operator')) {
+      return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not the owner'));
+    }
+    if (!cap.callable || cap.source.type !== 'manual') {
+      return res.status(400).json(error(config.nodeId, 'NOT_TESTABLE', 'Only manual callable capabilities can be tested'));
+    }
+
+    const { invokeCapability } = await import('../services/capability-invoke.js');
+    const jwt = (req.headers.authorization || '').replace('Bearer ', '');
+    try {
+      const result = await invokeCapability(config, storage, cap, req.body.input || {}, resolve(req), jwt, 'normal');
+      res.json(success(config.nodeId, { status: 'success', result: result.result, duration_ms: result.duration_ms }));
+    } catch (err: any) {
+      res.json(success(config.nodeId, { status: 'error', error: err.message, duration_ms: 0 }));
+    }
   });
 
   return router;

@@ -70,13 +70,35 @@ export async function invokeCapability(
         throw Object.assign(new Error('Webhook URL not configured'), { statusCode: 500, code: 'NO_WEBHOOK' });
       }
 
+      // Webhook security: validate URL
+      try {
+        const url = new URL(capability.webhookUrl);
+        if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+          throw new Error('only http/https');
+        }
+        const host = url.hostname;
+        if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '0.0.0.0') {
+          throw Object.assign(new Error('Webhook URL cannot target localhost'), { statusCode: 400, code: 'WEBHOOK_LOCALHOST' });
+        }
+        if (host === '169.254.169.254') {
+          throw Object.assign(new Error('Webhook URL cannot target metadata endpoint'), { statusCode: 400, code: 'WEBHOOK_METADATA' });
+        }
+      } catch (urlErr: any) {
+        if (urlErr.statusCode) throw urlErr;
+        throw Object.assign(new Error('Invalid webhook URL'), { statusCode: 400, code: 'INVALID_WEBHOOK' });
+      }
+
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10_000);
 
       try {
         const response = await fetch(capability.webhookUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-AIMEAT-Node': config.nodeId,
+            'X-AIMEAT-Timestamp': new Date().toISOString(),
+          },
           body: JSON.stringify({ input, caller: callerGhii, capability: capability.id }),
           signal: controller.signal,
         });

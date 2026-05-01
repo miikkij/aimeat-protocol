@@ -44,6 +44,7 @@ import GeneratorTab from './profile/generator-tab.js';
 import FoundryTab from './profile/foundry-tab.js';
 import CalibratorTab from './profile/calibrator-tab.js';
 import PackagesTab from './profile/packages-tab.js';
+import CapabilitiesTab from './profile/capabilities-tab.js';
 
 // Each tab has a minTier: 'new' | 'active' | 'experienced'
 // Tabs with minTier <= current tier are visible in the tab bar.
@@ -62,6 +63,7 @@ const TABS = [
   { id: 'boards',        key: 'profile.tabs.boards',         component: BoardsTab,         minTier: 'active' },
   { id: 'apps',          key: 'profile.tabs.apps',           component: AppsTab,           minTier: 'active' },
   { id: 'extensions',    key: 'profile.tabs.extensions',     component: ExtensionsTab,     minTier: 'active' },
+  { id: 'capabilities', key: 'capabilities.tabLabel',       component: CapabilitiesTab,   minTier: 'active' },
   { id: 'federation',    key: 'profile.tabs.federation',     component: FederationTab,     minTier: 'experienced' },
   { id: 'nodes',         key: 'profile.tabs.nodes',          component: NodesTab,          minTier: 'experienced' },
   { id: 'access',        key: 'profile.tabs.access',         component: AccessTab,         minTier: 'new' },
