@@ -1084,3 +1084,76 @@ model PackageInstance {
   @@index([owner])
   @@index([packageGroupId])
 }
+
+model Capability {
+  id                 String   @id @map("_id")
+  name               String
+  summary            String   @default("")
+  ownerGhii          String
+  visibility         String   @default("private")
+  scope              String   @default("local")
+  status             String   @default("draft")
+  rejectionReason    String?
+  deprecationMessage String?
+  replacedBy         String?
+  sourceType         String
+  sourceRef          String
+  sourceVersion      String   @default("")
+  authRequired       String   @default("registered")
+  callable           Boolean  @default(false)
+  inputSchema        Json?
+  outputSchema       Json?
+  exports            Json?    // CapabilityExport[]
+  usage              String   @default("")
+  whenToUse          String   @default("")
+  whenNotToUse       String   @default("")
+  examples           Json     @default("[]")   // Array<{ description, input, output }>
+  dependencies       Json     @default("[]")   // CapabilityDependency[]
+  schemaHash         String   @default("")
+  webhookUrl         String?
+  cost               Json?    // { morsels, perUnit? }
+  trustRequired      Float?
+  trust              Json     // CapabilityTrust
+  redactedFields     Json     @default("[]")   // string[]
+  operatorOverride   Json?    // CapabilityOverride
+  stats              Json     // CapabilityStats
+  tags               Json     @default("[]")   // string[]
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  logs               CapabilityLog[]
+  vouches            CapabilityVouch[]
+
+  @@index([ownerGhii])
+  @@index([sourceType, sourceRef])
+  @@index([status])
+  @@index([visibility])
+}
+
+model CapabilityLog {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  capabilityId String
+  callerGhii   String
+  input        Json     @default("{}")
+  status       String
+  durationMs   Int      @default(0)
+  error        String?
+  timestamp    DateTime @default(now())
+
+  capability   Capability @relation(fields: [capabilityId], references: [id], onDelete: Cascade)
+
+  @@index([capabilityId, timestamp])
+  @@index([capabilityId, status])
+}
+
+model CapabilityVouch {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  capabilityId String
+  userGhii     String
+  comment      String?
+  createdAt    DateTime @default(now())
+
+  capability   Capability @relation(fields: [capabilityId], references: [id], onDelete: Cascade)
+
+  @@unique([capabilityId, userGhii])
+}

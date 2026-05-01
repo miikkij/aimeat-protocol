@@ -9,6 +9,7 @@ import { aimeatWorkLib } from './lib-work.js';
 import { aimeatTunnelLib } from './lib-tunnel.js';
 import { aimeatAudioLib } from './lib-audio.js';
 import { aimeatSpeechLib } from './lib-speech.js';
+import { aimeatCapabilitiesLib } from './lib-capabilities.js';
 
 /**
  * Serves helper JavaScript libraries at /v1/libs/*
@@ -61,6 +62,11 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   // GET /v1/libs/aimeat-speech.js — Speech library
   router.get('/v1/libs/aimeat-speech.js', (_req, res) => {
     res.type('application/javascript').send(aimeatSpeechLib(config));
+  });
+
+  // GET /v1/libs/aimeat-capabilities.js — Capability discovery, invoke, management
+  router.get('/v1/libs/aimeat-capabilities.js', (_req, res) => {
+    res.type('application/javascript').send(aimeatCapabilitiesLib(config));
   });
 
   // GET /v1/libs/ — List available libraries
@@ -129,6 +135,14 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
           description: 'Audio engine: 6 built-in instruments (piano, guitar, bass, drums, flute, synth), custom synth builder, sample loader, soundboard, realtime bridge',
           size_estimate: '~60KB',
           include: `<script src="${config.baseUrl}/v1/libs/aimeat-audio.js"></script>`,
+        },
+        {
+          name: 'aimeat-capabilities',
+          url: '/v1/libs/aimeat-capabilities.js',
+          description: 'Capability discovery, invoke, and management: list, search, invoke, create, vouch',
+          size_estimate: '~6KB',
+          include: `<script src="${config.baseUrl}/v1/libs/aimeat-capabilities.js"></script>`,
+          requires: 'aimeat-auth',
         },
         {
           name: 'aimeat-speech',

@@ -23,6 +23,10 @@ export function registerCoreHandlers(
   if (config.personalNodesEnabled) {
     scheduler.registerCoreHandler('mailbox-cleanup', () => runMailboxCleanupJob(storage));
   }
+  scheduler.registerCoreHandler('capability-aggregation', async () => {
+    const { runCapabilityAggregation } = await import('./capability-aggregator.js');
+    await runCapabilityAggregation(config, storage);
+  });
 }
 
 // ── Core Job Handlers (pure async, no setInterval) ─────────────────

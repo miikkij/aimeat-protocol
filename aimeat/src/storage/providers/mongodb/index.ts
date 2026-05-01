@@ -60,6 +60,7 @@ import type {
     PackageRecord, PackageComponent, PackageComponentType, PackageFilter,
     TemplateListingRecord, TemplateReview, TemplateDiscussion, TemplateFilter,
     PackageInstanceRecord, InstalledComponent, InstanceFilter,
+    CapabilityRecord, CapabilityLogEntry, CapabilityFilter, CapabilityOverride, CapabilityTrust,
 } from '../../interface.js';
 
 import { matchesRecipient } from '../../../services/consent.js';
@@ -4853,6 +4854,236 @@ export class MongoStorage implements Storage {
             installedAt: row.installedAt instanceof Date ? row.installedAt.toISOString() : row.installedAt,
             updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
         };
+    }
+
+    // ── Capability Layer ──────────────────────────────────────────────
+
+    private toCapabilityRecord(row: any): CapabilityRecord {
+        return {
+            id: row.id,
+            name: row.name,
+            summary: row.summary ?? '',
+            ownerGhii: row.ownerGhii,
+            visibility: row.visibility ?? 'private',
+            scope: 'local',
+            status: row.status ?? 'draft',
+            rejectionReason: row.rejectionReason ?? null,
+            deprecationMessage: row.deprecationMessage ?? null,
+            replacedBy: row.replacedBy ?? null,
+            source: { type: row.sourceType, ref: row.sourceRef, version: row.sourceVersion ?? '' },
+            authRequired: row.authRequired ?? 'registered',
+            callable: row.callable ?? false,
+            inputSchema: row.inputSchema ?? null,
+            outputSchema: row.outputSchema ?? null,
+            exports: row.exports ?? null,
+            usage: row.usage ?? '',
+            whenToUse: row.whenToUse ?? '',
+            whenNotToUse: row.whenNotToUse ?? '',
+            examples: row.examples ?? [],
+            dependencies: row.dependencies ?? [],
+            schemaHash: row.schemaHash ?? '',
+            webhookUrl: row.webhookUrl ?? null,
+            cost: row.cost ?? null,
+            trustRequired: row.trustRequired ?? null,
+            trust: row.trust ?? { operatorReviewed: false, reviewedAt: null, vouchCount: 0, publisherTrustScore: 0, codeAudited: false, auditNotes: null },
+            redactedFields: row.redactedFields ?? [],
+            operatorOverride: row.operatorOverride ?? null,
+            stats: row.stats ?? { totalInvocations: 0, successCount: 0, errorCount: 0, lastInvokedAt: null, avgResponseMs: 0, lastError: null },
+            tags: row.tags ?? [],
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+            updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+        };
+    }
+
+    async createCapability(record: CapabilityRecord): Promise<CapabilityRecord> {
+        this.ensureReady();
+        const row = await this.prisma.capability.create({
+            data: {
+                id: record.id, name: record.name, summary: record.summary,
+                ownerGhii: record.ownerGhii, visibility: record.visibility, scope: record.scope,
+                status: record.status, rejectionReason: record.rejectionReason,
+                deprecationMessage: record.deprecationMessage, replacedBy: record.replacedBy,
+                sourceType: record.source.type, sourceRef: record.source.ref, sourceVersion: record.source.version,
+                authRequired: record.authRequired, callable: record.callable,
+                inputSchema: record.inputSchema ?? undefined, outputSchema: record.outputSchema ?? undefined,
+                exports: record.exports ?? undefined, usage: record.usage,
+                whenToUse: record.whenToUse, whenNotToUse: record.whenNotToUse,
+                examples: record.examples, dependencies: record.dependencies,
+                schemaHash: record.schemaHash, webhookUrl: record.webhookUrl,
+                cost: record.cost ?? undefined, trustRequired: record.trustRequired,
+                trust: record.trust as any, redactedFields: record.redactedFields,
+                operatorOverride: record.operatorOverride ?? undefined,
+                stats: record.stats as any, tags: record.tags,
+            },
+        });
+        return this.toCapabilityRecord(row);
+    }
+
+    async getCapability(id: string): Promise<CapabilityRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.capability.findUnique({ where: { id } });
+        return row ? this.toCapabilityRecord(row) : null;
+    }
+
+    async updateCapability(id: string, updates: Partial<CapabilityRecord>): Promise<CapabilityRecord | null> {
+        this.ensureReady();
+        const data: any = { ...updates };
+        if (updates.source) {
+            data.sourceType = updates.source.type;
+            data.sourceRef = updates.source.ref;
+            data.sourceVersion = updates.source.version;
+            delete data.source;
+        }
+        if (updates.trust) { data.trust = updates.trust; }
+        if (updates.stats) { data.stats = updates.stats; }
+        if (updates.operatorOverride !== undefined) { data.operatorOverride = updates.operatorOverride; }
+        try {
+            const row = await this.prisma.capability.update({ where: { id }, data });
+            return this.toCapabilityRecord(row);
+        } catch { return null; }
+    }
+
+    async deleteCapability(id: string): Promise<boolean> {
+        this.ensureReady();
+        try { await this.prisma.capability.delete({ where: { id } }); return true; } catch { return false; }
+    }
+
+    async listCapabilities(filters: CapabilityFilter): Promise<{ capabilities: CapabilityRecord[]; total: number }> {
+        this.ensureReady();
+        const where: any = {};
+        if (filters.ownerGhii) where.ownerGhii = filters.ownerGhii;
+        if (filters.visibility) where.visibility = filters.visibility;
+        if (filters.status) where.status = filters.status;
+        if (filters.sourceType) where.sourceType = filters.sourceType;
+        if (filters.authRequired) where.authRequired = filters.authRequired;
+        if (filters.callable !== undefined) where.callable = filters.callable;
+        if (filters.search) {
+            where.OR = [
+                { name: { contains: filters.search, mode: 'insensitive' } },
+                { summary: { contains: filters.search, mode: 'insensitive' } },
+            ];
+        }
+        // tags filter done in JS since tags is a Json field
+        const page = filters.page || 1;
+        const perPage = filters.perPage || 20;
+        const [rows, total] = await Promise.all([
+            this.prisma.capability.findMany({
+                where, orderBy: { updatedAt: 'desc' },
+                skip: (page - 1) * perPage, take: perPage,
+            }),
+            this.prisma.capability.count({ where }),
+        ]);
+        let caps = rows.map((r: any) => this.toCapabilityRecord(r));
+        if (filters.tags?.length) {
+            caps = caps.filter((c: CapabilityRecord) => filters.tags!.some(t => c.tags.includes(t)));
+        }
+        return { capabilities: caps, total };
+    }
+
+    async listCapabilitiesByOwner(ownerGhii: string): Promise<CapabilityRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.capability.findMany({ where: { ownerGhii }, orderBy: { updatedAt: 'desc' } });
+        return rows.map((r: any) => this.toCapabilityRecord(r));
+    }
+
+    async getCapabilityBySourceRef(sourceRef: string): Promise<CapabilityRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.capability.findFirst({ where: { sourceRef } });
+        return row ? this.toCapabilityRecord(row) : null;
+    }
+
+    async listCapabilitiesBySourceType(sourceType: string): Promise<CapabilityRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.capability.findMany({ where: { sourceType } });
+        return rows.map((r: any) => this.toCapabilityRecord(r));
+    }
+
+    async incrementCapabilityStats(id: string, delta: { success: number; error: number; totalMs: number; lastError?: string }): Promise<void> {
+        this.ensureReady();
+        const cap = await this.getCapability(id);
+        if (!cap) return;
+        const s = cap.stats;
+        const newTotal = s.totalInvocations + delta.success + delta.error;
+        const totalMs = (s.avgResponseMs * s.totalInvocations) + delta.totalMs;
+        const updated = {
+            totalInvocations: newTotal,
+            successCount: s.successCount + delta.success,
+            errorCount: s.errorCount + delta.error,
+            lastInvokedAt: new Date().toISOString(),
+            avgResponseMs: newTotal > 0 ? Math.round(totalMs / newTotal) : 0,
+            lastError: delta.lastError ?? s.lastError,
+        };
+        await this.prisma.capability.update({ where: { id }, data: { stats: updated } });
+    }
+
+    async addCapabilityLog(entry: CapabilityLogEntry): Promise<void> {
+        this.ensureReady();
+        await this.prisma.capabilityLog.create({
+            data: {
+                capabilityId: entry.capabilityId, callerGhii: entry.callerGhii,
+                input: entry.input as any, status: entry.status,
+                durationMs: entry.durationMs, error: entry.error,
+                timestamp: new Date(entry.timestamp),
+            },
+        });
+    }
+
+    async listCapabilityLogs(capabilityId: string, filters: { status?: 'success' | 'error'; page?: number; perPage?: number }): Promise<{ logs: CapabilityLogEntry[]; total: number }> {
+        this.ensureReady();
+        const where: any = { capabilityId };
+        if (filters.status) where.status = filters.status;
+        const page = filters.page || 1;
+        const perPage = filters.perPage || 50;
+        const [rows, total] = await Promise.all([
+            this.prisma.capabilityLog.findMany({
+                where, orderBy: { timestamp: 'desc' },
+                skip: (page - 1) * perPage, take: perPage,
+            }),
+            this.prisma.capabilityLog.count({ where }),
+        ]);
+        const logs: CapabilityLogEntry[] = rows.map((r: any) => ({
+            id: r.id,
+            capabilityId: r.capabilityId,
+            callerGhii: r.callerGhii,
+            input: r.input ?? {},
+            status: r.status,
+            durationMs: r.durationMs,
+            error: r.error ?? null,
+            timestamp: r.timestamp instanceof Date ? r.timestamp.toISOString() : r.timestamp,
+        }));
+        return { logs, total };
+    }
+
+    async deleteCapabilityLogsBefore(before: string): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.capabilityLog.deleteMany({ where: { timestamp: { lt: new Date(before) } } });
+        return result.count;
+    }
+
+    async setCapabilityOverride(id: string, override: CapabilityOverride | null): Promise<void> {
+        this.ensureReady();
+        await this.prisma.capability.update({ where: { id }, data: { operatorOverride: override ?? undefined } });
+    }
+
+    async setCapabilityTrust(id: string, trustUpdates: Partial<CapabilityTrust>): Promise<void> {
+        const cap = await this.getCapability(id);
+        if (!cap) return;
+        const merged = { ...cap.trust, ...trustUpdates };
+        await this.prisma.capability.update({ where: { id }, data: { trust: merged as any } });
+    }
+
+    async incrementVouchCount(id: string): Promise<void> {
+        const cap = await this.getCapability(id);
+        if (!cap) return;
+        const trust = { ...cap.trust, vouchCount: cap.trust.vouchCount + 1 };
+        await this.prisma.capability.update({ where: { id }, data: { trust: trust as any } });
+    }
+
+    async decrementVouchCount(id: string): Promise<void> {
+        const cap = await this.getCapability(id);
+        if (!cap) return;
+        const trust = { ...cap.trust, vouchCount: Math.max(0, cap.trust.vouchCount - 1) };
+        await this.prisma.capability.update({ where: { id }, data: { trust: trust as any } });
     }
 }
 

@@ -116,6 +116,8 @@ tags:
     description: Template gallery, reviews, discussions
   - name: Generator
     description: Agent-driven service generation pipeline. Endpoints allow AI agents to autonomously create and configure AIMEAT services on behalf of a user.
+  - name: Capabilities
+    description: Capability Layer — unified discovery, invoke, and management of node capabilities
   - name: OpenRouter
     description: OpenRouter AI integration for automated generator steps. Owner-only endpoints.
 
@@ -14663,6 +14665,221 @@ paths:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '503':
           description: Encryption not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  # ── Capabilities ──────────────────────────────────────────────────
+
+  /v1/capabilities:
+    get:
+      tags: [Capabilities]
+      summary: List and search capabilities
+      description: Returns all public active capabilities. Supports search, tag filtering, callable filtering, and pagination.
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: tags
+          in: query
+          schema: { type: string }
+        - name: callable
+          in: query
+          schema: { type: boolean }
+        - name: authRequired
+          in: query
+          schema: { type: string, enum: [none, anonymous, registered] }
+        - name: source_type
+          in: query
+          schema: { type: string, enum: [extension, action, cortex, manual] }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: per_page
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Capability list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+    post:
+      tags: [Capabilities]
+      summary: Create a manual capability
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                id: { type: string }
+                name: { type: string }
+                summary: { type: string }
+                callable: { type: boolean }
+                visibility: { type: string, enum: [private, owner, public] }
+                webhookUrl: { type: string }
+                tags: { type: array, items: { type: string } }
+      responses:
+        '201':
+          description: Capability created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/capabilities/{id}:
+    get:
+      tags: [Capabilities]
+      summary: Get capability detail with schemas, examples, exports, dependencies
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Capability detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+    put:
+      tags: [Capabilities]
+      summary: Update own capability
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+    delete:
+      tags: [Capabilities]
+      summary: Delete own manual capability
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/capabilities/{id}/invoke:
+    post:
+      tags: [Capabilities]
+      summary: Invoke a callable capability
+      description: Proxies to extension or webhook. Cortex returns BROWSER_ONLY. Non-callable returns NOT_CALLABLE with usage.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: mode
+          in: query
+          schema: { type: string, enum: [normal, raw] }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                input: { type: object }
+      responses:
+        '200':
+          description: Invoke result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/capabilities/{id}/telemetry:
+    post:
+      tags: [Capabilities]
+      summary: Record client-side telemetry (fire-and-forget)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204':
+          description: Recorded
+
+  /v1/admin/capabilities:
+    get:
+      tags: [Capabilities, Admin]
+      summary: List all capabilities (operator sees all visibilities)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: All capabilities
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/admin/capabilities/{id}/override:
+    put:
+      tags: [Capabilities, Admin]
+      summary: Set operator override (disable, notes, visibility)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Updated with override
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/admin/capabilities/{id}/logs:
+    get:
+      tags: [Capabilities, Admin]
+      summary: View capability invocation logs and stats
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string, enum: [success, error] }
+      responses:
+        '200':
+          description: Logs and stats
           content:
             application/json:
               schema:

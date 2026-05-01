@@ -1067,6 +1067,71 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_package_instances_owner ON package_instances(owner);
     CREATE INDEX IF NOT EXISTS idx_package_instances_package ON package_instances(packageGroupId);
 
+    -- Capabilities
+    CREATE TABLE IF NOT EXISTS capabilities (
+      id                TEXT PRIMARY KEY,
+      name              TEXT NOT NULL,
+      summary           TEXT NOT NULL DEFAULT '',
+      ownerGhii         TEXT NOT NULL,
+      visibility        TEXT NOT NULL DEFAULT 'private',
+      scope             TEXT NOT NULL DEFAULT 'local',
+      status            TEXT NOT NULL DEFAULT 'draft',
+      rejectionReason   TEXT,
+      deprecationMessage TEXT,
+      replacedBy        TEXT,
+      sourceType        TEXT NOT NULL,
+      sourceRef         TEXT NOT NULL,
+      sourceVersion     TEXT NOT NULL DEFAULT '',
+      authRequired      TEXT NOT NULL DEFAULT 'registered',
+      callable          INTEGER NOT NULL DEFAULT 0,
+      inputSchema       TEXT,
+      outputSchema      TEXT,
+      exports           TEXT,
+      usage             TEXT NOT NULL DEFAULT '',
+      whenToUse         TEXT NOT NULL DEFAULT '',
+      whenNotToUse      TEXT NOT NULL DEFAULT '',
+      examples          TEXT NOT NULL DEFAULT '[]',
+      dependencies      TEXT NOT NULL DEFAULT '[]',
+      schemaHash        TEXT NOT NULL DEFAULT '',
+      webhookUrl        TEXT,
+      cost              TEXT,
+      trustRequired     REAL,
+      trust             TEXT NOT NULL DEFAULT '{"operatorReviewed":false,"reviewedAt":null,"vouchCount":0,"publisherTrustScore":0,"codeAudited":false,"auditNotes":null}',
+      redactedFields    TEXT NOT NULL DEFAULT '[]',
+      operatorOverride  TEXT,
+      stats             TEXT NOT NULL DEFAULT '{"totalInvocations":0,"successCount":0,"errorCount":0,"lastInvokedAt":null,"avgResponseMs":0,"lastError":null}',
+      tags              TEXT NOT NULL DEFAULT '[]',
+      createdAt         TEXT NOT NULL,
+      updatedAt         TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_capabilities_owner ON capabilities(ownerGhii);
+    CREATE INDEX IF NOT EXISTS idx_capabilities_source ON capabilities(sourceType, sourceRef);
+    CREATE INDEX IF NOT EXISTS idx_capabilities_status ON capabilities(status);
+    CREATE INDEX IF NOT EXISTS idx_capabilities_visibility ON capabilities(visibility);
+
+    CREATE TABLE IF NOT EXISTS capability_logs (
+      id            TEXT PRIMARY KEY,
+      capabilityId  TEXT NOT NULL,
+      callerGhii    TEXT NOT NULL,
+      input         TEXT NOT NULL DEFAULT '{}',
+      status        TEXT NOT NULL,
+      durationMs    INTEGER NOT NULL DEFAULT 0,
+      error         TEXT,
+      timestamp     TEXT NOT NULL,
+      FOREIGN KEY (capabilityId) REFERENCES capabilities(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_capability_logs_cap ON capability_logs(capabilityId, timestamp);
+    CREATE INDEX IF NOT EXISTS idx_capability_logs_status ON capability_logs(capabilityId, status);
+
+    CREATE TABLE IF NOT EXISTS capability_vouches (
+      capabilityId  TEXT NOT NULL,
+      userGhii      TEXT NOT NULL,
+      comment       TEXT,
+      createdAt     TEXT NOT NULL,
+      PRIMARY KEY (capabilityId, userGhii),
+      FOREIGN KEY (capabilityId) REFERENCES capabilities(id) ON DELETE CASCADE
+    );
+
   `);
 
   // ── Schema migrations for existing databases ──

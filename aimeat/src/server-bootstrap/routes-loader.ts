@@ -68,6 +68,8 @@ import { packagesRouter } from '../routes/packages.js';
 import { instancesRouter } from '../routes/instances.js';
 import { templatesRouter } from '../routes/templates.js';
 import { adminSchedulerRouter } from '../routes/admin-scheduler.js';
+import { capabilitiesRouter } from '../routes/capabilities.js';
+import { adminCapabilitiesRouter } from '../routes/admin-capabilities.js';
 import { adminExtensionsRouter } from '../routes/admin-extensions.js';
 import { adminPromptsRouter } from '../routes/admin-prompts.js';
 import { statsRouter } from '../routes/stats.js';
@@ -317,6 +319,10 @@ export function mountRoutes(
   if (config.packagesEnabled && config.templatesEnabled) {
     app.use(templatesRouter(config, storage));
   }
+
+  // Capability Layer
+  app.use(capabilitiesRouter(config, storage));
+  app.use(adminCapabilitiesRouter(config, storage));
 
   // Scheduler admin routes
   app.use(adminSchedulerRouter(config, storage, scheduler));
