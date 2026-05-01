@@ -264,21 +264,45 @@ POST /v1/capabilities/:id/invoke
 ### Invoke proxy routing
 
 The proxy determines where to forward based on `source.type`.
-All callable capabilities are synchronous: call and get the result immediately.
 
 | source.type | callable | Invoke behavior | Notes |
 |-------------|----------|----------------|-------|
 | `extension` | true | `POST /v1/ext/:extName/:actionId` | Sync, WASM sandbox, result returned immediately |
 | `manual` | true | HTTP POST to `webhookUrl` | Sync, user-provided endpoint, must return `{ result }` |
 | `action` | false | Returns 400 NOT_CALLABLE | Actions use the async work queue. Usage field explains: "POST /v1/work/request" |
-| `cortex` | false | Returns 400 NOT_CALLABLE | Usage field explains how to load and use the cortex module |
+| `cortex` | false | Returns 400 NOT_CALLABLE | Cortex is a loadable capability. Usage field explains how to load its libraries. |
 | `app` | false | Returns 400 NOT_CALLABLE | Usage field explains how to access the app |
 
-Actions are deliberately NOT callable through the capability invoke proxy.
-The work queue is an async business process (request, accept, deliver, rate)
-that does not fit a synchronous invoke() pattern. The capability entry
-provides discovery (what this action does, its schemas, its cost) and the
-usage field guides the developer to use the work queue API directly.
+### Capability types explained
+
+**Callable capabilities** (invoke via API, sync result):
+- **Extensions**: Server-side WASM sandbox. Call and get result immediately.
+- **Manual webhooks**: User-provided HTTP endpoint. Call and get result immediately.
+
+**Loadable capabilities** (load in browser, use as library):
+- **Cortex modules**: Bundle schemas, prompts, libraries, seed data, and ontologies
+  into a coherent capability package. Apps load cortex JavaScript libraries via
+  `loadScript('/v1/cortex/:name/libs/:file')` and use them directly. A cortex
+  can encapsulate complex logic involving memory, storage, and realtime operations
+  so that the app does not need to interact with those systems directly.
+
+  Examples of cortex capabilities:
+  - `aimeat-charts`: data visualization (bar, line, pie charts)
+  - `aimeat-canvas`: drawing utilities and tools
+  - A custom "recipe-manager" cortex that handles recipe storage, search, and sharing
+  - A "game-engine" cortex that wraps realtime P2P + memory into a game state manager
+
+  When activated on a node, cortex modules:
+  - Lock schemas to memory keys (data structure enforcement)
+  - Register system prompts (AI guidance for the domain)
+  - Serve JavaScript libraries (the actual code apps load)
+  - Write seed data (initial content)
+  - Register ontologies (concept definitions for AI understanding)
+
+**Discoverable capabilities** (use via other APIs):
+- **Actions**: Agent services in the work queue. Async business process
+  (request, accept, deliver, rate). The capability entry provides discovery
+  and the usage field guides to the work queue API.
 
 ### Management (Owner, manages own capabilities)
 
@@ -677,7 +701,147 @@ Extensions, actions, cortex, packages, SDK libraries, and MCP core tools remain 
 
 ---
 
-## 10. Success Criteria
+## 10. Usage Patterns
+
+Two distinct paths for using capabilities, depending on who is consuming them.
+
+### Path 1: App builder (human + AI chat, GHII auth)
+
+The user describes what they want to build. The AI uses two layers:
+
+**Layer A: SDK libraries (always available, infrastructure)**
+Memory, storage, realtime, boards. These are the same on every node.
+Use them directly via `AIMEAT.data`, `AIMEAT.storage`, etc.
+No capability discovery needed.
+
+**Layer B: Node capabilities (vary per node, discoverable)**
+Extensions, cortex modules, manual webhooks, actions.
+These are what makes one node different from another.
+Discover via `AIMEAT.capabilities.list()`, use via `invoke()` or `loadScript()`.
+
+```javascript
+async function startApp(session) {
+  // Load the capabilities SDK
+  await loadScript('/v1/libs/aimeat-capabilities.js');
+
+  // Layer A: Infrastructure (always available, use directly)
+  const savedData = await AIMEAT.data.get('my-app.state');
+
+  // Layer B: Discover what THIS node offers
+  const caps = await AIMEAT.capabilities.list({ callable: true });
+  // -> [{ id: 'weather-fi', ... }, { id: 'translate', ... }]
+
+  // Use a callable capability (extension or manual webhook)
+  const weather = await AIMEAT.capabilities.invoke('weather-fi', {
+    city: 'Helsinki',
+  });
+
+  // Use a loadable capability (cortex)
+  const chartsCap = await AIMEAT.capabilities.get('cortex:aimeat-charts');
+  // chartsCap.usage tells us: "loadScript('/v1/cortex/aimeat-charts/libs/charts.js')"
+  await loadScript('/v1/cortex/aimeat-charts/libs/charts.js');
+  // Now AIMEAT.charts is available, use it to render weather data
+}
+```
+
+**Auth:** GHII via `aimeat-auth.js`. The login bar handles registration and login.
+`AIMEAT.capabilities.invoke()` uses `session.fetch()` internally,
+so the user's GHII identity is used for auth and billing.
+
+**Step-by-step for AI building an app:**
+
+1. User describes the app idea
+2. AI loads capability list: `GET /v1/capabilities`
+3. AI picks relevant capabilities for the idea
+4. AI starts with the starter template (from llms.txt / AIMEAT-OS.md)
+5. AI adds SDK libraries for infrastructure needs (memory, storage, realtime)
+6. AI adds `aimeat-capabilities.js` if the app needs node-specific capabilities
+7. AI loads cortex libraries for complex packaged functionality
+8. AI calls `capabilities.invoke()` for callable capabilities
+9. For non-callable (actions): AI shows the user how to use the work queue if needed
+10. Result: single-file HTML app with login bar, SDK libs, and capabilities
+
+### Path 2: AI agent (GAII auth, MCP or API)
+
+The agent connects to the node and wants to use its capabilities.
+
+**Via MCP (Claude Code, Copilot, MCP-compatible platforms):**
+
+```
+1. Agent connects MCP to the node (/v1/mcp)
+2. Agent calls aimeat_capabilities_list
+   -> sees all public callable and non-callable capabilities
+3. Agent calls aimeat_capabilities_get('weather-fi')
+   -> gets full schema, examples, whenToUse
+4. Agent calls aimeat_capabilities_invoke('weather-fi', { city: 'Helsinki' })
+   -> gets result directly
+5. For non-callable (actions): agent uses aimeat_action_execute MCP tool
+   or POST /v1/work/request via API
+```
+
+**Via REST API (custom agents, scripts, LangChain):**
+
+```
+1. Agent authenticates (device auth or connectivity key -> JWT)
+2. GET /v1/capabilities -> discover what this node can do
+3. GET /v1/capabilities/weather-fi -> get full details
+4. POST /v1/capabilities/weather-fi/invoke { input: { city: 'Helsinki' } }
+5. Use the result in the agent's workflow
+```
+
+**Auth:** GAII via device authorization or MCP OAuth. The agent's scoped
+permissions determine which capabilities it can invoke. The invoke proxy
+checks `authRequired` against the agent's auth level.
+
+### Path 3: Cortex as a capability package
+
+Cortex modules deserve special attention because they are the richest
+type of capability. A cortex bundles everything an app domain needs:
+
+```
+Example: "recipe-manager" cortex capability
+
+What it provides:
+- Schema: locks memory keys "recipes.*" to a recipe JSON schema
+- Prompt: AI instructions for generating recipe data
+- Library: recipe-manager.js with functions like:
+    RecipeManager.create(recipe)
+    RecipeManager.search(query)
+    RecipeManager.share(recipeId, visibility)
+    RecipeManager.import(externalUrl)
+- Seed data: 10 starter recipes
+- Ontology: food categories, cooking methods, dietary tags
+
+How an app uses it:
+1. Discover: AIMEAT.capabilities.get('cortex:recipe-manager')
+2. Load: await loadScript('/v1/cortex/recipe-manager/libs/recipe-manager.js')
+3. Use: const results = await RecipeManager.search('pasta')
+
+The app doesn't need to know about memory keys, schemas, or data
+structure. The cortex handles everything internally.
+```
+
+This is the power of cortex capabilities: they abstract entire domains
+into a single loadable package. The capability layer makes them discoverable
+and their usage self-documenting.
+
+### What capabilities are NOT
+
+Capabilities are not a replacement for:
+- **SDK libraries** (memory, storage, realtime): always-available infrastructure
+- **The work queue**: async business process for agent-to-agent commerce
+- **Direct API calls**: if you know the endpoint, use it directly
+
+Capabilities are for:
+- **Discovery**: "What can this node do that other nodes might not?"
+- **Unified invocation**: call extensions and webhooks without knowing the underlying API
+- **Self-documentation**: AI and humans understand what a capability does from its metadata
+
+---
+
+## 11. Success Criteria
+
+(renumbered from 10)
 
 1. `GET /v1/capabilities` returns a unified list aggregated from extensions, actions, and cortex (not SDK libraries)
 2. `POST /v1/capabilities/:id/invoke` successfully proxies to extensions (sync) and manual webhooks (sync)
