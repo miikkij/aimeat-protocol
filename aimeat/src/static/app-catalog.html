@@ -3190,11 +3190,13 @@
       merged.push({
         name: (sa.manifest && sa.manifest.name) ? sa.manifest.name : filename,
         filename: filename,
+        owner: sa.owner || '',
         version: sa.version_number ? 'v' + sa.version_number : '',
         date: sa.created_at ? new Date(sa.created_at).toLocaleDateString() : '',
         viewUrl: aimeatUrl + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(filename),
         source: source,
-        localId: localMatch ? localMatch.id : null
+        localId: localMatch ? localMatch.id : null,
+        isOwn: true
       });
     }
 
@@ -3227,7 +3229,7 @@
     for (var i = 0; i < merged.length; i++) {
       var app = merged[i];
       var badgeClass = app.source === 'both' ? 'both' : (app.source === 'server' ? 'server' : 'local');
-      var badgeLabel = app.source === 'both' ? 'local + server' : app.source;
+      var badgeLabel = app.source === 'both' ? 'PORTAL + MCP' : (app.source === 'server' ? 'MCP' : 'PORTAL');
       html +=
         '<div class="published-card">' +
           '<div class="published-card-name">' + escapeHtml(app.name) + (app.version ? ' <span style="opacity:.5;font-size:.85em">' + escapeHtml(app.version) + '</span>' : '') +
@@ -3239,7 +3241,8 @@
           '</div>' +
           '<div class="published-card-actions">' +
             (app.viewUrl ? '<button onclick="window.open(\'' + escapeHtml(app.viewUrl) + '?mode=inline\', \'_blank\')">&#x1F441; View</button>' : '') +
-            (app.localId ? '<button onclick="window._launcher.unpublishApp(\'' + escapeHtml(app.localId) + '\')" class="danger">&#x1F5D1; Remove</button>' : '') +
+            (app.localId ? '<button onclick="window._launcher.unpublishApp(\'' + escapeHtml(app.localId) + '\')" class="danger">&#x1F5D1; Remove</button>' :
+             app.isOwn ? '<button onclick="window._launcher.deleteServerApp(\'' + escapeHtml(app.filename) + '\')" class="danger">&#x1F5D1; Remove</button>' : '') +
           '</div>' +
         '</div>';
     }
@@ -3288,6 +3291,31 @@
       .catch(function(err) {
         alert('Error: ' + (err.message || err));
       });
+  }
+
+  function deleteServerApp(filename) {
+    if (!confirm('Delete "' + filename + '" from the server?')) return;
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
+    fetch(aimeatUrl + '/v1/auth/anonymous', { method: 'POST' })
+      .then(function(resp) { return resp.json(); })
+      .then(function(authJson) {
+        var token = authJson.data && authJson.data.token;
+        if (!token) throw new Error('Could not get auth token');
+        return fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(filename), {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(json) {
+        if (json.ok) {
+          loadPublishedApps();
+        } else {
+          alert('Failed to delete: ' + (json.error && json.error.message ? json.error.message : 'Unknown error'));
+        }
+      })
+      .catch(function(err) { alert('Error: ' + (err.message || err)); });
   }
 
   // ── Cortex Extensions Bar ─────────────────────────
@@ -4022,6 +4050,7 @@
     loadPublishedApps: loadPublishedApps,
     togglePublished: togglePublished,
     unpublishApp: unpublishApp,
+    deleteServerApp: deleteServerApp,
     renderRecentlyOpened: renderRecentlyOpened,
     loadCortexExtensions: loadCortexExtensions,
     showCortexPopup: showCortexPopup,
