@@ -32,6 +32,10 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
 
   jobs.push({ id: 'core:capability-aggregation', name: 'Capability Aggregation', coreHandler: 'capability-aggregation', cron: '*/5 * * * *' });
 
+  if (config.eudiwEnabled || config.ftnEnabled) {
+    jobs.push({ id: 'core:nonce-cleanup', name: 'Verification Nonce Cleanup', coreHandler: 'nonce-cleanup', cron: '*/5 * * * *' });
+  }
+
   const now = new Date().toISOString();
   for (const def of jobs) {
     const existing = await storage.getScheduledJob(def.id);

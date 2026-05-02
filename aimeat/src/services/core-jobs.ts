@@ -27,6 +27,9 @@ export function registerCoreHandlers(
     const { runCapabilityAggregation } = await import('./capability-aggregator.js');
     await runCapabilityAggregation(config, storage);
   });
+  if (config.eudiwEnabled || config.ftnEnabled) {
+    scheduler.registerCoreHandler('nonce-cleanup', () => runNonceCleanupJob(storage));
+  }
 }
 
 // ── Core Job Handlers (pure async, no setInterval) ─────────────────
@@ -183,6 +186,11 @@ async function runMailboxCleanupJob(storage: Storage): Promise<void> {
 async function runConsentExpiryJob(storage: Storage): Promise<void> {
   const { expireConsents } = await import('./consent.js');
   await expireConsents(storage);
+}
+
+async function runNonceCleanupJob(storage: Storage): Promise<void> {
+  const cleaned = await storage.cleanExpiredNonces();
+  if (cleaned > 0) logger.info(`Nonce cleanup: removed ${cleaned} expired verification nonces`);
 }
 
 async function runExecutionLogPruneJob(storage: Storage): Promise<void> {

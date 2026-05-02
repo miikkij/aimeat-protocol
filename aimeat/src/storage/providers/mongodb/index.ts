@@ -2541,6 +2541,54 @@ export class MongoStorage implements Storage {
         return { id: row.id, name: row.name, url: row.url, publicKey: row.publicKey, type: row.type, trusted: row.trusted, addedBy: row.addedBy, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt };
     }
 
+    // ── Verification Nonces (Phase 3.3) ──
+
+    async createVerificationNonce(record: import('../../interface.js').VerificationNonceRecord): Promise<import('../../interface.js').VerificationNonceRecord> {
+        this.ensureReady();
+        await this.prisma.verificationNonce.create({
+            data: {
+                id: record.id,
+                owner: record.owner,
+                type: record.type,
+                state: record.state,
+                nonce: record.nonce,
+                redirectUri: record.redirectUri ?? '',
+                createdAt: new Date(record.createdAt),
+                expiresAt: new Date(record.expiresAt),
+            },
+        });
+        return record;
+    }
+
+    async getVerificationNonce(state: string): Promise<import('../../interface.js').VerificationNonceRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.verificationNonce.findUnique({ where: { state } });
+        if (!row) return null;
+        return {
+            id: row.id,
+            owner: row.owner,
+            type: row.type as 'eudiw' | 'ftn',
+            state: row.state,
+            nonce: row.nonce,
+            redirectUri: row.redirectUri,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+            expiresAt: row.expiresAt instanceof Date ? row.expiresAt.toISOString() : row.expiresAt,
+        };
+    }
+
+    async deleteVerificationNonce(state: string): Promise<void> {
+        this.ensureReady();
+        await this.prisma.verificationNonce.deleteMany({ where: { state } });
+    }
+
+    async cleanExpiredNonces(): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.verificationNonce.deleteMany({
+            where: { expiresAt: { lt: new Date() } },
+        });
+        return result.count;
+    }
+
     // ── Genesis Peers (Phase 3.4) ──
 
     async createGenesisPeer(record: import('../../interface.js').GenesisPeerRecord): Promise<import('../../interface.js').GenesisPeerRecord> {

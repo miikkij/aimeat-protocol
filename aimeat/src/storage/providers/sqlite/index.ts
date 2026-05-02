@@ -13,7 +13,7 @@ import type {
   EmailVerificationRecord, FlagRecord, FlagSummary, MatchRecord,
   OrganismRecord, OrganismMembershipRecord, JoinRequestRecord,
   AppealRecord, ListingRecord, PurchaseRecord,
-  PushSubscriptionRecord, TrustedIssuerRecord,
+  PushSubscriptionRecord, TrustedIssuerRecord, VerificationNonceRecord,
   GenesisPeerRecord, OrganismReputationRecord,
   ChatInstanceRecord, RealtimeRoomRecord, SiteChangeLogEntry,
   ExtensionRecord, EscrowHoldRecord, BoardSubscriptionRecord,
@@ -3083,6 +3083,42 @@ export class SqliteStorage implements Storage {
       addedBy: row.addedBy as string,
       createdAt: row.createdAt as string,
     };
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Verification Nonces ──
+  // ══════════════════════════════════════════════════════════
+
+  async createVerificationNonce(record: VerificationNonceRecord): Promise<VerificationNonceRecord> {
+    this.db.prepare(
+      'INSERT INTO verification_nonces (id, owner, type, state, nonce, redirectUri, createdAt, expiresAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(record.id, record.owner, record.type, record.state, record.nonce, record.redirectUri ?? '', record.createdAt, record.expiresAt);
+    return record;
+  }
+
+  async getVerificationNonce(state: string): Promise<VerificationNonceRecord | null> {
+    const row = this.db.prepare('SELECT * FROM verification_nonces WHERE state = ?').get(state) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    return {
+      id: row.id as string,
+      owner: row.owner as string,
+      type: row.type as 'eudiw' | 'ftn',
+      state: row.state as string,
+      nonce: row.nonce as string,
+      redirectUri: row.redirectUri as string,
+      createdAt: row.createdAt as string,
+      expiresAt: row.expiresAt as string,
+    };
+  }
+
+  async deleteVerificationNonce(state: string): Promise<void> {
+    this.db.prepare('DELETE FROM verification_nonces WHERE state = ?').run(state);
+  }
+
+  async cleanExpiredNonces(): Promise<number> {
+    const now = new Date().toISOString();
+    const result = this.db.prepare('DELETE FROM verification_nonces WHERE expiresAt < ?').run(now);
+    return result.changes;
   }
 
   // ══════════════════════════════════════════════════════════

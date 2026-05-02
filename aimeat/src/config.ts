@@ -202,7 +202,11 @@ export interface AimeatConfig {
   eudiwRedirectUri: string;
   ftnEnabled: boolean;
   ftnProviderUrl: string;
+  ftnClientId: string;
+  ftnClientSecret: string;
   vcIssuerDid: string;
+  nonceTtlSeconds: number;
+  nationalEidPidClaim: string;
 
   // Cross-Federation (Phase 3.4)
   crossFederationEnabled: boolean;
@@ -530,7 +534,11 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     eudiwRedirectUri: process.env.AIMEAT_EUDIW_REDIRECT_URI ?? '',
     ftnEnabled: process.env.AIMEAT_FTN_ENABLED === 'true',
     ftnProviderUrl: process.env.AIMEAT_FTN_PROVIDER_URL ?? 'https://tunnistautuminen.suomi.fi',
+    ftnClientId: process.env.AIMEAT_FTN_CLIENT_ID ?? '',
+    ftnClientSecret: process.env.AIMEAT_FTN_CLIENT_SECRET ?? '',
     vcIssuerDid: process.env.AIMEAT_VC_ISSUER_DID ?? '',
+    nonceTtlSeconds: parseInt(process.env.AIMEAT_NONCE_TTL_SECONDS ?? '300', 10),
+    nationalEidPidClaim: process.env.AIMEAT_NATIONAL_EID_PID_CLAIM ?? 'personal_identity_code',
     crossFederationEnabled: process.env.AIMEAT_CROSS_FEDERATION_ENABLED !== 'false',
     maxGenesisPeers: parseInt(process.env.AIMEAT_MAX_GENESIS_PEERS ?? '10', 10),
     genesisSyncIntervalHours: parseInt(process.env.AIMEAT_GENESIS_SYNC_INTERVAL_HOURS ?? '6', 10),

@@ -528,6 +528,18 @@ export function initializeSchema(db: Database.Database): void {
       createdAt      TEXT NOT NULL
     );
 
+    -- ── Verification Nonces ──
+    CREATE TABLE IF NOT EXISTS verification_nonces (
+      id             TEXT PRIMARY KEY,
+      owner          TEXT NOT NULL,
+      type           TEXT NOT NULL,
+      state          TEXT NOT NULL UNIQUE,
+      nonce          TEXT NOT NULL,
+      redirectUri    TEXT NOT NULL DEFAULT '',
+      createdAt      TEXT NOT NULL,
+      expiresAt      TEXT NOT NULL
+    );
+
     -- ── Genesis Peers ──
     CREATE TABLE IF NOT EXISTS genesis_peers (
       id              TEXT PRIMARY KEY,

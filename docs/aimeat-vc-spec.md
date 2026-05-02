@@ -117,16 +117,17 @@ Error responses:
 | `AIMEAT_VC_DEFAULT_VALIDITY_DAYS` | `365` | Default credential validity period |
 | `AIMEAT_VC_CONTEXT_URL` | `https://aimeat.example/contexts/v1` | AIMEAT JSON-LD context URL |
 
-## Reference Implementation Notes
+## Implementation Status
 
-The current implementation has the following limitations:
+- **Signed JWT format** -- Credentials are issued as `vc+ld+jwt` signed with the node's Ed25519 keypair. Use `?format=jwt` on the credential endpoint.
+- **Unsigned JSON** -- Also available as `?format=json` (default) for backward compatibility.
+- **DID Document published** -- The node's `did:web` DID Document is served at `/.well-known/did.json`, containing the public key for signature verification.
+- **MyData consent receipts** -- KI-CR v1.1.0 format with Finnish jurisdiction.
 
-- **Plain JSON only.** Credentials are returned as unsigned JSON objects. Signed JWT (`vc+ld+jwt`) and Data Integrity proof formats are not yet implemented.
-- **No DID resolution.** The `did:web` issuer DID is asserted but not resolvable. No DID Document is published.
-- **No status list.** Credential revocation via W3C Bitstring Status List is not yet implemented.
-- **Consent receipts are simplified.** The KI-CR output covers core fields but omits optional sections like third-party disclosures.
-
-These items are tracked for future phases.
+**Not yet implemented:**
+- Credential revocation via W3C Bitstring Status List
+- SD-JWT issuance (selective disclosure for issued credentials)
+- Data Integrity proof format
 
 ---
 

@@ -102,16 +102,23 @@ Lists all configured trusted issuers. Public endpoint.
 | `AIMEAT_FTN_ISSUER_URL` | -- | FTN broker discovery URL |
 | `AIMEAT_EUDIW_NONCE_TTL_SECONDS` | `300` | Expiry for verification nonces |
 
-## Reference Implementation Notes
+## Implementation Status
 
-The current implementation provides the endpoint structure and flow scaffolding but has the following limitations:
+The EUDIW integration implements cryptographically complete verification:
 
-- **No real SD-JWT parsing.** Verifiable Presentations are accepted as opaque JSON objects. Selective disclosure and signature verification are not yet implemented.
-- **FTN integration is a placeholder.** The FTN endpoints accept mock assertions for development. Production use requires registering with a licensed FTN broker.
-- **Trusted issuer validation is name-based only.** The node checks issuer IDs against the trusted list but does not resolve or verify issuer DIDs.
-- **No revocation checking.** Credential status lists and revocation registries are not queried.
+- **SD-JWT parsing and signature verification** -- VP tokens are decoded and cryptographically verified against trusted issuer public keys (JWK format). Supports ES256 and EdDSA algorithms.
+- **Nonce/state validation** -- All verification flows use database-backed nonces with configurable TTL for CSRF protection and replay prevention.
+- **FTN integration** -- Generic OIDC client supporting any FTN broker (Signicat, DVV/Suomi.fi, Telia). Configurable via `AIMEAT_FTN_PROVIDER_URL`, `AIMEAT_FTN_CLIENT_ID`, `AIMEAT_FTN_CLIENT_SECRET`.
+- **Multi-country eID support** -- The national PID claim name is configurable via `AIMEAT_NATIONAL_EID_PID_CLAIM` (Finland: `personal_identity_code`, Sweden: `personalNumber`, Denmark: `dk.cpr`).
+- **Trusted issuer validation** -- Issuer signatures are verified against public keys stored as JWK in the trusted issuer registry.
 
-These limitations are documented in the codebase with `// TODO: Phase 3+` comments.
+**Production deployment requires:**
+- Registering with a licensed FTN broker to obtain OIDC client credentials
+- Configuring trusted issuers with their real public keys (JWK format)
+- For EUDIW: registering as a verifier with the EUDIW infrastructure
+
+**Not yet implemented:**
+- Credential revocation checking (status lists)
 
 ---
 

@@ -687,6 +687,19 @@ model TrustedIssuer {
   @@index([url])
 }
 
+model VerificationNonce {
+  id          String   @id @map("_id")
+  owner       String
+  type        String
+  state       String   @unique
+  nonce       String
+  redirectUri String   @default("")
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  @@index([expiresAt])
+}
+
 model GenesisPeer {
   id            String   @id @map("_id")
   genesisNodeId String

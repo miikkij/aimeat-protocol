@@ -2,6 +2,7 @@ import type {
   MaintenanceState,
   PushSubscriptionRecord,
   TrustedIssuerRecord,
+  VerificationNonceRecord,
   RealtimeRoomRecord,
   SiteChangeLogEntry,
   ExtensionRecord,
@@ -23,6 +24,10 @@ export interface NodeRepository {
   getTrustedIssuerByUrl(url: string): Promise<TrustedIssuerRecord | null>;
   listTrustedIssuers(opts?: { type?: string }): Promise<TrustedIssuerRecord[]>;
   deleteTrustedIssuer(id: string): Promise<boolean>;
+  createVerificationNonce(record: VerificationNonceRecord): Promise<VerificationNonceRecord>;
+  getVerificationNonce(state: string): Promise<VerificationNonceRecord | null>;
+  deleteVerificationNonce(state: string): Promise<void>;
+  cleanExpiredNonces(): Promise<number>;
   createRealtimeRoom(room: RealtimeRoomRecord): Promise<RealtimeRoomRecord>;
   getRealtimeRoom(id: string): Promise<RealtimeRoomRecord | null>;
   listRealtimeRooms(filter?: { appType?: string; isPublic?: boolean }): Promise<RealtimeRoomRecord[]>;

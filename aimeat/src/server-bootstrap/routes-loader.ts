@@ -82,6 +82,9 @@ import { openrouterRouter } from '../routes/openrouter.js';
 // Services needed during route mounting
 import { createPushService } from '../services/push.js';
 import { createEudiwService } from '../services/eudiw.js';
+import { createSdJwtVerifier } from '../services/sd-jwt.js';
+import { createOidcClient, type OidcClient } from '../services/oidc-client.js';
+import { createDidDocumentService } from '../services/did-document.js';
 import { createVcIssuerService } from '../services/vc-issuer.js';
 import { createMyDataReceiptService } from '../services/mydata-receipt.js';
 import { createEmailService } from '../services/email.js';
@@ -269,10 +272,38 @@ export function mountRoutes(
   app.use(pushRouter(config, storage, pushService));
 
   // EUDIW / VC / MyData services — Phase 3.3
-  const eudiwService = createEudiwService(config, storage);
+  const sdJwtVerifier = createSdJwtVerifier();
+  const eudiwService = createEudiwService(config, storage, sdJwtVerifier);
   const vcIssuerService = createVcIssuerService(config);
   const mydataReceiptService = createMyDataReceiptService(config);
-  app.use(verificationRouter(config, storage, eudiwService, vcIssuerService, mydataReceiptService));
+
+  // FTN OIDC client — Phase 3.3
+  let oidcClient: OidcClient | null = null;
+  if (config.ftnEnabled && config.ftnProviderUrl && config.ftnClientId) {
+    oidcClient = createOidcClient({
+      issuerUrl: config.ftnProviderUrl,
+      clientId: config.ftnClientId,
+      clientSecret: config.ftnClientSecret,
+      redirectUri: `${config.baseUrl}/v1/ghii/verify/ftn/callback`,
+      scopes: ['openid', 'profile', config.nationalEidPidClaim],
+    });
+    oidcClient.initialize().catch(err =>
+      logger.warn('FTN OIDC discovery failed, FTN endpoints will return 503', { error: String(err) }));
+  }
+
+  app.use(verificationRouter(config, storage, eudiwService, vcIssuerService, mydataReceiptService, oidcClient));
+
+  // DID Document + VC signing key — Phase 3.3
+  // Node key is loaded async; once available, enable VC signing and serve DID Document
+  storage.getNodeKey().then(async (nodeKeyPair) => {
+    if (!nodeKeyPair) return;
+    vcIssuerService.setNodeKeyPair(nodeKeyPair);
+    const publicJwk = await vcIssuerService.getPublicJwk();
+    const didDocService = createDidDocumentService(vcIssuerService.getIssuerDid(), publicJwk);
+    app.get('/.well-known/did.json', (_req, res) => {
+      res.json(didDocService.getDocument());
+    });
+  }).catch(err => logger.warn('DID Document setup failed', { error: String(err) }));
 
   // Match notification job — Phase 1.6
   startMatchNotificationJob(config, storage, emailService, directoryService);

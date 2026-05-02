@@ -694,6 +694,18 @@ export interface TrustedIssuerRecord {
   createdAt: string;
 }
 
+// Phase 3.3 — Verification Nonces (EUDIW/FTN state tracking)
+export interface VerificationNonceRecord {
+  id: string;
+  owner: string;
+  type: 'eudiw' | 'ftn';
+  state: string;
+  nonce: string;
+  redirectUri: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
 // Phase 3.4 — Genesis Peering (Cross-Federation)
 export interface GenesisPeerRecord {
   id: string;

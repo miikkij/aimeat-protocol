@@ -255,6 +255,10 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'eudiwRedirectUri', dotPath: 'eudiw.redirect_uri', envVar: 'AIMEAT_EUDIW_REDIRECT_URI', type: 'string', validate: () => true, immutable: false, description: 'EUDIW redirect URI' },
   { key: 'ftnProviderUrl', dotPath: 'eudiw.ftn_provider_url', envVar: 'AIMEAT_FTN_PROVIDER_URL', type: 'string', validate: () => true, immutable: false, description: 'Finnish Trust Network provider URL' },
   { key: 'vcIssuerDid', dotPath: 'eudiw.vc_issuer_did', envVar: 'AIMEAT_VC_ISSUER_DID', type: 'string', validate: () => true, immutable: false, description: 'Verifiable credential issuer DID' },
+  { key: 'ftnClientId', dotPath: 'eudiw.ftn_client_id', envVar: 'AIMEAT_FTN_CLIENT_ID', type: 'string', validate: () => true, immutable: false, description: 'FTN broker OIDC client ID' },
+  { key: 'ftnClientSecret', dotPath: 'eudiw.ftn_client_secret', envVar: 'AIMEAT_FTN_CLIENT_SECRET', type: 'string', validate: () => true, immutable: true, description: 'FTN broker OIDC client secret (secret)', adminDisplay: 'hidden' },
+  { key: 'nonceTtlSeconds', dotPath: 'eudiw.nonce_ttl_seconds', envVar: 'AIMEAT_NONCE_TTL_SECONDS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 60 && (v as number) <= 3600, immutable: false, description: 'Verification nonce TTL in seconds', range: '60-3600' },
+  { key: 'nationalEidPidClaim', dotPath: 'eudiw.national_eid_pid_claim', envVar: 'AIMEAT_NATIONAL_EID_PID_CLAIM', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'National eID PID claim name (e.g., personal_identity_code)' },
 
   // ── Setup (immutable) ──
   { key: 'setupAllowedIps', dotPath: 'setup.allowed_ips', envVar: 'AIMEAT_SETUP_ALLOWED_IPS', type: 'string', validate: () => true, immutable: true, description: 'Comma-separated IPs allowed for setup', adminDisplay: 'configured' },

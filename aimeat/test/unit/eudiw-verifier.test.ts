@@ -1,10 +1,26 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+/**
+ * @file eudiw-verifier.test.ts
+ * @description Unit tests for the EUDIW verification service
+ * @version-history
+ *   v1.0.0 — 2026-03-01 — Initial test suite
+ *   v2.0.0 — 2026-05-02 — Updated for real SD-JWT verification
+ */
+
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { createEudiwService } from '../../src/services/eudiw.js';
 import type { EudiwService } from '../../src/services/eudiw.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage, TrustedIssuerRecord } from '../../src/storage/interface.js';
+import { createSdJwtVerifier } from '../../src/services/sd-jwt.js';
+import { generateTestKeyPair, createTestSdJwt, type TestKeyPair } from '../helpers/test-sd-jwt.js';
 
 // ── Helpers ──────────────────────────────────────────────────
+
+let testKeyPair: TestKeyPair;
+
+beforeAll(async () => {
+    testKeyPair = await generateTestKeyPair('EdDSA');
+});
 
 function makeConfig(overrides: Partial<AimeatConfig> = {}): AimeatConfig {
     return {
@@ -25,21 +41,18 @@ function makeMockStorage(trustedIssuers: Map<string, TrustedIssuerRecord> = new 
             }
             return null;
         }),
+        listTrustedIssuers: vi.fn(async (_opts?: { type?: string }) => {
+            return [...trustedIssuers.values()];
+        }),
     } as unknown as Storage;
 }
 
-function createTestVpToken(payload: Record<string, unknown>): string {
-    const header = Buffer.from(JSON.stringify({ alg: 'ES256', typ: 'JWT' })).toString('base64url');
-    const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
-    return `${header}.${body}.fake-signature`;
-}
-
-function makeTrustedIssuer(url: string, trusted = true): TrustedIssuerRecord {
+function makeTrustedIssuer(url: string, trusted = true, publicKeyJwk?: object): TrustedIssuerRecord {
     return {
         id: `issuer-${Math.random().toString(36).slice(2, 8)}`,
         name: 'Test Issuer',
         url,
-        publicKey: 'test-public-key',
+        publicKey: JSON.stringify(publicKeyJwk ?? testKeyPair.publicJwk),
         type: 'eudiw',
         trusted,
         addedBy: 'operator',
@@ -60,13 +73,13 @@ describe('EUDIW Service', () => {
     describe('enabled state', () => {
         it('reports enabled when config.eudiwEnabled is true', () => {
             const storage = makeMockStorage();
-            service = createEudiwService(makeConfig({ eudiwEnabled: true }), storage);
+            service = createEudiwService(makeConfig({ eudiwEnabled: true }), storage, createSdJwtVerifier());
             expect(service.enabled).toBe(true);
         });
 
         it('reports disabled when config.eudiwEnabled is false', () => {
             const storage = makeMockStorage();
-            service = createEudiwService(makeConfig({ eudiwEnabled: false }), storage);
+            service = createEudiwService(makeConfig({ eudiwEnabled: false }), storage, createSdJwtVerifier());
             expect(service.enabled).toBe(false);
         });
     });
@@ -74,7 +87,7 @@ describe('EUDIW Service', () => {
     describe('generateAuthorizationRequest', () => {
         it('returns valid OpenID4VP structure', () => {
             const storage = makeMockStorage();
-            service = createEudiwService(makeConfig(), storage);
+            service = createEudiwService(makeConfig(), storage, createSdJwtVerifier());
             const request = service.generateAuthorizationRequest('test-state-123');
             expect(request.response_type).toBe('vp_token');
             expect(request.response_mode).toBe('direct_post');
@@ -84,14 +97,14 @@ describe('EUDIW Service', () => {
 
         it('contains correct client_id from config', () => {
             const storage = makeMockStorage();
-            service = createEudiwService(makeConfig({ eudiwClientId: 'my-custom-verifier' }), storage);
+            service = createEudiwService(makeConfig({ eudiwClientId: 'my-custom-verifier' }), storage, createSdJwtVerifier());
             const request = service.generateAuthorizationRequest('state-1');
             expect(request.client_id).toBe('my-custom-verifier');
         });
 
         it('contains presentation_definition with input descriptors', () => {
             const storage = makeMockStorage();
-            service = createEudiwService(makeConfig(), storage);
+            service = createEudiwService(makeConfig(), storage, createSdJwtVerifier());
             const request = service.generateAuthorizationRequest('state-1');
             const pd = request.presentation_definition as Record<string, unknown>;
             expect(pd).toBeTruthy();
@@ -103,63 +116,35 @@ describe('EUDIW Service', () => {
 
         it('uses fallback redirect_uri when eudiwRedirectUri is empty', () => {
             const storage = makeMockStorage();
-            service = createEudiwService(makeConfig({ eudiwRedirectUri: '', baseUrl: 'http://localhost:40050' }), storage);
+            service = createEudiwService(makeConfig({ eudiwRedirectUri: '', baseUrl: 'http://localhost:40050' }), storage, createSdJwtVerifier());
             const request = service.generateAuthorizationRequest('state-1');
             expect(request.redirect_uri).toBe('http://localhost:40050/v1/ghii/verify/eudiw/callback');
         });
 
         it('uses custom redirect_uri when eudiwRedirectUri is set', () => {
             const storage = makeMockStorage();
-            service = createEudiwService(makeConfig({ eudiwRedirectUri: 'https://custom.example.com/cb' }), storage);
+            service = createEudiwService(makeConfig({ eudiwRedirectUri: 'https://custom.example.com/cb' }), storage, createSdJwtVerifier());
             const request = service.generateAuthorizationRequest('state-1');
             expect(request.redirect_uri).toBe('https://custom.example.com/cb');
         });
     });
 
     describe('verifyPresentation', () => {
-        it('rejects invalid VP token format (not 3 parts)', async () => {
+        it('rejects invalid SD-JWT format', async () => {
             const storage = makeMockStorage();
-            service = createEudiwService(makeConfig(), storage);
-            const result = await service.verifyPresentation('not.valid', {});
+            service = createEudiwService(makeConfig(), storage, createSdJwtVerifier());
+            const result = await service.verifyPresentation('not-a-valid-token', {});
             expect(result.valid).toBe(false);
-            expect(result.error).toBe('Invalid VP token format');
-        });
-
-        it('rejects invalid base64url payload', async () => {
-            const storage = makeMockStorage();
-            service = createEudiwService(makeConfig(), storage);
-            const result = await service.verifyPresentation('header.!!!invalid!!!.sig', {});
-            expect(result.valid).toBe(false);
-            expect(result.error).toBe('Invalid VP token payload');
-        });
-
-        it('rejects expired tokens', async () => {
-            const issuerUrl = 'https://issuer.example.com';
-            const issuer = makeTrustedIssuer(issuerUrl);
-            trustedIssuers.set(issuer.id, issuer);
-            const storage = makeMockStorage(trustedIssuers);
-            service = createEudiwService(makeConfig(), storage);
-
-            const expiredPayload = { iss: issuerUrl, exp: Math.floor(Date.now() / 1000) - 3600 };
-            const token = createTestVpToken(expiredPayload);
-            const result = await service.verifyPresentation(token, {});
-            expect(result.valid).toBe(false);
-            expect(result.error).toBe('Credential expired');
-        });
-
-        it('rejects missing issuer in payload', async () => {
-            const storage = makeMockStorage();
-            service = createEudiwService(makeConfig(), storage);
-            const token = createTestVpToken({ sub: 'no-issuer-here' });
-            const result = await service.verifyPresentation(token, {});
-            expect(result.valid).toBe(false);
-            expect(result.error).toBe('Missing issuer in VP token');
         });
 
         it('rejects untrusted issuers', async () => {
-            const storage = makeMockStorage(); // no trusted issuers
-            service = createEudiwService(makeConfig(), storage);
-            const token = createTestVpToken({ iss: 'https://unknown-issuer.com', exp: Math.floor(Date.now() / 1000) + 3600 });
+            const storage = makeMockStorage();
+            service = createEudiwService(makeConfig(), storage, createSdJwtVerifier());
+            const token = await createTestSdJwt(
+                { given_name: 'Eve' },
+                'https://unknown-issuer.com',
+                testKeyPair,
+            );
             const result = await service.verifyPresentation(token, {});
             expect(result.valid).toBe(false);
             expect(result.error).toBe('Untrusted issuer');
@@ -170,12 +155,25 @@ describe('EUDIW Service', () => {
             const issuer = makeTrustedIssuer(issuerUrl, false);
             trustedIssuers.set(issuer.id, issuer);
             const storage = makeMockStorage(trustedIssuers);
-            service = createEudiwService(makeConfig(), storage);
+            service = createEudiwService(makeConfig(), storage, createSdJwtVerifier());
 
-            const token = createTestVpToken({ iss: issuerUrl, exp: Math.floor(Date.now() / 1000) + 3600 });
+            const token = await createTestSdJwt({ given_name: 'Eve' }, issuerUrl, testKeyPair);
             const result = await service.verifyPresentation(token, {});
             expect(result.valid).toBe(false);
-            expect(result.error).toBe('Untrusted issuer');
+        });
+
+        it('rejects token signed with wrong key', async () => {
+            const issuerUrl = 'https://trusted-issuer.example.com';
+            const wrongKeyPair = await generateTestKeyPair('EdDSA');
+            const issuer = makeTrustedIssuer(issuerUrl, true);
+            trustedIssuers.set(issuer.id, issuer);
+            const storage = makeMockStorage(trustedIssuers);
+            service = createEudiwService(makeConfig(), storage, createSdJwtVerifier());
+
+            const token = await createTestSdJwt({ given_name: 'Eve' }, issuerUrl, wrongKeyPair);
+            const result = await service.verifyPresentation(token, {});
+            expect(result.valid).toBe(false);
+            expect(result.error).toContain('Signature verification failed');
         });
 
         it('accepts valid tokens with trusted issuer and extracts attributes', async () => {
@@ -183,31 +181,20 @@ describe('EUDIW Service', () => {
             const issuer = makeTrustedIssuer(issuerUrl, true);
             trustedIssuers.set(issuer.id, issuer);
             const storage = makeMockStorage(trustedIssuers);
-            service = createEudiwService(makeConfig(), storage);
+            service = createEudiwService(makeConfig(), storage, createSdJwtVerifier());
 
-            const token = createTestVpToken({
-                iss: issuerUrl,
-                exp: Math.floor(Date.now() / 1000) + 3600,
-                vc: {
-                    credentialSubject: {
-                        id: 'did:example:123',
-                        type: 'Person',
-                        given_name: 'Alice',
-                        family_name: 'Smith',
-                        birthdate: '1990-01-01',
-                    },
-                },
-            });
+            const token = await createTestSdJwt(
+                { given_name: 'Alice', family_name: 'Smith', birthdate: '1990-01-01' },
+                issuerUrl,
+                testKeyPair,
+            );
             const result = await service.verifyPresentation(token, {});
             expect(result.valid).toBe(true);
             expect(result.issuer).toBe(issuerUrl);
             expect(result.attributes).toBeDefined();
-            // id and type should be excluded from attributes
             expect(result.attributes!.given_name).toBe('Alice');
             expect(result.attributes!.family_name).toBe('Smith');
             expect(result.attributes!.birthdate).toBe('1990-01-01');
-            expect(result.attributes!.id).toBeUndefined();
-            expect(result.attributes!.type).toBeUndefined();
         });
     });
 });

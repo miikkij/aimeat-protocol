@@ -1,6 +1,18 @@
+/**
+ * @file eudiw.ts
+ * @description EUDIW (EU Digital Identity Wallet) service for OpenID4VP verification.
+ *   Generates authorization requests and verifies VP tokens using real SD-JWT
+ *   cryptographic verification against trusted issuer public keys.
+ * @version-history
+ *   v1.0.0 — 2026-03-01 — Initial scaffold implementation
+ *   v2.0.0 — 2026-05-02 — Real SD-JWT cryptographic verification
+ */
+
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, TrustedIssuerRecord } from '../storage/interface.js';
+import type { SdJwtVerifier } from './sd-jwt.js';
+import type { JWK } from 'jose';
 import { logger } from '../utils/logger.js';
 
 export interface EudiwVerificationResult {
@@ -16,7 +28,36 @@ export interface EudiwService {
   verifyPresentation(vpToken: string, presentationSubmission: Record<string, unknown>): Promise<EudiwVerificationResult>;
 }
 
-export function createEudiwService(config: AimeatConfig, storage: Storage): EudiwService {
+function buildIssuerKeyMap(issuers: TrustedIssuerRecord[]): Map<string, JWK> {
+  const map = new Map<string, JWK>();
+  for (const issuer of issuers) {
+    if (!issuer.trusted) continue;
+    try {
+      const jwk = JSON.parse(issuer.publicKey) as JWK;
+      map.set(issuer.url, jwk);
+    } catch {
+      logger.warn(`Trusted issuer ${issuer.name} has invalid JWK in publicKey field`);
+    }
+  }
+  return map;
+}
+
+function extractIdentityAttributes(claims?: Record<string, unknown>): Record<string, unknown> {
+  if (!claims) return {};
+  const attributes: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(claims)) {
+    if (key !== 'id' && key !== 'type') {
+      attributes[key] = value;
+    }
+  }
+  return attributes;
+}
+
+export function createEudiwService(
+  config: AimeatConfig,
+  storage: Storage,
+  sdJwtVerifier: SdJwtVerifier,
+): EudiwService {
   return {
     get enabled() { return config.eudiwEnabled; },
 
@@ -48,62 +89,16 @@ export function createEudiwService(config: AimeatConfig, storage: Storage): Eudi
 
     async verifyPresentation(vpToken: string, _presentationSubmission: Record<string, unknown>): Promise<EudiwVerificationResult> {
       try {
-        // In a production implementation, this would:
-        // 1. Parse the SD-JWT from vpToken
-        // 2. Verify the issuer signature against trusted issuers
-        // 3. Check credential expiry
-        // 4. Extract selectively disclosed attributes
+        const issuers = await storage.listTrustedIssuers({ type: 'eudiw' });
+        const keyMap = buildIssuerKeyMap(issuers);
 
-        // For the reference implementation, we validate the structure
-        // and check against the trusted issuers list
-
-        // Parse JWT header to extract issuer info
-        const parts = vpToken.split('.');
-        if (parts.length < 3) {
-          return { valid: false, error: 'Invalid VP token format' };
+        const result = await sdJwtVerifier.verify(vpToken, keyMap);
+        if (!result.valid) {
+          return { valid: false, error: result.error };
         }
 
-        // Decode payload (simplified — production would verify signatures)
-        let payload: Record<string, unknown>;
-        try {
-          payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
-        } catch {
-          return { valid: false, error: 'Invalid VP token payload' };
-        }
-
-        const issuer = (payload.iss as string) ?? '';
-        if (!issuer) {
-          return { valid: false, error: 'Missing issuer in VP token' };
-        }
-
-        // Check expiry
-        const exp = payload.exp as number | undefined;
-        if (exp && exp * 1000 < Date.now()) {
-          return { valid: false, error: 'Credential expired' };
-        }
-
-        // Check trusted issuer
-        const trustedIssuer = await storage.getTrustedIssuerByUrl(issuer);
-        if (!trustedIssuer || !trustedIssuer.trusted) {
-          return { valid: false, error: 'Untrusted issuer' };
-        }
-
-        // Extract credential subject attributes
-        const vc = payload.vc as Record<string, unknown> | undefined;
-        const subject = (vc?.credentialSubject ?? payload.credentialSubject ?? {}) as Record<string, unknown>;
-
-        const attributes: Record<string, unknown> = {};
-        for (const [key, value] of Object.entries(subject)) {
-          if (key !== 'id' && key !== 'type') {
-            attributes[key] = value;
-          }
-        }
-
-        return {
-          valid: true,
-          attributes,
-          issuer,
-        };
+        const attributes = extractIdentityAttributes(result.disclosedClaims);
+        return { valid: true, attributes, issuer: result.issuer };
       } catch (err) {
         logger.error('EUDIW verification failed', { error: String(err) });
         return { valid: false, error: 'Verification failed' };
