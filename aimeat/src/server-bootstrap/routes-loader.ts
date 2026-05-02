@@ -78,6 +78,7 @@ import { generatorAutopilotRouter } from '../routes/generator-autopilot.js';
 import { foundryRouter } from '../routes/foundry.js';
 import { calibratorRouter } from '../routes/calibrator.js';
 import { openrouterRouter } from '../routes/openrouter.js';
+import { uploadRouter } from '../routes/upload.js';
 
 // Services needed during route mounting
 import { createPushService } from '../services/push.js';
@@ -146,6 +147,9 @@ export function mountRoutes(
   const metricsRegistry = config.metricsEnabled
     ? createMetricsRegistry(config)
     : undefined;
+
+  // Presigned upload endpoint (raw body — no JSON parsing needed)
+  app.use(uploadRouter(config, storage));
 
   // Mount routes
   app.use(setupRouter(config, storage, invalidateHasOwnersCache));

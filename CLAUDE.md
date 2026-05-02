@@ -150,6 +150,7 @@ All development standards are collected in `docs/coding-guidelines/`:
 | [Dependency Management](docs/coding-guidelines/dependency-management.md) | Adding packages, license checks, security audits |
 | [Environment Configs](docs/coding-guidelines/environment-configs.md) | Node type configs (full, personal, relay, mirror) |
 | [Storage Sync](docs/coding-guidelines/storage-sync.md) | Multi-backend sync process, adding fields/tables |
+| [MCP Uploads](docs/coding-guidelines/mcp-uploads.md) | Presigned upload URLs, adding upload-capable tools |
 | [Frontend Guide](docs/frontend-development-guide.md) | Preact + HTM SPA, admin dashboard conventions |
 
 ---
@@ -300,6 +301,21 @@ The extension is sovereign — it decides what to store, in what format, and wha
 3. **Cortex register API**: `{ libs: { "file.js": code } }`, NOT `{ lib: { filename, code } }`
 4. **Cortex re-activate**: must deactivate first, then activate (idempotent skip if already active)
 5. **Flat translation keys**: generator produces `"tab.search": "Haku"` — `t()` must check flat key before nested path
+
+## MCP Presigned Upload (File Transfer)
+
+MCP tools that accept file content (`aimeat_app_publish`, `aimeat_storage_upload`,
+`aimeat_extension_install`, `aimeat_cortex_install`) support a presigned upload mode.
+When content parameters are omitted, the tool returns an `upload_url`. The agent PUTs
+the raw file to that URL -- the file goes directly from disk to server without passing
+through the AI context window.
+
+- **App/Storage:** PUT the raw file (HTML, binary, etc.)
+- **Extension/Cortex:** PUT a ZIP containing `manifest.yaml` + `scripts/` or `libs/`
+- **Token:** Single-use, 60 min TTL, size-capped
+- **Inline fallback:** Providing content inline still works (backward-compatible)
+
+Full guide: `docs/coding-guidelines/mcp-uploads.md`
 
 ## Key Commands
 

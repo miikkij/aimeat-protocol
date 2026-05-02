@@ -19,6 +19,7 @@ import { parseCortexManifest } from '../services/cortex-manifest.js';
 import { runCapabilityAggregation } from '../services/capability-aggregator.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
+import { generateUploadToken } from '../services/upload-token.js';
 
 export function registerCortexTools(
     mcp: McpServer,
@@ -59,19 +60,53 @@ export function registerCortexTools(
     // ── Tool 2: aimeat_cortex_install ──
     mcp.tool(
         'aimeat_cortex_install',
-        'Install a cortex extension from a YAML manifest and optional lib files',
+        `Install a cortex extension. Two modes:
+UPLOAD MODE (recommended): Call with no arguments to get an upload URL. Create a ZIP containing manifest.yaml at root and lib files in libs/ directory, then PUT it to the URL.
+INLINE MODE: Provide manifest (YAML string) and optional libs (filename-to-code map) directly.`,
         {
-            manifest: z.string().describe('YAML manifest string for the cortex extension'),
-            libs: z.record(z.string(), z.string()).optional().describe('Map of filename to JavaScript source code for lib files'),
+            manifest: z.string().optional().describe('YAML manifest string. Omit to get an upload URL for a ZIP bundle.'),
+            libs: z.record(z.string(), z.string()).optional().describe('Map of filename to JavaScript source code for lib files.'),
         },
         async ({ manifest, libs }) => {
             const agentGaii = getAgentGaii();
             const parsed = parseGAII(agentGaii);
             const ownerName = parsed?.owner ?? agentGaii;
 
-            // Validate manifest is provided
-            if (!manifest || typeof manifest !== 'string') {
-                return { content: [{ type: 'text' as const, text: 'manifest is required and must be a YAML string' }], isError: true };
+            // --- UPLOAD MODE: no manifest provided, return presigned upload URL ---
+            if (!manifest) {
+                const maxBytes = config.cortexMaxLibSizeKb * 1024 * 50;
+                const token = await generateUploadToken({
+                    sub: agentGaii,
+                    utype: 'cortex',
+                    meta: {},
+                    maxBytes,
+                    contentType: 'application/zip',
+                });
+
+                const uploadUrl = `${config.baseUrl}/v1/upload/${token}`;
+
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: JSON.stringify({
+                            mode: 'upload',
+                            upload_url: uploadUrl,
+                            upload_method: 'PUT',
+                            content_type: 'application/zip',
+                            max_size_bytes: maxBytes,
+                            expires_in_seconds: 3600,
+                            zip_structure: 'manifest.yaml at root, lib files in libs/ directory',
+                            note: 'Create a ZIP with manifest.yaml and libs/*.js, then PUT it to upload_url.',
+                        }, null, 2),
+                    }],
+                };
+            }
+
+            // --- INLINE MODE: manifest provided, process immediately ---
+
+            // Validate manifest is a string
+            if (typeof manifest !== 'string') {
+                return { content: [{ type: 'text' as const, text: 'manifest must be a YAML string' }], isError: true };
             }
 
             // Manifest size limit

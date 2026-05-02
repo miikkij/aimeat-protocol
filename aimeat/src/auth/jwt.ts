@@ -9,6 +9,11 @@ import type { Storage } from '../storage/interface.js';
 let nodePrivateKey: CryptoKey | null = null;
 let nodePublicKey: CryptoKey | null = null;
 
+export function getNodeCryptoKeys(): { privateKey: CryptoKey; publicKey: CryptoKey } {
+  if (!nodePrivateKey || !nodePublicKey) throw new Error('Node keys not initialized');
+  return { privateKey: nodePrivateKey, publicKey: nodePublicKey };
+}
+
 export async function initNodeKeys(publicKeyBase64: string, privateKeyBase64: string): Promise<void> {
   const publicKeyBytes = Buffer.from(publicKeyBase64, 'base64');
   const privateKeyBytes = Buffer.from(privateKeyBase64, 'base64');

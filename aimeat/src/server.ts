@@ -52,9 +52,15 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   // Compress all responses (gzip/deflate based on Accept-Encoding)
   app.use(compression());
 
-  // Global body parsing middleware
-  app.use(express.json({ limit: '15mb' }));
-  app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+  // Global body parsing middleware (skip for presigned upload — it reads raw body)
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/v1/upload/')) return next();
+    express.json({ limit: '15mb' })(req, res, next);
+  });
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/v1/upload/')) return next();
+    express.urlencoded({ extended: false, limit: '1mb' })(req, res, next);
+  });
   app.use(express.text({ limit: '1mb', type: ['text/yaml', 'application/x-yaml'] }));
 
   // Static file serving (public, locales, PWA)

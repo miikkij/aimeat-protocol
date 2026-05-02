@@ -18,6 +18,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AppManifest } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
+import { generateUploadToken } from '../services/upload-token.js';
 
 export function registerAppsTools(
     mcp: McpServer,
@@ -31,10 +32,12 @@ export function registerAppsTools(
     // ── Tool 1: aimeat_app_publish ──
     mcp.tool(
         'aimeat_app_publish',
-        'Publish or update an HTML app. Content must be base64-encoded. Version number auto-increments.',
+        `Publish or update an HTML app. Two modes:
+UPLOAD MODE (recommended for files > 1 KB): Call with metadata only (omit content_base64). Returns an upload_url. PUT the raw HTML file to that URL. The PUT response contains the publish result as JSON.
+INLINE MODE (for tiny files < 1 KB): Include content_base64 with the base64-encoded HTML content. Result returned directly.`,
         {
             filename: z.string().describe('App filename (e.g. "starwars.html"). Alphanumeric, dots, hyphens, underscores. Max 100 chars.'),
-            content_base64: z.string().describe('Base64-encoded HTML content of the app'),
+            content_base64: z.string().optional().describe('Base64-encoded HTML content. Omit to get an upload URL instead (recommended for files > 1KB).'),
             name: z.string().describe('Display name of the app'),
             description: z.string().optional().describe('Short description of the app'),
             category: z.string().optional().describe('App category (default: "tool")'),
@@ -57,7 +60,36 @@ export function registerAppsTools(
                 };
             }
 
-            // Decode content
+            // --- UPLOAD MODE: no content provided, return presigned upload URL ---
+            if (!content_base64) {
+                const MAX_APP_SIZE = config.appMaxSizeMb * 1024 * 1024;
+                const token = await generateUploadToken({
+                    sub: `${parsed.owner}@${config.nodeId}`,
+                    utype: 'app',
+                    meta: { filename, name, description, category, tags, icon, version },
+                    maxBytes: MAX_APP_SIZE,
+                    contentType: 'text/html',
+                });
+
+                const uploadUrl = `${config.baseUrl}/v1/upload/${token}`;
+
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: JSON.stringify({
+                            mode: 'upload',
+                            upload_url: uploadUrl,
+                            upload_method: 'PUT',
+                            content_type: 'text/html',
+                            max_size_bytes: MAX_APP_SIZE,
+                            expires_in_seconds: 3600,
+                            note: 'PUT the raw HTML file to upload_url. The response contains the publish result as JSON.',
+                        }, null, 2),
+                    }],
+                };
+            }
+
+            // --- INLINE MODE: content provided, process immediately ---
             const data = Buffer.from(content_base64, 'base64');
             const MAX_APP_SIZE = config.appMaxSizeMb * 1024 * 1024;
             if (data.length > MAX_APP_SIZE) {
@@ -67,15 +99,11 @@ export function registerAppsTools(
                 };
             }
 
-            // Use owner GHII as app identity (same as REST route POST /v1/apps)
             const ownerGaii = `${parsed.owner}@${config.nodeId}`;
-
-            // Get latest version number for auto-increment
             const existingVersion = await storage.getLatestVersionNumber(ownerGaii, filename);
             const newVersion = existingVersion + 1;
             const isUpdate = existingVersion > 0;
 
-            // Build manifest
             const manifest: AppManifest = {
                 name,
                 description: description ?? '',
@@ -87,11 +115,9 @@ export function registerAppsTools(
             };
             if (icon) manifest.icon = icon;
 
-            const now = new Date().toISOString();
-
             try {
                 await storage.createApp({
-                    ownerGaii: ownerGaii,
+                    ownerGaii,
                     ownerName: parsed.owner,
                     filename,
                     versionNumber: newVersion,
@@ -99,19 +125,18 @@ export function registerAppsTools(
                     mimeType: 'text/html',
                     size: data.length,
                     data,
-                    createdAt: now,
+                    createdAt: new Date().toISOString(),
                 });
 
                 const downloadUrl = `/v1/apps/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(filename)}`;
-
                 logger.info(`App ${isUpdate ? 'updated' : 'published'} via MCP: ${filename} v${newVersion}`, { by: agentGaii });
-
                 emitResourceListChanged(agentGaii);
 
                 return {
                     content: [{
                         type: 'text' as const,
                         text: JSON.stringify({
+                            mode: 'inline',
                             filename,
                             version_number: newVersion,
                             name: manifest.name,
@@ -119,9 +144,6 @@ export function registerAppsTools(
                             is_update: isUpdate,
                             download_url: downloadUrl,
                             inline_url: `${downloadUrl}?mode=inline`,
-                            note: isUpdate
-                                ? `App updated to version ${newVersion}. Previous versions are preserved.`
-                                : 'App published successfully.',
                         }, null, 2),
                     }],
                 };

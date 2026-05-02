@@ -19,6 +19,7 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { generateTrackingCode } from '../utils/tracking-code.js';
 import { calculateWorkCost, holdEscrow, settlePayment } from '../services/morsel.js';
+import { generateUploadToken } from '../services/upload-token.js';
 import type { ResourceChangeEvent } from './index.js';
 import { resourceEvents } from './index.js';
 
@@ -436,9 +437,47 @@ export function registerCoreTools(
     // ── Tool 13: aimeat_storage_upload ──
     mcp.tool(
         'aimeat_storage_upload',
-        'Upload a file to binary storage (base64-encoded data)',
-        { key: z.string(), data_base64: z.string(), mime_type: z.string().optional(), visibility: z.enum(['private', 'owner', 'public']).optional() },
+        `Upload a file to binary storage. Two modes:
+UPLOAD MODE (recommended for files > 1 KB): Call with key only (omit data_base64). Returns an upload_url. PUT the raw file to that URL. The PUT response contains the result as JSON.
+INLINE MODE (for tiny files < 1 KB): Include data_base64 with base64-encoded data. Result returned directly.`,
+        {
+            key: z.string().describe('Storage key (path-like identifier)'),
+            data_base64: z.string().optional().describe('Base64-encoded file data. Omit to get an upload URL instead (recommended for files > 1KB).'),
+            mime_type: z.string().optional().describe('MIME type (default: application/octet-stream)'),
+            visibility: z.enum(['private', 'owner', 'public']).optional().describe('Access control (default: private)'),
+        },
         async ({ key, data_base64, mime_type, visibility }) => {
+            // --- UPLOAD MODE ---
+            if (!data_base64) {
+                const maxBytes = 10 * 1024 * 1024;
+                const contentType = mime_type ?? 'application/octet-stream';
+                const token = await generateUploadToken({
+                    sub: agentGaii,
+                    utype: 'storage',
+                    meta: { key, mime_type: contentType, visibility: visibility ?? 'private' },
+                    maxBytes,
+                    contentType,
+                });
+
+                const uploadUrl = `${config.baseUrl}/v1/upload/${token}`;
+
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: JSON.stringify({
+                            mode: 'upload',
+                            upload_url: uploadUrl,
+                            upload_method: 'PUT',
+                            content_type: contentType,
+                            max_size_bytes: maxBytes,
+                            expires_in_seconds: 3600,
+                            note: 'PUT the raw file to upload_url. The response contains the result as JSON.',
+                        }, null, 2),
+                    }],
+                };
+            }
+
+            // --- INLINE MODE ---
             const fileData = Buffer.from(data_base64, 'base64');
             if (fileData.length > 10 * 1024 * 1024) {
                 return { content: [{ type: 'text' as const, text: 'File exceeds 10MB limit' }], isError: true };
@@ -455,7 +494,7 @@ export function registerCoreTools(
             emitResourceUpdated(agentGaii, `aimeat://storage/${encodeURIComponent(key)}`);
             emitResourceListChanged(agentGaii);
             return {
-                content: [{ type: 'text' as const, text: JSON.stringify({ key: file.key, size: file.size, uploaded: true }, null, 2) }],
+                content: [{ type: 'text' as const, text: JSON.stringify({ mode: 'inline', key: file.key, size: file.size, uploaded: true }, null, 2) }],
             };
         },
     );

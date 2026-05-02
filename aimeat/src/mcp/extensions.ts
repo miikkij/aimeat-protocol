@@ -23,6 +23,7 @@ import { executeExtensionAction } from '../services/extension-runtime.js';
 import type { ExtensionCtx } from '../services/extension-runtime.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
+import { generateUploadToken } from '../services/upload-token.js';
 
 export function registerExtensionsTools(
     mcp: McpServer,
@@ -333,12 +334,49 @@ export function registerExtensionsTools(
     // ── Tool 3: aimeat_extension_install ──
     mcp.tool(
         'aimeat_extension_install',
-        'Install a new extension from a YAML manifest and JS scripts',
+        `Install a new extension. Two modes:
+UPLOAD MODE (recommended): Call with no arguments to get an upload URL. Create a ZIP containing manifest.yaml at root and scripts in scripts/ directory, then PUT it to the URL.
+INLINE MODE: Provide manifest (YAML string) and scripts (filename-to-code map) directly.`,
         {
-            manifest: z.string().describe('Extension manifest in YAML format'),
-            scripts: z.record(z.string(), z.string()).describe('Map of script filename to JavaScript source code'),
+            manifest: z.string().optional().describe('Extension manifest in YAML format. Omit to get an upload URL for a ZIP bundle.'),
+            scripts: z.record(z.string(), z.string()).optional().describe('Map of script filename to JavaScript source code. Omit for upload mode.'),
         },
         async ({ manifest: manifestYaml, scripts }) => {
+            // --- UPLOAD MODE: no manifest provided, return presigned upload URL ---
+            if (!manifestYaml) {
+                const maxBytes = config.extensionMaxCodeSizeKb * 1024 * 50;
+                const token = await generateUploadToken({
+                    sub: getAgentGaii(),
+                    utype: 'extension',
+                    meta: {},
+                    maxBytes,
+                    contentType: 'application/zip',
+                });
+
+                const uploadUrl = `${config.baseUrl}/v1/upload/${token}`;
+
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: JSON.stringify({
+                            mode: 'upload',
+                            upload_url: uploadUrl,
+                            upload_method: 'PUT',
+                            content_type: 'application/zip',
+                            max_size_bytes: maxBytes,
+                            expires_in_seconds: 3600,
+                            zip_structure: 'manifest.yaml at root, scripts in scripts/ directory',
+                            note: 'Create a ZIP with manifest.yaml and scripts/*.js, then PUT it to upload_url.',
+                        }, null, 2),
+                    }],
+                };
+            }
+
+            // --- INLINE MODE: manifest provided, process immediately ---
+            if (!scripts) {
+                return { content: [{ type: 'text' as const, text: 'scripts is required when using inline mode (manifest provided)' }], isError: true };
+            }
+
             // Parse manifest YAML
             let manifest: Record<string, unknown>;
             try {
