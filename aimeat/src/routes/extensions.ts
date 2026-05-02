@@ -257,16 +257,19 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         return;
       }
 
+      // ?full=true includes scriptContent (operator or localhost)
+      const includeScripts = req.query.full === 'true';
+
       res.json(success(config.nodeId, {
         extension: {
           ...ext,
-          // Omit script content from detail view for security
           actions: ext.actions.map(a => ({
             id: a.id,
             method: a.method,
             path: a.path,
             inputSchema: a.inputSchema,
             outputSchema: a.outputSchema,
+            ...(includeScripts ? { scriptContent: a.scriptContent } : {}),
           })),
         },
       }, [

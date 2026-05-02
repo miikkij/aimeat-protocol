@@ -6,6 +6,7 @@ import { requireAuth, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { generateUploadToken } from '../services/upload-token.js';
+import { resolveIdentity } from '../utils/gaii.js';
 import { randomBytes } from 'node:crypto';
 
 /**
@@ -227,7 +228,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
     // POST /v1/apps — Publish/update an app (requires auth)
     router.post('/v1/apps', requireAuth(), async (req, res) => {
-        const gaii = req.auth!.sub;
+        const gaii = resolveIdentity(req.auth!, config.nodeId);
         const owner = req.auth!.owner;
         const {
             filename, content, mime_type, access_code,
@@ -401,7 +402,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
     // PATCH /v1/apps/:filename — Update access code on an app you own (requires auth)
     router.patch('/v1/apps/:filename', requireAuth(), async (req, res) => {
-        const gaii = req.auth!.sub;
+        const gaii = resolveIdentity(req.auth!, config.nodeId);
         const filename = req.params.filename as string;
 
         const app = await storage.getApp(gaii, filename);
@@ -433,7 +434,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
     // DELETE /v1/apps/:filename — Remove an app you own (supports ?version=N)
     router.delete('/v1/apps/:filename', requireAuth(), async (req, res) => {
-        const gaii = req.auth!.sub;
+        const gaii = resolveIdentity(req.auth!, config.nodeId);
         const filename = req.params.filename as string;
         const versionParam = req.query.version as string | undefined;
         const version = versionParam ? parseInt(versionParam, 10) : undefined;

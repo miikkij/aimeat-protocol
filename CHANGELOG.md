@@ -2,6 +2,12 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.3.4] - 2026-05-03
+
+### Fixed
+- App REST handlers (POST, PATCH, DELETE) now use `resolveIdentity()` to convert bare owner username to full GHII -- fixes 404 on delete for MCP-published apps
+- Extension GET endpoint supports `?full=true` for operator export (includes scriptContent)
+
 ## [1.3.3] - 2026-05-02
 
 ### Added
