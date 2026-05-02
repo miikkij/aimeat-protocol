@@ -706,10 +706,14 @@ export default function ExtensionsTab({ session, showToast }) {
   const hasSrv = srvExts && srvExts.length > 0;
 
   return html`<div>
-    ${hasSrv ? html`
-      <div class="ext-v8-section">
-        <div class="section-title">${t('profile.v8ext.title')}</div>
-        <div class="section-desc">${t('profile.v8ext.desc')}</div>
+    <div class="ext-v8-section">
+      <div class="section-title">${t('profile.v8ext.title')}</div>
+      <div class="section-desc">${t('profile.v8ext.desc')}</div>
+      <div class="ext-hero-actions">
+        <button class="btn-primary" onClick=${() => { const p = buildServerExtensionPrompt(getSession() || {}); copyToClipboard(p); showToast(t('profile.extensions.promptCopied')); }}>${'\u{1F916}'} Create with AI</button>
+        <button class="btn-outline" onClick=${() => setShowSrvInstall(true)}>+ Add</button>
+      </div>
+      ${hasSrv ? html`
         <div class="ext-grid ext-grid-spaced">
           ${srvExts.map(ext => {
             const isActive = ext.status === 'active';
@@ -733,20 +737,8 @@ export default function ExtensionsTab({ session, showToast }) {
                 </div>
               </div>`;
           })}
-        </div>
-        <div class="ext-hero-actions" style="margin-top:8px">
-          <button class="btn-primary" onClick=${() => { const p = buildServerExtensionPrompt(getSession() || {}); copyToClipboard(p); showToast(t('profile.extensions.promptCopied')); }}>${'\u{1F916}'} Create Server Extension with AI</button>
-          <button class="btn-outline" onClick=${() => setShowSrvInstall(true)}>+ Add</button>
-        </div>
-      </div>` : html`
-      <div class="ext-v8-section" style="margin-bottom:16px">
-        <div class="section-title">${t('profile.v8ext.title')}</div>
-        <div class="section-desc">${t('profile.v8ext.desc')}</div>
-        <div class="ext-hero-actions" style="margin-top:8px">
-          <button class="btn-primary" onClick=${() => { const p = buildServerExtensionPrompt(getSession() || {}); copyToClipboard(p); showToast(t('profile.extensions.promptCopied')); }}>${'\u{1F916}'} Create Server Extension with AI</button>
-          <button class="btn-outline" onClick=${() => setShowSrvInstall(true)}>+ Add</button>
-        </div>
-      </div>`}
+        </div>` : null}
+    </div>
 
     <div class="ext-hero">
       <div class="section-title">${'\u{1F9E9}'} ${t('profile.extensions.title')}</div>
