@@ -2,6 +2,22 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.3.3] - 2026-05-02
+
+### Added
+- **Presigned upload URLs for MCP tools** -- files transfer directly from agent's filesystem to server over HTTPS without passing through the AI context window
+  - `aimeat_app_publish`: omit `content_base64` to get upload URL (PUT raw HTML)
+  - `aimeat_storage_upload`: omit `data_base64` to get upload URL (PUT raw file)
+  - `aimeat_extension_install`: omit manifest/scripts to get upload URL (PUT ZIP)
+  - `aimeat_cortex_install`: omit manifest/libs to get upload URL (PUT ZIP)
+  - Single-use tokens with 60-minute TTL, size-capped, Ed25519 signed
+  - Inline fallback preserved for backward compatibility
+- REST routes `POST /v1/apps` and `POST /v1/storage` support `mode: "presigned"` for same flow
+- New endpoint: `PUT /v1/upload/:token` -- generic presigned upload receiver
+- ZIP format for extension/cortex uploads (manifest.yaml + scripts/ or libs/)
+- E2E test suite: 13 tests covering full presigned upload flow
+- Developer guide: `docs/coding-guidelines/mcp-uploads.md`
+
 ## [1.3.2] - 2026-05-02
 
 ### Fixed

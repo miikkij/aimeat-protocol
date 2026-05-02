@@ -10,6 +10,7 @@ import { ChunkedUploadInitSchema, validateBody } from '../models/schemas.js';
 import { checkStorageQuota, chargeOverage } from '../services/quota.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { generateUploadToken } from '../services/upload-token.js';
 
 /** Anonymous agents (shared#anonymous@...) may only use keys prefixed with "anonymous/" */
 function isAnonymousGaii(gaii: string): boolean {
@@ -45,7 +46,33 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         let mimeType: string;
 
         if (contentType.includes('application/json')) {
-            const { key: k, visibility: v, data, mime_type } = req.body ?? {};
+            const { key: k, visibility: v, data, mime_type, mode } = req.body ?? {};
+
+            // --- PRESIGNED MODE: return upload URL ---
+            if (mode === 'presigned') {
+                if (!k) {
+                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key is required'));
+                    return;
+                }
+                const maxBytes = config.storageMaxFileSizeMb * 1024 * 1024;
+                const ct = (mime_type as string) ?? 'application/octet-stream';
+                const token = await generateUploadToken({
+                    sub: gaii,
+                    utype: 'storage',
+                    meta: { key: k, mime_type: ct, visibility: v ?? 'private' },
+                    maxBytes,
+                    contentType: ct,
+                });
+                res.json(success(config.nodeId, {
+                    upload_url: `${config.baseUrl}/v1/upload/${token}`,
+                    upload_method: 'PUT',
+                    content_type: ct,
+                    max_size_bytes: maxBytes,
+                    expires_in_seconds: 3600,
+                }));
+                return;
+            }
+
             if (!k || !data) {
                 res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key and data (base64) are required'));
                 return;

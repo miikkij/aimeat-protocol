@@ -5,6 +5,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
+import { generateUploadToken } from '../services/upload-token.js';
 import { randomBytes } from 'node:crypto';
 
 /**
@@ -242,6 +243,28 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
         if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(filename)) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Invalid filename. Use alphanumeric, dots, hyphens, underscores. Max 100 chars.'));
+            return;
+        }
+
+        // --- PRESIGNED MODE: return upload URL instead of requiring content ---
+        if (req.body.mode === 'presigned') {
+            const ownerGaii = `${owner}@${config.nodeId}`;
+            const MAX_APP_SIZE = config.appMaxSizeMb * 1024 * 1024;
+            const token = await generateUploadToken({
+                sub: ownerGaii,
+                utype: 'app',
+                meta: { filename, name: req.body.name ?? filename, description, category, tags, icon, version: semver },
+                maxBytes: MAX_APP_SIZE,
+                contentType: 'text/html',
+            });
+
+            res.json(success(config.nodeId, {
+                upload_url: `${config.baseUrl}/v1/upload/${token}`,
+                upload_method: 'PUT',
+                content_type: 'text/html',
+                max_size_bytes: MAX_APP_SIZE,
+                expires_in_seconds: 3600,
+            }));
             return;
         }
 

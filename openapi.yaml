@@ -4389,6 +4389,54 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  # ── Presigned Upload ───────────────────────────────────────
+  /v1/upload/{token}:
+    put:
+      operationId: uploadViaToken
+      summary: Upload file via presigned token
+      description: |
+        Receives a raw file body. The token (obtained from MCP tool or REST presigned mode)
+        encodes the upload type, metadata, size limit, and authorization.
+        Single-use token with 60-minute TTL. No Authorization header needed.
+      tags: [Upload]
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Presigned upload JWT token
+      requestBody:
+        required: true
+        content:
+          '*/*':
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Upload processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  type:
+                    type: string
+                    enum: [app, storage, extension, cortex]
+                additionalProperties: true
+        '401':
+          description: Invalid token
+        '409':
+          description: Token already used (single-use)
+        '410':
+          description: Token expired (60 min TTL)
+        '413':
+          description: File exceeds size limit encoded in token
+
   # ── Binary Storage ─────────────────────────────────────────
   /v1/storage:
     post:
