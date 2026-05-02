@@ -1110,6 +1110,36 @@
       font-size: .85rem;
     }
 
+    .published-source-badge {
+      display: inline-block;
+      font-size: .62rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+      padding: 2px 6px;
+      border-radius: 4px;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    .published-source-badge.local {
+      background: rgba(52, 211, 153, .12);
+      color: #34d399;
+      border: 1px solid rgba(52, 211, 153, .3);
+    }
+
+    .published-source-badge.server {
+      background: rgba(99, 102, 241, .10);
+      color: #6366f1;
+      border: 1px solid rgba(99, 102, 241, .25);
+    }
+
+    .published-source-badge.both {
+      background: rgba(245, 158, 11, .10);
+      color: #d97706;
+      border: 1px solid rgba(245, 158, 11, .25);
+    }
+
     /* ── Cortex Extensions Bar ──────────────────────── */
 
     .cortex-mini-card{background:#FFFFFF;border:1px solid #E5E7EB;border-radius:10px;padding:.75rem 1rem;cursor:pointer;min-width:160px;flex-shrink:0;transition:all .15s}
@@ -3082,41 +3112,138 @@
   }
 
   function loadPublishedApps() {
-    getAllApps().then(function(apps) {
-      var published = apps.filter(function(a) { return a.published; });
-      var section = document.getElementById('published-section');
-      var grid = document.getElementById('published-grid');
-      var countEl = document.getElementById('published-count');
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : '';
+    var section = document.getElementById('published-section');
+    var grid = document.getElementById('published-grid');
+    var countEl = document.getElementById('published-count');
 
-      if (published.length === 0) {
-        section.style.display = 'none';
+    // Get current owner name from session (if logged in)
+    var currentOwner = null;
+    try {
+      if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
+        currentOwner = window.AIMEAT.auth.getSession().owner || null;
+      }
+      if (!currentOwner) {
+        var stored = localStorage.getItem('aimeat_session');
+        if (stored) {
+          currentOwner = JSON.parse(stored).owner || null;
+        }
+      }
+    } catch(e) {}
+
+    // Always load local published apps
+    getAllApps().then(function(apps) {
+      var localPublished = apps.filter(function(a) { return a.published; });
+
+      // Build a lookup of local published apps by filename
+      var localByFilename = {};
+      for (var i = 0; i < localPublished.length; i++) {
+        var lp = localPublished[i];
+        if (lp.publishedFilename) {
+          localByFilename[lp.publishedFilename] = lp;
+        }
+      }
+
+      // If no aimeatUrl, fall back to local-only display
+      if (!aimeatUrl) {
+        renderPublishedApps(localPublished, [], localByFilename, aimeatUrl, section, grid, countEl);
         return;
       }
 
-      section.style.display = '';
-      countEl.textContent = '(' + published.length + ')';
-      var config = loadConfig();
-      var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : '';
+      // Fetch server apps
+      fetch(aimeatUrl + '/v1/apps')
+        .then(function(resp) {
+          if (!resp.ok) throw new Error('Server returned ' + resp.status);
+          return resp.json();
+        })
+        .then(function(json) {
+          var serverApps = json.data && json.data.apps ? json.data.apps : [];
 
-      var html = '';
-      for (var i = 0; i < published.length; i++) {
-        var app = published[i];
-        var url = app.publishedUrl ? (aimeatUrl + app.publishedUrl) : '';
-        html +=
-          '<div class="published-card">' +
-            '<div class="published-card-name">' + escapeHtml(app.name || app.publishedFilename || 'Untitled') + (app.publishedVersionNumber ? ' <span style="opacity:.5;font-size:.85em">v' + app.publishedVersionNumber + '</span>' : '') + '</div>' +
-            '<div class="published-card-meta">' +
-              '<span>' + escapeHtml(app.publishedFilename || '') + '</span>' +
-              '<span>' + (app.publishedAt ? new Date(app.publishedAt).toLocaleDateString() : '') + '</span>' +
-            '</div>' +
-            '<div class="published-card-actions">' +
-              (url ? '<button onclick="window.open(\'' + escapeHtml(url) + '?mode=inline\', \'_blank\')">&#x1F441; View</button>' : '') +
-              '<button onclick="window._launcher.unpublishApp(\'' + escapeHtml(app.id) + '\')" class="danger">&#x1F5D1; Remove</button>' +
-            '</div>' +
-          '</div>';
-      }
-      grid.innerHTML = html;
+          // Filter to current owner's apps if we know who they are
+          if (currentOwner) {
+            serverApps = serverApps.filter(function(a) { return a.owner === currentOwner; });
+          }
+
+          renderPublishedApps(localPublished, serverApps, localByFilename, aimeatUrl, section, grid, countEl);
+        })
+        .catch(function() {
+          // Server fetch failed - fall back to local only
+          renderPublishedApps(localPublished, [], localByFilename, aimeatUrl, section, grid, countEl);
+        });
     });
+  }
+
+  function renderPublishedApps(localPublished, serverApps, localByFilename, aimeatUrl, section, grid, countEl) {
+    // Merge: build a combined list. Server apps take priority for display data,
+    // but we note which source(s) each app comes from.
+    var merged = [];
+    var seenFilenames = {};
+
+    // Add server apps first
+    for (var s = 0; s < serverApps.length; s++) {
+      var sa = serverApps[s];
+      var filename = sa.filename || '';
+      var localMatch = localByFilename[filename] || null;
+      var source = localMatch ? 'both' : 'server';
+      seenFilenames[filename] = true;
+      merged.push({
+        name: (sa.manifest && sa.manifest.name) ? sa.manifest.name : filename,
+        filename: filename,
+        version: sa.version_number ? 'v' + sa.version_number : '',
+        date: sa.created_at ? new Date(sa.created_at).toLocaleDateString() : '',
+        viewUrl: aimeatUrl + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(filename),
+        source: source,
+        localId: localMatch ? localMatch.id : null
+      });
+    }
+
+    // Add local-only apps (not already seen from server)
+    for (var l = 0; l < localPublished.length; l++) {
+      var lp = localPublished[l];
+      var lpFilename = lp.publishedFilename || '';
+      if (lpFilename && seenFilenames[lpFilename]) continue;
+      var lpUrl = lp.publishedUrl ? (aimeatUrl + lp.publishedUrl) : '';
+      merged.push({
+        name: lp.name || lpFilename || 'Untitled',
+        filename: lpFilename,
+        version: lp.publishedVersionNumber ? 'v' + lp.publishedVersionNumber : '',
+        date: lp.publishedAt ? new Date(lp.publishedAt).toLocaleDateString() : '',
+        viewUrl: lpUrl,
+        source: 'local',
+        localId: lp.id
+      });
+    }
+
+    if (merged.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = '';
+    countEl.textContent = '(' + merged.length + ')';
+
+    var html = '';
+    for (var i = 0; i < merged.length; i++) {
+      var app = merged[i];
+      var badgeClass = app.source === 'both' ? 'both' : (app.source === 'server' ? 'server' : 'local');
+      var badgeLabel = app.source === 'both' ? 'local + server' : app.source;
+      html +=
+        '<div class="published-card">' +
+          '<div class="published-card-name">' + escapeHtml(app.name) + (app.version ? ' <span style="opacity:.5;font-size:.85em">' + escapeHtml(app.version) + '</span>' : '') +
+            ' <span class="published-source-badge ' + badgeClass + '">' + badgeLabel + '</span>' +
+          '</div>' +
+          '<div class="published-card-meta">' +
+            '<span>' + escapeHtml(app.filename) + '</span>' +
+            '<span>' + app.date + '</span>' +
+          '</div>' +
+          '<div class="published-card-actions">' +
+            (app.viewUrl ? '<button onclick="window.open(\'' + escapeHtml(app.viewUrl) + '?mode=inline\', \'_blank\')">&#x1F441; View</button>' : '') +
+            (app.localId ? '<button onclick="window._launcher.unpublishApp(\'' + escapeHtml(app.localId) + '\')" class="danger">&#x1F5D1; Remove</button>' : '') +
+          '</div>' +
+        '</div>';
+    }
+    grid.innerHTML = html;
   }
 
   function unpublishApp(appId) {
