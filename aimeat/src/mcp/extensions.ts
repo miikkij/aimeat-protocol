@@ -1,8 +1,8 @@
 /**
  * @file extensions.ts
- * @description MCP extension tools and resource registrations. Provides 2 tools for extension
- *   management (list active extensions, invoke an extension action) and 1 resource template
- *   for reading extension details via the MCP resource protocol.
+ * @description MCP extension tools and resource registrations. Provides 7 tools for extension
+ *   lifecycle management (list, invoke, install, activate, deactivate, delete, get) and 1
+ *   resource template for reading extension details via the MCP resource protocol.
  * @structure
  *   - registerExtensionsTools() — registers all extension tools and resources on an McpServer instance
  * @usage
@@ -10,13 +10,15 @@
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
  *   v1.0.0 — 2026-03-21 — Initial creation: 2 tools + 1 resource for extension management via MCP
+ *   v1.1.0 — 2026-05-02 — Add 5 lifecycle tools: install, activate, deactivate, delete, get
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
+import { parse as parseYaml } from 'yaml';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import { executeExtensionAction } from '../services/extension-runtime.js';
 import type { ExtensionCtx } from '../services/extension-runtime.js';
 import { parseGAII } from '../utils/gaii.js';
@@ -325,6 +327,290 @@ export function registerExtensionsTools(
                     isError: true,
                 };
             }
+        },
+    );
+
+    // ── Tool 3: aimeat_extension_install ──
+    mcp.tool(
+        'aimeat_extension_install',
+        'Install a new extension from a YAML manifest and JS scripts',
+        {
+            manifest: z.string().describe('Extension manifest in YAML format'),
+            scripts: z.record(z.string(), z.string()).describe('Map of script filename to JavaScript source code'),
+        },
+        async ({ manifest: manifestYaml, scripts }) => {
+            // Parse manifest YAML
+            let manifest: Record<string, unknown>;
+            try {
+                manifest = parseYaml(manifestYaml) as Record<string, unknown>;
+            } catch {
+                return { content: [{ type: 'text' as const, text: 'Failed to parse manifest YAML' }], isError: true };
+            }
+
+            // Validate required metadata fields
+            const metadata = manifest.metadata as Record<string, unknown> | undefined;
+            if (!metadata?.name || !metadata?.version || !metadata?.description || !metadata?.author) {
+                return {
+                    content: [{ type: 'text' as const, text: 'metadata.name, metadata.version, metadata.description, and metadata.author are required' }],
+                    isError: true,
+                };
+            }
+
+            // Validate actions array
+            const actions = manifest.actions as Array<Record<string, unknown>> | undefined;
+            if (!Array.isArray(actions) || actions.length === 0) {
+                return { content: [{ type: 'text' as const, text: 'actions array is required and must not be empty' }], isError: true };
+            }
+
+            for (const action of actions) {
+                if (!action.id || !action.method || !action.path || !action.script) {
+                    return {
+                        content: [{ type: 'text' as const, text: 'Each action must have id, method, path, and script fields' }],
+                        isError: true,
+                    };
+                }
+                if (!scripts[action.script as string]) {
+                    return {
+                        content: [{ type: 'text' as const, text: `Script "${action.script as string}" referenced in action "${action.id as string}" not found in scripts object` }],
+                        isError: true,
+                    };
+                }
+            }
+
+            // Check if extension already exists
+            const name = metadata.name as string;
+            const existingExt = await storage.getExtension(name);
+            if (existingExt) {
+                return { content: [{ type: 'text' as const, text: `Extension "${name}" is already installed` }], isError: true };
+            }
+
+            // Build ExtensionRecord
+            const manifestConfig = manifest.config as Record<string, unknown> | undefined;
+            const manifestLimits = manifest.limits as Record<string, unknown> | undefined;
+            const manifestFederation = manifest.federation as Record<string, unknown> | undefined;
+            const manifestSchedules = manifest.schedules as Array<Record<string, unknown>> | undefined;
+            const manifestInstances = manifest.instances as Record<string, unknown> | undefined;
+
+            const record: ExtensionRecord = {
+                name,
+                version: metadata.version as string,
+                description: metadata.description as string,
+                author: metadata.author as string,
+                status: 'inactive',
+                requiredApis: (manifest.required_apis as string[]) ?? [],
+                actions: actions.map(a => ({
+                    id: a.id as string,
+                    method: (a.method as string).toUpperCase(),
+                    path: a.path as string,
+                    inputSchema: (a.input as Record<string, unknown>) ?? {},
+                    outputSchema: (a.output as Record<string, unknown>) ?? {},
+                    scriptContent: scripts[a.script as string],
+                })),
+                config: {
+                    ...(manifestConfig
+                        ? Object.fromEntries(
+                            Object.entries(manifestConfig).map(([k, v]) => {
+                                if (v && typeof v === 'object' && 'default' in (v as Record<string, unknown>)) {
+                                    return [k, (v as Record<string, unknown>).default];
+                                }
+                                return [k, v];
+                            }),
+                        )
+                        : {}),
+                    ...(manifestSchedules ? { __schedules: manifestSchedules } : {}),
+                },
+                limits: {
+                    memoryMb: Math.min(
+                        (manifestLimits?.memory_mb as number) ?? config.extensionMaxMemoryMb,
+                        config.extensionMaxMemoryMb,
+                    ),
+                    timeoutMs: Math.min(
+                        (manifestLimits?.timeout_ms as number) ?? config.extensionTimeoutMs,
+                        config.extensionTimeoutMs,
+                    ),
+                    maxApiCalls: Math.min(
+                        (manifestLimits?.max_api_calls as number) ?? config.extensionMaxApiCalls,
+                        config.extensionMaxApiCalls,
+                    ),
+                },
+                federation: {
+                    advertise: (manifestFederation?.advertise as boolean) ?? false,
+                    capabilities: (manifestFederation?.capabilities as string[]) ?? [],
+                },
+                ...(manifestInstances?.supported ? {
+                    instances: {
+                        supported: true,
+                        configSchema: (manifestInstances.config_per_instance as Record<string, unknown>) ?? undefined,
+                    },
+                } : {}),
+                installedBy: parseGAII(getAgentGaii())?.owner ?? 'mcp-agent',
+                installedAt: new Date().toISOString(),
+            };
+
+            try {
+                const created = await storage.createExtension(record);
+                logger.info(`Extension installed via MCP: ${created.name}`, { version: created.version, by: record.installedBy });
+
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: JSON.stringify({
+                            name: created.name,
+                            version: created.version,
+                            status: created.status,
+                            actions: created.actions.map(a => ({ id: a.id, method: a.method, path: a.path })),
+                        }, null, 2),
+                    }],
+                };
+            } catch (err) {
+                return { content: [{ type: 'text' as const, text: `Failed to install extension: ${(err as Error).message}` }], isError: true };
+            }
+        },
+    );
+
+    // ── Tool 4: aimeat_extension_activate ──
+    mcp.tool(
+        'aimeat_extension_activate',
+        'Activate an installed extension',
+        {
+            name: z.string().describe('Name of the extension to activate'),
+        },
+        async ({ name }) => {
+            const ext = await storage.getExtension(name);
+            if (!ext) {
+                return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
+            }
+
+            try {
+                await storage.updateExtension(name, {
+                    status: 'active',
+                    activatedAt: new Date().toISOString(),
+                });
+
+                // Trigger capability aggregation so the extension appears immediately
+                import('../services/capability-aggregator.js')
+                    .then(m => m.runCapabilityAggregation(config, storage))
+                    .catch(() => {});
+
+                logger.info(`Extension activated via MCP: ${name}`, { by: getAgentGaii() });
+
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: JSON.stringify({ name, status: 'active', activated_at: new Date().toISOString() }, null, 2),
+                    }],
+                };
+            } catch (err) {
+                return { content: [{ type: 'text' as const, text: `Failed to activate extension: ${(err as Error).message}` }], isError: true };
+            }
+        },
+    );
+
+    // ── Tool 5: aimeat_extension_deactivate ──
+    mcp.tool(
+        'aimeat_extension_deactivate',
+        'Deactivate an active extension',
+        {
+            name: z.string().describe('Name of the extension to deactivate'),
+        },
+        async ({ name }) => {
+            const ext = await storage.getExtension(name);
+            if (!ext) {
+                return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
+            }
+
+            try {
+                await storage.updateExtension(name, { status: 'inactive' });
+
+                logger.info(`Extension deactivated via MCP: ${name}`, { by: getAgentGaii() });
+
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: JSON.stringify({ name, status: 'inactive' }, null, 2),
+                    }],
+                };
+            } catch (err) {
+                return { content: [{ type: 'text' as const, text: `Failed to deactivate extension: ${(err as Error).message}` }], isError: true };
+            }
+        },
+    );
+
+    // ── Tool 6: aimeat_extension_delete ──
+    mcp.tool(
+        'aimeat_extension_delete',
+        'Delete/uninstall an extension',
+        {
+            name: z.string().describe('Name of the extension to delete'),
+        },
+        async ({ name }) => {
+            const ext = await storage.getExtension(name);
+            if (!ext) {
+                return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
+            }
+
+            try {
+                // Deactivate first if active
+                if (ext.status === 'active') {
+                    await storage.updateExtension(name, { status: 'inactive' });
+                }
+
+                await storage.deleteExtension(name);
+
+                logger.info(`Extension deleted via MCP: ${name}`, { by: getAgentGaii() });
+
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: JSON.stringify({ name, deleted: true }, null, 2),
+                    }],
+                };
+            } catch (err) {
+                return { content: [{ type: 'text' as const, text: `Failed to delete extension: ${(err as Error).message}` }], isError: true };
+            }
+        },
+    );
+
+    // ── Tool 7: aimeat_extension_get ──
+    mcp.tool(
+        'aimeat_extension_get',
+        'Get full extension details including action schemas',
+        {
+            name: z.string().describe('Name of the extension to retrieve'),
+        },
+        async ({ name }) => {
+            const ext = await storage.getExtension(name);
+            if (!ext) {
+                return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
+            }
+
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                        name: ext.name,
+                        version: ext.version,
+                        description: ext.description,
+                        author: ext.author,
+                        status: ext.status,
+                        required_apis: ext.requiredApis,
+                        actions: ext.actions.map(a => ({
+                            id: a.id,
+                            method: a.method,
+                            path: a.path,
+                            input_schema: a.inputSchema,
+                            output_schema: a.outputSchema,
+                        })),
+                        config: ext.config,
+                        limits: ext.limits,
+                        federation: ext.federation,
+                        instances: ext.instances,
+                        installed_by: ext.installedBy,
+                        installed_at: ext.installedAt,
+                        activated_at: ext.activatedAt,
+                    }, null, 2),
+                }],
+            };
         },
     );
 }
