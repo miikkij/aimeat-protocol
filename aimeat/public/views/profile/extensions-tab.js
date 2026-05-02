@@ -159,8 +159,21 @@ actions:                      # each action is a callable endpoint
     output:
       result:
         type: object
-        description: "What it returns"
+        description: "Processing result"
+        properties:
+          value:
+            type: string
+            description: "The processed value"
+          processed_at:
+            type: string
+            description: "ISO 8601 timestamp"
+      success:
+        type: boolean
     script: actions/my-action.js
+
+IMPORTANT: Output schemas MUST have full property definitions with types
+and descriptions. Never use bare \`type: object\` without properties.
+AI and developers need to know the exact shape of returned data.
 
 schedules:                    # optional cron jobs
   - id: refresh-data
