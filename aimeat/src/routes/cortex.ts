@@ -259,7 +259,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // Trigger capability aggregation so the cortex appears immediately
-    import('../services/capability-aggregator.js').then(m => m.runCapabilityAggregation(config, storage)).catch(() => {});
+    import('../services/capability-aggregator.js').then(m => m.runCapabilityAggregation(config, storage)).catch(err => logger.error('Capability aggregation failed', { error: String(err) }));
 
     res.json(success(config.nodeId, {
       name: ext.name,

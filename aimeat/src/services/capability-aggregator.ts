@@ -83,7 +83,7 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
         }
       }
     }
-  } catch { /* extensions may not be enabled */ }
+  } catch (err) { logger.error('Capability aggregator: extension scan failed', { error: String(err) }); }
 
   // 2. Scan published actions (discovery only, callable: false)
   try {
@@ -120,7 +120,7 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
         created++;
       }
     }
-  } catch { /* actions may fail */ }
+  } catch (err) { logger.error('Capability aggregator: action scan failed', { error: String(err) }); }
 
   // 3. Scan active cortex modules (callable in browser)
   try {
@@ -205,7 +205,7 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
         updated++;
       }
     }
-  } catch { /* cortex may not be enabled */ }
+  } catch (err) { logger.error('Capability aggregator: cortex scan failed', { error: String(err) }); }
 
   // 4. Disable or delete capabilities whose sources are gone
   for (const sourceType of ['extension', 'action', 'cortex']) {
@@ -223,7 +223,7 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
           }
         }
       }
-    } catch { /* ignore */ }
+    } catch (err) { logger.error('Capability aggregator: cleanup scan failed', { error: String(err) }); }
   }
 
   if (created || updated || disabled) {

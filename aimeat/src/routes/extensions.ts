@@ -490,7 +490,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       logger.info(`Extension activated: ${name}`, { by: req.auth!.sub });
 
       // Trigger capability aggregation so the extension appears immediately
-      import('../services/capability-aggregator.js').then(m => m.runCapabilityAggregation(config, storage)).catch(() => {});
+      import('../services/capability-aggregator.js').then(m => m.runCapabilityAggregation(config, storage)).catch(err => logger.error('Capability aggregation failed', { error: String(err) }));
 
       res.json(success(config.nodeId, { extension: updated }, [
         { description: 'Execute an action', method: 'POST', url: `/v1/ext/${name}/<actionId>` },
