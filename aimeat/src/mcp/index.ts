@@ -43,6 +43,7 @@ import { registerFlagsTools } from './flags.js';
 import { registerPromptsTools } from './prompts.js';
 import { registerCapabilitiesTools } from './capabilities.js';
 import { registerCortexTools } from './cortex.js';
+import { registerAppsTools } from './apps.js';
 
 // ── Resource change event bus ──
 // Allows REST routes and MCP tools to emit resource change events
@@ -113,6 +114,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         registerPromptsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerCapabilitiesTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerCortexTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerAppsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
 
         return mcp;
     }
