@@ -115,10 +115,34 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
   // 3. Scan active cortex modules (callable in browser)
   try {
     const cortexList = await storage.listCortexExtensions({ status: 'active' });
+    logger.info(`Capability aggregator: found ${cortexList.length} active cortex modules`);
     for (const cortex of cortexList) {
       const ref = `cortex:${cortex.name}`;
       seenRefs.add(ref);
       const existing = await storage.getCapabilityBySourceRef(ref);
+
+      // Extract lib component exports and API surface from cortex manifest
+      const components = (cortex as any).components || [];
+      const libComponents = components.filter((c: any) => c.type === 'lib');
+      const promptComponents = components.filter((c: any) => c.type === 'prompt');
+
+      let apiSurface = '';
+      let libExports: string[] = [];
+      let libFilename = `${cortex.name}.js`;
+      for (const lib of libComponents) {
+        if (lib.exports) libExports = libExports.concat(lib.exports);
+        if (lib.apiSurface || lib.api_surface) apiSurface += (lib.apiSurface || lib.api_surface) + '\n';
+        if (lib.filename) libFilename = lib.filename;
+      }
+
+      // Extract prompt content for usage guidance
+      let promptContent = '';
+      for (const p of promptComponents) {
+        if (p.content) promptContent += p.content + '\n';
+      }
+
+      const usageLines = [`await loadScript('/v1/cortex/${cortex.name}/libs/${libFilename}')`];
+      if (apiSurface) usageLines.push('\nAPI:\n' + apiSurface.trim());
 
       if (!existing) {
         const cap: CapabilityRecord = {
@@ -130,9 +154,13 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
           rejectionReason: null, deprecationMessage: null, replacedBy: null,
           source: { type: 'cortex', ref, version: cortex.version },
           authRequired: 'registered', callable: true,
-          inputSchema: null, outputSchema: null, exports: null,
-          usage: `await loadScript('/v1/cortex/${cortex.name}/libs/${cortex.name}.js')`,
-          whenToUse: '', whenNotToUse: '',
+          inputSchema: null, outputSchema: null,
+          exports: libExports.length > 0 ? libExports.map(name => ({
+            name, description: '', inputSchema: {}, outputSchema: {}, example: null,
+          })) : null,
+          usage: usageLines.join('\n'),
+          whenToUse: promptContent ? promptContent.slice(0, 500) : '',
+          whenNotToUse: '',
           examples: [],
           dependencies: [{ type: 'sdk', id: 'aimeat-data', required: true, minVersion: null }],
           schemaHash: '', webhookUrl: null, cost: null, trustRequired: null,
@@ -142,6 +170,17 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
         };
         await storage.createCapability(cap);
         created++;
+      } else if (existing.exports === null && libExports.length > 0) {
+        // Update existing capability with exports if they were missing
+        await storage.updateCapability(existing.id, {
+          exports: libExports.map(name => ({
+            name, description: '', inputSchema: {}, outputSchema: {}, example: null,
+          })),
+          usage: usageLines.join('\n'),
+          whenToUse: promptContent ? promptContent.slice(0, 500) : existing.whenToUse,
+          updatedAt: now,
+        });
+        updated++;
       }
     }
   } catch { /* cortex may not be enabled */ }

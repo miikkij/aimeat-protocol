@@ -262,10 +262,183 @@ if (isOperator) {
     });
 }
 
-// ─── Phase 6: Delete ───
-console.log('\nPhase 6 — Delete');
+// ─── Phase 6: Cortex Install + Aggregator ───
+console.log('\nPhase 6 — Cortex & Aggregator');
 
-await test('DELETE /v1/capabilities/:id — delete manual', async () => {
+const testCortexName = 'e2e-test-cortex-' + Math.random().toString(36).slice(2, 8);
+const testCortexManifest = `apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: ${testCortexName}
+  namespace: ${ownerName}
+  description: "E2E test cortex for capability aggregation"
+  author: ${ownerName}
+  tags: [e2e, test]
+  visibility: public
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: lib
+      name: ${testCortexName}.js
+      filename: ${testCortexName}.js
+      exports: [doStuff, getInfo]
+      api_surface: |
+        AIMEAT.e2eTest.doStuff({ input: string }) — Process input. Returns { result: string, timestamp: string }
+        AIMEAT.e2eTest.getInfo() — Get info. Returns { version: string, name: string }
+    - type: prompt
+      name: e2e-assistant
+      content: |
+        You are using the ${testCortexName} cortex.
+        API: AIMEAT.e2eTest.doStuff({ input }) and AIMEAT.e2eTest.getInfo()
+`;
+
+const testCortexLib = `(function(AIMEAT) {
+  if (!AIMEAT.e2eTest) AIMEAT.e2eTest = {};
+  AIMEAT.e2eTest.doStuff = async function(params) {
+    return { result: 'processed: ' + (params.input || ''), timestamp: new Date().toISOString() };
+  };
+  AIMEAT.e2eTest.getInfo = async function() {
+    return { version: '1.0.0', name: '${testCortexName}' };
+  };
+})(window.AIMEAT || (window.AIMEAT = {}));`;
+
+await test('Install cortex', async () => {
+    const libs: Record<string, string> = {};
+    libs[`${testCortexName}.js`] = testCortexLib;
+    const { status, body } = await json('/v1/cortex', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+        body: JSON.stringify({ manifest: testCortexManifest, libs }),
+    });
+    assert(status === 201 || status === 200, `install status ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+    assert(body.ok === true, `install ok: ${JSON.stringify(body.error)}`);
+});
+
+await test('Activate cortex', async () => {
+    const { status, body } = await json(`/v1/cortex/${testCortexName}/activate`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `activate status ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+});
+
+// Trigger aggregator manually by importing and running it
+await test('Trigger aggregator via admin endpoint', async () => {
+    const { status, body } = await json('/v1/admin/capabilities/aggregate', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `aggregate status ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+    assert(body.data.created >= 0, 'created count');
+});
+
+await test('Cortex capability now exists', async () => {
+    const { body } = await json(`/v1/capabilities?search=${testCortexName}`);
+    assert(body.data?.total > 0, `aggregator did not create capability for ${testCortexName}`);
+});
+
+await test('Cortex capability has correct metadata', async () => {
+    const { status, body } = await json(`/v1/capabilities/cortex:${testCortexName}`);
+    assert(status === 200, `status ${status}`);
+    const cap = body.data;
+    assert(cap.source.type === 'cortex', `source type: ${cap.source.type}`);
+    assert(cap.callable === true, 'cortex should be callable');
+    assert(cap.status === 'active', `status: ${cap.status}`);
+    assert(cap.usage.includes('loadScript'), `usage should contain loadScript: ${cap.usage}`);
+    // Verify exports were populated from cortex manifest
+    if (cap.exports) {
+        assert(Array.isArray(cap.exports), 'exports should be array');
+        const exportNames = cap.exports.map((e: any) => e.name);
+        assert(exportNames.includes('doStuff'), `exports should include doStuff, got: ${exportNames}`);
+        assert(exportNames.includes('getInfo'), `exports should include getInfo, got: ${exportNames}`);
+    }
+    // Verify API surface is in usage
+    if (cap.usage.includes('API:')) {
+        assert(cap.usage.includes('doStuff'), 'usage API should mention doStuff');
+    }
+});
+
+await test('Cortex capability visible in list', async () => {
+    const { body } = await json('/v1/capabilities?source_type=cortex');
+    const found = body.data.capabilities.some((c: any) => c.id === `cortex:${testCortexName}`);
+    assert(found, 'cortex capability should appear in filtered list');
+});
+
+await test('Cortex invoke from API returns BROWSER_ONLY', async () => {
+    const { status, body } = await json(`/v1/capabilities/cortex:${testCortexName}/invoke`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+        body: JSON.stringify({ input: { test: true } }),
+    });
+    // Cortex capabilities should not be invokable via API
+    assert(status === 400, `status ${status}`);
+    assert(body.error.message.includes('browser') || body.error.code === 'NOT_CALLABLE',
+        `should mention browser-only: ${body.error.message}`);
+});
+
+// Cleanup cortex
+await test('Deactivate and delete cortex', async () => {
+    await json(`/v1/cortex/${testCortexName}/deactivate`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+    });
+    const { status } = await json(`/v1/cortex/${testCortexName}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `delete cortex status ${status}`);
+});
+
+// ─── Phase 7: Extension Invoke via Capability ───
+console.log('\nPhase 7 — Extension Invoke via Capability');
+
+// Check if there are any extension-sourced callable capabilities
+await test('Extension capabilities are callable', async () => {
+    const { body } = await json('/v1/capabilities?source_type=extension&callable=true');
+    // May or may not have extensions depending on test environment
+    if (body.data.total > 0) {
+        const cap = body.data.capabilities[0];
+        assert(cap.callable === true, 'extension cap should be callable');
+        assert(cap.source.type === 'extension', 'source should be extension');
+        assert(cap.usage.includes('invoke'), `usage should mention invoke: ${cap.usage}`);
+    }
+    // Test passes regardless - just verifying the filter works
+    assert(body.data.capabilities.every((c: any) => c.callable === true), 'all should be callable');
+});
+
+// ─── Phase 8: Vouch ───
+console.log('\nPhase 8 — Vouch');
+
+await test('Cannot vouch own capability', async () => {
+    // Create a temp capability to vouch test
+    const vouchCapId = 'vouch-test-' + Math.random().toString(36).slice(2, 8);
+    await json('/v1/capabilities', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            id: vouchCapId, name: 'Vouch Test', summary: 'Test',
+            source: { type: 'manual', ref: 'manual', version: '1.0.0' },
+            callable: false, visibility: 'public', status: 'active',
+        }),
+    });
+    const { status, body } = await json(`/v1/capabilities/${vouchCapId}/vouch`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+    });
+    assert(status === 400, `vouch own: status ${status}`);
+    assert(body.error.code === 'CANNOT_VOUCH_OWN', `code: ${body.error.code}`);
+    // Cleanup
+    await json(`/v1/capabilities/${vouchCapId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+    });
+});
+
+// ─── Phase 9: Delete ───
+console.log('\nPhase 9 — Delete');
+
+await test('DELETE manual capability', async () => {
     const { status, body } = await json(`/v1/capabilities/${capId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${ownerToken}` },
@@ -274,7 +447,7 @@ await test('DELETE /v1/capabilities/:id — delete manual', async () => {
     assert(body.data.deleted === true, 'deleted');
 });
 
-await test('GET /v1/capabilities/:id — verify 404 after delete', async () => {
+await test('Verify 404 after delete', async () => {
     const { status } = await json(`/v1/capabilities/${capId}`);
     assert(status === 404, 'deleted cap returns 404');
 });
@@ -299,3 +472,4 @@ await test('Delete test owner (cascade)', async () => {
 // ─── Summary ───
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===\n`);
 process.exit(failed > 0 ? 1 : 0);
+

@@ -115,6 +115,9 @@ export async function invokeCapability(
       break;
     }
 
+    case 'cortex':
+      throw Object.assign(new Error(`This capability is browser-only. Use it in an AIMEAT app: ${capability.usage}`), { statusCode: 400, code: 'BROWSER_ONLY' });
+
     default:
       throw Object.assign(new Error(`Cannot invoke source type: ${capability.source.type}`), { statusCode: 400, code: 'UNSUPPORTED_SOURCE' });
   }

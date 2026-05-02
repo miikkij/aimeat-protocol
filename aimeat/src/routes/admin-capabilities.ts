@@ -46,5 +46,12 @@ export function adminCapabilitiesRouter(config: AimeatConfig, storage: Storage):
     res.json(success(config.nodeId, { ...result, stats: cap?.stats }));
   });
 
+  // Trigger aggregation manually (operator only)
+  router.post('/v1/admin/capabilities/aggregate', ...auth, async (_req, res) => {
+    const { runCapabilityAggregation } = await import('../services/capability-aggregator.js');
+    const result = await runCapabilityAggregation(config, storage);
+    res.json(success(config.nodeId, result));
+  });
+
   return router;
 }
