@@ -2,6 +2,11 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.3.2] - 2026-05-02
+
+### Fixed
+- App catalog delete used anonymous token instead of owner JWT -- DELETE always returned 404. Now uses logged-in user's session token for both PORTAL and MCP app removal.
+
 ## [1.3.1] - 2026-05-02
 
 ### Fixed
