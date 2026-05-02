@@ -6,10 +6,25 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { num, Badge, Empty } from './shared.js';
 
+function schemaKeys(schema) {
+  if (!schema || typeof schema !== 'object') return '';
+  const props = schema.properties || schema;
+  return Object.entries(props)
+    .filter(([k]) => !['type','properties','items','required','description','nullable','enum'].includes(k))
+    .map(([k, v]) => {
+      const spec = (v && typeof v === 'object') ? v : {};
+      let t = spec.type || '?';
+      if (t === 'object' && spec.properties) t = '{...}';
+      if (t === 'array' && spec.items) t = '[...]';
+      return k + ':' + t;
+    }).join(', ');
+}
+
 export default function CapabilitiesTab({ data, session }) {
   const [caps, setCaps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
+  const [expanded, setExpanded] = useState(null);
 
   useEffect(() => {
     if (!session) return;
@@ -39,32 +54,57 @@ export default function CapabilitiesTab({ data, session }) {
           <thead><tr>
             <th>ID</th>
             <th>${t('capabilities.name')}</th>
-            <th>${t('capabilities.owner')}</th>
+            <th>Input</th>
+            <th>Output</th>
             <th>${t('capabilities.sourceType')}</th>
-            <th>${t('capabilities.status')}</th>
             <th>${t('capabilities.callable')}</th>
             <th>${t('capabilities.invocations')}</th>
             <th>${t('capabilities.errors')}</th>
-            <th>${t('capabilities.vouchCount')}</th>
           </tr></thead>
           <tbody>
             ${filtered.map(c => {
               const s = c.stats || {};
               const override = c.operatorOverride;
-              return html`<tr style=${override?.disabled ? 'opacity:0.5' : ''}>
-                <td class="mono" style="font-size:.75rem">${escHtml(c.id)}</td>
-                <td>
-                  <strong>${escHtml(c.name)}</strong>
-                  ${c.summary ? html`<div style="font-size:.72rem;color:var(--text-dim);max-width:200px">${escHtml(c.summary.slice(0,80))}</div>` : ''}
-                </td>
-                <td class="mono" style="font-size:.75rem">${escHtml(c.ownerGhii?.split('@')[0] || '')}</td>
-                <td><${Badge} type=${c.source?.type || 'manual'} /></td>
-                <td><${Badge} type=${c.status === 'active' ? 'success' : c.status === 'disabled' ? 'danger' : 'warning'} label=${c.status} /></td>
-                <td>${c.callable ? '✅' : '➖'}</td>
-                <td>${num(s.totalInvocations || 0)}</td>
-                <td style=${s.errorCount > 0 ? 'color:#E8564A' : ''}>${num(s.errorCount || 0)}</td>
-                <td>${num(c.trust?.vouchCount || 0)}</td>
-              </tr>`;
+              const isExp = expanded === c.id;
+              const inputKeys = schemaKeys(c.inputSchema);
+              const outputKeys = schemaKeys(c.outputSchema);
+              return html`
+                <tr style=${override?.disabled ? 'opacity:0.5;cursor:pointer' : 'cursor:pointer'}
+                    onClick=${() => setExpanded(isExp ? null : c.id)}>
+                  <td class="mono" style="font-size:.72rem;max-width:180px;overflow:hidden;text-overflow:ellipsis">${escHtml(c.id)}</td>
+                  <td>
+                    <strong>${escHtml(c.name)}</strong>
+                    ${c.summary ? html`<div style="font-size:.7rem;color:var(--text-dim);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(c.summary)}</div>` : ''}
+                  </td>
+                  <td style="font-size:.7rem;font-family:monospace;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${inputKeys || html`<span style="opacity:.4">—</span>`}</td>
+                  <td style="font-size:.7rem;font-family:monospace;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${outputKeys || html`<span style="opacity:.4">—</span>`}</td>
+                  <td><${Badge} type=${c.source?.type || 'manual'} /></td>
+                  <td>${c.callable ? '✅' : '➖'}</td>
+                  <td>${num(s.totalInvocations || 0)}</td>
+                  <td style=${s.errorCount > 0 ? 'color:#E8564A' : ''}>${num(s.errorCount || 0)}</td>
+                </tr>
+                ${isExp ? html`<tr>
+                  <td colspan="8" style="background:var(--bg-dim,#f5f5f5);padding:12px">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:.78rem">
+                      <div>
+                        <div style="font-weight:600;margin-bottom:4px">Input Schema</div>
+                        ${c.inputSchema ? html`<pre style="margin:0;white-space:pre-wrap;font-size:.72rem;max-height:200px;overflow:auto">${JSON.stringify(c.inputSchema, null, 2)}</pre>` : html`<span style="opacity:.5">None</span>`}
+                      </div>
+                      <div>
+                        <div style="font-weight:600;margin-bottom:4px">Output Schema</div>
+                        ${c.outputSchema ? html`<pre style="margin:0;white-space:pre-wrap;font-size:.72rem;max-height:200px;overflow:auto">${JSON.stringify(c.outputSchema, null, 2)}</pre>` : html`<span style="opacity:.5">None</span>`}
+                      </div>
+                    </div>
+                    <div style="margin-top:8px;font-size:.75rem;display:flex;gap:16px;flex-wrap:wrap">
+                      <span>Owner: <code>${escHtml(c.ownerGhii || '')}</code></span>
+                      <span>Status: <${Badge} type=${c.status === 'active' ? 'success' : c.status === 'disabled' ? 'danger' : 'warning'} label=${c.status} /></span>
+                      <span>Auth: ${c.authRequired}</span>
+                      <span>Vouches: ${c.trust?.vouchCount || 0}</span>
+                      <span>Avg: ${s.avgResponseMs || 0}ms</span>
+                      ${c.usage ? html`<div style="margin-top:4px;width:100%"><code style="font-size:.7rem;word-break:break-all">${escHtml(c.usage.slice(0,200))}</code></div>` : null}
+                    </div>
+                  </td>
+                </tr>` : null}`;
             })}
           </tbody>
         </table>

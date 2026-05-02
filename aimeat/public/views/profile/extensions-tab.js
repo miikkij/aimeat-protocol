@@ -79,6 +79,15 @@ spec:
 The "components" array can contain any mix of the 7 component types:
 schema, prompt, action, board-template, ontology, seed-data, lib.
 
+Required fields (installation fails without these):
+- apiVersion: must be "cortex.aimeat.org/v1"
+- kind: must be "Extension"
+- metadata.name, metadata.namespace: both mandatory strings
+- spec.version: mandatory semver string
+- spec.components: mandatory array, each component needs at least "type"
+- Schema components require: name, key_pattern
+- Lib components require: name, filename
+
 ────────────────────────────────────────────
 COMPONENT EXAMPLES
 ────────────────────────────────────────────
@@ -96,8 +105,7 @@ Schema (locks memory keys to a JSON Schema):
           value: { type: number, description: "Numeric value" }
         required: [id, name]
 
-IMPORTANT: Schema properties MUST have full definitions with types
-and descriptions. Never use bare "type: object" without properties.
+Schema properties must have full definitions with types and descriptions.
 
 Lib (JavaScript library loaded by apps):
     - type: lib
@@ -109,8 +117,7 @@ Lib (JavaScript library loaded by apps):
         AIMEAT.myExt.setData({ id, name, value }) — Save item. Returns saved item { id, name, value, createdAt }
         AIMEAT.myExt.search({ query }) — Search items. Returns Item[]
 
-IMPORTANT: api_surface MUST describe every function with exact parameter
-names, types, and return value shapes. This is what AI reads to write apps.
+api_surface must describe every function with parameter names, types, and return shapes.
 
 Prompt (AI instructions for using this cortex):
     - type: prompt
@@ -129,9 +136,7 @@ Seed data (initial entries written on activation):
         - key: myext.index
           value: []
 
-NOTE: seed-data keys must NOT collide with schema key_patterns.
-If schema locks "myext.items.*", do not put index under "myext.items.index".
-Use a separate namespace like "myext.index" instead.
+Seed-data keys must not collide with schema key_patterns (e.g. use "myext.index" not "myext.items.index").
 
 ────────────────────────────────────────────
 NODE INFO (auto-filled)
@@ -211,24 +216,32 @@ actions:                      # each action is a callable endpoint
         type: string
         required: true
         description: "Input parameter"
-    output:
-      result:
-        type: object
-        description: "Processing result"
-        properties:
-          value:
-            type: string
-            description: "The processed value"
-          processed_at:
-            type: string
-            description: "ISO 8601 timestamp"
-      success:
-        type: boolean
+    output:                       # use JSON Schema format for all outputs
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer, description: "Item ID" }
+              name: { type: string, description: "Item name" }
+              status: { type: string, enum: [active, inactive], description: "Current status" }
+              image: { type: string, description: "Image URL" }
+        info:
+          type: object
+          properties:
+            count: { type: integer, description: "Total matching items" }
+            pages: { type: integer, description: "Total pages" }
+            next: { type: string, nullable: true, description: "Next page URL or null" }
+        success: { type: boolean }
 
 RULES:
 - Each action requires: id, method, path, script. All four are mandatory.
 - The script filename must match the JS file provided during install.
-- Output schemas must have full property definitions, not bare \`type: object\`.
+- Input and output schemas use JSON Schema format (same as OpenAPI 3.1).
+  Every object needs \`properties\`, every array needs \`items\`. Use compact
+  inline syntax: \`name: { type: string, description: "..." }\` for leaf fields.
 
 schedules:                    # optional cron jobs
   - id: refresh-data
@@ -281,14 +294,26 @@ Each action script exports a default async function:
     return { result: json.data, processed_at: new Date().toISOString() };
   }
 
-IMPORTANT RULES:
+SANDBOX ENVIRONMENT:
+Available: JSON, Math, Date, RegExp, Promise, async/await, String, Array,
+  Object, Map, Set, encodeURIComponent, decodeURIComponent, parseInt, parseFloat
+
+NOT available (will crash):
+  URLSearchParams, URL, Buffer, TextEncoder, TextDecoder, Headers,
+  Request, Response, FormData, Blob, AbortController, atob, btoa,
+  require, import, process, fs, crypto, setTimeout, setInterval,
+  console.log (use ctx.log), fetch (use ctx.fetch), window, document
+
+URL construction (URLSearchParams is NOT available):
+  WRONG: const params = new URLSearchParams(); params.set('name', query);
+  RIGHT: const url = base + '?name=' + encodeURIComponent(query) + '&page=' + page;
+
+RULES:
 - Scripts use ES module syntax: export default async function(ctx, input) { ... }
 - ctx.fetch returns { status, ok, text, headers } — NOT a Response object
 - Parse JSON manually: JSON.parse(resp.text)
-- All API paths in ctx.memory are relative to the extension's namespace
 - Config values are set by the operator, never hardcode secrets
 - Return value must be a plain object (no classes, no functions)
-- No DOM, no window, no process, no require — pure server-side logic
 
 ────────────────────────────────────────────
 INSTALL
@@ -746,14 +771,25 @@ export default function ExtensionsTab({ session, showToast }) {
                       return html`<span style="display:inline-block;margin-right:8px"><code>${k}</code>${req ? html`<span style="color:#E8564A">*</span>` : ''}: ${spec.type || '?'}${spec.description ? html` <span style="opacity:.6">— ${spec.description}</span>` : ''}</span>`;
                     });
                   })()}
-                  ${(a.outputSchema || a.output) && Object.keys(a.outputSchema || a.output || {}).length > 1 ? html`
+                  ${(a.outputSchema || a.output) && Object.keys(a.outputSchema || a.output || {}).length > 0 ? html`
                     <div style="margin-top:2px;opacity:.6">→ ${(() => {
                       const out = a.outputSchema || a.output || {};
                       const props = out.properties || out;
-                      return Object.entries(props).filter(([k]) => k !== 'type' && k !== 'properties').map(([k, v]) => {
-                        const spec = (v && typeof v === 'object') ? v : {};
-                        return html`<code>${k}</code>: ${spec.type || '?'} `;
-                      });
+                      function renderProps(obj, depth) {
+                        if (!obj || depth > 2) return '';
+                        return Object.entries(obj).filter(([k]) => k !== 'type' && k !== 'properties' && k !== 'items' && k !== 'required' && k !== 'description' && k !== 'nullable' && k !== 'enum').map(([k, v]) => {
+                          const spec = (v && typeof v === 'object') ? v : {};
+                          let typeStr = spec.type || '?';
+                          let nested = '';
+                          if (spec.type === 'object' && spec.properties) {
+                            nested = ' { ' + renderProps(spec.properties, depth + 1) + ' }';
+                          } else if (spec.type === 'array' && spec.items?.properties) {
+                            nested = ' [{ ' + renderProps(spec.items.properties, depth + 1) + ' }]';
+                          }
+                          return k + ': ' + typeStr + nested;
+                        }).join(', ');
+                      }
+                      return renderProps(props, 0);
                     })()}</div>` : null}
                 </div>` : null}
               ${testAction?.actionId === a.id ? html`
