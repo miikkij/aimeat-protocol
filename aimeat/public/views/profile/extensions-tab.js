@@ -205,6 +205,7 @@ actions:                      # each action is a callable endpoint
     method: POST
     path: /my-action
     auth: authenticated
+    script: actions/my-action.js   # REQUIRED — JS file for this action
     input:
       param1:
         type: string
@@ -223,11 +224,12 @@ actions:                      # each action is a callable endpoint
             description: "ISO 8601 timestamp"
       success:
         type: boolean
-    script: actions/my-action.js
 
-IMPORTANT: Output schemas MUST have full property definitions with types
-and descriptions. Never use bare \`type: object\` without properties.
-AI and developers need to know the exact shape of returned data.
+IMPORTANT RULES:
+- Every action MUST have a \`script:\` field pointing to its JS file (e.g. actions/my-action.js).
+  Without it, installation will fail.
+- Output schemas MUST have full property definitions with types and descriptions.
+  Never use bare \`type: object\` without properties.
 
 schedules:                    # optional cron jobs
   - id: refresh-data
