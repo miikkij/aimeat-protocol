@@ -200,10 +200,10 @@ config:                       # operator-configurable settings (stored securely)
     default: "https://api.example.com"
 
 actions:                      # each action is a callable endpoint
-  - id: my-action             # REQUIRED — camelCase, becomes POST /v1/ext/{name}/{id}
-    method: POST              # REQUIRED
-    path: /my-action          # REQUIRED
-    script: actions/my-action.js  # REQUIRED — JS file implementing this action
+  - id: my-action             # camelCase, becomes POST /v1/ext/{name}/{id}
+    method: POST
+    path: /my-action
+    script: actions/my-action.js
     description: "What this action does"
     auth: authenticated
     input:
@@ -225,12 +225,10 @@ actions:                      # each action is a callable endpoint
       success:
         type: boolean
 
-IMPORTANT RULES:
-- Every action MUST have all four required fields: id, method, path, script.
-  Missing any of these will cause installation to fail.
-- The script field must match a filename in the scripts object provided during install.
-- Output schemas MUST have full property definitions with types and descriptions.
-  Never use bare \`type: object\` without properties.
+RULES:
+- Each action requires: id, method, path, script. All four are mandatory.
+- The script filename must match the JS file provided during install.
+- Output schemas must have full property definitions, not bare \`type: object\`.
 
 schedules:                    # optional cron jobs
   - id: refresh-data
