@@ -258,6 +258,9 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
       activationArtifacts: artifacts,
     });
 
+    // Trigger capability aggregation so the cortex appears immediately
+    import('../services/capability-aggregator.js').then(m => m.runCapabilityAggregation(config, storage)).catch(() => {});
+
     res.json(success(config.nodeId, {
       name: ext.name,
       status: 'active',

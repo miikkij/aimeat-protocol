@@ -433,6 +433,7 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
               <${MenuItem} icon="\u{1F512}" label=${t('profile.tabs.dataWallet')} active=${isOpen('dataWallet')} onClick=${() => open('dataWallet', 'manage-new')} />
               <${MenuItem} icon="\u{1F514}" label=${t('profile.tabs.notifications')} active=${isOpen('notifications')} onClick=${() => open('notifications', 'manage-new')} />
               <${MenuItem} icon="\u{1F512}" label=${t('profile.tabs.security')} active=${isOpen('security')} onClick=${() => open('security', 'manage-new')} />
+              <${MenuItem} icon="⚡" label=${t('capabilities.tabLabel')} active=${isOpen('capabilities')} onClick=${() => open('capabilities', 'manage-new')} />
             </div>
           `}
         <//>
@@ -468,6 +469,7 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
             <${MenuItem} icon="\u{1F3ED}" label=${t('profile.foundry.tabLabel')} active=${isOpen('foundry')} onClick=${() => open('foundry', 'build')} />
             <${MenuItem} icon="\u{1F3AF}" label=${t('profile.calibrator.tabLabel')} active=${isOpen('calibrator')} onClick=${() => open('calibrator', 'build')} />
             <${MenuItem} icon="\u{1F50C}" label=${t('profile.tabs.extensions')} active=${isOpen('extensions')} onClick=${() => open('extensions', 'build')} />
+            <${MenuItem} icon="⚡" label=${t('capabilities.tabLabel')} active=${isOpen('capabilities')} onClick=${() => open('capabilities', 'build')} />
             <${MenuItem} icon="\u{1F3A8}" label=${t('portfolio.tabLabel')} active=${isOpen('portfolio')} onClick=${() => open('portfolio', 'build')} />
             ${isExperienced && html`
               <${MenuItem} icon="\u{1F4E4}" label=${t('profile.landing.ownPackages')} active=${isOpen('packages')} onClick=${() => open('packages', 'build')} />

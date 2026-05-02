@@ -55,7 +55,14 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     }
 
     const result = await storage.listCapabilities(filters);
-    res.json(success(config.nodeId, result));
+    res.json(success(config.nodeId, {
+      ...result,
+      policy: {
+        publishing: config.capabilityPublishing,
+        publishers: config.capabilityPublishers,
+        webhooks: config.capabilityWebhooks,
+      },
+    }));
   });
 
   router.get('/v1/capabilities/:id', async (req, res) => {

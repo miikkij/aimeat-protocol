@@ -1,0 +1,211 @@
+/**
+ * @file capabilities.css
+ * @description Styles for the profile capabilities tab
+ * @version-history
+ *   v1.0.0 — 2026-05-02 — Initial styles
+ */
+
+.cap-filter-bar {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+.cap-search-input {
+  flex: 1;
+  min-width: 160px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--text);
+  font-size: .85rem;
+}
+.cap-filter-select {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--text);
+  font-size: .85rem;
+  min-width: 140px;
+}
+
+.cap-item {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: border-color .15s;
+  background: var(--card);
+}
+.cap-item:hover {
+  border-color: var(--accent);
+}
+.cap-item-selected {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+.cap-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.cap-item-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cap-source-icon {
+  font-size: .9rem;
+}
+.cap-item-stats {
+  display: flex;
+  gap: 12px;
+  font-size: .75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.cap-item-summary {
+  font-size: .8rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+.cap-item-tags {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.cap-tag {
+  font-size: .7rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--bg-dim);
+  color: var(--text-dim);
+}
+.cap-badge {
+  font-size: .7rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.cap-badge-callable {
+  background: var(--bg-dim);
+  color: var(--accent);
+}
+.cap-badge-browser {
+  background: var(--bg-dim);
+  color: var(--text-muted);
+}
+.cap-badge-status {
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
+.cap-detail {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: .82rem;
+}
+.cap-detail-row {
+  margin-bottom: 4px;
+  line-height: 1.5;
+}
+.cap-detail-label {
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.cap-detail-code {
+  font-family: var(--mono);
+  font-size: .78rem;
+  background: var(--bg-dim);
+  padding: 1px 5px;
+  border-radius: 3px;
+  word-break: break-all;
+}
+.cap-schema-details {
+  margin-top: 6px;
+}
+.cap-schema-details summary {
+  cursor: pointer;
+  font-size: .8rem;
+  color: var(--accent);
+}
+.cap-schema-pre {
+  font-family: var(--mono);
+  font-size: .75rem;
+  background: var(--bg-dim);
+  padding: 8px;
+  border-radius: 6px;
+  max-height: 200px;
+  overflow: auto;
+  margin-top: 4px;
+}
+
+.cap-info-section {
+  margin-top: 20px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.cap-info-title {
+  font-weight: 600;
+  font-size: .85rem;
+  margin-bottom: 4px;
+}
+.cap-info-desc {
+  font-size: .8rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+.cap-policy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.cap-policy-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cap-policy-label {
+  font-size: .75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.cap-policy-value {
+  font-size: .82rem;
+  font-weight: 500;
+}
+
+.cap-create-section {
+  margin-top: 20px;
+}
+.cap-create-form {
+  display: grid;
+  gap: 8px;
+  max-width: 400px;
+  margin-top: 10px;
+}
+.cap-form-input {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--text);
+  font-size: .85rem;
+}
+.cap-form-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .85rem;
+}

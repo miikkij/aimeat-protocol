@@ -63,6 +63,14 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         scripts?: Record<string, string>;
       };
 
+      // Debug: log what we received
+      logger.info('Extension install request', {
+        hasManifest: !!manifestYaml,
+        manifestLength: manifestYaml?.length || 0,
+        scriptKeys: scripts ? Object.keys(scripts) : [],
+        scriptSizes: scripts ? Object.fromEntries(Object.entries(scripts).map(([k, v]) => [k, typeof v === 'string' ? v.length : typeof v])) : {},
+      });
+
       if (!manifestYaml || typeof manifestYaml !== 'string') {
         res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'manifest (YAML string) is required'));
         return;
@@ -480,6 +488,9 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       }
 
       logger.info(`Extension activated: ${name}`, { by: req.auth!.sub });
+
+      // Trigger capability aggregation so the extension appears immediately
+      import('../services/capability-aggregator.js').then(m => m.runCapabilityAggregation(config, storage)).catch(() => {});
 
       res.json(success(config.nodeId, { extension: updated }, [
         { description: 'Execute an action', method: 'POST', url: `/v1/ext/${name}/<actionId>` },

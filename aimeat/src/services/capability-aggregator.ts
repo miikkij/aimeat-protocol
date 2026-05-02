@@ -62,6 +62,16 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
           };
           await storage.createCapability(cap);
           created++;
+        } else if (existing.status === 'disabled') {
+          // Re-enable: source is active again (extension was reinstalled)
+          await storage.updateCapability(existing.id, {
+            status: 'active',
+            source: { type: 'extension', ref, version: ext.version },
+            inputSchema: (action as any).inputSchema || null,
+            outputSchema: (action as any).outputSchema || null,
+            schemaHash, updatedAt: now,
+          });
+          updated++;
         } else if (existing.source.version !== ext.version || existing.schemaHash !== schemaHash) {
           await storage.updateCapability(existing.id, {
             source: { type: 'extension', ref, version: ext.version },
@@ -170,6 +180,18 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
         };
         await storage.createCapability(cap);
         created++;
+      } else if (existing.status === 'disabled') {
+        // Re-enable: cortex is active again (was reinstalled)
+        await storage.updateCapability(existing.id, {
+          status: 'active',
+          source: { type: 'cortex', ref, version: cortex.version },
+          exports: libExports.length > 0 ? libExports.map(name => ({
+            name, description: '', inputSchema: {}, outputSchema: {}, example: null,
+          })) : existing.exports,
+          usage: usageLines.join('\n'),
+          updatedAt: now,
+        });
+        updated++;
       } else if (existing.exports === null && libExports.length > 0) {
         // Update existing capability with exports if they were missing
         await storage.updateCapability(existing.id, {
@@ -185,14 +207,20 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
     }
   } catch { /* cortex may not be enabled */ }
 
-  // 4. Disable capabilities whose sources are gone
+  // 4. Disable or delete capabilities whose sources are gone
   for (const sourceType of ['extension', 'action', 'cortex']) {
     try {
       const existing = await storage.listCapabilitiesBySourceType(sourceType);
       for (const cap of existing) {
-        if (!seenRefs.has(cap.source.ref) && cap.status === 'active') {
-          await storage.updateCapability(cap.id, { status: 'disabled', updatedAt: now });
-          disabled++;
+        if (!seenRefs.has(cap.source.ref)) {
+          if (cap.status === 'active') {
+            await storage.updateCapability(cap.id, { status: 'disabled', updatedAt: now });
+            disabled++;
+          } else if (cap.status === 'disabled' && cap.source.type !== 'manual') {
+            // Clean up stale disabled auto-generated capabilities
+            await storage.deleteCapability(cap.id);
+            disabled++;
+          }
         }
       }
     } catch { /* ignore */ }

@@ -382,17 +382,18 @@ export default function ExtensionsTab({ session, showToast }) {
 
   function onSrvManifestChange(text) {
     setSrvManifestText(text);
-    // Auto-extract script filenames from YAML actions
     try {
       const scriptMatches = [...text.matchAll(/script:\s*(.+)/g)];
       if (scriptMatches.length > 0) {
-        const filenames = scriptMatches.map(m => m[1].trim());
-        const existing = srvScriptEntries.filter(e => e.code.trim());
-        const entries = filenames.map(fn => {
-          const found = existing.find(e => e.filename === fn);
-          return found || { filename: fn, code: '' };
+        const filenames = scriptMatches.map(m => m[1].trim().replace(/^["']|["']$/g, ''));
+        setSrvScriptEntries(prev => {
+          const existing = prev.filter(e => e.code.trim());
+          const entries = filenames.map(fn => {
+            const found = existing.find(e => e.filename === fn);
+            return found || { filename: fn, code: '' };
+          });
+          return entries.length > 0 ? entries : prev;
         });
-        if (entries.length > 0) setSrvScriptEntries(entries);
       }
     } catch { /* ignore parse errors */ }
   }
@@ -404,6 +405,9 @@ export default function ExtensionsTab({ session, showToast }) {
       for (const e of srvScriptEntries) {
         if (e.filename && e.code) scripts[e.filename] = e.code;
       }
+      const scriptCount = Object.keys(scripts).length;
+      if (scriptCount === 0) { showToast('At least one action script is required', true); return; }
+      console.log('[SrvInstall] Sending', scriptCount, 'scripts:', Object.keys(scripts).map(k => k + ' (' + scripts[k].length + ' chars)'));
       const sess = getSession();
       const res = await sess.fetch('/v1/extensions', {
         method: 'POST',

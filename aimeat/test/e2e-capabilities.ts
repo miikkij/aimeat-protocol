@@ -390,21 +390,131 @@ await test('Deactivate and delete cortex', async () => {
     assert(status === 200, `delete cortex status ${status}`);
 });
 
-// ─── Phase 7: Extension Invoke via Capability ───
-console.log('\nPhase 7 — Extension Invoke via Capability');
+// ─── Phase 7: Extension Install + Invoke via Capability ───
+console.log('\nPhase 7 — Extension Install + Invoke via Capability');
 
-// Check if there are any extension-sourced callable capabilities
-await test('Extension capabilities are callable', async () => {
-    const { body } = await json('/v1/capabilities?source_type=extension&callable=true');
-    // May or may not have extensions depending on test environment
-    if (body.data.total > 0) {
-        const cap = body.data.capabilities[0];
-        assert(cap.callable === true, 'extension cap should be callable');
-        assert(cap.source.type === 'extension', 'source should be extension');
-        assert(cap.usage.includes('invoke'), `usage should mention invoke: ${cap.usage}`);
-    }
-    // Test passes regardless - just verifying the filter works
-    assert(body.data.capabilities.every((c: any) => c.callable === true), 'all should be callable');
+const testExtName = 'e2e-cap-ext-' + Math.random().toString(36).slice(2, 8);
+const testExtManifest = `metadata:
+  name: ${testExtName}
+  version: 1.0.0
+  description: "E2E test extension for capability invoke"
+  author: ${ownerName}
+
+required_apis:
+  - memory
+
+actions:
+  - id: echo
+    method: POST
+    path: /echo
+    script: actions/echo.js
+    description: "Echo input back with timestamp"
+    auth: authenticated
+    input:
+      message:
+        type: string
+        required: true
+        description: "Message to echo"
+    output:
+      type: object
+      properties:
+        echoed: { type: string, description: "The echoed message" }
+        timestamp: { type: string, description: "ISO timestamp" }
+        success: { type: boolean }
+
+limits:
+  memory_mb: 32
+  timeout_ms: 3000
+  max_api_calls: 5
+`;
+
+const testExtScript = `export default async function(ctx, input) {
+  ctx.log('echo called with: ' + (input.message || ''));
+  return {
+    echoed: 'Echo: ' + (input.message || '(empty)'),
+    timestamp: new Date().toISOString(),
+    success: true,
+  };
+}`;
+
+await test('Install server extension with script', async () => {
+    const { status, body } = await json('/v1/extensions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            manifest: testExtManifest,
+            scripts: { 'actions/echo.js': testExtScript },
+        }),
+    });
+    assert(status === 201 || status === 200, `install status ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+    assert(body.ok === true, `install ok: ${JSON.stringify(body.error)}`);
+});
+
+await test('Activate server extension', async () => {
+    const { status, body } = await json(`/v1/extensions/${testExtName}/activate`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `activate status ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+});
+
+await test('Execute extension action directly', async () => {
+    const { status, body } = await json(`/v1/ext/${testExtName}/echo`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+        body: JSON.stringify({ message: 'hello from e2e' }),
+    });
+    assert(status === 200, `execute status ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+    assert(body.ok === true, `execute ok: ${JSON.stringify(body.error)}`);
+    assert(body.data?.echoed === 'Echo: hello from e2e', `echoed: ${body.data?.echoed}`);
+    assert(body.data?.success === true, 'success flag');
+});
+
+await test('Trigger aggregator picks up extension', async () => {
+    const { status, body } = await json('/v1/admin/capabilities/aggregate', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `aggregate status ${status}`);
+});
+
+await test('Extension capability exists and is callable', async () => {
+    const capId = `ext:${testExtName}:echo`;
+    const { status, body } = await json(`/v1/capabilities/${capId}`);
+    assert(status === 200, `cap status ${status}`);
+    assert(body.data.callable === true, 'should be callable');
+    assert(body.data.source.type === 'extension', 'source type');
+    assert(body.data.inputSchema?.message?.type === 'string', `inputSchema: ${JSON.stringify(body.data.inputSchema)}`);
+});
+
+await test('Invoke extension via capability proxy', async () => {
+    const capId = `ext:${testExtName}:echo`;
+    const { status, body } = await json(`/v1/capabilities/${capId}/invoke`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+        body: JSON.stringify({ input: { message: 'via capability' } }),
+    });
+    assert(status === 200, `invoke status ${status}: ${JSON.stringify(body).slice(0, 300)}`);
+    assert(body.data?.result?.echoed === 'Echo: via capability', `result: ${JSON.stringify(body.data?.result)}`);
+});
+
+await test('Invoke stats recorded', async () => {
+    const capId = `ext:${testExtName}:echo`;
+    const { body } = await json(`/v1/capabilities/${capId}`);
+    assert(body.data.stats.totalInvocations >= 1, `invocations: ${body.data.stats.totalInvocations}`);
+    assert(body.data.stats.successCount >= 1, `success: ${body.data.stats.successCount}`);
+});
+
+await test('Cleanup test extension', async () => {
+    await json(`/v1/extensions/${testExtName}/deactivate`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+    });
+    const { status } = await json(`/v1/extensions/${testExtName}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `delete status ${status}`);
 });
 
 // ─── Phase 8: Vouch ───

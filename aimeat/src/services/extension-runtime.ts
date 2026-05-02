@@ -173,11 +173,14 @@ ${userFnDecl}
         caller: JSON.parse(__callerJson),
         config: JSON.parse(__configJson),
         instance: __instanceJson ? JSON.parse(__instanceJson) : undefined,
-        log: {
-            info:  (msg, data) => __log_info(msg, data !== undefined ? JSON.stringify(data) : undefined),
-            warn:  (msg, data) => __log_warn(msg, data !== undefined ? JSON.stringify(data) : undefined),
-            error: (msg, data) => __log_error(msg, data !== undefined ? JSON.stringify(data) : undefined),
-        },
+        log: Object.assign(
+            (msg, data) => __log_info(msg, data !== undefined ? JSON.stringify(data) : undefined),
+            {
+                info:  (msg, data) => __log_info(msg, data !== undefined ? JSON.stringify(data) : undefined),
+                warn:  (msg, data) => __log_warn(msg, data !== undefined ? JSON.stringify(data) : undefined),
+                error: (msg, data) => __log_error(msg, data !== undefined ? JSON.stringify(data) : undefined),
+            },
+        ),
         notify: __notify ? (async (message, opts) => __call(__notify, [message, opts ? JSON.stringify(opts) : '{}'])) : undefined,
         email:  __email  ? (async (to, subject, body) => __call(__email, [to, subject, body]))                        : undefined,
     };
