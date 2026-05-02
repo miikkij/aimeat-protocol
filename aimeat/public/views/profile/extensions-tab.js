@@ -287,6 +287,23 @@ export default function ExtensionsTab({ session, showToast }) {
     } catch { setExtensions([]); }
   }
 
+  function onSrvManifestChange(text) {
+    setSrvManifestText(text);
+    // Auto-extract script filenames from YAML actions
+    try {
+      const scriptMatches = [...text.matchAll(/script:\s*(.+)/g)];
+      if (scriptMatches.length > 0) {
+        const filenames = scriptMatches.map(m => m[1].trim());
+        const existing = srvScriptEntries.filter(e => e.code.trim());
+        const entries = filenames.map(fn => {
+          const found = existing.find(e => e.filename === fn);
+          return found || { filename: fn, code: '' };
+        });
+        if (entries.length > 0) setSrvScriptEntries(entries);
+      }
+    } catch { /* ignore parse errors */ }
+  }
+
   async function handleSrvInstall() {
     if (!srvManifestText.trim()) { showToast('Manifest is required'); return; }
     try {
@@ -628,9 +645,49 @@ export default function ExtensionsTab({ session, showToast }) {
                 <span class="ext-action-desc">${a.description || ''}</span>
                 ${isActive ? html`<button class="btn-outline btn-sm" onClick=${() => {
                   if (testAction?.actionId === a.id) { setTestAction(null); setTestResult(null); }
-                  else { setTestAction({ actionId: a.id }); setTestResult(null); setTestInput('{}'); }
+                  else {
+                    setTestAction({ actionId: a.id }); setTestResult(null);
+                    // Pre-fill test input from inputSchema
+                    const schema = a.inputSchema || a.input;
+                    if (schema && typeof schema === 'object') {
+                      const props = schema.properties || schema;
+                      const example = {};
+                      for (const [k, v] of Object.entries(props)) {
+                        if (v && typeof v === 'object' && !Array.isArray(v)) {
+                          const spec = v;
+                          if (spec.type === 'string') example[k] = spec.description ? '<' + spec.description + '>' : '';
+                          else if (spec.type === 'number') example[k] = 0;
+                          else if (spec.type === 'boolean') example[k] = false;
+                          else example[k] = null;
+                        }
+                      }
+                      setTestInput(JSON.stringify(example, null, 2));
+                    } else { setTestInput('{}'); }
+                  }
                 }}>${testAction?.actionId === a.id ? t('profile.v8ext.test.close') : t('profile.v8ext.test.btn')}</button>` : null}
               </div>
+              ${(a.inputSchema || a.input) && Object.keys(a.inputSchema || a.input || {}).length > 0 ? html`
+                <div style="font-size:.75rem;opacity:.7;padding:2px 0 4px 12px">
+                  ${(() => {
+                    const schema = a.inputSchema || a.input || {};
+                    const props = schema.properties || schema;
+                    const required = schema.required || [];
+                    return Object.entries(props).filter(([k]) => k !== 'type' && k !== 'required' && k !== 'properties').map(([k, v]) => {
+                      const spec = (v && typeof v === 'object') ? v : {};
+                      const req = required.includes(k);
+                      return html`<span style="display:inline-block;margin-right:8px"><code>${k}</code>${req ? html`<span style="color:#E8564A">*</span>` : ''}: ${spec.type || '?'}${spec.description ? html` <span style="opacity:.6">— ${spec.description}</span>` : ''}</span>`;
+                    });
+                  })()}
+                  ${(a.outputSchema || a.output) && Object.keys(a.outputSchema || a.output || {}).length > 1 ? html`
+                    <div style="margin-top:2px;opacity:.6">→ ${(() => {
+                      const out = a.outputSchema || a.output || {};
+                      const props = out.properties || out;
+                      return Object.entries(props).filter(([k]) => k !== 'type' && k !== 'properties').map(([k, v]) => {
+                        const spec = (v && typeof v === 'object') ? v : {};
+                        return html`<code>${k}</code>: ${spec.type || '?'} `;
+                      });
+                    })()}</div>` : null}
+                </div>` : null}
               ${testAction?.actionId === a.id ? html`
                 <div class="ext-test-panel">
                   <div class="ext-test-label">${t('profile.v8ext.test.inputLabel')}</div>
@@ -877,7 +934,7 @@ export default function ExtensionsTab({ session, showToast }) {
           <h3>Install Server Extension</h3>
           <div class="ext-modal-section">
             <label>YAML Manifest</label>
-            <textarea rows="12" class="ext-modal-textarea" placeholder="metadata:\n  name: my-extension\n  version: 1.0.0\n  description: ...\n\nactions:\n  - id: my-action\n    ..." value=${srvManifestText} onInput=${(e) => setSrvManifestText(e.target.value)}></textarea>
+            <textarea rows="12" class="ext-modal-textarea" placeholder="metadata:\n  name: my-extension\n  version: 1.0.0\n  description: ...\n\nactions:\n  - id: my-action\n    ..." value=${srvManifestText} onInput=${(e) => onSrvManifestChange(e.target.value)}></textarea>
           </div>
           <div class="ext-modal-section">
             <label>Action Scripts (JS files)</label>
