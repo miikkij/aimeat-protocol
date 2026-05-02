@@ -676,8 +676,8 @@
       "launch": "Launch"
     },
     "v8ext": {
-      "title": "V8 Extensions",
-      "desc": "Sandboxed JavaScript extensions that run server-side. Each extension provides actions that can be called via API or from apps.",
+      "title": "Server Extensions",
+      "desc": "Sandboxed JavaScript extensions that run server-side in a secure isolate. Each extension provides actions that can be called via API or from apps.",
       "back": "Back",
       "author": "Author",
       "statusActive": "Active",

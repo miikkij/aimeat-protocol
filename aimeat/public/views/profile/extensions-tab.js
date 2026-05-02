@@ -1,18 +1,18 @@
 /**
  * @file extensions-tab.js
- * @description Profile tab for managing Cortex (YAML manifest) and V8 (sandboxed JS)
+ * @description Profile tab for managing Cortex (YAML manifest) and Server (sandboxed JS)
  *   extensions. Lists installed extensions, shows detail views with component
  *   breakdowns, action testing, instance management, and install/uninstall flows.
  * @structure
  *   - buildCortexPrompt()  — generates AI scaffolding prompt for extension creation
  *   - ExtensionsTab()      — main tab component (default export)
  *     - Cortex detail view — manifest components, prompts, libs, schemas, ontologies
- *     - V8 detail view     — actions, test runner, instances, endpoint info
+ *     - Server extension detail view — actions, test runner, instances, endpoint info
  *     - Grid view          — cards for installed + bundled extensions
  *     - Install modal      — upload/paste manifest + libs
  * @usage Loaded as a lazy tab in profile.js via dynamic import.
  * @version-history
- *   v1.0.0 — 2026-03-10 — Initial implementation with Cortex + V8 extension management
+ *   v1.0.0 — 2026-03-10 — Initial implementation with Cortex + Server extension management
  *   v1.1.0 — 2026-03-17 — Refactor: replace all inline style="" attributes with CSS classes
  */
 import { h } from 'preact';
@@ -110,6 +110,140 @@ Now ask the user what they want to build! Based on what they describe:
 To install: go to Profile > Extensions > + Add > paste the YAML manifest > add JS files if any > click Install.`;
 }
 
+/* ── Server Extension scaffolding prompt builder ── */
+function buildServerExtensionPrompt(sess) {
+  const url = getNodeUrl();
+  const owner = sess?.owner || 'user';
+  return `You are a Server Extension builder for the AIMEAT protocol.
+
+The user wants to create a server-side extension that runs in a secure sandbox.
+Node URL: ${url}
+Owner: ${owner}
+
+A server extension is a YAML manifest + JavaScript action scripts. Each action runs
+server-side in a sandboxed isolate with strict resource limits.
+
+────────────────────────────────────────────
+YAML MANIFEST STRUCTURE
+────────────────────────────────────────────
+
+metadata:
+  name: my-extension
+  version: 1.0.0
+  description: "What this extension does"
+  author: ${owner}
+  license: MIT
+
+required_apis:
+  - memory                    # which sandbox APIs the extension needs
+
+config:                       # operator-configurable settings (stored securely)
+  api_key:
+    type: string
+    description: "External API key"
+  base_url:
+    type: string
+    default: "https://api.example.com"
+
+actions:                      # each action is a callable endpoint
+  - id: my-action             # camelCase, becomes POST /v1/ext/{name}/{id}
+    description: "What this action does"
+    method: POST
+    path: /my-action
+    auth: authenticated
+    input:
+      param1:
+        type: string
+        required: true
+        description: "Input parameter"
+    output:
+      result:
+        type: object
+        description: "What it returns"
+    script: actions/my-action.js
+
+schedules:                    # optional cron jobs
+  - id: refresh-data
+    cron: "*/10 * * * *"      # every 10 minutes
+    action: refresh
+    description: "Periodic data refresh"
+
+limits:
+  memory_mb: 64
+  timeout_ms: 5000
+  max_api_calls: 50
+
+────────────────────────────────────────────
+SANDBOX API (available inside action scripts)
+────────────────────────────────────────────
+
+Each action script exports a default async function:
+
+  export default async function(ctx, input) {
+    // ctx.memory — read/write AIMEAT memory
+    const data = await ctx.memory.get('my-key');
+    await ctx.memory.set('my-key', { value: 'hello' });
+    await ctx.memory.delete('my-key');
+    const results = await ctx.memory.search('prefix:*');
+    const pub = await ctx.memory.getPublic('ext:my-ext', 'public-key');
+
+    // ctx.fetch — call external APIs (HTTP/HTTPS)
+    const resp = await ctx.fetch('https://api.example.com/data', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + ctx.config.api_key },
+      body: JSON.stringify({ query: input.query }),
+    });
+    // resp = { status, ok, text, headers }
+    const json = JSON.parse(resp.text);
+
+    // ctx.config — operator-configured values (from manifest config section)
+    const apiKey = ctx.config.api_key;
+
+    // ctx.caller — who called this action
+    // ctx.caller.gaii, ctx.caller.owner, ctx.caller.roles
+
+    // ctx.wallet.consume(amount, reason) — deduct morsels (optional)
+    // ctx.trust.getScore(gaii) — get trust score (optional)
+    // ctx.consent.check(grantorGaii, dataPattern) — check consent (optional)
+
+    // ctx.log(message) — log for debugging
+    ctx.log('Processing: ' + input.query);
+
+    // Return result (must be JSON-serializable object)
+    return { result: json.data, processed_at: new Date().toISOString() };
+  }
+
+IMPORTANT RULES:
+- Scripts use ES module syntax: export default async function(ctx, input) { ... }
+- ctx.fetch returns { status, ok, text, headers } — NOT a Response object
+- Parse JSON manually: JSON.parse(resp.text)
+- All API paths in ctx.memory are relative to the extension's namespace
+- Config values are set by the operator, never hardcode secrets
+- Return value must be a plain object (no classes, no functions)
+- No DOM, no window, no process, no require — pure server-side logic
+
+────────────────────────────────────────────
+INSTALL
+────────────────────────────────────────────
+
+Extension API:
+  POST   ${url}/v1/extensions    — install (body: { manifest: "<YAML>", scripts: { "actions/file.js": "<JS>" } })
+  POST   ${url}/v1/extensions/{name}/activate
+  POST   ${url}/v1/ext/{name}/{actionId}  — call an action
+
+Or go to Profile > Extensions > Server Extensions section to install via UI.
+
+────────────────────────────────────────────
+YOUR TASK
+────────────────────────────────────────────
+
+Ask the user what they want to build. Then:
+1. Design the YAML manifest with actions, config, and schedules as needed
+2. Write the JavaScript action scripts
+3. Explain what each action does and what external APIs it calls
+4. Provide complete YAML + JS files ready to install`;
+}
+
 export default function ExtensionsTab({ session, showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
   const NODE_URL = getNodeUrl();
@@ -122,10 +256,13 @@ export default function ExtensionsTab({ session, showToast }) {
   const [libEntries, setLibEntries] = useState([{filename:'', code:''}]);
   const [bundledInstalling, setBundledInstalling] = useState(null);
 
-  // V8 extension state
-  const [v8Exts, setV8Exts] = useState(null);
-  const [v8Detail, setV8Detail] = useState(null);
-  const [v8Instances, setV8Instances] = useState(null);
+  // Server extension state
+  const [showSrvInstall, setShowSrvInstall] = useState(false);
+  const [srvManifestText, setSrvManifestText] = useState('');
+  const [srvScriptEntries, setSrvScriptEntries] = useState([{filename:'', code:''}]);
+  const [srvExts, setSrvExts] = useState(null);
+  const [srvDetail, setSrvDetail] = useState(null);
+  const [srvInstances, setSrvInstances] = useState(null);
   const [newInstanceId, setNewInstanceId] = useState('');
   const [testAction, setTestAction] = useState(null); // { actionId }
   const [testInput, setTestInput] = useState('{}');
@@ -133,12 +270,12 @@ export default function ExtensionsTab({ session, showToast }) {
   const [testRunning, setTestRunning] = useState(false);
 
   useEffect(() => {
-    if (session) { loadExtensions(); loadV8Extensions(); }
+    if (session) { loadExtensions(); loadServerExtensions(); }
   }, [session]);
 
   // Auto-refresh on SSE live updates (extension install/activate/etc)
   useEffect(() => {
-    const handler = () => { loadExtensions(); loadV8Extensions(); };
+    const handler = () => { loadExtensions(); loadServerExtensions(); };
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, []);
@@ -150,49 +287,72 @@ export default function ExtensionsTab({ session, showToast }) {
     } catch { setExtensions([]); }
   }
 
-  async function loadV8Extensions() {
-    try { setV8Exts(await v8Ext.listV8Extensions()); } catch { setV8Exts([]); }
+  async function handleSrvInstall() {
+    if (!srvManifestText.trim()) { showToast('Manifest is required'); return; }
+    try {
+      const scripts = {};
+      for (const e of srvScriptEntries) {
+        if (e.filename && e.code) scripts[e.filename] = e.code;
+      }
+      const sess = getSession();
+      const res = await sess.fetch('/v1/extensions', {
+        method: 'POST',
+        body: JSON.stringify({ manifest: srvManifestText, scripts }),
+      });
+      if (!res.ok) throw new Error(res.error?.message || 'Install failed');
+      showToast('Extension installed!');
+      setShowSrvInstall(false);
+      setSrvManifestText('');
+      setSrvScriptEntries([{filename:'', code:''}]);
+      loadServerExtensions();
+    } catch (err) {
+      showToast('Install failed: ' + (err.message || err), true);
+    }
   }
 
-  async function loadV8Detail(name) {
-    setV8Detail(null);
-    setV8Instances(null);
+  async function loadServerExtensions() {
+    try { setSrvExts(await v8Ext.listV8Extensions()); } catch { setSrvExts([]); }
+  }
+
+  async function loadSrvDetail(name) {
+    setSrvDetail(null);
+    setSrvInstances(null);
     setNewInstanceId('');
     try {
       const ext = await v8Ext.getV8Extension(name);
-      setV8Detail(ext);
-      try { setV8Instances(await v8Ext.listInstances(name)); } catch { setV8Instances([]); }
-    } catch(e) { setV8Detail({ error: e.message }); }
+      setSrvDetail(ext);
+      try { setSrvInstances(await v8Ext.listInstances(name)); } catch { setSrvInstances([]); }
+    } catch(e) { setSrvDetail({ error: e.message }); }
   }
 
-  async function handleV8Activate(name) {
+  async function handleSrvActivate(name) {
     try {
       const resp = await v8Ext.activateV8Extension(name);
       if (resp.ok === false) throw new Error(resp.error?.message || 'Failed');
       showToast(t('profile.v8ext.activated'));
-      loadV8Extensions();
-      if (v8Detail?.name === name) loadV8Detail(name);
+      loadServerExtensions();
+      if (srvDetail?.name === name) loadSrvDetail(name);
     } catch(e) { showToast(e.message, true); }
   }
 
-  async function handleV8Deactivate(name) {
+  async function handleSrvDeactivate(name) {
     try {
       const resp = await v8Ext.deactivateV8Extension(name);
       if (resp.ok === false) throw new Error(resp.error?.message || 'Failed');
       showToast(t('profile.v8ext.deactivated'));
-      loadV8Extensions();
-      if (v8Detail?.name === name) loadV8Detail(name);
+      loadServerExtensions();
+      if (srvDetail?.name === name) loadSrvDetail(name);
     } catch(e) { showToast(e.message, true); }
   }
 
-  async function handleV8Delete(name) {
+  async function handleSrvDelete(name) {
     confirm(t('profile.v8ext.confirmDelete'), async () => {
       try {
         const resp = await v8Ext.deleteV8Extension(name);
         if (resp.ok === false) throw new Error(resp.error?.message || 'Failed');
         showToast(t('profile.v8ext.deleted'));
-        setV8Detail(null);
-        loadV8Extensions();
+        setSrvDetail(null);
+        loadServerExtensions();
       } catch(e) { showToast(e.message, true); }
     }, { danger: true });
   }
@@ -205,7 +365,7 @@ export default function ExtensionsTab({ session, showToast }) {
       if (resp.ok === false) throw new Error(resp.error?.message || 'Failed');
       showToast(t('profile.v8ext.instanceCreated'));
       setNewInstanceId('');
-      setV8Instances(await v8Ext.listInstances(name));
+      setSrvInstances(await v8Ext.listInstances(name));
     } catch(e) { showToast(e.message, true); }
   }
 
@@ -230,7 +390,7 @@ export default function ExtensionsTab({ session, showToast }) {
         const resp = await v8Ext.deleteInstance(name, instanceId);
         if (resp.ok === false) throw new Error(resp.error?.message || 'Failed');
         showToast(t('profile.v8ext.instanceDeleted'));
-        setV8Instances(await v8Ext.listInstances(name));
+        setSrvInstances(await v8Ext.listInstances(name));
       } catch(e) { showToast(e.message, true); }
     }, { danger: true });
   }
@@ -434,16 +594,16 @@ export default function ExtensionsTab({ session, showToast }) {
     </div>`;
   }
 
-  // ── V8 detail view ──
-  if (v8Detail) {
-    if (v8Detail.error) return html`<div><button class="btn-outline" onClick=${() => setV8Detail(null)}>${t('profile.v8ext.back')}</button><div class="empty">Error: ${v8Detail.error}</div></div>`;
-    const ext = v8Detail;
+  // ── Server extension detail view ──
+  if (srvDetail) {
+    if (srvDetail.error) return html`<div><button class="btn-outline" onClick=${() => setSrvDetail(null)}>${t('profile.v8ext.back')}</button><div class="empty">Error: ${srvDetail.error}</div></div>`;
+    const ext = srvDetail;
     const isActive = ext.status === 'active';
     const actions = ext.actions || [];
     const supportsInstances = ext.instances?.supported;
 
     return html`<div>
-      <button class="btn-outline" onClick=${() => setV8Detail(null)}>${t('profile.v8ext.back')}</button>
+      <button class="btn-outline" onClick=${() => setSrvDetail(null)}>${t('profile.v8ext.back')}</button>
       <div class="ext-detail-wrap">
         <div class="ext-title">
           ${ext.name}
@@ -499,9 +659,9 @@ export default function ExtensionsTab({ session, showToast }) {
       ${supportsInstances ? html`
         <div class="ext-detail-section mt-section">
           <div class="ext-detail-section-title">${t('profile.v8ext.instancesTitle')}</div>
-          ${!v8Instances ? html`<${Spinner} />` : v8Instances.length === 0
+          ${!srvInstances ? html`<${Spinner} />` : srvInstances.length === 0
             ? html`<div class="ext-no-instances">${t('profile.v8ext.noInstances')}</div>`
-            : v8Instances.map(inst => html`
+            : srvInstances.map(inst => html`
               <div class="ext-instance-row">
                 <span class="ext-instance-name">${inst.id}</span>
                 <span class="ext-status-dot ${inst.status}"></span>
@@ -525,9 +685,9 @@ export default function ExtensionsTab({ session, showToast }) {
 
       <div class="ext-actions-bar">
         ${isActive
-          ? html`<button class="btn-outline" onClick=${() => handleV8Deactivate(ext.name)}>${t('profile.v8ext.deactivate')}</button>`
-          : html`<button class="btn-primary" onClick=${() => handleV8Activate(ext.name)}>${t('profile.v8ext.activate')}</button>`}
-        <button class="btn-danger-solid" onClick=${() => handleV8Delete(ext.name)}>${t('profile.v8ext.delete')}</button>
+          ? html`<button class="btn-outline" onClick=${() => handleSrvDeactivate(ext.name)}>${t('profile.v8ext.deactivate')}</button>`
+          : html`<button class="btn-primary" onClick=${() => handleSrvActivate(ext.name)}>${t('profile.v8ext.activate')}</button>`}
+        <button class="btn-danger-solid" onClick=${() => handleSrvDelete(ext.name)}>${t('profile.v8ext.delete')}</button>
       </div>
       <${ConfirmUI} />
     </div>`;
@@ -543,18 +703,18 @@ export default function ExtensionsTab({ session, showToast }) {
   const hasExtensions = allExts.length > 0;
   const installedNames = allExts.map(e => e.name);
   const unbundled = BUNDLED.filter(b => !installedNames.includes(b.id));
-  const hasV8 = v8Exts && v8Exts.length > 0;
+  const hasSrv = srvExts && srvExts.length > 0;
 
   return html`<div>
-    ${hasV8 ? html`
+    ${hasSrv ? html`
       <div class="ext-v8-section">
         <div class="section-title">${t('profile.v8ext.title')}</div>
         <div class="section-desc">${t('profile.v8ext.desc')}</div>
         <div class="ext-grid ext-grid-spaced">
-          ${v8Exts.map(ext => {
+          ${srvExts.map(ext => {
             const isActive = ext.status === 'active';
             return html`
-              <div class="ext-card" onClick=${() => loadV8Detail(ext.name)}>
+              <div class="ext-card" onClick=${() => loadSrvDetail(ext.name)}>
                 <div class="ext-card-header">
                   <span class="ext-card-name">${ext.name}</span>
                   <span class="ext-card-version">v${ext.version || '?'}</span>
@@ -567,14 +727,26 @@ export default function ExtensionsTab({ session, showToast }) {
                   <span class="ext-status"><span class="ext-status-dot ${ext.status}"></span> ${isActive ? t('profile.v8ext.statusActive') : t('profile.v8ext.statusInactive')}</span>
                   <span class="ext-card-actions">
                     ${isActive
-                      ? html`<button onClick=${(e) => { e.stopPropagation(); handleV8Deactivate(ext.name); }}>${t('profile.v8ext.deactivate')}</button>`
-                      : html`<button onClick=${(e) => { e.stopPropagation(); handleV8Activate(ext.name); }}>${t('profile.v8ext.activate')}</button>`}
+                      ? html`<button onClick=${(e) => { e.stopPropagation(); handleSrvDeactivate(ext.name); }}>${t('profile.v8ext.deactivate')}</button>`
+                      : html`<button onClick=${(e) => { e.stopPropagation(); handleSrvActivate(ext.name); }}>${t('profile.v8ext.activate')}</button>`}
                   </span>
                 </div>
               </div>`;
           })}
         </div>
-      </div>` : null}
+        <div class="ext-hero-actions" style="margin-top:8px">
+          <button class="btn-primary" onClick=${() => { const p = buildServerExtensionPrompt(getSession() || {}); copyToClipboard(p); showToast(t('profile.extensions.promptCopied')); }}>${'\u{1F916}'} Create Server Extension with AI</button>
+          <button class="btn-outline" onClick=${() => setShowSrvInstall(true)}>+ Add</button>
+        </div>
+      </div>` : html`
+      <div class="ext-v8-section" style="margin-bottom:16px">
+        <div class="section-title">${t('profile.v8ext.title')}</div>
+        <div class="section-desc">${t('profile.v8ext.desc')}</div>
+        <div class="ext-hero-actions" style="margin-top:8px">
+          <button class="btn-primary" onClick=${() => { const p = buildServerExtensionPrompt(getSession() || {}); copyToClipboard(p); showToast(t('profile.extensions.promptCopied')); }}>${'\u{1F916}'} Create Server Extension with AI</button>
+          <button class="btn-outline" onClick=${() => setShowSrvInstall(true)}>+ Add</button>
+        </div>
+      </div>`}
 
     <div class="ext-hero">
       <div class="section-title">${'\u{1F9E9}'} ${t('profile.extensions.title')}</div>
@@ -706,6 +878,31 @@ export default function ExtensionsTab({ session, showToast }) {
           </form>
         </div>
       </div>` : null}
+
+    ${showSrvInstall ? html`
+      <div class="modal-overlay" onClick=${(e) => { if (e.target === e.currentTarget) setShowSrvInstall(false); }}>
+        <div class="modal ext-modal-narrow">
+          <h3>Install Server Extension</h3>
+          <div class="ext-modal-section">
+            <label>YAML Manifest</label>
+            <textarea rows="12" class="ext-modal-textarea" placeholder="metadata:\n  name: my-extension\n  version: 1.0.0\n  description: ...\n\nactions:\n  - id: my-action\n    ..." value=${srvManifestText} onInput=${(e) => setSrvManifestText(e.target.value)}></textarea>
+          </div>
+          <div class="ext-modal-section">
+            <label>Action Scripts (JS files)</label>
+            ${srvScriptEntries.map((entry, i) => html`
+              <div class="ext-lib-entry">
+                <input type="text" placeholder="actions/my-action.js" value=${entry.filename} onInput=${(e) => { const arr = [...srvScriptEntries]; arr[i] = {...arr[i], filename: e.target.value}; setSrvScriptEntries(arr); }} class="ext-lib-entry-input" />
+                <textarea rows="8" placeholder="export default async function(ctx, input) {\n  // ...\n  return { result: 'ok' };\n}" value=${entry.code} onInput=${(e) => { const arr = [...srvScriptEntries]; arr[i] = {...arr[i], code: e.target.value}; setSrvScriptEntries(arr); }} class="ext-lib-entry-code"></textarea>
+              </div>`)}
+            <button type="button" class="btn-outline ext-add-lib-btn" onClick=${() => setSrvScriptEntries([...srvScriptEntries, {filename:'', code:''}])}>+ Add Script</button>
+          </div>
+          <div class="ext-modal-footer">
+            <button class="btn-outline" onClick=${() => setShowSrvInstall(false)}>Cancel</button>
+            <button class="btn-primary" onClick=${handleSrvInstall}>Install</button>
+          </div>
+        </div>
+      </div>` : null}
+
     <${ConfirmUI} />
   </div>`;
 }

@@ -676,8 +676,8 @@
       "launch": "Käynnistä"
     },
     "v8ext": {
-      "title": "V8-laajennukset",
-      "desc": "Hiekkalaatikoituja JavaScript-laajennuksia jotka ajavat palvelimella. Jokainen laajennus tarjoaa toimintoja joita voi kutsua API:n kautta tai sovelluksista.",
+      "title": "Palvelinlaajennukset",
+      "desc": "Hiekkalaatikoituja JavaScript-laajennuksia jotka ajavat palvelimella turvallisessa eristysympäristössä. Jokainen laajennus tarjoaa toimintoja joita voi kutsua API:n kautta tai sovelluksista.",
       "back": "Takaisin",
       "author": "Tekijä",
       "statusActive": "Aktiivinen",
