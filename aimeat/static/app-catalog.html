@@ -3261,17 +3261,12 @@
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
 
-    // Get auth token and delete
-    fetch(aimeatUrl + '/v1/auth/anonymous', { method: 'POST' })
-      .then(function(resp) { return resp.json(); })
-      .then(function(authJson) {
-        var token = authJson.data && authJson.data.token;
-        if (!token) throw new Error('Could not get auth token');
-        return fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(app.publishedFilename), {
-          method: 'DELETE',
-          headers: { 'Authorization': 'Bearer ' + token }
-        });
-      })
+    var token = getCortexOwnerToken();
+    if (!token) { alert('You must be logged in to delete apps. Sign in first.'); return; }
+    fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(app.publishedFilename), {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token }
+    })
       .then(function(resp) { return resp.json(); })
       .then(function(json) {
         if (json.ok) {
@@ -3297,16 +3292,12 @@
     if (!confirm('Delete "' + filename + '" from the server?')) return;
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
-    fetch(aimeatUrl + '/v1/auth/anonymous', { method: 'POST' })
-      .then(function(resp) { return resp.json(); })
-      .then(function(authJson) {
-        var token = authJson.data && authJson.data.token;
-        if (!token) throw new Error('Could not get auth token');
-        return fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(filename), {
-          method: 'DELETE',
-          headers: { 'Authorization': 'Bearer ' + token }
-        });
-      })
+    var token = getCortexOwnerToken();
+    if (!token) { alert('You must be logged in to delete apps. Sign in first.'); return; }
+    fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(filename), {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token }
+    })
       .then(function(resp) { return resp.json(); })
       .then(function(json) {
         if (json.ok) {
