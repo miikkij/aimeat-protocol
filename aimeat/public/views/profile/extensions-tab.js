@@ -80,6 +80,60 @@ The "components" array can contain any mix of the 7 component types:
 schema, prompt, action, board-template, ontology, seed-data, lib.
 
 ────────────────────────────────────────────
+COMPONENT EXAMPLES
+────────────────────────────────────────────
+
+Schema (locks memory keys to a JSON Schema):
+    - type: schema
+      name: my-item
+      key_pattern: "myext.items.*"
+      apply_to: prefix
+      schema:
+        type: object
+        properties:
+          id: { type: string, description: "Unique ID" }
+          name: { type: string, description: "Item name" }
+          value: { type: number, description: "Numeric value" }
+        required: [id, name]
+
+IMPORTANT: Schema properties MUST have full definitions with types
+and descriptions. Never use bare "type: object" without properties.
+
+Lib (JavaScript library loaded by apps):
+    - type: lib
+      name: my-lib.js
+      filename: my-lib.js
+      exports: [getData, setData, search]
+      api_surface: |
+        AIMEAT.myExt.getData({ id }) — Get item by ID. Returns { id: string, name: string, value: number } or null
+        AIMEAT.myExt.setData({ id, name, value }) — Save item. Returns saved item { id, name, value, createdAt }
+        AIMEAT.myExt.search({ query }) — Search items. Returns Item[]
+
+IMPORTANT: api_surface MUST describe every function with exact parameter
+names, types, and return value shapes. This is what AI reads to write apps.
+
+Prompt (AI instructions for using this cortex):
+    - type: prompt
+      name: my-assistant
+      content: |
+        Available API:
+        AIMEAT.myExt.getData({ id }) — Returns { id, name, value }
+        ...
+      variables:
+        - metadata.name
+        - node_url
+
+Seed data (initial entries written on activation):
+    - type: seed-data
+      entries:
+        - key: myext.index
+          value: []
+
+NOTE: seed-data keys must NOT collide with schema key_patterns.
+If schema locks "myext.items.*", do not put index under "myext.items.index".
+Use a separate namespace like "myext.index" instead.
+
+────────────────────────────────────────────
 NODE INFO (auto-filled)
 ────────────────────────────────────────────
 
