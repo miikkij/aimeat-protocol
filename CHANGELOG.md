@@ -2,6 +2,13 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.3.1] - 2026-05-02
+
+### Fixed
+- App catalog Published Apps section now shows Remove button for MCP-published apps
+- Renamed source badges: "local/server" -> "PORTAL/MCP" (clearer -- both are on server, badge shows where it was published from)
+- App publish via MCP uses owner GHII for correct catalog visibility
+
 ## [1.3.0] - 2026-05-02
 
 ### Added
