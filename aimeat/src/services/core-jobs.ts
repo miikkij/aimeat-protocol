@@ -27,6 +27,10 @@ export function registerCoreHandlers(
     const { runCapabilityAggregation } = await import('./capability-aggregator.js');
     await runCapabilityAggregation(config, storage);
   });
+  // Run once at startup (non-blocking)
+  import('./capability-aggregator.js')
+    .then(m => m.runCapabilityAggregation(config, storage))
+    .catch(err => logger.error('Startup capability aggregation failed', { error: String(err) }));
   if (config.eudiwEnabled || config.ftnEnabled) {
     scheduler.registerCoreHandler('nonce-cleanup', () => runNonceCleanupJob(storage));
   }
