@@ -67,8 +67,11 @@ export function registerAppsTools(
                 };
             }
 
+            // Use owner GHII as app identity (same as REST route POST /v1/apps)
+            const ownerGaii = `${parsed.owner}@${config.nodeId}`;
+
             // Get latest version number for auto-increment
-            const existingVersion = await storage.getLatestVersionNumber(agentGaii, filename);
+            const existingVersion = await storage.getLatestVersionNumber(ownerGaii, filename);
             const newVersion = existingVersion + 1;
             const isUpdate = existingVersion > 0;
 
@@ -88,7 +91,7 @@ export function registerAppsTools(
 
             try {
                 await storage.createApp({
-                    ownerGaii: agentGaii,
+                    ownerGaii: ownerGaii,
                     ownerName: parsed.owner,
                     filename,
                     versionNumber: newVersion,
@@ -148,7 +151,7 @@ export function registerAppsTools(
                 sort: 'newest' as const,
                 limit: 50,
                 offset: 0,
-                ...(own ? { ownerGaii: agentGaii } : {}),
+                ...(own ? { ownerGaii: `${parseGAII(agentGaii)?.owner ?? agentGaii}@${config.nodeId}` } : {}),
             };
 
             const { apps, total } = await storage.listApps(opts);
@@ -228,9 +231,10 @@ export function registerAppsTools(
         },
         async ({ filename, version }) => {
             const agentGaii = getAgentGaii();
+            const ownerGaii = `${parseGAII(agentGaii)?.owner ?? agentGaii}@${config.nodeId}`;
 
-            // Verify the app exists and belongs to this agent
-            const app = await storage.getApp(agentGaii, filename, version);
+            // Verify the app exists and belongs to this owner
+            const app = await storage.getApp(ownerGaii, filename, version);
             if (!app) {
                 return {
                     content: [{ type: 'text' as const, text: `App "${filename}" not found in your uploads${version ? ` (version ${version})` : ''}` }],
@@ -239,7 +243,7 @@ export function registerAppsTools(
             }
 
             try {
-                await storage.deleteApp(agentGaii, filename, version);
+                await storage.deleteApp(ownerGaii, filename, version);
 
                 logger.info(`App deleted via MCP: ${filename}${version ? ` v${version}` : ' (all versions)'}`, { by: agentGaii });
 
