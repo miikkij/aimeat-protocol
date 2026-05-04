@@ -96,6 +96,38 @@
       box-shadow: 0 0 0 3px rgba(232, 86, 74, .12);
     }
 
+    .mode-toggle {
+      display: flex;
+      gap: 2px;
+      flex-shrink: 0;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 2px;
+    }
+
+    .mode-btn {
+      padding: 5px 10px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: .78rem;
+      cursor: pointer;
+      transition: all var(--transition);
+      white-space: nowrap;
+    }
+
+    .mode-btn.active {
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .mode-btn:hover:not(.active) {
+      background: rgba(0,0,0,.05);
+    }
+
     .header-actions {
       display: flex;
       gap: 8px;
@@ -1002,7 +1034,8 @@
 
     /* ── Published Apps Section ──────────────────────── */
 
-    #published-section {
+    #published-section,
+    #community-section {
       margin: 0 24px 24px;
       position: relative;
       z-index: 1;
@@ -1201,6 +1234,10 @@
 
   <header>
     <h1>My Apps</h1>
+    <div class="mode-toggle">
+      <button id="mode-global" class="mode-btn active" onclick="window._launcher.switchDbMode('global')" title="Shared across all accounts on this browser">&#x1F310; Global</button>
+      <button id="mode-personal" class="mode-btn" onclick="window._launcher.switchDbMode('personal')" title="Private to your account">&#x1F464; Personal</button>
+    </div>
     <input type="text" id="search-input" placeholder="Search apps..." autocomplete="off" spellcheck="false"/>
     <div class="header-actions">
       <button class="icon-btn" id="add-btn" title="Add app">+</button>
@@ -1253,7 +1290,7 @@
     </div>
   </div>
 
-  <!-- Published Apps Section -->
+  <!-- Published Apps Section (own) -->
   <div id="published-section" style="display:none">
     <div class="published-header" onclick="window._launcher.togglePublished()">
       <h2>&#x1F680; Published Apps <span id="published-count"></span></h2>
@@ -1262,12 +1299,24 @@
     <div id="published-grid" class="published-grid"></div>
   </div>
 
+  <!-- Community Apps Section (other users) -->
+  <div id="community-section" style="display:none">
+    <div class="published-header" onclick="window._launcher.toggleCommunity()">
+      <h2>&#x1F30D; Community Apps <span id="community-count"></span></h2>
+      <span class="arrow open" id="community-arrow">&#x25BC;</span>
+    </div>
+    <div id="community-grid" class="published-grid"></div>
+  </div>
+
   <!-- Recently Opened Strip -->
   <div id="recent-section" style="display:none;margin:0 24px 1rem">
     <h3 style="margin:0 0 .5rem;font-size:.9rem;color:#6B7280">&#x1F552; Recently Opened</h3>
     <div id="recent-strip" style="display:flex;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
   </div>
 
+  <div id="local-apps-header" style="display:none;margin:0 24px 8px">
+    <h2 style="font-size:1rem;font-weight:700;color:#6366f1;display:flex;align-items:center;gap:8px">&#x1F4BE; Local Apps <span id="local-apps-count" style="opacity:.6;font-weight:400"></span></h2>
+  </div>
   <main id="app-grid"></main>
 
   <footer>
@@ -1509,16 +1558,56 @@
 
   // ── IndexedDB wrapper ──────────────────────────────
 
-  const DB_NAME = 'AppLauncherDB';
+  const DB_NAME_GLOBAL = 'AppLauncherDB';
   const DB_VERSION = 2;
   const STORE_NAME = 'apps';
 
   let dbInstance = null;
+  let currentDbMode = localStorage.getItem('appCatalogMode') || 'global';
+
+  function getDbName() {
+    if (currentDbMode === 'personal') {
+      var owner = null;
+      try {
+        if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
+          owner = window.AIMEAT.auth.getSession().owner || null;
+        }
+        if (!owner) {
+          var stored = localStorage.getItem('aimeat_session');
+          if (stored) owner = JSON.parse(stored).owner || null;
+        }
+      } catch(e) {}
+      if (owner) return DB_NAME_GLOBAL + '_' + owner;
+    }
+    return DB_NAME_GLOBAL;
+  }
+
+  function switchDbMode(mode) {
+    if (mode === currentDbMode) return;
+    currentDbMode = mode;
+    localStorage.setItem('appCatalogMode', mode);
+    if (dbInstance) {
+      dbInstance.close();
+      dbInstance = null;
+    }
+    updateModeToggle();
+    refreshAll();
+  }
+
+  function updateModeToggle() {
+    var globalBtn = document.getElementById('mode-global');
+    var personalBtn = document.getElementById('mode-personal');
+    if (!globalBtn || !personalBtn) return;
+    globalBtn.classList.toggle('active', currentDbMode === 'global');
+    personalBtn.classList.toggle('active', currentDbMode === 'personal');
+  }
 
   function openDB() {
-    if (dbInstance) return Promise.resolve(dbInstance);
+    var name = getDbName();
+    if (dbInstance && dbInstance.name === name) return Promise.resolve(dbInstance);
+    if (dbInstance) { dbInstance.close(); dbInstance = null; }
     return new Promise(function (resolve, reject) {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      const request = indexedDB.open(name, DB_VERSION);
 
       request.onupgradeneeded = function (event) {
         const db = event.target.result;
@@ -2291,6 +2380,12 @@
       }
 
       var grid = document.getElementById('app-grid');
+      var localHeader = document.getElementById('local-apps-header');
+      var localCount = document.getElementById('local-apps-count');
+      if (localHeader) {
+        localHeader.style.display = allApps.length > 0 ? '' : 'none';
+        if (localCount) localCount.textContent = '(' + allApps.length + ')';
+      }
 
       if (filtered.length === 0) {
         if (!activeTag && !searchQuery && allApps.length === 0) {
@@ -3111,14 +3206,25 @@
     arrow.classList.toggle('open', publishedVisible);
   }
 
+  var communityVisible = true;
+  function toggleCommunity() {
+    communityVisible = !communityVisible;
+    var grid = document.getElementById('community-grid');
+    var arrow = document.getElementById('community-arrow');
+    grid.style.display = communityVisible ? '' : 'none';
+    arrow.classList.toggle('open', communityVisible);
+  }
+
   function loadPublishedApps() {
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : '';
     var section = document.getElementById('published-section');
     var grid = document.getElementById('published-grid');
     var countEl = document.getElementById('published-count');
+    var communitySection = document.getElementById('community-section');
+    var communityGrid = document.getElementById('community-grid');
+    var communityCountEl = document.getElementById('community-count');
 
-    // Get current owner name from session (if logged in)
     var currentOwner = null;
     try {
       if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
@@ -3132,11 +3238,9 @@
       }
     } catch(e) {}
 
-    // Always load local published apps
     getAllApps().then(function(apps) {
       var localPublished = apps.filter(function(a) { return a.published; });
 
-      // Build a lookup of local published apps by filename
       var localByFilename = {};
       for (var i = 0; i < localPublished.length; i++) {
         var lp = localPublished[i];
@@ -3145,13 +3249,12 @@
         }
       }
 
-      // If no aimeatUrl, fall back to local-only display
       if (!aimeatUrl) {
         renderPublishedApps(localPublished, [], localByFilename, aimeatUrl, section, grid, countEl);
+        if (communitySection) communitySection.style.display = 'none';
         return;
       }
 
-      // Fetch server apps
       fetch(aimeatUrl + '/v1/apps')
         .then(function(resp) {
           if (!resp.ok) throw new Error('Server returned ' + resp.status);
@@ -3160,18 +3263,59 @@
         .then(function(json) {
           var serverApps = json.data && json.data.apps ? json.data.apps : [];
 
-          // Filter to current owner's apps if we know who they are
-          if (currentOwner) {
-            serverApps = serverApps.filter(function(a) { return a.owner === currentOwner; });
-          }
+          var ownApps = currentOwner
+            ? serverApps.filter(function(a) { return a.owner === currentOwner; })
+            : [];
+          var communityApps = currentOwner
+            ? serverApps.filter(function(a) { return a.owner !== currentOwner; })
+            : serverApps;
 
-          renderPublishedApps(localPublished, serverApps, localByFilename, aimeatUrl, section, grid, countEl);
+          renderPublishedApps(localPublished, ownApps, localByFilename, aimeatUrl, section, grid, countEl);
+          renderCommunityApps(communityApps, aimeatUrl, communitySection, communityGrid, communityCountEl, currentOwner);
         })
         .catch(function() {
-          // Server fetch failed - fall back to local only
           renderPublishedApps(localPublished, [], localByFilename, aimeatUrl, section, grid, countEl);
+          if (communitySection) communitySection.style.display = 'none';
         });
     });
+  }
+
+  function renderCommunityApps(serverApps, aimeatUrl, section, grid, countEl, currentOwner) {
+    if (!section || !grid || !countEl) return;
+    if (serverApps.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = '';
+    countEl.textContent = '(' + serverApps.length + ')';
+
+    var html = '';
+    for (var i = 0; i < serverApps.length; i++) {
+      var sa = serverApps[i];
+      var name = (sa.manifest && sa.manifest.name) ? sa.manifest.name : (sa.filename || '');
+      var version = sa.version_number ? 'v' + sa.version_number : '';
+      var date = sa.created_at ? new Date(sa.created_at).toLocaleDateString() : '';
+      var author = (sa.manifest && sa.manifest.authorDisplay) ? sa.manifest.authorDisplay : (sa.owner || '');
+      var viewUrl = aimeatUrl + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(sa.filename || '');
+      html +=
+        '<div class="published-card">' +
+          '<div class="published-card-name">' + escapeHtml(name) +
+            (version ? ' <span style="opacity:.5;font-size:.85em">' + escapeHtml(version) + '</span>' : '') +
+          '</div>' +
+          '<div class="published-card-meta">' +
+            '<span>' + escapeHtml(sa.filename || '') + '</span>' +
+            '<span>' + date + '</span>' +
+          '</div>' +
+          '<div class="published-card-meta" style="margin-top:2px">' +
+            '<span style="color:var(--accent)">&#x1F464; ' + escapeHtml(author) + '</span>' +
+          '</div>' +
+          '<div class="published-card-actions">' +
+            '<button onclick="window.open(\'' + escapeHtml(viewUrl) + '?mode=inline\', \'_blank\')">&#x1F441; View</button>' +
+          '</div>' +
+        '</div>';
+    }
+    grid.innerHTML = html;
   }
 
   function renderPublishedApps(localPublished, serverApps, localByFilename, aimeatUrl, section, grid, countEl) {
@@ -4040,6 +4184,8 @@
     submitPublish: submitPublish,
     loadPublishedApps: loadPublishedApps,
     togglePublished: togglePublished,
+    toggleCommunity: toggleCommunity,
+    switchDbMode: switchDbMode,
     unpublishApp: unpublishApp,
     deleteServerApp: deleteServerApp,
     renderRecentlyOpened: renderRecentlyOpened,
@@ -4065,11 +4211,19 @@
   window.showCortexPopup = showCortexPopup;
   window.cortexCopy = cortexCopy;
 
+  function refreshAll() {
+    allApps = [];
+    renderApps();
+    loadPublishedApps();
+    renderRecentlyOpened();
+  }
+
   // ── Bootstrap ─────────────────────────────────────
 
   document.addEventListener('DOMContentLoaded', function () {
     // ── Apply theme on load ─────────────────────────
     applyTheme(loadConfig().theme);
+    updateModeToggle();
 
     renderApps();
     loadPublishedApps();
