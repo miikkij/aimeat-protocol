@@ -260,10 +260,12 @@ Each node runs independently with its own identity and portal. Operators customi
 
 ### Quick start with npx
 
-Requires Node.js 24+. This runs the server directly without cloning:
+Requires Node.js 24+. Runs without cloning the repo:
 
 ```bash
-npx aimeat start
+npx aimeat init     # interactive setup, generates .env
+npx aimeat start    # start the server
+npx aimeat seed     # seed example packages (in another terminal, server must be running)
 ```
 
 ### From source
