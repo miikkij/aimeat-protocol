@@ -208,8 +208,24 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
         ]));
         break;
       }
+      case 'package-builder': {
+        const record = await storage.getSystemPrompt('package-builder');
+        if (!record || !record.active) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Prompt not available')); return; }
+        const promptContent = resolvePromptContent(record, req.headers['accept-language'] as string);
+        const ownerName = req.auth?.owner ?? 'user';
+        const system_prompt = substituteVariables(promptContent, {
+          node_url: config.baseUrl,
+          node_id: config.nodeId,
+          owner_name: ownerName,
+        });
+        res.json(success(config.nodeId, {
+          name: record.name,
+          content: system_prompt,
+        }));
+        break;
+      }
       default:
-        res.status(400).json(error(config.nodeId, 'INVALID_TIER', `Unknown tier: ${tier}. Valid: 0, 0.5, 1, 2, anonymous, openclaw`));
+        res.status(400).json(error(config.nodeId, 'INVALID_TIER', `Unknown tier: ${tier}. Valid: 0, 0.5, 1, 2, anonymous, openclaw, package-builder`));
     }
   });
 

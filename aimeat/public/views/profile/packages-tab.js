@@ -23,7 +23,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
+import { escHtml, copyToClipboard } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as pkgService from '/js/services/packages.js';
@@ -204,6 +204,21 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
 
   const isOperator = session?.roles?.includes('operator');
 
+  const copyPackagePrompt = async () => {
+    try {
+      const res = await fetch('/v1/prompts/package-builder');
+      const json = await res.json();
+      if (json.ok && json.data?.content) {
+        copyToClipboard(json.data.content);
+        showToast(t('packages.promptCopied') || 'Prompt copied! Paste it into AI Chat.');
+      } else {
+        showToast('Failed to load prompt', true);
+      }
+    } catch (e) {
+      showToast('Failed to load prompt', true);
+    }
+  };
+
   if (loading) return html`<${Spinner} />`;
 
   const filtered = packages.filter(p => {
@@ -216,6 +231,12 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
     <div class="pkg-tab">
       <div class="section-title">${t('packages.title')}</div>
       <div class="section-desc">${t('packages.desc')}</div>
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.25rem;align-items:center">
+        <button class="btn-primary" onClick=${copyPackagePrompt}>
+          ${'\u{1F916}'} ${t('packages.createWithAi') || 'Create Package with AI'}
+        </button>
+        <span style="font-size:.8rem;color:var(--text-dim,#6B7280);max-width:420px">${t('packages.createWithAiDesc') || 'Copy this prompt and paste it into any AI. Describe what you want to build and the AI will create an installable package.'}</span>
+      </div>
       <div class="pkg-nav">
         <button class=${view === 'instances' ? 'active' : ''} onClick=${() => setView('instances')}>
           \u{1F4E6} ${t('packages.myInstances') || 'My Instances'} (${instances.length})
