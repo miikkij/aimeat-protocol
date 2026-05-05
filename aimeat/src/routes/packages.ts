@@ -195,7 +195,7 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
         category: parsed.category ?? 'other',
         tags: parsed.tags ?? [],
         visibility: 'private',
-        status: 'draft',
+        status: 'published',
         components,
         manifest: '',
         createdAt: now,

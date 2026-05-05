@@ -1939,6 +1939,24 @@ permissions:
 1. Create and zip the files
 2. Upload via the package import endpoint
 
+## Critical Quality Rules
+
+**BEFORE generating any code, verify these:**
+
+1. **Every field the app reads MUST exist in the seed data.** Trace through your app code -- every memGet key must have a matching entry in the seed data JSON. Every property accessed on the returned value must exist. If the app reads \`player.hp\`, the seed data must have \`{ "hp": 100 }\`. DO NOT leave undefined values.
+
+2. **If the app needs external data (weather, APIs, feeds), you MUST create a server extension.** Apps cannot call external APIs directly from the browser (CORS). Use the extension component type with a proper manifest and action scripts. The app calls the extension via \`/v1/ext/{name}/{action}\`.
+
+3. **If the app has reusable logic or needs scheduled processing, create a cortex.** Client-side helper libraries go in a cortex component. Include exports and api_surface documentation.
+
+4. **Initialize ALL state in seed data.** For a game: all player stats, empty history arrays, default config. For a dashboard: all settings with sensible defaults. Never rely on the app creating state on first run -- the seed data IS the initial state.
+
+5. **Test mentally before outputting.** Walk through the app code line by line. When it calls memGet('myapp:player'), what comes back? Does the seed data have that key? Does the returned object have all the properties the app accesses? Fix any gaps.
+
+6. **Make the UI polished and complete.** Not a prototype -- a finished product. Working navigation, proper error states, loading indicators, responsive layout, professional styling.
+
+7. **Use translations if the user wants multiple languages.** Add a translation component with all UI strings in each language. The app reads translations from memory and uses them for all displayed text.
+
 ## Reference: Digital Signage Package
 
 A complete working example with 6 components:

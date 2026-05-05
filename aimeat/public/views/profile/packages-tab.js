@@ -46,7 +46,7 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
     try {
       const [instRes, pkgRes, tplRes] = await Promise.all([
         pkgService.listInstances({ status: 'installed' }),
-        pkgService.listPackages({ status: 'published', author: session?.owner }),
+        pkgService.listPackages({ author: session?.owner }),
         pkgService.listTemplates({ sort: 'newest' }),
       ]);
       if (instRes.ok) setInstances(instRes.data?.instances ?? []);
@@ -283,10 +283,10 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
         <div class="pkg-section">
           <div class="pkg-section-header">
             <h3>${t('packages.browse') || 'Available Packages'}</h3>
-            <label class="btn-outline pkg-upload-btn">
+            <input type="file" id="pkg-zip-file" accept=".zip" style="display:none" onChange=${handleUploadZip} />
+            <button class="btn-outline" onClick=${() => document.getElementById('pkg-zip-file')?.click()}>
               ${t('packages.uploadZip') || 'Upload ZIP'}
-              <input type="file" accept=".zip" class="pkg-hidden-input" onChange=${handleUploadZip} />
-            </label>
+            </button>
           </div>
           <div class="pkg-filters">
             <input type="text" placeholder=${t('packages.search') || 'Search...'}
