@@ -17,6 +17,8 @@
  *   v1.1.0 — 2026-03-16 — fix memory component key management: use manifest key
  *     instead of prefix-based lookup for delete/fetch; store keys as-is without
  *     registeredAs prefix
+ *   v1.2.0 — 2026-05-05 — preserve lib component fields (filename, exports,
+ *     api_surface) in cortex registration; pass package metadata to app manifests
  */
 
 import { createHash } from 'node:crypto';
@@ -41,6 +43,9 @@ export interface ComponentRegistrationInput {
   owner: string;
   ownerGaii: string;
   packageName: string;
+  packageCategory?: string;
+  packageTags?: string[];
+  packageDescription?: string;
 }
 
 // ── Hash utility ─────────────────────────────────────────────────────
@@ -115,7 +120,7 @@ export async function registerComponent(
           version: (metadata.version as string) ?? '1.0.0',
           description: (metadata.description as string) ?? label,
           author: (metadata.author as string) ?? owner,
-          status: 'inactive',
+          status: 'active',
           requiredApis: (meta.required_apis as string[]) ?? [],
           actions,
           config: (meta.config ?? {}) as Record<string, unknown>,
@@ -143,6 +148,20 @@ export async function registerComponent(
         const metadata = (meta.metadata ?? meta) as Record<string, unknown>;
         const componentsRaw = (meta.components ?? []) as Array<Record<string, unknown>>;
 
+        const cortexComponents = componentsRaw.map(c => {
+          const comp: Record<string, unknown> = {
+            type: (c.type as string) ?? 'lib',
+            name: (c.name as string) ?? '',
+            content: typeof c.content === 'string' ? c.content : JSON.stringify(c.content ?? ''),
+          };
+          if (c.filename) comp.filename = c.filename as string;
+          if (c.exports) comp.exports = c.exports;
+          if (c.api_surface) comp.api_surface = c.api_surface as string;
+          if (c.key_pattern) comp.key_pattern = c.key_pattern as string;
+          if (c.apply_to) comp.apply_to = c.apply_to as string;
+          return comp;
+        });
+
         await storage.createCortexExtension({
           name: registeredAs,
           namespace: owner,
@@ -153,16 +172,13 @@ export async function registerComponent(
           author: (metadata.author as string) ?? owner,
           tags: (metadata.tags as string[]) ?? [],
           labels: {},
-          status: 'inactive',
+          status: 'active',
           visibility: 'private',
+          activatedAt: now,
           installedAt: now,
           installedBy: owner,
           manifest: manifestStr,
-          components: componentsRaw.map(c => ({
-            type: (c.type as string) ?? 'lib',
-            name: (c.name as string) ?? '',
-            content: typeof c.content === 'string' ? c.content : JSON.stringify(c.content ?? ''),
-          })) as any,
+          components: cortexComponents as any,
           activationArtifacts: {
             schemaKeys: [],
             promptKeys: [],
@@ -178,6 +194,37 @@ export async function registerComponent(
         for (const [libName, libContent] of Object.entries(libs)) {
           await storage.setCortexLibFile(registeredAs, libName, libContent);
         }
+
+        // Auto-activate: process components that need native registration
+        for (const comp of cortexComponents) {
+          const compType = comp.type as string;
+          if (compType === 'schema' && comp.key_pattern) {
+            try {
+              await storage.setSchema({
+                keyPattern: comp.key_pattern as string,
+                applyTo: ((comp.apply_to as string) ?? 'prefix') as 'exact' | 'prefix',
+                schemaJson: (comp.schema ?? comp.content ?? {}) as Record<string, unknown>,
+                schemaMode: 'strict',
+                lockedBy: ownerGaii,
+                setAt: now,
+                updatedAt: now,
+              });
+            } catch { /* schema may already exist */ }
+          } else if (compType === 'prompt' && comp.name) {
+            const promptKey = `__cortex__/${registeredAs}/prompts/${comp.name}`;
+            await storage.setMemory({
+              key: promptKey,
+              ownerGaii,
+              value: { name: comp.name, content: comp.content, variables: (comp as any).variables },
+              visibility: 'public',
+              tags: ['cortex', 'prompt', registeredAs],
+              ttlHours: null,
+              version: 1,
+              createdAt: now,
+              updatedAt: now,
+            });
+          }
+        }
         break;
       }
 
@@ -189,10 +236,12 @@ export async function registerComponent(
           versionNumber: 1,
           manifest: {
             name: label,
-            description: `Installed from package: ${packageName}`,
+            description: input.packageDescription
+              ? `${label} -- ${input.packageDescription}`
+              : `Installed from package: ${packageName}`,
             version: '1.0.0',
-            category: 'utility',
-            tags: ['package-installed'],
+            category: input.packageCategory || 'utility',
+            tags: [...(input.packageTags || []), 'package-installed'],
             authorDisplay: owner,
             usesCortex: [],
           },
@@ -312,8 +361,24 @@ export async function deleteComponent(
         return await storage.deleteCsm(registeredAs);
       case 'extension':
         return await storage.deleteExtension(registeredAs);
-      case 'cortex':
+      case 'cortex': {
+        const ctx = await storage.getCortexExtension(registeredAs);
+        if (ctx) {
+          for (const libFile of ctx.activationArtifacts.libFiles) {
+            await storage.deleteCortexLibFile(registeredAs, libFile);
+          }
+          for (const key of ctx.activationArtifacts.seedDataKeys) {
+            await storage.deleteMemory(ctx.installedBy, key);
+          }
+          for (const key of ctx.activationArtifacts.promptKeys) {
+            await storage.deleteMemory(ctx.installedBy, key);
+          }
+          for (const key of ctx.activationArtifacts.ontologyKeys) {
+            await storage.deleteMemory(ctx.installedBy, key);
+          }
+        }
         return await storage.deleteCortexExtension(registeredAs);
+      }
       case 'app':
         return await storage.deleteApp(ownerGaii, registeredAs);
       case 'msm':

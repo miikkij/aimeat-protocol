@@ -1090,7 +1090,7 @@ model PackageInstance {
   ownerGhii           String
   label               String   @default("")
   installedComponents Json     // InstalledComponent[]
-  status              String   @default("active")
+  status              String   @default("installed")
   installedAt         DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

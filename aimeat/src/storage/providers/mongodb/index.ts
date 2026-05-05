@@ -4898,7 +4898,7 @@ export class MongoStorage implements Storage {
             ownerGhii: row.ownerGhii,
             label: row.label ?? '',
             installedComponents: (row.installedComponents ?? []) as InstalledComponent[],
-            status: row.status ?? 'active',
+            status: row.status ?? 'installed',
             installedAt: row.installedAt instanceof Date ? row.installedAt.toISOString() : row.installedAt,
             updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
         };

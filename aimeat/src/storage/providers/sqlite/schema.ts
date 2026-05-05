@@ -1072,7 +1072,7 @@ export function initializeSchema(db: Database.Database): void {
       ownerGhii           TEXT NOT NULL,
       label               TEXT DEFAULT '',
       installedComponents TEXT NOT NULL,
-      status              TEXT DEFAULT 'active',
+      status              TEXT DEFAULT 'installed',
       installedAt         TEXT NOT NULL,
       updatedAt           TEXT NOT NULL
     );
@@ -1168,4 +1168,7 @@ export function initializeSchema(db: Database.Database): void {
 
   // Single-balance migration — per-agent daily spend limit
   safeAddColumn('agents', 'dailySpendLimit', 'REAL DEFAULT NULL');
+
+  // Package instance status rename: 'active' -> 'installed'
+  db.exec("UPDATE package_instances SET status = 'installed' WHERE status = 'active'");
 }

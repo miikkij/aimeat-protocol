@@ -68,7 +68,7 @@ Instances track installed copies of packages:
 - Links to: `packageGroupId`, `packageVersion`, `packageRecordId`
 - `owner`, `ownerGhii`, `label`
 - `installedComponents[]` — maps componentId → registeredAs name, tracks originalHash + customized flag
-- `status`: active/paused/removed
+- `status`: installed/paused/removed
 
 **Key features:**
 - Dependency-sorted installation via `component-registrar.ts`

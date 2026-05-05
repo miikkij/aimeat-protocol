@@ -14,6 +14,8 @@
  *   v1.2.0 — 2026-03-17 — rename Ad Slots to Rotated Views; add edit capability;
  *     support image/HTML/URL content types; layout modes (fullscreen/header/full);
  *     light+dark themes with accent colour; AI prompt helper for HTML views
+ *   v1.3.0 — 2026-05-05 — rewrite cortex manifest with proper components array,
+ *     .js lib filenames, tags, exports, and api_surface metadata
  */
 
 import { createHash, randomUUID } from 'node:crypto';
@@ -189,7 +191,8 @@ function memoryInit(): string {
       {
         key: 'signage:config',
         value: {
-          rotationIntervalMs: 8000, emergencyOverride: true, theme: 'dark',
+          rotationEnabled: true, rotationIntervalSec: 8,
+          emergencyOverride: true, theme: 'dark',
           layout: 'full', accentColor: '#1a1a2e',
           locale: 'en', buildingName: 'Sunrise Residences', floors: 12, timezone: 'Europe/Helsinki',
         },
@@ -219,10 +222,36 @@ function memoryInit(): string {
 }
 
 const CORTEX_SIGNAGE = JSON.stringify({
-  manifest: `name: signage-cortex\nversion: 1.0.0\ndescription: AI agent for managing digital signage content\ncapabilities: [memory_read, memory_write, consent_check]\ntriggers:\n  - { event: schedule, cron: "0 8 * * *", action: rotate_daily_content }\n  - { event: memory_change, key: "signage:announcements", action: notify_kiosk_refresh }`,
+  manifest: [
+    'name: signage-cortex',
+    'version: 1.0.0',
+    'description: Content management cortex for digital signage -- schedules content rotation, prunes expired announcements, and provides helper libraries for kiosk apps.',
+    'tags: [signage, kiosk, content-management, scheduling]',
+    'capabilities: [memory_read, memory_write, consent_check]',
+    'triggers:',
+    '  - { event: schedule, cron: "0 8 * * *", action: rotate_daily_content }',
+    '  - { event: memory_change, key: "signage:announcements", action: notify_kiosk_refresh }',
+    'components:',
+    '  - type: lib',
+    '    name: contentRotation',
+    '    filename: contentRotation.js',
+    '    exports: [selectActiveAnnouncements]',
+    '    api_surface: |',
+    '      selectActiveAnnouncements(announcements, now)',
+    '        Filters expired announcements and sorts by priority (emergency > urgent > normal).',
+    '        Returns: filtered, sorted array.',
+    '  - type: lib',
+    '    name: scheduling',
+    '    filename: scheduling.js',
+    '    exports: [rotateDailyContent]',
+    '    api_surface: |',
+    '      rotateDailyContent(api)',
+    '        Reads signage:announcements, removes expired entries, writes back.',
+    '        Called by the daily cron trigger.',
+  ].join('\n'),
   libs: {
-    contentRotation: 'function selectActiveAnnouncements(a,now){return a.filter(x=>!x.expiresAt||new Date(x.expiresAt)>now).sort((a,b)=>({emergency:0,urgent:1,normal:2}[a.priority]??2)-({emergency:0,urgent:1,normal:2}[b.priority]??2));}',
-    scheduling: 'async function rotateDailyContent(api){const a=await api.get("signage:announcements");const now=new Date();const active=a.filter(x=>!x.expiresAt||new Date(x.expiresAt)>now);if(active.length!==a.length)await api.set("signage:announcements",active);}',
+    'contentRotation.js': 'function selectActiveAnnouncements(a,now){return a.filter(x=>!x.expiresAt||new Date(x.expiresAt)>now).sort((a,b)=>({emergency:0,urgent:1,normal:2}[a.priority]??2)-({emergency:0,urgent:1,normal:2}[b.priority]??2));}',
+    'scheduling.js': 'async function rotateDailyContent(api){const a=await api.get("signage:announcements");const now=new Date();const active=a.filter(x=>!x.expiresAt||new Date(x.expiresAt)>now);if(active.length!==a.length)await api.set("signage:announcements",active);}',
   },
 }, null, 2);
 
@@ -326,7 +355,11 @@ button.outline{background:#fff;color:#0066cc;border:1px solid #0066cc;padding:.3
 <div id="tab-config" class="panel" style="display:none">
 <h2>Display Settings</h2>
 <div class="form-group"><label>Building Name</label><input id="cfg-building" placeholder="Building name"></div>
-<div class="form-group"><label>Rotation Interval (ms)</label><input id="cfg-interval" type="number" value="8000" min="2000" max="60000"></div>
+<div class="form-group">
+<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer"><input id="cfg-rotation" type="checkbox" checked> Rotate views automatically</label>
+<small style="color:#666">When off, only the first active view is shown</small>
+</div>
+<div class="form-group" id="cfg-interval-group"><label>Rotation Speed (seconds)</label><input id="cfg-interval" type="number" value="8" min="2" max="120"><small style="color:#666">How many seconds each view is shown before switching to the next</small></div>
 <div class="form-group">
 <label>Layout</label>
 <div class="layout-options">
@@ -430,32 +463,32 @@ document.getElementById("ai-prompt-box").textContent=AI_CHAT_PROMPT;
 el.innerHTML='<div class="type-fields"><div class="form-group"><label>Webpage URL</label><input id="view-content" placeholder="https://example.com"></div></div>';
 }}
 
-var AI_CHAT_PROMPT='You are a Digital Signage View Designer. Your job is to interview the user step by step and then produce a single self-contained HTML file (HTML + CSS + JS all in one file) that will be displayed on a digital signage kiosk screen.\n\n'
-+'## Interview Process\n\n'
-+'Ask these questions ONE AT A TIME. Wait for the user to answer before asking the next one. Be friendly and enthusiastic.\n\n'
-+'1. **Purpose**: "What do you want to show on the signage screen? For example: weather, clock, company info, event schedule, welcome message, menu, news feed, social media, custom animation, or something else?"\n\n'
-+'2. **Style**: "What visual style do you prefer? Options:\n   - Clean & minimal (lots of whitespace, simple fonts)\n   - Bold & colorful (gradients, vibrant colors, shadows)\n   - Corporate & professional (muted colors, structured layout)\n   - Playful & animated (movement, transitions, fun elements)\n   - Futuristic / tech (dark background, glowing effects, particle animations)\n   - Or describe your own style!"\n\n'
-+'3. **Colors**: "Any specific brand colors? Or should I pick colors that match your chosen style? You can say things like: dark background with blue accents, or use our brand colors #FF5733 and #333333"\n\n'
-+'4. **Content details**: Based on what they chose in step 1, ask relevant follow-up questions. For example:\n   - Weather: "Which city? Celsius or Fahrenheit?"\n   - Clock: "12h or 24h format? Show date too?"\n   - Welcome message: "What should the text say? Any logo URL?"\n   - Menu/schedule: "List the items you want to display"\n   - Custom: "Describe in detail what should appear on screen"\n\n'
-+'5. **Animations**: "Do you want any animations or movement? Options:\n   - None (static page)\n   - Subtle (gentle fades, slow floating elements)\n   - Dynamic (sliding text, rotating elements, particle effects)\n   - Eye-catching (bold transitions, attention-grabbing movement)"\n\n'
-+'6. **Size & layout**: "This will be displayed on a screen section. Should the content:\n   - Fill the entire area (full bleed)\n   - Be centered with padding\n   - Use a specific layout (sidebar, header+content, grid)?"\n\n'
-+'## Output Rules\n\n'
-+'After the interview, produce the HTML file following these rules:\n\n'
-+'- Single self-contained HTML file with inline CSS and JS (no external dependencies unless from CDN)\n'
-+'- Use <!DOCTYPE html> and proper structure\n'
-+'- The page should look great at any screen size (use vh/vw units, flexbox/grid)\n'
-+'- Background should fill the viewport (no white edges)\n'
-+'- Use system-ui font stack unless a specific font is requested\n'
-+'- If using animations, use CSS animations or requestAnimationFrame for smooth 60fps\n'
-+'- If showing live data (time, weather), update it automatically\n'
-+'- For weather, use a free API like wttr.in or open-meteo.com\n'
-+'- Make text large and readable from a distance (this is for a wall-mounted screen)\n'
-+'- High contrast between text and background\n'
-+'- No scrollbars, no overflow\n\n'
-+'## Final delivery\n\n'
-+'When you output the HTML, say:\n\n'
-+'"Here is your signage view! Copy ALL the code below and paste it into the **HTML Code** field in your Digital Signage Admin panel (Rotated Views tab, select HTML type)."\n\n'
-+'Then output the complete HTML in a code block.\n\n'
+var AI_CHAT_PROMPT='You are a Digital Signage View Designer. Your job is to interview the user step by step and then produce a single self-contained HTML file (HTML + CSS + JS all in one file) that will be displayed on a digital signage kiosk screen.\\n\\n'
++'## Interview Process\\n\\n'
++'Ask these questions ONE AT A TIME. Wait for the user to answer before asking the next one. Be friendly and enthusiastic.\\n\\n'
++'1. **Purpose**: "What do you want to show on the signage screen? For example: weather, clock, company info, event schedule, welcome message, menu, news feed, social media, custom animation, or something else?"\\n\\n'
++'2. **Style**: "What visual style do you prefer? Options:\\n   - Clean & minimal (lots of whitespace, simple fonts)\\n   - Bold & colorful (gradients, vibrant colors, shadows)\\n   - Corporate & professional (muted colors, structured layout)\\n   - Playful & animated (movement, transitions, fun elements)\\n   - Futuristic / tech (dark background, glowing effects, particle animations)\\n   - Or describe your own style!"\\n\\n'
++'3. **Colors**: "Any specific brand colors? Or should I pick colors that match your chosen style? You can say things like: dark background with blue accents, or use our brand colors #FF5733 and #333333"\\n\\n'
++'4. **Content details**: Based on what they chose in step 1, ask relevant follow-up questions. For example:\\n   - Weather: "Which city? Celsius or Fahrenheit?"\\n   - Clock: "12h or 24h format? Show date too?"\\n   - Welcome message: "What should the text say? Any logo URL?"\\n   - Menu/schedule: "List the items you want to display"\\n   - Custom: "Describe in detail what should appear on screen"\\n\\n'
++'5. **Animations**: "Do you want any animations or movement? Options:\\n   - None (static page)\\n   - Subtle (gentle fades, slow floating elements)\\n   - Dynamic (sliding text, rotating elements, particle effects)\\n   - Eye-catching (bold transitions, attention-grabbing movement)"\\n\\n'
++'6. **Size & layout**: "This will be displayed on a screen section. Should the content:\\n   - Fill the entire area (full bleed)\\n   - Be centered with padding\\n   - Use a specific layout (sidebar, header+content, grid)?"\\n\\n'
++'## Output Rules\\n\\n'
++'After the interview, produce the HTML file following these rules:\\n\\n'
++'- Single self-contained HTML file with inline CSS and JS (no external dependencies unless from CDN)\\n'
++'- Use <!DOCTYPE html> and proper structure\\n'
++'- The page should look great at any screen size (use vh/vw units, flexbox/grid)\\n'
++'- Background should fill the viewport (no white edges)\\n'
++'- Use system-ui font stack unless a specific font is requested\\n'
++'- If using animations, use CSS animations or requestAnimationFrame for smooth 60fps\\n'
++'- If showing live data (time, weather), update it automatically\\n'
++'- For weather, use a free API like wttr.in or open-meteo.com\\n'
++'- Make text large and readable from a distance (this is for a wall-mounted screen)\\n'
++'- High contrast between text and background\\n'
++'- No scrollbars, no overflow\\n\\n'
++'## Final delivery\\n\\n'
++'When you output the HTML, say:\\n\\n'
++'"Here is your signage view! Copy ALL the code below and paste it into the **HTML Code** field in your Digital Signage Admin panel (Rotated Views tab, select HTML type)."\\n\\n'
++'Then output the complete HTML in a code block.\\n\\n'
 +'After the code, add: "You can preview it in the admin panel and edit it anytime. Want me to make any changes?"';
 
 function copyAiPrompt(){
@@ -550,7 +583,11 @@ function loadConfig(){
 memGet('signage:config').then(function(_r){
 var c=_r?_r.value:{};
 document.getElementById('cfg-building').value=c.buildingName||'';
-document.getElementById('cfg-interval').value=c.rotationIntervalMs||8000;
+var rotEnabled=c.rotationEnabled!==false;
+document.getElementById('cfg-rotation').checked=rotEnabled;
+document.getElementById('cfg-interval-group').style.display=rotEnabled?'':'none';
+var sec=c.rotationIntervalSec||Math.round((c.rotationIntervalMs||8000)/1000);
+document.getElementById('cfg-interval').value=sec;
 document.getElementById('cfg-theme').value=c.theme||'dark';
 document.getElementById('cfg-accent').value=c.accentColor||'#1a1a2e';
 var layout=c.layout||'full';
@@ -561,11 +598,17 @@ if(o.getAttribute('data-layout')===layout)o.classList.add('selected');
 });
 })}
 
+document.getElementById('cfg-rotation').addEventListener('change',function(){
+document.getElementById('cfg-interval-group').style.display=this.checked?'':'none';
+});
+
 function saveConfig(){
 memGet('signage:config').then(function(_r){
 var c=_r?_r.value:{};
 c.buildingName=document.getElementById('cfg-building').value.trim();
-c.rotationIntervalMs=parseInt(document.getElementById('cfg-interval').value)||8000;
+c.rotationEnabled=document.getElementById('cfg-rotation').checked;
+c.rotationIntervalSec=parseInt(document.getElementById('cfg-interval').value)||8;
+delete c.rotationIntervalMs;
 c.theme=document.getElementById('cfg-theme').value;
 c.layout=document.getElementById('cfg-layout').value;
 c.accentColor=document.getElementById('cfg-accent').value;
@@ -695,7 +738,7 @@ body{background:var(--bg);color:var(--text)}
 
 <script>
 var session=null;
-var cfg={rotationIntervalMs:8000,buildingName:'Digital Signage',theme:'dark',layout:'full',accentColor:'#1a1a2e'};
+var cfg={rotationEnabled:true,rotationIntervalSec:8,buildingName:'Digital Signage',theme:'dark',layout:'full',accentColor:'#1a1a2e'};
 var anns=[],views=[],viewIdx=0,rotTimer=null;
 
 function getHeaders(){var h={'Content-Type':'application/json'};if(session&&session.jwt)h['Authorization']='Bearer '+session.jwt;return h}
@@ -766,9 +809,12 @@ viewIdx++;
 }
 
 function startRotation(){
-if(rotTimer)clearInterval(rotTimer);
+if(rotTimer){clearInterval(rotTimer);rotTimer=null}
 renderView();
-rotTimer=setInterval(function(){renderView()},cfg.rotationIntervalMs||8000);
+if(cfg.rotationEnabled!==false){
+var ms=(cfg.rotationIntervalSec||cfg.rotationIntervalMs/1000||8)*1000;
+rotTimer=setInterval(function(){renderView()},ms);
+}
 }
 
 /* ── Data loading ── */
@@ -777,10 +823,11 @@ Promise.all([memGet('signage:config'),memGet('signage:announcements'),memGet('si
 .then(function(res){
 var c=res[0],a=res[1],v=res[2];
 if(c){
-var oldInterval=cfg.rotationIntervalMs;
+var oldSec=cfg.rotationIntervalSec;
+var oldEnabled=cfg.rotationEnabled;
 cfg=Object.assign({},cfg,c);
 applyTheme();
-if(c.rotationIntervalMs!==oldInterval)startRotation();
+if(c.rotationIntervalSec!==oldSec||c.rotationEnabled!==oldEnabled)startRotation();
 }
 anns=Array.isArray(a)?a:[];
 views=Array.isArray(v)?v:[];

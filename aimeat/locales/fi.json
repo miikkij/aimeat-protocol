@@ -4431,6 +4431,8 @@
     "copiedBtn": "Kopioitu!"
   },
   "packages": {
+    "title": "Paketit",
+    "desc": "Paketit kokoavat skeemoja, laajennuksia, sovelluksia ja alkuarvoja asennettaviksi kokonaisuuksiksi. Asenna valmiita paketteja galleriasta, selaa muiden julkaisuja tai luo omasi Generaattorissa.",
     "created": "Paketti luotu",
     "updated": "Paketti päivitetty",
     "archived": "Paketti arkistoitu",
@@ -4445,6 +4447,8 @@
     "noUpdateAvailable": "Ei päivitystä saatavilla",
     "updateAvailable": "Päivitys saatavilla",
     "migrationApplied": "Migraatio suoritettu onnistuneesti",
+    "applyUpdateConfirm": "Paivitetaanko? Tietosi (muisti, asetukset) sailyvat. Sovellukset, laajennukset ja skeemat paivitetaan uusimpaan versioon.",
+    "updateApplied": "Paivitys asennettu onnistuneesti",
     "exportFailed": "Vienti epäonnistui",
     "importFailed": "Tuonti epäonnistui",
     "myInstances": "Omat instanssit",
@@ -4452,6 +4456,16 @@
     "gallery": "Mallipohjagalleria",
     "search": "Hae...",
     "allCategories": "Kaikki kategoriat",
+    "featured": "Suositeltu",
+    "categories": {
+      "signage": "Opasteet",
+      "marketplace": "Markkinapaikka",
+      "iot": "IoT",
+      "social": "Sosiaalinen",
+      "productivity": "Tuottavuus",
+      "communication": "Viestintä",
+      "other": "Muu"
+    },
     "version": "Versio",
     "components": "komponenttia",
     "by": "tekij\u00e4",
@@ -4508,13 +4522,6 @@
       "sourceNode": "Lähdesolmu",
       "installFromRemote": "Asenna etäsolmusta",
       "syncSuccess": "Federaatiosynkronointi valmis"
-    },
-    "gallery": {
-      "install": "Asenna",
-      "downloadZip": "Lataa ZIP",
-      "components": "Komponentit",
-      "rating": "Arvosana",
-      "installs": "Asennukset"
     }
   },
   "templates": {

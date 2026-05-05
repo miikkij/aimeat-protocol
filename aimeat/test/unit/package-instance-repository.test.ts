@@ -141,7 +141,7 @@ await test('Install package (POST /v1/packages/:groupId/install)', async () => {
   assert(body.data?.packageVersion === firstVersion, `version mismatch: ${body.data?.packageVersion}`);
   assert(body.data?.owner === ownerName, `owner mismatch: ${body.data?.owner}`);
   assert(body.data?.label === 'My test instance', `label mismatch: ${body.data?.label}`);
-  assert(body.data?.status === 'active', `Expected status=active, got ${body.data?.status}`);
+  assert(body.data?.status === 'installed', `Expected status=installed, got ${body.data?.status}`);
   assert(Array.isArray(body.data?.installedComponents), 'Missing installedComponents');
   assert(body.data.installedComponents.length === 2, `Expected 2 installed components, got ${body.data.installedComponents.length}`);
 
@@ -191,7 +191,7 @@ await test('Get instance (GET /v1/instances/:id)', async () => {
   assert(body.data?.packageVersion === firstVersion, `packageVersion mismatch`);
   assert(body.data?.owner === ownerName, `owner mismatch`);
   assert(body.data?.label === 'My test instance', `label mismatch`);
-  assert(body.data?.status === 'active', `status mismatch`);
+  assert(body.data?.status === 'installed', `status mismatch`);
   assert(typeof body.data?.installedAt === 'string', 'Missing installedAt');
   assert(typeof body.data?.updatedAt === 'string', 'Missing updatedAt');
   assert(body.data?.installedComponents?.length === 2, `Expected 2 components`);
@@ -233,13 +233,13 @@ await test('List instances with packageGroupId filter', async () => {
   }
 });
 
-await test('List instances with status=active filter', async () => {
-  const { status, body } = await json('/v1/instances?status=active', {
+await test('List instances with status=installed filter', async () => {
+  const { status, body } = await json('/v1/instances?status=installed', {
     headers: authed(ownerToken),
   });
   assert(status === 200, `Expected 200, got ${status}`);
   for (const inst of body.data.instances) {
-    assert(inst.status === 'active', `Unexpected status: ${inst.status}`);
+    assert(inst.status === 'installed', `Unexpected status: ${inst.status}`);
   }
 });
 

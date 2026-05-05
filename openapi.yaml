@@ -2131,7 +2131,7 @@ components:
             $ref: '#/components/schemas/InstalledComponent'
         status:
           type: string
-          enum: [active, paused, removed]
+          enum: [installed, paused, removed]
         installedAt:
           type: string
           format: date-time
@@ -13086,7 +13086,7 @@ paths:
       parameters:
         - name: status
           in: query
-          schema: { type: string, enum: [active, paused, removed] }
+          schema: { type: string, enum: [installed, paused, removed] }
         - name: limit
           in: query
           schema: { type: integer, default: 50 }

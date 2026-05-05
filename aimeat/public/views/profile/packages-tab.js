@@ -16,6 +16,7 @@
  *     importing packages into generator projects (fork vs edit detection)
  *   v1.3.0 — 2026-03-20 — add ZIP upload/download and template proposal buttons
  *   v1.4.0 — 2026-03-20 — add remote templates section with federation sync
+ *   v1.5.0 — 2026-05-05 — add intro section, i18n for categories/featured, fix status badge label
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -44,7 +45,7 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
     setLoading(true);
     try {
       const [instRes, pkgRes, tplRes] = await Promise.all([
-        pkgService.listInstances({ status: 'active' }),
+        pkgService.listInstances({ status: 'installed' }),
         pkgService.listPackages({ status: 'published', author: session?.owner }),
         pkgService.listTemplates({ sort: 'newest' }),
       ]);
@@ -83,7 +84,7 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
 
   const handleRemove = async (id) => {
     confirm(t('packages.confirmRemove') || 'Remove this instance?', async () => {
-      const res = await pkgService.removeInstance(id, false);
+      const res = await pkgService.removeInstance(id, true);
       if (res.ok) {
         showToast(t('packages.instanceRemoved'));
         loadData();
@@ -97,7 +98,27 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
     const res = await pkgService.checkUpdate(id);
     if (res.ok && res.data) {
       if (res.data.updateAvailable) {
-        showToast(`${t('packages.updateAvailable')}: ${res.data.latestVersion}`);
+        confirm(
+          `${t('packages.updateAvailable')}: ${res.data.latestVersion}\n\n${t('packages.applyUpdateConfirm') || 'Apply update? Your data (memory, settings) will be preserved. Apps, extensions, and schemas will be updated to the latest version.'}`,
+          async () => {
+            const instRes = await pkgService.getInstance(id);
+            const installed = instRes.data?.installedComponents || [];
+            const components = installed.map(c => ({
+              componentId: c.componentId,
+              action: (c.type === 'memory' || c.type === 'translation') ? 'skip' : 'replace',
+            }));
+            const applyRes = await pkgService.applyMigration(id, {
+              targetVersion: res.data.latestVersion,
+              components,
+            });
+            if (applyRes.ok) {
+              showToast(t('packages.updateApplied') || 'Update applied successfully');
+              loadData();
+            } else {
+              showToast(applyRes.error?.message || 'Update failed', true);
+            }
+          },
+        );
       } else {
         showToast(t('packages.noUpdateAvailable'));
       }
@@ -193,6 +214,8 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
 
   return html`
     <div class="pkg-tab">
+      <div class="section-title">${t('packages.title')}</div>
+      <div class="section-desc">${t('packages.desc')}</div>
       <div class="pkg-nav">
         <button class=${view === 'instances' ? 'active' : ''} onClick=${() => setView('instances')}>
           \u{1F4E6} ${t('packages.myInstances') || 'My Instances'} (${instances.length})
@@ -249,13 +272,13 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
               value=${search} onInput=${e => setSearch(e.target.value)} />
             <select value=${category} onChange=${e => setCategory(e.target.value)}>
               <option value="">${t('packages.allCategories') || 'All Categories'}</option>
-              <option value="signage">Signage</option>
-              <option value="marketplace">Marketplace</option>
-              <option value="iot">IoT</option>
-              <option value="social">Social</option>
-              <option value="productivity">Productivity</option>
-              <option value="communication">Communication</option>
-              <option value="other">Other</option>
+              <option value="signage">${t('packages.categories.signage') || 'Signage'}</option>
+              <option value="marketplace">${t('packages.categories.marketplace') || 'Marketplace'}</option>
+              <option value="iot">${t('packages.categories.iot') || 'IoT'}</option>
+              <option value="social">${t('packages.categories.social') || 'Social'}</option>
+              <option value="productivity">${t('packages.categories.productivity') || 'Productivity'}</option>
+              <option value="communication">${t('packages.categories.communication') || 'Communication'}</option>
+              <option value="other">${t('packages.categories.other') || 'Other'}</option>
             </select>
           </div>
           ${filtered.length === 0 ? html`
@@ -317,7 +340,7 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
                 <div class="pkg-card" key=${tpl.id}>
                   <div class="pkg-card-header">
                     <span class="pkg-card-name">${escHtml(tpl.title)}</span>
-                    ${tpl.featured && html`<span class="pkg-badge pkg-badge-featured">\u2B50 Featured</span>`}
+                    ${tpl.featured && html`<span class="pkg-badge pkg-badge-featured">\u2B50 ${t('packages.featured') || 'Featured'}</span>`}
                   </div>
                   <div class="pkg-card-desc">${escHtml(tpl.description || '')}</div>
                   <div class="pkg-card-meta">

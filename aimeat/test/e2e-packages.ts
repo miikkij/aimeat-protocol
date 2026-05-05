@@ -508,7 +508,7 @@ await test('Install package (POST /v1/packages/:groupId/install)', async () => {
   assert(body.data?.packageGroupId === groupId, 'groupId mismatch');
   assert(body.data?.packageVersion === secondVersion, `version mismatch: expected ${secondVersion}`);
   assert(body.data?.label === 'My Widget Instance', 'Label mismatch');
-  assert(body.data?.status === 'active', 'Expected active status');
+  assert(body.data?.status === 'installed', 'Expected installed status');
   assert(Array.isArray(body.data?.installedComponents), 'Missing installedComponents');
   assert(body.data?.installedComponents.length === 3, `Expected 3 installed components, got ${body.data?.installedComponents.length}`);
   instanceId = body.data.id;

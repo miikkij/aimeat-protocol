@@ -126,7 +126,7 @@ interface PackageInstanceRecord {
 
   installedComponents: InstalledComponent[];
 
-  status: 'active' | 'paused' | 'removed';
+  status: 'installed' | 'paused' | 'removed';
   installedAt: string;
   updatedAt: string;
 }
@@ -287,7 +287,7 @@ Notes: version defaults to latest published. Creates real component copies.
 ```
 GET /v1/instances
 Auth: requireAuth()
-Query: ?status=active&packageGroupId=&limit=&offset=
+Query: ?status=installed&packageGroupId=&limit=&offset=
 Response: 200 { instances: PackageInstanceRecord[], total }
 ```
 

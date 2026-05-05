@@ -405,7 +405,8 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         const gaii = resolveIdentity(req.auth!, config.nodeId);
         const filename = req.params.filename as string;
 
-        const app = await storage.getApp(gaii, filename);
+        let app = await storage.getApp(gaii, filename);
+        if (!app) app = await storage.getApp(req.auth!.owner, filename);
         if (!app) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found in your uploads`));
             return;
@@ -439,17 +440,25 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         const versionParam = req.query.version as string | undefined;
         const version = versionParam ? parseInt(versionParam, 10) : undefined;
 
-        const app = await storage.getApp(gaii, filename, version);
+        // Try full GHII first, fall back to bare owner name (backward compat for
+        // apps created before the ownerGaii fix in the package install flow)
+        let app = await storage.getApp(gaii, filename, version);
+        let effectiveGaii = gaii;
+        if (!app) {
+            const bareOwner = req.auth!.owner;
+            app = await storage.getApp(bareOwner, filename, version);
+            if (app) effectiveGaii = bareOwner;
+        }
         if (!app) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found in your uploads${version ? ` (version ${version})` : ''}`));
             return;
         }
 
-        await storage.deleteApp(gaii, filename, version);
+        await storage.deleteApp(effectiveGaii, filename, version);
 
         if (!version) {
             // Full delete — also remove screenshot
-            await storage.deleteStorageFile(gaii, `apps/screenshots/${filename}`);
+            await storage.deleteStorageFile(effectiveGaii, `apps/screenshots/${filename}`);
         }
 
         const owner = req.auth!.owner;

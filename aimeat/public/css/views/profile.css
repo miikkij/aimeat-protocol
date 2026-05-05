@@ -371,6 +371,7 @@
 .pf .pkg-tag{font-size:.7rem;padding:2px 8px;border-radius:6px;background:var(--bg-dim,#F3F4F6);color:var(--text-dim,#6B7280)}
 .pf .pkg-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
 .pf .pkg-badge-active{background:rgba(74,222,128,0.15);color:#4ade80}
+.pf .pkg-badge-installed{background:rgba(74,222,128,0.15);color:#4ade80}
 .pf .pkg-badge-inactive{background:rgba(156,163,175,0.15);color:#9ca3af}
 .pf .pkg-badge-error{background:rgba(239,68,68,0.15);color:#f87171}
 .pf .pkg-badge-featured{background:rgba(251,191,36,0.15);color:#fbbf24}

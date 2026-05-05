@@ -555,6 +555,7 @@
 .adm-badge-suspended { background: #FEF3C7; color: #B45309; }
 .adm-badge-published { background: #D1FAE5; color: #047857; }
 .adm-badge-active    { background: #D1FAE5; color: #047857; }
+.adm-badge-installed { background: #D1FAE5; color: #047857; }
 
 /* ── Board Members ── */
 .adm-board-detail { border-top: 1px solid var(--card-border, var(--glass-border)); padding-top: 8px; }

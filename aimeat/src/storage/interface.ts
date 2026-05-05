@@ -1226,7 +1226,7 @@ export interface PackageInstanceRecord {
 
   installedComponents: InstalledComponent[];
 
-  status: 'active' | 'paused' | 'removed';
+  status: 'installed' | 'paused' | 'removed';
   installedAt: string;
   updatedAt: string;
 }

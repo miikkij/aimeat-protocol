@@ -4431,6 +4431,8 @@
     "copiedBtn": "Copied!"
   },
   "packages": {
+    "title": "Packages",
+    "desc": "Packages bundle schemas, extensions, apps, and seed data into installable units. Install ready-made packages from the gallery, browse what others have published, or create your own in the Generator.",
     "created": "Package created",
     "updated": "Package updated",
     "archived": "Package archived",
@@ -4445,6 +4447,8 @@
     "noUpdateAvailable": "No update available",
     "updateAvailable": "Update available",
     "migrationApplied": "Migration applied successfully",
+    "applyUpdateConfirm": "Apply update? Your data (memory, settings) will be preserved. Apps, extensions, and schemas will be updated to the latest version.",
+    "updateApplied": "Update applied successfully",
     "exportFailed": "Export failed",
     "importFailed": "Import failed",
     "myInstances": "My Instances",
@@ -4452,6 +4456,16 @@
     "gallery": "Template Gallery",
     "search": "Search...",
     "allCategories": "All Categories",
+    "featured": "Featured",
+    "categories": {
+      "signage": "Signage",
+      "marketplace": "Marketplace",
+      "iot": "IoT",
+      "social": "Social",
+      "productivity": "Productivity",
+      "communication": "Communication",
+      "other": "Other"
+    },
     "version": "Version",
     "components": "components",
     "by": "by",
@@ -4508,13 +4522,6 @@
       "sourceNode": "Source Node",
       "installFromRemote": "Install from Remote",
       "syncSuccess": "Federation sync complete"
-    },
-    "gallery": {
-      "install": "Install",
-      "downloadZip": "Download ZIP",
-      "components": "Components",
-      "rating": "Rating",
-      "installs": "Installs"
     }
   },
   "templates": {

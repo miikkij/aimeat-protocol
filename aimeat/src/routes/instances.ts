@@ -93,7 +93,7 @@ export function instancesRouter(config: AimeatConfig, storage: Storage): Router 
     const groupId = decodeURIComponent(req.params.groupId as string);
     const owner = req.auth!.owner;
     const ownerGhii = await resolveGhii(storage, owner, req.auth!.sub);
-    const ownerGaii = req.auth!.sub;
+    const ownerGaii = ownerGhii;
 
     const { label, version, dry_run: dryRun } = req.body ?? {};
     const isDryRun = dryRun === true;
@@ -180,6 +180,9 @@ export function instancesRouter(config: AimeatConfig, storage: Storage): Router 
         owner,
         ownerGaii,
         packageName: pkg.name,
+        packageCategory: pkg.category,
+        packageTags: pkg.tags,
+        packageDescription: pkg.description,
       });
 
       if (result.success) {
@@ -233,7 +236,7 @@ export function instancesRouter(config: AimeatConfig, storage: Storage): Router 
       ownerGhii,
       label: (typeof label === 'string' && label) ? label : `${pkg.name} instance`,
       installedComponents: plannedComponents,
-      status: 'active',
+      status: 'installed',
       installedAt: now,
       updatedAt: now,
     };
@@ -301,7 +304,7 @@ export function instancesRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
 
-    const ownerGaii = req.auth!.sub;
+    const ownerGaii = await resolveGhii(storage, owner, req.auth!.sub);
 
     // Live hash comparison: fetch current content and compare
     const components = await Promise.all(
@@ -482,7 +485,7 @@ export function instancesRouter(config: AimeatConfig, storage: Storage): Router 
   router.delete('/v1/instances/:id', requireAuth(), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
-    const ownerGaii = req.auth!.sub;
+    const ownerGaii = await resolveGhii(storage, owner, req.auth!.sub);
 
     const instance = await storage.getInstance(id);
     if (!instance) {
@@ -494,7 +497,7 @@ export function instancesRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
 
-    const { removeComponents } = req.body ?? {};
+    const removeComponents = req.body?.removeComponents ?? req.query.removeComponents === 'true';
     let componentsRemoved = 0;
 
     if (removeComponents) {
@@ -666,7 +669,7 @@ export function instancesRouter(config: AimeatConfig, storage: Storage): Router 
   router.post('/v1/instances/:id/apply-migration', requireAuth(), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
-    const ownerGaii = req.auth!.sub;
+    const ownerGaii = await resolveGhii(storage, owner, req.auth!.sub);
 
     const instance = await storage.getInstance(id);
     if (!instance) {
@@ -748,6 +751,9 @@ export function instancesRouter(config: AimeatConfig, storage: Storage): Router 
             owner,
             ownerGaii,
             packageName: targetPkg.name,
+            packageCategory: targetPkg.category,
+            packageTags: targetPkg.tags,
+            packageDescription: targetPkg.description,
           });
 
           const newHash = computeHash(newContent);
@@ -791,6 +797,9 @@ export function instancesRouter(config: AimeatConfig, storage: Storage): Router 
             owner,
             ownerGaii,
             packageName: targetPkg.name,
+            packageCategory: targetPkg.category,
+            packageTags: targetPkg.tags,
+            packageDescription: targetPkg.description,
           });
 
           const customHash = computeHash(customContent);
@@ -817,6 +826,9 @@ export function instancesRouter(config: AimeatConfig, storage: Storage): Router 
               owner,
               ownerGaii,
               packageName: targetPkg.name,
+              packageCategory: targetPkg.category,
+              packageTags: targetPkg.tags,
+              packageDescription: targetPkg.description,
             });
 
             newInstalledComponents.push({
