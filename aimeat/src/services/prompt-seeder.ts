@@ -49,10 +49,11 @@ export async function seedSystemPrompts(storage: Storage): Promise<void> {
         usedIn: seed.usedIn,
       };
 
-      // Always update generator prompt content from seeds.
+      // Always update generator and builder prompt content from seeds.
       // These prompts are code — they must match the source code version.
       // Admin edits are preserved in version history and can be restored.
-      if (seed.group === 'generator' && existing.content !== seed.content) {
+      const syncGroups = ['generator', 'builders'];
+      if (syncGroups.includes(seed.group) && existing.content !== seed.content) {
         metaUpdate.content = seed.content;
         metaUpdate.updatedAt = new Date().toISOString();
         logger.info(`Generator prompt "${seed.id}" content synced from seed (${seed.content.length} chars)`);
