@@ -2,6 +2,34 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.4.0] - 2026-05-06
+
+### Added
+- **"Create Package with AI" prompt** in the Packages tab -- copy-pasteable prompt for Claude Code, VS Code Copilot, or any AI chat that interviews the user, builds and tests components on a live node, and packages the result as a distributable ZIP
+- **Package update flow** -- "Check Update" now shows a confirm dialog to apply updates, preserving user data (memory, settings) while replacing apps, extensions, and schemas
+- **Packages tab intro section** with title and description (matching all other profile tabs)
+- **i18n for package categories** and featured badge in template gallery
+- **Auto-activation** of cortex and server extensions on package install (no manual activation needed)
+- **Rotation settings** for digital signage -- toggle auto-rotation on/off, configurable speed in seconds
+
+### Fixed
+- **Broken `packages.gallery` translation** -- duplicate key in locale files caused "packages.gallery" to render as literal text
+- **Instance status renamed** from "active" to "installed" -- avoids confusion with cortex/extension activation status (updated across types, storage, API, OpenAPI spec, CSS, tests, docs)
+- **Instance removal now cleans up all components** -- apps, cortex (including lib files, prompts, seed data), CSM, memory, translations are deleted. Previously `removeComponents` was sent as query param but backend read from body; now supports both. Frontend defaults to `true`.
+- **ownerGaii mismatch** in package install/delete/migration -- was using bare username instead of full GHII, causing component lookups to fail. Fixed across install, delete, status check, and migration flows.
+- **App delete backward compat** -- DELETE/PATCH endpoints fall back to bare owner name for apps created before the GAII fix
+- **Admin panel syntax error** in digital signage seed -- `\n` in template literal produced actual newlines breaking inline JS strings
+- **App catalog shows empty on first visit** -- `aimeatUrl` defaulted to empty string, now defaults to `window.location.origin` so server apps load without localStorage
+- **Upload ZIP button** didn't trigger file picker (HTM template literal handler binding issue)
+- **ZIP import auto-publishes** -- uploaded packages now get status `published` instead of `draft`
+- **Browse Packages** shows all user's packages, not just published
+- **Prompt seeder** now syncs content for both `generator` and `builders` groups on restart
+
+### Improved
+- **Digital signage cortex manifest** rewritten with proper `components:` array, `.js` lib filenames, tags, exports, and `api_surface` metadata -- "What's included" section now shows library details
+- **Component registrar** preserves lib component fields (filename, exports, api_surface) in cortex registration; passes package metadata (category, tags, description) through to app manifests
+- **Cortex component delete** now cleans up lib files, prompts, ontologies, and seed data (previously only deleted the record)
+
 ## [1.3.4] - 2026-05-03
 
 ### Fixed
