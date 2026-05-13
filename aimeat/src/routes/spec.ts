@@ -28,8 +28,19 @@ export function specRouter(): Router {
     });
   });
 
-  // GET /v1/docs — simple HTML redirect to Swagger UI
+  // GET /v1/docs — Swagger UI with relaxed CSP for unpkg.com assets
   router.get('/v1/docs', (_req, res) => {
+    const nonce = (res.locals.cspNonce as string) || '';
+    res.setHeader('Content-Security-Policy', [
+      "default-src 'self'",
+      `script-src 'self' 'nonce-${nonce}' https://unpkg.com`,
+      `style-src 'self' 'unsafe-inline' https://unpkg.com`,
+      "connect-src 'self'",
+      "img-src 'self' data:",
+      "font-src 'self'",
+      "object-src 'none'",
+      "base-uri 'self'",
+    ].join('; '));
     res.type('text/html').send(`<!DOCTYPE html>
 <html>
 <head>
@@ -42,7 +53,7 @@ export function specRouter(): Router {
 <body>
   <div id="swagger-ui"></div>
   <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js" crossorigin></script>
-  <script>
+  <script nonce="${nonce}">
     SwaggerUIBundle({ url: '/v1/spec', dom_id: '#swagger-ui', deepLinking: true });
   </script>
 </body>
