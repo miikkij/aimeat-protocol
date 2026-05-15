@@ -15,7 +15,8 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, MemoryRecord } from '../storage/interface.js';
+import { parseGAII } from '../utils/gaii.js';
 
 export function registerKnowledgeTools(
     mcp: McpServer,
@@ -27,12 +28,39 @@ export function registerKnowledgeTools(
 ): void {
     const agentGaii = getAgentGaii();
 
+    // Aggregate owner-scope memory (GHII + all agents) — packages may be
+    // stored under the owner's GHII (web UI import) or any agent's GAII.
+    async function listOwnerScopeMemory(opts: { prefix?: string; tags?: string[]; visibility?: string }): Promise<MemoryRecord[]> {
+        const parsed = parseGAII(agentGaii);
+        const owner = parsed?.owner;
+        if (!owner) return storage.listMemory(agentGaii, opts);
+
+        const ownerGhii = `${owner}@${config.nodeId}`;
+        const seen = new Set<string>();
+        const results: MemoryRecord[] = [];
+
+        for (const rec of await storage.listMemory(ownerGhii, opts)) {
+            seen.add(rec.key);
+            results.push(rec);
+        }
+        const agents = await storage.getAgentsByOwner(owner);
+        for (const agent of agents) {
+            for (const rec of await storage.listMemory(agent.gaii, opts)) {
+                if (!seen.has(rec.key)) {
+                    seen.add(rec.key);
+                    results.push(rec);
+                }
+            }
+        }
+        return results;
+    }
+
     // ── Resource: knowledge package ──
     mcp.registerResource(
         'knowledge-package',
         new ResourceTemplate('aimeat://knowledge/{packageId}', {
             list: async () => {
-                const entries = await storage.listMemory(agentGaii, { prefix: 'packages/', tags: ['knowledge-package'] });
+                const entries = await listOwnerScopeMemory({ prefix: 'packages/', tags: ['knowledge-package'] });
                 const manifests = entries.filter(e => e.key.endsWith('/manifest'));
                 return {
                     resources: manifests.map(m => {
@@ -80,10 +108,10 @@ export function registerKnowledgeTools(
     // ── Tool 1: aimeat_knowledge_list ──
     mcp.tool(
         'aimeat_knowledge_list',
-        'List knowledge packages owned by this agent',
+        'List knowledge packages accessible to you (your own + owner\'s packages)',
         {},
         async () => {
-            const entries = await storage.listMemory(agentGaii, { prefix: 'packages/', tags: ['knowledge-package'] });
+            const entries = await listOwnerScopeMemory({ prefix: 'packages/', tags: ['knowledge-package'] });
             const manifests = entries.filter(e => e.key.endsWith('/manifest'));
             const packages = manifests.map(m => {
                 const pkg = m.value as any;

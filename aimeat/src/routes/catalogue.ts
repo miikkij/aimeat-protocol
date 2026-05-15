@@ -267,18 +267,19 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const language = req.query.language as string | undefined;
     const sort = (req.query.sort as string) || 'recent';
 
-    // Find all public package manifests across all agents
-    const allAgents = await storage.listAgents();
+    // Find all public package manifests across GHIIs and agents
+    const seen = new Set<string>();
     let manifests: Array<{ key: string; value: any; ownerGaii: string; tags: string[]; createdAt: string; updatedAt: string }> = [];
 
-    for (const agent of allAgents) {
-      const agentManifests = await storage.listMemory(agent.gaii, {
+    const collectManifests = async (gaii: string) => {
+      const records = await storage.listMemory(gaii, {
         prefix: 'packages/',
         visibility: 'public',
         tags: ['knowledge-package'],
       });
-      for (const m of agentManifests) {
-        if (m.key.endsWith('/manifest') && (m.value as any)?.type === 'knowledge-package') {
+      for (const m of records) {
+        if (m.key.endsWith('/manifest') && !seen.has(m.key) && (m.value as any)?.type === 'knowledge-package') {
+          seen.add(m.key);
           manifests.push({
             key: m.key,
             value: m.value,
@@ -289,6 +290,17 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
           });
         }
       }
+    };
+
+    // Search owner (GHII) namespaces — packages imported via web UI
+    const allOwners = await storage.listOwners();
+    for (const owner of allOwners) {
+      await collectManifests(`${owner.name}@${config.nodeId}`);
+    }
+    // Search agent (GAII) namespaces — packages imported via MCP/agent API
+    const allAgents = await storage.listAgents();
+    for (const agent of allAgents) {
+      await collectManifests(agent.gaii);
     }
 
     // Apply filters
