@@ -1667,7 +1667,7 @@
     "visibility": {
       "public": "Public",
       "private": "Private",
-      "owner": "Shared",
+      "owner": "My Agents",
       "protected": "Protected"
     },
     "knowledge": {
@@ -4248,7 +4248,8 @@
     "visibility": {
       "public": "Public",
       "private": "Private",
-      "owner": "Shared"
+      "owner": "My Agents",
+      "shared": "My Agents"
     },
     "operator": {
       "tabLabel": "Knowledge",

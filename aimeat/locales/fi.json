@@ -1667,7 +1667,7 @@
     "visibility": {
       "public": "Julkinen",
       "private": "Yksityinen",
-      "owner": "Jaettu",
+      "owner": "Omat agentit",
       "protected": "Suojattu"
     },
     "knowledge": {
@@ -4248,7 +4248,8 @@
     "visibility": {
       "public": "Julkinen",
       "private": "Yksityinen",
-      "owner": "Jaettu"
+      "owner": "Omat agentit",
+      "shared": "Omat agentit"
     },
     "operator": {
       "tabLabel": "Tietopankki",

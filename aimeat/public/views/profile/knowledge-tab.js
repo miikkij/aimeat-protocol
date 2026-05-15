@@ -492,7 +492,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
                 const entryRels = entry.related_entries || [];
                 return html`
                   <div class="kpkg-preview-entry" key=${i}>
-                    <span class="kpkg-badge kpkg-badge-${entry.visibility || 'private'}">${t('knowledge.visibility.' + (entry.visibility || 'private'))}</span>
+                    <span class="kpkg-badge kpkg-badge-${(entry.visibility === 'shared' ? 'owner' : entry.visibility) || 'private'}">${t('knowledge.visibility.' + ((entry.visibility === 'shared' ? 'owner' : entry.visibility) || 'private'))}</span>
                     <strong class="kpkg-entry-key">${escHtml(label)}</strong>
                     ${truncVal && html`<p class="kpkg-entry-value">${escHtml(truncVal)}</p>`}
                     ${entryRefs.length > 0 && html`
