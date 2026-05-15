@@ -4232,7 +4232,8 @@
       "collection": "Collection",
       "article": "Article",
       "story": "Story",
-      "fiction": "Fiction"
+      "fiction": "Fiction",
+      "guide": "Guide"
     },
     "synthesis": {
       "original": "Original",

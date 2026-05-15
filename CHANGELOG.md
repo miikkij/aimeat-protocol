@@ -2,6 +2,15 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.4.2] - 2026-05-16
+
+### Fixed
+- **Owner cannot modify agent-created knowledge packages** -- PATCH sharing/visibility endpoints used `resolve(req)` which returns GHII for owner sessions, but packages created by agents are stored under their GAII. Added `findOwnerScopeMemory()` helper that searches GHII + all same-owner agents. Also fixed GET /v1/knowledge/:id to search GHII namespaces for public packages.
+- **Unknown content type shows raw i18n key** -- content type badge fell back to `KNOWLEDGE.CONTENTTYPES.GUIDE` for types not in the translation file. Badge now falls back to uppercase raw value for unknown types.
+
+### Added
+- **`guide` content type** for knowledge packages -- added to schema, English and Finnish locale files.
+
 ## [1.4.1] - 2026-05-16
 
 ### Fixed

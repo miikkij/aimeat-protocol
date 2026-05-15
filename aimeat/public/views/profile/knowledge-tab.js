@@ -472,7 +472,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
           <div class="kpkg-preview">
             <h4>${t('knowledge.import.preview')}</h4>
             <div class="kpkg-preview-meta">
-              <span class="kpkg-badge kpkg-badge-type">${t('knowledge.contentTypes.' + (importPreview.pkg.content_type || 'document'))}</span>
+              <span class="kpkg-badge kpkg-badge-type">${t('knowledge.contentTypes.' + (importPreview.pkg.content_type || 'document')) || (importPreview.pkg.content_type || 'document').toUpperCase()}</span>
               <span class="kpkg-badge kpkg-badge-synthesis">${t('knowledge.synthesis.' + (importPreview.pkg.synthesis?.level || 'original'))}</span>
               <strong>${escHtml(importPreview.pkg.name || importPreview.pkg.title || importPreview.pkg.id || 'Untitled')}</strong>
             </div>
@@ -578,7 +578,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
               <div class="kpkg-card-header kpkg-card-clickable" onClick=${() => toggleExpand(pkg.key)}>
                 <span class="kpkg-expand-icon">${isExpanded ? '\u25BC' : '\u25B6'}</span>
                 <strong>${escHtml(manifest.name || 'Untitled')}</strong>
-                <span class="kpkg-badge kpkg-badge-type">${t('knowledge.contentTypes.' + (manifest.content_type || 'document'))}</span>
+                <span class="kpkg-badge kpkg-badge-type">${t('knowledge.contentTypes.' + (manifest.content_type || 'document')) || (manifest.content_type || 'document').toUpperCase()}</span>
                 <span class="kpkg-badge kpkg-badge-synthesis">${t('knowledge.synthesis.' + (manifest.synthesis?.level || 'original'))}</span>
                 <span class="kpkg-badge kpkg-badge-${manifest.maturity || 'draft'}">${t('knowledge.maturity.' + (manifest.maturity || 'draft'))}</span>
               </div>
@@ -708,7 +708,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
           <div class="kpkg-card" key=${pkg.package_id}>
             <div class="kpkg-card-header">
               <strong>${escHtml(pkg.name || 'Untitled')}</strong>
-              <span class="kpkg-badge kpkg-badge-type">${t('knowledge.contentTypes.' + (pkg.content_type || 'document'))}</span>
+              <span class="kpkg-badge kpkg-badge-type">${t('knowledge.contentTypes.' + (pkg.content_type || 'document')) || (pkg.content_type || 'document').toUpperCase()}</span>
               <span class="kpkg-badge kpkg-badge-synthesis">${t('knowledge.synthesis.' + (pkg.synthesis?.level || 'original'))}</span>
               <span class="kpkg-badge kpkg-badge-${pkg.maturity || 'draft'}">${t('knowledge.maturity.' + (pkg.maturity || 'draft'))}</span>
             </div>

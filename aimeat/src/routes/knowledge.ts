@@ -56,6 +56,26 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
   const router = Router();
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
+  // Find a memory record across the owner's scope (GHII + all agents).
+  // Owner sessions store packages under GHII but agents store under GAII.
+  // Returns the record + the actual ownerGaii it was found under.
+  async function findOwnerScopeMemory(req: Express.Request, key: string) {
+    const callerGaii = resolve(req);
+    const record = await storage.getMemory(callerGaii, key);
+    if (record) return { record, ownerGaii: callerGaii };
+
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    if (!isOwnerSession) return null;
+
+    const ownerName = req.auth!.owner as string;
+    const agents = await storage.getAgentsByOwner(ownerName);
+    for (const agent of agents) {
+      const agentRecord = await storage.getMemory(agent.gaii, key);
+      if (agentRecord) return { record: agentRecord, ownerGaii: agent.gaii };
+    }
+    return null;
+  }
+
   /* ── POST /v1/knowledge/import — Import a knowledge package from AI Chat output ── */
   router.post('/v1/knowledge/import', requireAuth(), async (req, res) => {
     const ownerGaii = resolve(req);
@@ -225,17 +245,25 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     const packageId = req.params.id as string;
     const manifestKey = `packages/${packageId}/manifest`;
 
-    // Try public read: scan all agents for a public manifest with this key
+    // Try public read: scan all owners (GHIIs) and agents for a public manifest
     let manifest: import('../storage/interface.js').MemoryRecord | undefined;
-    const allAgents = await storage.listAgents();
-    for (const agent of allAgents) {
-      const hits = await storage.listMemory(agent.gaii, { prefix: manifestKey, visibility: 'public' });
+    const allOwners = await storage.listOwners();
+    for (const owner of allOwners) {
+      const ghii = `${owner.name}@${config.nodeId}`;
+      const hits = await storage.listMemory(ghii, { prefix: manifestKey, visibility: 'public' });
       if (hits.length > 0) { manifest = hits[0]; break; }
     }
-    // If authenticated, also check the caller's own packages (any visibility)
+    if (!manifest) {
+      const allAgents = await storage.listAgents();
+      for (const agent of allAgents) {
+        const hits = await storage.listMemory(agent.gaii, { prefix: manifestKey, visibility: 'public' });
+        if (hits.length > 0) { manifest = hits[0]; break; }
+      }
+    }
+    // If authenticated, also check the caller's own packages (any visibility) via owner scope
     if (!manifest && req.auth?.sub) {
-      const hits = await storage.listMemory(req.auth.sub as string, { prefix: manifestKey });
-      if (hits.length > 0) manifest = hits[0];
+      const found = await findOwnerScopeMemory(req, manifestKey);
+      if (found) manifest = found.record;
     }
     if (!manifest) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found or not public'));
@@ -412,16 +440,16 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
 
   /* ── PATCH /v1/knowledge/:id/sharing — Update package sharing settings ── */
   router.patch('/v1/knowledge/:id/sharing', requireAuth(), requireRole('agent'), async (req, res) => {
-    const ownerGaii = resolve(req);
     const packageId = req.params.id as string;
     const { catalog_listed, allow_clone } = req.body ?? {};
 
     const manifestKey = `packages/${packageId}/manifest`;
-    const existing = await storage.getMemory(ownerGaii, manifestKey);
-    if (!existing) {
+    const found = await findOwnerScopeMemory(req, manifestKey);
+    if (!found) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found'));
       return;
     }
+    const { record: existing, ownerGaii } = found;
 
     const manifest: Record<string, any> = typeof existing.value === 'string'
       ? JSON.parse(existing.value as string)
@@ -458,7 +486,6 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
 
   /* ── PATCH /v1/knowledge/:id/entries/:entryKey/visibility — Change entry visibility ── */
   router.patch('/v1/knowledge/:id/entries/:entryKey/visibility', requireAuth(), requireRole('agent'), async (req, res) => {
-    const ownerGaii = resolve(req);
     const packageId = req.params.id as string;
     const entryKey = req.params.entryKey as string;
     const { visibility } = req.body ?? {};
@@ -469,11 +496,12 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
     }
 
     const manifestKey = `packages/${packageId}/manifest`;
-    const existing = await storage.getMemory(ownerGaii, manifestKey);
-    if (!existing) {
+    const found = await findOwnerScopeMemory(req, manifestKey);
+    if (!found) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found'));
       return;
     }
+    const { record: existing, ownerGaii } = found;
 
     const manifest: Record<string, any> = typeof existing.value === 'string'
       ? JSON.parse(existing.value as string)

@@ -4,6 +4,7 @@
 export const KNOWLEDGE_CONTENT_TYPES = [
   'idea', 'research', 'plan', 'dataset', 'document',
   'tutorial', 'collection', 'article', 'story', 'fiction',
+  'guide',
 ] as const;
 
 export const ManifestSchema = {
