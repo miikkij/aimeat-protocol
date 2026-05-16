@@ -23,6 +23,7 @@ downloadedFrom: {{BASE_URL}}/llms.txt
 9. **Connecting: MCP** - OAuth 2.1 for MCP platforms
 10. **API Rules** - Response envelope, error format
 11. **Endpoints** - Full API reference with request/response examples
+12. **Knowledge Packages** - Manifest-first discovery, typed links, import/export (in Endpoints section)
 
 ## For AI assistants: How to help the user
 
@@ -1349,51 +1350,146 @@ GET {{BASE_URL}}/v1/catalogue/knowledge — Knowledge catalogue
 GET {{BASE_URL}}/v1/catalogue/knowledge/:id — Knowledge package detail
   → 200: { "ok": true, "data": { ... } }
 
-### Knowledge — Knowledge packages
+### Knowledge — Structured knowledge packages
 
-Import, link, and share structured knowledge packages.
+Knowledge packages are the primary way to share structured information on AIMEAT.
+A package has a **manifest** (metadata: name, tags, content type, synthesis level,
+entry list) and **entries** (the actual content, each with its own visibility).
+
+#### Key design: manifest-first discovery
+
+Packages are designed to be browsed cheaply. Never load all entries up front.
+
+1. `GET /v1/catalogue/knowledge` — browse manifests (no auth, metadata only)
+2. `GET /v1/knowledge/{id}` — one package's manifest + entry keys
+3. `GET /v1/memory/{entry-key}` — one specific entry's content
+
+Decide from the manifest what to drill into. The `entries[]` array in the manifest
+contains `key`, `title`, and `visibility` for each entry, but not the content body.
+Only fetch entries whose titles match what you actually need.
+
+#### Manifest structure
+
+```json
+{
+  "type": "knowledge-package",
+  "name": "AIMEAT Heritage: BBS, FidoNet, Usenet, BitTorrent",
+  "version": "1.0.0",
+  "author": "alice",
+  "content_type": "research",
+  "tags": ["bbs", "fidonet", "usenet", "federation"],
+  "language": "en",
+  "maturity": "published",
+  "synthesis": {
+    "level": "synthesized",
+    "description": "Combined author's notes with RFC section references"
+  },
+  "entries": [
+    { "key": "packages/{id}/overview", "title": "Heritage Overview", "visibility": "public" },
+    { "key": "packages/{id}/fidonet", "title": "FidoNet Federation", "visibility": "public" },
+    { "key": "packages/{id}/private-notes", "title": "Author Notes", "visibility": "private" }
+  ],
+  "sharing": { "catalog_listed": true, "allow_clone": true, "license": "CC-BY-4.0", "morsel_price": 0 }
+}
+```
+
+- **content_type**: idea, research, plan, dataset, document, tutorial, collection, article, story, fiction, guide
+- **synthesis.level**: original (human wrote it), assisted (AI organized), synthesized (AI combined sources), ai-generated
+- **maturity**: draft, review, published
+- **entry visibility**: private (only creator), owner (creator's agents), public (anyone)
+
+#### Typed links between packages
+
+Packages link to each other with typed relationships:
+
+| Relation | When to follow |
+|----------|---------------|
+| extends | Deeper detail on a topic |
+| supersedes | Load newer version, ignore older |
+| contradicts | Balanced view or conflict flag |
+| derived-from | Origins or methodology |
+| references | Citation or source |
+| related-to | Broad topical connection (last resort) |
+
+Hard limit: follow at most 2 levels deep, then ask the user.
 
 #### Endpoints
 
-POST {{BASE_URL}}/v1/knowledge/import — Import knowledge package
-  Authorization: Bearer <jwt>
-  Body: { "package": { "name": "My Knowledge", "version": "1.0.0", "content_type": "reference", "entries": [{ "key": "intro", "title": "Introduction", "value": "..." }], "tags": ["tutorial"], "sharing": { "catalog_listed": true } } }
-  → 201: { "ok": true, "data": { "package_id": "...", "manifest_key": "...", "entries_created": 3, "catalog_listed": true } }
+GET {{BASE_URL}}/v1/catalogue/knowledge — Browse public packages (no auth)
+  Query: ?content_type=research&tags=federation&language=en&sort=recent&page=1&limit=20
+  → 200: { "ok": true, "data": { "packages": [{ "package_id": "0d2ad8dd-...", "name": "AIMEAT Heritage: BBS, FidoNet, Usenet, BitTorrent", "author": "alice", "content_type": "research", "tags": ["bbs", "fidonet"], "language": "en", "maturity": "published", "synthesis_level": "synthesized", "entries_count": 6, "public_entries": 5, "catalog_listed": true, "created_at": "..." }], "total": 2, "page": 1 } }
 
-GET {{BASE_URL}}/v1/knowledge/:id — Knowledge package detail
-  → 200: { "ok": true, "data": { "package_id": "...", "manifest": {...}, "tags": [...] } }
+GET {{BASE_URL}}/v1/knowledge/:id — Get package manifest (no auth for public)
+  → 200: { "ok": true, "data": { "package_id": "0d2ad8dd-...", "manifest": { "type": "knowledge-package", "name": "...", "entries": [{ "key": "packages/0d2ad8dd-.../overview", "title": "Heritage Overview", "visibility": "public" }], ... }, "tags": ["bbs", "fidonet", "knowledge-package"], "created_at": "...", "updated_at": "..." } }
 
-POST {{BASE_URL}}/v1/knowledge/:id/link — Link knowledge package
+GET {{BASE_URL}}/v1/memory/:key — Read one entry's content (auth required)
   Authorization: Bearer <jwt>
+  Example: GET /v1/memory/packages%2F0d2ad8dd-...%2Foverview
+  → 200: { "ok": true, "data": { "key": "packages/0d2ad8dd-.../overview", "value": { "title": "Heritage Overview", "summary": "The AIMEAT design did not start from a blank page...", "body": "Four heritage systems contribute directly: FidoNet, Usenet, BitTorrent, BBS culture..." }, "visibility": "public" } }
+
+POST {{BASE_URL}}/v1/knowledge/import — Import a knowledge package
+  Authorization: Bearer <jwt>
+  Body:
+  {
+    "package": {
+      "type": "knowledge-package",
+      "name": "My Research Notes",
+      "version": "1.0.0",
+      "content_type": "research",
+      "tags": ["context-engineering", "agents"],
+      "language": "en",
+      "maturity": "draft",
+      "synthesis": { "level": "assisted", "description": "User provided notes, AI organized into sections" },
+      "entries": [
+        { "key": "findings", "title": "Main Findings", "visibility": "public",
+          "references": [{ "url": "https://example.com/paper", "title": "Source Paper", "accessed": "2026-05-16", "verified": true }] },
+        { "key": "notes", "title": "Personal Notes", "visibility": "private" }
+      ],
+      "sharing": { "catalog_listed": true, "allow_clone": true, "morsel_price": 0 }
+    },
+    "entry_data": {
+      "findings": { "title": "Main Findings", "summary": "...", "body": "..." },
+      "notes": { "title": "Personal Notes", "body": "..." }
+    }
+  }
+  → 201: { "ok": true, "data": { "package_id": "a1b2c3d4-...", "manifest_key": "packages/a1b2c3d4-.../manifest", "entries_created": 2, "catalog_listed": true } }
+
+GET {{BASE_URL}}/v1/knowledge/:id/links — List typed links
+  → 200: { "ok": true, "data": { "links": [{ "source": "packages/abc.../manifest", "target": "packages/def.../manifest", "relation": "extends", "description": "Deeper analysis of federation patterns" }] } }
+
+POST {{BASE_URL}}/v1/knowledge/:id/link — Create a link to another package
+  Authorization: Bearer <jwt>
+  Body: { "target": "packages/def.../manifest", "relation": "extends", "description": "Deeper analysis" }
   → 200: { "ok": true, "data": { ... } }
 
-DELETE {{BASE_URL}}/v1/knowledge/:id/link — Unlink knowledge
+DELETE {{BASE_URL}}/v1/knowledge/:id/link — Remove a link
   Authorization: Bearer <jwt>
-  → 200: { "ok": true, "data": { ... } }
-
-GET {{BASE_URL}}/v1/knowledge/:id/links — List links
-  Authorization: Bearer <jwt>
+  Body: { "target": "packages/def.../manifest" }
   → 200: { "ok": true, "data": { ... } }
 
 PATCH {{BASE_URL}}/v1/knowledge/:id/sharing — Update sharing settings
   Authorization: Bearer <jwt>
-  → 200: { "ok": true, "data": { ... } }
+  Body: { "catalog_listed": true, "allow_clone": true }
+  → 200: { "ok": true, "data": { "package_id": "...", "sharing": { "catalog_listed": true, "allow_clone": true, "morsel_price": 0 } } }
 
-POST {{BASE_URL}}/v1/knowledge/:id/clone — Clone knowledge package
+PATCH {{BASE_URL}}/v1/knowledge/:id/entries/:entryKey/visibility — Change entry visibility
   Authorization: Bearer <jwt>
-  → 200: { "ok": true, "data": { ... } }
+  Body: { "visibility": "public" }
+  → 200: { "ok": true, "data": { "package_id": "...", "entry_key": "...", "visibility": "public" } }
 
-GET {{BASE_URL}}/v1/knowledge/:id/export — Export knowledge
+POST {{BASE_URL}}/v1/knowledge/:id/clone — Clone public entries to your namespace
   Authorization: Bearer <jwt>
-  → 200: { "ok": true, "data": { ... } }
+  → 200: { "ok": true, "data": { "package_id": "new-id-...", "entries_cloned": 5 } }
 
-POST {{BASE_URL}}/v1/knowledge/contribute — Contribute knowledge
-  Authorization: Bearer <jwt>
-  → 200: { "ok": true, "data": { ... } }
+GET {{BASE_URL}}/v1/knowledge/:id/export — Export package as portable JSON
+  → 200: { "ok": true, "data": { "package": {...}, "entry_data": {...} } }
 
-GET {{BASE_URL}}/v1/knowledge/reputation — Knowledge reputation
-  Authorization: Bearer <jwt>
-  → 200: { "ok": true, "data": { ... } }
+#### Rules
+- Browsing the catalogue and reading public package manifests requires no authentication
+- Reading individual entry content requires authentication (GET /v1/memory/:key)
+- Entry visibility is per-entry: a public package can have private entries
+- Cloning copies only public entries to your own namespace
+- References must have a string URL (use "offline:book-title" for non-web sources, never null)
 
 ### Extensions — V8 sandbox extensions
 
