@@ -94,6 +94,26 @@ export async function initializeServices(
   // Federation peer registry (shared between routes and heartbeat)
   const peers = new Map<string, PeerInfo>();
 
+  // Load persisted peers from storage
+  try {
+    const savedPeers = await storage.listFederationPeers();
+    for (const sp of savedPeers) {
+      peers.set(sp.nodeId, {
+        nodeId: sp.nodeId,
+        url: sp.url,
+        publicKey: sp.publicKey,
+        status: sp.status,
+        addedAt: sp.addedAt,
+        lastSeen: sp.lastSeen,
+      });
+    }
+    if (savedPeers.length > 0) {
+      logger.info(`Loaded ${savedPeers.length} persisted federation peers`);
+    }
+  } catch (err) {
+    logger.error('Failed to load persisted peers', { error: String(err) });
+  }
+
   // Start federation heartbeat job (signed heartbeats with catalogue hash, jittered scheduling)
   startHeartbeatJob(config, storage, peers);
 

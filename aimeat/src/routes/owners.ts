@@ -140,6 +140,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, {
       name: owner.name,
       display_name: owner.displayName,
+      roles: owner.roles,
       agents: agents.map(a => ({
         gaii: a.gaii,
         display_name: a.displayName,

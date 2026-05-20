@@ -878,6 +878,16 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_execution_log_createdAt ON execution_log(createdAt);
     CREATE INDEX IF NOT EXISTS idx_execution_log_extensionName ON execution_log(extensionName);
 
+    -- ── Federation Peers (persisted active peer connections) ──
+    CREATE TABLE IF NOT EXISTS federation_peers (
+      nodeId          TEXT PRIMARY KEY,
+      url             TEXT NOT NULL,
+      publicKey       TEXT NOT NULL DEFAULT '',
+      status          TEXT NOT NULL DEFAULT 'pending',
+      addedAt         TEXT NOT NULL,
+      lastSeen        TEXT NOT NULL
+    );
+
     -- ── Replication Queue (B.1) ──
     CREATE TABLE IF NOT EXISTS replication_queue (
       id              TEXT PRIMARY KEY,

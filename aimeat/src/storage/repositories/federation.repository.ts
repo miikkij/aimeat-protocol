@@ -1,6 +1,9 @@
-import type { PeeringRequestRecord, PersonalNodeRecord, MailboxItemRecord, GenesisPeerRecord } from '../interface.js';
+import type { PeeringRequestRecord, PersonalNodeRecord, MailboxItemRecord, GenesisPeerRecord, FederationPeerRecord } from '../interface.js';
 
 export interface FederationRepository {
+  saveFederationPeer(peer: FederationPeerRecord): Promise<void>;
+  listFederationPeers(): Promise<FederationPeerRecord[]>;
+  deleteFederationPeer(nodeId: string): Promise<boolean>;
   createPeeringRequest(req: PeeringRequestRecord): Promise<PeeringRequestRecord>;
   getPeeringRequest(id: string): Promise<PeeringRequestRecord | null>;
   listPeeringRequests(status?: string): Promise<PeeringRequestRecord[]>;

@@ -313,17 +313,19 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
             updatedAt: new Date().toISOString(),
         });
 
-        // If approved, add to peers list
+        // If approved, add to peers list and persist
         if (decision === 'approve') {
             const now = new Date().toISOString();
-            peers.set(request.fromNodeId ?? request.id, {
+            const peerInfo: PeerInfo = {
                 nodeId: request.fromNodeId ?? request.id,
                 url: request.targetUrl ?? request.fromNodeUrl,
                 publicKey: request.publicKey ?? '',
                 status: 'approved',
                 addedAt: now,
                 lastSeen: now,
-            });
+            };
+            peers.set(peerInfo.nodeId, peerInfo);
+            await storage.saveFederationPeer(peerInfo);
         }
 
         res.json(success(config.nodeId, {
@@ -351,6 +353,7 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
 
         peer.status = 'active';
         peer.lastSeen = new Date().toISOString();
+        await storage.saveFederationPeer(peer);
 
         // A.3: Trigger key exchange on peering activation
         const keyExchangeResult = await performKeyExchange(peer.url, config, storage);
@@ -438,14 +441,16 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
         }
 
         const now = new Date().toISOString();
-        peers.set(node_id, {
+        const peerInfo: PeerInfo = {
             nodeId: node_id,
             url,
             publicKey: public_key ?? '',
             status: 'pending',
             addedAt: now,
             lastSeen: now,
-        });
+        };
+        peers.set(node_id, peerInfo);
+        await storage.saveFederationPeer(peerInfo);
 
         res.status(201).json(success(config.nodeId, {
             peer: {
@@ -461,7 +466,7 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
     });
 
     // PUT /v1/federation/peers/:nodeId — update peer config (operator only)
-    router.put('/v1/federation/peers/:nodeId', requireAuth(), requireRole('operator'), (req, res) => {
+    router.put('/v1/federation/peers/:nodeId', requireAuth(), requireRole('operator'), async (req, res) => {
         const nodeId = req.params.nodeId as string;
         const peer = peers.get(nodeId);
         if (!peer) {
@@ -473,6 +478,7 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
         if (url) peer.url = url;
         if (public_key) peer.publicKey = public_key;
         if (status) peer.status = status;
+        await storage.saveFederationPeer(peer);
 
         res.json(success(config.nodeId, {
             node_id: nodeId,
@@ -502,6 +508,7 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
             // ── Emergency de-peering: immediate disconnect ──
             // 1. Remove peer immediately
             peers.delete(nodeId);
+            await storage.deleteFederationPeer(nodeId);
 
             // 2. Cancel all in-flight cross-node work from/to this peer and return escrow
             const allWork = await storage.listAllWork();
@@ -562,6 +569,7 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
 
             peer.status = 'depeering';
             (peer as PeerInfo & { depeerGraceEnd?: string }).depeerGraceEnd = gracePeriodEnd;
+            await storage.saveFederationPeer(peer);
 
             // Remove federated catalogue entries from this peer (mark expiring)
             const allActions = await storage.listActions();
@@ -620,13 +628,14 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
     });
 
     // POST /v1/federation/ping — federation health check (used by peers)
-    router.post('/v1/federation/ping', (req, res) => {
+    router.post('/v1/federation/ping', async (req, res) => {
         const { from_node } = req.body ?? {};
 
         if (from_node && peers.has(from_node)) {
             const peer = peers.get(from_node)!;
             peer.lastSeen = new Date().toISOString();
             peer.status = 'active';
+            storage.saveFederationPeer(peer).catch(() => {});
         }
 
         res.json(success(config.nodeId, {
@@ -641,7 +650,7 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
 
     // POST /v1/federation/key-exchange — Exchange public keys with a peer node
     router.post('/v1/federation/key-exchange', async (req, res) => {
-        const { node_id, node_public_key, agent_keys, timestamp } = req.body ?? {};
+        const { node_id, node_url, node_public_key, agent_keys, timestamp } = req.body ?? {};
 
         if (!node_id || !node_public_key) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
@@ -649,12 +658,34 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
             return;
         }
 
-        // Validate the sender is a known active peer
-        const peer = [...peers.values()].find(p => p.nodeId === node_id);
-        if (!peer || peer.status !== 'active') {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN',
-                `Node ${node_id} is not an active peer`));
-            return;
+        // Find or auto-add the sender as a peer (bidirectional peering)
+        let peer = [...peers.values()].find(p => p.nodeId === node_id);
+        if (!peer || (peer.status !== 'active' && peer.status !== 'approved')) {
+            // Auto-add if sender is our genesis node, or we have an approved peering request from them
+            const senderUrl = node_url as string | undefined;
+            const isGenesis = config.genesisUrl && senderUrl && config.genesisUrl.replace(/\/+$/, '') === senderUrl.replace(/\/+$/, '');
+            const requests = await storage.listPeeringRequests();
+            const hasApprovedRequest = requests.some(r => r.fromNodeId === node_id && (r.status === 'approved' || r.status === 'auto_approved'));
+
+            if ((isGenesis || hasApprovedRequest) && senderUrl) {
+                const now = new Date().toISOString();
+                const newPeer: PeerInfo = {
+                    nodeId: node_id,
+                    url: senderUrl,
+                    publicKey: node_public_key,
+                    status: 'active',
+                    addedAt: now,
+                    lastSeen: now,
+                };
+                peers.set(node_id, newPeer);
+                await storage.saveFederationPeer(newPeer);
+                peer = newPeer;
+                logger.info(`Auto-added peer ${node_id} during key exchange (reciprocal peering)`);
+            } else {
+                res.status(403).json(error(config.nodeId, 'FORBIDDEN',
+                    `Node ${node_id} is not a recognized peer`));
+                return;
+            }
         }
 
         // Store the peer's keys with TTL
@@ -677,6 +708,7 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
         // Also update the peer's public key in the peers map if it changed
         if (node_public_key !== peer.publicKey) {
             peer.publicKey = node_public_key;
+            await storage.saveFederationPeer(peer);
         }
 
         logger.info(`Received key exchange from peer ${node_id}`, {

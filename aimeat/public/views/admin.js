@@ -260,18 +260,14 @@ export default function Admin({ navigate, locale }) {
 
       try { const sr = await api.getStats(); if (sr.data) d.stats = sr.data; } catch { d.stats = null; }
 
-      // Load owners from agent owner names
+      // Load owners from dedicated admin endpoint (includes roles)
       try {
-        const ownerNames = d.agents?.agents
-          ? [...new Set(d.agents.agents.map(a => a.owner))]
-          : [];
-        d.owners = [];
-        for (const name of ownerNames) {
-          try { const o = await api.getOwnerDetail(name); d.owners.push(o.data); } catch {}
-        }
+        const ownersResp = await api.getAdminOwners();
+        d.owners = ownersResp.data?.owners || [];
       } catch { d.owners = []; }
 
       // Final counts
+      newCounts.owners = d.owners.length;
       newCounts.work = d.workItems.length;
       newCounts.peers = d.livePeers.length || d.federation.length;
       newCounts.rooms = d.realtime?.stats?.rooms || 0;

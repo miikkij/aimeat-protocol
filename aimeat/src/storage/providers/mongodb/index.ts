@@ -49,6 +49,7 @@ import type {
     MemoryLinkRecord, OperatorReviewRecord,
     ScheduledJobRecord,
     ExtensionInstanceRecord,
+    FederationPeerRecord,
     ReplicationQueueEntry,
     DeviceAuthorizationRecord,
     OAuthClientRecord,
@@ -3897,67 +3898,111 @@ export class MongoStorage implements Storage {
     }
 
     // ══════════════════════════════════════════════════════════
-    // ── Replication Queue (B.1) — in-memory (transient queue)
+    // ── Federation Peers (persisted active peer connections) ──
     // ══════════════════════════════════════════════════════════
 
-    private replicationQueue = new Map<string, ReplicationQueueEntry>();
+    async saveFederationPeer(peer: FederationPeerRecord): Promise<void> {
+        this.ensureReady();
+        await this.prisma.federationPeer.upsert({
+            where: { nodeId: peer.nodeId },
+            create: { nodeId: peer.nodeId, url: peer.url, publicKey: peer.publicKey, status: peer.status, addedAt: new Date(peer.addedAt), lastSeen: new Date(peer.lastSeen) },
+            update: { url: peer.url, publicKey: peer.publicKey, status: peer.status, lastSeen: new Date(peer.lastSeen) },
+        });
+    }
+
+    async listFederationPeers(): Promise<FederationPeerRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.federationPeer.findMany();
+        return rows.map((r: any) => ({
+            nodeId: r.nodeId,
+            url: r.url,
+            publicKey: r.publicKey,
+            status: r.status,
+            addedAt: r.addedAt instanceof Date ? r.addedAt.toISOString() : r.addedAt,
+            lastSeen: r.lastSeen instanceof Date ? r.lastSeen.toISOString() : r.lastSeen,
+        }));
+    }
+
+    async deleteFederationPeer(nodeId: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.federationPeer.delete({ where: { nodeId } });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // ── Replication Queue (B.1) — persisted to MongoDB
+    // ══════════════════════════════════════════════════════════
 
     async enqueueReplication(entry: Omit<ReplicationQueueEntry, 'id' | 'attempts' | 'lastAttemptAt' | 'status'>): Promise<string> {
+        this.ensureReady();
         const id = randomUUID();
-        const full: ReplicationQueueEntry = {
-            ...entry,
-            id,
-            attempts: 0,
-            lastAttemptAt: null,
-            status: 'pending',
-        };
-        this.replicationQueue.set(id, full);
+        await this.prisma.replicationQueue.create({
+            data: {
+                id,
+                type: entry.type,
+                targetPeers: entry.targetPeers,
+                payload: entry.payload != null ? JSON.stringify(entry.payload) : null,
+                createdAt: new Date(entry.createdAt),
+                attempts: 0,
+                lastAttemptAt: null,
+                status: 'pending',
+            },
+        });
         return id;
     }
 
     async dequeueReplication(peerId: string, limit: number): Promise<ReplicationQueueEntry[]> {
-        const results: ReplicationQueueEntry[] = [];
-        // Iterate in insertion order (Map preserves insertion order)
-        for (const entry of this.replicationQueue.values()) {
-            if (entry.status === 'pending' && entry.targetPeers.includes(peerId)) {
-                results.push(entry);
-                if (results.length >= limit) break;
-            }
-        }
-        return results.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+        this.ensureReady();
+        const rows = await this.prisma.replicationQueue.findMany({
+            where: { status: 'pending', targetPeers: { has: peerId } },
+            orderBy: { createdAt: 'asc' },
+            take: limit,
+        });
+        return rows.map((r: any) => ({
+            id: r.id,
+            type: r.type,
+            targetPeers: r.targetPeers,
+            payload: r.payload ? JSON.parse(r.payload) : null,
+            createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+            attempts: r.attempts,
+            lastAttemptAt: r.lastAttemptAt instanceof Date ? r.lastAttemptAt.toISOString() : r.lastAttemptAt,
+            status: r.status,
+        }));
     }
 
     async markReplicationSent(ids: string[]): Promise<void> {
-        for (const id of ids) {
-            const entry = this.replicationQueue.get(id);
-            if (entry) entry.status = 'sent';
-        }
+        this.ensureReady();
+        await this.prisma.replicationQueue.updateMany({
+            where: { id: { in: ids } },
+            data: { status: 'sent' },
+        });
     }
 
     async markReplicationFailed(ids: string[]): Promise<void> {
+        this.ensureReady();
         for (const id of ids) {
-            const entry = this.replicationQueue.get(id);
-            if (entry) {
-                entry.status = 'failed';
-                entry.attempts++;
-                entry.lastAttemptAt = new Date().toISOString();
-            }
+            await this.prisma.replicationQueue.update({
+                where: { id },
+                data: { status: 'failed', attempts: { increment: 1 }, lastAttemptAt: new Date() },
+            }).catch(() => {});
         }
     }
 
     async pruneReplicationQueue(maxAge: Date): Promise<number> {
-        let pruned = 0;
-        for (const [id, entry] of this.replicationQueue) {
-            if (new Date(entry.createdAt) < maxAge || entry.status === 'sent') {
-                this.replicationQueue.delete(id);
-                pruned++;
-            }
-        }
-        return pruned;
+        this.ensureReady();
+        const result = await this.prisma.replicationQueue.deleteMany({
+            where: { OR: [{ createdAt: { lt: maxAge } }, { status: 'sent' }] },
+        });
+        return result.count;
     }
 
     async replicationQueueSize(): Promise<number> {
-        return this.replicationQueue.size;
+        this.ensureReady();
+        return this.prisma.replicationQueue.count();
     }
 
     // ── Device Authorization (RFC 8628) ──

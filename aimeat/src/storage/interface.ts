@@ -719,6 +719,16 @@ export interface GenesisPeerRecord {
   updatedAt: string;
 }
 
+// Federation Peers — persisted active peer connections
+export interface FederationPeerRecord {
+  nodeId: string;
+  url: string;
+  publicKey: string;
+  status: string;
+  addedAt: string;
+  lastSeen: string;
+}
+
 // Phase B.1 — Replication Queue (federation data sync)
 export interface ReplicationQueueEntry {
   id: string;

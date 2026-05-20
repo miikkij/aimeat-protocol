@@ -134,6 +134,7 @@ export function startHeartbeatJob(
             const graceEnd = (peer as PeerInfo & { depeerGraceEnd?: string }).depeerGraceEnd;
             if (graceEnd && new Date(graceEnd).getTime() <= Date.now()) {
                 peers.delete(key);
+                storage.deleteFederationPeer(key).catch(() => {});
                 logger.info(`Peer ${peer.nodeId} purged after de-peering grace period expired`);
             }
         }
@@ -185,6 +186,7 @@ export function startHeartbeatJob(
                     peer.lastSeen = new Date().toISOString();
                     peer.status = 'active';
                     peerFailures.set(key, 0);
+                    storage.saveFederationPeer(peer).catch(() => {});
 
                     // Detect catalogue hash mismatch for sync triggering
                     const cachedHash = peerCatalogueHashes.get(key);
@@ -208,6 +210,7 @@ export function startHeartbeatJob(
                         peer.status = 'degraded';
                         logger.warn(`Peer ${peer.nodeId} degraded after ${failures} consecutive failures`);
                     }
+                    storage.saveFederationPeer(peer).catch(() => {});
                 }
             } catch {
                 const failures = (peerFailures.get(key) ?? 0) + 1;
@@ -218,6 +221,7 @@ export function startHeartbeatJob(
                 } else if (failures >= 3) {
                     peer.status = 'degraded';
                 }
+                storage.saveFederationPeer(peer).catch(() => {});
             }
         }
     }

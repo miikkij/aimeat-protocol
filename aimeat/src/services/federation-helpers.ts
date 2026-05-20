@@ -78,6 +78,7 @@ export async function performKeyExchange(
 
         const payload = {
             node_id: config.nodeId,
+            node_url: config.baseUrl,
             node_public_key: nodeKey.publicKey,
             agent_keys: agentKeys,
             timestamp: new Date().toISOString(),

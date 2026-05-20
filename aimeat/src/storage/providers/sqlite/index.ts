@@ -24,6 +24,7 @@ import type {
   MemoryLinkRecord, OperatorReviewRecord,
   ScheduledJobRecord,
   ExtensionInstanceRecord,
+  FederationPeerRecord,
   ReplicationQueueEntry,
   DeviceAuthorizationRecord,
   OAuthClientRecord,
@@ -4369,6 +4370,26 @@ export class SqliteStorage implements Storage {
       createdAt: row.createdAt as string,
       updatedAt: row.updatedAt as string,
     };
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Federation Peers (persisted active peer connections) ──
+  // ══════════════════════════════════════════════════════════
+
+  async saveFederationPeer(peer: FederationPeerRecord): Promise<void> {
+    this.db.prepare(
+      `INSERT OR REPLACE INTO federation_peers (nodeId, url, publicKey, status, addedAt, lastSeen)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(peer.nodeId, peer.url, peer.publicKey, peer.status, peer.addedAt, peer.lastSeen);
+  }
+
+  async listFederationPeers(): Promise<FederationPeerRecord[]> {
+    return this.db.prepare('SELECT * FROM federation_peers').all() as FederationPeerRecord[];
+  }
+
+  async deleteFederationPeer(nodeId: string): Promise<boolean> {
+    const result = this.db.prepare('DELETE FROM federation_peers WHERE nodeId = ?').run(nodeId);
+    return result.changes > 0;
   }
 
   // ══════════════════════════════════════════════════════════

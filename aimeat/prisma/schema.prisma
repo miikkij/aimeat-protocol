@@ -716,6 +716,17 @@ model GenesisPeer {
   @@index([status])
 }
 
+model FederationPeer {
+  nodeId    String   @id @map("_id")
+  url       String
+  publicKey String   @default("")
+  status    String   @default("pending")
+  addedAt   DateTime @default(now())
+  lastSeen  DateTime @default(now())
+
+  @@index([status])
+}
+
 model OrganismReputation {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
   organismId   String   @unique
@@ -1170,4 +1181,18 @@ model CapabilityVouch {
   capability   Capability @relation(fields: [capabilityId], references: [id], onDelete: Cascade)
 
   @@unique([capabilityId, userGhii])
+}
+
+model ReplicationQueue {
+  id            String   @id @map("_id")
+  type          String
+  targetPeers   String[]
+  payload       String?
+  createdAt     DateTime @default(now())
+  attempts      Int      @default(0)
+  lastAttemptAt DateTime?
+  status        String   @default("pending")
+
+  @@index([status])
+  @@index([createdAt])
 }

@@ -117,10 +117,22 @@ export function adminMonitoringRouter(
                 return;
             }
 
+            // Store local peering request so we recognize the peer during key exchange
+            const requestId = introBody.data?.request_id ?? `local-${Date.now()}`;
+            await storage.createPeeringRequest({
+                id: requestId,
+                fromNodeId: targetInfo.node_id ?? targetUrl,
+                fromNodeUrl: targetUrl,
+                toNodeId: config.nodeId,
+                status: 'approved',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            });
+
             res.json(success(config.nodeId, {
                 target_node_id: targetInfo.node_id,
                 target_url: targetUrl,
-                request_id: introBody.data?.request_id,
+                request_id: requestId,
                 status: introBody.data?.status ?? 'pending',
                 message: introBody.data?.message ?? 'Introduction sent. Awaiting genesis operator approval.',
             }));

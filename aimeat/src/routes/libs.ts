@@ -992,9 +992,19 @@ function showLoginModal(opts, renderBtn) {
     const password = document.getElementById('aimeat-password').value;
     const errEl = document.getElementById('aimeat-error');
 
-    // Accept full GHII (e.g. "alice@node-id") -- strip @node-id for local login
-    const isGhii = username.includes('@');
-    if (isGhii) username = username.split('@')[0];
+    // Accept full GHII (e.g. "alice@node-id") -- check node match
+    let isGhii = false;
+    if (username.includes('@')) {
+      const atIdx = username.indexOf('@');
+      const nodePart = username.substring(atIdx + 1);
+      if (nodePart && nodePart !== NODE_ID) {
+        errEl.textContent = i.errFederatedLogin || 'Federated login is not yet supported. This node is ' + NODE_ID + ', but the identity belongs to ' + nodePart + '.';
+        errEl.style.display = 'block';
+        return;
+      }
+      username = username.substring(0, atIdx);
+      isGhii = true;
+    }
 
     const displayName = document.getElementById('aimeat-displayname').value.trim() || username;
 

@@ -495,6 +495,23 @@ export function adminRouter(
         ]));
     });
 
+    // GET /v1/admin/owners — full owners list with roles
+    router.get('/v1/admin/owners', requireAuth(), requireRole('operator'), async (_req, res) => {
+        const owners = await storage.listOwners();
+        const result = [];
+        for (const o of owners) {
+            const agents = await storage.getAgentsByOwner(o.name);
+            result.push({
+                name: o.name,
+                display_name: o.displayName,
+                roles: o.roles,
+                agents: agents.map(a => ({ gaii: a.gaii, display_name: a.displayName, trust_score: a.trustScore })),
+                created_at: o.createdAt,
+            });
+        }
+        res.json(success(config.nodeId, { owners: result }));
+    });
+
     // GET /v1/admin/ui — legacy URL, redirect to SPA
     router.get('/v1/admin/ui', (_req, res) => {
         res.redirect(301, '/v1/admin');
