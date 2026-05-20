@@ -2,6 +2,56 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.5.0] - 2026-05-21
+
+### Added
+- **Federation Mesh Network** -- complete mesh networking across AIMEAT nodes with 4 layers of functionality:
+
+#### Per-Peer Policy + Federate Flags (Phase 1)
+- **Per-peer policy controls** -- each federation peer connection has configurable `shareCatalogue`, `replicateMemory`, `allowRouting` flags and a `peerMode` (federation/private). Private P2P peers are excluded from the public federation directory.
+- **Federate flag on all catalogue types** -- `ActionRecord`, `AgentRecord`, `BoardRecord`, `StorageFileRecord` each have a `federate` boolean. Only items explicitly marked for federation are shared across the network. `CsmRecord` and `MsmRecord` already had this.
+- **Policy enforcement** -- catalogue sync, memory replication, and multi-hop routing check peer policies before proceeding. Returns 403 `POLICY_DENIED` when blocked.
+- **Admin UI peer policy toggles** -- Live Peers table in the federation tab has per-peer checkboxes and mode selector.
+- **Profile UI federate badges** -- agents, boards, and knowledge tabs show interactive federate toggle badges.
+
+#### Network Directory (Phase 2)
+- **Service summary endpoint** -- `GET /v1/federation/service-summary` returns a compact catalogue of all federated items on a node, with a SHA-256 hash for change detection.
+- **Heartbeat-driven discovery** -- hub nodes detect service summary hash changes during heartbeat and automatically fetch updated summaries from peers. Summaries stored in-memory, cleaned up when peers go offline.
+- **Cross-catalogue network source** -- `GET /v1/federation/cross-catalogue` extended with `source_type: 'network'` entries aggregated from all peer summaries.
+- **Admin UI network directory browser** -- searchable table in the federation tab showing all services/data available across the federation.
+
+#### Federated Login (Phase 3)
+- **`POST /v1/federation/auth/verify`** -- home node verifies credentials for a remote node. Checks password (scrypt) and requires an active auth consent (`scope: 'auth'`) for the requesting node. Returns a signed Ed25519 attestation.
+- **`POST /v1/federation/auth/refresh`** -- re-verify a federated session without password. Checks user exists and auth consent still active.
+- **Auth consent isolation** -- `scope: 'auth'` is distinct from `scope: 'federation'`. Sharing data with a node does NOT grant login access. New `ConsentRecord.scope` value added to the type.
+- **Federated JWT claims** -- JWT extended with `federated`, `homeNode`, `homeUrl` claims. Short TTL (max 1 hour).
+- **Restricted federated sessions** -- federated users cannot perform operator actions, create agents, or manage consents. `requireLocalSession()` middleware added.
+- **Server-side federated login flow** -- `POST /v1/ghii/login` detects `@remote-node` in username, routes verification to the home node, and issues a local federated JWT on success.
+- **Client-side federated login** -- login modal sends full `user@node` to server. Shows "Connecting to home node..." during federation. "Federated" badge on logged-in state. Session stores federation info.
+- **Access tab Federation Access section** -- manage which nodes can authenticate you. Add/remove per-node auth consents. "Allow all federation nodes" wildcard toggle with warning.
+
+#### Cross-Node Data Access (Phase 4)
+- **`POST /v1/memory/pull`** -- copy a memory entry from the home node to the current (remote) node. Stores locally with `visibility: private` and `pulled-from:` tag.
+- **`POST /v1/memory/push-home`** -- save a local memory entry back to the home node via the federation replication protocol.
+- **Federation proxy utility** -- `middleware/federation-proxy.ts` routes requests from federated sessions to the home node with SSRF protection.
+- **Memory tab pull/push UI** -- federated sessions see a banner and per-entry "Copy from home" / "Save to home" buttons.
+
+#### Additional UI Enhancements
+- **Knowledge tab** -- interactive federate toggle creates/revokes federation consent per package.
+- **Data Wallet tab** -- distinct badges for federation (blue) and auth/login (purple) consent scopes. Scope filter buttons (All / Federation / Login Access).
+- **Memory tab** -- "Synced" badge on entries with active federation consent. Share/Unshare buttons for all sessions.
+- **Profile card** -- federation status indicator shows "Connected to X nodes" or "Standalone".
+
+### Fixed
+- **Multi-hop relay didn't forward auth headers** -- `POST /v1/federation/route` now includes the `Authorization` header when relaying through intermediate nodes, enabling B->A->C routing.
+- **Private peers visible in public directory** -- `GET /v1/federation/directory` now excludes peers with `peerMode: 'private'`.
+- **Federation sidebar count inflated by history** -- sidebar showed peering request history count when no live peers existed. Now shows only live peer count.
+- **Peering request history not deletable** -- added `DELETE /v1/admin/peering/requests/:id` endpoint and delete buttons in the admin federation tab.
+
+### Tests
+- **129 federation tests** -- 44 single-node E2E (peer policies, federate flags, service summary, auth verify, data access), 45 multi-node integration (3 nodes: hub + 2 contributors), 40 original federation tests.
+- **Multi-node integration suite** -- `test/federation-multinode.ts` boots 3 AIMEAT servers and tests service discovery through hub, cross-node routing (direct + multi-hop), federated login with consent isolation, private peer filtering, and routing fee verification.
+
 ## [1.4.8] - 2026-05-20
 
 ### Fixed
