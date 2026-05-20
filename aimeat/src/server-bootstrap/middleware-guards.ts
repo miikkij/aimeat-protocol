@@ -125,7 +125,13 @@ export function setupGuards(
       ];
       const wizardPath = wizardCandidates.find(p => existsSync(p));
       if (wizardPath) {
-        res.type('text/html').send(readFileSync(wizardPath, 'utf-8'));
+        let html = readFileSync(wizardPath, 'utf-8');
+        const nonce = res.locals.cspNonce as string || '';
+        if (nonce) {
+          html = html.replace(/<script(?=[ >])/g, `<script nonce="${nonce}"`);
+          html = html.replace(/<style(?=[ >])/g, `<style nonce="${nonce}"`);
+        }
+        res.type('text/html').send(html);
       } else {
         res.redirect(302, '/v1/setup/status');
       }

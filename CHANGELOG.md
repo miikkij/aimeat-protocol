@@ -2,10 +2,15 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.4.4] - 2026-05-20
+
+### Fixed
+- **Setup wizard still broken after 1.4.3** -- the root cause was in `middleware-guards.ts`: the first-run guard served `wizard.html` directly without injecting the CSP nonce into `<script>`/`<style>` tags. The 1.4.3 onclick fix was necessary but insufficient because the nonce was never reaching the HTML. Now uses the same `res.locals.cspNonce` injection pattern as all other HTML-serving routes.
+
 ## [1.4.3] - 2026-05-20
 
 ### Fixed
-- **Setup wizard broken by CSP** -- inline `onclick` event handlers in `wizard.html` were blocked by the Content Security Policy (`script-src` requires nonce or `unsafe-inline`). Replaced all 17 inline handlers with `addEventListener` calls inside the nonce-protected `<script>` block. New users could not complete initial node setup because no buttons worked.
+- **Setup wizard inline onclick handlers blocked by CSP** -- replaced all 17 inline `onclick` event handlers in `wizard.html` with `addEventListener` calls inside the nonce-protected `<script>` block. Inline event handlers require `unsafe-inline` regardless of nonce.
 
 ## [1.4.2] - 2026-05-16
 
