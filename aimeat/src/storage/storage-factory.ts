@@ -26,7 +26,7 @@ export async function createStorage(opts: StorageOptions): Promise<Storage> {
       try {
         const { SqliteStorage } = await import('./providers/sqlite/index.js');
         return new SqliteStorage(opts.sqlitePath ?? './data/aimeat.db');
-      } catch (err) { sqliteLoadFailed(err); }
+      } catch (err) { sqliteLoadFailed(err); break; }
     }
     case 'mongodb': {
       const { MongoStorage } = await import('./providers/mongodb/index.js');
