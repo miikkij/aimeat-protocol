@@ -90,15 +90,10 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage): Ro
             // and filter for auth-related consents targeting this node.
             const consents = await storage.listConsents(ghii, { status: 'active' });
             const hasAuthConsent = consents.some(c => {
-                // Check if consent grants auth to the requesting node
+                if (c.scope !== 'auth') return false;
                 if (c.recipient === `node:${requesting_node}`) return true;
                 if (c.recipient === '*') return true;
-                // Domain patterns: e.g. "domain:*.aimeat.io" matching "aimeat-fi-001"
-                if (c.recipient.startsWith('domain:')) {
-                    // Reuse the same glob logic -- import would create circular dep,
-                    // so do a simple check: recipient "domain:*" matches everything
-                    if (c.recipient === 'domain:*') return true;
-                }
+                if (c.recipient === 'domain:*') return true;
                 return false;
             });
 

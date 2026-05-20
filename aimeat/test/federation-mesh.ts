@@ -6,6 +6,7 @@
  * @version-history
  *   v1.0.0 — 2026-05-20 — Initial federation mesh E2E tests
  *   v1.1.0 — 2026-05-20 — Add network directory tests (Phase 2 Task 6)
+ *   v1.2.0 — 2026-05-21 — Add federated login E2E tests (Phase 3 Task 6)
  */
 
 // Run: cd aimeat && pnpm exec tsx test/federation-mesh.ts
@@ -496,6 +497,243 @@ await test('GET /v1/federation/cross-catalogue -- supports source=network filter
     assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
     assert(Array.isArray(body.data.entries), 'entries is array');
+});
+
+// ─── Test: Federated Login ───
+console.log('\nFederated Login');
+
+// The main test owner was registered via admin API (no password hash).
+// Federation auth/verify requires a password hash, so we register a separate
+// GHII user with a password specifically for these tests.
+const fedLoginUser = `fedlogin${Date.now()}`;
+const fedLoginPassword = 'FedTest1234';
+let fedLoginToken = '';
+let fedLoginPrivKey = '';
+
+await test('Register GHII with password for federation auth tests', async () => {
+    const { status, body } = await json('/v1/ghii', {
+        method: 'POST',
+        body: JSON.stringify({
+            username: fedLoginUser,
+            display_name: fedLoginUser,
+            password: fedLoginPassword,
+        }),
+    });
+    assert(status === 201, `register status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(body.data.has_password === true, 'has_password is true');
+    fedLoginPrivKey = body.data.private_key;
+    assert(typeof fedLoginPrivKey === 'string' && fedLoginPrivKey.length > 0, 'got private key');
+});
+
+await test('Authenticate federation login user', async () => {
+    const timestamp = new Date().toISOString();
+    const message = fedLoginUser + NODE_ID + timestamp;
+    const signature = await signMsg(fedLoginPrivKey, message);
+
+    // Use admin token endpoint if available, otherwise standard auth
+    if (ADMIN_PW) {
+        const { body } = await json('/v1/admin/setup/token', {
+            method: 'POST',
+            headers: { 'X-Admin-Password': ADMIN_PW },
+            body: JSON.stringify({ owner: fedLoginUser, private_key: fedLoginPrivKey }),
+        });
+        assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
+        fedLoginToken = body.token;
+    } else {
+        const { body } = await json('/v1/auth/token', {
+            method: 'POST',
+            body: JSON.stringify({ owner: fedLoginUser, timestamp, signature }),
+        });
+        assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
+        fedLoginToken = body.data?.token;
+    }
+    assert(typeof fedLoginToken === 'string', 'got token');
+});
+
+await test('Create auth consent for test node', async () => {
+    const { status, body } = await json('/v1/consent', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${fedLoginToken}` },
+        body: JSON.stringify({
+            data_pattern: '_identity',
+            recipient: 'node:test-remote-node',
+            scope: 'auth',
+            purpose: 'federation_login',
+        }),
+    });
+    assert(status === 201, `consent status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+});
+
+await test('Auth verify succeeds with valid credentials + auth consent', async () => {
+    const timestamp = new Date().toISOString();
+    const { status, body } = await json('/v1/federation/auth/verify', {
+        method: 'POST',
+        body: JSON.stringify({
+            username: fedLoginUser,
+            password: fedLoginPassword,
+            requesting_node: 'test-remote-node',
+            timestamp,
+        }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(typeof body.data.attestation === 'object', 'attestation is object');
+    assert(body.data.attestation.ghii.includes(fedLoginUser), `ghii contains username: ${body.data.attestation.ghii}`);
+    assert(typeof body.data.attestation.home_node === 'string', 'home_node exists');
+    assert(body.data.attestation.requesting_node === 'test-remote-node', 'requesting_node matches');
+    assert(typeof body.data.signature === 'string', 'signature exists');
+    assert(typeof body.data.attestation.issued_at === 'string', 'issued_at exists');
+    assert(typeof body.data.attestation.expires_at === 'string', 'expires_at exists');
+});
+
+await test('Auth verify fails without auth consent (unauthorized node)', async () => {
+    const timestamp = new Date().toISOString();
+    const { status, body } = await json('/v1/federation/auth/verify', {
+        method: 'POST',
+        body: JSON.stringify({
+            username: fedLoginUser,
+            password: fedLoginPassword,
+            requesting_node: 'unauthorized-node',
+            timestamp,
+        }),
+    });
+    assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === false, 'ok is false');
+    assert(body.error?.code === 'NO_AUTH_CONSENT', `error code: ${body.error?.code}`);
+});
+
+await test('Auth verify fails with wrong password', async () => {
+    const timestamp = new Date().toISOString();
+    const { status, body } = await json('/v1/federation/auth/verify', {
+        method: 'POST',
+        body: JSON.stringify({
+            username: fedLoginUser,
+            password: 'WrongPassword99',
+            requesting_node: 'test-remote-node',
+            timestamp,
+        }),
+    });
+    assert(status === 401, `expected 401, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === false, 'ok is false');
+    assert(body.error?.code === 'FEDERATION_AUTH_FAILED', `error code: ${body.error?.code}`);
+});
+
+await test('Auth verify fails with nonexistent user', async () => {
+    const timestamp = new Date().toISOString();
+    const { status, body } = await json('/v1/federation/auth/verify', {
+        method: 'POST',
+        body: JSON.stringify({
+            username: 'nonexistent_user_xyz',
+            password: 'SomePassword1',
+            requesting_node: 'test-remote-node',
+            timestamp,
+        }),
+    });
+    assert(status === 401, `expected 401, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === false, 'ok is false');
+    assert(body.error?.code === 'FEDERATION_AUTH_FAILED', `error code: ${body.error?.code}`);
+});
+
+await test('Auth verify fails with missing fields', async () => {
+    // Missing password
+    const { status: s1 } = await json('/v1/federation/auth/verify', {
+        method: 'POST',
+        body: JSON.stringify({
+            username: fedLoginUser,
+            requesting_node: 'test-remote-node',
+            timestamp: new Date().toISOString(),
+        }),
+    });
+    assert(s1 === 400, `missing password: expected 400, got ${s1}`);
+
+    // Missing username
+    const { status: s2 } = await json('/v1/federation/auth/verify', {
+        method: 'POST',
+        body: JSON.stringify({
+            password: fedLoginPassword,
+            requesting_node: 'test-remote-node',
+            timestamp: new Date().toISOString(),
+        }),
+    });
+    assert(s2 === 400, `missing username: expected 400, got ${s2}`);
+
+    // Missing requesting_node
+    const { status: s3 } = await json('/v1/federation/auth/verify', {
+        method: 'POST',
+        body: JSON.stringify({
+            username: fedLoginUser,
+            password: fedLoginPassword,
+            timestamp: new Date().toISOString(),
+        }),
+    });
+    assert(s3 === 400, `missing requesting_node: expected 400, got ${s3}`);
+
+    // Missing timestamp
+    const { status: s4 } = await json('/v1/federation/auth/verify', {
+        method: 'POST',
+        body: JSON.stringify({
+            username: fedLoginUser,
+            password: fedLoginPassword,
+            requesting_node: 'test-remote-node',
+        }),
+    });
+    assert(s4 === 400, `missing timestamp: expected 400, got ${s4}`);
+});
+
+await test('Auth verify fails with expired timestamp', async () => {
+    // Timestamp 10 minutes in the past (beyond the 5-minute window)
+    const oldTimestamp = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const { status, body } = await json('/v1/federation/auth/verify', {
+        method: 'POST',
+        body: JSON.stringify({
+            username: fedLoginUser,
+            password: fedLoginPassword,
+            requesting_node: 'test-remote-node',
+            timestamp: oldTimestamp,
+        }),
+    });
+    assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === false, 'ok is false');
+    assert(body.error?.code === 'INVALID_TIMESTAMP', `error code: ${body.error?.code}`);
+});
+
+await test('Data consent does not grant auth access (scope isolation)', async () => {
+    // Create a data/federation consent for a different node (NOT auth scope)
+    const { status: consentStatus, body: consentBody } = await json('/v1/consent', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${fedLoginToken}` },
+        body: JSON.stringify({
+            data_pattern: 'profile.*',
+            recipient: 'node:data-only-node',
+            scope: 'federation',
+            purpose: 'data_sharing',
+        }),
+    });
+    assert(consentStatus === 201, `consent created: ${consentStatus}: ${JSON.stringify(consentBody)}`);
+
+    const timestamp = new Date().toISOString();
+    const { status, body } = await json('/v1/federation/auth/verify', {
+        method: 'POST',
+        body: JSON.stringify({
+            username: fedLoginUser,
+            password: fedLoginPassword,
+            requesting_node: 'data-only-node',
+            timestamp,
+        }),
+    });
+    assert(status === 403, `expected 403 (data consent should NOT grant auth), got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'NO_AUTH_CONSENT', `error code: ${body.error?.code}`);
+});
+
+await test('Delete federation login user (cleanup)', async () => {
+    const { body } = await json(`/v1/owners/${fedLoginUser}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(body.ok === true, `delete: ${JSON.stringify(body.error)}`);
+    assert(body.data.deleted === true, 'confirmed deleted');
 });
 
 // ─── Cleanup ───
