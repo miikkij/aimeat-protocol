@@ -32,6 +32,30 @@ export function getNodeUrl() {
   return typeof window !== 'undefined' ? window.location.origin : '';
 }
 
+/** Fetch the current user's GHII profile from the server. */
+export async function getProfile() {
+  const s = getSession();
+  if (!s) return null;
+  return s.fetch(`/v1/ghii/${encodeURIComponent(s.ghii)}`);
+}
+
+/** Update the current user's profile via PUT /v1/ghii. */
+export async function updateProfile(fields) {
+  const s = getSession();
+  if (!s) throw new Error('Not logged in');
+  return s.fetch('/v1/ghii', { method: 'PUT', body: JSON.stringify(fields) });
+}
+
+/** Change the current user's password via POST /v1/ghii/password/change. */
+export async function changePassword(currentPassword, newPassword) {
+  const s = getSession();
+  if (!s) throw new Error('Not logged in');
+  return s.fetch('/v1/ghii/password/change', {
+    method: 'POST',
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+}
+
 /** Listen for auth state changes. Returns unsubscribe function. */
 export function onAuthChange(callback) {
   const handler = () => callback(getSession());

@@ -21,7 +21,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { getNodeUrl } from '/js/services/auth.js';
+import { getNodeUrl, getProfile, updateProfile, changePassword } from '/js/services/auth.js';
 import { listApps } from '/js/services/apps.js';
 import { Spinner } from './shared.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
@@ -56,9 +56,186 @@ export function tierLevel(tier) {
   return TIER_LEVELS[tier] || 0;
 }
 
+/* ───── Edit Profile Modal ───── */
+
+function EditProfileModal({ session, onClose, onSaved }) {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [fields, setFields] = useState({ display_name: '', bio: '', avatar: '', locale: 'en' });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const resp = await getProfile();
+        if (cancelled) return;
+        if (resp && resp.data) {
+          const d = resp.data;
+          setFields({
+            display_name: d.display_name || '',
+            bio: d.bio || '',
+            avatar: d.avatar || '',
+            locale: d.locale || 'en',
+          });
+        }
+      } catch { /* use defaults */ }
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const set = (key, val) => setFields(prev => ({ ...prev, [key]: val }));
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const resp = await updateProfile(fields);
+      if (resp && resp.data) {
+        if (session && typeof fields.display_name === 'string') {
+          session.displayName = fields.display_name;
+        }
+        onSaved?.();
+      } else {
+        alert(t('profile.landing.editError'));
+      }
+    } catch {
+      alert(t('profile.landing.editError'));
+    }
+    setSaving(false);
+  };
+
+  const onOverlayClick = (e) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  return html`
+    <div class="pf-edit-overlay" onClick=${onOverlayClick}>
+      <div class="pf-edit-modal">
+        <div class="pf-edit-header">
+          <h2 class="pf-edit-title">${t('profile.landing.editModalTitle')}</h2>
+          <button class="pf-edit-close" onClick=${onClose} aria-label=${t('profile.landing.editCancel')}>✕</button>
+        </div>
+        ${loading ? html`<div class="pf-edit-loading"><${Spinner} /></div>` : html`
+          <div class="pf-edit-body">
+            <label class="pf-edit-label">
+              ${t('profile.landing.editDisplayName')}
+              <input type="text" class="pf-edit-input" value=${fields.display_name}
+                placeholder=${t('profile.landing.editDisplayNamePlaceholder')}
+                maxlength="100"
+                onInput=${(e) => set('display_name', e.target.value)} />
+            </label>
+            <label class="pf-edit-label">
+              ${t('profile.landing.editBio')}
+              <textarea class="pf-edit-textarea" value=${fields.bio}
+                placeholder=${t('profile.landing.editBioPlaceholder')}
+                maxlength="500" rows="3"
+                onInput=${(e) => set('bio', e.target.value)}></textarea>
+            </label>
+            <label class="pf-edit-label">
+              ${t('profile.landing.editAvatar')}
+              <input type="text" class="pf-edit-input" value=${fields.avatar}
+                placeholder=${t('profile.landing.editAvatarPlaceholder')}
+                maxlength="50"
+                onInput=${(e) => set('avatar', e.target.value)} />
+            </label>
+            <label class="pf-edit-label">
+              ${t('profile.landing.editLocale')}
+              <select class="pf-edit-select" value=${fields.locale}
+                onChange=${(e) => set('locale', e.target.value)}>
+                <option value="en">English</option>
+                <option value="fi">Suomi</option>
+              </select>
+            </label>
+          </div>
+          <div class="pf-edit-footer">
+            <button class="btn-outline" onClick=${onClose} disabled=${saving}>
+              ${t('profile.landing.editCancel')}
+            </button>
+            <button class="btn-primary" onClick=${save} disabled=${saving}>
+              ${saving ? t('profile.landing.editSaving') : t('profile.landing.editSave')}
+            </button>
+          </div>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+/* ───── Change Password Modal ───── */
+
+function ChangePasswordModal({ onClose, onChanged }) {
+  const [current, setCurrent] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  const save = async () => {
+    setErr('');
+    if (newPw !== confirm) {
+      setErr(t('profile.landing.passwordMismatch'));
+      return;
+    }
+    setSaving(true);
+    try {
+      const resp = await changePassword(current, newPw);
+      if (resp && resp.data && resp.data.ok) {
+        onChanged?.();
+      } else {
+        setErr(resp?.error?.message || t('profile.landing.passwordChangeFailed'));
+      }
+    } catch {
+      setErr(t('profile.landing.passwordChangeFailed'));
+    }
+    setSaving(false);
+  };
+
+  const onOverlayClick = (e) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  return html`
+    <div class="pf-edit-overlay" onClick=${onOverlayClick}>
+      <div class="pf-edit-modal">
+        <div class="pf-edit-header">
+          <h2 class="pf-edit-title">${t('profile.landing.changePasswordTitle')}</h2>
+          <button class="pf-edit-close" onClick=${onClose} aria-label=${t('profile.landing.editCancel')}>✕</button>
+        </div>
+        <div class="pf-edit-body">
+          <label class="pf-edit-label">
+            ${t('profile.landing.currentPassword')}
+            <input type="password" class="pf-edit-input" value=${current}
+              onInput=${(e) => setCurrent(e.target.value)} />
+          </label>
+          <label class="pf-edit-label">
+            ${t('profile.landing.newPassword')}
+            <input type="password" class="pf-edit-input" value=${newPw}
+              onInput=${(e) => setNewPw(e.target.value)} />
+          </label>
+          <label class="pf-edit-label">
+            ${t('profile.landing.confirmPassword')}
+            <input type="password" class="pf-edit-input" value=${confirm}
+              onInput=${(e) => setConfirm(e.target.value)} />
+          </label>
+          <div class="pf-edit-hint">${t('profile.landing.passwordRequirements')}</div>
+          ${err && html`<div class="pf-edit-error">${err}</div>`}
+        </div>
+        <div class="pf-edit-footer">
+          <button class="btn-outline" onClick=${onClose} disabled=${saving}>
+            ${t('profile.landing.editCancel')}
+          </button>
+          <button class="btn-primary" onClick=${save} disabled=${saving || !current || !newPw || !confirm}>
+            ${saving ? t('profile.landing.passwordChanging') : t('profile.landing.editSave')}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 /* ───── Sub-components ───── */
 
-function ProfileCard({ tier, stats, session }) {
+function ProfileCard({ tier, stats, session, onEditProfile, onChangePassword }) {
   const NODE_URL = getNodeUrl();
   const isNew = tier === 'new';
   const isExperienced = tier === 'experienced';
@@ -71,11 +248,12 @@ function ProfileCard({ tier, stats, session }) {
         <div class="pf-lp-info">
           <div class="pf-lp-name-row">
             <span class="pf-lp-name">${escHtml(session.displayName || session.owner)}</span>
-            ${!isNew && html`
-              <a href="#" class="pf-lp-edit" onClick=${(e) => e.preventDefault()}>
-                ${t('profile.landing.editProfile')} \u2192
-              </a>
-            `}
+            <a href="#" class="pf-lp-edit" onClick=${(e) => { e.preventDefault(); onEditProfile?.(); }}>
+              ${t('profile.landing.editProfile')} \u2192
+            </a>
+            <a href="#" class="pf-lp-edit" onClick=${(e) => { e.preventDefault(); onChangePassword?.(); }}>
+              ${t('profile.landing.changePassword')} \u2192
+            </a>
           </div>
           <div class="pf-lp-ghii">${escHtml(session.ghii || '')}</div>
           <div class="pf-lp-node">${t('profile.node')}: ${escHtml(NODE_URL)}</div>
@@ -319,6 +497,8 @@ function InlineView({ tabId, label, onClose, renderTab }) {
 
 export default function LandingPage({ tier, stats, session, navigate, showToast, locale, renderTab, getTabLabel }) {
   const [apps, setApps] = useState([]);
+  const [editOpen, setEditOpen] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
   const [openView, setOpenView] = useState(() => {
     try {
       const saved = localStorage.getItem('aimeat-profile-tab');
@@ -390,7 +570,20 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
   return html`
     <div class="pf-landing">
 
-      <${ProfileCard} tier=${tier} stats=${stats} session=${session} />
+      <${ProfileCard} tier=${tier} stats=${stats} session=${session}
+        onEditProfile=${() => setEditOpen(true)}
+        onChangePassword=${() => setPwOpen(true)} />
+
+      ${editOpen && html`<${EditProfileModal}
+        session=${session}
+        onClose=${() => setEditOpen(false)}
+        onSaved=${() => { setEditOpen(false); showToast?.(t('profile.landing.editSaved')); }}
+      />`}
+
+      ${pwOpen && html`<${ChangePasswordModal}
+        onClose=${() => setPwOpen(false)}
+        onChanged=${() => { setPwOpen(false); showToast?.(t('profile.landing.passwordChanged')); }}
+      />`}
 
       ${isNew && html`
         <${HeroOnboarding} switchTab=${(id) => open(id, 'hero')} />

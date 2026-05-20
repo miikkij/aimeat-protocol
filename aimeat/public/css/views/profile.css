@@ -1573,6 +1573,54 @@
 }
 .pf .pf-expand-trigger:hover { color: var(--accent, #E8564A); }
 
+/* --- Edit Profile Modal --- */
+.pf-edit-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center;
+  animation: pf-fade-in .2s ease;
+}
+@keyframes pf-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.pf-edit-modal {
+  background: var(--card, #fff); border-radius: 16px; width: 92%; max-width: 440px;
+  box-shadow: 0 16px 48px rgba(0,0,0,.18); animation: pf-modal-in .25s ease;
+  max-height: 90vh; overflow-y: auto;
+}
+@keyframes pf-modal-in { from { opacity: 0; transform: translateY(16px) scale(.97); } to { opacity: 1; transform: none; } }
+.pf-edit-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 22px 14px; border-bottom: 1px solid var(--border-soft, #f0f0ec);
+}
+.pf-edit-title { font-size: 1.1rem; font-weight: 700; margin: 0; letter-spacing: -.2px; }
+.pf-edit-close {
+  width: 32px; height: 32px; border: none; background: transparent;
+  font-size: 1rem; cursor: pointer; border-radius: 8px; color: var(--text-dim, #9CA3AF);
+  display: flex; align-items: center; justify-content: center; transition: all .15s;
+}
+.pf-edit-close:hover { background: var(--accent-soft, #FFF0EE); color: var(--accent, #E8564A); }
+.pf-edit-loading { padding: 40px 22px; text-align: center; }
+.pf-edit-body { padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; }
+.pf-edit-label {
+  display: flex; flex-direction: column; gap: 5px;
+  font-size: .81rem; font-weight: 600; color: var(--text, #1a1a1a);
+}
+.pf-edit-input, .pf-edit-textarea, .pf-edit-select {
+  font-family: inherit; font-size: .88rem; padding: 9px 12px;
+  border: 1px solid var(--border, #e5e5e0); border-radius: 10px;
+  background: var(--bg, #fff); color: var(--text, #1a1a1a);
+  transition: border-color .15s;
+}
+.pf-edit-input:focus, .pf-edit-textarea:focus, .pf-edit-select:focus {
+  outline: none; border-color: var(--accent, #E8564A); box-shadow: 0 0 0 2px var(--accent-soft, #FFF0EE);
+}
+.pf-edit-textarea { resize: vertical; min-height: 72px; }
+.pf-edit-select { cursor: pointer; }
+.pf-edit-hint { font-size: .75rem; color: var(--text-dim, #9CA3AF); }
+.pf-edit-error { font-size: .81rem; color: var(--danger, #ef4444); padding: 8px 12px; background: var(--danger-soft, #FEF2F2); border-radius: 8px; }
+.pf-edit-footer {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding: 14px 22px 18px; border-top: 1px solid var(--border-soft, #f0f0ec);
+}
+
 /* --- Inline Preview Panels --- */
 .pf .pf-inline-panel {
   background: var(--card, #fff); border-radius: 16px;

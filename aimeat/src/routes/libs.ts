@@ -420,6 +420,7 @@ function createSession(data) {
     gaii: data.gaii || null,
     jwt: data.jwt,
     roles: jwtPayload?.roles || data.roles || [],
+    displayName: data.displayName || '',
     // SECURITY: Private keys are stored as non-extractable CryptoKeys in IndexedDB,
     // NOT in this session object or localStorage. Use _cryptoKey for in-memory ref only.
     _cryptoKey: data._cryptoKey || null,
@@ -472,6 +473,7 @@ function createSession(data) {
       save('session', {
         owner: session.owner, gaii: session.gaii, ghii: session.ghii,
         jwt: session.jwt, publicKey: session.publicKey, roles: session.roles,
+        displayName: session.displayName || '',
       });
       scheduleAutoRefresh(session);
       return session;
@@ -538,12 +540,14 @@ const auth = {
       ghii, owner: ownerName, gaii: null,
       jwt: ownerTokenData.data.token,
       _cryptoKey: ownerCryptoKey, publicKey: serverPublicKey,
+      displayName: regData.data.ghii.display_name || '',
     });
 
     // SECURITY: Only save metadata to localStorage (no private keys)
     save('session', {
       owner: ownerName, gaii: null, ghii,
       jwt: session.jwt, publicKey: serverPublicKey, roles: session.roles,
+      displayName: session.displayName || '',
     });
 
     currentSession = session;
@@ -618,12 +622,14 @@ const auth = {
       jwt: d.token,
       _cryptoKey: ownerCryptoKey,
       publicKey: d.owner_public_key || '',
+      displayName: d.ghii.display_name || '',
     });
 
     // SECURITY: Only save metadata to localStorage (no private keys)
     save('session', {
       owner: d.owner.name, gaii: null, ghii: d.ghii.ghii,
       jwt: d.token, publicKey: d.owner_public_key || '', roles: session.roles,
+      displayName: session.displayName || '',
     });
 
     currentSession = session;
@@ -982,10 +988,15 @@ function showLoginModal(opts, renderBtn) {
   });
 
   document.getElementById('aimeat-go-btn').addEventListener('click', async () => {
-    const username = document.getElementById('aimeat-username').value.trim().toLowerCase();
+    let username = document.getElementById('aimeat-username').value.trim().toLowerCase();
     const password = document.getElementById('aimeat-password').value;
-    const displayName = document.getElementById('aimeat-displayname').value.trim() || username;
     const errEl = document.getElementById('aimeat-error');
+
+    // Accept full GHII (e.g. "alice@node-id") -- strip @node-id for local login
+    const isGhii = username.includes('@');
+    if (isGhii) username = username.split('@')[0];
+
+    const displayName = document.getElementById('aimeat-displayname').value.trim() || username;
 
     if (!username || username.length < 3) {
       errEl.textContent = i.errUserShort || 'Username must be at least 3 characters';
@@ -1002,6 +1013,24 @@ function showLoginModal(opts, renderBtn) {
     const btn = document.getElementById('aimeat-go-btn');
     btn.textContent = i.working || 'Working...';
     btn.disabled = true;
+
+    // If input was a full GHII, skip register and go straight to login
+    if (isGhii) {
+      try {
+        const session = await auth.loginWithPassword(username, password);
+        modal.remove();
+        renderBtn();
+        if (opts.onLogin) opts.onLogin(session);
+      } catch(e2) {
+        errEl.textContent = e2.message.includes('Invalid username or password')
+          ? (i.errWrongPass || 'Wrong password for that username.')
+          : e2.message;
+        errEl.style.display = 'block';
+        btn.textContent = i.signInBtn || 'Sign In';
+        btn.disabled = false;
+      }
+      return;
+    }
 
     try {
       // Try registering first (new account)

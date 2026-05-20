@@ -13,6 +13,7 @@ import { validateTotpCode, validateBackupCode } from '../services/totp.js';
 import type { TotpConfig } from '../services/totp.js';
 import { hashPassword, verifyPassword } from '../services/password.js';
 import { rateLimit } from '../middleware/rate-limit.js';
+import { logger } from '../utils/logger.js';
 
 // SECURITY: Password strength validation
 const WEAK_PASSWORDS = [
@@ -214,7 +215,20 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             return;
         }
 
-        const ghii = `${username}@${config.nodeId}`;
+        // Accept full GHII (e.g. "alice@node-id") -- strip the @node-id for local lookup
+        let loginName = username.trim().toLowerCase();
+        if (loginName.includes('@')) {
+            const atIdx = loginName.indexOf('@');
+            const nodePart = loginName.substring(atIdx + 1);
+            loginName = loginName.substring(0, atIdx);
+            if (nodePart !== config.nodeId) {
+                res.status(400).json(error(config.nodeId, 'FEDERATION_LOGIN_UNSUPPORTED',
+                    `Federated login is not yet supported. This node is ${config.nodeId}, but the identity belongs to ${nodePart}.`));
+                return;
+            }
+        }
+
+        const ghii = `${loginName}@${config.nodeId}`;
         const ghiiRecord = await storage.getGHII(ghii);
         if (!ghiiRecord) {
             res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Invalid username or password'));
@@ -955,8 +969,14 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
                 verifiedAt: null,
             });
 
-            // Send reset code via email
-            await emailService.sendVerificationCode(ghiiRecord.notificationEmail, code, ghiiRecord.locale);
+            const sent = await emailService.sendVerificationCode(ghiiRecord.notificationEmail, code, ghiiRecord.locale);
+            if (sent) {
+                logger.info('Password reset code sent successfully');
+            } else {
+                logger.warn('Password reset code email failed to send');
+            }
+        } else if (ghiiRecord) {
+            logger.info(`Password reset skipped: email=${!!ghiiRecord.notificationEmail} verified=${!!ghiiRecord.emailVerifiedAt} service=${!!emailService?.enabled}`);
         }
 
         // Always return same response to not reveal if account exists
@@ -1029,6 +1049,49 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         res.json(success(config.nodeId, {
             ok: true,
             message: 'Password reset successful',
+        }));
+        emitChange('ghii');
+    });
+
+    // POST /v1/ghii/password/change — Change password (requires auth)
+    router.post('/v1/ghii/password/change', requireAuth(), rateLimit({ max: 5, windowMs: 10 * 60 * 1000 }), async (req, res) => {
+        const ownerName = req.auth!.owner;
+        const { current_password, new_password } = req.body ?? {};
+
+        if (!current_password || typeof current_password !== 'string') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'current_password is required'));
+            return;
+        }
+        if (!new_password || typeof new_password !== 'string') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'new_password is required'));
+            return;
+        }
+
+        const ghii = `${ownerName}@${config.nodeId}`;
+        const ghiiRecord = await storage.getGHII(ghii);
+        if (!ghiiRecord || !ghiiRecord.passwordHash) {
+            res.status(400).json(error(config.nodeId, 'NO_PASSWORD', 'Account does not have a password set'));
+            return;
+        }
+
+        const valid = await verifyPassword(current_password, ghiiRecord.passwordHash);
+        if (!valid) {
+            res.status(401).json(error(config.nodeId, 'WRONG_PASSWORD', 'Current password is incorrect'));
+            return;
+        }
+
+        const pwErr = validatePasswordStrength(new_password);
+        if (pwErr) {
+            res.status(400).json(error(config.nodeId, 'WEAK_PASSWORD', pwErr));
+            return;
+        }
+
+        const newHash = await hashPassword(new_password);
+        await storage.updateGHII(ghii, { passwordHash: newHash });
+
+        res.json(success(config.nodeId, {
+            ok: true,
+            message: 'Password changed successfully',
         }));
         emitChange('ghii');
     });
