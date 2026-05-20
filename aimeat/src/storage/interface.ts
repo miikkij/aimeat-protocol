@@ -438,7 +438,7 @@ export interface ConsentRecord {
   dataPattern: string;        // Glob-pattern: "profile.*.interests", "iot.*"
   recipient: string;          // "*" | GAII | "organism.{id}"
   purpose: string;            // Free-form: "discovery", "marketplace", "research"
-  scope: 'private' | 'dmz' | 'federation';  // DMZ zone
+  scope: 'private' | 'dmz' | 'federation' | 'auth';
   expires: string | null;     // ISO 8601 or null (indefinite)
   status: 'active' | 'revoked' | 'expired';
   grantedAt: string;          // ISO timestamp
