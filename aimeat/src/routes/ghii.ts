@@ -47,11 +47,24 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
     // POST /v1/ghii — Register a new human identity (no auth required)
     // Creates an owner account + GHII profile in one step
     router.post('/v1/ghii', async (req, res) => {
-        const { username, display_name, bio, avatar, locale, password } = req.body ?? {};
+        let { username, display_name, bio, avatar, locale, password } = req.body ?? {};
 
         if (!username || typeof username !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required'));
             return;
+        }
+
+        // Accept full GHII (e.g. "alice@node-id") -- strip @node-id for local registration
+        username = username.trim().toLowerCase();
+        if (username.includes('@')) {
+            const atIdx = username.indexOf('@');
+            const nodePart = username.substring(atIdx + 1);
+            username = username.substring(0, atIdx);
+            if (nodePart !== config.nodeId) {
+                res.status(400).json(error(config.nodeId, 'FEDERATION_REGISTER_UNSUPPORTED',
+                    `Cannot register here with a remote identity. "${username}" belongs to node ${nodePart}. Try signing in instead.`));
+                return;
+            }
         }
 
         const nameError = validateOwnerName(username);
@@ -391,11 +404,24 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
     // POST /v1/ghii/register-web — Web registration (no auth required)
     // Creates owner + GHII profile with optional email verification
     router.post('/v1/ghii/register-web', async (req, res) => {
-        const { username, display_name, email, locale, city, area, interests } = req.body ?? {};
+        let { username, display_name, email, locale, city, area, interests } = req.body ?? {};
 
         if (!username || typeof username !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required'));
             return;
+        }
+
+        // Accept full GHII -- strip @node-id
+        username = username.trim().toLowerCase();
+        if (username.includes('@')) {
+            const atIdx = username.indexOf('@');
+            const nodePart = username.substring(atIdx + 1);
+            username = username.substring(0, atIdx);
+            if (nodePart !== config.nodeId) {
+                res.status(400).json(error(config.nodeId, 'FEDERATION_REGISTER_UNSUPPORTED',
+                    `Cannot register here with a remote identity. "${username}" belongs to node ${nodePart}. Try signing in instead.`));
+                return;
+            }
         }
 
         const nameError = validateOwnerName(username);
@@ -1217,6 +1243,28 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             inherited: !updated.allowedOrigins,
         }));
         emitChange('ghii');
+    });
+
+    // GET /v1/ghii/me — Own profile with private fields (auth required)
+    // Must be registered before GET /v1/ghii/:ghii to avoid :ghii matching "me"
+    router.get('/v1/ghii/me', requireAuth(), async (req, res) => {
+        const ownerName = req.auth!.owner;
+        const ghiiRecord = await storage.getGHIIByOwner(ownerName);
+        if (!ghiiRecord) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No GHII profile found'));
+            return;
+        }
+
+        res.json(success(config.nodeId, {
+            ghii: ghiiRecord.ghii,
+            display_name: ghiiRecord.displayName,
+            bio: ghiiRecord.bio,
+            avatar: ghiiRecord.avatar,
+            locale: ghiiRecord.locale,
+            notification_email: ghiiRecord.notificationEmail ?? null,
+            verification_level: ghiiRecord.verificationLevel,
+            email_verified_at: ghiiRecord.emailVerifiedAt ?? null,
+        }));
     });
 
     // GET /v1/ghii/:ghii — Public profile (Tier 0, no auth)

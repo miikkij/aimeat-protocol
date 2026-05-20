@@ -13,7 +13,8 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Spinner, GlassCard } from './shared.js';
-import { apiGet, apiPost } from '/js/api.js';
+import { apiPost } from '/js/api.js';
+import { getProfile } from '/js/services/auth.js';
 
 export default function EmailTab({ session, showToast }) {
   const [loading, setLoading] = useState(true);
@@ -33,9 +34,8 @@ export default function EmailTab({ session, showToast }) {
   async function loadData() {
     setLoading(true);
     try {
-      const ghii = session.ghii || `${session.owner}@${window.AIMEAT?.auth?.nodeId || ''}`;
-      const res = await apiGet(`/v1/ghii/${encodeURIComponent(ghii)}`);
-      if (res.data) {
+      const res = await getProfile();
+      if (res && res.data) {
         setGhiiData(res.data);
         if (res.data.verification_level >= 1) {
           setStep('verified');
@@ -115,9 +115,11 @@ export default function EmailTab({ session, showToast }) {
             <span class="email-verified-icon">\u2713</span>
             <span class="email-verified-text">${t('profile.email.verified')}</span>
           </div>
-          <div class="email-status-text">
-            ${t('profile.email.verified')}
-          </div>
+          ${ghiiData?.notification_email ? html`
+            <div class="email-address-display">${ghiiData.notification_email}</div>
+          ` : html`
+            <div class="email-status-text">${t('profile.email.verified')}</div>
+          `}
           <button class="btn-outline btn-sm email-change-btn" onClick=${handleChangeEmail}>
             ${t('profile.email.changeEmail')}
           </button>

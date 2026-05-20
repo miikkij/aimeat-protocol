@@ -286,6 +286,7 @@ model Ghii {
   totpLockedUntil            String?
   emailHash                  String?
   emailVerifiedAt            String?
+  notificationEmail          String?
   verificationMethod         String?
   magicLinkEnabled           Boolean  @default(false)
   lastLoginAt                String?

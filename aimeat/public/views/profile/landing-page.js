@@ -62,6 +62,7 @@ function EditProfileModal({ session, onClose, onSaved }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fields, setFields] = useState({ display_name: '', bio: '', avatar: '', locale: 'en' });
+  const [currentEmail, setCurrentEmail] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -77,6 +78,7 @@ function EditProfileModal({ session, onClose, onSaved }) {
             avatar: d.avatar || '',
             locale: d.locale || 'en',
           });
+          setCurrentEmail(d.notification_email || '');
         }
       } catch { /* use defaults */ }
       if (!cancelled) setLoading(false);
@@ -146,6 +148,11 @@ function EditProfileModal({ session, onClose, onSaved }) {
                 <option value="fi">Suomi</option>
               </select>
             </label>
+            <div class="pf-edit-label">
+              ${t('profile.landing.editEmail')}
+              <div class="pf-edit-readonly">${currentEmail || t('profile.landing.editEmailNone')}</div>
+              <div class="pf-edit-hint">${t('profile.landing.editEmailHint')}</div>
+            </div>
           </div>
           <div class="pf-edit-footer">
             <button class="btn-outline" onClick=${onClose} disabled=${saving}>

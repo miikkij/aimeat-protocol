@@ -32,11 +32,11 @@ export function getNodeUrl() {
   return typeof window !== 'undefined' ? window.location.origin : '';
 }
 
-/** Fetch the current user's GHII profile from the server. */
+/** Fetch the current user's own profile (includes private fields like email). */
 export async function getProfile() {
   const s = getSession();
   if (!s) return null;
-  return s.fetch(`/v1/ghii/${encodeURIComponent(s.ghii)}`);
+  return s.fetch('/v1/ghii/me');
 }
 
 /** Update the current user's profile via PUT /v1/ghii. */

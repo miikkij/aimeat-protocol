@@ -1224,6 +1224,7 @@
 .pf .email-verified-icon { color: var(--success, #22C55E); font-size: 20px; }
 .pf .email-verified-text { font-weight: 600; color: var(--success, #22C55E); }
 .pf .email-status-text   { font-size: .9rem; color: var(--text-dim); }
+.pf .email-address-display { font-size: .9rem; color: var(--text, #1a1a1a); font-family: var(--font-mono, monospace); padding: 4px 0; }
 .pf .email-sent-text     { font-size: .9rem; color: var(--success, #22C55E); margin-bottom: 12px; }
 .pf .email-form-label    { display: block; margin-bottom: 5px; font-size: 12px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: var(--text-dim); }
 .pf .email-form-group    { margin-bottom: 14px; }
@@ -1614,6 +1615,11 @@
 }
 .pf-edit-textarea { resize: vertical; min-height: 72px; }
 .pf-edit-select { cursor: pointer; }
+.pf-edit-readonly {
+  font-size: .88rem; padding: 9px 12px; border-radius: 10px;
+  background: var(--bg-dim, #f5f5f3); color: var(--text-dim, #6B7280);
+  border: 1px solid var(--border-soft, #f0f0ec);
+}
 .pf-edit-hint { font-size: .75rem; color: var(--text-dim, #9CA3AF); }
 .pf-edit-error { font-size: .81rem; color: var(--danger, #ef4444); padding: 8px 12px; background: var(--danger-soft, #FEF2F2); border-radius: 8px; }
 .pf-edit-footer {
