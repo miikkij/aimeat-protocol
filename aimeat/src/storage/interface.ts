@@ -1413,6 +1413,7 @@ import type { PackageRepository } from './repositories/package.repository.js';
 import type { TemplateListingRepository } from './repositories/template-listing.repository.js';
 import type { PackageInstanceRepository } from './repositories/package-instance.repository.js';
 import type { CapabilityRepository } from './repositories/capability.repository.js';
+import type { StatsRepository } from './repositories/stats.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -1430,4 +1431,5 @@ export interface Storage extends
   DeviceAuthRepository,
   OAuthRepository, SystemPromptRepository,
   PackageRepository, TemplateListingRepository, PackageInstanceRepository,
-  CapabilityRepository { }
+  CapabilityRepository,
+  StatsRepository { }

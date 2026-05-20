@@ -32,3 +32,4 @@ export type { PackageRepository } from './package.repository.js';
 export type { TemplateListingRepository } from './template-listing.repository.js';
 export type { PackageInstanceRepository } from './package-instance.repository.js';
 export type { CapabilityRepository } from './capability.repository.js';
+export type { StatsRepository } from './stats.repository.js';
