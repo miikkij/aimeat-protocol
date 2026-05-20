@@ -34,6 +34,7 @@
     "test:e2e:disputes": "tsx test/e2e-disputes.ts",
     "test:e2e:extensions": "tsx test/e2e-extensions.ts",
     "test:e2e:federation": "tsx test/e2e-federation.ts",
+    "test:e2e:federation-mesh": "tsx test/federation-mesh.ts",
     "test:e2e:hooks": "tsx test/e2e-hooks.ts",
     "test:e2e:knowledge": "tsx test/e2e-knowledge.ts",
     "test:e2e:libs": "tsx test/e2e-libs.ts",

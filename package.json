@@ -24,6 +24,7 @@
     "test:e2e:all": "cd aimeat && node --import tsx test/run-e2e-ci.ts --all",
     "test:e2e:full": "cd aimeat && pnpm test:e2e",
     "test:e2e:federation": "cd aimeat && pnpm test:e2e:federation",
+    "test:e2e:federation-mesh": "cd aimeat && pnpm test:e2e:federation-mesh",
     "test:e2e:mcp": "cd aimeat && pnpm test:e2e:mcp",
     "test:e2e:disputes": "cd aimeat && pnpm test:e2e:disputes",
     "test:e2e:micro-memory": "cd aimeat && pnpm test:e2e:micro-memory",
