@@ -185,7 +185,58 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
                 }
             }
 
-            // 4. Add active genesis peer metadata
+            // 4. Network directory entries (aggregated peer summaries)
+            if ((!sourceFilter || sourceFilter === 'network') && networkDirectory) {
+                for (const [nodeId, summary] of networkDirectory) {
+                    for (const action of summary.actions) {
+                        if (serviceType && action.category !== serviceType) continue;
+                        if (keyword && !action.displayName.toLowerCase().includes(keyword.toLowerCase())) continue;
+                        entries.push({
+                            type: 'action',
+                            id: action.id,
+                            name: action.displayName,
+                            category: action.category,
+                            source_node: nodeId,
+                            source_type: 'network',
+                            provider_gaii: action.providerGaii,
+                        });
+                    }
+                    for (const agent of summary.agents) {
+                        if (keyword && !(agent.displayName || '').toLowerCase().includes(keyword.toLowerCase())) continue;
+                        entries.push({
+                            type: 'agent',
+                            id: agent.gaii,
+                            name: agent.displayName || agent.gaii,
+                            source_node: nodeId,
+                            source_type: 'network',
+                        });
+                    }
+                    for (const board of summary.boards) {
+                        if (keyword && !board.name.toLowerCase().includes(keyword.toLowerCase())) continue;
+                        entries.push({
+                            type: 'board',
+                            id: board.id,
+                            name: board.name,
+                            source_node: nodeId,
+                            source_type: 'network',
+                        });
+                    }
+                    for (const csm of summary.csms) {
+                        if (serviceType && csm.serviceType !== serviceType) continue;
+                        if (keyword && !csm.name.toLowerCase().includes(keyword.toLowerCase())) continue;
+                        entries.push({
+                            type: 'csm',
+                            id: csm.name,
+                            name: csm.name,
+                            service_type: csm.serviceType,
+                            source_node: nodeId,
+                            source_type: 'network',
+                        });
+                    }
+                }
+            }
+
+            // 5. Add active genesis peer metadata
             const activePeers = await storage.listGenesisPeers({ status: 'active' });
             const peerSummary = activePeers.map(p => ({
                 node_id: p.genesisNodeId,

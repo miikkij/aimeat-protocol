@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useState, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -8,7 +8,7 @@ import { dt, num, Badge, EconRow, StatsGrid, Empty, ExpandableHelp, ErrorBox } f
 import {
   getFederationPeers, getFederationDirectory, approvePeeringRequest, rejectPeeringRequest,
   deletePeeringRequest, activatePeer, addPeerDirect, removePeer, removePeerEmergency,
-  testFederationNode, joinGenesisNetwork, updatePeerPolicy,
+  testFederationNode, joinGenesisNetwork, updatePeerPolicy, getNetworkDirectory,
 } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
 
@@ -29,6 +29,36 @@ export default function FederationTab({ data, reload }) {
   const [joinRole, setJoinRole] = useState('contributor');
   const [joining, setJoining] = useState(false);
   const [joinResult, setJoinResult] = useState(null);
+
+  // ── Network Directory state ──
+  const [dirEntries, setDirEntries] = useState([]);
+  const [dirSearch, setDirSearch] = useState('');
+  const [dirLoading, setDirLoading] = useState(false);
+  const dirDebounceRef = useRef(null);
+
+  const loadDirectory = useCallback(async (keyword) => {
+    setDirLoading(true);
+    try {
+      const r = await getNetworkDirectory(keyword || '');
+      setDirEntries(r.data?.entries || []);
+    } catch { setDirEntries([]); }
+    finally { setDirLoading(false); }
+  }, []);
+
+  useEffect(() => { loadDirectory(''); }, []);
+
+  useEffect(() => {
+    const handler = () => loadDirectory(dirSearch);
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, [dirSearch]);
+
+  const onDirSearchInput = useCallback((e) => {
+    const val = e.target.value;
+    setDirSearch(val);
+    if (dirDebounceRef.current) clearTimeout(dirDebounceRef.current);
+    dirDebounceRef.current = setTimeout(() => loadDirectory(val), 400);
+  }, [loadDirectory]);
 
   // ── Derived stats ──
   const activePeers = livePeers.filter(p => p.status === 'active');
@@ -186,6 +216,36 @@ export default function FederationTab({ data, reload }) {
       { label: t('dashboard.fedOfflinePeers'), value: offlinePeers.length, color: '#ef4444' },
       { label: t('dashboard.fedPendingRequests'), value: pendingRequests.length, color: '#06b6d4' },
     ]} />
+
+    <!-- ═══ Network Directory ═══ -->
+    <div class="adm-card adm-mt-lg">
+      <h4 class="adm-mb-sm" style="margin:0">${t('dashboard.fedNetworkDirectoryTitle')}</h4>
+      <p class="adm-text-dim adm-text-base adm-mb-md" style="margin:0">${t('dashboard.fedNetworkDirectoryDesc')}</p>
+      <div class="adm-mb-md">
+        <input class="input-field" placeholder=${t('dashboard.fedNetworkDirSearch')} value=${dirSearch} onInput=${onDirSearchInput} />
+      </div>
+      ${dirLoading
+        ? html`<p class="adm-text-dim">...</p>`
+        : !dirEntries.length
+          ? html`<${Empty} text=${t('dashboard.fedNetworkDirEmpty')} />`
+          : html`<div class="scrollable"><table>
+              <thead><tr>
+                <th>${t('dashboard.fedNetworkDirType')}</th>
+                <th>${t('dashboard.fedNetworkDirName')}</th>
+                <th>${t('dashboard.fedNetworkDirNode')}</th>
+                <th>${t('dashboard.fedNetworkDirCategory')}</th>
+              </tr></thead>
+              <tbody>
+                ${dirEntries.map(e => html`<tr>
+                  <td><${Badge} type=${e.type === 'action' ? 'info' : e.type === 'agent' ? 'healthy' : e.type === 'board' ? 'watch' : 'neutral'} label=${e.type} /></td>
+                  <td>${escHtml(e.name || e.id || '—')}</td>
+                  <td class="mono adm-text-sm">${escHtml(e.source_node || '—')}</td>
+                  <td>${escHtml(e.category || e.service_type || '—')}</td>
+                </tr>`)}
+              </tbody>
+            </table></div>`
+      }
+    </div>
 
     <!-- ═══ Pending Peering Requests ═══ -->
     ${pendingRequests.length > 0 && html`

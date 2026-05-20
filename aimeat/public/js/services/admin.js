@@ -131,6 +131,9 @@ export const deleteMsm          = (name) => apiDelete(`/v1/admin/msm/${encodeURI
 export const getMsmTemplates     = ()    => apiGet('/v1/msm/templates');
 export const getMsmTemplate      = (type) => fetch(`/v1/msm/templates/${encodeURIComponent(type)}`, { headers: { 'Accept': 'application/x-yaml' } }).then(r => r.text());
 
+// ── Network Directory ──
+export const getNetworkDirectory = (keyword) => apiGet(`/v1/federation/cross-catalogue${keyword ? '?keyword=' + encodeURIComponent(keyword) + '&source=network' : '?source=network'}`);
+
 // ── Genesis ──
 export const getGenesisPeers    = ()          => apiGet('/v1/admin/genesis-peers');
 export const approveGenesisPeer = (id)        => apiPost(`/v1/admin/genesis-peers/${encodeURIComponent(id)}/approve`);

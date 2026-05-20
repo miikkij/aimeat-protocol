@@ -3195,6 +3195,16 @@
     "fedPolicyUpdated": "Vertaispolitiikka päivitetty",
     "fedPolicySectionTitle": "Politiikka",
 
+    "fedNetworkDirectoryTitle": "Verkkohakemisto",
+    "fedNetworkDirectoryDesc": "Palvelut ja data saatavilla federaatioverkossa.",
+    "fedNetworkDirType": "Tyyppi",
+    "fedNetworkDirName": "Nimi",
+    "fedNetworkDirNode": "Solmu",
+    "fedNetworkDirCategory": "Kategoria",
+    "fedNetworkDirPrice": "Hinta",
+    "fedNetworkDirEmpty": "Federoituja palveluita ei vielä löydetty. Palvelut näkyvät kun vertaissolmut jakavat kataloginsa.",
+    "fedNetworkDirSearch": "Hae palveluita...",
+
     "genesisExplain": "Genesis-vertaiset ovat federaatioklusterin perustajasolmuja. Genesis-solmu on ensimmäinen solmu, joka luo federaation, ja se hallinnoi vertaishyväksyntöjä, avainten vaihtoa ja klusterikäytäntöjä.",
     "genesisHelpTitle": "Mitä genesis-vertaiset ovat?",
     "genesisHelpDetail": "Kun luot uuden federaation, solmustasi tulee genesis-solmu (alkuperä). Muut solmut pyytävät liittymistä, ja hyväksyt tai hylkäät ne täällä. Genesis-vertaisilla on erityisoikeuksia: ne voivat asettaa klusterinlaajuisia käytäntöjä, hyväksyä uusia jäseniä ja keskeyttää väärin käyttäytyvät solmut. Hyväksytyt vertaiset voivat vaihtaa dataa federaatiosääntöjen mukaisesti.",

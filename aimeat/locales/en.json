@@ -3195,6 +3195,16 @@
     "fedPolicyUpdated": "Peer policy updated",
     "fedPolicySectionTitle": "Policy",
 
+    "fedNetworkDirectoryTitle": "Network Directory",
+    "fedNetworkDirectoryDesc": "Services and data available across the federation network.",
+    "fedNetworkDirType": "Type",
+    "fedNetworkDirName": "Name",
+    "fedNetworkDirNode": "Node",
+    "fedNetworkDirCategory": "Category",
+    "fedNetworkDirPrice": "Price",
+    "fedNetworkDirEmpty": "No federated services discovered yet. Services appear when peers share their catalogue.",
+    "fedNetworkDirSearch": "Search services...",
+
     "genesisExplain": "Genesis peers are the founding nodes of a federation cluster. The genesis node is the first node that creates the federation, and it manages peer approvals, key exchange, and cluster policies.",
     "genesisHelpTitle": "What are genesis peers?",
     "genesisHelpDetail": "When you create a new federation, your node becomes the genesis (origin) node. Other nodes request to join, and you approve or reject them here. Genesis peers have special privileges: they can set cluster-wide policies, approve new members, and suspend misbehaving nodes. Approved peers can exchange data according to federation rules.",
