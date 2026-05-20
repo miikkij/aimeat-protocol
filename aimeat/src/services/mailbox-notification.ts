@@ -3,6 +3,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, MailboxItemRecord, PersonalPushSubscriptionRecord, NotificationPreferences } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { resolveTemplate } from './notification-templates.js';
+import { getStats } from './stats.js';
 
 const require = createRequire(import.meta.url);
 
@@ -112,6 +113,7 @@ export class MailboxNotificationService {
         ?? defaultPreferences(personalNodeId, this.config);
 
       if (!prefs.enabled) {
+        getStats()?.incrementTyped('mailbox_notif_blocked', 'disabled');
         return { sent: false, reason: 'notifications_disabled' };
       }
 
@@ -123,10 +125,12 @@ export class MailboxNotificationService {
       const lastNotified = this.cooldownMap.get(personalNodeId) ?? 0;
       const cooldownMs = prefs.cooldownMinutes * 60_000;
       if (now - lastNotified < cooldownMs) {
+        getStats()?.incrementTyped('mailbox_notif_blocked', 'cooldown');
         return { sent: false, reason: 'cooldown_active' };
       }
 
       if (this.isInQuietHours(prefs)) {
+        getStats()?.incrementTyped('mailbox_notif_blocked', 'quiet_hours');
         return { sent: false, reason: 'quiet_hours' };
       }
 
@@ -155,14 +159,14 @@ export class MailboxNotificationService {
         const subscriptions = await this.storage.listPersonalPushSubscriptions(personalNodeId);
         for (const sub of subscriptions) {
           const ok = await this.sendWebPush(sub, payload, locale);
-          if (ok) { sentAny = true; sentChannels.push('web_push'); }
+          if (ok) { sentAny = true; sentChannels.push('web_push'); getStats()?.incrementTyped('mailbox_notif_sent', 'push'); }
         }
       }
 
       // Email channel
       if (prefs.channels.includes('email') && prefs.email) {
         const emailSent = await this.sendEmail(personalNodeId, prefs.email, payload, locale);
-        if (emailSent) { sentAny = true; sentChannels.push('email'); }
+        if (emailSent) { sentAny = true; sentChannels.push('email'); getStats()?.incrementTyped('mailbox_notif_sent', 'email'); }
       }
 
       if (sentAny) {
@@ -222,6 +226,7 @@ export class MailboxNotificationService {
           logger.warn('Push notification failed', { subId: sub.id, failureCount: newCount, error: String(err) });
         }
       }
+      getStats()?.incrementTyped('mailbox_notif_failed', 'push');
       return false;
     }
   }
@@ -262,6 +267,7 @@ export class MailboxNotificationService {
       return true;
     } catch (err) {
       logger.error('Email notification failed', { personalNodeId, error: String(err) });
+      getStats()?.incrementTyped('mailbox_notif_failed', 'email');
       return false;
     }
   }

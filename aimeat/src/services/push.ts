@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, PushSubscriptionRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { getStats } from './stats.js';
 
 const require = createRequire(import.meta.url);
 
@@ -70,15 +71,18 @@ export function createPushService(config: AimeatConfig, storage: Storage): PushS
           { TTL: 86400 },
         );
         await storage.createPushSubscription({ ...sub, lastUsedAt: new Date().toISOString() });
+        getStats()?.incrementTyped('push_sent', 'general');
         return true;
       } catch (err: unknown) {
         const statusCode = (err as { statusCode?: number }).statusCode;
         if (statusCode === 404 || statusCode === 410) {
           await storage.deletePushSubscription(ownerName);
           logger.info('Push subscription expired, removed', { ownerName });
+          getStats()?.increment('push_expired_subs');
         } else {
           logger.warn('Push notification failed', { ownerName, error: String(err) });
         }
+        getStats()?.incrementTyped('push_failed', 'general');
         return false;
       }
     },
