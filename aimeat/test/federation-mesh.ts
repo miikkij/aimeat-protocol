@@ -1,9 +1,11 @@
 /**
  * @file federation-mesh.ts
- * @description Federation Mesh Phase 1 E2E tests — per-peer policy fields, action/board/agent
- *   federate flag, and policy update persistence.
+ * @description Federation Mesh E2E tests — per-peer policy fields, action/board/agent
+ *   federate flag, policy update persistence, and network directory (service summary,
+ *   ping hash, cross-catalogue filtering).
  * @version-history
  *   v1.0.0 — 2026-05-20 — Initial federation mesh E2E tests
+ *   v1.1.0 — 2026-05-20 — Add network directory tests (Phase 2 Task 6)
  */
 
 // Run: cd aimeat && pnpm exec tsx test/federation-mesh.ts
@@ -422,6 +424,78 @@ await test('PATCH /v1/agents/:name/federate -- disable federation', async () => 
     });
     assert(body.ok === true, `toggle back: ${JSON.stringify(body.error)}`);
     assert(body.data.federate === false, `agent federate after toggle back: ${body.data.federate}`);
+});
+
+// ─── Test: Network Directory ───
+console.log('\nNetwork Directory');
+
+await test('GET /v1/federation/service-summary -- requires x-source-node header', async () => {
+    const { status, body } = await json('/v1/federation/service-summary');
+    assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === false, 'ok is false');
+});
+
+await test('GET /v1/federation/service-summary -- requires active peer', async () => {
+    const { status, body } = await json('/v1/federation/service-summary', {
+        headers: { 'x-source-node': 'unknown-node' },
+    });
+    assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === false, 'ok is false');
+});
+
+await test('PUT /v1/federation/peers/:nodeId -- activate peer for service-summary', async () => {
+    const { body } = await json(`/v1/federation/peers/${fakePeerNodeId}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ status: 'active' }),
+    });
+    assert(body.ok === true, `activate peer: ${JSON.stringify(body.error)}`);
+    assert(body.data.status === 'active', `peer status: ${body.data.status}`);
+});
+
+await test('GET /v1/federation/service-summary -- returns correct data', async () => {
+    const { status, body } = await json('/v1/federation/service-summary', {
+        headers: { 'x-source-node': fakePeerNodeId },
+    });
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(typeof body.data.node_id === 'string', `node_id is string: ${body.data.node_id}`);
+    assert(typeof body.data.summary_hash === 'string', `summary_hash is string: ${body.data.summary_hash}`);
+    assert(Array.isArray(body.data.actions), 'actions is array');
+    assert(Array.isArray(body.data.agents), 'agents is array');
+    assert(Array.isArray(body.data.boards), 'boards is array');
+    assert(Array.isArray(body.data.csms), 'csms is array');
+});
+
+await test('GET /v1/federation/service-summary -- includes only federated items', async () => {
+    const { status, body } = await json('/v1/federation/service-summary', {
+        headers: { 'x-source-node': fakePeerNodeId },
+    });
+    assert(status === 200, `expected 200, got ${status}`);
+
+    const actionIds = body.data.actions.map((a: any) => a.id);
+    assert(actionIds.includes(federatedActionId), `federated action ${federatedActionId} should be in summary`);
+    assert(!actionIds.includes(unfederatedActionId), `unfederated action ${unfederatedActionId} should NOT be in summary`);
+});
+
+await test('POST /v1/federation/ping -- response includes service_summary_hash', async () => {
+    const { status, body } = await json('/v1/federation/ping', {
+        method: 'POST',
+        body: JSON.stringify({ from_node: fakePeerNodeId }),
+    });
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(body.data.pong === true, 'pong is true');
+    assert(typeof body.data.service_summary_hash === 'string', `service_summary_hash is string: ${body.data.service_summary_hash}`);
+});
+
+await test('GET /v1/federation/cross-catalogue -- supports source=network filter', async () => {
+    const { status, body } = await json('/v1/federation/cross-catalogue?source=network', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(Array.isArray(body.data.entries), 'entries is array');
 });
 
 // ─── Cleanup ───
