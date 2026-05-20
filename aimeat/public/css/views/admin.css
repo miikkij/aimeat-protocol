@@ -111,6 +111,7 @@
 /* Cards */
 .adm-grid { display: grid; gap: 16px; margin-bottom: 20px; }
 .adm-grid-4 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.adm-grid-3 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .adm-grid-2 { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
 .adm-card {
   background: var(--glass-bg, #FFFFFF);
@@ -575,3 +576,83 @@
 .adm-member-add { display: flex; gap: 8px; align-items: center; }
 .adm-member-add .adm-input { flex: 1; font-size: .85rem; }
 .adm-font-mono { font-family: 'JetBrains Mono', monospace; }
+
+/* ── Stats Time Range Selector ── */
+.adm-time-range {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background: var(--glass-bg, #FFFFFF);
+  border: 1px solid var(--glass-border, #E5E7EB);
+  border-radius: 8px;
+}
+.adm-time-range-label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-right: 4px;
+}
+.adm-time-btn {
+  padding: 4px 12px;
+  font-size: 0.75rem;
+  border: 1px solid var(--glass-border, #E5E7EB);
+  border-radius: 6px;
+  background: transparent;
+  color: #1A1A2E;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.adm-time-btn:hover { border-color: var(--accent); color: var(--accent); }
+.adm-time-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.adm-time-custom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.adm-time-custom input[type="date"] {
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  border: 1px solid var(--glass-border, #E5E7EB);
+  border-radius: 4px;
+  background: #FAFAF8;
+  color: #1A1A2E;
+  font-family: inherit;
+}
+
+/* ── Stats Breakdown Table ── */
+.adm-breakdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  margin-top: 8px;
+}
+.adm-breakdown-table th {
+  text-align: left;
+  padding: 6px 10px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--glass-border, #E5E7EB);
+  font-weight: 500;
+}
+.adm-breakdown-table td {
+  padding: 5px 10px;
+  border-bottom: 1px solid #F3F4F6;
+}
+.adm-breakdown-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.adm-badge-live {
+  display: inline-block;
+  font-size: 0.6rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+  vertical-align: middle;
+  margin-left: 6px;
+}

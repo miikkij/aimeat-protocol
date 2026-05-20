@@ -173,7 +173,13 @@ export const getAdminMemory = (params = {}) => {
 export const deleteAdminMemory = (owner, key) => apiDelete(`/v1/admin/memory/${encodeURIComponent(owner)}/${encodeURIComponent(key)}`);
 
 // ── Stats ──
-export const getStats        = ()       => apiGet('/v1/stats');
+export const getStats = (from, to) => {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const qs = params.toString();
+  return apiGet('/v1/stats' + (qs ? '?' + qs : ''));
+};
 
 // ── Extensions & Instances ──
 export const getAvailableExtensions   = ()              => apiGet('/v1/admin/extensions/available');
