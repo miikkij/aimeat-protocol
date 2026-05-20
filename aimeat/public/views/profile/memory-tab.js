@@ -304,6 +304,14 @@ export default function MemoryTab({ session, showToast, onStats }) {
                 <div class="mem-actions">
                   <button class="btn-sm" onClick=${() => setEditModal({ key: m.key, value: typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || ''), visibility: m.visibility || 'private', version: m.version })}>${t('profile.memory.editBtn')}</button>
                   <button class="btn-danger" onClick=${() => handleDeleteMemory(m.key)}>${t('profile.memory.deleteBtn')}</button>
+                  ${session.federated && html`
+                    <button class="btn-ghost" onClick=${() => doPull(m.key)} title=${t('profile.memory.pullFromHome')}>
+                      ↓ ${t('profile.memory.pullFromHome')}
+                    </button>
+                    <button class="btn-ghost" onClick=${() => doPush(m.key)} title=${t('profile.memory.pushToHome')}>
+                      ↑ ${t('profile.memory.pushToHome')}
+                    </button>
+                  `}
                 </div>
               </div>
             `}
@@ -392,9 +400,30 @@ export default function MemoryTab({ session, showToast, onStats }) {
       }`;
   };
 
+  async function doPull(key) {
+    try {
+      await memoryService.pullFromHome(key);
+      showToast(t('profile.memory.pullSuccess'));
+      loadMemories();
+    } catch (e) { showToast(e.message, true); }
+  }
+
+  async function doPush(key) {
+    try {
+      await memoryService.pushToHome(key);
+      showToast(t('profile.memory.pushSuccess'));
+    } catch (e) { showToast(e.message, true); }
+  }
+
   return html`
     <div class="section-title">${t('profile.memory.title')}</div>
     <div class="section-desc">${t('profile.memory.desc')}</div>
+
+    ${session.federated && html`
+      <div class="alert alert-info">
+        <span class="alert-msg">${t('profile.memory.federatedSession')}</span>
+      </div>
+    `}
 
     ${agents.length > 1 && html`
       <div class="agent-selector mb-half">

@@ -7,6 +7,7 @@
  *   v1.0.0 — 2026-05-20 — Initial federation mesh E2E tests
  *   v1.1.0 — 2026-05-20 — Add network directory tests (Phase 2 Task 6)
  *   v1.2.0 — 2026-05-21 — Add federated login E2E tests (Phase 3 Task 6)
+ *   v1.3.0 — 2026-05-21 — Add cross-node data access tests (Phase 4 Task 4)
  */
 
 // Run: cd aimeat && pnpm exec tsx test/federation-mesh.ts
@@ -734,6 +735,45 @@ await test('Delete federation login user (cleanup)', async () => {
     });
     assert(body.ok === true, `delete: ${JSON.stringify(body.error)}`);
     assert(body.data.deleted === true, 'confirmed deleted');
+});
+
+// ─── Test: Cross-Node Data Access ───
+console.log('\nCross-Node Data Access');
+
+await test('POST /v1/memory/pull -- requires federated session', async () => {
+    const { status, body } = await json('/v1/memory/pull', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: 'test-key' }),
+    });
+    assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'NOT_FEDERATED', `code: ${body.error?.code}`);
+});
+
+await test('POST /v1/memory/push-home -- requires federated session', async () => {
+    const { status, body } = await json('/v1/memory/push-home', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: 'test-key' }),
+    });
+    assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'NOT_FEDERATED', `code: ${body.error?.code}`);
+});
+
+await test('POST /v1/memory/pull -- requires auth', async () => {
+    const { status } = await json('/v1/memory/pull', {
+        method: 'POST',
+        body: JSON.stringify({ key: 'test-key' }),
+    });
+    assert(status === 401, `expected 401, got ${status}`);
+});
+
+await test('POST /v1/memory/push-home -- requires auth', async () => {
+    const { status } = await json('/v1/memory/push-home', {
+        method: 'POST',
+        body: JSON.stringify({ key: 'test-key' }),
+    });
+    assert(status === 401, `expected 401, got ${status}`);
 });
 
 // ─── Cleanup ───

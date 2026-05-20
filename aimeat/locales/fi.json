@@ -539,7 +539,12 @@
       "noAgents": "Ei rekisteröityjä agentteja. Kun yhdistät AI-assistentin MCP:llä, sen muistimerkinnät näkyvät täällä.",
       "setupMcp": "Aseta MCP →",
       "agent": "Agentti",
-      "defaultAgent": "Oletusagentti"
+      "defaultAgent": "Oletusagentti",
+      "pullFromHome": "Kopioi kotisolmulta",
+      "pushToHome": "Tallenna kotisolmulle",
+      "pullSuccess": "Merkinta kopioitu kotisolmulta",
+      "pushSuccess": "Merkinta tallennettu kotisolmulle",
+      "federatedSession": "Federoitu istunto. Osa merkinnoista voi olla kotisolmullasi."
     },
     "files": {
       "title": "Tallennetut tiedostot",

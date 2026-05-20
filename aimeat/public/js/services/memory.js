@@ -110,3 +110,13 @@ export async function updateFileVisibility(key, visibility) {
 export async function deleteFile(key) {
   return apiDelete(`/v1/memory/files/${encodeURIComponent(key)}`);
 }
+
+/** Pull (copy) a memory entry from the home node to this node (federated sessions). */
+export async function pullFromHome(key) {
+  return apiPost('/v1/memory/pull', { key });
+}
+
+/** Push (save) a local memory entry to the home node (federated sessions). */
+export async function pushToHome(key) {
+  return apiPost('/v1/memory/push-home', { key });
+}

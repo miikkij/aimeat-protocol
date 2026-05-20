@@ -539,7 +539,12 @@
       "noAgents": "No agents registered yet. When you connect an AI assistant via MCP, its memory entries will appear here.",
       "setupMcp": "Set up MCP →",
       "agent": "Agent",
-      "defaultAgent": "Default agent"
+      "defaultAgent": "Default agent",
+      "pullFromHome": "Copy from home",
+      "pushToHome": "Save to home",
+      "pullSuccess": "Entry copied from home node",
+      "pushSuccess": "Entry saved to home node",
+      "federatedSession": "Federated session. Some entries may be on your home node."
     },
     "files": {
       "title": "Stored Files",
