@@ -2,7 +2,7 @@
 
 All notable changes to AIMEAT are documented in this file.
 
-## [1.4.6] - 2026-05-20
+## [1.4.7] - 2026-05-20
 
 ### Added
 - **Edit Profile modal** -- "edit profile" link in the profile card now opens a modal to update display name, bio, avatar, and language. Calls `PUT /v1/ghii` and updates the session immediately.
