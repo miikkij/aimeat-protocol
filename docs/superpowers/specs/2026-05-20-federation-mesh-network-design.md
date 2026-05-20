@@ -425,6 +425,61 @@ Suggested phasing to deliver incremental value:
 - Data pull ("Copy to this node") action
 - "Save to home node" action
 
+### Testing: Each Phase Includes Tests
+
+Every phase must ship with comprehensive automated tests. Tests run on both SQLite and MongoDB backends (`pnpm test:e2e:sqlite` and `pnpm test:e2e:mongodb`). Frontend features include Playwright browser tests (`pnpm test:playwright:mongodb`).
+
+**Phase 1 tests (per-peer policy + federate flags):**
+- E2E: peer policy flags persist across restart (save, restart, verify loaded)
+- E2E: `shareCatalogue: false` prevents catalogue sync to that peer
+- E2E: `replicateMemory: false` prevents memory replication to that peer
+- E2E: `allowRouting: false` rejects relay requests through that peer
+- E2E: `peerMode: 'private'` excludes peer from network directory
+- E2E: `federate` flag on actions/agents/boards/files -- only federated items appear in service summary
+- E2E: items without `federate: true` are excluded from catalogue sync
+- Playwright: federate toggle appears and works on agents, boards, knowledge, actions tabs
+- Playwright: peer policy toggles appear in admin federation tab
+
+**Phase 2 tests (network directory):**
+- E2E: `GET /v1/federation/service-summary` returns only federated items
+- E2E: hub aggregates summaries from multiple peers into cross-catalogue
+- E2E: stale summaries expire when peer goes offline
+- E2E: `source_type: 'network'` entries appear in cross-catalogue response
+- E2E: service summary hash changes when federate flags change
+- Playwright: network directory browser shows aggregated services, search/filter works
+
+**Phase 3 tests (federated login):**
+- E2E: `POST /v1/federation/auth/verify` succeeds with valid credentials + auth consent
+- E2E: verify fails without auth consent (returns `no_federation_consent`)
+- E2E: verify fails with wrong password
+- E2E: auth consent (`scope: auth`) is distinct from data consent (`scope: federation`)
+- E2E: federated JWT has correct claims (`federated`, `homeNode`, `homeUrl`)
+- E2E: federated session cannot perform admin/operator actions
+- E2E: federated session cannot create agents
+- E2E: JWT refresh re-verifies with home node
+- E2E: revoking auth consent on home node invalidates future refreshes
+- Playwright: login with `user@remote-node` shows federation indicator
+- Playwright: access-tab federation access section -- add/remove nodes, wildcard toggle
+
+**Phase 4 tests (cross-node data access):**
+- E2E: federated session reads memory from home node via proxy
+- E2E: federated session writes memory locally on remote node
+- E2E: "Save to home node" routes write to home node
+- E2E: data pull copies entry to local node with correct tags
+- E2E: pulled data is independent (no auto-sync back)
+- E2E: cross-node service invocation charges routing fee + service fee
+- Playwright: memory tab shows remote data for federated sessions
+- Playwright: "Copy to this node" and "Save to home" actions work
+
+**Multi-node integration tests (new test suite):**
+- Spin up 3 test nodes (A=hub, B=contributor, C=contributor)
+- Verify: B and C discover each other's federated services through A
+- Verify: user on B can invoke service on C, routed through A
+- Verify: federated login from B to C works (with auth consent on B's home node)
+- Verify: memory with `node:C` consent replicates to C but not A
+- Verify: private P2P peer is invisible in network directory
+- Verify: full round-trip with routing fees and settlement
+
 ## 12. Files Changed (Estimated)
 
 ### New Files
@@ -433,6 +488,11 @@ Suggested phasing to deliver incremental value:
 | `src/routes/federation-auth.ts` | Federated login endpoints (verify, refresh) |
 | `src/middleware/federation-proxy.ts` | Proxy middleware for routing to home node |
 | `public/views/admin/network-directory.js` | Network directory browser component |
+| `test/federation-mesh.ts` | E2E: per-peer policy, federate flags, service summary, directory |
+| `test/federation-login.ts` | E2E: federated auth verify/refresh, auth consent, JWT claims |
+| `test/federation-proxy.ts` | E2E: cross-node data proxy, data pull, save-to-home |
+| `test/federation-multinode.ts` | E2E: 3-node integration (hub + 2 contributors, full round-trip) |
+| `test/playwright/federation.spec.ts` | Playwright: federation UI (toggles, directory, access tab, login) |
 
 ### Modified Files -- Backend
 | File | Change |
