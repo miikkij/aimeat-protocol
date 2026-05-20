@@ -133,6 +133,7 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
     consulService,
     directoryService: services.directoryService,
     peers: services.peers,
+    networkDirectory: services.networkDirectory,
     tunnelManager: services.tunnelManager,
     mailboxNotificationService: services.mailboxNotificationService,
     scheduler: services.scheduler,

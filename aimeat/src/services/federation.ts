@@ -8,6 +8,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { sign } from '../auth/keypair.js';
 import { computeCatalogueHash } from '../utils/catalogue-hash.js';
+import type { ServiceSummary } from '../utils/service-summary.js';
 import { logger } from '../utils/logger.js';
 
 /** Cache of resolved GAIIs to their hosting node URL. TTL: 5 minutes. */
@@ -123,10 +124,14 @@ function peerStaggerMs(localNodeId: string, peerNodeId: string, intervalMs: numb
  * containing catalogue hash and stats. Uses jittered scheduling (±25%) and
  * per-peer stagger to prevent thundering herd.
  */
+/** Cached service summary hashes per peer for change detection. */
+const peerSummaryHashes = new Map<string, string>();
+
 export function startHeartbeatJob(
     config: AimeatConfig,
     storage: Storage,
     peers: Map<string, PeerInfo>,
+    networkDirectory?: Map<string, ServiceSummary>,
 ): ReturnType<typeof setInterval> {
     const BASE_INTERVAL_MS = 5 * 60_000;
     const TIMEOUT_MS = config.federationTimeoutMs;
@@ -139,6 +144,8 @@ export function startHeartbeatJob(
             if (graceEnd && new Date(graceEnd).getTime() <= Date.now()) {
                 peers.delete(key);
                 storage.deleteFederationPeer(key).catch(() => {});
+                networkDirectory?.delete(key);
+                peerSummaryHashes.delete(key);
                 logger.info(`Peer ${peer.nodeId} purged after de-peering grace period expired`);
             }
         }
@@ -199,6 +206,60 @@ export function startHeartbeatJob(
                     }
                     peerCatalogueHashes.set(key, catalogueHash);
 
+                    // ── Network directory: detect service summary hash changes ──
+                    if (networkDirectory && peer.shareCatalogue && peer.peerMode !== 'private') {
+                        try {
+                            const pingBody = await resp.json() as {
+                                data?: { service_summary_hash?: string };
+                            };
+                            const remoteSummaryHash = pingBody?.data?.service_summary_hash;
+
+                            if (remoteSummaryHash) {
+                                const cachedSummaryHash = peerSummaryHashes.get(key);
+
+                                if (cachedSummaryHash !== remoteSummaryHash) {
+                                    // Hash changed or first time -- fetch full summary
+                                    logger.info(`Service summary hash changed for peer ${peer.nodeId}, fetching summary`);
+                                    try {
+                                        const summaryResp = await fetch(
+                                            `${peer.url}/v1/federation/service-summary`,
+                                            {
+                                                headers: {
+                                                    'Accept': 'application/json',
+                                                    'x-source-node': config.nodeId,
+                                                },
+                                                signal: AbortSignal.timeout(TIMEOUT_MS),
+                                            },
+                                        );
+
+                                        if (summaryResp.ok) {
+                                            const summaryBody = await summaryResp.json() as {
+                                                data?: ServiceSummary;
+                                            };
+
+                                            if (summaryBody?.data) {
+                                                networkDirectory.set(key, summaryBody.data);
+                                                peerSummaryHashes.set(key, remoteSummaryHash);
+                                                logger.info(`Updated network directory for peer ${peer.nodeId}`, {
+                                                    actions: summaryBody.data.actions?.length ?? 0,
+                                                    agents: summaryBody.data.agents?.length ?? 0,
+                                                    boards: summaryBody.data.boards?.length ?? 0,
+                                                    csms: summaryBody.data.csms?.length ?? 0,
+                                                });
+                                            }
+                                        }
+                                    } catch (summaryErr) {
+                                        logger.warn(`Failed to fetch service summary from peer ${peer.nodeId}`, {
+                                            error: summaryErr instanceof Error ? summaryErr.message : String(summaryErr),
+                                        });
+                                    }
+                                }
+                            }
+                        } catch {
+                            // Non-critical: ping response parse error for summary hash
+                        }
+                    }
+
                     // Recovery trigger: peer came back from unreachable/offline
                     if ((previousStatus === 'offline' || previousStatus === 'unreachable') && onPeerRecovery) {
                         logger.info(`Peer ${peer.nodeId} recovered from ${previousStatus}, triggering re-sync`);
@@ -209,6 +270,8 @@ export function startHeartbeatJob(
                     peerFailures.set(key, failures);
                     if (failures >= 10) {
                         peer.status = 'offline';
+                        networkDirectory?.delete(key);
+                        peerSummaryHashes.delete(key);
                         logger.warn(`Peer ${peer.nodeId} offline after ${failures} consecutive failures`);
                     } else if (failures >= 3) {
                         peer.status = 'degraded';
@@ -221,6 +284,8 @@ export function startHeartbeatJob(
                 peerFailures.set(key, failures);
                 if (failures >= 10) {
                     peer.status = 'offline';
+                    networkDirectory?.delete(key);
+                    peerSummaryHashes.delete(key);
                     logger.warn(`Peer ${peer.nodeId} offline after ${failures} consecutive failures`);
                 } else if (failures >= 3) {
                     peer.status = 'degraded';

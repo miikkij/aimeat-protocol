@@ -4,6 +4,7 @@ import type { Storage, MaintenanceState } from '../storage/interface.js';
 import type { ConfigProvenance } from '../services/config-provenance.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
 import type { PeerInfo } from '../services/federation.js';
+import type { ServiceSummary } from '../utils/service-summary.js';
 import type { DirectoryService } from '../services/directory.js';
 import type { TunnelManager } from '../services/personal-tunnel.js';
 import { RealtimeManager } from '../services/realtime-manager.js';
@@ -114,6 +115,7 @@ export interface MountRoutesOptions {
   consulService: ConsulConfigService | null;
   directoryService: DirectoryService;
   peers: Map<string, PeerInfo>;
+  networkDirectory?: Map<string, ServiceSummary>;
   tunnelManager: TunnelManager | null;
   mailboxNotificationService: MailboxNotificationService | null;
   scheduler: Scheduler;
@@ -136,7 +138,7 @@ export function mountRoutes(
   const {
     rejectForRelay, mirrorReadOnly, maintenanceState,
     provenance, consulService, directoryService,
-    peers, tunnelManager, mailboxNotificationService,
+    peers, networkDirectory, tunnelManager, mailboxNotificationService,
     scheduler, invalidateHasOwnersCache,
   } = opts;
 
@@ -229,7 +231,7 @@ export function mountRoutes(
     // Allow unauthenticated introduce endpoints (federation join flow)
     if (req.path.startsWith('/peer/introduce')) return next();
     // Allow public directory and heartbeat/ping
-    if (req.path === '/directory' || req.path === '/ping' || req.path === '/heartbeat') return next();
+    if (req.path === '/directory' || req.path === '/ping' || req.path === '/heartbeat' || req.path === '/service-summary') return next();
     return requireExtended(req, res, next);
   });
   app.use('/v1/storage', requireExtended);
@@ -239,7 +241,7 @@ export function mountRoutes(
   app.use(promptsRouter(config, storage));
   app.use(adminRouter(config, storage, maintenanceState, provenance, consulService));
   app.use(organismsRouter(config, storage));
-  app.use(federationRouter(config, storage, peers));
+  app.use(federationRouter(config, storage, peers, networkDirectory));
   app.use(disputesRouter(config, storage));
   app.use(flagsRouter(config, storage));
   app.use(appealsRouter(config, storage));

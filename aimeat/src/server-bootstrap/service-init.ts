@@ -1,6 +1,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MaintenanceState } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
+import type { ServiceSummary } from '../utils/service-summary.js';
 import { generateKeyPair } from '../auth/keypair.js';
 import { enableAnonymousAuth } from '../auth/middleware.js';
 import { startHeartbeatJob, setOnPeerRecovery } from '../services/federation.js';
@@ -26,6 +27,7 @@ export interface ServiceInitResult {
   setMaintenanceCache: (state: MaintenanceState) => void;
   directoryService: DirectoryService;
   peers: Map<string, PeerInfo>;
+  networkDirectory: Map<string, ServiceSummary>;
   realtimeManager: RealtimeManager | null;
   tunnelManager: TunnelManager | null;
   mailboxNotificationService: MailboxNotificationService | null;
@@ -94,6 +96,9 @@ export async function initializeServices(
   // Federation peer registry (shared between routes and heartbeat)
   const peers = new Map<string, PeerInfo>();
 
+  // Network directory — aggregated service summaries from federation peers
+  const networkDirectory = new Map<string, ServiceSummary>();
+
   // Load persisted peers from storage
   try {
     const savedPeers = await storage.listFederationPeers();
@@ -119,7 +124,7 @@ export async function initializeServices(
   }
 
   // Start federation heartbeat job (signed heartbeats with catalogue hash, jittered scheduling)
-  startHeartbeatJob(config, storage, peers);
+  startHeartbeatJob(config, storage, peers, networkDirectory);
 
   // A.4: Wire peer recovery to key exchange + future full sync
   setOnPeerRecovery((peerId: string) => {
@@ -177,6 +182,7 @@ export async function initializeServices(
     setMaintenanceCache: (state: MaintenanceState) => { Object.assign(maintenanceCache, state); },
     directoryService,
     peers,
+    networkDirectory,
     realtimeManager,
     tunnelManager,
     mailboxNotificationService,

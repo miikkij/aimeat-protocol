@@ -18,6 +18,11 @@ import { sign, verify } from '../auth/keypair.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
 import { peerKeyCache, performKeyExchange } from '../services/federation-helpers.js';
+import { computeServiceSummary, computeSummaryHash } from '../utils/service-summary.js';
+
+/** Cached service summary hash to avoid recomputing on every ping (60s TTL). */
+let cachedSummaryHash = '';
+let summaryHashExpiry = 0;
 
 export function federationPeerRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
@@ -67,6 +72,30 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
         }, [
             { description: 'Request peering', method: 'POST', url: '/v1/federation/peer/request' },
         ]));
+    });
+
+    // GET /v1/federation/service-summary — return compact summary of all federated items
+    // Used by hub nodes to aggregate service listings from peers.
+    router.get('/v1/federation/service-summary', async (req, res) => {
+        const sourceNode = req.headers['x-source-node'] as string | undefined;
+        if (!sourceNode) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'x-source-node header is required'));
+            return;
+        }
+
+        const peer = [...peers.values()].find(p => p.nodeId === sourceNode);
+        if (!peer || peer.status !== 'active') {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Source node is not an active peer'));
+            return;
+        }
+
+        if (!peer.shareCatalogue) {
+            res.status(403).json(error(config.nodeId, 'POLICY_DENIED', 'Catalogue sharing is disabled for this peer'));
+            return;
+        }
+
+        const summary = await computeServiceSummary(config, storage);
+        res.json(success(config.nodeId, summary));
     });
 
     // POST /v1/federation/peer/introduce — unauthenticated "knock on the door" for joining nodes
@@ -670,10 +699,22 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
             storage.saveFederationPeer(peer).catch(() => {});
         }
 
+        // Compute service summary hash with 60s cache
+        if (!cachedSummaryHash || Date.now() > summaryHashExpiry) {
+            try {
+                const summary = await computeServiceSummary(config, storage);
+                cachedSummaryHash = summary.summary_hash;
+                summaryHashExpiry = Date.now() + 60_000;
+            } catch {
+                // Keep stale hash on error
+            }
+        }
+
         res.json(success(config.nodeId, {
             pong: true,
             node_id: config.nodeId,
             timestamp: new Date().toISOString(),
+            service_summary_hash: cachedSummaryHash,
         }));
         emitChange('federation');
     });

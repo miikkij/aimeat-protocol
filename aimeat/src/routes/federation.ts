@@ -10,6 +10,7 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
+import type { ServiceSummary } from '../utils/service-summary.js';
 import { federationPeerRouter } from './federation-peer.js';
 import { federationSyncRouter } from './federation-sync.js';
 import { federationSettlementsRouter } from './federation-settlements.js';
@@ -19,11 +20,16 @@ import { federationGenesisRouter } from './federation-genesis.js';
 export { peerKeyCache, performKeyExchange } from '../services/federation-helpers.js';
 export type { PeerKeyEntry } from '../services/federation-helpers.js';
 
-export function federationRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
+export function federationRouter(
+    config: AimeatConfig,
+    storage: Storage,
+    peers: Map<string, PeerInfo>,
+    networkDirectory?: Map<string, ServiceSummary>,
+): Router {
     const router = Router();
     router.use(federationPeerRouter(config, storage, peers));
     router.use(federationSyncRouter(config, storage, peers));
     router.use(federationSettlementsRouter(config, storage, peers));
-    router.use(federationGenesisRouter(config, storage, peers));
+    router.use(federationGenesisRouter(config, storage, peers, networkDirectory));
     return router;
 }

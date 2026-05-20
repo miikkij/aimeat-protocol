@@ -10,6 +10,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import type { PeerInfo } from '../services/federation.js';
+import type { ServiceSummary } from '../utils/service-summary.js';
 import { verify } from '../auth/keypair.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
@@ -17,7 +18,7 @@ import { createGenesisPeeringService } from '../services/genesis-peering.js';
 import { createOrganismReputationService } from '../services/organism-reputation.js';
 import { matchesKeyword, matchesActionKeyword, matchesGenesisKeyword, matchesLocation } from '../services/federation-helpers.js';
 
-export function federationGenesisRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
+export function federationGenesisRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>, networkDirectory?: Map<string, ServiceSummary>): Router {
     const router = Router();
     const genesisPeeringService = createGenesisPeeringService(config, storage);
 
