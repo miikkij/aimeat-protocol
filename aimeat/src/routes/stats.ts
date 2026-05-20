@@ -1,3 +1,17 @@
+/**
+ * @file stats.ts
+ * @description Stats and metrics route handlers. Serves node statistics at GET /v1/stats
+ *   (with optional from/to time-range filtering) and Prometheus metrics at GET /v1/metrics.
+ * @structure
+ *   - statsRouter() -- Express router factory for /v1/stats and /v1/metrics
+ * @usage
+ *   import { statsRouter } from '../routes/stats.js';
+ *   app.use(statsRouter(config, storage, stats, metricsRegistry));
+ * @version-history
+ *   v1.0.0 -- 2026-05-01 -- Initial stats route with consent permission breakdown
+ *   v1.1.0 -- 2026-05-21 -- Add time-range support (from/to query params), gauges, daily field
+ */
+
 import { Router } from 'express';
 import type { Registry } from 'prom-client';
 import type { AimeatConfig } from '../config.js';
@@ -57,12 +71,10 @@ export function statsRouter(
       } catch { /* skip owners without consents */ }
     }
 
-    res.json(success(config.nodeId, {
-      node_id: config.nodeId,
-      ...snap,
+    // Shared fields included in both response paths
+    const shared = {
       active_owners: owners.length,
       active_agents: agents.length,
-      // Push notification status (REQ-007)
       push_notifications: {
         enabled: config.pushEnabled && !!config.vapidPublicKey,
         personal_node_support: config.personalNodesEnabled,
@@ -77,6 +89,49 @@ export function statsRouter(
         by_wildcard: permStats.by_wildcard,
         unique_patterns: permStats.unique_patterns.size,
       },
+    };
+
+    // Point-in-time gauges (always from current snapshot, not summable)
+    const gauges = {
+      tunnel_connections_active: snap.tunnel.connections_active,
+      mailbox_items_total: snap.mailbox.items_total,
+      mailbox_bytes_total: snap.mailbox.bytes_total,
+      mailbox_oldest_item_age_seconds: snap.mailbox.oldest_item_age_seconds,
+    };
+
+    // Time-range filtering: if both from and to are provided, return range data
+    const fromParam = req.query.from as string | undefined;
+    const toParam = req.query.to as string | undefined;
+
+    if (fromParam && toParam) {
+      const range = stats.snapshotForRange(fromParam, toParam);
+      res.json(success(config.nodeId, {
+        node_id: config.nodeId,
+        from: fromParam,
+        to: toParam,
+        totals: range.totals,
+        daily: range.daily,
+        gauges,
+        ...shared,
+      }));
+      return;
+    }
+
+    // Default: full snapshot (backward compatible) with gauges and daily
+    const dailyCutoff = new Date();
+    dailyCutoff.setDate(dailyCutoff.getDate() - 30);
+    const dailyCutoffStr = dailyCutoff.toISOString().split('T')[0];
+    const daily: Record<string, Record<string, number>> = {};
+    for (const [day, counters] of Object.entries(snap.daily_history)) {
+      if (day >= dailyCutoffStr) daily[day] = counters;
+    }
+
+    res.json(success(config.nodeId, {
+      node_id: config.nodeId,
+      ...snap,
+      gauges,
+      daily,
+      ...shared,
     }));
   });
 
