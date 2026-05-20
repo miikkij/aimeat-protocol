@@ -426,6 +426,9 @@ function createSession(data) {
     _cryptoKey: data._cryptoKey || null,
     publicKey: data.publicKey,
     nodeUrl: NODE_URL,
+    federated: data.federated || false,
+    homeNode: data.homeNode || '',
+    homeUrl: data.homeUrl || '',
 
     // Authenticated fetch wrapper — returns parsed JSON without throwing on error
     // so callers (e.g. AIMEAT.data.get) can inspect res.ok / res.error themselves
@@ -441,6 +444,11 @@ function createSession(data) {
 
     // Re-authenticate using CryptoKey from IndexedDB
     async refresh() {
+      // Federated sessions cannot be refreshed via key signing -- user must re-login
+      if (session.federated) {
+        throw new Error('Federated session expired. Please log in again.');
+      }
+
       // Load CryptoKey from IndexedDB (or use in-memory ref)
       let key = session._cryptoKey;
       let body;
@@ -474,6 +482,9 @@ function createSession(data) {
         owner: session.owner, gaii: session.gaii, ghii: session.ghii,
         jwt: session.jwt, publicKey: session.publicKey, roles: session.roles,
         displayName: session.displayName || '',
+        federated: session.federated || false,
+        homeNode: session.homeNode || '',
+        homeUrl: session.homeUrl || '',
       });
       scheduleAutoRefresh(session);
       return session;
@@ -610,9 +621,13 @@ const auth = {
 
     const d = data.data;
 
-    // SECURITY: Import owner private key as non-extractable CryptoKey in IndexedDB
-    const ownerCryptoKey = await importEd25519Key(d.owner_private_key);
-    await storeKey('owner_key', ownerCryptoKey);
+    // Federated sessions have no owner key pair -- the home node owns the keys
+    let ownerCryptoKey = null;
+    if (d.owner_private_key) {
+      // SECURITY: Import owner private key as non-extractable CryptoKey in IndexedDB
+      ownerCryptoKey = await importEd25519Key(d.owner_private_key);
+      await storeKey('owner_key', ownerCryptoKey);
+    }
 
     // Owner session — human users authenticate as owners, not agents
     const session = createSession({
@@ -623,6 +638,9 @@ const auth = {
       _cryptoKey: ownerCryptoKey,
       publicKey: d.owner_public_key || '',
       displayName: d.ghii.display_name || '',
+      federated: d.federated || false,
+      homeNode: d.home_node || '',
+      homeUrl: d.home_url || '',
     });
 
     // SECURITY: Only save metadata to localStorage (no private keys)
@@ -630,6 +648,9 @@ const auth = {
       owner: d.owner.name, gaii: null, ghii: d.ghii.ghii,
       jwt: d.token, publicKey: d.owner_public_key || '', roles: session.roles,
       displayName: session.displayName || '',
+      federated: d.federated || false,
+      homeNode: d.home_node || '',
+      homeUrl: d.home_url || '',
     });
 
     currentSession = session;
@@ -768,6 +789,9 @@ const auth = {
           + 'text-shadow:0 1px 0 rgba(245,230,163,.6),0 -1px 0 rgba(50,35,10,.3);'
           + '-webkit-text-stroke:.2px rgba(120,85,20,.3)">'
           + escHtml(stored.ghii || stored.owner) + '</span>'
+          + (stored.federated ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;letter-spacing:.5px;color:#7dd3fc;'
+            + 'background:rgba(56,189,248,.15);padding:2px 6px;border-radius:4px;border:1px solid rgba(56,189,248,.3)">'
+            + '\\u{1F310} ' + escHtml(i.federated || 'Federated') + '</span>' : '')
           + '<button id="aimeat-logout-btn" style="'
           + 'background:radial-gradient(ellipse at 50% 30%,#ff6b6b 0%,#dc2626 35%,#991b1b 70%,#7f1d1d 100%);'
           + 'color:#ffd7d7;border:1px solid rgba(220,38,38,.6);border-top-color:rgba(255,130,130,.4);border-bottom-color:rgba(100,20,20,.8);'
@@ -992,18 +1016,22 @@ function showLoginModal(opts, renderBtn) {
     const password = document.getElementById('aimeat-password').value;
     const errEl = document.getElementById('aimeat-error');
 
-    // Accept full GHII (e.g. "alice@node-id") -- check node match
+    // Accept full GHII (e.g. "alice@node-id") -- detect local vs federated
     let isGhii = false;
+    let isFederated = false;
+    let fullUsername = username;
     if (username.includes('@')) {
       const atIdx = username.indexOf('@');
       const nodePart = username.substring(atIdx + 1);
       if (nodePart && nodePart !== NODE_ID) {
-        errEl.textContent = i.errFederatedLogin || 'Federated login is not yet supported. This node is ' + NODE_ID + ', but the identity belongs to ' + nodePart + '.';
-        errEl.style.display = 'block';
-        return;
+        // Federated login -- keep full username@node-id for the server
+        isFederated = true;
+        isGhii = true;
+      } else {
+        // Local GHII -- strip the @node-id
+        username = username.substring(0, atIdx);
+        isGhii = true;
       }
-      username = username.substring(0, atIdx);
-      isGhii = true;
     }
 
     const displayName = document.getElementById('aimeat-displayname').value.trim() || username;
@@ -1027,7 +1055,11 @@ function showLoginModal(opts, renderBtn) {
     // If input was a full GHII, skip register and go straight to login
     if (isGhii) {
       try {
-        const session = await auth.loginWithPassword(username, password);
+        if (isFederated) {
+          btn.textContent = i.connectingHome || 'Connecting to home node...';
+        }
+        const loginUser = isFederated ? fullUsername : username;
+        const session = await auth.loginWithPassword(loginUser, password);
         modal.remove();
         renderBtn();
         if (opts.onLogin) opts.onLogin(session);

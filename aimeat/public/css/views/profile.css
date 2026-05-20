@@ -1240,6 +1240,7 @@
 .pf .access-warn-text { font-size: .75rem; color: var(--warn); margin-top: .5rem; }
 .pf .access-mcp-url  { font-family: monospace; font-size: .85rem; color: var(--love3); }
 .pf .access-mcp-desc { font-size: .75rem; color: var(--muted); margin-top: .3rem; }
+.pf .access-fed-add  { margin-top: .5rem; }
 
 /* ── Wallet tab ── */
 .pf .wl-val-success  { color: var(--success, #22c55e); }

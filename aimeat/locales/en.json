@@ -748,7 +748,17 @@
       "keepSafe": "Keep this safe — it's your owner recovery key.",
       "keyCopied": "Key copied to clipboard!",
       "mcpEndpoint": "MCP Endpoint",
-      "mcpDesc": "Use this URL to connect MCP-compatible AI platforms to your node."
+      "mcpDesc": "Use this URL to connect MCP-compatible AI platforms to your node.",
+      "fedTitle": "Federation Access",
+      "fedDesc": "Control which federation nodes can verify your identity for remote login.",
+      "fedAddNode": "Add Node",
+      "fedNodeId": "Node ID",
+      "fedAllowAll": "Allow all federation nodes",
+      "fedAllowAllWarn": "Any node can verify your identity",
+      "fedNoConsents": "No federation login access granted.",
+      "fedRemove": "Remove",
+      "fedGranted": "Auth access granted",
+      "fedRevoked": "Auth access revoked"
     },
     "nodes": {
       "title": "Personal Nodes",

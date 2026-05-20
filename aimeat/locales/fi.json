@@ -748,7 +748,17 @@
       "keepSafe": "Pidä tämä turvassa — se on palautusavaimesi.",
       "keyCopied": "Avain kopioitu leikepöydälle!",
       "mcpEndpoint": "MCP-päätepiste",
-      "mcpDesc": "Käytä tätä URL:iä yhdistääksesi MCP-yhteensopivat AI-alustat solmuusi."
+      "mcpDesc": "Käytä tätä URL:iä yhdistääksesi MCP-yhteensopivat AI-alustat solmuusi.",
+      "fedTitle": "Federaatioyhteys",
+      "fedDesc": "Hallinnoi mitkä solmut voivat todentaa henkilöllisyytesi etäkirjautumista varten.",
+      "fedAddNode": "Lisää solmu",
+      "fedNodeId": "Solmun ID",
+      "fedAllowAll": "Salli kaikki federaatiosolmut",
+      "fedAllowAllWarn": "Mikä tahansa solmu voi todentaa henkilöllisyytesi",
+      "fedNoConsents": "Federaatiokirjautumista ei myönnetty.",
+      "fedRemove": "Poista",
+      "fedGranted": "Todennusoikeus myönnetty",
+      "fedRevoked": "Todennusoikeus peruutettu"
     },
     "nodes": {
       "title": "Henkilökohtaiset solmut",
