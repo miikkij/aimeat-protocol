@@ -581,6 +581,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
                 <span class="kpkg-badge kpkg-badge-type">${t('knowledge.contentTypes.' + (manifest.content_type || 'document')) || (manifest.content_type || 'document').toUpperCase()}</span>
                 <span class="kpkg-badge kpkg-badge-synthesis">${t('knowledge.synthesis.' + (manifest.synthesis?.level || 'original'))}</span>
                 <span class="kpkg-badge kpkg-badge-${manifest.maturity || 'draft'}">${t('knowledge.maturity.' + (manifest.maturity || 'draft'))}</span>
+                ${manifest.sharing?.catalog_listed && html`<span class="badge badge-muted" title=${t('profile.federateTooltip')}>${t('profile.notFederated')}</span>`}
               </div>
               <div class="kpkg-card-tags">
                 ${(manifest.tags || []).map(tag => html`<span class="kpkg-tag" key=${tag}>${escHtml(tag)}</span>`)}

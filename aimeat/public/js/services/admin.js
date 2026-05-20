@@ -57,6 +57,7 @@ export const addPeerDirect = (nodeId, url, publicKey) => apiPost('/v1/federation
 export const removePeer = (nodeId) => apiDelete(`/v1/federation/peers/${encodeURIComponent(nodeId)}`);
 export const removePeerEmergency = (nodeId) => apiDelete(`/v1/federation/peers/${encodeURIComponent(nodeId)}?emergency=true`);
 export const testFederationNode = (targetUrl) => apiPost('/v1/federation/test', { target_url: targetUrl });
+export const updatePeerPolicy = (nodeId, policy) => apiPut(`/v1/federation/peers/${encodeURIComponent(nodeId)}`, policy);
 export const joinGenesisNetwork = (genesisUrl, role) => apiPost('/v1/admin/federation/join', { genesis_url: genesisUrl, role: role || 'contributor' });
 
 // ── Hooks ──

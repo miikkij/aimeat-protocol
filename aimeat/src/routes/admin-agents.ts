@@ -23,6 +23,7 @@ export function adminAgentsRouter(
                 trust_score: a.trustScore,
                 morsel_balance: a.morselBalance,
                 allowed_origins: a.allowedOrigins ?? null,
+                federate: a.federate ?? false,
                 created_at: a.createdAt,
                 last_seen: a.lastSeen,
             })),

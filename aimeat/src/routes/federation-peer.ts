@@ -434,6 +434,10 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
             status: p.status,
             added_at: p.addedAt,
             last_seen: p.lastSeen,
+            share_catalogue: p.shareCatalogue ?? true,
+            replicate_memory: p.replicateMemory ?? true,
+            allow_routing: p.allowRouting ?? true,
+            peer_mode: p.peerMode ?? 'federation',
         }));
 
         res.json(success(config.nodeId, {
@@ -494,16 +498,24 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
             return;
         }
 
-        const { url, public_key, status } = req.body ?? {};
+        const { url, public_key, status, share_catalogue, replicate_memory, allow_routing, peer_mode } = req.body ?? {};
         if (url) peer.url = url;
         if (public_key) peer.publicKey = public_key;
         if (status) peer.status = status;
+        if (typeof share_catalogue === 'boolean') peer.shareCatalogue = share_catalogue;
+        if (typeof replicate_memory === 'boolean') peer.replicateMemory = replicate_memory;
+        if (typeof allow_routing === 'boolean') peer.allowRouting = allow_routing;
+        if (peer_mode === 'federation' || peer_mode === 'private') peer.peerMode = peer_mode;
         await storage.saveFederationPeer(peer);
 
         res.json(success(config.nodeId, {
             node_id: nodeId,
             url: peer.url,
             status: peer.status,
+            share_catalogue: peer.shareCatalogue,
+            replicate_memory: peer.replicateMemory,
+            allow_routing: peer.allowRouting,
+            peer_mode: peer.peerMode,
             updated: true,
         }));
         emitChange('federation');

@@ -213,6 +213,10 @@
     "close": "Sulje",
     "error": "Virhe",
     "unknownError": "Tuntematon virhe",
+    "federate": "Federoi",
+    "federateTooltip": "Tee näkyväksi federaatioverkossa",
+    "federated": "Federoitu",
+    "notFederated": "Vain paikallinen",
     "stats": {
       "agents": "Agentit",
       "morsels": "Muruset",
@@ -3181,6 +3185,15 @@
     "fedDepeeringTitle": "Poistettavat vertaiset",
     "fedDepeeringExplain": "Nämä vertaiset ovat armonaikajaksolla ennen lopullista poistamista. Keskeneräiset työt voivat vielä valmistua.",
     "fedDepeeringGrace": "Armonaika päättyy",
+
+    "fedShareCatalogue": "Jaa katalogi",
+    "fedReplicateMemory": "Replikoi muisti",
+    "fedAllowRouting": "Salli reititys",
+    "fedPeerMode": "Vertaistila",
+    "fedPeerModeFederation": "Federaatio",
+    "fedPeerModePrivate": "Yksityinen P2P",
+    "fedPolicyUpdated": "Vertaispolitiikka päivitetty",
+    "fedPolicySectionTitle": "Politiikka",
 
     "genesisExplain": "Genesis-vertaiset ovat federaatioklusterin perustajasolmuja. Genesis-solmu on ensimmäinen solmu, joka luo federaation, ja se hallinnoi vertaishyväksyntöjä, avainten vaihtoa ja klusterikäytäntöjä.",
     "genesisHelpTitle": "Mitä genesis-vertaiset ovat?",

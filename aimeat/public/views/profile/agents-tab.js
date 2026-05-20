@@ -14,7 +14,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, timeAgo, copyToClipboard } from '/js/utils.js';
 import { Spinner } from './shared.js';
-import { apiGet, apiPost } from '/js/api.js';
+import { apiGet, apiPost, apiPatch } from '/js/api.js';
 import { listAgents, updateAgentScopes, deleteAgent } from '/js/services/agents.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { useConfirm } from '/components/Modal.js';
@@ -314,6 +314,13 @@ export default function AgentsTab({ session, showToast, onStats }) {
     } catch { /* ignore */ }
   }
 
+  async function toggleFederate(agent) {
+    try {
+      await apiPatch(`/v1/agents/${encodeURIComponent(agent.name)}/federate`, { federate: !agent.federate });
+      loadData();
+    } catch (e) { showToast(e.message || t('profile.unknownError'), true); }
+  }
+
   if (!agents) return html`<${Spinner} text=${t('profile.agents.loadingAgents')} />`;
 
   return html`
@@ -417,6 +424,11 @@ export default function AgentsTab({ session, showToast, onStats }) {
                 <div class="card-title">${escHtml(a.display_name || a.name)}</div>
               </div>
               <span class="badge badge-info">${escHtml(a.name)}</span>
+              <span class="${a.federate ? 'badge badge-success' : 'badge badge-muted'}"
+                onClick=${(e) => { e.stopPropagation(); toggleFederate(a); }}
+                title=${t('profile.federateTooltip')}>
+                ${a.federate ? t('profile.federated') : t('profile.notFederated')}
+              </span>
             </div>
             <div class="card-subtitle mt-xs">
               ${t('profile.agents.trust')}: ${a.trust_score ?? '-'} \u2502

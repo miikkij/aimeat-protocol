@@ -29,11 +29,14 @@ export async function deleteBoard(boardId) {
   return apiDelete(`/v1/boards/${encodeURIComponent(boardId)}`);
 }
 
-/** Update board visibility. */
-export async function updateBoardVisibility(boardId, visibility) {
+/** Update board visibility and/or federate flag. */
+export async function updateBoardVisibility(boardId, visibility, federate) {
+  const body = {};
+  if (visibility !== undefined) body.visibility = visibility;
+  if (federate !== undefined) body.federate = federate;
   return api(`/v1/boards/${encodeURIComponent(boardId)}/visibility`, {
     method: 'PATCH',
-    body: JSON.stringify({ visibility }),
+    body: JSON.stringify(body),
   });
 }
 

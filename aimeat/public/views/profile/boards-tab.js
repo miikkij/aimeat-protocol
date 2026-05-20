@@ -118,6 +118,13 @@ export default function BoardsTab({ session, showToast }) {
     } catch (e) { showToast(e.message || t('profile.error'), true); }
   }
 
+  async function toggleBoardFederate(boardId, value) {
+    try {
+      await boardsService.updateBoardVisibility(boardId, undefined, value);
+      loadMyData();
+    } catch (e) { showToast(e.message || t('profile.error'), true); }
+  }
+
   async function handleDeleteBoard(boardId) {
     confirm(t('profile.boards.confirmDeleteBoard') || 'Delete this board and all its posts?', async () => {
       try {
@@ -230,6 +237,11 @@ export default function BoardsTab({ session, showToast }) {
                   title="${t('knowledge.visibility.' + vis)} \u2192 ${t('knowledge.visibility.' + nextVis)}"
                   style="background:${visBg[vis]};color:${visColor[vis]};border-color:${visColor[vis]}"
                 >${t('knowledge.visibility.' + vis)} \u25BE</button>
+                ${vis === 'public' && html`<span class="${b.federate ? 'badge badge-success' : 'badge badge-muted'}"
+                  onClick=${(e) => { e.stopPropagation(); toggleBoardFederate(bid, !b.federate); }}
+                  title=${t('profile.federateTooltip')}>
+                  ${b.federate ? t('profile.federated') : t('profile.notFederated')}
+                </span>`}
                 <button class="btn-danger-solid btn-sm" onClick=${(e) => { e.stopPropagation(); handleDeleteBoard(bid); }}>${t('profile.boards.deleteBoard')}</button>
               </div>
             </div>

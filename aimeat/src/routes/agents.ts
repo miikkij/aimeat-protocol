@@ -597,6 +597,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         created_at: a.createdAt,
         last_seen: a.lastSeen,
         public_key: a.publicKey,
+        federate: a.federate ?? false,
       })),
     }, [
       { description: 'Register a new agent', method: 'POST', url: '/v1/agents' },
@@ -944,6 +945,42 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     }, [
       { description: 'Re-authenticate to get a new JWT with updated scopes', method: 'POST', url: '/v1/auth/token' },
     ]));
+    emitChange('agents');
+  });
+
+  // PATCH /v1/agents/:name/federate — toggle agent federation visibility (owner only)
+  router.patch('/v1/agents/:name/federate', requireAuth(), requireRole('owner'), async (req, res) => {
+    const agentName = req.params.name as string;
+    const ownerName = req.auth!.owner;
+    const { federate } = req.body ?? {};
+
+    if (typeof federate !== 'boolean') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'federate must be a boolean'));
+      return;
+    }
+
+    const agents = await storage.getAgentsByOwner(ownerName);
+    const agent = agents.find(a => a.name === agentName);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent "${agentName}" not found under owner "${ownerName}"`));
+      return;
+    }
+    if (agent.owner !== req.auth!.owner) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only modify your own agents'));
+      return;
+    }
+
+    const updated = await storage.updateAgent(agent.gaii, { federate });
+    if (!updated) {
+      res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to update agent'));
+      return;
+    }
+
+    res.json(success(config.nodeId, {
+      gaii: updated.gaii,
+      name: updated.name,
+      federate: updated.federate ?? false,
+    }));
     emitChange('agents');
   });
 

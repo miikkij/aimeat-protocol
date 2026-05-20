@@ -131,11 +131,15 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
     const { visibility, federate } = req.body ?? {};
-    if (!visibility || !['private', 'public', 'shared'].includes(visibility)) {
+    if (visibility !== undefined && !['private', 'public', 'shared'].includes(visibility)) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility must be "private", "public", or "shared"'));
       return;
     }
-    const updated = await storage.updateBoardVisibility(boardId, visibility, typeof federate === 'boolean' ? federate : undefined);
+    if (visibility === undefined && typeof federate !== 'boolean') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility or federate must be provided'));
+      return;
+    }
+    const updated = await storage.updateBoardVisibility(boardId, visibility || board.visibility, typeof federate === 'boolean' ? federate : undefined);
     if (!updated) {
       res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to update board visibility'));
       return;

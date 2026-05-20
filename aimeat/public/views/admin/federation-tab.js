@@ -8,7 +8,7 @@ import { dt, num, Badge, EconRow, StatsGrid, Empty, ExpandableHelp, ErrorBox } f
 import {
   getFederationPeers, getFederationDirectory, approvePeeringRequest, rejectPeeringRequest,
   deletePeeringRequest, activatePeer, addPeerDirect, removePeer, removePeerEmergency,
-  testFederationNode, joinGenesisNetwork,
+  testFederationNode, joinGenesisNetwork, updatePeerPolicy,
 } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
 
@@ -84,6 +84,14 @@ export default function FederationTab({ data, reload }) {
       try { await removePeerEmergency(nodeId); flash(t('dashboard.fedPeerEmergencyRemoved')); reload(); }
       catch (e) { flashErr(e.message); }
     }, { danger: true });
+  }, [reload]);
+
+  const doUpdatePolicy = useCallback(async (nodeId, field, value) => {
+    try {
+      await updatePeerPolicy(nodeId, { [field]: value });
+      flash(t('dashboard.fedPolicyUpdated'));
+      reload();
+    } catch (e) { flashErr(e.message); }
   }, [reload]);
 
   const doTest = useCallback(async () => {
@@ -230,6 +238,7 @@ export default function FederationTab({ data, reload }) {
             <th>${t('dashboard.fedAddedAt')}</th>
             <th>${t('dashboard.lastSeen')}</th>
             <th>${t('dashboard.fedPublicKey')}</th>
+            <th>${t('dashboard.fedPolicySectionTitle')}</th>
             <th>${t('dashboard.actions')}</th>
           </tr></thead>
           <tbody>
@@ -240,6 +249,15 @@ export default function FederationTab({ data, reload }) {
               <td class="adm-text-dim">${dt(p.added_at)}</td>
               <td class="adm-text-dim">${dt(p.last_seen)}</td>
               <td class="mono" style="font-size:.7rem;max-width:100px;overflow:hidden;text-overflow:ellipsis" title=${p.public_key || ''}>${p.public_key ? p.public_key.substring(0, 16) + '...' : '\u2014'}</td>
+              <td>
+                <label class="adm-text-sm"><input type="checkbox" checked=${p.share_catalogue !== false} onChange=${(e) => doUpdatePolicy(p.node_id, 'share_catalogue', e.target.checked)} /> ${t('dashboard.fedShareCatalogue')}</label>
+                <label class="adm-text-sm"><input type="checkbox" checked=${p.replicate_memory !== false} onChange=${(e) => doUpdatePolicy(p.node_id, 'replicate_memory', e.target.checked)} /> ${t('dashboard.fedReplicateMemory')}</label>
+                <label class="adm-text-sm"><input type="checkbox" checked=${p.allow_routing !== false} onChange=${(e) => doUpdatePolicy(p.node_id, 'allow_routing', e.target.checked)} /> ${t('dashboard.fedAllowRouting')}</label>
+                <select class="adm-input" style="font-size:.75rem;padding:2px 4px;margin-top:4px" value=${p.peer_mode || 'federation'} onChange=${(e) => doUpdatePolicy(p.node_id, 'peer_mode', e.target.value)}>
+                  <option value="federation">${t('dashboard.fedPeerModeFederation')}</option>
+                  <option value="private">${t('dashboard.fedPeerModePrivate')}</option>
+                </select>
+              </td>
               <td style="display:flex;gap:4px;flex-wrap:wrap">
                 ${p.status === 'approved' && html`
                   <button class="adm-btn-sm" onClick=${() => doActivate(p.node_id)}>\u25B6 ${t('dashboard.fedActivate')}</button>

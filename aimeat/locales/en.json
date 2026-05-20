@@ -213,6 +213,10 @@
     "close": "Close",
     "error": "Error",
     "unknownError": "Unknown error",
+    "federate": "Federate",
+    "federateTooltip": "Make visible across the federation network",
+    "federated": "Federated",
+    "notFederated": "Local only",
     "stats": {
       "agents": "Agents",
       "morsels": "Morsels",
@@ -3181,6 +3185,15 @@
     "fedDepeeringTitle": "Peers Being Removed",
     "fedDepeeringExplain": "These peers are in the grace period before permanent removal. In-flight work can still complete.",
     "fedDepeeringGrace": "Grace ends",
+
+    "fedShareCatalogue": "Share Catalogue",
+    "fedReplicateMemory": "Replicate Memory",
+    "fedAllowRouting": "Allow Routing",
+    "fedPeerMode": "Peer Mode",
+    "fedPeerModeFederation": "Federation",
+    "fedPeerModePrivate": "Private P2P",
+    "fedPolicyUpdated": "Peer policy updated",
+    "fedPolicySectionTitle": "Policy",
 
     "genesisExplain": "Genesis peers are the founding nodes of a federation cluster. The genesis node is the first node that creates the federation, and it manages peer approvals, key exchange, and cluster policies.",
     "genesisHelpTitle": "What are genesis peers?",
