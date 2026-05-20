@@ -194,6 +194,7 @@ export class MongoStorage implements Storage {
                 morselBalance: agent.morselBalance,
                 allowedOrigins: agent.allowedOrigins ?? [],
                 defaultScopes: agent.defaultScopes ?? ['*'],
+                federate: agent.federate ?? false,
                 createdAt: new Date(agent.createdAt),
                 lastSeen: new Date(agent.lastSeen),
             },
@@ -583,6 +584,7 @@ export class MongoStorage implements Storage {
                 tags: action.tags,
                 webhookUrl: action.webhookUrl ?? null,
                 semantic: action.semantic as any ?? null,
+                federate: action.federate ?? false,
                 createdAt: new Date(action.createdAt),
                 updatedAt: new Date(action.updatedAt),
             },
@@ -792,6 +794,7 @@ export class MongoStorage implements Storage {
                 visibility: board.visibility,
                 ownerGaii: board.ownerGaii,
                 allowedGaiis: board.allowedGaiis,
+                federate: board.federate ?? false,
                 createdAt: new Date(board.createdAt),
             },
         });
@@ -1212,6 +1215,7 @@ export class MongoStorage implements Storage {
                 size: file.size,
                 data: file.data,
                 tags: file.tags || [],
+                federate: file.federate ?? false,
                 createdAt: new Date(file.createdAt),
             },
         });
@@ -1224,17 +1228,17 @@ export class MongoStorage implements Storage {
             where: { ownerGaii_key: { ownerGaii, key } },
         });
         if (!row) return null;
-        return { key: row.key, ownerGaii: row.ownerGaii, visibility: row.visibility as any, mimeType: row.mimeType, size: row.size, data: Buffer.from(row.data), tags: (row as any).tags || [], createdAt: row.createdAt.toISOString() };
+        return { key: row.key, ownerGaii: row.ownerGaii, visibility: row.visibility as any, mimeType: row.mimeType, size: row.size, data: Buffer.from(row.data), tags: (row as any).tags || [], federate: (row as any).federate ?? false, createdAt: row.createdAt.toISOString() };
     }
 
     async listStorageFiles(ownerGaii: string): Promise<StorageFileRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.storageFile.findMany({
             where: { ownerGaii },
-            select: { key: true, ownerGaii: true, visibility: true, mimeType: true, size: true, tags: true, createdAt: true },
+            select: { key: true, ownerGaii: true, visibility: true, mimeType: true, size: true, tags: true, federate: true, createdAt: true },
         });
         return rows.map((r: any) => ({
-            key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility, mimeType: r.mimeType, size: r.size, data: Buffer.alloc(0), tags: r.tags || [], createdAt: r.createdAt.toISOString(),
+            key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility, mimeType: r.mimeType, size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false, createdAt: r.createdAt.toISOString(),
         }));
     }
 
@@ -1368,7 +1372,7 @@ export class MongoStorage implements Storage {
     }
 
     private toAgentRecord(row: any): AgentRecord {
-        return { name: row.name, owner: row.owner, gaii: row.gaii, displayName: row.displayName ?? undefined, description: row.description ?? undefined, capabilities: row.capabilities, publicKey: row.publicKey, trustScore: row.trustScore, morselBalance: row.morselBalance, defaultScopes: row.defaultScopes?.length ? row.defaultScopes : undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined, createdAt: row.createdAt.toISOString(), lastSeen: row.lastSeen.toISOString() };
+        return { name: row.name, owner: row.owner, gaii: row.gaii, displayName: row.displayName ?? undefined, description: row.description ?? undefined, capabilities: row.capabilities, publicKey: row.publicKey, trustScore: row.trustScore, morselBalance: row.morselBalance, defaultScopes: row.defaultScopes?.length ? row.defaultScopes : undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined, federate: row.federate ?? false, createdAt: row.createdAt.toISOString(), lastSeen: row.lastSeen.toISOString() };
     }
 
     private toMemoryRecord(row: any): MemoryRecord {
@@ -1376,7 +1380,7 @@ export class MongoStorage implements Storage {
     }
 
     private toActionRecord(row: any): ActionRecord {
-        return { id: row.actionId, providerGaii: row.providerGaii, displayName: row.displayName, description: row.description, category: row.category ?? undefined, inputSchema: row.inputSchema as Record<string, unknown>, outputSchema: row.outputSchema as Record<string, unknown>, pricing: { baseMorsels: row.pricingBaseMorsels, perUnit: row.pricingPerUnit as any }, estimatedTimeSeconds: row.estimatedTimeSeconds ?? undefined, maxInputSizeBytes: row.maxInputSizeBytes ?? undefined, tags: row.tags, webhookUrl: row.webhookUrl ?? undefined, semantic: row.semantic as any ?? undefined, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
+        return { id: row.actionId, providerGaii: row.providerGaii, displayName: row.displayName, description: row.description, category: row.category ?? undefined, inputSchema: row.inputSchema as Record<string, unknown>, outputSchema: row.outputSchema as Record<string, unknown>, pricing: { baseMorsels: row.pricingBaseMorsels, perUnit: row.pricingPerUnit as any }, estimatedTimeSeconds: row.estimatedTimeSeconds ?? undefined, maxInputSizeBytes: row.maxInputSizeBytes ?? undefined, tags: row.tags, webhookUrl: row.webhookUrl ?? undefined, semantic: row.semantic as any ?? undefined, federate: row.federate ?? false, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString() };
     }
 
     private toWorkRecord(row: any): WorkRecord {
@@ -1384,7 +1388,7 @@ export class MongoStorage implements Storage {
     }
 
     private toBoardRecord(row: any): BoardRecord {
-        return { id: row.boardId, name: row.name, description: row.description ?? undefined, visibility: row.visibility as any, ownerGaii: row.ownerGaii, allowedGaiis: row.allowedGaiis, createdAt: row.createdAt.toISOString() };
+        return { id: row.boardId, name: row.name, description: row.description ?? undefined, visibility: row.visibility as any, ownerGaii: row.ownerGaii, allowedGaiis: row.allowedGaiis, federate: row.federate ?? false, createdAt: row.createdAt.toISOString() };
     }
 
     private toPostRecord(row: any): BoardPostRecord {
@@ -3913,8 +3917,8 @@ export class MongoStorage implements Storage {
         this.ensureReady();
         await this.prisma.federationPeer.upsert({
             where: { nodeId: peer.nodeId },
-            create: { nodeId: peer.nodeId, url: peer.url, publicKey: peer.publicKey, status: peer.status, addedAt: new Date(peer.addedAt), lastSeen: new Date(peer.lastSeen) },
-            update: { url: peer.url, publicKey: peer.publicKey, status: peer.status, lastSeen: new Date(peer.lastSeen) },
+            create: { nodeId: peer.nodeId, url: peer.url, publicKey: peer.publicKey, status: peer.status, addedAt: new Date(peer.addedAt), lastSeen: new Date(peer.lastSeen), shareCatalogue: peer.shareCatalogue, replicateMemory: peer.replicateMemory, allowRouting: peer.allowRouting, peerMode: peer.peerMode || 'federation' },
+            update: { url: peer.url, publicKey: peer.publicKey, status: peer.status, lastSeen: new Date(peer.lastSeen), shareCatalogue: peer.shareCatalogue, replicateMemory: peer.replicateMemory, allowRouting: peer.allowRouting, peerMode: peer.peerMode || 'federation' },
         });
     }
 
@@ -3928,6 +3932,10 @@ export class MongoStorage implements Storage {
             status: r.status,
             addedAt: r.addedAt instanceof Date ? r.addedAt.toISOString() : r.addedAt,
             lastSeen: r.lastSeen instanceof Date ? r.lastSeen.toISOString() : r.lastSeen,
+            shareCatalogue: r.shareCatalogue ?? true,
+            replicateMemory: r.replicateMemory ?? true,
+            allowRouting: r.allowRouting ?? true,
+            peerMode: r.peerMode || 'federation',
         }));
     }
 

@@ -228,8 +228,8 @@ export class SqliteStorage implements Storage {
   async createAgent(agent: AgentRecord): Promise<AgentRecord> {
     try {
       this.db.prepare(
-        `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic, allowedOrigins, defaultScopes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic, allowedOrigins, defaultScopes, federate)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         agent.gaii, agent.name, agent.owner,
         agent.displayName ?? null, agent.description ?? null,
@@ -239,6 +239,7 @@ export class SqliteStorage implements Storage {
         agent.semantic ? JSON.stringify(agent.semantic) : null,
         agent.allowedOrigins ? JSON.stringify(agent.allowedOrigins) : null,
         agent.defaultScopes ? JSON.stringify(agent.defaultScopes) : null,
+        agent.federate ? 1 : 0,
       );
       return agent;
     } catch (err: unknown) {
@@ -264,7 +265,7 @@ export class SqliteStorage implements Storage {
     this.db.prepare(
       `UPDATE agents SET name = ?, owner = ?, displayName = ?, description = ?, capabilities = ?,
        publicKey = ?, trustScore = ?, morselBalance = ?, createdAt = ?, lastSeen = ?, semantic = ?,
-       allowedOrigins = ?, defaultScopes = ?
+       allowedOrigins = ?, defaultScopes = ?, federate = ?
        WHERE gaii = ?`
     ).run(
       updated.name, updated.owner,
@@ -275,6 +276,7 @@ export class SqliteStorage implements Storage {
       updated.semantic ? JSON.stringify(updated.semantic) : null,
       updated.allowedOrigins ? JSON.stringify(updated.allowedOrigins) : null,
       updated.defaultScopes ? JSON.stringify(updated.defaultScopes) : null,
+      updated.federate ? 1 : 0,
       gaii,
     );
     return updated;
@@ -387,6 +389,7 @@ export class SqliteStorage implements Storage {
     if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
     if (row.allowedOrigins) record.allowedOrigins = JSON.parse(row.allowedOrigins as string);
     if (row.defaultScopes) record.defaultScopes = JSON.parse(row.defaultScopes as string);
+    record.federate = (row as any).federate === 1;
     return record;
   }
 
@@ -600,8 +603,8 @@ export class SqliteStorage implements Storage {
   async createAction(action: ActionRecord): Promise<ActionRecord> {
     try {
       this.db.prepare(
-        `INSERT INTO actions (providerGaii, id, displayName, description, category, inputSchema, outputSchema, pricing, estimatedTimeSeconds, maxInputSizeBytes, tags, webhookUrl, createdAt, updatedAt, semantic)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO actions (providerGaii, id, displayName, description, category, inputSchema, outputSchema, pricing, estimatedTimeSeconds, maxInputSizeBytes, tags, webhookUrl, createdAt, updatedAt, semantic, federate)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         action.providerGaii, action.id, action.displayName, action.description,
         action.category ?? null,
@@ -611,6 +614,7 @@ export class SqliteStorage implements Storage {
         JSON.stringify(action.tags), action.webhookUrl ?? null,
         action.createdAt, action.updatedAt,
         action.semantic ? JSON.stringify(action.semantic) : null,
+        action.federate ? 1 : 0,
       );
       return action;
     } catch (err: unknown) {
@@ -663,7 +667,7 @@ export class SqliteStorage implements Storage {
     this.db.prepare(
       `UPDATE actions SET displayName = ?, description = ?, category = ?, inputSchema = ?,
        outputSchema = ?, pricing = ?, estimatedTimeSeconds = ?, maxInputSizeBytes = ?,
-       tags = ?, webhookUrl = ?, createdAt = ?, updatedAt = ?, semantic = ?
+       tags = ?, webhookUrl = ?, createdAt = ?, updatedAt = ?, semantic = ?, federate = ?
        WHERE providerGaii = ? AND id = ?`
     ).run(
       updated.displayName, updated.description, updated.category ?? null,
@@ -673,6 +677,7 @@ export class SqliteStorage implements Storage {
       JSON.stringify(updated.tags), updated.webhookUrl ?? null,
       updated.createdAt, updated.updatedAt,
       updated.semantic ? JSON.stringify(updated.semantic) : null,
+      updated.federate ? 1 : 0,
       providerGaii, id,
     );
     return updated;
@@ -696,6 +701,7 @@ export class SqliteStorage implements Storage {
     if (row.maxInputSizeBytes !== null) record.maxInputSizeBytes = row.maxInputSizeBytes as number;
     if (row.webhookUrl) record.webhookUrl = row.webhookUrl as string;
     if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
+    record.federate = (row as any).federate === 1;
     return record;
   }
 
@@ -829,13 +835,14 @@ export class SqliteStorage implements Storage {
 
   async createBoard(board: BoardRecord): Promise<BoardRecord> {
     this.db.prepare(
-      `INSERT INTO boards (id, name, description, visibility, ownerGaii, allowedGaiis, createdAt, semantic)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO boards (id, name, description, visibility, ownerGaii, allowedGaiis, createdAt, semantic, federate)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       board.id, board.name, board.description ?? null,
       board.visibility, board.ownerGaii,
       JSON.stringify(board.allowedGaiis), board.createdAt,
       board.semantic ? JSON.stringify(board.semantic) : null,
+      board.federate ? 1 : 0,
     );
     return board;
   }
@@ -948,6 +955,7 @@ export class SqliteStorage implements Storage {
     };
     if (row.description) record.description = row.description as string;
     if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
+    record.federate = (row as any).federate === 1;
     return record;
   }
 
@@ -1277,12 +1285,13 @@ export class SqliteStorage implements Storage {
 
   async createStorageFile(file: StorageFileRecord): Promise<StorageFileRecord> {
     this.db.prepare(
-      `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, mimeType, size, data, accessCode, tags, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, mimeType, size, data, accessCode, tags, createdAt, federate)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       file.ownerGaii, file.key, file.visibility,
       file.mimeType, file.size, file.data,
       file.accessCode ?? null, JSON.stringify(file.tags || []), file.createdAt,
+      file.federate ? 1 : 0,
     );
     return file;
   }
@@ -1301,6 +1310,7 @@ export class SqliteStorage implements Storage {
       createdAt: row.createdAt as string,
     };
     if (row.accessCode) record.accessCode = row.accessCode as string;
+    record.federate = (row as any).federate === 1;
     return record;
   }
 
@@ -1318,6 +1328,7 @@ export class SqliteStorage implements Storage {
         createdAt: r.createdAt as string,
       };
       if (r.accessCode) record.accessCode = r.accessCode as string;
+      record.federate = (r as any).federate === 1;
       return record;
     });
   }
@@ -4383,13 +4394,27 @@ export class SqliteStorage implements Storage {
 
   async saveFederationPeer(peer: FederationPeerRecord): Promise<void> {
     this.db.prepare(
-      `INSERT OR REPLACE INTO federation_peers (nodeId, url, publicKey, status, addedAt, lastSeen)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(peer.nodeId, peer.url, peer.publicKey, peer.status, peer.addedAt, peer.lastSeen);
+      `INSERT OR REPLACE INTO federation_peers (nodeId, url, publicKey, status, addedAt, lastSeen, shareCatalogue, replicateMemory, allowRouting, peerMode)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(peer.nodeId, peer.url, peer.publicKey, peer.status, peer.addedAt, peer.lastSeen,
+      peer.shareCatalogue ? 1 : 0, peer.replicateMemory ? 1 : 0, peer.allowRouting ? 1 : 0,
+      peer.peerMode || 'federation');
   }
 
   async listFederationPeers(): Promise<FederationPeerRecord[]> {
-    return this.db.prepare('SELECT * FROM federation_peers').all() as FederationPeerRecord[];
+    const rows = this.db.prepare('SELECT * FROM federation_peers').all() as Record<string, unknown>[];
+    return rows.map(r => ({
+      nodeId: r.nodeId as string,
+      url: r.url as string,
+      publicKey: r.publicKey as string,
+      status: r.status as string,
+      addedAt: r.addedAt as string,
+      lastSeen: r.lastSeen as string,
+      shareCatalogue: r.shareCatalogue === 1,
+      replicateMemory: r.replicateMemory === 1,
+      allowRouting: r.allowRouting === 1,
+      peerMode: (r.peerMode as FederationPeerRecord['peerMode']) || 'federation',
+    }));
   }
 
   async deleteFederationPeer(nodeId: string): Promise<boolean> {

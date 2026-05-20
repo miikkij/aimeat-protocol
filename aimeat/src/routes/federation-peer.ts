@@ -323,6 +323,10 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
                 status: 'approved',
                 addedAt: now,
                 lastSeen: now,
+                shareCatalogue: true,
+                replicateMemory: true,
+                allowRouting: true,
+                peerMode: 'federation',
             };
             peers.set(peerInfo.nodeId, peerInfo);
             await storage.saveFederationPeer(peerInfo);
@@ -460,6 +464,10 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
             status: 'pending',
             addedAt: now,
             lastSeen: now,
+            shareCatalogue: true,
+            replicateMemory: true,
+            allowRouting: true,
+            peerMode: 'federation',
         };
         peers.set(node_id, peerInfo);
         await storage.saveFederationPeer(peerInfo);
@@ -688,6 +696,10 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
                     status: 'active',
                     addedAt: now,
                     lastSeen: now,
+                    shareCatalogue: true,
+                    replicateMemory: true,
+                    allowRouting: true,
+                    peerMode: 'federation',
                 };
                 peers.set(node_id, newPeer);
                 await storage.saveFederationPeer(newPeer);

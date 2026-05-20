@@ -28,7 +28,8 @@ export interface AgentRecord {
   semantic?: SemanticAnnotation;  // Phase 0.7b
   defaultScopes?: string[];      // REQ-006 — scopes assigned at registration
   allowedOrigins?: string[];     // CORS — per-agent origin restrictions (Phase 3)
-  dailySpendLimit?: number | null;  // Per-agent daily spend cap (null = no limit)
+  dailySpendLimit?: number | null;
+  federate?: boolean;
 }
 
 export interface MemoryRecord {
@@ -60,7 +61,8 @@ export interface ActionRecord {
   webhookUrl?: string;
   createdAt: string;
   updatedAt: string;
-  semantic?: SemanticAnnotation;  // Phase 0.7b
+  semantic?: SemanticAnnotation;
+  federate?: boolean;
 }
 
 export interface WorkRecord {
@@ -97,7 +99,8 @@ export interface BoardRecord {
   ownerGaii: string;
   allowedGaiis: string[];
   createdAt: string;
-  semantic?: SemanticAnnotation;  // Phase 0.7b
+  semantic?: SemanticAnnotation;
+  federate?: boolean;
 }
 
 export interface BoardPostRecord {
@@ -216,6 +219,7 @@ export interface StorageFileRecord {
   accessCode?: string;
   tags?: string[];
   createdAt: string;
+  federate?: boolean;
 }
 
 export interface AppManifest {
@@ -727,6 +731,10 @@ export interface FederationPeerRecord {
   status: string;
   addedAt: string;
   lastSeen: string;
+  shareCatalogue: boolean;
+  replicateMemory: boolean;
+  allowRouting: boolean;
+  peerMode: 'federation' | 'private';
 }
 
 // Phase B.1 — Replication Queue (federation data sync)

@@ -19,14 +19,15 @@ function deserializeAction(row: Record<string, unknown>): ActionRecord {
   if (row.maxInputSizeBytes !== null) record.maxInputSizeBytes = row.maxInputSizeBytes as number;
   if (row.webhookUrl) record.webhookUrl = row.webhookUrl as string;
   if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
+  record.federate = (row as any).federate === 1;
   return record;
 }
 
 export function createAction(db: Database.Database, action: ActionRecord): ActionRecord {
   try {
     db.prepare(
-      `INSERT INTO actions (providerGaii, id, displayName, description, category, inputSchema, outputSchema, pricing, estimatedTimeSeconds, maxInputSizeBytes, tags, webhookUrl, createdAt, updatedAt, semantic)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO actions (providerGaii, id, displayName, description, category, inputSchema, outputSchema, pricing, estimatedTimeSeconds, maxInputSizeBytes, tags, webhookUrl, createdAt, updatedAt, semantic, federate)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       action.providerGaii, action.id, action.displayName, action.description,
       action.category ?? null,
@@ -36,6 +37,7 @@ export function createAction(db: Database.Database, action: ActionRecord): Actio
       JSON.stringify(action.tags), action.webhookUrl ?? null,
       action.createdAt, action.updatedAt,
       action.semantic ? JSON.stringify(action.semantic) : null,
+      action.federate ? 1 : 0,
     );
     return action;
   } catch (err: unknown) {
@@ -88,7 +90,7 @@ export function updateAction(db: Database.Database, id: string, providerGaii: st
   db.prepare(
     `UPDATE actions SET displayName = ?, description = ?, category = ?, inputSchema = ?,
      outputSchema = ?, pricing = ?, estimatedTimeSeconds = ?, maxInputSizeBytes = ?,
-     tags = ?, webhookUrl = ?, createdAt = ?, updatedAt = ?, semantic = ?
+     tags = ?, webhookUrl = ?, createdAt = ?, updatedAt = ?, semantic = ?, federate = ?
      WHERE providerGaii = ? AND id = ?`
   ).run(
     updated.displayName, updated.description, updated.category ?? null,
@@ -98,6 +100,7 @@ export function updateAction(db: Database.Database, id: string, providerGaii: st
     JSON.stringify(updated.tags), updated.webhookUrl ?? null,
     updated.createdAt, updated.updatedAt,
     updated.semantic ? JSON.stringify(updated.semantic) : null,
+    updated.federate ? 1 : 0,
     providerGaii, id,
   );
   return updated;

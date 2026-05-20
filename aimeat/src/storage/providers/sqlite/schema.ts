@@ -1181,4 +1181,16 @@ export function initializeSchema(db: Database.Database): void {
 
   // Package instance status rename: 'active' -> 'installed'
   db.exec("UPDATE package_instances SET status = 'installed' WHERE status = 'active'");
+
+  // Federation Mesh Phase 1 — peer policy fields
+  safeAddColumn('federation_peers', 'shareCatalogue', 'INTEGER NOT NULL DEFAULT 1');
+  safeAddColumn('federation_peers', 'replicateMemory', 'INTEGER NOT NULL DEFAULT 1');
+  safeAddColumn('federation_peers', 'allowRouting', 'INTEGER NOT NULL DEFAULT 1');
+  safeAddColumn('federation_peers', 'peerMode', "TEXT NOT NULL DEFAULT 'federation'");
+
+  // Federation Mesh Phase 1 — per-record federation opt-in
+  safeAddColumn('actions', 'federate', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('agents', 'federate', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('boards', 'federate', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('storage_files', 'federate', 'INTEGER NOT NULL DEFAULT 0');
 }

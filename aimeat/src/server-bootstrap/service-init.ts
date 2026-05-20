@@ -105,6 +105,10 @@ export async function initializeServices(
         status: sp.status,
         addedAt: sp.addedAt,
         lastSeen: sp.lastSeen,
+        shareCatalogue: sp.shareCatalogue ?? true,
+        replicateMemory: sp.replicateMemory ?? true,
+        allowRouting: sp.allowRouting ?? true,
+        peerMode: sp.peerMode || 'federation',
       });
     }
     if (savedPeers.length > 0) {

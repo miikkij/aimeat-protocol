@@ -12,6 +12,7 @@ function deserializeBoard(row: Record<string, unknown>): BoardRecord {
   };
   if (row.description) record.description = row.description as string;
   if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
+  record.federate = (row as any).federate === 1;
   return record;
 }
 
@@ -49,13 +50,14 @@ function deserializeBoardSubscription(row: Record<string, unknown>): BoardSubscr
 
 export function createBoard(db: Database.Database, board: BoardRecord): BoardRecord {
   db.prepare(
-    `INSERT INTO boards (id, name, description, visibility, ownerGaii, allowedGaiis, createdAt, semantic)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO boards (id, name, description, visibility, ownerGaii, allowedGaiis, createdAt, semantic, federate)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     board.id, board.name, board.description ?? null,
     board.visibility, board.ownerGaii,
     JSON.stringify(board.allowedGaiis), board.createdAt,
     board.semantic ? JSON.stringify(board.semantic) : null,
+    board.federate ? 1 : 0,
   );
   return board;
 }

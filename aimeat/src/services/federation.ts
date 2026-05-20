@@ -24,6 +24,10 @@ export interface PeerInfo {
     status: string;
     addedAt: string;
     lastSeen: string;
+    shareCatalogue: boolean;
+    replicateMemory: boolean;
+    allowRouting: boolean;
+    peerMode: 'federation' | 'private';
 }
 
 /**

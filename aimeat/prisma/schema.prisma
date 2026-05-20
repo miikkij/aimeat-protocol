@@ -33,6 +33,7 @@ model Agent {
   dailySpendLimit Int?
   allowedOrigins String[]
   defaultScopes  String[]
+  federate      Boolean  @default(false)
   createdAt     DateTime @default(now())
   lastSeen      DateTime @default(now())
 
@@ -73,6 +74,7 @@ model Action {
   tags                 String[]
   webhookUrl           String?
   semantic             Json?
+  federate             Boolean  @default(false)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
@@ -126,6 +128,7 @@ model Board {
   visibility   String
   ownerGaii    String
   allowedGaiis String[]
+  federate     Boolean  @default(false)
   createdAt    DateTime @default(now())
 
   @@index([ownerGaii])
@@ -213,6 +216,7 @@ model StorageFile {
   size       Int
   data       Bytes
   tags       String[] @default([])
+  federate   Boolean  @default(false)
   createdAt  DateTime @default(now())
 
   @@unique([ownerGaii, key])
@@ -717,12 +721,16 @@ model GenesisPeer {
 }
 
 model FederationPeer {
-  nodeId    String   @id @map("_id")
-  url       String
-  publicKey String   @default("")
-  status    String   @default("pending")
-  addedAt   DateTime @default(now())
-  lastSeen  DateTime @default(now())
+  nodeId          String   @id @map("_id")
+  url             String
+  publicKey       String   @default("")
+  status          String   @default("pending")
+  addedAt         DateTime @default(now())
+  lastSeen        DateTime @default(now())
+  shareCatalogue  Boolean  @default(true)
+  replicateMemory Boolean  @default(true)
+  allowRouting    Boolean  @default(true)
+  peerMode        String   @default("federation")
 
   @@index([status])
 }
