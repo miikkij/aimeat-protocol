@@ -78,6 +78,11 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             return;
         }
 
+        // Strip @node-id from display_name if it matches a GHII pattern (old frontend fallback)
+        if (display_name.includes('@')) {
+            display_name = display_name.split('@')[0];
+        }
+
         // SECURITY: Validate password strength if provided
         if (password !== undefined && password !== null) {
             if (typeof password !== 'string') {
@@ -353,10 +358,10 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
 
         // Password (+ TOTP if enabled) verified — regenerate owner keys
         const ownerKeyPair = await generateKeyPair();
-        await storage.updateOwner(username, { publicKey: ownerKeyPair.publicKey });
+        await storage.updateOwner(loginName, { publicKey: ownerKeyPair.publicKey });
 
         // Issue OWNER JWT (human users authenticate as owners, not agents)
-        const ownerRecord = await storage.getOwner(username);
+        const ownerRecord = await storage.getOwner(loginName);
         const roles: string[] = [];
         if (ownerRecord?.roles.includes('owner')) roles.push('owner');
         if (ownerRecord?.roles.includes('operator')) roles.push('operator');
@@ -367,13 +372,13 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
           const hasOperator = allOwners.some(o => o.roles.includes('operator'));
           if (!hasOperator) {
             roles.push('operator');
-            await storage.updateOwner(username, { roles: [...ownerRecord.roles, 'operator'] });
+            await storage.updateOwner(loginName, { roles: [...ownerRecord.roles, 'operator'] });
           }
         }
 
         const token = await issueJWT({
-            sub: username,
-            owner: username,
+            sub: loginName,
+            owner: loginName,
             node: config.nodeId,
             roles,
         }, config.jwtTtlSeconds);
@@ -387,7 +392,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
                 username: ghiiRecord.username,
                 display_name: ghiiRecord.displayName,
             },
-            owner: { name: username },
+            owner: { name: loginName },
             token,
             expires_at: new Date(Date.now() + config.jwtTtlSeconds * 1000).toISOString(),
             owner_private_key: ownerKeyPair.privateKey,
@@ -433,6 +438,11 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         if (!display_name || typeof display_name !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'display_name is required'));
             return;
+        }
+
+        // Strip @node-id from display_name if it matches a GHII pattern
+        if (display_name.includes('@')) {
+            display_name = display_name.split('@')[0];
         }
 
         // Check if owner name is already taken
