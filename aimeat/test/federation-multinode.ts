@@ -368,11 +368,8 @@ await test('B can route to A (direct peer)', async () => {
     assert(body.data.routed_to === 'aimeat-hub-001-testa', 'routed to A');
 });
 
-await test('Multi-hop B->A->C fails (relay does not forward auth)', async () => {
-    // Known limitation: the relay implementation sends requests to intermediate
-    // nodes without auth headers, so /v1/federation/route on A rejects the relay.
-    // This test documents the current behavior.
-    const { status } = await nodeB!.json('/v1/federation/route', {
+await test('Multi-hop B->A->C succeeds (relay forwards auth)', async () => {
+    const { status, body } = await nodeB!.json('/v1/federation/route', {
         method: 'POST',
         headers: { Authorization: `Bearer ${nodeB!.ownerToken}` },
         body: JSON.stringify({
@@ -381,9 +378,8 @@ await test('Multi-hop B->A->C fails (relay does not forward auth)', async () => 
             path: '/v1/federation/directory',
         }),
     });
-    // B tries to relay through A, but A's /v1/federation/route requires auth
-    // and the relay request from B does not include auth headers.
-    assert(status === 404, `expected 404 (no route), got ${status}`);
+    assert(status === 200, `route B->A->C: status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data?.routed_to === 'aimeat-node-001-testc', 'routed to C');
 });
 
 await test('Routing to unknown node fails', async () => {
@@ -606,22 +602,16 @@ await test('Add a private peer on Node A', async () => {
     assert(updateRes.body.data.peer_mode === 'private', 'peer_mode is private');
 });
 
-await test('Directory listing on Node A includes all peers (no peer_mode filter)', async () => {
-    // The current directory endpoint does NOT filter by peerMode.
-    // This test documents the current behavior.
+await test('Directory listing on Node A excludes private peers', async () => {
     const { status, body } = await nodeA!.json('/v1/federation/directory');
     assert(status === 200, `directory: ${status}`);
     assert(body.ok === true, 'ok');
 
     const peerIds = body.data.peers.map((p: any) => p.node_id);
 
-    // All peers are visible in directory (including private ones)
-    // NOTE: The directory endpoint currently does NOT filter private peers.
-    // This test verifies the current behavior. A future fix should filter
-    // private peers from the public directory.
     assert(peerIds.includes('aimeat-node-001-testb'), 'B visible in directory');
     assert(peerIds.includes('aimeat-node-001-testc'), 'C visible in directory');
-    assert(peerIds.includes(privatePeerId), 'private peer IS visible (no filter yet)');
+    assert(!peerIds.includes(privatePeerId), 'private peer excluded from directory');
 });
 
 await test('Operator peers list shows peer_mode=private', async () => {

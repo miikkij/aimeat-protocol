@@ -29,12 +29,14 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
 
     // GET /v1/federation/directory — public peer directory (Tier 0)
     router.get('/v1/federation/directory', async (_req, res) => {
-        const peerList = [...peers.values()].map(p => ({
-            node_id: p.nodeId,
-            url: p.url,
-            status: p.status,
-            last_seen: p.lastSeen,
-        }));
+        const peerList = [...peers.values()]
+            .filter(p => p.peerMode !== 'private')
+            .map(p => ({
+                node_id: p.nodeId,
+                url: p.url,
+                status: p.status,
+                last_seen: p.lastSeen,
+            }));
 
         // Include personal nodes in the directory
         let personalNodesList: {

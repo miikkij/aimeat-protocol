@@ -419,6 +419,7 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Authorization': req.headers.authorization ?? '',
                         'X-Forwarded-From': config.nodeId,
                         'X-Relay-Hops': String(hops - 1),
                         'X-Relay-Path': relayPath,
