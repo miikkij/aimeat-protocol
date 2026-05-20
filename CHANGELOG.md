@@ -2,6 +2,11 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.4.3] - 2026-05-20
+
+### Fixed
+- **Setup wizard broken by CSP** -- inline `onclick` event handlers in `wizard.html` were blocked by the Content Security Policy (`script-src` requires nonce or `unsafe-inline`). Replaced all 17 inline handlers with `addEventListener` calls inside the nonce-protected `<script>` block. New users could not complete initial node setup because no buttons worked.
+
 ## [1.4.2] - 2026-05-16
 
 ### Fixed
