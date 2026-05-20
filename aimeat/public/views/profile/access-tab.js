@@ -141,6 +141,7 @@ export default function AccessTab({ session, showToast }) {
       ${authConsents.filter(c => c.recipient !== '*').map(c => html`
         <div class="mem-item">
           <span class="mem-key">${escHtml(c.recipient.replace('node:', ''))}</span>
+          <span class="adm-text-dim" style="font-size:.85em">${c.granted_at ? new Date(c.granted_at).toLocaleDateString() : ''}</span>
           <button class="btn-ghost btn-danger" onClick=${() => removeAuthConsent(c.id)}>
             ${t('profile.access.fedRemove')}
           </button>

@@ -175,6 +175,7 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage): Ro
                 if (c.scope !== 'auth') return false;
                 if (c.recipient === `node:${requesting_node}`) return true;
                 if (c.recipient === '*') return true;
+                if (c.recipient === 'domain:*') return true;
                 return false;
             });
 

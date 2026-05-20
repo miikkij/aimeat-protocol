@@ -306,12 +306,17 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
                 }
 
                 // Issue a local federated JWT with limited TTL
+                // Use scopes from attestation if provided (home node restricts what federated user can do)
+                const fedScopes = Array.isArray(attestation.scopes) && attestation.scopes.length > 0
+                    ? attestation.scopes
+                    : ['memory:read', 'memory:write', 'social:read', 'social:write'];
                 const fedTtl = Math.min(config.jwtTtlSeconds, 3600); // max 1 hour
                 const token = await issueJWT({
                     sub: loginName,
                     owner: loginName,
                     node: config.nodeId,
                     roles: ['owner'],
+                    scopes: fedScopes,
                     federated: true,
                     homeNode: attestation.home_node ?? federatedNodeId,
                     homeUrl: attestation.home_url ?? homePeer.url,

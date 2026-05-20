@@ -26,18 +26,20 @@ export interface ServiceSummaryAction {
     displayName: string;
     category?: string;
     providerGaii: string;
+    price: number;
 }
 
 export interface ServiceSummaryAgent {
     gaii: string;
     displayName?: string;
-    capabilities: string[];
+    trust_score: number;
 }
 
 export interface ServiceSummaryBoard {
     id: string;
     name: string;
     description?: string;
+    post_count: number;
 }
 
 export interface ServiceSummaryCsm {
@@ -52,6 +54,9 @@ export interface ServiceSummary {
     agents: ServiceSummaryAgent[];
     boards: ServiceSummaryBoard[];
     csms: ServiceSummaryCsm[];
+    knowledge: unknown[];
+    memory_keys: unknown[];
+    files: unknown[];
     computed_at: string;
 }
 
@@ -82,6 +87,7 @@ export async function computeServiceSummary(
             displayName: a.displayName,
             category: a.category,
             providerGaii: a.providerGaii,
+            price: a.pricing.baseMorsels,
         }));
 
     const agents: ServiceSummaryAgent[] = allAgents
@@ -89,7 +95,7 @@ export async function computeServiceSummary(
         .map(a => ({
             gaii: a.gaii,
             displayName: a.displayName,
-            capabilities: a.capabilities,
+            trust_score: a.trustScore ?? 0,
         }));
 
     const boards: ServiceSummaryBoard[] = allBoards
@@ -98,6 +104,7 @@ export async function computeServiceSummary(
             id: b.id,
             name: b.name,
             description: b.description,
+            post_count: 0,
         }));
 
     const csms: ServiceSummaryCsm[] = allCsms
@@ -114,6 +121,9 @@ export async function computeServiceSummary(
         agents,
         boards,
         csms,
+        knowledge: [],
+        memory_keys: [],
+        files: [],
         computed_at: new Date().toISOString(),
     };
 

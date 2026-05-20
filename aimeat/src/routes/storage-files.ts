@@ -44,9 +44,11 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         let visibility: string;
         let fileData: Buffer;
         let mimeType: string;
+        let federateFlag = false;
 
         if (contentType.includes('application/json')) {
-            const { key: k, visibility: v, data, mime_type, mode } = req.body ?? {};
+            const { key: k, visibility: v, data, mime_type, mode, federate: reqFederate } = req.body ?? {};
+            federateFlag = reqFederate === true;
 
             // --- PRESIGNED MODE: return upload URL ---
             if (mode === 'presigned') {
@@ -119,6 +121,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             mimeType,
             size: fileData.length,
             data: fileData,
+            federate: federateFlag === true,
             createdAt: new Date().toISOString(),
         });
 
@@ -135,6 +138,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             size: file.size,
             mime_type: file.mimeType,
             visibility: file.visibility,
+            federate: file.federate ?? false,
             created_at: file.createdAt,
             overage_charged: storageQuota.overageMorsels > 0 ? storageQuota.overageMorsels : undefined,
         }, [

@@ -413,6 +413,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
         updatedAt: now,
       });
 
+      emitChange('memory');
       res.json(success(config.nodeId, {
         pulled: true,
         key,
@@ -479,6 +480,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
         visibility: record.visibility,
         version: record.version,
         timestamp: record.updatedAt,
+        tags: record.tags ?? [],
       };
 
       const response = await fetch(replicateUrl, {

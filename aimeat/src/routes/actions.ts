@@ -179,6 +179,7 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
       id: updated.id,
       display_name: updated.displayName,
       description: updated.description,
+      federate: updated.federate ?? false,
       updated_at: updated.updatedAt,
     }));
     emitChange('actions');

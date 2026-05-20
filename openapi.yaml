@@ -359,6 +359,10 @@ components:
               type: integer
             age_days:
               type: integer
+        federate:
+          type: boolean
+          default: false
+          description: Whether this agent is visible in the federation network directory
         semantic:
           $ref: '#/components/schemas/SemanticAnnotation'
         created_at:
@@ -846,7 +850,7 @@ components:
           description: Whether to share catalogue data with this peer
         replicate_memory:
           type: boolean
-          default: false
+          default: true
           description: Whether to replicate memory entries to this peer
         allow_routing:
           type: boolean
@@ -854,8 +858,8 @@ components:
           description: Whether to accept routed requests from this peer
         peer_mode:
           type: string
-          enum: [full, catalogue_only, routing_only]
-          default: full
+          enum: [federation, private]
+          default: federation
           description: Peering mode controlling which federation features are enabled
 
     TrustAdvisory:
@@ -6258,7 +6262,7 @@ paths:
                   description: Whether to accept routed requests from this peer
                 peer_mode:
                   type: string
-                  enum: [full, catalogue_only, routing_only]
+                  enum: [federation, private]
                   description: Peering mode controlling which federation features are enabled
       responses:
         '200':
