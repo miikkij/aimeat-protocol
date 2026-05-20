@@ -51,6 +51,7 @@ export const getFederationPeers = ()    => apiGet('/v1/federation/peers');
 export const getFederationDirectory = () => apiGet('/v1/federation/directory');
 export const approvePeeringRequest = (id) => apiPut(`/v1/admin/peering/requests/${encodeURIComponent(id)}`, { decision: 'approve' });
 export const rejectPeeringRequest = (id) => apiPut(`/v1/admin/peering/requests/${encodeURIComponent(id)}`, { decision: 'reject' });
+export const deletePeeringRequest = (id) => apiDelete(`/v1/admin/peering/requests/${encodeURIComponent(id)}`);
 export const activatePeer = (nodeId) => apiPost('/v1/federation/peer/activate', { peer_node_id: nodeId });
 export const addPeerDirect = (nodeId, url, publicKey) => apiPost('/v1/federation/peers', { node_id: nodeId, url, public_key: publicKey || undefined });
 export const removePeer = (nodeId) => apiDelete(`/v1/federation/peers/${encodeURIComponent(nodeId)}`);

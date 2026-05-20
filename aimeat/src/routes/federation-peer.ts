@@ -337,6 +337,18 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
         emitChange('federation');
     });
 
+    // DELETE /v1/admin/peering/requests/:id — delete a peering request (operator)
+    router.delete('/v1/admin/peering/requests/:id', requireAuth(), requireRole('operator'), async (req, res) => {
+        const id = req.params.id as string;
+        const deleted = await storage.deletePeeringRequest(id);
+        if (!deleted) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Peering request not found: ${id}`));
+            return;
+        }
+        res.json(success(config.nodeId, { id, deleted: true }));
+        emitChange('federation');
+    });
+
     // POST /v1/federation/peer/activate — activate approved peering
     router.post('/v1/federation/peer/activate', requireAuth(), requireRole('operator'), async (req, res) => {
         const { peer_node_id } = req.body ?? {};

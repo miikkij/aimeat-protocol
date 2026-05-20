@@ -1313,6 +1313,14 @@ export class MongoStorage implements Storage {
         } catch { return null; }
     }
 
+    async deletePeeringRequest(id: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.peeringRequest.delete({ where: { requestId: id } });
+            return true;
+        } catch { return false; }
+    }
+
     // ── Chunked Uploads (kept in-memory — transient) ───────────
 
     async createChunkedUpload(record: ChunkedUploadRecord): Promise<ChunkedUploadRecord> {

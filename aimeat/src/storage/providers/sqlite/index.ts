@@ -1389,6 +1389,11 @@ export class SqliteStorage implements Storage {
     return updated;
   }
 
+  async deletePeeringRequest(id: string): Promise<boolean> {
+    const result = this.db.prepare('DELETE FROM peering_requests WHERE id = ?').run(id);
+    return result.changes > 0;
+  }
+
   private deserializePeeringRequest(row: Record<string, unknown>): PeeringRequestRecord {
     const record: PeeringRequestRecord = {
       id: row.id as string,

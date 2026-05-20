@@ -7,8 +7,8 @@ import { escHtml } from '/js/utils.js';
 import { dt, num, Badge, EconRow, StatsGrid, Empty, ExpandableHelp, ErrorBox } from './shared.js';
 import {
   getFederationPeers, getFederationDirectory, approvePeeringRequest, rejectPeeringRequest,
-  activatePeer, addPeerDirect, removePeer, removePeerEmergency, testFederationNode,
-  joinGenesisNetwork,
+  deletePeeringRequest, activatePeer, addPeerDirect, removePeer, removePeerEmergency,
+  testFederationNode, joinGenesisNetwork,
 } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
 
@@ -36,8 +36,7 @@ export default function FederationTab({ data, reload }) {
   const offlinePeers = livePeers.filter(p => p.status === 'offline');
   const depeeringPeers = livePeers.filter(p => p.status === 'depeering');
   const pendingRequests = peeringRequests.filter(r => r.status === 'pending');
-  const approvedRequests = peeringRequests.filter(r => r.status === 'approved');
-  const rejectedRequests = peeringRequests.filter(r => r.status === 'rejected');
+  const historyRequests = peeringRequests.filter(r => r.status !== 'pending');
 
   const { confirm, ConfirmUI } = useConfirm();
 
@@ -55,6 +54,13 @@ export default function FederationTab({ data, reload }) {
   const doReject = useCallback((id) => {
     confirm(t('dashboard.fedRejectPeerConfirm'), async () => {
       try { await rejectPeeringRequest(id); flash(t('dashboard.fedPeerRejected')); reload(); }
+      catch (e) { flashErr(e.message); }
+    }, { danger: true });
+  }, [reload]);
+
+  const doDeleteRequest = useCallback((id) => {
+    confirm(t('dashboard.fedDeleteRequestConfirm') || 'Delete this peering request?', async () => {
+      try { await deletePeeringRequest(id); flash(t('dashboard.fedRequestDeleted') || 'Request deleted'); reload(); }
       catch (e) { flashErr(e.message); }
     }, { danger: true });
   }, [reload]);
@@ -252,7 +258,7 @@ export default function FederationTab({ data, reload }) {
     </div>
 
     <!-- ═══ Peering Request History ═══ -->
-    ${(approvedRequests.length > 0 || rejectedRequests.length > 0) && html`
+    ${historyRequests.length > 0 && html`
       <div class="adm-card adm-mt-lg">
         <h4 class="adm-mb-sm" style="margin:0">\u{1F4DC} ${t('dashboard.fedRequestHistoryTitle')}</h4>
         <div class="scrollable"><table>
@@ -262,14 +268,16 @@ export default function FederationTab({ data, reload }) {
             <th>${t('dashboard.endpoint')}</th>
             <th>${t('dashboard.statusLabel')}</th>
             <th>${t('dashboard.fedCreatedAt')}</th>
+            <th></th>
           </tr></thead>
           <tbody>
-            ${[...approvedRequests, ...rejectedRequests].map(r => html`<tr>
+            ${historyRequests.map(r => html`<tr>
               <td class="mono" style="font-size:.75rem">${escHtml(r.id)}</td>
               <td class="mono adm-text-sm">${escHtml(r.from_node_id || '\u2014')}</td>
               <td class="mono adm-text-sm">${escHtml(r.from_node_url || r.target_url || '\u2014')}</td>
               <td>${statusBadge(r.status)}</td>
               <td class="adm-text-dim">${dt(r.created_at)}</td>
+              <td><button class="adm-btn-sm adm-text-error" onClick=${() => doDeleteRequest(r.id)}>\u2718</button></td>
             </tr>`)}
           </tbody>
         </table></div>

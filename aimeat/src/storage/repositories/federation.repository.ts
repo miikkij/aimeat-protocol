@@ -8,6 +8,7 @@ export interface FederationRepository {
   getPeeringRequest(id: string): Promise<PeeringRequestRecord | null>;
   listPeeringRequests(status?: string): Promise<PeeringRequestRecord[]>;
   updatePeeringRequest(id: string, updates: Partial<PeeringRequestRecord>): Promise<PeeringRequestRecord | null>;
+  deletePeeringRequest(id: string): Promise<boolean>;
   createPersonalNode(node: PersonalNodeRecord): Promise<PersonalNodeRecord>;
   getPersonalNode(nodeId: string): Promise<PersonalNodeRecord | null>;
   getPersonalNodeByOwner(ownerName: string): Promise<PersonalNodeRecord | null>;
