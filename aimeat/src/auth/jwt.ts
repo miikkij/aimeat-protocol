@@ -42,6 +42,9 @@ export interface JWTPayload {
   roles: string[];
   scopes?: string[];  // omitted = ['*'] for backward compat
   mcp_client?: string; // OAuth client name for MCP sessions (e.g. "Claude", "Cursor")
+  federated?: boolean;  // true for federated login sessions
+  homeNode?: string;    // home node ID for federated sessions
+  homeUrl?: string;     // home node base URL for federated sessions
 }
 
 /** Generate a unique session ID for JWT tracking. */
@@ -58,6 +61,9 @@ export async function issueJWT(payload: JWTPayload, ttlSeconds: number, sessionI
     roles: payload.roles,
     scopes: payload.scopes ?? ['*'],
     ...(payload.mcp_client ? { mcp_client: payload.mcp_client } : {}),
+    ...(payload.federated ? { federated: true } : {}),
+    ...(payload.homeNode ? { homeNode: payload.homeNode } : {}),
+    ...(payload.homeUrl ? { homeUrl: payload.homeUrl } : {}),
   })
     .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
     .setSubject(payload.sub)
@@ -82,6 +88,9 @@ export interface VerifiedToken {
   anonymous?: boolean;
   sessionId?: string;  // P3-7: Server-side session tracking
   mcp_client?: string; // OAuth client name for MCP sessions
+  federated?: boolean;  // true for federated login sessions
+  homeNode?: string;    // home node ID for federated sessions
+  homeUrl?: string;     // home node base URL for federated sessions
 }
 
 export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
@@ -100,6 +109,9 @@ export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
       scopes: (payload.scopes as string[]) ?? ['*'],
       sessionId: payload.jti as string | undefined,
       mcp_client: payload.mcp_client as string | undefined,
+      federated: (payload.federated as boolean) ?? false,
+      homeNode: payload.homeNode as string | undefined,
+      homeUrl: payload.homeUrl as string | undefined,
     };
   } catch {
     return null;

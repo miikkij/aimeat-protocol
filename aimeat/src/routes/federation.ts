@@ -15,6 +15,7 @@ import { federationPeerRouter } from './federation-peer.js';
 import { federationSyncRouter } from './federation-sync.js';
 import { federationSettlementsRouter } from './federation-settlements.js';
 import { federationGenesisRouter } from './federation-genesis.js';
+import { federationAuthRouter } from './federation-auth.js';
 
 // Re-export shared helpers for backward compatibility
 export { peerKeyCache, performKeyExchange } from '../services/federation-helpers.js';
@@ -31,5 +32,6 @@ export function federationRouter(
     router.use(federationSyncRouter(config, storage, peers));
     router.use(federationSettlementsRouter(config, storage, peers));
     router.use(federationGenesisRouter(config, storage, peers, networkDirectory));
+    router.use(federationAuthRouter(config, storage));
     return router;
 }

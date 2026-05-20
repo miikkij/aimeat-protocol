@@ -8,7 +8,7 @@ const __dirname_agents = dirname(fileURLToPath(import.meta.url));
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireLocalSession } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateAgentName, buildGAII, generateUserCode } from '../utils/gaii.js';
 import { calculateTrustScore } from '../services/trust.js';
@@ -362,8 +362,8 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     emitChange('agents');
   });
 
-  // POST /v1/agents — register a new agent (requires owner JWT)
-  router.post('/v1/agents', requireAuth(), requireRole('owner'), validateBody(AgentRegistrationSchema, config.nodeId), async (req, res) => {
+  // POST /v1/agents — register a new agent (requires owner JWT, local session only)
+  router.post('/v1/agents', requireAuth(), requireLocalSession(), requireRole('owner'), validateBody(AgentRegistrationSchema, config.nodeId), async (req, res) => {
     const { name, owner, display_name, description, capabilities, scopes } = req.body ?? {};
 
     // Extension hook: pre_agent_registration

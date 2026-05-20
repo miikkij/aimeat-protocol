@@ -232,6 +232,8 @@ export function mountRoutes(
     if (req.path.startsWith('/peer/introduce')) return next();
     // Allow public directory and heartbeat/ping
     if (req.path === '/directory' || req.path === '/ping' || req.path === '/heartbeat' || req.path === '/service-summary') return next();
+    // Allow federated auth verification (called by remote nodes)
+    if (req.path === '/auth/verify' && req.method === 'POST') return next();
     return requireExtended(req, res, next);
   });
   app.use('/v1/storage', requireExtended);
@@ -331,7 +333,7 @@ export function mountRoutes(
   }));
 
   app.use(totpRouter(config, storage));   // Phase 0.5 — MUST be before ghiiRouter (TOTP routes use /v1/ghii/totp/*)
-  app.use(ghiiRouter(config, storage, emailService, notifyDirectoryChange));
+  app.use(ghiiRouter(config, storage, emailService, notifyDirectoryChange, peers));
   app.use(chatInstancesRouter(config, storage));
   app.use(libsRouter(config, storage));
   app.use(appsRouter(config, storage, peers));

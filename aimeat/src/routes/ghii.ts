@@ -14,6 +14,7 @@ import type { TotpConfig } from '../services/totp.js';
 import { hashPassword, verifyPassword } from '../services/password.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { logger } from '../utils/logger.js';
+import type { PeerInfo } from '../services/federation.js';
 
 // SECURITY: Password strength validation
 const WEAK_PASSWORDS = [
@@ -41,7 +42,7 @@ function validatePasswordStrength(password: string): string | null {
  * - Operators/admins are owners with role=['owner','operator'] — they manage the node
  * - GHII users are owners with role=['owner'] + a GHII profile — they use apps
  */
-export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?: EmailService, onDirectoryChange?: () => void): Router {
+export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?: EmailService, onDirectoryChange?: () => void, peers?: Map<string, PeerInfo>): Router {
     const router = Router();
 
     // POST /v1/ghii — Register a new human identity (no auth required)
@@ -235,13 +236,112 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
 
         // Accept full GHII (e.g. "alice@node-id") -- strip the @node-id for local lookup
         let loginName = username.trim().toLowerCase();
+        let federatedNodeId: string | undefined;
         if (loginName.includes('@')) {
             const atIdx = loginName.indexOf('@');
             const nodePart = loginName.substring(atIdx + 1);
             loginName = loginName.substring(0, atIdx);
             if (nodePart !== config.nodeId) {
-                res.status(400).json(error(config.nodeId, 'FEDERATION_LOGIN_UNSUPPORTED',
-                    `Federated login is not yet supported. This node is ${config.nodeId}, but the identity belongs to ${nodePart}.`));
+                federatedNodeId = nodePart;
+            }
+        }
+
+        // --- Federated login: route auth request to the home node ---
+        if (federatedNodeId) {
+            if (!peers || peers.size === 0) {
+                res.status(400).json(error(config.nodeId, 'FEDERATION_UNREACHABLE',
+                    `Cannot reach home node ${federatedNodeId}. No federation peers configured.`));
+                return;
+            }
+
+            // Find a direct peer route to the home node
+            const homePeer = [...peers.values()].find(
+                p => p.nodeId === federatedNodeId && p.status === 'active',
+            );
+            if (!homePeer) {
+                res.status(400).json(error(config.nodeId, 'FEDERATION_UNREACHABLE',
+                    `Cannot reach home node ${federatedNodeId}. No active peer route found.`));
+                return;
+            }
+
+            // Send verification request to the home node
+            try {
+                const verifyResp = await fetch(`${homePeer.url}/v1/federation/auth/verify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: loginName,
+                        password,
+                        requesting_node: config.nodeId,
+                        timestamp: new Date().toISOString(),
+                    }),
+                    signal: AbortSignal.timeout(10_000),
+                });
+
+                if (!verifyResp.ok) {
+                    const body = await verifyResp.json().catch(() => ({})) as Record<string, unknown>;
+                    const errCode = (body as { error?: { code?: string } }).error?.code ?? 'FEDERATION_AUTH_FAILED';
+                    const errMsg = (body as { error?: { message?: string } }).error?.message ?? 'Remote authentication failed';
+                    res.status(verifyResp.status === 403 ? 403 : 401).json(
+                        error(config.nodeId, errCode as string, errMsg as string));
+                    return;
+                }
+
+                const result = await verifyResp.json() as {
+                    data?: {
+                        attestation?: {
+                            ghii?: string;
+                            display_name?: string;
+                            home_node?: string;
+                            home_url?: string;
+                        };
+                        signature?: string;
+                    };
+                };
+                const attestation = result.data?.attestation;
+                if (!attestation?.ghii) {
+                    res.status(502).json(error(config.nodeId, 'FEDERATION_AUTH_FAILED',
+                        'Invalid attestation received from home node'));
+                    return;
+                }
+
+                // Issue a local federated JWT with limited TTL
+                const fedTtl = Math.min(config.jwtTtlSeconds, 3600); // max 1 hour
+                const token = await issueJWT({
+                    sub: loginName,
+                    owner: loginName,
+                    node: config.nodeId,
+                    roles: ['owner'],
+                    federated: true,
+                    homeNode: attestation.home_node ?? federatedNodeId,
+                    homeUrl: attestation.home_url ?? homePeer.url,
+                }, fedTtl);
+
+                res.set('Cache-Control', 'no-store');
+                res.set('Pragma', 'no-cache');
+                res.json(success(config.nodeId, {
+                    ghii: {
+                        ghii: attestation.ghii,
+                        username: loginName,
+                        display_name: attestation.display_name,
+                    },
+                    owner: { name: loginName },
+                    token,
+                    expires_at: new Date(Date.now() + fedTtl * 1000).toISOString(),
+                    federated: true,
+                    home_node: attestation.home_node ?? federatedNodeId,
+                    home_url: attestation.home_url ?? homePeer.url,
+                }));
+                return;
+            } catch (err) {
+                if (err instanceof Error && err.name === 'TimeoutError') {
+                    res.status(504).json(error(config.nodeId, 'FEDERATION_UNREACHABLE',
+                        `Home node ${federatedNodeId} did not respond in time`));
+                    return;
+                }
+                logger.warn('Federation auth error', { node: federatedNodeId, error: String(err) });
+                res.status(502).json(error(config.nodeId, 'FEDERATION_UNREACHABLE',
+                    `Failed to reach home node ${federatedNodeId}`));
                 return;
             }
         }

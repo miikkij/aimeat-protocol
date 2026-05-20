@@ -164,6 +164,7 @@ export function requireAuthOrAnonymous() {
 
 /**
  * Require a specific role. Must be used after requireAuth().
+ * Federated sessions are blocked from operator role access.
  */
 export function requireRole(role: string) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -173,6 +174,12 @@ export function requireRole(role: string) {
       const prom = getPromMetrics();
       if (prom) prom.authFailuresTotal.inc();
       res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Authentication required'));
+      return;
+    }
+
+    // Federated sessions cannot access operator functions
+    if (role === 'operator' && req.auth.federated) {
+      res.status(403).json(errorEnvelope('FORBIDDEN', 'Federated sessions cannot access operator functions'));
       return;
     }
 
@@ -187,6 +194,21 @@ export function requireRole(role: string) {
       return;
     }
 
+    next();
+  };
+}
+
+/**
+ * Require a local (non-federated) session. Returns 403 for federated sessions.
+ * Use on endpoints that should not be accessible to federated users
+ * (e.g., agent creation on remote nodes).
+ */
+export function requireLocalSession() {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (req.auth?.federated) {
+      res.status(403).json(errorEnvelope('FORBIDDEN', 'This action requires a local session'));
+      return;
+    }
     next();
   };
 }
