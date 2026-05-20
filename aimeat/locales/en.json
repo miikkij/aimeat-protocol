@@ -544,7 +544,12 @@
       "pushToHome": "Save to home",
       "pullSuccess": "Entry copied from home node",
       "pushSuccess": "Entry saved to home node",
-      "federatedSession": "Federated session. Some entries may be on your home node."
+      "federatedSession": "Federated session. Some entries may be on your home node.",
+      "syncedToFederation": "Synced",
+      "shareToFederation": "Share",
+      "stopSharing": "Unshare",
+      "shareSuccess": "Shared to federation",
+      "unshareSuccess": "Removed from federation"
     },
     "files": {
       "title": "Stored Files",
@@ -733,7 +738,9 @@
       "error": "Could not load federation info.",
       "peers": "Connected Peers",
       "online": "Online",
-      "offline": "Offline"
+      "offline": "Offline",
+      "statusConnected": "Connected to {count} nodes",
+      "statusStandalone": "Standalone"
     },
     "access": {
       "title": "Access Codes & Tokens",
@@ -3950,7 +3957,12 @@
       "revoke": "Revoke",
       "never": "Never",
       "revoking": "Revoking...",
-      "revoked": "Consent revoked"
+      "revoked": "Consent revoked",
+      "scopeFederation": "Federation",
+      "scopeAuth": "Login Access",
+      "filterAll": "All",
+      "filterFederation": "Federation",
+      "filterAuth": "Login Access"
     },
     "audit": {
       "title": "Audit Report",
@@ -4319,6 +4331,11 @@
       "owner": "My Agents",
       "shared": "My Agents"
     },
+    "federate": "Federate",
+    "federated": "Federated",
+    "notFederated": "Local only",
+    "federateSuccess": "Package shared to federation",
+    "unfederateSuccess": "Package removed from federation",
     "operator": {
       "tabLabel": "Knowledge",
       "review": "Review",

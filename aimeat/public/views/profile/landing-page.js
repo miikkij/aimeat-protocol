@@ -264,12 +264,15 @@ function ProfileCard({ tier, stats, session, onEditProfile, onChangePassword }) 
           </div>
           <div class="pf-lp-ghii">${escHtml(session.ghii || '')}</div>
           <div class="pf-lp-node">${t('profile.node')}: ${escHtml(NODE_URL)}</div>
-          ${isExperienced && typeof stats.nodes === 'number' && stats.nodes > 0 && html`
-            <div class="pf-federation-badge">
-              <span class="pf-fed-dot"></span>
-              ${t('profile.landing.federationBadge').replace('{count}', String(stats.nodes))}
-            </div>
-          `}
+          ${typeof stats.nodes === 'number' && stats.nodes > 0
+            ? html`<div class="pf-federation-badge">
+                <span class="pf-fed-dot"></span>
+                ${t('profile.federation.statusConnected').replace('{count}', String(stats.nodes))}
+              </div>`
+            : html`<div class="pf-federation-badge pf-federation-standalone">
+                ${t('profile.federation.statusStandalone')}
+              </div>`
+          }
         </div>
       </div>
       <div class="pf-lp-stats">

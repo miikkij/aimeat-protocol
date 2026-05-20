@@ -1743,6 +1743,42 @@
   color: var(--danger, #ef4444);
 }
 
+/* --- Federation toggle (knowledge-tab) --- */
+.pf .kpkg-fed-toggle {
+  cursor: pointer;
+  border: none;
+  font-size: .7rem;
+  padding: .15rem .5rem;
+  border-radius: 6px;
+  font-weight: 700;
+  letter-spacing: .03em;
+}
+.pf .kpkg-fed-toggle:disabled { opacity: .5; cursor: wait; }
+
+/* --- Data Wallet scope filter buttons --- */
+.pf .dw-scope-filters {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.pf .dw-filter-row {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* --- Memory federation badge --- */
+.pf .pf-fed-badge {
+  font-size: .65rem;
+  padding: .1rem .4rem;
+  margin-left: 4px;
+}
+
+/* --- Federation standalone variant --- */
+.pf .pf-federation-standalone {
+  color: var(--text-dim, #6B7280);
+  background: var(--bg-dim, #f5f5f5);
+}
+
 .pf-gen-test-component.pf-gen-test-skipped .pf-gen-test-badge {
   background: var(--bg-dim);
   color: var(--text-muted);

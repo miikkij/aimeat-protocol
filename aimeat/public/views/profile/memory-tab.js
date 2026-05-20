@@ -16,7 +16,7 @@ import { Spinner, recipientBadge, VisibilityPill } from './shared.js';
 import * as memoryService from '/js/services/memory.js';
 import AuthImage from '/js/components/auth-image.js';
 import { listAgents } from '/js/services/agents.js';
-import { getKeyPermissions } from '/js/services/consent.js';
+import { getKeyPermissions, listConsents, grantConsent, revokeConsent } from '/js/services/consent.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import TagCloud from '/js/components/tag-cloud.js';
 import TagEditor from '/js/components/tag-editor.js';
@@ -38,18 +38,66 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const [editingFileTags, setEditingFileTags] = useState(null);
   const [agents, setAgents] = useState([]);
   const [selectedAgent, setSelectedAgent] = useState('');
+  const [fedConsents, setFedConsents] = useState({});   // { memoryKey: consentId }
+  const [togglingFed, setTogglingFed] = useState(null);
 
   useEffect(() => {
-    if (session) { loadAgents(); loadMemories(); loadFiles(); }
+    if (session) { loadAgents(); loadMemories(); loadFiles(); loadFedConsents(); }
   }, [session]);
 
   useEffect(() => {
     if (session) { loadMemories(); }
   }, [selectedAgent]);
 
+  async function loadFedConsents() {
+    try {
+      const allConsents = await listConsents();
+      const map = {};
+      for (const c of allConsents) {
+        if (c.scope === 'federation') {
+          const pat = c.data_pattern || c.pattern || '';
+          // Direct key match (no wildcard) or exact pattern
+          if (pat && !pat.includes('*')) {
+            map[pat] = c.id || c.consent_id;
+          }
+        }
+      }
+      setFedConsents(map);
+    } catch { /* ignore */ }
+  }
+
+  async function handleShareToFederation(key) {
+    setTogglingFed(key);
+    try {
+      await grantConsent({
+        data_pattern: key,
+        recipient: '*',
+        scope: 'federation',
+        purpose: 'federation_sharing',
+      });
+      showToast(t('profile.memory.shareSuccess'));
+      await loadFedConsents();
+    } catch (e) {
+      showToast(e.message || t('profile.error'), true);
+    } finally { setTogglingFed(null); }
+  }
+
+  async function handleStopSharing(key) {
+    const consentId = fedConsents[key];
+    if (!consentId) return;
+    setTogglingFed(key);
+    try {
+      await revokeConsent(consentId);
+      showToast(t('profile.memory.unshareSuccess'));
+      await loadFedConsents();
+    } catch (e) {
+      showToast(e.message || t('profile.error'), true);
+    } finally { setTogglingFed(null); }
+  }
+
   // Live update listener — refresh both memories and files
-  const liveRef = useRef(() => { loadMemories(); loadFiles(); });
-  liveRef.current = () => { loadMemories(); loadFiles(); };
+  const liveRef = useRef(() => { loadMemories(); loadFiles(); loadFedConsents(); });
+  liveRef.current = () => { loadMemories(); loadFiles(); loadFedConsents(); };
   useEffect(() => {
     const handler = () => liveRef.current();
     window.addEventListener('aimeat-live-update', handler);
@@ -268,6 +316,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
                 >${t('knowledge.visibility.' + vis)} ▾</button>`;
               })()}
               <span class="shield-icon" title=${t('permissions.sharingRules')} onClick=${(e) => { e.stopPropagation(); loadKeyPerms(m.key); }}>\u{1F6E1}\uFE0F</span>
+              ${fedConsents[m.key] && html`<span class="badge badge-success pf-fed-badge">${t('profile.memory.syncedToFederation')}</span>`}
             </div>
             ${expandedMem === m.key && html`
               <div class="mem-detail">
@@ -304,6 +353,16 @@ export default function MemoryTab({ session, showToast, onStats }) {
                 <div class="mem-actions">
                   <button class="btn-sm" onClick=${() => setEditModal({ key: m.key, value: typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || ''), visibility: m.visibility || 'private', version: m.version })}>${t('profile.memory.editBtn')}</button>
                   <button class="btn-danger" onClick=${() => handleDeleteMemory(m.key)}>${t('profile.memory.deleteBtn')}</button>
+                  ${fedConsents[m.key]
+                    ? html`<button class="btn-outline btn-sm" disabled=${togglingFed === m.key}
+                        onClick=${() => handleStopSharing(m.key)}>
+                        ${togglingFed === m.key ? '...' : t('profile.memory.stopSharing')}
+                      </button>`
+                    : html`<button class="btn-ghost btn-sm" disabled=${togglingFed === m.key}
+                        onClick=${() => handleShareToFederation(m.key)}>
+                        ${togglingFed === m.key ? '...' : t('profile.memory.shareToFederation')}
+                      </button>`
+                  }
                   ${session.federated && html`
                     <button class="btn-ghost" onClick=${() => doPull(m.key)} title=${t('profile.memory.pullFromHome')}>
                       ↓ ${t('profile.memory.pullFromHome')}

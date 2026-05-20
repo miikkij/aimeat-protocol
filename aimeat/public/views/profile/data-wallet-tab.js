@@ -27,6 +27,7 @@ export default function DataWalletTab({ session, showToast }) {
   const [permSummary, setPermSummary] = useState(null);
   const [showConsentForm, setShowConsentForm] = useState(false);
   const [consentFilter, setConsentFilter] = useState('');
+  const [scopeFilter, setScopeFilter] = useState('all');
   const [selectedConsents, setSelectedConsents] = useState(new Set());
 
   useEffect(() => {
@@ -108,6 +109,10 @@ export default function DataWalletTab({ session, showToast }) {
   }
 
   const filteredConsents = consents?.filter(c => {
+    // Scope filter
+    if (scopeFilter === 'federation' && c.scope !== 'federation') return false;
+    if (scopeFilter === 'auth' && c.scope !== 'auth') return false;
+    // Text filter
     if (!consentFilter) return true;
     const q = consentFilter.toLowerCase();
     const recip = (c.recipient_gaii || c.recipient || '').toLowerCase();
@@ -218,11 +223,25 @@ export default function DataWalletTab({ session, showToast }) {
     `}
 
     ${consents && consents.length > 0 && html`
-      <div class="flex-row mb-half">
+      <div class="flex-row mb-half dw-filter-row">
         <input type="text" class="input-field dw-filter-input"
           placeholder=${t('permissions.filterPlaceholder')}
           value=${consentFilter}
           onInput=${(e) => { setConsentFilter(e.target.value); setSelectedConsents(new Set()); }} />
+        <div class="dw-scope-filters">
+          <button class="btn-sm ${scopeFilter === 'all' ? 'btn-primary' : 'btn-outline'}"
+            onClick=${() => { setScopeFilter('all'); setSelectedConsents(new Set()); }}>
+            ${t('wallet.consents.filterAll')}
+          </button>
+          <button class="btn-sm ${scopeFilter === 'federation' ? 'btn-primary' : 'btn-outline'}"
+            onClick=${() => { setScopeFilter('federation'); setSelectedConsents(new Set()); }}>
+            ${t('wallet.consents.filterFederation')}
+          </button>
+          <button class="btn-sm ${scopeFilter === 'auth' ? 'btn-primary' : 'btn-outline'}"
+            onClick=${() => { setScopeFilter('auth'); setSelectedConsents(new Set()); }}>
+            ${t('wallet.consents.filterAuth')}
+          </button>
+        </div>
         ${selectedConsents.size > 0 && html`
           <button class="btn-danger text-meta" onClick=${() => handleBulkRevoke(selectedConsents)}>
             ${t('permissions.revokeSelected')} (${selectedConsents.size})
@@ -266,7 +285,15 @@ export default function DataWalletTab({ session, showToast }) {
                 <td><span class="dw-code-accent">${escHtml(c.data_pattern || c.pattern || '-')}</span></td>
                 <td class="dw-recipient-cell">${recipientBadge(c.recipient_gaii || c.recipient)} <span class="text-meta">${escHtml(c.recipient_gaii || c.recipient || '-')}</span></td>
                 <td>${escHtml(c.purpose || '-')}</td>
-                <td>${isExpired ? html`<span class="badge badge-muted">expired</span>` : html`<span class="badge badge-success">active</span>`} ${escHtml(c.scope || '-')}</td>
+                <td>
+                  ${isExpired ? html`<span class="badge badge-muted">expired</span>` : html`<span class="badge badge-success">active</span>`}
+                  ${' '}
+                  ${c.scope === 'federation'
+                    ? html`<span class="badge badge-info">${t('wallet.consents.scopeFederation')}</span>`
+                    : c.scope === 'auth'
+                    ? html`<span class="badge badge-warn">${t('wallet.consents.scopeAuth')}</span>`
+                    : html`<span>${escHtml(c.scope || '-')}</span>`}
+                </td>
                 <td class="text-meta">${c.granted_at ? new Date(c.granted_at).toLocaleDateString() : '-'}</td>
                 <td class="text-meta">
                   ${expSoon && html`<span class="dw-expiring-icon" title=${t('permissions.expiringWarning')}>\u26A0\uFE0F</span>`}

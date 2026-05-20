@@ -25,7 +25,8 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { apiGet } from '/js/api.js';
+import { apiGet, apiPost, apiDelete } from '/js/api.js';
+import { listConsents, grantConsent, revokeConsent } from '/js/services/consent.js';
 import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as knowledgeService from '/js/services/knowledge.js';
@@ -45,6 +46,10 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
   const [loadingEntries, setLoadingEntries] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [savingSharing, setSavingSharing] = useState(null);
+
+  /* ── Federation consent state ── */
+  const [fedConsents, setFedConsents] = useState({});   // { packageName: consentId }
+  const [togglingFed, setTogglingFed] = useState(null);
 
   /* ── Discovery state ── */
   const [discovered, setDiscovered] = useState([]);
@@ -77,11 +82,58 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
 
   useEffect(() => { loadPackages(); }, [loadPackages]);
 
+  /* ── Load federation consents for knowledge packages ── */
+  const loadFedConsents = useCallback(async () => {
+    try {
+      const allConsents = await listConsents();
+      const map = {};
+      for (const c of allConsents) {
+        if (c.scope === 'federation' && (c.data_pattern || c.pattern || '').startsWith('packages/')) {
+          const pat = c.data_pattern || c.pattern || '';
+          // Extract package name from pattern like "packages/{name}/*"
+          const match = pat.match(/^packages\/([^/]+)\//);
+          if (match) {
+            map[match[1]] = c.id || c.consent_id;
+          }
+        }
+      }
+      setFedConsents(map);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => { loadFedConsents(); }, [loadFedConsents]);
+
+  /* ── Toggle federation consent for a package ── */
+  const toggleFederation = useCallback(async (pkg) => {
+    const manifest = pkg.value;
+    const packageId = manifest?.id || pkg.key.split('/')[1] || pkg.key;
+    setTogglingFed(pkg.key);
+    try {
+      if (fedConsents[packageId]) {
+        // Revoke existing federation consent
+        await revokeConsent(fedConsents[packageId]);
+        showToast(t('knowledge.unfederateSuccess'));
+      } else {
+        // Grant federation consent
+        await grantConsent({
+          data_pattern: `packages/${packageId}/*`,
+          recipient: '*',
+          scope: 'federation',
+          purpose: 'knowledge_sharing',
+        });
+        showToast(t('knowledge.federateSuccess'));
+      }
+      await loadFedConsents();
+    } catch (err) {
+      showToast(err.message || t('profile.error'), true);
+    } finally { setTogglingFed(null); }
+  }, [fedConsents, showToast, loadFedConsents]);
+
   // Live update listener
   const loadRef = useRef(loadPackages);
   loadRef.current = loadPackages;
   useEffect(() => {
-    const handler = () => loadRef.current();
+    const handler = () => { loadRef.current(); loadFedConsents(); };
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, []);
@@ -581,7 +633,16 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
                 <span class="kpkg-badge kpkg-badge-type">${t('knowledge.contentTypes.' + (manifest.content_type || 'document')) || (manifest.content_type || 'document').toUpperCase()}</span>
                 <span class="kpkg-badge kpkg-badge-synthesis">${t('knowledge.synthesis.' + (manifest.synthesis?.level || 'original'))}</span>
                 <span class="kpkg-badge kpkg-badge-${manifest.maturity || 'draft'}">${t('knowledge.maturity.' + (manifest.maturity || 'draft'))}</span>
-                ${manifest.sharing?.catalog_listed && html`<span class="badge badge-muted" title=${t('profile.federateTooltip')}>${t('profile.notFederated')}</span>`}
+                ${(() => {
+                  const pkgId = manifest?.id || pkg.key.split('/')[1] || pkg.key;
+                  const isFed = !!fedConsents[pkgId];
+                  return html`<button
+                    class="badge ${isFed ? 'badge-success' : 'badge-muted'} kpkg-fed-toggle"
+                    title=${t('profile.federateTooltip')}
+                    disabled=${togglingFed === pkg.key}
+                    onClick=${(e) => { e.stopPropagation(); toggleFederation(pkg); }}
+                  >${togglingFed === pkg.key ? '...' : isFed ? t('knowledge.federated') : t('knowledge.notFederated')}</button>`;
+                })()}
               </div>
               <div class="kpkg-card-tags">
                 ${(manifest.tags || []).map(tag => html`<span class="kpkg-tag" key=${tag}>${escHtml(tag)}</span>`)}

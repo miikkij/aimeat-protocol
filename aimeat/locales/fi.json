@@ -544,7 +544,12 @@
       "pushToHome": "Tallenna kotisolmulle",
       "pullSuccess": "Merkinta kopioitu kotisolmulta",
       "pushSuccess": "Merkinta tallennettu kotisolmulle",
-      "federatedSession": "Federoitu istunto. Osa merkinnoista voi olla kotisolmullasi."
+      "federatedSession": "Federoitu istunto. Osa merkinnoista voi olla kotisolmullasi.",
+      "syncedToFederation": "Synkronoitu",
+      "shareToFederation": "Jaa",
+      "stopSharing": "Lopeta jakaminen",
+      "shareSuccess": "Jaettu federaatioon",
+      "unshareSuccess": "Poistettu federaatiosta"
     },
     "files": {
       "title": "Tallennetut tiedostot",
@@ -733,7 +738,9 @@
       "error": "Federaatiotietojen lataus epäonnistui.",
       "peers": "Yhdistetyt vertaiset",
       "online": "Online",
-      "offline": "Offline"
+      "offline": "Offline",
+      "statusConnected": "Yhdistetty {count} solmuun",
+      "statusStandalone": "Itsenäinen"
     },
     "access": {
       "title": "Pääsykoodit & tokenit",
@@ -3950,7 +3957,12 @@
       "revoke": "Peru",
       "never": "Ei koskaan",
       "revoking": "Perutaan...",
-      "revoked": "Suostumus peruttu"
+      "revoked": "Suostumus peruttu",
+      "scopeFederation": "Federaatio",
+      "scopeAuth": "Kirjautumisoikeus",
+      "filterAll": "Kaikki",
+      "filterFederation": "Federaatio",
+      "filterAuth": "Kirjautumisoikeus"
     },
     "audit": {
       "title": "Auditointiraportti",
@@ -4319,6 +4331,11 @@
       "owner": "Omat agentit",
       "shared": "Omat agentit"
     },
+    "federate": "Federoi",
+    "federated": "Federoitu",
+    "notFederated": "Vain paikallinen",
+    "federateSuccess": "Paketti jaettu federaatioon",
+    "unfederateSuccess": "Paketti poistettu federaatiosta",
     "operator": {
       "tabLabel": "Tietopankki",
       "review": "Arvioi",
