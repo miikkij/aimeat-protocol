@@ -190,15 +190,36 @@ POST /v1/federation/auth/verify (on node A, reached via routing)
 
 7. JWT TTL: 1 hour (short, vs normal 24h). Refresh re-verifies with home node.
 
+### Auth Consent (Distinct from Data Consent)
+
+Federated login requires a **separate auth consent**, not a generic data consent. Sharing memory with `node:B` should NOT automatically allow node B to authenticate you. Authentication is a higher-trust decision.
+
+**New consent scope:** `auth` (alongside existing `private`, `dmz`, `federation`).
+
+The federated login flow (step 4 above) checks specifically for:
+```
+scope: 'auth', recipient: 'node:node-B', pattern: '_identity', status: 'active'
+```
+
+**Where users manage this:** The profile **Access tab** (`access-tab.js`) gets a new "Federation Access" section:
+- List of nodes the user has granted auth consent to (with node ID, URL, granted date)
+- "Add node" form: enter a node ID to allow federated login from that node
+- "Remove" button per entry: revokes the auth consent immediately
+- "Allow all federation nodes" toggle: creates a wildcard auth consent (`recipient: *`)
+- Visual warning when wildcard is enabled: "Any federation node can verify your identity"
+
+Under the hood, each entry creates a `ConsentRecord` with `scope: 'auth'`, `recipient: 'node:<node-id>'`, `dataPattern: '_identity'`.
+
 ### Security Model
 
 | Concern | Mitigation |
 |---------|-----------|
 | Password exposure | Hashed with bcrypt before sending. Only travels over TLS between nodes. |
-| Unauthorized node login | Home node checks federation consent for `node:requesting-node`. No consent = denied. |
+| Unauthorized node login | Home node checks for auth-scope consent (`scope: auth`) for `node:requesting-node`. No consent = denied. Separate from data consent. |
 | Stale sessions | Short JWT TTL (1 hour). Refresh triggers re-verification with home node. |
-| Stolen federated JWT | Limited scopes (no admin, no operator actions). Home node can revoke consent to cut off access. |
+| Stolen federated JWT | Limited scopes (no admin, no operator actions). Home node can revoke auth consent to cut off access. |
 | MITM between nodes | Payloads signed with Ed25519 node keys. Signature verified against cached public key from key exchange. |
+| Consent confusion | Auth consent is a distinct scope (`auth`) from data consent (`federation`). Sharing data with a node does not grant login access. |
 
 ### Permissions for Federated Sessions
 
@@ -296,6 +317,15 @@ Payment comes from the user's morsel balance on their home node. The settlement 
 
 ### Profile Tabs
 
+**Access tab (federation access section):**
+- New section: "Federation Access" below existing session/keys/MCP sections
+- List of nodes granted auth consent (node ID, URL, granted date)
+- "Add node" form: enter node ID to allow federated login from that node
+- "Remove" button per entry: revokes auth consent immediately
+- "Allow all federation nodes" toggle: wildcard auth consent (`recipient: *`)
+- Warning when wildcard enabled: "Any federation node can verify your identity"
+- Visual distinction from session keys section (auth consent is about remote login, keys are about local crypto)
+
 **Agents tab:**
 - Add "Federate" toggle per agent card
 - Badge showing "Federated" on agents with `federate: true`
@@ -308,8 +338,9 @@ Payment comes from the user's morsel balance on their home node. The settlement 
 
 **Data Wallet tab (consents):**
 - Highlight federation-scope consents with a distinct badge
+- Highlight auth-scope consents with a separate "Login access" badge
 - "Quick share" button that creates a consent with `scope: federation, recipient: *, pattern: <key>`
-- Filter: show only federation consents
+- Filter: show only federation consents or auth consents
 
 **Boards tab:**
 - Add "Federate" toggle for owned public boards
@@ -423,15 +454,18 @@ Suggested phasing to deliver incremental value:
 | `src/routes/actions.ts` | Accept `federate` field on create/update |
 | `src/routes/agents.ts` | Accept `federate` field |
 | `src/routes/boards.ts` | Accept `federate` field |
+| `src/routes/consent.ts` | Support `scope: 'auth'` consent type |
+| `src/services/consent.ts` | Add `auth` to valid scope values |
 | `src/services/memory-replication.ts` | Per-peer policy check before replicating |
 
 ### Modified Files -- Frontend
 | File | Change |
 |------|---------|
 | `public/views/admin/federation-tab.js` | Peer policy toggles, network directory section |
+| `public/views/profile/access-tab.js` | New "Federation Access" section with auth consent management |
 | `public/views/profile/agents-tab.js` | Federate toggle per agent |
 | `public/views/profile/memory-tab.js` | Federation consent badges and quick actions |
-| `public/views/profile/data-wallet-tab.js` | Federation consent highlights and quick-share |
+| `public/views/profile/data-wallet-tab.js` | Federation + auth consent highlights and quick-share |
 | `public/views/profile/boards-tab.js` | Federate toggle |
 | `public/views/profile/knowledge-tab.js` | Federate toggle |
 | `public/js/services/admin.js` | New API functions for peer policies, directory |
