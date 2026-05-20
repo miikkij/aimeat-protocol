@@ -122,7 +122,7 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   );
 
   // ── Route Mounting ──
-  const { realtimeManager } = mountRoutes(app, config, storage, {
+  const { realtimeManager } = await mountRoutes(app, config, storage, {
     rejectForRelay: guards.rejectForRelay,
     mirrorReadOnly: guards.mirrorReadOnly,
     maintenanceState: {

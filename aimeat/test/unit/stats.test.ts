@@ -231,6 +231,50 @@ describe('StatsCollector', () => {
     });
   });
 
+  // --- Typed counters ---
+
+  describe('typed counters', () => {
+    it('incrementTyped stores as name:type', () => {
+      stats.incrementTyped('email_sent', 'verification');
+      stats.incrementTyped('email_sent', 'verification');
+      stats.incrementTyped('email_sent', 'magic_link');
+      const snap = stats.snapshot();
+      expect(snap.email_sent).toBe(3);
+      expect(snap.email_sent_by_type).toEqual({
+        verification: 2,
+        magic_link: 1,
+      });
+    });
+
+    it('incrementTyped records in daily history', () => {
+      stats.incrementTyped('push_sent', 'test');
+      const snap = stats.snapshot();
+      const today = new Date().toISOString().split('T')[0];
+      expect(snap.daily_history[today]['push_sent:test']).toBe(1);
+    });
+
+    it('snapshot groups multiple typed counter families', () => {
+      stats.incrementTyped('email_sent', 'verification');
+      stats.incrementTyped('email_failed', 'verification');
+      stats.incrementTyped('push_sent', 'board');
+      const snap = stats.snapshot();
+      expect(snap.email_sent).toBe(1);
+      expect(snap.email_sent_by_type).toEqual({ verification: 1 });
+      expect(snap.email_failed).toBe(1);
+      expect(snap.email_failed_by_type).toEqual({ verification: 1 });
+      expect(snap.push_sent).toBe(1);
+      expect(snap.push_sent_by_type).toEqual({ board: 1 });
+    });
+
+    it('non-typed counters are unaffected by grouping', () => {
+      stats.increment('requests_total');
+      stats.incrementTyped('email_sent', 'notification');
+      const snap = stats.snapshot();
+      expect(snap.requests_total).toBe(1);
+      expect((snap as Record<string, unknown>).requests_total_by_type).toBeUndefined();
+    });
+  });
+
   // --- Backward compatibility ---
 
   describe('backward compatibility', () => {

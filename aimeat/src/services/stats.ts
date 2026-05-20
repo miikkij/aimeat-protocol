@@ -1,3 +1,20 @@
+/**
+ * @file stats.ts
+ * @description StatsCollector service -- tracks request counters, tunnel/mailbox stats,
+ *   typed counters (name:type grouping), daily history, and optional persistence via Storage.
+ * @structure
+ *   - StatsCollector class (singleton via initStats/getStats)
+ *   - TunnelStats, MailboxStats, StatsSnapshot interfaces
+ *   - incrementTyped() for typed counter families
+ *   - Persistence: init(storage), flush(), shutdown()
+ * @version-history
+ *   v1.0.0 -- 2026-05-01 -- Initial stats collector
+ *   v1.1.0 -- 2026-05-21 -- Add typed counters, persistence, graceful shutdown, snapshotForRange
+ */
+
+import type { Storage } from '../storage/interface.js';
+import { logger } from '../utils/logger.js';
+
 export interface TunnelStats {
   connections_active: number;
   connections_total: number;
@@ -40,6 +57,8 @@ export interface StatsSnapshot {
   auth_failures_total: number;
   rate_limit_hits_total: number;
   scope_denials_total: number;
+  /** Index signature for dynamic typed counter fields (e.g. email_sent, email_sent_by_type) */
+  [key: string]: unknown;
 }
 
 const TRACKED_COUNTERS = [
@@ -76,6 +95,7 @@ export type MailboxGaugeName =
   | 'oldest_item_age_seconds';
 
 const LATENCY_WINDOW_SIZE = 1000;
+const FLUSH_INTERVAL_MS = 60_000;
 
 export class StatsCollector {
   private counters = new Map<string, number>();
@@ -95,12 +115,20 @@ export class StatsCollector {
   // Delivery latency rolling window
   private latencySamples: number[] = [];
 
-  increment(name: CounterName): void {
+  // Persistence
+  private storage: Storage | null = null;
+  private flushTimer: ReturnType<typeof setInterval> | null = null;
+
+  increment(name: string): void {
     this.counters.set(name, (this.counters.get(name) ?? 0) + 1);
     const day = new Date().toISOString().split('T')[0];
     if (!this.dailyHistory.has(day)) this.dailyHistory.set(day, new Map());
     const dayMap = this.dailyHistory.get(day)!;
     dayMap.set(name, (dayMap.get(name) ?? 0) + 1);
+  }
+
+  incrementTyped(name: string, type: string): void {
+    this.increment(`${name}:${type}`);
   }
 
   incrementMethod(method: string): void {
@@ -147,6 +175,39 @@ export class StatsCollector {
     const p95 = sorted[p95Index];
 
     return { avg, p95 };
+  }
+
+  /**
+   * Scan all counter keys containing ':' and group them into typed families.
+   * For key "email_sent:verification" with value 2 and "email_sent:magic_link" with value 1:
+   *   - email_sent = 3 (total)
+   *   - email_sent_by_type = { verification: 2, magic_link: 1 }
+   */
+  private buildTypedGroups(sourceCounters?: Map<string, number>): Record<string, unknown> {
+    const counters = sourceCounters ?? this.counters;
+    const groups = new Map<string, Map<string, number>>();
+
+    for (const [key, value] of counters) {
+      const colonIdx = key.indexOf(':');
+      if (colonIdx === -1) continue;
+      const base = key.substring(0, colonIdx);
+      const type = key.substring(colonIdx + 1);
+      if (!groups.has(base)) groups.set(base, new Map());
+      groups.get(base)!.set(type, (groups.get(base)!.get(type) ?? 0) + value);
+    }
+
+    const result: Record<string, unknown> = {};
+    for (const [base, types] of groups) {
+      let total = 0;
+      const byType: Record<string, number> = {};
+      for (const [type, count] of types) {
+        total += count;
+        byType[type] = count;
+      }
+      result[base] = total;
+      result[`${base}_by_type`] = byType;
+    }
+    return result;
   }
 
   snapshot(): StatsSnapshot {
@@ -199,11 +260,139 @@ export class StatsCollector {
       auth_failures_total: this.counters.get('auth_failures_total') ?? 0,
       rate_limit_hits_total: this.counters.get('rate_limit_hits_total') ?? 0,
       scope_denials_total: this.counters.get('scope_denials_total') ?? 0,
+      ...this.buildTypedGroups(),
     };
+  }
+
+  /**
+   * Sum counters for days within [from, to] range (inclusive, ISO date strings).
+   * Returns totals (with typed grouping) and per-day breakdown.
+   */
+  snapshotForRange(from: string, to: string): { totals: Record<string, unknown>; daily: Record<string, Record<string, number>> } {
+    const summed = new Map<string, number>();
+    const daily: Record<string, Record<string, number>> = {};
+
+    for (const [day, counters] of this.dailyHistory) {
+      if (day < from || day > to) continue;
+      daily[day] = Object.fromEntries(counters);
+      for (const [key, value] of counters) {
+        summed.set(key, (summed.get(key) ?? 0) + value);
+      }
+    }
+
+    // Build totals with typed grouping
+    const totals: Record<string, unknown> = {};
+    for (const [key, value] of summed) {
+      totals[key] = value;
+    }
+    // Merge typed groups from the summed counters
+    Object.assign(totals, this.buildTypedGroups(summed));
+
+    return { totals, daily };
+  }
+
+  // ── Persistence ──
+
+  /** Initialize persistence: load saved counters from storage and start flush timer. */
+  async init(storage: Storage): Promise<void> {
+    this.storage = storage;
+
+    try {
+      const saved = await storage.loadStats();
+      for (const [key, value] of Object.entries(saved)) {
+        if (key.startsWith('tunnel:')) {
+          const tunnelKey = key.substring(7);
+          this.tunnelCounters.set(tunnelKey, (this.tunnelCounters.get(tunnelKey) ?? 0) + value);
+        } else if (key.startsWith('mailbox:')) {
+          const mailboxKey = key.substring(8);
+          this.mailboxCounters.set(mailboxKey, (this.mailboxCounters.get(mailboxKey) ?? 0) + value);
+        } else if (key.startsWith('method:')) {
+          const methodKey = key.substring(7);
+          this.methods.set(methodKey, (this.methods.get(methodKey) ?? 0) + value);
+        } else if (key.startsWith('status:')) {
+          const statusKey = key.substring(7);
+          this.statuses.set(statusKey, (this.statuses.get(statusKey) ?? 0) + value);
+        } else {
+          this.counters.set(key, (this.counters.get(key) ?? 0) + value);
+        }
+      }
+
+      const savedHistory = await storage.loadDailyHistory();
+      for (const [day, counters] of Object.entries(savedHistory)) {
+        if (!this.dailyHistory.has(day)) this.dailyHistory.set(day, new Map());
+        const dayMap = this.dailyHistory.get(day)!;
+        for (const [key, value] of Object.entries(counters)) {
+          dayMap.set(key, (dayMap.get(key) ?? 0) + value);
+        }
+      }
+
+      logger.info('Stats loaded from storage', {
+        counters: Object.keys(saved).length,
+        historyDays: Object.keys(savedHistory).length,
+      });
+    } catch (err) {
+      logger.warn('Failed to load persisted stats, starting fresh', { error: String(err) });
+    }
+
+    this.flushTimer = setInterval(() => {
+      void this.flush();
+    }, FLUSH_INTERVAL_MS);
+  }
+
+  /** Stop the flush timer and do one final flush. */
+  async shutdown(): Promise<void> {
+    if (this.flushTimer) {
+      clearInterval(this.flushTimer);
+      this.flushTimer = null;
+    }
+    await this.flush();
+  }
+
+  /** Persist all counters and daily history to storage. */
+  private async flush(): Promise<void> {
+    if (!this.storage) return;
+
+    try {
+      // Collect all counters into one flat record with prefixed keys
+      const allCounters: Record<string, number> = {};
+
+      for (const [key, value] of this.counters) {
+        allCounters[key] = value;
+      }
+      for (const [key, value] of this.tunnelCounters) {
+        allCounters[`tunnel:${key}`] = value;
+      }
+      for (const [key, value] of this.mailboxCounters) {
+        allCounters[`mailbox:${key}`] = value;
+      }
+      for (const [key, value] of this.methods) {
+        allCounters[`method:${key}`] = value;
+      }
+      for (const [key, value] of this.statuses) {
+        allCounters[`status:${key}`] = value;
+      }
+
+      await this.storage.flushStats(allCounters);
+
+      // Flush daily history
+      const history: Record<string, Record<string, number>> = {};
+      for (const [day, counters] of this.dailyHistory) {
+        history[day] = Object.fromEntries(counters);
+      }
+      await this.storage.flushDailyHistory(history);
+    } catch (err) {
+      logger.warn('Stats flush failed', { error: String(err) });
+    }
   }
 }
 
 // Singleton pattern for use in services that can't accept constructor params
 let _instance: StatsCollector | null = null;
 export function getStats(): StatsCollector | null { return _instance; }
-export function initStats(): StatsCollector { _instance = new StatsCollector(); return _instance; }
+export async function initStats(storage?: Storage): Promise<StatsCollector> {
+  _instance = new StatsCollector();
+  if (storage) {
+    await _instance.init(storage);
+  }
+  return _instance;
+}

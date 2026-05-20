@@ -129,12 +129,12 @@ export interface MountRoutesResult {
 /**
  * Mount all 40+ route handlers on the Express app.
  */
-export function mountRoutes(
+export async function mountRoutes(
   app: express.Express,
   config: AimeatConfig,
   storage: Storage,
   opts: MountRoutesOptions,
-): MountRoutesResult {
+): Promise<MountRoutesResult> {
   const {
     rejectForRelay, mirrorReadOnly, maintenanceState,
     provenance, consulService, directoryService,
@@ -142,8 +142,8 @@ export function mountRoutes(
     scheduler, invalidateHasOwnersCache,
   } = opts;
 
-  // Statistics collector
-  const stats = initStats();
+  // Statistics collector (with persistence via storage)
+  const stats = await initStats(storage);
 
   // Prometheus metrics registry (opt-in)
   const metricsRegistry = config.metricsEnabled

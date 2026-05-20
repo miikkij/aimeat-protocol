@@ -634,6 +634,23 @@ if (subcommand === 'config') {
     if (tunnelManager) logger.info('WebSocket upgrade handler registered for /v1/personal/tunnel');
     if (realtimeManager) logger.info('WebSocket upgrade handler registered for /v1/realtime/ws');
   }
+
+  // Graceful shutdown handler -- flush stats and close connections
+  const { getStats: getStatsInstance } = await import('./services/stats.js');
+  const handleShutdown = async (signal: string) => {
+    logger.info(`Received ${signal}, shutting down...`);
+    const statsInstance = getStatsInstance();
+    if (statsInstance) await statsInstance.shutdown();
+    if (tunnelManager) await tunnelManager.shutdown();
+    if (realtimeManager) await realtimeManager.shutdown();
+    server.close(() => {
+      logger.info('Server closed');
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 5000);
+  };
+  process.on('SIGTERM', () => void handleShutdown('SIGTERM'));
+  process.on('SIGINT', () => void handleShutdown('SIGINT'));
 } else if (subcommand) {
   console.error(`Unknown command: ${subcommand}\n`);
   console.log(HELP_TEXT);
