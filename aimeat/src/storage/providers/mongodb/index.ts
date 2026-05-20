@@ -816,10 +816,12 @@ export class MongoStorage implements Storage {
         return rows.map((r: any) => this.toBoardRecord(r));
     }
 
-    async updateBoardVisibility(id: string, visibility: string): Promise<import('../../interface.js').BoardRecord | null> {
+    async updateBoardVisibility(id: string, visibility: string, federate?: boolean): Promise<import('../../interface.js').BoardRecord | null> {
         this.ensureReady();
         try {
-            const row = await this.prisma.board.update({ where: { boardId: id }, data: { visibility } });
+            const data: Record<string, unknown> = { visibility };
+            if (federate !== undefined) data.federate = federate;
+            const row = await this.prisma.board.update({ where: { boardId: id }, data });
             return this.toBoardRecord(row);
         } catch { return null; }
     }

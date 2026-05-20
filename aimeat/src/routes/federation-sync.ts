@@ -41,6 +41,11 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
             return;
         }
 
+        if (!peer.replicateMemory) {
+            res.status(403).json(error(config.nodeId, 'POLICY_DENIED', 'This peer has memory replication disabled'));
+            return;
+        }
+
         // P1-11: Require signed replication — verify peer signature
         if (!signature) {
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature on replication request'));
@@ -144,6 +149,11 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
         const peer = [...peers.values()].find(p => p.nodeId === source_node);
         if (!peer || peer.status !== 'active') {
             res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Source node is not an active peer'));
+            return;
+        }
+
+        if (!peer.shareCatalogue) {
+            res.status(403).json(error(config.nodeId, 'POLICY_DENIED', 'This peer has catalogue sharing disabled'));
             return;
         }
 
@@ -336,6 +346,11 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
         // 1. Check if target is a direct peer
         const targetPeer = [...peers.values()].find(p => p.nodeId === target_node && p.status === 'active');
 
+        if (targetPeer && !targetPeer.allowRouting) {
+            res.status(403).json(error(config.nodeId, 'POLICY_DENIED', 'Routing is disabled for this peer'));
+            return;
+        }
+
         if (targetPeer) {
             try {
                 const targetUrl = `${targetPeer.url}${path}`;
@@ -385,7 +400,7 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
 
         // 2. Not a direct peer — try multi-hop relay through active peers
         const activePeers = [...peers.values()].filter(p =>
-            p.status === 'active' && !pathNodes.includes(p.nodeId));
+            p.status === 'active' && p.allowRouting && !pathNodes.includes(p.nodeId));
         if (activePeers.length === 0) {
             res.status(404).json(error(config.nodeId, 'FEDERATION_ERROR', `No route to node ${target_node}`));
             return;

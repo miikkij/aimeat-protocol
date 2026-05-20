@@ -56,7 +56,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
   // POST /v1/boards — create a board (agent auth; system boards require operator)
   router.post('/v1/boards', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(BoardCreateSchema, config.nodeId), async (req, res) => {
-    const { name, visibility, allowed_gaiis, description } = req.body ?? {};
+    const { name, visibility, allowed_gaiis, description, federate } = req.body ?? {};
 
     // System and public boards can only be created by operators
     if ((visibility === 'system' || visibility === 'public') && !req.auth!.roles.includes('operator')) {
@@ -71,6 +71,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       visibility,
       ownerGaii: resolve(req),
       allowedGaiis: allowed_gaiis ?? [],
+      federate: federate === true,
       createdAt: new Date().toISOString(),
     });
 
@@ -78,6 +79,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       id: board.id,
       name: board.name,
       visibility: board.visibility,
+      federate: board.federate ?? false,
       created_at: board.createdAt,
     }, [
       { description: 'Post to this board', method: 'POST', url: `/v1/boards/${board.id}/posts` },
@@ -107,6 +109,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
         description: b.description,
         visibility: b.visibility,
         semantic: b.semantic,
+        federate: b.federate ?? false,
         created_at: b.createdAt,
         ...(gaii ? { owner_gaii: b.ownerGaii, allowed_gaiis: b.allowedGaiis } : {}),
       })),
@@ -127,17 +130,17 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the board owner can change visibility'));
       return;
     }
-    const { visibility } = req.body ?? {};
+    const { visibility, federate } = req.body ?? {};
     if (!visibility || !['private', 'public', 'shared'].includes(visibility)) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility must be "private", "public", or "shared"'));
       return;
     }
-    const updated = await storage.updateBoardVisibility(boardId, visibility);
+    const updated = await storage.updateBoardVisibility(boardId, visibility, typeof federate === 'boolean' ? federate : undefined);
     if (!updated) {
       res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to update board visibility'));
       return;
     }
-    res.json(success(config.nodeId, { id: updated.id, visibility: updated.visibility }));
+    res.json(success(config.nodeId, { id: updated.id, visibility: updated.visibility, federate: updated.federate ?? false }));
     emitChange('boards');
   });
 

@@ -98,6 +98,10 @@ export async function replicateMemoryToPeer(
     return { success: false, error: 'Entry not eligible for replication' };
   }
 
+  if (!peer.replicateMemory) {
+    return { success: false, error: 'Peer has memory replication disabled' };
+  }
+
   try {
     const urlCheck = await validateOutboundUrl(peer.url);
     if (!urlCheck.valid) {

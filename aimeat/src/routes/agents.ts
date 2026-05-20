@@ -569,6 +569,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       },
       actions_published: actionsPublished,
       semantic: agent.semantic,
+      federate: agent.federate ?? false,
       home_node: config.nodeId,
       created_at: agent.createdAt,
       last_seen: agent.lastSeen,

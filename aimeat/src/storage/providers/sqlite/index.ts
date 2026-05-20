@@ -861,9 +861,14 @@ export class SqliteStorage implements Storage {
     return rows.map(r => this.deserializeBoard(r));
   }
 
-  async updateBoardVisibility(id: string, visibility: string): Promise<BoardRecord | null> {
-    const result = this.db.prepare('UPDATE boards SET visibility = ? WHERE id = ?').run(visibility, id);
-    if (result.changes === 0) return null;
+  async updateBoardVisibility(id: string, visibility: string, federate?: boolean): Promise<BoardRecord | null> {
+    if (federate !== undefined) {
+      const result = this.db.prepare('UPDATE boards SET visibility = ?, federate = ? WHERE id = ?').run(visibility, federate ? 1 : 0, id);
+      if (result.changes === 0) return null;
+    } else {
+      const result = this.db.prepare('UPDATE boards SET visibility = ? WHERE id = ?').run(visibility, id);
+      if (result.changes === 0) return null;
+    }
     return this.getBoard(id);
   }
 
