@@ -8,11 +8,25 @@ export interface StorageOptions {
   dbUrl?: string;
 }
 
+function sqliteLoadFailed(err: unknown): never {
+  const msg = err instanceof Error ? err.message : String(err);
+  console.error('\n\x1b[31m[AIMEAT] SQLite native bindings failed to load:\x1b[0m');
+  console.error(`  ${msg.split('\n')[0]}\n`);
+  console.error('\x1b[33mFix options:\x1b[0m');
+  console.error('  1. Rebuild native modules:  npm rebuild better-sqlite3');
+  console.error('     (macOS: install Xcode CLI tools first: xcode-select --install)');
+  console.error('  2. Use MongoDB instead:     aimeat start --db mongodb --db-url mongodb://localhost:27017/aimeat');
+  console.error('  3. Reinstall from scratch:   npm install -g aimeat\n');
+  process.exit(1);
+}
+
 export async function createStorage(opts: StorageOptions): Promise<Storage> {
   switch (opts.provider) {
     case 'sqlite': {
-      const { SqliteStorage } = await import('./providers/sqlite/index.js');
-      return new SqliteStorage(opts.sqlitePath ?? './data/aimeat.db');
+      try {
+        const { SqliteStorage } = await import('./providers/sqlite/index.js');
+        return new SqliteStorage(opts.sqlitePath ?? './data/aimeat.db');
+      } catch (err) { sqliteLoadFailed(err); }
     }
     case 'mongodb': {
       const { MongoStorage } = await import('./providers/mongodb/index.js');
@@ -21,9 +35,10 @@ export async function createStorage(opts: StorageOptions): Promise<Storage> {
       return mongo;
     }
     default: {
-      // Use SQLite in-memory mode — single implementation for both memory and sqlite
-      const { SqliteStorage } = await import('./providers/sqlite/index.js');
-      return new SqliteStorage(':memory:');
+      try {
+        const { SqliteStorage } = await import('./providers/sqlite/index.js');
+        return new SqliteStorage(':memory:');
+      } catch (err) { sqliteLoadFailed(err); }
     }
   }
 }

@@ -101,15 +101,21 @@ if (values.help) {
   process.exit(0);
 }
 
+// Package root: from dist/src/index.js -> go up 2 levels to aimeat/
+const __pkgRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+
 if (values.version) {
-  console.log('aimeat v1.2.0');
+  try {
+    const pkg = JSON.parse(readFileSync(join(__pkgRoot, 'package.json'), 'utf-8'));
+    console.log(`aimeat v${pkg.version}`);
+  } catch {
+    console.log('aimeat (version unknown)');
+  }
   process.exit(0);
 }
 
 // Load .env into process.env if not already loaded by bin/aimeat.ts.
 // Search: CWD first, then package root (aimeat/ directory).
-// Package root: from dist/src/index.js -> go up 2 levels to aimeat/
-const __pkgRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const envPath = existsSync('.env') ? '.env'
   : existsSync(join(__pkgRoot, '.env')) ? join(__pkgRoot, '.env')
     : null;
