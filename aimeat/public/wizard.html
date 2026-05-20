@@ -501,11 +501,11 @@ body {
     <div class="wiz-card">
       <label style="margin-bottom:.75rem; display:block;" data-i18n="wizard.welcome.chooseLang">Choose your language</label>
       <div class="lang-cards">
-        <div class="lang-card selected" data-lang="en" onclick="setLang('en')">
+        <div class="lang-card selected" data-lang="en">
           <div class="lang-flag">EN</div>
           <div class="lang-name">English</div>
         </div>
-        <div class="lang-card" data-lang="fi" onclick="setLang('fi')">
+        <div class="lang-card" data-lang="fi">
           <div class="lang-flag">FI</div>
           <div class="lang-name">Suomi</div>
           <div class="lang-native">Finnish</div>
@@ -514,7 +514,7 @@ body {
     </div>
 
     <div class="btn-row">
-      <button class="btn btn-primary" onclick="goToStep(2)" data-i18n="wizard.btn.getStarted">Get Started</button>
+      <button class="btn btn-primary" data-go-step="2" data-i18n="wizard.btn.getStarted">Get Started</button>
     </div>
   </div>
 
@@ -535,14 +535,14 @@ body {
       <div class="field">
         <label data-i18n="wizard.node.typeLabel">Node Type</label>
         <div class="radio-group">
-          <label class="radio-card selected" onclick="selectRadio(this,'nodeType','personal')">
+          <label class="radio-card selected">
             <input type="radio" name="nodeType" value="personal" checked>
             <div>
               <div class="radio-label" data-i18n="wizard.node.typePersonal">Personal</div>
               <div class="radio-desc" data-i18n="wizard.node.typePersonalDesc">For your own data and AI agents</div>
             </div>
           </label>
-          <label class="radio-card" onclick="selectRadio(this,'nodeType','full')">
+          <label class="radio-card">
             <input type="radio" name="nodeType" value="full">
             <div>
               <div class="radio-label" data-i18n="wizard.node.typeFull">Full</div>
@@ -560,8 +560,8 @@ body {
     </div>
 
     <div class="btn-row">
-      <button class="btn btn-secondary" onclick="goToStep(1)" data-i18n="wizard.btn.back">Back</button>
-      <button class="btn btn-primary" onclick="goToStep(3)" data-i18n="wizard.btn.next">Next</button>
+      <button class="btn btn-secondary" data-go-step="1" data-i18n="wizard.btn.back">Back</button>
+      <button class="btn btn-primary" data-go-step="3" data-i18n="wizard.btn.next">Next</button>
     </div>
   </div>
 
@@ -577,13 +577,13 @@ body {
       <div class="field">
         <label data-i18n="wizard.identity.modeLabel">Identity Mode</label>
         <div class="radio-group">
-          <label class="radio-card selected" onclick="selectRadio(this,'identityMode','create'); toggleIdentityMode()">
+          <label class="radio-card selected">
             <input type="radio" name="identityMode" value="create" checked>
             <div>
               <div class="radio-label" data-i18n="wizard.identity.modeCreate">Create new identity</div>
             </div>
           </label>
-          <label class="radio-card" onclick="selectRadio(this,'identityMode','import'); toggleIdentityMode()">
+          <label class="radio-card">
             <input type="radio" name="identityMode" value="import">
             <div>
               <div class="radio-label" data-i18n="wizard.identity.modeImport">Import existing identity</div>
@@ -669,8 +669,8 @@ body {
     </div>
 
     <div class="btn-row">
-      <button class="btn btn-secondary" onclick="goToStep(2)" data-i18n="wizard.btn.back">Back</button>
-      <button class="btn btn-primary" onclick="validateAndGoStep4()" data-i18n="wizard.btn.next">Next</button>
+      <button class="btn btn-secondary" data-go-step="2" data-i18n="wizard.btn.back">Back</button>
+      <button class="btn btn-primary" id="validateBtn" data-i18n="wizard.btn.next">Next</button>
     </div>
   </div>
 
@@ -685,14 +685,14 @@ body {
       <div class="field">
         <label data-i18n="wizard.network.anchorLabel">Anchor Operator</label>
         <div class="radio-group">
-          <label class="radio-card selected" onclick="selectRadio(this,'anchor','standalone'); toggleGenesis()">
+          <label class="radio-card selected">
             <input type="radio" name="anchor" value="standalone" checked>
             <div>
               <div class="radio-label" data-i18n="wizard.network.standalone">Standalone (no federation)</div>
               <div class="radio-desc" data-i18n="wizard.network.standaloneDesc">Independent node, no connection to other nodes</div>
             </div>
           </label>
-          <label class="radio-card" onclick="selectRadio(this,'anchor','custom'); toggleGenesis()">
+          <label class="radio-card">
             <input type="radio" name="anchor" value="custom">
             <div>
               <div class="radio-label" data-i18n="wizard.network.custom">Custom anchor</div>
@@ -711,8 +711,8 @@ body {
     </div>
 
     <div class="btn-row">
-      <button class="btn btn-secondary" onclick="goToStep(3)" data-i18n="wizard.btn.back">Back</button>
-      <button class="btn btn-primary" onclick="goToStep(5)" data-i18n="wizard.btn.next">Next</button>
+      <button class="btn btn-secondary" data-go-step="3" data-i18n="wizard.btn.back">Back</button>
+      <button class="btn btn-primary" data-go-step="5" data-i18n="wizard.btn.next">Next</button>
     </div>
   </div>
 
@@ -763,8 +763,8 @@ body {
     <div id="initResult"></div>
 
     <div class="btn-row" id="step5Buttons">
-      <button class="btn btn-secondary" onclick="goToStep(4)" data-i18n="wizard.btn.back">Back</button>
-      <button class="btn btn-success" id="initBtn" onclick="doInit()" data-i18n="wizard.btn.initialize">Initialize Node</button>
+      <button class="btn btn-secondary" data-go-step="4" data-i18n="wizard.btn.back">Back</button>
+      <button class="btn btn-success" id="initBtn" data-i18n="wizard.btn.initialize">Initialize Node</button>
     </div>
   </div>
 
@@ -1314,6 +1314,39 @@ function escapeHtml(str) {
   if (browserLang.startsWith('fi')) {
     setLang('fi');
   }
+
+  // ── Event bindings (CSP-safe, no inline onclick) ──
+
+  // Language cards
+  document.querySelectorAll('.lang-card').forEach(function(card) {
+    card.addEventListener('click', function() {
+      setLang(card.getAttribute('data-lang'));
+    });
+  });
+
+  // Step navigation buttons
+  document.querySelectorAll('[data-go-step]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      goToStep(parseInt(btn.getAttribute('data-go-step')));
+    });
+  });
+
+  // Radio card selection (all radio groups)
+  document.querySelectorAll('.radio-card').forEach(function(card) {
+    card.addEventListener('click', function() {
+      var radio = card.querySelector('input[type="radio"]');
+      if (!radio) return;
+      selectRadio(card, radio.name, radio.value);
+      if (radio.name === 'identityMode') toggleIdentityMode();
+      if (radio.name === 'anchor') toggleGenesis();
+    });
+  });
+
+  // Validate step 3 and go to step 4
+  document.getElementById('validateBtn').addEventListener('click', validateAndGoStep4);
+
+  // Initialize node
+  document.getElementById('initBtn').addEventListener('click', doInit);
 })();
 </script>
 </body>
