@@ -1204,3 +1204,17 @@ model ReplicationQueue {
   @@index([status])
   @@index([createdAt])
 }
+
+model StatsCounter {
+  id    String @id @map("_id")
+  value Int    @default(0)
+}
+
+model StatsDailyHistory {
+  id    String @id @default(auto()) @map("_id") @db.ObjectId
+  date  String
+  key   String
+  value Int    @default(0)
+
+  @@unique([date, key])
+}

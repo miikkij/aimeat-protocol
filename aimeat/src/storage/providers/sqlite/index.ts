@@ -5554,4 +5554,58 @@ export class SqliteStorage implements Storage {
     this.db.prepare('UPDATE capabilities SET trust = ?, updatedAt = ? WHERE id = ?')
       .run(JSON.stringify(trust), new Date().toISOString(), id);
   }
+
+  // ── Stats Persistence ──
+
+  async flushStats(counters: Record<string, number>): Promise<void> {
+    const upsert = this.db.prepare(
+      `INSERT INTO stats_counters (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+    );
+    const tx = this.db.transaction((entries: [string, number][]) => {
+      for (const [key, value] of entries) {
+        upsert.run(key, value);
+      }
+    });
+    tx(Object.entries(counters));
+  }
+
+  async loadStats(): Promise<Record<string, number>> {
+    const rows = this.db.prepare('SELECT key, value FROM stats_counters').all() as Array<{ key: string; value: number }>;
+    const result: Record<string, number> = {};
+    for (const row of rows) {
+      result[row.key] = row.value;
+    }
+    return result;
+  }
+
+  async flushDailyHistory(history: Record<string, Record<string, number>>): Promise<void> {
+    const upsert = this.db.prepare(
+      `INSERT INTO stats_daily_history (date, key, value) VALUES (?, ?, ?)
+       ON CONFLICT(date, key) DO UPDATE SET value = excluded.value`
+    );
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 90);
+    const cutoffStr = cutoff.toISOString().split('T')[0];
+
+    const tx = this.db.transaction((entries: [string, Record<string, number>][]) => {
+      for (const [date, counters] of entries) {
+        for (const [key, value] of Object.entries(counters)) {
+          upsert.run(date, key, value);
+        }
+      }
+      this.db.prepare('DELETE FROM stats_daily_history WHERE date < ?').run(cutoffStr);
+    });
+    tx(Object.entries(history));
+  }
+
+  async loadDailyHistory(): Promise<Record<string, Record<string, number>>> {
+    const rows = this.db.prepare('SELECT date, key, value FROM stats_daily_history ORDER BY date').all() as Array<{ date: string; key: string; value: number }>;
+    const result: Record<string, Record<string, number>> = {};
+    for (const row of rows) {
+      if (!result[row.date]) result[row.date] = {};
+      result[row.date][row.key] = row.value;
+    }
+    return result;
+  }
 }

@@ -1154,6 +1154,19 @@ export function initializeSchema(db: Database.Database): void {
       FOREIGN KEY (capabilityId) REFERENCES capabilities(id) ON DELETE CASCADE
     );
 
+    -- ── Stats Persistence ──
+    CREATE TABLE IF NOT EXISTS stats_counters (
+      key   TEXT PRIMARY KEY,
+      value INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS stats_daily_history (
+      date  TEXT NOT NULL,
+      key   TEXT NOT NULL,
+      value INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (date, key)
+    );
+
   `);
 
   // ── Schema migrations for existing databases ──

@@ -5198,6 +5198,61 @@ export class MongoStorage implements Storage {
         const trust = { ...cap.trust, vouchCount: Math.max(0, cap.trust.vouchCount - 1) };
         await this.prisma.capability.update({ where: { id }, data: { trust: trust as any } });
     }
+
+    // ── Stats Persistence ──
+
+    async flushStats(counters: Record<string, number>): Promise<void> {
+        const ops = Object.entries(counters).map(([key, value]) =>
+            this.prisma.statsCounter.upsert({
+                where: { id: key },
+                create: { id: key, value },
+                update: { value },
+            })
+        );
+        await Promise.all(ops);
+    }
+
+    async loadStats(): Promise<Record<string, number>> {
+        const rows = await this.prisma.statsCounter.findMany();
+        const result: Record<string, number> = {};
+        for (const row of rows) {
+            result[row.id] = row.value;
+        }
+        return result;
+    }
+
+    async flushDailyHistory(history: Record<string, Record<string, number>>): Promise<void> {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 90);
+        const cutoffStr = cutoff.toISOString().split('T')[0];
+
+        const ops: Promise<unknown>[] = [];
+        for (const [date, counters] of Object.entries(history)) {
+            for (const [key, value] of Object.entries(counters)) {
+                ops.push(
+                    this.prisma.statsDailyHistory.upsert({
+                        where: { date_key: { date, key } },
+                        create: { date, key, value },
+                        update: { value },
+                    })
+                );
+            }
+        }
+        ops.push(
+            this.prisma.statsDailyHistory.deleteMany({ where: { date: { lt: cutoffStr } } })
+        );
+        await Promise.all(ops);
+    }
+
+    async loadDailyHistory(): Promise<Record<string, Record<string, number>>> {
+        const rows = await this.prisma.statsDailyHistory.findMany({ orderBy: { date: 'asc' } });
+        const result: Record<string, Record<string, number>> = {};
+        for (const row of rows) {
+            if (!result[row.date]) result[row.date] = {};
+            result[row.date][row.key] = row.value;
+        }
+        return result;
+    }
 }
 
 /**
