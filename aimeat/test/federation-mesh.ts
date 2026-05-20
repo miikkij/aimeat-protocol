@@ -580,13 +580,14 @@ await test('Auth verify succeeds with valid credentials + auth consent', async (
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
-    assert(typeof body.data.attestation === 'object', 'attestation is object');
-    assert(body.data.attestation.ghii.includes(fedLoginUser), `ghii contains username: ${body.data.attestation.ghii}`);
-    assert(typeof body.data.attestation.home_node === 'string', 'home_node exists');
-    assert(body.data.attestation.requesting_node === 'test-remote-node', 'requesting_node matches');
+    assert(body.data.verified === true, 'verified is true');
+    assert(typeof body.data.ghii === 'string' && body.data.ghii.includes(fedLoginUser), `ghii contains username: ${body.data.ghii}`);
+    assert(typeof body.data.home_node === 'string', 'home_node exists');
+    assert(body.data.requesting_node === 'test-remote-node', 'requesting_node matches');
     assert(typeof body.data.signature === 'string', 'signature exists');
-    assert(typeof body.data.attestation.issued_at === 'string', 'issued_at exists');
-    assert(typeof body.data.attestation.expires_at === 'string', 'expires_at exists');
+    assert(typeof body.data.issued_at === 'string', 'issued_at exists');
+    assert(typeof body.data.expires_at === 'string', 'expires_at exists');
+    assert(Array.isArray(body.data.scopes), 'scopes is an array');
 });
 
 await test('Auth verify fails without auth consent (unauthorized node)', async () => {

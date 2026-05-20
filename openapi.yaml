@@ -472,6 +472,10 @@ components:
           type: array
           items:
             type: string
+        federate:
+          type: boolean
+          default: false
+          description: Whether this action is visible to federated peer nodes
         semantic:
           $ref: '#/components/schemas/SemanticAnnotation'
 
@@ -518,6 +522,9 @@ components:
           type: integer
         average_rating:
           type: number
+        federate:
+          type: boolean
+          description: Whether this action is visible to federated peer nodes
         semantic:
           $ref: '#/components/schemas/SemanticAnnotation'
 
@@ -771,6 +778,10 @@ components:
           items:
             $ref: '#/components/schemas/GAII'
           description: For shared boards — invited external agents. Same-owner agents have automatic access.
+        federate:
+          type: boolean
+          default: false
+          description: Whether this board is visible to federated peer nodes
         semantic:
           $ref: '#/components/schemas/SemanticAnnotation'
 
@@ -829,6 +840,23 @@ components:
         last_heartbeat:
           type: string
           format: date-time
+        share_catalogue:
+          type: boolean
+          default: true
+          description: Whether to share catalogue data with this peer
+        replicate_memory:
+          type: boolean
+          default: false
+          description: Whether to replicate memory entries to this peer
+        allow_routing:
+          type: boolean
+          default: true
+          description: Whether to accept routed requests from this peer
+        peer_mode:
+          type: string
+          enum: [full, catalogue_only, routing_only]
+          default: full
+          description: Peering mode controlling which federation features are enabled
 
     TrustAdvisory:
       type: object
@@ -3855,6 +3883,60 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/agents/{name}/federate:
+    patch:
+      operationId: toggleAgentFederate
+      summary: Toggle agent federation visibility
+      description: Set whether an agent is visible to federated peer nodes.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name (not full GAII)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [federate]
+              properties:
+                federate:
+                  type: boolean
+                  description: Whether the agent should be visible to federated peers
+      responses:
+        '200':
+          description: Agent federation flag updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          gaii:
+                            type: string
+                          name:
+                            type: string
+                          federate:
+                            type: boolean
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   # ── Memory ─────────────────────────────────────────────────
   /v1/memory:
     post:
@@ -4086,6 +4168,102 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/memory/pull:
+    post:
+      operationId: memoryPull
+      summary: Pull memory from home node
+      description: |
+        Copy a memory entry from the user's home node to the current (remote) node.
+        Only available for federated sessions. The remote node fetches the entry from
+        the home node and stores it locally with private visibility.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key]
+              properties:
+                key:
+                  type: string
+                  description: Memory key to pull from home node
+      responses:
+        '200':
+          description: Memory entry pulled successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          pulled:
+                            type: boolean
+                          key:
+                            type: string
+                          source_node:
+                            type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/memory/push-home:
+    post:
+      operationId: memoryPushHome
+      summary: Push memory to home node
+      description: |
+        Save a local memory entry back to the user's home node via federation
+        replication. Only available for federated sessions. The remote node sends
+        the entry to the home node's /v1/federation/replicate endpoint.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key]
+              properties:
+                key:
+                  type: string
+                  description: Memory key to push to home node
+      responses:
+        '200':
+          description: Memory entry pushed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          pushed:
+                            type: boolean
+                          key:
+                            type: string
+                          target_node:
+                            type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /v1/memory/cors/{key}:
     get:
@@ -6068,6 +6246,20 @@ paths:
           application/json:
             schema:
               type: object
+              properties:
+                share_catalogue:
+                  type: boolean
+                  description: Whether to share catalogue data with this peer
+                replicate_memory:
+                  type: boolean
+                  description: Whether to replicate memory entries to this peer
+                allow_routing:
+                  type: boolean
+                  description: Whether to accept routed requests from this peer
+                peer_mode:
+                  type: string
+                  enum: [full, catalogue_only, routing_only]
+                  description: Peering mode controlling which federation features are enabled
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -6094,6 +6286,182 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+
+  # ── Federation Auth (cross-node identity verification) ─────
+  /v1/federation/service-summary:
+    get:
+      operationId: getServiceSummary
+      summary: Service summary for network directory
+      description: |
+        Returns a compact summary of all federated items (actions, agents, boards)
+        on this node. Used by hub nodes to aggregate service listings from peers.
+        Requires x-source-node header matching an active peer with catalogue sharing enabled.
+      tags: [Federation]
+      parameters:
+        - name: x-source-node
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Node ID of the requesting peer
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/federation/auth/verify:
+    post:
+      operationId: federationAuthVerify
+      summary: Verify credentials for federated login
+      description: |
+        Called by a remote node when a user tries to log in as username@thisNode
+        on that remote node. Verifies the password locally and checks that the
+        user has granted an auth consent to the requesting node. Returns a signed
+        attestation on success.
+      tags: [Federation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password, requesting_node, timestamp]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                requesting_node:
+                  type: string
+                  description: Node ID of the node requesting verification
+                timestamp:
+                  type: string
+                  format: date-time
+                  description: ISO timestamp (must be within 5 minutes of server time)
+      responses:
+        '200':
+          description: Signed attestation confirming user identity
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          verified:
+                            type: boolean
+                          ghii:
+                            type: string
+                          display_name:
+                            type: string
+                          home_node:
+                            type: string
+                          home_url:
+                            type: string
+                            format: uri
+                          owner:
+                            type: string
+                          scopes:
+                            type: array
+                            items:
+                              type: string
+                          requesting_node:
+                            type: string
+                          issued_at:
+                            type: string
+                            format: date-time
+                          expires_at:
+                            type: string
+                            format: date-time
+                          signature:
+                            type: string
+                            description: Ed25519 signature of the attestation payload
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/federation/auth/refresh:
+    post:
+      operationId: federationAuthRefresh
+      summary: Re-verify a federated session
+      description: |
+        Re-verify a federated session without requiring the password again.
+        Checks that the user still exists and the auth consent is still active,
+        then returns a fresh signed attestation.
+      tags: [Federation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ghii, requesting_node, timestamp]
+              properties:
+                ghii:
+                  type: string
+                  description: Full GHII of the user (e.g. alice@home-node)
+                requesting_node:
+                  type: string
+                  description: Node ID of the node requesting refresh
+                timestamp:
+                  type: string
+                  format: date-time
+                  description: ISO timestamp (must be within 5 minutes of server time)
+      responses:
+        '200':
+          description: Fresh signed attestation
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          verified:
+                            type: boolean
+                          ghii:
+                            type: string
+                          display_name:
+                            type: string
+                          home_node:
+                            type: string
+                          home_url:
+                            type: string
+                            format: uri
+                          owner:
+                            type: string
+                          scopes:
+                            type: array
+                            items:
+                              type: string
+                          requesting_node:
+                            type: string
+                          issued_at:
+                            type: string
+                            format: date-time
+                          expires_at:
+                            type: string
+                            format: date-time
+                          signature:
+                            type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   # ── Federation Internal (node-to-node) ─────────────────────
   /v1/federation/ping:

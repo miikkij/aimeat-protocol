@@ -289,16 +289,16 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
 
                 const result = await verifyResp.json() as {
                     data?: {
-                        attestation?: {
-                            ghii?: string;
-                            display_name?: string;
-                            home_node?: string;
-                            home_url?: string;
-                        };
+                        verified?: boolean;
+                        ghii?: string;
+                        display_name?: string;
+                        home_node?: string;
+                        home_url?: string;
+                        scopes?: string[];
                         signature?: string;
                     };
                 };
-                const attestation = result.data?.attestation;
+                const attestation = result.data;
                 if (!attestation?.ghii) {
                     res.status(502).json(error(config.nodeId, 'FEDERATION_AUTH_FAILED',
                         'Invalid attestation received from home node'));
