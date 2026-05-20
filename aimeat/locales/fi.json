@@ -2315,6 +2315,7 @@
     "created": "Luotu",
     "trust": "Luottamus",
     "lastSeen": "Viimeksi nähty",
+    "lastLogin": "Viimeisin kirjautuminen",
     "morselSupply": "Murusten tarjonta",
     "todayActivity": "Päivän aktiviteetti",
     "morselPolicy": "Muruspolitiikka",

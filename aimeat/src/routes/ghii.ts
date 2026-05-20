@@ -356,7 +356,13 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             }
         }
 
-        // Password (+ TOTP if enabled) verified — regenerate owner keys
+        // Password (+ TOTP if enabled) verified — track login and regenerate owner keys
+        const loginNow = new Date().toISOString();
+        await storage.updateGHII(ghiiRecord.ghii, {
+            lastLoginAt: loginNow,
+            loginCount: (ghiiRecord.loginCount ?? 0) + 1,
+        });
+
         const ownerKeyPair = await generateKeyPair();
         await storage.updateOwner(loginName, { publicKey: ownerKeyPair.publicKey });
 
@@ -631,14 +637,17 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             verifiedAt: now,
         });
 
-        // Update GHII with verified email info
+        // Update GHII with verified email info + track login
         const ghii = `${record.ownerName}@${config.nodeId}`;
+        const ghiiBeforeUpdate = await storage.getGHII(ghii);
         await storage.updateGHII(ghii, {
             emailHash: record.emailHash,
             emailVerifiedAt: now,
             verificationLevel: 1,
             verificationMethod: 'email',
             magicLinkEnabled: true,
+            lastLoginAt: now,
+            loginCount: (ghiiBeforeUpdate?.loginCount ?? 0) + 1,
         });
 
         // Create an agent if not exists, then issue JWT

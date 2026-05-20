@@ -269,7 +269,7 @@ export default function Admin({ navigate, locale }) {
       // Final counts
       newCounts.owners = d.owners.length;
       newCounts.work = d.workItems.length;
-      newCounts.peers = d.livePeers.length || d.federation.length;
+      newCounts.peers = d.livePeers.length;
       newCounts.rooms = d.realtime?.stats?.rooms || 0;
       newCounts.ghii = d.ghiiUsers.length;
       newCounts.genesis = d.genesis?.peers?.length || 0;

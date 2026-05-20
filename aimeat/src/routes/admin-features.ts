@@ -63,6 +63,8 @@ export function adminFeaturesRouter(
                     masked_email: maskedEmail,
                     owner_name: u.ownerName,
                     allowed_origins: u.allowedOrigins ?? null,
+                    last_login_at: u.lastLoginAt ?? null,
+                    login_count: u.loginCount ?? 0,
                     created_at: u.createdAt,
                     updated_at: u.updatedAt,
                 };

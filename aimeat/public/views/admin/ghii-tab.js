@@ -65,6 +65,7 @@ export default function GhiiTab({ data, reload }) {
           <th>${t('dashboard.ghiiEmail')}</th>
           <th>${t('dashboard.verification')}</th>
           <th>${t('dashboard.totp')}</th>
+          <th>${t('dashboard.lastLogin')}</th>
           <th>${t('dashboard.created')}</th>
           <th>${t('dashboard.actions')}</th>
         </tr></thead>
@@ -80,6 +81,7 @@ export default function GhiiTab({ data, reload }) {
               }</td>
               <td><${Badge} type=${vBadge} /> L${u.verification_level}</td>
               <td><${Badge} type=${u.totp_enabled ? 'healthy' : 'critical'} /></td>
+              <td>${u.last_login_at ? dt(u.last_login_at) : html`<span style="color:var(--text-dim)">–</span>`}</td>
               <td>${dt(u.created_at)}</td>
               <td>
                 <select onChange=${e => setLevel(u.ghii, e.target.value)}>
