@@ -152,6 +152,16 @@ All development standards are collected in `docs/coding-guidelines/`:
 | [Storage Sync](docs/coding-guidelines/storage-sync.md) | Multi-backend sync process, adding fields/tables |
 | [MCP Uploads](docs/coding-guidelines/mcp-uploads.md) | Presigned upload URLs, adding upload-capable tools |
 | [Frontend Guide](docs/frontend-development-guide.md) | Preact + HTM SPA, admin dashboard conventions |
+| [Known Gaps](docs/known_gaps.md) | Deferred technical gaps with structured tracking |
+
+### Rule 8: Known Gaps Must Be Developer-Approved
+
+`docs/known_gaps.md` tracks deferred technical gaps. Rules:
+
+1. **Never add entries on your own.** If you discover a gap during development, inform the developer. They decide whether to add it or fix it now.
+2. **Every entry requires all fields:** ID, Discovered date, Related to, Description, Impact, Severity (with justification), What needs to be done, Why deferred, Revisit when. No partial entries.
+3. **Remove entries when fixed.** If a gap is resolved, delete it from the file. Do not mark it as "done" -- just remove it.
+4. **The "Why deferred" field must have a real reason** from the developer -- not "will do later" or "low priority."
 
 ---
 
