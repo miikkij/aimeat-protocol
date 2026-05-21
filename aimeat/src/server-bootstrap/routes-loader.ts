@@ -34,6 +34,7 @@ import { promptsRouter } from '../routes/prompts.js';
 import { adminRouter } from '../routes/admin.js';
 import { federationRouter } from '../routes/federation.js';
 import { organismsRouter } from '../routes/organisms.js';
+import { sharingGroupsRouter } from '../routes/sharing-groups.js';
 import { specRouter } from '../routes/spec.js';
 import { disputesRouter } from '../routes/disputes.js';
 import { microMemoryRouter } from '../routes/micro-memory.js';
@@ -243,6 +244,7 @@ export async function mountRoutes(
   app.use(promptsRouter(config, storage));
   app.use(adminRouter(config, storage, maintenanceState, provenance, consulService));
   app.use(organismsRouter(config, storage));
+  app.use(sharingGroupsRouter(config, storage));
   app.use(federationRouter(config, storage, peers, networkDirectory));
   app.use(disputesRouter(config, storage));
   app.use(flagsRouter(config, storage));

@@ -54,7 +54,7 @@ export function permissionsRouter(config: AimeatConfig, storage: Storage): Route
         const memory = await storage.getMemory(ownerGaii, key);
         const visibility = memory?.visibility ?? 'private';
 
-        const result = await checkConsentForRead(storage, key, ownerGaii, accessor, visibility);
+        const result = await checkConsentForRead(storage, key, ownerGaii, accessor, visibility, memory?.groupId);
 
         res.json(success(config.nodeId, {
             key,

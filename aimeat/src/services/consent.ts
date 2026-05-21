@@ -73,6 +73,7 @@ export async function checkConsentForRead(
   ownerGaii: string,
   accessorGaii: string,
   visibility: string,
+  groupId?: string,
 ): Promise<{ allowed: boolean; consentId?: string; reason?: string }> {
   // Public data is always accessible
   if (visibility === 'public') {
@@ -92,6 +93,34 @@ export async function checkConsentForRead(
     if (ownerPart && accessorPart && ownerPart === accessorPart) {
       return { allowed: true, reason: 'same_owner' };
     }
+  }
+
+  // Group visibility: check membership in the referenced sharing group
+  if (visibility === 'group') {
+    if (!groupId) return { allowed: false, reason: 'missing_group_id' };
+    const group = await storage.getSharingGroup(groupId);
+    if (!group) return { allowed: false, reason: 'group_not_found' };
+
+    // Owner of the group always has access
+    if (group.ownerGaii === accessorGaii) {
+      return { allowed: true, reason: 'group_owner' };
+    }
+
+    // Check accessor ownership match (bare owner name vs GHII)
+    const accessorParsed = parseGaiiLoose(accessorGaii);
+    const groupOwnerParsed = parseGaiiLoose(group.ownerGaii);
+    if (accessorParsed && groupOwnerParsed && accessorParsed.owner === groupOwnerParsed.owner) {
+      return { allowed: true, reason: 'group_owner' };
+    }
+
+    const member = group.members.find(m =>
+      m.identifier === accessorGaii ||
+      (accessorParsed && m.identifier === `${accessorParsed.owner}@${accessorParsed.node}`),
+    );
+    if (!member) return { allowed: false, reason: 'not_group_member' };
+    const perms = member.permissions ?? group.defaultPermissions;
+    if (!perms.read) return { allowed: false, reason: 'no_read_permission' };
+    return { allowed: true, reason: 'group_member' };
   }
 
   // Private data requires explicit consent

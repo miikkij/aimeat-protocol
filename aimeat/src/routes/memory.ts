@@ -26,6 +26,7 @@ function visibilityToZone(visibility: string): 'private' | 'dmz' | 'federation' 
   switch (visibility) {
     case 'private': return 'private';
     case 'owner': return 'dmz';
+    case 'group': return 'dmz';
     case 'public': return 'federation';
     default: return 'private';
   }
@@ -1066,7 +1067,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
     // Non-public data with consent enabled: check consent
     const accessorGaii = req.auth?.sub ?? 'anonymous';
-    const consentResult = await checkConsentForRead(storage, key, record.ownerGaii, accessorGaii, record.visibility);
+    const consentResult = await checkConsentForRead(storage, key, record.ownerGaii, accessorGaii, record.visibility, record.groupId);
 
     // Audit the access attempt
     await auditDataAccess(storage, consentResult.consentId ?? null, record.ownerGaii, accessorGaii, key, 'read', consentResult.allowed);
