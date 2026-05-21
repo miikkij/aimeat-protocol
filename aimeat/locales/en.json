@@ -595,7 +595,9 @@
       "shareToFederation": "Share",
       "stopSharing": "Unshare",
       "shareSuccess": "Shared to federation",
-      "unshareSuccess": "Removed from federation"
+      "unshareSuccess": "Removed from federation",
+      "selectGroup": "Select group",
+      "noGroups": "No sharing groups. Create one in the Access tab."
     },
     "files": {
       "title": "Stored Files",

@@ -22,9 +22,10 @@ export async function searchMemory(query, agentGaii) {
 }
 
 /** Create a new memory entry. */
-export async function createMemory(key, value, visibility, tags) {
+export async function createMemory(key, value, visibility, tags, groupId) {
   const body = { key, value, visibility: visibility || 'private' };
   if (tags) body.tags = Array.isArray(tags) ? tags : tags.split(',').map(t => t.trim()).filter(Boolean);
+  if (visibility === 'group' && groupId) body.group_id = groupId;
   return api('/v1/memory', {
     method: 'POST',
     body: JSON.stringify(body),
@@ -48,10 +49,12 @@ export async function updateMemoryFull(key, fields) {
 }
 
 /** Update visibility on a memory entry. */
-export async function updateMemoryVisibility(key, visibility, version) {
+export async function updateMemoryVisibility(key, visibility, version, groupId) {
+  const body = { visibility, version };
+  if (visibility === 'group' && groupId) body.group_id = groupId;
   return api(`/v1/memory/${encodeURIComponent(key)}`, {
     method: 'PUT',
-    body: JSON.stringify({ visibility, version }),
+    body: JSON.stringify(body),
   });
 }
 

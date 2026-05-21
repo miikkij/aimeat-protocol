@@ -260,3 +260,21 @@
   border-color: var(--accent, #E8564A);
   color: var(--accent, #E8564A);
 }
+
+/* Group picker popup (memory tab visibility cycling) */
+.agd-group-picker {
+  position: absolute;
+  z-index: 10;
+  background: var(--card, #FFFFFF);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: var(--radius, 6px);
+  padding: var(--space-sm, 0.5rem);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  min-width: 200px;
+}
+.agd-group-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--space-xs, 0.25rem) var(--space-sm, 0.5rem);
+}

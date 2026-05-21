@@ -1803,13 +1803,14 @@ await test('GET /v1/stats includes notification counters and gauges', async () =
 await test('GET /v1/stats?from&to returns time-range response', async () => {
     const { body } = await json('/v1/stats?from=2020-01-01&to=2099-12-31');
     assert(body.ok === true, 'ok');
-    // Range response has totals, daily, and gauges
-    assert(typeof body.data.totals === 'object' && body.data.totals !== null, 'totals should be an object');
+    // Range response has flat counters, daily, and gauges (no totals wrapper)
     assert(typeof body.data.daily === 'object' && body.data.daily !== null, 'daily should be an object');
     assert(typeof body.data.gauges === 'object' && body.data.gauges !== null, 'gauges should be an object');
     // Range echoes the from/to params
     assert(body.data.from === '2020-01-01', 'from echoed');
     assert(body.data.to === '2099-12-31', 'to echoed');
+    // Counters are at root level (flat shape)
+    assert(typeof body.data.requests_total === 'number', 'requests_total in range');
     // Shared fields still present
     assert(typeof body.data.active_owners === 'number', 'active_owners in range');
     assert(typeof body.data.active_agents === 'number', 'active_agents in range');
@@ -1818,7 +1819,7 @@ await test('GET /v1/stats?from&to returns time-range response', async () => {
 await test('GET /v1/stats empty time range returns no daily entries', async () => {
     const { body } = await json('/v1/stats?from=2020-01-01&to=2020-01-02');
     assert(body.ok === true, 'ok');
-    assert(typeof body.data.totals === 'object' && body.data.totals !== null, 'totals exists');
+    assert(typeof body.data.requests_total === 'number', 'requests_total exists at root level');
     assert(typeof body.data.daily === 'object' && body.data.daily !== null, 'daily exists');
     // Historical range with no data should have empty daily
     assert(Object.keys(body.data.daily).length === 0, 'daily should be empty for historical range');

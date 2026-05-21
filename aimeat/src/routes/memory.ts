@@ -43,7 +43,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
   // POST /v1/memory — write a memory entry (agent auth required)
   router.post('/v1/memory', requireAuth(), requireRole('agent'), requireScope('memory:write'), validateBody(MemoryWriteSchema, config.nodeId), async (req, res) => {
-    const { key, value, visibility, tags, ttl_hours } = req.body ?? {};
+    const { key, value, visibility, tags, ttl_hours, group_id } = req.body ?? {};
 
     // Phase 2.3 — Workspace access check for organism.* keys (key comes from body, not params)
     if (typeof key === 'string' && key.startsWith('organism.')) {
@@ -133,12 +133,13 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       key,
       ownerGaii: gaii,
       value,
-      visibility: vis as 'private' | 'owner' | 'public',
+      visibility: vis as 'private' | 'owner' | 'group' | 'public',
       tags: Array.isArray(tags) ? tags : [],
       ttlHours: ttl_hours ?? null,
       version: existing ? existing.version + 1 : 1,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
+      ...(vis === 'group' && group_id ? { groupId: group_id } : {}),
     });
 
     // C.3: Event-driven replication queue integration
@@ -809,7 +810,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   router.put('/v1/memory/:key', requireAuth(), requireRole('agent'), requireScope('memory:write'), workspaceAccess, validateBody(MemoryUpdateSchema, config.nodeId), async (req, res) => {
     const gaii = resolve(req);
     const key = decodeURIComponent(req.params.key as string);
-    const { value, visibility, tags, ttl_hours, version } = req.body ?? {};
+    const { value, visibility, tags, ttl_hours, version, group_id } = req.body ?? {};
 
     // Anonymous namespace enforcement
     if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) {
@@ -868,16 +869,18 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     }
 
     const now = new Date().toISOString();
+    const effectiveVis = visibility ?? existing.visibility;
     const newRecord = {
       key,
       ownerGaii: gaii,
       value: value !== undefined ? value : existing.value,
-      visibility: visibility ?? existing.visibility,
+      visibility: effectiveVis,
       tags: tags ?? existing.tags,
       ttlHours: ttl_hours ?? existing.ttlHours,
       version: existing.version + 1,
       createdAt: existing.createdAt,
       updatedAt: now,
+      ...(effectiveVis === 'group' && group_id ? { groupId: group_id } : {}),
     };
 
     // Use atomic version-checked update when available (prevents race conditions)

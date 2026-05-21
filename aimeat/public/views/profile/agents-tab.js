@@ -40,6 +40,7 @@ const SCOPE_DOMAINS = [
   { key: 'agent',     permissions: ['register'] },
   { key: 'catalogue', permissions: ['read'] },
   { key: 'generator', permissions: ['read', 'write', 'execute'] },
+  { key: 'task', permissions: ['read', 'write', 'manage'] },
 ];
 
 const SCOPE_TEMPLATES = {

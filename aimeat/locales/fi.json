@@ -595,7 +595,9 @@
       "shareToFederation": "Jaa",
       "stopSharing": "Lopeta jakaminen",
       "shareSuccess": "Jaettu federaatioon",
-      "unshareSuccess": "Poistettu federaatiosta"
+      "unshareSuccess": "Poistettu federaatiosta",
+      "selectGroup": "Valitse ryhma",
+      "noGroups": "Ei jakoryhmiä. Luo ryhma Oikeudet-valilehdessa."
     },
     "files": {
       "title": "Tallennetut tiedostot",

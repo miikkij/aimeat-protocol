@@ -18,6 +18,7 @@ import AuthImage from '/js/components/auth-image.js';
 import { listAgents } from '/js/services/agents.js';
 import { getKeyPermissions, listConsents, grantConsent, revokeConsent } from '/js/services/consent.js';
 import { getNodeUrl } from '/js/services/auth.js';
+import { listGroups } from '/js/services/sharing-groups.js';
 import TagCloud from '/js/components/tag-cloud.js';
 import TagEditor from '/js/components/tag-editor.js';
 import { useConfirm } from '/components/Modal.js';
@@ -40,9 +41,11 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const [selectedAgent, setSelectedAgent] = useState('');
   const [fedConsents, setFedConsents] = useState({});   // { memoryKey: consentId }
   const [togglingFed, setTogglingFed] = useState(null);
+  const [groups, setGroups] = useState([]);
+  const [groupPickerFor, setGroupPickerFor] = useState(null); // key of the memory entry showing group picker
 
   useEffect(() => {
-    if (session) { loadAgents(); loadMemories(); loadFiles(); loadFedConsents(); }
+    if (session) { loadAgents(); loadMemories(); loadFiles(); loadFedConsents(); loadGroups(); }
   }, [session]);
 
   useEffect(() => {
@@ -111,6 +114,14 @@ export default function MemoryTab({ session, showToast, onStats }) {
     } catch { setAgents([]); }
   }
 
+  async function loadGroups() {
+    try {
+      const resp = await listGroups();
+      if (resp?.data?.groups) setGroups(resp.data.groups);
+      else if (Array.isArray(resp?.data)) setGroups(resp.data);
+    } catch { /* ignore */ }
+  }
+
   async function loadMemories() {
     try {
       const agentGaii = selectedAgent || undefined;
@@ -128,9 +139,9 @@ export default function MemoryTab({ session, showToast, onStats }) {
     } catch { setFiles([]); }
   }
 
-  async function handleCreateMemory(key, value, visibility, tags) {
+  async function handleCreateMemory(key, value, visibility, tags, groupId) {
     try {
-      await memoryService.createMemory(key, value, visibility, tags);
+      await memoryService.createMemory(key, value, visibility, tags, groupId);
       showToast(t('profile.memory.saved'));
       setShowMemForm(false);
       await loadMemories();
@@ -149,8 +160,10 @@ export default function MemoryTab({ session, showToast, onStats }) {
     }, { danger: true });
   }
 
-  async function handleSaveEdit(key, value, visibility, version) {
-    const resp = await memoryService.updateMemoryFull(key, { value, visibility, version });
+  async function handleSaveEdit(key, value, visibility, version, groupId) {
+    const body = { value, visibility, version };
+    if (visibility === 'group' && groupId) body.group_id = groupId;
+    const resp = await memoryService.updateMemoryFull(key, body);
     if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
     showToast(t('profile.memory.updated'));
     setEditModal(null);
@@ -234,10 +247,10 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const visColor = { private: '#c084fc', owner: '#60a5fa', group: '#10b981', public: '#4ade80' };
   const visBg = { private: 'rgba(150,100,200,.2)', owner: 'rgba(100,150,255,.2)', group: 'rgba(16,185,129,.2)', public: 'rgba(0,200,100,.2)' };
 
-  async function handleUpdateVisibility(key, newVis, version) {
+  async function handleUpdateVisibility(key, newVis, version, groupId) {
     // Optimistic update — change locally first, then persist
     setMemories(prev => prev.map(m => m.key === key ? { ...m, visibility: newVis, version: (m.version || 1) + 1 } : m));
-    const resp = await memoryService.updateMemoryVisibility(key, newVis, version);
+    const resp = await memoryService.updateMemoryVisibility(key, newVis, version, groupId);
     if (resp.ok === false) {
       showToast(resp.error?.message || t('profile.error'), true);
       loadMemories(); // Revert on error
@@ -299,7 +312,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
         <button class="btn-primary" onClick=${() => setShowMemForm(!showMemForm)}>${t('profile.memory.newBtn')}</button>
       </div>
       <${TagCloud} tags=${[...allMemTags]} selected=${memTagFilter} onToggle=${toggleMemTag} onClear=${() => setMemTagFilter(new Set())} />
-      ${showMemForm && html`<${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} />`}
+      ${showMemForm && html`<${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} groups=${groups} />`}
       ${filtered.length === 0
         ? html`<div class="empty">${memories.length > 0 ? (t('tags.noMatch') || 'No items match selected tags') : t('profile.memory.empty')}</div>`
         : filtered.map(m => html`
@@ -310,7 +323,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
                 const vis = m.visibility || 'private';
                 const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % cycleVis.length];
                 return html`<button class="kpkg-vis-pill"
-                  onClick=${(e) => { e.stopPropagation(); handleUpdateVisibility(m.key, nextVis, m.version); }}
+                  onClick=${(e) => { e.stopPropagation(); if (nextVis === 'group') { setGroupPickerFor(m.key); } else { handleUpdateVisibility(m.key, nextVis, m.version); } }}
                   title="${t('knowledge.visibility.' + vis)} → ${t('knowledge.visibility.' + nextVis)}"
                   style="background:${visBg[vis]};color:${visColor[vis]};border-color:${visColor[vis]}"
                 >${t('knowledge.visibility.' + vis)} ▾</button>`;
@@ -318,6 +331,21 @@ export default function MemoryTab({ session, showToast, onStats }) {
               <span class="shield-icon" title=${t('permissions.sharingRules')} onClick=${(e) => { e.stopPropagation(); loadKeyPerms(m.key); }}>\u{1F6E1}\uFE0F</span>
               ${fedConsents[m.key] && html`<span class="badge badge-success pf-fed-badge">${t('profile.memory.syncedToFederation')}</span>`}
             </div>
+            ${groupPickerFor === m.key && html`
+              <div class="agd-group-picker" onClick=${(e) => e.stopPropagation()}>
+                <div class="text-caption mb-xs">${t('profile.memory.selectGroup')}</div>
+                ${groups.length === 0
+                  ? html`<div class="text-meta-sm">${t('profile.memory.noGroups')}</div>`
+                  : groups.map(g => html`
+                    <button class="btn-ghost agd-group-option" onClick=${() => {
+                      handleUpdateVisibility(m.key, 'group', m.version, g.id);
+                      setGroupPickerFor(null);
+                    }}>${g.name} (${g.members?.length || 0} ${t('profile.access.sharingGroups.members')})</button>
+                  `)
+                }
+                <button class="btn-outline btn-sm mt-xs" onClick=${() => { setGroupPickerFor(null); }}>${t('profile.memory.cancelBtn')}</button>
+              </div>
+            `}
             ${expandedMem === m.key && html`
               <div class="mem-detail">
                 <pre>${typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || '')}</pre>
@@ -506,17 +534,19 @@ export default function MemoryTab({ session, showToast, onStats }) {
       initialValue=${editModal.value}
       initialVisibility=${editModal.visibility}
       initialVersion=${editModal.version}
-      onSave=${(v, vis, ver) => handleSaveEdit(editModal.key, v, vis, ver)}
+      groups=${groups}
+      onSave=${(v, vis, ver, gId) => handleSaveEdit(editModal.key, v, vis, ver, gId)}
       onCancel=${() => setEditModal(null)} />`}
     <${ConfirmUI} />
   `;
 }
 
-function MemoryForm({ onSave, onCancel }) {
+function MemoryForm({ onSave, onCancel, groups }) {
   const [key, setKey] = useState('');
   const [value, setValue] = useState('');
   const [vis, setVis] = useState('private');
   const [tags, setTags] = useState('');
+  const [groupId, setGroupId] = useState('');
   return html`
     <div class="create-form">
       <div class="form-row"><label>${t('profile.memory.keyLabel')}</label><input class="input-field" placeholder=${t('profile.memory.keyPlaceholder')} value=${key} onInput=${e => setKey(e.target.value)} /></div>
@@ -529,9 +559,17 @@ function MemoryForm({ onSave, onCancel }) {
           <option value="public">${t('profile.memory.visPublic')}</option>
         </select>
       </div>
+      ${vis === 'group' && html`
+        <div class="form-row"><label>${t('profile.memory.selectGroup')}</label>
+          <select class="input-field" value=${groupId} onChange=${e => setGroupId(e.target.value)}>
+            <option value="">-- ${t('profile.memory.selectGroup')} --</option>
+            ${(groups || []).map(g => html`<option value=${g.id}>${g.name}</option>`)}
+          </select>
+        </div>
+      `}
       <div class="form-row"><label>${t('profile.memory.tagsLabel')}</label><input class="input-field" placeholder=${t('profile.memory.tagsPlaceholder')} value=${tags} onInput=${e => setTags(e.target.value)} /></div>
       <div class="form-actions">
-        <button class="btn-primary" onClick=${() => { if (!key || !value) return; onSave(key, value, vis, tags); }}>${t('profile.memory.saveBtn')}</button>
+        <button class="btn-primary" onClick=${() => { if (!key || !value) return; onSave(key, value, vis, tags, vis === 'group' ? groupId : undefined); }}>${t('profile.memory.saveBtn')}</button>
         <button class="btn-outline" onClick=${onCancel}>${t('profile.memory.cancelBtn')}</button>
       </div>
     </div>`;
@@ -660,13 +698,24 @@ function FileUploadForm({ onUpload, onCancel }) {
     </div>`;
 }
 
-function EditMemoryModal({ memKey, initialValue, initialVisibility, initialVersion, onSave, onCancel }) {
+function EditMemoryModal({ memKey, initialValue, initialVisibility, initialVersion, onSave, onCancel, groups }) {
   const [value, setValue] = useState(initialValue);
   const [vis, setVis] = useState(initialVisibility || 'private');
+  const [groupId, setGroupId] = useState('');
+  const [showGroupSelect, setShowGroupSelect] = useState(false);
   const cycleVis = ['private', 'owner', 'group', 'public'];
   const visColor = { private: '#c084fc', owner: '#60a5fa', group: '#10b981', public: '#4ade80' };
   const visBg = { private: 'rgba(150,100,200,.2)', owner: 'rgba(100,150,255,.2)', group: 'rgba(16,185,129,.2)', public: 'rgba(0,200,100,.2)' };
   const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % cycleVis.length];
+  const handleVisCycle = () => {
+    if (nextVis === 'group') {
+      setShowGroupSelect(true);
+    } else {
+      setVis(nextVis);
+      setShowGroupSelect(false);
+      setGroupId('');
+    }
+  };
   return html`
     <div class="modal-overlay" onClick=${e => { if (e.target.className.includes('modal-overlay')) onCancel(); }}>
       <div class="modal">
@@ -674,14 +723,28 @@ function EditMemoryModal({ memKey, initialValue, initialVisibility, initialVersi
         <div class="form-row flex-row mb-half">
           <label class="pf-label-inline">${t('profile.memory.visLabel')}</label>
           <button class="kpkg-vis-pill"
-            onClick=${() => setVis(nextVis)}
+            onClick=${handleVisCycle}
             title="${t('knowledge.visibility.' + vis)} → ${t('knowledge.visibility.' + nextVis)}"
             style="background:${visBg[vis]};color:${visColor[vis]};border-color:${visColor[vis]}"
           >${t('knowledge.visibility.' + vis)} ▾</button>
         </div>
+        ${showGroupSelect && html`
+          <div class="form-row mb-half">
+            <label>${t('profile.memory.selectGroup')}</label>
+            <select class="input-field" value=${groupId} onChange=${e => {
+              setGroupId(e.target.value);
+              if (e.target.value) { setVis('group'); setShowGroupSelect(false); }
+            }}>
+              <option value="">-- ${t('profile.memory.selectGroup')} --</option>
+              ${(groups || []).map(g => html`<option value=${g.id}>${g.name}</option>`)}
+            </select>
+            ${(groups || []).length === 0 && html`<div class="text-meta-sm">${t('profile.memory.noGroups')}</div>`}
+            <button class="btn-outline btn-sm mt-xs" onClick=${() => setShowGroupSelect(false)}>${t('profile.memory.cancelBtn')}</button>
+          </div>
+        `}
         <textarea class="input-field" rows="6" value=${value} onInput=${e => setValue(e.target.value)}></textarea>
         <div class="form-actions mt-1">
-          <button class="btn-primary" onClick=${() => onSave(value, vis, initialVersion)}>${t('profile.save')}</button>
+          <button class="btn-primary" onClick=${() => onSave(value, vis, initialVersion, vis === 'group' ? groupId : undefined)}>${t('profile.save')}</button>
           <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
         </div>
       </div>
