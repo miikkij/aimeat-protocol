@@ -2,6 +2,70 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.6.1] - 2026-05-21
+
+### Security
+
+Full security audit covering authentication, authorization, input validation, dependencies, storage, GDPR, extensions, federation, and infrastructure. 33 findings addressed across 7 phases.
+
+#### Critical & High Fixes
+- **Extension SSRF protection** -- `ctx.fetch()` in extension sandbox now validates URLs via `validateOutboundUrl()`, blocking private/reserved IPs and cloud metadata endpoints (169.254.169.254). Applied to both QuickJS runtime and route-level fetch.
+- **GDPR cascade delete completion** -- `DELETE /v1/owners/:name` now deletes all data categories: GHII-level memory, consents, organism memberships, matches (by GHII), sessions, capabilities, scheduled jobs, device auth records, apps, extension instances, knowledge links, and knowledge reviews. Previously only agents, their memories, actions, and transactions were deleted.
+- **Admin password removed from logs** -- no longer logged via `logger.info()`. Auto-generated secrets written to stderr only.
+- **Login brute-force protection** -- per-route rate limit + per-account progressive lockout after configurable N failed attempts (default: 5 failures, 15-minute lockout).
+- **Extension script content gated** -- `GET /v1/extensions/:name?full=true` now requires authenticated owner/operator. Unauthenticated callers get metadata only. Does not affect cortex-to-extension calls (which use action invocation, not script reading).
+- **Extension email authorization** -- three-tier model: Tier 0 (default) allows emailing only the caller's own verified email. Tier 1 allows consented recipients via `purpose: 'extension_email'`. Tier 2 (operator-granted `emailPolicy: 'unrestricted'`) allows arbitrary recipients.
+- **Token refresh role revalidation** -- `POST /v1/auth/refresh` now re-reads roles from storage instead of copying from the old token, preventing stale privilege persistence after role changes.
+- **Unauthenticated federation auth refresh deleted** -- `POST /v1/federation/auth/refresh` removed entirely (no consumers existed; client library explicitly refuses federated refresh).
+
+#### Federation Auth Scope Configuration (new feature)
+- **Node-level federation auth policy** -- `federationAuthPolicy` config: `disabled` (default), `all_peers`, or `specific_peers`. Controls whether users from other nodes can log in.
+- **Per-peer auth settings** -- `allowFederatedAuth` and `federationAuthScopes` fields on each peer record, configurable from admin dashboard.
+- **Receiving node determines scopes** -- home node attestation no longer dictates scopes. The receiving node applies its own per-peer or default scope policy.
+- **Attestation signature verification** -- federated login now verifies the home node's Ed25519 signature on the attestation against the peer's known public key.
+- **Admin dashboard UI** -- federation tab gains auth policy dropdown (disabled/all_peers/specific_peers), default scopes checkboxes, and per-peer "Allow Federated Login" toggle.
+
+#### Medium Fixes
+- **Registration rate limiting** -- `POST /v1/ghii` and `/v1/ghii/register-web` rate-limited (default: 5/min).
+- **Admin setup rate limiting** -- `/v1/admin/setup/auth`, `/setup/register`, `/setup/token`, `/setup/initial-otk` all rate-limited (default: 5/min).
+- **Timing-safe admin password** -- all admin password comparisons use `crypto.timingSafeEqual()`.
+- **Strong admin passwords** -- setup wizard now enforces same password strength rules as regular registration (8+ chars, uppercase, lowercase, number, no common passwords).
+- **Extension limits capped** -- `Math.min()` instead of `Math.max()` ensures extensions cannot exceed admin-configured memory/timeout/API-call limits.
+- **Extension wallet spending cap** -- configurable per-call debit limit (default: 100 morsels, env: `AIMEAT_EXT_MAX_DEBIT`).
+- **Consent expiry sweep** -- `expireConsents()` now performs actual bulk expiration query instead of being a no-op.
+- **Unhandled rejection handler** -- `process.on('unhandledRejection')` prevents silent crashes from background services.
+- **scrypt v2 parameters** -- new password hashes use N=32768 (up from 16384). Versioned hash format (`v2:salt:key`) with transparent upgrade on login. Old hashes work forever.
+- **Relaxed CSP for test pages** -- generator/foundry test pages use `script-src 'unsafe-eval' 'unsafe-inline' https:` instead of removing CSP entirely.
+- **Zod schema validation** -- added to `POST /v1/ghii`, `/v1/ghii/register-web`, `/v1/ghii/login`, `/v1/consent`, `/v1/flags`, `/v1/extensions` with field type/size constraints.
+
+#### Low Fixes
+- **Content-Disposition sanitization** -- filename quotes/backslashes escaped in download headers.
+- **Interest storage identity** -- registration interests stored under owner GHII (was fabricated non-existent agent GAII). Directory service uses GHII-first lookup with agent GAII fallback for backward compatibility.
+- **Extension notification identity** -- `notify()` uses `resolveIdentity()` instead of raw `req.auth!.sub`.
+- **TOTP backup code entropy** -- increased from 4 bytes (8 hex chars) to 6 bytes (12 hex chars).
+- **Transaction IDs** -- all 23 sites migrated from `Math.random()` to `crypto.randomUUID()`.
+- **Rate limiter fallback** -- added `req.socket.remoteAddress` to key chain + stats counter for unknown key fallback.
+- **Security headers on all responses** -- X-Content-Type-Options, X-Frame-Options, Referrer-Policy, HSTS applied globally (was only when public directory existed).
+- **Generic upload error** -- internal error details no longer leaked to clients.
+- **JSON body limit** -- reduced default from 15MB to 5MB. Apps/extensions/cortex routes keep 15MB.
+- **Startup warnings** -- TOTP encryption key missing, dev mode on non-local config, Windows node key unencrypted.
+
+#### Configurable Security Settings (all via .env + admin dashboard)
+All security limits are runtime-configurable via environment variables and the admin dashboard Config tab under the "Security" group:
+- `AIMEAT_LOGIN_RATE_LIMIT_MAX` / `_WINDOW_MS` (default: 15 / 60000)
+- `AIMEAT_REGISTRATION_RATE_LIMIT_MAX` / `_WINDOW_MS` (default: 5 / 60000)
+- `AIMEAT_ADMIN_AUTH_RATE_LIMIT_MAX` / `_WINDOW_MS` (default: 5 / 60000)
+- `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` / `_MINUTES` (default: 5 / 15)
+- `AIMEAT_JSON_BODY_LIMIT_MB` / `_LARGE_MB` (default: 5 / 15)
+- `AIMEAT_EXT_MAX_DEBIT` (default: 100)
+- `AIMEAT_FEDERATION_AUTH_POLICY` (default: disabled)
+- `AIMEAT_FEDERATION_DEFAULT_SCOPES` (default: memory:read,catalogue:read)
+
+### Changed
+- **Password validation** extracted to shared `src/utils/password-validation.ts` (was private in ghii.ts).
+- **ConsentCreateSchema** scope enum now includes `'auth'` (was missing, needed for federation auth consents).
+- **Federation auth verify** rate limit increased from 10/min to configurable (default: 15/min).
+
 ## [1.6.0] - 2026-05-21
 
 ### Added
