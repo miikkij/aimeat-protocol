@@ -187,79 +187,9 @@ aimeat_task_complete    Mark task done with verification details
 aimeat_task_fail        Mark task failed with reason
 ```
 
-### Agent Prompt: Two-Part Design
+### Agent Prompt and Integration
 
-The connection prompt and the operating instructions are separate. The connection prompt is ultra-short (Telegram-safe). The agent downloads its own full instructions after authenticating.
-
-**Connection prompt** (`buildAgentPrompt()` in `agents-tab.js`, ~10 lines):
-
-```
-Connect to my AIMEAT node as an AI agent.
-
-Owner: {owner}
-Node: {nodeUrl}
-
-1. Authenticate: POST {nodeUrl}/v1/agents/device-authorize
-   Body: { "agent_name": "your-name", "owner": "{owner}" }
-   Tell me the verification URL so I can approve.
-
-2. After auth, download your operating instructions:
-   GET {nodeUrl}/v1/prompts/tier1
-   This file contains your directives, task queue, capabilities
-   reporting, and everything you need to operate on this node.
-   Read it fully before doing anything else.
-```
-
-**Full operating instructions** (served by existing `GET /v1/prompts/tier1`, extended):
-
-The tier1 prompt is updated to include all new behavior. Key sections:
-
-```
-# AIMEAT Agent Operating Instructions
-
-## Your Identity
-GAII, owner, trust score, morsel balance, daily allowance
-(variable-substituted per agent)
-
-## AIMEAT-First Principle
-Use AIMEAT extensions, scheduler, memory, apps as PRIMARY.
-Agent's own environment only when AIMEAT can't handle it.
-Justify agent-env steps in task TODOs.
-
-## Task Pickup (check every session)
-1. aimeat_task_list status:"queued"
-2. For each task: get -> start -> work TODOs -> log events -> verify -> complete/fail
-3. Follow directives (inherited rules) for every task
-
-## Directives (always active)
-GET /v1/agents/{name}/directives
-Standing instructions: memory schemas, token budgets, behavior rules.
-
-## Capability Reporting (on connect + when skills change)
-PUT /v1/agents/{name}/capabilities
-Report technical skills (MCP tools, Playwright, etc.) and domain knowledge.
-
-## Message Handling (Phase 3)
-GET /v1/agents/{name}/messages/inbox
-Process and respond. Can propose tasks from conversations.
-
-## Available APIs
-Memory, catalogue, wallet, work, boards, knowledge, extensions, apps.
-Full spec: /v1/spec
-```
-
-**UI changes** to "Connect an Automation Agent" section in agents-tab.js:
-- Short prompt box (~10 lines) with "Copy Prompt" button (primary)
-- "Download Full Instructions (.md)" button -- fetches tier1, saves as file (for Telegram file attachment or limited agents)
-- "Copy Full Instructions" button -- fetches tier1, copies to clipboard
-- Hint: "Telegram users: Send the downloaded file as attachment to avoid message splitting."
-
-**Why this works:**
-- Agent downloads its own instructions -- if it can't, it's not an agent
-- Instructions stay up-to-date -- every reconnect fetches latest version
-- No stale copy-pasted prompts -- new features (Phase 2/3) appear automatically
-- No new endpoint -- extends existing `GET /v1/prompts/tier1` which already has variable substitution
-- MCP-connected agents already have `aimeat_prompts_get` tool -- they fetch automatically
+See **Part 7: Agent Integration Kit** for the complete agent prompt design, watchdog/polling system, wake-up mechanism, local file structure, and error protocol. The agent prompt was moved there to consolidate all agent communication patterns in one place.
 
 ### Scopes
 
@@ -759,6 +689,257 @@ aimeat_message_send        Send a response message
 Phase 1's task creation right panel is a **task-scoped conversation** stored as task events (`type: 'message'`). Phase 3 Messages is a **general conversation** stored in `agent_messages`. They share the same UI pattern (chat bubbles, send box) but different data models.
 
 When Phase 3 ships, the task creation chat could optionally migrate to use the message system, but this is not required -- they can coexist.
+
+---
+
+## Part 7: Agent Integration Kit (Cross-Phase)
+
+### Concept
+
+A complete, pre-chewed integration package that agents download from AIMEAT to set up their watchdog, handler, and communication patterns. Everything is decided for the agent -- file structures, data schemas, protocols, API references. The agent only decides HOW to implement (using its native runtime), not WHAT to implement.
+
+**AI-accelerated:** give agents maximum ready-made structure so they integrate fast, precisely, and without guesswork.
+
+### Two-Part Agent Prompt
+
+The connection prompt is ultra-short (~10 lines, Telegram-safe). The agent downloads its own full instructions after authenticating.
+
+**Connection prompt** (`buildAgentPrompt()` in `agents-tab.js`):
+
+```
+Connect to my AIMEAT node as an AI agent.
+
+Owner: {owner}
+Node: {nodeUrl}
+
+1. Authenticate: POST {nodeUrl}/v1/agents/device-authorize
+   Body: { "agent_name": "your-name", "owner": "{owner}" }
+   Tell me the verification URL so I can approve.
+
+2. After auth, download your full operating instructions:
+   GET {nodeUrl}/v1/prompts/tier1
+   This file contains your directives, task queue, capabilities
+   reporting, and everything you need to operate on this node.
+   Read it fully before doing anything else.
+```
+
+**UI buttons:**
+- "Copy Prompt" (short version, primary)
+- "Download Full Instructions (.md)" (for Telegram file attachment)
+- "Copy Full Instructions" (for agents that accept pasted text)
+- Hint: "Telegram users: Send the downloaded file as attachment to avoid message splitting."
+
+**Full operating instructions** served by existing `GET /v1/prompts/tier1` (extended with all new behavior). Variable-substituted per agent (GAII, owner, balance). MCP agents already have `aimeat_prompts_get` tool. Instructions stay up-to-date -- every reconnect fetches latest version.
+
+### New Endpoint: Agent Inbox (consolidated)
+
+One endpoint that returns everything the agent needs to know:
+
+```
+GET /v1/agents/:name/inbox
+Authorization: Bearer {token}
+
+Response:
+{
+  "ok": true,
+  "data": {
+    "tasks_queued": 2,
+    "tasks_active": 1,
+    "messages_pending": 3,
+    "tasks": [ { "id": "...", "title": "...", "status": "queued", "created_at": "..." } ],
+    "active_tasks": [ { "id": "...", "title": "...", "todo_progress": "3/5" } ],
+    "messages": [ { "id": "...", "thread_id": "...", "preview": "...", "from": "..." } ]
+  }
+}
+```
+
+One call, one response. No multiple API calls needed for the poll cycle.
+
+### New Endpoint: Integration Kit
+
+Agent-specific integration kit with everything pre-filled:
+
+```
+GET /v1/agents/:name/integration-kit
+Authorization: Bearer {token}
+
+Response:
+{
+  "ok": true,
+  "data": {
+    "agent": "{agent_name}",
+    "node_url": "{node_url}",
+    "poll_interval_seconds": 30,
+    "inbox_endpoint": "GET {node_url}/v1/agents/{name}/inbox",
+    "instructions_endpoint": "GET {node_url}/v1/prompts/tier1",
+
+    "watchdog_spec": {
+      "description": "Build a system-level automated poller (cron, timer, loop). No AI needed.",
+      "poll_endpoint": "GET {node_url}/v1/agents/{name}/inbox",
+      "auth_header": "Authorization: Bearer {token}",
+      "re_auth": { "endpoint": "POST {node_url}/v1/auth/token", "body_spec": "{ gaii, timestamp, signature }" },
+      "wake_condition": "tasks_queued > 0 OR messages_pending > 0 OR (tasks_active > 0 AND resuming)",
+      "recommended_interval": "30-60 seconds",
+      "implementation_note": "Use your runtime's native scheduling (cron, heartbeat, timer). You decide how. AIMEAT only specifies WHAT to poll and WHEN to wake the AI."
+    },
+
+    "handler_spec": {
+      "on_wake": [
+        "1. Read inbox (from poll result or local index.json)",
+        "2. Download operating instructions: GET {node_url}/v1/prompts/tier1",
+        "3. Download directives: GET {node_url}/v1/agents/{name}/directives",
+        "4. Process active tasks first (resume from last pending TODO)",
+        "5. Process queued tasks (start -> work TODOs -> verify -> complete/fail)",
+        "6. Process pending messages (read -> respond -> propose task if appropriate)",
+        "7. Report capabilities if not yet reported",
+        "8. Exit cleanly"
+      ],
+      "task_api": "See Part 1 REST endpoints",
+      "message_api": "See Part 6 REST endpoints"
+    },
+
+    "error_protocol": {
+      "on_task_failure": "POST /v1/agents/{name}/tasks/{id}/fail with reason",
+      "on_api_unreachable": "Save to local errors/ directory with full context",
+      "on_unresolvable": "Report to user on next conversation, include error details",
+      "rule": "Never silently skip. Every failure must be reported somewhere."
+    },
+
+    "file_structure": { "see": "Local File Structure section below" },
+    "directives": { "current agent directives embedded here" },
+    "test_results": { "suite_passed": "8/8", "tested_at": "2026-05-21" }
+  }
+}
+```
+
+### Watchdog + Wake-Up Pattern
+
+The watchdog is a lightweight, non-AI system process. It polls AIMEAT, checks for new work, and wakes the AI agent only when needed.
+
+```
+WATCHDOG LOOP (no AI, zero tokens):
+
+  every {poll_interval} seconds:
+    1. Call GET /v1/agents/{name}/inbox
+    2. Compare with previous poll (or check tasks_queued / messages_pending counts)
+    3. If new work found:
+       a. Write new items to local inbox/ directory (one file per item)
+       b. Update index.json
+       c. WAKE UP the AI agent (pass local data directory as argument)
+    4. If no new work: do nothing, sleep until next tick
+
+  WAKE-UP depends on agent runtime (agent decides):
+    - Spawn a process: hermes --inbox ~/.aimeat/agent/
+    - In-process trigger: event emitter / callback
+    - File system watch: another process watches inbox/ for new files
+    - Notification: send push/message to owner
+```
+
+AIMEAT provides a generic reference watchdog script (bash + curl + jq) in the integration kit. Agents adapt it to their runtime or replace it entirely with their native scheduling.
+
+### Polling Alternatives
+
+Agents choose their preferred pattern. AIMEAT supports all three:
+
+| Pattern | Endpoint | When to use |
+|---------|----------|-------------|
+| **Short polling** | `GET /v1/agents/:name/inbox` every 30-60s | Default, works everywhere |
+| **SSE events** | `GET /v1/events` (existing) | Agents that can hold persistent connections. Task domain events emitted on creation/update. |
+| **Long polling** | `GET /v1/agents/:name/tasks/wait?timeout=60` (new) | Near-instant pickup with one connection. Blocks until task appears or timeout. |
+
+### Recommended Local File Structure
+
+Agent-agnostic. Agents implement this in whatever language/runtime they use.
+
+```
+~/.aimeat/{agent_name}/
+│
+├── index.json              <- master index: every file, status, timestamps
+├── config.json             <- node_url, agent_name, token, poll_interval
+├── status.json             <- last_poll, totals, error_count
+│
+├── inbox/                  <- new items from AIMEAT (watchdog writes here)
+│   ├── task-{id}.json      <- one file per queued task
+│   └── msg-{id}.json       <- one file per pending message
+│
+├── active/                 <- tasks being worked on
+│   └── task-{id}/
+│       ├── task.json       <- full task definition (immutable after start)
+│       ├── progress.json   <- which TODOs done, current step, timestamps
+│       └── events.jsonl    <- append-only event log (one JSON per line)
+│
+├── threads/                <- message conversations (grouped by thread)
+│   └── thread-{id}/
+│       ├── thread.json     <- thread metadata: participants, topic, linked_task
+│       ├── 001-inbound.json
+│       ├── 002-outbound.json
+│       └── summary.json    <- compressed context when thread grows large
+│
+├── completed/              <- finished tasks
+│   └── task-{id}/
+│       ├── task.json
+│       ├── result.json     <- verification results, final state
+│       └── events.jsonl
+│
+└── errors/                 <- failed items + error context
+    └── task-{id}/
+        ├── task.json       <- original task
+        ├── error.json      <- what went wrong, at which TODO step
+        └── events.jsonl    <- events up to failure point
+```
+
+**index.json** -- master index. Agent reads this once to know everything: what's in inbox, what's active, what threads need response, what errors are unresolved. No directory scanning needed.
+
+**threads/** -- message conversations in numbered files. When a thread grows large (>20 messages), agent compresses older messages into `summary.json`. LLM reads: summary + recent = full context without token explosion.
+
+**active/** -- tasks being worked on have their own directory with progress tracking. On resume after crash, agent reads `progress.json` to know where it left off.
+
+### Task Stall Detection
+
+New status `stalled` added to task lifecycle: `draft | queued | active | stalled | done | failed`.
+
+```typescript
+// Added to AgentTaskRecord
+lastEventAt?: string;  // updated on every aimeat_task_event call
+```
+
+Background job `task-stall-detector` runs every 5 minutes:
+- Finds tasks with status `active` where `lastEventAt` is older than `config.taskStallThresholdMinutes` (default: 30)
+- Marks as `stalled`
+- Notifies owner via SSE event + push notification
+- Owner can: reassign, restart, or mark failed
+
+### MCP Resource Events for Tasks
+
+When tasks are created, updated, started, or completed, emit `resource:updated` via the MCP event bus. MCP-connected agents receive this instantly without polling.
+
+### What AIMEAT Provides vs. What Agent Decides
+
+| AIMEAT provides | Agent decides |
+|----------------|---------------|
+| File structure spec + JSON schemas | How to implement (language, runtime) |
+| index.json format | How to poll (cron, heartbeat, loop, timer) |
+| Inbox endpoint (consolidated) | Polling interval (we recommend 30-60s) |
+| Error reporting protocol | How to wake up AI (spawn, in-process, event) |
+| Thread compression guidelines | Compression algorithm |
+| API endpoints + response schemas | Token optimization strategy |
+| Test suite results as proof | How to use native scheduling |
+| Generic reference watchdog script | Error recovery strategy |
+
+### Integration Kit Test Suite
+
+Tests run against a live AIMEAT node in CI. When they pass, agents can trust the specs.
+
+```
+test/integration-kit/poll-inbox.ts          -- create task, poll inbox, verify schema
+test/integration-kit/task-lifecycle.ts       -- start, log events, update TODOs, complete
+test/integration-kit/error-reporting.ts      -- fail a TODO, fail task, verify error visible
+test/integration-kit/stall-detection.ts      -- active task, no events, verify stalled
+test/integration-kit/resume-after-disconnect.ts -- start, complete 2 TODOs, re-poll, verify resume
+test/integration-kit/message-lifecycle.ts    -- send, poll inbox, respond, verify history
+test/integration-kit/file-structure-sim.ts   -- simulate watchdog, verify file names and structure
+test/integration-kit/thread-management.ts    -- create thread, add messages, verify chain
+```
 
 ---
 
