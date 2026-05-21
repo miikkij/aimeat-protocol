@@ -8,6 +8,13 @@ import { createServer } from './server.js';
 import { loadConfig } from './config.js';
 import { logger } from './utils/logger.js';
 
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled promise rejection', {
+    reason: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
+  });
+});
+
 const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: {
@@ -406,11 +413,26 @@ if (subcommand === 'config') {
       logger.info(`   📡 Realtime P2P rooms: ws://localhost:${config.port}/v1/realtime/ws`);
     }
     logger.info(``);
-    logger.info(`   Admin Setup: ${config.baseUrl}/v1/admin/setup?pw=${config.adminPassword}`);
+    logger.info(`   Admin Setup: ${config.baseUrl}/v1/admin/setup`);
     if (!process.env.AIMEAT_ADMIN_PASSWORD) {
-      logger.info(`   Admin Secret: ${config.adminPassword}`);
+      process.stderr.write(`   Admin Secret: ${config.adminPassword}\n`);
     }
     logger.info(`──────────────────────────────────────────────────────────`);
+
+    // Security warnings
+    if (config.totpEnabled && !config.totpSecretEncryptionKey) {
+      logger.warn('SECURITY: TOTP is enabled but AIMEAT_TOTP_ENCRYPTION_KEY is not set. TOTP secrets are stored in plaintext.');
+    }
+    if (config.devMode) {
+      const looksProduction = config.storageProvider !== 'memory' ||
+        (config.baseUrl && !config.baseUrl.includes('localhost') && !config.baseUrl.includes('127.0.0.1'));
+      if (looksProduction) {
+        logger.warn('SECURITY: Dev mode is ON with non-local configuration. Dev mode allows account wipe on duplicate registration.');
+      }
+    }
+    if (process.platform === 'win32' && !process.env.AIMEAT_KEY_PASSPHRASE) {
+      logger.warn('SECURITY: Node key is stored unencrypted. Windows does not enforce Unix file permissions. Set AIMEAT_KEY_PASSPHRASE to encrypt.');
+    }
 
     // Log active service extensions and their instances
     storage.listExtensions().then(async (extensions) => {

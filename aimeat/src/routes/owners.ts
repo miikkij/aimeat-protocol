@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
@@ -78,7 +79,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
       });
       // Record welcome bonus transaction
       await storage.addTransaction({
-        id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+        id: `tx-${randomUUID()}`,
         gaii: ghii,
         type: 'welcome_bonus',
         amount: config.welcomeBonus,
@@ -630,34 +631,55 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // Cascade delete: agents, memories, actions, transactions
+    // Cascade delete: agents, GHII-level data, owner record
     const agents = await storage.getAgentsByOwner(name);
+    const ghii = `${name}@${config.nodeId}`;
+    const deletionLog: string[] = [];
+
+    // 1. Cancel in-flight work and return escrow for all agents
     for (const agent of agents) {
-      // Cancel in-flight work and return escrow
       const providerWork = await storage.listWorkByProvider(agent.gaii);
       const requesterWork = await storage.listWorkByRequester(agent.gaii);
       for (const w of [...providerWork, ...requesterWork]) {
         if (['pending', 'accepted', 'in_progress'].includes(w.status)) {
           await storage.updateWork(w.trackingCode, { status: 'cancelled', updatedAt: new Date().toISOString() });
-          // Return escrow to requester (atomic credit)
           if (w.cost.inEscrow > 0) {
             await storage.creditBalance(w.requesterGaii, w.cost.total);
           }
         }
       }
-
-      await storage.deleteAllMemory(agent.gaii);
-      await storage.deleteActionsByProvider(agent.gaii);
-      await storage.deleteTransactions(agent.gaii);
-      await storage.deleteAgent(agent.gaii);
     }
 
+    // 2. Delete GHII-level data (not covered by per-agent cascade)
+    // Memory stored under GHII directly
+    try { await storage.deleteAllMemory(ghii); deletionLog.push('ghii_memory'); } catch { /* continue */ }
+    // Consents granted by the GHII identity
+    try {
+      const ghiiConsents = await storage.listConsents(ghii, {});
+      for (const c of ghiiConsents) await storage.deleteConsent(c.id);
+      if (ghiiConsents.length) deletionLog.push(`consents:${ghiiConsents.length}`);
+    } catch { /* continue */ }
+    // Organism memberships
+    try {
+      const memberships = await storage.listMembershipsByGhii(ghii);
+      for (const m of memberships) await storage.deleteMembership(m.id);
+      if (memberships.length) deletionLog.push(`memberships:${memberships.length}`);
+    } catch { /* continue */ }
+    // Matches (stored by GHII, not agent GAII)
+    try { await storage.deleteMatchesByProfile(ghii); deletionLog.push('matches'); } catch { /* continue */ }
+    // Sessions
+    try { await storage.revokeAllSessions(name); deletionLog.push('sessions'); } catch { /* continue */ }
+
+    // 3. Per-agent cascade + agent deletion (handled by storage.deleteOwner internally)
+    // The storage provider's deleteOwner cascades: agent data, GHII records,
+    // personal nodes, push subs, listings, purchases, chat instances, email verifications
     await storage.deleteOwner(name);
 
     res.json(success(config.nodeId, {
       deleted: true,
       owner: name,
       agents_deleted: agents.length,
+      deletion_log: deletionLog,
     }));
     emitChange('owners');
   });

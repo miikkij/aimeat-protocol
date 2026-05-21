@@ -2053,6 +2053,13 @@ export class SqliteStorage implements Storage {
     return results;
   }
 
+  async expireStaleConsents(before: string): Promise<number> {
+    const result = this.db.prepare(
+      `UPDATE consents SET status = 'expired' WHERE status = 'active' AND expires IS NOT NULL AND expires < ?`
+    ).run(before);
+    return result.changes;
+  }
+
   // Consent Audit
   async addConsentAuditEntry(entry: ConsentAuditEntry): Promise<ConsentAuditEntry> {
     this.db.prepare(
@@ -2511,6 +2518,13 @@ export class SqliteStorage implements Storage {
     const result = this.db.prepare(
       `DELETE FROM matches WHERE expiresAt < ? AND status != 'accepted'`
     ).run(now);
+    return result.changes;
+  }
+
+  async deleteMatchesByProfile(profile: string): Promise<number> {
+    const result = this.db.prepare(
+      `DELETE FROM matches WHERE profileA = ? OR profileB = ?`
+    ).run(profile, profile);
     return result.changes;
   }
 
@@ -4399,11 +4413,12 @@ export class SqliteStorage implements Storage {
 
   async saveFederationPeer(peer: FederationPeerRecord): Promise<void> {
     this.db.prepare(
-      `INSERT OR REPLACE INTO federation_peers (nodeId, url, publicKey, status, addedAt, lastSeen, shareCatalogue, replicateMemory, allowRouting, peerMode)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT OR REPLACE INTO federation_peers (nodeId, url, publicKey, status, addedAt, lastSeen, shareCatalogue, replicateMemory, allowRouting, peerMode, allowFederatedAuth, federationAuthScopes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(peer.nodeId, peer.url, peer.publicKey, peer.status, peer.addedAt, peer.lastSeen,
       peer.shareCatalogue ? 1 : 0, peer.replicateMemory ? 1 : 0, peer.allowRouting ? 1 : 0,
-      peer.peerMode || 'federation');
+      peer.peerMode || 'federation', peer.allowFederatedAuth ? 1 : 0,
+      (peer.federationAuthScopes ?? []).join(','));
   }
 
   async listFederationPeers(): Promise<FederationPeerRecord[]> {
@@ -4419,6 +4434,8 @@ export class SqliteStorage implements Storage {
       replicateMemory: r.replicateMemory === 1,
       allowRouting: r.allowRouting === 1,
       peerMode: (r.peerMode as FederationPeerRecord['peerMode']) || 'federation',
+      allowFederatedAuth: r.allowFederatedAuth === 1,
+      federationAuthScopes: ((r.federationAuthScopes as string) || '').split(',').filter(Boolean),
     }));
   }
 

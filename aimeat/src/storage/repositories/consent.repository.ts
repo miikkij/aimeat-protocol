@@ -10,6 +10,7 @@ export interface ConsentRepository {
   updateConsent(id: string, updates: Partial<ConsentRecord>): Promise<ConsentRecord | null>;
   deleteConsent(id: string): Promise<boolean>;
   findMatchingConsents(ownerGaii: string, memoryKey: string, accessorGaii: string): Promise<ConsentRecord[]>;
+  expireStaleConsents(before: string): Promise<number>;
   addConsentAuditEntry(entry: ConsentAuditEntry): Promise<ConsentAuditEntry>;
   listConsentAudit(ownerGaii: string, opts?: {
     days?: number;

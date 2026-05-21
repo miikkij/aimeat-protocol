@@ -1887,6 +1887,15 @@ export class MongoStorage implements Storage {
         return results;
     }
 
+    async expireStaleConsents(before: string): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.consent.updateMany({
+            where: { status: 'active', expires: { not: null, lt: new Date(before) } },
+            data: { status: 'expired' },
+        });
+        return result.count;
+    }
+
     // Consent Audit
     async addConsentAuditEntry(entry: ConsentAuditEntry): Promise<ConsentAuditEntry> {
         this.ensureReady();
@@ -2163,6 +2172,12 @@ export class MongoStorage implements Storage {
     async deleteExpiredMatches(): Promise<number> {
         this.ensureReady();
         const result = await this.prisma.match.deleteMany({ where: { expiresAt: { lt: new Date() }, status: { not: 'accepted' } } });
+        return result.count;
+    }
+
+    async deleteMatchesByProfile(profile: string): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.match.deleteMany({ where: { OR: [{ profileA: profile }, { profileB: profile }] } });
         return result.count;
     }
 
@@ -3919,8 +3934,8 @@ export class MongoStorage implements Storage {
         this.ensureReady();
         await this.prisma.federationPeer.upsert({
             where: { nodeId: peer.nodeId },
-            create: { nodeId: peer.nodeId, url: peer.url, publicKey: peer.publicKey, status: peer.status, addedAt: new Date(peer.addedAt), lastSeen: new Date(peer.lastSeen), shareCatalogue: peer.shareCatalogue, replicateMemory: peer.replicateMemory, allowRouting: peer.allowRouting, peerMode: peer.peerMode || 'federation' },
-            update: { url: peer.url, publicKey: peer.publicKey, status: peer.status, lastSeen: new Date(peer.lastSeen), shareCatalogue: peer.shareCatalogue, replicateMemory: peer.replicateMemory, allowRouting: peer.allowRouting, peerMode: peer.peerMode || 'federation' },
+            create: { nodeId: peer.nodeId, url: peer.url, publicKey: peer.publicKey, status: peer.status, addedAt: new Date(peer.addedAt), lastSeen: new Date(peer.lastSeen), shareCatalogue: peer.shareCatalogue, replicateMemory: peer.replicateMemory, allowRouting: peer.allowRouting, peerMode: peer.peerMode || 'federation', allowFederatedAuth: peer.allowFederatedAuth ?? false, federationAuthScopes: peer.federationAuthScopes ?? [] },
+            update: { url: peer.url, publicKey: peer.publicKey, status: peer.status, lastSeen: new Date(peer.lastSeen), shareCatalogue: peer.shareCatalogue, replicateMemory: peer.replicateMemory, allowRouting: peer.allowRouting, peerMode: peer.peerMode || 'federation', allowFederatedAuth: peer.allowFederatedAuth ?? false, federationAuthScopes: peer.federationAuthScopes ?? [] },
         });
     }
 
@@ -3938,6 +3953,8 @@ export class MongoStorage implements Storage {
             replicateMemory: r.replicateMemory ?? true,
             allowRouting: r.allowRouting ?? true,
             peerMode: r.peerMode || 'federation',
+            allowFederatedAuth: r.allowFederatedAuth ?? false,
+            federationAuthScopes: r.federationAuthScopes ?? [],
         }));
     }
 

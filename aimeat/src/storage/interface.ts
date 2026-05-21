@@ -337,6 +337,8 @@ export interface GHIIRecord {
   totpLastUsedCode?: string;    // Last used code (replay protection)
   totpFailedAttempts?: number;  // Failed attempts (rate limiting)
   totpLockedUntil?: string;     // Locked until (rate limiting)
+  passwordFailedAttempts?: number;  // Failed password attempts (brute-force protection)
+  passwordLockedUntil?: string;     // Password lockout expiry (brute-force protection)
   semantic?: SemanticAnnotation;  // Phase 0.7b
   // Phase 1.3 — Web registration & email verification
   emailHash?: string;           // SHA-256 of verified email
@@ -735,6 +737,8 @@ export interface FederationPeerRecord {
   replicateMemory: boolean;
   allowRouting: boolean;
   peerMode: 'federation' | 'private';
+  allowFederatedAuth: boolean;
+  federationAuthScopes: string[];
 }
 
 // Phase B.1 — Replication Queue (federation data sync)

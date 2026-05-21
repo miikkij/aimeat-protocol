@@ -26,7 +26,7 @@ export function rateLimit(opts: Partial<RateLimitTier> = {}, roleMultipliers?: R
 
     return (req: Request, res: Response, next: NextFunction) => {
         // Key by GAII if authenticated, otherwise by IP
-        const key = req.auth?.sub ?? req.ip ?? 'unknown';
+        const key = req.auth?.sub ?? req.ip ?? req.socket.remoteAddress ?? 'unknown';
         const now = Date.now();
 
         // Determine role-based multiplier

@@ -32,7 +32,7 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage): Ro
      * Returns: signed attestation on success
      */
     router.post('/v1/federation/auth/verify',
-        rateLimit({ max: 10, windowMs: 60 * 1000 }),
+        rateLimit({ max: 15, windowMs: 60 * 1000 }),
         async (req, res) => {
             const { username, password, requesting_node, timestamp } = req.body ?? {};
 
@@ -119,7 +119,7 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage): Ro
                 home_node: config.nodeId,
                 home_url: config.baseUrl,
                 owner: ghiiRecord.ownerName,
-                scopes: ['memory:read', 'memory:write', 'work:request', 'catalogue:read'],
+                scopes: [],
                 requesting_node,
                 issued_at: now,
                 expires_at: new Date(Date.now() + 3600 * 1000).toISOString(), // 1 hour
@@ -130,76 +130,6 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage): Ro
             const signature = await sign(nodeKey.privateKey, attestationJson);
 
             logger.info(`Federation auth success: ${ghii} verified for node ${requesting_node}`);
-
-            res.json(success(config.nodeId, { ...attestation, signature }));
-        },
-    );
-
-    /**
-     * POST /v1/federation/auth/refresh
-     *
-     * Re-verify a federated session without requiring the password again.
-     * The requesting node sends the GHII and its node ID; this node checks
-     * that the user still exists and the auth consent is still active, then
-     * returns a fresh signed attestation.
-     *
-     * Body: { ghii, requesting_node, timestamp }
-     */
-    router.post('/v1/federation/auth/refresh',
-        rateLimit({ max: 20, windowMs: 60 * 1000 }),
-        async (req, res) => {
-            const { ghii, home_node: _homeNode, requesting_node, timestamp } = req.body ?? {};
-
-            if (!ghii || !requesting_node || !timestamp) {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ghii, requesting_node, and timestamp required'));
-                return;
-            }
-
-            // Validate timestamp freshness
-            const age = Math.abs(Date.now() - new Date(timestamp).getTime());
-            if (isNaN(age) || age > 5 * 60_000) {
-                res.status(400).json(error(config.nodeId, 'INVALID_TIMESTAMP', 'Timestamp too old'));
-                return;
-            }
-
-            // Look up the user
-            const ghiiRecord = await storage.getGHII(ghii);
-            if (!ghiiRecord) {
-                res.status(401).json(error(config.nodeId, 'AUTH_FAILED', 'User not found'));
-                return;
-            }
-
-            // Check auth consent still valid
-            const consents = await storage.listConsents(ghii, { status: 'active' });
-            const hasAuthConsent = consents.some(c => {
-                if (c.scope !== 'auth') return false;
-                if (c.recipient === `node:${requesting_node}`) return true;
-                if (c.recipient === '*') return true;
-                if (c.recipient === 'domain:*') return true;
-                return false;
-            });
-
-            if (!hasAuthConsent) {
-                res.status(403).json(error(config.nodeId, 'NO_AUTH_CONSENT', 'Auth consent revoked'));
-                return;
-            }
-
-            // Issue fresh attestation (no password check -- already authenticated)
-            const nodeKey = await storage.getNodeKey();
-            const attestation = {
-                verified: true,
-                ghii,
-                display_name: ghiiRecord.displayName,
-                home_node: config.nodeId,
-                home_url: config.baseUrl,
-                owner: ghiiRecord.ownerName,
-                scopes: ['memory:read', 'memory:write', 'work:request', 'catalogue:read'],
-                requesting_node,
-                issued_at: new Date().toISOString(),
-                expires_at: new Date(Date.now() + 3600_000).toISOString(),
-            };
-
-            const signature = nodeKey ? await sign(nodeKey.privateKey, JSON.stringify(attestation)) : '';
 
             res.json(success(config.nodeId, { ...attestation, signature }));
         },

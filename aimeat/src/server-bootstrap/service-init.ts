@@ -114,6 +114,8 @@ export async function initializeServices(
         replicateMemory: sp.replicateMemory ?? true,
         allowRouting: sp.allowRouting ?? true,
         peerMode: sp.peerMode || 'federation',
+        allowFederatedAuth: sp.allowFederatedAuth ?? false,
+        federationAuthScopes: sp.federationAuthScopes ?? [],
       });
     }
     if (savedPeers.length > 0) {

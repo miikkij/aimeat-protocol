@@ -172,8 +172,11 @@ export class DirectoryService {
         let lat: number | undefined;
         let lon: number | undefined;
 
-        // Try loading interests from memory
-        const interestsMemory = await this.storage.getMemory(consentAgentGaii, `profile.${username}.interests`);
+        // Try loading interests from memory -- check GHII first, then agent GAII
+        let interestsMemory = await this.storage.getMemory(ghii.ghii, `profile.${username}.interests`);
+        if (!interestsMemory?.value) {
+          interestsMemory = await this.storage.getMemory(consentAgentGaii, `profile.${username}.interests`);
+        }
         if (interestsMemory?.value) {
           if (Array.isArray(interestsMemory.value)) {
             interests = interestsMemory.value as string[];
@@ -187,8 +190,11 @@ export class DirectoryService {
           }
         }
 
-        // Try loading location from memory
-        const locationMemory = await this.storage.getMemory(consentAgentGaii, `profile.${username}.location`);
+        // Try loading location from memory -- check GHII first, then agent GAII
+        let locationMemory = await this.storage.getMemory(ghii.ghii, `profile.${username}.location`);
+        if (!locationMemory?.value) {
+          locationMemory = await this.storage.getMemory(consentAgentGaii, `profile.${username}.location`);
+        }
         if (locationMemory?.value && typeof locationMemory.value === 'object' && locationMemory.value !== null) {
           const loc = locationMemory.value as Record<string, unknown>;
           if (typeof loc.city === 'string') city = loc.city;

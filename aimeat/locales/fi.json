@@ -3269,6 +3269,7 @@
     "fedShareCatalogue": "Jaa katalogi",
     "fedReplicateMemory": "Replikoi muisti",
     "fedAllowRouting": "Salli reititys",
+    "fedAllowAuth": "Salli federaatiokirjautuminen",
     "fedPeerMode": "Vertaistila",
     "fedPeerModeFederation": "Federaatio",
     "fedPeerModePrivate": "Yksityinen P2P",

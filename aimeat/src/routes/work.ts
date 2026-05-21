@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { MailboxNotificationService } from '../services/mailbox-notification.js';
@@ -154,7 +155,7 @@ async function createWorkItem(
       return { error: 'Insufficient morsels for cross-node routing fee (1 morsel)', status: 402, code: 'INSUFFICIENT_MORSELS' };
     }
     await storage.addTransaction({
-      id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      id: `tx-${randomUUID()}`,
       gaii: requesterGaii,
       type: 'routing_fee',
       amount: -1,

@@ -564,7 +564,7 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
     const filename = `${pkg.name}-${pkg.version}.zip`;
     res.set({
       'Content-Type': 'application/zip',
-      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Disposition': `attachment; filename="${filename.replace(/["\\]/g, '_')}"`,
       'Content-Length': String(zip.length),
     });
     res.send(zip);

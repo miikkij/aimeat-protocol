@@ -7,6 +7,7 @@ import { RoleGrantSchema, validateBody } from '../models/schemas.js';
 import { randomBytes } from 'node:crypto';
 import { generateKeyPair, sign } from '../auth/keypair.js';
 import { emitChange } from '../services/event-bus.js';
+import { validateOutboundUrl } from '../utils/url-validator.js';
 
 export function adminMonitoringRouter(
     config: AimeatConfig,
@@ -59,6 +60,13 @@ export function adminMonitoringRouter(
         }
         const joinRole = (role === 'operator' || role === 'contributor') ? role : 'contributor';
         const targetUrl = genesis_url.replace(/\/+$/, '');
+
+        // SSRF validation before outbound fetch
+        const ssrfCheck = await validateOutboundUrl(targetUrl);
+        if (!ssrfCheck.valid) {
+            res.status(400).json(error(config.nodeId, 'INVALID_URL', `URL blocked: ${ssrfCheck.reason}`));
+            return;
+        }
 
         // 1. Discovery
         let targetInfo: { node_id?: string; type?: string; protocol?: string; version?: string | number; capabilities?: string[] };

@@ -122,6 +122,8 @@ export interface AimeatConfig {
   // Federation role
   federationRole: FederationRole;
   genesisUrl: string | null;
+  federationAuthPolicy: 'disabled' | 'all_peers' | 'specific_peers';
+  federationDefaultScopes: string[];
 
   // Consent Layer (Phase 0.3)
   consentEnabled: boolean;
@@ -277,6 +279,7 @@ export interface AimeatConfig {
   extensionMaxMemoryMb: number;
   extensionTimeoutMs: number;
   extensionMaxApiCalls: number;
+  extensionMaxDebitPerCall: number;
   extensionMaxCodeSizeKb: number;
   extensionMaxInstalled: number;
   maxExtensionsPerOwner: number;
@@ -477,6 +480,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
       pre_federation_peer: [],
     },
     federationRole: (process.env.AIMEAT_FEDERATION_ROLE ?? 'standalone') as FederationRole,
+    federationAuthPolicy: (process.env.AIMEAT_FEDERATION_AUTH_POLICY ?? 'disabled') as 'disabled' | 'all_peers' | 'specific_peers',
+    federationDefaultScopes: (process.env.AIMEAT_FEDERATION_DEFAULT_SCOPES ?? 'memory:read,catalogue:read').split(',').filter(Boolean),
     genesisUrl: process.env.AIMEAT_GENESIS_URL ?? null,
     consentEnabled: process.env.AIMEAT_CONSENT_ENABLED !== 'false',
     consentAuditRetentionDays: parseInt(process.env.AIMEAT_CONSENT_AUDIT_RETENTION_DAYS ?? '365', 10),
@@ -594,6 +599,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     extensionMaxMemoryMb: parseInt(process.env.AIMEAT_EXT_MAX_MEMORY_MB ?? '64', 10),
     extensionTimeoutMs: parseInt(process.env.AIMEAT_EXT_TIMEOUT_MS ?? '5000', 10),
     extensionMaxApiCalls: parseInt(process.env.AIMEAT_EXT_MAX_API_CALLS ?? '500', 10),
+    extensionMaxDebitPerCall: parseInt(process.env.AIMEAT_EXT_MAX_DEBIT ?? '100', 10),
     extensionMaxCodeSizeKb: parseInt(process.env.AIMEAT_EXT_MAX_CODE_SIZE_KB ?? '256', 10),
     extensionMaxInstalled: parseInt(process.env.AIMEAT_EXT_MAX_INSTALLED ?? '20', 10),
     maxExtensionsPerOwner: parseInt(process.env.AIMEAT_MAX_EXTENSIONS_PER_OWNER || '10', 10),

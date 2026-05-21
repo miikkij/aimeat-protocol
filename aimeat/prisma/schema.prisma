@@ -721,16 +721,18 @@ model GenesisPeer {
 }
 
 model FederationPeer {
-  nodeId          String   @id @map("_id")
-  url             String
-  publicKey       String   @default("")
-  status          String   @default("pending")
-  addedAt         DateTime @default(now())
-  lastSeen        DateTime @default(now())
-  shareCatalogue  Boolean  @default(true)
-  replicateMemory Boolean  @default(true)
-  allowRouting    Boolean  @default(true)
-  peerMode        String   @default("federation")
+  nodeId               String   @id @map("_id")
+  url                  String
+  publicKey            String   @default("")
+  status               String   @default("pending")
+  addedAt              DateTime @default(now())
+  lastSeen             DateTime @default(now())
+  shareCatalogue       Boolean  @default(true)
+  replicateMemory      Boolean  @default(true)
+  allowRouting         Boolean  @default(true)
+  peerMode             String   @default("federation")
+  allowFederatedAuth   Boolean  @default(false)
+  federationAuthScopes String[] @default([])
 
   @@index([status])
 }

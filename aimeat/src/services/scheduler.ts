@@ -435,7 +435,23 @@ export class Scheduler {
           logger.warn(`[ext:${ext.name}] Email not available (SMTP not configured)`);
           return false;
         }
-        return this.emailService.sendNotification(to, subject, body);
+        // Tier 2: operator-granted unrestricted
+        if (ext.config?.emailPolicy === 'unrestricted') {
+          return this.emailService.sendNotification(to, subject, body);
+        }
+        const ownerGhii = `${ext.installedBy}@${this.config.nodeId}`;
+        const ghiiRec = await this.storage.getGHII(ownerGhii);
+        // Tier 0: self-only (installer's own verified email)
+        if (ghiiRec?.notificationEmail === to && ghiiRec.emailVerifiedAt) {
+          return this.emailService.sendNotification(to, subject, body);
+        }
+        // Tier 1: check consent
+        const consents = await this.storage.listConsents(ownerGhii, { status: 'active' });
+        if (consents.some(c => c.purpose === 'extension_email' && c.dataPattern === `ext:${ext.name}`)) {
+          return this.emailService.sendNotification(to, subject, body);
+        }
+        logger.warn(`[ext:${ext.name}] Scheduled email blocked: no authorization for recipient`);
+        return false;
       },
     };
 

@@ -3269,6 +3269,7 @@
     "fedShareCatalogue": "Share Catalogue",
     "fedReplicateMemory": "Replicate Memory",
     "fedAllowRouting": "Allow Routing",
+    "fedAllowAuth": "Allow Federated Login",
     "fedPeerMode": "Peer Mode",
     "fedPeerModeFederation": "Federation",
     "fedPeerModePrivate": "Private P2P",

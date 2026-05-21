@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, DisputeAuditEntry } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
@@ -279,7 +279,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
                 const credited = await storage.creditBalance(work.providerGaii, remaining);
                 if (credited) {
                     await storage.addTransaction({
-                        id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+                        id: `tx-${randomUUID()}`,
                         gaii: work.providerGaii,
                         type: 'earned',
                         amount: remaining,
@@ -385,7 +385,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
             const credited = await storage.creditBalance(work.providerGaii, to_provider);
             if (credited) {
                 await storage.addTransaction({
-                    id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+                    id: `tx-${randomUUID()}`,
                     gaii: work.providerGaii,
                     type: 'earned',
                     amount: to_provider,
@@ -397,7 +397,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         }
         if (burned > 0) {
             await storage.addTransaction({
-                id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+                id: `tx-${randomUUID()}`,
                 gaii: work.requesterGaii,
                 type: 'burn',
                 amount: -burned,

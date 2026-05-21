@@ -97,6 +97,7 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
     config.devMode = true;
     config.adminPassword = adminPw;
     config.storageProvider = 'memory';
+    config.federationAuthPolicy = 'all_peers';
 
     const { app } = await createServer(config);
     const server = await new Promise<Server>((resolve) => {

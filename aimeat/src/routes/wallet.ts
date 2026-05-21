@@ -12,6 +12,7 @@
  *   v1.0.0 — 2026-03-17 — Simplify to single GHII-based balance (remove dual agent/owner paths)
  */
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, WalletTransaction } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
@@ -160,7 +161,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     await storage.addTransaction({
-      id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      id: `tx-${randomUUID()}`,
       gaii: identity,
       type: 'allowance',
       amount: credited,

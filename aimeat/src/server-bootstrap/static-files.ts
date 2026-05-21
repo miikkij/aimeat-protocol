@@ -25,6 +25,17 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
     join(__dirname, '..', '..', 'public'),       // dev: server-bootstrap/../../public
     join(__dirname, '..', '..', '..', 'public'), // dist: dist/src/server-bootstrap/../../../public
   ];
+  // Security headers applied to ALL responses (API and static)
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    if (config.baseUrl?.startsWith('https://')) {
+      res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    next();
+  });
+
   const publicDir = publicCandidates.find(p => existsSync(p));
   if (publicDir) {
     // Redirect legacy HTML URLs to canonical /v1/ routes
@@ -53,13 +64,6 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
         "object-src 'none'",
         "base-uri 'self'",
       ].join('; '));
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-      res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-      // SECURITY: HSTS — instruct browsers to always use HTTPS
-      if (config.baseUrl?.startsWith('https://')) {
-        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-      }
       next();
     });
 

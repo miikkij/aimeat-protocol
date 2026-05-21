@@ -19,5 +19,6 @@ export interface ModerationRepository {
   listMatchesByProfile(profile: string, opts?: { status?: string; page?: number; perPage?: number }): Promise<MatchRecord[]>;
   updateMatch(id: string, updates: Partial<MatchRecord>): Promise<MatchRecord | null>;
   deleteExpiredMatches(): Promise<number>;
+  deleteMatchesByProfile(profile: string): Promise<number>;
   listAllMatches(limit?: number): Promise<MatchRecord[]>;
 }

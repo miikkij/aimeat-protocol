@@ -341,3 +341,31 @@ export function validateBody<T>(schema: z.ZodType<T>, nodeId: string) {
         next();
     };
 }
+
+// ── GHII Registration & Login (security audit -- public endpoints) ──
+
+export const GhiiRegistrationSchema = z.object({
+    username: z.string().min(1).max(64),
+    display_name: z.string().max(128).optional(),
+    bio: z.string().max(500).optional(),
+    avatar: z.string().max(128).optional(),
+    locale: z.string().max(10).optional(),
+    password: z.string().max(256).optional(),
+});
+
+export const GhiiWebRegistrationSchema = z.object({
+    username: z.string().min(3).max(64),
+    display_name: z.string().max(128).optional(),
+    email: z.string().email().max(256).optional(),
+    locale: z.string().max(10).optional(),
+    city: z.string().max(128).optional(),
+    area: z.string().max(128).optional(),
+    interests: z.array(z.string().max(64)).max(50).optional(),
+});
+
+export const GhiiLoginSchema = z.object({
+    username: z.string().min(1).max(128),
+    password: z.string().min(1).max(256),
+    totp_code: z.string().max(10).optional(),
+    backup_code: z.string().max(32).optional(),
+});

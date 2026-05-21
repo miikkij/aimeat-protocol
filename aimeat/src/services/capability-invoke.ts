@@ -6,6 +6,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord } from '../storage/interface.js';
+import { validateOutboundUrl } from '../utils/url-validator.js';
 
 export interface InvokeResult {
   capability: string;
@@ -70,22 +71,10 @@ export async function invokeCapability(
         throw Object.assign(new Error('Webhook URL not configured'), { statusCode: 500, code: 'NO_WEBHOOK' });
       }
 
-      // Webhook security: validate URL
-      try {
-        const url = new URL(capability.webhookUrl);
-        if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-          throw new Error('only http/https');
-        }
-        const host = url.hostname;
-        if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '0.0.0.0') {
-          throw Object.assign(new Error('Webhook URL cannot target localhost'), { statusCode: 400, code: 'WEBHOOK_LOCALHOST' });
-        }
-        if (host === '169.254.169.254') {
-          throw Object.assign(new Error('Webhook URL cannot target metadata endpoint'), { statusCode: 400, code: 'WEBHOOK_METADATA' });
-        }
-      } catch (urlErr: any) {
-        if (urlErr.statusCode) throw urlErr;
-        throw Object.assign(new Error('Invalid webhook URL'), { statusCode: 400, code: 'INVALID_WEBHOOK' });
+      // Webhook security: validate URL (includes DNS resolution check)
+      const ssrfCheck = await validateOutboundUrl(capability.webhookUrl);
+      if (!ssrfCheck.valid) {
+        throw Object.assign(new Error(`Webhook URL blocked: ${ssrfCheck.reason}`), { statusCode: 400, code: 'INVALID_WEBHOOK' });
       }
 
       const controller = new AbortController();

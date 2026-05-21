@@ -354,6 +354,25 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
 
   // POST /v1/auth/refresh
   router.post('/v1/auth/refresh', requireAuth(), async (req, res) => {
+    // Re-read roles from storage to prevent stale privilege persistence
+    const ownerRecord = await storage.getOwner(req.auth!.owner);
+    if (!ownerRecord) {
+      res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Owner not found'));
+      return;
+    }
+
+    let freshRoles: string[];
+    if (req.auth!.roles.includes('agent') && !req.auth!.roles.includes('owner')) {
+      const agent = await storage.getAgent(req.auth!.sub);
+      if (!agent) {
+        res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Agent no longer active'));
+        return;
+      }
+      freshRoles = ['agent'];
+    } else {
+      freshRoles = ownerRecord.roles ?? ['owner'];
+    }
+
     // P3-7: Create new session record for refreshed token
     const refreshSessionId = generateSessionId();
     const refreshNow = new Date();
@@ -363,7 +382,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       sub: req.auth!.sub,
       owner: req.auth!.owner,
       node: config.nodeId,
-      roles: req.auth!.roles,
+      roles: freshRoles,
     }, config.jwtTtlSeconds, refreshSessionId);
 
     await storage.createSession({

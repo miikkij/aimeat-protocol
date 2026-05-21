@@ -111,6 +111,13 @@ export function findMatchingConsents(db: Database.Database, ownerGaii: string, m
   return results;
 }
 
+export function expireStaleConsents(db: Database.Database, before: string): number {
+  const result = db.prepare(
+    `UPDATE consents SET status = 'expired' WHERE status = 'active' AND expires IS NOT NULL AND expires < ?`
+  ).run(before);
+  return result.changes;
+}
+
 // ── Consent Audit ──
 
 export function addConsentAuditEntry(db: Database.Database, entry: ConsentAuditEntry): ConsentAuditEntry {

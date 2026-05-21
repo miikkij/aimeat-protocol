@@ -8,6 +8,7 @@ import { emitChange } from '../services/event-bus.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { randomBytes } from 'node:crypto';
+import { validateOutboundUrl } from '../utils/url-validator.js';
 
 /**
  * App Catalog routes — versioned apps with manifest and search.
@@ -70,6 +71,8 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
             const peerResults = await Promise.allSettled(
                 activePeers.map(async (peer) => {
+                    const ssrfCheck = await validateOutboundUrl(peer.url);
+                    if (!ssrfCheck.valid) return [];
                     const resp = await fetch(`${peer.url}/v1/apps?${qs}`, {
                         signal: AbortSignal.timeout(5_000),
                     });
@@ -217,7 +220,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         if (mode === 'inline') {
             res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*; frame-ancestors 'self'");
         } else {
-            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.setHeader('Content-Disposition', `attachment; filename="${filename.replace(/["\\]/g, '_')}"`);
         }
         res.setHeader('X-Content-Type-Options', 'nosniff');
 

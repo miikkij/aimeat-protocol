@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord, ExtensionInstanceRecord, ScheduledJobRecord } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { executeExtensionAction } from '../services/extension-runtime.js';
@@ -11,6 +11,7 @@ import type { Scheduler } from '../services/scheduler.js';
 import { parse as parseYaml } from 'yaml';
 import { logger } from '../utils/logger.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { validateOutboundUrl } from '../utils/url-validator.js';
 
 export function extensionsRouter(config: AimeatConfig, storage: Storage, scheduler?: Scheduler, emailService?: import('../services/email.js').EmailService): Router {
   const router = Router();
@@ -248,7 +249,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   });
 
   // ── GET /v1/extensions/:name — Get extension detail ────────────
-  router.get('/v1/extensions/:name', async (req, res) => {
+  router.get('/v1/extensions/:name', optionalAuth(), async (req, res) => {
     try {
       const name = req.params.name as string;
       const ext = await storage.getExtension(name);
@@ -257,8 +258,13 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         return;
       }
 
-      // ?full=true includes scriptContent (operator or localhost)
-      const includeScripts = req.query.full === 'true';
+      // ?full=true includes scriptContent -- requires authenticated owner/operator
+      const wantFull = req.query.full === 'true';
+      if (wantFull && (!req.auth || req.auth.anonymous || (!req.auth.roles.includes('owner') && !req.auth.roles.includes('operator')))) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Script content requires authentication'));
+        return;
+      }
+      const includeScripts = wantFull;
 
       res.json(success(config.nodeId, {
         extension: {
@@ -914,6 +920,8 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
           },
         },
         fetch: async (url, opts) => {
+          const ssrfCheck = await validateOutboundUrl(url);
+          if (!ssrfCheck.valid) throw new Error(`Fetch blocked: ${ssrfCheck.reason}`);
           const resp = await fetch(url, {
             method: opts?.method || 'GET',
             headers: opts?.headers,
@@ -959,10 +967,13 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         },
         wallet: {
           consume: async (amount: number, reason: string) => {
+            if (amount > config.extensionMaxDebitPerCall) {
+              throw new Error(`DEBIT_LIMIT: max ${config.extensionMaxDebitPerCall} morsels per call`);
+            }
             const debited = await storage.debitBalance(callerGaii, amount);
             if (!debited) return { success: false, error: 'Insufficient balance' };
             await storage.addTransaction({
-              id: `ext-tx-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              id: `ext-tx-${randomUUID()}`,
               gaii: callerGaii,
               type: 'extension_consume',
               amount: -amount,
@@ -1010,25 +1021,41 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         },
         notify: async (message: string, opts?: { title?: string; priority?: string; channel?: string }) => {
           const key = `notifications.${req.auth!.owner}`;
-          const existing = await storage.getMemory(req.auth!.sub, key);
+          const existing = await storage.getMemory(callerGaii, key);
           const list = Array.isArray(existing?.value) ? (existing.value as unknown[]) : [];
           list.push({ id: randomUUID(), message, title: opts?.title || ext.name, priority: opts?.priority || 'normal', channel: opts?.channel || 'extension', source: ext.name, read: false, createdAt: new Date().toISOString() });
           const trimmed = list.slice(-100);
-          await storage.setMemory({ key, ownerGaii: req.auth!.sub, value: trimmed, visibility: 'private', tags: ['notifications'], ttlHours: null, version: (existing?.version || 0) + 1, createdAt: existing?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() });
+          await storage.setMemory({ key, ownerGaii: callerGaii, value: trimmed, visibility: 'private', tags: ['notifications'], ttlHours: null, version: (existing?.version || 0) + 1, createdAt: existing?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() });
           return true;
         },
         email: async (to: string, subject: string, body: string) => {
           if (!emailService?.enabled) { logger.warn(`[ext:${ext.name}] Email not available (SMTP not configured)`); return false; }
-          return emailService.sendNotification(to, subject, body);
+          // Tier 2: operator-granted unrestricted
+          if (ext.config?.emailPolicy === 'unrestricted') {
+            return emailService.sendNotification(to, subject, body);
+          }
+          const callerGhiiId = `${req.auth!.owner}@${config.nodeId}`;
+          const ghiiRec = await storage.getGHII(callerGhiiId);
+          // Tier 0: self-only (caller's own verified email)
+          if (ghiiRec?.notificationEmail === to && ghiiRec.emailVerifiedAt) {
+            return emailService.sendNotification(to, subject, body);
+          }
+          // Tier 1: check consent for extension_email
+          const consents = await storage.listConsents(callerGhiiId, { status: 'active' });
+          if (consents.some(c => c.purpose === 'extension_email' && c.dataPattern === `ext:${ext.name}`)) {
+            return emailService.sendNotification(to, subject, body);
+          }
+          logger.warn(`[ext:${ext.name}] Email blocked: no authorization for recipient`);
+          return false;
         },
       };
 
       // Execute the action in the sandbox
-      // Use the higher of stored vs config limits so admin can raise limits without reinstalling
+      // Cap at system maximum; floor at minimum useful value
       const limits = {
-        memoryMb: Math.max(ext.limits.memoryMb, config.extensionMaxMemoryMb),
-        timeoutMs: Math.max(ext.limits.timeoutMs, config.extensionTimeoutMs),
-        maxApiCalls: Math.max(ext.limits.maxApiCalls, config.extensionMaxApiCalls),
+        memoryMb: Math.min(Math.max(ext.limits.memoryMb, 16), config.extensionMaxMemoryMb),
+        timeoutMs: Math.min(Math.max(ext.limits.timeoutMs, 1000), config.extensionTimeoutMs),
+        maxApiCalls: Math.min(Math.max(ext.limits.maxApiCalls, 10), config.extensionMaxApiCalls),
       };
       const result = await executeExtensionAction(action.scriptContent, ctx, req.body as Record<string, unknown>, limits);
 
@@ -1136,6 +1163,8 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
           },
         },
         fetch: async (url, opts) => {
+          const ssrfCheck = await validateOutboundUrl(url);
+          if (!ssrfCheck.valid) throw new Error(`Fetch blocked: ${ssrfCheck.reason}`);
           const resp = await fetch(url, {
             method: opts?.method || 'GET',
             headers: opts?.headers,
@@ -1185,7 +1214,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
             const debited = await storage.debitBalance(callerGaii, amount);
             if (!debited) return { success: false, error: 'Insufficient balance' };
             await storage.addTransaction({
-              id: `ext-tx-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              id: `ext-tx-${randomUUID()}`,
               gaii: callerGaii,
               type: 'extension_consume',
               amount: -amount,
@@ -1235,25 +1264,41 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         },
         notify: async (message: string, opts?: { title?: string; priority?: string; channel?: string }) => {
           const key = `notifications.${req.auth!.owner}`;
-          const existing = await storage.getMemory(req.auth!.sub, key);
+          const existing = await storage.getMemory(callerGaii, key);
           const list = Array.isArray(existing?.value) ? (existing.value as unknown[]) : [];
           list.push({ id: randomUUID(), message, title: opts?.title || ext.name, priority: opts?.priority || 'normal', channel: opts?.channel || 'extension', source: ext.name, read: false, createdAt: new Date().toISOString() });
           const trimmed = list.slice(-100);
-          await storage.setMemory({ key, ownerGaii: req.auth!.sub, value: trimmed, visibility: 'private', tags: ['notifications'], ttlHours: null, version: (existing?.version || 0) + 1, createdAt: existing?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() });
+          await storage.setMemory({ key, ownerGaii: callerGaii, value: trimmed, visibility: 'private', tags: ['notifications'], ttlHours: null, version: (existing?.version || 0) + 1, createdAt: existing?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() });
           return true;
         },
         email: async (to: string, subject: string, body: string) => {
           if (!emailService?.enabled) { logger.warn(`[ext:${ext.name}] Email not available (SMTP not configured)`); return false; }
-          return emailService.sendNotification(to, subject, body);
+          // Tier 2: operator-granted unrestricted
+          if (ext.config?.emailPolicy === 'unrestricted') {
+            return emailService.sendNotification(to, subject, body);
+          }
+          const callerGhiiId = `${req.auth!.owner}@${config.nodeId}`;
+          const ghiiRec = await storage.getGHII(callerGhiiId);
+          // Tier 0: self-only (caller's own verified email)
+          if (ghiiRec?.notificationEmail === to && ghiiRec.emailVerifiedAt) {
+            return emailService.sendNotification(to, subject, body);
+          }
+          // Tier 1: check consent for extension_email
+          const consents = await storage.listConsents(callerGhiiId, { status: 'active' });
+          if (consents.some(c => c.purpose === 'extension_email' && c.dataPattern === `ext:${ext.name}`)) {
+            return emailService.sendNotification(to, subject, body);
+          }
+          logger.warn(`[ext:${ext.name}] Email blocked: no authorization for recipient`);
+          return false;
         },
       };
 
       // Execute the action in the sandbox
-      // Use the higher of stored vs config limits so admin can raise limits without reinstalling
+      // Cap at system maximum; floor at minimum useful value
       const limits = {
-        memoryMb: Math.max(ext.limits.memoryMb, config.extensionMaxMemoryMb),
-        timeoutMs: Math.max(ext.limits.timeoutMs, config.extensionTimeoutMs),
-        maxApiCalls: Math.max(ext.limits.maxApiCalls, config.extensionMaxApiCalls),
+        memoryMb: Math.min(Math.max(ext.limits.memoryMb, 16), config.extensionMaxMemoryMb),
+        timeoutMs: Math.min(Math.max(ext.limits.timeoutMs, 1000), config.extensionTimeoutMs),
+        maxApiCalls: Math.min(Math.max(ext.limits.maxApiCalls, 10), config.extensionMaxApiCalls),
       };
       const result = await executeExtensionAction(action.scriptContent, ctx, req.body as Record<string, unknown>, limits);
 

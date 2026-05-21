@@ -62,7 +62,7 @@
 | L1 | `safeAddColumn` uses string interpolation (not exploitable, all hardcoded) | `src/storage/providers/sqlite/schema.ts:1176` | **Track** |
 | L2 | Content-Disposition header interpolation (validated at write time) | `src/routes/apps.ts:220`, `src/routes/packages.ts:567` | **Fix approved** |
 | L3 | Agent JWT TTL defaults to 90 days | `src/config.ts:429` | **Track (document trade-off)** |
-| L4 | SSE broadcasts all change events to all authenticated users | `src/routes/sse.ts:71-73` | **Fix approved** |
+| L4 | SSE broadcasts all change events to all authenticated users | `src/routes/sse.ts:71-73` | **Deferred (events are domain-level, no user context to filter)** |
 | L5 | Interests stored under fabricated agent GAII during web registration | `src/routes/ghii.ts:625-636` | **Fix approved** |
 | L6 | Extension notifications use `req.auth!.sub` instead of `resolveIdentity()` | `src/routes/extensions.ts:1013,1017,1238,1242` | **Fix approved** |
 | L7 | WebSocket accepts JWT via query parameter (unavoidable for WS) | `src/index.ts:489-491` | **Track (document trade-off)** |

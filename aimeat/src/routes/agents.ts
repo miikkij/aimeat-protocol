@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -856,7 +856,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
     await storage.addTransaction({
-      id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      id: `tx-${randomUUID()}`,
       gaii,
       type: 'spent',
       amount: -PORTING_FEE,

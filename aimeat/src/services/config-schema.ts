@@ -198,6 +198,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'keyCacheRefreshMinutes', dotPath: 'federation.key_cache_refresh_minutes', envVar: 'AIMEAT_KEY_CACHE_REFRESH_MINUTES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Minutes between key cache refreshes', range: '1-60' },
   { key: 'federationRole', dotPath: 'federation.role', envVar: 'AIMEAT_FEDERATION_ROLE', type: 'string', validate: v => ['operator', 'contributor', 'standalone'].includes(v as string), immutable: false, description: 'Federation role: operator, contributor, or standalone' },
   { key: 'genesisUrl', dotPath: 'federation.genesis_url', envVar: 'AIMEAT_GENESIS_URL', type: 'string', validate: () => true, immutable: false, description: 'Genesis node URL for federation' },
+  { key: 'federationAuthPolicy', dotPath: 'federation.auth_policy', envVar: 'AIMEAT_FEDERATION_AUTH_POLICY', type: 'string', validate: v => ['disabled', 'all_peers', 'specific_peers'].includes(v as string), immutable: false, description: 'Federation auth policy: disabled, all_peers, or specific_peers' },
+  { key: 'federationDefaultScopes', dotPath: 'federation.default_scopes', envVar: 'AIMEAT_FEDERATION_DEFAULT_SCOPES', type: 'string', validate: () => true, immutable: false, description: 'Default scopes for federated users (comma-separated)' },
 
   // ── Quotas (mutable, additional) ──
   { key: 'memoryMaxValueSizeKb', dotPath: 'quota.memory_max_value_size_kb', envVar: 'AIMEAT_MEMORY_MAX_VALUE_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max memory value size in KB', range: '1-10240' },

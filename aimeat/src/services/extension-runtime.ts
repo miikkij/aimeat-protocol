@@ -12,6 +12,7 @@
  */
 import { getQuickJS, shouldInterruptAfterDeadline } from 'quickjs-emscripten';
 import type { QuickJSContext, QuickJSRuntime, QuickJSHandle } from 'quickjs-emscripten';
+import { validateOutboundUrl } from '../utils/url-validator.js';
 
 // ── Public interfaces (UNCHANGED) ──────────────────────────
 
@@ -291,6 +292,10 @@ export async function executeExtensionAction(
         // ── Fetch API ─────────────────────────────────────────
         registerAsyncHostFn(vm, '__fetch',
             async (url, optsJson) => {
+                const ssrfCheck = await validateOutboundUrl(url);
+                if (!ssrfCheck.valid) {
+                    throw new Error(`Fetch blocked: ${ssrfCheck.reason}`);
+                }
                 const opts = JSON.parse(optsJson || '{}') as {
                     method?: string; headers?: Record<string, string>; body?: string;
                 };

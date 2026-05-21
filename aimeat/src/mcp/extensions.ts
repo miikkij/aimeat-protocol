@@ -217,7 +217,7 @@ export function registerExtensionsTools(
                         const debited = await storage.debitBalance(agentGaii, amount);
                         if (!debited) return { success: false, error: 'Insufficient balance' };
                         await storage.addTransaction({
-                            id: `ext-tx-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                            id: `ext-tx-${randomUUID()}`,
                             gaii: agentGaii,
                             type: 'extension_consume',
                             amount: -amount,

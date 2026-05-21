@@ -1206,4 +1206,12 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('agents', 'federate', 'INTEGER NOT NULL DEFAULT 0');
   safeAddColumn('boards', 'federate', 'INTEGER NOT NULL DEFAULT 0');
   safeAddColumn('storage_files', 'federate', 'INTEGER NOT NULL DEFAULT 0');
+
+  // Security audit — per-account password brute-force protection
+  safeAddColumn('ghiis', 'passwordFailedAttempts', 'INTEGER DEFAULT 0');
+  safeAddColumn('ghiis', 'passwordLockedUntil', 'TEXT');
+
+  // Security audit — per-peer federation auth policy
+  safeAddColumn('federation_peers', 'allowFederatedAuth', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('federation_peers', 'federationAuthScopes', "TEXT NOT NULL DEFAULT ''");
 }

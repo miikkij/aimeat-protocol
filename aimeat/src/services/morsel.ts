@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, WorkRecord } from '../storage/interface.js';
 
@@ -36,7 +37,7 @@ export async function holdEscrow(
     if (!debited) return false;
 
     await storage.addTransaction({
-        id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+        id: `tx-${randomUUID()}`,
         gaii: requesterGaii,
         type: 'escrow_hold',
         amount: -total,
@@ -77,7 +78,7 @@ export async function settlePayment(
     const credited = await storage.creditBalance(work.providerGaii, basePrice);
     if (credited) {
         await storage.addTransaction({
-            id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+            id: `tx-${randomUUID()}`,
             gaii: work.providerGaii,
             type: 'earned',
             amount: basePrice,
@@ -90,7 +91,7 @@ export async function settlePayment(
     // Log burn transaction
     if (burned > 0) {
         await storage.addTransaction({
-            id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+            id: `tx-${randomUUID()}`,
             gaii: work.requesterGaii,
             type: 'burn',
             amount: -burned,
@@ -102,7 +103,7 @@ export async function settlePayment(
     // Log network fee
     if (networkFee > 0) {
         await storage.addTransaction({
-            id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+            id: `tx-${randomUUID()}`,
             gaii: work.requesterGaii,
             type: 'network_fee',
             amount: -networkFee,
@@ -117,7 +118,7 @@ export async function settlePayment(
         for (const relayNodeId of relayPath) {
             if (perRelay > 0) {
                 await storage.addTransaction({
-                    id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+                    id: `tx-${randomUUID()}`,
                     gaii: work.requesterGaii,
                     type: 'relay_fee',
                     amount: -perRelay,
@@ -130,7 +131,7 @@ export async function settlePayment(
     } else if (relayShare > 0) {
         // No relays in path — relay share stays on provider node (RFC fallback)
         await storage.addTransaction({
-            id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+            id: `tx-${randomUUID()}`,
             gaii: work.requesterGaii,
             type: 'relay_fee_unallocated',
             amount: -relayShare,
@@ -142,7 +143,7 @@ export async function settlePayment(
     // Log registry share
     if (registryShare > 0) {
         await storage.addTransaction({
-            id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+            id: `tx-${randomUUID()}`,
             gaii: work.requesterGaii,
             type: 'registry_fee',
             amount: -registryShare,
@@ -171,7 +172,7 @@ export async function returnEscrow(
     const credited = await storage.creditBalance(work.requesterGaii, returnAmount);
     if (credited) {
         await storage.addTransaction({
-            id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+            id: `tx-${randomUUID()}`,
             gaii: work.requesterGaii,
             type: 'escrow_return',
             amount: returnAmount,
@@ -195,7 +196,7 @@ export async function applyDailyAllowance(
     if (credited <= 0) return 0;
 
     await storage.addTransaction({
-        id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+        id: `tx-${randomUUID()}`,
         gaii,
         type: 'allowance',
         amount: credited,

@@ -29,6 +29,8 @@ export interface PeerInfo {
     replicateMemory: boolean;
     allowRouting: boolean;
     peerMode: 'federation' | 'private';
+    allowFederatedAuth: boolean;
+    federationAuthScopes: string[];
 }
 
 /**

@@ -3,7 +3,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { generateKeyPair, sign } from '../auth/keypair.js';
 import { validateOwnerName, buildGAII } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
@@ -25,6 +25,8 @@ import { adminAgentsRouter } from './admin-agents.js';
 import { adminMaintenanceRouter } from './admin-maintenance.js';
 import { adminEconomyRouter } from './admin-economy.js';
 import { adminMemoryRouter } from './admin-memory.js';
+import { validatePasswordStrength } from '../utils/password-validation.js';
+import { rateLimit } from '../middleware/rate-limit.js';
 
 export function adminRouter(
     config: AimeatConfig,
@@ -37,6 +39,14 @@ export function adminRouter(
     consulService?: ConsulConfigService | null,
 ): Router {
     const router = Router();
+
+    function verifyAdminPassword(input: string, expected: string): boolean {
+        if (!expected || !input) return false;
+        const a = Buffer.from(input);
+        const b = Buffer.from(expected);
+        if (a.length !== b.length) return false;
+        return timingSafeEqual(a, b);
+    }
 
     // ── Admin session management (in-memory, ephemeral) ──
     const adminSessions = new Map<string, { createdAt: number }>();
@@ -84,7 +94,7 @@ export function adminRouter(
 
         // Accept password via header only (NOT query param — password must not appear in URLs)
         const pw = (req.headers['x-admin-password'] as string) ?? '';
-        if (!config.adminPassword || pw !== config.adminPassword) {
+        if (!config.adminPassword || !verifyAdminPassword(pw, config.adminPassword)) {
             res.status(401).type('text/html').send(injectCspNonce(ADMIN_LOGIN_HTML, res));
             return false;
         }
@@ -99,9 +109,10 @@ export function adminRouter(
     }
 
     // POST /v1/admin/setup/auth — authenticate with admin password, get session cookie
-    router.post('/v1/admin/setup/auth', (req, res) => {
+    const adminAuthLimit = rateLimit({ max: 5, windowMs: 60_000 });
+    router.post('/v1/admin/setup/auth', adminAuthLimit, (req, res) => {
         const pw = (req.headers['x-admin-password'] as string) ?? req.body?.admin_password ?? '';
-        if (!config.adminPassword || pw !== config.adminPassword) {
+        if (!config.adminPassword || !verifyAdminPassword(pw, config.adminPassword)) {
             res.status(401).json({ ok: false, error: 'Invalid admin password' });
             return;
         }
@@ -127,7 +138,7 @@ export function adminRouter(
         // Check admin session (cookie or header) or password via header (NOT query param)
         const sessionId = getCookie(req, 'admin_session') ?? (req.headers['x-admin-session'] as string);
         const pw = (req.headers['x-admin-password'] as string) ?? '';
-        if (!(sessionId && validateAdminSession(sessionId)) && (!config.adminPassword || pw !== config.adminPassword)) {
+        if (!(sessionId && validateAdminSession(sessionId)) && (!config.adminPassword || !verifyAdminPassword(pw, config.adminPassword))) {
             res.status(401).json({ ok: false, error: 'Invalid admin password' });
             return;
         }
@@ -170,9 +181,15 @@ export function adminRouter(
         const now = new Date().toISOString();
         const existingGhii = await storage.getGHIIByOwner(name);
         if (!existingGhii) {
-            const passwordHash = (password && typeof password === 'string' && password.length >= 4)
-                ? await hashPassword(password)
-                : undefined;
+            let passwordHash: string | undefined;
+            if (password && typeof password === 'string') {
+                const pwErr = validatePasswordStrength(password);
+                if (pwErr) {
+                    res.status(400).json({ ok: false, error: pwErr });
+                    return;
+                }
+                passwordHash = await hashPassword(password);
+            }
             if (passwordHash) hasPassword = true;
             try {
                 await storage.createGHII({
@@ -190,7 +207,7 @@ export function adminRouter(
                 });
                 // Record welcome bonus transaction
                 await storage.addTransaction({
-                    id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+                    id: `tx-${randomUUID()}`,
                     gaii: ghii,
                     type: 'welcome_bonus',
                     amount: config.welcomeBonus,
@@ -210,7 +227,7 @@ export function adminRouter(
         // Check admin session (cookie or header) or password via header (NOT query param)
         const sessionId = getCookie(req, 'admin_session') ?? (req.headers['x-admin-session'] as string);
         const pw = (req.headers['x-admin-password'] as string) ?? '';
-        if (!(sessionId && validateAdminSession(sessionId)) && (!config.adminPassword || pw !== config.adminPassword)) {
+        if (!(sessionId && validateAdminSession(sessionId)) && (!config.adminPassword || !verifyAdminPassword(pw, config.adminPassword))) {
             res.status(401).json({ ok: false, error: 'Invalid admin password' });
             return;
         }
@@ -260,7 +277,7 @@ export function adminRouter(
         // Check admin session or password via header (NOT query param)
         const sessionId = getCookie(req, 'admin_session') ?? (req.headers['x-admin-session'] as string);
         const pw = (req.headers['x-admin-password'] as string) ?? '';
-        if (!(sessionId && validateAdminSession(sessionId)) && (!config.adminPassword || pw !== config.adminPassword)) {
+        if (!(sessionId && validateAdminSession(sessionId)) && (!config.adminPassword || !verifyAdminPassword(pw, config.adminPassword))) {
             res.status(401).json({ ok: false, error: 'Invalid admin password' });
             return;
         }
@@ -547,7 +564,7 @@ export function adminRouter(
             // Check admin password
             const sessionId = getCookie(req, 'admin_session') ?? (req.headers['x-admin-session'] as string);
             const pw = (req.headers['x-admin-password'] as string) ?? '';
-            if (!(sessionId && validateAdminSession(sessionId)) && (!config.adminPassword || pw !== config.adminPassword)) {
+            if (!(sessionId && validateAdminSession(sessionId)) && (!config.adminPassword || !verifyAdminPassword(pw, config.adminPassword))) {
                 res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Requires operator JWT or admin password'));
                 return;
             }

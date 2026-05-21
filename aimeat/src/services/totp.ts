@@ -52,7 +52,7 @@ export async function setupTotp(
   const backupCodes: string[] = [];
   const hashedBackupCodes: string[] = [];
   for (let i = 0; i < config.backupCodeCount; i++) {
-    const code = randomBytes(4).toString('hex');
+    const code = randomBytes(6).toString('hex');
     backupCodes.push(code);
     hashedBackupCodes.push(createHash('sha256').update(code).digest('hex'));
   }
@@ -140,7 +140,7 @@ export function generateBackupCodes(count: number): { plain: string[]; hashed: s
   const plain: string[] = [];
   const hashed: string[] = [];
   for (let i = 0; i < count; i++) {
-    const code = randomBytes(4).toString('hex');
+    const code = randomBytes(6).toString('hex');
     plain.push(code);
     hashed.push(createHash('sha256').update(code).digest('hex'));
   }

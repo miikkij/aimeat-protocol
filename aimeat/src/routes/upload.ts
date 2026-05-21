@@ -94,8 +94,8 @@ export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
                     res.status(400).json({ success: false, error: 'INVALID_TYPE', message: `Unknown upload type` });
             }
         } catch (err) {
-            logger.error('Upload processing failed', { error: (err as Error).message, type: verified.utype });
-            res.status(500).json({ success: false, error: 'PROCESSING_FAILED', message: (err as Error).message });
+            logger.error('Upload processing failed', { error: (err as Error).message, stack: (err as Error).stack, type: verified.utype });
+            res.status(500).json({ success: false, error: 'PROCESSING_FAILED', message: 'Upload processing failed' });
         }
     });
 

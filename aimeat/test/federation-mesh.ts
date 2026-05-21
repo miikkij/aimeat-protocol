@@ -730,56 +730,6 @@ await test('Data consent does not grant auth access (scope isolation)', async ()
     assert(body.error?.code === 'NO_AUTH_CONSENT', `error code: ${body.error?.code}`);
 });
 
-// ─── Test: Auth Refresh ───
-console.log('\nAuth Refresh');
-
-// Construct the GHII for the federation login user (matches what the server builds)
-const fedLoginGhii = `${fedLoginUser.toLowerCase().trim()}@${NODE_ID}`;
-
-await test('Auth refresh succeeds with valid consent', async () => {
-    const timestamp = new Date().toISOString();
-    const { status, body } = await json('/v1/federation/auth/refresh', {
-        method: 'POST',
-        body: JSON.stringify({
-            ghii: fedLoginGhii,
-            requesting_node: 'test-remote-node',
-            timestamp,
-        }),
-    });
-    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
-    assert(body.ok === true, 'ok');
-    assert(body.data.verified === true, `verified: ${body.data.verified}`);
-    assert(typeof body.data.ghii === 'string' && body.data.ghii.includes(fedLoginUser), `ghii: ${body.data.ghii}`);
-    assert(typeof body.data.signature === 'string' && body.data.signature.length > 0, 'signature exists');
-});
-
-await test('Auth refresh fails without consent (unauthorized node)', async () => {
-    const timestamp = new Date().toISOString();
-    const { status, body } = await json('/v1/federation/auth/refresh', {
-        method: 'POST',
-        body: JSON.stringify({
-            ghii: fedLoginGhii,
-            requesting_node: 'unauthorized-node',
-            timestamp,
-        }),
-    });
-    assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
-    assert(body.error?.code === 'NO_AUTH_CONSENT', `error code: ${body.error?.code}`);
-});
-
-await test('Auth refresh fails for nonexistent user', async () => {
-    const timestamp = new Date().toISOString();
-    const { status, body } = await json('/v1/federation/auth/refresh', {
-        method: 'POST',
-        body: JSON.stringify({
-            ghii: `nonexistent@${NODE_ID}`,
-            requesting_node: 'test-remote-node',
-            timestamp,
-        }),
-    });
-    assert(status === 401, `expected 401, got ${status}: ${JSON.stringify(body)}`);
-});
-
 // ─── Test: Wildcard Auth Consent ───
 console.log('\nWildcard Auth Consent');
 
@@ -801,19 +751,18 @@ await test('Wildcard auth consent grants access to any node', async () => {
     assert(consentBody.ok === true, 'wildcard consent created');
     wildcardConsentId = consentBody.data?.id || consentBody.data?.consent_id || '';
 
-    // Verify via auth/refresh (not auth/verify, which has a tight 10/min rate limit
-    // and is exhausted by the preceding tests). The refresh endpoint checks the same
-    // consent logic, so a wildcard '*' consent should let any node through.
+    // Verify via auth/verify -- wildcard '*' consent should let any node through
     const timestamp = new Date().toISOString();
-    const { status, body } = await json('/v1/federation/auth/refresh', {
+    const { status, body } = await json('/v1/federation/auth/verify', {
         method: 'POST',
         body: JSON.stringify({
-            ghii: fedLoginGhii,
+            username: fedLoginUser,
+            password: fedLoginPassword,
             requesting_node: 'random-new-node',
             timestamp,
         }),
     });
-    assert(status === 200, `wildcard refresh status ${status}: ${JSON.stringify(body)}`);
+    assert(status === 200, `wildcard verify status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
     assert(body.data.verified === true, 'verified via wildcard consent');
 

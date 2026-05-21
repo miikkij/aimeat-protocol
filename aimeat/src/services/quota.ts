@@ -6,6 +6,7 @@
  * Micro-memory:  default 500 KB total per agent (hard limit)
  */
 
+import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord, MicroMemoryRecord } from '../storage/interface.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
@@ -176,7 +177,7 @@ export async function chargeOverage(
     // Atomic debit — may go negative for overage charges (intentional)
     await storage.debitBalance(gaii, morsels);
     await storage.addTransaction({
-        id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+        id: `tx-${randomUUID()}`,
         gaii,
         type,
         amount: -morsels,

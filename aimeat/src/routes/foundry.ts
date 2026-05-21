@@ -615,8 +615,9 @@ export function foundryRouter(config: AimeatConfig, storage: Storage): Router {
     requireAuth(),
     requireRole('owner'),
     async (req, res) => {
-      // Remove CSP for test pages — AI-generated code may need eval()
-      res.removeHeader('Content-Security-Policy');
+      // Relaxed CSP for test pages -- AI-generated code may need eval()
+      res.setHeader('Content-Security-Policy',
+        "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'self'");
       const projectId = req.params['projectId'] as string;
       const componentId = req.params['componentId'] as string;
       const token = (req.headers.authorization ?? '').replace('Bearer ', '');

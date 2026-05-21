@@ -358,6 +358,8 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
                 replicateMemory: true,
                 allowRouting: true,
                 peerMode: 'federation',
+                allowFederatedAuth: false,
+                federationAuthScopes: [],
             };
             peers.set(peerInfo.nodeId, peerInfo);
             await storage.saveFederationPeer(peerInfo);
@@ -503,6 +505,8 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
             replicateMemory: true,
             allowRouting: true,
             peerMode: 'federation',
+            allowFederatedAuth: false,
+            federationAuthScopes: [],
         };
         peers.set(node_id, peerInfo);
         await storage.saveFederationPeer(peerInfo);
@@ -529,7 +533,7 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
             return;
         }
 
-        const { url, public_key, status, share_catalogue, replicate_memory, allow_routing, peer_mode } = req.body ?? {};
+        const { url, public_key, status, share_catalogue, replicate_memory, allow_routing, peer_mode, allow_federated_auth, federation_auth_scopes } = req.body ?? {};
         if (url) peer.url = url;
         if (public_key) peer.publicKey = public_key;
         if (status) peer.status = status;
@@ -537,6 +541,8 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
         if (typeof replicate_memory === 'boolean') peer.replicateMemory = replicate_memory;
         if (typeof allow_routing === 'boolean') peer.allowRouting = allow_routing;
         if (peer_mode === 'federation' || peer_mode === 'private') peer.peerMode = peer_mode;
+        if (typeof allow_federated_auth === 'boolean') peer.allowFederatedAuth = allow_federated_auth;
+        if (Array.isArray(federation_auth_scopes)) peer.federationAuthScopes = federation_auth_scopes;
         await storage.saveFederationPeer(peer);
 
         res.json(success(config.nodeId, {
@@ -547,6 +553,8 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
             replicate_memory: peer.replicateMemory,
             allow_routing: peer.allowRouting,
             peer_mode: peer.peerMode,
+            allow_federated_auth: peer.allowFederatedAuth,
+            federation_auth_scopes: peer.federationAuthScopes,
             updated: true,
         }));
         emitChange('federation');
@@ -755,6 +763,8 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
                     replicateMemory: true,
                     allowRouting: true,
                     peerMode: 'federation',
+                    allowFederatedAuth: false,
+                    federationAuthScopes: [],
                 };
                 peers.set(node_id, newPeer);
                 await storage.saveFederationPeer(newPeer);

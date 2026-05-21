@@ -102,6 +102,7 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_DEFAULT_AGENT_SCOPES: process.env.AIMEAT_DEFAULT_AGENT_SCOPES ?? '*',
         AIMEAT_ADMIN_PASSWORD: process.env.AIMEAT_ADMIN_PASSWORD ?? 'TestAdminPw123!',
         AIMEAT_ANONYMOUS: process.env.AIMEAT_ANONYMOUS ?? 'true',
+        AIMEAT_FEDERATION_AUTH_POLICY: process.env.AIMEAT_FEDERATION_AUTH_POLICY ?? 'all_peers',
     };
 
     const serverArgs = ['--import', 'tsx', 'src/index.ts', 'start', '--db', DB_TYPE];

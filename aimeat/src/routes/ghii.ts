@@ -8,29 +8,16 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { validateOwnerName, buildGAII } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { validateTotpCode, validateBackupCode } from '../services/totp.js';
 import type { TotpConfig } from '../services/totp.js';
-import { hashPassword, verifyPassword } from '../services/password.js';
+import { hashPassword, verifyPassword, isLegacyHash } from '../services/password.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { logger } from '../utils/logger.js';
 import type { PeerInfo } from '../services/federation.js';
 
-// SECURITY: Password strength validation
-const WEAK_PASSWORDS = [
-    'password', 'admin', 'testadminpw123', '123456', '12345678', 'letmein', 'qwerty',
-    'abc123', 'TestAdminPw123!', 'secret', 'test', 'demo', 'welcome', 'login',
-    'master', 'dragon', 'monkey', 'shadow', 'sunshine', 'trustno1',
-];
-
-function validatePasswordStrength(password: string): string | null {
-    if (password.length < 8) return 'Password must be at least 8 characters';
-    if (!/[A-Z]/.test(password)) return 'Password must contain an uppercase letter';
-    if (!/[a-z]/.test(password)) return 'Password must contain a lowercase letter';
-    if (!/[0-9]/.test(password)) return 'Password must contain a number';
-    if (WEAK_PASSWORDS.includes(password.toLowerCase())) return 'Password is too common';
-    return null;
-}
+import { validatePasswordStrength } from '../utils/password-validation.js';
+import { GhiiRegistrationSchema, GhiiWebRegistrationSchema, GhiiLoginSchema, validateBody } from '../models/schemas.js';
 
 /**
  * GHII — Global Human Intelligence Identifier
@@ -47,8 +34,10 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
 
     // POST /v1/ghii — Register a new human identity (no auth required)
     // Creates an owner account + GHII profile in one step
-    router.post('/v1/ghii', async (req, res) => {
-        let { username, display_name, bio, avatar, locale, password } = req.body ?? {};
+    const registrationLimit = rateLimit({ max: 5, windowMs: 60_000 });
+    router.post('/v1/ghii', registrationLimit, validateBody(GhiiRegistrationSchema, config.nodeId), async (req, res) => {
+        let { username, display_name } = req.body ?? {};
+        const { bio, avatar, locale, password } = req.body ?? {};
 
         if (!username || typeof username !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required'));
@@ -169,7 +158,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         // Record welcome bonus transaction
         if (config.welcomeBonus > 0) {
             await storage.addTransaction({
-                id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+                id: `tx-${randomUUID()}`,
                 gaii: ghii,
                 type: 'welcome_bonus',
                 amount: config.welcomeBonus,
@@ -222,7 +211,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
 
     // POST /v1/ghii/login — Login with username + password from any device
     // Regenerates keys, creates agent if missing, returns full session
-    router.post('/v1/ghii/login', async (req, res) => {
+    router.post('/v1/ghii/login', rateLimit({ max: 15, windowMs: 60_000 }), validateBody(GhiiLoginSchema, config.nodeId), async (req, res) => {
         const { username, password, totp_code, backup_code } = req.body ?? {};
 
         if (!username || typeof username !== 'string') {
@@ -261,6 +250,18 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             if (!homePeer) {
                 res.status(400).json(error(config.nodeId, 'FEDERATION_UNREACHABLE',
                     `Cannot reach home node ${federatedNodeId}. No active peer route found.`));
+                return;
+            }
+
+            // Check node-level federation auth policy
+            if (config.federationAuthPolicy === 'disabled') {
+                res.status(403).json(error(config.nodeId, 'FEDERATION_AUTH_DISABLED',
+                    'This node does not accept federated logins'));
+                return;
+            }
+            if (config.federationAuthPolicy === 'specific_peers' && !homePeer.allowFederatedAuth) {
+                res.status(403).json(error(config.nodeId, 'FEDERATION_AUTH_NOT_ALLOWED',
+                    'Federated login from this node is not permitted'));
                 return;
             }
 
@@ -305,11 +306,23 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
                     return;
                 }
 
-                // Issue a local federated JWT with limited TTL
-                // Use scopes from attestation if provided (home node restricts what federated user can do)
-                const fedScopes = Array.isArray(attestation.scopes) && attestation.scopes.length > 0
-                    ? attestation.scopes
-                    : ['memory:read', 'memory:write', 'social:read', 'social:write'];
+                // Verify attestation signature against peer's known public key
+                if (homePeer.publicKey && attestation.signature) {
+                    const { verify: verifySignature } = await import('../auth/keypair.js');
+                    const { signature: _sig, ...attestationPayload } = attestation;
+                    const payloadJson = JSON.stringify(attestationPayload);
+                    const sigValid = await verifySignature(homePeer.publicKey, payloadJson, attestation.signature);
+                    if (!sigValid) {
+                        logger.warn(`Federation attestation signature verification failed for ${attestation.ghii} from ${homePeer.nodeId}`);
+                        res.status(401).json(error(config.nodeId, 'INVALID_ATTESTATION', 'Attestation signature verification failed'));
+                        return;
+                    }
+                }
+
+                // Determine scopes from RECEIVING node policy (not home node attestation)
+                const fedScopes = (homePeer.federationAuthScopes?.length > 0)
+                    ? homePeer.federationAuthScopes
+                    : config.federationDefaultScopes;
                 const fedTtl = Math.min(config.jwtTtlSeconds, 3600); // max 1 hour
                 const token = await issueJWT({
                     sub: loginName,
@@ -363,10 +376,40 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             return;
         }
 
+        // Per-account password lockout (brute-force protection)
+        if (ghiiRecord.passwordLockedUntil) {
+            const lockExpires = new Date(ghiiRecord.passwordLockedUntil).getTime();
+            if (Date.now() < lockExpires) {
+                res.status(429).json(error(config.nodeId, 'PASSWORD_LOCKED',
+                    `Account temporarily locked due to too many failed login attempts. Try again after ${ghiiRecord.passwordLockedUntil}`));
+                return;
+            }
+            await storage.updateGHII(ghiiRecord.ghii, { passwordFailedAttempts: 0, passwordLockedUntil: undefined });
+            ghiiRecord.passwordFailedAttempts = 0;
+            ghiiRecord.passwordLockedUntil = undefined;
+        }
+
         const valid = await verifyPassword(password, ghiiRecord.passwordHash);
         if (!valid) {
+            const attempts = (ghiiRecord.passwordFailedAttempts ?? 0) + 1;
+            const update: Record<string, unknown> = { passwordFailedAttempts: attempts };
+            if (attempts >= 5) {
+                update.passwordLockedUntil = new Date(Date.now() + 15 * 60_000).toISOString();
+            }
+            await storage.updateGHII(ghiiRecord.ghii, update);
             res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Invalid username or password'));
             return;
+        }
+
+        // Reset failed attempts on successful login
+        if (ghiiRecord.passwordFailedAttempts) {
+            await storage.updateGHII(ghiiRecord.ghii, { passwordFailedAttempts: 0, passwordLockedUntil: undefined });
+        }
+
+        // Transparent scrypt parameter upgrade (v1 -> v2)
+        if (ghiiRecord.passwordHash && isLegacyHash(ghiiRecord.passwordHash)) {
+            const newHash = await hashPassword(password);
+            await storage.updateGHII(ghiiRecord.ghii, { passwordHash: newHash });
         }
 
         // Email confirmation check — if operator requires it, block unverified users
@@ -519,8 +562,9 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
 
     // POST /v1/ghii/register-web — Web registration (no auth required)
     // Creates owner + GHII profile with optional email verification
-    router.post('/v1/ghii/register-web', async (req, res) => {
-        let { username, display_name, email, locale, city, area, interests } = req.body ?? {};
+    router.post('/v1/ghii/register-web', registrationLimit, validateBody(GhiiWebRegistrationSchema, config.nodeId), async (req, res) => {
+        let { username, display_name } = req.body ?? {};
+        const { email, locale, city, area, interests } = req.body ?? {};
 
         if (!username || typeof username !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required'));
@@ -612,7 +656,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         // Record welcome bonus transaction
         if (config.welcomeBonus > 0) {
             await storage.addTransaction({
-                id: `tx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+                id: `tx-${randomUUID()}`,
                 gaii: ghii,
                 type: 'welcome_bonus',
                 amount: config.welcomeBonus,
@@ -622,10 +666,9 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
 
         // Store interest profile in memory if interests provided
         if (Array.isArray(interests) && interests.length > 0) {
-            const agentGaii = `app#${username}@${config.nodeId}`;
             await storage.setMemory({
                 key: `profile.${username}.interests`,
-                ownerGaii: agentGaii,
+                ownerGaii: ghii,
                 value: interests,
                 visibility: 'public',
                 tags: ['profile', 'interests'],

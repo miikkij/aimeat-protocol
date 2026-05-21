@@ -313,6 +313,7 @@ export default function FederationTab({ data, reload }) {
                 <label class="adm-text-sm"><input type="checkbox" checked=${p.share_catalogue !== false} onChange=${(e) => doUpdatePolicy(p.node_id, 'share_catalogue', e.target.checked)} /> ${t('dashboard.fedShareCatalogue')}</label>
                 <label class="adm-text-sm"><input type="checkbox" checked=${p.replicate_memory !== false} onChange=${(e) => doUpdatePolicy(p.node_id, 'replicate_memory', e.target.checked)} /> ${t('dashboard.fedReplicateMemory')}</label>
                 <label class="adm-text-sm"><input type="checkbox" checked=${p.allow_routing !== false} onChange=${(e) => doUpdatePolicy(p.node_id, 'allow_routing', e.target.checked)} /> ${t('dashboard.fedAllowRouting')}</label>
+                <label class="adm-text-sm"><input type="checkbox" checked=${!!p.allow_federated_auth} onChange=${(e) => doUpdatePolicy(p.node_id, 'allow_federated_auth', e.target.checked)} /> ${t('dashboard.fedAllowAuth')}</label>
                 <select class="adm-input" style="font-size:.75rem;padding:2px 4px;margin-top:4px" value=${p.peer_mode || 'federation'} onChange=${(e) => doUpdatePolicy(p.node_id, 'peer_mode', e.target.value)}>
                   <option value="federation">${t('dashboard.fedPeerModeFederation')}</option>
                   <option value="private">${t('dashboard.fedPeerModePrivate')}</option>
