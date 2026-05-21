@@ -126,10 +126,10 @@ await test('1. Create, start, and complete a task -> tasksCompleted incremented'
         body: JSON.stringify({
             title: 'Activity test task 1',
             description: 'Task for activity stats test',
-            scope: 'Test scope',
+            scope: [],
             rules: ['Test rule'],
             verification: { user_expects: 'Done', technical_checks: ['check'] },
-            todos: [{ id: 't1', order: 1, title: 'Step 1', status: 'pending' }],
+            todos: [{ id: 't1', order: 1, title: 'Step 1', environment: 'aimeat', status: 'pending' }],
             status: 'queued',
         }),
     });
@@ -176,10 +176,10 @@ await test('2. Create, start, and fail a task -> tasksFailed incremented, succes
         body: JSON.stringify({
             title: 'Activity test task 2 - will fail',
             description: 'Task that will be failed for stats test',
-            scope: 'Test scope',
+            scope: [],
             rules: ['Test rule'],
             verification: { user_expects: 'Done', technical_checks: ['check'] },
-            todos: [{ id: 't1', order: 1, title: 'Step 1', status: 'pending' }],
+            todos: [{ id: 't1', order: 1, title: 'Step 1', environment: 'aimeat', status: 'pending' }],
             status: 'queued',
         }),
     });

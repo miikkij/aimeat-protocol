@@ -274,7 +274,8 @@ export class SqliteStorage implements Storage {
     this.db.prepare(
       `UPDATE agents SET name = ?, owner = ?, displayName = ?, description = ?, capabilities = ?,
        publicKey = ?, trustScore = ?, morselBalance = ?, createdAt = ?, lastSeen = ?, semantic = ?,
-       allowedOrigins = ?, defaultScopes = ?, federate = ?
+       allowedOrigins = ?, defaultScopes = ?, federate = ?,
+       technicalCapabilities = ?, domainCapabilities = ?, activityStats = ?
        WHERE gaii = ?`
     ).run(
       updated.name, updated.owner,
@@ -286,6 +287,9 @@ export class SqliteStorage implements Storage {
       updated.allowedOrigins ? JSON.stringify(updated.allowedOrigins) : null,
       updated.defaultScopes ? JSON.stringify(updated.defaultScopes) : null,
       updated.federate ? 1 : 0,
+      JSON.stringify(updated.technicalCapabilities ?? []),
+      JSON.stringify(updated.domainCapabilities ?? []),
+      JSON.stringify(updated.activityStats ?? {}),
       gaii,
     );
     return updated;

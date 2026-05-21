@@ -50,9 +50,16 @@ async function updateAgentStats(
 ): Promise<void> {
   const agent = await storage.getAgent(agentGaii);
   if (!agent) return;
-  const stats: AgentActivityStats = agent.activityStats ?? {
-    tasksCompleted: 0, tasksFailed: 0, tokensUsed30d: 0,
-    aiCalls30d: 0, successRate: 0, extensionsCreated: 0, appsPublished: 0,
+  const existing = agent.activityStats;
+  const stats: AgentActivityStats = {
+    tasksCompleted: existing?.tasksCompleted ?? 0,
+    tasksFailed: existing?.tasksFailed ?? 0,
+    tokensUsed30d: existing?.tokensUsed30d ?? 0,
+    aiCalls30d: existing?.aiCalls30d ?? 0,
+    successRate: existing?.successRate ?? 0,
+    lastTaskAt: existing?.lastTaskAt,
+    extensionsCreated: existing?.extensionsCreated ?? 0,
+    appsPublished: existing?.appsPublished ?? 0,
   };
 
   if (outcome === 'completed') {
