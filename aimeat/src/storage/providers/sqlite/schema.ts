@@ -1167,6 +1167,84 @@ export function initializeSchema(db: Database.Database): void {
       PRIMARY KEY (date, key)
     );
 
+    -- ── Agent Tasks ──
+    CREATE TABLE IF NOT EXISTS agent_tasks (
+      id              TEXT PRIMARY KEY,
+      agentGaii       TEXT NOT NULL,
+      ownerGaii       TEXT NOT NULL,
+      title           TEXT NOT NULL,
+      description     TEXT NOT NULL DEFAULT '',
+      scope           TEXT NOT NULL DEFAULT '[]',
+      rules           TEXT NOT NULL DEFAULT '[]',
+      verification    TEXT NOT NULL DEFAULT '{}',
+      resources       TEXT,
+      todos           TEXT NOT NULL DEFAULT '[]',
+      status          TEXT NOT NULL DEFAULT 'draft',
+      parentTaskId    TEXT,
+      workTrackingCode TEXT,
+      telemetry       TEXT,
+      lastEventAt     TEXT,
+      createdAt       TEXT NOT NULL,
+      updatedAt       TEXT NOT NULL,
+      completedAt     TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_tasks_agent ON agent_tasks(agentGaii, status);
+    CREATE INDEX IF NOT EXISTS idx_agent_tasks_owner ON agent_tasks(ownerGaii);
+
+    -- Agent Task Events
+    CREATE TABLE IF NOT EXISTS agent_task_events (
+      id          TEXT PRIMARY KEY,
+      taskId      TEXT NOT NULL,
+      type        TEXT NOT NULL,
+      message     TEXT NOT NULL,
+      details     TEXT,
+      timestamp   TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_task_events_task ON agent_task_events(taskId, timestamp);
+
+    -- ── Agent Directives ──
+    CREATE TABLE IF NOT EXISTS agent_directives (
+      agentGaii     TEXT PRIMARY KEY,
+      purpose       TEXT NOT NULL DEFAULT '',
+      rules         TEXT NOT NULL DEFAULT '[]',
+      memoryAreas   TEXT NOT NULL DEFAULT '[]',
+      resources     TEXT NOT NULL DEFAULT '[]',
+      updatedAt     TEXT NOT NULL
+    );
+
+    -- Owner Agent Defaults
+    CREATE TABLE IF NOT EXISTS owner_agent_defaults (
+      ownerGaii           TEXT PRIMARY KEY,
+      rules               TEXT NOT NULL DEFAULT '[]',
+      defaultTokenBudget  INTEGER,
+      defaultMemoryAreas  TEXT NOT NULL DEFAULT '[]',
+      updatedAt           TEXT NOT NULL
+    );
+
+    -- ── Sharing Groups ──
+    CREATE TABLE IF NOT EXISTS sharing_groups (
+      id                 TEXT PRIMARY KEY,
+      name               TEXT NOT NULL,
+      description        TEXT,
+      ownerGaii          TEXT NOT NULL,
+      members            TEXT NOT NULL DEFAULT '[]',
+      defaultPermissions TEXT NOT NULL DEFAULT '{"read":true,"write":false}',
+      createdAt          TEXT NOT NULL,
+      updatedAt          TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_sharing_groups_owner ON sharing_groups(ownerGaii);
+
+    -- ── Agent Activity (Phase 2 prep) ──
+    CREATE TABLE IF NOT EXISTS agent_activity (
+      agentGaii TEXT NOT NULL,
+      date      TEXT NOT NULL,
+      hour      INTEGER NOT NULL,
+      metric    TEXT NOT NULL,
+      value     INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (agentGaii, date, hour, metric)
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_activity_gaii ON agent_activity(agentGaii, date);
+
   `);
 
   // ── Schema migrations for existing databases ──
@@ -1214,4 +1292,12 @@ export function initializeSchema(db: Database.Database): void {
   // Security audit — per-peer federation auth policy
   safeAddColumn('federation_peers', 'allowFederatedAuth', 'INTEGER NOT NULL DEFAULT 0');
   safeAddColumn('federation_peers', 'federationAuthScopes', "TEXT NOT NULL DEFAULT ''");
+
+  // Agent Dashboard Phase 1 — sharing group references + agent capabilities/activity
+  safeAddColumn('memory', 'groupId', 'TEXT');
+  safeAddColumn('storage_files', 'groupId', 'TEXT');
+  safeAddColumn('agents', 'technicalCapabilities', "TEXT DEFAULT '[]'");
+  safeAddColumn('agents', 'domainCapabilities', "TEXT DEFAULT '[]'");
+  safeAddColumn('agents', 'activityStats', "TEXT DEFAULT '{}'");
+  safeAddColumn('extensions', 'createdByAgent', 'TEXT');
 }

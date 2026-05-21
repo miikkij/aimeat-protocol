@@ -37,12 +37,21 @@ import type {
   TemplateListingRecord, TemplateReview, TemplateDiscussion, TemplateFilter,
   PackageInstanceRecord, InstalledComponent, InstanceFilter,
   CapabilityRecord, CapabilityLogEntry, CapabilityStats,
+  AgentTaskRecord, AgentTaskEventRecord,
+  AgentDirectivesRecord, OwnerAgentDefaults,
+  SharingGroupRecord,
+  AgentActivityRecord,
 } from '../../interface.js';
 import { initializeSchema } from './schema.js';
 
 import { matchWildcardPattern, consentMatchPattern } from '../../pattern-utils.js';
 import { matchesRecipient } from '../../../services/consent.js';
 import { parseGaiiLoose } from '../../../utils/gaii.js';
+
+import * as agentTaskRepo from './repos/agent-task.js';
+import * as sharingGroupRepo from './repos/sharing-group.js';
+import * as agentDirectivesRepo from './repos/agent-directives.js';
+import * as agentActivityRepo from './repos/agent-activity.js';
 
 export class SqliteStorage implements Storage {
   private db: Database.Database;
@@ -5644,5 +5653,117 @@ export class SqliteStorage implements Storage {
       result[row.date][row.key] = row.value;
     }
     return result;
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Agent Tasks ──
+  // ══════════════════════════════════════════════════════════
+
+  async createAgentTask(record: AgentTaskRecord): Promise<AgentTaskRecord> {
+    return agentTaskRepo.createAgentTask(this.db, record);
+  }
+
+  async getAgentTask(id: string): Promise<AgentTaskRecord | null> {
+    return agentTaskRepo.getAgentTask(this.db, id);
+  }
+
+  async listAgentTasks(agentGaii: string, opts?: { status?: string; page?: number; perPage?: number }): Promise<{ tasks: AgentTaskRecord[]; total: number }> {
+    return agentTaskRepo.listAgentTasks(this.db, agentGaii, opts);
+  }
+
+  async listAgentTasksByOwner(ownerGaii: string, opts?: { status?: string; agentGaii?: string; page?: number; perPage?: number }): Promise<{ tasks: AgentTaskRecord[]; total: number }> {
+    return agentTaskRepo.listAgentTasksByOwner(this.db, ownerGaii, opts);
+  }
+
+  async updateAgentTask(id: string, updates: Partial<AgentTaskRecord>): Promise<AgentTaskRecord | null> {
+    return agentTaskRepo.updateAgentTask(this.db, id, updates);
+  }
+
+  async deleteAgentTask(id: string): Promise<boolean> {
+    return agentTaskRepo.deleteAgentTask(this.db, id);
+  }
+
+  async appendTaskEvent(event: AgentTaskEventRecord): Promise<AgentTaskEventRecord> {
+    return agentTaskRepo.appendTaskEvent(this.db, event);
+  }
+
+  async listTaskEvents(taskId: string, opts?: { page?: number; perPage?: number }): Promise<{ events: AgentTaskEventRecord[]; total: number }> {
+    return agentTaskRepo.listTaskEvents(this.db, taskId, opts);
+  }
+
+  async countTasksByAgent(agentGaii: string): Promise<{ queued: number; active: number; done: number; failed: number }> {
+    return agentTaskRepo.countTasksByAgent(this.db, agentGaii);
+  }
+
+  async findStalledTasks(thresholdMinutes: number): Promise<AgentTaskRecord[]> {
+    return agentTaskRepo.findStalledTasks(this.db, thresholdMinutes);
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Agent Directives ──
+  // ══════════════════════════════════════════════════════════
+
+  async getAgentDirectives(agentGaii: string): Promise<AgentDirectivesRecord | null> {
+    return agentDirectivesRepo.getAgentDirectives(this.db, agentGaii);
+  }
+
+  async upsertAgentDirectives(record: AgentDirectivesRecord): Promise<AgentDirectivesRecord> {
+    return agentDirectivesRepo.upsertAgentDirectives(this.db, record);
+  }
+
+  async deleteAgentDirectives(agentGaii: string): Promise<boolean> {
+    return agentDirectivesRepo.deleteAgentDirectives(this.db, agentGaii);
+  }
+
+  async getOwnerAgentDefaults(ownerGaii: string): Promise<OwnerAgentDefaults | null> {
+    return agentDirectivesRepo.getOwnerAgentDefaults(this.db, ownerGaii);
+  }
+
+  async upsertOwnerAgentDefaults(record: OwnerAgentDefaults): Promise<OwnerAgentDefaults> {
+    return agentDirectivesRepo.upsertOwnerAgentDefaults(this.db, record);
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Sharing Groups ──
+  // ══════════════════════════════════════════════════════════
+
+  async createSharingGroup(record: SharingGroupRecord): Promise<SharingGroupRecord> {
+    return sharingGroupRepo.createSharingGroup(this.db, record);
+  }
+
+  async getSharingGroup(id: string): Promise<SharingGroupRecord | null> {
+    return sharingGroupRepo.getSharingGroup(this.db, id);
+  }
+
+  async listSharingGroups(ownerGaii: string): Promise<SharingGroupRecord[]> {
+    return sharingGroupRepo.listSharingGroups(this.db, ownerGaii);
+  }
+
+  async listSharingGroupsByMember(identifier: string): Promise<SharingGroupRecord[]> {
+    return sharingGroupRepo.listSharingGroupsByMember(this.db, identifier);
+  }
+
+  async updateSharingGroup(id: string, updates: Partial<SharingGroupRecord>): Promise<SharingGroupRecord | null> {
+    return sharingGroupRepo.updateSharingGroup(this.db, id, updates);
+  }
+
+  async deleteSharingGroup(id: string): Promise<boolean> {
+    return sharingGroupRepo.deleteSharingGroup(this.db, id);
+  }
+
+  async countEntriesReferencingGroup(groupId: string): Promise<number> {
+    return sharingGroupRepo.countEntriesReferencingGroup(this.db, groupId);
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Agent Activity ──
+  // ══════════════════════════════════════════════════════════
+
+  async recordActivity(record: AgentActivityRecord): Promise<void> {
+    return agentActivityRepo.recordActivity(this.db, record);
+  }
+
+  async getActivityHistory(agentGaii: string, opts?: { days?: number; granularity?: 'daily' | 'hourly' }): Promise<AgentActivityRecord[]> {
+    return agentActivityRepo.getActivityHistory(this.db, agentGaii, opts);
   }
 }
