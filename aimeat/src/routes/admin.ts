@@ -109,7 +109,7 @@ export function adminRouter(
     }
 
     // POST /v1/admin/setup/auth — authenticate with admin password, get session cookie
-    const adminAuthLimit = rateLimit({ max: 5, windowMs: 60_000 });
+    const adminAuthLimit = rateLimit({ max: config.adminAuthRateLimitMax, windowMs: config.adminAuthRateLimitWindowMs });
     router.post('/v1/admin/setup/auth', adminAuthLimit, (req, res) => {
         const pw = (req.headers['x-admin-password'] as string) ?? req.body?.admin_password ?? '';
         if (!config.adminPassword || !verifyAdminPassword(pw, config.adminPassword)) {

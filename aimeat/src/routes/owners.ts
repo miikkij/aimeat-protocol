@@ -693,6 +693,23 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
       for (const a of apps) await storage.deleteApp(ghii, a.filename);
       if (apps.length) deletionLog.push(`apps:${apps.length}`);
     } catch { /* continue */ }
+    // Extension instances created by this owner
+    try {
+      const count = await storage.deleteExtensionInstancesByOwner(ghii);
+      // Also try bare owner name (some instances may use it as createdBy)
+      const count2 = await storage.deleteExtensionInstancesByOwner(name);
+      if (count + count2) deletionLog.push(`ext_instances:${count + count2}`);
+    } catch { /* continue */ }
+    // Knowledge links contributed by this owner
+    try {
+      const count = await storage.deleteLinksByContributor(ghii);
+      if (count) deletionLog.push(`knowledge_links:${count}`);
+    } catch { /* continue */ }
+    // Knowledge reviews by this operator
+    try {
+      const count = await storage.deleteReviewsByOperator(ghii);
+      if (count) deletionLog.push(`knowledge_reviews:${count}`);
+    } catch { /* continue */ }
 
     // 3. Per-agent cascade + agent deletion (handled by storage.deleteOwner internally)
     // The storage provider's deleteOwner cascades: agent data, GHII records,

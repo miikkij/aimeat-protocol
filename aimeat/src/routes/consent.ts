@@ -6,6 +6,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import type { StatsCollector } from '../services/stats.js';
 import { emitChange } from '../services/event-bus.js';
+import { ConsentCreateSchema, validateBody } from '../models/schemas.js';
 import { resolveIdentity } from '../utils/gaii.js';
 
 export function consentRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector, onDirectoryChange?: () => void): Router {
@@ -13,7 +14,7 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
     const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
     // POST /v1/consent — Create a new consent grant
-    router.post('/v1/consent', requireAuth(), requireScope('consent:manage'), async (req, res) => {
+    router.post('/v1/consent', requireAuth(), requireScope('consent:manage'), validateBody(ConsentCreateSchema, config.nodeId), async (req, res) => {
         const ownerGaii = resolve(req);
         const {
             data_pattern,

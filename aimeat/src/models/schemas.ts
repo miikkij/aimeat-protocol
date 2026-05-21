@@ -272,7 +272,7 @@ export const ConsentCreateSchema = z.object({
     data_pattern: z.string().min(1).max(256),
     recipient: z.string().min(1).max(256),
     purpose: z.string().min(1).max(512),
-    scope: z.enum(['private', 'dmz', 'federation']).optional().default('federation'),
+    scope: z.enum(['private', 'dmz', 'federation', 'auth']).optional().default('federation'),
     expires: z.string().datetime().nullable().optional().default(null),
     metadata: z.record(z.string(), z.unknown()).optional(),
 });
@@ -368,4 +368,20 @@ export const GhiiLoginSchema = z.object({
     password: z.string().min(1).max(256),
     totp_code: z.string().max(10).optional(),
     backup_code: z.string().max(32).optional(),
+});
+
+// ── Flags (security audit -- authenticated endpoints) ──
+
+export const FlagCreateSchema = z.object({
+    targetType: z.enum(['memory', 'board_post', 'action', 'agent']),
+    targetId: z.string().min(1).max(256),
+    reason: z.enum(['unreliable', 'inappropriate', 'illegal', 'spam', 'other']),
+    description: z.string().max(1000).optional(),
+});
+
+// ── Extensions Install (security audit -- authenticated endpoints) ──
+
+export const ExtensionInstallSchema = z.object({
+    manifest: z.string().min(1).max(100_000),
+    scripts: z.record(z.string(), z.string().max(512_000)).optional(),
 });

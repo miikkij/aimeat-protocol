@@ -6,4 +6,5 @@ export interface ExtensionInstanceRepository {
   listExtensionInstances(extensionName: string): Promise<ExtensionInstanceRecord[]>;
   updateExtensionInstance(extensionName: string, instanceId: string, updates: Partial<ExtensionInstanceRecord>): Promise<ExtensionInstanceRecord | null>;
   deleteExtensionInstance(extensionName: string, instanceId: string): Promise<boolean>;
+  deleteExtensionInstancesByOwner(ownerIdentity: string): Promise<number>;
 }

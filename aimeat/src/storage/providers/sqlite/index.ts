@@ -4140,6 +4140,11 @@ export class SqliteStorage implements Storage {
     return broken;
   }
 
+  async deleteLinksByContributor(gaii: string): Promise<number> {
+    const result = this.db.prepare('DELETE FROM knowledge_links WHERE linked_by = ?').run(gaii);
+    return result.changes;
+  }
+
   // ══════════════════════════════════════════════════════════
   // ── Knowledge: Operator Reviews ──
   // ══════════════════════════════════════════════════════════
@@ -4161,6 +4166,11 @@ export class SqliteStorage implements Storage {
     const perPage = opts?.perPage ?? 20;
     const offset = (page - 1) * perPage;
     return this.db.prepare('SELECT * FROM knowledge_reviews ORDER BY timestamp DESC LIMIT ? OFFSET ?').all(perPage, offset) as OperatorReviewRecord[];
+  }
+
+  async deleteReviewsByOperator(gaii: string): Promise<number> {
+    const result = this.db.prepare('DELETE FROM knowledge_reviews WHERE operatorGaii = ?').run(gaii);
+    return result.changes;
   }
 
   // ══════════════════════════════════════════════════════════
@@ -4393,6 +4403,11 @@ export class SqliteStorage implements Storage {
       'DELETE FROM extension_instances WHERE extensionName = ? AND id = ?'
     ).run(extensionName, instanceId);
     return result.changes > 0;
+  }
+
+  async deleteExtensionInstancesByOwner(ownerIdentity: string): Promise<number> {
+    const result = this.db.prepare('DELETE FROM extension_instances WHERE createdBy = ?').run(ownerIdentity);
+    return result.changes;
   }
 
   private deserializeExtensionInstance(row: Record<string, unknown>): ExtensionInstanceRecord {

@@ -125,6 +125,18 @@ export interface AimeatConfig {
   federationAuthPolicy: 'disabled' | 'all_peers' | 'specific_peers';
   federationDefaultScopes: string[];
 
+  // Security limits (configurable per security audit)
+  loginRateLimitMax: number;
+  loginRateLimitWindowMs: number;
+  registrationRateLimitMax: number;
+  registrationRateLimitWindowMs: number;
+  adminAuthRateLimitMax: number;
+  adminAuthRateLimitWindowMs: number;
+  passwordLockoutAttempts: number;
+  passwordLockoutMinutes: number;
+  jsonBodyLimitMb: number;
+  jsonBodyLimitLargeMb: number;
+
   // Consent Layer (Phase 0.3)
   consentEnabled: boolean;
   consentAuditRetentionDays: number;
@@ -482,6 +494,18 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     federationRole: (process.env.AIMEAT_FEDERATION_ROLE ?? 'standalone') as FederationRole,
     federationAuthPolicy: (process.env.AIMEAT_FEDERATION_AUTH_POLICY ?? 'disabled') as 'disabled' | 'all_peers' | 'specific_peers',
     federationDefaultScopes: (process.env.AIMEAT_FEDERATION_DEFAULT_SCOPES ?? 'memory:read,catalogue:read').split(',').filter(Boolean),
+
+    // Security limits
+    loginRateLimitMax: parseInt(process.env.AIMEAT_LOGIN_RATE_LIMIT_MAX ?? '15', 10),
+    loginRateLimitWindowMs: parseInt(process.env.AIMEAT_LOGIN_RATE_LIMIT_WINDOW_MS ?? '60000', 10),
+    registrationRateLimitMax: parseInt(process.env.AIMEAT_REGISTRATION_RATE_LIMIT_MAX ?? '5', 10),
+    registrationRateLimitWindowMs: parseInt(process.env.AIMEAT_REGISTRATION_RATE_LIMIT_WINDOW_MS ?? '60000', 10),
+    adminAuthRateLimitMax: parseInt(process.env.AIMEAT_ADMIN_AUTH_RATE_LIMIT_MAX ?? '5', 10),
+    adminAuthRateLimitWindowMs: parseInt(process.env.AIMEAT_ADMIN_AUTH_RATE_LIMIT_WINDOW_MS ?? '60000', 10),
+    passwordLockoutAttempts: parseInt(process.env.AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS ?? '5', 10),
+    passwordLockoutMinutes: parseInt(process.env.AIMEAT_PASSWORD_LOCKOUT_MINUTES ?? '15', 10),
+    jsonBodyLimitMb: parseInt(process.env.AIMEAT_JSON_BODY_LIMIT_MB ?? '5', 10),
+    jsonBodyLimitLargeMb: parseInt(process.env.AIMEAT_JSON_BODY_LIMIT_LARGE_MB ?? '15', 10),
     genesisUrl: process.env.AIMEAT_GENESIS_URL ?? null,
     consentEnabled: process.env.AIMEAT_CONSENT_ENABLED !== 'false',
     consentAuditRetentionDays: parseInt(process.env.AIMEAT_CONSENT_AUDIT_RETENTION_DAYS ?? '365', 10),

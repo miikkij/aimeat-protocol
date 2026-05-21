@@ -5,6 +5,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
+import { FlagCreateSchema, validateBody } from '../models/schemas.js';
 
 const VALID_TARGET_TYPES = ['memory', 'board_post', 'action', 'agent'] as const;
 const VALID_REASONS = ['unreliable', 'inappropriate', 'illegal', 'spam', 'other'] as const;
@@ -28,7 +29,7 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
 
     // ── POST /v1/flags — Create a flag (auth required) ──
-    router.post('/v1/flags', requireAuth(), async (req, res) => {
+    router.post('/v1/flags', requireAuth(), validateBody(FlagCreateSchema, config.nodeId), async (req, res) => {
         const { targetType, targetId, reason, description } = req.body ?? {};
 
         // Validate required fields

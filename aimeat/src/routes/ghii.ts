@@ -34,7 +34,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
 
     // POST /v1/ghii — Register a new human identity (no auth required)
     // Creates an owner account + GHII profile in one step
-    const registrationLimit = rateLimit({ max: 5, windowMs: 60_000 });
+    const registrationLimit = rateLimit({ max: config.registrationRateLimitMax, windowMs: config.registrationRateLimitWindowMs });
     router.post('/v1/ghii', registrationLimit, validateBody(GhiiRegistrationSchema, config.nodeId), async (req, res) => {
         let { username, display_name } = req.body ?? {};
         const { bio, avatar, locale, password } = req.body ?? {};
@@ -211,7 +211,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
 
     // POST /v1/ghii/login — Login with username + password from any device
     // Regenerates keys, creates agent if missing, returns full session
-    router.post('/v1/ghii/login', rateLimit({ max: 15, windowMs: 60_000 }), validateBody(GhiiLoginSchema, config.nodeId), async (req, res) => {
+    router.post('/v1/ghii/login', rateLimit({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs }), validateBody(GhiiLoginSchema, config.nodeId), async (req, res) => {
         const { username, password, totp_code, backup_code } = req.body ?? {};
 
         if (!username || typeof username !== 'string') {
@@ -393,8 +393,8 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         if (!valid) {
             const attempts = (ghiiRecord.passwordFailedAttempts ?? 0) + 1;
             const update: Record<string, unknown> = { passwordFailedAttempts: attempts };
-            if (attempts >= 5) {
-                update.passwordLockedUntil = new Date(Date.now() + 15 * 60_000).toISOString();
+            if (attempts >= config.passwordLockoutAttempts) {
+                update.passwordLockedUntil = new Date(Date.now() + config.passwordLockoutMinutes * 60_000).toISOString();
             }
             await storage.updateGHII(ghiiRecord.ghii, update);
             res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Invalid username or password'));

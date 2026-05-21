@@ -12,6 +12,7 @@ import { parse as parseYaml } from 'yaml';
 import { logger } from '../utils/logger.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
+import { ExtensionInstallSchema, validateBody } from '../models/schemas.js';
 
 export function extensionsRouter(config: AimeatConfig, storage: Storage, scheduler?: Scheduler, emailService?: import('../services/email.js').EmailService): Router {
   const router = Router();
@@ -46,7 +47,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   });
 
   // ── POST /v1/extensions — Install extension from YAML manifest + JS scripts ──
-  router.post('/v1/extensions', requireAuth(), async (req, res) => {
+  router.post('/v1/extensions', requireAuth(), validateBody(ExtensionInstallSchema, config.nodeId), async (req, res) => {
     try {
       const roles = req.auth!.roles;
       const allowOwner = config.extInstallRole === 'owner';

@@ -3615,6 +3615,12 @@ export class MongoStorage implements Storage {
         return broken;
     }
 
+    async deleteLinksByContributor(gaii: string): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.knowledgeLink.deleteMany({ where: { linkedBy: gaii } });
+        return result.count;
+    }
+
     // ══════════════════════════════════════════════════════════
     // ── Knowledge: Operator Reviews (Prisma-persisted) ──
     // ══════════════════════════════════════════════════════════
@@ -3663,6 +3669,12 @@ export class MongoStorage implements Storage {
             take: perPage,
         });
         return rows.map((r: any) => this.toOperatorReviewRecord(r));
+    }
+
+    async deleteReviewsByOperator(gaii: string): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.knowledgeReview.deleteMany({ where: { operatorGaii: gaii } });
+        return result.count;
     }
 
     // ══════════════════════════════════════════════════════════
@@ -3924,6 +3936,12 @@ export class MongoStorage implements Storage {
         } catch {
             return false;
         }
+    }
+
+    async deleteExtensionInstancesByOwner(ownerIdentity: string): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.extensionInstance.deleteMany({ where: { createdBy: ownerIdentity } });
+        return result.count;
     }
 
     // ══════════════════════════════════════════════════════════
