@@ -1779,6 +1779,51 @@ await test('GET /v1/stats backward compatibility', async () => {
     assert(typeof body.data.active_agents === 'number', 'active_agents');
 });
 
+await test('GET /v1/stats includes notification counters and gauges', async () => {
+    const { body } = await json('/v1/stats');
+    assert(body.ok === true, 'ok');
+    // Notification counters are dynamic typed fields: present as number when
+    // incrementTyped has been called, absent otherwise. Both states are valid.
+    const emailSent = body.data.email_sent;
+    const pushSent = body.data.push_sent;
+    assert(emailSent === undefined || typeof emailSent === 'number',
+        'email_sent should be a number or absent');
+    assert(pushSent === undefined || typeof pushSent === 'number',
+        'push_sent should be a number or absent');
+    // Gauges object with point-in-time values
+    assert(typeof body.data.gauges === 'object' && body.data.gauges !== null, 'gauges should be an object');
+    assert(typeof body.data.gauges.tunnel_connections_active === 'number', 'gauges.tunnel_connections_active');
+    assert(typeof body.data.gauges.mailbox_items_total === 'number', 'gauges.mailbox_items_total');
+    assert(typeof body.data.gauges.mailbox_bytes_total === 'number', 'gauges.mailbox_bytes_total');
+    assert(typeof body.data.gauges.mailbox_oldest_item_age_seconds === 'number', 'gauges.mailbox_oldest_item_age_seconds');
+    // Daily history (last 30 days) is included in default response
+    assert(typeof body.data.daily === 'object' && body.data.daily !== null, 'daily should be an object');
+});
+
+await test('GET /v1/stats?from&to returns time-range response', async () => {
+    const { body } = await json('/v1/stats?from=2020-01-01&to=2099-12-31');
+    assert(body.ok === true, 'ok');
+    // Range response has totals, daily, and gauges
+    assert(typeof body.data.totals === 'object' && body.data.totals !== null, 'totals should be an object');
+    assert(typeof body.data.daily === 'object' && body.data.daily !== null, 'daily should be an object');
+    assert(typeof body.data.gauges === 'object' && body.data.gauges !== null, 'gauges should be an object');
+    // Range echoes the from/to params
+    assert(body.data.from === '2020-01-01', 'from echoed');
+    assert(body.data.to === '2099-12-31', 'to echoed');
+    // Shared fields still present
+    assert(typeof body.data.active_owners === 'number', 'active_owners in range');
+    assert(typeof body.data.active_agents === 'number', 'active_agents in range');
+});
+
+await test('GET /v1/stats empty time range returns no daily entries', async () => {
+    const { body } = await json('/v1/stats?from=2020-01-01&to=2020-01-02');
+    assert(body.ok === true, 'ok');
+    assert(typeof body.data.totals === 'object' && body.data.totals !== null, 'totals exists');
+    assert(typeof body.data.daily === 'object' && body.data.daily !== null, 'daily exists');
+    // Historical range with no data should have empty daily
+    assert(Object.keys(body.data.daily).length === 0, 'daily should be empty for historical range');
+});
+
 await test('Response includes X-Request-Id header', async () => {
     const { headers } = await json('/v1/health');
     const requestId = headers.get('x-request-id');
