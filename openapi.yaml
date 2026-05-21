@@ -16140,6 +16140,141 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   # ============================================================
+  # Agent Capabilities & Activity
+  # ============================================================
+
+  /v1/agents/{name}/capabilities:
+    put:
+      operationId: reportAgentCapabilities
+      summary: Report agent capabilities
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                technical:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      type:
+                        type: string
+                        enum: [mcp, skill, tool]
+                  maxItems: 100
+                domain:
+                  type: array
+                  items:
+                    type: string
+                  maxItems: 50
+                languages:
+                  type: array
+                  items:
+                    type: string
+                  maxItems: 20
+      responses:
+        '200':
+          description: Capabilities updated
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    get:
+      operationId: getAgentCapabilities
+      summary: Get agent capabilities
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent capabilities and activity stats
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/activity:
+    get:
+      operationId: getAgentActivity
+      summary: Get agent activity stats and history
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+        - name: granularity
+          in: query
+          schema:
+            type: string
+            enum: [daily, hourly]
+            default: daily
+      responses:
+        '200':
+          description: Activity stats, history, and scheduled jobs
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/activity/log:
+    get:
+      operationId: getAgentActivityLog
+      summary: Get agent activity event log
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated event log
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
   # Owner Agent Defaults
   # ============================================================
 
