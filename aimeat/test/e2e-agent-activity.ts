@@ -269,6 +269,20 @@ await test('4. GET /activity?days=7 filters to last 7 days', async () => {
     }
 });
 
+await test('4b. GET /activity?granularity=hourly returns hourly breakdown', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/activity?days=7&granularity=hourly`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'response ok');
+    assert(Array.isArray(body.data.history), 'history is array');
+    // Hourly records have hour field (0-23)
+    for (const record of body.data.history) {
+        assert(typeof record.hour === 'number', `hour should be number, got ${typeof record.hour}`);
+        assert(record.hour >= 0 && record.hour <= 23, `hour should be 0-23, got ${record.hour}`);
+    }
+});
+
 // ─── Phase 5: GET /activity/log returns paginated events ───
 console.log('\nPhase 5 -- GET /activity/log');
 

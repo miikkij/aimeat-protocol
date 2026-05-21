@@ -137,6 +137,12 @@ await test('1. PUT capabilities with technical + domain + languages', async () =
     assert(tech.length === 3, `expected 3 technical caps, got ${tech.length}`);
     assert(tech[0].name === 'filesystem', `first tech name: ${tech[0].name}`);
     assert(tech[0].type === 'mcp', `first tech type: ${tech[0].type}`);
+    // Agent session + MCP type = verified: true
+    const mcpCap = tech.find((c: any) => c.type === 'mcp');
+    assert(mcpCap.verified === true, `MCP cap should be verified when reported by agent, got ${mcpCap.verified}`);
+    // Non-MCP types stay unverified
+    const toolCap = tech.find((c: any) => c.type === 'tool');
+    assert(toolCap.verified === false, `tool cap should not be verified, got ${toolCap.verified}`);
 
     const domain = body.data.domain_capabilities;
     assert(Array.isArray(domain), 'domain_capabilities is array');

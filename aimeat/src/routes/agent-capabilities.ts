@@ -66,10 +66,12 @@ export function agentCapabilitiesRouter(config: AimeatConfig, storage: Storage):
 
     const body = parsed.data;
 
+    // Agent sessions imply an active MCP connection -- MCP-type capabilities are verified
+    const isAgentSession = req.auth!.roles.includes('agent');
     const technicalCapabilities: AgentTechnicalCapability[] = body.technical.map(cap => ({
       name: cap.name,
       type: cap.type,
-      verified: false,
+      verified: isAgentSession && cap.type === 'mcp',
     }));
 
     // Build domain capabilities, merging language entries if provided

@@ -45,11 +45,11 @@ export function registerAgentCapabilityTools(
                 return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };
             }
 
-            // Map technical entries to AgentTechnicalCapability with verified: false
+            // Agent is connected via MCP -- MCP-type capabilities are verified
             const technicalCapabilities: AgentTechnicalCapability[] = (technical ?? []).map(cap => ({
                 name: cap.name,
                 type: cap.type,
-                verified: false,
+                verified: cap.type === 'mcp',
             }));
 
             // Build domain capabilities, merging language entries as "Language: fi" etc.
