@@ -249,3 +249,16 @@ export const resetAllSystemPrompts = ()     => apiPost('/v1/admin/prompts/reset-
 export const resetPromptGroup     = (group) => apiPost(`/v1/admin/prompts/reset-group/${encodeURIComponent(group)}`);
 export const getPromptVersions    = (id)    => apiGet(`/v1/admin/prompts/${encodeURIComponent(id)}/versions`);
 export const restorePromptVersion = (id, v) => apiPost(`/v1/admin/prompts/${encodeURIComponent(id)}/versions/${v}/restore`);
+
+// ── Agent Tasks (admin) ──
+export const getAdminAgentTasks = (params = {}) => {
+  const q = new URLSearchParams();
+  if (params.status) q.set('status', params.status);
+  if (params.agent) q.set('agent', params.agent);
+  if (params.page) q.set('page', String(params.page));
+  if (params.per_page) q.set('per_page', String(params.per_page));
+  return apiGet('/v1/admin/agent-tasks?' + q.toString());
+};
+
+// ── Sharing Groups (admin) ──
+export const getAdminSharingGroups = () => apiGet('/v1/admin/sharing-groups');

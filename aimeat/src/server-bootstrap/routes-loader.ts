@@ -84,6 +84,8 @@ import { uploadRouter } from '../routes/upload.js';
 import { agentTasksRouter } from '../routes/agent-tasks.js';
 import { agentIntegrationRouter } from '../routes/agent-integration.js';
 import { agentDirectivesRouter } from '../routes/agent-directives.js';
+import { adminAgentTasksRouter } from '../routes/admin-agent-tasks.js';
+import { adminSharingGroupsRouter } from '../routes/admin-sharing-groups.js';
 
 // Services needed during route mounting
 import { createPushService } from '../services/push.js';
@@ -380,6 +382,10 @@ export async function mountRoutes(
 
   // System prompts admin routes
   app.use(adminPromptsRouter(config, storage));
+
+  // Agent tasks + sharing groups admin routes (Phase 1 Agent Dashboard)
+  app.use(adminAgentTasksRouter(config, storage));
+  app.use(adminSharingGroupsRouter(config, storage));
 
   // Seed core scheduled jobs (idempotent — only creates if not already present)
   seedCoreScheduledJobs(config, storage).catch(err =>

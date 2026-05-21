@@ -1,13 +1,36 @@
 import { h } from 'preact';
+import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { num, fmtUp, Badge, StatsGrid, EconRow, HealthRow } from './shared.js';
+import { apiGet } from '/js/api.js';
 
 export default function OverviewTab({ data }) {
   const d = data.dash;
   if (!d) return html`<div class="empty">${t('dashboard.loading')}</div>`;
+
+  const [activeTaskCount, setActiveTaskCount] = useState(null);
+  const [sharingGroupCount, setSharingGroupCount] = useState(null);
+
+  useEffect(() => {
+    // Fetch active/queued agent task count
+    apiGet('/v1/admin/agent-tasks?status=active&per_page=1')
+      .then(r => {
+        const activeTotal = r.data?.total || 0;
+        // Also fetch queued
+        return apiGet('/v1/admin/agent-tasks?status=queued&per_page=1').then(r2 => {
+          setActiveTaskCount(activeTotal + (r2.data?.total || 0));
+        });
+      })
+      .catch(() => setActiveTaskCount(0));
+
+    // Fetch sharing group count
+    apiGet('/v1/admin/sharing-groups')
+      .then(r => setSharingGroupCount(r.data?.total || 0))
+      .catch(() => setSharingGroupCount(0));
+  }, []);
 
   const h_ = d.health;
   const c = d.counts;
@@ -41,6 +64,8 @@ export default function OverviewTab({ data }) {
       { label: t('dashboard.publishedActions'), value: c.actions, color: '#06b6d4' },
       { label: t('dashboard.activeBoards'), value: c.boards, color: '#22c55e' },
       { label: t('dashboard.activeChatSessions'), value: c.chat_instances || 0, color: '#06b6d4' },
+      { label: t('dashboard.agentTasksActiveTasks'), value: activeTaskCount != null ? activeTaskCount : '--', color: '#f97316' },
+      { label: t('dashboard.sharingGroupsTotalCount'), value: sharingGroupCount != null ? sharingGroupCount : '--', color: '#8b5cf6' },
     ]} />
 
     <!-- Economy & Config -->

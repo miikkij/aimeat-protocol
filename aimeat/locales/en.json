@@ -354,6 +354,50 @@
         "credentials_warning": "Store the private key securely — it cannot be retrieved again.",
         "polling_note": "If your agent is polling automatically, it will receive these credentials within a few seconds.",
         "token_expiry_note": "The token expires in 24 hours. Your agent uses the private key to obtain a new token automatically."
+      },
+      "subtabs": {
+        "tasks": "Tasks",
+        "directives": "Directives"
+      },
+      "tasks": {
+        "title": "Task Queue",
+        "empty": "No tasks yet",
+        "newTask": "New Task",
+        "createTask": "Create Task",
+        "cancel": "Cancel",
+        "titleLabel": "Title",
+        "descLabel": "Description",
+        "statusLabel": "Status",
+        "draft": "Draft",
+        "queued": "Queued",
+        "active": "Active",
+        "done": "Done",
+        "failed": "Failed",
+        "stalled": "Stalled",
+        "events": "Events",
+        "noEvents": "No events",
+        "todoProgress": "TODO Progress",
+        "created": "Created",
+        "lastEvent": "Last Event",
+        "delete": "Delete",
+        "deleteConfirm": "Delete this task?"
+      },
+      "directives": {
+        "title": "Directives",
+        "purpose": "Purpose",
+        "rules": "Rules",
+        "memoryAreas": "Memory Areas",
+        "resources": "Resources",
+        "edit": "Edit",
+        "save": "Save",
+        "cancel": "Cancel",
+        "reset": "Reset to Defaults",
+        "resetConfirm": "Reset agent directives to defaults?",
+        "empty": "No directives configured",
+        "addRule": "Add Rule",
+        "system": "System",
+        "owner": "Owner",
+        "agent": "Agent"
       }
     },
     "scopes": {
@@ -772,7 +816,35 @@
       "fedNoConsents": "No federation login access granted.",
       "fedRemove": "Remove",
       "fedGranted": "Auth access granted",
-      "fedRevoked": "Auth access revoked"
+      "fedRevoked": "Auth access revoked",
+      "sharingGroups": {
+        "title": "Sharing Groups",
+        "desc": "Create groups to share memory and files with specific users and agents",
+        "empty": "No sharing groups yet",
+        "newGroup": "New Group",
+        "create": "Create Group",
+        "cancel": "Cancel",
+        "name": "Group Name",
+        "description": "Description",
+        "members": "Members",
+        "entries": "Shared Entries",
+        "delete": "Delete Group",
+        "deleteConfirm": "Delete this sharing group?",
+        "addMember": "Add Member",
+        "removeMember": "Remove",
+        "identifier": "Identifier (GAII or GHII)",
+        "identifierType": "Type"
+      },
+      "agentDefaults": {
+        "title": "Agent Defaults",
+        "desc": "Default rules and settings applied to all your agents",
+        "rules": "Default Rules",
+        "tokenBudget": "Default Token Budget",
+        "empty": "No defaults configured",
+        "edit": "Edit",
+        "save": "Save",
+        "cancel": "Cancel"
+      }
     },
     "nodes": {
       "title": "Personal Nodes",
@@ -1696,7 +1768,8 @@
       "public": "Public",
       "private": "Private",
       "owner": "My Agents",
-      "protected": "Protected"
+      "protected": "Protected",
+      "group": "Group"
     },
     "knowledge": {
       "parseError": "Could not parse the pasted content as JSON",
@@ -3576,7 +3649,32 @@
     "memoryFilterPrefix": "Filter by key prefix",
     "memoryNoResults": "No memory keys found",
     "memoryDeleteConfirm": "Delete this memory key?",
-    "memoryDeleted": "Memory key deleted"
+    "memoryDeleted": "Memory key deleted",
+    "agentTasksTab": "Agent Tasks",
+    "agentTasksDesc": "Overview of all agent tasks across the node",
+    "agentTasksTotal": "Total Tasks",
+    "agentTasksEmpty": "No agent tasks found",
+    "agentTasksAgent": "Agent",
+    "agentTasksTitle": "Title",
+    "agentTasksStatus": "Status",
+    "agentTasksTodoProgress": "TODO Progress",
+    "agentTasksCreated": "Created",
+    "agentTasksLastEvent": "Last Event",
+    "agentTasksActiveTasks": "Active Agent Tasks",
+    "agentTasksFilterStatus": "Filter by status",
+    "agentTasksAllStatuses": "All statuses",
+    "sharingGroupsTab": "Sharing Groups",
+    "sharingGroupsDesc": "Overview of all sharing groups on the node",
+    "sharingGroupsTotal": "Total Groups",
+    "sharingGroupsEmpty": "No sharing groups found",
+    "sharingGroupsName": "Name",
+    "sharingGroupsOwner": "Owner",
+    "sharingGroupsMembers": "Members",
+    "sharingGroupsEntries": "Entries",
+    "sharingGroupsCreated": "Created",
+    "sharingGroupsTotalCount": "Sharing Groups",
+    "overviewActiveTasks": "Active Tasks",
+    "overviewSharingGroups": "Sharing Groups"
   },
   "launcher": {
     "title": "My Apps",

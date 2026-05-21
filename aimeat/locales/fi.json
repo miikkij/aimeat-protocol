@@ -354,6 +354,50 @@
         "credentials_warning": "Säilytä yksityinen avain turvallisesti — sitä ei voi hakea uudelleen.",
         "polling_note": "Jos agenttisi pollaa automaattisesti, se saa nämä tunnistetiedot muutaman sekunnin kuluessa.",
         "token_expiry_note": "Token vanhenee 24 tunnin kuluttua. Agenttisi käyttää yksityistä avainta uuden tokenin hankkimiseen automaattisesti."
+      },
+      "subtabs": {
+        "tasks": "Tehtävät",
+        "directives": "Ohjeet"
+      },
+      "tasks": {
+        "title": "Tehtäväjono",
+        "empty": "Ei tehtäviä vielä",
+        "newTask": "Uusi tehtävä",
+        "createTask": "Luo tehtävä",
+        "cancel": "Peruuta",
+        "titleLabel": "Otsikko",
+        "descLabel": "Kuvaus",
+        "statusLabel": "Tila",
+        "draft": "Luonnos",
+        "queued": "Jonossa",
+        "active": "Aktiivinen",
+        "done": "Valmis",
+        "failed": "Epäonnistunut",
+        "stalled": "Pysähtynyt",
+        "events": "Tapahtumat",
+        "noEvents": "Ei tapahtumia",
+        "todoProgress": "TODO-edistyminen",
+        "created": "Luotu",
+        "lastEvent": "Viimeisin tapahtuma",
+        "delete": "Poista",
+        "deleteConfirm": "Poista tämä tehtävä?"
+      },
+      "directives": {
+        "title": "Ohjeet",
+        "purpose": "Tarkoitus",
+        "rules": "Säännöt",
+        "memoryAreas": "Muistialueet",
+        "resources": "Resurssit",
+        "edit": "Muokkaa",
+        "save": "Tallenna",
+        "cancel": "Peruuta",
+        "reset": "Palauta oletukset",
+        "resetConfirm": "Palauta agentin ohjeet oletuksiin?",
+        "empty": "Ohjeita ei määritetty",
+        "addRule": "Lisää sääntö",
+        "system": "Järjestelmä",
+        "owner": "Omistaja",
+        "agent": "Agentti"
       }
     },
     "scopes": {
@@ -772,7 +816,35 @@
       "fedNoConsents": "Federaatiokirjautumista ei myönnetty.",
       "fedRemove": "Poista",
       "fedGranted": "Todennusoikeus myönnetty",
-      "fedRevoked": "Todennusoikeus peruutettu"
+      "fedRevoked": "Todennusoikeus peruutettu",
+      "sharingGroups": {
+        "title": "Jakoryhmät",
+        "desc": "Luo ryhmiä jakaaksesi muistia ja tiedostoja tiettyjen käyttäjien ja agenttien kanssa",
+        "empty": "Ei jakoryhmiä vielä",
+        "newGroup": "Uusi ryhmä",
+        "create": "Luo ryhmä",
+        "cancel": "Peruuta",
+        "name": "Ryhmän nimi",
+        "description": "Kuvaus",
+        "members": "Jäsenet",
+        "entries": "Jaetut merkinnät",
+        "delete": "Poista ryhmä",
+        "deleteConfirm": "Poista tämä jakoryhmä?",
+        "addMember": "Lisää jäsen",
+        "removeMember": "Poista",
+        "identifier": "Tunniste (GAII tai GHII)",
+        "identifierType": "Tyyppi"
+      },
+      "agentDefaults": {
+        "title": "Agenttien oletukset",
+        "desc": "Oletussäännöt ja -asetukset kaikille agenteillesi",
+        "rules": "Oletussäännöt",
+        "tokenBudget": "Oletustoken-budjetti",
+        "empty": "Oletuksia ei määritetty",
+        "edit": "Muokkaa",
+        "save": "Tallenna",
+        "cancel": "Peruuta"
+      }
     },
     "nodes": {
       "title": "Henkilökohtaiset solmut",
@@ -1696,7 +1768,8 @@
       "public": "Julkinen",
       "private": "Yksityinen",
       "owner": "Omat agentit",
-      "protected": "Suojattu"
+      "protected": "Suojattu",
+      "group": "Ryhmä"
     },
     "knowledge": {
       "parseError": "Liitettyä sisältöä ei voitu jäsentää JSON-muodossa",
@@ -3576,7 +3649,32 @@
     "memoryFilterPrefix": "Suodata avaimen etuliitteellä",
     "memoryNoResults": "Muistiavaimia ei löytynyt",
     "memoryDeleteConfirm": "Poista tämä muistiavain?",
-    "memoryDeleted": "Muistiavain poistettu"
+    "memoryDeleted": "Muistiavain poistettu",
+    "agentTasksTab": "Agenttitehtävät",
+    "agentTasksDesc": "Yhteenveto kaikista agenttitehtävistä solmussa",
+    "agentTasksTotal": "Tehtäviä yhteensä",
+    "agentTasksEmpty": "Agenttitehtäviä ei löytynyt",
+    "agentTasksAgent": "Agentti",
+    "agentTasksTitle": "Otsikko",
+    "agentTasksStatus": "Tila",
+    "agentTasksTodoProgress": "TODO-edistyminen",
+    "agentTasksCreated": "Luotu",
+    "agentTasksLastEvent": "Viimeisin tapahtuma",
+    "agentTasksActiveTasks": "Aktiiviset agenttitehtävät",
+    "agentTasksFilterStatus": "Suodata tilan mukaan",
+    "agentTasksAllStatuses": "Kaikki tilat",
+    "sharingGroupsTab": "Jakoryhmät",
+    "sharingGroupsDesc": "Yhteenveto kaikista jakoryhmistä solmussa",
+    "sharingGroupsTotal": "Ryhmiä yhteensä",
+    "sharingGroupsEmpty": "Jakoryhmiä ei löytynyt",
+    "sharingGroupsName": "Nimi",
+    "sharingGroupsOwner": "Omistaja",
+    "sharingGroupsMembers": "Jäsenet",
+    "sharingGroupsEntries": "Merkinnät",
+    "sharingGroupsCreated": "Luotu",
+    "sharingGroupsTotalCount": "Jakoryhmät",
+    "overviewActiveTasks": "Aktiiviset tehtävät",
+    "overviewSharingGroups": "Jakoryhmät"
   },
   "launcher": {
     "title": "Omat Sovellukset",

@@ -120,6 +120,14 @@ tags:
     description: Capability Layer — unified discovery, invoke, and management of node capabilities
   - name: OpenRouter
     description: OpenRouter AI integration for automated generator steps. Owner-only endpoints.
+  - name: Agent Tasks
+    description: Task queue for AI agents — create, track, and complete structured work items
+  - name: Agent Integration
+    description: Agent inbox, integration kit, and long-poll task endpoints
+  - name: Agent Directives
+    description: Per-agent directives — purpose, rules, memory areas, and resources
+  - name: Sharing Groups
+    description: Named groups for sharing memory and files with specific users and agents
 
 components:
   securitySchemes:
@@ -158,7 +166,7 @@ components:
 
     Visibility:
       type: string
-      enum: [private, owner, public]
+      enum: [private, owner, group, public]
       default: private
 
     DisputeEventType:
@@ -385,6 +393,9 @@ components:
           description: Any JSON value
         visibility:
           $ref: '#/components/schemas/Visibility'
+        group_id:
+          type: string
+          description: Sharing group ID (required when visibility is 'group')
         tags:
           type: array
           items:
@@ -403,6 +414,9 @@ components:
         value: {}
         visibility:
           $ref: '#/components/schemas/Visibility'
+        group_id:
+          type: string
+          description: Sharing group ID (present when visibility is 'group')
         zone:
           type: string
           enum: [private, dmz, federation]
@@ -2329,6 +2343,163 @@ components:
         customized:
           type: boolean
 
+    # === Agent Tasks ===
+    TaskStatus:
+      type: string
+      enum: [draft, queued, active, done, failed, stalled]
+
+    AgentTask:
+      type: object
+      required: [id, agentName, ownerGaii, title, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        agentName:
+          type: string
+        ownerGaii:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        todos:
+          type: array
+          items:
+            type: object
+            properties:
+              text:
+                type: string
+              done:
+                type: boolean
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskEvent'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    TaskEvent:
+      type: object
+      required: [type, timestamp]
+      properties:
+        type:
+          type: string
+          enum: [created, started, progress, log, completed, failed, stalled]
+        message:
+          type: string
+        details:
+          type: object
+        timestamp:
+          type: string
+          format: date-time
+
+    # === Agent Directives ===
+    AgentDirectives:
+      type: object
+      properties:
+        purpose:
+          type: string
+        rules:
+          type: array
+          items:
+            type: object
+            properties:
+              text:
+                type: string
+              source:
+                type: string
+                enum: [system, owner, agent]
+        memoryAreas:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+              description:
+                type: string
+              access:
+                type: string
+                enum: [read, write, readwrite]
+        resources:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              uri:
+                type: string
+              description:
+                type: string
+
+    # === Sharing Groups ===
+    SharingGroup:
+      type: object
+      required: [id, name, ownerGaii, members, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        ownerGaii:
+          type: string
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/SharingGroupMember'
+        entryCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    SharingGroupMember:
+      type: object
+      required: [identifier, role, addedAt]
+      properties:
+        identifier:
+          type: string
+          description: GAII or GHII of the member
+        role:
+          type: string
+          enum: [reader, writer, admin]
+          default: reader
+        addedAt:
+          type: string
+          format: date-time
+
+    # === Owner Agent Defaults ===
+    AgentDefaults:
+      type: object
+      properties:
+        rules:
+          type: array
+          items:
+            type: object
+            properties:
+              text:
+                type: string
+              source:
+                type: string
+                enum: [system, owner]
+        tokenBudget:
+          type: integer
+          description: Default daily token budget for agents
+
   # === Reusable Response Wrappers ===
   responses:
     AimeatSuccess:
@@ -3999,7 +4170,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [private, owner, public]
+            enum: [private, owner, group, public]
         - name: tags
           in: query
           schema:
@@ -4160,7 +4331,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [private, owner, public]
+            enum: [private, owner, group, public]
         - name: max_flags
           in: query
           schema:
@@ -4641,7 +4812,10 @@ paths:
                   type: string
                 visibility:
                   type: string
-                  enum: [private, owner, public]
+                  enum: [private, owner, group, public]
+                group_id:
+                  type: string
+                  description: Sharing group ID (required when visibility is 'group')
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
@@ -15143,7 +15317,7 @@ paths:
                 name: { type: string }
                 summary: { type: string }
                 callable: { type: boolean }
-                visibility: { type: string, enum: [private, owner, public] }
+                visibility: { type: string, enum: [private, owner, group, public] }
                 webhookUrl: { type: string }
                 tags: { type: array, items: { type: string } }
       responses:
@@ -15304,3 +15478,1093 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+
+  # ============================================================
+  # Agent Tasks
+  # ============================================================
+
+  /v1/agents/{name}/tasks:
+    post:
+      operationId: createAgentTask
+      summary: Create a task for an agent
+      description: Create a new task in draft or queued status for the specified agent.
+      tags: [Agent Tasks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+          description: Agent name (not full GAII)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                status:
+                  type: string
+                  enum: [draft, queued]
+                  default: draft
+                todos:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      text: { type: string }
+                      done: { type: boolean, default: false }
+      responses:
+        '201':
+          description: Task created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentTask'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    get:
+      operationId: listAgentTasks
+      summary: List tasks for an agent
+      description: List all tasks for the specified agent, optionally filtered by status.
+      tags: [Agent Tasks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+          description: Agent name
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/TaskStatus'
+        - $ref: '#/components/parameters/Pagination'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          tasks:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/AgentTask'
+                          total:
+                            type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/tasks/{id}:
+    get:
+      operationId: getAgentTask
+      summary: Get task detail
+      description: Get full task detail including all events and TODO items.
+      tags: [Agent Tasks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Task detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentTask'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateAgentTask
+      summary: Update a task
+      description: Update task title, description, or TODO items. Only draft and queued tasks can have their title/description changed.
+      tags: [Agent Tasks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                todos:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      text: { type: string }
+                      done: { type: boolean }
+      responses:
+        '200':
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentTask'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteAgentTask
+      summary: Delete a task
+      description: Delete a task. Only draft and queued tasks can be deleted.
+      tags: [Agent Tasks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/tasks/{id}/start:
+    post:
+      operationId: startAgentTask
+      summary: Start a task
+      description: Transition a queued task to active status. Only queued tasks can be started.
+      tags: [Agent Tasks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Task started
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentTask'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /v1/agents/{name}/tasks/{id}/event:
+    post:
+      operationId: addTaskEvent
+      summary: Add an event to a task
+      description: Append a progress, log, or status event to an active task.
+      tags: [Agent Tasks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type]
+              properties:
+                type:
+                  type: string
+                  enum: [progress, log, stalled]
+                message:
+                  type: string
+                details:
+                  type: object
+      responses:
+        '200':
+          description: Event added
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentTask'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/tasks/{id}/complete:
+    post:
+      operationId: completeAgentTask
+      summary: Complete a task
+      description: Mark an active task as done with an optional completion message.
+      tags: [Agent Tasks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: Completion summary
+      responses:
+        '200':
+          description: Task completed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentTask'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /v1/agents/{name}/tasks/{id}/fail:
+    post:
+      operationId: failAgentTask
+      summary: Fail a task
+      description: Mark an active task as failed with an error message.
+      tags: [Agent Tasks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: Failure reason
+      responses:
+        '200':
+          description: Task failed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentTask'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /v1/agents/{name}/tasks/{id}/events:
+    get:
+      operationId: listTaskEvents
+      summary: List task events
+      description: Get the full event history for a task.
+      tags: [Agent Tasks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Task events
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          events:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/TaskEvent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # Agent Integration
+  # ============================================================
+
+  /v1/agents/{name}/inbox:
+    get:
+      operationId: getAgentInbox
+      summary: Agent inbox
+      description: |
+        Returns pending tasks, directives, and notifications for the agent.
+        Designed for agents to poll on startup or periodically.
+      tags: [Agent Integration]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Agent inbox contents
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          tasks:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/AgentTask'
+                          directives:
+                            $ref: '#/components/schemas/AgentDirectives'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/integration-kit:
+    get:
+      operationId: getAgentIntegrationKit
+      summary: Agent integration kit
+      description: |
+        Returns the full integration context for an agent: directives, available
+        memory areas, capabilities, and connection details. Agents use this on
+        first connect to understand their operating environment.
+      tags: [Agent Integration]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Integration kit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/tasks/wait:
+    get:
+      operationId: waitForAgentTask
+      summary: Long-poll for new tasks
+      description: |
+        Long-poll endpoint that blocks until a new task is available for the agent
+        or the timeout expires. Returns the next queued task if one exists.
+      tags: [Agent Integration]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: timeout
+          in: query
+          schema:
+            type: integer
+            default: 30
+            maximum: 120
+          description: Maximum seconds to wait before returning empty
+      responses:
+        '200':
+          description: Task available or timeout
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          task:
+                            $ref: '#/components/schemas/AgentTask'
+                            nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # Agent Directives
+  # ============================================================
+
+  /v1/agents/{name}/directives:
+    get:
+      operationId: getAgentDirectives
+      summary: Get merged agent directives
+      description: |
+        Returns the merged view of agent directives combining system defaults,
+        owner defaults, and agent-specific overrides. Rules are ordered by
+        source priority: system, owner, agent.
+      tags: [Agent Directives]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Merged directives
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentDirectives'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: upsertAgentDirectives
+      summary: Set agent directives
+      description: Create or replace the agent-specific directives. System and owner rules cannot be modified through this endpoint.
+      tags: [Agent Directives]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                purpose:
+                  type: string
+                rules:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      text: { type: string }
+                memoryAreas:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      key: { type: string }
+                      description: { type: string }
+                      access: { type: string, enum: [read, write, readwrite] }
+                resources:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type: { type: string }
+                      uri: { type: string }
+                      description: { type: string }
+      responses:
+        '200':
+          description: Directives saved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentDirectives'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: resetAgentDirectives
+      summary: Reset agent directives to defaults
+      description: Remove all agent-specific directive overrides. System and owner defaults will still apply.
+      tags: [Agent Directives]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # Owner Agent Defaults
+  # ============================================================
+
+  /v1/owner/agent-defaults:
+    get:
+      operationId: getOwnerAgentDefaults
+      summary: Get owner's agent defaults
+      description: Returns the default rules and settings the owner has configured for all their agents.
+      tags: [Agent Directives]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Agent defaults
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentDefaults'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      operationId: upsertOwnerAgentDefaults
+      summary: Set owner's agent defaults
+      description: Create or replace the owner's default rules and settings applied to all their agents.
+      tags: [Agent Directives]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rules:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      text: { type: string }
+                tokenBudget:
+                  type: integer
+      responses:
+        '200':
+          description: Defaults saved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentDefaults'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================================
+  # Sharing Groups
+  # ============================================================
+
+  /v1/groups:
+    post:
+      operationId: createSharingGroup
+      summary: Create a sharing group
+      description: Create a new sharing group. The creator is automatically added as an admin member.
+      tags: [Sharing Groups]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '201':
+          description: Group created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SharingGroup'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    get:
+      operationId: listSharingGroups
+      summary: List sharing groups
+      description: List all sharing groups the authenticated user is a member of or owns.
+      tags: [Sharing Groups]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of groups
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          groups:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/SharingGroup'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/groups/{id}:
+    get:
+      operationId: getSharingGroup
+      summary: Get sharing group detail
+      description: Get full detail of a sharing group including members and entry count.
+      tags: [Sharing Groups]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Group detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SharingGroup'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateSharingGroup
+      summary: Update sharing group
+      description: Update group name or description. Requires admin role in the group.
+      tags: [Sharing Groups]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '200':
+          description: Group updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SharingGroup'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteSharingGroup
+      summary: Delete a sharing group
+      description: Delete a sharing group. Only the group owner can delete it. All group visibility references become invalid.
+      tags: [Sharing Groups]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/groups/{id}/members:
+    post:
+      operationId: addSharingGroupMember
+      summary: Add a member to a sharing group
+      description: Add a user or agent to the sharing group with a specified role. Requires admin role.
+      tags: [Sharing Groups]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [identifier]
+              properties:
+                identifier:
+                  type: string
+                  description: GAII or GHII of the member to add
+                role:
+                  type: string
+                  enum: [reader, writer, admin]
+                  default: reader
+      responses:
+        '201':
+          description: Member added
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SharingGroupMember'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /v1/groups/{id}/members/{identifier}:
+    patch:
+      operationId: updateSharingGroupMember
+      summary: Update a member's role
+      description: Change a member's role in the sharing group. Requires admin role.
+      tags: [Sharing Groups]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: identifier
+          in: path
+          required: true
+          schema: { type: string }
+          description: URL-encoded GAII or GHII
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [reader, writer, admin]
+      responses:
+        '200':
+          description: Member role updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SharingGroupMember'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: removeSharingGroupMember
+      summary: Remove a member from a sharing group
+      description: Remove a user or agent from the sharing group. Requires admin role or the member themselves.
+      tags: [Sharing Groups]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: identifier
+          in: path
+          required: true
+          schema: { type: string }
+          description: URL-encoded GAII or GHII
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # Admin — Agent Tasks & Sharing Groups
+  # ============================================================
+
+  /v1/admin/agent-tasks:
+    get:
+      operationId: adminListAgentTasks
+      summary: List all agent tasks (operator)
+      description: Returns all agent tasks across the node with optional status filter. Operator-only.
+      tags: [Admin, Agent Tasks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/TaskStatus'
+        - $ref: '#/components/parameters/Pagination'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: All agent tasks
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          tasks:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/AgentTask'
+                          total:
+                            type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/admin/sharing-groups:
+    get:
+      operationId: adminListSharingGroups
+      summary: List all sharing groups (operator)
+      description: Returns all sharing groups on the node with member counts. Operator-only.
+      tags: [Admin, Sharing Groups]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: All sharing groups
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          groups:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/SharingGroup'
+                          total:
+                            type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'

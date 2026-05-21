@@ -48,6 +48,8 @@ import PackagesAdminTab  from './admin/packages-tab.js';
 import MemoryAdminTab    from './admin/memory-tab.js';
 import GeneratorDebugTab from './admin/generator-debug-tab.js';
 import CapabilitiesAdminTab from './admin/capabilities-tab.js';
+import AgentTasksAdminTab from './admin/agent-tasks-tab.js';
+import SharingGroupsAdminTab from './admin/sharing-groups-tab.js';
 
 // ── Sidebar nav structure ──
 const NAV_GROUPS = [
@@ -74,6 +76,8 @@ const NAV_GROUPS = [
     { id: 'realtime',      icon: '\u{1F4E1}',  key: 'dashboard.realtime',      component: RealtimeTab,       count: 'rooms' },
     { id: 'work',          icon: '\u{1F4E6}',  key: 'dashboard.work',          component: WorkTab,           count: 'work' },
     { id: 'memory-admin',  icon: '\u{1F5C4}',  key: 'dashboard.memoryAdmin',   component: MemoryAdminTab },
+    { id: 'agent-tasks',  icon: '\u{1F4CB}',  key: 'dashboard.agentTasksTab', component: AgentTasksAdminTab },
+    { id: 'sharing-groups', icon: '\u{1F465}', key: 'dashboard.sharingGroupsTab', component: SharingGroupsAdminTab },
     { id: 'capabilities', icon: '⚡',     key: 'capabilities.adminTitle', component: CapabilitiesAdminTab },
   ]},
   { key: 'dashboard.navInfrastructure', items: [
