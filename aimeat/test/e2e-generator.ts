@@ -634,6 +634,7 @@ await test('Agent: blueprint submit returns validation errors for invalid YAML',
 
     // Submit a valid blueprint so subsequent component-submit tests can proceed
     const validBlueprint = JSON.stringify({
+        service_slug: 'api-test-service',
         components: [
             { id: 'csm-main', type: 'csm', label: 'Main CSM' },
         ],

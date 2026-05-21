@@ -212,9 +212,9 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
       const { invokeCapability } = await import('../services/capability-invoke.js');
       const result = await invokeCapability(config, storage, cap, input, callerGhii, jwt, mode);
 
-      storage.incrementCapabilityStats(cap.id, {
+      await storage.incrementCapabilityStats(cap.id, {
         success: 1, error: 0, totalMs: result.duration_ms,
-      }).catch(() => {});
+      });
 
       const logInput = redactInput(input, cap.redactedFields);
       storage.addCapabilityLog({
@@ -249,9 +249,9 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     const { duration_ms, status: telStatus } = req.body;
     const capId = req.params.id as string;
     if (telStatus === 'success') {
-      storage.incrementCapabilityStats(capId, { success: 1, error: 0, totalMs: duration_ms || 0 }).catch(() => {});
+      await storage.incrementCapabilityStats(capId, { success: 1, error: 0, totalMs: duration_ms || 0 });
     } else {
-      storage.incrementCapabilityStats(capId, { success: 0, error: 1, totalMs: duration_ms || 0, lastError: req.body.error }).catch(() => {});
+      await storage.incrementCapabilityStats(capId, { success: 0, error: 1, totalMs: duration_ms || 0, lastError: req.body.error });
     }
     res.status(204).end();
   });
