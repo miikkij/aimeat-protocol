@@ -336,6 +336,9 @@ export interface AimeatConfig {
   capabilityWebhookDomainAllowlist: string[];
   capabilityLogRetentionDays: number;
 
+  // Agent Tasks (Phase 1)
+  taskStallThresholdMinutes: number;
+
   // CORS
   corsAllowedOrigins: string[];
 
@@ -669,6 +672,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     capabilityWebhooks: (process.env.AIMEAT_CAPABILITY_WEBHOOKS ?? 'disabled') as 'disabled' | 'allowlist_only' | 'open',
     capabilityWebhookDomainAllowlist: (process.env.AIMEAT_CAPABILITY_WEBHOOK_DOMAIN_ALLOWLIST ?? '').split(',').map(s => s.trim()).filter(Boolean),
     capabilityLogRetentionDays: parseInt(process.env.AIMEAT_CAPABILITY_LOG_RETENTION_DAYS ?? '30', 10),
+
+    // Agent Tasks (Phase 1)
+    taskStallThresholdMinutes: parseInt(process.env.AIMEAT_TASK_STALL_THRESHOLD_MINUTES ?? '30', 10),
 
     corsAllowedOrigins: (process.env.AIMEAT_CORS_ALLOWED_ORIGINS ?? '*').split(',').map(s => s.trim()).filter(Boolean),
 

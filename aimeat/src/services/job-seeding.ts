@@ -36,6 +36,9 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
     jobs.push({ id: 'core:nonce-cleanup', name: 'Verification Nonce Cleanup', coreHandler: 'nonce-cleanup', cron: '*/5 * * * *' });
   }
 
+  // Agent task stall detection (Phase 1) -- runs every 5 minutes
+  jobs.push({ id: 'core:task-stall-detection', name: 'Task Stall Detection', coreHandler: 'task-stall-detection', cron: '*/5 * * * *' });
+
   const now = new Date().toISOString();
   for (const def of jobs) {
     const existing = await storage.getScheduledJob(def.id);
