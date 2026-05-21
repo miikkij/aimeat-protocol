@@ -339,6 +339,12 @@ export interface AimeatConfig {
   // Agent Tasks (Phase 1)
   taskStallThresholdMinutes: number;
 
+  // Agent Directives (Phase 1)
+  agentSystemPrinciples: string[];
+  agentMaxTokensPerTask: number;
+  agentMandatoryLogging: boolean;
+  agentAimeatFirstEnabled: boolean;
+
   // CORS
   corsAllowedOrigins: string[];
 
@@ -675,6 +681,12 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
 
     // Agent Tasks (Phase 1)
     taskStallThresholdMinutes: parseInt(process.env.AIMEAT_TASK_STALL_THRESHOLD_MINUTES ?? '30', 10),
+
+    // Agent Directives (Phase 1)
+    agentSystemPrinciples: JSON.parse(process.env.AIMEAT_AGENT_SYSTEM_PRINCIPLES || '["AIMEAT-first: prefer native systems", "Log all significant actions"]'),
+    agentMaxTokensPerTask: parseInt(process.env.AIMEAT_AGENT_MAX_TOKENS_PER_TASK || '100000', 10),
+    agentMandatoryLogging: process.env.AIMEAT_AGENT_MANDATORY_LOGGING !== 'false',
+    agentAimeatFirstEnabled: process.env.AIMEAT_AGENT_AIMEAT_FIRST !== 'false',
 
     corsAllowedOrigins: (process.env.AIMEAT_CORS_ALLOWED_ORIGINS ?? '*').split(',').map(s => s.trim()).filter(Boolean),
 

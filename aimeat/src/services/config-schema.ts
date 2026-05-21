@@ -336,6 +336,12 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'consulToken', dotPath: 'consul.token', envVar: 'AIMEAT_CONSUL_TOKEN', type: 'string', validate: () => true, immutable: true, description: 'Consul ACL token', adminDisplay: 'configured' },
   { key: 'consulWatchIntervalSeconds', dotPath: 'consul.watch_interval_seconds', envVar: 'AIMEAT_CONSUL_WATCH_INTERVAL', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 5 && (v as number) <= 3600, immutable: true, description: 'Consul watch poll interval in seconds', range: '5-3600' },
   { key: 'consulDatacenter', dotPath: 'consul.datacenter', envVar: 'AIMEAT_CONSUL_DATACENTER', type: 'string', validate: () => true, immutable: true, description: 'Consul datacenter name' },
+
+  // ── Agent Directives (Phase 1, mutable) ──
+  { key: 'agentSystemPrinciples', dotPath: 'agent.system_principles', envVar: 'AIMEAT_AGENT_SYSTEM_PRINCIPLES', type: 'object', validate: (v: unknown) => Array.isArray(v) && v.every(item => typeof item === 'string'), immutable: false, description: 'System-level principles injected into all agent directives' },
+  { key: 'agentMaxTokensPerTask', dotPath: 'agent.max_tokens_per_task', envVar: 'AIMEAT_AGENT_MAX_TOKENS_PER_TASK', type: 'number', validate: (v: unknown) => typeof v === 'number' && (v as number) >= 1000 && (v as number) <= 10000000, immutable: false, description: 'Maximum token budget per agent task', range: '1000-10000000' },
+  { key: 'agentMandatoryLogging', dotPath: 'agent.mandatory_logging', envVar: 'AIMEAT_AGENT_MANDATORY_LOGGING', type: 'boolean', validate: (v: unknown) => typeof v === 'boolean', immutable: false, description: 'Require agents to log all significant actions' },
+  { key: 'agentAimeatFirstEnabled', dotPath: 'agent.aimeat_first', envVar: 'AIMEAT_AGENT_AIMEAT_FIRST', type: 'boolean', validate: (v: unknown) => typeof v === 'boolean', immutable: false, description: 'Enable AIMEAT-first principle in agent directives' },
 ];
 
 // ── Derived Lookup Maps ──

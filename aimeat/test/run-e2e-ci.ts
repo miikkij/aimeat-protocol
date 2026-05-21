@@ -61,6 +61,7 @@ const ALL_SUITES = [
     'test/openrouter.ts',
     'test/e2e-sharing-groups.ts',
     'test/e2e-agent-tasks.ts',
+    'test/e2e-agent-directives.ts',
 ];
 
 const PORT = process.env.AIMEAT_PORT ?? '40251';
