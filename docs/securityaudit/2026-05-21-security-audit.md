@@ -837,11 +837,25 @@ res.setHeader('Content-Security-Policy',
 
 ---
 
-### Plan 27: L5 -- Store Interests Under Owner GHII
+### Plan 27: L5 -- Store Interests Under Owner GHII (Coordinated Fix)
 
-**Where:** `src/routes/ghii.ts` lines 625-636.
+**What:** Registration-time interests were stored under a fabricated agent GAII (`app#username@nodeId`) for an agent that doesn't exist. The directory service read interests using a different agent GAII. Both sides needed to be updated together.
 
-**Changes:** Replace `app#${username}@${config.nodeId}` with `${username}@${config.nodeId}` (the owner's GHII).
+**Where:** `src/routes/ghii.ts` (write side), `src/services/directory.ts` (read side).
+
+**Changes (coordinated):**
+
+1. **Write side** (`ghii.ts`): Store interests under the owner's GHII (`username@nodeId`) instead of the fabricated `app#username@nodeId`. Removed the unused `agentGaii` variable.
+
+2. **Read side** (`directory.ts`): Check GHII first when loading interests and location, fall back to agent GAII for backward compatibility with records stored under the old fabricated identity:
+   ```typescript
+   let interestsMemory = await this.storage.getMemory(ghii.ghii, key);
+   if (!interestsMemory?.value) {
+     interestsMemory = await this.storage.getMemory(consentAgentGaii, key);
+   }
+   ```
+
+**Why both sides:** Changing only the write side would break the directory lookup (it was reading from agent GAII). Changing only the read side would leave the fabricated identity in place. The GHII-first fallback ensures both old and new records are found.
 
 ---
 
