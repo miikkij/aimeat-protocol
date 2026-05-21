@@ -187,32 +187,79 @@ aimeat_task_complete    Mark task done with verification details
 aimeat_task_fail        Mark task failed with reason
 ```
 
-### Agent Prompt Extension
+### Agent Prompt: Two-Part Design
 
-Added to the agent connection prompt in `agents-tab.js` `buildAgentPrompt()`:
+The connection prompt and the operating instructions are separate. The connection prompt is ultra-short (Telegram-safe). The agent downloads its own full instructions after authenticating.
+
+**Connection prompt** (`buildAgentPrompt()` in `agents-tab.js`, ~10 lines):
 
 ```
-TASK PICKUP (check on every session)
+Connect to my AIMEAT node as an AI agent.
 
-After connecting, check your task queue:
-  aimeat_task_list status:"queued"
+Owner: {owner}
+Node: {nodeUrl}
 
-For each task:
-  1. aimeat_task_get task_id:"<id>" -> read scope, rules, resources, TODOs
-  2. aimeat_task_start task_id:"<id>"
-  3. Read pre-bound resources (knowledge packages, memory keys)
-  4. Work through TODOs in order, following AIMEAT-first principle:
-     - Use AIMEAT extensions, scheduler, memory, apps as primary
-     - Only use your own environment when AIMEAT can't handle it
-  5. Log progress: aimeat_task_event after each significant step
-  6. Update TODO status: aimeat_task_todo for each completed step
-  7. Verify against verification.userExpects and verification.technicalChecks
-  8. aimeat_task_complete OR aimeat_task_fail
+1. Authenticate: POST {nodeUrl}/v1/agents/device-authorize
+   Body: { "agent_name": "your-name", "owner": "{owner}" }
+   Tell me the verification URL so I can approve.
 
-Directives (always active):
-  Your directives are your standing instructions. Every task inherits them.
-  Check directives for: memory schemas, token budgets, behavior rules.
+2. After auth, download your operating instructions:
+   GET {nodeUrl}/v1/prompts/tier1
+   This file contains your directives, task queue, capabilities
+   reporting, and everything you need to operate on this node.
+   Read it fully before doing anything else.
 ```
+
+**Full operating instructions** (served by existing `GET /v1/prompts/tier1`, extended):
+
+The tier1 prompt is updated to include all new behavior. Key sections:
+
+```
+# AIMEAT Agent Operating Instructions
+
+## Your Identity
+GAII, owner, trust score, morsel balance, daily allowance
+(variable-substituted per agent)
+
+## AIMEAT-First Principle
+Use AIMEAT extensions, scheduler, memory, apps as PRIMARY.
+Agent's own environment only when AIMEAT can't handle it.
+Justify agent-env steps in task TODOs.
+
+## Task Pickup (check every session)
+1. aimeat_task_list status:"queued"
+2. For each task: get -> start -> work TODOs -> log events -> verify -> complete/fail
+3. Follow directives (inherited rules) for every task
+
+## Directives (always active)
+GET /v1/agents/{name}/directives
+Standing instructions: memory schemas, token budgets, behavior rules.
+
+## Capability Reporting (on connect + when skills change)
+PUT /v1/agents/{name}/capabilities
+Report technical skills (MCP tools, Playwright, etc.) and domain knowledge.
+
+## Message Handling (Phase 3)
+GET /v1/agents/{name}/messages/inbox
+Process and respond. Can propose tasks from conversations.
+
+## Available APIs
+Memory, catalogue, wallet, work, boards, knowledge, extensions, apps.
+Full spec: /v1/spec
+```
+
+**UI changes** to "Connect an Automation Agent" section in agents-tab.js:
+- Short prompt box (~10 lines) with "Copy Prompt" button (primary)
+- "Download Full Instructions (.md)" button -- fetches tier1, saves as file (for Telegram file attachment or limited agents)
+- "Copy Full Instructions" button -- fetches tier1, copies to clipboard
+- Hint: "Telegram users: Send the downloaded file as attachment to avoid message splitting."
+
+**Why this works:**
+- Agent downloads its own instructions -- if it can't, it's not an agent
+- Instructions stay up-to-date -- every reconnect fetches latest version
+- No stale copy-pasted prompts -- new features (Phase 2/3) appear automatically
+- No new endpoint -- extends existing `GET /v1/prompts/tier1` which already has variable substitution
+- MCP-connected agents already have `aimeat_prompts_get` tool -- they fetch automatically
 
 ### Scopes
 
@@ -786,6 +833,97 @@ The agents tab transforms from a flat card list to a card list where clicking an
 ### Existing Agent Card Content
 
 The current expanded card content (GAII, description, roles, trust, balance, last seen, created, public key, capabilities, scopes, delete) becomes the **card header** -- always visible when the agent is expanded. Sub-tabs appear below.
+
+---
+
+## Integration Surface: Every Place These Features Touch
+
+This section exists to prevent shadow systems and missed touchpoints. The implementation plan MUST address every item here.
+
+### Group Visibility: Complete Touchpoint Map
+
+Adding `visibility: 'group'` ripples across ~200+ lines in 30 categories. NOT all visibility-bearing entities get `group` (see Part 3 for the list), but the implementation must audit every touchpoint.
+
+**Critical path (must change):**
+
+| Category | Files | What to do |
+|----------|-------|------------|
+| Access control logic | `src/services/consent.ts:64-95` | Add `group` branch to `checkConsentForRead()` |
+| Zone mapping | `src/routes/memory.ts:25-31` | Map `group` -> `dmz` in `visibilityToZone()` |
+| Type definitions | `src/storage/interface.ts` (lines 39, 215, 302, 1024, 1327) | Add `'group'` to MemoryRecord, StorageFileRecord, ChunkedUploadRecord, KnowledgeEntryDescriptor, CapabilityRecord |
+| Zod schemas | `src/models/schemas.ts` (lines 73, 80, 253) | Add `'group'` to MemoryWriteSchema, MemoryUpdateSchema, ChunkedUploadInitSchema |
+| MCP tool schemas | `src/mcp/core.ts:201,447`, `src/mcp/memory-extended.ts:36` | Add `'group'` to memory write/search tools |
+| Memory route casts | `src/routes/memory.ts:135,546,574-584` | Update type casts and PATCH validation to include `'group'` |
+| Knowledge visibility | `src/routes/knowledge.ts:488-551`, `src/schemas/knowledge-package.ts:56` | Add `'group'` to knowledge entry visibility validation |
+| Storage file routes | `src/routes/storage-files.ts:83,89,120` | Accept `'group'` visibility on file upload |
+| Frontend visibility cycles | `public/views/profile/memory-tab.js:233,664`, `public/views/profile/knowledge-tab.js:385` | Add `'group'` to cycling arrays, add group picker popup |
+| Frontend dropdowns | `public/views/profile/memory-tab.js:524-528`, `public/views/admin/memory-tab.js:140-145` | Add `'group'` option to select elements |
+| Frontend badges/pills | `public/views/profile/shared.js:40-42`, `public/views/profile/memory-tab.js:310-316`, inline-panels, marketplace | Add `vis-group` CSS class and rendering |
+| CSS classes | `public/css/views/profile.css`, `public/css/views/foundry.css`, `public/css/views/marketplace.css` | Add `.vis-group`, `.pf-vis-group`, `.mk-vis-group` |
+| i18n keys | `locales/en.json`, `locales/fi.json` | Add `visGroup` labels for memory, knowledge, boards, extensions |
+| OpenAPI spec | `openapi.yaml` (~20 enum declarations) | Add `'group'` to all relevant visibility enums |
+
+**Audit path (verify, may not need changes):**
+
+| Category | Files | Why to audit |
+|----------|-------|-------------|
+| Board visibility | `src/routes/boards.ts` (12 conditionals) | Boards use `shared`+`allowedGaiis` not `group`, but audit that `group` entries don't leak through board queries |
+| Federation sync | `src/routes/federation-sync.ts`, `federation-genesis.ts`, `federation-peer.ts` | `group` is node-local Phase 1 -- verify it doesn't get synced outbound |
+| Memory replication | `src/services/memory-replication.ts:45,183` | `group` entries must NOT replicate (filter = `public` only) |
+| Catalogue routes | `src/routes/catalogue.ts:119,277` | Catalogue shows `public` only -- `group` should not appear |
+| Service summary | `src/utils/service-summary.ts:102` | Federation summary filters `public` only -- verify |
+| Packages | `src/routes/packages.ts:57` | Hardcoded `VALID_VISIBILITIES = ['private', 'public']` -- decide if packages get `group` |
+| Cortex | `src/routes/cortex.ts:323-340`, `src/services/cortex-manifest.ts:97` | Cortex only supports `public`/`private` -- no change needed but verify parser doesn't reject |
+| CSM parser | `src/services/csm-parser.ts:132-133` | CSM `visibilityDefault` is a different dimension (dmz zones) -- no change needed |
+
+### Admin Dashboard: New Views Needed
+
+The admin dashboard currently has ZERO awareness of agent tasks, directives, or sharing groups. These views must be added.
+
+**Agents tab expansion** (admin/agents-tab.js):
+- Add per-agent activity summary: tasks completed, tasks active, tokens used, success rate
+- Add clickable drill-down to agent task list and event log
+- Show agent directives (read-only for operator)
+- Show agent capabilities (when Phase 2 ships)
+
+**New admin tabs/sections needed:**
+
+| Tab | Nav Group | Content | Admin API endpoint |
+|-----|-----------|---------|-------------------|
+| Agent Tasks | Data | All tasks across all agents. Filter by agent, status, date. Task detail with TODO list and event log. | `GET /v1/admin/agent-tasks` |
+| Sharing Groups | Identity | All groups on the node. Members, shared entry count, owner. Audit: which entries reference each group. | `GET /v1/admin/sharing-groups` |
+| Agent Activity (Phase 2) | Data | Aggregate activity across all agents. Charts, top agents by tokens, failure rates. | `GET /v1/admin/agent-activity` |
+
+**Existing admin views to extend:**
+
+| View | What to add |
+|------|------------|
+| Overview tab | Add: Active Agent Tasks count, Sharing Groups count to stats grid |
+| Memory tab | Add: `group` to visibility filter dropdown. Show `groupId` and group name in entry detail. |
+| Work tab | Add: link to associated agent task (via `workTrackingCode`) when it exists |
+| Scheduler tab | Add: `createdByAgent` column to show which agent created extension jobs |
+| Stats tab | Add: per-agent task stats section (Phase 2) |
+
+**Admin loadAll() integration:**
+New data must plug into the centralized `loadAll()` in `admin.js` (lines 150-293). Add to Phase 2 parallel batch:
+- `getAdminAgentTasks()` -> task counts per agent
+- `getAdminSharingGroups()` -> group list with entry counts
+
+### Existing Systems: No Duplication Checklist
+
+Before implementing, verify these existing systems are EXTENDED, not duplicated:
+
+| New feature | Existing system to check | Risk |
+|-------------|------------------------|------|
+| Agent Tasks | Work exchange (`/v1/work/`) | Tasks are self-assigned work. Do NOT create a parallel work system. Tasks link to work via `workTrackingCode` for inter-agent calls. |
+| Agent Directives | Agent scopes (`SCOPE_DOMAINS` in agents-tab.js) | Scopes control WHAT an agent CAN do. Directives control HOW it SHOULD behave. Different layers, not overlapping. |
+| Sharing Groups | Board `allowedGaiis` pattern | Boards already have member-based access. Groups are reusable across entities. Do NOT add `allowedGaiis` to memory -- use `groupId` reference instead. |
+| Sharing Groups | Consent grants | Consent is pattern-based cross-owner access. Groups are membership-based same-node access. They coexist -- consent is the fallback after group check. |
+| Sharing Groups | Organisms | Organisms are social groups (community, team, club). Sharing Groups are access control lists. Different purpose. An organism COULD reference a sharing group for its data access, but they are not the same entity. |
+| Activity stats | StatsCollector + stats_counters | StatsCollector is node-wide. Agent stats are per-agent (embedded on AgentRecord + agent_activity table). Do NOT add agent dimensions to StatsCollector. |
+| Activity stats | CapabilityRecord.stats | Capability stats are per-capability. Agent stats are per-agent aggregate. Different granularity, no overlap. |
+| Task event log | ExecutionLogEntry (scheduler) | Scheduler logs are per-extension-job. Task events are per-task. Different entity, same pattern (separate table, append-only). |
+| Task event log | CapabilityLog | Capability logs are per-capability-invocation. Task events are per-task-step. Same pattern, different scope. |
 
 ---
 
