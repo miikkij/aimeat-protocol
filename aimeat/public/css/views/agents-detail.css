@@ -5,6 +5,7 @@
  *   All colors use CSS variables from theme.css.
  * @version-history
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
+ *   v1.1.0 -- 2026-05-22 -- Add capability badge styles for Capabilities sub-tab
  */
 
 /* Sub-tab bar */
@@ -278,3 +279,146 @@
   text-align: left;
   padding: var(--space-xs, 0.25rem) var(--space-sm, 0.5rem);
 }
+
+/* ── Capabilities sub-tab ── */
+
+/* Badge list container */
+.pf .agd-cap-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Individual capability badge */
+.pf .agd-cap-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 12px;
+  font-size: 0.8rem;
+  background: var(--card-bg, #FFFFFF);
+  color: var(--text, #1A1A2E);
+}
+.pf .agd-cap-name {
+  font-weight: 500;
+}
+
+/* Type badges (MCP / skill / tool) */
+.pf .agd-cap-type {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  background: var(--card-bg-alt, #F3F4F6);
+  color: var(--text-dim, #6B7280);
+}
+.pf .agd-cap-type-mcp {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+}
+.pf .agd-cap-type-skill {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success, #10b981);
+}
+.pf .agd-cap-type-tool {
+  background: rgba(217, 119, 6, 0.1);
+  color: #d97706;
+}
+
+/* Verified / self-reported badges */
+.pf .agd-cap-verified {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 500;
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success, #10b981);
+}
+.pf .agd-cap-unverified {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 500;
+  background: var(--card-bg-alt, #F3F4F6);
+  color: var(--text-dim, #6B7280);
+}
+
+/* Domain badge variant */
+.pf .agd-cap-domain {
+  background: var(--card-bg-alt, #F3F4F6);
+}
+
+/* Language tags row */
+.pf .agd-cap-langs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+.pf .agd-cap-lang-label {
+  font-size: 0.8rem;
+  color: var(--text-dim, #6B7280);
+  font-weight: 500;
+}
+.pf .agd-cap-lang {
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+  font-weight: 500;
+}
+
+/* Action queue support list */
+.pf .agd-cap-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.pf .agd-cap-queue-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text, #1A1A2E);
+}
+.pf .agd-cap-check {
+  color: var(--success, #10b981);
+  font-weight: 700;
+}
+
+/* ── Activity sub-tab ── */
+
+/* Activity stats cards */
+.pf .agd-stats-grid { display: flex; gap: 8px; margin-bottom: 16px; }
+.pf .agd-stat-card { flex: 1; background: var(--card-bg, #FFFFFF); border: 1px solid var(--border, #E5E7EB); border-radius: 8px; padding: 12px; text-align: center; }
+.pf .agd-stat-value { font-size: 1.5rem; font-weight: 600; color: var(--text, #1A1A2E); }
+.pf .agd-stat-label { font-size: 0.75rem; color: var(--text-muted, #9CA3AF); }
+
+/* Activity chart area */
+.pf .agd-chart-container { background: var(--card-bg, #FFFFFF); border: 1px solid var(--border, #E5E7EB); border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+.pf .agd-chart-rows { display: flex; flex-direction: column; gap: 4px; }
+.pf .agd-chart-row { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; }
+.pf .agd-chart-date { min-width: 52px; color: var(--text-muted, #9CA3AF); text-align: right; }
+.pf .agd-chart-bar-track { flex: 1; height: 14px; background: var(--card-bg-alt, #F3F4F6); border-radius: 3px; overflow: hidden; }
+.pf .agd-chart-bar-fill { height: 100%; background: var(--accent, #E8564A); border-radius: 3px; transition: width 0.2s; }
+.pf .agd-chart-count { min-width: 24px; text-align: right; font-weight: 600; color: var(--text-dim, #6B7280); }
+
+/* Event log entries */
+.pf .agd-log-entry { display: flex; gap: 8px; padding: 6px 10px; background: var(--card-bg, #FFFFFF); border: 1px solid var(--border, #E5E7EB); border-radius: 6px; margin-bottom: 3px; font-size: 0.8rem; align-items: center; }
+.pf .agd-log-time { color: var(--text-muted, #9CA3AF); white-space: nowrap; min-width: 80px; }
+.pf .agd-log-type { font-weight: 600; min-width: 80px; color: var(--text, #1A1A2E); }
+.pf .agd-log-msg { flex: 1; color: var(--text-dim, #6B7280); }
+.pf .agd-event-log-scroll { max-height: 300px; overflow-y: auto; margin-bottom: 4px; }
+
+/* Scheduled jobs badges */
+.pf .agd-job-badge-aimeat { background: var(--card-bg-alt, #F3F4F6); color: var(--success, #10B981); padding: 2px 6px; border-radius: 3px; font-size: 0.7rem; white-space: nowrap; flex-shrink: 0; }
+.pf .agd-job-badge-agent { background: var(--card-bg-alt, #F3F4F6); color: var(--warn, #F59E0B); padding: 2px 6px; border-radius: 3px; font-size: 0.7rem; white-space: nowrap; flex-shrink: 0; }
+
+/* Time range selector */
+.pf .agd-range-bar { display: flex; gap: 4px; margin-bottom: 8px; }
+.pf .agd-range-btn { padding: 2px 8px; border: 1px solid var(--border, #E5E7EB); border-radius: 4px; background: none; cursor: pointer; font-size: 0.75rem; color: var(--text-dim, #6B7280); }
+.pf .agd-range-btn.active { background: var(--accent, #E8564A); color: #FFFFFF; border-color: var(--accent, #E8564A); }

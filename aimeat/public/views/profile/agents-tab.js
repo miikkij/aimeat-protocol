@@ -8,6 +8,7 @@
  *   v1.2.0 — 2026-03-19 — Replace profile-initiated device auth with inline pending request approval
  *   v1.3.0 — 2026-05-21 — Shorten agent prompt to delegate to tier1; add Download/Copy Instructions buttons
  *   v1.4.0 — 2026-05-21 — Add sub-tab navigation (Tasks, Directives) in expanded agent detail view
+ *   v1.5.0 — 2026-05-22 — Add Capabilities sub-tab with technical/domain skill display
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -22,11 +23,15 @@ import { getNodeUrl } from '/js/services/auth.js';
 import { useConfirm } from '/components/Modal.js';
 import AgentTasksSubtab from './agents-tasks-subtab.js';
 import AgentDirectivesSubtab from './agents-directives-subtab.js';
+import AgentCapabilitiesSubtab from './agents-capabilities-subtab.js';
+import AgentActivitySubtab from './agents-activity-subtab.js';
 
 // === Agent Detail Sub-tabs ===
 const AGENT_SUBTABS = [
   { id: 'tasks', label: 'profile.agents.subtabs.tasks' },
   { id: 'directives', label: 'profile.agents.subtabs.directives' },
+  { id: 'capabilities', label: 'profile.agents.subtabs.capabilities' },
+  { id: 'activity', label: 'profile.agents.subtabs.activity' },
 ];
 
 // === Scope Management Constants ===
@@ -538,6 +543,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
               <div class="agd-subtab-content" onClick=${(e) => e.stopPropagation()}>
                 ${activeSubtab === 'tasks' && html`<${AgentTasksSubtab} agentName=${a.name} session=${session} showToast=${showToast} />`}
                 ${activeSubtab === 'directives' && html`<${AgentDirectivesSubtab} agentName=${a.name} session=${session} showToast=${showToast} />`}
+                ${activeSubtab === 'capabilities' && html`<${AgentCapabilitiesSubtab} agentName=${a.name} session=${session} showToast=${showToast} agent=${a} />`}
+                ${activeSubtab === 'activity' && html`<${AgentActivitySubtab} agentName=${a.name} session=${session} showToast=${showToast} />`}
               </div>
 
               <div class="agent-detail-row mt-1">

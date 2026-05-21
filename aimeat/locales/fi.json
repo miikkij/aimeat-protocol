@@ -407,7 +407,10 @@
         "actionQueue": "Toimintajonotuki",
         "verified": "vahvistettu",
         "selfReported": "itse ilmoitettu",
-        "empty": "Kyvykkyyksiä ei vielä ilmoitettu"
+        "empty": "Kyvykkyyksiä ei vielä ilmoitettu",
+        "canAccept": "Voi vastaanottaa toimeksiantoja",
+        "canDeliver": "Voi toimittaa tuloksia",
+        "languages": "Kielet"
       },
       "activity": {
         "tasksCompleted": "Tehtäviä suoritettu",

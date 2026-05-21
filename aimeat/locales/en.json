@@ -407,7 +407,10 @@
         "actionQueue": "Action Queue Support",
         "verified": "verified",
         "selfReported": "self-reported",
-        "empty": "No capabilities reported yet"
+        "empty": "No capabilities reported yet",
+        "canAccept": "Can accept work",
+        "canDeliver": "Can deliver work",
+        "languages": "Languages"
       },
       "activity": {
         "tasksCompleted": "Tasks Completed",
