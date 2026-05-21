@@ -53,7 +53,7 @@ export const ManifestSchema = {
         properties: {
           key: { type: 'string' },
           title: { type: 'string' },
-          visibility: { type: 'string', enum: ['private', 'owner', 'public'] },
+          visibility: { type: 'string', enum: ['private', 'owner', 'group', 'public'] },
           schema: { type: 'string' },
           references: {
             type: 'array',

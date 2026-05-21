@@ -488,10 +488,10 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
   router.patch('/v1/knowledge/:id/entries/:entryKey/visibility', requireAuth(), requireRole('agent'), async (req, res) => {
     const packageId = req.params.id as string;
     const entryKey = req.params.entryKey as string;
-    const { visibility } = req.body ?? {};
+    const { visibility, group_id: groupId } = req.body ?? {};
 
-    if (!['private', 'owner', 'public'].includes(visibility)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Visibility must be private, owner, or public'));
+    if (!['private', 'owner', 'group', 'public'].includes(visibility)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Visibility must be private, owner, group, or public'));
       return;
     }
 
@@ -540,6 +540,7 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
       await storage.setMemory({
         ...entryRecord,
         visibility,
+        groupId: visibility === 'group' ? groupId : undefined,
         updatedAt: now,
         version: (entryRecord.version || 0) + 1,
       });

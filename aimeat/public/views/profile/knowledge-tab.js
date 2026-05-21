@@ -381,10 +381,10 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
     finally { setLoadingEntries(null); }
   }, [expandedPkg, packages, entryData]);
 
-  /* ── Cycle visibility: private → owner → public → private ── */
-  const cycleVis = ['private', 'owner', 'public'];
-  const visColor = { private: '#c084fc', owner: '#60a5fa', public: '#4ade80' };
-  const visBg = { private: 'rgba(150,100,200,.2)', owner: 'rgba(100,150,255,.2)', public: 'rgba(0,200,100,.2)' };
+  /* ── Cycle visibility: private → owner → group → public → private ── */
+  const cycleVis = ['private', 'owner', 'group', 'public'];
+  const visColor = { private: '#c084fc', owner: '#60a5fa', group: '#10b981', public: '#4ade80' };
+  const visBg = { private: 'rgba(150,100,200,.2)', owner: 'rgba(100,150,255,.2)', group: 'rgba(16,185,129,.2)', public: 'rgba(0,200,100,.2)' };
 
   /* ── Scroll to entry by key (matches full or short key) ── */
   const scrollToEntry = useCallback((entryKey) => {
@@ -468,7 +468,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
     const rawData = entryData[entry.key] ?? entry.value;
     const val = formatEntryValue(rawData);
     const vis = entry.visibility || 'private';
-    const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % 3];
+    const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % cycleVis.length];
     const entryKey = entry.key || '';
     return html`
       <div class="kpkg-detail-entry" key=${i} data-entry-key=${entryKey}>

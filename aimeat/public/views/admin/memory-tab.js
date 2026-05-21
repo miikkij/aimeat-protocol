@@ -141,6 +141,7 @@ export default function MemoryTab({ data, reload, session }) {
           <option value="">${t('dashboard.memoryVisibility')} (${t('dashboard.all') || 'All'})</option>
           <option value="private">private</option>
           <option value="owner">owner</option>
+          <option value="group">group</option>
           <option value="public">public</option>
         </select>
         <button type="submit" class="adm-btn" disabled=${loading}>

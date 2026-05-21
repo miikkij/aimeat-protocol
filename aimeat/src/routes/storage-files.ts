@@ -45,9 +45,10 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         let fileData: Buffer;
         let mimeType: string;
         let federateFlag = false;
+        let groupId: string | undefined;
 
         if (contentType.includes('application/json')) {
-            const { key: k, visibility: v, data, mime_type, mode, federate: reqFederate } = req.body ?? {};
+            const { key: k, visibility: v, data, mime_type, mode, federate: reqFederate, group_id: reqGroupId } = req.body ?? {};
             federateFlag = reqFederate === true;
 
             // --- PRESIGNED MODE: return upload URL ---
@@ -81,6 +82,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             }
             key = k;
             visibility = v ?? 'private';
+            groupId = visibility === 'group' ? reqGroupId : undefined;
             fileData = Buffer.from(data, 'base64');
             mimeType = mime_type ?? 'application/octet-stream';
         } else {
@@ -117,7 +119,8 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         const file = await storage.createStorageFile({
             key,
             ownerGaii: gaii,
-            visibility: visibility as 'private' | 'owner' | 'public',
+            visibility: visibility as 'private' | 'owner' | 'group' | 'public',
+            groupId,
             mimeType,
             size: fileData.length,
             data: fileData,

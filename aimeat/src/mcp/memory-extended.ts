@@ -33,7 +33,7 @@ export function registerMemoryExtendedTools(
         'Full-text search across your own memory entries',
         {
             query: z.string(),
-            visibility: z.enum(['private', 'owner', 'public']).optional(),
+            visibility: z.enum(['private', 'owner', 'group', 'public']).optional(),
         },
         async ({ query, visibility }) => {
             const results = await storage.searchMemory(agentGaii, query, {

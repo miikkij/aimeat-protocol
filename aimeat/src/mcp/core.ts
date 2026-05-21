@@ -198,16 +198,18 @@ export function registerCoreTools(
         {
             key: z.string().describe('Memory key (hierarchical, slash-separated)'),
             value: z.union([z.string(), z.number(), z.boolean(), z.record(z.string(), z.unknown()), z.array(z.unknown())]).describe('The value to store — any JSON type'),
-            visibility: z.enum(['private', 'owner', 'public']).default('private').describe('private = only you, owner = all your agents, public = anyone'),
+            visibility: z.enum(['private', 'owner', 'group', 'public']).default('private').describe('private = only you, owner = all your agents, group = sharing group members, public = anyone'),
+            group_id: z.string().optional().describe('ID of sharing group for group visibility'),
             tags: z.array(z.string()).default([]).describe('Optional tags for filtering'),
         },
-        async ({ key, value, visibility, tags }) => {
+        async ({ key, value, visibility, group_id, tags }) => {
             const existing = await storage.getMemory(agentGaii, key);
             const record = await storage.setMemory({
                 key,
                 ownerGaii: agentGaii,
                 value,
                 visibility,
+                groupId: visibility === 'group' ? group_id : undefined,
                 tags,
                 ttlHours: null,
                 version: existing ? existing.version + 1 : 1,
@@ -444,9 +446,10 @@ INLINE MODE (for tiny files < 1 KB): Include data_base64 with base64-encoded dat
             key: z.string().describe('Storage key (path-like identifier)'),
             data_base64: z.string().optional().describe('Base64-encoded file data. Omit to get an upload URL instead (recommended for files > 1KB).'),
             mime_type: z.string().optional().describe('MIME type (default: application/octet-stream)'),
-            visibility: z.enum(['private', 'owner', 'public']).optional().describe('Access control (default: private)'),
+            visibility: z.enum(['private', 'owner', 'group', 'public']).optional().describe('Access control (default: private)'),
+            group_id: z.string().optional().describe('ID of sharing group for group visibility'),
         },
-        async ({ key, data_base64, mime_type, visibility }) => {
+        async ({ key, data_base64, mime_type, visibility, group_id }) => {
             // --- UPLOAD MODE ---
             if (!data_base64) {
                 const maxBytes = 10 * 1024 * 1024;
@@ -486,6 +489,7 @@ INLINE MODE (for tiny files < 1 KB): Include data_base64 with base64-encoded dat
                 key,
                 ownerGaii: agentGaii,
                 visibility: visibility ?? 'private',
+                groupId: visibility === 'group' ? group_id : undefined,
                 mimeType: mime_type ?? 'application/octet-stream',
                 size: fileData.length,
                 data: fileData,

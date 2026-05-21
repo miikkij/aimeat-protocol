@@ -229,10 +229,10 @@ export default function MemoryTab({ session, showToast, onStats }) {
     } catch { setKeyRulesPopover(null); }
   }
 
-  /* ── Cycle visibility: private → owner → public → private ── */
-  const cycleVis = ['private', 'owner', 'public'];
-  const visColor = { private: '#c084fc', owner: '#60a5fa', public: '#4ade80' };
-  const visBg = { private: 'rgba(150,100,200,.2)', owner: 'rgba(100,150,255,.2)', public: 'rgba(0,200,100,.2)' };
+  /* ── Cycle visibility: private → owner → group → public → private ── */
+  const cycleVis = ['private', 'owner', 'group', 'public'];
+  const visColor = { private: '#c084fc', owner: '#60a5fa', group: '#10b981', public: '#4ade80' };
+  const visBg = { private: 'rgba(150,100,200,.2)', owner: 'rgba(100,150,255,.2)', group: 'rgba(16,185,129,.2)', public: 'rgba(0,200,100,.2)' };
 
   async function handleUpdateVisibility(key, newVis, version) {
     // Optimistic update — change locally first, then persist
@@ -308,7 +308,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
               <span class="mem-key">${escHtml(m.key)}</span>
               ${(() => {
                 const vis = m.visibility || 'private';
-                const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % 3];
+                const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % cycleVis.length];
                 return html`<button class="kpkg-vis-pill"
                   onClick=${(e) => { e.stopPropagation(); handleUpdateVisibility(m.key, nextVis, m.version); }}
                   title="${t('knowledge.visibility.' + vis)} → ${t('knowledge.visibility.' + nextVis)}"
@@ -423,7 +423,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
               const fKey = f.key || f.name;
               const isImage = f.mime_type?.startsWith('image');
               const vis = f.visibility || 'private';
-              const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % 3];
+              const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % cycleVis.length];
               return html`
                 <div class="file-card">
                   ${isImage
@@ -525,6 +525,7 @@ function MemoryForm({ onSave, onCancel }) {
         <select class="input-field" value=${vis} onChange=${e => setVis(e.target.value)}>
           <option value="private">${t('profile.memory.visPrivate')}</option>
           <option value="shared">${t('profile.memory.visShared')}</option>
+          <option value="group">Group</option>
           <option value="public">${t('profile.memory.visPublic')}</option>
         </select>
       </div>
@@ -628,6 +629,7 @@ function FileUploadForm({ onUpload, onCancel }) {
         <select class="input-field" value=${vis} onChange=${e => setVis(e.target.value)}>
           <option value="private">${t('profile.files.visPrivate')}</option>
           <option value="owner">${t('profile.files.visOwner')}</option>
+          <option value="group">Group</option>
           <option value="public">${t('profile.files.visPublic')}</option>
         </select>
       </div>
@@ -661,10 +663,10 @@ function FileUploadForm({ onUpload, onCancel }) {
 function EditMemoryModal({ memKey, initialValue, initialVisibility, initialVersion, onSave, onCancel }) {
   const [value, setValue] = useState(initialValue);
   const [vis, setVis] = useState(initialVisibility || 'private');
-  const cycleVis = ['private', 'owner', 'public'];
-  const visColor = { private: '#c084fc', owner: '#60a5fa', public: '#4ade80' };
-  const visBg = { private: 'rgba(150,100,200,.2)', owner: 'rgba(100,150,255,.2)', public: 'rgba(0,200,100,.2)' };
-  const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % 3];
+  const cycleVis = ['private', 'owner', 'group', 'public'];
+  const visColor = { private: '#c084fc', owner: '#60a5fa', group: '#10b981', public: '#4ade80' };
+  const visBg = { private: 'rgba(150,100,200,.2)', owner: 'rgba(100,150,255,.2)', group: 'rgba(16,185,129,.2)', public: 'rgba(0,200,100,.2)' };
+  const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % cycleVis.length];
   return html`
     <div class="modal-overlay" onClick=${e => { if (e.target.className.includes('modal-overlay')) onCancel(); }}>
       <div class="modal">
