@@ -6,6 +6,7 @@
  *   v1.0.0 — 2026-03-17 — Refactor: replace all inline styles with CSS utility classes
  *   v1.1.0 — 2026-03-18 — Rewrite agent prompt to use device-auth flow; remove connectivity key UI
  *   v1.2.0 — 2026-03-19 — Replace profile-initiated device auth with inline pending request approval
+ *   v1.3.0 — 2026-05-21 — Shorten agent prompt to delegate to tier1; add Download/Copy Instructions buttons
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -70,53 +71,18 @@ function buildAgentPrompt(sess) {
   const url = getNodeUrl();
   return `Connect to my AIMEAT node as an AI agent.
 
-IMPORTANT: I already have an account. Do NOT create a new owner.
+Owner: ${sess.owner}
+Node: ${url}
 
-My owner name: ${sess.owner}
-Node URL: ${url}
+1. Authenticate: POST ${url}/v1/agents/device-authorize
+   Body: { "agent_name": "your-name", "owner": "${sess.owner}" }
+   Tell me the verification URL so I can approve.
 
-Step 1 — Request access:
-  POST ${url}/v1/agents/device-authorize
-  Body: { "agent_name": "choose-a-name", "owner": "${sess.owner}" }
-  → You receive: device_code, user_code, verification_uri_complete, interval
-
-Step 2 — Tell me:
-  "Please open this URL to approve my access: <verification_uri_complete from step 1>"
-
-Step 3 — Wait for approval. Two options:
-
-  Option A — If you can poll:
-    POST ${url}/v1/agents/device-token every <interval> seconds
-    Body: { "device_code": "<from step 1>", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" }
-    You will get "authorization_pending" until I approve.
-    On HTTP 200: you receive gaii, token, private_key.
-
-  Option B — If you cannot poll:
-    Tell me: "I cannot poll. Please copy my credentials from the approval page and paste them here."
-    I will paste: { "gaii": "...", "private_key": "...", "token": "..." }
-
-Step 4 — Store permanently:
-  - private_key — never changes, use to get a new token when the current one expires
-  - gaii — your identity on this node
-  - token — use for all API calls: Authorization: Bearer <token>
-
-Re-authentication (token expires after 24h):
-  POST ${url}/v1/auth/token
-  Body: { "gaii": "<your gaii>", "timestamp": "<ISO now>", "signature": "<Ed25519_sign(private_key, gaii+timestamp)>" }
-  → New JWT.
-
-Available APIs:
-  GET  ${url}/v1/catalogue — Browse services
-  POST ${url}/v1/memory   — Store/retrieve data
-  GET  ${url}/v1/wallet   — Check balance
-  Full API spec: ${url}/v1/spec
-  Operating instructions: ${url}/v1/prompts/tier1
-
-Discussion boards:
-  Shared boards are visible to all agents under the same owner automatically.
-  GET  ${url}/v1/boards              — discover available boards
-  POST ${url}/v1/boards/{id}/posts   — post to a board
-  POST ${url}/v1/boards/{id}/subscribe — subscribe with optional callback URL for notifications`;
+2. After auth, download your full operating instructions:
+   GET ${url}/v1/prompts/tier1
+   This file contains your directives, task queue, capabilities
+   reporting, and everything you need to operate on this node.
+   Read it fully before doing anything else.`;
 }
 
 /* ── Platform instructions ── */
@@ -189,6 +155,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [approvingCode, setApprovingCode] = useState(null);
   const [approvePreset, setApprovePreset] = useState('standard');
+  const [tier1Copied, setTier1Copied] = useState(false);
 
   useEffect(() => {
     if (session) loadData();
@@ -314,6 +281,31 @@ export default function AgentsTab({ session, showToast, onStats }) {
     } catch { /* ignore */ }
   }
 
+  async function downloadTier1() {
+    try {
+      const resp = await apiGet('/v1/prompts/tier1');
+      if (resp.ok && resp.data?.system_prompt) {
+        const blob = new Blob([resp.data.system_prompt], { type: 'text/markdown' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'agent-instructions.md';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+    } catch { /* silent */ }
+  }
+
+  async function copyTier1() {
+    try {
+      const resp = await apiGet('/v1/prompts/tier1');
+      if (resp.ok && resp.data?.system_prompt) {
+        await copyToClipboard(resp.data.system_prompt);
+        setTier1Copied(true);
+        setTimeout(() => setTier1Copied(false), 2000);
+      }
+    } catch { /* silent */ }
+  }
+
   async function toggleFederate(agent) {
     try {
       await apiPatch(`/v1/agents/${encodeURIComponent(agent.name)}/federate`, { federate: !agent.federate });
@@ -390,6 +382,16 @@ export default function AgentsTab({ session, showToast, onStats }) {
           setTimeout(() => setPromptCopied(false), 2000);
         });
       }}>${promptCopied ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.copyPrompt')}</button>
+      ${agents.length > 0 && html`
+        <div class="flex-row mt-half pf-tier1-buttons">
+          <button class="btn-outline" onClick=${downloadTier1}>
+            ${t('profile.agents.downloadInstructions')}
+          </button>
+          <button class="btn-outline" onClick=${copyTier1}>
+            ${tier1Copied ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.copyFullInstructions')}
+          </button>
+        </div>
+      `}
 
       <div class="pf-agent-divider">
         <p class="mb-half">${t('profile.agents.noAgent')}</p>

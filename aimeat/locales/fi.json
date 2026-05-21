@@ -256,6 +256,8 @@
       "connect": "Yhdistä automaatioagentti",
       "connectDesc": "Jos sinulla on OpenClaw tai muu AI-automaatioagentti, anna sille tämä kehote rekisteröidäksesi agentin tilillesi:",
       "copyPrompt": "Kopioi kehote",
+      "downloadInstructions": "Lataa ohjeet",
+      "copyFullInstructions": "Kopioi kaikki ohjeet",
       "copied": "Kopioitu!",
       "copyGaii": "Kopioi GAII",
       "noAgent": "Eikö sinulla vielä ole automaatioagenttia?",

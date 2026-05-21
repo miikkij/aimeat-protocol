@@ -1,8 +1,18 @@
+/**
+ * @file prompts.ts
+ * @description Routes for serving tiered system prompts (tier0 through tier2, anonymous,
+ *   openclaw, package-builder) and prompt packages. Each tier provides progressively
+ *   more context to AI agents based on their authentication level.
+ * @version-history
+ *   v1.0.0 -- 2026-03-01 -- Initial tiered prompts (0, 1, 2, anonymous)
+ *   v1.1.0 -- 2026-05-21 -- Extend tier1 response with directives, task queue, and agent endpoints
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
+import { parseGaiiLoose } from '../utils/gaii.js';
 
 export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -73,13 +83,49 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
           morsel_balance: agent?.morselBalance ?? 0,
           daily_allowance: config.dailyAllowance,
         });
+        // Fetch directives for this agent
+        const directives = gaii !== 'unknown' ? await storage.getAgentDirectives(gaii) : null;
+        const ownerGhii = req.auth?.owner ? `${req.auth.owner}@${config.nodeId}` : '';
+        const ownerDefaults = ownerGhii ? await storage.getOwnerAgentDefaults(ownerGhii) : null;
+
+        // Fetch queued and active tasks
+        const queuedTasks = gaii !== 'unknown' ? await storage.listAgentTasks(gaii, { status: 'queued' }) : { tasks: [], total: 0 };
+        const activeTasks = gaii !== 'unknown' ? await storage.listAgentTasks(gaii, { status: 'active' }) : { tasks: [], total: 0 };
+
+        // Extract agent name from GAII for endpoint URLs
+        const parsed = parseGaiiLoose(gaii);
+        const agentName = parsed.agent || '{name}';
+
         res.json(success(config.nodeId, {
           tier: '1',
           system_prompt,
-          available_operations: ['memory_crud', 'action_publish', 'action_execute', 'work_queue', 'wallet', 'boards', 'catalogue'],
+          available_operations: ['memory_crud', 'action_publish', 'action_execute', 'work_queue', 'wallet', 'boards', 'catalogue', 'task_lifecycle', 'directives'],
           economics: {
             daily_allowance: config.dailyAllowance,
             current_balance: agent?.morselBalance ?? 0,
+          },
+          directives: {
+            purpose: directives?.purpose ?? '',
+            system_rules: config.agentSystemPrinciples.map((desc, i) => ({ id: `system-${i + 1}`, description: desc })),
+            owner_rules: (ownerDefaults?.rules ?? []).map(r => ({ id: r.id, description: r.description })),
+            agent_rules: (directives?.rules ?? []).map(r => ({ id: r.id, description: r.description })),
+            memory_areas: directives?.memoryAreas ?? [],
+            resources: directives?.resources ?? [],
+            max_tokens_per_task: config.agentMaxTokensPerTask,
+            mandatory_logging: config.agentMandatoryLogging,
+            aimeat_first: config.agentAimeatFirstEnabled,
+          },
+          task_queue: {
+            queued: queuedTasks.tasks.map(t => ({ id: t.id, title: t.title, status: t.status })),
+            active: activeTasks.tasks.map(t => ({ id: t.id, title: t.title, status: t.status })),
+            endpoints: {
+              inbox: `/v1/agents/${encodeURIComponent(agentName)}/inbox`,
+              start: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/start`,
+              event: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/event`,
+              complete: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/complete`,
+              fail: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/fail`,
+              wait: `/v1/agents/${encodeURIComponent(agentName)}/tasks/wait`,
+            },
           },
         }));
         break;

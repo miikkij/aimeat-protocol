@@ -256,6 +256,8 @@
       "connect": "Connect an Automation Agent",
       "connectDesc": "If you have OpenClaw or any other AI automation agent, give it this prompt to register an agent under your account:",
       "copyPrompt": "Copy Prompt",
+      "downloadInstructions": "Download Instructions",
+      "copyFullInstructions": "Copy Full Instructions",
       "copied": "Copied!",
       "copyGaii": "Copy GAII",
       "noAgent": "Don’t have an automation agent yet?",
