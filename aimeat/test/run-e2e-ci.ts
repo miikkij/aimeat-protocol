@@ -62,6 +62,7 @@ const ALL_SUITES = [
     'test/e2e-sharing-groups.ts',
     'test/e2e-agent-tasks.ts',
     'test/e2e-agent-directives.ts',
+    'test/e2e-integration-kit.ts',
 ];
 
 const PORT = process.env.AIMEAT_PORT ?? '40251';
