@@ -10,6 +10,7 @@
  * @version-history
  *   v1.0.0 -- 2026-05-01 -- Initial stats collector
  *   v1.1.0 -- 2026-05-21 -- Add typed counters, persistence, graceful shutdown, snapshotForRange
+ *   v1.1.1 -- 2026-05-21 -- Reduce flush interval from 60s to 15s to minimize data loss on force-kill
  */
 
 import type { Storage } from '../storage/interface.js';
@@ -95,7 +96,7 @@ export type MailboxGaugeName =
   | 'oldest_item_age_seconds';
 
 const LATENCY_WINDOW_SIZE = 1000;
-const FLUSH_INTERVAL_MS = 60_000;
+const FLUSH_INTERVAL_MS = 15_000;
 
 export class StatsCollector {
   private counters = new Map<string, number>();

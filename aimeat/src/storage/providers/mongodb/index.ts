@@ -1,14 +1,25 @@
 /**
- * MongoDB Storage Implementation using Prisma Client.
+ * @file mongodb/index.ts
+ * @description MongoDB Storage Implementation using Prisma Client.
+ *   Auto-syncs collections & indexes on startup via `prisma db push`.
  *
  * To use:
  *   1. pnpm add @prisma/client prisma
  *   2. npx prisma generate
  *   3. Set DATABASE_URL environment variable
  *   4. Start with: aimeat --db mongodb://localhost:27017/aimeat
+ *
+ * @version-history
+ *   v1.0.0 — 2025-01-15 — Initial MongoDB storage implementation
+ *   v1.1.0 — 2026-05-21 — Auto-sync Prisma schema on startup (prisma db push)
  */
 
+import { execSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { logger } from '../../../utils/logger.js';
 
 import type {
     Storage,
@@ -82,9 +93,49 @@ export class MongoStorage implements Storage {
     }
 
     private async init(databaseUrl: string) {
+        this.syncSchema(databaseUrl);
+
         const { PrismaClient } = await import('@prisma/client');
         this.prisma = new PrismaClient({ datasourceUrl: databaseUrl });
         await this.prisma.$connect();
+    }
+
+    /**
+     * Run `prisma db push --skip-generate` to create any missing
+     * MongoDB collections & indexes. Safe and idempotent — never drops data.
+     * Skips silently if the prisma CLI is not available.
+     */
+    private syncSchema(databaseUrl: string): void {
+        const schemaPath = this.findPrismaSchema();
+        if (!schemaPath) {
+            logger.warn('prisma/schema.prisma not found — skipping auto schema sync');
+            return;
+        }
+
+        try {
+            execSync(`npx prisma db push --skip-generate --schema "${schemaPath}"`, {
+                stdio: 'pipe',
+                env: { ...process.env, DATABASE_URL: databaseUrl },
+                timeout: 30_000,
+            });
+            logger.info('MongoDB schema synced');
+        } catch (err: any) {
+            const stderr = err.stderr?.toString() ?? '';
+            logger.warn(`Auto schema sync skipped — run "pnpm db:push" manually if needed. ${stderr || err.message}`);
+        }
+    }
+
+    /** Walk up from this file to find the nearest prisma/schema.prisma */
+    private findPrismaSchema(): string | null {
+        let dir = dirname(fileURLToPath(import.meta.url));
+        for (let i = 0; i < 10; i++) {
+            const candidate = resolve(dir, 'prisma', 'schema.prisma');
+            if (existsSync(candidate)) return candidate;
+            const parent = dirname(dir);
+            if (parent === dir) break;
+            dir = parent;
+        }
+        return null;
     }
 
     private ensureReady() {

@@ -2796,7 +2796,7 @@
     "dailyActivity": "Päivittäinen aktiivisuus (30 päivää)",
     "weeklyComparison": "Viikkovertailu",
     "monthlyTrend": "Kuukausitrendi",
-    "statsExplain": "Kevyet käyttölaskurit. Nollautuvat palvelimen uudelleenkäynnistyksessä.",
+    "statsExplain": "Laskurit tallennetaan tietokantaan. Käyttöaika ja reaaliaikamittarit nollautuvat uudelleenkäynnistyksessä.",
     "writes": "Kirjoitukset",
     "reads": "Luvut",
     "grants": "Myönnöt",

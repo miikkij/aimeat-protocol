@@ -2796,7 +2796,7 @@
     "dailyActivity": "Daily Activity (30 days)",
     "weeklyComparison": "Weekly Comparison",
     "monthlyTrend": "Monthly Trend",
-    "statsExplain": "Lightweight usage counters. Resets on server restart.",
+    "statsExplain": "Usage counters persisted to database. Uptime and live gauges reset on restart.",
     "writes": "Writes",
     "reads": "Reads",
     "grants": "Grants",

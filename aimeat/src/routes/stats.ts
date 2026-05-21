@@ -10,6 +10,7 @@
  * @version-history
  *   v1.0.0 -- 2026-05-01 -- Initial stats route with consent permission breakdown
  *   v1.1.0 -- 2026-05-21 -- Add time-range support (from/to query params), gauges, daily field
+ *   v1.1.1 -- 2026-05-21 -- Fix range response to return same flat shape as full snapshot
  */
 
 import { Router } from 'express';
@@ -105,11 +106,37 @@ export function statsRouter(
 
     if (fromParam && toParam) {
       const range = stats.snapshotForRange(fromParam, toParam);
+
+      // Return the same flat shape as the full snapshot so the frontend
+      // can render both responses identically.  Counter fields default to
+      // 0 for the range (no activity = 0, not the cumulative total).
+      // Live state (tunnel, mailbox, uptime) comes from the full snapshot.
+      const rangeCounters: Record<string, unknown> = {
+        requests_total: 0,
+        memory_writes: 0,
+        memory_reads: 0,
+        consent_grants: 0,
+        consent_revocations: 0,
+        schema_validations: 0,
+        schema_validation_failures: 0,
+        auth_failures_total: 0,
+        rate_limit_hits_total: 0,
+        scope_denials_total: 0,
+        ...range.totals,
+      };
+
       res.json(success(config.nodeId, {
         node_id: config.nodeId,
         from: fromParam,
         to: toParam,
-        totals: range.totals,
+        uptime_seconds: snap.uptime_seconds,
+        started_at: snap.started_at,
+        requests_by_method: snap.requests_by_method,
+        requests_by_status: snap.requests_by_status,
+        tunnel: snap.tunnel,
+        mailbox: snap.mailbox,
+        ...rangeCounters,
+        daily_history: range.daily,
         daily: range.daily,
         gauges,
         ...shared,
