@@ -46,6 +46,7 @@ import { registerCortexTools } from './cortex.js';
 import { registerAppsTools } from './apps.js';
 import { registerSharingGroupTools } from './sharing-groups.js';
 import { registerAgentTaskTools } from './agent-tasks.js';
+import { registerAgentCapabilityTools } from './agent-capabilities.js';
 
 // ── Resource change event bus ──
 // Allows REST routes and MCP tools to emit resource change events
@@ -119,6 +120,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         registerAppsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerSharingGroupTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentTaskTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerAgentCapabilityTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
 
         return mcp;
     }
