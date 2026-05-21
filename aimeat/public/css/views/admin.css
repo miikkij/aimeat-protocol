@@ -656,6 +656,12 @@
 /* ── Breakdown Table ── */
 .adm-breakdown-table th.num { text-align: right; }
 
+/* ── Stats Inline Breakdown ── */
+.adm-date-separator { color: var(--text-dim); }
+.adm-mailbox-inline { padding: 10px 16px; }
+.adm-blocked-reasons { margin-bottom: 6px; color: var(--text-dim); }
+.adm-channels-summary { color: var(--text-dim); }
+
 .adm-badge-live {
   display: inline-block;
   font-size: 0.6rem;

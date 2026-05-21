@@ -18,6 +18,8 @@
  *     mailbox notification sections, per-day charts, self-managed data fetching
  *   v2.0.1 -- 2026-05-21 -- i18n chart labels, chart cleanup on unmount, live
  *     badges on gauge cards, section header CSS classes, breakdown table th fix
+ *   v2.0.2 -- 2026-05-21 -- Replace inline styles with CSS classes, i18n weekday
+ *     labels, use periodCustom/periodFrom/periodTo i18n keys on date inputs
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -93,9 +95,12 @@ function TimeRange({ period, setPeriod, customFrom, setCustomFrom, customTo, set
           onClick=${() => setPeriod(p.key)}>${p.label}</button>
       `)}
       <div class="adm-time-custom">
-        <input type="date" value=${customFrom} onInput=${e => setCustomFrom(e.target.value)} />
-        <span style="color:var(--text-dim)">-</span>
-        <input type="date" value=${customTo} onInput=${e => setCustomTo(e.target.value)} />
+        <span class="adm-text-dim adm-text-sm">${t('dashboard.periodCustom')}:</span>
+        <input type="date" value=${customFrom} aria-label=${t('dashboard.periodFrom')}
+          onInput=${e => setCustomFrom(e.target.value)} />
+        <span class="adm-date-separator">-</span>
+        <input type="date" value=${customTo} aria-label=${t('dashboard.periodTo')}
+          onInput=${e => setCustomTo(e.target.value)} />
         <button class="adm-time-btn" onClick=${onApply}>${t('dashboard.periodApply')}</button>
       </div>
     </div>
@@ -311,9 +316,9 @@ export default function StatsTab({ data }) {
       <${StatCard} label=${t('dashboard.mailboxNotifBlocked')} value=${mboxBlocked} color=${mboxBlocked > 0 ? '#eab308' : '#22c55e'} />
     </div>
     ${(sd.mailbox_notif_blocked_by_type || sd.mailbox_notif_sent_by_type) ? html`
-      <div class="adm-card adm-mt-md adm-text-sm" style="padding:10px 16px">
+      <div class="adm-card adm-mt-md adm-text-sm adm-mailbox-inline">
         ${sd.mailbox_notif_blocked_by_type ? html`
-          <div style="margin-bottom:6px;color:var(--text-dim)">
+          <div class="adm-blocked-reasons">
             <strong>${t('dashboard.blocked')}:</strong>
             ${' '} ${t('dashboard.blockedCooldown')}: ${num((sd.mailbox_notif_blocked_by_type || {}).cooldown || 0)}
             ${' | '} ${t('dashboard.blockedQuietHours')}: ${num((sd.mailbox_notif_blocked_by_type || {}).quiet_hours || 0)}
@@ -321,7 +326,7 @@ export default function StatsTab({ data }) {
           </div>
         ` : ''}
         ${sd.mailbox_notif_sent_by_type ? html`
-          <div style="color:var(--text-dim)">
+          <div class="adm-channels-summary">
             <strong>${t('dashboard.channels')}:</strong>
             ${' '} ${t('dashboard.channelPush')}: ${num((sd.mailbox_notif_sent_by_type || {}).push || 0)} ${t('dashboard.breakdownSent').toLowerCase()}, ${num((sd.mailbox_notif_failed_by_type || {}).push || 0)} ${t('dashboard.breakdownFailed').toLowerCase()}
             ${' | '} ${t('dashboard.channelEmail')}: ${num((sd.mailbox_notif_sent_by_type || {}).email || 0)} ${t('dashboard.breakdownSent').toLowerCase()}, ${num((sd.mailbox_notif_failed_by_type || {}).email || 0)} ${t('dashboard.breakdownFailed').toLowerCase()}
@@ -407,7 +412,7 @@ async function renderAllCharts(sd, chartRefs) {
   // Weekly Comparison line chart
   const wc = document.getElementById('chartWeekly');
   if (wc && days.length > 0) {
-    const weekLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const weekLabels = [t('dashboard.weekMon'), t('dashboard.weekTue'), t('dashboard.weekWed'), t('dashboard.weekThu'), t('dashboard.weekFri'), t('dashboard.weekSat'), t('dashboard.weekSun')];
     const getWeekData = (weeksAgo) => {
       const data = new Array(7).fill(0);
       const now = new Date();

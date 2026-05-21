@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { StatsCollector } from '../../src/services/stats.js';
 import type { TunnelStats, MailboxStats } from '../../src/services/stats.js';
+import type { Storage } from '../../src/storage/interface.js';
 
 describe('StatsCollector', () => {
   let stats: StatsCollector;
@@ -272,6 +273,212 @@ describe('StatsCollector', () => {
       const snap = stats.snapshot();
       expect(snap.requests_total).toBe(1);
       expect((snap as Record<string, unknown>).requests_total_by_type).toBeUndefined();
+    });
+  });
+
+  // --- snapshotForRange ---
+
+  describe('snapshotForRange', () => {
+    it('includes daily entries within the date range', () => {
+      const today = new Date().toISOString().split('T')[0];
+      stats.increment('requests_total');
+      stats.increment('memory_writes');
+
+      // Range that includes today
+      const result = stats.snapshotForRange(today, today);
+      expect(result.daily[today]).toBeDefined();
+      expect(result.daily[today].requests_total).toBe(1);
+      expect(result.daily[today].memory_writes).toBe(1);
+      expect(result.totals.requests_total).toBe(1);
+      expect(result.totals.memory_writes).toBe(1);
+    });
+
+    it('excludes daily entries outside the date range', () => {
+      stats.increment('requests_total');
+
+      // Range that excludes today (past dates only)
+      const result = stats.snapshotForRange('2020-01-01', '2020-01-02');
+      expect(Object.keys(result.daily)).toHaveLength(0);
+      expect(Object.keys(result.totals)).toHaveLength(0);
+    });
+
+    it('groups typed counters in range results', () => {
+      stats.incrementTyped('email_sent', 'verification');
+      stats.incrementTyped('email_sent', 'magic_link');
+
+      const today = new Date().toISOString().split('T')[0];
+      const result = stats.snapshotForRange(today, today);
+
+      expect(result.totals.email_sent).toBe(2);
+      expect(result.totals.email_sent_by_type).toEqual({
+        verification: 1,
+        magic_link: 1,
+      });
+    });
+
+    it('returns empty objects for a range with no data', () => {
+      const result = stats.snapshotForRange('2020-01-01', '2020-01-02');
+      expect(result.totals).toEqual({});
+      expect(result.daily).toEqual({});
+    });
+
+    it('does not leak colon-keyed counters into totals', () => {
+      stats.incrementTyped('email_sent', 'verification');
+      stats.incrementTyped('email_sent', 'magic_link');
+      stats.incrementTyped('push_sent', 'board');
+
+      const today = new Date().toISOString().split('T')[0];
+      const result = stats.snapshotForRange(today, today);
+
+      // Verify no colon keys in totals
+      for (const key of Object.keys(result.totals)) {
+        expect(key).not.toContain(':');
+      }
+
+      // Verify the grouped keys are present instead
+      expect(result.totals.email_sent).toBe(2);
+      expect(result.totals.email_sent_by_type).toBeDefined();
+      expect(result.totals.push_sent).toBe(1);
+      expect(result.totals.push_sent_by_type).toBeDefined();
+    });
+  });
+
+  // --- Persistence ---
+
+  describe('persistence', () => {
+    function createMockStorage() {
+      let savedCounters: Record<string, number> = {};
+      let savedHistory: Record<string, Record<string, number>> = {};
+      return {
+        flushStats: async (counters: Record<string, number>) => { savedCounters = { ...counters }; },
+        loadStats: async () => ({ ...savedCounters }),
+        flushDailyHistory: async (history: Record<string, Record<string, number>>) => { savedHistory = JSON.parse(JSON.stringify(history)); },
+        loadDailyHistory: async () => JSON.parse(JSON.stringify(savedHistory)) as Record<string, Record<string, number>>,
+        getSavedCounters: () => savedCounters,
+        getSavedHistory: () => savedHistory,
+      };
+    }
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('init loads persisted counters', async () => {
+      const mock = createMockStorage();
+      mock.flushStats({ requests_total: 10, 'email_sent:verification': 5 });
+
+      await stats.init(mock as unknown as Storage);
+
+      const snap = stats.snapshot();
+      expect(snap.requests_total).toBe(10);
+      expect(snap.email_sent).toBe(5);
+
+      await stats.shutdown();
+    });
+
+    it('init loads prefixed counters', async () => {
+      const mock = createMockStorage();
+      mock.flushStats({ 'tunnel:connections_total': 3, 'method:GET': 7, 'status:2xx': 15 });
+
+      await stats.init(mock as unknown as Storage);
+
+      const snap = stats.snapshot();
+      expect(snap.tunnel.connections_total).toBe(3);
+      expect(snap.requests_by_method.GET).toBe(7);
+      expect(snap.requests_by_status['2xx']).toBe(15);
+
+      await stats.shutdown();
+    });
+
+    it('init loads daily history', async () => {
+      const mock = createMockStorage();
+      const testDate = new Date().toISOString().split('T')[0];
+      await mock.flushDailyHistory({ [testDate]: { requests_total: 5, memory_writes: 2 } });
+
+      await stats.init(mock as unknown as Storage);
+
+      const snap = stats.snapshot();
+      expect(snap.daily_history[testDate]).toBeDefined();
+      expect(snap.daily_history[testDate].requests_total).toBe(5);
+      expect(snap.daily_history[testDate].memory_writes).toBe(2);
+
+      await stats.shutdown();
+    });
+
+    it('shutdown flushes counters to storage', async () => {
+      const mock = createMockStorage();
+      await stats.init(mock as unknown as Storage);
+
+      stats.increment('requests_total');
+      stats.increment('requests_total');
+      stats.incrementTunnel('connections_total');
+      stats.incrementMethod('POST');
+      stats.incrementStatus(200);
+
+      await stats.shutdown();
+
+      const saved = mock.getSavedCounters();
+      expect(saved.requests_total).toBe(2);
+      expect(saved['tunnel:connections_total']).toBe(1);
+      expect(saved['method:POST']).toBe(1);
+      expect(saved['status:2xx']).toBe(1);
+    });
+
+    it('shutdown clears the flush timer', async () => {
+      vi.useFakeTimers();
+      const mock = createMockStorage();
+      await stats.init(mock as unknown as Storage);
+
+      stats.increment('requests_total');
+      await stats.shutdown();
+
+      // After shutdown, the saved counters should reflect the final flush
+      const savedAfterShutdown = { ...mock.getSavedCounters() };
+      expect(savedAfterShutdown.requests_total).toBe(1);
+
+      // Increment more counters after shutdown
+      stats.increment('requests_total');
+      stats.increment('requests_total');
+
+      // Advance time past the flush interval -- timer should be cleared
+      await vi.advanceTimersByTimeAsync(120_000);
+
+      // Storage should NOT have been updated since shutdown cleared the timer
+      const savedAfterTimer = mock.getSavedCounters();
+      expect(savedAfterTimer.requests_total).toBe(1);
+    });
+
+    it('flush error is caught gracefully', async () => {
+      const mock = {
+        flushStats: async () => { throw new Error('disk full'); },
+        loadStats: async () => ({}),
+        flushDailyHistory: async () => { throw new Error('disk full'); },
+        loadDailyHistory: async () => ({}),
+      };
+
+      await stats.init(mock as unknown as Storage);
+      stats.increment('requests_total');
+
+      // shutdown calls flush internally -- should not throw
+      await expect(stats.shutdown()).resolves.toBeUndefined();
+    });
+
+    it('init error falls back to fresh state', async () => {
+      const mock = {
+        flushStats: async () => {},
+        loadStats: async () => { throw new Error('corrupt data'); },
+        flushDailyHistory: async () => {},
+        loadDailyHistory: async () => { throw new Error('corrupt data'); },
+      };
+
+      // init should not throw despite loadStats throwing
+      await expect(stats.init(mock as unknown as Storage)).resolves.toBeUndefined();
+
+      const snap = stats.snapshot();
+      expect(snap.requests_total).toBe(0);
+      expect(snap.memory_writes).toBe(0);
+
+      await stats.shutdown();
     });
   });
 

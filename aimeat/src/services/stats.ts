@@ -283,7 +283,7 @@ export class StatsCollector {
     // Build totals with typed grouping
     const totals: Record<string, unknown> = {};
     for (const [key, value] of summed) {
-      totals[key] = value;
+      if (!key.includes(':')) totals[key] = value;
     }
     // Merge typed groups from the summed counters
     Object.assign(totals, this.buildTypedGroups(summed));

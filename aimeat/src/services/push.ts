@@ -1,3 +1,20 @@
+/**
+ * @file push.ts
+ * @description Web push notification service -- manages VAPID-based push subscriptions
+ *   and sends notifications to individual users or broadcasts to organism members.
+ * @structure
+ *   - PushPayload interface (notification content shape)
+ *   - PushService interface (subscribe, unsubscribe, send, broadcast)
+ *   - createPushService() factory (configures web-push with VAPID keys)
+ * @usage
+ *   import { createPushService } from '../services/push.js';
+ *   const push = createPushService(config, storage);
+ *   await push.sendNotification(ownerName, { title: '...', body: '...' });
+ * @version-history
+ *   v1.0.0 -- 2026-04-15 -- Initial push notification service
+ *   v1.1.0 -- 2026-05-21 -- Add stats counter instrumentation (push_sent, push_failed, push_expired_subs)
+ */
+
 import { createRequire } from 'node:module';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, PushSubscriptionRecord } from '../storage/interface.js';

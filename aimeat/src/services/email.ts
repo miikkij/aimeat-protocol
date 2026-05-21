@@ -1,8 +1,21 @@
 /**
- * Email Service — Phase 1.1
- *
- * SMTP-based email delivery with retry logic and template support.
- * Privacy-first: never logs email addresses.
+ * @file email.ts
+ * @description Email service -- SMTP-based email delivery with retry logic, template support,
+ *   and privacy-first logging (never logs email addresses). Supports verification codes,
+ *   magic links, notifications, match suggestions, and raw HTML emails.
+ * @structure
+ *   - EmailService interface (sendVerificationCode, sendMagicLink, sendNotification, sendMatchSuggestion, sendRaw)
+ *   - withRetry() exponential backoff helper
+ *   - createDisabledService() stub for when SMTP is not configured
+ *   - createEmailService() factory (configures nodemailer transport)
+ * @usage
+ *   import { createEmailService } from '../services/email.js';
+ *   const email = createEmailService(config);
+ *   await email.sendVerificationCode(to, code, 'en');
+ * @version-history
+ *   v1.0.0 -- 2026-04-10 -- Initial email service with SMTP transport
+ *   v1.1.0 -- 2026-05-01 -- Add retry logic, match suggestion emails, raw send
+ *   v1.2.0 -- 2026-05-21 -- Add stats counter instrumentation (email_sent, email_failed, email_retried)
  */
 
 import { createTransport, type Transporter } from 'nodemailer';

@@ -1,3 +1,21 @@
+/**
+ * @file mailbox-notification.ts
+ * @description Mailbox notification service -- notifies personal node owners when messages
+ *   are queued, via web push and/or email channels with cooldown, quiet hours, and per-type filtering.
+ * @structure
+ *   - MailboxPushPayload, NotifyResult interfaces
+ *   - isAllowedPushEndpoint() SSRF prevention helper
+ *   - MailboxNotificationService class (notify, clearCooldown, sendWebPush, sendEmail, isInQuietHours)
+ * @usage
+ *   import { MailboxNotificationService } from '../services/mailbox-notification.js';
+ *   const notifier = new MailboxNotificationService(config, storage);
+ *   void notifier.notify(personalNodeId, mailboxItem);
+ * @version-history
+ *   v1.0.0 -- 2026-04-20 -- Initial mailbox notification service with web push
+ *   v1.1.0 -- 2026-05-01 -- Add email channel, notification templates, quiet hours
+ *   v1.2.0 -- 2026-05-21 -- Add stats counter instrumentation (mailbox_notif_sent, mailbox_notif_failed, mailbox_notif_blocked)
+ */
+
 import { createRequire } from 'node:module';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MailboxItemRecord, PersonalPushSubscriptionRecord, NotificationPreferences } from '../storage/interface.js';
