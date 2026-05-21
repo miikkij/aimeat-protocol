@@ -19,6 +19,8 @@ import { resolve, basename } from 'node:path';
 const ALL_SUITES = [
     'test/api-full.ts',
     'test/e2e-admin-features.ts',
+    'test/e2e-agent-activity.ts',
+    'test/e2e-agent-capabilities.ts',
     'test/e2e-anonymous.ts',
     'test/e2e-auth-lib.ts',
     'test/e2e-board-access.ts',
