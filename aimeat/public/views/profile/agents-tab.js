@@ -7,6 +7,7 @@
  *   v1.1.0 — 2026-03-18 — Rewrite agent prompt to use device-auth flow; remove connectivity key UI
  *   v1.2.0 — 2026-03-19 — Replace profile-initiated device auth with inline pending request approval
  *   v1.3.0 — 2026-05-21 — Shorten agent prompt to delegate to tier1; add Download/Copy Instructions buttons
+ *   v1.4.0 — 2026-05-21 — Add sub-tab navigation (Tasks, Directives) in expanded agent detail view
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -19,6 +20,14 @@ import { apiGet, apiPost, apiPatch } from '/js/api.js';
 import { listAgents, updateAgentScopes, deleteAgent } from '/js/services/agents.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { useConfirm } from '/components/Modal.js';
+import AgentTasksSubtab from './agents-tasks-subtab.js';
+import AgentDirectivesSubtab from './agents-directives-subtab.js';
+
+// === Agent Detail Sub-tabs ===
+const AGENT_SUBTABS = [
+  { id: 'tasks', label: 'profile.agents.subtabs.tasks' },
+  { id: 'directives', label: 'profile.agents.subtabs.directives' },
+];
 
 // === Scope Management Constants ===
 const SCOPE_DOMAINS = [
@@ -150,6 +159,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [activePlat, setActivePlat] = useState('windows');
   const [scopesModal, setScopesModal] = useState(null);
   const [expandedAgent, setExpandedAgent] = useState(null);
+  const [activeSubtab, setActiveSubtab] = useState('tasks');
   const [gaiiCopied, setGaiiCopied] = useState(null);
   const [keyCopied, setKeyCopied] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -195,6 +205,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
   function toggleAgent(name) {
     setExpandedAgent(prev => prev === name ? null : name);
+    setActiveSubtab('tasks');
   }
 
   function truncateKey(key) {
@@ -510,6 +521,24 @@ export default function AgentsTab({ session, showToast, onStats }) {
                   </span>
                 </div>
               `}
+
+              <div class="agd-subtab-bar">
+                ${AGENT_SUBTABS.map(tab => {
+                  const label = t(tab.label);
+                  return html`
+                    <button class="agd-subtab ${activeSubtab === tab.id ? 'agd-subtab-active' : ''}"
+                            onClick=${(e) => { e.stopPropagation(); setActiveSubtab(tab.id); }}>
+                      ${label !== tab.label ? label : tab.id.charAt(0).toUpperCase() + tab.id.slice(1)}
+                    </button>
+                  `;
+                })}
+              </div>
+
+              <div class="agd-subtab-content" onClick=${(e) => e.stopPropagation()}>
+                ${activeSubtab === 'tasks' && html`<${AgentTasksSubtab} agentName=${a.name} session=${session} showToast=${showToast} />`}
+                ${activeSubtab === 'directives' && html`<${AgentDirectivesSubtab} agentName=${a.name} session=${session} showToast=${showToast} />`}
+              </div>
+
               <div class="agent-detail-row mt-1">
                 <button class="btn-danger btn-sm" onClick=${(e) => { e.stopPropagation(); handleDeleteAgent(a.name); }}>
                   ${t('profile.agents.deleteAgent')}

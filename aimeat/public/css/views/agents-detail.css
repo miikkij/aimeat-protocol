@@ -1,0 +1,262 @@
+/**
+ * @file agents-detail.css
+ * @description Styles for agent detail view sub-tabs (tasks, directives).
+ *   Uses agd- prefix to avoid collisions with other profile styles.
+ *   All colors use CSS variables from theme.css.
+ * @version-history
+ *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
+ */
+
+/* Sub-tab bar */
+.pf .agd-subtab-bar {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border, #E5E7EB);
+  margin-top: 1rem;
+  padding-bottom: 0;
+}
+.pf .agd-subtab {
+  padding: 0.35rem 1rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim, #6B7280);
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: color 0.15s, border-color 0.15s;
+}
+.pf .agd-subtab:hover { color: var(--text, #1A1A2E); }
+.pf .agd-subtab-active {
+  color: var(--accent, #E8564A);
+  border-bottom-color: var(--accent, #E8564A);
+  font-weight: 600;
+}
+
+/* Sub-tab content area */
+.pf .agd-subtab-content {
+  padding: 1rem 0 0.5rem;
+  min-height: 120px;
+}
+
+/* Section headers inside sub-tabs */
+.pf .agd-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+.pf .agd-section-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-dim, #6B7280);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Task list items */
+.pf .agd-task-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: var(--radius-xs, 6px);
+  margin-bottom: 0.35rem;
+  background: var(--card-bg, #FFFFFF);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.pf .agd-task-item:hover { background: var(--card-bg-alt, #F3F4F6); }
+.pf .agd-task-title { font-weight: 500; flex: 1; font-size: 0.85rem; }
+.pf .agd-task-meta { display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0; }
+.pf .agd-task-time { font-size: 0.75rem; color: var(--text-dim, #6B7280); }
+
+/* Status badges */
+.pf .agd-status {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.pf .agd-status-draft { background: var(--card-bg-alt, #F3F4F6); color: var(--text-dim, #6B7280); }
+.pf .agd-status-queued { background: rgba(217, 119, 6, 0.1); color: #d97706; }
+.pf .agd-status-active { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
+.pf .agd-status-done { background: rgba(16, 185, 129, 0.1); color: var(--success, #10b981); }
+.pf .agd-status-failed { background: rgba(239, 68, 68, 0.1); color: var(--danger, #ef4444); }
+.pf .agd-status-stalled { background: rgba(239, 68, 68, 0.1); color: #d97706; }
+
+/* Task creation form */
+.pf .agd-create-form {
+  padding: 0.75rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: var(--radius-xs, 6px);
+  margin-top: 0.5rem;
+  background: var(--card-bg, #FFFFFF);
+}
+.pf .agd-form-field { margin-bottom: 0.65rem; }
+.pf .agd-form-field label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: var(--text-dim, #6B7280);
+}
+.pf .agd-form-field input,
+.pf .agd-form-field textarea,
+.pf .agd-form-field select {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: var(--radius-xs, 6px);
+  background: var(--card-bg, #FFFFFF);
+  color: var(--text, #1A1A2E);
+  font-size: 0.85rem;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.pf .agd-form-field input:focus,
+.pf .agd-form-field textarea:focus,
+.pf .agd-form-field select:focus {
+  outline: none;
+  border-color: var(--accent, #E8564A);
+}
+.pf .agd-form-field textarea { min-height: 70px; resize: vertical; }
+.pf .agd-form-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+
+/* Task expanded detail / event log */
+.pf .agd-task-expanded {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-top: none;
+  border-radius: 0 0 var(--radius-xs, 6px) var(--radius-xs, 6px);
+  margin-top: -0.35rem;
+  margin-bottom: 0.35rem;
+  background: var(--card-bg-alt, #F3F4F6);
+  font-size: 0.85rem;
+}
+.pf .agd-task-desc { color: var(--text-dim, #6B7280); margin-bottom: 0.5rem; line-height: 1.4; }
+.pf .agd-task-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+
+.pf .agd-event-log { max-height: 200px; overflow-y: auto; margin-top: 0.5rem; }
+.pf .agd-event-item {
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--border, #E5E7EB);
+  font-size: 0.8rem;
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+.pf .agd-event-item:last-child { border-bottom: none; }
+.pf .agd-event-time { color: var(--text-dim, #6B7280); font-size: 0.7rem; flex-shrink: 0; }
+.pf .agd-event-type { font-weight: 500; flex-shrink: 0; }
+
+/* Empty state */
+.pf .agd-empty {
+  text-align: center;
+  padding: 1.5rem;
+  color: var(--text-dim, #6B7280);
+  font-size: 0.85rem;
+}
+
+/* Directives display */
+.pf .agd-directive-section { margin-bottom: 1rem; }
+.pf .agd-directive-section h4 {
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+  color: var(--text-dim, #6B7280);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.pf .agd-purpose-text {
+  font-size: 0.85rem;
+  color: var(--text, #1A1A2E);
+  line-height: 1.5;
+  padding: 0.35rem 0;
+}
+.pf .agd-rule-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.pf .agd-rule-text { flex: 1; }
+.pf .agd-rule-source {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-weight: 500;
+  margin-top: 2px;
+}
+.pf .agd-source-system { background: var(--card-bg-alt, #F3F4F6); color: var(--text-dim, #6B7280); }
+.pf .agd-source-owner { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
+.pf .agd-source-agent { background: rgba(16, 185, 129, 0.1); color: var(--success, #10b981); }
+
+/* Resource / memory area lists */
+.pf .agd-list-item {
+  padding: 0.25rem 0;
+  font-size: 0.85rem;
+  color: var(--text, #1A1A2E);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+.pf .agd-list-item:last-child { border-bottom: none; }
+.pf .agd-list-item code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* Editable rule input row */
+.pf .agd-rule-edit-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+.pf .agd-rule-edit-row input {
+  flex: 1;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: var(--radius-xs, 6px);
+  font-size: 0.85rem;
+  background: var(--card-bg, #FFFFFF);
+  color: var(--text, #1A1A2E);
+  font-family: inherit;
+}
+.pf .agd-rule-edit-row input:focus {
+  outline: none;
+  border-color: var(--accent, #E8564A);
+}
+.pf .agd-remove-btn {
+  background: none;
+  border: none;
+  color: var(--danger, #ef4444);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0 0.25rem;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.pf .agd-remove-btn:hover { opacity: 1; }
+.pf .agd-add-btn {
+  background: none;
+  border: 1px dashed var(--border, #E5E7EB);
+  color: var(--text-dim, #6B7280);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--radius-xs, 6px);
+  transition: border-color 0.15s, color 0.15s;
+  margin-top: 0.25rem;
+}
+.pf .agd-add-btn:hover {
+  border-color: var(--accent, #E8564A);
+  color: var(--accent, #E8564A);
+}
