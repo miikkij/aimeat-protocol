@@ -16,6 +16,8 @@
  *   v1.0.0 -- 2026-05-01 -- Initial stats tab with basic cards and Chart.js charts
  *   v2.0.0 -- 2026-05-21 -- Major rewrite: time range selector, email / push /
  *     mailbox notification sections, per-day charts, self-managed data fetching
+ *   v2.0.1 -- 2026-05-21 -- i18n chart labels, chart cleanup on unmount, live
+ *     badges on gauge cards, section header CSS classes, breakdown table th fix
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -106,7 +108,7 @@ function BreakdownTable({ byType, columns, typePrefix }) {
     <table class="adm-breakdown-table">
       <thead><tr>
         <th>${t('dashboard.breakdownType')}</th>
-        ${columns.map(c => html`<th style="text-align:right">${t(c.label)}</th>`)}
+        ${columns.map(c => html`<th class="num">${t(c.label)}</th>`)}
       </tr></thead>
       <tbody>
         ${Object.keys(byType).map(type => html`
@@ -153,9 +155,17 @@ export default function StatsTab({ data }) {
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [period, customFrom, customTo]);
 
-  // Re-render charts when data changes
+  // Re-render charts when data changes; destroy on unmount
   useEffect(() => {
     if (sd) renderAllCharts(sd, chartRefs);
+    return () => {
+      for (const key of Object.keys(chartRefs.current)) {
+        if (chartRefs.current[key]) {
+          chartRefs.current[key].destroy();
+          delete chartRefs.current[key];
+        }
+      }
+    };
   }, [sd]);
 
   if (!sd) return html`<div class="empty">${t('dashboard.statsNotAvailable')}</div>`;
@@ -215,9 +225,9 @@ export default function StatsTab({ data }) {
     <div class="adm-card adm-mt-lg"><h2>${t('dashboard.monthlyTrend')}</h2><canvas id="chartMonthly" height="160"></canvas></div>
 
     <!-- Tunnel Stats -->
-    <h3 class="adm-text-accent" style="margin-top:24px;font-size:.9rem">${t('dashboard.tunnelStats')}</h3>
+    <h3 class="adm-mt-lg adm-text-sm adm-text-accent">${t('dashboard.tunnelStats')}</h3>
     <div class="adm-grid adm-grid-4 adm-mt-md">
-      <${StatCard} label=${t('dashboard.tunnelActive')} value=${gs.tunnel_connections_active ?? ts.connections_active ?? 0} color="#22c55e" />
+      <${StatCard} label=${html`${t('dashboard.tunnelActive')} <span class="adm-badge-live">${t('dashboard.live')}</span>`} value=${gs.tunnel_connections_active ?? ts.connections_active ?? 0} color="#22c55e" />
       <${StatCard} label=${t('dashboard.tunnelTotal')} value=${ts.connections_total || 0} />
       <${StatCard} label=${t('dashboard.tunnelDisconnections')} value=${ts.disconnections_total || 0} color="#eab308" />
       <${StatCard} label=${t('dashboard.tunnelReconnects')} value=${ts.reconnects_total || 0} color="#3b82f6" />
@@ -239,21 +249,21 @@ export default function StatsTab({ data }) {
     </div>
 
     <!-- Mailbox Stats -->
-    <h3 class="adm-mt-lg adm-text-sm" style="color:#a855f7">${t('dashboard.mailboxStats')}</h3>
+    <h3 class="adm-mt-lg adm-text-sm adm-section-purple">${t('dashboard.mailboxStats')}</h3>
     <div class="adm-grid adm-grid-4 adm-mt-md">
-      <${StatCard} label=${t('dashboard.mailboxItems')} value=${gs.mailbox_items_total ?? ms.items_total ?? 0} />
-      <${StatCard} label=${t('dashboard.mailboxBytes')} value=${fmtBytes(gs.mailbox_bytes_total ?? ms.bytes_total ?? 0)} />
+      <${StatCard} label=${html`${t('dashboard.mailboxItems')} <span class="adm-badge-live">${t('dashboard.live')}</span>`} value=${gs.mailbox_items_total ?? ms.items_total ?? 0} />
+      <${StatCard} label=${html`${t('dashboard.mailboxBytes')} <span class="adm-badge-live">${t('dashboard.live')}</span>`} value=${fmtBytes(gs.mailbox_bytes_total ?? ms.bytes_total ?? 0)} />
       <${StatCard} label=${t('dashboard.mailboxEnqueued')} value=${ms.enqueued_total || 0} color="#3b82f6" />
       <${StatCard} label=${t('dashboard.mailboxDelivered')} value=${ms.delivered_total || 0} color="#22c55e" />
     </div>
     <div class="adm-grid adm-grid-4">
       <${StatCard} label=${t('dashboard.mailboxExpired')} value=${ms.expired_total || 0} color=${ms.expired_total > 0 ? '#eab308' : '#22c55e'} />
       <${StatCard} label=${t('dashboard.mailboxQuotaRejects')} value=${ms.quota_rejections_total || 0} color=${ms.quota_rejections_total > 0 ? '#ef4444' : '#22c55e'} />
-      <${StatCard} label=${t('dashboard.mailboxOldestAge')} value=${fmtUp(gs.mailbox_oldest_item_age_seconds ?? ms.oldest_item_age_seconds ?? 0)} color="var(--text-dim)" />
+      <${StatCard} label=${html`${t('dashboard.mailboxOldestAge')} <span class="adm-badge-live">${t('dashboard.live')}</span>`} value=${fmtUp(gs.mailbox_oldest_item_age_seconds ?? ms.oldest_item_age_seconds ?? 0)} color="var(--text-dim)" />
     </div>
 
     <!-- Email Delivery -->
-    <h3 class="adm-mt-lg adm-text-sm" style="color:#06b6d4">${t('dashboard.emailDelivery')}</h3>
+    <h3 class="adm-mt-lg adm-text-sm adm-section-cyan">${t('dashboard.emailDelivery')}</h3>
     <div class="adm-grid adm-grid-4 adm-mt-md">
       <${StatCard} label=${t('dashboard.emailsSent')} value=${emailSent} />
       <${StatCard} label=${t('dashboard.emailsFailed')} value=${emailFailed} color=${emailFailed > 0 ? '#ef4444' : '#22c55e'} />
@@ -274,7 +284,7 @@ export default function StatsTab({ data }) {
     <div class="adm-card adm-mt-md"><canvas id="chartEmailDaily" height="180"></canvas></div>
 
     <!-- Push Notifications -->
-    <h3 class="adm-mt-lg adm-text-sm" style="color:#8b5cf6">${t('dashboard.pushDelivery')}</h3>
+    <h3 class="adm-mt-lg adm-text-sm adm-section-violet">${t('dashboard.pushDelivery')}</h3>
     <div class="adm-grid adm-grid-4 adm-mt-md">
       <${StatCard} label=${t('dashboard.pushSent')} value=${pushSent} />
       <${StatCard} label=${t('dashboard.pushFailed')} value=${pushFailed} color=${pushFailed > 0 ? '#ef4444' : '#22c55e'} />
@@ -294,7 +304,7 @@ export default function StatsTab({ data }) {
     <div class="adm-card adm-mt-md"><canvas id="chartPushDaily" height="180"></canvas></div>
 
     <!-- Mailbox Notifications -->
-    <h3 class="adm-mt-lg adm-text-sm" style="color:#f59e0b">${t('dashboard.mailboxNotifications')}</h3>
+    <h3 class="adm-mt-lg adm-text-sm adm-section-amber">${t('dashboard.mailboxNotifications')}</h3>
     <div class="adm-grid adm-grid-3 adm-mt-md">
       <${StatCard} label=${t('dashboard.mailboxNotifSent')} value=${mboxSent} />
       <${StatCard} label=${t('dashboard.mailboxNotifFailed')} value=${mboxFailed} color=${mboxFailed > 0 ? '#ef4444' : '#22c55e'} />
@@ -321,7 +331,7 @@ export default function StatsTab({ data }) {
     ` : ''}
 
     <!-- Consent Permission Stats -->
-    <h3 class="adm-mt-lg adm-text-sm" style="color:#a855f7">${t('dashboard.consentPermStats')}</h3>
+    <h3 class="adm-mt-lg adm-text-sm adm-section-purple">${t('dashboard.consentPermStats')}</h3>
     <div class="adm-grid adm-grid-4 adm-mt-md">
       <${StatCard} label=${t('dashboard.consentActiveRules')} value=${cs.active_rules || 0} color="#a855f7" />
       <${StatCard} label=${t('dashboard.consentByGaii')} value=${cs.by_gaii || 0} color="#3b82f6" />
@@ -336,7 +346,7 @@ export default function StatsTab({ data }) {
     </div>
 
     <!-- Security Stats -->
-    <h3 class="adm-mt-lg adm-text-sm" style="color:#ef4444">${t('dashboard.securityStats')}</h3>
+    <h3 class="adm-mt-lg adm-text-sm adm-section-red">${t('dashboard.securityStats')}</h3>
     <div class="adm-grid adm-grid-4 adm-mt-md">
       <${StatCard} label=${t('dashboard.authFailures')} value=${sd.auth_failures_total || 0} color=${sd.auth_failures_total > 0 ? '#ef4444' : '#22c55e'} />
       <${StatCard} label=${t('dashboard.rateLimitHits')} value=${sd.rate_limit_hits_total || 0} color=${sd.rate_limit_hits_total > 0 ? '#eab308' : '#22c55e'} />
@@ -387,9 +397,9 @@ async function renderAllCharts(sd, chartRefs) {
     refs.chartDaily = new Chart(dc, { type: 'bar', data: {
       labels: days.map(d => d.slice(5)),
       datasets: [
-        { label: 'Requests', data: days.map(d => (daily[d] || {}).requests_total || 0), backgroundColor: '#3b82f688' },
-        { label: 'Writes',   data: days.map(d => (daily[d] || {}).memory_writes || 0),  backgroundColor: '#22c55e88' },
-        { label: 'Reads',    data: days.map(d => (daily[d] || {}).memory_reads || 0),   backgroundColor: '#06b6d488' },
+        { label: t('dashboard.requestsTotal') || 'Requests', data: days.map(d => (daily[d] || {}).requests_total || 0), backgroundColor: '#3b82f688' },
+        { label: t('dashboard.writes') || 'Writes',   data: days.map(d => (daily[d] || {}).memory_writes || 0),  backgroundColor: '#22c55e88' },
+        { label: t('dashboard.reads') || 'Reads',    data: days.map(d => (daily[d] || {}).memory_reads || 0),   backgroundColor: '#06b6d488' },
       ],
     }, options: chartOpts });
   }
@@ -412,8 +422,8 @@ async function renderAllCharts(sd, chartRefs) {
     refs.chartWeekly = new Chart(wc, { type: 'line', data: {
       labels: weekLabels,
       datasets: [
-        { label: 'This week', data: getWeekData(0), borderColor: '#3b82f6', backgroundColor: '#3b82f622', fill: true },
-        { label: 'Last week', data: getWeekData(1), borderColor: '#22c55e', backgroundColor: '#22c55e22', fill: true },
+        { label: t('dashboard.thisWeek') || 'This week', data: getWeekData(0), borderColor: '#3b82f6', backgroundColor: '#3b82f622', fill: true },
+        { label: t('dashboard.lastWeek') || 'Last week', data: getWeekData(1), borderColor: '#22c55e', backgroundColor: '#22c55e22', fill: true },
       ],
     }, options: chartOpts });
   }
@@ -423,7 +433,7 @@ async function renderAllCharts(sd, chartRefs) {
   if (mc && days.length > 0) {
     refs.chartMonthly = new Chart(mc, { type: 'line', data: {
       labels: days.map(d => d.slice(5)),
-      datasets: [{ label: 'Requests', data: days.map(d => (daily[d] || {}).requests_total || 0), borderColor: '#06b6d4', backgroundColor: '#06b6d422', fill: true }],
+      datasets: [{ label: t('dashboard.requestsTotal') || 'Requests', data: days.map(d => (daily[d] || {}).requests_total || 0), borderColor: '#06b6d4', backgroundColor: '#06b6d422', fill: true }],
     }, options: chartOpts });
   }
 
@@ -432,7 +442,7 @@ async function renderAllCharts(sd, chartRefs) {
   if (tc) {
     const tunnel = sd.tunnel || {};
     refs.chartTunnel = new Chart(tc, { type: 'doughnut', data: {
-      labels: ['Sent', 'Received', 'Rejected', 'Fallbacks'],
+      labels: [t('dashboard.tunnelMsgSent') || 'Sent', t('dashboard.tunnelMsgReceived') || 'Received', t('dashboard.tunnelDeliveryFails') || 'Rejected', t('dashboard.tunnelMailboxFallbacks') || 'Fallbacks'],
       datasets: [{ data: [tunnel.messages_sent_total || 0, tunnel.messages_received_total || 0, tunnel.delivery_failures_total || 0, tunnel.mailbox_fallbacks_total || 0],
         backgroundColor: ['#3b82f6', '#22c55e', '#ef4444', '#eab308'] }],
     }, options: { responsive: true, plugins: { legend: { labels: { color: '#94a3b8' } } } } });
@@ -444,9 +454,9 @@ async function renderAllCharts(sd, chartRefs) {
     refs.chartEmailDaily = new Chart(ec, { type: 'bar', data: {
       labels: days.map(d => d.slice(5)),
       datasets: [
-        { label: 'Sent',    data: days.map(d => sumByPrefix(daily[d], 'email_sent')),    backgroundColor: '#06b6d488' },
-        { label: 'Failed',  data: days.map(d => sumByPrefix(daily[d], 'email_failed')),  backgroundColor: '#ef444488' },
-        { label: 'Retried', data: days.map(d => sumByPrefix(daily[d], 'email_retried')), backgroundColor: '#eab30888' },
+        { label: t('dashboard.breakdownSent') || 'Sent',    data: days.map(d => sumByPrefix(daily[d], 'email_sent')),    backgroundColor: '#06b6d488' },
+        { label: t('dashboard.breakdownFailed') || 'Failed',  data: days.map(d => sumByPrefix(daily[d], 'email_failed')),  backgroundColor: '#ef444488' },
+        { label: t('dashboard.breakdownRetried') || 'Retried', data: days.map(d => sumByPrefix(daily[d], 'email_retried')), backgroundColor: '#eab30888' },
       ],
     }, options: chartOpts });
   }
@@ -457,8 +467,8 @@ async function renderAllCharts(sd, chartRefs) {
     refs.chartPushDaily = new Chart(pc, { type: 'bar', data: {
       labels: days.map(d => d.slice(5)),
       datasets: [
-        { label: 'Sent',   data: days.map(d => sumByPrefix(daily[d], 'push_sent')),   backgroundColor: '#8b5cf688' },
-        { label: 'Failed', data: days.map(d => sumByPrefix(daily[d], 'push_failed')), backgroundColor: '#ef444488' },
+        { label: t('dashboard.breakdownSent') || 'Sent',   data: days.map(d => sumByPrefix(daily[d], 'push_sent')),   backgroundColor: '#8b5cf688' },
+        { label: t('dashboard.breakdownFailed') || 'Failed', data: days.map(d => sumByPrefix(daily[d], 'push_failed')), backgroundColor: '#ef444488' },
       ],
     }, options: chartOpts });
   }

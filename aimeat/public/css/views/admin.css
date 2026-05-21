@@ -646,6 +646,16 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ── Stats Section Header Colors ── */
+.adm-section-purple  { color: #a855f7; }
+.adm-section-cyan    { color: #06b6d4; }
+.adm-section-violet  { color: #8b5cf6; }
+.adm-section-amber   { color: #f59e0b; }
+.adm-section-red     { color: #ef4444; }
+
+/* ── Breakdown Table ── */
+.adm-breakdown-table th.num { text-align: right; }
+
 .adm-badge-live {
   display: inline-block;
   font-size: 0.6rem;
