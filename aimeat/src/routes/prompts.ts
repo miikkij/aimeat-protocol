@@ -99,7 +99,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
         res.json(success(config.nodeId, {
           tier: '1',
           system_prompt,
-          available_operations: ['memory_crud', 'action_publish', 'action_execute', 'work_queue', 'wallet', 'boards', 'catalogue', 'task_lifecycle', 'directives'],
+          available_operations: ['memory_crud', 'action_publish', 'action_execute', 'work_queue', 'wallet', 'boards', 'catalogue', 'task_lifecycle', 'directives', 'capabilities_report'],
           economics: {
             daily_allowance: config.dailyAllowance,
             current_balance: agent?.morselBalance ?? 0,
@@ -126,6 +126,14 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
               fail: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/fail`,
               wait: `/v1/agents/${encodeURIComponent(agentName)}/tasks/wait`,
             },
+          },
+          capabilities: {
+            report_endpoint: `/v1/agents/${encodeURIComponent(agentName)}/capabilities`,
+            current: {
+              technical: agent?.technicalCapabilities ?? [],
+              domain: agent?.domainCapabilities ?? [],
+            },
+            instructions: 'Report your capabilities on first connect and when they change. PUT to the report_endpoint with: { technical: [{ name, type }], domain: [string], languages: [string] }',
           },
         }));
         break;
