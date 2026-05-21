@@ -4587,6 +4587,11 @@ export class SqliteStorage implements Storage {
     return result.changes;
   }
 
+  async deleteDeviceAuthByOwner(ownerName: string): Promise<number> {
+    const result = this.db.prepare(`DELETE FROM device_auth WHERE ownerName = ?`).run(ownerName);
+    return result.changes;
+  }
+
   private deserializeDeviceAuth(row: Record<string, unknown>): DeviceAuthorizationRecord {
     return {
       deviceCode: row.deviceCode as string,

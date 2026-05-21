@@ -4112,6 +4112,12 @@ export class MongoStorage implements Storage {
         return result.count;
     }
 
+    async deleteDeviceAuthByOwner(ownerName: string): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.deviceAuth.deleteMany({ where: { ownerName } });
+        return result.count;
+    }
+
     private toDeviceAuthRecord(row: any): DeviceAuthorizationRecord {
         return {
             deviceCode: row.deviceCode,

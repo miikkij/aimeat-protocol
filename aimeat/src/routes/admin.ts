@@ -134,7 +134,7 @@ export function adminRouter(
     });
 
     // POST /v1/admin/setup/register — register owner (password-protected, no auth)
-    router.post('/v1/admin/setup/register', async (req, res) => {
+    router.post('/v1/admin/setup/register', adminAuthLimit, async (req, res) => {
         // Check admin session (cookie or header) or password via header (NOT query param)
         const sessionId = getCookie(req, 'admin_session') ?? (req.headers['x-admin-session'] as string);
         const pw = (req.headers['x-admin-password'] as string) ?? '';
@@ -223,7 +223,7 @@ export function adminRouter(
     });
 
     // POST /v1/admin/setup/token — sign + get JWT for an owner (password-protected)
-    router.post('/v1/admin/setup/token', async (req, res) => {
+    router.post('/v1/admin/setup/token', adminAuthLimit, async (req, res) => {
         // Check admin session (cookie or header) or password via header (NOT query param)
         const sessionId = getCookie(req, 'admin_session') ?? (req.headers['x-admin-session'] as string);
         const pw = (req.headers['x-admin-password'] as string) ?? '';
@@ -273,7 +273,7 @@ export function adminRouter(
     });
 
     // POST /v1/admin/setup/initial-otk — generate an Initial OTK (password-protected)
-    router.post('/v1/admin/setup/initial-otk', async (req, res) => {
+    router.post('/v1/admin/setup/initial-otk', adminAuthLimit, async (req, res) => {
         // Check admin session or password via header (NOT query param)
         const sessionId = getCookie(req, 'admin_session') ?? (req.headers['x-admin-session'] as string);
         const pw = (req.headers['x-admin-password'] as string) ?? '';

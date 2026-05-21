@@ -9,6 +9,7 @@ import {
   getFederationPeers, getFederationDirectory, approvePeeringRequest, rejectPeeringRequest,
   deletePeeringRequest, activatePeer, addPeerDirect, removePeer, removePeerEmergency,
   testFederationNode, joinGenesisNetwork, updatePeerPolicy, getNetworkDirectory,
+  getConfig, saveConfig,
 } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
 
@@ -29,6 +30,39 @@ export default function FederationTab({ data, reload }) {
   const [joinRole, setJoinRole] = useState('contributor');
   const [joining, setJoining] = useState(false);
   const [joinResult, setJoinResult] = useState(null);
+
+  // ── Federation Auth Policy state ──
+  const [authPolicy, setAuthPolicy] = useState('disabled');
+  const [defaultScopes, setDefaultScopes] = useState([]);
+  const [authPolicyLoading, setAuthPolicyLoading] = useState(true);
+
+  useEffect(() => {
+    getConfig().then(res => {
+      if (res.ok && res.data?.config) {
+        const c = res.data.config;
+        setAuthPolicy(c.federation?.auth_policy ?? c.federationAuthPolicy ?? 'disabled');
+        const scopes = c.federation?.default_scopes ?? c.federationDefaultScopes ?? 'memory:read,catalogue:read';
+        setDefaultScopes(typeof scopes === 'string' ? scopes.split(',').filter(Boolean) : (scopes || []));
+      }
+      setAuthPolicyLoading(false);
+    });
+  }, []);
+
+  const doSaveAuthPolicy = async (policy, scopes) => {
+    const changes = [
+      { key: 'federation.auth_policy', value: policy },
+      { key: 'federation.default_scopes', value: Array.isArray(scopes) ? scopes.join(',') : scopes },
+    ];
+    const res = await saveConfig(changes);
+    if (res.ok) { setActionSuccess(t('dashboard.fedPolicyUpdated')); setTimeout(() => setActionSuccess(null), 3000); }
+    else setActionError(res.error?.message || 'Failed to save');
+  };
+
+  const toggleScope = (scope) => {
+    const next = defaultScopes.includes(scope) ? defaultScopes.filter(s => s !== scope) : [...defaultScopes, scope];
+    setDefaultScopes(next);
+    doSaveAuthPolicy(authPolicy, next);
+  };
 
   // ── Network Directory state ──
   const [dirEntries, setDirEntries] = useState([]);
@@ -216,6 +250,31 @@ export default function FederationTab({ data, reload }) {
       { label: t('dashboard.fedOfflinePeers'), value: offlinePeers.length, color: '#ef4444' },
       { label: t('dashboard.fedPendingRequests'), value: pendingRequests.length, color: '#06b6d4' },
     ]} />
+
+    <!-- ═══ Federation Auth Policy ═══ -->
+    <div class="adm-card adm-mt-lg">
+      <h4 class="adm-mb-sm" style="margin:0">${t('dashboard.fedAuthPolicyTitle')}</h4>
+      <p class="adm-text-dim adm-text-base adm-mb-md" style="margin:0">${t('dashboard.fedAuthPolicyDesc')}</p>
+      ${authPolicyLoading ? html`<p class="adm-text-dim">...</p>` : html`
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <select class="adm-input" style="max-width:240px" value=${authPolicy} onChange=${(e) => { setAuthPolicy(e.target.value); doSaveAuthPolicy(e.target.value, defaultScopes); }}>
+            <option value="disabled">${t('dashboard.fedAuthDisabled')}</option>
+            <option value="all_peers">${t('dashboard.fedAuthAllPeers')}</option>
+            <option value="specific_peers">${t('dashboard.fedAuthSpecificPeers')}</option>
+          </select>
+        </div>
+        ${authPolicy !== 'disabled' && html`
+          <div class="adm-mt-md">
+            <p class="adm-text-sm adm-text-dim adm-mb-sm">${t('dashboard.fedDefaultScopes')}</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              ${['memory:read','memory:write','catalogue:read','social:read','social:write','work:request','boards:read','boards:write'].map(s => html`
+                <label class="adm-text-sm"><input type="checkbox" checked=${defaultScopes.includes(s)} onChange=${() => toggleScope(s)} /> ${s}</label>
+              `)}
+            </div>
+          </div>
+        `}
+      `}
+    </div>
 
     <!-- ═══ Network Directory ═══ -->
     <div class="adm-card adm-mt-lg">

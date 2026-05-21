@@ -669,6 +669,30 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
     try { await storage.deleteMatchesByProfile(ghii); deletionLog.push('matches'); } catch { /* continue */ }
     // Sessions
     try { await storage.revokeAllSessions(name); deletionLog.push('sessions'); } catch { /* continue */ }
+    // Capabilities registered by this owner
+    try {
+      const caps = await storage.listCapabilitiesByOwner(ghii);
+      for (const c of caps) await storage.deleteCapability(c.id);
+      if (caps.length) deletionLog.push(`capabilities:${caps.length}`);
+    } catch { /* continue */ }
+    // Scheduled jobs owned by this user
+    try {
+      const jobs = await storage.listScheduledJobs({});
+      const ownerJobs = jobs.filter(j => j.createdBy === ghii || j.createdBy === name);
+      for (const j of ownerJobs) await storage.deleteScheduledJob(j.id);
+      if (ownerJobs.length) deletionLog.push(`scheduled_jobs:${ownerJobs.length}`);
+    } catch { /* continue */ }
+    // Device auth records
+    try {
+      await storage.deleteDeviceAuthByOwner(name);
+      deletionLog.push('device_auth');
+    } catch { /* continue */ }
+    // Apps published by this owner
+    try {
+      const { apps } = await storage.listApps({ ownerGaii: ghii });
+      for (const a of apps) await storage.deleteApp(ghii, a.filename);
+      if (apps.length) deletionLog.push(`apps:${apps.length}`);
+    } catch { /* continue */ }
 
     // 3. Per-agent cascade + agent deletion (handled by storage.deleteOwner internally)
     // The storage provider's deleteOwner cascades: agent data, GHII records,

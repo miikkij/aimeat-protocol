@@ -1211,6 +1211,9 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         wallet: {
           // SECURITY: Extensions can only debit the calling agent's own balance
           consume: async (amount: number, reason: string) => {
+            if (amount > config.extensionMaxDebitPerCall) {
+              throw new Error(`DEBIT_LIMIT: max ${config.extensionMaxDebitPerCall} morsels per call`);
+            }
             const debited = await storage.debitBalance(callerGaii, amount);
             if (!debited) return { success: false, error: 'Insufficient balance' };
             await storage.addTransaction({

@@ -105,6 +105,9 @@ function persistNodeKey(kp: { publicKey: string; privateKey: string }): void {
     } else {
       // Backward compatible: write plaintext
       writeFileSync(keyPath, JSON.stringify({ publicKey: kp.publicKey, privateKey: kp.privateKey }, null, 2) + '\n', { mode: 0o600 });
+      if (process.platform === 'win32') {
+        logger.warn('Node key saved without encryption. Windows does not enforce 0o600 permissions. Set AIMEAT_KEY_PASSPHRASE.');
+      }
     }
   } catch (err) {
     logger.warn('Could not persist node key', { path: keyPath, error: err });

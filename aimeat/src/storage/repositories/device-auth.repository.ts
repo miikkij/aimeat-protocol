@@ -8,4 +8,5 @@ export interface DeviceAuthRepository {
   countPendingDeviceAuthByOwner(ownerName: string): Promise<number>;
   listPendingDeviceAuthByOwner(ownerName: string): Promise<DeviceAuthorizationRecord[]>;
   cleanupExpiredDeviceAuth(): Promise<number>;
+  deleteDeviceAuthByOwner(ownerName: string): Promise<number>;
 }
