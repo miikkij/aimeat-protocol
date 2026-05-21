@@ -60,6 +60,7 @@ const ALL_SUITES = [
     'test/cortex-ui-e2e.ts',
     'test/openrouter.ts',
     'test/e2e-sharing-groups.ts',
+    'test/e2e-agent-tasks.ts',
 ];
 
 const PORT = process.env.AIMEAT_PORT ?? '40251';
