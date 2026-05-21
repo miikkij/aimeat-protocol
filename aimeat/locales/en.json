@@ -357,7 +357,9 @@
       },
       "subtabs": {
         "tasks": "Tasks",
-        "directives": "Directives"
+        "directives": "Directives",
+        "capabilities": "Capabilities",
+        "activity": "Activity"
       },
       "tasks": {
         "title": "Task Queue",
@@ -398,6 +400,25 @@
         "system": "System",
         "owner": "Owner",
         "agent": "Agent"
+      },
+      "capabilities": {
+        "technical": "Technical Skills",
+        "domain": "Domain Knowledge",
+        "actionQueue": "Action Queue Support",
+        "verified": "verified",
+        "selfReported": "self-reported",
+        "empty": "No capabilities reported yet"
+      },
+      "activity": {
+        "tasksCompleted": "Tasks Completed",
+        "tokensUsed": "Tokens Used (30d)",
+        "successRate": "Success Rate",
+        "scheduledJobs": "Scheduled Jobs",
+        "recentLog": "Recent Log",
+        "viewFullLog": "View full log",
+        "noActivity": "No activity recorded yet",
+        "aimeatJob": "AIMEAT (system)",
+        "agentJob": "Agent environment"
       }
     },
     "scopes": {

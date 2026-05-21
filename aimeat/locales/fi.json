@@ -357,7 +357,9 @@
       },
       "subtabs": {
         "tasks": "Tehtävät",
-        "directives": "Ohjeet"
+        "directives": "Ohjeet",
+        "capabilities": "Kyvykkyydet",
+        "activity": "Aktiivisuus"
       },
       "tasks": {
         "title": "Tehtäväjono",
@@ -398,6 +400,25 @@
         "system": "Järjestelmä",
         "owner": "Omistaja",
         "agent": "Agentti"
+      },
+      "capabilities": {
+        "technical": "Tekniset taidot",
+        "domain": "Osaamisalueet",
+        "actionQueue": "Toimintajonotuki",
+        "verified": "vahvistettu",
+        "selfReported": "itse ilmoitettu",
+        "empty": "Kyvykkyyksiä ei vielä ilmoitettu"
+      },
+      "activity": {
+        "tasksCompleted": "Tehtäviä suoritettu",
+        "tokensUsed": "Tokeneita käytetty (30pv)",
+        "successRate": "Onnistumisprosentti",
+        "scheduledJobs": "Ajastetut tehtävät",
+        "recentLog": "Viimeisimmät tapahtumat",
+        "viewFullLog": "Näytä koko loki",
+        "noActivity": "Ei vielä aktiivisuutta",
+        "aimeatJob": "AIMEAT (järjestelmä)",
+        "agentJob": "Agentti-ympäristö"
       }
     },
     "scopes": {
