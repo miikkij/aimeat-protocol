@@ -882,6 +882,7 @@ export interface ExtensionInstanceRecord {
   /** Per-locale translation overrides: { "en": { "mkt.cat.foo": "Foo" }, "fi": { ... } } */
   translations?: Record<string, Record<string, string>>;
   createdBy: string;
+  createdByAgent?: string;
   createdAt: string;
   updatedAt: string;
 }

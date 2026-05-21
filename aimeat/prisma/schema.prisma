@@ -34,6 +34,9 @@ model Agent {
   allowedOrigins String[]
   defaultScopes  String[]
   federate      Boolean  @default(false)
+  technicalCapabilities Json?
+  domainCapabilities    Json?
+  activityStats         Json?
   createdAt     DateTime @default(now())
   lastSeen      DateTime @default(now())
 
@@ -51,6 +54,7 @@ model Memory {
   version    Int      @default(1)
   flagCount  Int      @default(0)
   allowedOrigins String[]
+  groupId    String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -217,6 +221,7 @@ model StorageFile {
   data       Bytes
   tags       String[] @default([])
   federate   Boolean  @default(false)
+  groupId    String?
   createdAt  DateTime @default(now())
 
   @@unique([ownerGaii, key])
@@ -337,6 +342,7 @@ model ExtensionInstance {
   status        String    @default("active")
   translations  Json?
   createdBy     String
+  createdByAgent String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -1219,4 +1225,83 @@ model StatsDailyHistory {
   value Int    @default(0)
 
   @@unique([date, key])
+}
+
+model AgentTask {
+  id               String    @id @map("_id")
+  agentGaii        String
+  ownerGaii        String
+  title            String
+  description      String    @default("")
+  scope            Json      @default("[]")
+  rules            Json      @default("[]")
+  verification     Json      @default("{}")
+  resources        Json?
+  todos            Json      @default("[]")
+  status           String    @default("draft")
+  parentTaskId     String?
+  workTrackingCode String?
+  telemetry        Json?
+  lastEventAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  completedAt      DateTime?
+
+  @@index([agentGaii, status])
+  @@index([ownerGaii])
+}
+
+model AgentTaskEvent {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  taskId    String
+  type      String
+  message   String
+  details   Json?
+  timestamp DateTime @default(now())
+
+  @@index([taskId, timestamp])
+}
+
+model AgentDirective {
+  id          String   @id @map("_id")
+  agentGaii   String   @unique
+  purpose     String   @default("")
+  rules       Json     @default("[]")
+  memoryAreas Json     @default("[]")
+  resources   Json     @default("[]")
+  updatedAt   DateTime @updatedAt
+}
+
+model OwnerAgentDefault {
+  id                 String   @id @map("_id")
+  ownerGaii          String   @unique
+  rules              Json     @default("[]")
+  defaultTokenBudget Int?
+  defaultMemoryAreas Json     @default("[]")
+  updatedAt          DateTime @updatedAt
+}
+
+model SharingGroup {
+  id                 String   @id @map("_id")
+  name               String
+  description        String?
+  ownerGaii          String
+  members            Json     @default("[]")
+  defaultPermissions Json     @default("{\"read\":true,\"write\":false}")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([ownerGaii])
+}
+
+model AgentActivity {
+  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  agentGaii String
+  date      String
+  hour      Int
+  metric    String
+  value     Int    @default(0)
+
+  @@unique([agentGaii, date, hour, metric])
+  @@index([agentGaii, date])
 }

@@ -399,6 +399,9 @@ export class SqliteStorage implements Storage {
     if (row.allowedOrigins) record.allowedOrigins = JSON.parse(row.allowedOrigins as string);
     if (row.defaultScopes) record.defaultScopes = JSON.parse(row.defaultScopes as string);
     record.federate = (row as any).federate === 1;
+    if (row.technicalCapabilities) record.technicalCapabilities = JSON.parse(row.technicalCapabilities as string);
+    if (row.domainCapabilities) record.domainCapabilities = JSON.parse(row.domainCapabilities as string);
+    if (row.activityStats) record.activityStats = JSON.parse(row.activityStats as string);
     return record;
   }
 
@@ -602,6 +605,7 @@ export class SqliteStorage implements Storage {
       record.flagCount = row.flagCount as number;
     }
     if (row.allowedOrigins) record.allowedOrigins = JSON.parse(row.allowedOrigins as string);
+    if (row.groupId) record.groupId = row.groupId as string;
     return record;
   }
 
@@ -1324,6 +1328,7 @@ export class SqliteStorage implements Storage {
       createdAt: row.createdAt as string,
     };
     if (row.accessCode) record.accessCode = row.accessCode as string;
+    if (row.groupId) record.groupId = row.groupId as string;
     record.federate = (row as any).federate === 1;
     return record;
   }
@@ -1342,6 +1347,7 @@ export class SqliteStorage implements Storage {
         createdAt: r.createdAt as string,
       };
       if (r.accessCode) record.accessCode = r.accessCode as string;
+      if (r.groupId) record.groupId = r.groupId as string;
       record.federate = (r as any).federate === 1;
       return record;
     });
@@ -4420,7 +4426,7 @@ export class SqliteStorage implements Storage {
   }
 
   private deserializeExtensionInstance(row: Record<string, unknown>): ExtensionInstanceRecord {
-    return {
+    const record: ExtensionInstanceRecord = {
       id: row.id as string,
       extensionName: row.extensionName as string,
       config: JSON.parse(row.config as string),
@@ -4429,6 +4435,9 @@ export class SqliteStorage implements Storage {
       createdAt: row.createdAt as string,
       updatedAt: row.updatedAt as string,
     };
+    if (row.createdByAgent) record.createdByAgent = row.createdByAgent as string;
+    if (row.translations) record.translations = JSON.parse(row.translations as string);
+    return record;
   }
 
   // ══════════════════════════════════════════════════════════

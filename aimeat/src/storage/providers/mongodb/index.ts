@@ -73,6 +73,10 @@ import type {
     TemplateListingRecord, TemplateReview, TemplateDiscussion, TemplateFilter,
     PackageInstanceRecord, InstalledComponent, InstanceFilter,
     CapabilityRecord, CapabilityLogEntry, CapabilityFilter, CapabilityOverride, CapabilityTrust,
+    AgentTaskRecord, AgentTaskEventRecord,
+    AgentDirectivesRecord, OwnerAgentDefaults,
+    SharingGroupRecord,
+    AgentActivityRecord,
 } from '../../interface.js';
 
 import { matchesRecipient } from '../../../services/consent.js';
@@ -222,6 +226,14 @@ export class MongoStorage implements Storage {
             // 10. Delete email verifications for this owner (Prisma)
             await this.prisma.emailVerification.deleteMany({ where: { ownerName: name } });
 
+            // 10b. Delete owner-level agent dashboard data
+            const ghiiRows = await this.prisma.ghii.findMany({ where: { ownerName: name }, select: { ghii: true } });
+            for (const g of ghiiRows) {
+                await this.prisma.agentTask.deleteMany({ where: { ownerGaii: g.ghii } });
+                await this.prisma.sharingGroup.deleteMany({ where: { ownerGaii: g.ghii } });
+                try { await this.prisma.ownerAgentDefault.delete({ where: { ownerGaii: g.ghii } }); } catch { /* not found */ }
+            }
+
             // 11. Delete the owner record
             await this.prisma.owner.delete({ where: { name } });
             return true;
@@ -246,6 +258,9 @@ export class MongoStorage implements Storage {
                 allowedOrigins: agent.allowedOrigins ?? [],
                 defaultScopes: agent.defaultScopes ?? ['*'],
                 federate: agent.federate ?? false,
+                technicalCapabilities: agent.technicalCapabilities as any ?? null,
+                domainCapabilities: agent.domainCapabilities as any ?? null,
+                activityStats: agent.activityStats as any ?? null,
                 createdAt: new Date(agent.createdAt),
                 lastSeen: new Date(agent.lastSeen),
             },
@@ -340,6 +355,16 @@ export class MongoStorage implements Storage {
         // OAuth refresh tokens and approvals for this agent
         await this.prisma.oAuthRefreshToken.deleteMany({ where: { gaii } });
         await this.prisma.oAuthApproval.deleteMany({ where: { gaii } });
+        // Agent tasks and events
+        const tasks = await this.prisma.agentTask.findMany({ where: { agentGaii: gaii }, select: { id: true } });
+        for (const t of tasks) {
+            await this.prisma.agentTaskEvent.deleteMany({ where: { taskId: t.id } });
+        }
+        await this.prisma.agentTask.deleteMany({ where: { agentGaii: gaii } });
+        // Agent directives
+        try { await this.prisma.agentDirective.delete({ where: { agentGaii: gaii } }); } catch { /* not found */ }
+        // Agent activity
+        await this.prisma.agentActivity.deleteMany({ where: { agentGaii: gaii } });
     }
 
     async listAgents(): Promise<AgentRecord[]> {
@@ -450,6 +475,7 @@ export class MongoStorage implements Storage {
                 ownerGaii: record.ownerGaii,
                 value: record.value as any,
                 visibility: record.visibility,
+                groupId: record.groupId ?? null,
                 tags: record.tags,
                 ttlHours: record.ttlHours,
                 version: record.version,
@@ -461,6 +487,7 @@ export class MongoStorage implements Storage {
             update: {
                 value: record.value as any,
                 visibility: record.visibility,
+                groupId: record.groupId ?? null,
                 tags: record.tags,
                 ttlHours: record.ttlHours,
                 version: record.version,
@@ -484,6 +511,7 @@ export class MongoStorage implements Storage {
             data: {
                 value: record.value as any,
                 visibility: record.visibility,
+                groupId: record.groupId ?? null,
                 tags: record.tags,
                 ttlHours: record.ttlHours,
                 version: record.version,
@@ -1269,6 +1297,7 @@ export class MongoStorage implements Storage {
                 data: file.data,
                 tags: file.tags || [],
                 federate: file.federate ?? false,
+                groupId: file.groupId ?? null,
                 createdAt: new Date(file.createdAt),
             },
         });
@@ -1281,17 +1310,17 @@ export class MongoStorage implements Storage {
             where: { ownerGaii_key: { ownerGaii, key } },
         });
         if (!row) return null;
-        return { key: row.key, ownerGaii: row.ownerGaii, visibility: row.visibility as any, mimeType: row.mimeType, size: row.size, data: Buffer.from(row.data), tags: (row as any).tags || [], federate: (row as any).federate ?? false, createdAt: row.createdAt.toISOString() };
+        return { key: row.key, ownerGaii: row.ownerGaii, visibility: row.visibility as any, groupId: row.groupId ?? undefined, mimeType: row.mimeType, size: row.size, data: Buffer.from(row.data), tags: (row as any).tags || [], federate: (row as any).federate ?? false, createdAt: row.createdAt.toISOString() };
     }
 
     async listStorageFiles(ownerGaii: string): Promise<StorageFileRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.storageFile.findMany({
             where: { ownerGaii },
-            select: { key: true, ownerGaii: true, visibility: true, mimeType: true, size: true, tags: true, federate: true, createdAt: true },
+            select: { key: true, ownerGaii: true, visibility: true, groupId: true, mimeType: true, size: true, tags: true, federate: true, createdAt: true },
         });
         return rows.map((r: any) => ({
-            key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility, mimeType: r.mimeType, size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false, createdAt: r.createdAt.toISOString(),
+            key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility, groupId: r.groupId ?? undefined, mimeType: r.mimeType, size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false, createdAt: r.createdAt.toISOString(),
         }));
     }
 
@@ -1425,11 +1454,11 @@ export class MongoStorage implements Storage {
     }
 
     private toAgentRecord(row: any): AgentRecord {
-        return { name: row.name, owner: row.owner, gaii: row.gaii, displayName: row.displayName ?? undefined, description: row.description ?? undefined, capabilities: row.capabilities, publicKey: row.publicKey, trustScore: row.trustScore, morselBalance: row.morselBalance, defaultScopes: row.defaultScopes?.length ? row.defaultScopes : undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined, federate: row.federate ?? false, createdAt: row.createdAt.toISOString(), lastSeen: row.lastSeen.toISOString() };
+        return { name: row.name, owner: row.owner, gaii: row.gaii, displayName: row.displayName ?? undefined, description: row.description ?? undefined, capabilities: row.capabilities, publicKey: row.publicKey, trustScore: row.trustScore, morselBalance: row.morselBalance, defaultScopes: row.defaultScopes?.length ? row.defaultScopes : undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined, federate: row.federate ?? false, technicalCapabilities: row.technicalCapabilities ?? undefined, domainCapabilities: row.domainCapabilities ?? undefined, activityStats: row.activityStats ?? undefined, createdAt: row.createdAt.toISOString(), lastSeen: row.lastSeen.toISOString() };
     }
 
     private toMemoryRecord(row: any): MemoryRecord {
-        return { key: row.key, ownerGaii: row.ownerGaii, value: row.value, visibility: row.visibility as any, tags: row.tags, ttlHours: row.ttlHours, version: row.version, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), flagCount: row.flagCount ?? undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined };
+        return { key: row.key, ownerGaii: row.ownerGaii, value: row.value, visibility: row.visibility as any, groupId: row.groupId ?? undefined, tags: row.tags, ttlHours: row.ttlHours, version: row.version, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(), flagCount: row.flagCount ?? undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined };
     }
 
     private toActionRecord(row: any): ActionRecord {
@@ -3922,6 +3951,7 @@ export class MongoStorage implements Storage {
             status: row.status as 'active' | 'paused',
             translations: row.translations as Record<string, Record<string, string>> | undefined,
             createdBy: row.createdBy,
+            createdByAgent: row.createdByAgent ?? undefined,
             createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
             updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
         };
@@ -3937,6 +3967,7 @@ export class MongoStorage implements Storage {
                 status: record.status,
                 translations: record.translations ? record.translations as any : undefined,
                 createdBy: record.createdBy,
+                createdByAgent: record.createdByAgent ?? null,
                 createdAt: new Date(record.createdAt),
             },
         });
@@ -5344,6 +5375,481 @@ export class MongoStorage implements Storage {
             result[row.date][row.key] = row.value;
         }
         return result;
+    }
+
+    // ── Agent Tasks ──
+
+    private toTaskRecord(row: any): AgentTaskRecord {
+        return {
+            id: row.id,
+            agentGaii: row.agentGaii,
+            ownerGaii: row.ownerGaii,
+            title: row.title,
+            description: row.description,
+            scope: row.scope as AgentTaskRecord['scope'],
+            rules: row.rules as string[],
+            verification: row.verification as AgentTaskRecord['verification'],
+            resources: row.resources as AgentTaskRecord['resources'] ?? undefined,
+            todos: row.todos as AgentTaskRecord['todos'],
+            status: row.status as AgentTaskRecord['status'],
+            parentTaskId: row.parentTaskId ?? undefined,
+            workTrackingCode: row.workTrackingCode ?? undefined,
+            telemetry: row.telemetry as AgentTaskRecord['telemetry'] ?? undefined,
+            lastEventAt: row.lastEventAt ? (row.lastEventAt instanceof Date ? row.lastEventAt.toISOString() : row.lastEventAt) : undefined,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+            updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+            completedAt: row.completedAt ? (row.completedAt instanceof Date ? row.completedAt.toISOString() : row.completedAt) : undefined,
+        };
+    }
+
+    private toTaskEventRecord(row: any): AgentTaskEventRecord {
+        return {
+            id: row.id,
+            taskId: row.taskId,
+            type: row.type as AgentTaskEventRecord['type'],
+            message: row.message,
+            details: row.details as Record<string, unknown> | undefined ?? undefined,
+            timestamp: row.timestamp instanceof Date ? row.timestamp.toISOString() : row.timestamp,
+        };
+    }
+
+    async createAgentTask(record: AgentTaskRecord): Promise<AgentTaskRecord> {
+        this.ensureReady();
+        await this.prisma.agentTask.create({
+            data: {
+                id: record.id,
+                agentGaii: record.agentGaii,
+                ownerGaii: record.ownerGaii,
+                title: record.title,
+                description: record.description,
+                scope: record.scope as any,
+                rules: record.rules as any,
+                verification: record.verification as any,
+                resources: record.resources as any ?? null,
+                todos: record.todos as any,
+                status: record.status,
+                parentTaskId: record.parentTaskId ?? null,
+                workTrackingCode: record.workTrackingCode ?? null,
+                telemetry: record.telemetry as any ?? null,
+                lastEventAt: record.lastEventAt ? new Date(record.lastEventAt) : null,
+                createdAt: new Date(record.createdAt),
+                completedAt: record.completedAt ? new Date(record.completedAt) : null,
+            },
+        });
+        return record;
+    }
+
+    async getAgentTask(id: string): Promise<AgentTaskRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.agentTask.findUnique({ where: { id } });
+        return row ? this.toTaskRecord(row) : null;
+    }
+
+    async listAgentTasks(agentGaii: string, opts?: { status?: string; page?: number; perPage?: number }): Promise<{ tasks: AgentTaskRecord[]; total: number }> {
+        this.ensureReady();
+        const page = opts?.page ?? 1;
+        const perPage = opts?.perPage ?? 20;
+        const where: any = { agentGaii };
+        if (opts?.status) where.status = opts.status;
+
+        const [rows, total] = await Promise.all([
+            this.prisma.agentTask.findMany({
+                where,
+                orderBy: { updatedAt: 'desc' },
+                skip: (page - 1) * perPage,
+                take: perPage,
+            }),
+            this.prisma.agentTask.count({ where }),
+        ]);
+        return { tasks: rows.map((r: any) => this.toTaskRecord(r)), total };
+    }
+
+    async listAgentTasksByOwner(ownerGaii: string, opts?: { status?: string; agentGaii?: string; page?: number; perPage?: number }): Promise<{ tasks: AgentTaskRecord[]; total: number }> {
+        this.ensureReady();
+        const page = opts?.page ?? 1;
+        const perPage = opts?.perPage ?? 20;
+        const where: any = { ownerGaii };
+        if (opts?.agentGaii) where.agentGaii = opts.agentGaii;
+        if (opts?.status) where.status = opts.status;
+
+        const [rows, total] = await Promise.all([
+            this.prisma.agentTask.findMany({
+                where,
+                orderBy: { updatedAt: 'desc' },
+                skip: (page - 1) * perPage,
+                take: perPage,
+            }),
+            this.prisma.agentTask.count({ where }),
+        ]);
+        return { tasks: rows.map((r: any) => this.toTaskRecord(r)), total };
+    }
+
+    async updateAgentTask(id: string, updates: Partial<AgentTaskRecord>): Promise<AgentTaskRecord | null> {
+        this.ensureReady();
+        const existing = await this.getAgentTask(id);
+        if (!existing) return null;
+
+        const merged: AgentTaskRecord = {
+            ...existing,
+            ...updates,
+            id: existing.id,
+            agentGaii: existing.agentGaii,
+            ownerGaii: existing.ownerGaii,
+            createdAt: existing.createdAt,
+        };
+
+        try {
+            const row = await this.prisma.agentTask.update({
+                where: { id },
+                data: {
+                    title: merged.title,
+                    description: merged.description,
+                    scope: merged.scope as any,
+                    rules: merged.rules as any,
+                    verification: merged.verification as any,
+                    resources: merged.resources as any ?? null,
+                    todos: merged.todos as any,
+                    status: merged.status,
+                    parentTaskId: merged.parentTaskId ?? null,
+                    workTrackingCode: merged.workTrackingCode ?? null,
+                    telemetry: merged.telemetry as any ?? null,
+                    lastEventAt: merged.lastEventAt ? new Date(merged.lastEventAt) : null,
+                    completedAt: merged.completedAt ? new Date(merged.completedAt) : null,
+                },
+            });
+            return this.toTaskRecord(row);
+        } catch { return null; }
+    }
+
+    async deleteAgentTask(id: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            const result = await this.prisma.agentTask.deleteMany({
+                where: { id, status: { in: ['draft', 'queued'] } },
+            });
+            if (result.count > 0) {
+                await this.prisma.agentTaskEvent.deleteMany({ where: { taskId: id } });
+                return true;
+            }
+            return false;
+        } catch { return false; }
+    }
+
+    async appendTaskEvent(event: AgentTaskEventRecord): Promise<AgentTaskEventRecord> {
+        this.ensureReady();
+        const row = await this.prisma.agentTaskEvent.create({
+            data: {
+                taskId: event.taskId,
+                type: event.type,
+                message: event.message,
+                details: event.details as any ?? null,
+                timestamp: new Date(event.timestamp),
+            },
+        });
+        return this.toTaskEventRecord(row);
+    }
+
+    async listTaskEvents(taskId: string, opts?: { page?: number; perPage?: number }): Promise<{ events: AgentTaskEventRecord[]; total: number }> {
+        this.ensureReady();
+        const page = opts?.page ?? 1;
+        const perPage = opts?.perPage ?? 20;
+        const where = { taskId };
+
+        const [rows, total] = await Promise.all([
+            this.prisma.agentTaskEvent.findMany({
+                where,
+                orderBy: { timestamp: 'asc' },
+                skip: (page - 1) * perPage,
+                take: perPage,
+            }),
+            this.prisma.agentTaskEvent.count({ where }),
+        ]);
+        return { events: rows.map((r: any) => this.toTaskEventRecord(r)), total };
+    }
+
+    async countTasksByAgent(agentGaii: string): Promise<{ queued: number; active: number; done: number; failed: number }> {
+        this.ensureReady();
+        const rows = await this.prisma.agentTask.groupBy({
+            by: ['status'],
+            where: { agentGaii },
+            _count: true,
+        });
+        const counts = { queued: 0, active: 0, done: 0, failed: 0 };
+        for (const row of rows) {
+            if (row.status in counts) {
+                counts[row.status as keyof typeof counts] = row._count;
+            }
+        }
+        return counts;
+    }
+
+    async findStalledTasks(thresholdMinutes: number): Promise<AgentTaskRecord[]> {
+        this.ensureReady();
+        const threshold = new Date(Date.now() - thresholdMinutes * 60 * 1000);
+        const rows = await this.prisma.agentTask.findMany({
+            where: {
+                status: 'active',
+                lastEventAt: { not: null, lt: threshold },
+            },
+        });
+        return rows.map((r: any) => this.toTaskRecord(r));
+    }
+
+    // ── Sharing Groups ──
+
+    private toSharingGroupRecord(row: any): SharingGroupRecord {
+        const record: SharingGroupRecord = {
+            id: row.id,
+            name: row.name,
+            ownerGaii: row.ownerGaii,
+            members: row.members as SharingGroupRecord['members'],
+            defaultPermissions: row.defaultPermissions as SharingGroupRecord['defaultPermissions'],
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+            updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+        };
+        if (row.description) record.description = row.description;
+        return record;
+    }
+
+    async createSharingGroup(record: SharingGroupRecord): Promise<SharingGroupRecord> {
+        this.ensureReady();
+        await this.prisma.sharingGroup.create({
+            data: {
+                id: record.id,
+                name: record.name,
+                description: record.description ?? null,
+                ownerGaii: record.ownerGaii,
+                members: record.members as any,
+                defaultPermissions: record.defaultPermissions as any,
+                createdAt: new Date(record.createdAt),
+            },
+        });
+        return record;
+    }
+
+    async getSharingGroup(id: string): Promise<SharingGroupRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.sharingGroup.findUnique({ where: { id } });
+        return row ? this.toSharingGroupRecord(row) : null;
+    }
+
+    async listSharingGroups(ownerGaii: string): Promise<SharingGroupRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.sharingGroup.findMany({
+            where: { ownerGaii },
+            orderBy: { createdAt: 'desc' },
+        });
+        return rows.map((r: any) => this.toSharingGroupRecord(r));
+    }
+
+    async listSharingGroupsByMember(identifier: string): Promise<SharingGroupRecord[]> {
+        this.ensureReady();
+        // MongoDB JSON arrays can't be queried with SQL json_each; filter in memory
+        const allGroups = await this.prisma.sharingGroup.findMany();
+        return allGroups
+            .filter((g: any) => {
+                const members = g.members as Array<{ identifier: string }>;
+                return Array.isArray(members) && members.some(m => m.identifier === identifier);
+            })
+            .map((r: any) => this.toSharingGroupRecord(r));
+    }
+
+    async updateSharingGroup(id: string, updates: Partial<SharingGroupRecord>): Promise<SharingGroupRecord | null> {
+        this.ensureReady();
+        const existing = await this.getSharingGroup(id);
+        if (!existing) return null;
+
+        const merged: SharingGroupRecord = {
+            ...existing,
+            ...updates,
+            id: existing.id,
+            ownerGaii: existing.ownerGaii,
+            createdAt: existing.createdAt,
+        };
+
+        try {
+            const row = await this.prisma.sharingGroup.update({
+                where: { id },
+                data: {
+                    name: merged.name,
+                    description: merged.description ?? null,
+                    members: merged.members as any,
+                    defaultPermissions: merged.defaultPermissions as any,
+                },
+            });
+            return this.toSharingGroupRecord(row);
+        } catch { return null; }
+    }
+
+    async deleteSharingGroup(id: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.sharingGroup.delete({ where: { id } });
+            return true;
+        } catch { return false; }
+    }
+
+    async countEntriesReferencingGroup(groupId: string): Promise<number> {
+        this.ensureReady();
+        const [memoryCount, fileCount] = await Promise.all([
+            this.prisma.memory.count({ where: { groupId } }),
+            this.prisma.storageFile.count({ where: { groupId } }),
+        ]);
+        return memoryCount + fileCount;
+    }
+
+    // ── Agent Directives ──
+
+    private toDirectivesRecord(row: any): AgentDirectivesRecord {
+        return {
+            agentGaii: row.agentGaii,
+            purpose: row.purpose,
+            rules: row.rules as AgentDirectivesRecord['rules'],
+            memoryAreas: row.memoryAreas as AgentDirectivesRecord['memoryAreas'],
+            resources: row.resources as AgentDirectivesRecord['resources'],
+            updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+        };
+    }
+
+    private toOwnerDefaultsRecord(row: any): OwnerAgentDefaults {
+        const record: OwnerAgentDefaults = {
+            ownerGaii: row.ownerGaii,
+            rules: row.rules as OwnerAgentDefaults['rules'],
+            updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+        };
+        if (row.defaultTokenBudget != null) record.defaultTokenBudget = row.defaultTokenBudget;
+        if (row.defaultMemoryAreas) record.defaultMemoryAreas = row.defaultMemoryAreas as OwnerAgentDefaults['defaultMemoryAreas'];
+        return record;
+    }
+
+    async getAgentDirectives(agentGaii: string): Promise<AgentDirectivesRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.agentDirective.findUnique({ where: { agentGaii } });
+        return row ? this.toDirectivesRecord(row) : null;
+    }
+
+    async upsertAgentDirectives(record: AgentDirectivesRecord): Promise<AgentDirectivesRecord> {
+        this.ensureReady();
+        const row = await this.prisma.agentDirective.upsert({
+            where: { agentGaii: record.agentGaii },
+            create: {
+                id: `dir-${record.agentGaii}`,
+                agentGaii: record.agentGaii,
+                purpose: record.purpose,
+                rules: record.rules as any,
+                memoryAreas: record.memoryAreas as any,
+                resources: record.resources as any,
+            },
+            update: {
+                purpose: record.purpose,
+                rules: record.rules as any,
+                memoryAreas: record.memoryAreas as any,
+                resources: record.resources as any,
+            },
+        });
+        return this.toDirectivesRecord(row);
+    }
+
+    async deleteAgentDirectives(agentGaii: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.agentDirective.delete({ where: { agentGaii } });
+            return true;
+        } catch { return false; }
+    }
+
+    async getOwnerAgentDefaults(ownerGaii: string): Promise<OwnerAgentDefaults | null> {
+        this.ensureReady();
+        const row = await this.prisma.ownerAgentDefault.findUnique({ where: { ownerGaii } });
+        return row ? this.toOwnerDefaultsRecord(row) : null;
+    }
+
+    async upsertOwnerAgentDefaults(record: OwnerAgentDefaults): Promise<OwnerAgentDefaults> {
+        this.ensureReady();
+        const row = await this.prisma.ownerAgentDefault.upsert({
+            where: { ownerGaii: record.ownerGaii },
+            create: {
+                id: `owd-${record.ownerGaii}`,
+                ownerGaii: record.ownerGaii,
+                rules: record.rules as any,
+                defaultTokenBudget: record.defaultTokenBudget ?? null,
+                defaultMemoryAreas: record.defaultMemoryAreas as any ?? [],
+            },
+            update: {
+                rules: record.rules as any,
+                defaultTokenBudget: record.defaultTokenBudget ?? null,
+                defaultMemoryAreas: record.defaultMemoryAreas as any ?? [],
+            },
+        });
+        return this.toOwnerDefaultsRecord(row);
+    }
+
+    // ── Agent Activity ──
+
+    private toActivityRecord(row: any): AgentActivityRecord {
+        return {
+            agentGaii: row.agentGaii,
+            date: row.date,
+            hour: row.hour,
+            metric: row.metric,
+            value: row.value,
+        };
+    }
+
+    async recordActivity(record: AgentActivityRecord): Promise<void> {
+        this.ensureReady();
+        await this.prisma.agentActivity.upsert({
+            where: {
+                agentGaii_date_hour_metric: {
+                    agentGaii: record.agentGaii,
+                    date: record.date,
+                    hour: record.hour,
+                    metric: record.metric,
+                },
+            },
+            create: {
+                agentGaii: record.agentGaii,
+                date: record.date,
+                hour: record.hour,
+                metric: record.metric,
+                value: record.value,
+            },
+            update: {
+                value: { increment: record.value },
+            },
+        });
+    }
+
+    async getActivityHistory(agentGaii: string, opts?: { days?: number; granularity?: 'daily' | 'hourly' }): Promise<AgentActivityRecord[]> {
+        this.ensureReady();
+        const days = opts?.days ?? 30;
+        const granularity = opts?.granularity ?? 'daily';
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - days);
+        const cutoffStr = cutoff.toISOString().split('T')[0];
+
+        if (granularity === 'daily') {
+            const rows = await this.prisma.agentActivity.groupBy({
+                by: ['agentGaii', 'date', 'metric'],
+                where: { agentGaii, date: { gte: cutoffStr } },
+                _sum: { value: true },
+                orderBy: { date: 'asc' },
+            });
+            return rows.map((r: any) => ({
+                agentGaii: r.agentGaii,
+                date: r.date,
+                hour: 0,
+                metric: r.metric,
+                value: r._sum.value ?? 0,
+            }));
+        }
+
+        // hourly granularity
+        const rows = await this.prisma.agentActivity.findMany({
+            where: { agentGaii, date: { gte: cutoffStr } },
+            orderBy: [{ date: 'asc' }, { hour: 'asc' }],
+        });
+        return rows.map((r: any) => this.toActivityRecord(r));
     }
 }
 
