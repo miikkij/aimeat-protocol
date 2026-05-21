@@ -26,6 +26,7 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
+import { recordTaskStarted, recordTaskCompleted, recordTaskFailed } from '../services/activity-recorder.js';
 import { AgentTaskCreateSchema, AgentTaskUpdateSchema, AgentTaskEventSchema } from '../models/agent-task-schemas.js';
 
 export function agentTasksRouter(config: AimeatConfig, storage: Storage): Router {
@@ -319,6 +320,8 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage): Router
       timestamp: now,
     });
 
+    await recordTaskStarted(storage, task.agentGaii);
+
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks');
   });
@@ -422,6 +425,8 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage): Router
       timestamp: now,
     });
 
+    await recordTaskCompleted(storage, task.agentGaii, task.telemetry);
+
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks');
   });
@@ -464,6 +469,8 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage): Router
       message,
       timestamp: now,
     });
+
+    await recordTaskFailed(storage, task.agentGaii);
 
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks');
