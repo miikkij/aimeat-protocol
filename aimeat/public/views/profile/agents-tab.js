@@ -9,6 +9,7 @@
  *   v1.3.0 — 2026-05-21 — Shorten agent prompt to delegate to tier1; add Download/Copy Instructions buttons
  *   v1.4.0 — 2026-05-21 — Add sub-tab navigation (Tasks, Directives) in expanded agent detail view
  *   v1.5.0 — 2026-05-22 — Add Capabilities sub-tab with technical/domain skill display
+ *   v1.6.0 — 2026-05-22 — Add Activity sub-tab with stats, chart, scheduled jobs, event log
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
