@@ -1,0 +1,35 @@
+/**
+ * @file agent-task.repository.ts
+ * @description Repository interface for agent task CRUD, events, and stall detection
+ * @version-history
+ *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
+ */
+
+import type { AgentTaskRecord, AgentTaskEventRecord } from '../interface.js';
+
+export interface AgentTaskRepository {
+  createAgentTask(record: AgentTaskRecord): Promise<AgentTaskRecord>;
+  getAgentTask(id: string): Promise<AgentTaskRecord | null>;
+  listAgentTasks(agentGaii: string, opts?: {
+    status?: string;
+    page?: number;
+    perPage?: number;
+  }): Promise<{ tasks: AgentTaskRecord[]; total: number }>;
+  listAgentTasksByOwner(ownerGaii: string, opts?: {
+    status?: string;
+    agentGaii?: string;
+    page?: number;
+    perPage?: number;
+  }): Promise<{ tasks: AgentTaskRecord[]; total: number }>;
+  updateAgentTask(id: string, updates: Partial<AgentTaskRecord>): Promise<AgentTaskRecord | null>;
+  deleteAgentTask(id: string): Promise<boolean>;
+
+  appendTaskEvent(event: AgentTaskEventRecord): Promise<AgentTaskEventRecord>;
+  listTaskEvents(taskId: string, opts?: {
+    page?: number;
+    perPage?: number;
+  }): Promise<{ events: AgentTaskEventRecord[]; total: number }>;
+
+  countTasksByAgent(agentGaii: string): Promise<{ queued: number; active: number; done: number; failed: number }>;
+  findStalledTasks(thresholdMinutes: number): Promise<AgentTaskRecord[]>;
+}

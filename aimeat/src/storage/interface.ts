@@ -30,13 +30,17 @@ export interface AgentRecord {
   allowedOrigins?: string[];     // CORS — per-agent origin restrictions (Phase 3)
   dailySpendLimit?: number | null;
   federate?: boolean;
+  technicalCapabilities?: AgentTechnicalCapability[];
+  domainCapabilities?: string[];
+  activityStats?: AgentActivityStats;
 }
 
 export interface MemoryRecord {
   key: string;
   ownerGaii: string;    // the agent GAII that owns this memory
   value: unknown;
-  visibility: 'private' | 'owner' | 'public';
+  visibility: 'private' | 'owner' | 'group' | 'public';
+  groupId?: string;
   tags: string[];
   ttlHours: number | null;
   version: number;
@@ -212,7 +216,8 @@ export interface MicroMemoryRecord {
 export interface StorageFileRecord {
   key: string;
   ownerGaii: string;
-  visibility: 'private' | 'owner' | 'public';
+  visibility: 'private' | 'owner' | 'group' | 'public';
+  groupId?: string;
   mimeType: string;
   size: number;
   data: Buffer;
@@ -299,7 +304,7 @@ export interface ChunkedUploadRecord {
   ownerGaii: string;
   key: string;
   mimeType: string;
-  visibility: 'private' | 'owner' | 'public';
+  visibility: 'private' | 'owner' | 'group' | 'public';
   chunkSize: number;
   totalChunks?: number;
   receivedChunks: Map<number, Buffer>;
@@ -1021,7 +1026,7 @@ export interface KnowledgeEntryRelation {
 export interface KnowledgeEntryDescriptor {
   key: string;
   title: string;
-  visibility: 'private' | 'owner' | 'public';
+  visibility: 'private' | 'owner' | 'group' | 'public';
   schema?: string;
   references?: KnowledgeReference[];        // Per-entry citations (independent knowledge unit)
   related_entries?: KnowledgeEntryRelation[]; // Intra-package relationships
@@ -1378,6 +1383,164 @@ export interface CapabilityFilter {
   perPage?: number;
 }
 
+// ── Agent Tasks (Phase 1) ──
+
+export interface AgentTaskScope {
+  name: string;
+  value: string;
+  type: 'text' | 'url' | 'memory_key' | 'number' | 'cron';
+  description?: string;
+}
+
+export interface AgentTaskTodo {
+  id: string;
+  order: number;
+  title: string;
+  description: string;
+  environment: 'aimeat' | 'agent';
+  environmentReason?: string;
+  verification: string;
+  estimateMinutes?: number;
+  status: 'pending' | 'active' | 'done' | 'failed' | 'skipped';
+  completedAt?: string;
+}
+
+export interface AgentTaskRecord {
+  id: string;
+  agentGaii: string;
+  ownerGaii: string;
+  title: string;
+  description: string;
+  scope: AgentTaskScope[];
+  rules: string[];
+  verification: {
+    userExpects: string;
+    technicalChecks: string[];
+  };
+  resources?: {
+    knowledgePackages?: string[];
+    memoryKeys?: string[];
+    memoryPrefixes?: string[];
+  };
+  todos: AgentTaskTodo[];
+  status: 'draft' | 'queued' | 'active' | 'stalled' | 'done' | 'failed';
+  parentTaskId?: string;
+  workTrackingCode?: string;
+  telemetry?: {
+    aiCalls?: number;
+    tokensIn?: number;
+    tokensOut?: number;
+    durationSeconds?: number;
+  };
+  lastEventAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
+export interface AgentTaskEventRecord {
+  id: string;
+  taskId: string;
+  type: 'started' | 'progress' | 'todo_completed' | 'todo_failed' |
+        'memory_write' | 'extension_install' | 'app_publish' |
+        'verification' | 'completed' | 'failed' | 'message';
+  message: string;
+  details?: Record<string, unknown>;
+  timestamp: string;
+}
+
+// ── Agent Directives (Phase 1) ──
+
+export interface DirectiveRule {
+  id: string;
+  description: string;
+  details?: string;
+}
+
+export interface DirectiveMemoryArea {
+  keyPrefix: string;
+  description: string;
+  schema?: Record<string, unknown>;
+  csmId?: string;
+}
+
+export interface DirectiveResource {
+  type: 'knowledge_package' | 'memory_key';
+  reference: string;
+  description: string;
+}
+
+export interface AgentDirectivesRecord {
+  agentGaii: string;
+  purpose: string;
+  rules: DirectiveRule[];
+  memoryAreas: DirectiveMemoryArea[];
+  resources: DirectiveResource[];
+  updatedAt: string;
+}
+
+export interface OwnerAgentDefaults {
+  ownerGaii: string;
+  rules: DirectiveRule[];
+  defaultTokenBudget?: number;
+  defaultMemoryAreas?: DirectiveMemoryArea[];
+  updatedAt: string;
+}
+
+// ── Sharing Groups (Phase 1) ──
+
+export interface SharingGroupMember {
+  identifier: string;
+  identifierType: 'gaii' | 'ghii';
+  permissions: {
+    read: boolean;
+    write: boolean;
+  };
+  addedAt: string;
+  addedBy: string;
+}
+
+export interface SharingGroupRecord {
+  id: string;
+  name: string;
+  description?: string;
+  ownerGaii: string;
+  members: SharingGroupMember[];
+  defaultPermissions: {
+    read: boolean;
+    write: boolean;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Agent Activity (Phase 2 prep) ──
+
+export interface AgentTechnicalCapability {
+  name: string;
+  type: 'mcp' | 'skill' | 'tool';
+  verified: boolean;
+}
+
+export interface AgentActivityStats {
+  tasksCompleted: number;
+  tasksFailed: number;
+  tokensUsed30d: number;
+  aiCalls30d: number;
+  successRate: number;
+  lastTaskAt?: string;
+  extensionsCreated: number;
+  appsPublished: number;
+}
+
+export interface AgentActivityRecord {
+  agentGaii: string;
+  date: string;
+  hour: number;
+  metric: string;
+  value: number;
+}
+
 // ── Domain Repository Interfaces ────────────────────────────────────
 import type { OwnerRepository } from './repositories/owner.repository.js';
 import type { AgentRepository } from './repositories/agent.repository.js';
@@ -1418,6 +1581,10 @@ import type { TemplateListingRepository } from './repositories/template-listing.
 import type { PackageInstanceRepository } from './repositories/package-instance.repository.js';
 import type { CapabilityRepository } from './repositories/capability.repository.js';
 import type { StatsRepository } from './repositories/stats.repository.js';
+import type { AgentTaskRepository } from './repositories/agent-task.repository.js';
+import type { AgentDirectivesRepository } from './repositories/agent-directives.repository.js';
+import type { SharingGroupRepository } from './repositories/sharing-group.repository.js';
+import type { AgentActivityRepository } from './repositories/agent-activity.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -1436,4 +1603,5 @@ export interface Storage extends
   OAuthRepository, SystemPromptRepository,
   PackageRepository, TemplateListingRepository, PackageInstanceRepository,
   CapabilityRepository,
+  AgentTaskRepository, AgentDirectivesRepository, SharingGroupRepository, AgentActivityRepository,
   StatsRepository { }

@@ -33,3 +33,7 @@ export type { TemplateListingRepository } from './template-listing.repository.js
 export type { PackageInstanceRepository } from './package-instance.repository.js';
 export type { CapabilityRepository } from './capability.repository.js';
 export type { StatsRepository } from './stats.repository.js';
+export type { AgentTaskRepository } from './agent-task.repository.js';
+export type { AgentDirectivesRepository } from './agent-directives.repository.js';
+export type { SharingGroupRepository } from './sharing-group.repository.js';
+export type { AgentActivityRepository } from './agent-activity.repository.js';
