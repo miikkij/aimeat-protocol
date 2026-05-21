@@ -2,6 +2,34 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.6.0] - 2026-05-21
+
+### Added
+- **Notification Statistics** -- email, push, and mailbox notification counters with type-level breakdown for operational visibility and abuse detection.
+  - **Email counters** -- `email_sent`, `email_failed`, `email_retried` tracked per type (verification, magic_link, notification, match_suggestion, group_send).
+  - **Push counters** -- `push_sent`, `push_failed`, `push_expired_subs` tracked per type.
+  - **Mailbox notification counters** -- `mailbox_notif_sent`, `mailbox_notif_failed` per channel (push, email), `mailbox_notif_blocked` per reason (cooldown, quiet_hours, disabled).
+  - **`incrementTyped(name, type)` API** -- new `StatsCollector` method stores typed counters as `name:type`, with automatic grouping in `snapshot()` into `{base}` totals and `{base}_by_type` breakdowns.
+- **Stats Persistence** -- all counters survive server restarts via periodic flush (every 60s) to storage.
+  - **`StatsRepository` interface** -- `flushStats`, `loadStats`, `flushDailyHistory`, `loadDailyHistory` methods added to the storage layer.
+  - **SQLite backend** -- `stats_counters` and `stats_daily_history` tables with upsert and 90-day pruning.
+  - **MongoDB backend** -- `StatsCounter` and `StatsDailyHistory` Prisma models with composite unique constraints.
+  - **Graceful shutdown** -- `stats.shutdown()` flushes final counter state on SIGTERM/SIGINT.
+- **Time-Range Filtered Stats API** -- `GET /v1/stats?from=YYYY-MM-DD&to=YYYY-MM-DD` returns summed counters and per-day breakdown for the selected range. Backward compatible (no params = lifetime totals).
+  - **Gauges** -- `tunnel_connections_active`, `mailbox_items_total`, `mailbox_bytes_total`, `mailbox_oldest_item_age_seconds` always return current values regardless of time range.
+- **Stats Tab UI** -- admin dashboard Stats tab gains three new sections and a time range selector.
+  - **Time range selector** -- preset buttons (Today, This Week, 7 Days, 30 Days, All) plus custom date range. Default: 7 Days. Re-fetches data on change.
+  - **Email Delivery section** -- 4 stat cards (Sent, Failed, Retried, Success Rate), breakdown table by type, per-day bar chart.
+  - **Push Notification section** -- 4 stat cards (Sent, Failed, Expired Subs, Success Rate), breakdown table by type, per-day bar chart.
+  - **Mailbox Notifications section** -- 3 stat cards (Sent, Failed, Blocked), inline breakdowns by blocked reason and channel.
+  - **Live badge** -- gauge values show a "live" indicator badge.
+- **i18n** -- 51 new translation keys added to both `en.json` and `fi.json` (section headers, stat cards, type labels, time range presets, weekday abbreviations).
+
+### Tests
+- **12 new unit tests** -- typed counter grouping (5 tests), persistence init/flush/shutdown (7 tests) including prefixed counter deserialization, error recovery, and timer cleanup.
+- **5 new Playwright tests** -- admin stats tab: time range selector rendering, button switching, email/push/mailbox section rendering with stat card verification.
+- **E2E stats tests** -- time-range-filtered `GET /v1/stats` with `totals`, `daily`, `gauges` key verification, empty range handling.
+
 ## [1.5.0] - 2026-05-21
 
 ### Added
