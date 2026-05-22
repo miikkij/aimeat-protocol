@@ -8,6 +8,7 @@
  *   - PUT  /v1/agents/:name/capabilities -- Agent reports its capabilities
  *   - GET  /v1/agents/:name/capabilities -- Get agent capabilities + activity stats
  * @version-history
+ *   v1.1.0 -- 2026-05-22 -- Add modules_loaded and limitations to PUT/GET
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 2
  */
 
@@ -82,9 +83,14 @@ export function agentCapabilitiesRouter(config: AimeatConfig, storage: Storage):
       }
     }
 
+    const modulesLoaded = body.modules_loaded ?? undefined;
+    const agentLimitations = body.limitations ?? undefined;
+
     const updated = await storage.updateAgent(agentGaii, {
       technicalCapabilities,
       domainCapabilities,
+      ...(modulesLoaded !== undefined && { modulesLoaded }),
+      ...(agentLimitations !== undefined && { agentLimitations }),
     });
 
     if (!updated) {
@@ -97,6 +103,8 @@ export function agentCapabilitiesRouter(config: AimeatConfig, storage: Storage):
     res.json(success(config.nodeId, {
       technical_capabilities: updated.technicalCapabilities ?? [],
       domain_capabilities: updated.domainCapabilities ?? [],
+      modules_loaded: updated.modulesLoaded ?? [],
+      limitations: updated.agentLimitations ?? [],
     }, [
       { description: 'View capabilities', method: 'GET', url: `/v1/agents/${agentName}/capabilities` },
     ]));
@@ -121,6 +129,8 @@ export function agentCapabilitiesRouter(config: AimeatConfig, storage: Storage):
     res.json(success(config.nodeId, {
       technical_capabilities: agent.technicalCapabilities ?? [],
       domain_capabilities: agent.domainCapabilities ?? [],
+      modules_loaded: agent.modulesLoaded ?? [],
+      limitations: agent.agentLimitations ?? [],
       activity_stats: agent.activityStats ?? null,
     }));
   });
