@@ -13,8 +13,10 @@
  *   - POST   /v1/agents/:name/tasks/:id/event -- Append event
  *   - POST   /v1/agents/:name/tasks/:id/complete -- Complete task (active->done)
  *   - POST   /v1/agents/:name/tasks/:id/fail  -- Fail task (active->failed)
+ *   - PATCH  /v1/agents/:name/tasks/:id/todos/:todoId -- Update individual todo status
  *   - GET    /v1/agents/:name/tasks/:id/events -- List events
  * @version-history
+ *   v1.2.0 -- 2026-05-22 -- Add individual todo update endpoint (PATCH /todos/:todoId)
  *   v1.1.0 -- 2026-05-22 -- Fix: accumulate telemetry across events instead of overwriting; allow agent PATCH on queued tasks
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  */
@@ -28,7 +30,7 @@ import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { recordTaskStarted, recordTaskCompleted, recordTaskFailed } from '../services/activity-recorder.js';
-import { AgentTaskCreateSchema, AgentTaskUpdateSchema, AgentTaskEventSchema } from '../models/agent-task-schemas.js';
+import { AgentTaskCreateSchema, AgentTaskUpdateSchema, AgentTaskEventSchema, AgentTaskTodoUpdateSchema } from '../models/agent-task-schemas.js';
 
 export function agentTasksRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -475,6 +477,65 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage): Router
     await recordTaskFailed(storage, task.agentGaii);
 
     res.json(success(config.nodeId, { task: updated }));
+    emitChange('agent-tasks');
+  });
+
+  /* ── PATCH /v1/agents/:name/tasks/:id/todos/:todoId -- Update individual todo ── */
+  router.patch('/v1/agents/:name/tasks/:id/todos/:todoId', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const todoId = req.params.todoId as string;
+
+    const task = await storage.getAgentTask(id);
+    if (!task) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Task not found'));
+      return;
+    }
+
+    if (!canAccessTask(req, task)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      return;
+    }
+
+    if (task.status !== 'active') {
+      res.status(409).json(error(config.nodeId, 'INVALID_STATE',
+        `Todo updates are only allowed on active tasks (current: ${task.status})`));
+      return;
+    }
+
+    const parsed = AgentTaskTodoUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')));
+      return;
+    }
+
+    const todos = task.todos || [];
+    const todoIndex = todos.findIndex(t => t.id === todoId);
+    if (todoIndex === -1) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Todo '${todoId}' not found in task`));
+      return;
+    }
+
+    const body = parsed.data;
+    const now = new Date().toISOString();
+    const updatedTodos = [...todos];
+    updatedTodos[todoIndex] = {
+      ...updatedTodos[todoIndex],
+      status: body.status,
+      ...(body.completed_at ? { completedAt: body.completed_at } : body.status === 'done' ? { completedAt: now } : {}),
+    };
+
+    const updated = await storage.updateAgentTask(id, {
+      todos: updatedTodos,
+      updatedAt: now,
+    });
+
+    if (!updated) {
+      res.status(500).json(error(config.nodeId, 'UPDATE_FAILED', 'Failed to update todo'));
+      return;
+    }
+
+    res.json(success(config.nodeId, { task: updated, todo: updatedTodos[todoIndex] }));
     emitChange('agent-tasks');
   });
 

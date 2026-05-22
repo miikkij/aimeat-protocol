@@ -255,6 +255,55 @@ await test('9. Update TODO status', async () => {
     assert(updatedTodo.status === 'done', `todo status: ${updatedTodo.status}`);
 });
 
+await test('9b. Update single todo via /todos/:todoId endpoint', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks/${queuedTaskId}/todos/qt-2`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ status: 'done' }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const updatedTodo = body.data.todo;
+    assert(updatedTodo.status === 'done', `todo status: ${updatedTodo.status}`);
+    assert(typeof updatedTodo.completedAt === 'string', 'auto-set completedAt');
+    // Verify full task returned too
+    assert(body.data.task.todos.every((t: any) => t.status === 'done'), 'all todos now done');
+});
+
+await test('9c. Individual todo update rejects non-active tasks', async () => {
+    // draftTaskId is still in draft status - should get 404 since we deleted it, let's use a queued one
+    // Create a fresh queued task for this test
+    const { body: createBody } = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            title: 'Queued for todo test',
+            todos: [{ id: 'x-1', order: 1, title: 'Step', environment: 'agent' }],
+            status: 'queued',
+        }),
+    });
+    const testId = createBody.data.task.id;
+    const { status } = await json(`/v1/agents/${agentName}/tasks/${testId}/todos/x-1`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ status: 'done' }),
+    });
+    assert(status === 409, `expected 409, got ${status}`);
+    // Cleanup: delete it
+    await json(`/v1/agents/${agentName}/tasks/${testId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+});
+
+await test('9d. Individual todo update rejects nonexistent todoId', async () => {
+    const { status } = await json(`/v1/agents/${agentName}/tasks/${queuedTaskId}/todos/nonexistent`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ status: 'done' }),
+    });
+    assert(status === 404, `expected 404, got ${status}`);
+});
+
 await test('10. Complete task (active -> done)', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/tasks/${queuedTaskId}/complete`, {
         method: 'POST',

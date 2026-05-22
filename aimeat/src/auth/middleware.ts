@@ -13,6 +13,20 @@ export function initSessionAuth(storage: Storage): void {
   _sessionStorage = storage;
 }
 
+const _lastSeenCache = new Map<string, number>();
+const LAST_SEEN_THROTTLE_MS = 5 * 60_000;
+
+function touchAgentLastSeen(auth: VerifiedToken): void {
+  if (!_sessionStorage) return;
+  if (!auth.roles.includes('agent')) return;
+  const gaii = auth.sub;
+  const now = Date.now();
+  const last = _lastSeenCache.get(gaii) ?? 0;
+  if (now - last < LAST_SEEN_THROTTLE_MS) return;
+  _lastSeenCache.set(gaii, now);
+  _sessionStorage.updateAgent(gaii, { lastSeen: new Date(now).toISOString() }).catch(() => {});
+}
+
 // Anonymous mode: when enabled, inject this identity for unauthenticated requests
 let _anonymousMode = false;
 let _anonymousGaii = '';
@@ -86,6 +100,7 @@ export function requireAuth() {
   return async (req: Request, res: Response, next: NextFunction) => {
     // If auth was already resolved by global optionalAuth() (e.g. anonymous mode)
     if (req.auth) {
+      touchAgentLastSeen(req.auth);
       // SECURITY: Reject anonymous credentials — requireAuth() requires real authentication
       if (req.auth.anonymous) {
         const stats = getStats();
@@ -142,6 +157,7 @@ export function requireAuth() {
     }
 
     req.auth = verified;
+    touchAgentLastSeen(verified);
     next();
   };
 }

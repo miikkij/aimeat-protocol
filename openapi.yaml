@@ -16039,6 +16039,70 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
 
+  /v1/agents/{name}/tasks/{id}/todos/{todoId}:
+    patch:
+      operationId: updateTaskTodo
+      summary: Update individual todo status
+      description: |
+        Update a single todo's status during task execution. This is the primary way for agents
+        to mark individual todos as done, failed, or skipped without sending the full todos array.
+        Only works on active tasks.
+      tags: [Agent Tasks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: todoId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [pending, active, done, failed, skipped]
+                completed_at:
+                  type: string
+                  format: date-time
+      responses:
+        '200':
+          description: Todo updated, returns full task
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          task:
+                            $ref: '#/components/schemas/AgentTask'
+                          todo:
+                            type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
   /v1/agents/{name}/tasks/{id}/events:
     get:
       operationId: listTaskEvents
