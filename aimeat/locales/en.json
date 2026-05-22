@@ -3375,6 +3375,8 @@
     "fedPeerEmergencyRemoved": "Peer immediately disconnected. All in-flight work cancelled.",
 
     "fedRequestHistoryTitle": "Peering Request History",
+    "fedDeleteRequestConfirm": "Delete this peering request from history?",
+    "fedRequestDeleted": "Peering request deleted",
 
     "fedJoinTitle": "Join Genesis Network",
     "fedJoinExplain": "Connect this node to an existing AIMEAT genesis network. Enter the genesis node URL and select your role. The genesis operator will review and approve your request.",

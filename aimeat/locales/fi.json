@@ -3375,6 +3375,8 @@
     "fedPeerEmergencyRemoved": "Vertainen katkaistu välittömästi. Kaikki keskeneräiset työt peruutettu.",
 
     "fedRequestHistoryTitle": "Vertaispyyntöjen historia",
+    "fedDeleteRequestConfirm": "Poista tämä vertaisverkkopyyntö historiasta?",
+    "fedRequestDeleted": "Vertaisverkkopyyntö poistettu",
 
     "fedJoinTitle": "Liity genesis-verkkoon",
     "fedJoinExplain": "Yhdistä tämä solmu olemassa olevaan AIMEAT genesis-verkkoon. Syötä genesis-solmun URL ja valitse roolisi. Genesis-operaattori tarkistaa ja hyväksyy pyyntösi.",
