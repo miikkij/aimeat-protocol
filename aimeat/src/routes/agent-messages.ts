@@ -1,0 +1,206 @@
+/**
+ * @file agent-messages.ts
+ * @description REST endpoints for agent direct messaging (send, list, inbox, threads, status updates)
+ * @structure
+ *   - POST   /v1/agents/:name/messages         -- Send message
+ *   - GET    /v1/agents/:name/messages/inbox   -- Get pending inbound messages
+ *   - GET    /v1/agents/:name/messages/threads -- List conversation threads
+ *   - GET    /v1/agents/:name/messages         -- List message history
+ *   - PATCH  /v1/agents/:name/messages/:id     -- Update message status
+ * @version-history
+ *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 3
+ */
+
+import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
+import type { AimeatConfig } from '../config.js';
+import type { Storage, AgentMessageRecord } from '../storage/interface.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
+import { success, error } from '../middleware/envelope.js';
+import { resolveIdentity, buildGAII } from '../utils/gaii.js';
+import { emitChange } from '../services/event-bus.js';
+import { AgentMessageCreateSchema, AgentMessageStatusSchema } from '../models/agent-message-schemas.js';
+
+export function agentMessagesRouter(config: AimeatConfig, storage: Storage): Router {
+  const router = Router();
+
+  /** Resolve effective identity -- owner sessions use GHII, agents use GAII */
+  const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
+
+  /** Build GAII for the named agent under the authenticated owner */
+  function resolveAgentGaii(req: Express.Request, agentName: string): string {
+    const owner = req.auth!.owner as string;
+    return buildGAII(agentName, owner, config.nodeId);
+  }
+
+  /** Check if current session can access an agent's messages */
+  function canAccessAgent(req: Express.Request, agentName: string): boolean {
+    const roles = req.auth!.roles as string[];
+    const isOwnerSession = roles.includes('owner') && !roles.includes('agent');
+    if (isOwnerSession) return true;
+    // Agent can access own messages
+    if (roles.includes('agent')) {
+      const gaii = resolveAgentGaii(req, agentName);
+      return req.auth!.sub === gaii;
+    }
+    return false;
+  }
+
+  /* ── POST /v1/agents/:name/messages -- Send a message ── */
+  router.post('/v1/agents/:name/messages', requireAuth(), async (req, res) => {
+    const agentName = req.params.name as string;
+
+    if (!canAccessAgent(req, agentName)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      return;
+    }
+
+    const agentGaii = resolveAgentGaii(req, agentName);
+
+    // Verify agent exists
+    const agent = await storage.getAgent(agentGaii);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
+      return;
+    }
+
+    // Validate body
+    const parsed = AgentMessageCreateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')));
+      return;
+    }
+
+    const body = parsed.data;
+    const now = new Date().toISOString();
+    const id = randomUUID();
+    const threadId = body.thread_id ?? randomUUID();
+
+    // Determine sender identity
+    const roles = req.auth!.roles as string[];
+    const isOwnerSession = roles.includes('owner') && !roles.includes('agent');
+    const senderGaii = isOwnerSession
+      ? `${req.auth!.owner}@${config.nodeId}`
+      : req.auth!.sub as string;
+
+    // Owner sends inbound (user->agent), agent sends outbound (agent->user)
+    const status = body.direction === 'inbound' ? 'pending' : 'delivered';
+
+    const record: AgentMessageRecord = {
+      id,
+      agentGaii,
+      threadId,
+      direction: body.direction,
+      senderGaii,
+      content: body.content,
+      status,
+      linkedTaskId: body.linked_task_id,
+      metadata: body.metadata ? {
+        tokensUsed: body.metadata.tokens_used,
+        processingMs: body.metadata.processing_ms,
+        proposedTask: body.metadata.proposed_task,
+      } : undefined,
+      createdAt: now,
+    };
+
+    const created = await storage.createMessage(record);
+
+    res.status(201).json(success(config.nodeId, { message: created }, [
+      { description: 'View messages', method: 'GET', url: `/v1/agents/${agentName}/messages` },
+      { description: 'View thread', method: 'GET', url: `/v1/agents/${agentName}/messages?thread_id=${threadId}` },
+      { description: 'View inbox', method: 'GET', url: `/v1/agents/${agentName}/messages/inbox` },
+    ]));
+    emitChange('agent-messages');
+  });
+
+  /* ── GET /v1/agents/:name/messages/inbox -- Pending inbound messages ── */
+  router.get('/v1/agents/:name/messages/inbox', requireAuth(), async (req, res) => {
+    const agentName = req.params.name as string;
+
+    if (!canAccessAgent(req, agentName)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      return;
+    }
+
+    const agentGaii = resolveAgentGaii(req, agentName);
+    const messages = await storage.listPendingMessages(agentGaii);
+
+    res.json(success(config.nodeId, { messages }));
+  });
+
+  /* ── GET /v1/agents/:name/messages/threads -- List conversation threads ── */
+  router.get('/v1/agents/:name/messages/threads', requireAuth(), async (req, res) => {
+    const agentName = req.params.name as string;
+
+    if (!canAccessAgent(req, agentName)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      return;
+    }
+
+    const agentGaii = resolveAgentGaii(req, agentName);
+    const threads = await storage.listThreads(agentGaii);
+
+    res.json(success(config.nodeId, { threads }));
+  });
+
+  /* ── GET /v1/agents/:name/messages -- List message history ── */
+  router.get('/v1/agents/:name/messages', requireAuth(), async (req, res) => {
+    const agentName = req.params.name as string;
+
+    if (!canAccessAgent(req, agentName)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      return;
+    }
+
+    const agentGaii = resolveAgentGaii(req, agentName);
+    const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
+    const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string || '20', 10)));
+    const direction = req.query.direction as 'inbound' | 'outbound' | undefined;
+    const threadId = req.query.thread_id as string | undefined;
+
+    const result = await storage.listMessages(agentGaii, { direction, threadId, page, perPage });
+
+    res.json(success(config.nodeId, {
+      messages: result.messages,
+      total: result.total,
+      page,
+      per_page: perPage,
+    }));
+  });
+
+  /* ── PATCH /v1/agents/:name/messages/:id -- Update message status ── */
+  router.patch('/v1/agents/:name/messages/:id', requireAuth(), async (req, res) => {
+    const agentName = req.params.name as string;
+    const id = req.params.id as string;
+
+    if (!canAccessAgent(req, agentName)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      return;
+    }
+
+    // Validate body
+    const parsed = AgentMessageStatusSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')));
+      return;
+    }
+
+    const { status } = parsed.data;
+    const processedAt = status === 'delivered' || status === 'error'
+      ? new Date().toISOString()
+      : undefined;
+
+    const updated = await storage.updateMessageStatus(id, status, processedAt);
+    if (!updated) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Message not found'));
+      return;
+    }
+
+    res.json(success(config.nodeId, { message: updated }));
+    emitChange('agent-messages');
+  });
+
+  return router;
+}
