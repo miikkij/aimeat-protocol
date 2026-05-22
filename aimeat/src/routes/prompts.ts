@@ -106,8 +106,9 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
           system_prompt,
           available_operations: ['memory_crud', 'action_publish', 'action_execute', 'work_queue', 'wallet', 'boards', 'catalogue', 'task_lifecycle', 'directives', 'capabilities_report', 'message_handling'],
           economics: {
+            note: 'Agents share the owner\'s wallet. This balance belongs to your owner, not you individually.',
             daily_allowance: config.dailyAllowance,
-            current_balance: agent?.morselBalance ?? 0,
+            current_balance: ownerGhii ? (await storage.getGHIIByOwner(req.auth?.owner as string))?.morselBalance ?? 0 : 0,
           },
           directives: {
             purpose: directives?.purpose ?? '',

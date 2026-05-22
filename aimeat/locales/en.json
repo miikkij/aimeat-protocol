@@ -267,6 +267,7 @@
       "loadError": "Could not load agents.",
       "trust": "Trust",
       "balance": "Balance",
+      "usesOwnerWallet": "Uses owner's wallet",
       "lastSeen": "Last seen",
       "roles": "Roles",
       "created": "Created",

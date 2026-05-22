@@ -461,7 +461,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
             </div>
             <div class="card-subtitle mt-xs">
               ${t('profile.agents.trust')}: ${a.trust_score ?? '-'} \u2502
-              ${t('profile.agents.balance')}: ${a.morsel_balance ?? '-'} \u2502
+              ${t('profile.agents.balance')}: ${t('profile.agents.usesOwnerWallet')} \u2502
               ${t('profile.agents.lastSeen')}: ${a.last_seen ? timeAgo(a.last_seen) : '-'}
             </div>
           </div>
@@ -504,7 +504,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
               <div class="agent-detail-row">
                 <span class="agent-detail-label">${t('profile.agents.balance')}</span>
-                <span class="agent-detail-value">${a.morsel_balance ?? '-'}</span>
+                <span class="agent-detail-value">${t('profile.agents.usesOwnerWallet')}</span>
               </div>
 
               <div class="agent-detail-row">

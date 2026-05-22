@@ -267,6 +267,7 @@
       "loadError": "Agenttien lataus epäonnistui.",
       "trust": "Luottamus",
       "balance": "Saldo",
+      "usesOwnerWallet": "Käyttää omistajan lompakkoa",
       "lastSeen": "Nähty viimeksi",
       "roles": "Roolit",
       "created": "Luotu",
