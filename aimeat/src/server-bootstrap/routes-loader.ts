@@ -193,6 +193,28 @@ export async function mountRoutes(
   app.use(mirrorReadOnly);
 
   app.use(ownersRouter(config, storage));
+  // Resolve /v1/agents/me/... to /v1/agents/{actual-name}/... by decoding agent name from JWT
+  app.use((req, _res, next) => {
+    if (!req.url.startsWith('/v1/agents/me') && !req.originalUrl.startsWith('/v1/agents/me')) { next(); return; }
+    const tail = req.originalUrl.slice('/v1/agents/me'.length);
+    if (tail && !tail.startsWith('/')) { next(); return; } // /v1/agents/memory etc.
+    const auth = req.headers.authorization;
+    if (!auth?.startsWith('Bearer ')) { next(); return; }
+    try {
+      const payload = JSON.parse(Buffer.from(auth.split('.')[1], 'base64url').toString());
+      const sub = payload.sub as string;
+      const hashIdx = sub?.indexOf('#');
+      const atIdx = sub?.lastIndexOf('@');
+      if (hashIdx >= 0 && atIdx > hashIdx) {
+        const agentName = sub.slice(0, hashIdx);
+        const rewritten = `/v1/agents/${encodeURIComponent(agentName)}${tail}`;
+        req.url = rewritten;
+        req.originalUrl = rewritten;
+      }
+    } catch { /* auth verification happens later in requireAuth() */ }
+    next();
+  });
+
   // Agent tasks, directives, capabilities, and integration BEFORE agentsRouter to avoid /v1/agents/:name param conflicts
   app.use(agentTasksRouter(config, storage));
   app.use(agentDirectivesRouter(config, storage));

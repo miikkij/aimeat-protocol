@@ -53,10 +53,12 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
       if (tx.type === 'welcome_bonus') welcomeBonus += tx.amount;
     }
 
+    const isAgentSession = req.auth!.roles.includes('agent') && !req.auth!.roles.includes('owner');
     res.json(success(config.nodeId, {
       '@context': { schema: 'https://schema.org/', aimeat: 'https://aimeat.io/ns/' },
       '@type': 'aimeat:Wallet',
       gaii: identity,
+      ...(isAgentSession ? { note: 'This is your owner\'s shared wallet. Agents do not have separate balances -- all spending is deducted from the owner\'s account.', accessed_by: req.auth!.sub } : {}),
       balance,
       in_escrow: inEscrow,
       available: balance - inEscrow,

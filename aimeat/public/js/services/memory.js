@@ -123,3 +123,20 @@ export async function pullFromHome(key) {
 export async function pushToHome(key) {
   return apiPost('/v1/memory/push-home', { key });
 }
+
+/** List memory entries on the home node (federated sessions). */
+export async function listHomeMemories() {
+  const resp = await apiPost('/v1/memory/list-home', {});
+  return resp?.data?.entries || [];
+}
+
+/** List memory entries on a remote peer node (home sessions). */
+export async function listRemoteMemories(peerNodeId) {
+  const resp = await apiPost('/v1/memory/list-remote', { peer_node_id: peerNodeId });
+  return resp?.data?.entries || [];
+}
+
+/** Pull a memory entry from a remote peer node (home sessions). */
+export async function pullFromRemote(peerNodeId, key) {
+  return apiPost('/v1/memory/pull-remote', { peer_node_id: peerNodeId, key });
+}

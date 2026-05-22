@@ -74,10 +74,14 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
         const record = await storage.getSystemPrompt('tier-1');
         if (!record || !record.active) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Prompt not available')); return; }
         const promptContent = resolvePromptContent(record, req.headers['accept-language'] as string);
+        // Extract agent name from GAII for template
+        const parsedSelf = parseGaiiLoose(gaii);
+        const selfAgentName = parsedSelf.agent || 'unknown';
         const system_prompt = substituteVariables(promptContent, {
           node_url: config.baseUrl,
           node_id: config.nodeId,
           gaii,
+          agent_name: selfAgentName,
           owner_name: req.auth?.owner ?? 'unknown',
           trust_score: agent?.trustScore ?? 50,
           morsel_balance: agent?.morselBalance ?? 0,
@@ -98,6 +102,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
 
         res.json(success(config.nodeId, {
           tier: '1',
+          agent_name: selfAgentName,
           system_prompt,
           available_operations: ['memory_crud', 'action_publish', 'action_execute', 'work_queue', 'wallet', 'boards', 'catalogue', 'task_lifecycle', 'directives', 'capabilities_report', 'message_handling'],
           economics: {

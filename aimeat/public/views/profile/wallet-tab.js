@@ -5,6 +5,7 @@
  * @version-history
  *   v1.0.0 — 2026-03-16 — Initial wallet tab
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes
+ *   v1.2.0 — 2026-05-22 — Show info message for federated users instead of infinite spinner
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -129,6 +130,19 @@ export default function WalletTab({ session, showToast, onStats }) {
     } finally {
       setReqLoading(false);
     }
+  }
+
+  if (session?.federated) {
+    return html`
+      <div class="section-title">${t('profile.wallet.title')}</div>
+      <div class="section-desc">${t('profile.wallet.desc')}</div>
+      <div class="alert alert-info">
+        <span class="alert-msg">${t('profile.wallet.federatedInfo')}</span>
+      </div>
+      <div class="text-meta mt-1">
+        ${t('profile.wallet.federatedHomeNode')}: <strong>${session.homeNode || '?'}</strong>
+      </div>
+    `;
   }
 
   if (!walletData) return html`<${Spinner} text=${t('profile.wallet.loading')} />`;

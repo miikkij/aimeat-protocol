@@ -5,6 +5,7 @@
  * @version-history
  *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS utility classes
  *   v1.1.0 — 2026-03-18 — Fix: use AuthImage for thumbnails and authenticated download to avoid 401
+ *   v1.2.0 — 2026-05-22 — Add Browse Home / Browse Remote panels for federation memory sync
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -16,6 +17,7 @@ import { Spinner, recipientBadge, VisibilityPill } from './shared.js';
 import * as memoryService from '/js/services/memory.js';
 import AuthImage from '/js/components/auth-image.js';
 import { listAgents } from '/js/services/agents.js';
+import { listPeers } from '/js/services/federation.js';
 import { getKeyPermissions, listConsents, grantConsent, revokeConsent } from '/js/services/consent.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { listGroups } from '/js/services/sharing-groups.js';
@@ -42,7 +44,13 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const [fedConsents, setFedConsents] = useState({});   // { memoryKey: consentId }
   const [togglingFed, setTogglingFed] = useState(null);
   const [groups, setGroups] = useState([]);
-  const [groupPickerFor, setGroupPickerFor] = useState(null); // key of the memory entry showing group picker
+  const [groupPickerFor, setGroupPickerFor] = useState(null);
+  const [browseMode, setBrowseMode] = useState(null); // 'home' | 'remote' | null
+  const [remoteEntries, setRemoteEntries] = useState(null);
+  const [remotePeers, setRemotePeers] = useState([]);
+  const [selectedPeer, setSelectedPeer] = useState('');
+  const [browseLoading, setBrowseLoading] = useState(false);
+  const [pullingKeys, setPullingKeys] = useState(new Set());
 
   useEffect(() => {
     if (session) { loadAgents(); loadMemories(); loadFiles(); loadFedConsents(); loadGroups(); }
@@ -502,6 +510,153 @@ export default function MemoryTab({ session, showToast, onStats }) {
     } catch (e) { showToast(e.message, true); }
   }
 
+  async function loadBrowseHome() {
+    setBrowseMode('home');
+    setBrowseLoading(true);
+    setRemoteEntries(null);
+    try {
+      const entries = await memoryService.listHomeMemories();
+      setRemoteEntries(entries);
+    } catch (e) {
+      showToast(e.message, true);
+      setRemoteEntries([]);
+    } finally { setBrowseLoading(false); }
+  }
+
+  async function loadBrowseRemote(peerNodeId) {
+    if (!peerNodeId) return;
+    setSelectedPeer(peerNodeId);
+    setBrowseMode('remote');
+    setBrowseLoading(true);
+    setRemoteEntries(null);
+    try {
+      const entries = await memoryService.listRemoteMemories(peerNodeId);
+      setRemoteEntries(entries);
+    } catch (e) {
+      showToast(e.message, true);
+      setRemoteEntries([]);
+    } finally { setBrowseLoading(false); }
+  }
+
+  async function initBrowseRemote() {
+    setBrowseMode('remote');
+    setRemoteEntries(null);
+    setSelectedPeer('');
+    try {
+      const peers = await listPeers();
+      setRemotePeers(Array.isArray(peers) ? peers.filter(p => p.status === 'active' || p.status === 'healthy') : []);
+    } catch { setRemotePeers([]); }
+  }
+
+  async function handlePullRemoteEntry(key, peerNodeId) {
+    const nodeId = peerNodeId || selectedPeer;
+    setPullingKeys(prev => new Set([...prev, key]));
+    try {
+      if (session?.federated) {
+        await memoryService.pullFromHome(key);
+      } else {
+        await memoryService.pullFromRemote(nodeId, key);
+      }
+      showToast(t('profile.memory.pullSuccess'));
+      loadMemories();
+    } catch (e) {
+      showToast(e.message, true);
+    } finally {
+      setPullingKeys(prev => { const n = new Set(prev); n.delete(key); return n; });
+    }
+  }
+
+  async function handlePullAll() {
+    if (!remoteEntries?.length) return;
+    const node = session?.federated ? (session.homeNode || 'home') : selectedPeer;
+    const msg = t('profile.memory.pullAllConfirm').replace('{count}', remoteEntries.length).replace('{node}', node);
+    confirm(msg, async () => {
+      let pulled = 0;
+      for (const entry of remoteEntries) {
+        try {
+          if (session?.federated) {
+            await memoryService.pullFromHome(entry.key);
+          } else {
+            await memoryService.pullFromRemote(selectedPeer, entry.key);
+          }
+          pulled++;
+        } catch { /* skip failed entries */ }
+      }
+      showToast(t('profile.memory.pullAllSuccess').replace('{count}', pulled));
+      loadMemories();
+    });
+  }
+
+  function closeBrowse() {
+    setBrowseMode(null);
+    setRemoteEntries(null);
+    setSelectedPeer('');
+  }
+
+  const renderBrowsePanel = () => {
+    if (!browseMode) return null;
+    const isHome = browseMode === 'home';
+    const title = isHome ? t('profile.memory.browseHome') : t('profile.memory.browseRemote');
+    const desc = isHome ? t('profile.memory.browseHomeDesc') : t('profile.memory.browseRemoteDesc');
+
+    return html`
+      <div class="mem-browse-panel">
+        <div class="mem-browse-header">
+          <div>
+            <div class="section-title">${title}</div>
+            <div class="section-desc">${desc}</div>
+          </div>
+          <button class="btn-outline btn-sm" onClick=${closeBrowse}>${t('profile.memory.cancelBtn')}</button>
+        </div>
+
+        ${!isHome && !selectedPeer && html`
+          <div class="mb-1">
+            ${remotePeers.length === 0
+              ? html`<div class="empty">${t('profile.memory.noPeers')}</div>`
+              : html`
+                <select class="input-field" onChange=${e => loadBrowseRemote(e.target.value)}>
+                  <option value="">${t('profile.memory.browseRemoteSelect')}</option>
+                  ${remotePeers.map(p => html`<option key=${p.node_id} value=${p.node_id}>${escHtml(p.node_id)} (${escHtml(p.url || '')})</option>`)}
+                </select>
+              `}
+          </div>
+        `}
+
+        ${browseLoading && html`<${Spinner} text=${isHome ? t('profile.memory.loadingHome') : t('profile.memory.loadingRemote')} />`}
+
+        ${remoteEntries && !browseLoading && html`
+          <div class="mb-half text-meta">
+            ${isHome
+              ? t('profile.memory.homeEntries').replace('{count}', remoteEntries.length)
+              : t('profile.memory.remoteEntries').replace('{count}', remoteEntries.length).replace('{node}', selectedPeer)}
+            ${remoteEntries.length > 0 && html`
+              <button class="btn-ghost btn-sm pf-ml-half" onClick=${handlePullAll}>${t('profile.memory.pullAllBtn')}</button>
+            `}
+          </div>
+          ${remoteEntries.length === 0
+            ? html`<div class="empty">${isHome ? t('profile.memory.noHomeEntries') : t('profile.memory.noRemoteEntries')}</div>`
+            : html`<div class="mem-browse-list">
+                ${remoteEntries.map(entry => html`
+                  <div key=${entry.key} class="mem-browse-item">
+                    <div class="mem-browse-key">${escHtml(entry.key)}</div>
+                    <div class="mem-browse-meta">
+                      <${VisibilityPill} visibility=${entry.visibility} />
+                      ${entry.tags?.length > 0 && html`<span class="text-meta-sm">${entry.tags.join(', ')}</span>`}
+                    </div>
+                    <button class="btn-primary btn-sm"
+                      disabled=${pullingKeys.has(entry.key)}
+                      onClick=${() => handlePullRemoteEntry(entry.key)}>
+                      ${pullingKeys.has(entry.key) ? '...' : t('profile.memory.pullEntry')}
+                    </button>
+                  </div>
+                `)}
+              </div>`
+          }
+        `}
+      </div>
+    `;
+  };
+
   return html`
     <div class="section-title">${t('profile.memory.title')}</div>
     <div class="section-desc">${t('profile.memory.desc')}</div>
@@ -510,7 +665,22 @@ export default function MemoryTab({ session, showToast, onStats }) {
       <div class="alert alert-info">
         <span class="alert-msg">${t('profile.memory.federatedSession')}</span>
       </div>
+      <div class="mb-1">
+        <button class="btn-primary btn-sm" onClick=${loadBrowseHome}>
+          ${t('profile.memory.browseHome')}
+        </button>
+      </div>
     `}
+
+    ${!session.federated && html`
+      <div class="mb-1">
+        <button class="btn-outline btn-sm" onClick=${initBrowseRemote}>
+          ${t('profile.memory.browseRemote')}
+        </button>
+      </div>
+    `}
+
+    ${renderBrowsePanel()}
 
     ${agents.length > 1 && html`
       <div class="agent-selector mb-half">

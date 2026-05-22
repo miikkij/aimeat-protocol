@@ -590,7 +590,9 @@
       "lifetimeEarned": "Ansaittu",
       "lifetimeSpent": "Käytetty",
       "lifetimeAllowance": "Kiintiö vastaanotettu",
-      "lifetimeWelcome": "Tervetuliaisbonus"
+      "lifetimeWelcome": "Tervetuliaisbonus",
+      "federatedInfo": "Lompakkosi on kotisolmullasi. Morselisaldo, tapahtumat ja päiväkohtaiset lisäykset hallitaan siellä.",
+      "federatedHomeNode": "Kotisolmu"
     },
     "memory": {
       "title": "Muisti",
@@ -644,7 +646,24 @@
       "shareSuccess": "Jaettu federaatioon",
       "unshareSuccess": "Poistettu federaatiosta",
       "selectGroup": "Valitse ryhma",
-      "noGroups": "Ei jakoryhmiä. Luo ryhma Oikeudet-valilehdessa."
+      "noGroups": "Ei jakoryhmiä. Luo ryhma Oikeudet-valilehdessa.",
+      "browseHome": "Selaa kotisolmua",
+      "browseHomeDesc": "Muistisi kotisolmullasi. Vedä ne tänne käytettäväksi paikallisesti.",
+      "browseRemote": "Selaa etäsolmuja",
+      "browseRemoteDesc": "Muistisi solmuilla joihin olet kirjautunut federaation kautta.",
+      "browseRemoteSelect": "Valitse vertaissolmu selataksesi muistejasi siellä",
+      "remoteEntries": "{count} merkintää solmulla {node}",
+      "homeEntries": "{count} merkintää kotisolmulla",
+      "pullEntry": "Vedä",
+      "pullAllBtn": "Vedä kaikki",
+      "pullAllConfirm": "Vedä kaikki {count} merkintää solmulta {node}?",
+      "pullingAll": "Vedetään merkintöjä...",
+      "pullAllSuccess": "Vedetty {count} merkintää",
+      "noPeers": "Ei aktiivisia federaatiovertaisia",
+      "noRemoteEntries": "Ei muistimerkintöjä tällä solmulla",
+      "noHomeEntries": "Ei muistimerkintöjä kotisolmullasi",
+      "loadingRemote": "Ladataan etämuisteja...",
+      "loadingHome": "Ladataan kotisolmun muisteja..."
     },
     "files": {
       "title": "Tallennetut tiedostot",

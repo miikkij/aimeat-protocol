@@ -6,6 +6,7 @@
  * @version-history
  *   v1.0.0 — 2026-03-15 — Initial federation sync routes
  *   v1.1.0 — 2026-03-20 — Add federation template endpoints (GET /v1/federation/templates, POST /v1/federation/templates/sync)
+ *   v1.2.0 — 2026-05-22 — Add POST /v1/federation/memory/list for peer-to-peer memory browsing
  */
 
 import { Router } from 'express';
@@ -719,6 +720,38 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
 
         emitChange('templates');
         res.json(success(config.nodeId, { syncResults: results }));
+    });
+
+    // POST /v1/federation/memory/list — List memory entries for a user (peer-to-peer)
+    router.post('/v1/federation/memory/list', async (req, res) => {
+        const { requesting_node, gaii } = req.body ?? {};
+
+        if (!requesting_node || !gaii) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'requesting_node and gaii are required'));
+            return;
+        }
+
+        const peer = [...peers.values()].find(p => p.nodeId === requesting_node);
+        if (!peer || peer.status !== 'active') {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Requesting node is not an active peer'));
+            return;
+        }
+
+        try {
+            const memories = await storage.listMemory(gaii as string, {});
+            const entries = memories.map(m => ({
+                key: m.key,
+                visibility: m.visibility,
+                tags: m.tags ?? [],
+                updatedAt: m.updatedAt,
+                version: m.version,
+            }));
+
+            res.json(success(config.nodeId, { entries, total: entries.length }));
+        } catch (err) {
+            logger.error('Federation memory list error', { gaii, error: String(err) });
+            res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to list memory entries'));
+        }
     });
 
     return router;

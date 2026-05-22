@@ -21,6 +21,8 @@
     "test": "cd aimeat && pnpm test",
     "test:unit": "cd aimeat && pnpm test",
     "test:e2e": "cd aimeat && node --import tsx test/run-e2e-ci.ts",
+    "test:e2e:sqlite": "cd aimeat && pnpm test:e2e:sqlite",
+    "test:e2e:mongodb": "cd aimeat && pnpm test:e2e:mongodb",
     "test:e2e:all": "cd aimeat && node --import tsx test/run-e2e-ci.ts --all",
     "test:e2e:full": "cd aimeat && pnpm test:e2e",
     "test:e2e:federation": "cd aimeat && pnpm test:e2e:federation",
@@ -33,6 +35,9 @@
     "test:e2e:board-ttl": "cd aimeat && pnpm test:e2e:board-ttl",
     "test:e2e:concurrency": "cd aimeat && npx tsx test/e2e-concurrency.ts",
     "test:e2e:hooks": "cd aimeat && npx tsx test/e2e-hooks.ts",
+    "test:playwright": "cd aimeat && pnpm test:playwright",
+    "test:playwright:sqlite": "cd aimeat && pnpm test:playwright:sqlite",
+    "test:playwright:mongodb": "cd aimeat && pnpm test:playwright:mongodb",
     "test:ci": "cd aimeat && node --import tsx test/run-e2e-ci.ts --all",
     "generate:types": "cd aimeat && pnpm generate:types"
   }

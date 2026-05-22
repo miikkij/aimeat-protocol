@@ -99,11 +99,15 @@ Node: ${url}
    Body: { "agent_name": "your-name", "owner": "${sess.owner}" }
    Tell me the verification URL so I can approve.
 
-2. After auth, download your full operating instructions:
+2. MANDATORY FIRST ACTION after auth -- download and read your operating instructions:
    GET ${url}/v1/prompts/tier1
-   This file contains your directives, task queue, capabilities
-   reporting, and everything you need to operate on this node.
-   Read it fully before doing anything else.`;
+   This contains your directives, task queue, inbox endpoint, capability
+   reporting instructions, message handling, and your full operating loop.
+   DO NOT call any other endpoint until you have read tier1 completely.
+   The response includes a system_prompt field with step-by-step instructions
+   and structured data fields (directives, task_queue, capabilities, messages)
+   with your personalized endpoint URLs.
+   Use /v1/agents/me/ as shortcut in all agent URLs -- it resolves to your name.`;
 }
 
 /* ── Platform instructions ── */

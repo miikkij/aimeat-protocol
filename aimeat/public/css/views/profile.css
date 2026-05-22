@@ -104,7 +104,14 @@
 .pf .key-rules-box{background:#F9FAFB;border:1px solid rgba(139,92,246,.3);border-radius:8px;padding:.75rem;margin-top:.75rem;margin-bottom:.5rem}
 .pf .mem-detail{background:rgba(0,0,0,.04);border:1px solid rgba(232,86,74,.1);border-radius:8px;padding:1rem;margin-top:.5rem;font-size:.85rem}
 .pf .mem-detail pre{white-space:pre-wrap;word-break:break-all;font-family:monospace;color:var(--text,#1A1A2E);font-size:.8rem}
-.pf .mem-detail .mem-actions{display:flex;gap:.5rem;margin-top:.75rem}
+.pf .mem-detail .mem-actions{display:flex;gap:.5rem;margin-top:.75rem;flex-wrap:wrap}
+.pf .mem-browse-panel{background:var(--surface,#F9FAFB);border:1px solid var(--border,#E5E7EB);border-radius:var(--radius,12px);padding:1rem;margin-bottom:1rem}
+.pf .mem-browse-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.75rem}
+.pf .mem-browse-list{display:flex;flex-direction:column;gap:.5rem}
+.pf .mem-browse-item{display:flex;align-items:center;gap:.75rem;padding:.5rem .75rem;background:var(--card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:8px}
+.pf .mem-browse-item:hover{border-color:var(--accent,#E8564A)}
+.pf .mem-browse-key{font-family:monospace;color:var(--accent,#E8564A);font-weight:500;flex:1;font-size:.85rem;word-break:break-all}
+.pf .mem-browse-meta{display:flex;align-items:center;gap:.5rem;flex-shrink:0}
 .pf .peer-card{display:flex;justify-content:space-between;align-items:center}
 .pf .peer-status{display:flex;align-items:center;gap:.4rem}
 .pf .peer-dot{width:8px;height:8px;border-radius:50%}

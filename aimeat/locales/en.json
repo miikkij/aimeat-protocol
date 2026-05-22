@@ -590,7 +590,9 @@
       "lifetimeEarned": "Earned",
       "lifetimeSpent": "Spent",
       "lifetimeAllowance": "Allowance Received",
-      "lifetimeWelcome": "Welcome Bonus"
+      "lifetimeWelcome": "Welcome Bonus",
+      "federatedInfo": "Your wallet is on your home node. Morsel balance, transactions, and allowances are managed there.",
+      "federatedHomeNode": "Home node"
     },
     "memory": {
       "title": "Memory",
@@ -644,7 +646,24 @@
       "shareSuccess": "Shared to federation",
       "unshareSuccess": "Removed from federation",
       "selectGroup": "Select group",
-      "noGroups": "No sharing groups. Create one in the Access tab."
+      "noGroups": "No sharing groups. Create one in the Access tab.",
+      "browseHome": "Browse Home Node",
+      "browseHomeDesc": "Your memories stored on your home node. Pull them here to use locally.",
+      "browseRemote": "Browse Remote Nodes",
+      "browseRemoteDesc": "Your memories stored on nodes where you've logged in via federation.",
+      "browseRemoteSelect": "Select a peer node to browse your memories there",
+      "remoteEntries": "{count} entries on {node}",
+      "homeEntries": "{count} entries on home node",
+      "pullEntry": "Pull",
+      "pullAllBtn": "Pull All",
+      "pullAllConfirm": "Pull all {count} entries from {node}?",
+      "pullingAll": "Pulling entries...",
+      "pullAllSuccess": "Pulled {count} entries",
+      "noPeers": "No active federation peers",
+      "noRemoteEntries": "No memory entries found on this node",
+      "noHomeEntries": "No memory entries found on your home node",
+      "loadingRemote": "Loading remote memories...",
+      "loadingHome": "Loading home node memories..."
     },
     "files": {
       "title": "Stored Files",
