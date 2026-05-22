@@ -206,7 +206,7 @@ await test('1. Set provider directives (enables task system)', async () => {
         headers: { Authorization: `Bearer ${providerOwnerToken}` },
         body: JSON.stringify({
             purpose: 'Test service provider agent',
-            rules: ['Always deliver work on time'],
+            rules: [{ id: 'rule-1', description: 'Always deliver work on time' }],
             memory_areas: [],
             resources: [],
         }),

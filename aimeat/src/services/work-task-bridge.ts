@@ -21,7 +21,7 @@ export async function createTaskFromWork(
   const task: AgentTaskRecord = {
     id: randomUUID(),
     agentGaii: providerGaii,
-    ownerGaii: providerGaii.split('#')[1]?.split('@')[0] ?? providerGaii,
+    ownerGaii: providerGaii.split('#')[1] ?? providerGaii,
     title: `Work: ${action?.displayName ?? work.actionId}`,
     description: `Auto-created from work request ${work.trackingCode}. Requester: ${work.requesterGaii}.`,
     scope: Object.entries(work.input || {}).map(([name, value]) => ({
