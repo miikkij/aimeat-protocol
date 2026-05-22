@@ -29,9 +29,9 @@ const RANGE_OPTIONS = [
 
 function StatsCards({ stats }) {
   const cards = [
-    { key: 'tasksCompleted', value: stats?.tasks_completed ?? 0 },
-    { key: 'tokensUsed', value: stats?.tokens_used_30d ?? 0 },
-    { key: 'successRate', value: stats?.success_rate != null ? `${Math.round(stats.success_rate)}%` : '-' },
+    { key: 'tasksCompleted', value: stats?.tasksCompleted ?? 0 },
+    { key: 'tokensUsed', value: stats?.tokensUsed30d ?? 0 },
+    { key: 'successRate', value: stats?.successRate != null ? `${Math.round(stats.successRate)}%` : '-' },
   ];
 
   return html`
@@ -64,7 +64,15 @@ function ActivityChart({ history, selectedDays, onRangeChange }) {
     `;
   }
 
-  const maxTasks = Math.max(...history.map(d => d.task_count || 0), 1);
+  // API returns { date, metric, value } rows -- aggregate tasks_completed per date
+  const dailyTotals = {};
+  for (const row of history) {
+    if (row.metric === 'tasks_completed' || row.metric === 'tasks_started') {
+      dailyTotals[row.date] = (dailyTotals[row.date] || 0) + (row.value || 0);
+    }
+  }
+  const dates = Object.keys(dailyTotals).sort();
+  const maxTasks = Math.max(...Object.values(dailyTotals), 1);
 
   return html`
     <div class="agd-chart-container">
@@ -78,12 +86,12 @@ function ActivityChart({ history, selectedDays, onRangeChange }) {
         `)}
       </div>
       <div class="agd-chart-rows">
-        ${history.map(day => {
-          const count = day.task_count || 0;
+        ${dates.map(date => {
+          const count = dailyTotals[date] || 0;
           const pct = Math.round((count / maxTasks) * 100);
-          const dateStr = day.date ? new Date(day.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+          const dateStr = new Date(date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
           return html`
-            <div class="agd-chart-row" key=${day.date}>
+            <div class="agd-chart-row" key=${date}>
               <span class="agd-chart-date">${dateStr}</span>
               <div class="agd-chart-bar-track">
                 <div class="agd-chart-bar-fill" style="width:${pct}%"></div>
@@ -107,14 +115,14 @@ function ScheduledJobs({ jobs }) {
       </div>
       ${jobs.map((job, i) => html`
         <div class="agd-log-entry" key=${job.id || i}>
-          <span class="${job.source === 'aimeat' ? 'agd-job-badge-aimeat' : 'agd-job-badge-agent'}">
-            ${job.source === 'aimeat' ? t('profile.agents.activity.aimeatJob') : t('profile.agents.activity.agentJob')}
+          <span class="${job.type === 'aimeat' ? 'agd-job-badge-aimeat' : 'agd-job-badge-agent'}">
+            ${job.type === 'aimeat' ? t('profile.agents.activity.aimeatJob') : t('profile.agents.activity.agentJob')}
           </span>
           <span class="agd-log-type">${job.name || job.id || '-'}</span>
           <span class="agd-log-msg">${job.cron || ''}</span>
           <span class="agd-log-time">
             ${job.enabled === false ? 'disabled' : ''}
-            ${job.last_run ? timeAgo(job.last_run) : ''}
+            ${job.lastRunAt ? timeAgo(job.lastRunAt) : ''}
           </span>
         </div>
       `)}

@@ -130,19 +130,25 @@ export function agentActivityRouter(config: AimeatConfig, storage: Storage): Rou
     // Get time-series activity history
     const history = await storage.getActivityHistory(agentGaii, { days, granularity });
 
-    // Get scheduled jobs -- extension-type jobs + any tagged to this agent
-    const allJobs = await storage.listScheduledJobs();
-    const scheduledJobs = allJobs.map(job => ({
-      id: job.id,
-      name: job.name,
-      type: job.type === 'extension' ? 'aimeat' as const : 'agent' as const,
-      cron: job.cron,
-      enabled: job.enabled,
-      extensionName: job.extensionName ?? null,
-      lastRunAt: job.lastRunAt ?? null,
-      lastRunResult: job.lastRunResult ?? null,
-      nextRunAt: job.nextRunAt ?? null,
-    }));
+    // Get scheduled jobs belonging to extensions installed by this agent
+    const allExtensions = await storage.listExtensions();
+    const agentExtNames = new Set(
+      allExtensions.filter(e => e.installedBy === agentGaii).map(e => e.name)
+    );
+    const allJobs = await storage.listScheduledJobs({ type: 'extension' });
+    const scheduledJobs = allJobs
+      .filter(job => job.extensionName && agentExtNames.has(job.extensionName))
+      .map(job => ({
+        id: job.id,
+        name: job.name,
+        type: 'aimeat' as const,
+        cron: job.cron,
+        enabled: job.enabled,
+        extensionName: job.extensionName ?? null,
+        lastRunAt: job.lastRunAt ?? null,
+        lastRunResult: job.lastRunResult ?? null,
+        nextRunAt: job.nextRunAt ?? null,
+      }));
 
     res.json(success(config.nodeId, {
       activity_stats: agent.activityStats ?? null,
