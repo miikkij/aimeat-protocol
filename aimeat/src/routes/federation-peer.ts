@@ -476,6 +476,10 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
             replicate_memory: p.replicateMemory ?? true,
             allow_routing: p.allowRouting ?? true,
             peer_mode: p.peerMode ?? 'federation',
+            allow_federated_auth: p.allowFederatedAuth ?? false,
+            federation_auth_scopes: p.federationAuthScopes ?? [],
+            ...((p as PeerInfo & { depeerGraceEnd?: string }).depeerGraceEnd
+                ? { depeer_grace_end: (p as PeerInfo & { depeerGraceEnd?: string }).depeerGraceEnd } : {}),
         }));
 
         res.json(success(config.nodeId, {

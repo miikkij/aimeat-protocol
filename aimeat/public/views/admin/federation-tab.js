@@ -38,10 +38,10 @@ export default function FederationTab({ data, reload }) {
 
   useEffect(() => {
     getConfig().then(res => {
-      if (res.ok && res.data?.config) {
-        const c = res.data.config;
-        setAuthPolicy(c.federation?.auth_policy ?? c.federationAuthPolicy ?? 'disabled');
-        const scopes = c.federation?.default_scopes ?? c.federationDefaultScopes ?? 'memory:read,catalogue:read';
+      if (res.ok && res.data?.schema) {
+        const s = res.data.schema;
+        setAuthPolicy(s['federation.auth_policy']?.value ?? 'disabled');
+        const scopes = s['federation.default_scopes']?.value ?? 'memory:read,catalogue:read';
         setDefaultScopes(typeof scopes === 'string' ? scopes.split(',').filter(Boolean) : (scopes || []));
       }
       setAuthPolicyLoading(false);
