@@ -57,16 +57,23 @@ export function agentIntegrationRouter(config: AimeatConfig, storage: Storage): 
       return;
     }
 
-    // Fetch queued and active tasks
-    const [queuedResult, activeResult] = await Promise.all([
+    // Fetch queued and active tasks + pending messages
+    const [queuedResult, activeResult, pendingMessages] = await Promise.all([
       storage.listAgentTasks(agentGaii, { status: 'queued', perPage: 50 }),
       storage.listAgentTasks(agentGaii, { status: 'active', perPage: 50 }),
+      storage.listPendingMessages(agentGaii),
     ]);
 
     res.json(success(config.nodeId, {
       queued_tasks: queuedResult.tasks,
       active_tasks: activeResult.tasks,
-      pending_messages: [],
+      pending_messages: pendingMessages.map(m => ({
+        id: m.id,
+        thread_id: m.threadId,
+        preview: m.content.substring(0, 100),
+        from: m.senderGaii,
+        created_at: m.createdAt,
+      })),
     }, [
       { description: 'View integration kit', method: 'GET', url: `/v1/agents/${agentName}/integration-kit` },
       { description: 'Wait for new tasks', method: 'GET', url: `/v1/agents/${agentName}/tasks/wait` },
