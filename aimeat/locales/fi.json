@@ -4637,7 +4637,8 @@
       "public": "Julkinen",
       "private": "Yksityinen",
       "owner": "Omat agentit",
-      "shared": "Omat agentit"
+      "shared": "Omat agentit",
+      "group": "Ryhma"
     },
     "federate": "Federoi",
     "federated": "Federoitu",

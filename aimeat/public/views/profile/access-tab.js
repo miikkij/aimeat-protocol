@@ -51,6 +51,8 @@ function SharingGroupsSection({ showToast }) {
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
   const [editDesc, setEditDesc] = useState('');
+  const [editRead, setEditRead] = useState(true);
+  const [editWrite, setEditWrite] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const loadGroups = useCallback(async () => {
@@ -119,6 +121,8 @@ function SharingGroupsSection({ showToast }) {
     setEditingId(group.id);
     setEditName(group.name);
     setEditDesc(group.description || '');
+    setEditRead(group.defaultPermissions?.read ?? true);
+    setEditWrite(group.defaultPermissions?.write ?? false);
   }, []);
 
   const handleUpdate = useCallback(async (id) => {
@@ -131,6 +135,7 @@ function SharingGroupsSection({ showToast }) {
       await groupsApi.updateGroup(id, {
         name: editName.trim(),
         description: editDesc.trim() || undefined,
+        default_permissions: { read: editRead, write: editWrite },
       });
       showToast(t('profile.access.sgUpdated') || 'Group updated');
       setEditingId(null);
@@ -296,6 +301,19 @@ function SharingGroupsSection({ showToast }) {
                 <label>${t('profile.access.sgDescription') || 'Description'}</label>
                 <textarea class="input-field input-sm" rows="2"
                   value=${editDesc} onInput=${e => setEditDesc(e.target.value)} />
+              </div>
+              <div class="form-row">
+                <label>${t('profile.access.sgDefaultPerms') || 'Default permissions'}</label>
+                <div class="flex-row-wrap">
+                  <label class="flex-row">
+                    <input type="checkbox" checked=${editRead} onChange=${() => setEditRead(!editRead)} />
+                    ${t('profile.access.sgRead') || 'Read'}
+                  </label>
+                  <label class="flex-row">
+                    <input type="checkbox" checked=${editWrite} onChange=${() => setEditWrite(!editWrite)} />
+                    ${t('profile.access.sgWrite') || 'Write'}
+                  </label>
+                </div>
               </div>
               <div class="form-actions">
                 <button class="btn-primary btn-sm" onClick=${() => handleUpdate(group.id)} disabled=${saving}>

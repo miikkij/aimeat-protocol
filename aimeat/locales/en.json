@@ -4637,7 +4637,8 @@
       "public": "Public",
       "private": "Private",
       "owner": "My Agents",
-      "shared": "My Agents"
+      "shared": "My Agents",
+      "group": "Group"
     },
     "federate": "Federate",
     "federated": "Federated",
