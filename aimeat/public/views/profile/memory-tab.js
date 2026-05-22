@@ -50,6 +50,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const [remotePeers, setRemotePeers] = useState([]);
   const [selectedPeer, setSelectedPeer] = useState('');
   const [browseLoading, setBrowseLoading] = useState(false);
+  const [browseError, setBrowseError] = useState(null);
   const [pullingKeys, setPullingKeys] = useState(new Set());
 
   useEffect(() => {
@@ -510,15 +511,28 @@ export default function MemoryTab({ session, showToast, onStats }) {
     } catch (e) { showToast(e.message, true); }
   }
 
+  function browseErrorMessage(e) {
+    const code = e.code || '';
+    const msg = e.message || '';
+    if (code === 'FEDERATION_PROXY_ERROR' || msg.includes('Localhost not allowed') || msg.includes('ocalhost'))
+      return t('profile.memory.errorLocalhost');
+    if (code === 'PEER_NOT_FOUND' || msg.includes('not found'))
+      return t('profile.memory.errorPeerNotFound');
+    if (code === 'ROUTE_NOT_FOUND' || e.status === 404)
+      return t('profile.memory.errorPeerUnsupported');
+    return msg;
+  }
+
   async function loadBrowseHome() {
     setBrowseMode('home');
     setBrowseLoading(true);
+    setBrowseError(null);
     setRemoteEntries(null);
     try {
       const entries = await memoryService.listHomeMemories();
       setRemoteEntries(entries);
     } catch (e) {
-      showToast(e.message, true);
+      setBrowseError(browseErrorMessage(e));
       setRemoteEntries([]);
     } finally { setBrowseLoading(false); }
   }
@@ -528,12 +542,13 @@ export default function MemoryTab({ session, showToast, onStats }) {
     setSelectedPeer(peerNodeId);
     setBrowseMode('remote');
     setBrowseLoading(true);
+    setBrowseError(null);
     setRemoteEntries(null);
     try {
       const entries = await memoryService.listRemoteMemories(peerNodeId);
       setRemoteEntries(entries);
     } catch (e) {
-      showToast(e.message, true);
+      setBrowseError(browseErrorMessage(e));
       setRemoteEntries([]);
     } finally { setBrowseLoading(false); }
   }
@@ -624,7 +639,13 @@ export default function MemoryTab({ session, showToast, onStats }) {
 
         ${browseLoading && html`<${Spinner} text=${isHome ? t('profile.memory.loadingHome') : t('profile.memory.loadingRemote')} />`}
 
-        ${remoteEntries && !browseLoading && html`
+        ${browseError && !browseLoading && html`
+          <div class="alert alert-warning">
+            <span class="alert-msg">${browseError}</span>
+          </div>
+        `}
+
+        ${remoteEntries && !browseLoading && !browseError && html`
           <div class="mb-half text-meta">
             ${isHome
               ? t('profile.memory.homeEntries').replace('{count}', remoteEntries.length)
@@ -638,10 +659,10 @@ export default function MemoryTab({ session, showToast, onStats }) {
             : html`<div class="mem-browse-list">
                 ${remoteEntries.map(entry => html`
                   <div key=${entry.key} class="mem-browse-item">
-                    <div class="mem-browse-key">${escHtml(entry.key)}</div>
+                    <div class="mem-browse-key" title=${entry.key}>${escHtml(entry.key)}</div>
                     <div class="mem-browse-meta">
                       <${VisibilityPill} visibility=${entry.visibility} />
-                      ${entry.tags?.length > 0 && html`<span class="text-meta-sm">${entry.tags.join(', ')}</span>`}
+                      ${entry.tags?.length > 0 && html`<span class="text-meta-sm mem-browse-tags" title=${entry.tags.join(', ')}>${entry.tags.join(', ')}</span>`}
                     </div>
                     <button class="btn-primary btn-sm"
                       disabled=${pullingKeys.has(entry.key)}

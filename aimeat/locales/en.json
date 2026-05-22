@@ -664,7 +664,10 @@
       "noRemoteEntries": "No memory entries found on this node",
       "noHomeEntries": "No memory entries found on your home node",
       "loadingRemote": "Loading remote memories...",
-      "loadingHome": "Loading home node memories..."
+      "loadingHome": "Loading home node memories...",
+      "errorLocalhost": "Cannot browse this node. Local/development nodes are not reachable from public nodes. Both nodes must be publicly accessible for cross-node browsing to work.",
+      "errorPeerNotFound": "Peer node not found in the federation directory. It may have been removed or is no longer active.",
+      "errorPeerUnsupported": "This peer node does not support memory browsing yet. It may be running an older version of AIMEAT."
     },
     "files": {
       "title": "Stored Files",

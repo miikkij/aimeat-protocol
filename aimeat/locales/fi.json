@@ -664,7 +664,10 @@
       "noRemoteEntries": "Ei muistimerkintöjä tällä solmulla",
       "noHomeEntries": "Ei muistimerkintöjä kotisolmullasi",
       "loadingRemote": "Ladataan etämuisteja...",
-      "loadingHome": "Ladataan kotisolmun muisteja..."
+      "loadingHome": "Ladataan kotisolmun muisteja...",
+      "errorLocalhost": "Tätä solmua ei voi selata. Paikalliset/kehityssolmut eivät ole saavutettavissa julkisilta solmuilta. Molempien solmujen tulee olla julkisesti saavutettavissa.",
+      "errorPeerNotFound": "Vertaissolmua ei löydy federaatiohakemistosta. Se on voitu poistaa tai se ei ole enää aktiivinen.",
+      "errorPeerUnsupported": "Tämä vertaissolmu ei tue vielä muistien selaamista. Se saattaa käyttää vanhempaa AIMEAT-versiota."
     },
     "files": {
       "title": "Tallennetut tiedostot",
