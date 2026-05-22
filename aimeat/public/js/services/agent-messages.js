@@ -3,15 +3,17 @@
  * @description Frontend API service for agent messages.
  *   Provides send, list, thread listing, and status update operations.
  * @version-history
+ *   v1.1.0 -- 2026-05-22 -- Add linkedTaskId param to sendMessage for task-scoped chat
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 3
  */
 import { apiGet, apiPost, apiPatch } from '/js/api.js';
 
-export async function sendMessage(agentName, content, threadId) {
+export async function sendMessage(agentName, content, threadId, linkedTaskId) {
   return apiPost(`/v1/agents/${encodeURIComponent(agentName)}/messages`, {
     content,
     direction: 'inbound',
     ...(threadId && { thread_id: threadId }),
+    ...(linkedTaskId && { linked_task_id: linkedTaskId }),
   });
 }
 

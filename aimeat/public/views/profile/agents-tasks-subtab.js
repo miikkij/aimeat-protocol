@@ -6,8 +6,9 @@
  * @structure
  *   - AgentTasksSubtab (default export) -- main component
  *   - TaskItem -- task row with expand/collapse, todo list, start button
- *   - TaskCreateForm -- inline task creation form
  * @version-history
+ *   v3.0.0 -- 2026-05-22 -- Replace TaskCreateForm with TaskCreationBuilder (design spec split-panel)
+ *   v2.1.0 -- 2026-05-22 -- Fix: use camelCase field names from API; add task and todo timestamps
  *   v2.0.0 -- 2026-05-22 -- Add todo rendering, Start button, progress tracking
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  */
@@ -17,7 +18,8 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
-import { listTasks, createTask, deleteTask, startTask, listEvents } from '/js/services/agent-tasks.js';
+import { listTasks, deleteTask, startTask, listEvents } from '/js/services/agent-tasks.js';
+import TaskCreationBuilder from './agents-task-builder.js';
 
 function statusLabel(status) {
   const key = `profile.agents.tasks.status.${status}`;
@@ -89,9 +91,16 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
   const isQueued = task.status === 'queued' || task.status === 'draft';
   const isActive = task.status === 'active';
   const canStart = isQueued && hasTodos;
-  const totalMinutes = todos.reduce((sum, td) => sum + (td.estimateMinutes || td.estimate_minutes || 0), 0);
+  const totalMinutes = todos.reduce((sum, td) => sum + (td.estimateMinutes || 0), 0);
   const aimeatSteps = todos.filter(td => td.environment === 'aimeat').length;
   const agentSteps = todos.filter(td => td.environment === 'agent').length;
+
+  function formatDateTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString([], { day: 'numeric', month: 'short' }) + ' ' +
+           d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
 
   return html`
     <div>
@@ -101,13 +110,19 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
           ${progress && html`<span class="agd-todo-progress">${progress}</span>`}
         </div>
         <div class="agd-task-meta">
-          ${task.created_at && html`<span class="agd-task-time">${timeAgo(task.created_at)}</span>`}
+          ${task.createdAt && html`<span class="agd-task-time">${timeAgo(task.createdAt)}</span>`}
           <span class="agd-status agd-status-${task.status || 'draft'}">${statusLabel(task.status || 'draft')}</span>
         </div>
       </div>
       ${expanded && html`
         <div class="agd-task-expanded">
           ${task.description && html`<div class="agd-task-desc">${task.description}</div>`}
+
+          <div class="agd-task-timestamps">
+            ${task.createdAt && html`<span>${t('profile.agents.tasks.created')}: ${formatDateTime(task.createdAt)}</span>`}
+            ${task.updatedAt && task.updatedAt !== task.createdAt && html`<span>${t('profile.agents.tasks.updated')}: ${formatDateTime(task.updatedAt)}</span>`}
+            ${task.completedAt && html`<span>${t('profile.agents.tasks.completed')}: ${formatDateTime(task.completedAt)}</span>`}
+          </div>
 
           ${hasTodos && html`
             <div class="agd-todo-section">
@@ -127,15 +142,16 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
                       <div class="agd-todo-title">
                         ${td.title}
                         <span class="agd-env-badge agd-env-${td.environment || 'agent'}">${(td.environment || 'agent').toUpperCase()}</span>
-                        ${(td.estimateMinutes || td.estimate_minutes) && html`
-                          <span class="agd-todo-est">${td.estimateMinutes || td.estimate_minutes} min</span>
+                        ${td.estimateMinutes && html`
+                          <span class="agd-todo-est">${td.estimateMinutes} min</span>
                         `}
                       </div>
                       ${td.description && html`<div class="agd-todo-desc">${td.description}</div>`}
-                      ${(td.environmentReason || td.environment_reason) && html`
-                        <div class="agd-todo-reason">${td.environmentReason || td.environment_reason}</div>
+                      ${td.environmentReason && html`
+                        <div class="agd-todo-reason">${td.environmentReason}</div>
                       `}
                       ${td.verification && html`<div class="agd-todo-verify">${td.verification}</div>`}
+                      ${td.completedAt && html`<div class="agd-todo-completed-at">${formatDateTime(td.completedAt)}</div>`}
                     </div>
                   </div>
                 `)}
@@ -178,59 +194,6 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
         </div>
       `}
     </div>
-  `;
-}
-
-function TaskCreateForm({ agentName, showToast, onCreated, onCancel }) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [status, setStatus] = useState('queued');
-  const [saving, setSaving] = useState(false);
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!title.trim()) return;
-    setSaving(true);
-    try {
-      await createTask(agentName, {
-        title: title.trim(),
-        description: description.trim() || undefined,
-        status,
-      });
-      showToast('Task created');
-      onCreated();
-    } catch (err) {
-      showToast(err.message || 'Failed to create task', true);
-    }
-    setSaving(false);
-  }
-
-  return html`
-    <form class="agd-create-form" onSubmit=${handleSubmit}>
-      <div class="agd-form-field">
-        <label>Title</label>
-        <input type="text" value=${title} onInput=${(e) => setTitle(e.target.value)}
-               placeholder="What should the agent do?" required />
-      </div>
-      <div class="agd-form-field">
-        <label>Description</label>
-        <textarea value=${description} onInput=${(e) => setDescription(e.target.value)}
-                  placeholder="Detailed instructions (optional)"></textarea>
-      </div>
-      <div class="agd-form-field">
-        <label>Initial status</label>
-        <select value=${status} onChange=${(e) => setStatus(e.target.value)}>
-          <option value="draft">${statusLabel('draft')}</option>
-          <option value="queued">${statusLabel('queued')}</option>
-        </select>
-      </div>
-      <div class="agd-form-actions">
-        <button type="submit" class="btn-primary btn-sm" disabled=${saving || !title.trim()}>
-          ${saving ? 'Creating...' : 'Create Task'}
-        </button>
-        <button type="button" class="btn-outline btn-sm" onClick=${onCancel}>Cancel</button>
-      </div>
-    </form>
   `;
 }
 
@@ -285,7 +248,7 @@ export default function AgentTasksSubtab({ agentName, session, showToast }) {
       </div>
 
       ${showCreate && html`
-        <${TaskCreateForm} agentName=${agentName} showToast=${showToast} onCreated=${handleCreated} onCancel=${() => setShowCreate(false)} />
+        <${TaskCreationBuilder} agentName=${agentName} session=${session} showToast=${showToast} onClose=${handleCreated} />
       `}
 
       ${error && html`<div class="agd-empty">${error}</div>`}

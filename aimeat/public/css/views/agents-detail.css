@@ -8,6 +8,8 @@
  *   v1.1.0 -- 2026-05-22 -- Add capability badge styles for Capabilities sub-tab
  *   v1.2.0 -- 2026-05-22 -- Add Activity sub-tab styles (stats cards, chart, jobs, event log)
  *   v1.3.0 -- 2026-05-22 -- Add Services and Messages sub-tab styles
+ *   v1.6.0 -- 2026-05-22 -- Add Task Creation Builder split-panel styles
+ *   v1.5.0 -- 2026-05-22 -- Add task timestamp and todo completion time styles
  *   v1.4.0 -- 2026-05-22 -- Add Task TODO list, progress, environment badges, Start button styles
  */
 
@@ -140,6 +142,21 @@
   font-size: 0.85rem;
 }
 .pf .agd-task-desc { color: var(--text-dim, #6B7280); margin-bottom: 0.5rem; line-height: 1.4; }
+.pf .agd-task-timestamps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.7rem;
+  color: var(--text-muted, #9CA3AF);
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border, #E5E7EB);
+}
+.pf .agd-todo-completed-at {
+  font-size: 0.7rem;
+  color: var(--text-muted, #9CA3AF);
+  margin-top: 0.15rem;
+}
 .pf .agd-task-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
 
 .pf .agd-event-log { max-height: 200px; overflow-y: auto; margin-top: 0.5rem; }
@@ -566,6 +583,153 @@
   border-color: var(--accent, #E8564A);
   color: var(--accent, #E8564A);
 }
+
+/* ── Task Creation Builder (split-panel) ── */
+
+.pf .agd-builder {
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: var(--radius, 8px);
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+.pf .agd-builder-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border, #E5E7EB);
+  background: var(--card-bg, #FFFFFF);
+}
+.pf .agd-builder-header h4 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.pf .agd-builder-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 350px;
+}
+@media (max-width: 768px) {
+  .pf .agd-builder-panels { grid-template-columns: 1fr; }
+}
+.pf .agd-proposal {
+  border-right: 1px solid var(--border, #E5E7EB);
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 768px) {
+  .pf .agd-proposal { border-right: none; border-bottom: 1px solid var(--border, #E5E7EB); }
+}
+.pf .agd-proposal-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border, #E5E7EB);
+  background: var(--bg-dim, #F9FAFB);
+}
+.pf .agd-proposal-tab {
+  flex: 1;
+  padding: 0.4rem 0.5rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim, #6B7280);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-align: center;
+  transition: color 0.15s, border-color 0.15s;
+}
+.pf .agd-proposal-tab:hover { color: var(--text, #1A1A2E); }
+.pf .agd-proposal-tab-active {
+  color: var(--accent, #E8564A);
+  border-bottom-color: var(--accent, #E8564A);
+}
+.pf .agd-proposal-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem;
+  font-size: 0.82rem;
+  max-height: 400px;
+}
+.pf .agd-prop-section { margin-bottom: 0.75rem; }
+.pf .agd-prop-section:last-child { margin-bottom: 0; }
+.pf .agd-prop-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim, #6B7280);
+  margin-bottom: 0.25rem;
+}
+.pf .agd-prop-value { color: var(--text, #1A1A2E); line-height: 1.5; }
+.pf .agd-prop-empty { color: var(--text-muted, #9CA3AF); font-style: italic; font-size: 0.8rem; }
+.pf .agd-prop-code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.pf .agd-prop-list { list-style: none; padding: 0; margin: 0; }
+.pf .agd-prop-list li { padding: 0.15rem 0; border-bottom: 1px solid rgba(0, 0, 0, 0.04); }
+.pf .agd-prop-list li:last-child { border-bottom: none; }
+.pf .agd-prop-check { display: flex; align-items: baseline; gap: 0.35rem; }
+.pf .agd-prop-check::before { content: '\2713'; color: var(--success, #10b981); font-weight: 600; }
+.pf .agd-scope-item { display: flex; align-items: baseline; gap: 0.5rem; padding: 0.2rem 0; }
+.pf .agd-scope-name { font-weight: 500; min-width: 80px; }
+.pf .agd-scope-type {
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: var(--bg-dim, #F9FAFB);
+  color: var(--text-dim, #6B7280);
+}
+.pf .agd-builder-chat { display: flex; flex-direction: column; background: var(--card-bg, #FFFFFF); }
+.pf .agd-builder-chat-history {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 350px;
+}
+.pf .agd-builder-chat-input {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--border, #E5E7EB);
+}
+.pf .agd-builder-chat-input textarea {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.82rem;
+  min-height: 2.5rem;
+  max-height: 5rem;
+  font-family: inherit;
+}
+.pf .agd-builder-analyzing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: var(--text-dim, #6B7280);
+  font-size: 0.85rem;
+  text-align: center;
+}
+.pf .agd-builder-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--border, #E5E7EB);
+  background: var(--bg-dim, #F9FAFB);
+}
+.pf .agd-builder-actions-right { display: flex; gap: 0.5rem; }
+.pf .agd-version-badge { font-size: 0.7rem; color: var(--text-muted, #9CA3AF); }
 
 /* ── Task TODO list ── */
 
