@@ -65,12 +65,13 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage): Ro
             const ghii = `${username.toLowerCase().trim()}@${config.nodeId}`;
             const ghiiRecord = await storage.getGHII(ghii);
             if (!ghiiRecord) {
-                // Use generic error to avoid revealing whether user exists
+                logger.warn(`Federation auth: GHII not found: ${ghii} (requested by ${requesting_node})`);
                 res.status(401).json(error(config.nodeId, 'FEDERATION_AUTH_FAILED', 'Authentication failed'));
                 return;
             }
 
             if (!ghiiRecord.passwordHash) {
+                logger.warn(`Federation auth: no password hash for ${ghii} (requested by ${requesting_node})`);
                 res.status(401).json(error(config.nodeId, 'FEDERATION_AUTH_FAILED', 'Authentication failed'));
                 return;
             }
@@ -78,6 +79,7 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage): Ro
             // --- Verify password ---
             const valid = await verifyPassword(password, ghiiRecord.passwordHash);
             if (!valid) {
+                logger.warn(`Federation auth: password mismatch for ${ghii} (requested by ${requesting_node})`);
                 res.status(401).json(error(config.nodeId, 'FEDERATION_AUTH_FAILED', 'Authentication failed'));
                 return;
             }

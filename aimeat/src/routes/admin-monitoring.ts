@@ -158,9 +158,9 @@ export function adminMonitoringRouter(
             const targetNodeId = targetInfo.node_id ?? targetUrl;
 
             if (remoteStatus === 'auto_approved') {
-                completeJoin(targetUrl, targetNodeId, publicKey, config, storage, peers);
+                completeJoin(targetUrl, targetNodeId, config, storage, peers);
             } else {
-                pollForApprovalAndComplete(targetUrl, targetNodeId, requestId, publicKey, config, storage, peers);
+                pollForApprovalAndComplete(targetUrl, targetNodeId, requestId, config, storage, peers);
             }
         } catch (e) {
             res.status(502).json(error(config.nodeId, 'INTRODUCTION_FAILED',
@@ -410,7 +410,6 @@ export function adminMonitoringRouter(
 async function completeJoin(
     targetUrl: string,
     targetNodeId: string,
-    targetPublicKey: string,
     config: AimeatConfig,
     storage: Storage,
     peers?: Map<string, PeerInfo>,
@@ -419,7 +418,7 @@ async function completeJoin(
     const newPeer: PeerInfo = {
         nodeId: targetNodeId,
         url: targetUrl,
-        publicKey: targetPublicKey,
+        publicKey: '',
         status: 'active',
         addedAt: now,
         lastSeen: now,
@@ -435,8 +434,12 @@ async function completeJoin(
     await storage.saveFederationPeer(newPeer);
 
     const result = await performKeyExchange(targetUrl, config, storage);
-    if (result.success) {
+    if (result.success && result.peerPublicKey) {
+        newPeer.publicKey = result.peerPublicKey;
+        await storage.saveFederationPeer(newPeer);
         logger.info(`Join complete: peer ${targetNodeId} added and keys exchanged`);
+    } else if (result.success) {
+        logger.info(`Join complete: peer ${targetNodeId} added (no public key received)`);
     } else {
         logger.warn(`Join: peer ${targetNodeId} saved but key exchange failed: ${result.error}`);
     }
@@ -448,7 +451,6 @@ function pollForApprovalAndComplete(
     targetUrl: string,
     targetNodeId: string,
     requestId: string,
-    targetPublicKey: string,
     config: AimeatConfig,
     storage: Storage,
     peers?: Map<string, PeerInfo>,
@@ -473,7 +475,7 @@ function pollForApprovalAndComplete(
             if (status === 'approved' || status === 'auto_approved') {
                 clearInterval(timer);
                 logger.info(`Join request ${requestId} approved by ${targetNodeId}`);
-                await completeJoin(targetUrl, targetNodeId, targetPublicKey, config, storage, peers);
+                await completeJoin(targetUrl, targetNodeId, config, storage, peers);
             } else if (status === 'rejected') {
                 clearInterval(timer);
                 logger.info(`Join request ${requestId} rejected by ${targetNodeId}`);

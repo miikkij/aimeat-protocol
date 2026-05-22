@@ -64,7 +64,7 @@ export async function performKeyExchange(
     peerUrl: string,
     config: AimeatConfig,
     storage: Storage,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; peerPublicKey?: string }> {
     try {
         const nodeKey = await storage.getNodeKey();
         if (!nodeKey) {
@@ -129,7 +129,7 @@ export async function performKeyExchange(
             ttlMinutes: config.keyCacheRefreshMinutes,
         });
 
-        return { success: true };
+        return { success: true, peerPublicKey: peerData.node_public_key };
     } catch (err) {
         const msg = err instanceof Error ? err.message : 'unknown error';
         logger.warn(`Key exchange failed with ${peerUrl}: ${msg}`);
