@@ -706,6 +706,12 @@ export function ComponentDetail({ component, project, components, projectId, int
                 try {
                   const parsed = JSON.parse(specResult);
                   await saveSpec(projectId, component.id, parsed);
+                  // Rebuild code prompt now that the spec is saved
+                  const freshPrompt = await loadPromptFromBackend(projectId, component.id, 'code');
+                  setGeneratedPrompt(freshPrompt);
+                  if (component.prompt) {
+                    await saveComponent(projectId, { ...component, prompt: freshPrompt, spec: parsed });
+                  }
                   showToast?.('Spec saved');
                   onUpdate();
                 } catch (e) {

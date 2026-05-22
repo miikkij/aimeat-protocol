@@ -5,6 +5,7 @@
  * @version-history
  *   v1.0.0 — 2026-03-15 — Initial memory routes
  *   v1.1.0 — 2026-05-22 — Add list-home, list-remote, pull-remote federation endpoints
+ *   v1.2.0 — 2026-05-22 — Add discover and copy endpoints for cross-user public memory
  */
 
 import { Router } from 'express';
@@ -336,6 +337,105 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       total: results.length,
       query: q,
     }));
+  });
+
+  // GET /v1/memory/discover — browse public memory entries across all users on this node
+  router.get('/v1/memory/discover', requireAuth(), async (req, res) => {
+    const prefix = req.query.prefix as string | undefined;
+    const owner = req.query.owner as string | undefined;
+    const q = req.query.q as string | undefined;
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
+    const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+
+    const callerGaii = resolve(req);
+
+    const result = await storage.listAllMemory({
+      prefix: prefix || undefined,
+      ownerPrefix: owner || undefined,
+      visibility: 'public',
+      limit,
+      offset,
+    });
+
+    // Filter out the caller's own entries and apply text search if provided
+    let items = result.items.filter(m => m.ownerGaii !== callerGaii);
+    if (q) {
+      const lq = q.toLowerCase();
+      items = items.filter(m =>
+        m.key.toLowerCase().includes(lq) ||
+        (m.ownerGaii && m.ownerGaii.toLowerCase().includes(lq)) ||
+        (m.tags && m.tags.some(t => t.toLowerCase().includes(lq)))
+      );
+    }
+
+    stats?.increment('memory_discover');
+
+    res.json(success(config.nodeId, {
+      items: items.map(m => ({
+        key: m.key,
+        owner_gaii: m.ownerGaii,
+        visibility: m.visibility,
+        tags: m.tags,
+        version: m.version,
+        created_at: m.createdAt,
+        updated_at: m.updatedAt,
+      })),
+      total: items.length,
+      limit,
+      offset,
+    }));
+  });
+
+  // POST /v1/memory/copy — copy a public memory entry from another user to your own memory
+  router.post('/v1/memory/copy', requireAuth(), requireRole('agent'), requireScope('memory:write'), async (req, res) => {
+    const callerGaii = resolve(req);
+    const { source_gaii, key, visibility: targetVis } = req.body as {
+      source_gaii: string; key: string; visibility?: string;
+    };
+
+    if (!source_gaii || !key) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_gaii and key are required'));
+      return;
+    }
+
+    const sourceRecord = await storage.getMemory(source_gaii, key);
+    if (!sourceRecord || sourceRecord.visibility !== 'public') {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public memory entry not found'));
+      return;
+    }
+
+    const sourceBytes = Buffer.byteLength(JSON.stringify(sourceRecord.value), 'utf8');
+    const quotaCheck = await checkMemoryQuota(config, storage, callerGaii, sourceBytes);
+    if (!quotaCheck.allowed) {
+      res.status(429).json(error(config.nodeId, 'QUOTA_EXCEEDED', quotaCheck.reason!));
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const existing = await storage.getMemory(callerGaii, key);
+    const newVersion = existing ? existing.version + 1 : 1;
+
+    await storage.setMemory({
+      key,
+      ownerGaii: callerGaii,
+      value: sourceRecord.value,
+      visibility: (targetVis as MemoryRecord['visibility']) || 'private',
+      tags: sourceRecord.tags || [],
+      ttlHours: null,
+      version: newVersion,
+      createdAt: existing?.createdAt || now,
+      updatedAt: now,
+    });
+
+    emitResourceUpdated(callerGaii, `aimeat://memory/${encodeURIComponent(key)}`);
+    emitResourceListChanged(callerGaii);
+
+    res.json(success(config.nodeId, {
+      key,
+      copied_from: source_gaii,
+      version: newVersion,
+    }));
+    emitChange('memory');
   });
 
   // ── /v1/memory/pull — Copy a memory entry from home node to local (federated sessions) ──

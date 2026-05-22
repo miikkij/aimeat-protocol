@@ -26,7 +26,7 @@ const log = { info: (m: string) => logger.info(m), warn: (m: string) => logger.w
 // ── Clean TypeScript imports from src/services/generator-prompts/ ──
 // No browser imports, no pathToFileURL hacks, no dynamic import()
 import { buildPrompt, stripCodeblock, createBundle } from './generator-prompts/index.js';
-import { validateComponent } from './generator-prompts/validate.js';
+import { validateComponent, verifyContract } from './generator-prompts/validate.js';
 import { validateExtensionSpec, validateDataApiSpec, validateComponentSpec, validateAppDomainSpec, validateAppSpec, validateSpecAgainstProbe } from './generator-prompts/spec-validate.js';
 import type { PromptRuntimeData, ComponentState, ProbeResult, Blueprint, InterviewSpec } from './generator-prompts/types.js';
 
@@ -367,43 +367,58 @@ export async function runAutopilot(
                 alog.info(`[${cid}] Spec generated: ${(spec as Record<string, unknown>).name as string}`);
 
                 // Validate spec structure — per component type
-                if (compType === 'extension') {
-                  const sv = validateExtensionSpec(spec);
-                  if (!sv.valid) {
-                    alog.warn(`[${cid}] Spec validation issues: ${sv.errors.join('; ')}`);
+                const validateSpec = (): { valid: boolean; errors: string[] } => {
+                  if (!spec) return { valid: false, errors: ['Spec is null'] };
+                  if (compType === 'extension') {
+                    const sv = validateExtensionSpec(spec);
+                    // Also check blueprint action coverage
+                    const specActionIds = new Set(((spec.actions || []) as Array<Record<string, unknown>>).map(a => a.id as string));
+                    const bpActions = Object.keys((blueprint as Record<string, unknown>).dataModel ? ((blueprint as Record<string, unknown>).dataModel as Record<string, unknown>).actions as Record<string, unknown> || {} : {})
+                      .filter(k => k.startsWith('ext:'))
+                      .map(k => k.replace('ext:', '').replace(/^[^/]+\//, ''));
+                    const missingActions = bpActions.filter(a => !specActionIds.has(a));
+                    if (missingActions.length > 0) {
+                      sv.valid = false;
+                      sv.errors.push(...missingActions.map(a => `Blueprint declares action "${a}" but it is missing from the spec`));
+                    }
+                    return sv;
+                  } else if (compType === 'app') {
+                    return validateAppSpec(spec);
+                  } else if (compType === 'cortex') {
+                    const sub = (bpComp?.subtype as string) || '';
+                    return sub === 'data' ? validateDataApiSpec(spec)
+                      : sub === 'component' ? validateComponentSpec(spec)
+                      : sub === 'app-domain' ? validateAppDomainSpec(spec)
+                      : { valid: true, errors: [] as string[] };
                   }
+                  return { valid: true, errors: [] };
+                };
 
-                  // Validate spec has ALL blueprint actions
-                  const specActionIds = new Set(((spec.actions || []) as Array<Record<string, unknown>>).map(a => a.id as string));
-                  const bpActions = Object.keys((blueprint as Record<string, unknown>).dataModel ? ((blueprint as Record<string, unknown>).dataModel as Record<string, unknown>).actions as Record<string, unknown> || {} : {})
-                    .filter(k => k.startsWith('ext:'))
-                    .map(k => k.replace('ext:', '').replace(/^[^/]+\//, ''));
-                  const missingActions = bpActions.filter(a => !specActionIds.has(a));
-                  if (missingActions.length > 0) {
-                    alog.warn(`[${cid}] Spec missing blueprint actions: ${missingActions.join(', ')} — spec will be used but code validator will flag these`);
-                  }
-                } else if (compType === 'app') {
-                  const sv = validateAppSpec(spec);
-                  if (!sv.valid) {
-                    alog.warn(`[${cid}] App spec validation issues: ${sv.errors.join('; ')}`);
-                    if (sv.errors.some(e => e.includes('ASCII'))) {
-                      alog.error(`[${cid}] App spec has non-ASCII name — rejecting. Will retry without spec.`);
+                let sv = validateSpec();
+                if (!sv.valid) {
+                  alog.warn(`[${cid}] Spec validation failed: ${sv.errors.join('; ')} — retrying`);
+                  // Retry: ask LLM to fix the spec
+                  const specFixPrompt = 'Fix the following spec JSON. It has validation errors.\n\n'
+                    + '## Errors\n' + sv.errors.map((e, i) => `${i + 1}. ${e}`).join('\n')
+                    + '\n\n## Current Spec\n```json\n' + JSON.stringify(spec, null, 2) + '\n```\n\n'
+                    + '## Rules\n- Fix ONLY the listed errors\n- Do NOT remove existing fields\n- Return ONLY the COMPLETE fixed JSON, no markdown fences';
+                  const fixedRaw = await callLLM(specFixPrompt);
+                  let fixedText = fixedRaw.trim();
+                  const fixFence = fixedText.match(/```(?:json)?\s*\n([\s\S]*?)```/);
+                  if (fixFence) fixedText = fixFence[1].trim();
+                  try {
+                    spec = JSON.parse(fixedText) as Record<string, unknown>;
+                    sv = validateSpec();
+                    if (sv.valid) {
+                      alog.info(`[${cid}] Spec fix succeeded`);
+                      debug.writeArtifact(cid, 'spec-fixed', JSON.stringify(spec, null, 2)).catch(() => {});
+                    } else {
+                      alog.error(`[${cid}] Spec fix still invalid: ${sv.errors.join('; ')} — continuing without spec`);
                       spec = null;
                     }
-                  }
-                } else if (compType === 'cortex') {
-                  const sub = (bpComp?.subtype as string) || '';
-                  const sv = sub === 'data' ? validateDataApiSpec(spec)
-                    : sub === 'component' ? validateComponentSpec(spec)
-                    : sub === 'app-domain' ? validateAppDomainSpec(spec)
-                    : { valid: true, errors: [] as string[] };
-                  if (!sv.valid) {
-                    alog.warn(`[${cid}] Spec validation issues: ${sv.errors.join('; ')}`);
-                    // If name is non-ASCII, reject the spec entirely — it will break registration and tests
-                    if (sv.errors.some(e => e.includes('ASCII'))) {
-                      alog.error(`[${cid}] Spec has non-ASCII name — rejecting. Will retry without spec.`);
-                      spec = null;
-                    }
+                  } catch {
+                    alog.error(`[${cid}] Spec fix JSON parse failed — continuing without spec`);
+                    spec = null;
                   }
                 }
               } catch {
@@ -510,6 +525,37 @@ export async function runAutopilot(
           entry.status.progress.failed++;
           entry.status.componentResults.push({ id: cid, label: compLabel, status: 'validation_failed', error: vr.errors[0] });
           break; // STOP — downstream components depend on this one
+        }
+
+        // ── CONTRACT VERIFICATION ──
+        const bpCompForContract = ((blueprint.components as Array<Record<string, unknown>>) || [])
+          .find((c: Record<string, unknown>) => c.label === compLabel || c.id === cid);
+        if (bpCompForContract) {
+          const cr = verifyContract(compType, content, bpCompForContract as unknown as import('./generator-prompts/types.js').BlueprintComponent, blueprint as unknown as import('./generator-prompts/types.js').Blueprint);
+          if (!cr.valid) {
+            alog.warn(`[${cid}] Contract mismatches: ${cr.mismatches.join('; ')}`);
+            // Attempt one fix round with contract errors
+            const contractFixPrompt = await buildPrompt(storage, 'gen-fix', {
+              blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec,
+              originalPrompt: prompt, code: content,
+              errors: cr.mismatches.map(m => `Contract: ${m}`),
+              componentType: compType,
+            } as unknown as PromptRuntimeData);
+            let fixedContent = await callLLM(contractFixPrompt);
+            if (compType !== 'cortex') fixedContent = stripCodeblock(fixedContent);
+            const fixVr = validateComponent(compType, fixedContent, blueprint as unknown as Blueprint);
+            if (fixVr.valid) {
+              const fixCr = verifyContract(compType, fixedContent, bpCompForContract as unknown as import('./generator-prompts/types.js').BlueprintComponent, blueprint as unknown as import('./generator-prompts/types.js').Blueprint);
+              if (fixCr.valid) {
+                content = fixedContent;
+                alog.info(`[${cid}] Contract fix succeeded`);
+              } else {
+                alog.warn(`[${cid}] Contract fix still has mismatches — proceeding with original: ${fixCr.mismatches.join('; ')}`);
+              }
+            } else {
+              alog.warn(`[${cid}] Contract fix broke validation — proceeding with original`);
+            }
+          }
         }
 
         // ── REGISTER ──
@@ -635,6 +681,38 @@ export async function runAutopilot(
           entry.status.progress.failed++;
           entry.status.componentResults.push({ id: cid, label: compLabel, status: 'registration_failed', error: (regErr as Error).message });
           break; // STOP — downstream components depend on this one
+        }
+
+        // ── SMOKE TEST ──
+        if (['extension', 'cortex', 'app'].includes(compType) && comp.registeredAs) {
+          try {
+            if (compType === 'extension') {
+              const smokeResp = await internalFetch(config, `/v1/extensions/${encodeURIComponent(comp.registeredAs as string)}/activate`, jwt, { method: 'POST' });
+              if (!smokeResp.ok) {
+                alog.warn(`[${cid}] Smoke test failed: extension activation error (${smokeResp.status})`);
+              } else {
+                alog.info(`[${cid}] Smoke test passed: extension activates`);
+              }
+            } else if (compType === 'cortex') {
+              const libUrl = `/v1/cortex/${encodeURIComponent(comp.registeredAs as string)}/libs/${encodeURIComponent(comp.registeredAs as string)}.js`;
+              const smokeResp = await internalFetch(config, libUrl, jwt, { method: 'GET' });
+              if (!smokeResp.ok) {
+                alog.warn(`[${cid}] Smoke test failed: cortex lib not accessible (${smokeResp.status})`);
+              } else {
+                alog.info(`[${cid}] Smoke test passed: cortex lib accessible`);
+              }
+            } else if (compType === 'app') {
+              const appUrl = `/v1/apps/${encodeURIComponent(ownerGhii.split('@')[0])}/${encodeURIComponent(comp.registeredAs as string)}`;
+              const smokeResp = await internalFetch(config, appUrl, jwt, { method: 'GET' });
+              if (!smokeResp.ok) {
+                alog.warn(`[${cid}] Smoke test failed: app not accessible (${smokeResp.status})`);
+              } else {
+                alog.info(`[${cid}] Smoke test passed: app accessible`);
+              }
+            }
+          } catch (e) {
+            alog.warn(`[${cid}] Smoke test error: ${(e as Error).message}`);
+          }
         }
 
         // ── ACTIVATE EXTENSION ──

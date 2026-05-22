@@ -6,6 +6,7 @@
  *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS utility classes
  *   v1.1.0 — 2026-03-18 — Fix: use AuthImage for thumbnails and authenticated download to avoid 401
  *   v1.2.0 — 2026-05-22 — Add Browse Home / Browse Remote panels for federation memory sync
+ *   v1.3.0 — 2026-05-22 — Add timestamps, sort controls, fix group picker rotation bug
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -52,6 +53,13 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const [browseLoading, setBrowseLoading] = useState(false);
   const [browseError, setBrowseError] = useState(null);
   const [pullingKeys, setPullingKeys] = useState(new Set());
+  const [sortBy, setSortBy] = useState('updated');
+  const [discoverEntries, setDiscoverEntries] = useState(null);
+  const [discoverLoading, setDiscoverLoading] = useState(false);
+  const [discoverError, setDiscoverError] = useState(null);
+  const [discoverSearch, setDiscoverSearch] = useState('');
+  const [copyingKeys, setCopyingKeys] = useState(new Set());
+  const [expandedDiscover, setExpandedDiscover] = useState(null);
 
   useEffect(() => {
     if (session) { loadAgents(); loadMemories(); loadFiles(); loadFedConsents(); loadGroups(); }
@@ -288,6 +296,35 @@ export default function MemoryTab({ session, showToast, onStats }) {
     }
   }
 
+  function formatRelativeTime(isoStr) {
+    if (!isoStr) return '';
+    const d = new Date(isoStr);
+    const now = Date.now();
+    const diff = now - d.getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return t('profile.memory.timeJustNow');
+    if (mins < 60) return t('profile.memory.timeMinsAgo').replace('{n}', mins);
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return t('profile.memory.timeHoursAgo').replace('{n}', hrs);
+    const days = Math.floor(hrs / 24);
+    if (days < 30) return t('profile.memory.timeDaysAgo').replace('{n}', days);
+    return d.toLocaleDateString();
+  }
+
+  function sortEntries(entries) {
+    const sorted = [...entries];
+    switch (sortBy) {
+      case 'updated':
+        return sorted.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
+      case 'created':
+        return sorted.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      case 'alpha':
+        return sorted.sort((a, b) => a.key.localeCompare(b.key));
+      default:
+        return sorted;
+    }
+  }
+
   const renderEntries = () => {
     const searchRef = useRef(null);
     if (!memories) return html`<${Spinner} text=${t('profile.memory.loading')} />`;
@@ -298,9 +335,11 @@ export default function MemoryTab({ session, showToast, onStats }) {
       if (m.tags) for (const tag of m.tags) allMemTags.add(tag);
     }
 
-    // Filter by selected tags
-    const filtered = memTagFilter.size === 0 ? memories : memories.filter(m =>
-      m.tags && [...memTagFilter].every(tag => m.tags.includes(tag))
+    // Filter by selected tags, then sort
+    const filtered = sortEntries(
+      memTagFilter.size === 0 ? memories : memories.filter(m =>
+        m.tags && [...memTagFilter].every(tag => m.tags.includes(tag))
+      )
     );
 
     const toggleMemTag = (tag) => {
@@ -318,6 +357,14 @@ export default function MemoryTab({ session, showToast, onStats }) {
           <button class="btn-sm" onClick=${() => handleSearch(searchRef.current?.value)}>${t('profile.memory.searchBtn')}</button>
           <button class="btn-outline btn-sm" onClick=${() => { if (searchRef.current) searchRef.current.value = ''; loadMemories(); }}>${t('profile.memory.clearBtn')}</button>
         </div>
+        <div class="mem-sort-bar">
+          <label class="text-meta-sm">${t('profile.memory.sortLabel')}</label>
+          <select class="input-field mem-sort-select" value=${sortBy} onChange=${e => setSortBy(e.target.value)}>
+            <option value="updated">${t('profile.memory.sortUpdated')}</option>
+            <option value="created">${t('profile.memory.sortCreated')}</option>
+            <option value="alpha">${t('profile.memory.sortAlpha')}</option>
+          </select>
+        </div>
         <button class="btn-primary" onClick=${() => setShowMemForm(!showMemForm)}>${t('profile.memory.newBtn')}</button>
       </div>
       <${TagCloud} tags=${[...allMemTags]} selected=${memTagFilter} onToggle=${toggleMemTag} onClear=${() => setMemTagFilter(new Set())} />
@@ -328,6 +375,9 @@ export default function MemoryTab({ session, showToast, onStats }) {
           <div>
             <div class="mem-item" onClick=${() => setExpandedMem(expandedMem === m.key ? null : m.key)}>
               <span class="mem-key">${escHtml(m.key)}</span>
+              <span class="mem-time" title="${m.created_at ? new Date(m.created_at).toLocaleString() : ''} / ${m.updated_at ? new Date(m.updated_at).toLocaleString() : ''}">
+                ${formatRelativeTime(m.updated_at || m.created_at)}
+              </span>
               ${(() => {
                 const vis = m.visibility || 'private';
                 const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % cycleVis.length];
@@ -352,7 +402,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
                     }}>${g.name} (${g.members?.length || 0} ${t('profile.access.sharingGroups.members')})</button>
                   `)
                 }
-                <button class="btn-outline btn-sm mt-xs" onClick=${() => { setGroupPickerFor(null); }}>${t('profile.memory.cancelBtn')}</button>
+                <button class="btn-outline btn-sm mt-xs" onClick=${() => { setGroupPickerFor(null); handleUpdateVisibility(m.key, 'public', m.version); }}>${t('profile.memory.skipGroup')}</button>
               </div>
             `}
             ${expandedMem === m.key && html`
@@ -602,14 +652,115 @@ export default function MemoryTab({ session, showToast, onStats }) {
     });
   }
 
+  async function loadDiscoverEntries(query) {
+    setDiscoverLoading(true);
+    setDiscoverError(null);
+    setDiscoverEntries(null);
+    setExpandedDiscover(null);
+    try {
+      const result = await memoryService.discoverPublicMemories({ q: query || undefined, limit: 100 });
+      setDiscoverEntries(result.items || []);
+    } catch (e) {
+      setDiscoverError(e.message || t('profile.error'));
+      setDiscoverEntries([]);
+    } finally { setDiscoverLoading(false); }
+  }
+
+  function initDiscover() {
+    setBrowseMode('discover');
+    loadDiscoverEntries('');
+  }
+
+  async function handleCopyEntry(ownerGaii, key) {
+    setCopyingKeys(prev => new Set([...prev, key]));
+    try {
+      const resp = await memoryService.copyPublicMemory(ownerGaii, key, 'private');
+      if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
+      showToast(t('profile.memory.discoverCopied'));
+      loadMemories();
+    } catch (e) {
+      showToast(e.message || t('profile.error'), true);
+    } finally {
+      setCopyingKeys(prev => { const n = new Set(prev); n.delete(key); return n; });
+    }
+  }
+
   function closeBrowse() {
     setBrowseMode(null);
     setRemoteEntries(null);
     setSelectedPeer('');
+    setDiscoverEntries(null);
+    setDiscoverSearch('');
+    setExpandedDiscover(null);
   }
 
   const renderBrowsePanel = () => {
     if (!browseMode) return null;
+
+    if (browseMode === 'discover') {
+      return html`
+        <div class="mem-browse-panel">
+          <div class="mem-browse-header">
+            <div>
+              <div class="section-title">${t('profile.memory.discoverTitle')}</div>
+              <div class="section-desc">${t('profile.memory.discoverDesc')}</div>
+            </div>
+            <button class="btn-outline btn-sm" onClick=${closeBrowse}>${t('profile.memory.cancelBtn')}</button>
+          </div>
+          <div class="mem-discover-search mb-half">
+            <input type="text" class="input-field" placeholder=${t('profile.memory.discoverSearchPlaceholder')}
+              value=${discoverSearch}
+              onInput=${e => setDiscoverSearch(e.target.value)}
+              onKeyDown=${e => e.key === 'Enter' && loadDiscoverEntries(discoverSearch)} />
+            <button class="btn-sm" onClick=${() => loadDiscoverEntries(discoverSearch)}>${t('profile.memory.searchBtn')}</button>
+          </div>
+
+          ${discoverLoading && html`<${Spinner} text=${t('profile.memory.discoverLoading')} />`}
+
+          ${discoverError && !discoverLoading && html`
+            <div class="alert alert-warning"><span class="alert-msg">${discoverError}</span></div>
+          `}
+
+          ${discoverEntries && !discoverLoading && !discoverError && html`
+            <div class="mb-half text-meta">
+              ${t('profile.memory.discoverCount').replace('{count}', discoverEntries.length)}
+            </div>
+            ${discoverEntries.length === 0
+              ? html`<div class="empty">${t('profile.memory.discoverEmpty')}</div>`
+              : html`<div class="mem-browse-list">
+                  ${discoverEntries.map(entry => {
+                    const ownerShort = entry.owner_gaii?.split('@')[0] || entry.owner_gaii;
+                    const isExpanded = expandedDiscover === entry.owner_gaii + '/' + entry.key;
+                    return html`
+                      <div key=${entry.owner_gaii + '/' + entry.key} class="mem-discover-item">
+                        <div class="mem-discover-row" onClick=${() => setExpandedDiscover(isExpanded ? null : entry.owner_gaii + '/' + entry.key)}>
+                          <div class="mem-discover-info">
+                            <div class="mem-browse-key" title=${entry.key}>${escHtml(entry.key)}</div>
+                            <div class="mem-discover-owner">${escHtml(ownerShort)}</div>
+                          </div>
+                          <div class="mem-browse-meta">
+                            ${entry.tags?.length > 0 && html`<span class="text-meta-sm mem-browse-tags" title=${entry.tags.join(', ')}>${entry.tags.join(', ')}</span>`}
+                            <span class="mem-time">${formatRelativeTime(entry.updated_at || entry.created_at)}</span>
+                          </div>
+                          <button class="btn-primary btn-sm"
+                            disabled=${copyingKeys.has(entry.key)}
+                            onClick=${(e) => { e.stopPropagation(); handleCopyEntry(entry.owner_gaii, entry.key); }}>
+                            ${copyingKeys.has(entry.key) ? '...' : t('profile.memory.discoverCopy')}
+                          </button>
+                        </div>
+                        ${isExpanded && html`
+                          <${DiscoverPreview} ownerGaii=${entry.owner_gaii} memKey=${entry.key} />
+                        `}
+                      </div>
+                    `;
+                  })}
+                </div>`
+            }
+          `}
+        </div>
+      `;
+    }
+
     const isHome = browseMode === 'home';
     const title = isHome ? t('profile.memory.browseHome') : t('profile.memory.browseRemote');
     const desc = isHome ? t('profile.memory.browseHomeDesc') : t('profile.memory.browseRemoteDesc');
@@ -682,22 +833,24 @@ export default function MemoryTab({ session, showToast, onStats }) {
     <div class="section-title">${t('profile.memory.title')}</div>
     <div class="section-desc">${t('profile.memory.desc')}</div>
 
-    ${session.federated && html`
-      <div class="alert alert-info">
-        <span class="alert-msg">${t('profile.memory.federatedSession')}</span>
-      </div>
-      <div class="mb-1">
-        <button class="btn-primary btn-sm" onClick=${loadBrowseHome}>
+    <div class="mem-browse-buttons mb-1">
+      <button class="btn-outline btn-sm" onClick=${initDiscover}>
+        ${t('profile.memory.discoverTitle')}
+      </button>
+      ${session.federated && html`
+        <button class="btn-outline btn-sm" onClick=${loadBrowseHome}>
           ${t('profile.memory.browseHome')}
         </button>
-      </div>
-    `}
-
-    ${!session.federated && html`
-      <div class="mb-1">
+      `}
+      ${!session.federated && html`
         <button class="btn-outline btn-sm" onClick=${initBrowseRemote}>
           ${t('profile.memory.browseRemote')}
         </button>
+      `}
+    </div>
+    ${session.federated && html`
+      <div class="alert alert-info mb-half">
+        <span class="alert-msg">${t('profile.memory.federatedSession')}</span>
       </div>
     `}
 
@@ -730,6 +883,26 @@ export default function MemoryTab({ session, showToast, onStats }) {
       onCancel=${() => setEditModal(null)} />`}
     <${ConfirmUI} />
   `;
+}
+
+function DiscoverPreview({ ownerGaii, memKey }) {
+  const [value, setValue] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+  useEffect(() => {
+    setLoading(true);
+    const url = getNodeUrl() + '/v1/memory/' + encodeURIComponent(ownerGaii) + '/' + encodeURIComponent(memKey);
+    fetch(url).then(r => r.json()).then(res => {
+      if (res.ok) setValue(res.data.value);
+      else setErr(res.error?.message || 'Not found');
+    }).catch(e => setErr(e.message)).finally(() => setLoading(false));
+  }, [ownerGaii, memKey]);
+
+  if (loading) return html`<div class="mem-discover-preview"><span class="text-meta-sm">...</span></div>`;
+  if (err) return html`<div class="mem-discover-preview"><span class="text-meta-sm" style="color:var(--danger)">${err}</span></div>`;
+  const text = typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value || '');
+  const truncated = text.length > 2000 ? text.slice(0, 2000) + '\n...' : text;
+  return html`<div class="mem-discover-preview"><pre>${truncated}</pre></div>`;
 }
 
 function MemoryForm({ onSave, onCancel, groups }) {
@@ -930,7 +1103,7 @@ function EditMemoryModal({ memKey, initialValue, initialVisibility, initialVersi
               ${(groups || []).map(g => html`<option value=${g.id}>${g.name}</option>`)}
             </select>
             ${(groups || []).length === 0 && html`<div class="text-meta-sm">${t('profile.memory.noGroups')}</div>`}
-            <button class="btn-outline btn-sm mt-xs" onClick=${() => setShowGroupSelect(false)}>${t('profile.memory.cancelBtn')}</button>
+            <button class="btn-outline btn-sm mt-xs" onClick=${() => { setVis('public'); setShowGroupSelect(false); setGroupId(''); }}>${t('profile.memory.skipGroup')}</button>
           </div>
         `}
         <textarea class="input-field" rows="6" value=${value} onInput=${e => setValue(e.target.value)}></textarea>

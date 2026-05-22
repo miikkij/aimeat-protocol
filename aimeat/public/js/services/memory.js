@@ -140,3 +140,25 @@ export async function listRemoteMemories(peerNodeId) {
 export async function pullFromRemote(peerNodeId, key) {
   return apiPost('/v1/memory/pull-remote', { peer_node_id: peerNodeId, key });
 }
+
+/** Discover public memory entries from other users on this node. */
+export async function discoverPublicMemories(opts = {}) {
+  const params = new URLSearchParams();
+  if (opts.prefix) params.set('prefix', opts.prefix);
+  if (opts.owner) params.set('owner', opts.owner);
+  if (opts.q) params.set('q', opts.q);
+  if (opts.limit) params.set('limit', String(opts.limit));
+  if (opts.offset) params.set('offset', String(opts.offset));
+  const qs = params.toString();
+  const data = await apiGet('/v1/memory/discover' + (qs ? '?' + qs : ''));
+  return data?.data || { items: [], total: 0 };
+}
+
+/** Copy a public memory entry from another user to your own memory. */
+export async function copyPublicMemory(sourceGaii, key, visibility) {
+  return apiPost('/v1/memory/copy', {
+    source_gaii: sourceGaii,
+    key,
+    visibility: visibility || 'private',
+  });
+}

@@ -4434,6 +4434,86 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /v1/memory/discover:
+    get:
+      operationId: discoverPublicMemory
+      summary: Discover public memory entries
+      description: |
+        Browse public memory entries shared by other users on this node.
+        Returns entries with visibility 'public' from all users except the caller.
+        Supports text search across keys, owners, and tags.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Search query (matches key, owner GAII, or tags)
+        - name: prefix
+          in: query
+          schema:
+            type: string
+          description: Filter by key prefix
+        - name: owner
+          in: query
+          schema:
+            type: string
+          description: Filter by owner GAII prefix
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/memory/copy:
+    post:
+      operationId: copyPublicMemory
+      summary: Copy a public memory entry
+      description: |
+        Copy a public memory entry from another user to your own memory.
+        The source entry must have visibility 'public'. The copy is stored
+        with the specified visibility (defaults to 'private').
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_gaii, key]
+              properties:
+                source_gaii:
+                  type: string
+                  description: GAII of the source entry owner
+                key:
+                  type: string
+                  description: Memory key to copy
+                visibility:
+                  type: string
+                  enum: [private, owner, group, public]
+                  default: private
+                  description: Visibility for the copied entry
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/memory/pull:
     post:
       operationId: memoryPull
