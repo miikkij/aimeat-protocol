@@ -66,6 +66,7 @@ const ALL_SUITES = [
     'test/e2e-agent-directives.ts',
     'test/e2e-agent-messages.ts',
     'test/e2e-agent-services.ts',
+    'test/e2e-prompt-modules.ts',
     'test/e2e-integration-kit.ts',
 ];
 
