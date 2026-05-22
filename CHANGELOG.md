@@ -2,6 +2,55 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.8.0] - 2026-05-22
+
+### Added
+
+#### Tier 1 Multi-Module Prompt System
+- **Bootloader rewrite** -- tier-1 prompt rewritten as a lightweight bootloader that loads capability-specific modules on demand instead of one monolithic prompt. Reduces initial payload and lets agents load only what they need.
+- **7 module prompt seeds** -- `memory`, `tasks`, `messaging`, `knowledge`, `wallet`, `work-exchange`, `extensions` as separate loadable modules stored in the prompt system.
+- **Modular route** -- `GET /v1/prompts/tier1/:module` serves individual modules so agents can fetch capabilities incrementally.
+- **Bootloader watchdog** -- enforces propose-first workflow where agents must propose actions before executing them.
+- **E2E test suite** -- dedicated test suite for the tier1 module system.
+
+#### Federation Enhancements
+- **Schema-based auth policy** -- federation tab and peer routes updated to support structured auth policy configuration with federated auth scopes.
+- **Peer re-introduction** -- depeered or offline nodes can be re-introduced without re-creating the peering from scratch.
+- **Key exchange improvements** -- peer public key included in exchange process, streamlined join functions.
+- **Federated memory UI** -- enhanced browsing and interaction for federated memory across peers.
+- **Peering request management** -- confirmation and deletion flows for peering requests.
+
+#### Memory Discovery
+- **Discover and copy public memory** -- new endpoints for discovering public memory entries across identities and copying them to the caller's own namespace.
+
+#### Agent Capabilities Schema
+- **`modulesLoaded` field** -- tracks which tier1 modules an agent has loaded, visible in capabilities reporting and admin views.
+- **`agentLimitations` field** -- agents can self-report operational limitations (context window, rate limits, etc.).
+
+#### Generator Autopilot Improvements
+- **Contract verification** -- autopilot now runs `verifyContract()` after code validation, checking generated output against blueprint actions, exported methods, and cortex references. Attempts one fix round on mismatch.
+- **Blocking spec validation** -- spec validation failures now trigger a retry with error context instead of silently proceeding with a broken spec. Blueprint action coverage is enforced as part of validation.
+- **Smoke test after registration** -- quick accessibility check (extension activates, cortex lib loads, app HTML serves) runs immediately after registration to catch deployment failures early.
+- **App spec validator** -- new `validateAppSpec()` function validates app-type specs (name, title, appDomainLib, cortexDependencies) instead of falling through to the wrong validator.
+
+### Fixed
+- **Message timestamps and ordering** -- messages now show timestamps and sort oldest-first (chat-style chronological order).
+- **Task telemetry accumulation** -- telemetry counters now accumulate across task events instead of being overwritten on each event.
+- **Propose-first task workflow** -- agents must propose tasks before the owner approves them; todo UI rendering corrected for this flow.
+- **Agent PATCH on queued tasks** -- agents can now update todos on tasks that are still in queued status.
+- **Tier1 module field corrections** -- 39 field name and schema errors corrected across all 7 module prompts (3 audit passes).
+- **Spec UI prompt refresh** -- saving a spec now immediately rebuilds the code generation prompt so it includes the spec. Previously required clicking "Copy Prompt" twice.
+
+### Changed
+- **Sharing group member resolution** -- member identifiers in sharing groups now resolve correctly against GHII/GAII identity formats.
+- **Sharing group default permissions** -- groups support editing default read/write permissions for new members.
+- **Agent instructions** -- updated operational clarity in agent prompts, added llms.txt reference to bootloader.
+- **Wallet UI** -- ownership clarification text added to wallet display.
+- **Memory browsing errors** -- user-facing error messages added for memory browsing failures.
+
+### i18n
+- New translation keys in both `en.json` and `fi.json` for federation peering, memory browsing errors, wallet ownership, and agent limitations.
+
 ## [1.7.0] - 2026-05-22
 
 ### Added -- Agent Dashboard (3 phases, 7 features, ~15,000 lines across 113 files)
