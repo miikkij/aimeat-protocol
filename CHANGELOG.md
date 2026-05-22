@@ -2,6 +2,94 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.7.0] - 2026-05-22
+
+### Added -- Agent Dashboard (3 phases, 7 features, ~15,000 lines across 113 files)
+
+Complete per-agent management dashboard with task queues, directives, sharing groups, capabilities, activity monitoring, offered services, and messaging -- all accessible from the profile Agents tab.
+
+#### Agent Tasks (Phase 1)
+- **Task queue per agent** -- create, assign, start, complete, fail tasks with full lifecycle management. Each task tracks status (`queued`/`active`/`completed`/`failed`), priority, deadline, and event log.
+- **Task creation builder** -- frontend form with title, description, priority, and deadline fields.
+- **Task stall detection** -- background job flags active tasks with no events past a configurable threshold (`AIMEAT_TASK_STALL_THRESHOLD_MINUTES`).
+- **Work-to-task bridge** -- automatically creates an `AgentTask` when an agent accepts a work exchange item, linking the two systems.
+- **Task event logging** -- every lifecycle transition (start, complete, fail, stall) is recorded as a timestamped event with optional metadata.
+- **7 MCP tools** -- `agent_task_create`, `agent_task_list`, `agent_task_get`, `agent_task_start`, `agent_task_complete`, `agent_task_fail`, `agent_task_event`.
+- **Admin agent tasks tab** -- operator view of all tasks across all agents with status badges.
+
+#### Agent Directives (Phase 1)
+- **Three-layer directive inheritance** -- System (operator-set via admin dashboard), Owner (user-set via access tab), and Agent (per-agent in detail view). Merged view shows effective directives with source labels.
+- **System configuration fields** -- `agentSystemPrinciples`, `agentMaxTokensPerTask`, `agentMandatoryLogging`, `agentAimeatFirstEnabled` configurable via admin dashboard and `.env`.
+- **Tier1 prompt extended** -- downloaded agent instructions now include directives and task handling sections.
+
+#### Sharing Groups (Phase 1)
+- **Group-based memory visibility** -- new `group` visibility level extends `private|owner|public`. Memory entries with `visibility: 'group'` are readable only by group members.
+- **Group CRUD** -- create, update, delete groups with per-member GAII/GHII read/write permissions.
+- **Consent integration** -- `checkConsentForRead()` extended with group visibility branch.
+- **Memory tab group picker** -- visibility cycle extended to 4 states; popup for selecting target group.
+- **Access tab sections** -- sharing groups management and agent directive defaults in the access tab.
+- **Admin sharing groups tab** -- operator view of all groups across all owners.
+- **5 MCP tools** -- `sharing_group_create`, `sharing_group_list`, `sharing_group_get`, `sharing_group_update`, `sharing_group_delete`.
+
+#### Agent Capabilities (Phase 2)
+- **Technical + domain capabilities** -- agents report their technical capabilities (languages, frameworks, APIs) and domain skills via `PUT /v1/agents/:name/capabilities`.
+- **MCP-type verification** -- capabilities reported by agent sessions are verified against actual MCP tool availability.
+- **Capabilities sub-tab** -- displays technical skills, domain skills, and action queue in the agent detail view.
+- **2 MCP tools** -- `capabilities_report`, `agent_activity`.
+
+#### Activity Monitoring (Phase 2)
+- **Embedded activity counters** -- `tasksCompleted`, `tasksFailed`, `messagesProcessed`, `lastActiveAt` on AgentRecord, updated on every task lifecycle event.
+- **Time-series activity table** -- `agent_activity` stores metric/value/timestamp rows for historical charts.
+- **Activity recorder service** -- records task events to the time-series table automatically.
+- **Activity sub-tab** -- stats cards, CSS bar chart (no external charting library), scheduled jobs list, and scrollable event log.
+- **REST endpoints** -- `GET /v1/agents/:name/activity/stats`, `/activity/history`, `/activity/log`.
+
+#### Offered Services (Phase 3)
+- **Services sub-tab** -- displays published actions (services) offered by the agent on the work exchange, with name, description, cost, visibility, call count, success rate, and average response time.
+- **Unpublish button** -- remove a service from the exchange directly from the dashboard.
+
+#### Agent Messages (Phase 3)
+- **Message CRUD with thread support** -- `POST/GET /v1/agents/:name/messages` with optional `threadId` for conversation threading.
+- **Chat UI** -- message bubbles (inbound/outbound), auto-scroll, textarea with Enter-to-send.
+- **Proposed task handling** -- inbound messages with `metadata.proposedTask` render inline with "Create Task" and "Adjust" buttons.
+- **Status bar** -- online/offline indicator, inbox/delivered/error counters.
+- **Thread selector** -- horizontal thread navigation buttons.
+- **Inbox integration** -- pending messages included in the agent integration kit inbox endpoint.
+- **2 MCP tools** -- `message_inbox`, `message_send`.
+- **Tier1 prompt extended** -- message handling instructions added to downloadable agent specs.
+
+#### Agent Detail View (cross-phase)
+- **6 sub-tabs** -- Tasks, Directives, Capabilities, Activity, Services, Messages. Tab navigation within agent detail.
+- **Shortened connection prompt** -- buildAgentPrompt() reduced to 10 lines (Telegram-safe). Full instructions available via Download/Copy buttons.
+- **Agent Integration Kit** -- consolidated inbox endpoint (`GET /v1/agents/:name/inbox`) returns pending tasks, messages, and directives in one call. Long-poll support for real-time agents.
+- **Live updates** -- all sub-tabs listen for SSE `aimeat-live-update` events and refresh automatically.
+
+#### Admin Integration
+- **Peer management in admin monitoring** -- admin monitoring tab extended with peer status tracking and routing controls.
+
+### Storage
+- **7 new SQLite tables** -- `agent_tasks`, `agent_task_events`, `agent_directives`, `owner_agent_defaults`, `sharing_groups`, `agent_activity`, `agent_messages`.
+- **7 new Prisma models** -- matching MongoDB implementations for all tables.
+- **6 new repository interfaces** -- `AgentTaskRepository`, `AgentDirectivesRepository`, `SharingGroupRepository`, `AgentActivityRepository`, `AgentMessageRepository`, plus capability extensions on `AgentRepository`.
+- **Storage interface extended** -- `AgentTaskRecord`, `AgentDirectivesRecord`, `SharingGroupRecord`, `AgentMessageRecord`, `AgentActivityRecord`, `AgentActivityStats`, `AgentTechnicalCapability` types added.
+
+### Tests
+- **8 new E2E test suites, 109+ tests** covering all features on both SQLite and MongoDB:
+  - `e2e-agent-tasks.ts` (19 tests) -- task CRUD, lifecycle, stall detection, events
+  - `e2e-agent-directives.ts` (12 tests) -- three-layer inheritance, merge view
+  - `e2e-sharing-groups.ts` (23 tests) -- group CRUD, member permissions, memory visibility
+  - `e2e-integration-kit.ts` (15 tests) -- inbox, task lifecycle, kit endpoint, long-poll
+  - `e2e-agent-capabilities.ts` (8 tests) -- capability reporting, MCP verification
+  - `e2e-agent-activity.ts` (10 tests) -- stats, history, log, recorder
+  - `e2e-agent-messages.ts` (14 tests) -- message CRUD, threads, inbox integration
+  - `e2e-agent-services.ts` (22 tests) -- service listing, stats, unpublish
+
+### i18n
+- **228 new translation keys** in both `en.json` and `fi.json` covering all 7 features, admin tabs, status badges, form labels, and empty states.
+
+### OpenAPI
+- **~1,700 lines added to `openapi.yaml`** -- all new endpoints documented with request/response schemas, including agent tasks, directives, sharing groups, capabilities, activity, messages, and integration kit.
+
 ## [1.6.1] - 2026-05-21
 
 ### Security
