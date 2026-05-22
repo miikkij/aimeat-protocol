@@ -3,7 +3,6 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { dt, Badge, StatsGrid, Empty, ExpandableHelp, Spinner } from './shared.js';
 import {
   getSystemPrompts, getSystemPrompt, updateSystemPrompt,
@@ -141,8 +140,8 @@ export default function PromptsTab({ data, reload }) {
     return html`
       <div>
         <button class="adm-btn-action" onClick=${() => { setEditId(null); setEditData(null); }}>← ${t('dashboard.promptsTab')}</button>
-        <h3 style="margin:12px 0 4px">${escHtml(editData.name)}</h3>
-        <p class="adm-text-dim adm-text-base" style="margin:0 0 16px">${escHtml(editData.description)}</p>
+        <h3 style="margin:12px 0 4px">${editData.name}</h3>
+        <p class="adm-text-dim adm-text-base" style="margin:0 0 16px">${editData.description}</p>
 
         <!-- Active toggle -->
         <label class="adm-flex-center adm-mb-md" style="cursor:pointer">
@@ -172,8 +171,8 @@ export default function PromptsTab({ data, reload }) {
           <div style="margin:8px 0">
             <strong class="adm-text-base">${t('dashboard.promptsUsedIn')}:</strong>
             ${editData.usedIn.map(u => u.startsWith('/')
-              ? html` <a href="${u}" target="_blank" class="adm-prompt-used-tag" style="text-decoration:none;color:var(--accent,#06b6d4)">${escHtml(u)}</a>`
-              : html` <span class="adm-prompt-used-tag">${escHtml(u)}</span>`
+              ? html` <a href="${u}" target="_blank" class="adm-prompt-used-tag" style="text-decoration:none;color:var(--accent,#06b6d4)">${u}</a>`
+              : html` <span class="adm-prompt-used-tag">${u}</span>`
             )}
           </div>
         `}
@@ -202,7 +201,7 @@ export default function PromptsTab({ data, reload }) {
             : versions.map(v => html`
               <div class="adm-prompt-version-row">
                 <span style="font-weight:600">v${v.version}</span>
-                <span class="adm-text-dim" style="flex:1">${dt(v.changedAt)} · ${escHtml(v.changedBy)}${v.changeNote ? ` · ${escHtml(v.changeNote)}` : ''}</span>
+                <span class="adm-text-dim" style="flex:1">${dt(v.changedAt)} · ${v.changedBy}${v.changeNote ? ` · ${v.changeNote}` : ''}</span>
                 <button class="adm-btn-sm" onClick=${() => handleRestore(v.version)} disabled=${saving}>
                   ${t('dashboard.promptsRestore')}
                 </button>
@@ -263,14 +262,14 @@ export default function PromptsTab({ data, reload }) {
             <div class="adm-hrow" style="cursor:pointer" onClick=${() => openEdit(p.id)}>
               <div style="flex:1">
                 <div class="adm-flex-center" style="gap:6px">
-                  <strong>${escHtml(p.name)}</strong>
+                  <strong>${p.name}</strong>
                   <${Badge} type=${p.active ? 'healthy' : 'critical'} />
                 </div>
-                <div class="adm-text-sm adm-text-dim">${escHtml(p.description)}</div>
+                <div class="adm-text-sm adm-text-dim">${p.description}</div>
                 ${p.usedIn && p.usedIn.length > 0 && html`
                   <div>${p.usedIn.map(u => u.startsWith('/')
-                    ? html`<a href="${u}" target="_blank" class="adm-prompt-used-tag" style="text-decoration:none;color:var(--accent,#06b6d4)" onClick=${e => e.stopPropagation()}>${escHtml(u)}</a> `
-                    : html`<span class="adm-prompt-used-tag">${escHtml(u)}</span> `
+                    ? html`<a href="${u}" target="_blank" class="adm-prompt-used-tag" style="text-decoration:none;color:var(--accent,#06b6d4)" onClick=${e => e.stopPropagation()}>${u}</a> `
+                    : html`<span class="adm-prompt-used-tag">${u}</span> `
                   )}</div>
                 `}
               </div>

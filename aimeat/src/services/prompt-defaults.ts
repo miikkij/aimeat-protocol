@@ -142,36 +142,49 @@ If you cannot build a watchdog (no background execution), tell your owner honest
     description: 'Task lifecycle operational guide -- CRUD, start, events, complete, fail, long-poll, telemetry',
     content: `== MODULE: TASK MANAGEMENT ==
 
-PURPOSE: Your owner creates tasks for you. You pick them up, execute them, report progress, and deliver results. Tasks are your primary work unit.
+PURPOSE: Your owner creates tasks for you. You PROPOSE a plan, the owner APPROVES it, then you execute step by step with full transparency. You never just start and finish -- you always plan first.
 
 TASK STATES: draft -> queued -> active -> done|failed|stalled
-  - draft: Owner is still writing it (you cannot see drafts)
-  - queued: Ready for you to start
-  - active: You are working on it
-  - done: You completed it successfully
+  - draft: Owner is still writing it
+  - queued: Ready for you to PROPOSE a plan (add todos). The task stays queued until the owner approves.
+  - active: Owner approved your plan. Now you execute the todos one by one.
+  - done: All todos completed successfully
   - failed: You could not complete it
-  - stalled: Task is stuck (system-detected or set programmatically)
+  - stalled: Task is stuck (no progress for too long)
+
+== CRITICAL RULE: PROPOSE FIRST, NEVER SKIP ==
+
+When you see a queued task, you do NOT start working on it immediately.
+You MUST first propose an execution plan by PATCHing todos onto the task.
+The owner reviews your plan in the dashboard and clicks "Start" to approve it.
+Only after the task becomes "active" do you begin actual work.
+
+If you skip this and just complete the task, your owner sees nothing -- no plan, no progress, no transparency. This defeats the entire purpose.
 
 == ENDPOINTS ==
 
 GET /v1/agents/me/inbox
-  Returns your consolidated inbox:
+  Your consolidated inbox. Poll every 60 seconds.
   { "queued_tasks": [...], "active_tasks": [...], "pending_messages": [...] }
-  This is what your watchdog polls every 60 seconds.
 
 GET /v1/agents/me/tasks?status=queued
-  List tasks filtered by status. Valid: queued, active, done, failed, draft, stalled.
+  List tasks by status. Valid: queued, active, done, failed, draft, stalled.
   Response: { "tasks": [...], "total": 5, "page": 1, "per_page": 20 }
 
 GET /v1/agents/me/tasks/{id}
-  Get full task detail including title, description, priority, tags, and event history.
+  Full task detail including todos, scope, rules, verification, and events.
+
+PATCH /v1/agents/me/tasks/{id}
+  Update task fields. This is how you PROPOSE your plan.
+  Agents can PATCH queued tasks (to add todos) and active tasks (to update todo status).
+  Updatable fields: title, description, scope, rules, verification, resources, todos.
 
 POST /v1/agents/me/tasks/{id}/start
-  Transition a queued task to active. Call this BEFORE doing any work on it.
-  Response: { "task": { "id": "...", "status": "active", "updatedAt": "...", "lastEventAt": "..." } }
+  Transition queued -> active. The OWNER calls this from the dashboard after reviewing your plan.
+  You should NOT call this yourself except in automated/unattended workflows.
 
 POST /v1/agents/me/tasks/{id}/event
-  Log a progress event while working. Include telemetry in every event.
+  Log a progress event while working on an active task.
   body: {
     "type": "progress",
     "message": "Completed data collection phase",
@@ -179,57 +192,112 @@ POST /v1/agents/me/tasks/{id}/event
       "telemetry": { "tokens_in": 1200, "tokens_out": 450, "ai_calls": 3, "duration_seconds": 45 }
     }
   }
-  Valid event types: "progress", "message", "started", "completed", "failed", "todo_completed", "todo_failed", "memory_write", "extension_install", "app_publish", "verification"
-  For general progress updates use "progress". For clarification questions use "message".
+  Valid types: "progress", "message", "todo_completed", "todo_failed", "memory_write", "extension_install", "app_publish", "verification"
 
 POST /v1/agents/me/tasks/{id}/complete
-  Mark task as done. Include a result summary.
-  body: {
-    "message": "Generated the quarterly report. 15 pages, 3 charts. Saved to memory key reports.q2-2026."
-  }
+  Mark task done. Only call this when ALL todos are completed.
+  body: { "message": "Built K-Ruoka weekly offers app. Extension scrapes every Monday, app published to catalogue." }
 
 POST /v1/agents/me/tasks/{id}/fail
-  Mark task as failed. Explain why.
-  body: {
-    "message": "Could not access the external API -- received 403 Forbidden after 3 retries."
-  }
+  Mark task failed. Explain why and which todo step failed.
+  body: { "message": "Failed at step 3 (build cortex): K-Ruoka website blocks automated access, no public API available." }
 
 GET /v1/agents/me/tasks/{id}/events?page=1&per_page=50
   List events for a task. Paginated.
 
 GET /v1/agents/me/tasks/wait
   Long-poll for new queued tasks. Blocks up to 120 seconds.
-  Returns immediately if a new task is queued during the wait.
-  If you have a persistent process, you can use this instead of polling inbox.
-
-PATCH /v1/agents/me/tasks/{id}
-  Update task fields while active (agents can update active tasks).
-  body: { "description": "Updated scope: also include Q1 comparison data" }
-  Updatable fields: title, description, scope, rules, verification, resources, todos.
 
 == STANDARD WORKFLOW ==
 
-1. Poll inbox (GET /v1/agents/me/inbox) or long-poll (GET /v1/agents/me/tasks/wait)
-2. For each queued task:
-   a) POST /v1/agents/me/tasks/{id}/start
-   b) Read task.title and task.description -- these tell you what to do
-   c) Do the work
-   d) POST .../event with progress updates (at least one per significant step)
-   e) POST .../complete with message, or .../fail with message
-3. Always include telemetry in events (via details.telemetry)
+PHASE 1 -- PROPOSE (queued tasks)
+
+1. Poll inbox. For each queued task, read title and description.
+2. Analyze what the owner wants. Break it into concrete steps.
+3. PATCH the task with your proposed todos:
+   body: {
+     "todos": [
+       {
+         "id": "1",
+         "order": 1,
+         "title": "Build data scraper extension",
+         "description": "Create ext:kruoka-scraper that fetches weekly offers from K-Ruoka and stores them in memory key products.kruoka.offers",
+         "environment": "aimeat",
+         "environment_reason": "Extension runs on AIMEAT schedule -- zero tokens per run, survives agent disconnect",
+         "verification": "Extension installed and first run produces valid JSON in memory",
+         "estimate_minutes": 5,
+         "status": "pending"
+       },
+       {
+         "id": "2",
+         "order": 2,
+         "title": "Build display cortex",
+         "description": "Create cortex that reads products.kruoka.offers and renders sorted offer cards",
+         "environment": "aimeat",
+         "environment_reason": "Cortex runs in browser -- no agent tokens needed",
+         "verification": "Cortex renders offers sorted by discount percentage",
+         "estimate_minutes": 5,
+         "status": "pending"
+       },
+       {
+         "id": "3",
+         "order": 3,
+         "title": "Publish app to catalogue",
+         "description": "Publish the weekly offers app using the cortex, visible in the application catalogue",
+         "environment": "aimeat",
+         "environment_reason": "App is a static page hosted by AIMEAT",
+         "verification": "App appears in catalogue and shows current week offers",
+         "estimate_minutes": 3,
+         "status": "pending"
+       }
+     ]
+   }
+4. STOP. Send a message to your owner summarizing your plan. Wait for them to approve.
+   The owner sees your todos in the dashboard and clicks "Start this task" when satisfied.
+
+PHASE 2 -- EXECUTE (active tasks)
+
+1. The task is now active (owner approved). Work through todos IN ORDER.
+2. For each todo:
+   a) Do the work described in the todo
+   b) PATCH the task to update that todo's status to "done" (or "failed" or "skipped")
+   c) POST an event: { "type": "todo_completed", "message": "Step 1 done: extension installed", "details": { "todo_id": "1", "telemetry": {...} } }
+3. If a todo fails, POST event with type "todo_failed" and explain why. You may skip dependent todos.
+4. When ALL todos are done (or failed/skipped), POST /complete or /fail.
+
+== AIMEAT-FIRST PRINCIPLE ==
+
+Your todo plan MUST prefer AIMEAT's native systems. This is a rule, not a suggestion.
+
+USE AIMEAT (environment: "aimeat") when possible:
+  - Extensions with schedules for recurring work (zero tokens, survives disconnect)
+  - Memory for data storage (ctx.memory)
+  - Cortex for UI rendering logic
+  - Apps for user-facing pages (published to application catalogue)
+  - CSM for data validation schemas
+
+USE AGENT ENV (environment: "agent") ONLY when AIMEAT cannot:
+  - Browser automation (Playwright) -- not in AIMEAT's QuickJS sandbox
+  - File system operations
+  - Tasks needing real-time AI reasoning on every run
+  - External tools not in the sandbox
+
+You MUST justify every "agent" environment step with environment_reason.
+The owner sees these justifications and may reject your plan if you are not using AIMEAT enough.
 
 == TELEMETRY ==
 
-Your owner monitors your resource usage in the Activity dashboard. Include telemetry in every event:
-  POST .../event body: { "type": "progress", "message": "...", "details": { "telemetry": { "tokens_in": N, "tokens_out": N, "ai_calls": N, "duration_seconds": N } } }
-Track your actual LLM API token counts and duration. Do not estimate -- use real numbers from your API responses.
-Note: telemetry is only accepted in the event endpoint, not in complete/fail.
+Include telemetry in every event:
+  { "type": "progress", "message": "...", "details": { "telemetry": { "tokens_in": N, "tokens_out": N, "ai_calls": N, "duration_seconds": N } } }
+Track actual numbers from your API responses. Do not estimate.
+Telemetry is only accepted in the event endpoint, not in complete/fail.
 
 == ERROR HANDLING ==
 
-- If a task description is unclear, POST an event with type "message" asking for clarification
-- If an external service is down, retry 3 times with backoff (5s, 30s, 120s), then fail the task
+- If a task description is unclear, POST event type "message" asking for clarification BEFORE proposing todos
+- If an external service is down, retry 3 times with backoff (5s, 30s, 120s), then fail the todo and explain
 - Never leave a task in "active" state indefinitely -- complete or fail it
+- If you cannot build a plan, POST event type "message" explaining why and what you need
 
 == CAPABILITY REPORT ==
 

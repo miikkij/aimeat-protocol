@@ -288,7 +288,10 @@ export class MongoStorage implements Storage {
         try {
             const row = await this.prisma.agent.update({ where: { gaii }, data: updates });
             return this.toAgentRecord(row);
-        } catch { return null; }
+        } catch (err) {
+            logger.warn('updateAgent failed for %s: %s', gaii, (err as Error).message);
+            return null;
+        }
     }
 
     async deleteAgent(gaii: string): Promise<boolean> {

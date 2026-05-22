@@ -8,6 +8,7 @@
  *   v1.1.0 -- 2026-05-22 -- Add capability badge styles for Capabilities sub-tab
  *   v1.2.0 -- 2026-05-22 -- Add Activity sub-tab styles (stats cards, chart, jobs, event log)
  *   v1.3.0 -- 2026-05-22 -- Add Services and Messages sub-tab styles
+ *   v1.4.0 -- 2026-05-22 -- Add Task TODO list, progress, environment badges, Start button styles
  */
 
 /* Sub-tab bar */
@@ -560,4 +561,149 @@
 .pf .agd-msg-thread-btn-active {
   border-color: var(--accent, #E8564A);
   color: var(--accent, #E8564A);
+}
+
+/* ── Task TODO list ── */
+
+/* Progress badge shown next to task title */
+.pf .agd-todo-progress {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+  white-space: nowrap;
+}
+
+/* TODO section wrapper inside expanded task */
+.pf .agd-todo-section {
+  margin: 0.5rem 0;
+}
+.pf .agd-todo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+  font-size: 0.8rem;
+}
+.pf .agd-todo-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pf .agd-todo-time {
+  font-size: 0.7rem;
+  color: var(--text-muted, #9CA3AF);
+}
+
+/* Environment badges (AIMEAT / Agent) */
+.pf .agd-env-badge {
+  font-size: 0.6rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.pf .agd-env-aimeat {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--success, #10b981);
+}
+.pf .agd-env-agent {
+  background: rgba(217, 119, 6, 0.12);
+  color: #d97706;
+}
+
+/* TODO item list */
+.pf .agd-todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.pf .agd-todo-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius-xs, 6px);
+  background: var(--card-bg, #FFFFFF);
+  border: 1px solid var(--border, #E5E7EB);
+  font-size: 0.8rem;
+  transition: border-color 0.15s;
+}
+.pf .agd-todo-active {
+  border-color: #2563eb;
+  background: rgba(37, 99, 235, 0.04);
+}
+.pf .agd-todo-done {
+  opacity: 0.7;
+}
+.pf .agd-todo-failed {
+  border-color: var(--danger, #ef4444);
+  background: rgba(239, 68, 68, 0.04);
+}
+.pf .agd-todo-skipped {
+  opacity: 0.5;
+}
+
+/* Status icon column */
+.pf .agd-todo-icon {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  width: 1.2rem;
+  text-align: center;
+}
+
+/* Content column */
+.pf .agd-todo-content {
+  flex: 1;
+  min-width: 0;
+}
+.pf .agd-todo-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.pf .agd-todo-est {
+  font-size: 0.65rem;
+  color: var(--text-muted, #9CA3AF);
+  white-space: nowrap;
+}
+.pf .agd-todo-desc {
+  font-size: 0.75rem;
+  color: var(--text-dim, #6B7280);
+  line-height: 1.4;
+  margin-top: 0.15rem;
+}
+.pf .agd-todo-reason {
+  font-size: 0.7rem;
+  color: var(--text-muted, #9CA3AF);
+  font-style: italic;
+  margin-top: 0.1rem;
+}
+.pf .agd-todo-verify {
+  font-size: 0.7rem;
+  color: var(--text-muted, #9CA3AF);
+  margin-top: 0.1rem;
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--border, #E5E7EB);
+}
+
+/* Waiting state (no todos yet) */
+.pf .agd-todo-waiting {
+  text-align: center;
+  padding: 1rem;
+  color: var(--text-muted, #9CA3AF);
+  font-size: 0.8rem;
+  font-style: italic;
+  background: var(--card-bg, #FFFFFF);
+  border: 1px dashed var(--border, #E5E7EB);
+  border-radius: var(--radius-xs, 6px);
+  margin: 0.5rem 0;
 }
