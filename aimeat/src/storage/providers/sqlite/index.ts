@@ -277,7 +277,8 @@ export class SqliteStorage implements Storage {
       `UPDATE agents SET name = ?, owner = ?, displayName = ?, description = ?, capabilities = ?,
        publicKey = ?, trustScore = ?, morselBalance = ?, createdAt = ?, lastSeen = ?, semantic = ?,
        allowedOrigins = ?, defaultScopes = ?, federate = ?,
-       technicalCapabilities = ?, domainCapabilities = ?, activityStats = ?
+       technicalCapabilities = ?, domainCapabilities = ?, activityStats = ?,
+       modulesLoaded = ?, agentLimitations = ?
        WHERE gaii = ?`
     ).run(
       updated.name, updated.owner,
@@ -292,6 +293,8 @@ export class SqliteStorage implements Storage {
       JSON.stringify(updated.technicalCapabilities ?? []),
       JSON.stringify(updated.domainCapabilities ?? []),
       JSON.stringify(updated.activityStats ?? {}),
+      JSON.stringify(updated.modulesLoaded ?? []),
+      JSON.stringify(updated.agentLimitations ?? []),
       gaii,
     );
     return updated;
@@ -408,6 +411,8 @@ export class SqliteStorage implements Storage {
     if (row.technicalCapabilities) record.technicalCapabilities = JSON.parse(row.technicalCapabilities as string);
     if (row.domainCapabilities) record.domainCapabilities = JSON.parse(row.domainCapabilities as string);
     if (row.activityStats) record.activityStats = JSON.parse(row.activityStats as string);
+    if (row.modulesLoaded) record.modulesLoaded = JSON.parse(row.modulesLoaded as string);
+    if (row.agentLimitations) record.agentLimitations = JSON.parse(row.agentLimitations as string);
     return record;
   }
 

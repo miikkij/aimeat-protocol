@@ -37,6 +37,8 @@ model Agent {
   technicalCapabilities Json?
   domainCapabilities    Json?
   activityStats         Json?
+  modulesLoaded         Json?
+  agentLimitations      Json?
   createdAt     DateTime @default(now())
   lastSeen      DateTime @default(now())
 

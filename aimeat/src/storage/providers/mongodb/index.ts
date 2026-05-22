@@ -262,6 +262,8 @@ export class MongoStorage implements Storage {
                 technicalCapabilities: agent.technicalCapabilities as any ?? null,
                 domainCapabilities: agent.domainCapabilities as any ?? null,
                 activityStats: agent.activityStats as any ?? null,
+                modulesLoaded: agent.modulesLoaded as any ?? null,
+                agentLimitations: agent.agentLimitations as any ?? null,
                 createdAt: new Date(agent.createdAt),
                 lastSeen: new Date(agent.lastSeen),
             },
@@ -1455,7 +1457,7 @@ export class MongoStorage implements Storage {
     }
 
     private toAgentRecord(row: any): AgentRecord {
-        return { name: row.name, owner: row.owner, gaii: row.gaii, displayName: row.displayName ?? undefined, description: row.description ?? undefined, capabilities: row.capabilities, publicKey: row.publicKey, trustScore: row.trustScore, morselBalance: row.morselBalance, defaultScopes: row.defaultScopes?.length ? row.defaultScopes : undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined, federate: row.federate ?? false, technicalCapabilities: row.technicalCapabilities ?? undefined, domainCapabilities: row.domainCapabilities ?? undefined, activityStats: row.activityStats ?? undefined, createdAt: row.createdAt.toISOString(), lastSeen: row.lastSeen.toISOString() };
+        return { name: row.name, owner: row.owner, gaii: row.gaii, displayName: row.displayName ?? undefined, description: row.description ?? undefined, capabilities: row.capabilities, publicKey: row.publicKey, trustScore: row.trustScore, morselBalance: row.morselBalance, defaultScopes: row.defaultScopes?.length ? row.defaultScopes : undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined, federate: row.federate ?? false, technicalCapabilities: row.technicalCapabilities ?? undefined, domainCapabilities: row.domainCapabilities ?? undefined, activityStats: row.activityStats ?? undefined, modulesLoaded: row.modulesLoaded ?? undefined, agentLimitations: row.agentLimitations ?? undefined, createdAt: row.createdAt.toISOString(), lastSeen: row.lastSeen.toISOString() };
     }
 
     private toMemoryRecord(row: any): MemoryRecord {

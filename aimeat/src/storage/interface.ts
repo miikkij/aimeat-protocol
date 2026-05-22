@@ -33,6 +33,8 @@ export interface AgentRecord {
   technicalCapabilities?: AgentTechnicalCapability[];
   domainCapabilities?: string[];
   activityStats?: AgentActivityStats;
+  modulesLoaded?: string[];
+  agentLimitations?: string[];
 }
 
 export interface MemoryRecord {

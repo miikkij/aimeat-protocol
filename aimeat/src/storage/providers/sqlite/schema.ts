@@ -1316,5 +1316,7 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('agents', 'technicalCapabilities', "TEXT DEFAULT '[]'");
   safeAddColumn('agents', 'domainCapabilities', "TEXT DEFAULT '[]'");
   safeAddColumn('agents', 'activityStats', "TEXT DEFAULT '{}'");
+  safeAddColumn('agents', 'modulesLoaded', "TEXT DEFAULT '[]'");
+  safeAddColumn('agents', 'agentLimitations', "TEXT DEFAULT '[]'");
   safeAddColumn('extensions', 'createdByAgent', 'TEXT');
 }
