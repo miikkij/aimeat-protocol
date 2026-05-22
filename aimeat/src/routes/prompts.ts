@@ -99,7 +99,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
         res.json(success(config.nodeId, {
           tier: '1',
           system_prompt,
-          available_operations: ['memory_crud', 'action_publish', 'action_execute', 'work_queue', 'wallet', 'boards', 'catalogue', 'task_lifecycle', 'directives', 'capabilities_report'],
+          available_operations: ['memory_crud', 'action_publish', 'action_execute', 'work_queue', 'wallet', 'boards', 'catalogue', 'task_lifecycle', 'directives', 'capabilities_report', 'message_handling'],
           economics: {
             daily_allowance: config.dailyAllowance,
             current_balance: agent?.morselBalance ?? 0,
@@ -134,6 +134,11 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
               domain: agent?.domainCapabilities ?? [],
             },
             instructions: 'Report your capabilities on first connect and when they change. PUT to the report_endpoint with: { technical: [{ name, type }], domain: [string], languages: [string] }',
+          },
+          messages: {
+            inbox_endpoint: `GET ${config.baseUrl}/v1/agents/${encodeURIComponent(agentName)}/messages/inbox`,
+            send_endpoint: `POST ${config.baseUrl}/v1/agents/${encodeURIComponent(agentName)}/messages`,
+            instructions: 'Poll inbox for pending messages. For each: read content, process, send response as outbound message. If user asks you to do something, include proposedTask in metadata.',
           },
         }));
         break;
