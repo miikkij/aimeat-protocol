@@ -10,6 +10,7 @@
  *   v1.4.0 — 2026-05-21 — Add sub-tab navigation (Tasks, Directives) in expanded agent detail view
  *   v1.5.0 — 2026-05-22 — Add Capabilities sub-tab with technical/domain skill display
  *   v1.6.0 — 2026-05-22 — Add Activity sub-tab with stats, chart, scheduled jobs, event log
+ *   v1.7.0 — 2026-05-22 — Add Services and Messages sub-tabs
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -26,6 +27,8 @@ import AgentTasksSubtab from './agents-tasks-subtab.js';
 import AgentDirectivesSubtab from './agents-directives-subtab.js';
 import AgentCapabilitiesSubtab from './agents-capabilities-subtab.js';
 import AgentActivitySubtab from './agents-activity-subtab.js';
+import AgentServicesSubtab from './agents-services-subtab.js';
+import AgentMessagesSubtab from './agents-messages-subtab.js';
 
 // === Agent Detail Sub-tabs ===
 const AGENT_SUBTABS = [
@@ -33,6 +36,8 @@ const AGENT_SUBTABS = [
   { id: 'directives', label: 'profile.agents.subtabs.directives' },
   { id: 'capabilities', label: 'profile.agents.subtabs.capabilities' },
   { id: 'activity', label: 'profile.agents.subtabs.activity' },
+  { id: 'services', label: 'profile.agents.subtabs.services' },
+  { id: 'messages', label: 'profile.agents.subtabs.messages' },
 ];
 
 // === Scope Management Constants ===
@@ -546,6 +551,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
                 ${activeSubtab === 'directives' && html`<${AgentDirectivesSubtab} agentName=${a.name} session=${session} showToast=${showToast} />`}
                 ${activeSubtab === 'capabilities' && html`<${AgentCapabilitiesSubtab} agentName=${a.name} session=${session} showToast=${showToast} agent=${a} />`}
                 ${activeSubtab === 'activity' && html`<${AgentActivitySubtab} agentName=${a.name} session=${session} showToast=${showToast} />`}
+                ${activeSubtab === 'services' && html`<${AgentServicesSubtab} agentName=${a.name} session=${session} showToast=${showToast} />`}
+                ${activeSubtab === 'messages' && html`<${AgentMessagesSubtab} agentName=${a.name} session=${session} showToast=${showToast} />`}
               </div>
 
               <div class="agent-detail-row mt-1">
