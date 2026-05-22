@@ -191,15 +191,15 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage): Router
 
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
 
-    // Owners can only update draft/queued tasks; agents can update active tasks
+    // Owners can update draft/queued tasks; agents can update queued (propose todos) and active (execute todos)
     if (isOwnerSession && !['draft', 'queued'].includes(task.status)) {
       res.status(409).json(error(config.nodeId, 'INVALID_STATE',
         `Owner can only update draft or queued tasks (current: ${task.status})`));
       return;
     }
-    if (!isOwnerSession && task.status !== 'active') {
+    if (!isOwnerSession && !['queued', 'active'].includes(task.status)) {
       res.status(409).json(error(config.nodeId, 'INVALID_STATE',
-        `Agent can only update active tasks (current: ${task.status})`));
+        `Agent can only update queued or active tasks (current: ${task.status})`));
       return;
     }
 
