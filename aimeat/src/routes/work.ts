@@ -16,6 +16,7 @@ import { resolveGaii } from '../services/federation.js';
 import type { PeerInfo } from '../services/federation.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
+import { createTaskFromWork } from '../services/work-task-bridge.js';
 
 function param(p: string | string[]): string {
   return Array.isArray(p) ? p[0] : p;
@@ -462,6 +463,11 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       status: 'accepted',
       updatedAt: new Date().toISOString(),
     });
+
+    // Auto-create task if agent has task system enabled
+    await createTaskFromWork(storage, work, work.providerGaii).catch(err =>
+      logger.warn('work-task-bridge: failed to create task', { tc: work.trackingCode, err: (err as Error).message })
+    );
 
     res.json(success(config.nodeId, {
       tracking_code: updated!.trackingCode,
