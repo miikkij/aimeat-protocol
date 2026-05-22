@@ -173,8 +173,24 @@ export default function AgentMessagesSubtab({ agentName, session, showToast }) {
     return html`<div class="agd-empty">${t('profile.loading')}</div>`;
   }
 
+  const pendingCount = messages.filter(m => m.status === 'pending' && m.direction === 'inbound').length;
+  const deliveredCount = messages.filter(m => m.status === 'delivered').length;
+  const errorCount = messages.filter(m => m.status === 'error').length;
+  const lastSeen = null; // TODO Phase 2+: derive from agent.last_seen
+
   return html`
     <div>
+      <div class="agd-msg-status-bar">
+        <div>
+          <span class="${lastSeen ? 'badge badge-success' : 'badge badge-muted'}">${lastSeen ? t('profile.agents.messages.online') : t('profile.agents.messages.offline')}</span>
+        </div>
+        <div class="agd-msg-status-counts">
+          <span class="badge badge-muted">inbox: ${pendingCount}</span>
+          <span class="badge badge-muted">delivered: ${deliveredCount}</span>
+          ${errorCount > 0 && html`<span class="badge badge-danger">errors: ${errorCount}</span>`}
+        </div>
+      </div>
+
       <${ThreadList} threads=${threads} activeThread=${activeThread} onSelect=${setActiveThread} />
 
       ${messages.length === 0 && !loading && html`

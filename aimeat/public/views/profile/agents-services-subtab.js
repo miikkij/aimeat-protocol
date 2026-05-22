@@ -16,12 +16,14 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { getAgentServices } from '/js/services/agent-services.js';
 
-function ServiceCard({ service }) {
+function ServiceCard({ service, onUnpublish }) {
   const name = service.display_name || service.name || service.action_id || 'Unnamed';
   const desc = service.description || '';
   const cost = service.cost != null ? `${service.cost} morsels` : 'Free';
   const visibility = service.visibility || 'public';
   const calls = service.invocation_count || service.call_count || 0;
+  const successRate = service.success_rate != null ? `${Math.round(service.success_rate)}%` : null;
+  const avgResponse = service.avg_response_ms != null ? `${Math.round(service.avg_response_ms)}ms` : null;
 
   return html`
     <div class="agd-service-card">
@@ -31,6 +33,13 @@ function ServiceCard({ service }) {
         <span>${cost}</span>
         <span>${visibility}</span>
         <span>${calls} ${t('profile.agents.services.calls')}</span>
+        ${successRate && html`<span>${successRate} ${t('profile.agents.activity.successRate')}</span>`}
+        ${avgResponse && html`<span>${avgResponse} avg</span>`}
+      </div>
+      <div class="agd-service-actions">
+        <button class="btn-ghost btn-sm" onClick=${() => onUnpublish(service)}>
+          ${t('profile.agents.services.unpublish')}
+        </button>
       </div>
     </div>
   `;
@@ -49,6 +58,25 @@ export default function AgentServicesSubtab({ agentName, session, showToast }) {
       showToast(err.message || 'Failed to load services', true);
     }
     setLoading(false);
+  }
+
+  async function handleUnpublish(service) {
+    try {
+      const actionId = service.action_id || service.id;
+      const resp = await fetch(`/v1/actions/${encodeURIComponent(actionId)}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${session?.token}` },
+      });
+      if (resp.ok) {
+        showToast(t('profile.agents.services.unpublish') + ': OK');
+        loadServices();
+      } else {
+        const body = await resp.json().catch(() => ({}));
+        showToast(body.error?.message || 'Failed to unpublish', true);
+      }
+    } catch (err) {
+      showToast(err.message || 'Failed to unpublish', true);
+    }
   }
 
   useEffect(() => { loadServices(); }, [agentName]);
@@ -75,7 +103,7 @@ export default function AgentServicesSubtab({ agentName, session, showToast }) {
 
       ${services.length > 0 && html`
         <div class="agd-services-list">
-          ${services.map(s => html`<${ServiceCard} service=${s} key=${s.action_id || s.name} />`)}
+          ${services.map(s => html`<${ServiceCard} service=${s} key=${s.action_id || s.name} onUnpublish=${handleUnpublish} />`)}
         </div>
       `}
     </div>
