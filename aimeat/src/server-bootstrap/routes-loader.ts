@@ -257,7 +257,7 @@ export async function mountRoutes(
 
   app.use(boardsRouter(config, storage));
   app.use(promptsRouter(config, storage));
-  app.use(adminRouter(config, storage, maintenanceState, provenance, consulService));
+  app.use(adminRouter(config, storage, maintenanceState, provenance, consulService, peers));
   app.use(organismsRouter(config, storage));
   app.use(sharingGroupsRouter(config, storage));
   app.use(federationRouter(config, storage, peers, networkDirectory));

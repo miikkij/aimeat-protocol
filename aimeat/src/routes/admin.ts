@@ -37,6 +37,7 @@ export function adminRouter(
     },
     provenance?: ConfigProvenance,
     consulService?: ConsulConfigService | null,
+    peers?: Map<string, import('../services/federation.js').PeerInfo>,
 ): Router {
     const router = Router();
 
@@ -604,7 +605,7 @@ export function adminRouter(
 
     // ── Mount domain sub-routers ──
     router.use(adminConfigRouter(config, storage, provenance, consulService));
-    router.use(adminMonitoringRouter(config, storage));
+    router.use(adminMonitoringRouter(config, storage, peers));
     router.use(adminAgentsRouter(config, storage));
     router.use(adminMaintenanceRouter(config, storage, maintenanceCache));
     router.use(adminEconomyRouter(config, storage));

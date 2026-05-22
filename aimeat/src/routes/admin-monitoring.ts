@@ -8,10 +8,17 @@ import { randomBytes } from 'node:crypto';
 import { generateKeyPair, sign } from '../auth/keypair.js';
 import { emitChange } from '../services/event-bus.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
+import type { PeerInfo } from '../services/federation.js';
+import { performKeyExchange } from '../services/federation-helpers.js';
+import { logger } from '../utils/logger.js';
+
+const POLL_INTERVAL_MS = 10_000;
+const MAX_POLL_DURATION_MS = 30 * 60_000;
 
 export function adminMonitoringRouter(
     config: AimeatConfig,
     storage: Storage,
+    peers?: Map<string, PeerInfo>,
 ): Router {
     const router = Router();
 
@@ -137,14 +144,24 @@ export function adminMonitoringRouter(
                 updatedAt: new Date().toISOString(),
             });
 
+            const remoteStatus = introBody.data?.status ?? 'pending';
+
             res.json(success(config.nodeId, {
                 target_node_id: targetInfo.node_id,
                 target_url: targetUrl,
                 request_id: requestId,
-                status: introBody.data?.status ?? 'pending',
+                status: remoteStatus,
                 message: introBody.data?.message ?? 'Introduction sent. Awaiting genesis operator approval.',
             }));
             emitChange('config');
+
+            const targetNodeId = targetInfo.node_id ?? targetUrl;
+
+            if (remoteStatus === 'auto_approved') {
+                completeJoin(targetUrl, targetNodeId, publicKey, config, storage, peers);
+            } else {
+                pollForApprovalAndComplete(targetUrl, targetNodeId, requestId, publicKey, config, storage, peers);
+            }
         } catch (e) {
             res.status(502).json(error(config.nodeId, 'INTRODUCTION_FAILED',
                 `Failed to introduce to ${targetUrl}: ${e instanceof Error ? e.message : String(e)}`));
@@ -387,4 +404,84 @@ export function adminMonitoringRouter(
     });
 
     return router;
+}
+
+/** Save the remote node as a local peer and perform key exchange. */
+async function completeJoin(
+    targetUrl: string,
+    targetNodeId: string,
+    targetPublicKey: string,
+    config: AimeatConfig,
+    storage: Storage,
+    peers?: Map<string, PeerInfo>,
+): Promise<void> {
+    const now = new Date().toISOString();
+    const newPeer: PeerInfo = {
+        nodeId: targetNodeId,
+        url: targetUrl,
+        publicKey: targetPublicKey,
+        status: 'active',
+        addedAt: now,
+        lastSeen: now,
+        shareCatalogue: true,
+        replicateMemory: true,
+        allowRouting: true,
+        peerMode: 'federation',
+        allowFederatedAuth: false,
+        federationAuthScopes: [],
+    };
+
+    if (peers) peers.set(targetNodeId, newPeer);
+    await storage.saveFederationPeer(newPeer);
+
+    const result = await performKeyExchange(targetUrl, config, storage);
+    if (result.success) {
+        logger.info(`Join complete: peer ${targetNodeId} added and keys exchanged`);
+    } else {
+        logger.warn(`Join: peer ${targetNodeId} saved but key exchange failed: ${result.error}`);
+    }
+    emitChange('federation');
+}
+
+/** Background poll for remote approval, then complete the join. */
+function pollForApprovalAndComplete(
+    targetUrl: string,
+    targetNodeId: string,
+    requestId: string,
+    targetPublicKey: string,
+    config: AimeatConfig,
+    storage: Storage,
+    peers?: Map<string, PeerInfo>,
+): void {
+    const startedAt = Date.now();
+
+    const timer = setInterval(async () => {
+        if (Date.now() - startedAt > MAX_POLL_DURATION_MS) {
+            clearInterval(timer);
+            logger.warn(`Join poll for ${targetNodeId} timed out after ${MAX_POLL_DURATION_MS / 60_000}min`);
+            return;
+        }
+        try {
+            const resp = await fetch(
+                `${targetUrl}/v1/federation/peer/introduce/${requestId}/status`,
+                { signal: AbortSignal.timeout(10_000) },
+            );
+            if (!resp.ok) return;
+            const body = await resp.json() as { data?: { status: string } };
+            const status = body.data?.status;
+
+            if (status === 'approved' || status === 'auto_approved') {
+                clearInterval(timer);
+                logger.info(`Join request ${requestId} approved by ${targetNodeId}`);
+                await completeJoin(targetUrl, targetNodeId, targetPublicKey, config, storage, peers);
+            } else if (status === 'rejected') {
+                clearInterval(timer);
+                logger.info(`Join request ${requestId} rejected by ${targetNodeId}`);
+                await storage.updatePeeringRequest(requestId, { status: 'rejected' });
+                emitChange('federation');
+            }
+        } catch {
+            // Network error during poll -- keep trying
+        }
+    }, POLL_INTERVAL_MS);
 }
