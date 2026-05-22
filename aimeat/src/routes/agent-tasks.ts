@@ -15,6 +15,7 @@
  *   - POST   /v1/agents/:name/tasks/:id/fail  -- Fail task (active->failed)
  *   - GET    /v1/agents/:name/tasks/:id/events -- List events
  * @version-history
+ *   v1.1.0 -- 2026-05-22 -- Fix: accumulate telemetry across events instead of overwriting; allow agent PATCH on queued tasks
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  */
 
@@ -373,11 +374,12 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage): Router
     };
     if (body.details?.telemetry) {
       const tel = body.details.telemetry as Record<string, unknown>;
+      const prev = task.telemetry;
       taskUpdates.telemetry = {
-        aiCalls: typeof tel.ai_calls === 'number' ? tel.ai_calls : task.telemetry?.aiCalls,
-        tokensIn: typeof tel.tokens_in === 'number' ? tel.tokens_in : task.telemetry?.tokensIn,
-        tokensOut: typeof tel.tokens_out === 'number' ? tel.tokens_out : task.telemetry?.tokensOut,
-        durationSeconds: typeof tel.duration_seconds === 'number' ? tel.duration_seconds : task.telemetry?.durationSeconds,
+        aiCalls: (prev?.aiCalls ?? 0) + (typeof tel.ai_calls === 'number' ? tel.ai_calls : 0),
+        tokensIn: (prev?.tokensIn ?? 0) + (typeof tel.tokens_in === 'number' ? tel.tokens_in : 0),
+        tokensOut: (prev?.tokensOut ?? 0) + (typeof tel.tokens_out === 'number' ? tel.tokens_out : 0),
+        durationSeconds: (prev?.durationSeconds ?? 0) + (typeof tel.duration_seconds === 'number' ? tel.duration_seconds : 0),
       };
     }
     await storage.updateAgentTask(id, taskUpdates);
