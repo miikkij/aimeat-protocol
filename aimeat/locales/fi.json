@@ -16,7 +16,8 @@
     "profile": "Profiili",
     "logout": "Kirjaudu ulos",
     "loggedInAs": "kirjautuneena",
-    "help": "Apua"
+    "help": "Apua",
+    "admin": "Hallinta"
   },
   "hero": {
     "title": "Tietosi on sinun. AI:si työskentelee puolestasi.",

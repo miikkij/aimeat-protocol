@@ -391,9 +391,14 @@
             <a href="/v1/help" onClick=${(e) => handleNav(e, '/v1/help')} class="${currentPath === '/v1/help' ? 'active' : ''}">${t('nav.help')}</a>
             ${session && html`
               <a href="/app-catalog.html" target="_blank" class="${currentPath === '/app-catalog.html' ? 'active' : ''}">${t('nav.apps') || 'Apps'}</a>
-              <a href="/v1/profile" class="profile-link visible" onClick=${(e) => handleNav(e, '/v1/profile')}>
+              <a href="/v1/profile" class="profile-link visible ${currentPath === '/v1/profile' ? 'active' : ''}" onClick=${(e) => handleNav(e, '/v1/profile')}>
                 ${t('nav.profile')}
               </a>
+              ${session.roles && session.roles.includes('operator') && html`
+                <a href="/v1/admin" class="${currentPath === '/v1/admin' ? 'active' : ''}" onClick=${(e) => handleNav(e, '/v1/admin')}>
+                  ${t('nav.admin')}
+                </a>
+              `}
             `}
             <div class="topnav-center">
               <button class="lang-btn ${locale === 'en' ? 'active' : ''}" onClick=${() => handleLangSwitch('en')}>EN</button>

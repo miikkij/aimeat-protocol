@@ -4,6 +4,8 @@ build/
 .env
 .env.local
 .env.developer.override
+.env.test.*
+!.env.test.*.example
 package-lock.json
 yarn.lock
 .DS_Store

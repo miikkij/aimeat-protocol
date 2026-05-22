@@ -16,7 +16,8 @@
     "profile": "Profile",
     "logout": "Log Out",
     "loggedInAs": "logged in as",
-    "help": "Help"
+    "help": "Help",
+    "admin": "Admin"
   },
   "hero": {
     "title": "Your data is yours. Your AI works for you.",

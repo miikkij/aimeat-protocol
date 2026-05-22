@@ -169,19 +169,14 @@ await test('GET /v1/admin/email/status \u2192 200, has enabled field', async () 
     assert(typeof body.data?.confirmation_required === 'boolean', 'has confirmation_required');
 });
 
-await test('POST /v1/admin/email/test \u2192 400 (SMTP not configured)', async () => {
+await test('POST /v1/admin/email/test \u2192 200, sent', async () => {
     const { status, body } = await json('/v1/admin/email/test', authed({
         method: 'POST',
-        body: JSON.stringify({ to: 'test@example.com' }),
+        body: JSON.stringify({ to: 'notifications@aimeat.io' }),
     }));
-    // Server may send via aimeat protocol fallback when SMTP is not configured
-    assert(status === 400 || status === 200, `expected 400 or 200, got ${status}: ${JSON.stringify(body)}`);
-    if (status === 200) {
-        assert(body.ok === true, 'ok');
-        assert(body.data?.sent === true, 'sent');
-    } else {
-        assert(body.ok === false, 'ok is false');
-    }
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'ok');
+    assert(body.data?.sent === true, 'sent');
 });
 
 // ─── Directory ───

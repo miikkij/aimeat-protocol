@@ -50,8 +50,8 @@ export default function FederationTab({ data, reload }) {
 
   const doSaveAuthPolicy = async (policy, scopes) => {
     const changes = [
-      { key: 'federation.auth_policy', value: policy },
-      { key: 'federation.default_scopes', value: Array.isArray(scopes) ? scopes.join(',') : scopes },
+      { path: 'federation.auth_policy', value: policy },
+      { path: 'federation.default_scopes', value: Array.isArray(scopes) ? scopes.join(',') : scopes },
     ];
     const res = await saveConfig(changes);
     if (res.ok) { setActionSuccess(t('dashboard.fedPolicyUpdated')); setTimeout(() => setActionSuccess(null), 3000); }
