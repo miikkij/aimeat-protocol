@@ -9,6 +9,7 @@
  *   - ProposedTask -- task proposal from agent with create/adjust buttons
  *   - ThreadList -- horizontal thread selector
  * @version-history
+ *   v1.1.0 -- 2026-05-22 -- Show timestamp on messages, sort oldest-first (chat-style)
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 3
  */
 import { h } from 'preact';
@@ -66,7 +67,7 @@ function MessageBubble({ msg, agentName, showToast }) {
         ${msg.content}
       </div>
       <div class="agd-msg-meta ${isInbound ? 'agd-msg-meta-right' : ''}">
-        ${msg.created_at ? timeAgo(msg.created_at) : ''}
+        ${msg.created_at ? html`<span class="agd-msg-time">${new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> ${timeAgo(msg.created_at)}` : ''}
         ${msg.tokens_used ? html` · ${msg.tokens_used} ${t('profile.agents.messages.tokensUsed')}` : ''}
       </div>
       ${proposedTask && html`
@@ -199,7 +200,7 @@ export default function AgentMessagesSubtab({ agentName, session, showToast }) {
 
       ${messages.length > 0 && html`
         <div class="agd-msg-history" ref=${historyRef}>
-          ${messages.map(msg => html`
+          ${[...messages].sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0)).map(msg => html`
             <${MessageBubble} key=${msg.id || msg.created_at} msg=${msg} agentName=${agentName} showToast=${showToast} />
           `)}
         </div>

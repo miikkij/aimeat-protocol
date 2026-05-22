@@ -511,6 +511,10 @@
 .pf .agd-msg-meta-right {
   text-align: right;
 }
+.pf .agd-msg-time {
+  font-weight: 500;
+  color: var(--text-secondary, #6B7280);
+}
 .pf .agd-msg-input {
   display: flex;
   gap: 0.5rem;
