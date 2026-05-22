@@ -77,6 +77,7 @@ import type {
     AgentDirectivesRecord, OwnerAgentDefaults,
     SharingGroupRecord,
     AgentActivityRecord,
+    AgentMessageRecord,
 } from '../../interface.js';
 
 import { matchesRecipient } from '../../../services/consent.js';
@@ -5850,6 +5851,122 @@ export class MongoStorage implements Storage {
             orderBy: [{ date: 'asc' }, { hour: 'asc' }],
         });
         return rows.map((r: any) => this.toActivityRecord(r));
+    }
+
+    // ── Agent Messages ──
+
+    private toMessageRecord(row: any): AgentMessageRecord {
+        const record: AgentMessageRecord = {
+            id: row.id,
+            agentGaii: row.agentGaii,
+            threadId: row.threadId,
+            direction: row.direction as AgentMessageRecord['direction'],
+            senderGaii: row.senderGaii,
+            content: row.content,
+            status: row.status as AgentMessageRecord['status'],
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+        };
+        if (row.linkedTaskId) record.linkedTaskId = row.linkedTaskId;
+        if (row.metadata) record.metadata = row.metadata as AgentMessageRecord['metadata'];
+        if (row.processedAt) record.processedAt = row.processedAt instanceof Date ? row.processedAt.toISOString() : row.processedAt;
+        return record;
+    }
+
+    async createMessage(record: AgentMessageRecord): Promise<AgentMessageRecord> {
+        this.ensureReady();
+        await this.prisma.agentMessage.create({
+            data: {
+                id: record.id,
+                agentGaii: record.agentGaii,
+                threadId: record.threadId,
+                direction: record.direction,
+                senderGaii: record.senderGaii,
+                content: record.content,
+                status: record.status,
+                linkedTaskId: record.linkedTaskId ?? null,
+                metadata: record.metadata as any ?? null,
+                createdAt: new Date(record.createdAt),
+                processedAt: record.processedAt ? new Date(record.processedAt) : null,
+            },
+        });
+        return record;
+    }
+
+    async getMessage(id: string): Promise<AgentMessageRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.agentMessage.findUnique({ where: { id } });
+        return row ? this.toMessageRecord(row) : null;
+    }
+
+    async listMessages(agentGaii: string, opts?: { direction?: 'inbound' | 'outbound'; threadId?: string; page?: number; perPage?: number }): Promise<{ messages: AgentMessageRecord[]; total: number }> {
+        this.ensureReady();
+        const page = opts?.page ?? 1;
+        const perPage = opts?.perPage ?? 20;
+        const where: any = { agentGaii };
+        if (opts?.direction) where.direction = opts.direction;
+        if (opts?.threadId) where.threadId = opts.threadId;
+
+        const [rows, total] = await Promise.all([
+            this.prisma.agentMessage.findMany({
+                where,
+                orderBy: { createdAt: 'desc' },
+                skip: (page - 1) * perPage,
+                take: perPage,
+            }),
+            this.prisma.agentMessage.count({ where }),
+        ]);
+        return { messages: rows.map((r: any) => this.toMessageRecord(r)), total };
+    }
+
+    async listPendingMessages(agentGaii: string): Promise<AgentMessageRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.agentMessage.findMany({
+            where: { agentGaii, status: 'pending', direction: 'inbound' },
+            orderBy: { createdAt: 'asc' },
+        });
+        return rows.map((r: any) => this.toMessageRecord(r));
+    }
+
+    async updateMessageStatus(id: string, status: string, processedAt?: string): Promise<AgentMessageRecord | null> {
+        this.ensureReady();
+        try {
+            const data: any = { status };
+            if (processedAt) data.processedAt = new Date(processedAt);
+            const row = await this.prisma.agentMessage.update({
+                where: { id },
+                data,
+            });
+            return this.toMessageRecord(row);
+        } catch { return null; }
+    }
+
+    async listThreads(agentGaii: string): Promise<{ threadId: string; lastMessage: string; messageCount: number; updatedAt: string }[]> {
+        this.ensureReady();
+        const groups = await this.prisma.agentMessage.groupBy({
+            by: ['threadId'],
+            where: { agentGaii },
+            _count: { _all: true },
+            _max: { createdAt: true },
+        });
+
+        const results: { threadId: string; lastMessage: string; messageCount: number; updatedAt: string }[] = [];
+        for (const g of groups) {
+            const lastMsg = await this.prisma.agentMessage.findFirst({
+                where: { agentGaii, threadId: g.threadId },
+                orderBy: { createdAt: 'desc' },
+                select: { content: true },
+            });
+            results.push({
+                threadId: g.threadId,
+                lastMessage: lastMsg?.content ?? '',
+                messageCount: g._count._all,
+                updatedAt: g._max.createdAt instanceof Date ? g._max.createdAt.toISOString() : (g._max.createdAt ?? ''),
+            });
+        }
+
+        // Sort by updatedAt descending
+        results.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+        return results;
     }
 }
 

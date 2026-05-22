@@ -1305,3 +1305,20 @@ model AgentActivity {
   @@unique([agentGaii, date, hour, metric])
   @@index([agentGaii, date])
 }
+
+model AgentMessage {
+  id           String    @id @map("_id")
+  agentGaii    String
+  threadId     String
+  direction    String
+  senderGaii   String
+  content      String
+  status       String    @default("pending")
+  linkedTaskId String?
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+  processedAt  DateTime?
+
+  @@index([agentGaii, threadId, createdAt])
+  @@index([agentGaii, status])
+}

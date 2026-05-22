@@ -41,6 +41,7 @@ import type {
   AgentDirectivesRecord, OwnerAgentDefaults,
   SharingGroupRecord,
   AgentActivityRecord,
+  AgentMessageRecord,
 } from '../../interface.js';
 import { initializeSchema } from './schema.js';
 
@@ -52,6 +53,7 @@ import * as agentTaskRepo from './repos/agent-task.js';
 import * as sharingGroupRepo from './repos/sharing-group.js';
 import * as agentDirectivesRepo from './repos/agent-directives.js';
 import * as agentActivityRepo from './repos/agent-activity.js';
+import * as agentMessageRepo from './repos/agent-message.js';
 
 export class SqliteStorage implements Storage {
   private db: Database.Database;
@@ -5778,5 +5780,33 @@ export class SqliteStorage implements Storage {
 
   async getActivityHistory(agentGaii: string, opts?: { days?: number; granularity?: 'daily' | 'hourly' }): Promise<AgentActivityRecord[]> {
     return agentActivityRepo.getActivityHistory(this.db, agentGaii, opts);
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Agent Messages ──
+  // ══════════════════════════════════════════════════════════
+
+  async createMessage(record: AgentMessageRecord): Promise<AgentMessageRecord> {
+    return agentMessageRepo.createMessage(this.db, record);
+  }
+
+  async getMessage(id: string): Promise<AgentMessageRecord | null> {
+    return agentMessageRepo.getMessage(this.db, id);
+  }
+
+  async listMessages(agentGaii: string, opts?: { direction?: 'inbound' | 'outbound'; threadId?: string; page?: number; perPage?: number }): Promise<{ messages: AgentMessageRecord[]; total: number }> {
+    return agentMessageRepo.listMessages(this.db, agentGaii, opts);
+  }
+
+  async listPendingMessages(agentGaii: string): Promise<AgentMessageRecord[]> {
+    return agentMessageRepo.listPendingMessages(this.db, agentGaii);
+  }
+
+  async updateMessageStatus(id: string, status: string, processedAt?: string): Promise<AgentMessageRecord | null> {
+    return agentMessageRepo.updateMessageStatus(this.db, id, status, processedAt);
+  }
+
+  async listThreads(agentGaii: string): Promise<{ threadId: string; lastMessage: string; messageCount: number; updatedAt: string }[]> {
+    return agentMessageRepo.listThreads(this.db, agentGaii);
   }
 }

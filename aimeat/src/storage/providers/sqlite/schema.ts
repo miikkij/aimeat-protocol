@@ -1245,6 +1245,23 @@ export function initializeSchema(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_agent_activity_gaii ON agent_activity(agentGaii, date);
 
+    -- ── Agent Messages (Phase 3) ──
+    CREATE TABLE IF NOT EXISTS agent_messages (
+      id            TEXT PRIMARY KEY,
+      agentGaii     TEXT NOT NULL,
+      threadId      TEXT NOT NULL,
+      direction     TEXT NOT NULL,
+      senderGaii    TEXT NOT NULL,
+      content       TEXT NOT NULL,
+      status        TEXT NOT NULL DEFAULT 'pending',
+      linkedTaskId  TEXT,
+      metadata      TEXT,
+      createdAt     TEXT NOT NULL,
+      processedAt   TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_messages_agent ON agent_messages(agentGaii, threadId, createdAt);
+    CREATE INDEX IF NOT EXISTS idx_agent_messages_pending ON agent_messages(agentGaii, status);
+
   `);
 
   // ── Schema migrations for existing databases ──

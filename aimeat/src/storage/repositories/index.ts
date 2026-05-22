@@ -37,3 +37,4 @@ export type { AgentTaskRepository } from './agent-task.repository.js';
 export type { AgentDirectivesRepository } from './agent-directives.repository.js';
 export type { SharingGroupRepository } from './sharing-group.repository.js';
 export type { AgentActivityRepository } from './agent-activity.repository.js';
+export type { AgentMessageRepository } from './agent-message.repository.js';

@@ -1542,6 +1542,29 @@ export interface AgentActivityRecord {
   value: number;
 }
 
+// ── Agent Messages (Phase 3) ──
+
+export interface AgentMessageRecord {
+  id: string;
+  agentGaii: string;
+  threadId: string;
+  direction: 'inbound' | 'outbound';
+  senderGaii: string;
+  content: string;
+  status: 'pending' | 'processing' | 'delivered' | 'error';
+  linkedTaskId?: string;
+  metadata?: {
+    tokensUsed?: number;
+    processingMs?: number;
+    proposedTask?: {
+      title: string;
+      description: string;
+    };
+  };
+  createdAt: string;
+  processedAt?: string;
+}
+
 // ── Domain Repository Interfaces ────────────────────────────────────
 import type { OwnerRepository } from './repositories/owner.repository.js';
 import type { AgentRepository } from './repositories/agent.repository.js';
@@ -1586,6 +1609,7 @@ import type { AgentTaskRepository } from './repositories/agent-task.repository.j
 import type { AgentDirectivesRepository } from './repositories/agent-directives.repository.js';
 import type { SharingGroupRepository } from './repositories/sharing-group.repository.js';
 import type { AgentActivityRepository } from './repositories/agent-activity.repository.js';
+import type { AgentMessageRepository } from './repositories/agent-message.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -1605,4 +1629,5 @@ export interface Storage extends
   PackageRepository, TemplateListingRepository, PackageInstanceRepository,
   CapabilityRepository,
   AgentTaskRepository, AgentDirectivesRepository, SharingGroupRepository, AgentActivityRepository,
+  AgentMessageRepository,
   StatsRepository { }
