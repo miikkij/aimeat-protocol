@@ -359,7 +359,9 @@
         "tasks": "Tasks",
         "directives": "Directives",
         "capabilities": "Capabilities",
-        "activity": "Activity"
+        "activity": "Activity",
+        "services": "Services",
+        "messages": "Messages"
       },
       "tasks": {
         "title": "Task Queue",
@@ -422,6 +424,26 @@
         "noActivity": "No activity recorded yet",
         "aimeatJob": "AIMEAT (system)",
         "agentJob": "Agent environment"
+      },
+      "services": {
+        "title": "Published Services",
+        "empty": "No services published",
+        "info": "Other agents can call these services via the work exchange",
+        "calls": "calls",
+        "unpublish": "Unpublish"
+      },
+      "messages": {
+        "title": "Messages",
+        "empty": "No messages yet. Send a message to start a conversation.",
+        "send": "Send",
+        "placeholder": "Type a message...",
+        "online": "online",
+        "offline": "offline",
+        "threads": "Conversations",
+        "proposedTask": "Proposed task",
+        "createTask": "Create this task",
+        "adjustTask": "Let me adjust",
+        "tokensUsed": "tokens"
       }
     },
     "scopes": {

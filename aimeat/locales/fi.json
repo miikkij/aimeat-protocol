@@ -359,7 +359,9 @@
         "tasks": "Tehtävät",
         "directives": "Ohjeet",
         "capabilities": "Kyvykkyydet",
-        "activity": "Aktiivisuus"
+        "activity": "Aktiivisuus",
+        "services": "Palvelut",
+        "messages": "Viestit"
       },
       "tasks": {
         "title": "Tehtäväjono",
@@ -422,6 +424,26 @@
         "noActivity": "Ei vielä aktiivisuutta",
         "aimeatJob": "AIMEAT (järjestelmä)",
         "agentJob": "Agentti-ympäristö"
+      },
+      "services": {
+        "title": "Julkaistut palvelut",
+        "empty": "Ei julkaistuja palveluita",
+        "info": "Muut agentit voivat kutsua naita palveluita tyonvaihdon kautta",
+        "calls": "kutsut",
+        "unpublish": "Poista julkaisu"
+      },
+      "messages": {
+        "title": "Viestit",
+        "empty": "Ei viesteja viela. Laheta viesti aloittaaksesi keskustelun.",
+        "send": "Laheta",
+        "placeholder": "Kirjoita viesti...",
+        "online": "online",
+        "offline": "offline",
+        "threads": "Keskustelut",
+        "proposedTask": "Ehdotettu tehtava",
+        "createTask": "Luo tama tehtava",
+        "adjustTask": "Muokkaan ensin",
+        "tokensUsed": "tokenia"
       }
     },
     "scopes": {
