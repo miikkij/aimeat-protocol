@@ -32,7 +32,7 @@ import {
 // DEPRECATED: browser-side prompt builders no longer used. Prompts loaded from database via API.
 // import { buildComponentPrompt, buildFixPrompt, buildReflectionPrompt, buildTestPrompt } from '/js/services/generator-prompts.js';
 import { validateComponent } from '/js/services/generator-validate.js';
-import { validateExtensionSpec, validateDataApiSpec, validateComponentSpec, validateAppDomainSpec } from '/js/services/generator-spec-validate.js';
+import { validateExtensionSpec, validateDataApiSpec, validateComponentSpec, validateAppDomainSpec, validateAppSpec } from '/js/services/generator-spec-validate.js';
 import { verifyContract } from '/js/services/generator-contract.js';
 import { smokeTest } from '/js/services/generator-smoke.js';
 import { createBundle } from '/js/services/generator-context-bundle.js';
@@ -672,6 +672,7 @@ export function ComponentDetail({ component, project, components, projectId, int
                 // Validate spec structure
                 let sv;
                 if (component.type === 'extension') sv = validateExtensionSpec(parsed);
+                else if (component.type === 'app') sv = validateAppSpec(parsed);
                 else if (component.subtype === 'data') sv = validateDataApiSpec(parsed);
                 else if (component.subtype === 'component') sv = validateComponentSpec(parsed);
                 else if (component.subtype === 'app-domain') sv = validateAppDomainSpec(parsed);

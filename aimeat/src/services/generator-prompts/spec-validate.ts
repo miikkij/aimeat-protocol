@@ -144,6 +144,25 @@ export function validateAppDomainSpec(spec: Record<string, unknown> | null): Val
   return { valid: errors.length === 0, errors };
 }
 
+export function validateAppSpec(spec: Record<string, unknown> | null): ValidationResult {
+  const errors: string[] = [];
+  if (!spec) return { valid: false, errors: ['Spec is null or undefined'] };
+
+  if (!spec.name) errors.push('Missing spec.name');
+  if (spec.name && typeof spec.name === 'string') {
+    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(spec.name)) {
+      errors.push(`spec.name "${spec.name}" must be ASCII kebab-case`);
+    }
+  }
+  if (!spec.title) errors.push('Missing spec.title');
+  if (!spec.appDomainLib) errors.push('Missing spec.appDomainLib');
+  if (!Array.isArray(spec.cortexDependencies) || (spec.cortexDependencies as unknown[]).length === 0) {
+    errors.push('Missing or empty spec.cortexDependencies');
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
 export function validateSpecAgainstProbe(
   spec: Record<string, unknown>,
   probeResults: ProbeResult[],

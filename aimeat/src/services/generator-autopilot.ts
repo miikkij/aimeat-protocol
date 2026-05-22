@@ -27,7 +27,7 @@ const log = { info: (m: string) => logger.info(m), warn: (m: string) => logger.w
 // No browser imports, no pathToFileURL hacks, no dynamic import()
 import { buildPrompt, stripCodeblock, createBundle } from './generator-prompts/index.js';
 import { validateComponent } from './generator-prompts/validate.js';
-import { validateExtensionSpec, validateDataApiSpec, validateComponentSpec, validateAppDomainSpec, validateSpecAgainstProbe } from './generator-prompts/spec-validate.js';
+import { validateExtensionSpec, validateDataApiSpec, validateComponentSpec, validateAppDomainSpec, validateAppSpec, validateSpecAgainstProbe } from './generator-prompts/spec-validate.js';
 import type { PromptRuntimeData, ComponentState, ProbeResult, Blueprint, InterviewSpec } from './generator-prompts/types.js';
 
 // ── Autopilot state ──
@@ -381,6 +381,15 @@ export async function runAutopilot(
                   const missingActions = bpActions.filter(a => !specActionIds.has(a));
                   if (missingActions.length > 0) {
                     alog.warn(`[${cid}] Spec missing blueprint actions: ${missingActions.join(', ')} — spec will be used but code validator will flag these`);
+                  }
+                } else if (compType === 'app') {
+                  const sv = validateAppSpec(spec);
+                  if (!sv.valid) {
+                    alog.warn(`[${cid}] App spec validation issues: ${sv.errors.join('; ')}`);
+                    if (sv.errors.some(e => e.includes('ASCII'))) {
+                      alog.error(`[${cid}] App spec has non-ASCII name — rejecting. Will retry without spec.`);
+                      spec = null;
+                    }
                   }
                 } else if (compType === 'cortex') {
                   const sub = (bpComp?.subtype as string) || '';

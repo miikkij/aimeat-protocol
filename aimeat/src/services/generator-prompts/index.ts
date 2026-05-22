@@ -114,7 +114,7 @@ export { stripCodeblock } from './strip.js';
 export { createBundle, formatBundlesForPrompt } from './bundle.js';
 export {
   validateExtensionSpec, validateDataApiSpec, validateComponentSpec,
-  validateAppDomainSpec, validateSpecAgainstProbe,
+  validateAppDomainSpec, validateAppSpec, validateSpecAgainstProbe,
 } from './spec-validate.js';
 export type {
   Blueprint, InterviewSpec, ComponentState, ProbeResult,

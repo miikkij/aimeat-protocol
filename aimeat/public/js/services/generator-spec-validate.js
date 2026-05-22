@@ -8,6 +8,7 @@
  *   - validateDataApiSpec: structural validation of data API spec JSON
  *   - validateComponentSpec: structural validation of component spec JSON
  *   - validateAppDomainSpec: structural validation of app-domain spec JSON
+ *   - validateAppSpec: structural validation of app (HTML page) spec JSON
  *   - validateSpecAgainstProbe: compare spec declarations against probe results
  * @usage
  *   import { validateExtensionSpec, validateSpecAgainstProbe } from '/js/services/generator-spec-validate.js';
@@ -117,6 +118,28 @@ export function validateAppDomainSpec(spec) {
   if (!Array.isArray(spec.views) || spec.views.length === 0) errors.push('Missing or empty spec.views');
   if (!Array.isArray(spec.scriptDependencies) || spec.scriptDependencies.length === 0) {
     errors.push('Missing or empty spec.scriptDependencies — app needs these to load scripts in order');
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Validate that an app (HTML page) spec has required structure.
+ * @param {object} spec - Parsed app spec JSON
+ * @returns {{ valid: boolean, errors: string[] }}
+ */
+export function validateAppSpec(spec) {
+  const errors = [];
+  if (!spec) return { valid: false, errors: ['Spec is null or undefined'] };
+
+  if (!spec.name) errors.push('Missing spec.name');
+  if (spec.name && !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(spec.name)) {
+    errors.push(`spec.name "${spec.name}" must be ASCII kebab-case`);
+  }
+  if (!spec.title) errors.push('Missing spec.title');
+  if (!spec.appDomainLib) errors.push('Missing spec.appDomainLib — must reference the app-domain cortex libName');
+  if (!Array.isArray(spec.cortexDependencies) || spec.cortexDependencies.length === 0) {
+    errors.push('Missing or empty spec.cortexDependencies — must list all cortex registeredAs names');
   }
 
   return { valid: errors.length === 0, errors };
