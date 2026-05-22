@@ -144,10 +144,15 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
             return;
         }
 
-        // Check if already a peer
-        if (peers.has(node_id)) {
+        // Check if already a peer (allow re-introduction if depeering/offline)
+        const existingPeer = peers.get(node_id);
+        if (existingPeer && existingPeer.status !== 'depeering' && existingPeer.status !== 'offline') {
             res.status(409).json(error(config.nodeId, 'CONFLICT', `Node "${node_id}" is already a peer`));
             return;
+        }
+        if (existingPeer) {
+            peers.delete(node_id);
+            await storage.deleteFederationPeer(node_id);
         }
 
         // Extension hook: pre_federation_peer

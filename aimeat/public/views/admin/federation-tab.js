@@ -385,7 +385,7 @@ export default function FederationTab({ data, reload }) {
                 ${(p.status === 'active' || p.status === 'degraded') && html`
                   <button class="adm-btn-sm" onClick=${() => doRemove(p.node_id)}>${t('dashboard.fedDepeer')}</button>
                 `}
-                ${p.status === 'active' && html`
+                ${(p.status === 'active' || p.status === 'degraded' || p.status === 'offline' || p.status === 'depeering') && html`
                   <button class="adm-btn-sm adm-text-error" onClick=${() => doEmergencyRemove(p.node_id)}>\u26A0 ${t('dashboard.fedEmergencyDepeer')}</button>
                 `}
               </td>
