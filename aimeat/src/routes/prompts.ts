@@ -6,16 +6,55 @@
  * @version-history
  *   v1.0.0 -- 2026-03-01 -- Initial tiered prompts (0, 1, 2, anonymous)
  *   v1.1.0 -- 2026-05-21 -- Extend tier1 response with directives, task queue, and agent endpoints
+ *   v1.2.0 -- 2026-05-22 -- Add GET /v1/prompts/tier1/:module for modular prompt system
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 
 export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+
+  const VALID_MODULES = ['tasks', 'messages', 'work', 'services', 'memory', 'activity', 'social'] as const;
+
+  // GET /v1/prompts/tier1/:module -- Feature module prompts (auth required)
+  router.get('/v1/prompts/tier1/:module', requireAuth(), async (req, res) => {
+    const mod = req.params.module as string;
+    if (!(VALID_MODULES as readonly string[]).includes(mod)) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+        `Unknown module: ${mod}. Valid: ${VALID_MODULES.join(', ')}`));
+      return;
+    }
+
+    const record = await storage.getSystemPrompt(`tier-1-${mod}`);
+    if (!record || !record.active) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Module prompt not available'));
+      return;
+    }
+
+    const gaii = req.auth?.sub ?? 'unknown';
+    const agent = req.auth?.sub ? await storage.getAgent(req.auth.sub) : null;
+    const parsed = parseGaiiLoose(gaii);
+    const promptContent = resolvePromptContent(record, req.headers['accept-language'] as string);
+    const system_prompt = substituteVariables(promptContent, {
+      node_url: config.baseUrl,
+      node_id: config.nodeId,
+      gaii,
+      agent_name: parsed.agent || 'unknown',
+      trust_score: agent?.trustScore ?? 50,
+      daily_allowance: config.dailyAllowance,
+    });
+
+    res.json(success(config.nodeId, {
+      tier: '1',
+      module: mod,
+      system_prompt,
+    }));
+  });
 
   // GET /v1/prompts/:tier — unified prompts endpoint (Tier 0)
   router.get('/v1/prompts/:tier', async (req, res) => {
