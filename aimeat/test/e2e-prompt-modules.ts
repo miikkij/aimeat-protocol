@@ -198,7 +198,7 @@ await test('Messages module contains required sections', async () => {
     const prompt = body.data.system_prompt as string;
     assert(prompt.includes('/messages/inbox'), 'has inbox endpoint');
     assert(prompt.includes('thread_id'), 'mentions threading');
-    assert(prompt.includes('proposedTask'), 'mentions proposed tasks');
+    assert(prompt.includes('proposed_task'), 'mentions proposed tasks');
     assert(prompt.includes('tokens_used'), 'mentions token tracking in messages');
 });
 
