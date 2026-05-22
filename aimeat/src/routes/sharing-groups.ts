@@ -29,6 +29,11 @@ import {
   SharingGroupUpdateMemberSchema,
 } from '../models/sharing-group-schemas.js';
 
+function resolveMemberIdentifier(identifier: string, nodeId: string): string {
+  if (identifier.includes('@') || identifier.includes('#')) return identifier;
+  return `${identifier}@${nodeId}`;
+}
+
 export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
@@ -59,7 +64,7 @@ export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Rou
 
     // Convert members from request format (identifier_type) to storage format (identifierType)
     const storageMbers: SharingGroupMember[] = members.map(m => ({
-      identifier: m.identifier,
+      identifier: resolveMemberIdentifier(m.identifier, config.nodeId),
       identifierType: m.identifier_type,
       permissions: m.permissions ?? default_permissions,
       addedAt: now,
@@ -236,7 +241,8 @@ export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Rou
       return;
     }
 
-    const { identifier, identifier_type, permissions } = parsed.data;
+    const { identifier: rawIdentifier, identifier_type, permissions } = parsed.data;
+    const identifier = resolveMemberIdentifier(rawIdentifier, config.nodeId);
 
     // Check for duplicate
     if (group.members.some(m => m.identifier === identifier)) {

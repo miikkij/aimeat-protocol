@@ -1048,14 +1048,24 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       return;
     }
 
-    const existing = await storage.getMemory(gaii, key);
+    // Owner sessions can update any of their agents' memory entries
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    let existing = await storage.getMemory(gaii, key);
+    let effectiveGaii = gaii;
+    if (!existing && isOwnerSession) {
+      const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
+      for (const agent of agents) {
+        const found = await storage.getMemory(agent.gaii, key);
+        if (found) { existing = found; effectiveGaii = agent.gaii; break; }
+      }
+    }
     if (!existing) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key not found: ${key}`));
       return;
     }
 
-    // Defense-in-depth: verify ownership even though getMemory is scoped by GAII
-    if (existing.ownerGaii !== gaii) {
+    // Defense-in-depth: verify ownership
+    if (existing.ownerGaii !== effectiveGaii) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only modify your own memory records'));
       return;
     }
@@ -1078,7 +1088,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
     // M-1: Total memory quota check on update
     const existingSize = Buffer.byteLength(JSON.stringify(existing.value), 'utf8');
-    const quotaCheck = await checkMemoryQuota(config, storage, gaii, newValueSize, existingSize);
+    const quotaCheck = await checkMemoryQuota(config, storage, effectiveGaii, newValueSize, existingSize);
     if (!quotaCheck.allowed) {
       res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', quotaCheck.reason!));
       return;
@@ -1102,7 +1112,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     const effectiveVis = visibility ?? existing.visibility;
     const newRecord = {
       key,
-      ownerGaii: gaii,
+      ownerGaii: effectiveGaii,
       value: value !== undefined ? value : existing.value,
       visibility: effectiveVis,
       tags: tags ?? existing.tags,
@@ -1118,7 +1128,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     if (storage.setMemoryIfVersion) {
       const result = await storage.setMemoryIfVersion(newRecord, version);
       if (!result) {
-        const current = await storage.getMemory(gaii, key);
+        const current = await storage.getMemory(effectiveGaii, key);
         res.status(409).json(error(config.nodeId, 'VERSION_CONFLICT',
           `Expected version ${version} but current is ${current?.version ?? 'unknown'}`,
           409, { current_version: current?.version, your_version: version }));
@@ -1131,17 +1141,17 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
     // C.3: Event-driven replication queue integration
     if (peers) {
-      enqueueMemoryReplication(gaii, key, config, storage, peers).catch(() => {
+      enqueueMemoryReplication(effectiveGaii, key, config, storage, peers).catch(() => {
         // Non-critical — will be picked up by scheduled sync
       });
     }
 
     // Charge overage morsels if over quota (§15)
     if (quotaCheck.overageMorsels > 0) {
-      await chargeOverage(storage, gaii, quotaCheck.overageMorsels, 'memory_overage');
+      await chargeOverage(storage, effectiveGaii, quotaCheck.overageMorsels, 'memory_overage');
     }
 
-    emitResourceUpdated(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
+    emitResourceUpdated(effectiveGaii, `aimeat://memory/${encodeURIComponent(key)}`);
 
     stats?.increment('memory_writes');
 
