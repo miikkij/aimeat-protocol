@@ -126,6 +126,8 @@ tags:
     description: Agent inbox, integration kit, and long-poll task endpoints
   - name: Agent Directives
     description: Per-agent directives — purpose, rules, memory areas, and resources
+  - name: Agent Messages
+    description: Bidirectional messaging between owners and agents with thread support
   - name: Sharing Groups
     description: Named groups for sharing memory and files with specific users and agents
 
@@ -2499,6 +2501,94 @@ components:
         tokenBudget:
           type: integer
           description: Default daily token budget for agents
+
+    # === Agent Messages ===
+    AgentMessageCreate:
+      type: object
+      required: [content, direction]
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 10000
+        direction:
+          type: string
+          enum: [inbound, outbound]
+        thread_id:
+          type: string
+          format: uuid
+        linked_task_id:
+          type: string
+          format: uuid
+        metadata:
+          type: object
+          properties:
+            tokens_used:
+              type: number
+            processing_ms:
+              type: number
+            proposed_task:
+              type: object
+              properties:
+                title:
+                  type: string
+                  maxLength: 256
+                description:
+                  type: string
+                  maxLength: 5000
+
+    AgentMessageStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [processing, delivered, error]
+
+    AgentMessageRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        agentGaii:
+          type: string
+        threadId:
+          type: string
+          format: uuid
+        direction:
+          type: string
+          enum: [inbound, outbound]
+        senderGaii:
+          type: string
+        content:
+          type: string
+        status:
+          type: string
+          enum: [pending, processing, delivered, error]
+        linkedTaskId:
+          type: string
+          format: uuid
+        metadata:
+          type: object
+          properties:
+            tokensUsed:
+              type: number
+            processingMs:
+              type: number
+            proposedTask:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+        createdAt:
+          type: string
+          format: date-time
+        processedAt:
+          type: string
+          format: date-time
 
   # === Reusable Response Wrappers ===
   responses:
@@ -16134,6 +16224,235 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # Agent Messages
+  # ============================================================
+
+  /v1/agents/{name}/messages:
+    post:
+      operationId: sendAgentMessage
+      summary: Send message to agent
+      description: Send an inbound message (owner to agent) or outbound message (agent to user)
+      tags: [Agent Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentMessageCreate'
+      responses:
+        '200':
+          description: Message created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentMessageRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    get:
+      operationId: listAgentMessages
+      summary: List message history
+      description: Paginated message history with optional direction and thread filters
+      tags: [Agent Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: direction
+          in: query
+          schema:
+            type: string
+            enum: [inbound, outbound]
+        - name: thread_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Message list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          messages:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/AgentMessageRecord'
+                          total:
+                            type: integer
+                          page:
+                            type: integer
+                          per_page:
+                            type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/messages/inbox:
+    get:
+      operationId: getAgentInbox
+      summary: Get pending inbound messages
+      description: Returns messages with status 'pending' and direction 'inbound' (agent polling endpoint)
+      tags: [Agent Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Pending messages
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          messages:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/AgentMessageRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/messages/threads:
+    get:
+      operationId: listAgentMessageThreads
+      summary: List conversation threads
+      description: Returns thread summaries with last message preview and message count
+      tags: [Agent Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Thread list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          threads:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                threadId:
+                                  type: string
+                                  format: uuid
+                                lastMessage:
+                                  $ref: '#/components/schemas/AgentMessageRecord'
+                                messageCount:
+                                  type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/messages/{id}:
+    patch:
+      operationId: updateAgentMessageStatus
+      summary: Update message status
+      description: Transition message status (pending -> processing -> delivered/error)
+      tags: [Agent Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentMessageStatusUpdate'
+      responses:
+        '200':
+          description: Message updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentMessageRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
