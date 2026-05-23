@@ -32,7 +32,17 @@ export function initializeSchema(db: Database.Database): void {
       lastSeen       TEXT NOT NULL,
       semantic       TEXT,
       allowedOrigins TEXT,
-      defaultScopes  TEXT
+      defaultScopes  TEXT,
+      webhookUrl         TEXT,
+      webhookSecret      TEXT,
+      webhookEnabled     INTEGER NOT NULL DEFAULT 0,
+      webhookLastSuccess TEXT,
+      webhookLastFailure TEXT,
+      webhookFailCount   INTEGER NOT NULL DEFAULT 0,
+      platform           TEXT,
+      platformVersion    TEXT,
+      platformDetectedBy TEXT,
+      tags               TEXT
     );
 
     -- ── Memory ──
@@ -1319,4 +1329,16 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('agents', 'modulesLoaded', "TEXT DEFAULT '[]'");
   safeAddColumn('agents', 'agentLimitations', "TEXT DEFAULT '[]'");
   safeAddColumn('extensions', 'createdByAgent', 'TEXT');
+
+  // Push Layer Phase A — webhook delivery fields
+  safeAddColumn('agents', 'webhookUrl', 'TEXT');
+  safeAddColumn('agents', 'webhookSecret', 'TEXT');
+  safeAddColumn('agents', 'webhookEnabled', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('agents', 'webhookLastSuccess', 'TEXT');
+  safeAddColumn('agents', 'webhookLastFailure', 'TEXT');
+  safeAddColumn('agents', 'webhookFailCount', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('agents', 'platform', 'TEXT');
+  safeAddColumn('agents', 'platformVersion', 'TEXT');
+  safeAddColumn('agents', 'platformDetectedBy', 'TEXT');
+  safeAddColumn('agents', 'tags', 'TEXT');
 }

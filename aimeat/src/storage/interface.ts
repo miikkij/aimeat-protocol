@@ -35,6 +35,19 @@ export interface AgentRecord {
   activityStats?: AgentActivityStats;
   modulesLoaded?: string[];
   agentLimitations?: string[];
+  // Webhook delivery (Phase A push layer)
+  webhookUrl?: string;
+  webhookSecret?: string;
+  webhookEnabled?: boolean;
+  webhookLastSuccess?: string;
+  webhookLastFailure?: string;
+  webhookFailCount?: number;
+  // Platform identification (Phase B prep)
+  platform?: string;
+  platformVersion?: string;
+  platformDetectedBy?: 'auto' | 'self_report' | 'message_reply';
+  // Tags for inter-agent data sharing
+  tags?: string[];
 }
 
 export interface MemoryRecord {

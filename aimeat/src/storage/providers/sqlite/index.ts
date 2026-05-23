@@ -239,8 +239,9 @@ export class SqliteStorage implements Storage {
   async createAgent(agent: AgentRecord): Promise<AgentRecord> {
     try {
       this.db.prepare(
-        `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic, allowedOrigins, defaultScopes, federate)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic, allowedOrigins, defaultScopes, federate,
+         webhookUrl, webhookSecret, webhookEnabled, webhookLastSuccess, webhookLastFailure, webhookFailCount, platform, platformVersion, platformDetectedBy, tags)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         agent.gaii, agent.name, agent.owner,
         agent.displayName ?? null, agent.description ?? null,
@@ -251,6 +252,10 @@ export class SqliteStorage implements Storage {
         agent.allowedOrigins ? JSON.stringify(agent.allowedOrigins) : null,
         agent.defaultScopes ? JSON.stringify(agent.defaultScopes) : null,
         agent.federate ? 1 : 0,
+        agent.webhookUrl ?? null, agent.webhookSecret ?? null, agent.webhookEnabled ? 1 : 0,
+        agent.webhookLastSuccess ?? null, agent.webhookLastFailure ?? null, agent.webhookFailCount ?? 0,
+        agent.platform ?? null, agent.platformVersion ?? null, agent.platformDetectedBy ?? null,
+        agent.tags ? JSON.stringify(agent.tags) : null,
       );
       return agent;
     } catch (err: unknown) {
@@ -278,7 +283,9 @@ export class SqliteStorage implements Storage {
        publicKey = ?, trustScore = ?, morselBalance = ?, createdAt = ?, lastSeen = ?, semantic = ?,
        allowedOrigins = ?, defaultScopes = ?, federate = ?,
        technicalCapabilities = ?, domainCapabilities = ?, activityStats = ?,
-       modulesLoaded = ?, agentLimitations = ?
+       modulesLoaded = ?, agentLimitations = ?,
+       webhookUrl = ?, webhookSecret = ?, webhookEnabled = ?, webhookLastSuccess = ?, webhookLastFailure = ?, webhookFailCount = ?,
+       platform = ?, platformVersion = ?, platformDetectedBy = ?, tags = ?
        WHERE gaii = ?`
     ).run(
       updated.name, updated.owner,
@@ -295,6 +302,10 @@ export class SqliteStorage implements Storage {
       JSON.stringify(updated.activityStats ?? {}),
       JSON.stringify(updated.modulesLoaded ?? []),
       JSON.stringify(updated.agentLimitations ?? []),
+      updated.webhookUrl ?? null, updated.webhookSecret ?? null, updated.webhookEnabled ? 1 : 0,
+      updated.webhookLastSuccess ?? null, updated.webhookLastFailure ?? null, updated.webhookFailCount ?? 0,
+      updated.platform ?? null, updated.platformVersion ?? null, updated.platformDetectedBy ?? null,
+      updated.tags ? JSON.stringify(updated.tags) : null,
       gaii,
     );
     return updated;
@@ -413,6 +424,16 @@ export class SqliteStorage implements Storage {
     if (row.activityStats) record.activityStats = JSON.parse(row.activityStats as string);
     if (row.modulesLoaded) record.modulesLoaded = JSON.parse(row.modulesLoaded as string);
     if (row.agentLimitations) record.agentLimitations = JSON.parse(row.agentLimitations as string);
+    if (row.webhookUrl) record.webhookUrl = row.webhookUrl as string;
+    if (row.webhookSecret) record.webhookSecret = row.webhookSecret as string;
+    record.webhookEnabled = (row as any).webhookEnabled === 1;
+    if (row.webhookLastSuccess) record.webhookLastSuccess = row.webhookLastSuccess as string;
+    if (row.webhookLastFailure) record.webhookLastFailure = row.webhookLastFailure as string;
+    record.webhookFailCount = (row.webhookFailCount as number) ?? 0;
+    if (row.platform) record.platform = row.platform as string;
+    if (row.platformVersion) record.platformVersion = row.platformVersion as string;
+    if (row.platformDetectedBy) record.platformDetectedBy = row.platformDetectedBy as 'auto' | 'self_report' | 'message_reply';
+    if (row.tags) record.tags = JSON.parse(row.tags as string);
     return record;
   }
 

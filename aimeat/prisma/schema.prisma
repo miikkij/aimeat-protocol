@@ -39,6 +39,16 @@ model Agent {
   activityStats         Json?
   modulesLoaded         Json?
   agentLimitations      Json?
+  webhookUrl        String?
+  webhookSecret     String?
+  webhookEnabled    Boolean  @default(false)
+  webhookLastSuccess DateTime?
+  webhookLastFailure DateTime?
+  webhookFailCount  Int      @default(0)
+  platform          String?
+  platformVersion   String?
+  platformDetectedBy String?
+  tags              String[]
   createdAt     DateTime @default(now())
   lastSeen      DateTime @default(now())
 
