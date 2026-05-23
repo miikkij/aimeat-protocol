@@ -300,8 +300,75 @@ await test('12. Agent can check its own version', async () => {
     assert(body.ok === true, 'ok');
 });
 
+// ─── Phase 3: Cross-access authorization ───
+console.log('\nPhase 3 -- Cross-Access Authorization');
+
+const otherOwnerName = `sbother${Date.now()}`;
+let otherOwnerPrivKey = '';
+let otherOwnerToken = '';
+let otherAgentGaii = '';
+let otherAgentToken = '';
+let otherAgentPrivKey = '';
+const otherAgentName = 'other-bundle-agent';
+
+await test('Setup: register second owner + agent', async () => {
+    const { status, body } = await json('/v1/owners', {
+        method: 'POST',
+        body: JSON.stringify({ name: otherOwnerName, public_key: 'placeholder' }),
+    });
+    assert(status === 201, `owner status ${status}`);
+    otherOwnerPrivKey = body.data.private_key;
+    otherOwnerToken = await getToken(otherOwnerName, otherOwnerPrivKey, false);
+
+    const agentRes = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+        body: JSON.stringify({ name: otherAgentName, owner: otherOwnerName, capabilities: ['memory'] }),
+    });
+    assert(agentRes.status === 201, `agent status ${agentRes.status}`);
+    otherAgentGaii = agentRes.body.data.agent.gaii;
+    otherAgentPrivKey = agentRes.body.data.private_key;
+    otherAgentToken = await getToken(otherAgentGaii, otherAgentPrivKey, true);
+});
+
+await test('13. Owner B cannot access Owner A\'s agent bundle (404)', async () => {
+    const { status } = await json(`/v1/agents/${agentName}/skill-bundle?runtime=hermes`, {
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+    });
+    assert(status === 404, `expected 404, got ${status}`);
+});
+
+await test('14. Agent B cannot download Agent A\'s bundle (403)', async () => {
+    const res = await rawFetch(`/v1/agents/${agentName}/skill-bundle?runtime=hermes`, {
+        headers: { Authorization: `Bearer ${otherAgentToken}` },
+    });
+    assert(res.status === 403, `expected 403, got ${res.status}`);
+});
+
+await test('15. Owner B cannot check version for Owner A\'s agent (404)', async () => {
+    const { status } = await json(`/v1/agents/${agentName}/skill-bundle/version?runtime=hermes`, {
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+    });
+    assert(status === 404, `expected 404, got ${status}`);
+});
+
+await test('16. Agent B cannot check version for Agent A\'s bundle (403)', async () => {
+    const { status } = await json(`/v1/agents/${agentName}/skill-bundle/version?runtime=hermes`, {
+        headers: { Authorization: `Bearer ${otherAgentToken}` },
+    });
+    assert(status === 403, `expected 403, got ${status}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
+
+await test('Cascade-delete second owner', async () => {
+    const { status, body } = await json(`/v1/owners/${encodeURIComponent(otherOwnerName)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+});
 
 await test('Cascade-delete owner', async () => {
     const { status, body } = await json(`/v1/owners/${encodeURIComponent(ownerName)}`, {

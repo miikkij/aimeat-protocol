@@ -17255,6 +17255,10 @@ paths:
               schema:
                 type: string
               description: Runtime adapter used
+            Content-Disposition:
+              schema:
+                type: string
+              description: 'attachment; filename="{bundle-name}.zip"'
           content:
             application/zip:
               schema:
