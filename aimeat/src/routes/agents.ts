@@ -18,6 +18,8 @@ import { AgentRegistrationSchema, validateBody } from '../models/schemas.js';
 import { verifyJWT, issueJWT, generateSessionId } from '../auth/jwt.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { emitChange } from '../services/event-bus.js';
+import { createDefaultSteps } from '../models/agent-onboarding-schemas.js';
+import { detectPlatform } from '../services/platform-detector.js';
 
 /** Device authorization code expires after 30 minutes */
 const DEVICE_AUTH_EXPIRY_MS = 1_800_000;
@@ -360,6 +362,38 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       existing_agent: !!existing,
     }));
     emitChange('agents');
+
+    // ── Auto-start Hello Integration onboarding ──
+    const onboardingSteps = createDefaultSteps();
+    onboardingSteps[0].status = 'passed';
+    onboardingSteps[0].validatedAt = now;
+    onboardingSteps[0].validationMethod = 'automatic';
+    onboardingSteps[0].details = { createdAt: existing?.createdAt ?? now };
+
+    const detectedPlatform = detectPlatform(req.headers['user-agent'] as string | undefined);
+    if (detectedPlatform) {
+      onboardingSteps[1].status = 'passed';
+      onboardingSteps[1].validatedAt = now;
+      onboardingSteps[1].validationMethod = 'automatic';
+      onboardingSteps[1].details = { platform: detectedPlatform.id, version: detectedPlatform.version };
+      await storage.updateAgent(gaii, {
+        platform: detectedPlatform.id,
+        platformVersion: detectedPlatform.version,
+        platformDetectedBy: detectedPlatform.detectedBy,
+      });
+    }
+
+    const existingOnboarding = await storage.getOnboarding(gaii);
+    if (!existingOnboarding) {
+      await storage.createOnboarding({
+        agentGaii: gaii,
+        status: 'in_progress',
+        startedAt: now,
+        steps: onboardingSteps,
+        detectedPlatform: detectedPlatform?.id,
+      });
+      emitChange('agent-onboarding');
+    }
   });
 
   // POST /v1/agents — register a new agent (requires owner JWT, local session only)
@@ -478,6 +512,35 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       },
     ]));
     emitChange('agents');
+
+    // ── Auto-start Hello Integration onboarding (direct registration path) ──
+    const regOnboardingSteps = createDefaultSteps();
+    regOnboardingSteps[0].status = 'passed';
+    regOnboardingSteps[0].validatedAt = now;
+    regOnboardingSteps[0].validationMethod = 'automatic';
+    regOnboardingSteps[0].details = { createdAt: now };
+
+    const regDetected = detectPlatform(req.headers['user-agent'] as string | undefined);
+    if (regDetected) {
+      regOnboardingSteps[1].status = 'passed';
+      regOnboardingSteps[1].validatedAt = now;
+      regOnboardingSteps[1].validationMethod = 'automatic';
+      regOnboardingSteps[1].details = { platform: regDetected.id, version: regDetected.version };
+      await storage.updateAgent(gaii, {
+        platform: regDetected.id,
+        platformVersion: regDetected.version,
+        platformDetectedBy: regDetected.detectedBy,
+      });
+    }
+
+    await storage.createOnboarding({
+      agentGaii: gaii,
+      status: 'in_progress',
+      startedAt: now,
+      steps: regOnboardingSteps,
+      detectedPlatform: regDetected?.id,
+    });
+    emitChange('agent-onboarding');
   });
 
   // GET /v1/agents/device-authorize/pending — list pending device auth requests for the logged-in owner

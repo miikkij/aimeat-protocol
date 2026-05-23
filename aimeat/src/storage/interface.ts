@@ -1605,6 +1605,48 @@ export interface WebhookDeliveryLog {
   createdAt: string;
 }
 
+// ── Agent Onboarding (Phase B Hello Integration) ──
+
+export interface AgentOnboardingStep {
+  id: string;
+  order: number;
+  title: string;
+  description: string;
+  status: 'pending' | 'passed' | 'failed' | 'skipped';
+  required: boolean;
+  validatedAt?: string;
+  validationMethod: 'automatic' | 'api_call' | 'owner_confirm';
+  details?: Record<string, unknown>;
+  failureReason?: string;
+}
+
+export interface AgentOnboardingRecord {
+  agentGaii: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  startedAt: string;
+  completedAt?: string;
+  steps: AgentOnboardingStep[];
+  readinessScore?: number;
+  readinessLevel?: 'basic' | 'standard' | 'full' | 'expert';
+  detectedPlatform?: string;
+  installedRuntime?: string;
+  onboardingBaseline?: number;
+  operationalHealth?: number;
+  healthComponents?: {
+    deliveryHealth: number;
+    telemetryContinuity: number;
+    taskCompletion: number;
+  };
+  healthRecalculatedAt?: string;
+  readinessOverride?: {
+    level: 'basic' | 'standard' | 'full' | 'expert';
+    setBy: string;
+    setAt: string;
+    expiresAt: string;
+    reason?: string;
+  };
+}
+
 // ── Domain Repository Interfaces ────────────────────────────────────
 import type { OwnerRepository } from './repositories/owner.repository.js';
 import type { AgentRepository } from './repositories/agent.repository.js';
@@ -1651,6 +1693,7 @@ import type { SharingGroupRepository } from './repositories/sharing-group.reposi
 import type { AgentActivityRepository } from './repositories/agent-activity.repository.js';
 import type { AgentMessageRepository } from './repositories/agent-message.repository.js';
 import type { AgentTelemetryRepository, AgentWebhookRepository } from './repositories/agent-webhook.repository.js';
+import type { AgentOnboardingRepository } from './repositories/agent-onboarding.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -1672,4 +1715,5 @@ export interface Storage extends
   AgentTaskRepository, AgentDirectivesRepository, SharingGroupRepository, AgentActivityRepository,
   AgentMessageRepository,
   AgentTelemetryRepository, AgentWebhookRepository,
+  AgentOnboardingRepository,
   StatsRepository { }

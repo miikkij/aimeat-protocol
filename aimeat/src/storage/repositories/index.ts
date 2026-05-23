@@ -39,3 +39,4 @@ export type { SharingGroupRepository } from './sharing-group.repository.js';
 export type { AgentActivityRepository } from './agent-activity.repository.js';
 export type { AgentMessageRepository } from './agent-message.repository.js';
 export type { AgentTelemetryRepository, AgentWebhookRepository } from './agent-webhook.repository.js';
+export type { AgentOnboardingRepository } from './agent-onboarding.repository.js';

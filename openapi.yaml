@@ -132,6 +132,8 @@ tags:
     description: Webhook registration, testing, and delivery log for push-based agent notifications
   - name: Agent Telemetry
     description: Telemetry event collection and retrieval for agent observability
+  - name: Agent Onboarding
+    description: Hello Integration onboarding flow for new agents
   - name: Sharing Groups
     description: Named groups for sharing memory and files with specific users and agents
 
@@ -2593,6 +2595,59 @@ components:
         processedAt:
           type: string
           format: date-time
+
+    AgentOnboardingRecord:
+      type: object
+      properties:
+        agentGaii:
+          type: string
+        status:
+          type: string
+          enum: [pending, in_progress, completed, failed]
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentOnboardingStep'
+        readinessScore:
+          type: integer
+        readinessLevel:
+          type: string
+          enum: [basic, standard, full, expert]
+        detectedPlatform:
+          type: string
+        installedRuntime:
+          type: string
+
+    AgentOnboardingStep:
+      type: object
+      properties:
+        id:
+          type: string
+        order:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [pending, passed, failed, skipped]
+        required:
+          type: boolean
+        validatedAt:
+          type: string
+          format: date-time
+        validationMethod:
+          type: string
+          enum: [automatic, api_call, owner_confirm]
+        failureReason:
+          type: string
 
   # === Reusable Response Wrappers ===
   responses:
@@ -17324,6 +17379,153 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # Agent Onboarding (Hello Integration)
+  # ============================================================
+
+  /v1/agents/{name}/onboarding:
+    get:
+      operationId: getAgentOnboardingStatus
+      summary: Get onboarding status
+      description: |
+        Returns the Hello Integration onboarding record with all step statuses.
+        Auto-validates observable steps on each request.
+      tags: [Agent Onboarding]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name
+      responses:
+        '200':
+          description: Onboarding status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentOnboardingRecord'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: cancelAgentOnboarding
+      summary: Cancel onboarding
+      description: Cancel in-progress onboarding. Owner only.
+      tags: [Agent Onboarding]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name
+      responses:
+        '200':
+          description: Onboarding cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/onboarding/start:
+    post:
+      operationId: startAgentOnboarding
+      summary: Start or reset onboarding
+      description: |
+        Start the Hello Integration onboarding process. Creates a test task
+        for steps 9-10. Owner only.
+      tags: [Agent Onboarding]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name
+      responses:
+        '200':
+          description: Onboarding started
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentOnboardingRecord'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/onboarding/step/{stepId}:
+    post:
+      operationId: confirmAgentOnboardingStep
+      summary: Confirm an onboarding step
+      description: |
+        Agent confirms completion of an onboarding step. Server validates
+        against actual system state.
+      tags: [Agent Onboarding]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name
+        - name: stepId
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - authenticate
+              - identify_platform
+              - install_skill
+              - report_capabilities
+              - read_directives
+              - send_test_message
+              - configure_delivery
+              - report_telemetry
+              - accept_test_task
+              - complete_test_task
+              - declare_services
+          description: Onboarding step identifier
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Step-specific payload (varies by step ID)
+      responses:
+        '200':
+          description: Step validation result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentOnboardingRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
 
   # ============================================================
   # Owner Agent Defaults

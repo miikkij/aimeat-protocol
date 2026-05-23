@@ -1345,6 +1345,26 @@ model WebhookDeliveryLog {
   @@index([agentGaii, createdAt])
 }
 
+model AgentOnboarding {
+  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  agentGaii            String   @unique
+  status               String   @default("pending")
+  startedAt            DateTime @default(now())
+  completedAt          DateTime?
+  steps                Json     @default("[]")
+  readinessScore       Int?
+  readinessLevel       String?
+  detectedPlatform     String?
+  installedRuntime     String?
+  onboardingBaseline   Int?
+  operationalHealth    Float?
+  healthComponents     Json?
+  healthRecalculatedAt DateTime?
+  readinessOverride    Json?
+
+  @@index([status])
+}
+
 model AgentMessage {
   id           String    @id @map("_id")
   agentGaii    String

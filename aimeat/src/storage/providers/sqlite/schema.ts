@@ -1299,6 +1299,25 @@ export function initializeSchema(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_delivery_log_agent ON webhook_delivery_log(agentGaii, createdAt);
 
+    -- ── Agent Onboarding (Phase B Hello Integration) ──
+    CREATE TABLE IF NOT EXISTS agent_onboarding (
+      agentGaii TEXT PRIMARY KEY,
+      status TEXT NOT NULL DEFAULT 'pending',
+      startedAt TEXT NOT NULL,
+      completedAt TEXT,
+      steps TEXT NOT NULL DEFAULT '[]',
+      readinessScore INTEGER,
+      readinessLevel TEXT,
+      detectedPlatform TEXT,
+      installedRuntime TEXT,
+      onboardingBaseline INTEGER,
+      operationalHealth REAL,
+      healthComponents TEXT,
+      healthRecalculatedAt TEXT,
+      readinessOverride TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_onboarding_status ON agent_onboarding(status);
+
   `);
 
   // ── Schema migrations for existing databases ──

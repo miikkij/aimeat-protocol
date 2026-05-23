@@ -5128,5 +5128,46 @@
     "filterByType": "Suodata lähteen mukaan",
     "myCapabilities": "Omat kyvykkyydet",
     "totalCount": "{count} kyvykkyyttä"
+  },
+  "agentOnboarding": {
+    "title": "Hello-integraatio",
+    "status": "Perehdytyksen tila",
+    "notStarted": "Ei aloitettu",
+    "inProgress": "Käynnissä",
+    "completed": "Valmis",
+    "failed": "Epäonnistunut",
+    "progress": "Edistyminen",
+    "startButton": "Aloita Hello-integraatio",
+    "restartButton": "Suorita uudelleen",
+    "cancelButton": "Peruuta",
+    "steps": {
+      "authenticate": "Tunnistaudu",
+      "identify_platform": "Tunnista alusta",
+      "install_skill": "Asenna taitopaketti",
+      "report_capabilities": "Raportoi kyvykkyydet",
+      "read_directives": "Lue ohjeistukset",
+      "send_test_message": "Lähetä testiviesti",
+      "configure_delivery": "Määritä toimitus",
+      "report_telemetry": "Raportoi telemetria",
+      "accept_test_task": "Hyväksy testitehtävä",
+      "complete_test_task": "Suorita testitehtävä",
+      "declare_services": "Ilmoita palvelut"
+    },
+    "readiness": {
+      "title": "Valmius",
+      "basic": "Perus",
+      "standard": "Normaali",
+      "full": "Täysi",
+      "expert": "Asiantuntija",
+      "overrideActive": "Manuaalinen ohitus aktiivinen",
+      "overrideExpires": "Vanhenee"
+    },
+    "platform": {
+      "title": "Alusta",
+      "autoDetected": "Automaattisesti tunnistettu",
+      "selfReported": "Itse ilmoitettu",
+      "messageReply": "Viestivastaus",
+      "unknown": "Tuntematon"
+    }
   }
 }

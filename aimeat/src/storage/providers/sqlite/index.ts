@@ -44,6 +44,7 @@ import type {
   AgentMessageRecord,
   TelemetryEvent,
   WebhookDeliveryLog,
+  AgentOnboardingRecord,
 } from '../../interface.js';
 import { initializeSchema } from './schema.js';
 
@@ -5836,6 +5837,115 @@ export class SqliteStorage implements Storage {
 
   async listThreads(agentGaii: string): Promise<{ threadId: string; lastMessage: string; messageCount: number; updatedAt: string }[]> {
     return agentMessageRepo.listThreads(this.db, agentGaii);
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Agent Onboarding ──
+  // ══════════════════════════════════════════════════════════
+
+  private deserializeOnboarding(row: Record<string, unknown>): AgentOnboardingRecord {
+    return {
+      agentGaii: row.agentGaii as string,
+      status: row.status as AgentOnboardingRecord['status'],
+      startedAt: row.startedAt as string,
+      completedAt: row.completedAt as string | undefined,
+      steps: JSON.parse(row.steps as string),
+      readinessScore: row.readinessScore as number | undefined,
+      readinessLevel: row.readinessLevel as AgentOnboardingRecord['readinessLevel'],
+      detectedPlatform: row.detectedPlatform as string | undefined,
+      installedRuntime: row.installedRuntime as string | undefined,
+      onboardingBaseline: row.onboardingBaseline as number | undefined,
+      operationalHealth: row.operationalHealth as number | undefined,
+      healthComponents: row.healthComponents ? JSON.parse(row.healthComponents as string) : undefined,
+      healthRecalculatedAt: row.healthRecalculatedAt as string | undefined,
+      readinessOverride: row.readinessOverride ? JSON.parse(row.readinessOverride as string) : undefined,
+    };
+  }
+
+  async createOnboarding(record: AgentOnboardingRecord): Promise<AgentOnboardingRecord> {
+    this.db.prepare(
+      `INSERT INTO agent_onboarding
+       (agentGaii, status, startedAt, completedAt, steps, readinessScore, readinessLevel,
+        detectedPlatform, installedRuntime, onboardingBaseline, operationalHealth,
+        healthComponents, healthRecalculatedAt, readinessOverride)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      record.agentGaii,
+      record.status,
+      record.startedAt,
+      record.completedAt ?? null,
+      JSON.stringify(record.steps),
+      record.readinessScore ?? null,
+      record.readinessLevel ?? null,
+      record.detectedPlatform ?? null,
+      record.installedRuntime ?? null,
+      record.onboardingBaseline ?? null,
+      record.operationalHealth ?? null,
+      record.healthComponents ? JSON.stringify(record.healthComponents) : null,
+      record.healthRecalculatedAt ?? null,
+      record.readinessOverride ? JSON.stringify(record.readinessOverride) : null,
+    );
+    return record;
+  }
+
+  async getOnboarding(agentGaii: string): Promise<AgentOnboardingRecord | null> {
+    const row = this.db.prepare(
+      'SELECT * FROM agent_onboarding WHERE agentGaii = ?'
+    ).get(agentGaii) as Record<string, unknown> | undefined;
+    return row ? this.deserializeOnboarding(row) : null;
+  }
+
+  async updateOnboarding(agentGaii: string, updates: Partial<AgentOnboardingRecord>): Promise<AgentOnboardingRecord | null> {
+    const existing = await this.getOnboarding(agentGaii);
+    if (!existing) return null;
+
+    const merged = { ...existing, ...updates, agentGaii };
+    this.db.prepare(
+      `UPDATE agent_onboarding SET
+         status = ?, startedAt = ?, completedAt = ?, steps = ?,
+         readinessScore = ?, readinessLevel = ?,
+         detectedPlatform = ?, installedRuntime = ?,
+         onboardingBaseline = ?, operationalHealth = ?,
+         healthComponents = ?, healthRecalculatedAt = ?, readinessOverride = ?
+       WHERE agentGaii = ?`
+    ).run(
+      merged.status,
+      merged.startedAt,
+      merged.completedAt ?? null,
+      JSON.stringify(merged.steps),
+      merged.readinessScore ?? null,
+      merged.readinessLevel ?? null,
+      merged.detectedPlatform ?? null,
+      merged.installedRuntime ?? null,
+      merged.onboardingBaseline ?? null,
+      merged.operationalHealth ?? null,
+      merged.healthComponents ? JSON.stringify(merged.healthComponents) : null,
+      merged.healthRecalculatedAt ?? null,
+      merged.readinessOverride ? JSON.stringify(merged.readinessOverride) : null,
+      agentGaii,
+    );
+    return this.getOnboarding(agentGaii);
+  }
+
+  async deleteOnboarding(agentGaii: string): Promise<boolean> {
+    const result = this.db.prepare(
+      'DELETE FROM agent_onboarding WHERE agentGaii = ?'
+    ).run(agentGaii);
+    return result.changes > 0;
+  }
+
+  async listOnboardingByOwner(owner: string): Promise<AgentOnboardingRecord[]> {
+    const rows = this.db.prepare(
+      `SELECT * FROM agent_onboarding WHERE agentGaii LIKE ? ORDER BY startedAt DESC`
+    ).all(`%#${owner}@%`) as Record<string, unknown>[];
+    return rows.map(row => this.deserializeOnboarding(row));
+  }
+
+  async listOnboardingByStatus(status: string): Promise<AgentOnboardingRecord[]> {
+    const rows = this.db.prepare(
+      'SELECT * FROM agent_onboarding WHERE status = ? ORDER BY startedAt DESC'
+    ).all(status) as Record<string, unknown>[];
+    return rows.map(row => this.deserializeOnboarding(row));
   }
 
   // ══════════════════════════════════════════════════════════

@@ -80,6 +80,8 @@ import type {
     AgentMessageRecord,
     TelemetryEvent,
     WebhookDeliveryLog,
+    AgentOnboardingRecord,
+    AgentOnboardingStep,
 } from '../../interface.js';
 
 import { matchesRecipient } from '../../../services/consent.js';
@@ -5984,6 +5986,114 @@ export class MongoStorage implements Storage {
         // Sort by updatedAt descending
         results.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
         return results;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // ── Agent Onboarding ──
+    // ══════════════════════════════════════════════════════════
+
+    private toOnboardingRecord(row: any): AgentOnboardingRecord {
+        return {
+            agentGaii: row.agentGaii,
+            status: row.status,
+            startedAt: row.startedAt instanceof Date ? row.startedAt.toISOString() : row.startedAt,
+            completedAt: row.completedAt instanceof Date ? row.completedAt.toISOString() : row.completedAt ?? undefined,
+            steps: row.steps as AgentOnboardingStep[],
+            readinessScore: row.readinessScore ?? undefined,
+            readinessLevel: row.readinessLevel ?? undefined,
+            detectedPlatform: row.detectedPlatform ?? undefined,
+            installedRuntime: row.installedRuntime ?? undefined,
+            onboardingBaseline: row.onboardingBaseline ?? undefined,
+            operationalHealth: row.operationalHealth ?? undefined,
+            healthComponents: row.healthComponents as AgentOnboardingRecord['healthComponents'] ?? undefined,
+            healthRecalculatedAt: row.healthRecalculatedAt instanceof Date ? row.healthRecalculatedAt.toISOString() : row.healthRecalculatedAt ?? undefined,
+            readinessOverride: row.readinessOverride as AgentOnboardingRecord['readinessOverride'] ?? undefined,
+        };
+    }
+
+    async createOnboarding(record: AgentOnboardingRecord): Promise<AgentOnboardingRecord> {
+        this.ensureReady();
+        const row = await this.prisma.agentOnboarding.create({
+            data: {
+                agentGaii: record.agentGaii,
+                status: record.status,
+                startedAt: new Date(record.startedAt),
+                completedAt: record.completedAt ? new Date(record.completedAt) : null,
+                steps: record.steps as any,
+                readinessScore: record.readinessScore ?? null,
+                readinessLevel: record.readinessLevel ?? null,
+                detectedPlatform: record.detectedPlatform ?? null,
+                installedRuntime: record.installedRuntime ?? null,
+                onboardingBaseline: record.onboardingBaseline ?? null,
+                operationalHealth: record.operationalHealth ?? null,
+                healthComponents: record.healthComponents as any ?? null,
+                healthRecalculatedAt: record.healthRecalculatedAt ? new Date(record.healthRecalculatedAt) : null,
+                readinessOverride: record.readinessOverride as any ?? null,
+            },
+        });
+        return this.toOnboardingRecord(row);
+    }
+
+    async getOnboarding(agentGaii: string): Promise<AgentOnboardingRecord | null> {
+        this.ensureReady();
+        try {
+            const row = await this.prisma.agentOnboarding.findUnique({ where: { agentGaii } });
+            return row ? this.toOnboardingRecord(row) : null;
+        } catch {
+            return null;
+        }
+    }
+
+    async updateOnboarding(agentGaii: string, updates: Partial<AgentOnboardingRecord>): Promise<AgentOnboardingRecord | null> {
+        this.ensureReady();
+        try {
+            const data: any = {};
+            if (updates.status !== undefined) data.status = updates.status;
+            if (updates.startedAt !== undefined) data.startedAt = new Date(updates.startedAt);
+            if (updates.completedAt !== undefined) data.completedAt = updates.completedAt ? new Date(updates.completedAt) : null;
+            if (updates.steps !== undefined) data.steps = updates.steps as any;
+            if (updates.readinessScore !== undefined) data.readinessScore = updates.readinessScore ?? null;
+            if (updates.readinessLevel !== undefined) data.readinessLevel = updates.readinessLevel ?? null;
+            if (updates.detectedPlatform !== undefined) data.detectedPlatform = updates.detectedPlatform ?? null;
+            if (updates.installedRuntime !== undefined) data.installedRuntime = updates.installedRuntime ?? null;
+            if (updates.onboardingBaseline !== undefined) data.onboardingBaseline = updates.onboardingBaseline ?? null;
+            if (updates.operationalHealth !== undefined) data.operationalHealth = updates.operationalHealth ?? null;
+            if (updates.healthComponents !== undefined) data.healthComponents = updates.healthComponents as any ?? null;
+            if (updates.healthRecalculatedAt !== undefined) data.healthRecalculatedAt = updates.healthRecalculatedAt ? new Date(updates.healthRecalculatedAt) : null;
+            if (updates.readinessOverride !== undefined) data.readinessOverride = updates.readinessOverride as any ?? null;
+            const row = await this.prisma.agentOnboarding.update({ where: { agentGaii }, data });
+            return this.toOnboardingRecord(row);
+        } catch {
+            return null;
+        }
+    }
+
+    async deleteOnboarding(agentGaii: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.agentOnboarding.delete({ where: { agentGaii } });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    async listOnboardingByOwner(owner: string): Promise<AgentOnboardingRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.agentOnboarding.findMany({
+            where: { agentGaii: { contains: `#${owner}@` } },
+            orderBy: { startedAt: 'desc' },
+        });
+        return rows.map((r: any) => this.toOnboardingRecord(r));
+    }
+
+    async listOnboardingByStatus(status: string): Promise<AgentOnboardingRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.agentOnboarding.findMany({
+            where: { status },
+            orderBy: { startedAt: 'desc' },
+        });
+        return rows.map((r: any) => this.toOnboardingRecord(r));
     }
 
     // ── Agent Telemetry ──

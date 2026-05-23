@@ -92,6 +92,7 @@ import { agentMessagesRouter } from '../routes/agent-messages.js';
 import { agentWebhookRouter } from '../routes/agent-webhook.js';
 import { agentTelemetryRouter } from '../routes/agent-telemetry.js';
 import { agentSkillBundleRouter } from '../routes/agent-skill-bundle.js';
+import { agentOnboardingRouter } from '../routes/agent-onboarding.js';
 
 // Services needed during route mounting
 import { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
@@ -231,6 +232,7 @@ export async function mountRoutes(
   app.use(agentWebhookRouter(config, storage));
   app.use(agentTelemetryRouter(config, storage));
   app.use(agentSkillBundleRouter(config, storage));
+  app.use(agentOnboardingRouter(config, storage));
   app.use(agentIntegrationRouter(config, storage));
   app.use(agentsRouter(config, storage));
   const notifyDirectoryChange = () => directoryService.notifyChange();

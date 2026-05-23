@@ -5128,5 +5128,46 @@
     "filterByType": "Filter by source",
     "myCapabilities": "My Capabilities",
     "totalCount": "{count} capabilities"
+  },
+  "agentOnboarding": {
+    "title": "Hello Integration",
+    "status": "Onboarding Status",
+    "notStarted": "Not started",
+    "inProgress": "In progress",
+    "completed": "Completed",
+    "failed": "Failed",
+    "progress": "Progress",
+    "startButton": "Start Hello Integration",
+    "restartButton": "Re-run Hello Integration",
+    "cancelButton": "Cancel",
+    "steps": {
+      "authenticate": "Authenticate",
+      "identify_platform": "Identify Platform",
+      "install_skill": "Install Skill Bundle",
+      "report_capabilities": "Report Capabilities",
+      "read_directives": "Read Directives",
+      "send_test_message": "Send Test Message",
+      "configure_delivery": "Configure Delivery",
+      "report_telemetry": "Report Telemetry",
+      "accept_test_task": "Accept Test Task",
+      "complete_test_task": "Complete Test Task",
+      "declare_services": "Declare Services"
+    },
+    "readiness": {
+      "title": "Readiness",
+      "basic": "Basic",
+      "standard": "Standard",
+      "full": "Full",
+      "expert": "Expert",
+      "overrideActive": "Manual override active",
+      "overrideExpires": "Expires"
+    },
+    "platform": {
+      "title": "Platform",
+      "autoDetected": "Auto-detected",
+      "selfReported": "Self-reported",
+      "messageReply": "Message reply",
+      "unknown": "Unknown"
+    }
   }
 }
