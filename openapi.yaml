@@ -16900,15 +16900,31 @@ paths:
                     properties:
                       data:
                         type: object
+                        required: [configured]
                         properties:
+                          configured:
+                            type: boolean
+                            description: Whether a webhook URL is configured for this agent
                           url:
                             type: string
                             format: uri
+                            description: Webhook URL (present only when configured is true)
                           enabled:
                             type: boolean
+                            description: Whether webhook delivery is enabled (present only when configured is true)
+                          last_success:
+                            type: string
+                            format: date-time
+                            nullable: true
+                            description: Timestamp of last successful delivery (present only when configured is true)
+                          last_failure:
+                            type: string
+                            format: date-time
+                            nullable: true
+                            description: Timestamp of last failed delivery (present only when configured is true)
                           fail_count:
                             type: integer
-                            description: Consecutive delivery failure count
+                            description: Consecutive delivery failure count (present only when configured is true)
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -16940,7 +16956,7 @@ paths:
                       data:
                         type: object
                         properties:
-                          deleted:
+                          removed:
                             type: boolean
                             example: true
         '403':
