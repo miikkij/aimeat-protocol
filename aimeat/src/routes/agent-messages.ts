@@ -20,6 +20,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
+import { emitResourceUpdated } from '../mcp/index.js';
 import { AgentMessageCreateSchema, AgentMessageStatusSchema } from '../models/agent-message-schemas.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 
@@ -110,16 +111,19 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
 
     const created = await storage.createMessage(record);
 
-    // Dispatch webhook for inbound messages (owner -> agent, fire-and-forget)
-    if (webhookDispatcher && record.direction === 'inbound') {
-      webhookDispatcher.dispatchWebhookEvent(agentGaii, 'message.inbound', {
-        message_id: record.id,
-        thread_id: record.threadId,
-        linked_task_id: record.linkedTaskId ?? null,
-        preview: record.content.substring(0, 200),
-        has_proposed_task: !!(record.metadata?.proposedTask),
-        created_at: record.createdAt,
-      });
+    // Push: webhook + MCP notification (parallel, fire-and-forget)
+    if (record.direction === 'inbound') {
+      if (webhookDispatcher) {
+        webhookDispatcher.dispatchWebhookEvent(agentGaii, 'message.inbound', {
+          message_id: record.id,
+          thread_id: record.threadId,
+          linked_task_id: record.linkedTaskId ?? null,
+          preview: record.content.substring(0, 200),
+          has_proposed_task: !!(record.metadata?.proposedTask),
+          created_at: record.createdAt,
+        });
+      }
+      try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/messages`); } catch { /* MCP not connected */ }
     }
 
     res.status(201).json(success(config.nodeId, { message: created }, [

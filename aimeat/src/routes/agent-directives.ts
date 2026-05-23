@@ -19,6 +19,7 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
+import { emitResourceUpdated } from '../mcp/index.js';
 import { AgentDirectivesSchema, OwnerAgentDefaultsSchema } from '../models/agent-directives-schemas.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 
@@ -124,7 +125,7 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
       updatedAt: now,
     });
 
-    // Dispatch webhook for directive updates (fire-and-forget)
+    // Push: webhook + MCP notification (parallel, fire-and-forget)
     if (webhookDispatcher) {
       const changedSections: string[] = [];
       if (body.purpose !== undefined) changedSections.push('purpose');
@@ -141,6 +142,7 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
         });
       }
     }
+    try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/directives`); } catch { /* MCP not connected */ }
 
     emitChange('agent-directives');
 

@@ -30,6 +30,7 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
+import { emitResourceUpdated } from '../mcp/index.js';
 import { recordTaskStarted, recordTaskCompleted, recordTaskFailed } from '../services/activity-recorder.js';
 import { AgentTaskCreateSchema, AgentTaskUpdateSchema, AgentTaskEventSchema, AgentTaskTodoUpdateSchema } from '../models/agent-task-schemas.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
@@ -123,17 +124,20 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
 
     const created = await storage.createAgentTask(record);
 
-    // Dispatch webhook for queued tasks (fire-and-forget)
-    if (webhookDispatcher && record.status === 'queued') {
-      webhookDispatcher.dispatchWebhookEvent(agentGaii, 'task.queued', {
-        task_id: record.id,
-        title: record.title,
-        description: record.description ?? '',
-        has_todos: (record.todos?.length ?? 0) > 0,
-        todo_count: record.todos?.length ?? 0,
-        scope_summary: (record.scope ?? []).slice(0, 5).map((s: AgentTaskScope) => `${s.type || s.name}:${s.value}`),
-        created_at: record.createdAt,
-      });
+    // Push: webhook + MCP notification (parallel, fire-and-forget)
+    if (record.status === 'queued') {
+      if (webhookDispatcher) {
+        webhookDispatcher.dispatchWebhookEvent(agentGaii, 'task.queued', {
+          task_id: record.id,
+          title: record.title,
+          description: record.description ?? '',
+          has_todos: (record.todos?.length ?? 0) > 0,
+          todo_count: record.todos?.length ?? 0,
+          scope_summary: (record.scope ?? []).slice(0, 5).map((s: AgentTaskScope) => `${s.type || s.name}:${s.value}`),
+          created_at: record.createdAt,
+        });
+      }
+      try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/tasks`); } catch { /* MCP not connected */ }
     }
 
     res.status(201).json(success(config.nodeId, { task: created }, [
@@ -366,7 +370,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
 
     await recordTaskStarted(storage, task.agentGaii);
 
-    // Dispatch webhook for task approval/start (fire-and-forget)
+    // Push: webhook + MCP notification (parallel, fire-and-forget)
     if (webhookDispatcher) {
       webhookDispatcher.dispatchWebhookEvent(task.agentGaii, 'task.approved', {
         task_id: task.id,
@@ -377,6 +381,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
         approved_at: now,
       });
     }
+    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${req.params.name as string}/tasks`); } catch { /* MCP not connected */ }
 
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks');
@@ -418,6 +423,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
       timestamp: now,
     });
 
+    // Push: webhook + MCP notification (parallel, fire-and-forget)
     if (webhookDispatcher) {
       webhookDispatcher.dispatchWebhookEvent(task.agentGaii, 'task.paused', {
         task_id: task.id,
@@ -426,6 +432,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
         paused_at: now,
       });
     }
+    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${req.params.name as string}/tasks`); } catch { /* MCP not connected */ }
 
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks');
