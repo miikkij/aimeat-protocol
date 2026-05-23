@@ -90,6 +90,7 @@ import { agentCapabilitiesRouter } from '../routes/agent-capabilities.js';
 import { agentActivityRouter } from '../routes/agent-activity.js';
 import { agentMessagesRouter } from '../routes/agent-messages.js';
 import { agentWebhookRouter } from '../routes/agent-webhook.js';
+import { agentTelemetryRouter } from '../routes/agent-telemetry.js';
 
 // Services needed during route mounting
 import { createPushService } from '../services/push.js';
@@ -223,6 +224,7 @@ export async function mountRoutes(
   app.use(agentActivityRouter(config, storage));
   app.use(agentMessagesRouter(config, storage));
   app.use(agentWebhookRouter(config, storage));
+  app.use(agentTelemetryRouter(config, storage));
   app.use(agentIntegrationRouter(config, storage));
   app.use(agentsRouter(config, storage));
   const notifyDirectoryChange = () => directoryService.notifyChange();
