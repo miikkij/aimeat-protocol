@@ -1318,6 +1318,33 @@ model AgentActivity {
   @@index([agentGaii, date])
 }
 
+model TelemetryEvent {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  agentGaii String
+  type      String
+  data      Json
+  sessionId String?
+  taskId    String?
+  createdAt DateTime @default(now())
+
+  @@index([agentGaii, createdAt])
+}
+
+model WebhookDeliveryLog {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  agentGaii    String
+  event        String
+  payload      Json
+  status       String
+  httpStatus   Int?
+  errorMessage String?
+  attemptCount Int
+  latencyMs    Int
+  createdAt    DateTime @default(now())
+
+  @@index([agentGaii, createdAt])
+}
+
 model AgentMessage {
   id           String    @id @map("_id")
   agentGaii    String

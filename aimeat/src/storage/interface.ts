@@ -1580,6 +1580,31 @@ export interface AgentMessageRecord {
   processedAt?: string;
 }
 
+// ── Telemetry + Webhook Delivery Log (Phase A) ──
+
+export interface TelemetryEvent {
+  id: string;
+  agentGaii: string;
+  type: 'llm_call' | 'tool_call' | 'agent_report';
+  data: Record<string, unknown>;
+  sessionId?: string;
+  taskId?: string;
+  createdAt: string;
+}
+
+export interface WebhookDeliveryLog {
+  id: string;
+  agentGaii: string;
+  event: string;
+  payload: Record<string, unknown>;
+  status: 'success' | 'failed';
+  httpStatus?: number;
+  errorMessage?: string;
+  attemptCount: number;
+  latencyMs: number;
+  createdAt: string;
+}
+
 // ── Domain Repository Interfaces ────────────────────────────────────
 import type { OwnerRepository } from './repositories/owner.repository.js';
 import type { AgentRepository } from './repositories/agent.repository.js';
@@ -1625,6 +1650,7 @@ import type { AgentDirectivesRepository } from './repositories/agent-directives.
 import type { SharingGroupRepository } from './repositories/sharing-group.repository.js';
 import type { AgentActivityRepository } from './repositories/agent-activity.repository.js';
 import type { AgentMessageRepository } from './repositories/agent-message.repository.js';
+import type { AgentTelemetryRepository, AgentWebhookRepository } from './repositories/agent-webhook.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -1645,4 +1671,5 @@ export interface Storage extends
   CapabilityRepository,
   AgentTaskRepository, AgentDirectivesRepository, SharingGroupRepository, AgentActivityRepository,
   AgentMessageRepository,
+  AgentTelemetryRepository, AgentWebhookRepository,
   StatsRepository { }

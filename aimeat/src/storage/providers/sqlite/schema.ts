@@ -1272,6 +1272,33 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_agent_messages_agent ON agent_messages(agentGaii, threadId, createdAt);
     CREATE INDEX IF NOT EXISTS idx_agent_messages_pending ON agent_messages(agentGaii, status);
 
+    -- ── Telemetry Events (Phase A push layer) ──
+    CREATE TABLE IF NOT EXISTS telemetry_events (
+      id TEXT PRIMARY KEY,
+      agentGaii TEXT NOT NULL,
+      type TEXT NOT NULL,
+      data TEXT NOT NULL DEFAULT '{}',
+      sessionId TEXT,
+      taskId TEXT,
+      createdAt TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_telemetry_agent_created ON telemetry_events(agentGaii, createdAt);
+
+    -- ── Webhook Delivery Log (Phase A push layer) ──
+    CREATE TABLE IF NOT EXISTS webhook_delivery_log (
+      id TEXT PRIMARY KEY,
+      agentGaii TEXT NOT NULL,
+      event TEXT NOT NULL,
+      payload TEXT NOT NULL DEFAULT '{}',
+      status TEXT NOT NULL,
+      httpStatus INTEGER,
+      errorMessage TEXT,
+      attemptCount INTEGER NOT NULL DEFAULT 1,
+      latencyMs INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_delivery_log_agent ON webhook_delivery_log(agentGaii, createdAt);
+
   `);
 
   // ── Schema migrations for existing databases ──

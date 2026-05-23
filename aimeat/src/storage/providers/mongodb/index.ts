@@ -78,6 +78,8 @@ import type {
     SharingGroupRecord,
     AgentActivityRecord,
     AgentMessageRecord,
+    TelemetryEvent,
+    WebhookDeliveryLog,
 } from '../../interface.js';
 
 import { matchesRecipient } from '../../../services/consent.js';
@@ -5982,6 +5984,111 @@ export class MongoStorage implements Storage {
         // Sort by updatedAt descending
         results.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
         return results;
+    }
+
+    // ── Agent Telemetry ──
+
+    private toTelemetryEvent(row: any): TelemetryEvent {
+        return {
+            id: row.id,
+            agentGaii: row.agentGaii,
+            type: row.type,
+            data: row.data as Record<string, unknown>,
+            sessionId: row.sessionId ?? undefined,
+            taskId: row.taskId ?? undefined,
+            createdAt: row.createdAt.toISOString(),
+        };
+    }
+
+    async appendTelemetry(event: TelemetryEvent): Promise<void> {
+        this.ensureReady();
+        await this.prisma.telemetryEvent.create({
+            data: {
+                id: event.id,
+                agentGaii: event.agentGaii,
+                type: event.type,
+                data: event.data,
+                sessionId: event.sessionId ?? null,
+                taskId: event.taskId ?? null,
+                createdAt: new Date(event.createdAt),
+            },
+        });
+    }
+
+    async listTelemetry(agentGaii: string, opts: { since?: string; type?: string; limit?: number }): Promise<TelemetryEvent[]> {
+        this.ensureReady();
+        const where: any = { agentGaii };
+        if (opts.type) where.type = opts.type;
+        if (opts.since) where.createdAt = { gt: new Date(opts.since) };
+        const rows = await this.prisma.telemetryEvent.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            take: opts.limit ?? 50,
+        });
+        return rows.map((r: any) => this.toTelemetryEvent(r));
+    }
+
+    // ── Webhook Delivery Log ──
+
+    private toDeliveryLog(row: any): WebhookDeliveryLog {
+        return {
+            id: row.id,
+            agentGaii: row.agentGaii,
+            event: row.event,
+            payload: row.payload as Record<string, unknown>,
+            status: row.status as 'success' | 'failed',
+            httpStatus: row.httpStatus ?? undefined,
+            errorMessage: row.errorMessage ?? undefined,
+            attemptCount: row.attemptCount,
+            latencyMs: row.latencyMs,
+            createdAt: row.createdAt.toISOString(),
+        };
+    }
+
+    async appendDeliveryLog(log: WebhookDeliveryLog): Promise<void> {
+        this.ensureReady();
+        await this.prisma.webhookDeliveryLog.create({
+            data: {
+                id: log.id,
+                agentGaii: log.agentGaii,
+                event: log.event,
+                payload: log.payload,
+                status: log.status,
+                httpStatus: log.httpStatus ?? null,
+                errorMessage: log.errorMessage ?? null,
+                attemptCount: log.attemptCount,
+                latencyMs: log.latencyMs,
+                createdAt: new Date(log.createdAt),
+            },
+        });
+    }
+
+    async listDeliveryLog(agentGaii: string, limit?: number): Promise<WebhookDeliveryLog[]> {
+        this.ensureReady();
+        const rows = await this.prisma.webhookDeliveryLog.findMany({
+            where: { agentGaii },
+            orderBy: { createdAt: 'desc' },
+            take: limit ?? 50,
+        });
+        return rows.map((r: any) => this.toDeliveryLog(r));
+    }
+
+    async pruneDeliveryLog(agentGaii: string, keepCount: number): Promise<number> {
+        this.ensureReady();
+        // Find the cutoff: the keepCount-th newest record's createdAt
+        const cutoffRows = await this.prisma.webhookDeliveryLog.findMany({
+            where: { agentGaii },
+            orderBy: { createdAt: 'desc' },
+            skip: keepCount,
+            take: 1,
+            select: { createdAt: true },
+        });
+        if (cutoffRows.length === 0) return 0;
+        const cutoff = cutoffRows[0].createdAt;
+        const result = await this.prisma.webhookDeliveryLog.deleteMany({
+            where: { agentGaii, createdAt: { lte: cutoff } },
+        });
+        return result.count;
     }
 }
 

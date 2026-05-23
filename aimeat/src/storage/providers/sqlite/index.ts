@@ -42,6 +42,8 @@ import type {
   SharingGroupRecord,
   AgentActivityRecord,
   AgentMessageRecord,
+  TelemetryEvent,
+  WebhookDeliveryLog,
 } from '../../interface.js';
 import { initializeSchema } from './schema.js';
 
@@ -5834,5 +5836,106 @@ export class SqliteStorage implements Storage {
 
   async listThreads(agentGaii: string): Promise<{ threadId: string; lastMessage: string; messageCount: number; updatedAt: string }[]> {
     return agentMessageRepo.listThreads(this.db, agentGaii);
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Telemetry Events ──
+  // ══════════════════════════════════════════════════════════
+
+  async appendTelemetry(event: TelemetryEvent): Promise<void> {
+    this.db.prepare(
+      `INSERT INTO telemetry_events (id, agentGaii, type, data, sessionId, taskId, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      event.id,
+      event.agentGaii,
+      event.type,
+      JSON.stringify(event.data),
+      event.sessionId ?? null,
+      event.taskId ?? null,
+      event.createdAt,
+    );
+  }
+
+  async listTelemetry(agentGaii: string, opts: { since?: string; type?: string; limit?: number }): Promise<TelemetryEvent[]> {
+    let whereSql = 'WHERE agentGaii = ?';
+    const params: unknown[] = [agentGaii];
+
+    if (opts.since) {
+      whereSql += ' AND createdAt > ?';
+      params.push(opts.since);
+    }
+    if (opts.type) {
+      whereSql += ' AND type = ?';
+      params.push(opts.type);
+    }
+
+    const limit = opts.limit ?? 50;
+
+    const rows = this.db.prepare(
+      `SELECT * FROM telemetry_events ${whereSql} ORDER BY createdAt DESC LIMIT ?`
+    ).all(...params, limit) as Record<string, unknown>[];
+
+    return rows.map(row => ({
+      id: row.id as string,
+      agentGaii: row.agentGaii as string,
+      type: row.type as TelemetryEvent['type'],
+      data: JSON.parse(row.data as string),
+      sessionId: row.sessionId as string | undefined,
+      taskId: row.taskId as string | undefined,
+      createdAt: row.createdAt as string,
+    }));
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Webhook Delivery Log ──
+  // ══════════════════════════════════════════════════════════
+
+  async appendDeliveryLog(log: WebhookDeliveryLog): Promise<void> {
+    this.db.prepare(
+      `INSERT INTO webhook_delivery_log
+       (id, agentGaii, event, payload, status, httpStatus, errorMessage, attemptCount, latencyMs, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      log.id,
+      log.agentGaii,
+      log.event,
+      JSON.stringify(log.payload),
+      log.status,
+      log.httpStatus ?? null,
+      log.errorMessage ?? null,
+      log.attemptCount,
+      log.latencyMs,
+      log.createdAt,
+    );
+  }
+
+  async listDeliveryLog(agentGaii: string, limit?: number): Promise<WebhookDeliveryLog[]> {
+    const rows = this.db.prepare(
+      `SELECT * FROM webhook_delivery_log WHERE agentGaii = ? ORDER BY createdAt DESC LIMIT ?`
+    ).all(agentGaii, limit ?? 50) as Record<string, unknown>[];
+
+    return rows.map(row => ({
+      id: row.id as string,
+      agentGaii: row.agentGaii as string,
+      event: row.event as string,
+      payload: JSON.parse(row.payload as string),
+      status: row.status as WebhookDeliveryLog['status'],
+      httpStatus: row.httpStatus as number | undefined,
+      errorMessage: row.errorMessage as string | undefined,
+      attemptCount: row.attemptCount as number,
+      latencyMs: row.latencyMs as number,
+      createdAt: row.createdAt as string,
+    }));
+  }
+
+  async pruneDeliveryLog(agentGaii: string, keepCount: number): Promise<number> {
+    const result = this.db.prepare(
+      `DELETE FROM webhook_delivery_log
+       WHERE agentGaii = ? AND id NOT IN (
+         SELECT id FROM webhook_delivery_log WHERE agentGaii = ? ORDER BY createdAt DESC LIMIT ?
+       )`
+    ).run(agentGaii, agentGaii, keepCount);
+    return result.changes;
   }
 }
