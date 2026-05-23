@@ -476,6 +476,31 @@
         "createTask": "Create this task",
         "adjustTask": "Let me adjust",
         "tokensUsed": "tokens"
+      },
+      "webhook": {
+        "title": "Webhook",
+        "url": "Webhook URL",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "failCount": "Consecutive failures",
+        "lastSuccess": "Last success",
+        "lastFailure": "Last failure",
+        "test": "Test webhook",
+        "testSuccess": "Webhook delivered successfully",
+        "testFailed": "Webhook delivery failed",
+        "register": "Register webhook",
+        "remove": "Remove webhook",
+        "deliveryLog": "Delivery Log",
+        "noDeliveries": "No deliveries yet"
+      },
+      "telemetry": {
+        "title": "Telemetry",
+        "noEvents": "No telemetry events",
+        "type": {
+          "llm_call": "LLM Call",
+          "tool_call": "Tool Call",
+          "agent_report": "Agent Report"
+        }
       }
     },
     "scopes": {

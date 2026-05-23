@@ -476,6 +476,31 @@
         "createTask": "Luo tama tehtava",
         "adjustTask": "Muokkaan ensin",
         "tokensUsed": "tokenia"
+      },
+      "webhook": {
+        "title": "Webhook",
+        "url": "Webhook-osoite",
+        "enabled": "Käytössä",
+        "disabled": "Pois käytöstä",
+        "failCount": "Peräkkäiset virheet",
+        "lastSuccess": "Viimeisin onnistunut",
+        "lastFailure": "Viimeisin epäonnistunut",
+        "test": "Testaa webhook",
+        "testSuccess": "Webhook toimitettu onnistuneesti",
+        "testFailed": "Webhook-toimitus epäonnistui",
+        "register": "Rekisteröi webhook",
+        "remove": "Poista webhook",
+        "deliveryLog": "Toimitushistoria",
+        "noDeliveries": "Ei toimituksia vielä"
+      },
+      "telemetry": {
+        "title": "Telemetria",
+        "noEvents": "Ei telemetriatapahtumia",
+        "type": {
+          "llm_call": "LLM-kutsu",
+          "tool_call": "Työkalukutsu",
+          "agent_report": "Agenttiraportti"
+        }
       }
     },
     "scopes": {

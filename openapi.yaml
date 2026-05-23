@@ -128,6 +128,10 @@ tags:
     description: Per-agent directives — purpose, rules, memory areas, and resources
   - name: Agent Messages
     description: Bidirectional messaging between owners and agents with thread support
+  - name: Agent Webhooks
+    description: Webhook registration, testing, and delivery log for push-based agent notifications
+  - name: Agent Telemetry
+    description: Telemetry event collection and retrieval for agent observability
   - name: Sharing Groups
     description: Named groups for sharing memory and files with specific users and agents
 
@@ -16153,6 +16157,7 @@ paths:
       description: |
         Returns pending tasks, directives, and notifications for the agent.
         Designed for agents to poll on startup or periodically.
+        Supports cursor-based delta polling via the `since` parameter.
       tags: [Agent Integration]
       security:
         - BearerAuth: []
@@ -16161,6 +16166,18 @@ paths:
           in: path
           required: true
           schema: { type: string }
+        - name: since
+          in: query
+          schema:
+            type: string
+          description: Cursor for delta polling in format {ISO timestamp}@{event_id_prefix}
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+          description: Maximum number of items to return
       responses:
         '200':
           description: Agent inbox contents
@@ -16180,6 +16197,16 @@ paths:
                               $ref: '#/components/schemas/AgentTask'
                           directives:
                             $ref: '#/components/schemas/AgentDirectives'
+                          next_cursor:
+                            type: string
+                            description: Cursor to pass as `since` for the next poll
+                          cursor_status:
+                            type: string
+                            enum: [exact, approximate]
+                            description: Whether the cursor matched exactly or was approximated
+                          has_more:
+                            type: boolean
+                            description: Whether more items exist beyond the current page
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -16734,6 +16761,401 @@ paths:
           description: Paginated event log
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # Agent Webhooks
+  # ============================================================
+
+  /v1/agents/{name}/webhook:
+    put:
+      operationId: upsertAgentWebhook
+      summary: Register or update webhook
+      description: |
+        Register or update a webhook URL for push-based notifications to this agent.
+        When configured, the node will POST events (new tasks, messages, directives)
+        to the webhook URL instead of requiring the agent to poll.
+      tags: [Agent Webhooks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                  description: HTTPS URL to receive webhook POST requests
+                secret:
+                  type: string
+                  minLength: 16
+                  maxLength: 256
+                  description: Shared secret for HMAC-SHA256 signature verification
+      responses:
+        '200':
+          description: Webhook configuration saved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          url:
+                            type: string
+                            format: uri
+                          secret:
+                            type: string
+                            description: The configured secret (returned only on PUT)
+                          enabled:
+                            type: boolean
+                          fail_count:
+                            type: integer
+                            description: Consecutive delivery failure count
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    get:
+      operationId: getAgentWebhook
+      summary: Get webhook config
+      description: |
+        Returns the current webhook configuration for this agent.
+        The secret is not included in the response for security.
+      tags: [Agent Webhooks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name
+      responses:
+        '200':
+          description: Webhook status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          url:
+                            type: string
+                            format: uri
+                          enabled:
+                            type: boolean
+                          fail_count:
+                            type: integer
+                            description: Consecutive delivery failure count
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteAgentWebhook
+      summary: Remove webhook
+      description: Removes the webhook configuration for this agent, reverting to poll-based inbox.
+      tags: [Agent Webhooks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name
+      responses:
+        '200':
+          description: Webhook removed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          deleted:
+                            type: boolean
+                            example: true
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/webhook/test:
+    post:
+      operationId: testAgentWebhook
+      summary: Test webhook delivery
+      description: |
+        Sends a test event to the configured webhook URL and reports the result.
+        Useful for verifying connectivity and signature validation before relying
+        on push delivery.
+      tags: [Agent Webhooks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name
+      responses:
+        '200':
+          description: Test delivery result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          delivered:
+                            type: boolean
+                            description: Whether the test event was delivered successfully
+                          http_status:
+                            type: integer
+                            description: HTTP status code returned by the webhook endpoint
+                          latency_ms:
+                            type: number
+                            description: Round-trip latency in milliseconds
+                          error:
+                            type: string
+                            description: Error message if delivery failed
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/webhook/log:
+    get:
+      operationId: getAgentWebhookLog
+      summary: Get delivery log
+      description: |
+        Returns recent webhook delivery attempts for this agent, including
+        successful deliveries and failures with error details.
+      tags: [Agent Webhooks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+          description: Maximum number of delivery records to return
+      responses:
+        '200':
+          description: Delivery log
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          deliveries:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                event_type:
+                                  type: string
+                                delivered:
+                                  type: boolean
+                                http_status:
+                                  type: integer
+                                latency_ms:
+                                  type: number
+                                error:
+                                  type: string
+                                timestamp:
+                                  type: string
+                                  format: date-time
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # Agent Telemetry
+  # ============================================================
+
+  /v1/agents/{name}/telemetry:
+    post:
+      operationId: appendAgentTelemetry
+      summary: Append telemetry event
+      description: |
+        Record a telemetry event for this agent. Used by agents to report
+        LLM calls, tool invocations, and structured activity reports for
+        owner visibility and debugging.
+      tags: [Agent Telemetry]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, data]
+              properties:
+                type:
+                  type: string
+                  enum: [llm_call, tool_call, agent_report]
+                  description: Type of telemetry event
+                data:
+                  type: object
+                  description: Event-specific payload (schema varies by type)
+                session_id:
+                  type: string
+                  description: Optional session identifier for grouping related events
+                task_id:
+                  type: string
+                  description: Optional task identifier linking the event to a specific task
+      responses:
+        '201':
+          description: Telemetry event recorded
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            description: Unique identifier for the recorded event
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    get:
+      operationId: listAgentTelemetry
+      summary: List telemetry events
+      description: |
+        Retrieve telemetry events for this agent with optional filtering
+        by time range, event type, and pagination.
+      tags: [Agent Telemetry]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name
+        - name: since
+          in: query
+          schema:
+            type: string
+          description: ISO 8601 timestamp to filter events after this time
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [llm_call, tool_call, agent_report]
+          description: Filter by event type
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: Maximum number of events to return
+      responses:
+        '200':
+          description: Telemetry events
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          events:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                type:
+                                  type: string
+                                  enum: [llm_call, tool_call, agent_report]
+                                data:
+                                  type: object
+                                session_id:
+                                  type: string
+                                task_id:
+                                  type: string
+                                timestamp:
+                                  type: string
+                                  format: date-time
+                          count:
+                            type: integer
+                            description: Total number of events returned
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
