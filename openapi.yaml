@@ -17152,12 +17152,12 @@ paths:
             type: string
             enum: [llm_call, tool_call, agent_report]
           description: Filter by event type
-        - name: limit
+        - name: per_page
           in: query
           schema:
             type: integer
             default: 50
-          description: Maximum number of events to return
+          description: Maximum number of events to return (max 200)
       responses:
         '200':
           description: Telemetry events

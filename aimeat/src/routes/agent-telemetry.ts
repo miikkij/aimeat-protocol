@@ -112,11 +112,11 @@ export function agentTelemetryRouter(config: AimeatConfig, storage: Storage): Ro
 
     const since = req.query.since as string | undefined;
     const type = req.query.type as string | undefined;
-    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
+    const perPage = Math.min(Math.max(parseInt(req.query.per_page as string) || 50, 1), 200);
 
-    const events = await storage.listTelemetry(agentGaii, { since, type, limit });
+    const events = await storage.listTelemetry(agentGaii, { since, type, limit: perPage });
 
-    res.json(success(config.nodeId, { events, count: events.length }));
+    res.json(success(config.nodeId, { events, count: events.length, per_page: perPage }));
   });
 
   return router;
