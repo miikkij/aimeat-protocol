@@ -9,6 +9,7 @@
  *   - GET /v1/agents/:name/tasks/wait       -- Long poll for new tasks
  * @version-history
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
+ *   v1.1.0 -- 2026-05-23 -- Add cursor-based ?since= and ?limit= to inbox endpoint
  */
 
 import { Router } from 'express';
@@ -17,6 +18,31 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
+
+/* ── Cursor helpers for inbox pagination ── */
+
+interface ParsedCursor {
+  timestamp: string;
+  tiebreaker: string;
+}
+
+function parseCursor(since: string): ParsedCursor | null {
+  const atIdx = since.lastIndexOf('@');
+  if (atIdx === -1) return null;
+  const timestamp = since.substring(0, atIdx);
+  const tiebreaker = since.substring(atIdx + 1);
+  if (!timestamp || !tiebreaker) return null;
+  const d = new Date(timestamp);
+  if (isNaN(d.getTime())) return null;
+  return { timestamp, tiebreaker };
+}
+
+function buildCursor(timestamp: string, id: string): string {
+  return `${timestamp}@${id.substring(0, 12)}`;
+}
+
+/** Max age for cursors (90 days in milliseconds) */
+const CURSOR_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
 
 export function agentIntegrationRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -57,23 +83,142 @@ export function agentIntegrationRouter(config: AimeatConfig, storage: Storage): 
       return;
     }
 
+    // Parse limit (default 50, max 200)
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string || '50', 10)));
+
+    // Parse optional cursor
+    const sinceParam = req.query.since as string | undefined;
+    let cursor: ParsedCursor | null = null;
+
+    if (sinceParam) {
+      cursor = parseCursor(sinceParam);
+      if (!cursor) {
+        res.status(400).json(error(config.nodeId, 'INVALID_CURSOR', 'Malformed cursor. Expected format: {ISO timestamp}@{id_prefix}'));
+        return;
+      }
+
+      // Check if cursor is older than 90 days
+      const cursorAge = Date.now() - new Date(cursor.timestamp).getTime();
+      if (cursorAge > CURSOR_MAX_AGE_MS) {
+        res.status(400).json(error(config.nodeId, 'PRUNED_CURSOR', 'Cursor expired. Omit ?since to perform full sync.'));
+        return;
+      }
+    }
+
     // Fetch queued and active tasks + pending messages
     const [queuedResult, activeResult, pendingMessages] = await Promise.all([
-      storage.listAgentTasks(agentGaii, { status: 'queued', perPage: 50 }),
-      storage.listAgentTasks(agentGaii, { status: 'active', perPage: 50 }),
+      storage.listAgentTasks(agentGaii, { status: 'queued', perPage: limit }),
+      storage.listAgentTasks(agentGaii, { status: 'active', perPage: limit }),
       storage.listPendingMessages(agentGaii),
     ]);
 
-    res.json(success(config.nodeId, {
-      queued_tasks: queuedResult.tasks,
-      active_tasks: activeResult.tasks,
-      pending_messages: pendingMessages.map(m => ({
+    // Build unified inbox items with a common timestamp and id for cursor logic
+    interface InboxItem {
+      type: 'queued_task' | 'active_task' | 'pending_message';
+      id: string;
+      timestamp: string;
+      data: Record<string, unknown>;
+    }
+
+    const allItems: InboxItem[] = [];
+
+    for (const t of queuedResult.tasks) {
+      allItems.push({
+        type: 'queued_task',
+        id: t.id,
+        timestamp: t.createdAt,
+        data: t as unknown as Record<string, unknown>,
+      });
+    }
+    for (const t of activeResult.tasks) {
+      allItems.push({
+        type: 'active_task',
+        id: t.id,
+        timestamp: t.createdAt,
+        data: t as unknown as Record<string, unknown>,
+      });
+    }
+    for (const m of pendingMessages) {
+      allItems.push({
+        type: 'pending_message',
         id: m.id,
-        thread_id: m.threadId,
-        preview: m.content.substring(0, 100),
-        from: m.senderGaii,
-        created_at: m.createdAt,
-      })),
+        timestamp: m.createdAt,
+        data: {
+          id: m.id,
+          thread_id: m.threadId,
+          preview: m.content.substring(0, 100),
+          from: m.senderGaii,
+          created_at: m.createdAt,
+        },
+      });
+    }
+
+    // Sort by timestamp ascending (oldest first) for consistent cursor ordering
+    allItems.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+
+    // Apply cursor filter if provided
+    let filteredItems = allItems;
+    let cursorStatus: 'exact' | 'approximate' = 'exact';
+
+    if (cursor) {
+      const cursorTs = cursor.timestamp;
+      const cursorTb = cursor.tiebreaker;
+
+      // Filter to items strictly after the cursor timestamp,
+      // or same timestamp but different from the cursor tiebreaker
+      filteredItems = allItems.filter(item => {
+        if (item.timestamp > cursorTs) return true;
+        if (item.timestamp === cursorTs) {
+          // Same timestamp: exclude items at or before the tiebreaker position
+          return item.id.substring(0, 12) > cursorTb;
+        }
+        return false;
+      });
+
+      // Check if tiebreaker matches any known event
+      const tiebreakerMatches = allItems.some(
+        item => item.id.substring(0, 12) === cursorTb
+      );
+      if (!tiebreakerMatches) {
+        cursorStatus = 'approximate';
+      }
+    }
+
+    // Apply limit
+    const paginatedItems = filteredItems.slice(0, limit);
+    const hasMore = filteredItems.length > limit;
+
+    // Build next_cursor from last item, or echo the input cursor if no new items
+    let nextCursor: string;
+    if (paginatedItems.length > 0) {
+      const lastItem = paginatedItems[paginatedItems.length - 1];
+      nextCursor = buildCursor(lastItem.timestamp, lastItem.id);
+    } else if (sinceParam) {
+      nextCursor = sinceParam;
+    } else {
+      // Initial sync with no items -- use current time as cursor
+      nextCursor = buildCursor(new Date().toISOString(), '000000000000');
+    }
+
+    // Separate back into typed arrays for response
+    const queuedTasks = paginatedItems
+      .filter(i => i.type === 'queued_task')
+      .map(i => i.data);
+    const activeTasks = paginatedItems
+      .filter(i => i.type === 'active_task')
+      .map(i => i.data);
+    const messages = paginatedItems
+      .filter(i => i.type === 'pending_message')
+      .map(i => i.data);
+
+    res.json(success(config.nodeId, {
+      items: paginatedItems.map(i => i.data),
+      queued_tasks: queuedTasks,
+      active_tasks: activeTasks,
+      pending_messages: messages,
+      next_cursor: nextCursor,
+      cursor_status: cursorStatus,
+      has_more: hasMore,
     }, [
       { description: 'View integration kit', method: 'GET', url: `/v1/agents/${agentName}/integration-kit` },
       { description: 'Wait for new tasks', method: 'GET', url: `/v1/agents/${agentName}/tasks/wait` },
