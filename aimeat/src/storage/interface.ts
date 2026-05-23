@@ -1439,7 +1439,7 @@ export interface AgentTaskRecord {
     memoryPrefixes?: string[];
   };
   todos: AgentTaskTodo[];
-  status: 'draft' | 'queued' | 'active' | 'stalled' | 'done' | 'failed';
+  status: 'draft' | 'queued' | 'active' | 'paused' | 'stalled' | 'done' | 'failed';
   parentTaskId?: string;
   workTrackingCode?: string;
   telemetry?: {

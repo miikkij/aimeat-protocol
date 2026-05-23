@@ -342,9 +342,9 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
       return;
     }
 
-    if (task.status !== 'queued') {
+    if (task.status !== 'queued' && task.status !== 'paused') {
       res.status(409).json(error(config.nodeId, 'INVALID_STATE',
-        `Only queued tasks can be started (current: ${task.status})`));
+        `Only queued or paused tasks can be started (current: ${task.status})`));
       return;
     }
 
@@ -375,6 +375,55 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
         todo_count: task.todos?.length ?? 0,
         pending_todo_count: (task.todos ?? []).filter((t: AgentTaskTodo) => t.status === 'pending').length,
         approved_at: now,
+      });
+    }
+
+    res.json(success(config.nodeId, { task: updated }));
+    emitChange('agent-tasks');
+  });
+
+  /* ── POST /v1/agents/:name/tasks/:id/pause -- Pause task (active -> paused) ── */
+  router.post('/v1/agents/:name/tasks/:id/pause', requireAuth(), requireRole('owner'), async (req, res) => {
+    const id = req.params.id as string;
+
+    const task = await storage.getAgentTask(id);
+    if (!task) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Task not found'));
+      return;
+    }
+
+    if (!canAccessTask(req, task)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      return;
+    }
+
+    if (task.status !== 'active') {
+      res.status(409).json(error(config.nodeId, 'INVALID_STATE',
+        `Only active tasks can be paused (current: ${task.status})`));
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const updated = await storage.updateAgentTask(id, {
+      status: 'paused',
+      lastEventAt: now,
+      updatedAt: now,
+    });
+
+    await storage.appendTaskEvent({
+      id: randomUUID(),
+      taskId: id,
+      type: 'message',
+      message: 'Task paused by owner',
+      timestamp: now,
+    });
+
+    if (webhookDispatcher) {
+      webhookDispatcher.dispatchWebhookEvent(task.agentGaii, 'task.paused', {
+        task_id: task.id,
+        title: task.title,
+        status: 'paused',
+        paused_at: now,
       });
     }
 

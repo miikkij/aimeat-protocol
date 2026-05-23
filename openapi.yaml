@@ -15870,7 +15870,7 @@ paths:
     post:
       operationId: startAgentTask
       summary: Start a task
-      description: Transition a queued task to active status. Only queued tasks can be started.
+      description: Transition a queued or paused task to active status.
       tags: [Agent Tasks]
       security:
         - BearerAuth: []
@@ -15952,6 +15952,45 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/tasks/{id}/pause:
+    post:
+      operationId: pauseAgentTask
+      summary: Pause an active task
+      description: Owner pauses an active task. Agent receives task.paused webhook. Resume via POST /start.
+      tags: [Agent Tasks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Task paused
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          task:
+                            $ref: '#/components/schemas/AgentTask'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/BadRequest'
 
   /v1/agents/{name}/tasks/{id}/complete:
     post:
