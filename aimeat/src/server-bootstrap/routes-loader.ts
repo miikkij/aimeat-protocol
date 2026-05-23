@@ -93,6 +93,7 @@ import { agentWebhookRouter } from '../routes/agent-webhook.js';
 import { agentTelemetryRouter } from '../routes/agent-telemetry.js';
 
 // Services needed during route mounting
+import { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 import { createPushService } from '../services/push.js';
 import { createEudiwService } from '../services/eudiw.js';
 import { createSdJwtVerifier } from '../services/sd-jwt.js';
@@ -152,6 +153,9 @@ export async function mountRoutes(
     peers, networkDirectory, tunnelManager, mailboxNotificationService,
     scheduler, invalidateHasOwnersCache,
   } = opts;
+
+  // Webhook dispatcher for agent push notifications
+  const webhookDispatcher = createWebhookDispatcher({ config, storage });
 
   // Statistics collector (with persistence via storage)
   const stats = await initStats(storage);
@@ -218,11 +222,11 @@ export async function mountRoutes(
   });
 
   // Agent tasks, directives, capabilities, and integration BEFORE agentsRouter to avoid /v1/agents/:name param conflicts
-  app.use(agentTasksRouter(config, storage));
-  app.use(agentDirectivesRouter(config, storage));
+  app.use(agentTasksRouter(config, storage, webhookDispatcher));
+  app.use(agentDirectivesRouter(config, storage, webhookDispatcher));
   app.use(agentCapabilitiesRouter(config, storage));
   app.use(agentActivityRouter(config, storage));
-  app.use(agentMessagesRouter(config, storage));
+  app.use(agentMessagesRouter(config, storage, webhookDispatcher));
   app.use(agentWebhookRouter(config, storage));
   app.use(agentTelemetryRouter(config, storage));
   app.use(agentIntegrationRouter(config, storage));

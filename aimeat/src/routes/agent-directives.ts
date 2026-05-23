@@ -8,6 +8,7 @@
  *   - GET    /v1/owner/agent-defaults         -- Get owner-level defaults
  *   - PUT    /v1/owner/agent-defaults         -- Upsert owner defaults
  * @version-history
+ *   v1.1.0 -- 2026-05-23 -- Add webhook dispatch for directive.updated events
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  */
 
@@ -19,8 +20,11 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { AgentDirectivesSchema, OwnerAgentDefaultsSchema } from '../models/agent-directives-schemas.js';
+import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 
-export function agentDirectivesRouter(config: AimeatConfig, storage: Storage): Router {
+type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
+
+export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, webhookDispatcher?: WebhookDispatcher): Router {
   const router = Router();
 
   /** Resolve effective identity -- owner sessions use GHII, agents use GAII */
@@ -119,6 +123,24 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage): R
       resources: body.resources,
       updatedAt: now,
     });
+
+    // Dispatch webhook for directive updates (fire-and-forget)
+    if (webhookDispatcher) {
+      const changedSections: string[] = [];
+      if (body.purpose !== undefined) changedSections.push('purpose');
+      if (body.rules) changedSections.push('rules');
+      if (body.memory_areas) changedSections.push('memory_areas');
+      if (body.resources) changedSections.push('resources');
+      if (changedSections.length > 0) {
+        webhookDispatcher.dispatchWebhookEvent(agentGaii, 'directive.updated', {
+          changed_sections: changedSections,
+          rule_count: record.rules?.length ?? 0,
+          memory_area_count: record.memoryAreas?.length ?? 0,
+          resource_count: record.resources?.length ?? 0,
+          updated_at: now,
+        });
+      }
+    }
 
     emitChange('agent-directives');
 

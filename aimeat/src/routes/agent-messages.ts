@@ -8,6 +8,7 @@
  *   - GET    /v1/agents/:name/messages         -- List message history
  *   - PATCH  /v1/agents/:name/messages/:id     -- Update message status
  * @version-history
+ *   v1.1.0 -- 2026-05-23 -- Add webhook dispatch for message.inbound events
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 3
  */
 
@@ -20,8 +21,11 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { AgentMessageCreateSchema, AgentMessageStatusSchema } from '../models/agent-message-schemas.js';
+import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 
-export function agentMessagesRouter(config: AimeatConfig, storage: Storage): Router {
+type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
+
+export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webhookDispatcher?: WebhookDispatcher): Router {
   const router = Router();
 
   /** Resolve effective identity -- owner sessions use GHII, agents use GAII */
@@ -105,6 +109,18 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage): Rou
     };
 
     const created = await storage.createMessage(record);
+
+    // Dispatch webhook for inbound messages (owner -> agent, fire-and-forget)
+    if (webhookDispatcher && record.direction === 'inbound') {
+      webhookDispatcher.dispatchWebhookEvent(agentGaii, 'message.inbound', {
+        message_id: record.id,
+        thread_id: record.threadId,
+        linked_task_id: record.linkedTaskId ?? null,
+        preview: record.content.substring(0, 200),
+        has_proposed_task: !!(record.metadata?.proposedTask),
+        created_at: record.createdAt,
+      });
+    }
 
     res.status(201).json(success(config.nodeId, { message: created }, [
       { description: 'View messages', method: 'GET', url: `/v1/agents/${agentName}/messages` },

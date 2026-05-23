@@ -16,6 +16,7 @@
  *   - PATCH  /v1/agents/:name/tasks/:id/todos/:todoId -- Update individual todo status
  *   - GET    /v1/agents/:name/tasks/:id/events -- List events
  * @version-history
+ *   v1.3.0 -- 2026-05-23 -- Add webhook dispatch for task.queued, task.approved, task.updated events
  *   v1.2.0 -- 2026-05-22 -- Add individual todo update endpoint (PATCH /todos/:todoId)
  *   v1.1.0 -- 2026-05-22 -- Fix: accumulate telemetry across events instead of overwriting; allow agent PATCH on queued tasks
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
@@ -24,15 +25,18 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentTaskRecord, AgentTaskTodo } from '../storage/interface.js';
+import type { Storage, AgentTaskRecord, AgentTaskTodo, AgentTaskScope } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { recordTaskStarted, recordTaskCompleted, recordTaskFailed } from '../services/activity-recorder.js';
 import { AgentTaskCreateSchema, AgentTaskUpdateSchema, AgentTaskEventSchema, AgentTaskTodoUpdateSchema } from '../models/agent-task-schemas.js';
+import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 
-export function agentTasksRouter(config: AimeatConfig, storage: Storage): Router {
+type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
+
+export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhookDispatcher?: WebhookDispatcher): Router {
   const router = Router();
 
   /** Resolve effective identity -- owner sessions use GHII, agents use GAII */
@@ -118,6 +122,19 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage): Router
     };
 
     const created = await storage.createAgentTask(record);
+
+    // Dispatch webhook for queued tasks (fire-and-forget)
+    if (webhookDispatcher && record.status === 'queued') {
+      webhookDispatcher.dispatchWebhookEvent(agentGaii, 'task.queued', {
+        task_id: record.id,
+        title: record.title,
+        description: record.description ?? '',
+        has_todos: (record.todos?.length ?? 0) > 0,
+        todo_count: record.todos?.length ?? 0,
+        scope_summary: (record.scope ?? []).slice(0, 5).map((s: AgentTaskScope) => `${s.type || s.name}:${s.value}`),
+        created_at: record.createdAt,
+      });
+    }
 
     res.status(201).json(success(config.nodeId, { task: created }, [
       { description: 'View task', method: 'GET', url: `/v1/agents/${agentName}/tasks/${id}` },
@@ -256,6 +273,30 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage): Router
       return;
     }
 
+    // Dispatch webhook when owner edits a task (fire-and-forget)
+    if (webhookDispatcher && isOwnerSession) {
+      const changedFields: string[] = [];
+      if (body.title !== undefined) changedFields.push('title');
+      if (body.description !== undefined) changedFields.push('description');
+      if (body.scope !== undefined) changedFields.push('scope');
+      if (body.rules !== undefined) changedFields.push('rules');
+      if (body.todos !== undefined) changedFields.push('todos');
+      if (body.verification !== undefined) changedFields.push('verification');
+      if (body.resources !== undefined) changedFields.push('resources');
+      if (changedFields.length > 0) {
+        const agentGaii = resolveAgentGaii(req, req.params.name as string);
+        webhookDispatcher.dispatchWebhookEvent(agentGaii, 'task.updated', {
+          task_id: updated.id,
+          title: updated.title,
+          status: updated.status,
+          changed_fields: changedFields,
+          todo_count: updated.todos?.length ?? 0,
+          pending_todo_count: (updated.todos ?? []).filter((t: AgentTaskTodo) => t.status === 'pending').length,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    }
+
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks');
   });
@@ -324,6 +365,18 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage): Router
     });
 
     await recordTaskStarted(storage, task.agentGaii);
+
+    // Dispatch webhook for task approval/start (fire-and-forget)
+    if (webhookDispatcher) {
+      webhookDispatcher.dispatchWebhookEvent(task.agentGaii, 'task.approved', {
+        task_id: task.id,
+        title: task.title,
+        status: 'active',
+        todo_count: task.todos?.length ?? 0,
+        pending_todo_count: (task.todos ?? []).filter((t: AgentTaskTodo) => t.status === 'pending').length,
+        approved_at: now,
+      });
+    }
 
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks');
