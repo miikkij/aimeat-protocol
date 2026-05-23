@@ -17215,6 +17215,113 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   # ============================================================
+  # Agent Skill Bundle
+  # ============================================================
+
+  /v1/agents/{name}/skill-bundle:
+    get:
+      operationId: downloadAgentSkillBundle
+      summary: Download skill bundle ZIP
+      description: |
+        Download a runtime-specific skill bundle as a ZIP file. The bundle contains
+        reference documentation, SKILL.md manifest, and runtime-specific scripts/config.
+      tags: [Agent Integration]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name
+        - name: runtime
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [hermes, generic]
+            default: generic
+          description: Target runtime platform
+      responses:
+        '200':
+          description: Skill bundle ZIP file
+          headers:
+            X-Bundle-Version:
+              schema:
+                type: string
+              description: Bundle content hash version (first 12 hex chars of SHA-256)
+            X-Bundle-Runtime:
+              schema:
+                type: string
+              description: Runtime adapter used
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/skill-bundle/version:
+    get:
+      operationId: getAgentSkillBundleVersion
+      summary: Check skill bundle version
+      description: |
+        Lightweight version check without downloading the full bundle.
+        Returns current version hash and runtime metadata.
+      tags: [Agent Integration]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name
+        - name: runtime
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [hermes, generic]
+            default: generic
+          description: Target runtime platform
+      responses:
+        '200':
+          description: Bundle version info
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          version:
+                            type: string
+                            description: Content hash version (12 hex chars)
+                          runtime:
+                            type: string
+                            description: Runtime adapter used
+                          bundle_name:
+                            type: string
+                            description: Bundle name (e.g. aimeat-hermes)
+                          generated_at:
+                            type: string
+                            format: date-time
+                            description: When the bundle was generated
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================
   # Owner Agent Defaults
   # ============================================================
 

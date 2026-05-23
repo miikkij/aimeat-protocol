@@ -501,6 +501,23 @@
           "tool_call": "Tool Call",
           "agent_report": "Agent Report"
         }
+      },
+      "skillBundle": {
+        "title": "Skill Bundle",
+        "downloadLabel": "Download skill bundle",
+        "versionLabel": "Version",
+        "runtimeLabel": "Runtime",
+        "hermesRuntime": "Hermes (OpenClaw)",
+        "genericRuntime": "Generic",
+        "installCommand": "Install command",
+        "copyCommand": "Copy",
+        "downloadZip": "Download ZIP",
+        "copyCurl": "Copy curl command",
+        "upToDate": "Up to date",
+        "updateAvailable": "Update available",
+        "reinstall": "Re-install",
+        "lastGenerated": "Last generated",
+        "notInstalled": "Not installed"
       }
     },
     "scopes": {

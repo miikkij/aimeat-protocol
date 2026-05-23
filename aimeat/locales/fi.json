@@ -501,6 +501,23 @@
           "tool_call": "Työkalukutsu",
           "agent_report": "Agenttiraportti"
         }
+      },
+      "skillBundle": {
+        "title": "Taitopaketti",
+        "downloadLabel": "Lataa taitopaketti",
+        "versionLabel": "Versio",
+        "runtimeLabel": "Ajoympäristö",
+        "hermesRuntime": "Hermes (OpenClaw)",
+        "genericRuntime": "Yleinen",
+        "installCommand": "Asennuskomento",
+        "copyCommand": "Kopioi",
+        "downloadZip": "Lataa ZIP",
+        "copyCurl": "Kopioi curl-komento",
+        "upToDate": "Ajan tasalla",
+        "updateAvailable": "Päivitys saatavilla",
+        "reinstall": "Asenna uudelleen",
+        "lastGenerated": "Viimeksi luotu",
+        "notInstalled": "Ei asennettu"
       }
     },
     "scopes": {
