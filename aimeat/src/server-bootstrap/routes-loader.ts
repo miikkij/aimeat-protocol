@@ -89,6 +89,7 @@ import { adminSharingGroupsRouter } from '../routes/admin-sharing-groups.js';
 import { agentCapabilitiesRouter } from '../routes/agent-capabilities.js';
 import { agentActivityRouter } from '../routes/agent-activity.js';
 import { agentMessagesRouter } from '../routes/agent-messages.js';
+import { agentWebhookRouter } from '../routes/agent-webhook.js';
 
 // Services needed during route mounting
 import { createPushService } from '../services/push.js';
@@ -221,6 +222,7 @@ export async function mountRoutes(
   app.use(agentCapabilitiesRouter(config, storage));
   app.use(agentActivityRouter(config, storage));
   app.use(agentMessagesRouter(config, storage));
+  app.use(agentWebhookRouter(config, storage));
   app.use(agentIntegrationRouter(config, storage));
   app.use(agentsRouter(config, storage));
   const notifyDirectoryChange = () => directoryService.notifyChange();
