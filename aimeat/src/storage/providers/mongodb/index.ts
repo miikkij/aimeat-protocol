@@ -5721,7 +5721,7 @@ export class MongoStorage implements Storage {
     // ── Agent Directives ──
 
     private toDirectivesRecord(row: any): AgentDirectivesRecord {
-        return {
+        const record: AgentDirectivesRecord = {
             agentGaii: row.agentGaii,
             purpose: row.purpose,
             rules: row.rules as AgentDirectivesRecord['rules'],
@@ -5729,6 +5729,8 @@ export class MongoStorage implements Storage {
             resources: row.resources as AgentDirectivesRecord['resources'],
             updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
         };
+        if (row.budgetLimits) record.budgetLimits = row.budgetLimits as AgentDirectivesRecord['budgetLimits'];
+        return record;
     }
 
     private toOwnerDefaultsRecord(row: any): OwnerAgentDefaults {
@@ -5759,12 +5761,14 @@ export class MongoStorage implements Storage {
                 rules: record.rules as any,
                 memoryAreas: record.memoryAreas as any,
                 resources: record.resources as any,
+                budgetLimits: record.budgetLimits as any ?? null,
             },
             update: {
                 purpose: record.purpose,
                 rules: record.rules as any,
                 memoryAreas: record.memoryAreas as any,
                 resources: record.resources as any,
+                budgetLimits: record.budgetLimits as any ?? null,
             },
         });
         return this.toDirectivesRecord(row);

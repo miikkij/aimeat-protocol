@@ -12,6 +12,8 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { getActivity, getActivityLog } from '/js/services/agent-activity.js';
+import { getDirectives } from '/js/services/agent-directives.js';
+import { getWebhookConfig, getTelemetry, getDeliveryLog } from '/js/services/agent-integration.js';
 
 const html = htm.bind(h);
 
@@ -34,6 +36,7 @@ function eventCategory(event) {
 export default function TabActivity({ agentName, session, showToast }) {
   const [events, setEvents] = useState([]);
   const [stats, setStats] = useState(null);
+  const [governance, setGovernance] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [logPage, setLogPage] = useState(1);
@@ -42,14 +45,38 @@ export default function TabActivity({ agentName, session, showToast }) {
   async function loadData() {
     setLoading(true);
     try {
-      const [actResp, logResp] = await Promise.all([
+      const [actResp, logResp, dirResp, whResp, telResp] = await Promise.all([
         getActivity(agentName, 30).catch(() => null),
         getActivityLog(agentName, 1, 50).catch(() => null),
+        getDirectives(agentName).catch(() => null),
+        getWebhookConfig(agentName).catch(() => null),
+        getTelemetry(agentName, { days: 1 }).catch(() => null),
       ]);
       setStats(actResp?.data?.activity_stats || null);
       setEvents(logResp?.data?.events || []);
       setHasMore((logResp?.data?.events || []).length >= 50);
       setLogPage(1);
+
+      const allEvents = logResp?.data?.events || [];
+      const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+      const todayEvents = allEvents.filter(ev => new Date(ev.timestamp) >= todayStart);
+      const govEvents = todayEvents.filter(ev => eventCategory(ev) === 'governance');
+      const taskEvents = todayEvents.filter(ev => eventCategory(ev) === 'tasks');
+      const budget = dirResp?.data?.budget_limits;
+      const wh = whResp?.data?.webhook;
+      const telemetryEntries = telResp?.data?.entries || [];
+
+      setGovernance({
+        budget,
+        tokensUsedToday: telemetryEntries.reduce((sum, e) => sum + (e.tokens_used || 0), 0),
+        tasksToday: taskEvents.length,
+        policyIssues: govEvents.length,
+        telemetryCount: telemetryEntries.length,
+        webhookEnabled: wh?.enabled ?? false,
+        webhookSuccessCount: wh?.success_count ?? 0,
+        webhookTotalCount: (wh?.success_count ?? 0) + (wh?.fail_count ?? 0),
+        mcpActive: false,
+      });
     } catch {
       setStats(null);
       setEvents([]);
@@ -104,6 +131,42 @@ export default function TabActivity({ agentName, session, showToast }) {
           <div class="agd-stat-card">
             <div class="agd-stat-value">${stats.successRate != null ? `${Math.round(stats.successRate)}%` : '-'}</div>
             <div class="agd-stat-label">${t('profile.agents.activity.successRate')}</div>
+          </div>
+        </div>
+      `}
+
+      <!-- Governance summary -->
+      ${governance && html`
+        <div class="agd-governance-section">
+          <div class="agd-section-title">${t('governance.title')}</div>
+          <div class="agd-governance-grid">
+            ${governance.budget ? html`
+              <div class="agd-governance-item">
+                <span class="agd-governance-label">${t('governance.tokenBudget')}</span>
+                <span class="agd-governance-value">${(governance.tokensUsedToday || 0).toLocaleString()} / ${(governance.budget.max_tokens_per_day || '---').toLocaleString()}</span>
+              </div>
+            ` : ''}
+            <div class="agd-governance-item">
+              <span class="agd-governance-label">${t('governance.tasksToday')}</span>
+              <span class="agd-governance-value">${governance.tasksToday}</span>
+            </div>
+            <div class="agd-governance-item">
+              <span class="agd-governance-label">${t('governance.policyIssues')}</span>
+              <span class="agd-governance-value" style=${governance.policyIssues > 0 ? 'color:var(--warning)' : ''}>${governance.policyIssues}</span>
+            </div>
+            <div class="agd-governance-item">
+              <span class="agd-governance-label">${t('governance.telemetryEvents')}</span>
+              <span class="agd-governance-value">${governance.telemetryCount}</span>
+            </div>
+          </div>
+          <div class="agd-governance-delivery">
+            <span class="agd-governance-label">${t('governance.deliveryHealth')}</span>
+            <span class="agd-governance-value">
+              ${governance.webhookEnabled
+                ? `Webhook: ${governance.webhookSuccessCount}/${governance.webhookTotalCount}`
+                : t('agents.detail.integration.webhookNotConfigured')
+              }
+            </span>
           </div>
         </div>
       `}

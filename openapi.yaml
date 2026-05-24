@@ -2447,6 +2447,23 @@ components:
                 type: string
               description:
                 type: string
+        budget_limits:
+          type: object
+          properties:
+            max_tokens_per_task:
+              type: integer
+              description: Per-task token cap
+            max_tokens_per_day:
+              type: integer
+              description: Daily token cap
+            max_tasks_per_day:
+              type: integer
+              description: Max tasks per day
+            alert_threshold:
+              type: integer
+              minimum: 1
+              maximum: 100
+              description: Percentage at which to warn owner
 
     # === Sharing Groups ===
     SharingGroup:
@@ -18125,6 +18142,189 @@ paths:
                               $ref: '#/components/schemas/AgentTask'
                           total:
                             type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ============================================================
+  # Admin -- Agent Integration
+  # ============================================================
+
+  /v1/admin/platforms:
+    get:
+      operationId: adminListPlatforms
+      summary: List known platforms with agent counts
+      tags: [Admin, Agent Integration]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Platform registry
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          platforms:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                display_name:
+                                  type: string
+                                bundle_name:
+                                  type: string
+                                agent_count:
+                                  type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/admin/agents/onboarding:
+    get:
+      operationId: adminOnboardingOverview
+      summary: Aggregate onboarding status across all agents
+      tags: [Admin, Agent Integration]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Onboarding summary
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          completed:
+                            type: integer
+                          in_progress:
+                            type: integer
+                          pending:
+                            type: integer
+                          stuck:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                agent_gaii:
+                                  type: string
+                                current_step:
+                                  type: string
+                                stuck_since:
+                                  type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/admin/agents/readiness:
+    get:
+      operationId: adminReadinessDistribution
+      summary: Readiness level distribution
+      tags: [Admin, Agent Integration]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Readiness distribution
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          distribution:
+                            type: object
+                            properties:
+                              expert:
+                                type: integer
+                              full:
+                                type: integer
+                              standard:
+                                type: integer
+                              basic:
+                                type: integer
+                          total:
+                            type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/admin/skill-bundles:
+    get:
+      operationId: adminListSkillBundles
+      summary: Bundle version status per platform
+      tags: [Admin, Agent Integration]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Skill bundle status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          bundles:
+                            type: object
+                            additionalProperties:
+                              type: object
+                              properties:
+                                agents:
+                                  type: integer
+                                outdated:
+                                  type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/admin/skill-bundles/regenerate:
+    post:
+      operationId: adminRegenerateSkillBundles
+      summary: Force regenerate skill bundles and notify outdated agents
+      tags: [Admin, Agent Integration]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Regeneration queued
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          regenerated:
+                            type: boolean
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

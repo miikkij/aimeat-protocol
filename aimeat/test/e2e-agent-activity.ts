@@ -139,7 +139,7 @@ await test('1. Create, start, and complete a task -> tasksCompleted incremented'
     // Start the task
     const { status: startStatus } = await json(`/v1/agents/${agentName}/tasks/${completedTaskId}/start`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${agentToken}` },
+        headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(startStatus === 200, `start status ${startStatus}`);
 
@@ -189,7 +189,7 @@ await test('2. Create, start, and fail a task -> tasksFailed incremented, succes
     // Start the task
     const { status: startStatus } = await json(`/v1/agents/${agentName}/tasks/${failedTaskId}/start`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${agentToken}` },
+        headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(startStatus === 200, `start status ${startStatus}`);
 

@@ -73,6 +73,7 @@ const ALL_SUITES = [
     'test/e2e-agent-webhook.ts',
     'test/e2e-agent-skill-bundle.ts',
     'test/e2e-agent-onboarding.ts',
+    'test/e2e-agent-governance.ts',
 ];
 
 const PORT = process.env.AIMEAT_PORT ?? '40251';

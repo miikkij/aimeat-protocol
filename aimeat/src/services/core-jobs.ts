@@ -34,10 +34,11 @@ export function registerCoreHandlers(
   if (config.eudiwEnabled || config.ftnEnabled) {
     scheduler.registerCoreHandler('nonce-cleanup', () => runNonceCleanupJob(storage));
   }
-  // Agent task stall detection (Phase 1)
+  // Agent task stall detection + agent connectivity checks
   scheduler.registerCoreHandler('task-stall-detection', async () => {
-    const { detectStalledTasks } = await import('./task-stall-detector.js');
+    const { detectStalledTasks, detectAgentStallConditions } = await import('./task-stall-detector.js');
     await detectStalledTasks(storage, config);
+    await detectAgentStallConditions(storage);
   });
 }
 

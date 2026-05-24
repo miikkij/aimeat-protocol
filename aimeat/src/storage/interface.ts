@@ -1486,12 +1486,20 @@ export interface DirectiveResource {
   description: string;
 }
 
+export interface BudgetLimits {
+  maxTokensPerTask?: number;
+  maxTokensPerDay?: number;
+  maxTasksPerDay?: number;
+  alertThreshold?: number;
+}
+
 export interface AgentDirectivesRecord {
   agentGaii: string;
   purpose: string;
   rules: DirectiveRule[];
   memoryAreas: DirectiveMemoryArea[];
   resources: DirectiveResource[];
+  budgetLimits?: BudgetLimits;
   updatedAt: string;
 }
 

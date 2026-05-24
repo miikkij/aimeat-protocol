@@ -1219,6 +1219,7 @@ export function initializeSchema(db: Database.Database): void {
       rules         TEXT NOT NULL DEFAULT '[]',
       memoryAreas   TEXT NOT NULL DEFAULT '[]',
       resources     TEXT NOT NULL DEFAULT '[]',
+      budgetLimits  TEXT,
       updatedAt     TEXT NOT NULL
     );
 
@@ -1375,6 +1376,9 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('agents', 'modulesLoaded', "TEXT DEFAULT '[]'");
   safeAddColumn('agents', 'agentLimitations', "TEXT DEFAULT '[]'");
   safeAddColumn('extensions', 'createdByAgent', 'TEXT');
+
+  // Governance Phase C — budget limits on agent directives
+  safeAddColumn('agent_directives', 'budgetLimits', 'TEXT');
 
   // Push Layer Phase A — webhook delivery fields
   safeAddColumn('agents', 'webhookUrl', 'TEXT');

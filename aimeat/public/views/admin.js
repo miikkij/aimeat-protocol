@@ -50,6 +50,7 @@ import GeneratorDebugTab from './admin/generator-debug-tab.js';
 import CapabilitiesAdminTab from './admin/capabilities-tab.js';
 import AgentTasksAdminTab from './admin/agent-tasks-tab.js';
 import SharingGroupsAdminTab from './admin/sharing-groups-tab.js';
+import AgentIntegrationAdminTab from './admin/agent-integration-tab.js';
 
 // ── Sidebar nav structure ──
 const NAV_GROUPS = [
@@ -68,6 +69,7 @@ const NAV_GROUPS = [
     { id: 'owners',  icon: '\u{1F464}', key: 'dashboard.owners',  component: OwnersTab,  count: 'owners' },
     { id: 'agents',  icon: '\u{1F916}', key: 'dashboard.agents',  component: AgentsTab,  count: 'agents' },
     { id: 'ghii',    icon: '\u{1F511}', key: 'dashboard.ghii',    component: GhiiTab,    count: 'ghii' },
+    { id: 'agent-integration', icon: '\u{1F50C}', key: 'admin.tabs.agentIntegration', component: AgentIntegrationAdminTab },
   ]},
   { key: 'dashboard.navData', items: [
     { id: 'actions',       icon: '\u26A1',     key: 'dashboard.actions',       component: ActionsTab,        count: 'actions' },

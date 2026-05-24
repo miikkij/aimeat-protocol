@@ -33,6 +33,7 @@ import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { recordTaskStarted, recordTaskCompleted, recordTaskFailed } from '../services/activity-recorder.js';
 import { AgentTaskCreateSchema, AgentTaskUpdateSchema, AgentTaskEventSchema, AgentTaskTodoUpdateSchema } from '../models/agent-task-schemas.js';
+import { requireReadiness } from '../middleware/readiness-gate.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
@@ -199,7 +200,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
   });
 
   /* ── PATCH /v1/agents/:name/tasks/:id -- Update task ── */
-  router.patch('/v1/agents/:name/tasks/:id', requireAuth(), async (req, res) => {
+  router.patch('/v1/agents/:name/tasks/:id', requireAuth(), requireReadiness('standard', config, storage), async (req, res) => {
     const id = req.params.id as string;
 
     const task = await storage.getAgentTask(id);
@@ -333,6 +334,13 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
 
   /* ── POST /v1/agents/:name/tasks/:id/start -- Start task (queued -> active) ── */
   router.post('/v1/agents/:name/tasks/:id/start', requireAuth(), async (req, res) => {
+    // Owner-only: agents must not self-start tasks (propose-before-start rule)
+    const isOwner = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    if (!isOwner) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the owner can start tasks'));
+      return;
+    }
+
     const id = req.params.id as string;
 
     const task = await storage.getAgentTask(id);
@@ -388,7 +396,14 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/pause -- Pause task (active -> paused) ── */
-  router.post('/v1/agents/:name/tasks/:id/pause', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/agents/:name/tasks/:id/pause', requireAuth(), async (req, res) => {
+    // Owner-only: agents cannot pause tasks
+    const isOwner = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    if (!isOwner) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the owner can pause tasks'));
+      return;
+    }
+
     const id = req.params.id as string;
 
     const task = await storage.getAgentTask(id);
@@ -439,7 +454,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/event -- Append event ── */
-  router.post('/v1/agents/:name/tasks/:id/event', requireAuth(), async (req, res) => {
+  router.post('/v1/agents/:name/tasks/:id/event', requireAuth(), requireReadiness('standard', config, storage), async (req, res) => {
     const id = req.params.id as string;
 
     const task = await storage.getAgentTask(id);
@@ -500,7 +515,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/complete -- Complete task (active -> done) ── */
-  router.post('/v1/agents/:name/tasks/:id/complete', requireAuth(), async (req, res) => {
+  router.post('/v1/agents/:name/tasks/:id/complete', requireAuth(), requireReadiness('standard', config, storage), async (req, res) => {
     const id = req.params.id as string;
 
     const task = await storage.getAgentTask(id);

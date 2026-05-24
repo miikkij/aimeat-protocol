@@ -1,0 +1,141 @@
+/**
+ * @file admin-agent-integration.css
+ * @description Admin Agent Integration tab styles (adm-agi-* prefix).
+ * @version-history
+ *   v1.0.0 -- 2026-05-24 -- Initial creation for Governance Phase C
+ */
+
+/* ── Section containers ── */
+.adm-agi-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.adm-agi-section-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  margin-bottom: 14px;
+}
+
+/* ── Stats row ── */
+.adm-agi-stats {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.adm-agi-stat-card {
+  background: var(--bg-dim);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 18px;
+  min-width: 100px;
+  text-align: center;
+}
+
+.adm-agi-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.adm-agi-stat-label {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* ── Tables ── */
+.adm-agi-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.adm-agi-table th {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+}
+
+.adm-agi-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.adm-agi-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── Stuck agent highlight ── */
+.adm-agi-stuck {
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-top: 8px;
+  font-size: 0.8rem;
+}
+
+.adm-agi-stuck-agent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.adm-agi-stuck-agent:last-child {
+  border-bottom: none;
+}
+
+/* ── Readiness distribution bars ── */
+.adm-agi-readiness-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.adm-agi-readiness-level {
+  width: 70px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.adm-agi-readiness-track {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-dim);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.adm-agi-readiness-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.adm-agi-readiness-count {
+  width: 30px;
+  text-align: right;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+/* ── Regenerate button ── */
+.adm-agi-regen-btn {
+  margin-top: 12px;
+}

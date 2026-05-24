@@ -6,6 +6,13 @@
  */
 import { z } from 'zod';
 
+export const BudgetLimitsSchema = z.object({
+  max_tokens_per_task: z.number().int().positive().optional(),
+  max_tokens_per_day: z.number().int().positive().optional(),
+  max_tasks_per_day: z.number().int().positive().optional(),
+  alert_threshold: z.number().int().min(1).max(100).optional(),
+}).optional();
+
 export const AgentDirectivesSchema = z.object({
   purpose: z.string().max(1024).optional().default(''),
   rules: z.array(z.object({
@@ -24,6 +31,7 @@ export const AgentDirectivesSchema = z.object({
     reference: z.string(),
     description: z.string(),
   })).optional().default([]),
+  budget_limits: BudgetLimitsSchema,
 });
 
 export const OwnerAgentDefaultsSchema = z.object({

@@ -561,6 +561,7 @@
         "identity": "Identity",
         "deliveryLog": "Delivery Log",
         "showAll": "Show all",
+        "showLess": "Show less",
         "zone2": {
           "newTitle": "Onboarding not started",
           "newDesc": "Install the skill bundle to begin Hello Integration. The agent needs to identify itself and complete 11 onboarding steps.",
@@ -581,7 +582,9 @@
           "time": "Time",
           "event": "Event",
           "channel": "Channel",
-          "result": "Result"
+          "result": "Result",
+          "latency": "Latency",
+          "webhookNotConfigured": "Webhook not configured"
         },
         "commands": {
           "title": "Agent Commands",
@@ -5309,6 +5312,48 @@
       "codex": "OpenAI Codex CLI",
       "gemini": "Google Gemini CLI",
       "other": "Other / Unknown"
+    }
+  },
+  "governance": {
+    "title": "Today's Governance",
+    "tokenBudget": "Token budget",
+    "tasksToday": "Tasks today",
+    "policyIssues": "Policy issues",
+    "telemetryEvents": "Telemetry events today",
+    "deliveryHealth": "Delivery health",
+    "budgetLimits": {
+      "title": "Budget Limits",
+      "maxTokensPerTask": "Max tokens per task",
+      "maxTokensPerDay": "Max tokens per day",
+      "maxTasksPerDay": "Max tasks per day",
+      "alertThreshold": "Alert threshold (%)"
+    },
+    "readinessGate": {
+      "insufficient": "Readiness level insufficient",
+      "required": "Required level"
+    }
+  },
+  "admin": {
+    "tabs": {
+      "agentIntegration": "Agent Integration"
+    },
+    "agentIntegration": {
+      "platformRegistry": "Platform Registry",
+      "onboardingOverview": "Onboarding Overview",
+      "skillBundles": "Skill Bundles",
+      "readinessDistribution": "Readiness Distribution",
+      "completed": "Completed",
+      "inProgress": "In Progress",
+      "stuck": "Stuck",
+      "stuckSince": "Stuck since",
+      "regenerateAll": "Regenerate all bundles",
+      "outdated": "Outdated",
+      "agentCount": "Agents",
+      "totalAgents": "Total agents",
+      "adapter": "Adapter",
+      "detectPattern": "Auto-detect pattern",
+      "noPlatforms": "No platforms registered",
+      "platform": "Platform"
     }
   }
 }

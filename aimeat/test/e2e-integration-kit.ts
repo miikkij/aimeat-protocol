@@ -175,7 +175,7 @@ console.log('\nGroup 2 -- Full Task Lifecycle');
 await test('4. Start task from inbox', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/tasks/${taskId}/start`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${agentToken}` },
+        headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.task.status === 'active', `status: ${body.data.task.status}`);
@@ -314,7 +314,7 @@ await test('11. Stall detection setup', async () => {
     // Start it
     const { status: startStatus, body: startBody } = await json(`/v1/agents/${agentName}/tasks/${stallTaskId}/start`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${agentToken}` },
+        headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(startStatus === 200, `start status ${startStatus}: ${JSON.stringify(startBody)}`);
     assert(startBody.data.task.status === 'active', `expected active, got ${startBody.data.task.status}`);

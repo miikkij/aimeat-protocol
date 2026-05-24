@@ -74,7 +74,7 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
     // Merge: system + owner + agent
     const mergedRules = [...systemRules, ...ownerRules, ...agentRules];
 
-    res.json(success(config.nodeId, {
+    const responseData: Record<string, unknown> = {
       purpose: agentDirectives?.purpose ?? '',
       rules: mergedRules,
       memory_areas: (agentDirectives?.memoryAreas ?? []).map(ma => ({
@@ -84,7 +84,16 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
         csm_id: ma.csmId,
       })),
       resources: agentDirectives?.resources ?? [],
-    }));
+    };
+    if (agentDirectives?.budgetLimits) {
+      responseData.budget_limits = {
+        max_tokens_per_task: agentDirectives.budgetLimits.maxTokensPerTask,
+        max_tokens_per_day: agentDirectives.budgetLimits.maxTokensPerDay,
+        max_tasks_per_day: agentDirectives.budgetLimits.maxTasksPerDay,
+        alert_threshold: agentDirectives.budgetLimits.alertThreshold,
+      };
+    }
+    res.json(success(config.nodeId, responseData));
   });
 
   /* ── PUT /v1/agents/:name/directives -- Upsert agent-level directives ── */
@@ -111,7 +120,7 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
     const now = new Date().toISOString();
 
     // Convert snake_case to camelCase for storage
-    const record = await storage.upsertAgentDirectives({
+    const directivesData: Parameters<typeof storage.upsertAgentDirectives>[0] = {
       agentGaii,
       purpose: body.purpose,
       rules: body.rules,
@@ -123,7 +132,16 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
       })),
       resources: body.resources,
       updatedAt: now,
-    });
+    };
+    if (body.budget_limits) {
+      directivesData.budgetLimits = {
+        maxTokensPerTask: body.budget_limits.max_tokens_per_task,
+        maxTokensPerDay: body.budget_limits.max_tokens_per_day,
+        maxTasksPerDay: body.budget_limits.max_tasks_per_day,
+        alertThreshold: body.budget_limits.alert_threshold,
+      };
+    }
+    const record = await storage.upsertAgentDirectives(directivesData);
 
     // Push: webhook + MCP notification (parallel, fire-and-forget)
     if (webhookDispatcher) {
@@ -132,6 +150,7 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
       if (body.rules) changedSections.push('rules');
       if (body.memory_areas) changedSections.push('memory_areas');
       if (body.resources) changedSections.push('resources');
+      if (body.budget_limits) changedSections.push('budget_limits');
       if (changedSections.length > 0) {
         webhookDispatcher.dispatchWebhookEvent(agentGaii, 'directive.updated', {
           changed_sections: changedSections,
@@ -146,21 +165,28 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
 
     emitChange('agent-directives');
 
-    res.json(success(config.nodeId, {
-      directives: {
-        agent_gaii: record.agentGaii,
-        purpose: record.purpose,
-        rules: record.rules,
-        memory_areas: record.memoryAreas.map(ma => ({
-          key_prefix: ma.keyPrefix,
-          description: ma.description,
-          schema: ma.schema,
-          csm_id: ma.csmId,
-        })),
-        resources: record.resources,
-        updated_at: record.updatedAt,
-      },
-    }));
+    const putResponse: Record<string, unknown> = {
+      agent_gaii: record.agentGaii,
+      purpose: record.purpose,
+      rules: record.rules,
+      memory_areas: record.memoryAreas.map(ma => ({
+        key_prefix: ma.keyPrefix,
+        description: ma.description,
+        schema: ma.schema,
+        csm_id: ma.csmId,
+      })),
+      resources: record.resources,
+      updated_at: record.updatedAt,
+    };
+    if (record.budgetLimits) {
+      putResponse.budget_limits = {
+        max_tokens_per_task: record.budgetLimits.maxTokensPerTask,
+        max_tokens_per_day: record.budgetLimits.maxTokensPerDay,
+        max_tasks_per_day: record.budgetLimits.maxTasksPerDay,
+        alert_threshold: record.budgetLimits.alertThreshold,
+      };
+    }
+    res.json(success(config.nodeId, { directives: putResponse }));
   });
 
   /* ── DELETE /v1/agents/:name/directives -- Reset to defaults ── */

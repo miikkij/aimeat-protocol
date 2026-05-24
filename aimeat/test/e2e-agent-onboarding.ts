@@ -508,7 +508,7 @@ await test('25. Step 10: complete_test_task -- triggers auto-complete with all s
     // Start the task (queued -> active)
     const { status: startStatus, body: startBody } = await json(`/v1/agents/${agentName}/tasks/${fullTestTaskId}/start`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${agentToken}` },
+        headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(startStatus === 200, `POST start status ${startStatus}: ${JSON.stringify(startBody)}`);
     assert(startBody.data.task.status === 'active', `expected active, got ${startBody.data.task.status}`);
@@ -734,7 +734,7 @@ await test('35. Provision server state for auto-checkable steps (no POST step ye
 
     const { status: startStatus } = await json(`/v1/agents/${agent2Name}/tasks/${autoTestTaskId}/start`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${agent2Token}` },
+        headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(startStatus === 200, `POST task start failed: ${startStatus}`);
 

@@ -1275,13 +1275,14 @@ model AgentTaskEvent {
 }
 
 model AgentDirective {
-  id          String   @id @map("_id")
-  agentGaii   String   @unique
-  purpose     String   @default("")
-  rules       Json     @default("[]")
-  memoryAreas Json     @default("[]")
-  resources   Json     @default("[]")
-  updatedAt   DateTime @updatedAt
+  id           String   @id @map("_id")
+  agentGaii    String   @unique
+  purpose      String   @default("")
+  rules        Json     @default("[]")
+  memoryAreas  Json     @default("[]")
+  resources    Json     @default("[]")
+  budgetLimits Json?
+  updatedAt    DateTime @updatedAt
 }
 
 model OwnerAgentDefault {

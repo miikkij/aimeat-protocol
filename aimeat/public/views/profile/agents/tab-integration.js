@@ -31,6 +31,8 @@ export default function TabIntegration({ agent, onboarding, session, showToast, 
   const [testing, setTesting] = useState(false);
   const [rerunning, setRerunning] = useState(false);
   const [copiedCmd, setCopiedCmd] = useState(false);
+  const [showAllDeliveries, setShowAllDeliveries] = useState(false);
+  const [allDeliveries, setAllDeliveries] = useState(null);
 
   async function loadData() {
     setLoading(true);
@@ -106,7 +108,18 @@ export default function TabIntegration({ agent, onboarding, session, showToast, 
     return renderOnboardingView(onboarding, agentName, handleRerun, rerunning, handleCopyInstall, copiedCmd);
   }
 
-  return renderProductionView(agent, onboarding, webhook, bundleVersion, deliveries, handleTestWebhook, testing, handleRerun, rerunning, handleCopyInstall, copiedCmd);
+  async function handleShowAll() {
+    if (showAllDeliveries) { setShowAllDeliveries(false); return; }
+    try {
+      const resp = await getDeliveryLog(agentName, 200);
+      setAllDeliveries(resp?.data?.deliveries || []);
+    } catch { /* silent */ }
+    setShowAllDeliveries(true);
+  }
+
+  const displayDeliveries = showAllDeliveries && allDeliveries ? allDeliveries : deliveries;
+
+  return renderProductionView(agent, onboarding, webhook, bundleVersion, displayDeliveries, handleTestWebhook, testing, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleShowAll, showAllDeliveries);
 }
 
 function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, handleCopyInstall, copiedCmd) {
@@ -164,7 +177,7 @@ function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, han
   `;
 }
 
-function renderProductionView(agent, onboarding, webhook, bundleVersion, deliveries, handleTestWebhook, testing, handleRerun, rerunning, handleCopyInstall, copiedCmd) {
+function renderProductionView(agent, onboarding, webhook, bundleVersion, displayDeliveries, handleTestWebhook, testing, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleShowAll, showAllDeliveries) {
   const steps = onboarding?.steps || [];
   const agentName = agent.name;
 
@@ -275,19 +288,24 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, deliver
                 <th>${t('agents.detail.integration.event')}</th>
                 <th>${t('agents.detail.integration.channel')}</th>
                 <th>${t('agents.detail.integration.result')}</th>
+                <th>${t('agents.detail.integration.latency')}</th>
               </tr>
             </thead>
             <tbody>
-              ${deliveries.map((d, i) => html`
+              ${displayDeliveries.map((d, i) => html`
                 <tr key=${d.id || i}>
                   <td>${d.timestamp ? timeAgo(d.timestamp) : '--'}</td>
                   <td>${d.eventType || d.event || '--'}</td>
                   <td>${d.channel || '--'}</td>
-                  <td>${d.success ? '✓' : '✗'} ${d.latencyMs ? `${d.latencyMs}ms` : ''}</td>
+                  <td>${d.success ? '✓' : '✗'}</td>
+                  <td>${d.latencyMs ? `${(d.latencyMs / 1000).toFixed(1)}s` : '--'}</td>
                 </tr>
               `)}
             </tbody>
           </table>
+          <button class="btn-ghost btn-sm" style="margin-top:6px" onClick=${handleShowAll}>
+            ${showAllDeliveries ? t('agents.detail.showLess') : t('agents.detail.showAll')}
+          </button>
         </div>
       `}
     </div>

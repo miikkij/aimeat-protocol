@@ -11,7 +11,7 @@ import type { AgentDirectivesRecord, OwnerAgentDefaults } from '../../../interfa
 // ── Helpers ──
 
 function deserializeDirectives(row: Record<string, unknown>): AgentDirectivesRecord {
-  return {
+  const record: AgentDirectivesRecord = {
     agentGaii: row.agentGaii as string,
     purpose: row.purpose as string,
     rules: JSON.parse(row.rules as string),
@@ -19,6 +19,8 @@ function deserializeDirectives(row: Record<string, unknown>): AgentDirectivesRec
     resources: JSON.parse(row.resources as string),
     updatedAt: row.updatedAt as string,
   };
+  if (row.budgetLimits) record.budgetLimits = JSON.parse(row.budgetLimits as string);
+  return record;
 }
 
 function deserializeOwnerDefaults(row: Record<string, unknown>): OwnerAgentDefaults {
@@ -41,13 +43,14 @@ export function getAgentDirectives(db: Database.Database, agentGaii: string): Ag
 
 export function upsertAgentDirectives(db: Database.Database, record: AgentDirectivesRecord): AgentDirectivesRecord {
   db.prepare(
-    `INSERT INTO agent_directives (agentGaii, purpose, rules, memoryAreas, resources, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO agent_directives (agentGaii, purpose, rules, memoryAreas, resources, budgetLimits, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(agentGaii) DO UPDATE SET
        purpose = excluded.purpose,
        rules = excluded.rules,
        memoryAreas = excluded.memoryAreas,
        resources = excluded.resources,
+       budgetLimits = excluded.budgetLimits,
        updatedAt = excluded.updatedAt`
   ).run(
     record.agentGaii,
@@ -55,6 +58,7 @@ export function upsertAgentDirectives(db: Database.Database, record: AgentDirect
     JSON.stringify(record.rules),
     JSON.stringify(record.memoryAreas),
     JSON.stringify(record.resources),
+    record.budgetLimits ? JSON.stringify(record.budgetLimits) : null,
     record.updatedAt,
   );
   return record;

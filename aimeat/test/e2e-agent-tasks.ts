@@ -204,7 +204,7 @@ console.log('\nPhase 3 -- Task Lifecycle');
 await test('6. Start task (queued -> active)', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/tasks/${queuedTaskId}/start`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${agentToken}` },
+        headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.task.status === 'active', `status: ${body.data.task.status}`);
@@ -335,7 +335,7 @@ await test('11. Fail task', async () => {
     // Start it
     await json(`/v1/agents/${agentName}/tasks/${failTaskId}/start`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${agentToken}` },
+        headers: { Authorization: `Bearer ${ownerToken}` },
     });
 
     // Fail it

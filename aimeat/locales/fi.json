@@ -561,6 +561,7 @@
         "identity": "Identiteetti",
         "deliveryLog": "Toimitushistoria",
         "showAll": "Näytä kaikki",
+        "showLess": "Näytä vähemmän",
         "zone2": {
           "newTitle": "Perehdytystä ei aloitettu",
           "newDesc": "Asenna taitopaketti aloittaaksesi Hello-integraation. Agentin tulee tunnistautua ja suorittaa 11 perehdytysvaihetta.",
@@ -581,7 +582,9 @@
           "time": "Aika",
           "event": "Tapahtuma",
           "channel": "Kanava",
-          "result": "Tulos"
+          "result": "Tulos",
+          "latency": "Viive",
+          "webhookNotConfigured": "Webhookia ei ole määritetty"
         },
         "commands": {
           "title": "Agentin komennot",
@@ -5309,6 +5312,48 @@
       "codex": "OpenAI Codex CLI",
       "gemini": "Google Gemini CLI",
       "other": "Muu / Tuntematon"
+    }
+  },
+  "governance": {
+    "title": "Tämän päivän hallinto",
+    "tokenBudget": "Token-budjetti",
+    "tasksToday": "Tehtävät tänään",
+    "policyIssues": "Sääntörikkomukset",
+    "telemetryEvents": "Telemetriatapahtumia tänään",
+    "deliveryHealth": "Toimituksen tila",
+    "budgetLimits": {
+      "title": "Budjettirajat",
+      "maxTokensPerTask": "Max tokenit per tehtävä",
+      "maxTokensPerDay": "Max tokenit per päivä",
+      "maxTasksPerDay": "Max tehtävät per päivä",
+      "alertThreshold": "Hälytysraja (%)"
+    },
+    "readinessGate": {
+      "insufficient": "Valmiustaso riittämätön",
+      "required": "Vaadittu taso"
+    }
+  },
+  "admin": {
+    "tabs": {
+      "agentIntegration": "Agenttiintegraatio"
+    },
+    "agentIntegration": {
+      "platformRegistry": "Alustarekisteri",
+      "onboardingOverview": "Perehdytyksen yleiskuva",
+      "skillBundles": "Taitopaketit",
+      "readinessDistribution": "Valmiusjakauma",
+      "completed": "Valmiit",
+      "inProgress": "Käynnissä",
+      "stuck": "Jumissa",
+      "stuckSince": "Jumissa lähtien",
+      "regenerateAll": "Luo kaikki paketit uudelleen",
+      "outdated": "Vanhentunut",
+      "agentCount": "Agentit",
+      "totalAgents": "Agentit yhteensä",
+      "adapter": "Adapteri",
+      "detectPattern": "Tunnistuskaava",
+      "noPlatforms": "Ei rekisteröityjä alustoja",
+      "platform": "Alusta"
     }
   }
 }
