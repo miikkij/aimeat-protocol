@@ -11,7 +11,8 @@
     "search": "Haku...",
     "noData": "Ei tietoja saatavilla",
     "id": "ID",
-    "name": "Nimi"
+    "name": "Nimi",
+    "add": "Lisää"
   },
   "nav": {
     "try": "Kokeile",
@@ -585,7 +586,8 @@
           "problem": "Ongelma",
           "newSummary": "Odottaa taitopaketin asennusta",
           "problemSummary": "Toimitushäiriö havaittu",
-          "idle": "Toimeton"
+          "idle": "Toimeton",
+          "next": "Seuraava"
         },
         "sharedTags": "Jaetut tunnisteet",
         "lastSeen": "Viimeksi nähty",
@@ -614,7 +616,13 @@
           "diagnose": "Diagnosoi",
           "testWebhook": "Testaa webhook",
           "updateUrl": "Päivitä URL",
-          "overrideReadiness": "Ohita valmiustaso"
+          "overrideReadiness": "Ohita valmiustaso",
+          "testWebhookSuccess": "Webhook-testi lähetetty onnistuneesti",
+          "testWebhookFailed": "Webhook-testi epäonnistui",
+          "urlUpdated": "Webhook-URL päivitetty",
+          "urlUpdateFailed": "Webhook-URL:n päivitys epäonnistui",
+          "save": "Tallenna",
+          "cancel": "Peruuta"
         },
         "integration": {
           "checklistTitle": "Hello-integraatio",
@@ -630,14 +638,22 @@
           "latency": "Viive",
           "webhookNotConfigured": "Webhookia ei ole määritetty",
           "editWebhook": "Muokkaa webhookia",
+          "webhookUpdated": "Webhook-URL päivitetty",
+          "webhookUpdateError": "Webhook-URL:n päivitys epäonnistui",
           "platformVersion": "Versio",
           "detectionMethod": "Tunnistus",
-          "autoDetected": "automaattinen",
+          "autoDetected": "Automaattinen",
+          "manual": "Manuaalinen",
           "update": "Päivitä",
           "lastValidated": "Viimeksi vahvistettu",
           "strengths": "Vahvuudet",
           "gaps": "Puutteet",
-          "roles": "Roolit"
+          "noStrengths": "Ei mitään",
+          "noGaps": "Ei mitään",
+          "roles": "Roolit",
+          "readinessScore": "Valmius",
+          "copyInstallCommand": "Kopioi asennuskomento",
+          "installCommandCopied": "Asennuskomento kopioitu"
         },
         "commands": {
           "title": "Agentin komennot",
@@ -677,7 +693,12 @@
           "noPackagesAvailable": "Ei saatavilla olevia tietopaketteja",
           "noAreas": "Ei muistialueita määritetty",
           "noPackages": "Ei tietopaketteja linkitetty",
-          "scopeNote": "Tämä laajuusyhteenveto sisältyy agentin taitopakettiin, jotta se tietää tietorajansa."
+          "scopeNote": "Tämä laajuusyhteenveto sisältyy agentin taitopakettiin, jotta se tietää tietorajansa.",
+          "scopeFooter": "Tämä yhteenveto sisällytetään agentin taitopakettiin, jotta se tietää datarajansa.",
+          "addAreaError": "Muistialueen lisäys epäonnistui",
+          "linkPackageError": "Tietopaketin linkitys epäonnistui",
+          "packageNamePlaceholder": "Paketin nimi tai URL",
+          "packageDescPlaceholder": "Kuvaus"
         },
         "agentConfig": {
           "copy": "Kopioi",
@@ -696,10 +717,23 @@
           "filterMessages": "Viestit",
           "filterGovernance": "Hallinto",
           "filterSystem": "Järjestelmä",
-          "auditTrail": "Tapahtumaloki on vain lisättävä auditointipolku. Hallintotapahtumat vaikuttavat agentin luottamuspisteisiin."
+          "auditTrail": "Tapahtumaloki on vain lisättävä auditointipolku. Hallintotapahtumat vaikuttavat agentin luottamuspisteisiin.",
+          "governance": {
+            "title": "Tämän päivän hallinto",
+            "tokenBudget": "Token-budjetti",
+            "tasksToday": "Tehtävät tänään",
+            "completed": "Valmiit",
+            "activeTasks": "Aktiiviset",
+            "failed": "Epäonnistuneet",
+            "policyIssues": "Sääntörikkomukset",
+            "telemetryEvents": "Telemetriatapahtumia tänään",
+            "deliveryHealth": "Toimituksen tila"
+          }
         },
         "directives": {
-          "footer": "Direktiivit sisältyvät jokaiseen taitopaketin päivitykseen. Agentti vastaanottaa nämä käyttäytymisrajoituksina."
+          "footer": "Direktiivit sisältyvät jokaiseen taitopaketin päivitykseen. Agentti vastaanottaa nämä käyttäytymisrajoituksina.",
+          "contentLabel": "Käyttäytymisdirektiivit",
+          "contentPlaceholder": "Kirjoita käyttäytymisdirektiivit...\n\n## Prioriteettisäännöt\n1. Älä aloita tehtäviä ilman omistajan hyväksyntää\n\n## Toimintarajat\n- Käytä vain ruokaan liittyvää dataa"
         },
         "services": {
           "info": "Palvelut julistetaan agentin toimesta Hello-integraation vaiheessa 11 (valinnainen). Ne määrittelevät mitä agentti tarjoaa muille agenteille ja verkolle.",
@@ -5436,7 +5470,23 @@
       "adapter": "Adapteri",
       "detectPattern": "Tunnistuskaava",
       "noPlatforms": "Ei rekisteröityjä alustoja",
-      "platform": "Alusta"
+      "platform": "Alusta",
+      "notStarted": "Ei aloitettu",
+      "stuckAgents": "Jumissa olevat agentit",
+      "currentVersion": "Nykyinen versio",
+      "addPlatform": "Lisää alusta",
+      "platformName": "Alustan nimi",
+      "platformId": "Alustan tunnus",
+      "adapterPattern": "Adapteri",
+      "autoDetectRegex": "Tunnistusregex",
+      "sendReminder": "Lähetä muistutus",
+      "skipStep": "Ohita vaihe",
+      "suggestion": {
+        "webhook": "Webhook-URL ei rekisteröity tai päätepiste tavoittamattomissa",
+        "platform": "Alustan tunnistus epäonnistui -- tarkista User-Agent tai aseta manuaalisesti",
+        "skillBundle": "Taitopakettia ei ole asennettu tai havaittu vanhentunut versio",
+        "default": "Ei edistymistä yli 24 tuntiin -- harkitse yhteydenottoa agentin omistajaan"
+      }
     }
   }
 }

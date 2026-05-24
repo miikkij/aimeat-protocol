@@ -11,18 +11,24 @@
  *   v1.6.0 -- 2026-05-22 -- Add Task Creation Builder split-panel styles
  *   v1.5.0 -- 2026-05-22 -- Add task timestamp and todo completion time styles
  *   v2.0.0 -- 2026-05-24 -- Add styles for audit fix components (status dots, config actions, URL forms, help text)
+ *   v2.1.0 -- 2026-05-24 -- Add scope footer and config upload styles for F8-F16 audit fixes
+ *   v2.1.0 -- 2026-05-24 -- Add webhook edit form, role badge, strengths/gaps styles for Integration tab
  *   v1.4.0 -- 2026-05-22 -- Add Task TODO list, progress, environment badges, Start button styles
+ *   v2.2.0 -- 2026-05-24 -- Fix C6: remove GAII CSS, M2: compact connect content
+ *   v2.3.0 -- 2026-05-24 -- Add F18 violation badge, C5 directives textarea styles
  */
 
 /* Sub-tab bar */
-.pf .agd-subtab-bar {
+.pf .agd-subtab-bar ,
+.pf .pf-agd-subtab-bar  {
   display: flex;
   gap: 0.25rem;
   border-bottom: 1px solid var(--border, #E5E7EB);
   margin-top: 1rem;
   padding-bottom: 0;
 }
-.pf .agd-subtab {
+.pf .agd-subtab ,
+.pf .pf-agd-subtab  {
   padding: 0.35rem 1rem;
   background: none;
   border: none;
@@ -32,27 +38,32 @@
   font-size: 0.875rem;
   transition: color 0.15s, border-color 0.15s;
 }
-.pf .agd-subtab:hover { color: var(--text, #1A1A2E); }
-.pf .agd-subtab-active {
+.pf .agd-subtab:hover ,
+.pf .pf-agd-subtab:hover  { color: var(--text, #1A1A2E); }
+.pf .agd-subtab-active ,
+.pf .pf-agd-subtab-active  {
   color: var(--accent, #E8564A);
   border-bottom-color: var(--accent, #E8564A);
   font-weight: 600;
 }
 
 /* Sub-tab content area */
-.pf .agd-subtab-content {
+.pf .agd-subtab-content ,
+.pf .pf-agd-subtab-content  {
   padding: 1rem 0 0.5rem;
   min-height: 120px;
 }
 
 /* Section headers inside sub-tabs */
-.pf .agd-section-header {
+.pf .agd-section-header ,
+.pf .pf-agd-section-header  {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 0.5rem;
 }
-.pf .agd-section-title {
+.pf .agd-section-title ,
+.pf .pf-agd-section-title  {
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--text-dim, #6B7280);
@@ -61,7 +72,8 @@
 }
 
 /* Task list items */
-.pf .agd-task-item {
+.pf .agd-task-item ,
+.pf .pf-agd-task-item  {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -73,36 +85,50 @@
   cursor: pointer;
   transition: background 0.15s;
 }
-.pf .agd-task-item:hover { background: var(--card-bg-alt, #F3F4F6); }
-.pf .agd-task-title { font-weight: 500; flex: 1; font-size: 0.85rem; }
-.pf .agd-task-meta { display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0; }
-.pf .agd-task-time { font-size: 0.75rem; color: var(--text-dim, #6B7280); }
+.pf .agd-task-item:hover ,
+.pf .pf-agd-task-item:hover  { background: var(--card-bg-alt, #F3F4F6); }
+.pf .agd-task-title ,
+.pf .pf-agd-task-title  { font-weight: 500; flex: 1; font-size: 0.85rem; }
+.pf .agd-task-meta ,
+.pf .pf-agd-task-meta  { display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0; }
+.pf .agd-task-time ,
+.pf .pf-agd-task-time  { font-size: 0.75rem; color: var(--text-dim, #6B7280); }
 
 /* Status badges */
-.pf .agd-status {
+.pf .agd-status ,
+.pf .pf-agd-status  {
   font-size: 0.7rem;
   padding: 2px 8px;
   border-radius: 12px;
   font-weight: 500;
   white-space: nowrap;
 }
-.pf .agd-status-draft { background: var(--card-bg-alt, #F3F4F6); color: var(--text-dim, #6B7280); }
-.pf .agd-status-queued { background: rgba(217, 119, 6, 0.1); color: var(--warn, #F59E0B); }
-.pf .agd-status-active { background: rgba(37, 99, 235, 0.1); color: var(--blue, #3B82F6); }
-.pf .agd-status-done { background: rgba(16, 185, 129, 0.1); color: var(--success, #10b981); }
-.pf .agd-status-failed { background: rgba(239, 68, 68, 0.1); color: var(--danger, #ef4444); }
-.pf .agd-status-stalled { background: rgba(239, 68, 68, 0.1); color: var(--warn, #F59E0B); }
+.pf .agd-status-draft ,
+.pf .pf-agd-status-draft  { background: var(--card-bg-alt, #F3F4F6); color: var(--text-dim, #6B7280); }
+.pf .agd-status-queued ,
+.pf .pf-agd-status-queued  { background: rgba(217, 119, 6, 0.1); color: var(--warn, #F59E0B); }
+.pf .agd-status-active ,
+.pf .pf-agd-status-active  { background: rgba(37, 99, 235, 0.1); color: var(--blue, #3B82F6); }
+.pf .agd-status-done ,
+.pf .pf-agd-status-done  { background: rgba(16, 185, 129, 0.1); color: var(--success, #10b981); }
+.pf .agd-status-failed ,
+.pf .pf-agd-status-failed  { background: rgba(239, 68, 68, 0.1); color: var(--danger, #ef4444); }
+.pf .agd-status-stalled ,
+.pf .pf-agd-status-stalled  { background: rgba(239, 68, 68, 0.1); color: var(--warn, #F59E0B); }
 
 /* Task creation form */
-.pf .agd-create-form {
+.pf .agd-create-form ,
+.pf .pf-agd-create-form  {
   padding: 0.75rem;
   border: 1px solid var(--border, #E5E7EB);
   border-radius: var(--radius-xs, 6px);
   margin-top: 0.5rem;
   background: var(--card-bg, #FFFFFF);
 }
-.pf .agd-form-field { margin-bottom: 0.65rem; }
-.pf .agd-form-field label {
+.pf .agd-form-field ,
+.pf .pf-agd-form-field  { margin-bottom: 0.65rem; }
+.pf .agd-form-field label ,
+.pf .pf-agd-form-field label  {
   display: block;
   font-size: 0.8rem;
   font-weight: 600;
@@ -111,7 +137,10 @@
 }
 .pf .agd-form-field input,
 .pf .agd-form-field textarea,
-.pf .agd-form-field select {
+.pf .agd-form-field select ,
+.pf .pf-agd-form-field input,
+.pf .pf-agd-form-field textarea,
+.pf .pf-agd-form-field select  {
   width: 100%;
   padding: 0.35rem 0.5rem;
   border: 1px solid var(--border, #E5E7EB);
@@ -124,15 +153,21 @@
 }
 .pf .agd-form-field input:focus,
 .pf .agd-form-field textarea:focus,
-.pf .agd-form-field select:focus {
+.pf .agd-form-field select:focus ,
+.pf .pf-agd-form-field input:focus,
+.pf .pf-agd-form-field textarea:focus,
+.pf .pf-agd-form-field select:focus  {
   outline: none;
   border-color: var(--accent, #E8564A);
 }
-.pf .agd-form-field textarea { min-height: 70px; resize: vertical; }
-.pf .agd-form-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+.pf .agd-form-field textarea ,
+.pf .pf-agd-form-field textarea  { min-height: 70px; resize: vertical; }
+.pf .agd-form-actions ,
+.pf .pf-agd-form-actions  { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
 
 /* Task expanded detail / event log */
-.pf .agd-task-expanded {
+.pf .agd-task-expanded ,
+.pf .pf-agd-task-expanded  {
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--border, #E5E7EB);
   border-top: none;
@@ -142,8 +177,10 @@
   background: var(--card-bg-alt, #F3F4F6);
   font-size: 0.85rem;
 }
-.pf .agd-task-desc { color: var(--text-dim, #6B7280); margin-bottom: 0.5rem; line-height: 1.4; }
-.pf .agd-task-timestamps {
+.pf .agd-task-desc ,
+.pf .pf-agd-task-desc  { color: var(--text-dim, #6B7280); margin-bottom: 0.5rem; line-height: 1.4; }
+.pf .agd-task-timestamps ,
+.pf .pf-agd-task-timestamps  {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
@@ -153,15 +190,19 @@
   padding-bottom: 0.4rem;
   border-bottom: 1px solid var(--border, #E5E7EB);
 }
-.pf .agd-todo-completed-at {
+.pf .agd-todo-completed-at ,
+.pf .pf-agd-todo-completed-at  {
   font-size: 0.7rem;
   color: var(--text-muted, #9CA3AF);
   margin-top: 0.15rem;
 }
-.pf .agd-task-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+.pf .agd-task-actions ,
+.pf .pf-agd-task-actions  { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
 
-.pf .agd-event-log { max-height: 200px; overflow-y: auto; margin-top: 0.5rem; }
-.pf .agd-event-item {
+.pf .agd-event-log ,
+.pf .pf-agd-event-log  { max-height: 200px; overflow-y: auto; margin-top: 0.5rem; }
+.pf .agd-event-item ,
+.pf .pf-agd-event-item  {
   padding: 0.25rem 0;
   border-bottom: 1px solid var(--border, #E5E7EB);
   font-size: 0.8rem;
@@ -169,12 +210,16 @@
   gap: 0.5rem;
   align-items: baseline;
 }
-.pf .agd-event-item:last-child { border-bottom: none; }
-.pf .agd-event-time { color: var(--text-dim, #6B7280); font-size: 0.7rem; flex-shrink: 0; }
-.pf .agd-event-type { font-weight: 500; flex-shrink: 0; }
+.pf .agd-event-item:last-child ,
+.pf .pf-agd-event-item:last-child  { border-bottom: none; }
+.pf .agd-event-time ,
+.pf .pf-agd-event-time  { color: var(--text-dim, #6B7280); font-size: 0.7rem; flex-shrink: 0; }
+.pf .agd-event-type ,
+.pf .pf-agd-event-type  { font-weight: 500; flex-shrink: 0; }
 
 /* Empty state */
-.pf .agd-empty {
+.pf .agd-empty ,
+.pf .pf-agd-empty  {
   text-align: center;
   padding: 1.5rem;
   color: var(--text-dim, #6B7280);
@@ -182,8 +227,10 @@
 }
 
 /* Directives display */
-.pf .agd-directive-section { margin-bottom: 1rem; }
-.pf .agd-directive-section h4 {
+.pf .agd-directive-section ,
+.pf .pf-agd-directive-section  { margin-bottom: 1rem; }
+.pf .agd-directive-section h4 ,
+.pf .pf-agd-directive-section h4  {
   font-size: 0.8rem;
   font-weight: 600;
   margin-bottom: 0.35rem;
@@ -191,13 +238,15 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
-.pf .agd-purpose-text {
+.pf .agd-purpose-text ,
+.pf .pf-agd-purpose-text  {
   font-size: 0.85rem;
   color: var(--text, #1A1A2E);
   line-height: 1.5;
   padding: 0.35rem 0;
 }
-.pf .agd-rule-item {
+.pf .agd-rule-item ,
+.pf .pf-agd-rule-item  {
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
@@ -205,8 +254,10 @@
   font-size: 0.85rem;
   line-height: 1.4;
 }
-.pf .agd-rule-text { flex: 1; }
-.pf .agd-rule-source {
+.pf .agd-rule-text ,
+.pf .pf-agd-rule-text  { flex: 1; }
+.pf .agd-rule-source ,
+.pf .pf-agd-rule-source  {
   font-size: 0.65rem;
   padding: 1px 6px;
   border-radius: 8px;
@@ -215,19 +266,25 @@
   font-weight: 500;
   margin-top: 2px;
 }
-.pf .agd-source-system { background: var(--card-bg-alt, #F3F4F6); color: var(--text-dim, #6B7280); }
-.pf .agd-source-owner { background: rgba(37, 99, 235, 0.1); color: var(--blue, #3B82F6); }
-.pf .agd-source-agent { background: rgba(16, 185, 129, 0.1); color: var(--success, #10b981); }
+.pf .agd-source-system ,
+.pf .pf-agd-source-system  { background: var(--card-bg-alt, #F3F4F6); color: var(--text-dim, #6B7280); }
+.pf .agd-source-owner ,
+.pf .pf-agd-source-owner  { background: rgba(37, 99, 235, 0.1); color: var(--blue, #3B82F6); }
+.pf .agd-source-agent ,
+.pf .pf-agd-source-agent  { background: rgba(16, 185, 129, 0.1); color: var(--success, #10b981); }
 
 /* Resource / memory area lists */
-.pf .agd-list-item {
+.pf .agd-list-item ,
+.pf .pf-agd-list-item  {
   padding: 0.25rem 0;
   font-size: 0.85rem;
   color: var(--text, #1A1A2E);
   border-bottom: 1px solid var(--border-subtle, #F3F4F6);
 }
-.pf .agd-list-item:last-child { border-bottom: none; }
-.pf .agd-list-item code {
+.pf .agd-list-item:last-child ,
+.pf .pf-agd-list-item:last-child  { border-bottom: none; }
+.pf .agd-list-item code ,
+.pf .pf-agd-list-item code  {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.78rem;
   background: var(--code-bg, #F3F4F6);
@@ -236,13 +293,15 @@
 }
 
 /* Editable rule input row */
-.pf .agd-rule-edit-row {
+.pf .agd-rule-edit-row ,
+.pf .pf-agd-rule-edit-row  {
   display: flex;
   gap: 0.5rem;
   align-items: center;
   margin-bottom: 0.35rem;
 }
-.pf .agd-rule-edit-row input {
+.pf .agd-rule-edit-row input ,
+.pf .pf-agd-rule-edit-row input  {
   flex: 1;
   padding: 0.3rem 0.5rem;
   border: 1px solid var(--border, #E5E7EB);
@@ -252,11 +311,13 @@
   color: var(--text, #1A1A2E);
   font-family: inherit;
 }
-.pf .agd-rule-edit-row input:focus {
+.pf .agd-rule-edit-row input:focus ,
+.pf .pf-agd-rule-edit-row input:focus  {
   outline: none;
   border-color: var(--accent, #E8564A);
 }
-.pf .agd-remove-btn {
+.pf .agd-remove-btn ,
+.pf .pf-agd-remove-btn  {
   background: none;
   border: none;
   color: var(--danger, #ef4444);
@@ -266,8 +327,10 @@
   opacity: 0.6;
   transition: opacity 0.15s;
 }
-.pf .agd-remove-btn:hover { opacity: 1; }
-.pf .agd-add-btn {
+.pf .agd-remove-btn:hover ,
+.pf .pf-agd-remove-btn:hover  { opacity: 1; }
+.pf .agd-add-btn ,
+.pf .pf-agd-add-btn  {
   background: none;
   border: 1px dashed var(--border, #E5E7EB);
   color: var(--text-dim, #6B7280);
@@ -278,7 +341,8 @@
   transition: border-color 0.15s, color 0.15s;
   margin-top: 0.25rem;
 }
-.pf .agd-add-btn:hover {
+.pf .agd-add-btn:hover ,
+.pf .pf-agd-add-btn:hover  {
   border-color: var(--accent, #E8564A);
   color: var(--accent, #E8564A);
 }
@@ -304,7 +368,8 @@
 /* ── Capabilities sub-tab ── */
 
 /* Badge list container */
-.pf .agd-cap-list {
+.pf .agd-cap-list ,
+.pf .pf-agd-cap-list  {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
@@ -312,7 +377,8 @@
 }
 
 /* Individual capability badge */
-.pf .agd-cap-badge {
+.pf .agd-cap-badge ,
+.pf .pf-agd-cap-badge  {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -323,12 +389,14 @@
   background: var(--card-bg, #FFFFFF);
   color: var(--text, #1A1A2E);
 }
-.pf .agd-cap-name {
+.pf .agd-cap-name ,
+.pf .pf-agd-cap-name  {
   font-weight: 500;
 }
 
 /* Type badges (MCP / skill / tool) */
-.pf .agd-cap-type {
+.pf .agd-cap-type ,
+.pf .pf-agd-cap-type  {
   font-size: 0.65rem;
   padding: 1px 6px;
   border-radius: 8px;
@@ -338,21 +406,25 @@
   background: var(--card-bg-alt, #F3F4F6);
   color: var(--text-dim, #6B7280);
 }
-.pf .agd-cap-type-mcp {
+.pf .agd-cap-type-mcp ,
+.pf .pf-agd-cap-type-mcp  {
   background: rgba(37, 99, 235, 0.1);
   color: var(--blue, #3B82F6);
 }
-.pf .agd-cap-type-skill {
+.pf .agd-cap-type-skill ,
+.pf .pf-agd-cap-type-skill  {
   background: rgba(16, 185, 129, 0.1);
   color: var(--success, #10b981);
 }
-.pf .agd-cap-type-tool {
+.pf .agd-cap-type-tool ,
+.pf .pf-agd-cap-type-tool  {
   background: rgba(217, 119, 6, 0.1);
   color: var(--warn, #F59E0B);
 }
 
 /* Verified / self-reported badges */
-.pf .agd-cap-verified {
+.pf .agd-cap-verified ,
+.pf .pf-agd-cap-verified  {
   font-size: 0.65rem;
   padding: 1px 6px;
   border-radius: 8px;
@@ -360,7 +432,8 @@
   background: rgba(16, 185, 129, 0.1);
   color: var(--success, #10b981);
 }
-.pf .agd-cap-unverified {
+.pf .agd-cap-unverified ,
+.pf .pf-agd-cap-unverified  {
   font-size: 0.65rem;
   padding: 1px 6px;
   border-radius: 8px;
@@ -370,43 +443,50 @@
 }
 
 /* Domain badge variant */
-.pf .agd-cap-domain {
+.pf .agd-cap-domain ,
+.pf .pf-agd-cap-domain  {
   background: var(--card-bg-alt, #F3F4F6);
 }
 
 /* Language tags row */
-.pf .agd-cap-langs {
+.pf .agd-cap-langs ,
+.pf .pf-agd-cap-langs  {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.35rem;
   margin-top: 0.5rem;
 }
-.pf .agd-cap-lang-label {
+.pf .agd-cap-lang-label ,
+.pf .pf-agd-cap-lang-label  {
   font-size: 0.8rem;
   color: var(--text-dim, #6B7280);
   font-weight: 500;
 }
-.pf .agd-cap-lang {
+.pf .agd-cap-lang ,
+.pf .pf-agd-cap-lang  {
   background: rgba(37, 99, 235, 0.08);
   color: var(--blue, #3B82F6);
   font-weight: 500;
 }
 
 /* Action queue support list */
-.pf .agd-cap-queue-list {
+.pf .agd-cap-queue-list ,
+.pf .pf-agd-cap-queue-list  {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
 }
-.pf .agd-cap-queue-item {
+.pf .agd-cap-queue-item ,
+.pf .pf-agd-cap-queue-item  {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.85rem;
   color: var(--text, #1A1A2E);
 }
-.pf .agd-cap-check {
+.pf .agd-cap-check ,
+.pf .pf-agd-cap-check  {
   color: var(--success, #10b981);
   font-weight: 700;
 }
@@ -414,39 +494,61 @@
 /* ── Activity sub-tab ── */
 
 /* Activity stats cards */
-.pf .agd-stats-grid { display: flex; gap: 8px; margin-bottom: 16px; }
-.pf .agd-stat-card { flex: 1; background: var(--card-bg, #FFFFFF); border: 1px solid var(--border, #E5E7EB); border-radius: 8px; padding: 12px; text-align: center; }
-.pf .agd-stat-value { font-size: 1.5rem; font-weight: 600; color: var(--text, #1A1A2E); }
-.pf .agd-stat-label { font-size: 0.75rem; color: var(--text-muted, #9CA3AF); }
+.pf .agd-stats-grid ,
+.pf .pf-agd-stats-grid  { display: flex; gap: 8px; margin-bottom: 16px; }
+.pf .agd-stat-card ,
+.pf .pf-agd-stat-card  { flex: 1; background: var(--card-bg, #FFFFFF); border: 1px solid var(--border, #E5E7EB); border-radius: 8px; padding: 12px; text-align: center; }
+.pf .agd-stat-value ,
+.pf .pf-agd-stat-value  { font-size: 1.5rem; font-weight: 600; color: var(--text, #1A1A2E); }
+.pf .agd-stat-label ,
+.pf .pf-agd-stat-label  { font-size: 0.75rem; color: var(--text-muted, #9CA3AF); }
 
 /* Activity chart area */
-.pf .agd-chart-container { background: var(--card-bg, #FFFFFF); border: 1px solid var(--border, #E5E7EB); border-radius: 8px; padding: 12px; margin-bottom: 16px; }
-.pf .agd-chart-rows { display: flex; flex-direction: column; gap: 4px; }
-.pf .agd-chart-row { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; }
-.pf .agd-chart-date { min-width: 52px; color: var(--text-muted, #9CA3AF); text-align: right; }
-.pf .agd-chart-bar-track { flex: 1; height: 14px; background: var(--card-bg-alt, #F3F4F6); border-radius: 3px; overflow: hidden; }
-.pf .agd-chart-bar-fill { height: 100%; background: var(--accent, #E8564A); border-radius: 3px; transition: width 0.2s; }
-.pf .agd-chart-count { min-width: 24px; text-align: right; font-weight: 600; color: var(--text-dim, #6B7280); }
+.pf .agd-chart-container ,
+.pf .pf-agd-chart-container  { background: var(--card-bg, #FFFFFF); border: 1px solid var(--border, #E5E7EB); border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+.pf .agd-chart-rows ,
+.pf .pf-agd-chart-rows  { display: flex; flex-direction: column; gap: 4px; }
+.pf .agd-chart-row ,
+.pf .pf-agd-chart-row  { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; }
+.pf .agd-chart-date ,
+.pf .pf-agd-chart-date  { min-width: 52px; color: var(--text-muted, #9CA3AF); text-align: right; }
+.pf .agd-chart-bar-track ,
+.pf .pf-agd-chart-bar-track  { flex: 1; height: 14px; background: var(--card-bg-alt, #F3F4F6); border-radius: 3px; overflow: hidden; }
+.pf .agd-chart-bar-fill ,
+.pf .pf-agd-chart-bar-fill  { height: 100%; background: var(--accent, #E8564A); border-radius: 3px; transition: width 0.2s; }
+.pf .agd-chart-count ,
+.pf .pf-agd-chart-count  { min-width: 24px; text-align: right; font-weight: 600; color: var(--text-dim, #6B7280); }
 
 /* Event log entries */
-.pf .agd-log-entry { display: flex; gap: 8px; padding: 6px 10px; background: var(--card-bg, #FFFFFF); border: 1px solid var(--border, #E5E7EB); border-radius: 6px; margin-bottom: 3px; font-size: 0.8rem; align-items: center; }
-.pf .agd-log-time { color: var(--text-muted, #9CA3AF); white-space: nowrap; min-width: 80px; }
-.pf .agd-log-type { font-weight: 600; min-width: 80px; color: var(--text, #1A1A2E); }
-.pf .agd-log-msg { flex: 1; color: var(--text-dim, #6B7280); }
-.pf .agd-event-log-scroll { max-height: 300px; overflow-y: auto; margin-bottom: 4px; }
+.pf .agd-log-entry ,
+.pf .pf-agd-log-entry  { display: flex; gap: 8px; padding: 6px 10px; background: var(--card-bg, #FFFFFF); border: 1px solid var(--border, #E5E7EB); border-radius: 6px; margin-bottom: 3px; font-size: 0.8rem; align-items: center; }
+.pf .agd-log-time ,
+.pf .pf-agd-log-time  { color: var(--text-muted, #9CA3AF); white-space: nowrap; min-width: 80px; }
+.pf .agd-log-type ,
+.pf .pf-agd-log-type  { font-weight: 600; min-width: 80px; color: var(--text, #1A1A2E); }
+.pf .agd-log-msg ,
+.pf .pf-agd-log-msg  { flex: 1; color: var(--text-dim, #6B7280); }
+.pf .agd-event-log-scroll ,
+.pf .pf-agd-event-log-scroll  { max-height: 300px; overflow-y: auto; margin-bottom: 4px; }
 
 /* Scheduled jobs badges */
-.pf .agd-job-badge-aimeat { background: var(--card-bg-alt, #F3F4F6); color: var(--success, #10B981); padding: 2px 6px; border-radius: 3px; font-size: 0.7rem; white-space: nowrap; flex-shrink: 0; }
-.pf .agd-job-badge-agent { background: var(--card-bg-alt, #F3F4F6); color: var(--warn, #F59E0B); padding: 2px 6px; border-radius: 3px; font-size: 0.7rem; white-space: nowrap; flex-shrink: 0; }
+.pf .agd-job-badge-aimeat ,
+.pf .pf-agd-job-badge-aimeat  { background: var(--card-bg-alt, #F3F4F6); color: var(--success, #10B981); padding: 2px 6px; border-radius: 3px; font-size: 0.7rem; white-space: nowrap; flex-shrink: 0; }
+.pf .agd-job-badge-agent ,
+.pf .pf-agd-job-badge-agent  { background: var(--card-bg-alt, #F3F4F6); color: var(--warn, #F59E0B); padding: 2px 6px; border-radius: 3px; font-size: 0.7rem; white-space: nowrap; flex-shrink: 0; }
 
 /* Time range selector */
-.pf .agd-range-bar { display: flex; gap: 4px; margin-bottom: 8px; }
-.pf .agd-range-btn { padding: 2px 8px; border: 1px solid var(--border, #E5E7EB); border-radius: 4px; background: none; cursor: pointer; font-size: 0.75rem; color: var(--text-dim, #6B7280); }
-.pf .agd-range-btn.active { background: var(--accent, #E8564A); color: var(--bg, #FFFFFF); border-color: var(--accent, #E8564A); }
+.pf .agd-range-bar ,
+.pf .pf-agd-range-bar  { display: flex; gap: 4px; margin-bottom: 8px; }
+.pf .agd-range-btn ,
+.pf .pf-agd-range-btn  { padding: 2px 8px; border: 1px solid var(--border, #E5E7EB); border-radius: 4px; background: none; cursor: pointer; font-size: 0.75rem; color: var(--text-dim, #6B7280); }
+.pf .agd-range-btn.active ,
+.pf .pf-agd-range-btn.active  { background: var(--accent, #E8564A); color: var(--bg, #FFFFFF); border-color: var(--accent, #E8564A); }
 
 /* ── Services sub-tab ── */
 
-.pf .agd-services-info {
+.pf .agd-services-info ,
+.pf .pf-agd-services-info  {
   background: var(--bg-dim, #F9FAFB);
   border: 1px solid var(--border, #E5E7EB);
   border-radius: 8px;
@@ -455,27 +557,32 @@
   color: var(--text-dim, #6B7280);
   margin-bottom: 1rem;
 }
-.pf .agd-services-list {
+.pf .agd-services-list ,
+.pf .pf-agd-services-list  {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
-.pf .agd-service-card {
+.pf .agd-service-card ,
+.pf .pf-agd-service-card  {
   background: var(--card, #FFFFFF);
   border: 1px solid var(--border, #E5E7EB);
   border-radius: 8px;
   padding: 0.75rem 1rem;
 }
-.pf .agd-service-name {
+.pf .agd-service-name ,
+.pf .pf-agd-service-name  {
   font-weight: 600;
   font-size: 0.9rem;
 }
-.pf .agd-service-desc {
+.pf .agd-service-desc ,
+.pf .pf-agd-service-desc  {
   font-size: 0.8rem;
   color: var(--text-dim, #6B7280);
   margin-top: 0.25rem;
 }
-.pf .agd-service-meta {
+.pf .agd-service-meta ,
+.pf .pf-agd-service-meta  {
   display: flex;
   gap: 0.75rem;
   font-size: 0.75rem;
@@ -485,7 +592,8 @@
 
 /* ── Messages sub-tab ── */
 
-.pf .agd-msg-status-bar {
+.pf .agd-msg-status-bar ,
+.pf .pf-agd-msg-status-bar  {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -495,7 +603,8 @@
   color: var(--text-dim, #6B7280);
   margin-bottom: 0.75rem;
 }
-.pf .agd-msg-history {
+.pf .agd-msg-history ,
+.pf .pf-agd-msg-history  {
   max-height: 400px;
   overflow-y: auto;
   padding: 0.5rem 0;
@@ -503,44 +612,52 @@
   flex-direction: column;
   gap: 0.5rem;
 }
-.pf .agd-msg-bubble {
+.pf .agd-msg-bubble ,
+.pf .pf-agd-msg-bubble  {
   max-width: 80%;
   padding: 0.625rem 0.875rem;
   border-radius: 12px;
   font-size: 0.85rem;
   line-height: 1.5;
 }
-.pf .agd-msg-inbound {
+.pf .agd-msg-inbound ,
+.pf .pf-agd-msg-inbound  {
   align-self: flex-end;
   background: var(--accent-dim, #FEF2F1);
   border-bottom-right-radius: 4px;
 }
-.pf .agd-msg-outbound {
+.pf .agd-msg-outbound ,
+.pf .pf-agd-msg-outbound  {
   align-self: flex-start;
   background: var(--surface, #F3F4F6);
   border: 1px solid var(--border, #E5E7EB);
   border-bottom-left-radius: 4px;
 }
-.pf .agd-msg-meta {
+.pf .agd-msg-meta ,
+.pf .pf-agd-msg-meta  {
   font-size: 0.7rem;
   color: var(--text-muted, #9CA3AF);
   margin-top: 0.25rem;
 }
-.pf .agd-msg-meta-right {
+.pf .agd-msg-meta-right ,
+.pf .pf-agd-msg-meta-right  {
   text-align: right;
 }
-.pf .agd-msg-time {
+.pf .agd-msg-time ,
+.pf .pf-agd-msg-time  {
   font-weight: 500;
   color: var(--text-secondary, #6B7280);
 }
-.pf .agd-msg-input {
+.pf .agd-msg-input ,
+.pf .pf-agd-msg-input  {
   display: flex;
   gap: 0.5rem;
   padding: 0.75rem 0;
   border-top: 1px solid var(--border, #E5E7EB);
   margin-top: 0.75rem;
 }
-.pf .agd-msg-input textarea {
+.pf .agd-msg-input textarea ,
+.pf .pf-agd-msg-input textarea  {
   flex: 1;
   resize: none;
   border: 1px solid var(--border, #E5E7EB);
@@ -551,7 +668,8 @@
   max-height: 6rem;
   font-family: inherit;
 }
-.pf .agd-msg-proposed-task {
+.pf .agd-msg-proposed-task ,
+.pf .pf-agd-msg-proposed-task  {
   background: var(--card, #FFFFFF);
   border: 1px solid var(--accent, #E8564A);
   border-radius: 8px;
@@ -559,18 +677,21 @@
   margin-top: 0.5rem;
   font-size: 0.8rem;
 }
-.pf .agd-msg-proposed-task h5 {
+.pf .agd-msg-proposed-task h5 ,
+.pf .pf-agd-msg-proposed-task h5  {
   margin: 0 0 0.25rem;
   font-size: 0.8rem;
   color: var(--accent, #E8564A);
 }
-.pf .agd-msg-threads {
+.pf .agd-msg-threads ,
+.pf .pf-agd-msg-threads  {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
   margin-bottom: 0.75rem;
 }
-.pf .agd-msg-thread-btn {
+.pf .agd-msg-thread-btn ,
+.pf .pf-agd-msg-thread-btn  {
   background: var(--surface, #F3F4F6);
   border: 1px solid var(--border, #E5E7EB);
   border-radius: 6px;
@@ -580,20 +701,24 @@
   transition: border-color 0.15s;
 }
 .pf .agd-msg-thread-btn:hover,
-.pf .agd-msg-thread-btn-active {
+.pf .agd-msg-thread-btn-active ,
+.pf .pf-agd-msg-thread-btn:hover,
+.pf .pf-agd-msg-thread-btn-active  {
   border-color: var(--accent, #E8564A);
   color: var(--accent, #E8564A);
 }
 
 /* ── Task Creation Builder (split-panel) ── */
 
-.pf .agd-builder {
+.pf .agd-builder ,
+.pf .pf-agd-builder  {
   border: 1px solid var(--border, #E5E7EB);
   border-radius: var(--radius, 8px);
   overflow: hidden;
   margin-top: 0.5rem;
 }
-.pf .agd-builder-header {
+.pf .agd-builder-header ,
+.pf .pf-agd-builder-header  {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -601,12 +726,14 @@
   border-bottom: 1px solid var(--border, #E5E7EB);
   background: var(--card-bg, #FFFFFF);
 }
-.pf .agd-builder-header h4 {
+.pf .agd-builder-header h4 ,
+.pf .pf-agd-builder-header h4  {
   margin: 0;
   font-size: 0.9rem;
   font-weight: 600;
 }
-.pf .agd-builder-panels {
+.pf .agd-builder-panels ,
+.pf .pf-agd-builder-panels  {
   display: grid;
   grid-template-columns: 1fr 1fr;
   min-height: 350px;
@@ -614,7 +741,8 @@
 @media (max-width: 768px) {
   .pf .agd-builder-panels { grid-template-columns: 1fr; }
 }
-.pf .agd-proposal {
+.pf .agd-proposal ,
+.pf .pf-agd-proposal  {
   border-right: 1px solid var(--border, #E5E7EB);
   display: flex;
   flex-direction: column;
@@ -622,12 +750,14 @@
 @media (max-width: 768px) {
   .pf .agd-proposal { border-right: none; border-bottom: 1px solid var(--border, #E5E7EB); }
 }
-.pf .agd-proposal-tabs {
+.pf .agd-proposal-tabs ,
+.pf .pf-agd-proposal-tabs  {
   display: flex;
   border-bottom: 1px solid var(--border, #E5E7EB);
   background: var(--bg-dim, #F9FAFB);
 }
-.pf .agd-proposal-tab {
+.pf .agd-proposal-tab ,
+.pf .pf-agd-proposal-tab  {
   flex: 1;
   padding: 0.4rem 0.5rem;
   background: none;
@@ -640,21 +770,27 @@
   text-align: center;
   transition: color 0.15s, border-color 0.15s;
 }
-.pf .agd-proposal-tab:hover { color: var(--text, #1A1A2E); }
-.pf .agd-proposal-tab-active {
+.pf .agd-proposal-tab:hover ,
+.pf .pf-agd-proposal-tab:hover  { color: var(--text, #1A1A2E); }
+.pf .agd-proposal-tab-active ,
+.pf .pf-agd-proposal-tab-active  {
   color: var(--accent, #E8564A);
   border-bottom-color: var(--accent, #E8564A);
 }
-.pf .agd-proposal-content {
+.pf .agd-proposal-content ,
+.pf .pf-agd-proposal-content  {
   flex: 1;
   overflow-y: auto;
   padding: 0.75rem;
   font-size: 0.82rem;
   max-height: 400px;
 }
-.pf .agd-prop-section { margin-bottom: 0.75rem; }
-.pf .agd-prop-section:last-child { margin-bottom: 0; }
-.pf .agd-prop-label {
+.pf .agd-prop-section ,
+.pf .pf-agd-prop-section  { margin-bottom: 0.75rem; }
+.pf .agd-prop-section:last-child ,
+.pf .pf-agd-prop-section:last-child  { margin-bottom: 0; }
+.pf .agd-prop-label ,
+.pf .pf-agd-prop-label  {
   font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -662,31 +798,44 @@
   color: var(--text-dim, #6B7280);
   margin-bottom: 0.25rem;
 }
-.pf .agd-prop-value { color: var(--text, #1A1A2E); line-height: 1.5; }
-.pf .agd-prop-empty { color: var(--text-muted, #9CA3AF); font-style: italic; font-size: 0.8rem; }
-.pf .agd-prop-code {
+.pf .agd-prop-value ,
+.pf .pf-agd-prop-value  { color: var(--text, #1A1A2E); line-height: 1.5; }
+.pf .agd-prop-empty ,
+.pf .pf-agd-prop-empty  { color: var(--text-muted, #9CA3AF); font-style: italic; font-size: 0.8rem; }
+.pf .agd-prop-code ,
+.pf .pf-agd-prop-code  {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.75rem;
   background: var(--code-bg, #F3F4F6);
   padding: 2px 6px;
   border-radius: 3px;
 }
-.pf .agd-prop-list { list-style: none; padding: 0; margin: 0; }
-.pf .agd-prop-list li { padding: 0.15rem 0; border-bottom: 1px solid var(--border-subtle, #F3F4F6); }
-.pf .agd-prop-list li:last-child { border-bottom: none; }
-.pf .agd-prop-check { display: flex; align-items: baseline; gap: 0.35rem; }
-.pf .agd-prop-check::before { content: '\2713'; color: var(--success, #10b981); font-weight: 600; }
-.pf .agd-scope-item { display: flex; align-items: baseline; gap: 0.5rem; padding: 0.2rem 0; }
-.pf .agd-scope-name { font-weight: 500; min-width: 80px; }
-.pf .agd-scope-type {
+.pf .agd-prop-list ,
+.pf .pf-agd-prop-list  { list-style: none; padding: 0; margin: 0; }
+.pf .agd-prop-list li ,
+.pf .pf-agd-prop-list li  { padding: 0.15rem 0; border-bottom: 1px solid var(--border-subtle, #F3F4F6); }
+.pf .agd-prop-list li:last-child ,
+.pf .pf-agd-prop-list li:last-child  { border-bottom: none; }
+.pf .agd-prop-check ,
+.pf .pf-agd-prop-check  { display: flex; align-items: baseline; gap: 0.35rem; }
+.pf .agd-prop-check::before ,
+.pf .pf-agd-prop-check::before  { content: '\2713'; color: var(--success, #10b981); font-weight: 600; }
+.pf .agd-scope-item ,
+.pf .pf-agd-scope-item  { display: flex; align-items: baseline; gap: 0.5rem; padding: 0.2rem 0; }
+.pf .agd-scope-name ,
+.pf .pf-agd-scope-name  { font-weight: 500; min-width: 80px; }
+.pf .agd-scope-type ,
+.pf .pf-agd-scope-type  {
   font-size: 0.65rem;
   padding: 1px 5px;
   border-radius: 6px;
   background: var(--bg-dim, #F9FAFB);
   color: var(--text-dim, #6B7280);
 }
-.pf .agd-builder-chat { display: flex; flex-direction: column; background: var(--card-bg, #FFFFFF); }
-.pf .agd-builder-chat-history {
+.pf .agd-builder-chat ,
+.pf .pf-agd-builder-chat  { display: flex; flex-direction: column; background: var(--card-bg, #FFFFFF); }
+.pf .agd-builder-chat-history ,
+.pf .pf-agd-builder-chat-history  {
   flex: 1;
   overflow-y: auto;
   padding: 0.5rem 0.75rem;
@@ -695,13 +844,15 @@
   gap: 0.4rem;
   max-height: 350px;
 }
-.pf .agd-builder-chat-input {
+.pf .agd-builder-chat-input ,
+.pf .pf-agd-builder-chat-input  {
   display: flex;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
   border-top: 1px solid var(--border, #E5E7EB);
 }
-.pf .agd-builder-chat-input textarea {
+.pf .agd-builder-chat-input textarea ,
+.pf .pf-agd-builder-chat-input textarea  {
   flex: 1;
   resize: none;
   border: 1px solid var(--border, #E5E7EB);
@@ -712,7 +863,8 @@
   max-height: 5rem;
   font-family: inherit;
 }
-.pf .agd-builder-analyzing {
+.pf .agd-builder-analyzing ,
+.pf .pf-agd-builder-analyzing  {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -721,7 +873,8 @@
   font-size: 0.85rem;
   text-align: center;
 }
-.pf .agd-builder-actions {
+.pf .agd-builder-actions ,
+.pf .pf-agd-builder-actions  {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -729,13 +882,16 @@
   border-top: 1px solid var(--border, #E5E7EB);
   background: var(--bg-dim, #F9FAFB);
 }
-.pf .agd-builder-actions-right { display: flex; gap: 0.5rem; }
-.pf .agd-version-badge { font-size: 0.7rem; color: var(--text-muted, #9CA3AF); }
+.pf .agd-builder-actions-right ,
+.pf .pf-agd-builder-actions-right  { display: flex; gap: 0.5rem; }
+.pf .agd-version-badge ,
+.pf .pf-agd-version-badge  { font-size: 0.7rem; color: var(--text-muted, #9CA3AF); }
 
 /* ── Task TODO list ── */
 
 /* Progress badge shown next to task title */
-.pf .agd-todo-progress {
+.pf .agd-todo-progress ,
+.pf .pf-agd-todo-progress  {
   font-size: 0.7rem;
   font-weight: 600;
   padding: 1px 7px;
@@ -746,28 +902,33 @@
 }
 
 /* TODO section wrapper inside expanded task */
-.pf .agd-todo-section {
+.pf .agd-todo-section ,
+.pf .pf-agd-todo-section  {
   margin: 0.5rem 0;
 }
-.pf .agd-todo-header {
+.pf .agd-todo-header ,
+.pf .pf-agd-todo-header  {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 0.35rem;
   font-size: 0.8rem;
 }
-.pf .agd-todo-summary {
+.pf .agd-todo-summary ,
+.pf .pf-agd-todo-summary  {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
-.pf .agd-todo-time {
+.pf .agd-todo-time ,
+.pf .pf-agd-todo-time  {
   font-size: 0.7rem;
   color: var(--text-muted, #9CA3AF);
 }
 
 /* Environment badges (AIMEAT / Agent) */
-.pf .agd-env-badge {
+.pf .agd-env-badge ,
+.pf .pf-agd-env-badge  {
   font-size: 0.6rem;
   font-weight: 600;
   padding: 1px 6px;
@@ -776,22 +937,26 @@
   letter-spacing: 0.3px;
   white-space: nowrap;
 }
-.pf .agd-env-aimeat {
+.pf .agd-env-aimeat ,
+.pf .pf-agd-env-aimeat  {
   background: rgba(16, 185, 129, 0.12);
   color: var(--success, #10b981);
 }
-.pf .agd-env-agent {
+.pf .agd-env-agent ,
+.pf .pf-agd-env-agent  {
   background: rgba(217, 119, 6, 0.12);
   color: var(--warn, #F59E0B);
 }
 
 /* TODO item list */
-.pf .agd-todo-list {
+.pf .agd-todo-list ,
+.pf .pf-agd-todo-list  {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
 }
-.pf .agd-todo-item {
+.pf .agd-todo-item ,
+.pf .pf-agd-todo-item  {
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
@@ -802,23 +967,28 @@
   font-size: 0.8rem;
   transition: border-color 0.15s;
 }
-.pf .agd-todo-active {
+.pf .agd-todo-active ,
+.pf .pf-agd-todo-active  {
   border-color: var(--blue, #3B82F6);
   background: rgba(37, 99, 235, 0.04);
 }
-.pf .agd-todo-done {
+.pf .agd-todo-done ,
+.pf .pf-agd-todo-done  {
   opacity: 0.7;
 }
-.pf .agd-todo-failed {
+.pf .agd-todo-failed ,
+.pf .pf-agd-todo-failed  {
   border-color: var(--danger, #ef4444);
   background: rgba(239, 68, 68, 0.04);
 }
-.pf .agd-todo-skipped {
+.pf .agd-todo-skipped ,
+.pf .pf-agd-todo-skipped  {
   opacity: 0.5;
 }
 
 /* Status icon column */
-.pf .agd-todo-icon {
+.pf .agd-todo-icon ,
+.pf .pf-agd-todo-icon  {
   flex-shrink: 0;
   font-size: 0.85rem;
   line-height: 1.4;
@@ -827,11 +997,13 @@
 }
 
 /* Content column */
-.pf .agd-todo-content {
+.pf .agd-todo-content ,
+.pf .pf-agd-todo-content  {
   flex: 1;
   min-width: 0;
 }
-.pf .agd-todo-title {
+.pf .agd-todo-title ,
+.pf .pf-agd-todo-title  {
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -839,24 +1011,28 @@
   font-weight: 500;
   line-height: 1.4;
 }
-.pf .agd-todo-est {
+.pf .agd-todo-est ,
+.pf .pf-agd-todo-est  {
   font-size: 0.65rem;
   color: var(--text-muted, #9CA3AF);
   white-space: nowrap;
 }
-.pf .agd-todo-desc {
+.pf .agd-todo-desc ,
+.pf .pf-agd-todo-desc  {
   font-size: 0.75rem;
   color: var(--text-dim, #6B7280);
   line-height: 1.4;
   margin-top: 0.15rem;
 }
-.pf .agd-todo-reason {
+.pf .agd-todo-reason ,
+.pf .pf-agd-todo-reason  {
   font-size: 0.7rem;
   color: var(--text-muted, #9CA3AF);
   font-style: italic;
   margin-top: 0.1rem;
 }
-.pf .agd-todo-verify {
+.pf .agd-todo-verify ,
+.pf .pf-agd-todo-verify  {
   font-size: 0.7rem;
   color: var(--text-muted, #9CA3AF);
   margin-top: 0.1rem;
@@ -865,7 +1041,8 @@
 }
 
 /* Waiting state (no todos yet) */
-.pf .agd-todo-waiting {
+.pf .agd-todo-waiting ,
+.pf .pf-agd-todo-waiting  {
   text-align: center;
   padding: 1rem;
   color: var(--text-muted, #9CA3AF);
@@ -1053,11 +1230,6 @@
 .pf .pf-agd-zone1-name {
   font-weight: 600;
   font-size: 0.95rem;
-}
-.pf .pf-agd-zone1-gaii {
-  font-size: 0.7rem;
-  color: var(--text-muted, #9CA3AF);
-  font-family: var(--font-mono, 'JetBrains Mono', monospace);
 }
 .pf .pf-agd-zone1-badges {
   display: flex;
@@ -1443,6 +1615,23 @@
   margin-top: 1rem;
 }
 
+/* Scope summary footer note */
+.pf .pf-agd-scope-footer {
+  font-size: 0.72rem;
+  color: var(--text-muted, #9CA3AF);
+  margin-top: 0.5rem;
+  line-height: 1.4;
+}
+
+/* Config file upload row */
+.pf .pf-agd-config-upload {
+  margin-bottom: 1rem;
+}
+/* Hidden file input */
+.pf .pf-agd-hidden-input {
+  display: none;
+}
+
 /* ── Agent Config tab ── */
 
 .pf .pf-agd-config-list {
@@ -1534,6 +1723,37 @@
 .pf .pf-agd-event-badge--messages { background: var(--accent-subtle, rgba(59, 130, 246, 0.1)); color: var(--blue, #3B82F6); }
 .pf .pf-agd-event-badge--governance { background: var(--accent-subtle, rgba(245, 158, 11, 0.1)); color: var(--warn, #F59E0B); }
 .pf .pf-agd-event-badge--system { background: var(--card-bg-alt, #F3F4F6); color: var(--text-dim, #6B7280); }
+.pf .pf-agd-event-badge--violation { background: rgba(239, 68, 68, 0.12); color: var(--danger, #ef4444); }
+
+/* ── Directives tab (structured text editor) ── */
+.pf .pf-agd-directives-content {
+  white-space: pre-wrap;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-height: 80px;
+  color: var(--text);
+}
+.pf .pf-agd-directives-textarea {
+  width: 100%;
+  min-height: 200px;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: inherit;
+  resize: vertical;
+}
+.pf .pf-agd-directives-textarea:focus {
+  outline: none;
+  border-color: var(--accent, #E8564A);
+}
 
 /* ── Services tab ── */
 
@@ -1611,7 +1831,8 @@
 }
 
 /* Directive footer */
-.pf .agd-directive-footer {
+.pf .agd-directive-footer ,
+.pf .pf-agd-directive-footer  {
   font-size: 0.75rem;
   color: var(--text-dim, #6B7280);
   margin-top: 1rem;
@@ -1719,19 +1940,22 @@
 .pf .pf-agd-progress-header {
   margin-top: 0.25rem;
 }
-.pf .agd-task-title-row {
+.pf .agd-task-title-row ,
+.pf .pf-agd-task-title-row  {
   flex: 1;
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
-.pf .agd-task-group-title {
+.pf .agd-task-group-title ,
+.pf .pf-agd-task-group-title  {
   margin-top: 0.5rem;
   margin-bottom: 0.25rem;
 }
 
 /* ── Governance section (Activity tab) ── */
-.pf .agd-governance-section {
+.pf .agd-governance-section ,
+.pf .pf-agd-governance-section  {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -1739,35 +1963,96 @@
   margin-bottom: 12px;
 }
 
-.pf .agd-governance-grid {
+.pf .agd-governance-grid ,
+.pf .pf-agd-governance-grid  {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 8px;
   margin-bottom: 8px;
 }
 
-.pf .agd-governance-item {
+.pf .agd-governance-item ,
+.pf .pf-agd-governance-item  {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 4px 0;
 }
 
-.pf .agd-governance-label {
+.pf .agd-governance-label ,
+.pf .pf-agd-governance-label  {
   font-size: 0.75rem;
   color: var(--text-dim);
 }
 
-.pf .agd-governance-value {
+.pf .agd-governance-value ,
+.pf .pf-agd-governance-value  {
   font-size: 0.8rem;
   font-weight: 600;
 }
 .pf .pf-agd-warning-text { color: var(--warning); }
 
-.pf .agd-governance-delivery {
+.pf .agd-governance-delivery ,
+.pf .pf-agd-governance-delivery  {
   display: flex;
   justify-content: space-between;
   padding-top: 6px;
   border-top: 1px solid var(--border);
   margin-top: 4px;
+}
+
+/* ── Integration tab: Webhook edit form ── */
+
+.pf .pf-agd-webhook-form {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+.pf .pf-agd-webhook-form input {
+  flex: 1;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 4px;
+  font-size: 0.82rem;
+  background: var(--card-bg, #FFFFFF);
+  color: var(--text, #1A1A2E);
+  font-family: inherit;
+}
+.pf .pf-agd-webhook-form input:focus {
+  outline: none;
+  border-color: var(--accent, #E8564A);
+}
+
+/* ── Integration tab: Roles badge ── */
+
+.pf .pf-agd-role-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+  background: var(--accent-subtle, rgba(59, 130, 246, 0.1));
+  color: var(--blue, #3B82F6);
+}
+
+/* ── Integration tab: Strengths / Gaps text ── */
+
+.pf .pf-agd-strengths-gaps {
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+  line-height: 1.5;
+}
+.pf .pf-agd-strengths-gaps-label {
+  font-weight: 600;
+  color: var(--text-dim, #6B7280);
+}
+.pf .pf-agd-strengths-gaps-value {
+  color: var(--text, #1A1A2E);
+}
+
+/* ── Compact Connect Agent content ── */
+
+.pf .pf-agd-connect-content {
+  margin-top: 0.75rem;
 }

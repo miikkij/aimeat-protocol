@@ -4,6 +4,7 @@
  *   Two-Zone Header (identity + state-dependent status), and 8-tab bar.
  * @version-history
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
+ *   v1.1.0 -- 2026-05-24 -- Fix C6: remove GAII from Zone 1, M1: add Next prefix, C1: production stats, C2: problem action buttons
  */
 
 import { h } from 'preact';
@@ -12,6 +13,7 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { detectAgentState, getDefaultTab, getStateColor } from './state-detector.js';
+import { testWebhook, updateWebhook } from '/js/services/agent-integration.js';
 import TabIntegration from './tab-integration.js';
 import TabTasks from './tab-tasks.js';
 import TabMessages from './tab-messages.js';
@@ -79,7 +81,6 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
           <span class="pf-agd-expand-icon pf-agd-expand-icon--open">▶</span>
           <div class="pf-agd-zone1-identity">
             <span class="pf-agd-zone1-name">${agent.display_name || agent.name}</span>
-            ${agent.gaii && html`<span class="pf-agd-zone1-gaii">${agent.gaii}</span>`}
           </div>
           <div class="pf-agd-zone1-badges">
             ${renderPlatformBadge(onboarding)}
@@ -92,7 +93,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
         </div>
 
         <!-- Zone 2: Status -->
-        ${renderZone2(state, agent, onboarding, setActiveTab)}
+        ${renderZone2(state, agent, onboarding, setActiveTab, showToast)}
 
         <!-- Tab Bar -->
         <div class="pf-agd-tabs">
@@ -177,17 +178,24 @@ function renderCollapsedStats(state, agent, onboarding) {
       return html`${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''} | ${t('profile.agents.detail.state.newSummary')}`;
     case 'onboarding': {
       const nextStep = onboarding?.steps?.find(s => s.status === 'pending');
-      return html`${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''} ${nextStep ? `| ${nextStep.name}` : ''}`;
+      return html`${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''} ${nextStep ? `| ${t('profile.agents.detail.state.next')}: ${nextStep.name}` : ''}`;
     }
     case 'problem':
       return html`${t('profile.agents.detail.state.problemSummary')} | ${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''}`;
     case 'production':
-    default:
-      return html`${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''}`;
+    default: {
+      const parts = [];
+      if (agent.last_seen) parts.push(`${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}`);
+      if (agent.taskStats) {
+        const { done, active: act } = agent.taskStats;
+        if (done || act) parts.push(`${t('profile.agents.detail.today')}: ${done || 0} ${t('profile.agents.detail.done')}${act ? `, ${act} ${t('profile.agents.detail.active')}` : ''}`);
+      }
+      return html`${parts.join(' | ')}`;
+    }
   }
 }
 
-function renderZone2(state, agent, onboarding, setActiveTab) {
+function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
   switch (state) {
     case 'new':
       return html`
@@ -211,7 +219,7 @@ function renderZone2(state, agent, onboarding, setActiveTab) {
         <div class="pf-agd-zone2 pf-agd-zone2--onboarding">
           <div class="pf-agd-zone2-title">
             ${t('profile.agents.detail.zone2.onboardingTitle')}: ${passed} / ${total}
-            ${nextStep ? html`<span class="pf-agd-zone2-desc"> ${nextStep.name}</span>` : ''}
+            ${nextStep ? html`<span class="pf-agd-zone2-desc"> ${t('profile.agents.detail.state.next')}: ${nextStep.name}</span>` : ''}
           </div>
           <div class="pf-agd-progress-bar">
             <div class="pf-agd-progress-fill" style="width: ${pct}%"></div>
@@ -226,36 +234,106 @@ function renderZone2(state, agent, onboarding, setActiveTab) {
         </div>
       `;
     }
-    case 'problem': {
-      const failCount = agent.webhookFailCount ?? 0;
-      return html`
-        <div class="pf-agd-zone2 pf-agd-zone2--problem">
-          <div class="pf-agd-zone2-title">${t('profile.agents.detail.zone2.problemTitle')}</div>
-          <div class="pf-agd-zone2-desc">
-            ${failCount >= 5 ? t('profile.agents.detail.zone2.webhookFailed', { count: failCount }) : ''}
-            ${!agent.last_seen ? t('profile.agents.detail.zone2.noTelemetry') : ''}
-          </div>
-          <div class="pf-agd-zone2-actions">
-            <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); setActiveTab('integration'); }}>
-              ${t('profile.agents.detail.zone2.diagnose')}
-            </button>
-          </div>
-        </div>
-      `;
-    }
+    case 'problem':
+      return html`<${ProblemZone2} agent=${agent} setActiveTab=${setActiveTab} showToast=${showToast} />`;
+
     case 'production':
     default: {
       const tags = agent.tags ?? [];
+      const hasWebhook = agent.webhookUrl || agent.webhook_url;
+      const deliveryLabel = hasWebhook ? t('profile.agents.detail.deliveryWebhook') : t('profile.agents.detail.deliveryPolling');
+      const stats = agent.taskStats;
       return html`
         <div class="pf-agd-zone2 pf-agd-zone2--production">
           <div class="pf-agd-zone2-stats">
+            <span>${deliveryLabel}</span>
             ${agent.last_seen ? html`<span>${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}</span>` : ''}
+            ${stats && (stats.done || stats.active) ? html`<span>${t('profile.agents.detail.today')}: ${stats.done || 0} ${t('profile.agents.detail.done')}${stats.active ? `, ${stats.active} ${t('profile.agents.detail.active')}` : ''}</span>` : ''}
             ${tags.length > 0 ? html`<span>${t('profile.agents.detail.sharedTags')}: ${tags.map(tag => `[${tag}]`).join(' ')}</span>` : ''}
           </div>
         </div>
       `;
     }
   }
+}
+
+function ProblemZone2({ agent, setActiveTab, showToast }) {
+  const [editingUrl, setEditingUrl] = useState(false);
+  const [urlValue, setUrlValue] = useState(agent.webhook_url || agent.webhookUrl || '');
+  const [testing, setTesting] = useState(false);
+
+  async function handleTestWebhook(e) {
+    e.stopPropagation();
+    setTesting(true);
+    try {
+      const resp = await testWebhook(agent.name);
+      if (resp?.ok !== false) {
+        showToast(t('profile.agents.detail.zone2.testWebhookSuccess'));
+      } else {
+        showToast(t('profile.agents.detail.zone2.testWebhookFailed'), true);
+      }
+    } catch {
+      showToast(t('profile.agents.detail.zone2.testWebhookFailed'), true);
+    }
+    setTesting(false);
+  }
+
+  async function handleSaveUrl(e) {
+    e.stopPropagation();
+    try {
+      const resp = await updateWebhook(agent.name, { url: urlValue });
+      if (resp?.ok !== false) {
+        showToast(t('profile.agents.detail.zone2.urlUpdated'));
+        setEditingUrl(false);
+      } else {
+        showToast(t('profile.agents.detail.zone2.urlUpdateFailed'), true);
+      }
+    } catch {
+      showToast(t('profile.agents.detail.zone2.urlUpdateFailed'), true);
+    }
+  }
+
+  function handleOverrideReadiness(e) {
+    e.stopPropagation();
+    setActiveTab('integration');
+  }
+
+  const failCount = agent.webhookFailCount ?? 0;
+
+  return html`
+    <div class="pf-agd-zone2 pf-agd-zone2--problem">
+      <div class="pf-agd-zone2-title">${t('profile.agents.detail.zone2.problemTitle')}</div>
+      <div class="pf-agd-zone2-desc">
+        ${failCount >= 5 ? t('profile.agents.detail.zone2.webhookFailed', { count: failCount }) : ''}
+        ${!agent.last_seen ? t('profile.agents.detail.zone2.noTelemetry') : ''}
+      </div>
+      <div class="pf-agd-zone2-actions">
+        <button class="btn-outline btn-sm" onClick=${handleTestWebhook} disabled=${testing}>
+          ${t('profile.agents.detail.zone2.testWebhook')}
+        </button>
+        <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); setEditingUrl(!editingUrl); }}>
+          ${t('profile.agents.detail.zone2.updateUrl')}
+        </button>
+        <button class="btn-outline btn-sm" onClick=${handleOverrideReadiness}>
+          ${t('profile.agents.detail.zone2.overrideReadiness')}
+        </button>
+      </div>
+      ${editingUrl && html`
+        <div class="pf-agd-zone2-url-form">
+          <input type="text" value=${urlValue}
+                 onInput=${(e) => setUrlValue(e.target.value)}
+                 onClick=${(e) => e.stopPropagation()}
+                 placeholder="https://..." />
+          <button class="btn-primary btn-sm" onClick=${handleSaveUrl}>
+            ${t('profile.agents.detail.zone2.save')}
+          </button>
+          <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); setEditingUrl(false); }}>
+            ${t('profile.agents.detail.zone2.cancel')}
+          </button>
+        </div>
+      `}
+    </div>
+  `;
 }
 
 function renderTabContent(activeTab, agent, onboarding, session, showToast, allAgents) {

@@ -3,6 +3,7 @@
  * @description Admin Agent Integration tab styles (adm-agi-* prefix).
  * @version-history
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Governance Phase C
+ *   v1.1.0 -- 2026-05-24 -- Fix M8 M9 F19 F20 F21 audit findings
  */
 
 /* ── Section containers ── */
@@ -187,4 +188,96 @@
 /* ── Regenerate button ── */
 .adm-agi-regen-btn {
   margin-top: 12px;
+}
+
+/* ── M8: Platform ID secondary text ── */
+.adm-agi-platform-id {
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  margin-top: 1px;
+}
+
+/* ── M9: Stuck agents sub-section title ── */
+.adm-agi-stuck-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+/* ── F19: Add platform form ── */
+.adm-agi-add-btn {
+  margin-top: 12px;
+}
+
+.adm-agi-add-form {
+  margin-top: 12px;
+  padding: 14px;
+  background: var(--bg-dim);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.adm-agi-add-form-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.adm-agi-add-form-label {
+  width: 130px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.adm-agi-add-form-input {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+}
+
+.adm-agi-add-form-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.adm-agi-add-form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* ── F20: Stuck agent layout with suggestion + actions ── */
+.adm-agi-stuck-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.adm-agi-stuck-suggestion {
+  font-size: 0.72rem;
+  font-style: italic;
+  color: var(--warning);
+  margin-top: 3px;
+}
+
+.adm-agi-stuck-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.adm-agi-stuck-btn {
+  font-size: 0.7rem;
+  padding: 4px 10px;
 }

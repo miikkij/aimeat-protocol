@@ -232,6 +232,26 @@ new Date(ev.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digi
 
 ---
 
+## BACKEND BUG: Connectivity Key Connect Route Not Transactional
+
+### Fix 20: POST /v1/agents/connect creates orphan agent on onboarding failure
+
+**File:** `aimeat/src/routes/agents.ts`
+- **Lines ~447-491:** The connect route creates the agent (line 447-460), then creates the onboarding record (line 484-490). These are two separate storage calls with no transaction.
+- If `createOnboarding()` fails (e.g., unique constraint on `AgentOnboarding_agentGaii_key` because an onboarding record already exists from a previous attempt), the agent is left in the database but the response returns `INTERNAL_ERROR`. The agent then exists but is invisible or broken.
+- **Fix:** Wrap agent creation + onboarding creation in a try/catch. If onboarding creation fails, either delete the just-created agent or use `upsertOnboarding` instead of `createOnboarding`. The simpler fix:
+  ```typescript
+  // Before createOnboarding, check if one already exists and delete it
+  const existingOnboarding = await storage.getOnboarding(gaii);
+  if (existingOnboarding) {
+    await storage.deleteOnboarding(gaii);
+  }
+  await storage.createOnboarding({ ... });
+  ```
+- Alternatively, wrap the whole block in try/catch and roll back agent creation on failure.
+
+---
+
 ## VERIFICATION AFTER FIXES
 
 After completing all Critical and High fixes:

@@ -11,7 +11,8 @@
     "search": "Search...",
     "noData": "No data available",
     "id": "ID",
-    "name": "Name"
+    "name": "Name",
+    "add": "Add"
   },
   "nav": {
     "try": "Try it",
@@ -585,7 +586,8 @@
           "problem": "Problem",
           "newSummary": "Awaiting skill bundle install",
           "problemSummary": "Delivery issue detected",
-          "idle": "Idle"
+          "idle": "Idle",
+          "next": "Next"
         },
         "sharedTags": "Shared tags",
         "lastSeen": "Last seen",
@@ -614,7 +616,13 @@
           "diagnose": "Diagnose",
           "testWebhook": "Test webhook",
           "updateUrl": "Update URL",
-          "overrideReadiness": "Override readiness"
+          "overrideReadiness": "Override readiness",
+          "testWebhookSuccess": "Webhook test sent successfully",
+          "testWebhookFailed": "Webhook test failed",
+          "urlUpdated": "Webhook URL updated",
+          "urlUpdateFailed": "Failed to update webhook URL",
+          "save": "Save",
+          "cancel": "Cancel"
         },
         "integration": {
           "checklistTitle": "Hello Integration",
@@ -630,14 +638,22 @@
           "latency": "Latency",
           "webhookNotConfigured": "Webhook not configured",
           "editWebhook": "Edit webhook",
+          "webhookUpdated": "Webhook URL updated",
+          "webhookUpdateError": "Failed to update webhook URL",
           "platformVersion": "Version",
           "detectionMethod": "Detection",
-          "autoDetected": "auto-detected",
+          "autoDetected": "Auto-detected",
+          "manual": "Manual",
           "update": "Update",
           "lastValidated": "Last validated",
           "strengths": "Strengths",
           "gaps": "Gaps",
-          "roles": "Roles"
+          "noStrengths": "None",
+          "noGaps": "None",
+          "roles": "Roles",
+          "readinessScore": "Readiness",
+          "copyInstallCommand": "Copy install command",
+          "installCommandCopied": "Install command copied"
         },
         "commands": {
           "title": "Agent Commands",
@@ -677,7 +693,12 @@
           "noPackagesAvailable": "No knowledge packages available",
           "noAreas": "No memory areas assigned",
           "noPackages": "No knowledge packages linked",
-          "scopeNote": "This scope summary is included in the agent's skill bundle so it knows its data boundaries."
+          "scopeNote": "This scope summary is included in the agent's skill bundle so it knows its data boundaries.",
+          "scopeFooter": "This summary is included in the agent's skill bundle so it knows its data boundaries.",
+          "addAreaError": "Failed to add memory area",
+          "linkPackageError": "Failed to link knowledge package",
+          "packageNamePlaceholder": "Package name or URL",
+          "packageDescPlaceholder": "Description"
         },
         "agentConfig": {
           "copy": "Copy",
@@ -696,10 +717,23 @@
           "filterMessages": "Messages",
           "filterGovernance": "Governance",
           "filterSystem": "System",
-          "auditTrail": "Activity log is an append-only audit trail. Governance events feed into the agent's trust score."
+          "auditTrail": "Activity log is an append-only audit trail. Governance events feed into the agent's trust score.",
+          "governance": {
+            "title": "Today's Governance",
+            "tokenBudget": "Token budget",
+            "tasksToday": "Tasks today",
+            "completed": "Completed",
+            "activeTasks": "Active",
+            "failed": "Failed",
+            "policyIssues": "Policy issues",
+            "telemetryEvents": "Telemetry events today",
+            "deliveryHealth": "Delivery health"
+          }
         },
         "directives": {
-          "footer": "Directives are included in every skill bundle update. The agent receives these as behavioral constraints."
+          "footer": "Directives are included in every skill bundle update. The agent receives these as behavioral constraints.",
+          "contentLabel": "Behavioral directives",
+          "contentPlaceholder": "Enter behavioral directives...\n\n## Priority Rules\n1. Never start tasks without owner approval\n\n## Scope Boundaries\n- Only access grocery-related data"
         },
         "services": {
           "info": "Services are declared by the agent during Hello Integration Step 11 (optional). They define what the agent offers to other agents and the network.",
@@ -5436,7 +5470,23 @@
       "adapter": "Adapter",
       "detectPattern": "Auto-detect pattern",
       "noPlatforms": "No platforms registered",
-      "platform": "Platform"
+      "platform": "Platform",
+      "notStarted": "Not Started",
+      "stuckAgents": "Stuck Agents",
+      "currentVersion": "Current Version",
+      "addPlatform": "Add platform",
+      "platformName": "Platform name",
+      "platformId": "Platform ID",
+      "adapterPattern": "Adapter",
+      "autoDetectRegex": "Auto-detect regex",
+      "sendReminder": "Send reminder",
+      "skipStep": "Skip step",
+      "suggestion": {
+        "webhook": "Webhook URL not registered or endpoint unreachable",
+        "platform": "Platform detection failed -- verify User-Agent or configure manually",
+        "skillBundle": "Skill bundle not installed or outdated version detected",
+        "default": "No progress for over 24 hours -- consider contacting the agent owner"
+      }
     }
   }
 }

@@ -4,6 +4,7 @@
  *   Platform Registry, Onboarding Overview, Skill Bundle Management.
  * @version-history
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Governance Phase C
+ *   v1.1.0 -- 2026-05-24 -- Fix M8 M9 F19 F20 F21 audit findings
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -65,15 +66,18 @@ export default function AgentIntegrationTab({ data, session }) {
 
   return html`
     <div>
-      ${renderPlatformRegistry(platforms, totalAgents)}
-      ${renderOnboardingOverview(onboarding)}
+      ${renderPlatformRegistry(platforms, totalAgents, session, loadData)}
+      ${renderOnboardingOverview(onboarding, session, loadData)}
       ${renderReadinessDistribution(readiness, readinessTotal)}
       ${renderSkillBundles(bundles, handleRegenerate, regenerating)}
     </div>
   `;
 }
 
-function renderPlatformRegistry(platforms, totalAgents) {
+/* ── M8: Merged Platform column (name + ID as secondary text) ── */
+function renderPlatformRegistry(platforms, totalAgents, session, loadData) {
+  const [showForm, setShowForm] = useState(false);
+
   return html`
     <div class="adm-agi-section">
       <div class="adm-agi-section-title">${t('admin.agentIntegration.platformRegistry')}</div>
@@ -82,8 +86,7 @@ function renderPlatformRegistry(platforms, totalAgents) {
         : html`
           <table class="adm-agi-table">
             <thead><tr>
-              <th>${t('common.id')}</th>
-              <th>${t('common.name')}</th>
+              <th>${t('admin.agentIntegration.platform')}</th>
               <th>${t('admin.agentIntegration.agentCount')}</th>
               <th>${t('admin.agentIntegration.adapter')}</th>
               <th>${t('admin.agentIntegration.detectPattern')}</th>
@@ -91,8 +94,10 @@ function renderPlatformRegistry(platforms, totalAgents) {
             <tbody>
               ${platforms.map(p => html`
                 <tr>
-                  <td class="adm-agi-mono-sm">${p.id}</td>
-                  <td>${p.display_name}</td>
+                  <td>
+                    <div>${p.display_name}</div>
+                    <div class="adm-agi-platform-id">${p.id}</div>
+                  </td>
                   <td>${num(p.agent_count)}</td>
                   <td class="adm-agi-mono-sm">${p.bundle_name}</td>
                   <td class="adm-agi-mono-sm">${p.detect_pattern || '--'}</td>
@@ -105,14 +110,73 @@ function renderPlatformRegistry(platforms, totalAgents) {
           </div>
         `
       }
+      ${showForm
+        ? html`<${AddPlatformForm} session=${session} onDone=${() => { setShowForm(false); loadData(); }} onCancel=${() => setShowForm(false)} />`
+        : html`<button class="btn-outline adm-agi-add-btn" onClick=${() => setShowForm(true)}>
+            ${t('admin.agentIntegration.addPlatform')}
+          </button>`
+      }
     </div>
   `;
 }
 
-function renderOnboardingOverview(onboarding) {
+/* ── F19: Inline Add Platform form ── */
+function AddPlatformForm({ session, onDone, onCancel }) {
+  const [name, setName] = useState('');
+  const [id, setId] = useState('');
+  const [adapter, setAdapter] = useState('');
+  const [pattern, setPattern] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!name.trim() || !id.trim()) return;
+    setSubmitting(true);
+    try {
+      await api.registerPlatform(session, {
+        id: id.trim(),
+        display_name: name.trim(),
+        bundle_name: adapter.trim() || undefined,
+        detect_pattern: pattern.trim() || undefined,
+      });
+      onDone();
+    } catch { /* ignore */ }
+    setSubmitting(false);
+  };
+
+  return html`
+    <div class="adm-agi-add-form">
+      <div class="adm-agi-add-form-row">
+        <label class="adm-agi-add-form-label">${t('admin.agentIntegration.platformName')}</label>
+        <input class="adm-agi-add-form-input" value=${name} onInput=${e => setName(e.target.value)} placeholder="Hermes" />
+      </div>
+      <div class="adm-agi-add-form-row">
+        <label class="adm-agi-add-form-label">${t('admin.agentIntegration.platformId')}</label>
+        <input class="adm-agi-add-form-input" value=${id} onInput=${e => setId(e.target.value)} placeholder="hermes-openclaw" />
+      </div>
+      <div class="adm-agi-add-form-row">
+        <label class="adm-agi-add-form-label">${t('admin.agentIntegration.adapterPattern')}</label>
+        <input class="adm-agi-add-form-input" value=${adapter} onInput=${e => setAdapter(e.target.value)} placeholder="aimeat-hermes" />
+      </div>
+      <div class="adm-agi-add-form-row">
+        <label class="adm-agi-add-form-label">${t('admin.agentIntegration.autoDetectRegex')}</label>
+        <input class="adm-agi-add-form-input" value=${pattern} onInput=${e => setPattern(e.target.value)} placeholder="hermes|openclaw" />
+      </div>
+      <div class="adm-agi-add-form-actions">
+        <button class="btn-primary" onClick=${handleSubmit} disabled=${submitting || !name.trim() || !id.trim()}>
+          ${submitting ? t('common.loading') : t('common.add')}
+        </button>
+        <button class="btn-ghost" onClick=${onCancel}>${t('common.cancel')}</button>
+      </div>
+    </div>
+  `;
+}
+
+/* ── M9: Not Started stat card + F20: Stuck section with suggestions + actions ── */
+function renderOnboardingOverview(onboarding, session, loadData) {
   if (!onboarding) return html`<div class="adm-agi-section"><${Empty} text=${t('common.noData')} /></div>`;
 
   const stuck = onboarding.stuck || [];
+  const notStarted = onboarding.not_started || 0;
 
   return html`
     <div class="adm-agi-section">
@@ -127,27 +191,77 @@ function renderOnboardingOverview(onboarding) {
           <div class="adm-agi-stat-label">${t('admin.agentIntegration.inProgress')}</div>
         </div>
         <div class="adm-agi-stat-card">
-          <div class="adm-agi-stat-value adm-agi-stat-value--warning">${num(stuck.length)}</div>
-          <div class="adm-agi-stat-label">${t('admin.agentIntegration.stuck')}</div>
+          <div class="adm-agi-stat-value">${num(notStarted)}</div>
+          <div class="adm-agi-stat-label">${t('admin.agentIntegration.notStarted')}</div>
         </div>
       </div>
       ${stuck.length > 0 ? html`
+        <div class="adm-agi-stuck-title">${t('admin.agentIntegration.stuckAgents')}</div>
         <div class="adm-agi-stuck">
           ${stuck.map(s => html`
-            <div class="adm-agi-stuck-agent">
-              <div>
-                <span class="adm-agi-stuck-name">${s.agent_gaii}</span>
-                <div class="adm-agi-stuck-detail">${s.current_step}</div>
-              </div>
-              <div class="adm-agi-stuck-detail">
-                ${t('admin.agentIntegration.stuckSince')}: ${dt(s.stuck_since)}
-              </div>
-            </div>
+            <${StuckAgentRow} agent=${s} session=${session} onAction=${loadData} />
           `)}
         </div>
       ` : ''}
     </div>
   `;
+}
+
+/* ── F20: Single stuck agent row with suggestion + actions ── */
+function StuckAgentRow({ agent, session, onAction }) {
+  const [acting, setActing] = useState(false);
+  const suggestion = getSuggestion(agent.current_step);
+
+  const handleRemind = async () => {
+    setActing(true);
+    try {
+      await api.sendReminder(session, agent.agent_gaii);
+      onAction();
+    } catch { /* ignore */ }
+    setActing(false);
+  };
+
+  const handleSkip = async () => {
+    setActing(true);
+    try {
+      await api.skipOnboardingStep(session, agent.agent_gaii, agent.current_step);
+      onAction();
+    } catch { /* ignore */ }
+    setActing(false);
+  };
+
+  return html`
+    <div class="adm-agi-stuck-agent">
+      <div class="adm-agi-stuck-info">
+        <div>
+          <span class="adm-agi-stuck-name">${agent.agent_gaii}</span>
+          <div class="adm-agi-stuck-detail">${agent.current_step}</div>
+        </div>
+        <div class="adm-agi-stuck-detail">
+          ${t('admin.agentIntegration.stuckSince')}: ${dt(agent.stuck_since)}
+        </div>
+        <div class="adm-agi-stuck-suggestion">${suggestion}</div>
+      </div>
+      <div class="adm-agi-stuck-actions">
+        <button class="btn-outline adm-agi-stuck-btn" onClick=${handleRemind} disabled=${acting}>
+          ${t('admin.agentIntegration.sendReminder')}
+        </button>
+        <button class="btn-ghost adm-agi-stuck-btn" onClick=${handleSkip} disabled=${acting}>
+          ${t('admin.agentIntegration.skipStep')}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function getSuggestion(stepId) {
+  if (stepId?.includes('webhook') || stepId?.includes('delivery'))
+    return t('admin.agentIntegration.suggestion.webhook');
+  if (stepId?.includes('platform') || stepId?.includes('detect'))
+    return t('admin.agentIntegration.suggestion.platform');
+  if (stepId?.includes('skill') || stepId?.includes('bundle'))
+    return t('admin.agentIntegration.suggestion.skillBundle');
+  return t('admin.agentIntegration.suggestion.default');
 }
 
 function renderReadinessDistribution(readiness, total) {
@@ -183,6 +297,7 @@ function renderReadinessDistribution(readiness, total) {
   `;
 }
 
+/* ── F21: Added "Current version" column to skill bundle table ── */
 function renderSkillBundles(bundles, onRegenerate, regenerating) {
   if (!bundles) return '';
   const entries = Object.entries(bundles);
@@ -197,6 +312,7 @@ function renderSkillBundles(bundles, onRegenerate, regenerating) {
             <thead><tr>
               <th>${t('admin.agentIntegration.platform')}</th>
               <th>${t('admin.agentIntegration.agentCount')}</th>
+              <th>${t('admin.agentIntegration.currentVersion')}</th>
               <th>${t('admin.agentIntegration.outdated')}</th>
             </tr></thead>
             <tbody>
@@ -204,6 +320,7 @@ function renderSkillBundles(bundles, onRegenerate, regenerating) {
                 <tr>
                   <td>${platform}</td>
                   <td>${num(info.agents)}</td>
+                  <td class="adm-agi-mono-sm">${info.version || info.currentVersion || '--'}</td>
                   <td>${info.outdated > 0
                     ? html`<span class="adm-agi-outdated">${num(info.outdated)}</span>`
                     : html`<span class="adm-agi-zero">0</span>`

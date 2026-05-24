@@ -14,6 +14,7 @@
  *   v1.7.0 -- 2026-05-22 -- Add Services and Messages sub-tabs
  *   v2.1.0 -- 2026-05-24 -- Fix: scroll-to on board click, agent count badge in header
  *   v2.0.0 -- 2026-05-24 -- Plan 4: Shared Agent Board + expandable cards with Two-Zone Header + 8-tab bar
+ *   v2.2.0 -- 2026-05-24 -- Fix M2: compact Connect Agent, C1: load task stats for production cards
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -29,6 +30,7 @@ import { useConfirm } from '/components/Modal.js';
 import SharedBoard from './agents/shared-board.js';
 import AgentCard from './agents/agent-card.js';
 import { getOnboarding } from '/js/services/agent-integration.js';
+import { listTasks } from '/js/services/agent-tasks.js';
 
 // === Scope Management Constants ===
 const SCOPE_DOMAINS = [
@@ -170,6 +172,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [approvingCode, setApprovingCode] = useState(null);
   const [approvePreset, setApprovePreset] = useState('standard');
   const [tier1Copied, setTier1Copied] = useState(false);
+  const [connectExpanded, setConnectExpanded] = useState(false);
+  const [taskStatsMap, setTaskStatsMap] = useState({});
 
   useEffect(() => {
     if (session) loadData();
@@ -203,6 +207,20 @@ export default function AgentsTab({ session, showToast, onStats }) {
         } catch { obMap[a.name] = null; }
       }));
       setOnboardings(obMap);
+      const tsMap = {};
+      await Promise.all(list.map(async (a) => {
+        try {
+          const [doneResp, activeResp] = await Promise.all([
+            listTasks(a.name, { status: 'done', per_page: 100 }),
+            listTasks(a.name, { status: 'active', per_page: 100 }),
+          ]);
+          const today = new Date().toISOString().slice(0, 10);
+          const doneToday = (doneResp?.data?.tasks || []).filter(tk => tk.completedAt?.startsWith(today)).length;
+          const activeCount = (activeResp?.data?.tasks || []).length;
+          tsMap[a.name] = { done: doneToday, active: activeCount };
+        } catch { tsMap[a.name] = null; }
+      }));
+      setTaskStatsMap(tsMap);
     } catch { setAgents([]); }
   }
 
@@ -369,44 +387,50 @@ export default function AgentsTab({ session, showToast, onStats }) {
     `}
 
     <div class="agent-cta">
-      <h3>${t('profile.agents.connect')}</h3>
-      <p>${t('profile.agents.connectDesc')}</p>
-      <div class="agent-prompt-box">${buildAgentPrompt(session)}</div>
-      <button class="copy-prompt-btn" onClick=${() => {
-        copyToClipboard(buildAgentPrompt(session)).then(() => {
-          setPromptCopied(true);
-          setTimeout(() => setPromptCopied(false), 2000);
-        });
-      }}>${promptCopied ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.copyPrompt')}</button>
-      ${agents.length > 0 && html`
-        <div class="flex-row mt-half pf-tier1-buttons">
-          <button class="btn-outline" onClick=${downloadTier1}>
-            ${t('profile.agents.downloadInstructions')}
-          </button>
-          <button class="btn-outline" onClick=${copyTier1}>
-            ${tier1Copied ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.copyFullInstructions')}
-          </button>
+      <button class="${connectExpanded ? 'btn-outline' : 'btn-primary'}" onClick=${() => setConnectExpanded(!connectExpanded)}>
+        ${connectExpanded ? t('profile.agents.detail.zone2.cancel') : `+ ${t('profile.agents.connect')}`}
+      </button>
+      ${connectExpanded && html`
+        <div class="pf-agd-connect-content">
+          <p>${t('profile.agents.connectDesc')}</p>
+          <div class="agent-prompt-box">${buildAgentPrompt(session)}</div>
+          <button class="copy-prompt-btn" onClick=${() => {
+            copyToClipboard(buildAgentPrompt(session)).then(() => {
+              setPromptCopied(true);
+              setTimeout(() => setPromptCopied(false), 2000);
+            });
+          }}>${promptCopied ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.copyPrompt')}</button>
+          ${agents.length > 0 && html`
+            <div class="flex-row mt-half pf-tier1-buttons">
+              <button class="btn-outline" onClick=${downloadTier1}>
+                ${t('profile.agents.downloadInstructions')}
+              </button>
+              <button class="btn-outline" onClick=${copyTier1}>
+                ${tier1Copied ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.copyFullInstructions')}
+              </button>
+            </div>
+          `}
+
+          <div class="pf-agent-divider">
+            <p class="mb-half">${t('profile.agents.noAgent')}</p>
+            <button class="expand-btn" onClick=${() => setPlatExpand(!platExpand)}>
+              <span>${t('profile.agents.seeHow')}</span>
+              <span class="pf-chevron ${platExpand ? 'pf-chevron-open' : ''}">\u25BC</span>
+            </button>
+            ${platExpand && html`
+              <div class="platform-instructions expanded">
+                <div class="platform-tabs">
+                  ${PLATFORM_KEYS.map(k => html`
+                    <button class="platform-tab ${k === activePlat ? 'active' : ''}" onClick=${() => setActivePlat(k)}>${t(PLATFORM_LABELS[k])}</button>
+                  `)}
+                </div>
+                ${/* SAFE: PLATFORMS is hardcoded developer constant, not user input */''}
+                <div class="platform-content" dangerouslySetInnerHTML=${{ __html: PLATFORMS[activePlat] }}></div>
+              </div>
+            `}
+          </div>
         </div>
       `}
-
-      <div class="pf-agent-divider">
-        <p class="mb-half">${t('profile.agents.noAgent')}</p>
-        <button class="expand-btn" onClick=${() => setPlatExpand(!platExpand)}>
-          <span>${t('profile.agents.seeHow')}</span>
-          <span class="pf-chevron ${platExpand ? 'pf-chevron-open' : ''}">\u25BC</span>
-        </button>
-        ${platExpand && html`
-          <div class="platform-instructions expanded">
-            <div class="platform-tabs">
-              ${PLATFORM_KEYS.map(k => html`
-                <button class="platform-tab ${k === activePlat ? 'active' : ''}" onClick=${() => setActivePlat(k)}>${t(PLATFORM_LABELS[k])}</button>
-              `)}
-            </div>
-            ${/* SAFE: PLATFORMS is hardcoded developer constant, not user input */''}
-            <div class="platform-content" dangerouslySetInnerHTML=${{ __html: PLATFORMS[activePlat] }}></div>
-          </div>
-        `}
-      </div>
     </div>
 
     ${agents.length === 0
@@ -427,7 +451,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
           <div data-agent-name=${a.name}>
           <${AgentCard}
             key=${a.name}
-            agent=${a}
+            agent=${{ ...a, taskStats: taskStatsMap[a.name] || null }}
             onboarding=${onboardings[a.name]}
             expanded=${expandedAgent === a.name}
             onToggle=${toggleAgent}

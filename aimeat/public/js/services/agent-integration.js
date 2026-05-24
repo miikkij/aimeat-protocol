@@ -4,6 +4,7 @@
  *   telemetry, skill bundle, and delivery log.
  * @version-history
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
+ *   v1.1.0 -- 2026-05-24 -- Add updateSkillBundle function
  */
 
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
@@ -57,6 +58,10 @@ export async function getSkillBundleVersion(agentName, runtime) {
 export function getSkillBundleUrl(agentName, runtime) {
   const qs = runtime ? `?runtime=${encodeURIComponent(runtime)}` : '';
   return `/v1/agents/${encodeURIComponent(agentName)}/skill-bundle${qs}`;
+}
+
+export async function updateSkillBundle(agentName) {
+  return apiPost(`/v1/agents/${encodeURIComponent(agentName)}/skill-bundle/update`);
 }
 
 export async function getDeliveryLog(agentName, limit = 20) {
