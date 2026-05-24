@@ -5153,6 +5153,31 @@
       "complete_test_task": "Complete Test Task",
       "declare_services": "Declare Services"
     },
+    "stepDescriptions": {
+      "authenticate": "Agent is authenticated via device auth",
+      "identify_platform": "Determine which AI platform the agent runs on",
+      "install_skill": "Skill bundle installed and version reported",
+      "report_capabilities": "PUT /capabilities called with non-empty data",
+      "read_directives": "GET /directives called, agent confirms reading",
+      "send_test_message": "POST /messages proves the message channel works",
+      "configure_delivery": "Webhook registered OR MCP detected OR polling confirmed",
+      "report_telemetry": "At least one telemetry event with non-zero data",
+      "accept_test_task": "Agent proposes todos for the test task",
+      "complete_test_task": "Agent executes and completes the test task",
+      "declare_services": "Agent declares offered services (optional)"
+    },
+    "errors": {
+      "accessDenied": "Access denied",
+      "agentNotFound": "Agent '{{name}}' not found",
+      "onboardingNotActive": "Onboarding is not in progress",
+      "unknownStep": "Unknown onboarding step: {{stepId}}",
+      "stepNotFound": "Step '{{stepId}}' not found",
+      "stepAlreadyPassed": "Step already passed",
+      "noOnboardingRecord": "No onboarding record found",
+      "invalidLevel": "level must be one of: basic, standard, full, expert",
+      "testTaskTitle": "Onboarding verification",
+      "testTaskDescription": "This is a test task created during Hello Integration. Propose todos, get approval, execute, and complete."
+    },
     "readiness": {
       "title": "Readiness",
       "basic": "Basic",

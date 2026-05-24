@@ -14,7 +14,7 @@
  *   v1.1.0 -- 2026-05-24 -- Add readiness override + auto-complete on step confirm
  */
 
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -27,9 +27,15 @@ import type { OnboardingStepId } from '../models/agent-onboarding-schemas.js';
 import { validateStep, checkAutoSteps } from '../services/onboarding-validator.js';
 import { calculateReadiness } from '../services/readiness-scorer.js';
 import { detectPlatform } from '../services/platform-detector.js';
+import { createT, detectLocale } from '../i18n.js';
 
 export function agentOnboardingRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+
+  function t(req: Request, key: string, vars?: Record<string, string | number>): string {
+    const locale = detectLocale(req.headers['accept-language'] as string | undefined);
+    return createT(locale)(key, vars);
+  }
 
   function resolveAgentGaii(req: Express.Request, agentName: string): string {
     const owner = req.auth!.owner as string;
@@ -47,14 +53,14 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage): R
   router.get('/v1/agents/:name/onboarding', requireAuth(), async (req, res) => {
     const agentName = req.params.name as string;
     if (!canAccessAgent(req, agentName)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', t(req, 'agentOnboarding.errors.accessDenied')));
       return;
     }
 
     const agentGaii = resolveAgentGaii(req, agentName);
     const agent = await storage.getAgent(agentGaii);
     if (!agent) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', t(req, 'agentOnboarding.errors.agentNotFound', { name: agentName })));
       return;
     }
 
@@ -97,7 +103,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage): R
 
     const agent = await storage.getAgent(agentGaii);
     if (!agent) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', t(req, 'agentOnboarding.errors.agentNotFound', { name: agentName })));
       return;
     }
 
@@ -126,8 +132,8 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage): R
       id: testTaskId,
       agentGaii,
       ownerGaii: `${req.auth!.owner}@${config.nodeId}`,
-      title: 'Onboarding verification',
-      description: 'This is a test task created during Hello Integration. Propose todos, get approval, execute, and complete.',
+      title: t(req, 'agentOnboarding.errors.testTaskTitle'),
+      description: t(req, 'agentOnboarding.errors.testTaskDescription'),
       status: 'queued' as const,
       scope: [],
       rules: [],
@@ -179,30 +185,30 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage): R
     const stepId = req.params.id as string;
 
     if (!canAccessAgent(req, agentName)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', t(req, 'agentOnboarding.errors.accessDenied')));
       return;
     }
 
     if (!(ONBOARDING_STEP_IDS as readonly string[]).includes(stepId)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_STEP', `Unknown onboarding step: ${stepId}`));
+      res.status(400).json(error(config.nodeId, 'INVALID_STEP', t(req, 'agentOnboarding.errors.unknownStep', { stepId })));
       return;
     }
 
     const agentGaii = resolveAgentGaii(req, agentName);
     const onboarding = await storage.getOnboarding(agentGaii);
     if (!onboarding || onboarding.status !== 'in_progress') {
-      res.status(400).json(error(config.nodeId, 'ONBOARDING_NOT_ACTIVE', 'Onboarding is not in progress'));
+      res.status(400).json(error(config.nodeId, 'ONBOARDING_NOT_ACTIVE', t(req, 'agentOnboarding.errors.onboardingNotActive')));
       return;
     }
 
     const step = onboarding.steps.find(s => s.id === stepId);
     if (!step) {
-      res.status(400).json(error(config.nodeId, 'INVALID_STEP', `Step '${stepId}' not found`));
+      res.status(400).json(error(config.nodeId, 'INVALID_STEP', t(req, 'agentOnboarding.errors.stepNotFound', { stepId })));
       return;
     }
 
     if (step.status === 'passed') {
-      res.json(success(config.nodeId, { step, message: 'Step already passed' }));
+      res.json(success(config.nodeId, { step, message: t(req, 'agentOnboarding.errors.stepAlreadyPassed') }));
       return;
     }
 
@@ -283,14 +289,14 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage): R
 
     const onboarding = await storage.getOnboarding(agentGaii);
     if (!onboarding) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No onboarding record found'));
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', t(req, 'agentOnboarding.errors.noOnboardingRecord')));
       return;
     }
 
     const { level, reason } = req.body ?? {};
     const validLevels = ['basic', 'standard', 'full', 'expert'];
     if (!level || !validLevels.includes(level)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `level must be one of: ${validLevels.join(', ')}`));
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', t(req, 'agentOnboarding.errors.invalidLevel')));
       return;
     }
 
@@ -319,7 +325,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage): R
 
     const onboarding = await storage.getOnboarding(agentGaii);
     if (!onboarding) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No onboarding record found'));
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', t(req, 'agentOnboarding.errors.noOnboardingRecord')));
       return;
     }
 
@@ -340,7 +346,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage): R
 
     const deleted = await storage.deleteOnboarding(agentGaii);
     if (!deleted) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No onboarding record found'));
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', t(req, 'agentOnboarding.errors.noOnboardingRecord')));
       return;
     }
 

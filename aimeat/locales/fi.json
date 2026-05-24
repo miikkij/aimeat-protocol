@@ -5153,6 +5153,31 @@
       "complete_test_task": "Suorita testitehtävä",
       "declare_services": "Ilmoita palvelut"
     },
+    "stepDescriptions": {
+      "authenticate": "Agentti on tunnistautunut laitevarmennuksen kautta",
+      "identify_platform": "Tunnista millä tekoälyalustalla agentti toimii",
+      "install_skill": "Taitopaketti asennettu ja versio raportoitu",
+      "report_capabilities": "PUT /capabilities kutsuttu, tiedot eivät tyhjiä",
+      "read_directives": "GET /directives kutsuttu, agentti vahvistaa lukeneensa",
+      "send_test_message": "POST /messages todistaa viestikanavan toimivuuden",
+      "configure_delivery": "Webhook rekisteröity TAI MCP havaittu TAI pollaus vahvistettu",
+      "report_telemetry": "Vähintään yksi telemetriatapahtuma nollasta poikkeavalla datalla",
+      "accept_test_task": "Agentti ehdottaa todoja testitehtävälle",
+      "complete_test_task": "Agentti suorittaa ja viimeistelee testitehtävän",
+      "declare_services": "Agentti ilmoittaa tarjoamansa palvelut (valinnainen)"
+    },
+    "errors": {
+      "accessDenied": "Pääsy estetty",
+      "agentNotFound": "Agenttia '{{name}}' ei löydy",
+      "onboardingNotActive": "Perehdytys ei ole käynnissä",
+      "unknownStep": "Tuntematon perehdytysvaihe: {{stepId}}",
+      "stepNotFound": "Vaihetta '{{stepId}}' ei löydy",
+      "stepAlreadyPassed": "Vaihe on jo läpäisty",
+      "noOnboardingRecord": "Perehdytystietuetta ei löydy",
+      "invalidLevel": "Tason on oltava jokin näistä: basic, standard, full, expert",
+      "testTaskTitle": "Perehdytyksen vahvistus",
+      "testTaskDescription": "Tämä on Hello-integraation aikana luotu testitehtävä. Ehdota todoja, saa hyväksyntä, suorita ja viimeistele."
+    },
     "readiness": {
       "title": "Valmius",
       "basic": "Perus",
