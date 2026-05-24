@@ -21,7 +21,7 @@ function ServiceCard({ service, onUnpublish }) {
   const name = service.display_name || service.name || service.action_id || t('profile.agents.services.unnamed');
   const desc = service.description || '';
   const cost = service.cost != null ? `${service.cost} ${t('profile.agents.services.morsels')}` : t('profile.agents.services.free');
-  const visibility = service.visibility || 'public';
+  const visibility = t('profile.agents.services.visibility.' + (service.visibility || 'public'));
   const isActive = service.active !== false && service.status !== 'inactive';
   const calls = service.invocation_count || service.call_count || 0;
   const successRate = service.success_rate != null ? `${Math.round(service.success_rate)}%` : null;

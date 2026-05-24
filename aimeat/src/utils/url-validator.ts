@@ -8,6 +8,9 @@ const BLOCKED_RANGES = [
   /^192\.168\./,      // Private class C
   /^169\.254\./,      // Link-local / cloud metadata
   /^0\./,             // Current network
+  /^192\.0\.2\./,     // RFC 5737 TEST-NET-1
+  /^198\.51\.100\./,  // RFC 5737 TEST-NET-2
+  /^203\.0\.113\./,   // RFC 5737 TEST-NET-3
   /^::1$/,            // IPv6 loopback
   /^fc00:/i,          // IPv6 unique local
   /^fe80:/i,          // IPv6 link-local

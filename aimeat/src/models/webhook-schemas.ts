@@ -106,7 +106,7 @@ export const DirectiveUpdatedPayload = WebhookEnvelopeBase.extend({
   event: z.literal('directive.updated'),
   data: z.object({
     changed_sections: z.array(z.enum([
-      'purpose', 'rules', 'memory_areas', 'resources',
+      'purpose', 'rules', 'memory_areas', 'resources', 'budget_limits',
     ])),
     rule_count: z.number().int(),
     memory_area_count: z.number().int(),

@@ -282,10 +282,12 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
     if (webhookDispatcher) {
       webhookDispatcher.dispatchWebhookEvent(agentGaii, 'onboarding.step', {
         step_id: stepId,
-        status: step.status,
-        progress: onboarding.steps.filter(s => s.status === 'passed').length,
-        total: onboarding.steps.length,
-        completed: !!completedOnboarding,
+        step_order: step.order,
+        step_title: step.title,
+        action: step.status as 'needed' | 'passed' | 'failed',
+        message: step.failureReason,
+        onboarding_progress: onboarding.steps.filter(s => s.status === 'passed').length,
+        onboarding_total: onboarding.steps.length,
       });
     }
 

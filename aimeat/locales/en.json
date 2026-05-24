@@ -506,7 +506,12 @@
         "morsels": "morsels",
         "avg": "avg",
         "unpublishError": "Failed to unpublish",
-        "loadError": "Failed to load services"
+        "loadError": "Failed to load services",
+        "visibility": {
+          "public": "Public",
+          "private": "Private",
+          "internal": "Internal"
+        }
       },
       "messages": {
         "title": "Messages",
@@ -5518,6 +5523,12 @@
       "notifyOutdated": "Notify",
       "notifySuccess": "Notifications sent",
       "comingSoon": "Coming soon",
+      "placeholders": {
+        "name": "Hermes",
+        "id": "hermes-openclaw",
+        "adapter": "aimeat-hermes",
+        "regex": "hermes|openclaw"
+      },
       "suggestion": {
         "webhook": "Webhook URL not registered or endpoint unreachable",
         "platform": "Platform detection failed -- verify User-Agent or configure manually",

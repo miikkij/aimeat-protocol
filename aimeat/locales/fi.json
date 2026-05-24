@@ -506,7 +506,12 @@
         "morsels": "morselia",
         "avg": "ka.",
         "unpublishError": "Julkaisun poisto epäonnistui",
-        "loadError": "Palveluiden lataus epäonnistui"
+        "loadError": "Palveluiden lataus epäonnistui",
+        "visibility": {
+          "public": "Julkinen",
+          "private": "Yksityinen",
+          "internal": "Sisäinen"
+        }
       },
       "messages": {
         "title": "Viestit",
@@ -5518,6 +5523,12 @@
       "notifyOutdated": "Ilmoita",
       "notifySuccess": "Ilmoitukset lähetetty",
       "comingSoon": "Tulossa pian",
+      "placeholders": {
+        "name": "Hermes",
+        "id": "hermes-openclaw",
+        "adapter": "aimeat-hermes",
+        "regex": "hermes|openclaw"
+      },
       "suggestion": {
         "webhook": "Webhook-URL ei rekisteröity tai päätepiste tavoittamattomissa",
         "platform": "Alustan tunnistus epäonnistui -- tarkista User-Agent tai aseta manuaalisesti",

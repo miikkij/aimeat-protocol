@@ -304,6 +304,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
 
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks');
+    try { emitResourceUpdated(resolveAgentGaii(req, req.params.name as string), `aimeat://agents/${req.params.name as string}/tasks`); } catch { /* MCP not connected */ }
   });
 
   /* ── DELETE /v1/agents/:name/tasks/:id -- Delete task (draft/queued only) ── */

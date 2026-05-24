@@ -148,19 +148,19 @@ function AddPlatformForm({ session, onDone, onCancel }) {
     <div class="adm-agi-add-form">
       <div class="adm-agi-add-form-row">
         <label class="adm-agi-add-form-label">${t('admin.agentIntegration.platformName')}</label>
-        <input class="adm-agi-add-form-input" value=${name} onInput=${e => setName(e.target.value)} placeholder="Hermes" />
+        <input class="adm-agi-add-form-input" value=${name} onInput=${e => setName(e.target.value)} placeholder=${t('admin.agentIntegration.placeholders.name')} />
       </div>
       <div class="adm-agi-add-form-row">
         <label class="adm-agi-add-form-label">${t('admin.agentIntegration.platformId')}</label>
-        <input class="adm-agi-add-form-input" value=${id} onInput=${e => setId(e.target.value)} placeholder="hermes-openclaw" />
+        <input class="adm-agi-add-form-input" value=${id} onInput=${e => setId(e.target.value)} placeholder=${t('admin.agentIntegration.placeholders.id')} />
       </div>
       <div class="adm-agi-add-form-row">
         <label class="adm-agi-add-form-label">${t('admin.agentIntegration.adapterPattern')}</label>
-        <input class="adm-agi-add-form-input" value=${adapter} onInput=${e => setAdapter(e.target.value)} placeholder="aimeat-hermes" />
+        <input class="adm-agi-add-form-input" value=${adapter} onInput=${e => setAdapter(e.target.value)} placeholder=${t('admin.agentIntegration.placeholders.adapter')} />
       </div>
       <div class="adm-agi-add-form-row">
         <label class="adm-agi-add-form-label">${t('admin.agentIntegration.autoDetectRegex')}</label>
-        <input class="adm-agi-add-form-input" value=${pattern} onInput=${e => setPattern(e.target.value)} placeholder="hermes|openclaw" />
+        <input class="adm-agi-add-form-input" value=${pattern} onInput=${e => setPattern(e.target.value)} placeholder=${t('admin.agentIntegration.placeholders.regex')} />
       </div>
       <div class="adm-agi-add-form-actions">
         <button class="btn-primary" onClick=${handleSubmit} disabled=${submitting || !name.trim() || !id.trim()}>
