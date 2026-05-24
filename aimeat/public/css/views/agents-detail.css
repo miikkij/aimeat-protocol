@@ -86,11 +86,11 @@
   white-space: nowrap;
 }
 .pf .agd-status-draft { background: var(--card-bg-alt, #F3F4F6); color: var(--text-dim, #6B7280); }
-.pf .agd-status-queued { background: rgba(217, 119, 6, 0.1); color: #d97706; }
-.pf .agd-status-active { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
+.pf .agd-status-queued { background: rgba(217, 119, 6, 0.1); color: var(--warn, #F59E0B); }
+.pf .agd-status-active { background: rgba(37, 99, 235, 0.1); color: var(--blue, #3B82F6); }
 .pf .agd-status-done { background: rgba(16, 185, 129, 0.1); color: var(--success, #10b981); }
 .pf .agd-status-failed { background: rgba(239, 68, 68, 0.1); color: var(--danger, #ef4444); }
-.pf .agd-status-stalled { background: rgba(239, 68, 68, 0.1); color: #d97706; }
+.pf .agd-status-stalled { background: rgba(239, 68, 68, 0.1); color: var(--warn, #F59E0B); }
 
 /* Task creation form */
 .pf .agd-create-form {
@@ -215,7 +215,7 @@
   margin-top: 2px;
 }
 .pf .agd-source-system { background: var(--card-bg-alt, #F3F4F6); color: var(--text-dim, #6B7280); }
-.pf .agd-source-owner { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
+.pf .agd-source-owner { background: rgba(37, 99, 235, 0.1); color: var(--blue, #3B82F6); }
 .pf .agd-source-agent { background: rgba(16, 185, 129, 0.1); color: var(--success, #10b981); }
 
 /* Resource / memory area lists */
@@ -223,13 +223,13 @@
   padding: 0.25rem 0;
   font-size: 0.85rem;
   color: var(--text, #1A1A2E);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  border-bottom: 1px solid var(--border-subtle, #F3F4F6);
 }
 .pf .agd-list-item:last-child { border-bottom: none; }
 .pf .agd-list-item code {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.78rem;
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--code-bg, #F3F4F6);
   padding: 1px 5px;
   border-radius: 3px;
 }
@@ -290,7 +290,7 @@
   border: 1px solid var(--border, #E5E7EB);
   border-radius: var(--radius, 6px);
   padding: var(--space-sm, 0.5rem);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,0.08));
   min-width: 200px;
 }
 .agd-group-option {
@@ -339,7 +339,7 @@
 }
 .pf .agd-cap-type-mcp {
   background: rgba(37, 99, 235, 0.1);
-  color: #2563eb;
+  color: var(--blue, #3B82F6);
 }
 .pf .agd-cap-type-skill {
   background: rgba(16, 185, 129, 0.1);
@@ -347,7 +347,7 @@
 }
 .pf .agd-cap-type-tool {
   background: rgba(217, 119, 6, 0.1);
-  color: #d97706;
+  color: var(--warn, #F59E0B);
 }
 
 /* Verified / self-reported badges */
@@ -388,7 +388,7 @@
 }
 .pf .agd-cap-lang {
   background: rgba(37, 99, 235, 0.08);
-  color: #2563eb;
+  color: var(--blue, #3B82F6);
   font-weight: 500;
 }
 
@@ -441,7 +441,7 @@
 /* Time range selector */
 .pf .agd-range-bar { display: flex; gap: 4px; margin-bottom: 8px; }
 .pf .agd-range-btn { padding: 2px 8px; border: 1px solid var(--border, #E5E7EB); border-radius: 4px; background: none; cursor: pointer; font-size: 0.75rem; color: var(--text-dim, #6B7280); }
-.pf .agd-range-btn.active { background: var(--accent, #E8564A); color: #FFFFFF; border-color: var(--accent, #E8564A); }
+.pf .agd-range-btn.active { background: var(--accent, #E8564A); color: var(--bg, #FFFFFF); border-color: var(--accent, #E8564A); }
 
 /* ── Services sub-tab ── */
 
@@ -666,12 +666,12 @@
 .pf .agd-prop-code {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.75rem;
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--code-bg, #F3F4F6);
   padding: 2px 6px;
   border-radius: 3px;
 }
 .pf .agd-prop-list { list-style: none; padding: 0; margin: 0; }
-.pf .agd-prop-list li { padding: 0.15rem 0; border-bottom: 1px solid rgba(0, 0, 0, 0.04); }
+.pf .agd-prop-list li { padding: 0.15rem 0; border-bottom: 1px solid var(--border-subtle, #F3F4F6); }
 .pf .agd-prop-list li:last-child { border-bottom: none; }
 .pf .agd-prop-check { display: flex; align-items: baseline; gap: 0.35rem; }
 .pf .agd-prop-check::before { content: '\2713'; color: var(--success, #10b981); font-weight: 600; }
@@ -740,7 +740,7 @@
   padding: 1px 7px;
   border-radius: 10px;
   background: rgba(37, 99, 235, 0.1);
-  color: #2563eb;
+  color: var(--blue, #3B82F6);
   white-space: nowrap;
 }
 
@@ -781,7 +781,7 @@
 }
 .pf .agd-env-agent {
   background: rgba(217, 119, 6, 0.12);
-  color: #d97706;
+  color: var(--warn, #F59E0B);
 }
 
 /* TODO item list */
@@ -802,7 +802,7 @@
   transition: border-color 0.15s;
 }
 .pf .agd-todo-active {
-  border-color: #2563eb;
+  border-color: var(--blue, #3B82F6);
   background: rgba(37, 99, 235, 0.04);
 }
 .pf .agd-todo-done {
