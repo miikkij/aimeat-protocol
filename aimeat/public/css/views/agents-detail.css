@@ -16,7 +16,16 @@
  *   v1.4.0 -- 2026-05-22 -- Add Task TODO list, progress, environment badges, Start button styles
  *   v2.2.0 -- 2026-05-24 -- Fix C6: remove GAII CSS, M2: compact connect content
  *   v2.3.0 -- 2026-05-24 -- Add F18 violation badge, C5 directives textarea styles
+ *   v2.4.0 -- 2026-05-24 -- Add header-row flex layout for title + connect button alignment
  */
+
+/* Header row: title left, connect button right */
+.pf-agd-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
 
 /* Sub-tab bar */
 .pf .agd-subtab-bar ,
@@ -225,6 +234,11 @@
   color: var(--text-dim, #6B7280);
   font-size: 0.85rem;
 }
+.pf .pf-agd-empty-hint {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
 
 /* Directives display */
 .pf .agd-directive-section ,
@@ -348,7 +362,8 @@
 }
 
 /* Group picker popup (memory tab visibility cycling) */
-.agd-group-picker {
+.pf .agd-group-picker,
+.pf .pf-agd-group-picker {
   position: absolute;
   z-index: 10;
   background: var(--card, #FFFFFF);
@@ -358,7 +373,8 @@
   box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,0.08));
   min-width: 200px;
 }
-.agd-group-option {
+.pf .agd-group-option,
+.pf .pf-agd-group-option {
   display: block;
   width: 100%;
   text-align: left;
@@ -522,6 +538,9 @@
 /* Event log entries */
 .pf .agd-log-entry ,
 .pf .pf-agd-log-entry  { display: flex; gap: 8px; padding: 6px 10px; background: var(--card-bg, #FFFFFF); border: 1px solid var(--border, #E5E7EB); border-radius: 6px; margin-bottom: 3px; font-size: 0.8rem; align-items: center; }
+.pf .pf-agd-log-entry--two-line { flex-direction: column; align-items: stretch; gap: 2px; }
+.pf .pf-agd-log-entry-primary { display: flex; gap: 8px; align-items: center; }
+.pf .pf-agd-log-entry-detail { font-size: 0.75rem; color: var(--text-muted, #9CA3AF); padding-left: 88px; }
 .pf .agd-log-time ,
 .pf .pf-agd-log-time  { color: var(--text-muted, #9CA3AF); white-space: nowrap; min-width: 80px; }
 .pf .agd-log-type ,
@@ -1148,7 +1167,7 @@
   flex-shrink: 0;
 }
 .pf .pf-agd-expand-icon--open {
-  transform: rotate(90deg);
+  transform: none;
 }
 .pf .pf-agd-collapsed-icon {
   font-size: 0.9rem;
@@ -1199,6 +1218,7 @@
 .pf .pf-agd-badge--readiness-basic { background: var(--accent-subtle, rgba(245, 158, 11, 0.1)); color: var(--warn, #F59E0B); }
 .pf .pf-agd-badge--readiness-none { background: var(--card-bg-alt, #F3F4F6); color: var(--text-muted, #9CA3AF); }
 .pf .pf-agd-badge--readiness-onboarding { background: var(--accent-subtle, rgba(245, 158, 11, 0.1)); color: var(--warn, #F59E0B); }
+.pf .pf-agd-badge--degraded { color: var(--warn, #F59E0B); }
 .pf .pf-agd-badge--federation {
   background: rgba(16, 185, 129, 0.1);
   color: var(--success, #10b981);
@@ -1262,7 +1282,7 @@
 }
 .pf .pf-agd-zone2--problem {
   border-left: 3px solid var(--danger, #ef4444);
-  background: rgba(239, 68, 68, 0.06);
+  background: rgba(239, 68, 68, 0.14);
 }
 .pf .pf-agd-zone2-title {
   font-weight: 600;
@@ -1327,6 +1347,10 @@
 .pf .pf-agd-step-pill--failed {
   background: rgba(239, 68, 68, 0.12);
   color: var(--danger, #ef4444);
+}
+.pf .pf-agd-step-pill--warn {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--warn, #F59E0B);
 }
 
 /* ── Tab Bar ── */
@@ -1778,6 +1802,7 @@
 }
 .pf .pf-agd-status-dot--active { background: var(--success, #10b981); }
 .pf .pf-agd-status-dot--inactive { background: var(--text-dim, #6B7280); }
+.pf .pf-agd-status-dot--error { background: var(--danger, #ef4444); }
 
 /* Active/Inactive badges */
 .pf .pf-agd-badge--active { background: var(--success, #10b981); color: var(--bg, #fff); }
@@ -2055,4 +2080,22 @@
 
 .pf .pf-agd-connect-content {
   margin-top: 0.75rem;
+}
+
+/* ── Message command-reply pairing ── */
+
+.pf .pf-agd-msg-pair {
+  margin-bottom: 0.75rem;
+  border-left: 2px solid var(--border, #E5E7EB);
+  padding-left: 0.5rem;
+}
+.pf .pf-agd-msg-reply-indicator {
+  color: var(--text-muted, #9CA3AF);
+  font-size: 0.75rem;
+  padding: 0.15rem 0 0.15rem 0.25rem;
+}
+.pf .pf-agd-msg-reply {
+  opacity: 0.95;
+  border-left: 2px solid var(--info, #3B82F6);
+  padding-left: 0.5rem;
 }

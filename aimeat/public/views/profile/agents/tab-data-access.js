@@ -65,9 +65,9 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
       setTags(updated);
       setNewTag('');
       setAddingTag(false);
-      showToast(t('profile.agents.detail.dataAccess.tagAdded'));
+      showToast(t('profile.agents.detail.data_access.tagAdded'));
     } catch (err) {
-      showToast(err.message || t('profile.agents.detail.dataAccess.addTagError'), true);
+      showToast(err.message || t('profile.agents.detail.data_access.addTagError'), true);
     }
   }
 
@@ -76,9 +76,9 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
       const updated = tags.filter(t => t !== tag);
       await apiPatch(`/v1/agents/${encodeURIComponent(agentName)}/tags`, { tags: updated });
       setTags(updated);
-      showToast(t('profile.agents.detail.dataAccess.tagRemoved'));
+      showToast(t('profile.agents.detail.data_access.tagRemoved'));
     } catch (err) {
-      showToast(err.message || t('profile.agents.detail.dataAccess.removeTagError'), true);
+      showToast(err.message || t('profile.agents.detail.data_access.removeTagError'), true);
     }
   }
 
@@ -93,9 +93,9 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
       setNewAreaDesc('');
       setNewAreaPerm('read+write');
       setAddingArea(false);
-      showToast(t('profile.agents.detail.dataAccess.areaAdded'));
+      showToast(t('profile.agents.detail.data_access.areaAdded'));
     } catch (err) {
-      showToast(err.message || t('profile.agents.detail.dataAccess.addAreaError'), true);
+      showToast(err.message || t('profile.agents.detail.data_access.addAreaError'), true);
     }
   }
 
@@ -109,9 +109,9 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
       setNewPkgName('');
       setNewPkgDesc('');
       setAddingPackage(false);
-      showToast(t('profile.agents.detail.dataAccess.packageLinked'));
+      showToast(t('profile.agents.detail.data_access.packageLinked'));
     } catch (err) {
-      showToast(err.message || t('profile.agents.detail.dataAccess.linkPackageError'), true);
+      showToast(err.message || t('profile.agents.detail.data_access.linkPackageError'), true);
     }
   }
 
@@ -131,9 +131,9 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
   if (!hasTags && !hasAreas && !hasResources && !addingTag) {
     return html`
       <div>
-        <div class="pf-agd-empty">${t('profile.agents.detail.empty.dataAccess')}</div>
+        <div class="pf-agd-empty">${t('profile.agents.detail.empty.data_access')}</div>
         <div class="pf-agd-form-actions">
-          <button class="btn-outline btn-sm" onClick=${() => setAddingTag(true)}>+ ${t('profile.agents.detail.dataAccess.addTag')}</button>
+          <button class="btn-outline btn-sm" onClick=${() => setAddingTag(true)}>+ ${t('profile.agents.detail.data_access.addTag')}</button>
         </div>
       </div>
     `;
@@ -144,15 +144,15 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
       <!-- SHARED TAGS -->
       <div class="pf-agd-data-section">
         <div class="pf-agd-section-header">
-          <span class="pf-agd-section-title">${t('profile.agents.detail.dataAccess.sharedTagsTitle')}</span>
-          <button class="btn-outline btn-sm" onClick=${() => setAddingTag(!addingTag)}>+ ${t('profile.agents.detail.dataAccess.addTag')}</button>
+          <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.sharedTagsTitle')}</span>
+          <button class="btn-outline btn-sm" onClick=${() => setAddingTag(!addingTag)}>+ ${t('profile.agents.detail.data_access.addTag')}</button>
         </div>
         ${addingTag && html`
           <div class="pf-agd-form-field pf-agd-tag-input-row">
             <input type="text" value=${newTag} onInput=${(e) => setNewTag(e.target.value)}
-                   placeholder=${t('profile.agents.detail.dataAccess.tagPlaceholder')}
+                   placeholder=${t('profile.agents.detail.data_access.tagPlaceholder')}
                    onKeyDown=${(e) => e.key === 'Enter' && handleAddTag()} />
-            <button class="btn-primary btn-sm" onClick=${handleAddTag}>${t('profile.agents.detail.commands.send')}</button>
+            <button class="btn-primary btn-sm" onClick=${handleAddTag}>${t('common.add')}</button>
           </div>
         `}
         ${tags.map(tag => {
@@ -163,37 +163,37 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
               <span class="pf-agd-tag-prefix">agents.tag.${tag}.*</span>
               <span class="pf-agd-tag-sharing">
                 ${shared.length > 0
-                  ? `${t('profile.agents.detail.dataAccess.with')}: ${shared.map(a => a.name).join(', ')}`
-                  : t('profile.agents.detail.dataAccess.onlyYou')}
+                  ? `${t('profile.agents.detail.data_access.with')}: ${shared.map(a => a.name).join(', ')}`
+                  : t('profile.agents.detail.data_access.onlyYou')}
               </span>
               <button class="pf-agd-remove-btn" onClick=${() => handleRemoveTag(tag)}>x</button>
             </div>
           `;
         })}
         ${tags.length === 0 && !addingTag && html`
-          <div class="pf-agd-empty">${t('profile.agents.detail.dataAccess.noTags')}</div>
+          <div class="pf-agd-empty">${t('profile.agents.detail.data_access.noTags')}</div>
         `}
-        <div class="pf-agd-help-text">${t('profile.agents.detail.dataAccess.tagsHelp')}</div>
+        <div class="pf-agd-help-text">${t('profile.agents.detail.data_access.tagsHelp')}</div>
       </div>
 
       <!-- MEMORY AREAS -->
       <div class="pf-agd-data-section">
         <div class="pf-agd-section-header">
-          <span class="pf-agd-section-title">${t('profile.agents.detail.dataAccess.memoryAreasTitle')}</span>
-          <button class="btn-outline btn-sm" onClick=${() => setAddingArea(!addingArea)}>+ ${t('profile.agents.detail.dataAccess.addArea')}</button>
+          <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.memoryAreasTitle')}</span>
+          <button class="btn-outline btn-sm" onClick=${() => setAddingArea(!addingArea)}>+ ${t('profile.agents.detail.data_access.addArea')}</button>
         </div>
         ${addingArea && html`
           <div class="pf-agd-area-form">
             <input type="text" value=${newAreaKey} onInput=${(e) => setNewAreaKey(e.target.value)}
-                   placeholder=${t('profile.agents.detail.dataAccess.areaKeyPlaceholder')} />
+                   placeholder=${t('profile.agents.detail.data_access.areaKeyPlaceholder')} />
             <input type="text" value=${newAreaDesc} onInput=${(e) => setNewAreaDesc(e.target.value)}
-                   placeholder=${t('profile.agents.detail.dataAccess.areaDescPlaceholder')} />
+                   placeholder=${t('profile.agents.detail.data_access.areaDescPlaceholder')} />
             <select value=${newAreaPerm} onChange=${(e) => setNewAreaPerm(e.target.value)}>
-              <option value="read+write">read+write</option>
-              <option value="read">read only</option>
+              <option value="read+write">${t('profile.agents.detail.data_access.permReadWrite')}</option>
+              <option value="read">${t('profile.agents.detail.data_access.permReadOnly')}</option>
             </select>
-            <button class="btn-primary btn-sm" onClick=${handleAddArea}>${t('profile.agents.detail.dataAccess.addArea')}</button>
-            <button class="btn-outline btn-sm" onClick=${() => setAddingArea(false)}>${t('profile.agents.detail.agentConfig.cancel')}</button>
+            <button class="btn-primary btn-sm" onClick=${handleAddArea}>${t('profile.agents.detail.data_access.addArea')}</button>
+            <button class="btn-outline btn-sm" onClick=${() => setAddingArea(false)}>${t('common.cancel')}</button>
           </div>
         `}
         ${hasAreas ? memoryAreas.map(area => html`
@@ -201,47 +201,47 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
             <span class="pf-agd-area-key">${area.key || area}</span>
             <span class="pf-agd-area-desc">${area.description || ''}</span>
             <span class="pf-agd-area-perm ${area.access === 'read' ? 'pf-agd-area-perm--ro' : 'pf-agd-area-perm--rw'}">
-              ${area.access || 'read+write'}
+              ${area.access === 'read' ? t('profile.agents.detail.data_access.permReadOnly') : t('profile.agents.detail.data_access.permReadWrite')}
             </span>
           </div>
         `) : !addingArea && html`
-          <div class="pf-agd-empty">${t('profile.agents.detail.dataAccess.noAreas')}</div>
+          <div class="pf-agd-empty">${t('profile.agents.detail.data_access.noAreas')}</div>
         `}
       </div>
 
       <!-- KNOWLEDGE PACKAGES -->
       <div class="pf-agd-data-section">
         <div class="pf-agd-section-header">
-          <span class="pf-agd-section-title">${t('profile.agents.detail.dataAccess.knowledgeTitle')}</span>
-          <button class="btn-outline btn-sm" onClick=${() => setAddingPackage(!addingPackage)}>+ ${t('profile.agents.detail.dataAccess.linkPackage')}</button>
+          <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.knowledgeTitle')}</span>
+          <button class="btn-outline btn-sm" onClick=${() => setAddingPackage(!addingPackage)}>+ ${t('profile.agents.detail.data_access.linkPackage')}</button>
         </div>
         ${addingPackage && html`
           <div class="pf-agd-area-form">
             <input type="text" value=${newPkgName} onInput=${(e) => setNewPkgName(e.target.value)}
-                   placeholder=${t('profile.agents.detail.dataAccess.packageNamePlaceholder')} />
+                   placeholder=${t('profile.agents.detail.data_access.packageNamePlaceholder')} />
             <input type="text" value=${newPkgDesc} onInput=${(e) => setNewPkgDesc(e.target.value)}
-                   placeholder=${t('profile.agents.detail.dataAccess.packageDescPlaceholder')} />
-            <button class="btn-primary btn-sm" onClick=${handleLinkPackage}>${t('profile.agents.detail.dataAccess.linkPackage')}</button>
-            <button class="btn-outline btn-sm" onClick=${() => setAddingPackage(false)}>${t('profile.agents.detail.agentConfig.cancel')}</button>
+                   placeholder=${t('profile.agents.detail.data_access.packageDescPlaceholder')} />
+            <button class="btn-primary btn-sm" onClick=${handleLinkPackage}>${t('profile.agents.detail.data_access.linkPackage')}</button>
+            <button class="btn-outline btn-sm" onClick=${() => setAddingPackage(false)}>${t('common.cancel')}</button>
           </div>
         `}
         ${hasResources ? resources.map(res => html`
           <div key=${res.url || res.name || res} class="pf-agd-area-row">
             <span class="pf-agd-area-key">${res.name || res.url || res}</span>
             <span class="pf-agd-area-desc">${res.description || ''}</span>
-            ${(res.documentCount || res.count) ? html`<span class="pf-agd-package-count">${res.documentCount || res.count} docs</span>` : ''}
+            ${(res.documentCount || res.count) ? html`<span class="pf-agd-package-count">${res.documentCount || res.count} ${t('profile.agents.detail.data_access.docCount')}</span>` : ''}
           </div>
         `) : !addingPackage && html`
-          <div class="pf-agd-empty">${t('profile.agents.detail.dataAccess.noPackages')}</div>
+          <div class="pf-agd-empty">${t('profile.agents.detail.data_access.noPackages')}</div>
         `}
       </div>
 
       <!-- EFFECTIVE SCOPE SUMMARY -->
       <div class="pf-agd-scope-summary">
-        ${t('profile.agents.detail.dataAccess.effectiveScope')}:\n${
+        ${t('profile.agents.detail.data_access.effectiveScope')}:\n${
           [...memoryAreas.map(a => a.key || a), ...tags.map(tag => `agents.tag.${tag}.*`), 'agents.shared.index'].join(', ')
-        }${hasResources ? `\n${t('profile.agents.detail.dataAccess.knowledgeTitle')}: ${resources.map(r => r.name || r.url || r).join(', ')}` : ''}
-        <div class="pf-agd-scope-footer">${t('profile.agents.detail.dataAccess.scopeFooter')}</div>
+        }${hasResources ? `\n${t('profile.agents.detail.data_access.knowledgeTitle')}: ${resources.map(r => r.name || r.url || r).join(', ')}` : ''}
+        <div class="pf-agd-scope-footer">${t('profile.agents.detail.data_access.scopeFooter')}</div>
       </div>
     </div>
   `;

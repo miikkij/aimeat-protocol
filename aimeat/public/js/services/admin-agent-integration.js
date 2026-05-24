@@ -4,6 +4,7 @@
  * @version-history
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Governance Phase C
  *   v1.1.0 -- 2026-05-24 -- Add registerPlatform, sendReminder, skipOnboardingStep
+ *   v1.2.0 -- 2026-05-24 -- Add notifyOutdatedAgents
  */
 
 export async function getPlatforms(session) {
@@ -44,4 +45,8 @@ export async function skipOnboardingStep(session, agentGaii, stepId) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ step_id: stepId }),
   });
+}
+
+export async function notifyOutdatedAgents(session, platform) {
+  return session.fetch(`/v1/admin/skill-bundles/${encodeURIComponent(platform)}/notify`, { method: 'POST' });
 }

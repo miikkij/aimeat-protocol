@@ -500,6 +500,7 @@
         "info": "Muut agentit voivat kutsua naita palveluita tyonvaihdon kautta",
         "calls": "kutsut",
         "unpublish": "Poista julkaisu",
+        "unpublished": "Palvelun julkaisu poistettu",
         "unnamed": "Nimetön",
         "free": "Ilmainen",
         "morsels": "morselia",
@@ -573,9 +574,9 @@
           "integration": "Integraatio",
           "tasks": "Tehtävät",
           "messages": "Viestit",
-          "dataAccess": "Datayhteydet",
+          "data_access": "Datayhteydet",
           "directives": "Ohjeistukset",
-          "agentConfig": "Agenttiasetukset",
+          "agent_config": "Agenttiasetukset",
           "activity": "Toiminta",
           "services": "Palvelut"
         },
@@ -594,6 +595,9 @@
         "deliveryMcp": "MCP-ilmoitukset",
         "deliveryWebhook": "Webhook",
         "deliveryPolling": "Pollaus",
+        "deliveryMcpWh": "MCP+WH",
+        "deliveryWh": "WH",
+        "tokensToday": "Tokenit",
         "connection": "Yhteys",
         "platform": "Alusta",
         "skillBundle": "Taitopaketti",
@@ -636,6 +640,8 @@
           "channel": "Kanava",
           "result": "Tulos",
           "latency": "Viive",
+          "deliveryMethod": "Toimitustapa",
+          "pollingInterval": "Pollausväli",
           "webhookNotConfigured": "Webhookia ei ole määritetty",
           "editWebhook": "Muokkaa webhookia",
           "webhookUpdated": "Webhook-URL päivitetty",
@@ -653,23 +659,24 @@
           "roles": "Roolit",
           "readinessScore": "Valmius",
           "copyInstallCommand": "Kopioi asennuskomento",
-          "installCommandCopied": "Asennuskomento kopioitu"
-        },
-        "commands": {
-          "title": "Agentin komennot",
-          "available": "saatavilla",
-          "noCommands": "Ei rekisteröityjä komentoja",
-          "noCommandsHint": "Agentti voi rekisteröidä komentoja kirjoittamalla komentojen muistiavaimeen.",
-          "send": "Lähetä",
-          "defaultCategory": "Yleinen"
+          "installCommandCopied": "Asennuskomento kopioitu",
+          "noDeliveries": "Ei toimituksia vielä."
         },
         "messages": {
+          "commands": {
+            "title": "Agentin komennot",
+            "available": "saatavilla",
+            "noCommands": "Ei rekisteröityjä komentoja",
+            "noCommandsHint": "Agentti voi rekisteröidä komentoja kirjoittamalla komentojen muistiavaimeen.",
+            "send": "Lähetä",
+            "defaultCategory": "Yleinen"
+          },
           "placeholder": "Kirjoita / komennoille tai viesti...",
           "hint": "Kirjoita / nähdäksesi saatavilla olevat komennot",
           "sendError": "Viestin lähetys epäonnistui",
           "command": "komento"
         },
-        "dataAccess": {
+        "data_access": {
           "sharedTagsTitle": "Jaetut tunnisteet",
           "addTag": "Lisää tunniste",
           "tagPlaceholder": "Tunnisteen nimi",
@@ -692,6 +699,9 @@
           "packageLinked": "Tietopaketti linkitetty",
           "noPackagesAvailable": "Ei saatavilla olevia tietopaketteja",
           "noAreas": "Ei muistialueita määritetty",
+          "permReadWrite": "Luku + kirjoitus",
+          "permReadOnly": "Vain luku",
+          "docCount": "dokumenttia",
           "noPackages": "Ei tietopaketteja linkitetty",
           "scopeNote": "Tämä laajuusyhteenveto sisältyy agentin taitopakettiin, jotta se tietää tietorajansa.",
           "scopeFooter": "Tämä yhteenveto sisällytetään agentin taitopakettiin, jotta se tietää datarajansa.",
@@ -700,7 +710,7 @@
           "packageNamePlaceholder": "Paketin nimi tai URL",
           "packageDescPlaceholder": "Kuvaus"
         },
-        "agentConfig": {
+        "agent_config": {
           "copy": "Kopioi",
           "download": "Lataa",
           "edit": "Muokkaa",
@@ -708,7 +718,9 @@
           "cancel": "Peruuta",
           "upload": "Lataa asetustiedosto",
           "saved": "Asetustiedosto tallennettu",
+          "saveError": "Asetustiedoston tallennus epäonnistui",
           "uploaded": "Asetustiedosto ladattu",
+          "uploadError": "Asetustiedoston lataus epäonnistui",
           "viewing": "Katsellaan"
         },
         "activity": {
@@ -727,7 +739,10 @@
             "failed": "Epäonnistuneet",
             "policyIssues": "Sääntörikkomukset",
             "telemetryEvents": "Telemetriatapahtumia tänään",
-            "deliveryHealth": "Toimituksen tila"
+            "deliveryHealth": "Toimituksen tila",
+            "connected": "Yhdistetty",
+            "mcpLabel": "MCP",
+            "notConfigured": "Ei määritetty"
           }
         },
         "directives": {
@@ -740,11 +755,22 @@
           "active": "Aktiivinen",
           "inactive": "Ei aktiivinen"
         },
+        "tasks": {
+          "filter": {
+            "all": "Kaikki",
+            "active": "Aktiiviset",
+            "queued": "Jonossa",
+            "completed": "Valmiit",
+            "failed": "Epäonnistuneet"
+          },
+          "scope": "Laajuus",
+          "rules": "Säännöt"
+        },
         "empty": {
           "tasks": "Ei tehtäviä. Luo tehtävä antaaksesi agentille työtä.",
           "messages": "Ei viestejä. Lähetä viesti tai käytä komentoa.",
-          "dataAccess": "Ei datayhteyksien asetuksia. Lisää muistialueita tai tunnisteita yllä olevista painikkeista.",
-          "agentConfig": "Ei asetustiedostoja. Agentti lähettää asetustiedostot taitopaketin asennuksen jälkeen.",
+          "data_access": "Ei datayhteyksien asetuksia. Lisää muistialueita tai tunnisteita yllä olevista painikkeista.",
+          "agent_config": "Ei asetustiedostoja. Agentti lähettää asetustiedostot taitopaketin asennuksen jälkeen.",
           "activity": "Ei tallennettua toimintaa. Tapahtumat ilmestyvät tähän kun agentti aloittaa työskentelyn.",
           "services": "Ei ilmoitettuja palveluja. Agentti voi ilmoittaa palvelut Hello-integraation vaiheessa 11."
         }
@@ -5410,8 +5436,10 @@
     },
     "readiness": {
       "title": "Valmius",
+      "none": "Ei mitään",
       "basic": "Perus",
       "standard": "Normaali",
+      "advanced": "Edistynyt",
       "full": "Täysi",
       "expert": "Asiantuntija",
       "overrideActive": "Manuaalinen ohitus aktiivinen",
@@ -5481,6 +5509,15 @@
       "autoDetectRegex": "Tunnistusregex",
       "sendReminder": "Lähetä muistutus",
       "skipStep": "Ohita vaihe",
+      "bundleTemplates": "Pakettipohjat",
+      "customReferences": "Mukautetut viitteet",
+      "customScripts": "Mukautetut skriptit",
+      "lastGenerated": "Viimeksi generoitu",
+      "customizeBundle": "Muokkaa pakettia",
+      "previewBundle": "Esikatsele pakettia",
+      "notifyOutdated": "Ilmoita",
+      "notifySuccess": "Ilmoitukset lähetetty",
+      "comingSoon": "Tulossa pian",
       "suggestion": {
         "webhook": "Webhook-URL ei rekisteröity tai päätepiste tavoittamattomissa",
         "platform": "Alustan tunnistus epäonnistui -- tarkista User-Agent tai aseta manuaalisesti",

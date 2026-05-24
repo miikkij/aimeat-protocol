@@ -500,6 +500,7 @@
         "info": "Other agents can call these services via the work exchange",
         "calls": "calls",
         "unpublish": "Unpublish",
+        "unpublished": "Service unpublished",
         "unnamed": "Unnamed",
         "free": "Free",
         "morsels": "morsels",
@@ -573,9 +574,9 @@
           "integration": "Integration",
           "tasks": "Tasks",
           "messages": "Messages",
-          "dataAccess": "Data Access",
+          "data_access": "Data Access",
           "directives": "Directives",
-          "agentConfig": "Agent Config",
+          "agent_config": "Agent Config",
           "activity": "Activity",
           "services": "Services"
         },
@@ -594,6 +595,9 @@
         "deliveryMcp": "MCP notifications",
         "deliveryWebhook": "Webhook",
         "deliveryPolling": "Polling",
+        "deliveryMcpWh": "MCP+WH",
+        "deliveryWh": "WH",
+        "tokensToday": "Tokens",
         "connection": "Connection",
         "platform": "Platform",
         "skillBundle": "Skill Bundle",
@@ -636,6 +640,8 @@
           "channel": "Channel",
           "result": "Result",
           "latency": "Latency",
+          "deliveryMethod": "Delivery method",
+          "pollingInterval": "Polling interval",
           "webhookNotConfigured": "Webhook not configured",
           "editWebhook": "Edit webhook",
           "webhookUpdated": "Webhook URL updated",
@@ -653,23 +659,24 @@
           "roles": "Roles",
           "readinessScore": "Readiness",
           "copyInstallCommand": "Copy install command",
-          "installCommandCopied": "Install command copied"
-        },
-        "commands": {
-          "title": "Agent Commands",
-          "available": "available",
-          "noCommands": "No commands registered",
-          "noCommandsHint": "The agent can register commands by writing to its commands memory key.",
-          "send": "Send",
-          "defaultCategory": "General"
+          "installCommandCopied": "Install command copied",
+          "noDeliveries": "No deliveries recorded yet."
         },
         "messages": {
+          "commands": {
+            "title": "Agent Commands",
+            "available": "available",
+            "noCommands": "No commands registered",
+            "noCommandsHint": "The agent can register commands by writing to its commands memory key.",
+            "send": "Send",
+            "defaultCategory": "General"
+          },
           "placeholder": "Type / for commands or a message...",
           "hint": "Type / to see available commands",
           "sendError": "Failed to send message",
           "command": "command"
         },
-        "dataAccess": {
+        "data_access": {
           "sharedTagsTitle": "Shared Tags",
           "addTag": "Add tag",
           "tagPlaceholder": "Tag name",
@@ -692,6 +699,9 @@
           "packageLinked": "Knowledge package linked",
           "noPackagesAvailable": "No knowledge packages available",
           "noAreas": "No memory areas assigned",
+          "permReadWrite": "Read + Write",
+          "permReadOnly": "Read only",
+          "docCount": "docs",
           "noPackages": "No knowledge packages linked",
           "scopeNote": "This scope summary is included in the agent's skill bundle so it knows its data boundaries.",
           "scopeFooter": "This summary is included in the agent's skill bundle so it knows its data boundaries.",
@@ -700,7 +710,7 @@
           "packageNamePlaceholder": "Package name or URL",
           "packageDescPlaceholder": "Description"
         },
-        "agentConfig": {
+        "agent_config": {
           "copy": "Copy",
           "download": "Download",
           "edit": "Edit",
@@ -708,7 +718,9 @@
           "cancel": "Cancel",
           "upload": "Upload config file",
           "saved": "Config file saved",
+          "saveError": "Failed to save config file",
           "uploaded": "Config file uploaded",
+          "uploadError": "Failed to upload config file",
           "viewing": "Viewing"
         },
         "activity": {
@@ -727,7 +739,10 @@
             "failed": "Failed",
             "policyIssues": "Policy issues",
             "telemetryEvents": "Telemetry events today",
-            "deliveryHealth": "Delivery health"
+            "deliveryHealth": "Delivery health",
+            "connected": "Connected",
+            "notConfigured": "Not configured",
+            "mcpLabel": "MCP"
           }
         },
         "directives": {
@@ -740,11 +755,22 @@
           "active": "Active",
           "inactive": "Inactive"
         },
+        "tasks": {
+          "filter": {
+            "all": "All",
+            "active": "Active",
+            "queued": "Queued",
+            "completed": "Completed",
+            "failed": "Failed"
+          },
+          "scope": "Scope",
+          "rules": "Rules"
+        },
         "empty": {
           "tasks": "No tasks yet. Create a task to give this agent work.",
           "messages": "No messages yet. Send a message or use a command.",
-          "dataAccess": "No data access configured. Add memory areas or tags using the controls above.",
-          "agentConfig": "No configuration files. The agent will push its config files after the skill bundle is installed.",
+          "data_access": "No data access configured. Add memory areas or tags using the controls above.",
+          "agent_config": "No configuration files. The agent will push its config files after the skill bundle is installed.",
           "activity": "No activity recorded yet. Events will appear here once the agent starts working.",
           "services": "No services declared. The agent can declare services during Hello Integration Step 11."
         }
@@ -5410,8 +5436,10 @@
     },
     "readiness": {
       "title": "Readiness",
+      "none": "None",
       "basic": "Basic",
       "standard": "Standard",
+      "advanced": "Advanced",
       "full": "Full",
       "expert": "Expert",
       "overrideActive": "Manual override active",
@@ -5481,6 +5509,15 @@
       "autoDetectRegex": "Auto-detect regex",
       "sendReminder": "Send reminder",
       "skipStep": "Skip step",
+      "bundleTemplates": "Bundle Templates",
+      "customReferences": "Custom references",
+      "customScripts": "Custom scripts",
+      "lastGenerated": "Last generated",
+      "customizeBundle": "Customize bundle",
+      "previewBundle": "Preview bundle",
+      "notifyOutdated": "Notify",
+      "notifySuccess": "Notifications sent",
+      "comingSoon": "Coming soon",
       "suggestion": {
         "webhook": "Webhook URL not registered or endpoint unreachable",
         "platform": "Platform detection failed -- verify User-Agent or configure manually",

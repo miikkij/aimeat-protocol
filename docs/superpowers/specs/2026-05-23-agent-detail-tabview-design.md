@@ -243,10 +243,13 @@ The UI determines agent state from these conditions (checked in order):
 |----------|-----------|-------|
 | 1 | `onboarding.status === 'pending'` or no onboarding record | New |
 | 2 | `onboarding.status === 'in_progress'` | Onboarding |
-| 3 | `webhookFailCount >= 5` or `readinessLevel` dropped from previous | Problem |
-| 4 | Everything else | Production |
+| 3 | `webhookFailCount >= 5` or `readinessLevel` dropped or no telemetry >24h | Problem |
+| 4 | `last_seen` stale >60 minutes (but <24h) | Idle |
+| 5 | Everything else | Production |
 
 Problem state is checked *after* onboarding completion. An agent in onboarding cannot be in "problem" state (it has not established a baseline yet).
+
+**Idle state (v1.2.0):** Agents that completed onboarding but have not been seen for >60 minutes are marked "idle" (gray color in board/badges). They render identically to production in Zone 2 but visually signal inactivity. Default tab: Tasks.
 
 ---
 

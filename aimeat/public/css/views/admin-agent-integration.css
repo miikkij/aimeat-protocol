@@ -4,6 +4,7 @@
  * @version-history
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Governance Phase C
  *   v1.1.0 -- 2026-05-24 -- Fix M8 M9 F19 F20 F21 audit findings
+ *   v1.2.0 -- 2026-05-24 -- Add subsection, button row, notify button styles
  */
 
 /* ── Section containers ── */
@@ -280,4 +281,24 @@
 .adm-agi-stuck-btn {
   font-size: 0.7rem;
   padding: 4px 10px;
+}
+
+/* ── Subsection (nested inside a section, e.g. readiness inside onboarding) ── */
+.adm-agi-subsection {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Button row (side-by-side action buttons) ── */
+.adm-agi-btn-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* ── Per-row notify button ── */
+.adm-agi-notify-btn {
+  font-size: 0.7rem;
+  padding: 3px 10px;
 }

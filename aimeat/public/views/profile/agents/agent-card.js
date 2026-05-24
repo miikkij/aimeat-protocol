@@ -5,6 +5,8 @@
  * @version-history
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  *   v1.1.0 -- 2026-05-24 -- Fix C6: remove GAII from Zone 1, M1: add Next prefix, C1: production stats, C2: problem action buttons
+ *   v1.3.0 -- 2026-05-24 -- Audit fix: use proper down arrow glyph for collapse icon
+ *   v1.2.0 -- 2026-05-24 -- Add idle state handling, tokens today display, combined delivery label
  */
 
 import { h } from 'preact';
@@ -29,9 +31,9 @@ const TABS = [
   { id: 'integration', key: 'profile.agents.detail.tabs.integration' },
   { id: 'tasks', key: 'profile.agents.detail.tabs.tasks' },
   { id: 'messages', key: 'profile.agents.detail.tabs.messages' },
-  { id: 'data-access', key: 'profile.agents.detail.tabs.dataAccess' },
+  { id: 'data-access', key: 'profile.agents.detail.tabs.data_access' },
   { id: 'directives', key: 'profile.agents.detail.tabs.directives' },
-  { id: 'agent-config', key: 'profile.agents.detail.tabs.agentConfig' },
+  { id: 'agent-config', key: 'profile.agents.detail.tabs.agent_config' },
   { id: 'activity', key: 'profile.agents.detail.tabs.activity' },
   { id: 'services', key: 'profile.agents.detail.tabs.services' },
 ];
@@ -78,7 +80,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
       <div class="pf-agd-expanded">
         <!-- Zone 1: Identity -->
         <div class="pf-agd-zone1" onClick=${handleCollapse}>
-          <span class="pf-agd-expand-icon pf-agd-expand-icon--open">▶</span>
+          <span class="pf-agd-expand-icon pf-agd-expand-icon--open">▼</span>
           <div class="pf-agd-zone1-identity">
             <span class="pf-agd-zone1-name">${agent.display_name || agent.name}</span>
           </div>
@@ -141,12 +143,22 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
 
 function renderDeliveryIndicator(agent) {
   const hasWebhook = agent.webhookUrl || agent.webhook_url;
-  if (hasWebhook) {
-    const failCount = agent.webhookFailCount ?? 0;
-    const icon = failCount >= 5 ? '⚠' : '✓';
-    return html`<span class="pf-agd-delivery-indicator">${t('profile.agents.detail.deliveryWebhook')}: ${icon} </span>`;
+  const hasMcp = agent.mcpEnabled || agent.mcp_enabled;
+  const failCount = agent.webhookFailCount ?? 0;
+  const icon = hasWebhook ? (failCount >= 5 ? '⚠' : '✓') : '';
+
+  let label;
+  if (hasMcp && hasWebhook) {
+    label = t('profile.agents.detail.deliveryMcpWh');
+  } else if (hasWebhook) {
+    label = t('profile.agents.detail.deliveryWh');
+  } else if (hasMcp) {
+    label = t('profile.agents.detail.deliveryMcp');
+  } else {
+    label = t('profile.agents.detail.deliveryPolling');
   }
-  return html`<span class="pf-agd-delivery-indicator">${t('profile.agents.detail.deliveryPolling')} </span>`;
+
+  return html`<span class="pf-agd-delivery-indicator">${label}${icon ? ` ${icon}` : ''} </span>`;
 }
 
 function renderPlatformBadge(onboarding) {
@@ -155,6 +167,8 @@ function renderPlatformBadge(onboarding) {
   const version = onboarding?.platformVersion;
   return html`<span class="pf-agd-badge pf-agd-badge--platform">${platform}${version ? ` v${version}` : ''}</span>`;
 }
+
+const READINESS_RANKS = { none: 0, basic: 1, standard: 2, advanced: 3, full: 4 };
 
 function renderReadinessBadge(state, onboarding) {
   if (state === 'new') {
@@ -165,6 +179,15 @@ function renderReadinessBadge(state, onboarding) {
     const total = onboarding?.steps?.length ?? 11;
     return html`<span class="pf-agd-badge pf-agd-badge--readiness-onboarding">${t('profile.agents.detail.state.onboarding')}: ${passed}/${total}</span>`;
   }
+  if (state === 'problem') {
+    const level = onboarding?.readinessLevel || 'none';
+    const score = onboarding?.readinessScore;
+    if (!score && score !== 0) return html`<span class="pf-agd-badge pf-agd-badge--readiness-none">--</span>`;
+    const label = t(`agentOnboarding.readiness.${level}`);
+    const degraded = onboarding?.previousReadinessLevel && (READINESS_RANKS[level] ?? 0) < (READINESS_RANKS[onboarding.previousReadinessLevel] ?? 0);
+    return html`<span class="pf-agd-badge pf-agd-badge--readiness-${level} ${degraded ? 'pf-agd-badge--degraded' : ''}">${degraded ? '↓ ' : ''}${label} (${score})</span>`;
+  }
+  // idle and production both show level + score
   const level = onboarding?.readinessLevel || 'none';
   const score = onboarding?.readinessScore;
   if (!score && score !== 0) return html`<span class="pf-agd-badge pf-agd-badge--readiness-none">--</span>`;
@@ -182,6 +205,7 @@ function renderCollapsedStats(state, agent, onboarding) {
     }
     case 'problem':
       return html`${t('profile.agents.detail.state.problemSummary')} | ${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''}`;
+    case 'idle':
     case 'production':
     default: {
       const parts = [];
@@ -190,6 +214,7 @@ function renderCollapsedStats(state, agent, onboarding) {
         const { done, active: act } = agent.taskStats;
         if (done || act) parts.push(`${t('profile.agents.detail.today')}: ${done || 0} ${t('profile.agents.detail.done')}${act ? `, ${act} ${t('profile.agents.detail.active')}` : ''}`);
       }
+      if (agent.tokensUsedToday != null) parts.push(`${t('profile.agents.detail.tokensToday')}: ${agent.tokensUsedToday.toLocaleString()}`);
       return html`${parts.join(' | ')}`;
     }
   }
@@ -237,11 +262,17 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
     case 'problem':
       return html`<${ProblemZone2} agent=${agent} setActiveTab=${setActiveTab} showToast=${showToast} />`;
 
+    case 'idle':
     case 'production':
     default: {
       const tags = agent.tags ?? [];
       const hasWebhook = agent.webhookUrl || agent.webhook_url;
-      const deliveryLabel = hasWebhook ? t('profile.agents.detail.deliveryWebhook') : t('profile.agents.detail.deliveryPolling');
+      const hasMcp = agent.mcpEnabled || agent.mcp_enabled;
+      let deliveryLabel;
+      if (hasMcp && hasWebhook) deliveryLabel = t('profile.agents.detail.deliveryMcpWh');
+      else if (hasWebhook) deliveryLabel = t('profile.agents.detail.deliveryWh');
+      else if (hasMcp) deliveryLabel = t('profile.agents.detail.deliveryMcp');
+      else deliveryLabel = t('profile.agents.detail.deliveryPolling');
       const stats = agent.taskStats;
       return html`
         <div class="pf-agd-zone2 pf-agd-zone2--production">
@@ -249,6 +280,7 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
             <span>${deliveryLabel}</span>
             ${agent.last_seen ? html`<span>${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}</span>` : ''}
             ${stats && (stats.done || stats.active) ? html`<span>${t('profile.agents.detail.today')}: ${stats.done || 0} ${t('profile.agents.detail.done')}${stats.active ? `, ${stats.active} ${t('profile.agents.detail.active')}` : ''}</span>` : ''}
+            ${agent.tokensUsedToday != null ? html`<span>${t('profile.agents.detail.tokensToday')}: ${agent.tokensUsedToday.toLocaleString()}</span>` : ''}
             ${tags.length > 0 ? html`<span>${t('profile.agents.detail.sharedTags')}: ${tags.map(tag => `[${tag}]`).join(' ')}</span>` : ''}
           </div>
         </div>

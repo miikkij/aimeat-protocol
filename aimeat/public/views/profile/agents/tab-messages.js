@@ -3,6 +3,7 @@
  * @description Messages tab with command palette, "/" autocomplete, and chat area.
  *   Wraps the existing messages subtab and adds command discovery.
  * @version-history
+ *   v1.2.0 -- 2026-05-24 -- Add command-reply visual pairing for slash commands
  *   v1.1.0 -- 2026-05-24 -- M7: visual distinction for command messages (slash prefix)
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  */
@@ -18,18 +19,19 @@ import { getAgentCommands } from '/js/services/agent-integration.js';
 const html = htm.bind(h);
 
 function CommandPalette({ commands, onSend }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   if (!commands || commands.length === 0) {
     return html`
       <div class="pf-agd-commands">
         <div class="pf-agd-commands-header" onClick=${() => setExpanded(!expanded)}>
-          <span>${t('profile.agents.detail.commands.title')} (0)</span>
+          <span>${t('profile.agents.detail.messages.commands.title')} (0)</span>
           <span>${expanded ? '▼' : '▶'}</span>
         </div>
         ${expanded && html`
           <div class="pf-agd-commands-body">
-            <div class="pf-agd-empty">${t('profile.agents.detail.commands.noCommands')}</div>
+            <div class="pf-agd-empty">${t('profile.agents.detail.messages.commands.noCommands')}</div>
+            <div class="pf-agd-empty-hint">${t('profile.agents.detail.messages.commands.noCommandsHint')}</div>
           </div>
         `}
       </div>
@@ -39,7 +41,7 @@ function CommandPalette({ commands, onSend }) {
   const categories = useMemo(() => {
     const cats = {};
     for (const cmd of commands) {
-      const cat = cmd.category || t('profile.agents.detail.commands.defaultCategory');
+      const cat = cmd.category || t('profile.agents.detail.messages.commands.defaultCategory');
       if (!cats[cat]) cats[cat] = [];
       cats[cat].push(cmd);
     }
@@ -49,7 +51,7 @@ function CommandPalette({ commands, onSend }) {
   return html`
     <div class="pf-agd-commands">
       <div class="pf-agd-commands-header" onClick=${() => setExpanded(!expanded)}>
-        <span>${t('profile.agents.detail.commands.title')} (${commands.length} ${t('profile.agents.detail.commands.available')})</span>
+        <span>${t('profile.agents.detail.messages.commands.title')} (${commands.length} ${t('profile.agents.detail.messages.commands.available')})</span>
         <span>${expanded ? '▼' : '▶'}</span>
       </div>
       ${expanded && html`
@@ -62,7 +64,7 @@ function CommandPalette({ commands, onSend }) {
                   <span class="pf-agd-command-name">${cmd.name}</span>
                   <span class="pf-agd-command-desc">${cmd.description || ''}</span>
                   <button class="btn-outline btn-sm" onClick=${() => onSend(cmd.name)}>
-                    ${t('profile.agents.detail.commands.send')}
+                    ${t('profile.agents.detail.messages.commands.send')}
                   </button>
                 </div>
               `)}
@@ -174,6 +176,20 @@ export default function TabMessages({ agentName, session, showToast }) {
     setShowAutocomplete(false);
   }
 
+  function renderMessage(msg, isCommand, isReply) {
+    return html`
+      <div key=${msg.id || msg.createdAt}>
+        <div class="pf-agd-msg-bubble ${msg.direction === 'inbound' ? 'pf-agd-msg-inbound' : 'pf-agd-msg-outbound'} ${isCommand ? 'pf-agd-msg-command' : ''} ${isReply ? 'pf-agd-msg-reply' : ''}">
+          ${isCommand && html`<span class="pf-agd-command-badge">${t('profile.agents.detail.messages.command')}</span>`}
+          ${msg.content}
+        </div>
+        <div class="pf-agd-msg-meta ${msg.direction === 'inbound' ? 'pf-agd-msg-meta-right' : ''}">
+          ${msg.createdAt ? html`<span class="pf-agd-msg-time">${new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> ${timeAgo(msg.createdAt)}` : ''}
+        </div>
+      </div>
+    `;
+  }
+
   if (loading && messages.length === 0) {
     return html`<div class="pf-agd-empty">${t('profile.loading')}</div>`;
   }
@@ -204,19 +220,30 @@ export default function TabMessages({ agentName, session, showToast }) {
 
       ${messages.length > 0 && html`
         <div class="pf-agd-msg-history" ref=${historyRef}>
-          ${[...messages].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)).map(msg => {
-            const isCommand = msg.content?.startsWith('/');
-            return html`
-            <div key=${msg.id || msg.createdAt}>
-              <div class="pf-agd-msg-bubble ${msg.direction === 'inbound' ? 'pf-agd-msg-inbound' : 'pf-agd-msg-outbound'} ${isCommand ? 'pf-agd-msg-command' : ''}">
-                ${isCommand && html`<span class="pf-agd-command-badge">${t('profile.agents.detail.messages.command')}</span>`}
-                ${msg.content}
-              </div>
-              <div class="pf-agd-msg-meta ${msg.direction === 'inbound' ? 'pf-agd-msg-meta-right' : ''}">
-                ${msg.createdAt ? html`<span class="pf-agd-msg-time">${new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> ${timeAgo(msg.createdAt)}` : ''}
-              </div>
-            </div>
-          `;})}
+          ${(() => {
+            const sorted = [...messages].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+            const rendered = [];
+            for (let i = 0; i < sorted.length; i++) {
+              const msg = sorted[i];
+              const isCommand = msg.content?.startsWith('/') && msg.direction === 'inbound';
+              const nextMsg = sorted[i + 1];
+              const hasReply = isCommand && nextMsg && nextMsg.direction === 'outbound';
+
+              if (hasReply) {
+                rendered.push(html`
+                  <div class="pf-agd-msg-pair" key=${msg.id || msg.createdAt}>
+                    ${renderMessage(msg, true, false)}
+                    <div class="pf-agd-msg-reply-indicator">↳</div>
+                    ${renderMessage(nextMsg, false, true)}
+                  </div>
+                `);
+                i++;
+              } else {
+                rendered.push(renderMessage(msg, isCommand, false));
+              }
+            }
+            return rendered;
+          })()}
         </div>
       `}
 

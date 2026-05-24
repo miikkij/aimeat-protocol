@@ -74,7 +74,7 @@ export default function AgentServicesSubtab({ agentName, session, showToast }) {
         headers: { 'Authorization': `Bearer ${session?.token}` },
       });
       if (resp.ok) {
-        showToast(t('profile.agents.services.unpublish') + ': OK');
+        showToast(t('profile.agents.services.unpublished'));
         loadServices();
       } else {
         const body = await resp.json().catch(() => ({}));

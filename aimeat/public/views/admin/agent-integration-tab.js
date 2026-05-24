@@ -1,10 +1,12 @@
 /**
  * @file agent-integration-tab.js
- * @description Admin dashboard Agent Integration tab. Three sections:
- *   Platform Registry, Onboarding Overview, Skill Bundle Management.
+ * @description Admin dashboard Agent Integration tab. Four sections:
+ *   Platform Registry, Onboarding Overview (with readiness distribution),
+ *   Skill Bundle Management, Bundle Templates.
  * @version-history
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Governance Phase C
  *   v1.1.0 -- 2026-05-24 -- Fix M8 M9 F19 F20 F21 audit findings
+ *   v1.2.0 -- 2026-05-24 -- Move readiness into onboarding, add bundle templates, add notify button
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -62,14 +64,13 @@ export default function AgentIntegrationTab({ data, session }) {
   };
 
   const totalAgents = platforms.reduce((sum, p) => sum + (p.agent_count || 0), 0);
-  const readinessTotal = readiness?.total || 0;
 
   return html`
     <div>
       ${renderPlatformRegistry(platforms, totalAgents, session, loadData)}
-      ${renderOnboardingOverview(onboarding, session, loadData)}
-      ${renderReadinessDistribution(readiness, readinessTotal)}
-      ${renderSkillBundles(bundles, handleRegenerate, regenerating)}
+      ${renderOnboardingOverview(onboarding, readiness, session, loadData)}
+      ${renderSkillBundles(bundles, handleRegenerate, regenerating, session)}
+      ${renderBundleTemplates()}
     </div>
   `;
 }
@@ -172,11 +173,12 @@ function AddPlatformForm({ session, onDone, onCancel }) {
 }
 
 /* ── M9: Not Started stat card + F20: Stuck section with suggestions + actions ── */
-function renderOnboardingOverview(onboarding, session, loadData) {
+function renderOnboardingOverview(onboarding, readiness, session, loadData) {
   if (!onboarding) return html`<div class="adm-agi-section"><${Empty} text=${t('common.noData')} /></div>`;
 
   const stuck = onboarding.stuck || [];
   const notStarted = onboarding.not_started || 0;
+  const readinessTotal = (onboarding.completed || 0) + (onboarding.in_progress || 0) + notStarted;
 
   return html`
     <div class="adm-agi-section">
@@ -203,6 +205,7 @@ function renderOnboardingOverview(onboarding, session, loadData) {
           `)}
         </div>
       ` : ''}
+      ${renderReadinessDistribution(readiness, readinessTotal)}
     </div>
   `;
 }
@@ -270,7 +273,7 @@ function renderReadinessDistribution(readiness, total) {
   const levels = ['expert', 'full', 'standard', 'basic'];
 
   return html`
-    <div class="adm-agi-section">
+    <div class="adm-agi-subsection">
       <div class="adm-agi-section-title">${t('admin.agentIntegration.readinessDistribution')}</div>
       ${total === 0
         ? html`<div class="adm-agi-empty-text">${t('common.noData')}</div>`
@@ -298,9 +301,16 @@ function renderReadinessDistribution(readiness, total) {
 }
 
 /* ── F21: Added "Current version" column to skill bundle table ── */
-function renderSkillBundles(bundles, onRegenerate, regenerating) {
+function renderSkillBundles(bundles, onRegenerate, regenerating, session) {
   if (!bundles) return '';
   const entries = Object.entries(bundles);
+
+  const handleNotify = async (platform) => {
+    try {
+      await api.notifyOutdatedAgents(session, platform);
+      window.dispatchEvent(new CustomEvent('aimeat-toast', { detail: { message: t('admin.agentIntegration.notifySuccess') } }));
+    } catch { /* ignore */ }
+  };
 
   return html`
     <div class="adm-agi-section">
@@ -314,6 +324,7 @@ function renderSkillBundles(bundles, onRegenerate, regenerating) {
               <th>${t('admin.agentIntegration.agentCount')}</th>
               <th>${t('admin.agentIntegration.currentVersion')}</th>
               <th>${t('admin.agentIntegration.outdated')}</th>
+              <th></th>
             </tr></thead>
             <tbody>
               ${entries.map(([platform, info]) => html`
@@ -325,6 +336,11 @@ function renderSkillBundles(bundles, onRegenerate, regenerating) {
                     ? html`<span class="adm-agi-outdated">${num(info.outdated)}</span>`
                     : html`<span class="adm-agi-zero">0</span>`
                   }</td>
+                  <td>${info.outdated > 0 ? html`
+                    <button class="btn-outline adm-agi-notify-btn" onClick=${() => handleNotify(platform)}>
+                      ${t('admin.agentIntegration.notifyOutdated')}
+                    </button>
+                  ` : ''}</td>
                 </tr>
               `)}
             </tbody>
@@ -334,6 +350,41 @@ function renderSkillBundles(bundles, onRegenerate, regenerating) {
       <button class="btn-outline adm-agi-regen-btn" onClick=${onRegenerate} disabled=${regenerating}>
         ${regenerating ? t('common.loading') : t('admin.agentIntegration.regenerateAll')}
       </button>
+    </div>
+  `;
+}
+
+/* ── Bundle Templates (Phase C stub) ── */
+function renderBundleTemplates() {
+  const handleComingSoon = () => {
+    window.dispatchEvent(new CustomEvent('aimeat-toast', { detail: { message: t('admin.agentIntegration.comingSoon') } }));
+  };
+
+  return html`
+    <div class="adm-agi-section">
+      <div class="adm-agi-section-title">${t('admin.agentIntegration.bundleTemplates')}</div>
+      <div class="adm-agi-stats">
+        <div class="adm-agi-stat-card">
+          <div class="adm-agi-stat-value">0</div>
+          <div class="adm-agi-stat-label">${t('admin.agentIntegration.customReferences')}</div>
+        </div>
+        <div class="adm-agi-stat-card">
+          <div class="adm-agi-stat-value">0</div>
+          <div class="adm-agi-stat-label">${t('admin.agentIntegration.customScripts')}</div>
+        </div>
+        <div class="adm-agi-stat-card">
+          <div class="adm-agi-stat-value adm-agi-mono-sm">--</div>
+          <div class="adm-agi-stat-label">${t('admin.agentIntegration.lastGenerated')}</div>
+        </div>
+      </div>
+      <div class="adm-agi-btn-row">
+        <button class="btn-outline" onClick=${handleComingSoon}>
+          ${t('admin.agentIntegration.customizeBundle')}
+        </button>
+        <button class="btn-outline" onClick=${handleComingSoon}>
+          ${t('admin.agentIntegration.previewBundle')}
+        </button>
+      </div>
     </div>
   `;
 }

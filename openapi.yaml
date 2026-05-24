@@ -2354,7 +2354,7 @@ components:
     # === Agent Tasks ===
     TaskStatus:
       type: string
-      enum: [draft, queued, active, done, failed, stalled]
+      enum: [draft, queued, active, paused, done, failed, stalled]
 
     AgentTask:
       type: object

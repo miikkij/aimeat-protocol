@@ -3,10 +3,12 @@
  * @description Task queue sub-tab for agent detail view.
  *   Shows queued, active, and completed tasks with todo plans,
  *   "Start this task" approval button, and progress tracking.
+ *   Filter pills allow switching between all/active/queued/completed/failed views.
  * @structure
- *   - AgentTasksSubtab (default export) -- main component
+ *   - AgentTasksSubtab (default export) -- main component with filter pills
  *   - TaskItem -- task row with expand/collapse, todo list, start button
  * @version-history
+ *   v3.2.0 -- 2026-05-24 -- Add interactive filter pills, scope/rules display, migrate to pf-agd- CSS prefix
  *   v3.1.0 -- 2026-05-24 -- Fix: use correct locale key for empty state
  *   v3.0.0 -- 2026-05-22 -- Replace TaskCreateForm with TaskCreationBuilder (design spec split-panel)
  *   v2.1.0 -- 2026-05-22 -- Fix: use camelCase field names from API; add task and todo timestamps
@@ -22,8 +24,10 @@ import { timeAgo } from '/js/utils.js';
 import { listTasks, deleteTask, startTask, listEvents } from '/js/services/agent-tasks.js';
 import TaskCreationBuilder from './agents-task-builder.js';
 
+const TASK_FILTERS = ['all', 'active', 'queued', 'completed', 'failed'];
+
 function statusLabel(status) {
-  const key = `profile.agents.tasks.status.${status}`;
+  const key = `profile.agents.tasks.${status}`;
   const val = t(key);
   return val !== key ? val : status.charAt(0).toUpperCase() + status.slice(1);
 }
@@ -105,54 +109,69 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
 
   return html`
     <div>
-      <div class="agd-task-item" onClick=${handleExpand}>
-        <div class="agd-task-title-row">
-          <span class="agd-task-title">${task.title || task.id}</span>
-          ${progress && html`<span class="agd-todo-progress">${progress}</span>`}
+      <div class="pf-agd-task-item" onClick=${handleExpand}>
+        <div class="pf-agd-task-title-row">
+          <span class="pf-agd-task-title">${task.title || task.id}</span>
+          ${progress && html`<span class="pf-agd-todo-progress">${progress}</span>`}
         </div>
-        <div class="agd-task-meta">
-          ${task.createdAt && html`<span class="agd-task-time">${timeAgo(task.createdAt)}</span>`}
-          <span class="agd-status agd-status-${task.status || 'draft'}">${statusLabel(task.status || 'draft')}</span>
+        <div class="pf-agd-task-meta">
+          ${task.createdAt && html`<span class="pf-agd-task-time">${timeAgo(task.createdAt)}</span>`}
+          <span class="pf-agd-status pf-agd-status-${task.status || 'draft'}">${statusLabel(task.status || 'draft')}</span>
         </div>
       </div>
       ${expanded && html`
-        <div class="agd-task-expanded">
-          ${task.description && html`<div class="agd-task-desc">${task.description}</div>`}
+        <div class="pf-agd-task-expanded">
+          ${task.description && html`<div class="pf-agd-task-desc">${task.description}</div>`}
 
-          <div class="agd-task-timestamps">
+          ${task.scope && html`
+            <div class="pf-agd-info-row">
+              <span class="pf-agd-info-label">${t('profile.agents.detail.tasks.scope')}</span>
+              <span class="pf-agd-info-value">${Array.isArray(task.scope) ? task.scope.join(', ') : task.scope}</span>
+            </div>
+          `}
+          ${task.rules && task.rules.length > 0 && html`
+            <div class="pf-agd-info-row">
+              <span class="pf-agd-info-label">${t('profile.agents.detail.tasks.rules')}</span>
+              <span class="pf-agd-info-value">
+                ${Array.isArray(task.rules) ? task.rules.map(r => html`<div key=${r}>${r}</div>`) : task.rules}
+              </span>
+            </div>
+          `}
+
+          <div class="pf-agd-task-timestamps">
             ${task.createdAt && html`<span>${t('profile.agents.tasks.created')}: ${formatDateTime(task.createdAt)}</span>`}
             ${task.updatedAt && task.updatedAt !== task.createdAt && html`<span>${t('profile.agents.tasks.updated')}: ${formatDateTime(task.updatedAt)}</span>`}
             ${task.completedAt && html`<span>${t('profile.agents.tasks.completed')}: ${formatDateTime(task.completedAt)}</span>`}
           </div>
 
           ${hasTodos && html`
-            <div class="agd-todo-section">
-              <div class="agd-todo-header">
+            <div class="pf-agd-todo-section">
+              <div class="pf-agd-todo-header">
                 <strong>${t('profile.agents.tasks.todoLabel')}</strong>
-                <span class="agd-todo-summary">
-                  ${aimeatSteps > 0 && html`<span class="agd-env-badge agd-env-aimeat">${t('profile.agents.tasks.envAimeat')}: ${aimeatSteps}</span>`}
-                  ${agentSteps > 0 && html`<span class="agd-env-badge agd-env-agent">${t('profile.agents.tasks.envAgent')}: ${agentSteps}</span>`}
-                  ${totalMinutes > 0 && html`<span class="agd-todo-time">~${totalMinutes} ${t('profile.agents.tasks.minuteShort')}</span>`}
+                <span class="pf-agd-todo-summary">
+                  ${aimeatSteps > 0 && html`<span class="pf-agd-env-badge pf-agd-env-aimeat">${t('profile.agents.tasks.envAimeat')}: ${aimeatSteps}</span>`}
+                  ${agentSteps > 0 && html`<span class="pf-agd-env-badge pf-agd-env-agent">${t('profile.agents.tasks.envAgent')}: ${agentSteps}</span>`}
+                  ${totalMinutes > 0 && html`<span class="pf-agd-todo-time">~${totalMinutes} ${t('profile.agents.tasks.minuteShort')}</span>`}
                 </span>
               </div>
-              <div class="agd-todo-list">
+              <div class="pf-agd-todo-list">
                 ${todos.map((td, i) => html`
-                  <div class="agd-todo-item agd-todo-${td.status || 'pending'}" key=${td.id || i}>
-                    <span class="agd-todo-icon">${todoStatusIcon(td.status || 'pending')}</span>
-                    <div class="agd-todo-content">
-                      <div class="agd-todo-title">
+                  <div class="pf-agd-todo-item pf-agd-todo-${td.status || 'pending'}" key=${td.id || i}>
+                    <span class="pf-agd-todo-icon">${todoStatusIcon(td.status || 'pending')}</span>
+                    <div class="pf-agd-todo-content">
+                      <div class="pf-agd-todo-title">
                         ${td.title}
-                        <span class="agd-env-badge agd-env-${td.environment || 'agent'}">${td.environment === 'aimeat' ? t('profile.agents.tasks.envAimeat') : t('profile.agents.tasks.envAgent')}</span>
+                        <span class="pf-agd-env-badge pf-agd-env-${td.environment || 'agent'}">${td.environment === 'aimeat' ? t('profile.agents.tasks.envAimeat') : t('profile.agents.tasks.envAgent')}</span>
                         ${td.estimateMinutes && html`
-                          <span class="agd-todo-est">${td.estimateMinutes} ${t('profile.agents.tasks.minuteShort')}</span>
+                          <span class="pf-agd-todo-est">${td.estimateMinutes} ${t('profile.agents.tasks.minuteShort')}</span>
                         `}
                       </div>
-                      ${td.description && html`<div class="agd-todo-desc">${td.description}</div>`}
+                      ${td.description && html`<div class="pf-agd-todo-desc">${td.description}</div>`}
                       ${td.environmentReason && html`
-                        <div class="agd-todo-reason">${td.environmentReason}</div>
+                        <div class="pf-agd-todo-reason">${td.environmentReason}</div>
                       `}
-                      ${td.verification && html`<div class="agd-todo-verify">${td.verification}</div>`}
-                      ${td.completedAt && html`<div class="agd-todo-completed-at">${formatDateTime(td.completedAt)}</div>`}
+                      ${td.verification && html`<div class="pf-agd-todo-verify">${td.verification}</div>`}
+                      ${td.completedAt && html`<div class="pf-agd-todo-completed-at">${formatDateTime(td.completedAt)}</div>`}
                     </div>
                   </div>
                 `)}
@@ -161,28 +180,28 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
           `}
 
           ${!hasTodos && isQueued && html`
-            <div class="agd-todo-waiting">
+            <div class="pf-agd-todo-waiting">
               ${t('profile.agents.tasks.builder.waitingTodos')}
             </div>
           `}
 
-          ${loadingEvents && html`<div class="agd-empty">${t('profile.loading')}</div>`}
+          ${loadingEvents && html`<div class="pf-agd-empty">${t('profile.loading')}</div>`}
           ${events && events.length > 0 && html`
-            <div class="agd-event-log">
+            <div class="pf-agd-event-log">
               ${events.map(ev => html`
-                <div class="agd-event-item" key=${ev.id || ev.timestamp}>
-                  <span class="agd-event-time">${ev.timestamp ? timeAgo(ev.timestamp) : ''}</span>
-                  <span class="agd-event-type">${ev.type || ''}</span>
+                <div class="pf-agd-event-item" key=${ev.id || ev.timestamp}>
+                  <span class="pf-agd-event-time">${ev.timestamp ? timeAgo(ev.timestamp) : ''}</span>
+                  <span class="pf-agd-event-type">${ev.type || ''}</span>
                   <span>${ev.message || ''}</span>
                 </div>
               `)}
             </div>
           `}
           ${events && events.length === 0 && !isQueued && html`
-            <div class="agd-empty">${t('profile.agents.tasks.noEventsRecorded')}</div>
+            <div class="pf-agd-empty">${t('profile.agents.tasks.noEventsRecorded')}</div>
           `}
 
-          <div class="agd-task-actions">
+          <div class="pf-agd-task-actions">
             ${canStart && html`
               <button class="btn-primary btn-sm" onClick=${handleStart} disabled=${starting}>
                 ${starting ? t('profile.agents.tasks.starting') : t('profile.agents.tasks.startThisTask')}
@@ -202,6 +221,7 @@ export default function AgentTasksSubtab({ agentName, session, showToast }) {
   const [tasks, setTasks] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [error, setError] = useState(null);
+  const [filter, setFilter] = useState('all');
 
   async function loadTasks() {
     try {
@@ -230,17 +250,23 @@ export default function AgentTasksSubtab({ agentName, session, showToast }) {
   }
 
   if (tasks === null) {
-    return html`<div class="agd-empty">${t('profile.loading')}</div>`;
+    return html`<div class="pf-agd-empty">${t('profile.loading')}</div>`;
   }
 
-  const active = tasks.filter(t => t.status === 'active');
-  const queued = tasks.filter(t => t.status === 'queued' || t.status === 'draft');
-  const completed = tasks.filter(t => t.status === 'done' || t.status === 'failed' || t.status === 'stalled');
+  const filtered = filter === 'all' ? tasks : tasks.filter(task => {
+    switch (filter) {
+      case 'active': return task.status === 'active';
+      case 'queued': return task.status === 'queued' || task.status === 'draft';
+      case 'completed': return task.status === 'done';
+      case 'failed': return task.status === 'failed' || task.status === 'stalled';
+      default: return true;
+    }
+  });
 
   return html`
     <div>
-      <div class="agd-section-header">
-        <span class="agd-section-title">
+      <div class="pf-agd-section-header">
+        <span class="pf-agd-section-title">
           ${t('profile.agents.tasks.title')}${tasks.length > 0 ? ` (${tasks.length})` : ''}
         </span>
         <button class="btn-outline btn-sm" onClick=${() => setShowCreate(!showCreate)}>
@@ -252,25 +278,22 @@ export default function AgentTasksSubtab({ agentName, session, showToast }) {
         <${TaskCreationBuilder} agentName=${agentName} session=${session} showToast=${showToast} onClose=${handleCreated} />
       `}
 
-      ${error && html`<div class="agd-empty">${error}</div>`}
+      ${error && html`<div class="pf-agd-empty">${error}</div>`}
 
-      ${active.length > 0 && html`
-        <div class="agd-section-title agd-task-group-title">${t('profile.agents.tasks.active')}</div>
-        ${active.map(task => html`<${TaskItem} key=${task.id} task=${task} agentName=${agentName} showToast=${showToast} onRefresh=${loadTasks} />`)}
-      `}
+      <div class="pf-agd-filter-bar">
+        ${TASK_FILTERS.map(f => html`
+          <button key=${f}
+                  class="pf-agd-filter-pill ${filter === f ? 'pf-agd-filter-pill--active' : ''}"
+                  onClick=${() => setFilter(f)}>
+            ${t(`profile.agents.detail.tasks.filter.${f}`)}
+          </button>
+        `)}
+      </div>
 
-      ${queued.length > 0 && html`
-        <div class="agd-section-title agd-task-group-title">${t('profile.agents.tasks.queued')}</div>
-        ${queued.map(task => html`<${TaskItem} key=${task.id} task=${task} agentName=${agentName} showToast=${showToast} onRefresh=${loadTasks} />`)}
-      `}
-
-      ${completed.length > 0 && html`
-        <div class="agd-section-title agd-task-group-title">${t('profile.agents.tasks.completed')}</div>
-        ${completed.map(task => html`<${TaskItem} key=${task.id} task=${task} agentName=${agentName} showToast=${showToast} onRefresh=${loadTasks} />`)}
-      `}
-
-      ${tasks.length === 0 && !showCreate && html`
-        <div class="agd-empty">${t('profile.agents.detail.empty.tasks')}</div>
+      ${filtered.length > 0 ? filtered.map(task => html`
+        <${TaskItem} key=${task.id} task=${task} agentName=${agentName} showToast=${showToast} onRefresh=${loadTasks} />
+      `) : html`
+        <div class="pf-agd-empty">${t('profile.agents.detail.empty.tasks')}</div>
       `}
     </div>
   `;

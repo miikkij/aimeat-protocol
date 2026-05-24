@@ -7,6 +7,8 @@
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  *   v1.1.0 -- 2026-05-24 -- Fix 9 UI audit findings: pending icon, readiness score, webhook edit,
  *     strengths/gaps, last validated, roles badge, platform version, bundle update, copy install cmd
+ *   v1.3.0 -- 2026-05-24 -- Audit fix: always show delivery log section, add warn icon for step pills
+ *   v1.2.0 -- 2026-05-24 -- Add delivery status indicator dot, show polling fallback interval
  */
 
 import { h } from 'preact';
@@ -207,7 +209,7 @@ function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, han
         ${steps.map((step, i) => html`
           <div key=${step.id || i} class="pf-agd-step pf-agd-step--${step.status}">
             <span class="pf-agd-step-icon">
-              ${step.status === 'passed' ? '✅' : step.status === 'failed' ? '❌' : '○'}
+              ${step.status === 'passed' ? '✓' : step.status === 'failed' ? '✗' : '○'}
             </span>
             <span class="pf-agd-step-name">${i + 1}. ${step.name || step.id}</span>
             <span class="pf-agd-step-detail">
@@ -267,6 +269,13 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
       <!-- CONNECTION -->
       <div class="pf-agd-section">
         <div class="pf-agd-section-label">${t('profile.agents.detail.connection')}</div>
+        <div class="pf-agd-info-row">
+          <span class="pf-agd-info-label">${t('profile.agents.detail.integration.deliveryMethod')}</span>
+          <span class="pf-agd-info-value">
+            <span class="pf-agd-status-dot ${webhook && (webhook.failCount ?? 0) < 5 ? 'pf-agd-status-dot--active' : webhook && (webhook.failCount ?? 0) >= 5 ? 'pf-agd-status-dot--error' : 'pf-agd-status-dot--inactive'}"></span>
+            ${webhook ? t('profile.agents.detail.deliveryWebhook') : t('profile.agents.detail.deliveryPolling')}
+          </span>
+        </div>
         ${webhook ? html`
           <div class="pf-agd-info-row">
             <span class="pf-agd-info-label">${t('profile.agents.webhook.url')}</span>
@@ -307,7 +316,8 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
           `}
         ` : html`
           <div class="pf-agd-info-row">
-            <span class="pf-agd-info-value">${t('profile.agents.detail.deliveryPolling')}</span>
+            <span class="pf-agd-info-label">${t('profile.agents.detail.integration.pollingInterval')}</span>
+            <span class="pf-agd-info-value">${agent.pollingInterval || agent.polling_interval || '60s'}</span>
           </div>
         `}
         <div class="pf-agd-info-row">
@@ -353,7 +363,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
         <div class="pf-agd-step-pills">
           ${steps.map(s => html`
             <span key=${s.id} class="pf-agd-step-pill pf-agd-step-pill--${s.status}">
-              ${s.status === 'passed' ? '✓' : '○'} ${s.name?.split(' ').slice(0, 2).join(' ') || s.id}
+              ${s.status === 'passed' ? '✓' : s.status === 'failed' ? '✗' : s.status === 'warn' ? '⚠' : '○'} ${s.name?.split(' ').slice(0, 2).join(' ') || s.id}
             </span>
           `)}
         </div>
@@ -414,9 +424,9 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
       </div>
 
       <!-- DELIVERY LOG -->
-      ${displayDeliveries.length > 0 && html`
-        <div class="pf-agd-section">
-          <div class="pf-agd-section-label">${t('profile.agents.detail.deliveryLog')}</div>
+      <div class="pf-agd-section">
+        <div class="pf-agd-section-label">${t('profile.agents.detail.deliveryLog')}</div>
+        ${displayDeliveries.length > 0 ? html`
           <table class="pf-agd-delivery-log">
             <thead>
               <tr>
@@ -442,8 +452,10 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
           <button class="btn-ghost btn-sm pf-agd-delivery-toggle" onClick=${handleShowAll}>
             ${showAllDeliveries ? t('profile.agents.detail.showLess') : t('profile.agents.detail.showAll')}
           </button>
-        </div>
-      `}
+        ` : html`
+          <div class="pf-agd-empty-hint">${t('profile.agents.detail.integration.noDeliveries')}</div>
+        `}
+      </div>
     </div>
   `;
 }

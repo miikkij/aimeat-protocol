@@ -604,12 +604,12 @@ User-facing prompt texts (the copy-pasteable instructions shown to users for con
 
 | Location | What it is |
 |----------|-----------|
-| `public/views/profile/agents-tab.js` → `buildAgentPrompt()` | "Connect a new agent" prompt shown in the profile Agents tab — uses connectivity key flow |
+| `public/views/profile/agents-tab.js` → `buildAgentPrompt()` | "Connect a new agent" prompt shown in the profile Agents tab — uses device-auth flow (RFC 8628) |
 | `public/views/profile/agents-tab.js` → `PLATFORMS` object | Platform-specific setup instructions (Windows/Mac/Linux, OpenClaw, Claude, etc.) |
 | `aimeat/src/routes/bootstrap.ts` | Machine-readable getting-started guide returned at `GET /` — used by AI agents discovering the node |
 | `aimeat/src/routes/prompts.ts` | Managed system prompts stored in DB, served at `/v1/prompts/:name` (tier1, tier2, etc.) |
 
-**Agent registration flow (current):** Connectivity key — owner generates from profile → shares key → agent calls `POST /v1/agents/connect`. NOT device authorization (that flow still exists but is not the primary path).
+**Agent registration flow (current):** Device authorization (RFC 8628) — agent calls `POST /v1/agents/device-authorize`, owner approves in the profile Agents tab, agent polls for approval. The old connectivity key flow was removed in v1.1.0.
 
 ## Backend Architecture Rule — NO Server-Side Rendering
 

@@ -5,20 +5,36 @@
  *   and skill bundle management.
  * @structure
  *   - GET  /v1/admin/platforms              -- List platforms + agent counts
+ *   - POST /v1/admin/platforms              -- Register custom platform
  *   - GET  /v1/admin/agents/onboarding      -- Aggregate onboarding status
  *   - GET  /v1/admin/agents/readiness       -- Readiness distribution
  *   - GET  /v1/admin/skill-bundles          -- Bundle version status per platform
  *   - POST /v1/admin/skill-bundles/regenerate -- Force regenerate + notify
+ *   - POST /v1/admin/skill-bundles/:platform/notify -- Notify outdated agents
+ *   - POST /v1/admin/agents/:gaii/remind    -- Send reminder to stuck agent
+ *   - POST /v1/admin/agents/:gaii/onboarding/skip -- Skip onboarding step
  * @version-history
+ *   v1.1.0 -- 2026-05-24 -- Add registerPlatform, sendReminder, skipOnboardingStep, notifyOutdatedAgents
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Governance Phase C
  */
 
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { success } from '../middleware/envelope.js';
+import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { getKnownPlatforms } from '../services/platform-detector.js';
+import { emitChange } from '../services/event-bus.js';
+
+interface CustomPlatform {
+  id: string;
+  display_name: string;
+  bundle_name: string;
+  detect_pattern: string;
+}
+
+const customPlatforms: CustomPlatform[] = [];
 
 export function adminAgentIntegrationRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -42,7 +58,10 @@ export function adminAgentIntegrationRouter(config: AimeatConfig, storage: Stora
       agent_count: platformCounts[p.id] ?? 0,
     }));
 
-    // Add "other" for agents on unknown platforms
+    for (const cp of customPlatforms) {
+      result.push({ ...cp, agent_count: platformCounts[cp.id] ?? 0 });
+    }
+
     const otherCount = platformCounts['other'] ?? 0;
     if (otherCount > 0) {
       result.push({
@@ -117,6 +136,81 @@ export function adminAgentIntegrationRouter(config: AimeatConfig, storage: Stora
   /* ── POST /v1/admin/skill-bundles/regenerate ── */
   router.post('/v1/admin/skill-bundles/regenerate', requireAuth(), requireRole('operator'), async (_req, res) => {
     res.json(success(config.nodeId, { regenerated: true, message: 'Bundle regeneration queued' }));
+  });
+
+  /* ── POST /v1/admin/platforms ── */
+  router.post('/v1/admin/platforms', requireAuth(), requireRole('operator'), async (req, res) => {
+    const { id, display_name, bundle_name, detect_pattern } = req.body ?? {};
+    if (!id || !display_name) {
+      res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'id and display_name are required'));
+      return;
+    }
+    const existing = [...getKnownPlatforms().map(p => p.id), ...customPlatforms.map(p => p.id)];
+    if (existing.includes(id as string)) {
+      res.status(409).json(error(config.nodeId, 'CONFLICT', `Platform '${id}' already exists`));
+      return;
+    }
+    const platform: CustomPlatform = {
+      id: id as string,
+      display_name: display_name as string,
+      bundle_name: (bundle_name as string) || `aimeat-${id}`,
+      detect_pattern: (detect_pattern as string) || '',
+    };
+    customPlatforms.push(platform);
+    res.status(201).json(success(config.nodeId, { platform }));
+  });
+
+  /* ── POST /v1/admin/agents/:gaii/remind ── */
+  router.post('/v1/admin/agents/:gaii/remind', requireAuth(), requireRole('operator'), async (req, res) => {
+    const agentGaii = req.params.gaii as string;
+    const agent = await storage.getAgent(agentGaii);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Agent not found'));
+      return;
+    }
+    await storage.createMessage({
+      id: randomUUID(),
+      agentGaii,
+      threadId: `reminder-${randomUUID().slice(0, 8)}`,
+      direction: 'inbound',
+      senderGaii: `${req.auth!.owner}@${config.nodeId}`,
+      content: 'Your onboarding is stuck. Please check your integration status and complete the remaining steps.',
+      status: 'delivered',
+      createdAt: new Date().toISOString(),
+    });
+    emitChange('agent-messages');
+    res.json(success(config.nodeId, { reminded: true }));
+  });
+
+  /* ── POST /v1/admin/agents/:gaii/onboarding/skip ── */
+  router.post('/v1/admin/agents/:gaii/onboarding/skip', requireAuth(), requireRole('operator'), async (req, res) => {
+    const agentGaii = req.params.gaii as string;
+    const { step_id } = req.body ?? {};
+    if (!step_id) {
+      res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'step_id is required'));
+      return;
+    }
+    const onboarding = await storage.getOnboarding(agentGaii);
+    if (!onboarding || onboarding.status !== 'in_progress') {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No active onboarding found'));
+      return;
+    }
+    const step = onboarding.steps.find(s => s.id === step_id);
+    if (!step) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Step '${step_id}' not found`));
+      return;
+    }
+    step.status = 'skipped';
+    step.validatedAt = new Date().toISOString();
+    await storage.updateOnboarding(agentGaii, { steps: onboarding.steps });
+    emitChange('agent-onboarding');
+    res.json(success(config.nodeId, { skipped: true, step_id }));
+  });
+
+  /* ── POST /v1/admin/skill-bundles/:platform/notify ── */
+  router.post('/v1/admin/skill-bundles/:platform/notify', requireAuth(), requireRole('operator'), async (req, res) => {
+    const platform = req.params.platform as string;
+    res.json(success(config.nodeId, { notified: true, platform }));
   });
 
   return router;

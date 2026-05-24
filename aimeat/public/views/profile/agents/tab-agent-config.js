@@ -82,15 +82,15 @@ export default function TabAgentConfig({ agentName, session, showToast }) {
       setEditing(false);
       const updated = files.map(f => f.key === selectedFile ? { ...f, content: editContent } : f);
       setFiles(updated);
-      showToast(t('profile.agents.detail.agentConfig.saved'));
+      showToast(t('profile.agents.detail.agent_config.saved'));
     } catch (err) {
-      showToast(err.message || t('profile.agents.detail.agentConfig.saved'), true);
+      showToast(err.message || t('profile.agents.detail.agent_config.saveError'), true);
     }
   }
 
   function handleCopy() {
     navigator.clipboard.writeText(preview).then(() => {
-      showToast(t('profile.agents.detail.agentConfig.copy'));
+      showToast(t('profile.agents.detail.agent_config.copy'));
     });
   }
 
@@ -119,12 +119,12 @@ export default function TabAgentConfig({ agentName, session, showToast }) {
       const key = `agents.${agentName}.config.${file.name}`;
       try {
         await apiPut(`/v1/memory/${encodeURIComponent(key)}`, { value: content });
-        showToast(t('profile.agents.detail.agentConfig.uploaded'));
+        showToast(t('profile.agents.detail.agent_config.uploaded'));
         await loadFiles();
         setSelectedFile(key);
         setPreview(content);
       } catch (err) {
-        showToast(err.message || t('profile.agents.detail.agentConfig.uploaded'), true);
+        showToast(err.message || t('profile.agents.detail.agent_config.uploadError'), true);
       }
     };
     reader.readAsText(file);
@@ -139,10 +139,10 @@ export default function TabAgentConfig({ agentName, session, showToast }) {
     return html`
       <div>
         <div class="pf-agd-config-upload">
-          <button class="btn-outline btn-sm" onClick=${handleUploadClick}>+ ${t('profile.agents.detail.agentConfig.upload')}</button>
+          <button class="btn-outline btn-sm" onClick=${handleUploadClick}>+ ${t('profile.agents.detail.agent_config.upload')}</button>
           <input ref=${fileInputRef} type="file" accept=".md,.yaml,.yml,.json" class="pf-agd-hidden-input" onChange=${handleFileUpload} />
         </div>
-        <div class="pf-agd-empty">${t('profile.agents.detail.empty.agentConfig')}</div>
+        <div class="pf-agd-empty">${t('profile.agents.detail.empty.agent_config')}</div>
       </div>
     `;
   }
@@ -150,7 +150,7 @@ export default function TabAgentConfig({ agentName, session, showToast }) {
   return html`
     <div>
       <div class="pf-agd-config-upload">
-        <button class="btn-outline btn-sm" onClick=${handleUploadClick}>+ ${t('profile.agents.detail.agentConfig.upload')}</button>
+        <button class="btn-outline btn-sm" onClick=${handleUploadClick}>+ ${t('profile.agents.detail.agent_config.upload')}</button>
         <input ref=${fileInputRef} type="file" accept=".md,.yaml,.yml,.json" class="pf-agd-hidden-input" onChange=${handleFileUpload} />
       </div>
 
@@ -171,12 +171,12 @@ export default function TabAgentConfig({ agentName, session, showToast }) {
       ${selectedFile && html`
         <div>
           <div class="pf-agd-config-preview-header">
-            <span>${t('profile.agents.detail.agentConfig.viewing')}: ${files.find(f => f.key === selectedFile)?.filename || ''}</span>
+            <span>${t('profile.agents.detail.agent_config.viewing')}: ${files.find(f => f.key === selectedFile)?.filename || ''}</span>
             <div class="pf-agd-config-actions">
               ${!editing && html`
-                <button class="btn-outline btn-sm" onClick=${handleEdit}>${t('profile.agents.detail.agentConfig.edit')}</button>
-                <button class="btn-outline btn-sm" onClick=${handleCopy}>${t('profile.agents.detail.agentConfig.copy')}</button>
-                <button class="btn-outline btn-sm" onClick=${handleDownload}>${t('profile.agents.detail.agentConfig.download')}</button>
+                <button class="btn-outline btn-sm" onClick=${handleEdit}>${t('profile.agents.detail.agent_config.edit')}</button>
+                <button class="btn-outline btn-sm" onClick=${handleCopy}>${t('profile.agents.detail.agent_config.copy')}</button>
+                <button class="btn-outline btn-sm" onClick=${handleDownload}>${t('profile.agents.detail.agent_config.download')}</button>
               `}
             </div>
           </div>
@@ -184,8 +184,8 @@ export default function TabAgentConfig({ agentName, session, showToast }) {
             <div class="pf-agd-config-edit">
               <textarea class="pf-agd-config-textarea" value=${editContent} onInput=${(e) => setEditContent(e.target.value)}></textarea>
               <div class="pf-agd-form-actions">
-                <button class="btn-primary btn-sm" onClick=${handleSave}>${t('profile.agents.detail.agentConfig.save')}</button>
-                <button class="btn-outline btn-sm" onClick=${handleCancelEdit}>${t('profile.agents.detail.agentConfig.cancel')}</button>
+                <button class="btn-primary btn-sm" onClick=${handleSave}>${t('profile.agents.detail.agent_config.save')}</button>
+                <button class="btn-outline btn-sm" onClick=${handleCancelEdit}>${t('profile.agents.detail.agent_config.cancel')}</button>
               </div>
             </div>
           ` : html`

@@ -3,6 +3,8 @@
  * @description Enhanced Activity tab with governance filter and category badges.
  *   Wraps the existing activity subtab with additional filter pills.
  * @version-history
+ *   v1.4.0 -- 2026-05-24 -- Audit fix: two-line event layout with secondary detail row
+ *   v1.3.0 -- 2026-05-24 -- Wire up MCP status in delivery health from agent data
  *   v1.2.0 -- 2026-05-24 -- Fix: F17 task breakdown, F18 violation red badge, M5 governance i18n namespace
  *   v1.1.0 -- 2026-05-24 -- Fix: HH:MM timestamps, token budget %, readiness/override categories, audit trail footer, fix locale prefix
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
@@ -35,7 +37,7 @@ function eventCategory(event) {
   return 'system';
 }
 
-export default function TabActivity({ agentName, session, showToast }) {
+export default function TabActivity({ agent, agentName, session, showToast }) {
   const [events, setEvents] = useState([]);
   const [stats, setStats] = useState(null);
   const [governance, setGovernance] = useState(null);
@@ -83,7 +85,7 @@ export default function TabActivity({ agentName, session, showToast }) {
         webhookEnabled: wh?.enabled ?? false,
         webhookSuccessCount: wh?.success_count ?? 0,
         webhookTotalCount: (wh?.success_count ?? 0) + (wh?.fail_count ?? 0),
-        mcpActive: false,
+        mcpActive: agent?.mcpEnabled || agent?.mcp_enabled || false,
       });
     } catch {
       setStats(null);
@@ -170,6 +172,11 @@ export default function TabActivity({ agentName, session, showToast }) {
           <div class="pf-agd-governance-delivery">
             <span class="pf-agd-governance-label">${t('profile.agents.detail.activity.governance.deliveryHealth')}</span>
             <span class="pf-agd-governance-value">
+              ${governance.mcpActive
+                ? html`<span class="pf-agd-status-dot pf-agd-status-dot--active"></span> ${t('profile.agents.detail.activity.governance.mcpLabel')}: ${t('profile.agents.detail.activity.governance.connected')}`
+                : html`<span class="pf-agd-status-dot pf-agd-status-dot--inactive"></span> ${t('profile.agents.detail.activity.governance.mcpLabel')}: ${t('profile.agents.detail.activity.governance.notConfigured')}`
+              }
+              ${' | '}
               ${governance.webhookEnabled
                 ? `${t('profile.agents.webhook.title')}: ${governance.webhookSuccessCount}/${governance.webhookTotalCount}`
                 : t('profile.agents.detail.integration.webhookNotConfigured')
@@ -205,11 +212,13 @@ export default function TabActivity({ agentName, session, showToast }) {
             ? 'pf-agd-event-badge--violation'
             : `pf-agd-event-badge--${cat}`;
           return html`
-            <div key=${ev.id || i} class="pf-agd-log-entry">
-              <span class="pf-agd-log-time">${ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</span>
-              <span class="pf-agd-event-badge ${badgeClass}">${t(FILTERS.find(f => f.id === cat)?.key || '') || cat}</span>
-              <span class="pf-agd-log-type">${ev.type || ev.event || '-'}</span>
-              <span class="pf-agd-log-msg">${ev.message || ''}</span>
+            <div key=${ev.id || i} class="pf-agd-log-entry pf-agd-log-entry--two-line">
+              <div class="pf-agd-log-entry-primary">
+                <span class="pf-agd-log-time">${ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</span>
+                <span class="pf-agd-event-badge ${badgeClass}">${t(FILTERS.find(f => f.id === cat)?.key || '') || cat}</span>
+                <span class="pf-agd-log-type">${ev.type || ev.event || '-'}</span>
+              </div>
+              ${ev.message && html`<div class="pf-agd-log-entry-detail">${ev.message}</div>`}
             </div>
           `;
         })}

@@ -330,7 +330,12 @@ export default function AgentsTab({ session, showToast, onStats }) {
   if (!agents) return html`<${Spinner} text=${t('profile.agents.loadingAgents')} />`;
 
   return html`
-    <div class="section-title">${t('profile.agents.title')}${agents.length > 0 ? html` <span class="pf-agd-count-badge">(${agents.length})</span>` : ''}</div>
+    <div class="pf-agd-header-row">
+      <div class="section-title">${t('profile.agents.title')}${agents.length > 0 ? html` <span class="pf-agd-count-badge">(${agents.length})</span>` : ''}</div>
+      <button class="${connectExpanded ? 'btn-outline' : 'btn-primary'} btn-sm" onClick=${() => setConnectExpanded(!connectExpanded)}>
+        ${connectExpanded ? t('profile.agents.detail.zone2.cancel') : `+ ${t('profile.agents.connect')}`}
+      </button>
+    </div>
     <div class="section-desc">${t('profile.agents.desc')}</div>
 
     ${pendingRequests.length > 0 && html`
@@ -386,52 +391,47 @@ export default function AgentsTab({ session, showToast, onStats }) {
       </div>
     `}
 
-    <div class="agent-cta">
-      <button class="${connectExpanded ? 'btn-outline' : 'btn-primary'}" onClick=${() => setConnectExpanded(!connectExpanded)}>
-        ${connectExpanded ? t('profile.agents.detail.zone2.cancel') : `+ ${t('profile.agents.connect')}`}
-      </button>
-      ${connectExpanded && html`
-        <div class="pf-agd-connect-content">
-          <p>${t('profile.agents.connectDesc')}</p>
-          <div class="agent-prompt-box">${buildAgentPrompt(session)}</div>
-          <button class="copy-prompt-btn" onClick=${() => {
-            copyToClipboard(buildAgentPrompt(session)).then(() => {
-              setPromptCopied(true);
-              setTimeout(() => setPromptCopied(false), 2000);
-            });
-          }}>${promptCopied ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.copyPrompt')}</button>
-          ${agents.length > 0 && html`
-            <div class="flex-row mt-half pf-tier1-buttons">
-              <button class="btn-outline" onClick=${downloadTier1}>
-                ${t('profile.agents.downloadInstructions')}
-              </button>
-              <button class="btn-outline" onClick=${copyTier1}>
-                ${tier1Copied ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.copyFullInstructions')}
-              </button>
+    ${connectExpanded && html`
+      <div class="pf-agd-connect-content">
+        <p>${t('profile.agents.connectDesc')}</p>
+        <div class="agent-prompt-box">${buildAgentPrompt(session)}</div>
+        <button class="copy-prompt-btn" onClick=${() => {
+          copyToClipboard(buildAgentPrompt(session)).then(() => {
+            setPromptCopied(true);
+            setTimeout(() => setPromptCopied(false), 2000);
+          });
+        }}>${promptCopied ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.copyPrompt')}</button>
+        ${agents.length > 0 && html`
+          <div class="flex-row mt-half pf-tier1-buttons">
+            <button class="btn-outline" onClick=${downloadTier1}>
+              ${t('profile.agents.downloadInstructions')}
+            </button>
+            <button class="btn-outline" onClick=${copyTier1}>
+              ${tier1Copied ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.copyFullInstructions')}
+            </button>
+          </div>
+        `}
+
+        <div class="pf-agent-divider">
+          <p class="mb-half">${t('profile.agents.noAgent')}</p>
+          <button class="expand-btn" onClick=${() => setPlatExpand(!platExpand)}>
+            <span>${t('profile.agents.seeHow')}</span>
+            <span class="pf-chevron ${platExpand ? 'pf-chevron-open' : ''}">\u25BC</span>
+          </button>
+          ${platExpand && html`
+            <div class="platform-instructions expanded">
+              <div class="platform-tabs">
+                ${PLATFORM_KEYS.map(k => html`
+                  <button class="platform-tab ${k === activePlat ? 'active' : ''}" onClick=${() => setActivePlat(k)}>${t(PLATFORM_LABELS[k])}</button>
+                `)}
+              </div>
+              ${/* SAFE: PLATFORMS is hardcoded developer constant, not user input */''}
+              <div class="platform-content" dangerouslySetInnerHTML=${{ __html: PLATFORMS[activePlat] }}></div>
             </div>
           `}
-
-          <div class="pf-agent-divider">
-            <p class="mb-half">${t('profile.agents.noAgent')}</p>
-            <button class="expand-btn" onClick=${() => setPlatExpand(!platExpand)}>
-              <span>${t('profile.agents.seeHow')}</span>
-              <span class="pf-chevron ${platExpand ? 'pf-chevron-open' : ''}">\u25BC</span>
-            </button>
-            ${platExpand && html`
-              <div class="platform-instructions expanded">
-                <div class="platform-tabs">
-                  ${PLATFORM_KEYS.map(k => html`
-                    <button class="platform-tab ${k === activePlat ? 'active' : ''}" onClick=${() => setActivePlat(k)}>${t(PLATFORM_LABELS[k])}</button>
-                  `)}
-                </div>
-                ${/* SAFE: PLATFORMS is hardcoded developer constant, not user input */''}
-                <div class="platform-content" dangerouslySetInnerHTML=${{ __html: PLATFORMS[activePlat] }}></div>
-              </div>
-            `}
-          </div>
         </div>
-      `}
-    </div>
+      </div>
+    `}
 
     ${agents.length === 0
       ? html`<div class="empty">${t('profile.agents.empty')}</div>`
