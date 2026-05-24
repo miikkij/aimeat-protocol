@@ -55,6 +55,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
         <div class="pf-agd-collapsed ${state === 'problem' ? 'pf-agd-collapsed--problem' : ''}"
              onClick=${() => onToggle(agent.name)}>
           <span class="pf-agd-expand-icon">▶</span>
+          <span class="pf-agd-collapsed-icon">🤖</span>
           <span class="pf-agd-collapsed-name">${agent.display_name || agent.name}</span>
           <div class="pf-agd-collapsed-badges">
             ${renderPlatformBadge(onboarding)}
@@ -62,6 +63,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
             ${agent.federate && html`<span class="pf-agd-badge pf-agd-badge--federation">${t('profile.federated')}</span>`}
           </div>
           <span class="pf-agd-collapsed-stats">
+            ${renderDeliveryIndicator(agent)}
             ${renderCollapsedStats(state, agent, onboarding)}
           </span>
         </div>
@@ -75,7 +77,10 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
         <!-- Zone 1: Identity -->
         <div class="pf-agd-zone1" onClick=${handleCollapse}>
           <span class="pf-agd-expand-icon pf-agd-expand-icon--open">▶</span>
-          <span class="pf-agd-zone1-name">${agent.display_name || agent.name}</span>
+          <div class="pf-agd-zone1-identity">
+            <span class="pf-agd-zone1-name">${agent.display_name || agent.name}</span>
+            ${agent.gaii && html`<span class="pf-agd-zone1-gaii">${agent.gaii}</span>`}
+          </div>
           <div class="pf-agd-zone1-badges">
             ${renderPlatformBadge(onboarding)}
             ${renderReadinessBadge(state, onboarding)}
@@ -131,6 +136,16 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
       </div>
     </div>
   `;
+}
+
+function renderDeliveryIndicator(agent) {
+  const hasWebhook = agent.webhookUrl || agent.webhook_url;
+  if (hasWebhook) {
+    const failCount = agent.webhookFailCount ?? 0;
+    const icon = failCount >= 5 ? '⚠' : '✓';
+    return html`<span class="pf-agd-delivery-indicator">${t('agents.detail.deliveryWebhook')}: ${icon} </span>`;
+  }
+  return html`<span class="pf-agd-delivery-indicator">${t('agents.detail.deliveryPolling')} </span>`;
 }
 
 function renderPlatformBadge(onboarding) {

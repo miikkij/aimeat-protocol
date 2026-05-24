@@ -389,6 +389,10 @@
         "lastEvent": "Last Event",
         "delete": "Delete",
         "deleteConfirm": "Delete this task?",
+        "taskStarted": "Task started",
+        "taskDeleted": "Task deleted",
+        "startError": "Failed to start task",
+        "deleteError": "Failed to delete task",
         "builder": {
           "title": "New Task",
           "placeholder": "What should the agent do? Describe in plain language or technical detail.",
@@ -462,7 +466,13 @@
         "empty": "No services published",
         "info": "Other agents can call these services via the work exchange",
         "calls": "calls",
-        "unpublish": "Unpublish"
+        "unpublish": "Unpublish",
+        "unnamed": "Unnamed",
+        "free": "Free",
+        "morsels": "morsels",
+        "avg": "avg",
+        "unpublishError": "Failed to unpublish",
+        "loadError": "Failed to load services"
       },
       "messages": {
         "title": "Messages",
@@ -567,6 +577,7 @@
           "rerun": "Re-run Hello Integration",
           "rerunStarted": "Hello Integration re-started",
           "startOnboarding": "Start Hello Integration",
+          "startError": "Failed to start onboarding",
           "time": "Time",
           "event": "Event",
           "channel": "Channel",
@@ -576,11 +587,13 @@
           "title": "Agent Commands",
           "available": "available",
           "noCommands": "No commands registered",
-          "send": "Send"
+          "send": "Send",
+          "defaultCategory": "General"
         },
         "messages": {
           "placeholder": "Type / for commands or a message...",
-          "hint": "Type / to see available commands"
+          "hint": "Type / to see available commands",
+          "sendError": "Failed to send message"
         },
         "dataAccess": {
           "sharedTagsTitle": "Shared Tags",
@@ -588,6 +601,8 @@
           "tagPlaceholder": "Tag name",
           "tagAdded": "Tag added",
           "tagRemoved": "Tag removed",
+          "addTagError": "Failed to add tag",
+          "removeTagError": "Failed to remove tag",
           "with": "with",
           "onlyYou": "only you",
           "noTags": "No tags assigned",

@@ -17,9 +17,9 @@ import { t } from '/js/i18n.js';
 import { getAgentServices } from '/js/services/agent-services.js';
 
 function ServiceCard({ service, onUnpublish }) {
-  const name = service.display_name || service.name || service.action_id || 'Unnamed';
+  const name = service.display_name || service.name || service.action_id || t('profile.agents.services.unnamed');
   const desc = service.description || '';
-  const cost = service.cost != null ? `${service.cost} morsels` : 'Free';
+  const cost = service.cost != null ? `${service.cost} ${t('profile.agents.services.morsels')}` : t('profile.agents.services.free');
   const visibility = service.visibility || 'public';
   const calls = service.invocation_count || service.call_count || 0;
   const successRate = service.success_rate != null ? `${Math.round(service.success_rate)}%` : null;
@@ -34,7 +34,7 @@ function ServiceCard({ service, onUnpublish }) {
         <span>${visibility}</span>
         <span>${calls} ${t('profile.agents.services.calls')}</span>
         ${successRate && html`<span>${successRate} ${t('profile.agents.activity.successRate')}</span>`}
-        ${avgResponse && html`<span>${avgResponse} avg</span>`}
+        ${avgResponse && html`<span>${avgResponse} ${t('profile.agents.services.avg')}</span>`}
       </div>
       <div class="agd-service-actions">
         <button class="btn-ghost btn-sm" onClick=${() => onUnpublish(service)}>
@@ -55,7 +55,7 @@ export default function AgentServicesSubtab({ agentName, session, showToast }) {
       const res = await getAgentServices(agentName);
       setServices(res.actions || []);
     } catch (err) {
-      showToast(err.message || 'Failed to load services', true);
+      showToast(err.message || t('profile.agents.services.loadError'), true);
     }
     setLoading(false);
   }
@@ -72,10 +72,10 @@ export default function AgentServicesSubtab({ agentName, session, showToast }) {
         loadServices();
       } else {
         const body = await resp.json().catch(() => ({}));
-        showToast(body.error?.message || 'Failed to unpublish', true);
+        showToast(body.error?.message || t('profile.agents.services.unpublishError'), true);
       }
     } catch (err) {
-      showToast(err.message || 'Failed to unpublish', true);
+      showToast(err.message || t('profile.agents.services.unpublishError'), true);
     }
   }
 

@@ -82,7 +82,7 @@ export default function TabIntegration({ agent, onboarding, session, showToast, 
       showToast(t('agents.detail.integration.rerunStarted'));
       loadData();
     } catch (err) {
-      showToast(err.message || 'Failed to start onboarding', true);
+      showToast(err.message || t('agents.detail.integration.startError'), true);
     }
     setRerunning(false);
   }
@@ -122,7 +122,7 @@ function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, han
         <div class="pf-agd-progress-bar">
           <div class="pf-agd-progress-fill" style="width: ${pct}%"></div>
         </div>
-        <div class="agd-section-header" style="margin-top: 0.25rem">
+        <div class="agd-section-header pf-agd-progress-header">
           <span>${t('agents.detail.integration.progress')}: ${passed}/${total}</span>
           <span>${pct}%</span>
         </div>

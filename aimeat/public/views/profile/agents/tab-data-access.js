@@ -59,7 +59,7 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
       setAddingTag(false);
       showToast(t('agents.detail.dataAccess.tagAdded'));
     } catch (err) {
-      showToast(err.message || 'Failed to add tag', true);
+      showToast(err.message || t('agents.detail.dataAccess.addTagError'), true);
     }
   }
 
@@ -70,7 +70,7 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
       setTags(updated);
       showToast(t('agents.detail.dataAccess.tagRemoved'));
     } catch (err) {
-      showToast(err.message || 'Failed to remove tag', true);
+      showToast(err.message || t('agents.detail.dataAccess.removeTagError'), true);
     }
   }
 
@@ -107,7 +107,7 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
           <button class="btn-outline btn-sm" onClick=${() => setAddingTag(!addingTag)}>+ ${t('agents.detail.dataAccess.addTag')}</button>
         </div>
         ${addingTag && html`
-          <div class="agd-form-field" style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.5rem">
+          <div class="agd-form-field pf-agd-tag-input-row">
             <input type="text" value=${newTag} onInput=${(e) => setNewTag(e.target.value)}
                    placeholder=${t('agents.detail.dataAccess.tagPlaceholder')}
                    onKeyDown=${(e) => e.key === 'Enter' && handleAddTag()} />

@@ -38,7 +38,7 @@ function CommandPalette({ commands, onSend }) {
   const categories = useMemo(() => {
     const cats = {};
     for (const cmd of commands) {
-      const cat = cmd.category || 'General';
+      const cat = cmd.category || t('agents.detail.commands.defaultCategory');
       if (!cats[cat]) cats[cat] = [];
       cats[cat].push(cmd);
     }
@@ -144,7 +144,7 @@ export default function TabMessages({ agentName, session, showToast }) {
       setShowAutocomplete(false);
       await loadMessages();
     } catch (err) {
-      showToast(err.message || 'Failed to send message', true);
+      showToast(err.message || t('agents.detail.messages.sendError'), true);
     }
     setSending(false);
   }
@@ -217,7 +217,7 @@ export default function TabMessages({ agentName, session, showToast }) {
       `}
 
       <div class="agd-msg-input">
-        <div class="pf-agd-input-wrap" style="flex:1; position:relative">
+        <div class="pf-agd-input-wrap">
           ${showAutocomplete && filteredCommands.length > 0 && html`
             <div class="pf-agd-autocomplete">
               ${filteredCommands.map(cmd => html`

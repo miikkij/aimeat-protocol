@@ -66,10 +66,10 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
     setStarting(true);
     try {
       await startTask(agentName, task.id);
-      showToast('Task started');
+      showToast(t('profile.agents.tasks.taskStarted'));
       onRefresh();
     } catch (err) {
-      showToast(err.message || 'Failed to start task', true);
+      showToast(err.message || t('profile.agents.tasks.startError'), true);
     }
     setStarting(false);
   }
@@ -78,10 +78,10 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
     e.stopPropagation();
     try {
       await deleteTask(agentName, task.id);
-      showToast('Task deleted');
+      showToast(t('profile.agents.tasks.taskDeleted'));
       onRefresh();
     } catch (err) {
-      showToast(err.message || 'Failed to delete task', true);
+      showToast(err.message || t('profile.agents.tasks.deleteError'), true);
     }
   }
 
@@ -105,7 +105,7 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
   return html`
     <div>
       <div class="agd-task-item" onClick=${handleExpand}>
-        <div style="flex:1;display:flex;align-items:center;gap:0.5rem">
+        <div class="agd-task-title-row">
           <span class="agd-task-title">${task.title || task.id}</span>
           ${progress && html`<span class="agd-todo-progress">${progress}</span>`}
         </div>
@@ -254,22 +254,22 @@ export default function AgentTasksSubtab({ agentName, session, showToast }) {
       ${error && html`<div class="agd-empty">${error}</div>`}
 
       ${active.length > 0 && html`
-        <div class="agd-section-title" style="margin-top:0.5rem;margin-bottom:0.25rem">ACTIVE</div>
+        <div class="agd-section-title agd-task-group-title">${t('profile.agents.tasks.active')}</div>
         ${active.map(task => html`<${TaskItem} key=${task.id} task=${task} agentName=${agentName} showToast=${showToast} onRefresh=${loadTasks} />`)}
       `}
 
       ${queued.length > 0 && html`
-        <div class="agd-section-title" style="margin-top:0.5rem;margin-bottom:0.25rem">QUEUED</div>
+        <div class="agd-section-title agd-task-group-title">${t('profile.agents.tasks.queued')}</div>
         ${queued.map(task => html`<${TaskItem} key=${task.id} task=${task} agentName=${agentName} showToast=${showToast} onRefresh=${loadTasks} />`)}
       `}
 
       ${completed.length > 0 && html`
-        <div class="agd-section-title" style="margin-top:0.5rem;margin-bottom:0.25rem">COMPLETED</div>
+        <div class="agd-section-title agd-task-group-title">${t('profile.agents.tasks.completed')}</div>
         ${completed.map(task => html`<${TaskItem} key=${task.id} task=${task} agentName=${agentName} showToast=${showToast} onRefresh=${loadTasks} />`)}
       `}
 
       ${tasks.length === 0 && !showCreate && html`
-        <div class="agd-empty">No tasks yet. Create one to get started.</div>
+        <div class="agd-empty">${t('profile.agents.tasks.empty')}</div>
       `}
     </div>
   `;

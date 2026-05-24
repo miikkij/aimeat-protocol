@@ -389,6 +389,10 @@
         "lastEvent": "Viimeisin tapahtuma",
         "delete": "Poista",
         "deleteConfirm": "Poista tämä tehtävä?",
+        "taskStarted": "Tehtävä aloitettu",
+        "taskDeleted": "Tehtävä poistettu",
+        "startError": "Tehtävän aloitus epäonnistui",
+        "deleteError": "Tehtävän poisto epäonnistui",
         "builder": {
           "title": "Uusi tehtävä",
           "placeholder": "Mitä agentin pitäisi tehdä? Kuvaile selkokielellä tai teknisesti.",
@@ -462,7 +466,13 @@
         "empty": "Ei julkaistuja palveluita",
         "info": "Muut agentit voivat kutsua naita palveluita tyonvaihdon kautta",
         "calls": "kutsut",
-        "unpublish": "Poista julkaisu"
+        "unpublish": "Poista julkaisu",
+        "unnamed": "Nimetön",
+        "free": "Ilmainen",
+        "morsels": "morselia",
+        "avg": "ka.",
+        "unpublishError": "Julkaisun poisto epäonnistui",
+        "loadError": "Palveluiden lataus epäonnistui"
       },
       "messages": {
         "title": "Viestit",
@@ -567,6 +577,7 @@
           "rerun": "Suorita Hello-integraatio uudelleen",
           "rerunStarted": "Hello-integraatio aloitettu uudelleen",
           "startOnboarding": "Aloita Hello-integraatio",
+          "startError": "Perehdytyksen aloitus epäonnistui",
           "time": "Aika",
           "event": "Tapahtuma",
           "channel": "Kanava",
@@ -576,11 +587,13 @@
           "title": "Agentin komennot",
           "available": "saatavilla",
           "noCommands": "Ei rekisteröityjä komentoja",
-          "send": "Lähetä"
+          "send": "Lähetä",
+          "defaultCategory": "Yleinen"
         },
         "messages": {
           "placeholder": "Kirjoita / komennoille tai viesti...",
-          "hint": "Kirjoita / nähdäksesi saatavilla olevat komennot"
+          "hint": "Kirjoita / nähdäksesi saatavilla olevat komennot",
+          "sendError": "Viestin lähetys epäonnistui"
         },
         "dataAccess": {
           "sharedTagsTitle": "Jaetut tunnisteet",
@@ -588,6 +601,8 @@
           "tagPlaceholder": "Tunnisteen nimi",
           "tagAdded": "Tunniste lisätty",
           "tagRemoved": "Tunniste poistettu",
+          "addTagError": "Tunnisteen lisäys epäonnistui",
+          "removeTagError": "Tunnisteen poisto epäonnistui",
           "with": "jaettu",
           "onlyYou": "vain sinä",
           "noTags": "Ei tunnisteita",

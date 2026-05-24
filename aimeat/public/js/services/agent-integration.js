@@ -16,6 +16,10 @@ export async function startOnboarding(agentName) {
   return apiPost(`/v1/agents/${encodeURIComponent(agentName)}/onboarding/start`);
 }
 
+export async function confirmOnboardingStep(agentName, stepId, payload) {
+  return apiPost(`/v1/agents/${encodeURIComponent(agentName)}/onboarding/step/${encodeURIComponent(stepId)}`, payload);
+}
+
 export async function cancelOnboarding(agentName) {
   return apiDelete(`/v1/agents/${encodeURIComponent(agentName)}/onboarding`);
 }
