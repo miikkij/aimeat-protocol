@@ -135,6 +135,51 @@
   color: var(--text-dim);
 }
 
+/* ── Stat value color variants ── */
+.adm-agi-stat-value--success { color: var(--success); }
+.adm-agi-stat-value--accent { color: var(--accent); }
+.adm-agi-stat-value--warning { color: var(--warning); }
+
+/* ── Mono cell (platform ID, adapter) ── */
+.adm-agi-mono-sm {
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+}
+
+/* ── Section footer (totals line) ── */
+.adm-agi-footer {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+/* ── Stuck agent detail text ── */
+.adm-agi-stuck-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.adm-agi-stuck-detail {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+/* ── Outdated highlight ── */
+.adm-agi-outdated {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.adm-agi-zero {
+  color: var(--text-dim);
+}
+
+/* ── Empty state text ── */
+.adm-agi-empty-text {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
 /* ── Regenerate button ── */
 .adm-agi-regen-btn {
   margin-top: 12px;

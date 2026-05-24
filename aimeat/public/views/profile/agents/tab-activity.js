@@ -163,7 +163,7 @@ export default function TabActivity({ agentName, session, showToast }) {
             <span class="agd-governance-label">${t('governance.deliveryHealth')}</span>
             <span class="agd-governance-value">
               ${governance.webhookEnabled
-                ? `Webhook: ${governance.webhookSuccessCount}/${governance.webhookTotalCount}`
+                ? `${t('profile.agents.webhook.title')}: ${governance.webhookSuccessCount}/${governance.webhookTotalCount}`
                 : t('agents.detail.integration.webhookNotConfigured')
               }
             </span>

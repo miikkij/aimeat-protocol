@@ -88,23 +88,25 @@ function renderPlatformRegistry(platforms, totalAgents) {
         : html`
           <table class="adm-agi-table">
             <thead><tr>
-              <th>ID</th>
+              <th>${t('common.id')}</th>
               <th>${t('common.name')}</th>
               <th>${t('admin.agentIntegration.agentCount')}</th>
               <th>${t('admin.agentIntegration.adapter')}</th>
+              <th>${t('admin.agentIntegration.detectPattern')}</th>
             </tr></thead>
             <tbody>
               ${platforms.map(p => html`
                 <tr>
-                  <td class="mono" style="font-size:.75rem">${p.id}</td>
+                  <td class="adm-agi-mono-sm">${p.id}</td>
                   <td>${p.display_name}</td>
                   <td>${num(p.agent_count)}</td>
-                  <td style="font-size:.75rem;font-family:var(--font-mono)">${p.bundle_name}</td>
+                  <td class="adm-agi-mono-sm">${p.bundle_name}</td>
+                  <td class="adm-agi-mono-sm">${p.detect_pattern || '--'}</td>
                 </tr>
               `)}
             </tbody>
           </table>
-          <div style="margin-top:8px;font-size:.75rem;color:var(--text-dim)">
+          <div class="adm-agi-footer">
             ${t('admin.agentIntegration.totalAgents')}: ${num(totalAgents)}
           </div>
         `
@@ -123,15 +125,15 @@ function renderOnboardingOverview(onboarding) {
       <div class="adm-agi-section-title">${t('admin.agentIntegration.onboardingOverview')}</div>
       <div class="adm-agi-stats">
         <div class="adm-agi-stat-card">
-          <div class="adm-agi-stat-value" style="color:var(--success)">${num(onboarding.completed)}</div>
+          <div class="adm-agi-stat-value adm-agi-stat-value--success">${num(onboarding.completed)}</div>
           <div class="adm-agi-stat-label">${t('admin.agentIntegration.completed')}</div>
         </div>
         <div class="adm-agi-stat-card">
-          <div class="adm-agi-stat-value" style="color:var(--accent)">${num(onboarding.in_progress)}</div>
+          <div class="adm-agi-stat-value adm-agi-stat-value--accent">${num(onboarding.in_progress)}</div>
           <div class="adm-agi-stat-label">${t('admin.agentIntegration.inProgress')}</div>
         </div>
         <div class="adm-agi-stat-card">
-          <div class="adm-agi-stat-value" style="color:var(--warning)">${num(stuck.length)}</div>
+          <div class="adm-agi-stat-value adm-agi-stat-value--warning">${num(stuck.length)}</div>
           <div class="adm-agi-stat-label">${t('admin.agentIntegration.stuck')}</div>
         </div>
       </div>
@@ -140,10 +142,10 @@ function renderOnboardingOverview(onboarding) {
           ${stuck.map(s => html`
             <div class="adm-agi-stuck-agent">
               <div>
-                <strong style="font-size:.8rem">${s.agent_gaii}</strong>
-                <div style="font-size:.72rem;color:var(--text-dim)">${s.current_step}</div>
+                <span class="adm-agi-stuck-name">${s.agent_gaii}</span>
+                <div class="adm-agi-stuck-detail">${s.current_step}</div>
               </div>
-              <div style="font-size:.72rem;color:var(--text-dim)">
+              <div class="adm-agi-stuck-detail">
                 ${t('admin.agentIntegration.stuckSince')}: ${dt(s.stuck_since)}
               </div>
             </div>
@@ -163,7 +165,7 @@ function renderReadinessDistribution(readiness, total) {
     <div class="adm-agi-section">
       <div class="adm-agi-section-title">${t('admin.agentIntegration.readinessDistribution')}</div>
       ${total === 0
-        ? html`<div style="font-size:.8rem;color:var(--text-dim)">${t('common.noData')}</div>`
+        ? html`<div class="adm-agi-empty-text">${t('common.noData')}</div>`
         : html`
           ${levels.map(level => {
             const count = dist[level] || 0;
@@ -178,7 +180,7 @@ function renderReadinessDistribution(readiness, total) {
               </div>
             `;
           })}
-          <div style="margin-top:8px;font-size:.75rem;color:var(--text-dim)">
+          <div class="adm-agi-footer">
             ${t('admin.agentIntegration.totalAgents')}: ${num(total)}
           </div>
         `
@@ -195,7 +197,7 @@ function renderSkillBundles(bundles, onRegenerate, regenerating) {
     <div class="adm-agi-section">
       <div class="adm-agi-section-title">${t('admin.agentIntegration.skillBundles')}</div>
       ${entries.length === 0
-        ? html`<div style="font-size:.8rem;color:var(--text-dim)">${t('common.noData')}</div>`
+        ? html`<div class="adm-agi-empty-text">${t('common.noData')}</div>`
         : html`
           <table class="adm-agi-table">
             <thead><tr>
@@ -209,8 +211,8 @@ function renderSkillBundles(bundles, onRegenerate, regenerating) {
                   <td>${platform}</td>
                   <td>${num(info.agents)}</td>
                   <td>${info.outdated > 0
-                    ? html`<span style="color:var(--warning);font-weight:600">${num(info.outdated)}</span>`
-                    : html`<span style="color:var(--text-dim)">0</span>`
+                    ? html`<span class="adm-agi-outdated">${num(info.outdated)}</span>`
+                    : html`<span class="adm-agi-zero">0</span>`
                   }</td>
                 </tr>
               `)}

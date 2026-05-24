@@ -6,7 +6,12 @@
     "somethingWentWrong": "Something went wrong",
     "retry": "Retry",
     "save": "Save",
-    "close": "Close"
+    "close": "Close",
+    "loading": "Loading...",
+    "search": "Search...",
+    "noData": "No data available",
+    "id": "ID",
+    "name": "Name"
   },
   "nav": {
     "try": "Try it",

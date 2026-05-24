@@ -278,7 +278,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
       </div>
 
       <!-- DELIVERY LOG -->
-      ${deliveries.length > 0 && html`
+      ${displayDeliveries.length > 0 && html`
         <div class="pf-agd-section">
           <div class="pf-agd-section-label">${t('agents.detail.deliveryLog')}</div>
           <table class="pf-agd-delivery-log">

@@ -6,7 +6,12 @@
     "somethingWentWrong": "Jokin meni pieleen",
     "retry": "Yritä uudelleen",
     "save": "Tallenna",
-    "close": "Sulje"
+    "close": "Sulje",
+    "loading": "Ladataan...",
+    "search": "Haku...",
+    "noData": "Ei tietoja saatavilla",
+    "id": "ID",
+    "name": "Nimi"
   },
   "nav": {
     "try": "Kokeile",
