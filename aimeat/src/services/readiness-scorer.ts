@@ -6,13 +6,14 @@
  * @structure
  *   - calculateBaseline(steps) -- onboarding score (0-100)
  *   - calculateHealth(agentGaii, storage) -- 7-day operational health (0.0-1.0)
- *   - calculateReadiness(agentGaii, steps, storage) -- effective score + level
+ *   - calculateReadiness(agentGaii, steps, storage, override?) -- effective score + level (with optional owner override)
  *   - getReadinessLevel(score) -- score to level mapping
  * @version-history
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Integration Phase B
+ *   v1.1.0 -- 2026-05-24 -- Add readiness override support
  */
 
-import type { Storage, AgentOnboardingStep } from '../storage/interface.js';
+import type { Storage, AgentOnboardingStep, AgentOnboardingRecord } from '../storage/interface.js';
 
 export interface ReadinessResult {
   effectiveScore: number;
@@ -103,11 +104,16 @@ export async function calculateReadiness(
   agentGaii: string,
   steps: AgentOnboardingStep[],
   storage: Storage,
+  override?: AgentOnboardingRecord['readinessOverride'],
 ): Promise<ReadinessResult> {
   const baseline = calculateBaseline(steps);
   const { health, components } = await calculateHealth(agentGaii, storage);
   const effectiveScore = Math.floor(baseline * health);
-  const level = getReadinessLevel(effectiveScore);
+  let level = getReadinessLevel(effectiveScore);
+
+  if (override && new Date(override.expiresAt) > new Date()) {
+    level = override.level;
+  }
 
   return { effectiveScore, level, baseline, health, healthComponents: components };
 }

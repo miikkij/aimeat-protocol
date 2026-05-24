@@ -5167,7 +5167,13 @@
       "autoDetected": "Automaattisesti tunnistettu",
       "selfReported": "Itse ilmoitettu",
       "messageReply": "Viestivastaus",
-      "unknown": "Tuntematon"
+      "unknown": "Tuntematon",
+      "hermes": "Hermes (OpenClaw)",
+      "claude-code": "Claude Code",
+      "copilot": "GitHub Copilot CLI",
+      "codex": "OpenAI Codex CLI",
+      "gemini": "Google Gemini CLI",
+      "other": "Muu / Tuntematon"
     }
   }
 }

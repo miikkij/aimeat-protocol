@@ -5167,7 +5167,13 @@
       "autoDetected": "Auto-detected",
       "selfReported": "Self-reported",
       "messageReply": "Message reply",
-      "unknown": "Unknown"
+      "unknown": "Unknown",
+      "hermes": "Hermes (OpenClaw)",
+      "claude-code": "Claude Code",
+      "copilot": "GitHub Copilot CLI",
+      "codex": "OpenAI Codex CLI",
+      "gemini": "Google Gemini CLI",
+      "other": "Other / Unknown"
     }
   }
 }

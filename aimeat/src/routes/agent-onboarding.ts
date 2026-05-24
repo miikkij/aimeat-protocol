@@ -6,9 +6,12 @@
  *   - GET    /v1/agents/:name/onboarding           -- Get onboarding status
  *   - POST   /v1/agents/:name/onboarding/start     -- Start/reset onboarding
  *   - POST   /v1/agents/:name/onboarding/step/:id  -- Agent confirms a step
+ *   - PUT    /v1/agents/:name/onboarding/override    -- Set readiness override
+ *   - DELETE /v1/agents/:name/onboarding/override    -- Clear readiness override
  *   - DELETE /v1/agents/:name/onboarding           -- Cancel onboarding
  * @version-history
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Integration Phase B
+ *   v1.1.0 -- 2026-05-24 -- Add readiness override + auto-complete on step confirm
  */
 
 import { Router } from 'express';
@@ -66,7 +69,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage): R
       const allRequiredPassed = updatedSteps.filter(s => s.required).every(s => s.status === 'passed');
 
       if (allRequiredPassed) {
-        const readiness = await calculateReadiness(agentGaii, updatedSteps, storage);
+        const readiness = await calculateReadiness(agentGaii, updatedSteps, storage, onboarding.readinessOverride);
         onboarding = (await storage.updateOnboarding(agentGaii, {
           steps: updatedSteps,
           status: 'completed',
@@ -236,18 +239,98 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage): R
       step.failureReason = result.failureReason;
     }
 
-    await storage.updateOnboarding(agentGaii, {
-      steps: onboarding.steps,
-      detectedPlatform: onboarding.detectedPlatform,
-      installedRuntime: onboarding.installedRuntime,
-    });
+    // Check if all required steps are now passed -> auto-complete
+    const allRequiredPassed = onboarding.steps.filter(s => s.required).every(s => s.status === 'passed');
+    let completedOnboarding = null;
+    if (result.passed && allRequiredPassed) {
+      const readiness = await calculateReadiness(agentGaii, onboarding.steps, storage, onboarding.readinessOverride);
+      completedOnboarding = await storage.updateOnboarding(agentGaii, {
+        steps: onboarding.steps,
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+        readinessScore: readiness.effectiveScore,
+        readinessLevel: readiness.level,
+        onboardingBaseline: readiness.baseline,
+        operationalHealth: readiness.health,
+        healthComponents: readiness.healthComponents,
+        healthRecalculatedAt: new Date().toISOString(),
+        detectedPlatform: onboarding.detectedPlatform,
+        installedRuntime: onboarding.installedRuntime,
+      });
+    } else {
+      await storage.updateOnboarding(agentGaii, {
+        steps: onboarding.steps,
+        detectedPlatform: onboarding.detectedPlatform,
+        installedRuntime: onboarding.installedRuntime,
+      });
+    }
     emitChange('agent-onboarding');
 
     res.json(success(config.nodeId, {
       step,
       progress: onboarding.steps.filter(s => s.status === 'passed').length,
       total: onboarding.steps.length,
+      completed: !!completedOnboarding,
+      readinessScore: completedOnboarding?.readinessScore,
+      readinessLevel: completedOnboarding?.readinessLevel,
     }));
+  });
+
+  /* -- PUT /v1/agents/:name/onboarding/override -- Set readiness override -- */
+  router.put('/v1/agents/:name/onboarding/override', requireAuth(), requireRole('owner'), async (req, res) => {
+    const agentName = req.params.name as string;
+    const agentGaii = resolveAgentGaii(req, agentName);
+
+    const onboarding = await storage.getOnboarding(agentGaii);
+    if (!onboarding) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No onboarding record found'));
+      return;
+    }
+
+    const { level, reason } = req.body ?? {};
+    const validLevels = ['basic', 'standard', 'full', 'expert'];
+    if (!level || !validLevels.includes(level)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `level must be one of: ${validLevels.join(', ')}`));
+      return;
+    }
+
+    const now = new Date();
+    const override = {
+      level: level as 'basic' | 'standard' | 'full' | 'expert',
+      setBy: `${req.auth!.owner}@${config.nodeId}`,
+      setAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+      reason: reason ?? undefined,
+    };
+
+    const updated = await storage.updateOnboarding(agentGaii, {
+      readinessOverride: override,
+      readinessLevel: override.level,
+    });
+
+    emitChange('agent-onboarding');
+    res.json(success(config.nodeId, { onboarding: updated }));
+  });
+
+  /* -- DELETE /v1/agents/:name/onboarding/override -- Clear readiness override -- */
+  router.delete('/v1/agents/:name/onboarding/override', requireAuth(), requireRole('owner'), async (req, res) => {
+    const agentName = req.params.name as string;
+    const agentGaii = resolveAgentGaii(req, agentName);
+
+    const onboarding = await storage.getOnboarding(agentGaii);
+    if (!onboarding) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No onboarding record found'));
+      return;
+    }
+
+    const readiness = await calculateReadiness(agentGaii, onboarding.steps, storage);
+    const updated = await storage.updateOnboarding(agentGaii, {
+      readinessOverride: undefined,
+      readinessLevel: readiness.level,
+    });
+
+    emitChange('agent-onboarding');
+    res.json(success(config.nodeId, { onboarding: updated }));
   });
 
   /* -- DELETE /v1/agents/:name/onboarding -- */

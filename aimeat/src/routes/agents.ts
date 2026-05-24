@@ -396,6 +396,121 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     }
   });
 
+  // POST /v1/agents/connect — register an agent via connectivity key (no auth required)
+  router.post('/v1/agents/connect', async (req, res) => {
+    const { connectivity_key, agent_name, display_name } = req.body ?? {};
+
+    if (!connectivity_key) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'connectivity_key is required'));
+      return;
+    }
+
+    const otk = await storage.consumeOtk(connectivity_key, config.otkGraceMs);
+    if (!otk || otk.action !== 'register_agent') {
+      res.status(404).json(error(config.nodeId, 'INVALID_KEY', 'Connectivity key not found, already used, or invalid'));
+      return;
+    }
+
+    const owner = otk.params.owner as string;
+    const finalName = agent_name ?? (otk.params.agent_name as string | null);
+
+    if (!finalName) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'agent_name is required (either in the connectivity key or in the request body)'));
+      return;
+    }
+
+    const nameError = validateAgentName(finalName);
+    if (nameError) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', nameError));
+      return;
+    }
+
+    const ownerRecord = await storage.getOwner(owner);
+    if (!ownerRecord) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner "${owner}" not found`));
+      return;
+    }
+
+    const gaii = buildGAII(finalName, owner, config.nodeId);
+
+    const existing = await storage.getAgent(gaii);
+    if (existing) {
+      res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Agent "${finalName}" already exists under owner "${owner}"`));
+      return;
+    }
+
+    const keyPair = await generateKeyPair();
+    const now = new Date().toISOString();
+    const description = (otk.params.description as string | null) ?? undefined;
+    const requestedScopes = config.defaultAgentScopes;
+
+    await storage.createAgent({
+      name: finalName,
+      owner,
+      gaii,
+      displayName: display_name ?? finalName,
+      description,
+      capabilities: [],
+      defaultScopes: requestedScopes,
+      publicKey: keyPair.publicKey,
+      trustScore: 50,
+      morselBalance: 0,
+      createdAt: now,
+      lastSeen: now,
+    });
+
+    fireHook(config, storage, 'post_agent_registration', { gaii, owner });
+
+    // Auto-start Hello Integration onboarding
+    const connectSteps = createDefaultSteps();
+    connectSteps[0].status = 'passed';
+    connectSteps[0].validatedAt = now;
+    connectSteps[0].validationMethod = 'automatic';
+    connectSteps[0].details = { createdAt: now };
+
+    const connectDetected = detectPlatform(req.headers['user-agent'] as string | undefined);
+    if (connectDetected) {
+      connectSteps[1].status = 'passed';
+      connectSteps[1].validatedAt = now;
+      connectSteps[1].validationMethod = 'automatic';
+      connectSteps[1].details = { platform: connectDetected.id, version: connectDetected.version };
+      await storage.updateAgent(gaii, {
+        platform: connectDetected.id,
+        platformVersion: connectDetected.version,
+        platformDetectedBy: connectDetected.detectedBy,
+      });
+    }
+
+    await storage.createOnboarding({
+      agentGaii: gaii,
+      status: 'in_progress',
+      startedAt: now,
+      steps: connectSteps,
+      detectedPlatform: connectDetected?.id,
+    });
+    emitChange('agent-onboarding');
+
+    res.set('Cache-Control', 'no-store');
+    res.set('Pragma', 'no-cache');
+    res.status(201).json(success(config.nodeId, {
+      agent: {
+        gaii,
+        display_name: display_name ?? finalName,
+        description,
+        scopes: requestedScopes,
+      },
+      private_key: keyPair.privateKey,
+      public_key: keyPair.publicKey,
+    }, [
+      {
+        description: 'Authenticate as this agent to get a JWT',
+        method: 'POST',
+        url: '/v1/auth/token',
+      },
+    ]));
+    emitChange('agents');
+  });
+
   // POST /v1/agents — register a new agent (requires owner JWT, local session only)
   router.post('/v1/agents', requireAuth(), requireLocalSession(), requireRole('owner'), validateBody(AgentRegistrationSchema, config.nodeId), async (req, res) => {
     const { name, owner, display_name, description, capabilities, scopes } = req.body ?? {};
