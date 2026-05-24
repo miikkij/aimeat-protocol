@@ -1,44 +1,33 @@
 /**
  * @file agents-tab.js
- * @description Profile tab for managing AI agents — device auth flow, agent prompt,
- *   platform instructions, scope management modal, and agent detail cards.
+ * @description Profile tab for managing AI agents -- Shared Agent Board,
+ *   expandable agent cards with Two-Zone Header + 8-tab interface,
+ *   device auth flow, scope management modal.
  * @version-history
- *   v1.0.0 — 2026-03-17 — Refactor: replace all inline styles with CSS utility classes
- *   v1.1.0 — 2026-03-18 — Rewrite agent prompt to use device-auth flow; remove connectivity key UI
- *   v1.2.0 — 2026-03-19 — Replace profile-initiated device auth with inline pending request approval
- *   v1.3.0 — 2026-05-21 — Shorten agent prompt to delegate to tier1; add Download/Copy Instructions buttons
- *   v1.4.0 — 2026-05-21 — Add sub-tab navigation (Tasks, Directives) in expanded agent detail view
- *   v1.5.0 — 2026-05-22 — Add Capabilities sub-tab with technical/domain skill display
- *   v1.6.0 — 2026-05-22 — Add Activity sub-tab with stats, chart, scheduled jobs, event log
- *   v1.7.0 — 2026-05-22 — Add Services and Messages sub-tabs
+ *   v1.0.0 -- 2026-03-17 -- Refactor: replace all inline styles with CSS utility classes
+ *   v1.1.0 -- 2026-03-18 -- Rewrite agent prompt to use device-auth flow; remove connectivity key UI
+ *   v1.2.0 -- 2026-03-19 -- Replace profile-initiated device auth with inline pending request approval
+ *   v1.3.0 -- 2026-05-21 -- Shorten agent prompt to delegate to tier1; add Download/Copy Instructions buttons
+ *   v1.4.0 -- 2026-05-21 -- Add sub-tab navigation (Tasks, Directives) in expanded agent detail view
+ *   v1.5.0 -- 2026-05-22 -- Add Capabilities sub-tab with technical/domain skill display
+ *   v1.6.0 -- 2026-05-22 -- Add Activity sub-tab with stats, chart, scheduled jobs, event log
+ *   v1.7.0 -- 2026-05-22 -- Add Services and Messages sub-tabs
+ *   v2.0.0 -- 2026-05-24 -- Plan 4: Shared Agent Board + expandable cards with Two-Zone Header + 8-tab bar
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml, timeAgo, copyToClipboard } from '/js/utils.js';
+import { escHtml, copyToClipboard } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { apiGet, apiPost, apiPatch } from '/js/api.js';
 import { listAgents, updateAgentScopes, deleteAgent } from '/js/services/agents.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { useConfirm } from '/components/Modal.js';
-import AgentTasksSubtab from './agents-tasks-subtab.js';
-import AgentDirectivesSubtab from './agents-directives-subtab.js';
-import AgentCapabilitiesSubtab from './agents-capabilities-subtab.js';
-import AgentActivitySubtab from './agents-activity-subtab.js';
-import AgentServicesSubtab from './agents-services-subtab.js';
-import AgentMessagesSubtab from './agents-messages-subtab.js';
-
-// === Agent Detail Sub-tabs ===
-const AGENT_SUBTABS = [
-  { id: 'tasks', label: 'profile.agents.subtabs.tasks' },
-  { id: 'directives', label: 'profile.agents.subtabs.directives' },
-  { id: 'capabilities', label: 'profile.agents.subtabs.capabilities' },
-  { id: 'activity', label: 'profile.agents.subtabs.activity' },
-  { id: 'services', label: 'profile.agents.subtabs.services' },
-  { id: 'messages', label: 'profile.agents.subtabs.messages' },
-];
+import SharedBoard from './agents/shared-board.js';
+import AgentCard from './agents/agent-card.js';
+import { getOnboarding } from '/js/services/agent-integration.js';
 
 // === Scope Management Constants ===
 const SCOPE_DOMAINS = [
@@ -170,14 +159,12 @@ const PLATFORM_LABELS = { windows:'profile.platforms.windows', mac:'profile.plat
 export default function AgentsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
   const [agents, setAgents] = useState(null);
+  const [onboardings, setOnboardings] = useState({});
   const [promptCopied, setPromptCopied] = useState(false);
   const [platExpand, setPlatExpand] = useState(false);
   const [activePlat, setActivePlat] = useState('windows');
   const [scopesModal, setScopesModal] = useState(null);
   const [expandedAgent, setExpandedAgent] = useState(null);
-  const [activeSubtab, setActiveSubtab] = useState('tasks');
-  const [gaiiCopied, setGaiiCopied] = useState(null);
-  const [keyCopied, setKeyCopied] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [approvingCode, setApprovingCode] = useState(null);
   const [approvePreset, setApprovePreset] = useState('standard');
@@ -207,6 +194,14 @@ export default function AgentsTab({ session, showToast, onStats }) {
       const list = await listAgents(session.owner);
       setAgents(list);
       onStats?.({ agents: list.length });
+      const obMap = {};
+      await Promise.all(list.map(async (a) => {
+        try {
+          const resp = await getOnboarding(a.name);
+          obMap[a.name] = resp?.data?.onboarding || null;
+        } catch { obMap[a.name] = null; }
+      }));
+      setOnboardings(obMap);
     } catch { setAgents([]); }
   }
 
@@ -221,33 +216,6 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
   function toggleAgent(name) {
     setExpandedAgent(prev => prev === name ? null : name);
-    setActiveSubtab('tasks');
-  }
-
-  function truncateKey(key) {
-    if (!key) return '-';
-    if (key.length <= 20) return key;
-    return key.slice(0, 10) + '...' + key.slice(-10);
-  }
-
-  function handleCopyGaii(gaii) {
-    copyToClipboard(gaii).then(() => {
-      setGaiiCopied(gaii);
-      setTimeout(() => setGaiiCopied(null), 2000);
-    });
-  }
-
-  function handleCopyKey(key) {
-    copyToClipboard(key).then(() => {
-      setKeyCopied(key);
-      setTimeout(() => setKeyCopied(null), 2000);
-    });
-  }
-
-  function formatDate(iso) {
-    if (!iso) return '-';
-    try { return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); }
-    catch { return '-'; }
   }
 
   async function handleSaveScopes(agentName, newScopes) {
@@ -442,154 +410,28 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
     ${agents.length === 0
       ? html`<div class="empty">${t('profile.agents.empty')}</div>`
-      : agents.map(a => {
-        const isExpanded = expandedAgent === a.name;
-        return html`
-        <div class="card agent-card ${isExpanded ? 'agent-card-expanded' : ''}">
-          <div class="agent-card-header-clickable" onClick=${() => toggleAgent(a.name)}>
-            <div class="card-header mb-0">
-              <div class="flex-row">
-                <span class="agent-expand-icon ${isExpanded ? 'pf-rotate-90' : ''}">\u25B6</span>
-                <div class="card-title">${escHtml(a.display_name || a.name)}</div>
-              </div>
-              <span class="badge badge-info">${escHtml(a.name)}</span>
-              <span class="${a.federate ? 'badge badge-success' : 'badge badge-muted'}"
-                onClick=${(e) => { e.stopPropagation(); toggleFederate(a); }}
-                title=${t('profile.federateTooltip')}>
-                ${a.federate ? t('profile.federated') : t('profile.notFederated')}
-              </span>
-            </div>
-            <div class="card-subtitle mt-xs">
-              ${t('profile.agents.trust')}: ${a.trust_score ?? '-'} \u2502
-              ${t('profile.agents.balance')}: ${t('profile.agents.usesOwnerWallet')} \u2502
-              ${t('profile.agents.lastSeen')}: ${a.last_seen ? timeAgo(a.last_seen) : '-'}
-            </div>
-          </div>
-
-          ${isExpanded && html`
-            <div class="agent-details">
-              <div class="agent-detail-row">
-                <span class="agent-detail-label">GAII</span>
-                <span class="agent-detail-value flex-row">
-                  <span class="text-code pf-code-break">${escHtml(a.gaii || '-')}</span>
-                  ${a.gaii && html`
-                    <button class="btn-outline agent-copy-btn" onClick=${(e) => { e.stopPropagation(); handleCopyGaii(a.gaii); }}>
-                      ${gaiiCopied === a.gaii ? '\u2713 ' + t('profile.agents.copied') : t('profile.agents.copyGaii')}
-                    </button>
-                  `}
-                </span>
-              </div>
-
-              ${a.description ? html`
-                <div class="agent-detail-row">
-                  <span class="agent-detail-label">${t('profile.agents.description')}</span>
-                  <span class="agent-detail-value">${escHtml(a.description)}</span>
-                </div>
-              ` : ''}
-
-              <div class="agent-detail-row">
-                <span class="agent-detail-label">${t('profile.agents.roles')}</span>
-                <span class="agent-detail-value">
-                  ${(a.roles && a.roles.length > 0)
-                    ? a.roles.map(r => html`<span class="badge badge-muted pf-badge-gap">${escHtml(r)}</span>`)
-                    : html`<span class="badge badge-muted">agent</span>`
-                  }
-                </span>
-              </div>
-
-              <div class="agent-detail-row">
-                <span class="agent-detail-label">${t('profile.agents.trust')}</span>
-                <span class="agent-detail-value">${a.trust_score ?? '-'}</span>
-              </div>
-
-              <div class="agent-detail-row">
-                <span class="agent-detail-label">${t('profile.agents.balance')}</span>
-                <span class="agent-detail-value">${t('profile.agents.usesOwnerWallet')}</span>
-              </div>
-
-              <div class="agent-detail-row">
-                <span class="agent-detail-label">${t('profile.agents.lastSeen')}</span>
-                <span class="agent-detail-value">${a.last_seen ? timeAgo(a.last_seen) + ' (' + formatDate(a.last_seen) + ')' : '-'}</span>
-              </div>
-
-              <div class="agent-detail-row">
-                <span class="agent-detail-label">${t('profile.agents.created')}</span>
-                <span class="agent-detail-value">${a.created_at ? formatDate(a.created_at) : '-'}</span>
-              </div>
-
-              ${a.public_key ? html`
-                <div class="agent-detail-row">
-                  <span class="agent-detail-label">${t('profile.agents.publicKey')}</span>
-                  <span class="agent-detail-value flex-row">
-                    <code class="agent-pubkey">${escHtml(truncateKey(a.public_key))}</code>
-                    <button class="btn-outline agent-copy-btn" onClick=${(e) => { e.stopPropagation(); handleCopyKey(a.public_key); }}>
-                      ${keyCopied === a.public_key ? '\u2713 ' + t('profile.agents.copied') : t('profile.agents.copyGaii')}
-                    </button>
-                  </span>
-                </div>
-              ` : ''}
-
-              ${a.capabilities?.length > 0 && html`
-                <div class="agent-detail-row">
-                  <span class="agent-detail-label">${t('profile.agents.capabilities')}</span>
-                  <span class="agent-detail-value">
-                    <div class="caps">${a.capabilities.map(c => html`<span class="cap">${escHtml(c)}</span>`)}</div>
-                  </span>
-                </div>
-              `}
-
-              <div class="agd-subtab-bar">
-                ${AGENT_SUBTABS.map(tab => {
-                  const label = t(tab.label);
-                  return html`
-                    <button class="agd-subtab ${activeSubtab === tab.id ? 'agd-subtab-active' : ''}"
-                            onClick=${(e) => { e.stopPropagation(); setActiveSubtab(tab.id); }}>
-                      ${label !== tab.label ? label : tab.id.charAt(0).toUpperCase() + tab.id.slice(1)}
-                    </button>
-                  `;
-                })}
-              </div>
-
-              <div class="agd-subtab-content" onClick=${(e) => e.stopPropagation()}>
-                ${activeSubtab === 'tasks' && html`<${AgentTasksSubtab} agentName=${a.name} session=${session} showToast=${showToast} />`}
-                ${activeSubtab === 'directives' && html`<${AgentDirectivesSubtab} agentName=${a.name} session=${session} showToast=${showToast} />`}
-                ${activeSubtab === 'capabilities' && html`<${AgentCapabilitiesSubtab} agentName=${a.name} session=${session} showToast=${showToast} agent=${a} />`}
-                ${activeSubtab === 'activity' && html`<${AgentActivitySubtab} agentName=${a.name} session=${session} showToast=${showToast} />`}
-                ${activeSubtab === 'services' && html`<${AgentServicesSubtab} agentName=${a.name} session=${session} showToast=${showToast} />`}
-                ${activeSubtab === 'messages' && html`<${AgentMessagesSubtab} agentName=${a.name} session=${session} showToast=${showToast} />`}
-              </div>
-
-              <div class="agent-detail-row mt-1">
-                <button class="btn-danger btn-sm" onClick=${(e) => { e.stopPropagation(); handleDeleteAgent(a.name); }}>
-                  ${t('profile.agents.deleteAgent')}
-                </button>
-              </div>
-            </div>
-          `}
-
-          ${!isExpanded && a.capabilities?.length > 0 && html`
-            <div class="caps mb-half">${a.capabilities.map(c => html`<span class="cap">${escHtml(c)}</span>`)}</div>
-          `}
-
-          ${(() => {
-            const scopes = a.default_scopes ?? ['*'];
-            const tpl = detectTemplate(scopes);
-            const count = scopes.includes('*') ? '\u221E' : scopes.length;
-            const isOwnerOrOp = session.roles?.includes('owner') || session.roles?.includes('operator');
-            return html`
-              <div class="scope-summary">
-                <span class="scope-badge">${templateLabel(tpl)}</span>
-                <span class="scope-count">${count} ${t('profile.agents.scopeUi.scopes')}</span>
-                ${isOwnerOrOp
-                  ? html`<button class="scope-manage-btn" onClick=${(e) => { e.stopPropagation(); setScopesModal(a); }}>
-                      ${t('profile.agents.scopeUi.manage')} \u25B8
-                    </button>`
-                  : html`<span class="scope-lock">\uD83D\uDD12</span>`
-                }
-              </div>`;
-          })()}
-        </div>
-      `; })
+      : html`
+        <${SharedBoard}
+          agents=${agents}
+          onboardings=${onboardings}
+          onAgentClick=${(name) => { setExpandedAgent(name); }}
+        />
+        ${agents.map(a => html`
+          <${AgentCard}
+            key=${a.name}
+            agent=${a}
+            onboarding=${onboardings[a.name]}
+            expanded=${expandedAgent === a.name}
+            onToggle=${toggleAgent}
+            session=${session}
+            showToast=${showToast}
+            allAgents=${agents}
+            onScopesClick=${(agent) => setScopesModal(agent)}
+            onDeleteClick=${handleDeleteAgent}
+            onFederateToggle=${toggleFederate}
+          />
+        `)}
+      `
     }
 
     ${scopesModal && html`<${ScopesModal}

@@ -518,6 +518,101 @@
         "reinstall": "Re-install",
         "lastGenerated": "Last generated",
         "notInstalled": "Not installed"
+      },
+      "detail": {
+        "tabs": {
+          "integration": "Integration",
+          "tasks": "Tasks",
+          "messages": "Messages",
+          "dataAccess": "Data Access",
+          "directives": "Directives",
+          "agentConfig": "Agent Config",
+          "activity": "Activity",
+          "services": "Services"
+        },
+        "state": {
+          "new": "New",
+          "onboarding": "Onboarding",
+          "production": "Production",
+          "problem": "Problem",
+          "newSummary": "Awaiting skill bundle install",
+          "problemSummary": "Delivery issue detected",
+          "idle": "Idle"
+        },
+        "sharedTags": "Shared tags",
+        "lastSeen": "Last seen",
+        "deliveryMcp": "MCP notifications",
+        "deliveryWebhook": "Webhook",
+        "deliveryPolling": "Polling",
+        "connection": "Connection",
+        "platform": "Platform",
+        "skillBundle": "Skill Bundle",
+        "readiness": "Readiness",
+        "identity": "Identity",
+        "deliveryLog": "Delivery Log",
+        "showAll": "Show all",
+        "zone2": {
+          "newTitle": "Onboarding not started",
+          "newDesc": "Install the skill bundle to begin Hello Integration. The agent needs to identify itself and complete 11 onboarding steps.",
+          "goToIntegration": "Go to Integration tab",
+          "onboardingTitle": "Hello Integration",
+          "problemTitle": "Delivery issue",
+          "webhookFailed": "Webhook failed {count} consecutive times",
+          "noTelemetry": "No telemetry received for 24+ hours",
+          "diagnose": "Diagnose"
+        },
+        "integration": {
+          "checklistTitle": "Hello Integration",
+          "progress": "Progress",
+          "rerun": "Re-run Hello Integration",
+          "rerunStarted": "Hello Integration re-started",
+          "startOnboarding": "Start Hello Integration",
+          "time": "Time",
+          "event": "Event",
+          "channel": "Channel",
+          "result": "Result"
+        },
+        "commands": {
+          "title": "Agent Commands",
+          "available": "available",
+          "noCommands": "No commands registered",
+          "send": "Send"
+        },
+        "messages": {
+          "placeholder": "Type / for commands or a message...",
+          "hint": "Type / to see available commands"
+        },
+        "dataAccess": {
+          "sharedTagsTitle": "Shared Tags",
+          "addTag": "Add tag",
+          "tagPlaceholder": "Tag name",
+          "tagAdded": "Tag added",
+          "tagRemoved": "Tag removed",
+          "with": "with",
+          "onlyYou": "only you",
+          "noTags": "No tags assigned",
+          "memoryAreasTitle": "Agent Memory Areas",
+          "knowledgeTitle": "Knowledge Packages",
+          "effectiveScope": "Effective data scope for this agent"
+        },
+        "agentConfig": {
+          "viewing": "Viewing"
+        },
+        "activity": {
+          "filterAll": "All",
+          "filterTasks": "Tasks",
+          "filterMessages": "Messages",
+          "filterGovernance": "Governance",
+          "filterSystem": "System"
+        },
+        "empty": {
+          "tasks": "No tasks yet. Create a task to give this agent work.",
+          "messages": "No messages yet. Send a message or use a command.",
+          "dataAccess": "No data access configured. Add memory areas or tags using the controls above.",
+          "agentConfig": "No configuration files. The agent will push its config files after the skill bundle is installed.",
+          "activity": "No activity recorded yet. Events will appear here once the agent starts working.",
+          "services": "No services declared. The agent can declare services during Hello Integration Step 11."
+        }
       }
     },
     "scopes": {

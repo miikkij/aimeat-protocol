@@ -518,6 +518,101 @@
         "reinstall": "Asenna uudelleen",
         "lastGenerated": "Viimeksi luotu",
         "notInstalled": "Ei asennettu"
+      },
+      "detail": {
+        "tabs": {
+          "integration": "Integraatio",
+          "tasks": "Tehtävät",
+          "messages": "Viestit",
+          "dataAccess": "Datayhteydet",
+          "directives": "Ohjeistukset",
+          "agentConfig": "Agenttiasetukset",
+          "activity": "Toiminta",
+          "services": "Palvelut"
+        },
+        "state": {
+          "new": "Uusi",
+          "onboarding": "Perehdytys",
+          "production": "Tuotanto",
+          "problem": "Ongelma",
+          "newSummary": "Odottaa taitopaketin asennusta",
+          "problemSummary": "Toimitushäiriö havaittu",
+          "idle": "Toimeton"
+        },
+        "sharedTags": "Jaetut tunnisteet",
+        "lastSeen": "Viimeksi nähty",
+        "deliveryMcp": "MCP-ilmoitukset",
+        "deliveryWebhook": "Webhook",
+        "deliveryPolling": "Pollaus",
+        "connection": "Yhteys",
+        "platform": "Alusta",
+        "skillBundle": "Taitopaketti",
+        "readiness": "Valmius",
+        "identity": "Identiteetti",
+        "deliveryLog": "Toimitushistoria",
+        "showAll": "Näytä kaikki",
+        "zone2": {
+          "newTitle": "Perehdytystä ei aloitettu",
+          "newDesc": "Asenna taitopaketti aloittaaksesi Hello-integraation. Agentin tulee tunnistautua ja suorittaa 11 perehdytysvaihetta.",
+          "goToIntegration": "Siirry Integraatio-välilehteen",
+          "onboardingTitle": "Hello-integraatio",
+          "problemTitle": "Toimitusongelma",
+          "webhookFailed": "Webhook epäonnistunut {count} kertaa peräkkäin",
+          "noTelemetry": "Ei telemetriaa 24+ tuntiin",
+          "diagnose": "Diagnosoi"
+        },
+        "integration": {
+          "checklistTitle": "Hello-integraatio",
+          "progress": "Edistyminen",
+          "rerun": "Suorita Hello-integraatio uudelleen",
+          "rerunStarted": "Hello-integraatio aloitettu uudelleen",
+          "startOnboarding": "Aloita Hello-integraatio",
+          "time": "Aika",
+          "event": "Tapahtuma",
+          "channel": "Kanava",
+          "result": "Tulos"
+        },
+        "commands": {
+          "title": "Agentin komennot",
+          "available": "saatavilla",
+          "noCommands": "Ei rekisteröityjä komentoja",
+          "send": "Lähetä"
+        },
+        "messages": {
+          "placeholder": "Kirjoita / komennoille tai viesti...",
+          "hint": "Kirjoita / nähdäksesi saatavilla olevat komennot"
+        },
+        "dataAccess": {
+          "sharedTagsTitle": "Jaetut tunnisteet",
+          "addTag": "Lisää tunniste",
+          "tagPlaceholder": "Tunnisteen nimi",
+          "tagAdded": "Tunniste lisätty",
+          "tagRemoved": "Tunniste poistettu",
+          "with": "jaettu",
+          "onlyYou": "vain sinä",
+          "noTags": "Ei tunnisteita",
+          "memoryAreasTitle": "Agentin muistialueet",
+          "knowledgeTitle": "Tietopaketit",
+          "effectiveScope": "Agentin tehokas datan laajuus"
+        },
+        "agentConfig": {
+          "viewing": "Katsellaan"
+        },
+        "activity": {
+          "filterAll": "Kaikki",
+          "filterTasks": "Tehtävät",
+          "filterMessages": "Viestit",
+          "filterGovernance": "Hallinto",
+          "filterSystem": "Järjestelmä"
+        },
+        "empty": {
+          "tasks": "Ei tehtäviä. Luo tehtävä antaaksesi agentille työtä.",
+          "messages": "Ei viestejä. Lähetä viesti tai käytä komentoa.",
+          "dataAccess": "Ei datayhteyksien asetuksia. Lisää muistialueita tai tunnisteita yllä olevista painikkeista.",
+          "agentConfig": "Ei asetustiedostoja. Agentti lähettää asetustiedostot taitopaketin asennuksen jälkeen.",
+          "activity": "Ei tallennettua toimintaa. Tapahtumat ilmestyvät tähän kun agentti aloittaa työskentelyn.",
+          "services": "Ei ilmoitettuja palveluja. Agentti voi ilmoittaa palvelut Hello-integraation vaiheessa 11."
+        }
       }
     },
     "scopes": {

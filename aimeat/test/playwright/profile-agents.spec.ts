@@ -58,8 +58,8 @@ async function gotoAgentsTab(page: Page) {
     await expect(card).toBeVisible({ timeout: 5_000 });
     await card.click();
   }
-  // Wait for the agents tab content to render
-  await expect(page.locator('.agent-cta, .agent-card, .empty').first()).toBeVisible({ timeout: 15_000 });
+  // Wait for the agents tab content to render (new tab-view uses pf-agd-card classes)
+  await expect(page.locator('.agent-cta, .pf-agd-card, .pf-agd-collapsed, .empty').first()).toBeVisible({ timeout: 15_000 });
 }
 
 /** Register user, create an agent, navigate to agents tab, wait for tab to load. */
@@ -83,11 +83,11 @@ test.describe('Agents — List Rendering', () => {
   test('shows agent cards after creation', async ({ page }) => {
     const { agentName } = await setupAgentsTab(page, 'list');
 
-    // Wait for agents to load (spinner gone)
-    await expect(page.locator('.agent-card').first()).toBeVisible({ timeout: 10_000 });
+    // Wait for agents to load (new tab-view uses pf-agd-card/pf-agd-collapsed)
+    await expect(page.locator('.pf-agd-card').first()).toBeVisible({ timeout: 10_000 });
 
     // Agent name should appear in card
-    const cardText = await page.locator('.agent-card').first().textContent();
+    const cardText = await page.locator('.pf-agd-card').first().textContent();
     expect(cardText).toContain(agentName);
   });
 
@@ -130,75 +130,78 @@ test.describe('Agents — Empty State', () => {
 // ── TC-05: Expand agent card ──────────────────────────
 
 test.describe('Agents — Card Expansion', () => {
-  test('clicking card header expands details', async ({ page }) => {
+  test('clicking collapsed card expands to tab-view', async ({ page }) => {
     const { agentName } = await setupAgentsTab(page, 'expand');
 
-    const card = page.locator('.agent-card').first();
+    const card = page.locator('.pf-agd-card').first();
     await expect(card).toBeVisible({ timeout: 10_000 });
 
     // Card should start collapsed
-    await expect(card).not.toHaveClass(/agent-card-expanded/);
+    await expect(card.locator('.pf-agd-collapsed')).toBeVisible();
 
-    // Click the header to expand
-    await card.locator('.agent-card-header-clickable').click();
-    await expect(card).toHaveClass(/agent-card-expanded/);
+    // Click the collapsed card to expand
+    await card.locator('.pf-agd-collapsed').click();
 
-    // Detail rows should be visible
-    await expect(card.locator('.agent-details')).toBeVisible();
+    // Expanded view with zones and tabs should be visible
+    await expect(card.locator('.pf-agd-expanded')).toBeVisible({ timeout: 5_000 });
+    await expect(card.locator('.pf-agd-zone1')).toBeVisible();
+    await expect(card.locator('.pf-agd-tabs')).toBeVisible();
 
-    // GAII should contain the agent name
-    const gaiiText = await card.locator('.agent-details').textContent();
-    expect(gaiiText).toContain(agentName);
+    // Agent name should appear in the identity zone
+    const zone1Text = await card.locator('.pf-agd-zone1').textContent();
+    expect(zone1Text).toContain(agentName);
   });
 });
 
 // ── Translations: no raw i18n keys visible ────────────
 
 test.describe('Agents — Translations', () => {
-  test('expanded card shows translated labels, not i18n key paths', async ({ page }) => {
+  test('expanded card shows translated tab labels, not i18n key paths', async ({ page }) => {
     await setupAgentsTab(page, 'i18n');
 
-    const card = page.locator('.agent-card').first();
+    const card = page.locator('.pf-agd-card').first();
     await expect(card).toBeVisible({ timeout: 10_000 });
-    await card.locator('.agent-card-header-clickable').click();
-    await expect(card.locator('.agent-details')).toBeVisible();
+    await card.locator('.pf-agd-collapsed').click();
+    await expect(card.locator('.pf-agd-expanded')).toBeVisible({ timeout: 5_000 });
 
-    const detailText = await card.locator('.agent-details').textContent();
+    const expandedText = await card.locator('.pf-agd-expanded').textContent();
 
-    // These i18n key paths should NOT appear as visible text
-    expect(detailText).not.toContain('profile.agents.roles');
-    expect(detailText).not.toContain('profile.agents.created');
-    expect(detailText).not.toContain('profile.agents.publicKey');
-    expect(detailText).not.toContain('profile.agents.capabilities');
-    expect(detailText).not.toContain('profile.agents.description');
+    // Tab labels should be translated, not raw i18n keys
+    expect(expandedText).not.toContain('agents.detail.tabs.integration');
+    expect(expandedText).not.toContain('agents.detail.tabs.tasks');
+    expect(expandedText).not.toContain('agents.detail.tabs.messages');
   });
 });
 
 // ── Scope management: Manage button visible for owner ──
 
 test.describe('Agents — Scope Management', () => {
-  test('owner sees Manage button, not lock icon', async ({ page }) => {
+  test('owner sees Manage button in expanded card', async ({ page }) => {
     await setupAgentsTab(page, 'scopes');
 
-    const card = page.locator('.agent-card').first();
+    const card = page.locator('.pf-agd-card').first();
     await expect(card).toBeVisible({ timeout: 10_000 });
 
-    // Scope summary should show "Manage" button
-    const manageBtn = card.locator('.scope-manage-btn');
-    await expect(manageBtn).toBeVisible({ timeout: 5_000 });
+    // Expand the card to see the footer with manage button
+    await card.locator('.pf-agd-collapsed').click();
+    await expect(card.locator('.pf-agd-expanded')).toBeVisible({ timeout: 5_000 });
 
-    // Should NOT show lock icon
-    const lock = card.locator('.scope-lock');
-    await expect(lock).toHaveCount(0);
+    // Scope manage button should be in the card footer
+    const manageBtn = card.locator('.pf-agd-card-footer .btn-outline', { hasText: /Manage|Hallinta/i });
+    await expect(manageBtn).toBeVisible({ timeout: 5_000 });
   });
 
   test('clicking Manage opens scope modal', async ({ page }) => {
     await setupAgentsTab(page, 'scopemodal');
 
-    const card = page.locator('.agent-card').first();
+    const card = page.locator('.pf-agd-card').first();
     await expect(card).toBeVisible({ timeout: 10_000 });
 
-    const manageBtn = card.locator('.scope-manage-btn');
+    // Expand card first
+    await card.locator('.pf-agd-collapsed').click();
+    await expect(card.locator('.pf-agd-expanded')).toBeVisible({ timeout: 5_000 });
+
+    const manageBtn = card.locator('.pf-agd-card-footer .btn-outline', { hasText: /Manage|Hallinta/i });
     await expect(manageBtn).toBeVisible({ timeout: 5_000 });
     await manageBtn.click();
 
@@ -209,11 +212,15 @@ test.describe('Agents — Scope Management', () => {
   test('saving scopes via modal does not return 404', async ({ page }) => {
     await setupAgentsTab(page, 'scopesave');
 
-    const card = page.locator('.agent-card').first();
+    const card = page.locator('.pf-agd-card').first();
     await expect(card).toBeVisible({ timeout: 10_000 });
 
+    // Expand card first
+    await card.locator('.pf-agd-collapsed').click();
+    await expect(card.locator('.pf-agd-expanded')).toBeVisible({ timeout: 5_000 });
+
     // Open scope modal
-    const manageBtn = card.locator('.scope-manage-btn');
+    const manageBtn = card.locator('.pf-agd-card-footer .btn-outline', { hasText: /Manage|Hallinta/i });
     await expect(manageBtn).toBeVisible({ timeout: 5_000 });
     await manageBtn.click();
     await expect(page.locator('.scope-modal')).toBeVisible({ timeout: 5_000 });

@@ -875,3 +875,672 @@
   border-radius: var(--radius-xs, 6px);
   margin: 0.5rem 0;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   Agent Detail Tab-View (Plan 4)
+   All new classes use pf-agd- prefix (profile agent detail)
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Shared Agent Board ── */
+
+.pf .pf-agd-board {
+  background: var(--card-bg, #FFFFFF);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: var(--radius, 8px);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.pf .pf-agd-board-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+@media (max-width: 768px) {
+  .pf .pf-agd-board-grid { grid-template-columns: 1fr; }
+}
+.pf .pf-agd-board-card {
+  background: var(--card-bg-alt, #F3F4F6);
+  border: 1px solid var(--border, #E5E7EB);
+  border-left: 3px solid var(--text-muted, #9CA3AF);
+  border-radius: var(--radius-xs, 6px);
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.pf .pf-agd-board-card:hover {
+  background: var(--card-bg, #FFFFFF);
+}
+.pf .pf-agd-board-card-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: 0.2rem;
+}
+.pf .pf-agd-board-card-activity {
+  font-size: 0.75rem;
+  color: var(--text-dim, #6B7280);
+  margin-bottom: 0.15rem;
+}
+.pf .pf-agd-board-card-tags {
+  font-size: 0.7rem;
+  color: var(--text-muted, #9CA3AF);
+}
+.pf .pf-agd-board-tags {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border, #E5E7EB);
+  font-size: 0.8rem;
+  color: var(--text-dim, #6B7280);
+}
+.pf .pf-agd-tag-pill {
+  display: inline-block;
+  background: var(--card-bg-alt, #F3F4F6);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 0.75rem;
+  margin-right: 0.35rem;
+}
+
+/* ── Collapsed Agent Card ── */
+
+.pf .pf-agd-card {
+  margin-bottom: 0.5rem;
+}
+.pf .pf-agd-collapsed {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  background: var(--card-bg, #FFFFFF);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: var(--radius-xs, 6px);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.pf .pf-agd-collapsed:hover {
+  background: var(--card-bg-alt, #F3F4F6);
+}
+.pf .pf-agd-collapsed--problem {
+  border-color: var(--danger, #ef4444);
+}
+.pf .pf-agd-expand-icon {
+  font-size: 0.7rem;
+  color: var(--text-dim, #6B7280);
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+.pf .pf-agd-expand-icon--open {
+  transform: rotate(90deg);
+}
+.pf .pf-agd-collapsed-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+.pf .pf-agd-collapsed-badges {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+.pf .pf-agd-collapsed-stats {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--text-dim, #6B7280);
+  white-space: nowrap;
+  text-align: right;
+}
+
+/* ── Badges (platform, readiness, federation) ── */
+
+.pf .pf-agd-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.7rem;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.pf .pf-agd-badge--platform {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+}
+.pf .pf-agd-badge--readiness-expert { background: rgba(16, 185, 129, 0.1); color: var(--success, #10b981); }
+.pf .pf-agd-badge--readiness-full { background: rgba(16, 185, 129, 0.1); color: var(--success, #10b981); }
+.pf .pf-agd-badge--readiness-standard { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
+.pf .pf-agd-badge--readiness-basic { background: rgba(217, 119, 6, 0.1); color: #d97706; }
+.pf .pf-agd-badge--readiness-none { background: var(--card-bg-alt, #F3F4F6); color: var(--text-muted, #9CA3AF); }
+.pf .pf-agd-badge--readiness-onboarding { background: rgba(217, 119, 6, 0.1); color: #d97706; }
+.pf .pf-agd-badge--federation {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success, #10b981);
+}
+
+/* ── Expanded Card ── */
+
+.pf .pf-agd-expanded {
+  background: var(--card-bg, #FFFFFF);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: var(--radius, 8px);
+  overflow: hidden;
+}
+
+/* Zone 1: Identity */
+.pf .pf-agd-zone1 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+}
+.pf .pf-agd-zone1-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+.pf .pf-agd-zone1-badges {
+  display: flex;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+.pf .pf-agd-zone1-right {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--text-dim, #6B7280);
+}
+
+/* Zone 2: Status (state-dependent) */
+.pf .pf-agd-zone2 {
+  padding: 0.625rem 1rem;
+  font-size: 0.85rem;
+}
+.pf .pf-agd-zone2--new {
+  border-left: 3px solid var(--warning, #F59E0B);
+  background: rgba(245, 158, 11, 0.06);
+}
+.pf .pf-agd-zone2--onboarding {
+  border-left: 3px solid var(--info, #3B82F6);
+  background: rgba(59, 130, 246, 0.06);
+}
+.pf .pf-agd-zone2--production {
+  padding: 0.375rem 1rem;
+  font-size: 0.8rem;
+  color: var(--text-dim, #6B7280);
+}
+.pf .pf-agd-zone2--problem {
+  border-left: 3px solid var(--danger, #ef4444);
+  background: rgba(239, 68, 68, 0.06);
+}
+.pf .pf-agd-zone2-title {
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 0.25rem;
+}
+.pf .pf-agd-zone2-desc {
+  font-size: 0.8rem;
+  color: var(--text-dim, #6B7280);
+  line-height: 1.4;
+}
+.pf .pf-agd-zone2-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.pf .pf-agd-zone2-stats {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* ── Progress bar (onboarding zone2) ── */
+.pf .pf-agd-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--card-bg-alt, #F3F4F6);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 0.35rem 0;
+}
+.pf .pf-agd-progress-fill {
+  height: 100%;
+  background: var(--info, #3B82F6);
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+/* Step pills (onboarding zone2) */
+.pf .pf-agd-step-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.35rem;
+}
+.pf .pf-agd-step-pill {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.pf .pf-agd-step-pill--passed {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--success, #10b981);
+}
+.pf .pf-agd-step-pill--pending {
+  background: var(--card-bg-alt, #F3F4F6);
+  color: var(--text-muted, #9CA3AF);
+}
+.pf .pf-agd-step-pill--failed {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--danger, #ef4444);
+}
+
+/* ── Tab Bar ── */
+
+.pf .pf-agd-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border, #E5E7EB);
+  overflow-x: auto;
+}
+.pf .pf-agd-tab {
+  padding: 0.5rem 0.875rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim, #6B7280);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+.pf .pf-agd-tab:hover { color: var(--text, #1A1A2E); }
+.pf .pf-agd-tab--active {
+  color: var(--accent, #E8564A);
+  border-bottom-color: var(--accent, #E8564A);
+  font-weight: 600;
+}
+.pf .pf-agd-tab-content {
+  padding: 1rem;
+  min-height: 150px;
+}
+
+/* ── Integration tab: Onboarding checklist ── */
+
+.pf .pf-agd-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+.pf .pf-agd-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius-xs, 6px);
+  font-size: 0.82rem;
+  border: 1px solid var(--border, #E5E7EB);
+  background: var(--card-bg, #FFFFFF);
+}
+.pf .pf-agd-step--passed {
+  border-color: rgba(16, 185, 129, 0.3);
+}
+.pf .pf-agd-step--pending {
+  opacity: 0.7;
+}
+.pf .pf-agd-step--failed {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.pf .pf-agd-step-icon {
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  width: 1.2rem;
+  text-align: center;
+}
+.pf .pf-agd-step-name {
+  font-weight: 500;
+  flex: 1;
+}
+.pf .pf-agd-step-detail {
+  font-size: 0.7rem;
+  color: var(--text-muted, #9CA3AF);
+  margin-left: auto;
+}
+
+/* ── Integration tab: Production sections ── */
+
+.pf .pf-agd-section {
+  margin-bottom: 1.25rem;
+}
+.pf .pf-agd-section-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim, #6B7280);
+  margin-bottom: 0.5rem;
+}
+.pf .pf-agd-info-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  font-size: 0.82rem;
+}
+.pf .pf-agd-info-label {
+  font-weight: 500;
+  min-width: 120px;
+  color: var(--text-dim, #6B7280);
+  flex-shrink: 0;
+}
+.pf .pf-agd-info-value {
+  color: var(--text, #1A1A2E);
+  word-break: break-all;
+}
+
+/* ── Delivery log table ── */
+
+.pf .pf-agd-delivery-log {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+.pf .pf-agd-delivery-log th {
+  text-align: left;
+  padding: 0.35rem 0.5rem;
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-dim, #6B7280);
+  border-bottom: 1px solid var(--border, #E5E7EB);
+}
+.pf .pf-agd-delivery-log td {
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  color: var(--text, #1A1A2E);
+}
+.pf .pf-agd-delivery-log tr:last-child td { border-bottom: none; }
+
+/* ── Messages tab: Command palette ── */
+
+.pf .pf-agd-commands {
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: var(--radius-xs, 6px);
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+.pf .pf-agd-commands-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-dim, #F9FAFB);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.pf .pf-agd-commands-body {
+  padding: 0.5rem 0.75rem;
+}
+.pf .pf-agd-commands-category {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--info, #3B82F6);
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+.pf .pf-agd-commands-category:first-child { margin-top: 0; }
+.pf .pf-agd-command-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0;
+  font-size: 0.82rem;
+}
+.pf .pf-agd-command-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 500;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+.pf .pf-agd-command-desc {
+  flex: 1;
+  color: var(--text-dim, #6B7280);
+  font-size: 0.78rem;
+}
+
+/* Autocomplete dropdown for / commands */
+.pf .pf-agd-autocomplete {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background: var(--card, #FFFFFF);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: var(--radius-xs, 6px);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 10;
+}
+.pf .pf-agd-autocomplete-item {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.pf .pf-agd-autocomplete-item:hover {
+  background: var(--card-bg-alt, #F3F4F6);
+}
+
+/* ── Data Access tab ── */
+
+.pf .pf-agd-data-section {
+  margin-bottom: 1.25rem;
+}
+.pf .pf-agd-tag-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  font-size: 0.82rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+.pf .pf-agd-tag-row:last-child { border-bottom: none; }
+.pf .pf-agd-tag-name {
+  font-weight: 500;
+  background: var(--card-bg-alt, #F3F4F6);
+  border: 1px solid var(--border, #E5E7EB);
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+}
+.pf .pf-agd-tag-prefix {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--text-dim, #6B7280);
+}
+.pf .pf-agd-tag-sharing {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--text-muted, #9CA3AF);
+}
+.pf .pf-agd-area-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.3rem 0;
+  font-size: 0.82rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+.pf .pf-agd-area-row:last-child { border-bottom: none; }
+.pf .pf-agd-area-key {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.pf .pf-agd-area-desc {
+  flex: 1;
+  color: var(--text-dim, #6B7280);
+  font-size: 0.78rem;
+}
+.pf .pf-agd-area-perm {
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+.pf .pf-agd-area-perm--rw {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success, #10b981);
+}
+.pf .pf-agd-area-perm--ro {
+  background: rgba(217, 119, 6, 0.1);
+  color: #d97706;
+}
+
+/* Effective scope summary */
+.pf .pf-agd-scope-summary {
+  background: var(--bg-dim, #F9FAFB);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: var(--radius-xs, 6px);
+  padding: 0.625rem 0.875rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--text-dim, #6B7280);
+  line-height: 1.5;
+  margin-top: 1rem;
+}
+
+/* ── Agent Config tab ── */
+
+.pf .pf-agd-config-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+.pf .pf-agd-config-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: var(--radius-xs, 6px);
+  cursor: pointer;
+  transition: background 0.15s;
+  font-size: 0.82rem;
+}
+.pf .pf-agd-config-item:hover { background: var(--card-bg-alt, #F3F4F6); }
+.pf .pf-agd-config-item--active {
+  border-color: var(--accent, #E8564A);
+  background: var(--card-bg-alt, #F3F4F6);
+}
+.pf .pf-agd-config-name { font-weight: 600; }
+.pf .pf-agd-config-desc { flex: 1; font-size: 0.78rem; color: var(--text-dim, #6B7280); }
+.pf .pf-agd-config-platform {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+}
+.pf .pf-agd-config-preview {
+  background: var(--bg-dim, #F9FAFB);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: var(--radius-xs, 6px);
+  padding: 0.75rem 1rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  max-height: 300px;
+  overflow-y: auto;
+  line-height: 1.5;
+}
+.pf .pf-agd-config-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+/* ── Activity tab: Filter pills ── */
+
+.pf .pf-agd-filter-bar {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+.pf .pf-agd-filter-pill {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 12px;
+  background: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--text-dim, #6B7280);
+  transition: border-color 0.15s, color 0.15s;
+}
+.pf .pf-agd-filter-pill:hover { border-color: var(--accent, #E8564A); color: var(--text, #1A1A2E); }
+.pf .pf-agd-filter-pill--active {
+  background: var(--accent, #E8564A);
+  color: #FFFFFF;
+  border-color: var(--accent, #E8564A);
+}
+
+/* Activity event badges */
+.pf .pf-agd-event-badge {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.pf .pf-agd-event-badge--tasks { background: rgba(16, 185, 129, 0.1); color: var(--success, #10b981); }
+.pf .pf-agd-event-badge--messages { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
+.pf .pf-agd-event-badge--governance { background: rgba(217, 119, 6, 0.1); color: #d97706; }
+.pf .pf-agd-event-badge--system { background: var(--card-bg-alt, #F3F4F6); color: var(--text-dim, #6B7280); }
+
+/* ── Services tab ── */
+
+.pf .pf-agd-service-status {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.pf .pf-agd-service-status--active { background: var(--success, #10b981); }
+.pf .pf-agd-service-status--inactive { background: var(--text-muted, #9CA3AF); }
+
+/* ── Scope management (card footer) ── */
+
+.pf .pf-agd-card-footer {
+  padding: 0.5rem 1rem;
+  border-top: 1px solid var(--border, #E5E7EB);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.pf .pf-agd-card-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* ── Input wrapper for autocomplete ── */
+.pf .pf-agd-input-wrap {
+  position: relative;
+}
