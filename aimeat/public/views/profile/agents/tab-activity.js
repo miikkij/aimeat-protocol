@@ -119,10 +119,6 @@ export default function TabActivity({ agent, agentName, session, showToast }) {
     return html`<div class="pf-agd-empty">${t('profile.loading')}</div>`;
   }
 
-  if (events.length === 0 && !stats) {
-    return html`<div class="pf-agd-empty">${t('profile.agents.detail.empty.activity')}</div>`;
-  }
-
   const filtered = filter === 'all' ? events : events.filter(ev => eventCategory(ev) === filter);
 
   return html`

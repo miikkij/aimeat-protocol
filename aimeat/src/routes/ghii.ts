@@ -95,11 +95,11 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         const existingOwner = await storage.getOwner(username);
         const ghii = `${username}@${config.nodeId}`;
 
-        // Preserve old roles before dev-mode wipe (so operator isn't lost)
+        // Preserve old roles before re-registration (so operator isn't lost)
         let preservedRoles: string[] | null = null;
         if (existingOwner) {
-            if (config.devMode) {
-                // Dev mode: wipe old account and re-create (lost credentials recovery)
+            if (config.testMode) {
+                // Test mode: wipe old account entirely and re-create (E2E test isolation)
                 preservedRoles = existingOwner.roles;
                 const oldAgents = await storage.getAgentsByOwner(username);
                 for (const agent of oldAgents) {
@@ -108,6 +108,9 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
                 const oldGhii = await storage.getGHII(ghii);
                 if (oldGhii) await storage.deleteGHII(ghii);
                 await storage.deleteOwner(username);
+            } else if (config.devMode) {
+                // Dev mode: reset credentials only, preserve all data (agents, memory, etc.)
+                preservedRoles = existingOwner.roles;
             } else {
                 res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Username "${username}" is already registered`));
                 return;
@@ -117,14 +120,50 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
         // Generate keypair for the owner account
         const keyPair = await generateKeyPair();
 
+        // Dev-mode credential reset: update password + key, preserve everything else
+        if (existingOwner && config.devMode && !config.testMode) {
+            await storage.updateOwner(username, { publicKey: keyPair.publicKey });
+            const existingGhii = await storage.getGHII(ghii);
+            if (existingGhii) {
+                await storage.updateGHII(ghii, {
+                    passwordHash,
+                    ...(display_name ? { displayName: display_name } : {}),
+                    updatedAt: new Date().toISOString(),
+                });
+            }
+
+            const token = await issueJWT({
+                sub: username,
+                owner: username,
+                node: config.nodeId,
+                roles: preservedRoles ?? ['owner'],
+            }, config.jwtTtlSeconds);
+
+            res.set('Cache-Control', 'no-store');
+            res.set('Pragma', 'no-cache');
+            res.status(200).json(success(config.nodeId, {
+                ghii: {
+                    ghii,
+                    username,
+                    display_name: display_name || existingGhii?.displayName,
+                },
+                owner: { name: username },
+                token,
+                expires_at: new Date(Date.now() + config.jwtTtlSeconds * 1000).toISOString(),
+                owner_private_key: keyPair.privateKey,
+                owner_public_key: keyPair.publicKey,
+                dev_mode_reset: true,
+            }));
+            return;
+        }
+
         // First real owner gets operator role (same logic as /v1/owners)
-        // Also restore operator if the account previously had it (dev-mode re-create)
         // Self-heal: if no operator exists anywhere, promote this user
         const allOwners = await storage.listOwners();
         const realOwners = allOwners.filter(o => o.name !== 'anonymous');
         const hasOperator = allOwners.some(o => o.roles.includes('operator'));
         const roles: string[] = ['owner'];
-        if (realOwners.length === 0 || !hasOperator || preservedRoles?.includes('operator')) {
+        if (realOwners.length === 0 || !hasOperator) {
             roles.push('operator');
         }
 

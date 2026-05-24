@@ -29,6 +29,7 @@ let server: Server | null = null;
 if (!process.env.E2E_BASE) {
     process.env.AIMEAT_PORT = String(TEST_PORT);
     process.env.AIMEAT_DEV_MODE = 'true';
+    process.env.AIMEAT_TEST_MODE = 'true';
     if (!process.env.AIMEAT_ADMIN_PASSWORD) {
         process.env.AIMEAT_ADMIN_PASSWORD = randomBytes(16).toString('base64url');
     }

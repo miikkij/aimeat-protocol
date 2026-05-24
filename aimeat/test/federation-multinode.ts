@@ -84,6 +84,7 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
     // Set env vars that loadConfig reads
     process.env.AIMEAT_PORT = String(port);
     process.env.AIMEAT_DEV_MODE = 'true';
+    process.env.AIMEAT_TEST_MODE = 'true';
     process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
     process.env.AIMEAT_NODE_ID = nodeId;
     process.env.AIMEAT_BASE_URL = `http://localhost:${port}`;
@@ -95,6 +96,7 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
     config.nodeId = nodeId;
     config.baseUrl = `http://localhost:${port}`;
     config.devMode = true;
+    config.testMode = true;
     config.adminPassword = adminPw;
     config.storageProvider = 'memory';
     config.federationAuthPolicy = 'all_peers';

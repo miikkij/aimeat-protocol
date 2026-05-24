@@ -62,6 +62,7 @@ export interface AimeatConfig {
   sqlitePath: string;
   adminPassword: string | null;
   devMode: boolean;
+  testMode: boolean;
   anonymousMode: boolean;
   jwtTtlSeconds: number;
   agentJwtTtlSeconds: number;
@@ -448,6 +449,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     sqlitePath: process.env.AIMEAT_SQLITE_PATH ?? './data/aimeat.db',
     adminPassword: process.env.AIMEAT_ADMIN_PASSWORD ?? null,
     devMode: process.env.AIMEAT_DEV_MODE === 'true',
+    testMode: process.env.AIMEAT_TEST_MODE === 'true',
     anonymousMode: process.env.AIMEAT_ANONYMOUS === 'true',
     jwtTtlSeconds: parseInt(process.env.AIMEAT_JWT_TTL ?? '3600', 10),
     agentJwtTtlSeconds: parseInt(process.env.AIMEAT_AGENT_JWT_TTL ?? '7776000', 10), // 90 days

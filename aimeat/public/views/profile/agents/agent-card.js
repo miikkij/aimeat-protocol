@@ -201,7 +201,7 @@ function renderCollapsedStats(state, agent, onboarding) {
       return html`${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''} | ${t('profile.agents.detail.state.newSummary')}`;
     case 'onboarding': {
       const nextStep = onboarding?.steps?.find(s => s.status === 'pending');
-      return html`${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''} ${nextStep ? `| ${t('profile.agents.detail.state.next')}: ${nextStep.name}` : ''}`;
+      return html`${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''} ${nextStep ? `| ${t('profile.agents.detail.state.next')}: ${nextStep.title || nextStep.id}` : ''}`;
     }
     case 'problem':
       return html`${t('profile.agents.detail.state.problemSummary')} | ${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''}`;
@@ -244,7 +244,7 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
         <div class="pf-agd-zone2 pf-agd-zone2--onboarding">
           <div class="pf-agd-zone2-title">
             ${t('profile.agents.detail.zone2.onboardingTitle')}: ${passed} / ${total}
-            ${nextStep ? html`<span class="pf-agd-zone2-desc"> ${t('profile.agents.detail.state.next')}: ${nextStep.name}</span>` : ''}
+            ${nextStep ? html`<span class="pf-agd-zone2-desc"> ${t('profile.agents.detail.state.next')}: ${nextStep.title || nextStep.id}</span>` : ''}
           </div>
           <div class="pf-agd-progress-bar">
             <div class="pf-agd-progress-fill" style="width: ${pct}%"></div>
@@ -252,7 +252,7 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
           <div class="pf-agd-step-pills">
             ${steps.map(s => html`
               <span key=${s.id} class="pf-agd-step-pill pf-agd-step-pill--${s.status}">
-                ${s.status === 'passed' ? '✓' : '○'} ${s.name?.split(' ').slice(0, 2).join(' ') || s.id}
+                ${s.status === 'passed' ? '✓' : '○'} ${s.title || s.id}
               </span>
             `)}
           </div>

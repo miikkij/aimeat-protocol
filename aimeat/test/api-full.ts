@@ -18,6 +18,7 @@ if (!process.env.E2E_BASE) {
     // No external server specified — start one in-process
     process.env.AIMEAT_PORT = String(TEST_PORT);
     process.env.AIMEAT_DEV_MODE = 'true';
+    process.env.AIMEAT_TEST_MODE = 'true';
     if (!process.env.AIMEAT_ADMIN_PASSWORD) {
         process.env.AIMEAT_ADMIN_PASSWORD = randomBytes(16).toString('base64url');
     }

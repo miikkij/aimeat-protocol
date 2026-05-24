@@ -128,12 +128,14 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
   const hasAreas = memoryAreas.length > 0;
   const hasResources = resources.length > 0;
 
-  if (!hasTags && !hasAreas && !hasResources && !addingTag) {
+  if (!hasTags && !hasAreas && !hasResources && !addingTag && !addingArea && !addingPackage) {
     return html`
       <div>
         <div class="pf-agd-empty">${t('profile.agents.detail.empty.data_access')}</div>
         <div class="pf-agd-form-actions">
           <button class="btn-outline btn-sm" onClick=${() => setAddingTag(true)}>+ ${t('profile.agents.detail.data_access.addTag')}</button>
+          <button class="btn-outline btn-sm" onClick=${() => setAddingArea(true)}>+ ${t('profile.agents.detail.data_access.addArea')}</button>
+          <button class="btn-outline btn-sm" onClick=${() => setAddingPackage(true)}>+ ${t('profile.agents.detail.data_access.linkPackage')}</button>
         </div>
       </div>
     `;
