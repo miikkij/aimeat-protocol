@@ -12,6 +12,7 @@
  *   v1.5.0 -- 2026-05-22 -- Add Capabilities sub-tab with technical/domain skill display
  *   v1.6.0 -- 2026-05-22 -- Add Activity sub-tab with stats, chart, scheduled jobs, event log
  *   v1.7.0 -- 2026-05-22 -- Add Services and Messages sub-tabs
+ *   v2.1.0 -- 2026-05-24 -- Fix: scroll-to on board click, agent count badge in header
  *   v2.0.0 -- 2026-05-24 -- Plan 4: Shared Agent Board + expandable cards with Two-Zone Header + 8-tab bar
  */
 import { h } from 'preact';
@@ -311,7 +312,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
   if (!agents) return html`<${Spinner} text=${t('profile.agents.loadingAgents')} />`;
 
   return html`
-    <div class="section-title">${t('profile.agents.title')}</div>
+    <div class="section-title">${t('profile.agents.title')}${agents.length > 0 ? html` <span class="pf-agd-count-badge">(${agents.length})</span>` : ''}</div>
     <div class="section-desc">${t('profile.agents.desc')}</div>
 
     ${pendingRequests.length > 0 && html`
@@ -414,9 +415,16 @@ export default function AgentsTab({ session, showToast, onStats }) {
         <${SharedBoard}
           agents=${agents}
           onboardings=${onboardings}
-          onAgentClick=${(name) => { setExpandedAgent(name); }}
+          onAgentClick=${(name) => {
+            setExpandedAgent(name);
+            requestAnimationFrame(() => {
+              const el = document.querySelector(`[data-agent-name="${name}"]`);
+              el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+          }}
         />
         ${agents.map(a => html`
+          <div data-agent-name=${a.name}>
           <${AgentCard}
             key=${a.name}
             agent=${a}
@@ -430,6 +438,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
             onDeleteClick=${handleDeleteAgent}
             onFederateToggle=${toggleFederate}
           />
+          </div>
         `)}
       `
     }

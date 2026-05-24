@@ -3,6 +3,7 @@
  * @description Shared Agent Board component. Shows fleet-wide overview grid
  *   above agent cards with mini-cards per agent and shared tag summary.
  * @version-history
+ *   v1.1.0 -- 2026-05-24 -- Fix: board card name colored by state, fix locale prefix
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  */
 
@@ -45,7 +46,7 @@ export default function SharedBoard({ agents, onboardings, onAgentClick }) {
             style="border-left-color: ${getStateColor(state)}"
             onClick=${() => onAgentClick?.(agent.name)}
           >
-            <div class="pf-agd-board-card-name">${agent.display_name || agent.name}</div>
+            <div class="pf-agd-board-card-name" style="color: ${getStateColor(state)}">${agent.display_name || agent.name}</div>
             <div class="pf-agd-board-card-activity">
               ${renderActivitySummary(state, agent, onboarding)}
             </div>
@@ -59,7 +60,7 @@ export default function SharedBoard({ agents, onboardings, onAgentClick }) {
       </div>
       ${Object.keys(allTags).length > 0 && html`
         <div class="pf-agd-board-tags">
-          ${t('agents.detail.sharedTags')}: ${Object.entries(allTags).map(([tag, count]) =>
+          ${t('profile.agents.detail.sharedTags')}: ${Object.entries(allTags).map(([tag, count]) =>
             html`<span class="pf-agd-tag-pill" key=${tag}>[${tag}] (${count})</span> `
           )}
         </div>
@@ -71,19 +72,19 @@ export default function SharedBoard({ agents, onboardings, onAgentClick }) {
 function renderActivitySummary(state, agent, onboarding) {
   switch (state) {
     case 'new':
-      return t('agents.detail.state.newSummary');
+      return t('profile.agents.detail.state.newSummary');
     case 'onboarding': {
       const passed = onboarding?.steps?.filter(s => s.status === 'passed').length ?? 0;
       const total = onboarding?.steps?.length ?? 11;
-      return `${t('agents.detail.state.onboarding')}: ${passed}/${total}`;
+      return `${t('profile.agents.detail.state.onboarding')}: ${passed}/${total}`;
     }
     case 'problem':
-      return t('agents.detail.state.problemSummary');
+      return t('profile.agents.detail.state.problemSummary');
     case 'production':
     default:
       return agent.last_seen
-        ? `${t('agents.detail.lastSeen')}: ${formatTimeAgo(agent.last_seen)}`
-        : t('agents.detail.state.idle');
+        ? `${t('profile.agents.detail.lastSeen')}: ${formatTimeAgo(agent.last_seen)}`
+        : t('profile.agents.detail.state.idle');
   }
 }
 

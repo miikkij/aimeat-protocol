@@ -7,6 +7,7 @@
  *   - AgentTasksSubtab (default export) -- main component
  *   - TaskItem -- task row with expand/collapse, todo list, start button
  * @version-history
+ *   v3.1.0 -- 2026-05-24 -- Fix: use correct locale key for empty state
  *   v3.0.0 -- 2026-05-22 -- Replace TaskCreateForm with TaskCreationBuilder (design spec split-panel)
  *   v2.1.0 -- 2026-05-22 -- Fix: use camelCase field names from API; add task and todo timestamps
  *   v2.0.0 -- 2026-05-22 -- Add todo rendering, Start button, progress tracking
@@ -269,7 +270,7 @@ export default function AgentTasksSubtab({ agentName, session, showToast }) {
       `}
 
       ${tasks.length === 0 && !showCreate && html`
-        <div class="agd-empty">${t('profile.agents.tasks.empty')}</div>
+        <div class="agd-empty">${t('profile.agents.detail.empty.tasks')}</div>
       `}
     </div>
   `;

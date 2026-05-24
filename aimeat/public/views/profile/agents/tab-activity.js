@@ -3,6 +3,7 @@
  * @description Enhanced Activity tab with governance filter and category badges.
  *   Wraps the existing activity subtab with additional filter pills.
  * @version-history
+ *   v1.1.0 -- 2026-05-24 -- Fix: HH:MM timestamps, token budget %, readiness/override categories, audit trail footer, fix locale prefix
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  */
 
@@ -29,7 +30,7 @@ function eventCategory(event) {
   const type = (event.type || event.event || '').toLowerCase();
   if (type.includes('task') || type.includes('todo')) return 'tasks';
   if (type.includes('message') || type.includes('msg')) return 'messages';
-  if (type.includes('approve') || type.includes('scope') || type.includes('permission') || type.includes('governance') || type.includes('policy')) return 'governance';
+  if (type.includes('approve') || type.includes('scope') || type.includes('permission') || type.includes('governance') || type.includes('policy') || type.includes('readiness') || type.includes('override')) return 'governance';
   return 'system';
 }
 
@@ -110,7 +111,7 @@ export default function TabActivity({ agentName, session, showToast }) {
   }
 
   if (events.length === 0 && !stats) {
-    return html`<div class="agd-empty">${t('agents.detail.empty.activity')}</div>`;
+    return html`<div class="agd-empty">${t('profile.agents.detail.empty.activity')}</div>`;
   }
 
   const filtered = filter === 'all' ? events : events.filter(ev => eventCategory(ev) === filter);
@@ -143,7 +144,7 @@ export default function TabActivity({ agentName, session, showToast }) {
             ${governance.budget ? html`
               <div class="agd-governance-item">
                 <span class="agd-governance-label">${t('governance.tokenBudget')}</span>
-                <span class="agd-governance-value">${(governance.tokensUsedToday || 0).toLocaleString()} / ${(governance.budget.max_tokens_per_day || '---').toLocaleString()}</span>
+                <span class="agd-governance-value">${(governance.tokensUsedToday || 0).toLocaleString()} / ${(governance.budget.max_tokens_per_day || '---').toLocaleString()}${governance.budget.max_tokens_per_day ? ` (${Math.round((governance.tokensUsedToday || 0) / governance.budget.max_tokens_per_day * 100)}%)` : ''}</span>
               </div>
             ` : ''}
             <div class="agd-governance-item">
@@ -164,7 +165,7 @@ export default function TabActivity({ agentName, session, showToast }) {
             <span class="agd-governance-value">
               ${governance.webhookEnabled
                 ? `${t('profile.agents.webhook.title')}: ${governance.webhookSuccessCount}/${governance.webhookTotalCount}`
-                : t('agents.detail.integration.webhookNotConfigured')
+                : t('profile.agents.detail.integration.webhookNotConfigured')
               }
             </span>
           </div>
@@ -188,13 +189,13 @@ export default function TabActivity({ agentName, session, showToast }) {
       <!-- Event log -->
       <div class="agd-event-log-scroll">
         ${filtered.length === 0 && html`
-          <div class="agd-empty">${t('agents.detail.empty.activity')}</div>
+          <div class="agd-empty">${t('profile.agents.detail.empty.activity')}</div>
         `}
         ${filtered.map((ev, i) => {
           const cat = eventCategory(ev);
           return html`
             <div key=${ev.id || i} class="agd-log-entry">
-              <span class="agd-log-time">${ev.timestamp ? timeAgo(ev.timestamp) : '-'}</span>
+              <span class="agd-log-time">${ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</span>
               <span class="pf-agd-event-badge pf-agd-event-badge--${cat}">${cat}</span>
               <span class="agd-log-type">${ev.type || ev.event || '-'}</span>
               <span class="agd-log-msg">${ev.message || ''}</span>
@@ -205,9 +206,11 @@ export default function TabActivity({ agentName, session, showToast }) {
 
       ${hasMore && html`
         <button class="btn-ghost btn-sm" onClick=${handleLoadMore}>
-          ${t('agents.detail.showAll')}
+          ${t('profile.agents.detail.showAll')}
         </button>
       `}
+
+      <div class="pf-agd-help-text">${t('profile.agents.detail.activity.auditTrail')}</div>
     </div>
   `;
 }

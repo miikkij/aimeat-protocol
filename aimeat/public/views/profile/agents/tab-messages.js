@@ -3,6 +3,7 @@
  * @description Messages tab with command palette, "/" autocomplete, and chat area.
  *   Wraps the existing messages subtab and adds command discovery.
  * @version-history
+ *   v1.1.0 -- 2026-05-24 -- Fix: command palette hint text, slash command visual distinction, fix locale prefix
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  */
 
@@ -23,12 +24,15 @@ function CommandPalette({ commands, onSend }) {
     return html`
       <div class="pf-agd-commands">
         <div class="pf-agd-commands-header" onClick=${() => setExpanded(!expanded)}>
-          <span>${t('agents.detail.commands.title')} (0)</span>
+          <span>${t('profile.agents.detail.commands.title')} (0)</span>
           <span>${expanded ? '▼' : '▶'}</span>
         </div>
         ${expanded && html`
           <div class="pf-agd-commands-body">
-            <div class="agd-empty">${t('agents.detail.commands.noCommands')}</div>
+            <div class="agd-empty">
+              ${t('profile.agents.detail.commands.noCommands')}
+              <div class="pf-agd-help-text">${t('profile.agents.detail.commands.noCommandsHint')}</div>
+            </div>
           </div>
         `}
       </div>
@@ -38,7 +42,7 @@ function CommandPalette({ commands, onSend }) {
   const categories = useMemo(() => {
     const cats = {};
     for (const cmd of commands) {
-      const cat = cmd.category || t('agents.detail.commands.defaultCategory');
+      const cat = cmd.category || t('profile.agents.detail.commands.defaultCategory');
       if (!cats[cat]) cats[cat] = [];
       cats[cat].push(cmd);
     }
@@ -48,7 +52,7 @@ function CommandPalette({ commands, onSend }) {
   return html`
     <div class="pf-agd-commands">
       <div class="pf-agd-commands-header" onClick=${() => setExpanded(!expanded)}>
-        <span>${t('agents.detail.commands.title')} (${commands.length} ${t('agents.detail.commands.available')})</span>
+        <span>${t('profile.agents.detail.commands.title')} (${commands.length} ${t('profile.agents.detail.commands.available')})</span>
         <span>${expanded ? '▼' : '▶'}</span>
       </div>
       ${expanded && html`
@@ -61,7 +65,7 @@ function CommandPalette({ commands, onSend }) {
                   <span class="pf-agd-command-name">${cmd.name}</span>
                   <span class="pf-agd-command-desc">${cmd.description || ''}</span>
                   <button class="btn-outline btn-sm" onClick=${() => onSend(cmd.name)}>
-                    ${t('agents.detail.commands.send')}
+                    ${t('profile.agents.detail.commands.send')}
                   </button>
                 </div>
               `)}
@@ -144,7 +148,7 @@ export default function TabMessages({ agentName, session, showToast }) {
       setShowAutocomplete(false);
       await loadMessages();
     } catch (err) {
-      showToast(err.message || t('agents.detail.messages.sendError'), true);
+      showToast(err.message || t('profile.agents.detail.messages.sendError'), true);
     }
     setSending(false);
   }
@@ -198,15 +202,15 @@ export default function TabMessages({ agentName, session, showToast }) {
       `}
 
       ${messages.length === 0 && !loading && html`
-        <div class="agd-empty">${t('agents.detail.empty.messages')}</div>
+        <div class="agd-empty">${t('profile.agents.detail.empty.messages')}</div>
       `}
 
       ${messages.length > 0 && html`
         <div class="agd-msg-history" ref=${historyRef}>
           ${[...messages].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)).map(msg => html`
             <div key=${msg.id || msg.createdAt}>
-              <div class="agd-msg-bubble ${msg.direction === 'inbound' ? 'agd-msg-inbound' : 'agd-msg-outbound'}">
-                ${msg.content}
+              <div class="agd-msg-bubble ${msg.direction === 'inbound' ? 'agd-msg-inbound' : 'agd-msg-outbound'} ${(msg.content || '').startsWith('/') ? 'pf-agd-msg-command' : ''}">
+                ${(msg.content || '').startsWith('/') ? html`<span class="pf-agd-command-badge">${t('profile.agents.detail.messages.command')}</span> ` : ''}${msg.content}
               </div>
               <div class="agd-msg-meta ${msg.direction === 'inbound' ? 'agd-msg-meta-right' : ''}">
                 ${msg.createdAt ? html`<span class="agd-msg-time">${new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> ${timeAgo(msg.createdAt)}` : ''}
@@ -232,7 +236,7 @@ export default function TabMessages({ agentName, session, showToast }) {
             value=${draft}
             onInput=${handleInput}
             onKeyDown=${handleKeyDown}
-            placeholder=${t('agents.detail.messages.placeholder')}
+            placeholder=${t('profile.agents.detail.messages.placeholder')}
             rows="1"
           />
         </div>
@@ -240,7 +244,7 @@ export default function TabMessages({ agentName, session, showToast }) {
           ${t('profile.agents.messages.send')}
         </button>
       </div>
-      <div class="agd-msg-meta">${t('agents.detail.messages.hint')}</div>
+      <div class="agd-msg-meta">${t('profile.agents.detail.messages.hint')}</div>
     </div>
   `;
 }

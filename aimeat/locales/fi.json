@@ -565,6 +565,9 @@
         "readiness": "Valmius",
         "identity": "Identiteetti",
         "deliveryLog": "Toimitushistoria",
+        "today": "Tänään",
+        "done": "tehty",
+        "active": "aktiivinen",
         "showAll": "Näytä kaikki",
         "showLess": "Näytä vähemmän",
         "zone2": {
@@ -575,7 +578,10 @@
           "problemTitle": "Toimitusongelma",
           "webhookFailed": "Webhook epäonnistunut {count} kertaa peräkkäin",
           "noTelemetry": "Ei telemetriaa 24+ tuntiin",
-          "diagnose": "Diagnosoi"
+          "diagnose": "Diagnosoi",
+          "testWebhook": "Testaa webhook",
+          "updateUrl": "Päivitä URL",
+          "overrideReadiness": "Ohita valmiustaso"
         },
         "integration": {
           "checklistTitle": "Hello-integraatio",
@@ -589,19 +595,30 @@
           "channel": "Kanava",
           "result": "Tulos",
           "latency": "Viive",
-          "webhookNotConfigured": "Webhookia ei ole määritetty"
+          "webhookNotConfigured": "Webhookia ei ole määritetty",
+          "editWebhook": "Muokkaa webhookia",
+          "platformVersion": "Versio",
+          "detectionMethod": "Tunnistus",
+          "autoDetected": "automaattinen",
+          "update": "Päivitä",
+          "lastValidated": "Viimeksi vahvistettu",
+          "strengths": "Vahvuudet",
+          "gaps": "Puutteet",
+          "roles": "Roolit"
         },
         "commands": {
           "title": "Agentin komennot",
           "available": "saatavilla",
           "noCommands": "Ei rekisteröityjä komentoja",
+          "noCommandsHint": "Agentti voi rekisteröidä komentoja kirjoittamalla komentojen muistiavaimeen.",
           "send": "Lähetä",
           "defaultCategory": "Yleinen"
         },
         "messages": {
           "placeholder": "Kirjoita / komennoille tai viesti...",
           "hint": "Kirjoita / nähdäksesi saatavilla olevat komennot",
-          "sendError": "Viestin lähetys epäonnistui"
+          "sendError": "Viestin lähetys epäonnistui",
+          "command": "komento"
         },
         "dataAccess": {
           "sharedTagsTitle": "Jaetut tunnisteet",
@@ -616,9 +633,28 @@
           "noTags": "Ei tunnisteita",
           "memoryAreasTitle": "Agentin muistialueet",
           "knowledgeTitle": "Tietopaketit",
-          "effectiveScope": "Agentin tehokas datan laajuus"
+          "effectiveScope": "Agentin tehokas datan laajuus",
+          "tagsHelp": "Tagit luovat jaettuja muistialueita. Kaikki agentit samalla tagilla voivat lukea ja kirjoittaa agents.tag.{name}.* -- ne löytävät toisensa automaattisesti.",
+          "addArea": "Lisää alue",
+          "areaKeyPlaceholder": "Avainprefiksi (esim. agents.tietoni.)",
+          "areaDescPlaceholder": "Kuvaus",
+          "areaAdded": "Muistialue lisätty",
+          "linkPackage": "Linkitä paketti",
+          "packageLinked": "Tietopaketti linkitetty",
+          "noPackagesAvailable": "Ei saatavilla olevia tietopaketteja",
+          "noAreas": "Ei muistialueita määritetty",
+          "noPackages": "Ei tietopaketteja linkitetty",
+          "scopeNote": "Tämä laajuusyhteenveto sisältyy agentin taitopakettiin, jotta se tietää tietorajansa."
         },
         "agentConfig": {
+          "copy": "Kopioi",
+          "download": "Lataa",
+          "edit": "Muokkaa",
+          "save": "Tallenna",
+          "cancel": "Peruuta",
+          "upload": "Lataa asetustiedosto",
+          "saved": "Asetustiedosto tallennettu",
+          "uploaded": "Asetustiedosto ladattu",
           "viewing": "Katsellaan"
         },
         "activity": {
@@ -626,7 +662,16 @@
           "filterTasks": "Tehtävät",
           "filterMessages": "Viestit",
           "filterGovernance": "Hallinto",
-          "filterSystem": "Järjestelmä"
+          "filterSystem": "Järjestelmä",
+          "auditTrail": "Tapahtumaloki on vain lisättävä auditointipolku. Hallintotapahtumat vaikuttavat agentin luottamuspisteisiin."
+        },
+        "directives": {
+          "footer": "Direktiivit sisältyvät jokaiseen taitopaketin päivitykseen. Agentti vastaanottaa nämä käyttäytymisrajoituksina."
+        },
+        "services": {
+          "info": "Palvelut julistetaan agentin toimesta Hello-integraation vaiheessa 11 (valinnainen). Ne määrittelevät mitä agentti tarjoaa muille agenteille ja verkolle.",
+          "active": "Aktiivinen",
+          "inactive": "Ei aktiivinen"
         },
         "empty": {
           "tasks": "Ei tehtäviä. Luo tehtävä antaaksesi agentille työtä.",

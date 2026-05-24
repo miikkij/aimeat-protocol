@@ -8,6 +8,7 @@
  *   - RulesList -- displays rules with source badges
  *   - EditableRules -- editable agent-level rules in edit mode
  * @version-history
+ *   v1.1.0 -- 2026-05-24 -- Remove memory areas/resources (moved to Data Access); add footer note
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  */
 import { h } from 'preact';
@@ -212,32 +213,11 @@ export default function AgentDirectivesSubtab({ agentName, session, showToast })
           `}
         </div>
 
-        ${memoryAreas.length > 0 && html`
-          <div class="agd-directive-section">
-            <h4>${tFallback('profile.agents.directives.memoryAreas', 'Memory Areas')}</h4>
-            ${memoryAreas.map(area => html`
-              <div class="agd-list-item" key=${area.key || area}>
-                <code>${area.key || area}</code>
-                ${area.access && html` -- ${area.access}`}
-                ${area.description && html` -- ${area.description}`}
-              </div>
-            `)}
-          </div>
-        `}
+        <div class="agd-directive-footer">
+          ${t('profile.agents.detail.directives.footer')}
+        </div>
 
-        ${resources.length > 0 && html`
-          <div class="agd-directive-section">
-            <h4>${tFallback('profile.agents.directives.resources', 'Resources')}</h4>
-            ${resources.map(res => html`
-              <div class="agd-list-item" key=${res.url || res}>
-                <code>${res.url || res}</code>
-                ${res.description && html` -- ${res.description}`}
-              </div>
-            `)}
-          </div>
-        `}
-
-        ${!purpose && rules.length === 0 && memoryAreas.length === 0 && resources.length === 0 && html`
+        ${!purpose && rules.length === 0 && html`
           <div class="agd-empty">
             ${tFallback('profile.agents.directives.empty', 'No directives configured for this agent. Click Edit to add rules and purpose.')}
           </div>

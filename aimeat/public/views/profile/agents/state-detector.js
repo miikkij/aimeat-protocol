@@ -4,6 +4,7 @@
  *   States: 'new' | 'onboarding' | 'production' | 'problem'
  *   Also provides default tab selection and state color mapping.
  * @version-history
+ *   v1.1.0 -- 2026-05-24 -- Fix: onboarding color to yellow, add readiness drop detection for problem state
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  */
 
@@ -17,7 +18,9 @@ export function detectAgentState(agent, onboarding) {
 
   const webhookDown = (agent.webhookFailCount ?? 0) >= 5;
   const noTelemetry = !agent.last_seen || isStale(agent.last_seen, 24 * 60);
-  if (webhookDown || noTelemetry) return 'problem';
+  const readinessDrop = onboarding.previousReadinessLevel && onboarding.readinessLevel
+    && readinessRank(onboarding.readinessLevel) < readinessRank(onboarding.previousReadinessLevel);
+  if (webhookDown || noTelemetry || readinessDrop) return 'problem';
 
   return 'production';
 }
@@ -35,7 +38,7 @@ export function getDefaultTab(state) {
 export function getStateColor(state) {
   switch (state) {
     case 'new': return 'var(--warning)';
-    case 'onboarding': return 'var(--info)';
+    case 'onboarding': return 'var(--warning)';
     case 'problem': return 'var(--danger)';
     case 'production': return 'var(--success)';
     default: return 'var(--text-muted)';
@@ -50,6 +53,11 @@ export function getStateLabel(state) {
     problem: 'agents.detail.state.problem',
   };
   return map[state] || 'agents.detail.state.production';
+}
+
+const READINESS_RANKS = { none: 0, basic: 1, standard: 2, advanced: 3, full: 4 };
+function readinessRank(level) {
+  return READINESS_RANKS[level] ?? 0;
 }
 
 function isStale(isoDate, thresholdMinutes) {

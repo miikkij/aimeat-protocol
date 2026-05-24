@@ -10,6 +10,7 @@
  *   v1.3.0 -- 2026-05-22 -- Add Services and Messages sub-tab styles
  *   v1.6.0 -- 2026-05-22 -- Add Task Creation Builder split-panel styles
  *   v1.5.0 -- 2026-05-22 -- Add task timestamp and todo completion time styles
+ *   v2.0.0 -- 2026-05-24 -- Add styles for audit fix components (status dots, config actions, URL forms, help text)
  *   v1.4.0 -- 2026-05-22 -- Add Task TODO list, progress, environment badges, Start button styles
  */
 
@@ -1541,6 +1542,150 @@
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+/* ── Audit fix additions ── */
+
+/* Status dots (active/inactive) */
+.pf .pf-agd-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 0.35rem;
+  flex-shrink: 0;
+}
+.pf .pf-agd-status-dot--active { background: var(--success, #10b981); }
+.pf .pf-agd-status-dot--inactive { background: var(--text-dim, #6B7280); }
+
+/* Active/Inactive badges */
+.pf .pf-agd-badge--active { background: var(--success, #10b981); color: var(--bg, #fff); }
+.pf .pf-agd-badge--inactive { background: var(--card-bg-alt, #F3F4F6); color: var(--text-dim, #6B7280); }
+
+/* Config tab: action buttons row */
+.pf .pf-agd-config-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+/* Config tab: edit textarea */
+.pf .pf-agd-config-edit {
+  margin-top: 0.5rem;
+}
+.pf .pf-agd-config-textarea {
+  width: 100%;
+  min-height: 200px;
+  padding: 0.5rem;
+  font-family: monospace;
+  font-size: 0.82rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 6px;
+  background: var(--card, #fff);
+  color: var(--text, #1A1A2E);
+  resize: vertical;
+}
+
+/* Zone 2 inline URL form */
+.pf .pf-agd-zone2-url-form {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+.pf .pf-agd-zone2-url-form input {
+  flex: 1;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 4px;
+  font-size: 0.82rem;
+}
+
+/* Help text (footer notes, explanatory text) */
+.pf .pf-agd-help-text {
+  font-size: 0.75rem;
+  color: var(--text-dim, #6B7280);
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}
+
+/* Directive footer */
+.pf .agd-directive-footer {
+  font-size: 0.75rem;
+  color: var(--text-dim, #6B7280);
+  margin-top: 1rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border, #E5E7EB);
+  line-height: 1.4;
+}
+
+/* Delivery method status indicator */
+.pf .pf-agd-delivery-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+/* Data access: area form */
+.pf .pf-agd-area-form {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+.pf .pf-agd-area-form input,
+.pf .pf-agd-area-form select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 4px;
+  font-size: 0.82rem;
+}
+.pf .pf-agd-area-form input { flex: 1; min-width: 120px; }
+
+/* Data access: package picker */
+.pf .pf-agd-package-picker {
+  margin-bottom: 0.5rem;
+}
+.pf .pf-agd-package-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.pf .pf-agd-package-option:hover { background: var(--card-bg-alt, #F3F4F6); }
+.pf .pf-agd-package-count {
+  font-size: 0.72rem;
+  color: var(--text-dim, #6B7280);
+}
+
+/* Agent count badge in section header */
+.pf .pf-agd-count-badge {
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: var(--text-dim, #6B7280);
+}
+
+/* Command badge for slash command messages */
+.pf .pf-agd-command-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--accent-subtle, rgba(232, 86, 74, 0.1));
+  color: var(--accent, #E8564A);
+  font-weight: 500;
+  margin-right: 0.25rem;
+}
+
+/* Slash command message bubble */
+.pf .pf-agd-msg-command {
+  border-left: 2px solid var(--accent, #E8564A);
 }
 .pf .pf-agd-service-status--active { background: var(--success, #10b981); }
 .pf .pf-agd-service-status--inactive { background: var(--text-muted, #9CA3AF); }

@@ -565,6 +565,9 @@
         "readiness": "Readiness",
         "identity": "Identity",
         "deliveryLog": "Delivery Log",
+        "today": "Today",
+        "done": "done",
+        "active": "active",
         "showAll": "Show all",
         "showLess": "Show less",
         "zone2": {
@@ -575,7 +578,10 @@
           "problemTitle": "Delivery issue",
           "webhookFailed": "Webhook failed {count} consecutive times",
           "noTelemetry": "No telemetry received for 24+ hours",
-          "diagnose": "Diagnose"
+          "diagnose": "Diagnose",
+          "testWebhook": "Test webhook",
+          "updateUrl": "Update URL",
+          "overrideReadiness": "Override readiness"
         },
         "integration": {
           "checklistTitle": "Hello Integration",
@@ -589,19 +595,30 @@
           "channel": "Channel",
           "result": "Result",
           "latency": "Latency",
-          "webhookNotConfigured": "Webhook not configured"
+          "webhookNotConfigured": "Webhook not configured",
+          "editWebhook": "Edit webhook",
+          "platformVersion": "Version",
+          "detectionMethod": "Detection",
+          "autoDetected": "auto-detected",
+          "update": "Update",
+          "lastValidated": "Last validated",
+          "strengths": "Strengths",
+          "gaps": "Gaps",
+          "roles": "Roles"
         },
         "commands": {
           "title": "Agent Commands",
           "available": "available",
           "noCommands": "No commands registered",
+          "noCommandsHint": "The agent can register commands by writing to its commands memory key.",
           "send": "Send",
           "defaultCategory": "General"
         },
         "messages": {
           "placeholder": "Type / for commands or a message...",
           "hint": "Type / to see available commands",
-          "sendError": "Failed to send message"
+          "sendError": "Failed to send message",
+          "command": "command"
         },
         "dataAccess": {
           "sharedTagsTitle": "Shared Tags",
@@ -616,9 +633,28 @@
           "noTags": "No tags assigned",
           "memoryAreasTitle": "Agent Memory Areas",
           "knowledgeTitle": "Knowledge Packages",
-          "effectiveScope": "Effective data scope for this agent"
+          "effectiveScope": "Effective data scope for this agent",
+          "tagsHelp": "Tags create shared memory areas. All agents with the same tag can read and write to agents.tag.{name}.* -- they discover each other automatically.",
+          "addArea": "Add area",
+          "areaKeyPlaceholder": "Key prefix (e.g., agents.mydata.)",
+          "areaDescPlaceholder": "Description",
+          "areaAdded": "Memory area added",
+          "linkPackage": "Link package",
+          "packageLinked": "Knowledge package linked",
+          "noPackagesAvailable": "No knowledge packages available",
+          "noAreas": "No memory areas assigned",
+          "noPackages": "No knowledge packages linked",
+          "scopeNote": "This scope summary is included in the agent's skill bundle so it knows its data boundaries."
         },
         "agentConfig": {
+          "copy": "Copy",
+          "download": "Download",
+          "edit": "Edit",
+          "save": "Save",
+          "cancel": "Cancel",
+          "upload": "Upload config file",
+          "saved": "Config file saved",
+          "uploaded": "Config file uploaded",
           "viewing": "Viewing"
         },
         "activity": {
@@ -626,7 +662,16 @@
           "filterTasks": "Tasks",
           "filterMessages": "Messages",
           "filterGovernance": "Governance",
-          "filterSystem": "System"
+          "filterSystem": "System",
+          "auditTrail": "Activity log is an append-only audit trail. Governance events feed into the agent's trust score."
+        },
+        "directives": {
+          "footer": "Directives are included in every skill bundle update. The agent receives these as behavioral constraints."
+        },
+        "services": {
+          "info": "Services are declared by the agent during Hello Integration Step 11 (optional). They define what the agent offers to other agents and the network.",
+          "active": "Active",
+          "inactive": "Inactive"
         },
         "empty": {
           "tasks": "No tasks yet. Create a task to give this agent work.",
