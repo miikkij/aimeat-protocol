@@ -38,6 +38,7 @@ export function adminAgentIntegrationRouter(config: AimeatConfig, storage: Stora
       id: p.id,
       display_name: p.displayName,
       bundle_name: p.bundleName,
+      detect_pattern: p.detectPattern,
       agent_count: platformCounts[p.id] ?? 0,
     }));
 
@@ -48,6 +49,7 @@ export function adminAgentIntegrationRouter(config: AimeatConfig, storage: Stora
         id: 'other',
         display_name: 'Other / Unknown',
         bundle_name: 'aimeat-agent',
+        detect_pattern: '*',
         agent_count: otherCount,
       });
     }

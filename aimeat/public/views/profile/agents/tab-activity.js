@@ -19,11 +19,11 @@ import { getWebhookConfig, getTelemetry, getDeliveryLog } from '/js/services/age
 const html = htm.bind(h);
 
 const FILTERS = [
-  { id: 'all', key: 'agents.detail.activity.filterAll' },
-  { id: 'tasks', key: 'agents.detail.activity.filterTasks' },
-  { id: 'messages', key: 'agents.detail.activity.filterMessages' },
-  { id: 'governance', key: 'agents.detail.activity.filterGovernance' },
-  { id: 'system', key: 'agents.detail.activity.filterSystem' },
+  { id: 'all', key: 'profile.agents.detail.activity.filterAll' },
+  { id: 'tasks', key: 'profile.agents.detail.activity.filterTasks' },
+  { id: 'messages', key: 'profile.agents.detail.activity.filterMessages' },
+  { id: 'governance', key: 'profile.agents.detail.activity.filterGovernance' },
+  { id: 'system', key: 'profile.agents.detail.activity.filterSystem' },
 ];
 
 function eventCategory(event) {
@@ -153,7 +153,7 @@ export default function TabActivity({ agentName, session, showToast }) {
             </div>
             <div class="agd-governance-item">
               <span class="agd-governance-label">${t('governance.policyIssues')}</span>
-              <span class="agd-governance-value" style=${governance.policyIssues > 0 ? 'color:var(--warning)' : ''}>${governance.policyIssues}</span>
+              <span class="agd-governance-value ${governance.policyIssues > 0 ? 'pf-agd-warning-text' : ''}">${governance.policyIssues}</span>
             </div>
             <div class="agd-governance-item">
               <span class="agd-governance-label">${t('governance.telemetryEvents')}</span>

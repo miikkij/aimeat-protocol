@@ -233,7 +233,7 @@ export async function mountRoutes(
   app.use(agentWebhookRouter(config, storage));
   app.use(agentTelemetryRouter(config, storage));
   app.use(agentSkillBundleRouter(config, storage));
-  app.use(agentOnboardingRouter(config, storage));
+  app.use(agentOnboardingRouter(config, storage, webhookDispatcher));
   app.use(agentIntegrationRouter(config, storage));
   app.use(agentsRouter(config, storage));
   const notifyDirectoryChange = () => directoryService.notifyChange();

@@ -47,12 +47,12 @@ export function getStateColor(state) {
 
 export function getStateLabel(state) {
   const map = {
-    new: 'agents.detail.state.new',
-    onboarding: 'agents.detail.state.onboarding',
-    production: 'agents.detail.state.production',
-    problem: 'agents.detail.state.problem',
+    new: 'profile.agents.detail.state.new',
+    onboarding: 'profile.agents.detail.state.onboarding',
+    production: 'profile.agents.detail.state.production',
+    problem: 'profile.agents.detail.state.problem',
   };
-  return map[state] || 'agents.detail.state.production';
+  return map[state] || 'profile.agents.detail.state.production';
 }
 
 const READINESS_RANKS = { none: 0, basic: 1, standard: 2, advanced: 3, full: 4 };

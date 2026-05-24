@@ -438,11 +438,30 @@
         "cancel": "Peruuta",
         "reset": "Palauta oletukset",
         "resetConfirm": "Palauta agentin ohjeet oletuksiin?",
-        "empty": "Ohjeita ei määritetty",
+        "empty": "Ohjeita ei määritetty. Napsauta Muokkaa lisätäksesi sääntöjä ja tarkoituksen.",
         "addRule": "Lisää sääntö",
         "system": "Järjestelmä",
         "owner": "Omistaja",
-        "agent": "Agentti"
+        "agent": "Agentti",
+        "source": {
+          "system": "Järjestelmä",
+          "owner": "Omistaja",
+          "agent": "Agentti"
+        },
+        "noRules": "Sääntöjä ei määritetty",
+        "rulePlaceholder": "Kirjoita sääntö tai ohje...",
+        "removeRule": "Poista",
+        "saved": "Ohjeet tallennettu",
+        "saveError": "Tallennus epäonnistui",
+        "resetError": "Palautus epäonnistui",
+        "editing": "Ohjeiden muokkaus",
+        "purposePlaceholder": "Mihin tämä agentti on tarkoitettu?",
+        "systemRules": "Järjestelmäsäännöt",
+        "readOnly": "vain luku",
+        "ownerRules": "Omistajan säännöt",
+        "agentRules": "Agentin säännöt",
+        "saving": "Tallennetaan...",
+        "resetDefaults": "Palauta oletukset"
       },
       "capabilities": {
         "technical": "Tekniset taidot",

@@ -3,7 +3,6 @@
  * @description Messages tab with command palette, "/" autocomplete, and chat area.
  *   Wraps the existing messages subtab and adds command discovery.
  * @version-history
- *   v1.1.0 -- 2026-05-24 -- Fix: command palette hint text, slash command visual distinction, fix locale prefix
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  */
 
@@ -29,10 +28,7 @@ function CommandPalette({ commands, onSend }) {
         </div>
         ${expanded && html`
           <div class="pf-agd-commands-body">
-            <div class="agd-empty">
-              ${t('profile.agents.detail.commands.noCommands')}
-              <div class="pf-agd-help-text">${t('profile.agents.detail.commands.noCommandsHint')}</div>
-            </div>
+            <div class="agd-empty">${t('profile.agents.detail.commands.noCommands')}</div>
           </div>
         `}
       </div>
@@ -209,8 +205,8 @@ export default function TabMessages({ agentName, session, showToast }) {
         <div class="agd-msg-history" ref=${historyRef}>
           ${[...messages].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)).map(msg => html`
             <div key=${msg.id || msg.createdAt}>
-              <div class="agd-msg-bubble ${msg.direction === 'inbound' ? 'agd-msg-inbound' : 'agd-msg-outbound'} ${(msg.content || '').startsWith('/') ? 'pf-agd-msg-command' : ''}">
-                ${(msg.content || '').startsWith('/') ? html`<span class="pf-agd-command-badge">${t('profile.agents.detail.messages.command')}</span> ` : ''}${msg.content}
+              <div class="agd-msg-bubble ${msg.direction === 'inbound' ? 'agd-msg-inbound' : 'agd-msg-outbound'}">
+                ${msg.content}
               </div>
               <div class="agd-msg-meta ${msg.direction === 'inbound' ? 'agd-msg-meta-right' : ''}">
                 ${msg.createdAt ? html`<span class="agd-msg-time">${new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> ${timeAgo(msg.createdAt)}` : ''}

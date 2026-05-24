@@ -4,7 +4,6 @@
  *   during onboarding or production status (connection, platform, readiness,
  *   identity, delivery log) after completion.
  * @version-history
- *   v1.1.0 -- 2026-05-24 -- Fix: edit webhook, delivery status, platform version/detection, last validated, roles, fix locale prefix
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  */
 
@@ -16,7 +15,7 @@ import { timeAgo, copyToClipboard } from '/js/utils.js';
 import { detectAgentState } from './state-detector.js';
 import {
   getOnboarding, startOnboarding,
-  getWebhookConfig, testWebhook, updateWebhook,
+  getWebhookConfig, testWebhook,
   getSkillBundleVersion, getSkillBundleUrl,
   getDeliveryLog
 } from '/js/services/agent-integration.js';
@@ -34,8 +33,6 @@ export default function TabIntegration({ agent, onboarding, session, showToast, 
   const [copiedCmd, setCopiedCmd] = useState(false);
   const [showAllDeliveries, setShowAllDeliveries] = useState(false);
   const [allDeliveries, setAllDeliveries] = useState(null);
-  const [editingWebhook, setEditingWebhook] = useState(false);
-  const [editWebhookUrl, setEditWebhookUrl] = useState('');
 
   async function loadData() {
     setLoading(true);
@@ -122,19 +119,7 @@ export default function TabIntegration({ agent, onboarding, session, showToast, 
 
   const displayDeliveries = showAllDeliveries && allDeliveries ? allDeliveries : deliveries;
 
-  async function handleSaveWebhook(e) {
-    e.stopPropagation();
-    try {
-      await updateWebhook(agentName, { url: editWebhookUrl });
-      showToast(t('profile.agents.webhook.testSuccess'));
-      setEditingWebhook(false);
-      loadData();
-    } catch (err) { showToast(err.message || t('profile.unknownError'), true); }
-  }
-
-  return renderProductionView(agent, onboarding, webhook, bundleVersion, displayDeliveries, handleTestWebhook, testing, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleShowAll, showAllDeliveries, {
-    editingWebhook, setEditingWebhook, editWebhookUrl, setEditWebhookUrl, handleSaveWebhook, showToast,
-  });
+  return renderProductionView(agent, onboarding, webhook, bundleVersion, displayDeliveries, handleTestWebhook, testing, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleShowAll, showAllDeliveries);
 }
 
 function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, handleCopyInstall, copiedCmd) {
@@ -192,22 +177,15 @@ function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, han
   `;
 }
 
-function renderProductionView(agent, onboarding, webhook, bundleVersion, displayDeliveries, handleTestWebhook, testing, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleShowAll, showAllDeliveries, ctx = {}) {
+function renderProductionView(agent, onboarding, webhook, bundleVersion, displayDeliveries, handleTestWebhook, testing, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleShowAll, showAllDeliveries) {
   const steps = onboarding?.steps || [];
   const agentName = agent.name;
-  const webhookHealthy = webhook && (webhook.failCount ?? 0) < 5;
-  const deliveryMethod = webhook ? (webhookHealthy ? 'Webhook + MCP' : 'Webhook (failing)') : 'Polling only';
-  const deliveryColor = webhook ? (webhookHealthy ? 'var(--success)' : 'var(--danger)') : 'var(--warning)';
 
   return html`
     <div>
       <!-- CONNECTION -->
       <div class="pf-agd-section">
         <div class="pf-agd-section-label">${t('profile.agents.detail.connection')}</div>
-        <div class="pf-agd-delivery-status">
-          <span class="pf-agd-status-dot" style="background: ${deliveryColor}"></span>
-          <span>${deliveryMethod}</span>
-        </div>
         ${webhook ? html`
           <div class="pf-agd-info-row">
             <span class="pf-agd-info-label">${t('profile.agents.webhook.url')}</span>
@@ -221,22 +199,11 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
             <span class="pf-agd-info-label">${t('profile.agents.webhook.lastSuccess')}</span>
             <span class="pf-agd-info-value">${webhook.lastSuccessAt ? timeAgo(webhook.lastSuccessAt) : '--'}</span>
           </div>
-          ${ctx.editingWebhook ? html`
-            <div class="pf-agd-zone2-url-form">
-              <input type="text" value=${ctx.editWebhookUrl} onInput=${(e) => ctx.setEditWebhookUrl?.(e.target.value)} placeholder="https://..." />
-              <button class="btn-primary btn-sm" onClick=${ctx.handleSaveWebhook}>${t('common.save')}</button>
-              <button class="btn-outline btn-sm" onClick=${() => ctx.setEditingWebhook?.(false)}>${t('common.cancel')}</button>
-            </div>
-          ` : html`
-            <div class="agd-form-actions">
-              <button class="btn-outline btn-sm" onClick=${handleTestWebhook} disabled=${testing}>
-                ${testing ? '...' : t('profile.agents.webhook.test')}
-              </button>
-              <button class="btn-outline btn-sm" onClick=${() => { ctx.setEditWebhookUrl?.(webhook.url || ''); ctx.setEditingWebhook?.(true); }}>
-                ${t('profile.agents.detail.integration.editWebhook')}
-              </button>
-            </div>
-          `}
+          <div class="agd-form-actions">
+            <button class="btn-outline btn-sm" onClick=${handleTestWebhook} disabled=${testing}>
+              ${testing ? '...' : t('profile.agents.webhook.test')}
+            </button>
+          </div>
         ` : html`
           <div class="pf-agd-info-row">
             <span class="pf-agd-info-value">${t('profile.agents.detail.deliveryPolling')}</span>
@@ -255,14 +222,6 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
           <span class="pf-agd-info-label">${t('profile.agents.detail.platform')}</span>
           <span class="pf-agd-info-value">${onboarding?.platformName || onboarding?.detectedPlatform || '--'}</span>
         </div>
-        <div class="pf-agd-info-row">
-          <span class="pf-agd-info-label">${t('profile.agents.detail.integration.platformVersion')}</span>
-          <span class="pf-agd-info-value">${onboarding?.platformVersion || '--'}</span>
-        </div>
-        <div class="pf-agd-info-row">
-          <span class="pf-agd-info-label">${t('profile.agents.detail.integration.detectionMethod')}</span>
-          <span class="pf-agd-info-value">${onboarding?.detectionMethod || t('profile.agents.detail.integration.autoDetected')}</span>
-        </div>
         ${bundleVersion ? html`
           <div class="pf-agd-info-row">
             <span class="pf-agd-info-label">${t('profile.agents.skillBundle.versionLabel')}</span>
@@ -272,9 +231,6 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
         <div class="agd-form-actions">
           <button class="btn-outline btn-sm" onClick=${handleCopyInstall}>
             ${copiedCmd ? '✓ ' + t('profile.agents.copied') : t('profile.agents.skillBundle.reinstall')}
-          </button>
-          <button class="btn-outline btn-sm" onClick=${handleRerun} disabled=${rerunning}>
-            ${rerunning ? '...' : t('profile.agents.detail.integration.update')}
           </button>
         </div>
       </div>
@@ -293,22 +249,6 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
           <div class="pf-agd-info-row">
             <span class="pf-agd-info-label">${t('profile.agents.detail.readiness')}</span>
             <span class="pf-agd-info-value">${onboarding.readinessLevel} (${onboarding.readinessScore})</span>
-          </div>
-        `}
-        <div class="pf-agd-info-row">
-          <span class="pf-agd-info-label">${t('profile.agents.detail.integration.lastValidated')}</span>
-          <span class="pf-agd-info-value">${onboarding?.lastValidatedAt ? timeAgo(onboarding.lastValidatedAt) : '--'}</span>
-        </div>
-        ${onboarding?.strengths && html`
-          <div class="pf-agd-info-row">
-            <span class="pf-agd-info-label">${t('profile.agents.detail.integration.strengths')}</span>
-            <span class="pf-agd-info-value">${onboarding.strengths}</span>
-          </div>
-        `}
-        ${onboarding?.gaps && html`
-          <div class="pf-agd-info-row">
-            <span class="pf-agd-info-label">${t('profile.agents.detail.integration.gaps')}</span>
-            <span class="pf-agd-info-value">${onboarding.gaps}</span>
           </div>
         `}
         <div class="agd-form-actions">
@@ -334,10 +274,6 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
         <div class="pf-agd-info-row">
           <span class="pf-agd-info-label">${t('profile.agents.created')}</span>
           <span class="pf-agd-info-value">${agent.created_at ? new Date(agent.created_at).toLocaleDateString() : '--'}</span>
-        </div>
-        <div class="pf-agd-info-row">
-          <span class="pf-agd-info-label">${t('profile.agents.detail.integration.roles')}</span>
-          <span class="pf-agd-info-value">${agent.roles?.join(', ') || 'agent'}</span>
         </div>
       </div>
 
@@ -367,7 +303,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
               `)}
             </tbody>
           </table>
-          <button class="btn-ghost btn-sm" style="margin-top:6px" onClick=${handleShowAll}>
+          <button class="btn-ghost btn-sm pf-agd-delivery-toggle" onClick=${handleShowAll}>
             ${showAllDeliveries ? t('profile.agents.detail.showLess') : t('profile.agents.detail.showAll')}
           </button>
         </div>

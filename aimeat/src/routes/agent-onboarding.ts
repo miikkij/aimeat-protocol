@@ -28,8 +28,11 @@ import { validateStep, checkAutoSteps } from '../services/onboarding-validator.j
 import { calculateReadiness } from '../services/readiness-scorer.js';
 import { detectPlatform } from '../services/platform-detector.js';
 import { createT, detectLocale } from '../i18n.js';
+import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 
-export function agentOnboardingRouter(config: AimeatConfig, storage: Storage): Router {
+type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
+
+export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, webhookDispatcher?: WebhookDispatcher): Router {
   const router = Router();
 
   function t(req: Request, key: string, vars?: Record<string, string | number>): string {
@@ -271,6 +274,16 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage): R
       });
     }
     emitChange('agent-onboarding');
+
+    if (webhookDispatcher) {
+      webhookDispatcher.dispatchWebhookEvent(agentGaii, 'onboarding.step', {
+        step_id: stepId,
+        status: step.status,
+        progress: onboarding.steps.filter(s => s.status === 'passed').length,
+        total: onboarding.steps.length,
+        completed: !!completedOnboarding,
+      });
+    }
 
     res.json(success(config.nodeId, {
       step,

@@ -52,9 +52,15 @@ export async function loadTranslations(locale) {
   document.documentElement.lang = currentLocale;
 }
 
-/** Translate a dot-notation key. Returns the key itself if not found. */
-export function t(key) {
-  return translations[key] ?? fallback[key] ?? key;
+/** Translate a dot-notation key with optional interpolation. Returns the key itself if not found. */
+export function t(key, vars) {
+  let str = translations[key] ?? fallback[key] ?? key;
+  if (vars && typeof str === 'string') {
+    for (const [k, v] of Object.entries(vars)) {
+      str = str.replaceAll(`{${k}}`, String(v));
+    }
+  }
+  return str;
 }
 
 /** Get current locale. */

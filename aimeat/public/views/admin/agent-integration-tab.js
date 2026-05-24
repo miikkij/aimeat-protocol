@@ -14,12 +14,6 @@ import { useViewCSS } from '/components/useViewCSS.js';
 import { num, dt, Empty } from './shared.js';
 import * as api from '/js/services/admin-agent-integration.js';
 
-const READINESS_COLORS = {
-  expert: 'var(--success)',
-  full: 'var(--accent)',
-  standard: 'var(--warning)',
-  basic: 'var(--text-dim)',
-};
 
 export default function AgentIntegrationTab({ data, session }) {
   useViewCSS('/css/views/admin-agent-integration.css');
@@ -174,7 +168,7 @@ function renderReadinessDistribution(readiness, total) {
               <div class="adm-agi-readiness-bar">
                 <div class="adm-agi-readiness-level">${level}</div>
                 <div class="adm-agi-readiness-track">
-                  <div class="adm-agi-readiness-fill" style="width:${pct}%;background:${READINESS_COLORS[level]}"></div>
+                  <div class="adm-agi-readiness-fill" style="width:${pct}%" data-level="${level}"></div>
                 </div>
                 <div class="adm-agi-readiness-count">${count}</div>
               </div>

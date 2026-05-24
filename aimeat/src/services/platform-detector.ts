@@ -90,6 +90,6 @@ export function parsePlatformFromMessage(message: string): PlatformInfo | null {
   return null;
 }
 
-export function getKnownPlatforms(): Array<{ id: string; displayName: string; bundleName: string }> {
-  return KNOWN_PLATFORMS.map(p => ({ id: p.id, displayName: p.displayName, bundleName: p.bundleName }));
+export function getKnownPlatforms(): Array<{ id: string; displayName: string; bundleName: string; detectPattern: string }> {
+  return KNOWN_PLATFORMS.map(p => ({ id: p.id, displayName: p.displayName, bundleName: p.bundleName, detectPattern: p.userAgentPattern.source }));
 }

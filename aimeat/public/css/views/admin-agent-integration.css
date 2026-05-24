@@ -127,6 +127,10 @@
   border-radius: 4px;
   transition: width 0.3s ease;
 }
+.adm-agi-readiness-fill[data-level="expert"] { background: var(--success); }
+.adm-agi-readiness-fill[data-level="full"] { background: var(--accent); }
+.adm-agi-readiness-fill[data-level="standard"] { background: var(--warning); }
+.adm-agi-readiness-fill[data-level="basic"] { background: var(--text-dim); }
 
 .adm-agi-readiness-count {
   width: 30px;

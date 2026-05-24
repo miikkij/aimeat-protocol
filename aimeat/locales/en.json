@@ -438,11 +438,30 @@
         "cancel": "Cancel",
         "reset": "Reset to Defaults",
         "resetConfirm": "Reset agent directives to defaults?",
-        "empty": "No directives configured",
-        "addRule": "Add Rule",
+        "empty": "No directives configured for this agent. Click Edit to add rules and purpose.",
+        "addRule": "Add rule",
         "system": "System",
         "owner": "Owner",
-        "agent": "Agent"
+        "agent": "Agent",
+        "source": {
+          "system": "System",
+          "owner": "Owner",
+          "agent": "Agent"
+        },
+        "noRules": "No rules defined",
+        "rulePlaceholder": "Enter a rule or guideline...",
+        "removeRule": "Remove",
+        "saved": "Directives saved",
+        "saveError": "Failed to save",
+        "resetError": "Failed to reset",
+        "editing": "Editing Directives",
+        "purposePlaceholder": "What is this agent for?",
+        "systemRules": "System Rules",
+        "readOnly": "read-only",
+        "ownerRules": "Owner Rules",
+        "agentRules": "Agent Rules",
+        "saving": "Saving...",
+        "resetDefaults": "Reset to Defaults"
       },
       "capabilities": {
         "technical": "Technical Skills",
