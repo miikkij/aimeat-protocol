@@ -398,6 +398,14 @@
         "taskDeleted": "Task deleted",
         "startError": "Failed to start task",
         "deleteError": "Failed to delete task",
+        "createError": "Failed to create task",
+        "todoLabel": "TODO",
+        "envAimeat": "AIMEAT",
+        "envAgent": "Agent",
+        "minuteShort": "min",
+        "starting": "Starting...",
+        "startThisTask": "Start this task",
+        "noEventsRecorded": "No events recorded",
         "builder": {
           "title": "New Task",
           "placeholder": "What should the agent do? Describe in plain language or technical detail.",
@@ -509,7 +517,13 @@
         "proposedTask": "Proposed task",
         "createTask": "Create this task",
         "adjustTask": "Let me adjust",
-        "tokensUsed": "tokens"
+        "tokensUsed": "tokens",
+        "proposedTaskDefault": "Agent proposed task",
+        "createTaskError": "Failed to create task",
+        "sendError": "Failed to send message",
+        "inboxLabel": "inbox",
+        "deliveredLabel": "delivered",
+        "errorsLabel": "errors"
       },
       "webhook": {
         "title": "Webhook",

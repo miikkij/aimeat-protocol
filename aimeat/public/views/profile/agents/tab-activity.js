@@ -196,7 +196,7 @@ export default function TabActivity({ agentName, session, showToast }) {
           return html`
             <div key=${ev.id || i} class="agd-log-entry">
               <span class="agd-log-time">${ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</span>
-              <span class="pf-agd-event-badge pf-agd-event-badge--${cat}">${cat}</span>
+              <span class="pf-agd-event-badge pf-agd-event-badge--${cat}">${t(FILTERS.find(f => f.id === cat)?.key || '') || cat}</span>
               <span class="agd-log-type">${ev.type || ev.event || '-'}</span>
               <span class="agd-log-msg">${ev.message || ''}</span>
             </div>

@@ -18,13 +18,8 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { getDirectives, upsertDirectives, deleteDirectives } from '/js/services/agent-directives.js';
 
-function tFallback(key, fallback) {
-  const val = t(key);
-  return val !== key ? val : fallback;
-}
-
 function sourceLabel(source) {
-  return tFallback(`profile.agents.directives.source.${source}`, source.charAt(0).toUpperCase() + source.slice(1));
+  return t(`profile.agents.directives.source.${source}`);
 }
 
 function sourceClass(source) {
@@ -36,7 +31,7 @@ function sourceClass(source) {
 
 function RulesList({ rules }) {
   if (!rules || rules.length === 0) {
-    return html`<div class="agd-empty">${tFallback('profile.agents.directives.noRules', 'No rules defined')}</div>`;
+    return html`<div class="agd-empty">${t('profile.agents.directives.noRules')}</div>`;
   }
   return html`
     <div>
@@ -71,14 +66,14 @@ function EditableRules({ rules, onChange }) {
       ${rules.map((rule, i) => html`
         <div class="agd-rule-edit-row" key=${i}>
           <input type="text" value=${rule} onInput=${(e) => handleChange(i, e.target.value)}
-                 placeholder=${tFallback('profile.agents.directives.rulePlaceholder', 'Enter a rule or guideline...')} />
-          <button class="agd-remove-btn" onClick=${() => handleRemove(i)} title=${tFallback('profile.agents.directives.removeRule', 'Remove')}>
+                 placeholder=${t('profile.agents.directives.rulePlaceholder')} />
+          <button class="agd-remove-btn" onClick=${() => handleRemove(i)} title=${t('profile.agents.directives.removeRule')}>
             ×
           </button>
         </div>
       `)}
       <button class="agd-add-btn" onClick=${handleAdd}>
-        + ${tFallback('profile.agents.directives.addRule', 'Add rule')}
+        + ${t('profile.agents.directives.addRule')}
       </button>
     </div>
   `;
@@ -146,11 +141,11 @@ export default function AgentDirectivesSubtab({ agentName, session, showToast })
         purpose: editPurpose.trim() || undefined,
         rules: cleanRules.length > 0 ? cleanRules : undefined,
       });
-      showToast(tFallback('profile.agents.directives.saved', 'Directives saved'));
+      showToast(t('profile.agents.directives.saved'));
       setEditing(false);
       await loadDirectives();
     } catch (err) {
-      showToast(err.message || tFallback('profile.agents.directives.saveError', 'Failed to save'), true);
+      showToast(err.message || t('profile.agents.directives.saveError'), true);
     }
     setSaving(false);
   }
@@ -159,11 +154,11 @@ export default function AgentDirectivesSubtab({ agentName, session, showToast })
     setSaving(true);
     try {
       await deleteDirectives(agentName);
-      showToast(tFallback('profile.agents.directives.reset', 'Directives reset to defaults'));
+      showToast(t('profile.agents.directives.reset'));
       setEditing(false);
       await loadDirectives();
     } catch (err) {
-      showToast(err.message || tFallback('profile.agents.directives.resetError', 'Failed to reset'), true);
+      showToast(err.message || t('profile.agents.directives.resetError'), true);
     }
     setSaving(false);
   }
@@ -191,25 +186,25 @@ export default function AgentDirectivesSubtab({ agentName, session, showToast })
       ${!editing ? html`
         <!-- View mode -->
         <div class="agd-section-header">
-          <span class="agd-section-title">${tFallback('profile.agents.directives.title', 'Directives')}</span>
+          <span class="agd-section-title">${t('profile.agents.directives.title')}</span>
           <div>
             <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); startEditing(); }}>
-              ${tFallback('profile.agents.directives.edit', 'Edit')}
+              ${t('profile.agents.directives.edit')}
             </button>
           </div>
         </div>
 
         ${purpose && html`
           <div class="agd-directive-section">
-            <h4>${tFallback('profile.agents.directives.purpose', 'Purpose')}</h4>
+            <h4>${t('profile.agents.directives.purpose')}</h4>
             <div class="agd-purpose-text">${purpose}</div>
           </div>
         `}
 
         <div class="agd-directive-section">
-          <h4>${tFallback('profile.agents.directives.rules', 'Rules')}</h4>
+          <h4>${t('profile.agents.directives.rules')}</h4>
           ${rules.length > 0 ? html`<${RulesList} rules=${rules} />` : html`
-            <div class="agd-empty">${tFallback('profile.agents.directives.noRules', 'No rules defined')}</div>
+            <div class="agd-empty">${t('profile.agents.directives.noRules')}</div>
           `}
         </div>
 
@@ -219,51 +214,51 @@ export default function AgentDirectivesSubtab({ agentName, session, showToast })
 
         ${!purpose && rules.length === 0 && html`
           <div class="agd-empty">
-            ${tFallback('profile.agents.directives.empty', 'No directives configured for this agent. Click Edit to add rules and purpose.')}
+            ${t('profile.agents.directives.empty')}
           </div>
         `}
       ` : html`
         <!-- Edit mode -->
         <div class="agd-section-header">
-          <span class="agd-section-title">${tFallback('profile.agents.directives.editing', 'Editing Directives')}</span>
+          <span class="agd-section-title">${t('profile.agents.directives.editing')}</span>
         </div>
 
         <div class="agd-directive-section">
-          <h4>${tFallback('profile.agents.directives.purpose', 'Purpose')}</h4>
+          <h4>${t('profile.agents.directives.purpose')}</h4>
           <div class="agd-form-field">
             <textarea value=${editPurpose} onInput=${(e) => setEditPurpose(e.target.value)}
-                      placeholder=${tFallback('profile.agents.directives.purposePlaceholder', 'What is this agent for?')}></textarea>
+                      placeholder=${t('profile.agents.directives.purposePlaceholder')}></textarea>
           </div>
         </div>
 
         ${systemRules.length > 0 && html`
           <div class="agd-directive-section">
-            <h4>${tFallback('profile.agents.directives.systemRules', 'System Rules')} (${tFallback('profile.agents.directives.readOnly', 'read-only')})</h4>
+            <h4>${t('profile.agents.directives.systemRules')} (${t('profile.agents.directives.readOnly')})</h4>
             <${RulesList} rules=${systemRules} />
           </div>
         `}
 
         ${ownerRules.length > 0 && html`
           <div class="agd-directive-section">
-            <h4>${tFallback('profile.agents.directives.ownerRules', 'Owner Rules')} (${tFallback('profile.agents.directives.readOnly', 'read-only')})</h4>
+            <h4>${t('profile.agents.directives.ownerRules')} (${t('profile.agents.directives.readOnly')})</h4>
             <${RulesList} rules=${ownerRules} />
           </div>
         `}
 
         <div class="agd-directive-section">
-          <h4>${tFallback('profile.agents.directives.agentRules', 'Agent Rules')}</h4>
+          <h4>${t('profile.agents.directives.agentRules')}</h4>
           <${EditableRules} rules=${editRules} onChange=${setEditRules} />
         </div>
 
         <div class="agd-form-actions">
           <button class="btn-primary btn-sm" onClick=${(e) => { e.stopPropagation(); handleSave(); }} disabled=${saving}>
-            ${saving ? tFallback('profile.agents.directives.saving', 'Saving...') : tFallback('profile.agents.directives.save', 'Save')}
+            ${saving ? t('profile.agents.directives.saving') : t('profile.agents.directives.save')}
           </button>
           <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); cancelEditing(); }}>
             ${t('profile.agents.scopeUi.cancel')}
           </button>
           <button class="btn-danger btn-sm" onClick=${(e) => { e.stopPropagation(); handleReset(); }} disabled=${saving}>
-            ${tFallback('profile.agents.directives.resetDefaults', 'Reset to Defaults')}
+            ${t('profile.agents.directives.resetDefaults')}
           </button>
         </div>
       `}

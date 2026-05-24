@@ -167,7 +167,7 @@ function renderReadinessBadge(state, onboarding) {
   const level = onboarding?.readinessLevel || 'none';
   const score = onboarding?.readinessScore;
   if (!score && score !== 0) return html`<span class="pf-agd-badge pf-agd-badge--readiness-none">--</span>`;
-  const label = level.charAt(0).toUpperCase() + level.slice(1);
+  const label = t(`agentOnboarding.readiness.${level}`);
   return html`<span class="pf-agd-badge pf-agd-badge--readiness-${level}">${label} (${score})</span>`;
 }
 

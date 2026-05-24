@@ -128,11 +128,11 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
           ${hasTodos && html`
             <div class="agd-todo-section">
               <div class="agd-todo-header">
-                <strong>TODO</strong>
+                <strong>${t('profile.agents.tasks.todoLabel')}</strong>
                 <span class="agd-todo-summary">
-                  ${aimeatSteps > 0 && html`<span class="agd-env-badge agd-env-aimeat">AIMEAT: ${aimeatSteps}</span>`}
-                  ${agentSteps > 0 && html`<span class="agd-env-badge agd-env-agent">Agent: ${agentSteps}</span>`}
-                  ${totalMinutes > 0 && html`<span class="agd-todo-time">~${totalMinutes} min</span>`}
+                  ${aimeatSteps > 0 && html`<span class="agd-env-badge agd-env-aimeat">${t('profile.agents.tasks.envAimeat')}: ${aimeatSteps}</span>`}
+                  ${agentSteps > 0 && html`<span class="agd-env-badge agd-env-agent">${t('profile.agents.tasks.envAgent')}: ${agentSteps}</span>`}
+                  ${totalMinutes > 0 && html`<span class="agd-todo-time">~${totalMinutes} ${t('profile.agents.tasks.minuteShort')}</span>`}
                 </span>
               </div>
               <div class="agd-todo-list">
@@ -142,9 +142,9 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
                     <div class="agd-todo-content">
                       <div class="agd-todo-title">
                         ${td.title}
-                        <span class="agd-env-badge agd-env-${td.environment || 'agent'}">${(td.environment || 'agent').toUpperCase()}</span>
+                        <span class="agd-env-badge agd-env-${td.environment || 'agent'}">${td.environment === 'aimeat' ? t('profile.agents.tasks.envAimeat') : t('profile.agents.tasks.envAgent')}</span>
                         ${td.estimateMinutes && html`
-                          <span class="agd-todo-est">${td.estimateMinutes} min</span>
+                          <span class="agd-todo-est">${td.estimateMinutes} ${t('profile.agents.tasks.minuteShort')}</span>
                         `}
                       </div>
                       ${td.description && html`<div class="agd-todo-desc">${td.description}</div>`}
@@ -162,7 +162,7 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
 
           ${!hasTodos && isQueued && html`
             <div class="agd-todo-waiting">
-              Waiting for agent to propose a plan...
+              ${t('profile.agents.tasks.builder.waitingTodos')}
             </div>
           `}
 
@@ -179,17 +179,17 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
             </div>
           `}
           ${events && events.length === 0 && !isQueued && html`
-            <div class="agd-empty">No events recorded</div>
+            <div class="agd-empty">${t('profile.agents.tasks.noEventsRecorded')}</div>
           `}
 
           <div class="agd-task-actions">
             ${canStart && html`
               <button class="btn-primary btn-sm" onClick=${handleStart} disabled=${starting}>
-                ${starting ? 'Starting...' : 'Start this task'}
+                ${starting ? t('profile.agents.tasks.starting') : t('profile.agents.tasks.startThisTask')}
               </button>
             `}
             ${(isQueued || task.status === 'draft') && html`
-              <button class="btn-danger btn-sm" onClick=${handleDelete}>Delete</button>
+              <button class="btn-danger btn-sm" onClick=${handleDelete}>${t('profile.agents.tasks.delete')}</button>
             `}
           </div>
         </div>
@@ -241,10 +241,10 @@ export default function AgentTasksSubtab({ agentName, session, showToast }) {
     <div>
       <div class="agd-section-header">
         <span class="agd-section-title">
-          TASK QUEUE${tasks.length > 0 ? ` (${tasks.length})` : ''}
+          ${t('profile.agents.tasks.title')}${tasks.length > 0 ? ` (${tasks.length})` : ''}
         </span>
         <button class="btn-outline btn-sm" onClick=${() => setShowCreate(!showCreate)}>
-          ${showCreate ? '-' : '+'} New Task
+          ${showCreate ? '-' : '+'} ${t('profile.agents.tasks.newTask')}
         </button>
       </div>
 

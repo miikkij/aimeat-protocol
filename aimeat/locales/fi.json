@@ -398,6 +398,14 @@
         "taskDeleted": "Tehtävä poistettu",
         "startError": "Tehtävän aloitus epäonnistui",
         "deleteError": "Tehtävän poisto epäonnistui",
+        "createError": "Tehtävän luonti epäonnistui",
+        "todoLabel": "TODO",
+        "envAimeat": "AIMEAT",
+        "envAgent": "Agentti",
+        "minuteShort": "min",
+        "starting": "Käynnistetään...",
+        "startThisTask": "Käynnistä tehtävä",
+        "noEventsRecorded": "Ei tallennettuja tapahtumia",
         "builder": {
           "title": "Uusi tehtävä",
           "placeholder": "Mitä agentin pitäisi tehdä? Kuvaile selkokielellä tai teknisesti.",
@@ -509,7 +517,13 @@
         "proposedTask": "Ehdotettu tehtava",
         "createTask": "Luo tama tehtava",
         "adjustTask": "Muokkaan ensin",
-        "tokensUsed": "tokenia"
+        "tokensUsed": "tokenia",
+        "proposedTaskDefault": "Agentin ehdottama tehtava",
+        "createTaskError": "Tehtavan luonti epaonnistui",
+        "sendError": "Viestin lahetys epaonnistui",
+        "inboxLabel": "saapuneet",
+        "deliveredLabel": "toimitettu",
+        "errorsLabel": "virheet"
       },
       "webhook": {
         "title": "Webhook",

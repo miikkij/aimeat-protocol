@@ -29,13 +29,13 @@ function ProposedTask({ task, agentName, showToast }) {
     setCreating(true);
     try {
       await createTask(agentName, {
-        title: task.title || task.summary || 'Agent proposed task',
+        title: task.title || task.summary || t('profile.agents.messages.proposedTaskDefault'),
         description: task.description || '',
         status: 'queued',
       });
       showToast(t('profile.agents.tasks.createTask'));
     } catch (err) {
-      showToast(err.message || 'Failed to create task', true);
+      showToast(err.message || t('profile.agents.messages.createTaskError'), true);
     }
     setCreating(false);
   }
@@ -159,7 +159,7 @@ export default function AgentMessagesSubtab({ agentName, session, showToast }) {
       setDraft('');
       await loadMessages();
     } catch (err) {
-      showToast(err.message || 'Failed to send message', true);
+      showToast(err.message || t('profile.agents.messages.sendError'), true);
     }
     setSending(false);
   }
@@ -187,9 +187,9 @@ export default function AgentMessagesSubtab({ agentName, session, showToast }) {
           <span class="${lastSeen ? 'badge badge-success' : 'badge badge-muted'}">${lastSeen ? t('profile.agents.messages.online') : t('profile.agents.messages.offline')}</span>
         </div>
         <div class="agd-msg-status-counts">
-          <span class="badge badge-muted">inbox: ${pendingCount}</span>
-          <span class="badge badge-muted">delivered: ${deliveredCount}</span>
-          ${errorCount > 0 && html`<span class="badge badge-danger">errors: ${errorCount}</span>`}
+          <span class="badge badge-muted">${t('profile.agents.messages.inboxLabel')}: ${pendingCount}</span>
+          <span class="badge badge-muted">${t('profile.agents.messages.deliveredLabel')}: ${deliveredCount}</span>
+          ${errorCount > 0 && html`<span class="badge badge-danger">${t('profile.agents.messages.errorsLabel')}: ${errorCount}</span>`}
         </div>
       </div>
 

@@ -129,16 +129,16 @@ function ProposalPanel({ task, taskId }) {
           ${hasTodos ? html`
             <div>
               <div class="agd-todo-header">
-                <strong>TODO</strong>
+                <strong>${t('profile.agents.tasks.todoLabel')}</strong>
                 <span class="agd-todo-summary">
                   ${(() => {
                     const aimeatSteps = task.todos.filter(td => td.environment === 'aimeat').length;
                     const agentSteps = task.todos.filter(td => td.environment === 'agent').length;
                     const totalMinutes = task.todos.reduce((sum, td) => sum + (td.estimateMinutes || 0), 0);
                     return html`
-                      ${aimeatSteps > 0 && html`<span class="agd-env-badge agd-env-aimeat">AIMEAT: ${aimeatSteps}</span>`}
-                      ${agentSteps > 0 && html`<span class="agd-env-badge agd-env-agent">Agent: ${agentSteps}</span>`}
-                      ${totalMinutes > 0 && html`<span class="agd-todo-time">~${totalMinutes} min</span>`}
+                      ${aimeatSteps > 0 && html`<span class="agd-env-badge agd-env-aimeat">${t('profile.agents.tasks.envAimeat')}: ${aimeatSteps}</span>`}
+                      ${agentSteps > 0 && html`<span class="agd-env-badge agd-env-agent">${t('profile.agents.tasks.envAgent')}: ${agentSteps}</span>`}
+                      ${totalMinutes > 0 && html`<span class="agd-todo-time">~${totalMinutes} ${t('profile.agents.tasks.minuteShort')}</span>`}
                     `;
                   })()}
                 </span>
@@ -150,8 +150,8 @@ function ProposalPanel({ task, taskId }) {
                     <div class="agd-todo-content">
                       <div class="agd-todo-title">
                         <span>${i + 1}. ${td.title}</span>
-                        <span class="agd-env-badge agd-env-${td.environment || 'agent'}">${(td.environment || 'agent').toUpperCase()}</span>
-                        ${td.estimateMinutes && html`<span class="agd-todo-est">${td.estimateMinutes} min</span>`}
+                        <span class="agd-env-badge agd-env-${td.environment || 'agent'}">${td.environment === 'aimeat' ? t('profile.agents.tasks.envAimeat') : t('profile.agents.tasks.envAgent')}</span>
+                        ${td.estimateMinutes && html`<span class="agd-todo-est">${td.estimateMinutes} ${t('profile.agents.tasks.minuteShort')}</span>`}
                       </div>
                       ${td.description && html`<div class="agd-todo-desc">${td.description}</div>`}
                       ${td.environmentReason && html`<div class="agd-todo-reason">${td.environmentReason}</div>`}
@@ -251,7 +251,7 @@ function BuilderChat({ agentName, taskId, threadId, onTaskCreated, showToast }) 
       setDraft('');
       await loadMessages();
     } catch (err) {
-      showToast(err.message || 'Failed to send', true);
+      showToast(err.message || t('profile.agents.messages.sendError'), true);
     }
     setSending(false);
   }
@@ -349,7 +349,7 @@ export default function TaskCreationBuilder({ agentName, session, showToast, onC
       setThreadId(newThreadId);
       await sendMessage(agentName, text, newThreadId, newTaskId);
     } catch (err) {
-      showToast(err.message || 'Failed to create task', true);
+      showToast(err.message || t('profile.agents.tasks.createError'), true);
     }
   }
 
@@ -360,7 +360,7 @@ export default function TaskCreationBuilder({ agentName, session, showToast, onC
       showToast(t('profile.agents.tasks.builder.startTask'));
       onClose();
     } catch (err) {
-      showToast(err.message || 'Failed to start task', true);
+      showToast(err.message || t('profile.agents.tasks.startError'), true);
     }
     setStarting(false);
   }

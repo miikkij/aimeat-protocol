@@ -166,7 +166,7 @@ function renderReadinessDistribution(readiness, total) {
             const pct = total > 0 ? (count / total * 100) : 0;
             return html`
               <div class="adm-agi-readiness-bar">
-                <div class="adm-agi-readiness-level">${level}</div>
+                <div class="adm-agi-readiness-level">${t(`agentOnboarding.readiness.${level}`)}</div>
                 <div class="adm-agi-readiness-track">
                   <div class="adm-agi-readiness-fill" style="width:${pct}%" data-level="${level}"></div>
                 </div>
