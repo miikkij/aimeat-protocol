@@ -238,7 +238,7 @@ export class SqliteStorage implements Storage {
     // Telemetry events
     this.db.prepare('DELETE FROM telemetry_events WHERE agentGaii = ?').run(gaii);
     // Webhook delivery logs
-    this.db.prepare('DELETE FROM webhook_delivery_logs WHERE agentGaii = ?').run(gaii);
+    this.db.prepare('DELETE FROM webhook_delivery_log WHERE agentGaii = ?').run(gaii);
     // Onboarding record
     this.db.prepare('DELETE FROM agent_onboarding WHERE agentGaii = ?').run(gaii);
     // Sharing groups
