@@ -197,11 +197,13 @@ POST /v1/memory
 \`\`\`
 
 ### Register Your Commands
-Register commands so your owner can use them from the Messages tab command palette:
+Register commands so your owner can use them from the Messages tab command palette.
+The value MUST be a flat array (not wrapped in an object). Each item needs: name (with / prefix), description, category.
 \`\`\`
 POST /v1/memory
 { "key": "agents.${ctx.agentName}.commands", "value": [
   { "name": "/status", "description": "Show current agent status", "category": "general" },
+  { "name": "/inbox", "description": "Check inbox for tasks and messages", "category": "tasks" },
   { "name": "/model", "description": "Show which AI model you are using", "category": "general" }
 ], "visibility": "owner" }
 \`\`\`
