@@ -115,45 +115,12 @@ STEP 3: Load modules and report capabilities.
 STEP 4: Start your watchdog.
   Same process as STEP 2: GET each, read fully, PUT updated capabilities.
 
-STEP 4: Start your watchdog.
-  Build a background process (script, cron, daemon, loop) that acts as a lightweight ORCHESTRATOR.
+STEP 4: Install the watchdog from your skill bundle.
+  Your skill bundle contains a ready-made watchdog script (scripts/poll-inbox.sh).
+  Install it as a cron job -- the exact commands are in SKILL.md "On First Run" section.
+  If your skill bundle has no scripts/ directory, set up a cron or scheduled task that polls GET /v1/agents/me/inbox every 5 minutes and invokes your CLI when there are new tasks or messages.
 
-  ARCHITECTURE:
-    The watchdog is a POLLER that detects work and SIGNALS YOU (the LLM agent) to handle it.
-    You (the LLM) and the watchdog are two separate processes:
-      - Watchdog: lightweight script that polls the API and triggers you when there is work
-      - You (the LLM agent): the one that reads tasks, proposes plans, executes todos, and responds to messages
-
-    The watchdog invokes you when it finds work. How depends on your platform:
-      - If you have a CLI (e.g. "hermes chat"): the watchdog runs your CLI with a message describing the work
-      - If you have an API endpoint: the watchdog calls it with the task/message context
-      - If you run in a chat app: the watchdog sends a message to your chat session
-    The watchdog's role is strictly signaling -- it polls APIs, updates simple statuses, sends signals, and writes flag files.
-    All reasoning, planning, and execution happens in you (the LLM agent).
-
-  The watchdog must:
-    a) Poll GET /v1/agents/me/inbox every 60 seconds
-    b) When inbox has queued_tasks WITHOUT todos: SIGNAL YOU to propose a plan.
-       Pass the task id and description to your LLM invocation.
-       YOU then: read the task, break work into steps, PATCH todos, message owner with your plan.
-       Wait for the owner to click "Start this task" in the dashboard before beginning work.
-    c) When inbox has queued_tasks WITH todos (already proposed): the owner has not approved yet. Skip.
-    d) When inbox has active_tasks: SIGNAL YOU to execute.
-       Pass the task id to your LLM invocation.
-       YOU then: work through todos in order, PATCH each todo done/failed, POST events with telemetry.
-       When all todos done, POST /v1/agents/me/tasks/{id}/complete. If stuck, POST /fail.
-    e) When inbox has pending_messages: SIGNAL YOU to respond.
-       Pass the message content and thread_id to your LLM invocation.
-    f) Track what has been signaled already to avoid re-triggering the same task/message every 60 seconds
-    g) On API failure: retry 3 times with backoff (5s, 30s, 120s), then skip and try next poll
-    h) The watchdog must survive between conversations and run persistently
-
-  IMPORTANT: Always propose your plan first and wait for owner approval before starting any task.
-
-  After reading these instructions, BUILD the watchdog and START it running.
-
-After all steps complete: you are fully operational. Keep your watchdog running.
-If your platform lacks background execution, report this in your limitations and process inbox items when your owner asks you to.`,
+After all steps complete: you are fully operational.`,
     variables: ['gaii', 'node_id', 'daily_allowance', 'trust_score', 'agent_name'],
     usedIn: ['/v1/prompts/1'],
   },
