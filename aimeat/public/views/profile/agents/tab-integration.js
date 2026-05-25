@@ -198,7 +198,7 @@ curl -H "Authorization: Bearer <jwt>" -o skill-bundle.zip "${url}" && unzip skil
   const isOnboarding = state === 'new' || state === 'onboarding';
 
   if (isOnboarding) {
-    return renderOnboardingView(onboarding, agentName, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleCopyInstallCommand, copiedInstall);
+    return renderOnboardingView(onboarding, agentName, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleCopyInstallCommand, copiedInstall, handleCopyAgentPrompt, copiedPrompt);
   }
 
   async function handleShowAll() {
@@ -212,10 +212,10 @@ curl -H "Authorization: Bearer <jwt>" -o skill-bundle.zip "${url}" && unzip skil
 
   const displayDeliveries = showAllDeliveries && allDeliveries ? allDeliveries : deliveries;
 
-  return renderProductionView(agent, onboarding, webhook, bundleVersion, displayDeliveries, handleTestWebhook, testing, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleShowAll, showAllDeliveries, editingWebhook, webhookDraft, setWebhookDraft, handleEditWebhook, handleSaveWebhook, handleCancelWebhook, savingWebhook, handleUpdateBundle, updatingBundle, handleCopyInstallCommand, copiedInstall);
+  return renderProductionView(agent, onboarding, webhook, bundleVersion, displayDeliveries, handleTestWebhook, testing, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleShowAll, showAllDeliveries, editingWebhook, webhookDraft, setWebhookDraft, handleEditWebhook, handleSaveWebhook, handleCancelWebhook, savingWebhook, handleUpdateBundle, updatingBundle, handleCopyInstallCommand, copiedInstall, handleCopyAgentPrompt, copiedPrompt);
 }
 
-function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleCopyInstallCommand, copiedInstall) {
+function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleCopyInstallCommand, copiedInstall, handleCopyAgentPrompt, copiedPrompt) {
   const steps = onboarding?.steps || [];
   const passed = steps.filter(s => s.status === 'passed').length;
   const total = steps.length || 11;
@@ -279,7 +279,7 @@ function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, han
   `;
 }
 
-function renderProductionView(agent, onboarding, webhook, bundleVersion, displayDeliveries, handleTestWebhook, testing, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleShowAll, showAllDeliveries, editingWebhook, webhookDraft, setWebhookDraft, handleEditWebhook, handleSaveWebhook, handleCancelWebhook, savingWebhook, handleUpdateBundle, updatingBundle, handleCopyInstallCommand, copiedInstall) {
+function renderProductionView(agent, onboarding, webhook, bundleVersion, displayDeliveries, handleTestWebhook, testing, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleShowAll, showAllDeliveries, editingWebhook, webhookDraft, setWebhookDraft, handleEditWebhook, handleSaveWebhook, handleCancelWebhook, savingWebhook, handleUpdateBundle, updatingBundle, handleCopyInstallCommand, copiedInstall, handleCopyAgentPrompt, copiedPrompt) {
   const steps = onboarding?.steps || [];
   const agentName = agent.name;
 
@@ -383,6 +383,9 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
           </div>
         ` : ''}
         <div class="pf-agd-form-actions">
+          <button class="btn-primary btn-sm" onClick=${handleCopyAgentPrompt}>
+            ${copiedPrompt ? '✓ ' + t('profile.agents.detail.integration.promptCopied') : t('profile.agents.detail.integration.copyAgentPrompt')}
+          </button>
           <button class="btn-outline btn-sm" onClick=${handleCopyInstall}>
             ${copiedCmd ? '✓ ' + t('profile.agents.copied') : t('profile.agents.skillBundle.reinstall')}
           </button>
