@@ -29,7 +29,12 @@ async function _open() {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${jwt}` },
     });
-    if (!resp.ok) return;
+    if (!resp.ok) {
+      console.warn('[SSE] Ticket request failed:', resp.status);
+      reconnectTimer = setTimeout(() => { if (refCount > 0) _open(); }, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
+      return;
+    }
     const body = await resp.json();
     const ticket = body.data.ticket;
 
