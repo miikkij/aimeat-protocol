@@ -190,13 +190,13 @@ TASK STATES: draft -> queued -> active -> done|failed|stalled
   - failed: You could not complete it
   - stalled: Task is stuck (no progress for too long)
 
-== WORKFLOW: ALWAYS PROPOSE FIRST ==
+== WORKFLOW: PROPOSE THEN EXECUTE ==
 
-When you see a queued task, propose an execution plan by PATCHing todos onto the task.
-For normal tasks: the owner reviews your plan and clicks "Start" to approve it. Wait for active status.
-For onboarding test tasks: the system auto-starts after you propose todos. GET /v1/agents/me/onboarding to trigger auto-start, then check the task status -- it will be active. Execute immediately.
-
-After proposing todos, always GET /v1/agents/me/onboarding to check -- if the task auto-started, proceed without waiting.
+When you see a queued task:
+1. Propose your plan by PATCHing todos onto the task.
+2. GET /v1/agents/me/onboarding to trigger auto-validation.
+3. Check the task status -- if it is active, execute the todos immediately.
+4. If it is still queued, your owner will start it from the dashboard.
 
 == ENDPOINTS ==
 
