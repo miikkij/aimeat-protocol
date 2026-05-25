@@ -2,6 +2,86 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.9.0] - 2026-05-25
+
+### Added
+
+#### Agent Integration Architecture (Plans 1-5)
+- **Push Layer (Plan 1)** -- webhook infrastructure with HMAC-SHA256 signing, 3x retry with backoff, auto-disable after 10 failures, SSRF validation, delivery log (last 50 per agent), telemetry endpoints (POST/GET), cursor-based inbox polling with composite timestamp@id cursors, 7 webhook event schemas with Zod validation.
+- **Skill Bundle Generator (Plan 2)** -- runtime-specific skill bundles (Hermes + Generic adapters), SHA-256 versioned ZIP downloads, 6 reference documents (api-overview, task-lifecycle, message-protocol, telemetry-protocol, capability-report, error-protocol), auto-selects adapter based on agent platform.
+- **Hello Integration (Plan 3)** -- 11-step onboarding flow with platform detection, readiness scoring (baseline + operational health), auto-check on GET, auto-start test task, device auth auto-creates onboarding + test task.
+- **Agent Detail Tab-View (Plan 4)** -- 8-tab UI (Integration, Tasks, Messages, Data Access, Directives, Agent Config, Activity, Services), state detector (5 states), two-zone card header, shared agent board, step pills with i18n, expandable memory key preview.
+- **Governance + Admin (Plan 5)** -- budget limits on directives, owner-only task pause, readiness gate middleware, stall detection (unreachable + webhook_down), 5 admin fleet endpoints, admin Agent Integration dashboard tab.
+
+#### Agent Onboarding UX
+- **Device auth next_steps** -- device-token response includes step-by-step instructions for skill bundle download, system prompt, and Hello Integration with exact URLs.
+- **Device auth user_instructions** -- tells the agent where the owner approves (AIMEAT profile Agents tab) so the agent can relay this to the user.
+- **Copy prompt for agent** -- button in Integration tab copies a ready-made prompt with auth, skill bundle download, and onboarding instructions.
+- **Polling instructions in prompt** -- exact curl command + python3 parse example for device-token polling, with "poll IMMEDIATELY" instruction.
+- **Test task auto-start** -- onboarding validator auto-starts the test task when agent proposes todos, removing the need for owner to click Start.
+- **Test task auto-creation** -- device auth approval creates the test task automatically so agents can complete steps 9-10 without owner intervention.
+- **access_token alias** -- device-token response includes both `token` and `access_token` (RFC 8628 standard) for compatibility.
+
+#### Agent Dashboard Features
+- **Capabilities badges** -- technical (green) and domain (blue) capability badges displayed on agent card below the name.
+- **Agent Commands palette** -- Messages tab shows agent-registered commands with `/` autocomplete.
+- **Stored Memory Keys** -- Data Access tab shows agent's actual memory keys with click-to-expand JSON preview.
+- **Agent Config tab** -- shows config files pushed by the agent (watchdog, skill_bundle metadata).
+- **Activity onboarding events** -- Activity tab includes Hello Integration step-pass events alongside task events.
+- **TODAY'S GOVERNANCE section** -- token budget, tasks today, policy issues, delivery health always visible in Activity tab.
+- **10s polling fallback** -- agents-tab and messages-tab poll every 10 seconds as SSE fallback.
+
+#### Agent Prompt Improvements
+- **Positive framing** -- 60 negations in prompt-defaults.ts rewritten to positive language (e.g., "wait for approval" instead of "DO NOT start working").
+- **Boot sequence reordered** -- directives, CORE modules (tasks, messages), Hello Integration, EXTEND modules, watchdog. Agents learn task operations before onboarding.
+- **Each onboarding step documented** -- tier1 prompt lists what triggers validation for every step (PUT capabilities, POST message, POST telemetry, etc.).
+- **Watchdog uses skill bundle script** -- tier1 prompt says "install scripts/poll-inbox.sh from your skill bundle" instead of 40 lines of "build your own".
+- **Commands/config in SKILL.md** -- "After Onboarding" section with exact POST /v1/memory examples moved from references/ to SKILL.md where agents actually read it.
+- **Agent API Quick Reference in llms.txt** -- copypaste-ready examples for capabilities PUT, todos PATCH, telemetry POST, onboarding step POST, memory write.
+
+### Fixed
+
+#### Critical Data Safety
+- **Dev-mode no longer destroys agent data** -- re-registration in dev mode now resets password only, preserving all agents, memory, and data. New `AIMEAT_TEST_MODE` flag for E2E test isolation (full wipe behavior).
+- **Agent cascade delete** -- deleting an agent now cleans up messages, telemetry, webhook logs, onboarding records, sharing groups (were missing from cascade).
+
+#### Prisma/Storage
+- **TelemetryEvent 500 fix** -- Prisma schema used `@db.ObjectId` but code generated UUIDs. Removed ObjectId constraint.
+- **WebhookDeliveryLog 500 fix** -- same ObjectId issue.
+- **Webhook DELETE fix** -- used `undefined` instead of `null` for Prisma nullable fields, so webhook URL was never actually cleared.
+- **Step 10 testTaskId lost** -- validateAcceptTestTask overwrote step details without preserving testTaskId, causing validateCompleteTestTask to always fail "No test task created".
+- **read_directives auto-validation** -- added to auto-check list (always passes but was missing, requiring manual POST).
+- **Memory route owner access** -- removed `requireRole('agent')` from GET /v1/memory and search routes so owner sessions can view agent memory with `?agent=GAII`.
+- **Memory `?agent=` parameter** -- when agent GAII is specified, bypasses ownerScope aggregation and queries only that agent's keys.
+
+#### UI Fixes
+- **Zone 2 "NEXT: undefined"** -- used `nextStep.name` but steps have `title`. Fixed to `nextStep.title || nextStep.id`.
+- **Onboarding step names translated** -- UI now uses `t('agentOnboarding.steps.' + step.id)` instead of raw step IDs.
+- **Data Access empty state** -- shows all 3 action buttons (tag, area, package) and corrected text from "above" to "below".
+- **TabMessages missing agent prop** -- commands always showed (0) because `agent.gaii` was undefined.
+- **Approve/Deny removes request immediately** -- no more 5-second wait for polling to clear it.
+- **Deny button styled** -- changed from invisible `btn-danger` (text only) to visible `btn-danger-solid`.
+- **Messages textarea full width** -- input field stretches to fill available space.
+- **SSE ticket retry** -- SSE connection now retries with backoff when ticket request fails instead of silently giving up.
+
+#### Webhook/Schema
+- **onboarding.step webhook payload** -- field names now match Zod schema (step_order, step_title, action, onboarding_progress, onboarding_total).
+- **directive.updated Zod enum** -- added `budget_limits` to changed_sections enum.
+- **MCP notification for task.updated** -- added missing `emitResourceUpdated()` in PATCH task handler.
+
+#### Security
+- **SSRF blocklist** -- added RFC 5737 TEST-NET ranges (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24).
+
+### Changed
+- **Hermes skill bundle** -- SKILL.md "On First Run" includes exact cron install commands for poll-inbox.sh and telemetry hook.
+- **Skill bundle adapter selection** -- auto-selects Hermes adapter based on agent's platform field instead of requiring `?runtime=hermes` query parameter.
+- **i18n** -- service visibility values translated (Public/Private/Internal), admin platform form placeholders translated, onboarding step names translated in both en.json and fi.json.
+- **E2E webhook test** -- unreachable URL changed from RFC 5737 blocked IP to httpbin.org:12345.
+
+### Documentation
+- **Hello Integration demo video** -- added to README with YouTube thumbnail link.
+- **AIMEAT_TEST_MODE** -- documented in .env.example, config-schema.ts, env-config.ts.
+
 ## [1.8.0] - 2026-05-22
 
 ### Added
