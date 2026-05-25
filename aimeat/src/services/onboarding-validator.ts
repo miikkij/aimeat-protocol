@@ -128,11 +128,14 @@ async function validateTestMessage(agentGaii: string, storage: Storage): Promise
 async function validateDelivery(agentGaii: string, storage: Storage): Promise<StepValidationResult> {
   const agent = await storage.getAgent(agentGaii);
   const hasWebhook = !!(agent?.webhookUrl && agent.webhookEnabled);
+  const lastSeenRecently = !!(agent?.lastSeen && (Date.now() - new Date(agent.lastSeen).getTime()) < 10 * 60 * 1000);
+  const hasDelivery = hasWebhook || lastSeenRecently;
+  const method = hasWebhook ? 'webhook' : lastSeenRecently ? 'polling' : 'none';
   return {
-    passed: hasWebhook,
+    passed: hasDelivery,
     validationMethod: 'automatic',
-    details: { webhookUrl: agent?.webhookUrl, webhookEnabled: agent?.webhookEnabled },
-    failureReason: hasWebhook ? undefined : 'No delivery channel configured. Register a webhook via PUT /v1/agents/me/webhook',
+    details: { webhookUrl: agent?.webhookUrl, webhookEnabled: agent?.webhookEnabled, deliveryMethod: method },
+    failureReason: hasDelivery ? undefined : 'Ensure your polling watchdog is running (agent must be seen within 10 minutes) or register a webhook via PUT /v1/agents/me/webhook.',
   };
 }
 
@@ -151,18 +154,22 @@ async function validateAcceptTestTask(agentGaii: string, storage: Storage): Prom
   const onboarding = await storage.getOnboarding(agentGaii);
   const testTaskId = (onboarding?.steps.find(s => s.id === 'accept_test_task')?.details as Record<string, unknown> | undefined)?.testTaskId as string | undefined;
   if (!testTaskId) {
-    return { passed: false, validationMethod: 'automatic', failureReason: 'No test task created. Start onboarding first.' };
+    return { passed: false, validationMethod: 'automatic', failureReason: 'Start onboarding first to create a test task.' };
   }
   const task = await storage.getAgentTask(testTaskId);
   if (!task) {
-    return { passed: false, validationMethod: 'automatic', failureReason: 'Test task not found' };
+    return { passed: false, validationMethod: 'automatic', failureReason: 'Test task missing. Re-run Hello Integration to create a new one.' };
   }
   const hasTodos = (task.todos?.length ?? 0) > 0;
+  if (hasTodos && task.status === 'queued') {
+    const now = new Date().toISOString();
+    await storage.updateAgentTask(testTaskId, { status: 'active', lastEventAt: now, updatedAt: now });
+  }
   return {
     passed: hasTodos,
     validationMethod: 'automatic',
-    details: { taskId: testTaskId, todoCount: task.todos?.length ?? 0 },
-    failureReason: hasTodos ? undefined : 'Test task has no todos. Propose todos via PATCH /v1/agents/me/tasks/{id}',
+    details: { taskId: testTaskId, todoCount: task.todos?.length ?? 0, autoStarted: hasTodos && task.status === 'queued' },
+    failureReason: hasTodos ? undefined : 'Propose todos on the test task via PATCH /v1/agents/me/tasks/{id}',
   };
 }
 
