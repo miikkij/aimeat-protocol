@@ -168,7 +168,7 @@ async function validateAcceptTestTask(agentGaii: string, storage: Storage): Prom
   return {
     passed: hasTodos,
     validationMethod: 'automatic',
-    details: { taskId: testTaskId, todoCount: task.todos?.length ?? 0, autoStarted: hasTodos && task.status === 'queued' },
+    details: { testTaskId, taskId: testTaskId, todoCount: task.todos?.length ?? 0, autoStarted: hasTodos && task.status === 'queued' },
     failureReason: hasTodos ? undefined : 'Propose todos on the test task via PATCH /v1/agents/me/tasks/{id}',
   };
 }
