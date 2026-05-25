@@ -87,19 +87,28 @@ function buildAgentPrompt(sess) {
 Owner: ${sess.owner}
 Node: ${url}
 
-1. Authenticate: POST ${url}/v1/agents/device-authorize
-   Body: { "agent_name": "your-name", "owner": "${sess.owner}" }
-   Tell me the verification URL so I can approve.
+Step 1: Authenticate
+  POST ${url}/v1/agents/device-authorize
+  Body: { "agent_name": "your-name", "owner": "${sess.owner}" }
+  Show me the verification URL so I can approve you.
 
-2. MANDATORY FIRST ACTION after auth -- download and read your operating instructions:
-   GET ${url}/v1/prompts/tier1
-   This contains your directives, task queue, inbox endpoint, capability
-   reporting instructions, message handling, and your full operating loop.
-   DO NOT call any other endpoint until you have read tier1 completely.
-   The response includes a system_prompt field with step-by-step instructions
-   and structured data fields (directives, task_queue, capabilities, messages)
-   with your personalized endpoint URLs.
-   Use /v1/agents/me/ as shortcut in all agent URLs -- it resolves to your name.`;
+Step 2: Download your skill bundle (first thing after auth)
+  GET ${url}/v1/agents/your-name/skill-bundle
+  Header: Authorization: Bearer <your-token>
+  Save as ZIP, extract it, and read SKILL.md.
+  It contains your personalized directives, rules, and complete API reference.
+
+Step 3: Read your system prompt
+  GET ${url}/v1/prompts/tier1
+  Header: Authorization: Bearer <your-token>
+  This gives you your operating loop, task queue, inbox, and all endpoint URLs.
+
+Step 4: Start Hello Integration
+  GET ${url}/v1/agents/me/onboarding
+  Header: Authorization: Bearer <your-token>
+  Follow the onboarding steps to reach production readiness.
+
+Tip: Use /v1/agents/me/ as shortcut in all agent URLs -- it resolves to your name.`;
 }
 
 /* ── Platform instructions ── */
@@ -292,7 +301,10 @@ export default function AgentsTab({ session, showToast, onStats }) {
         owner_token: session.jwt,
       });
       showToast(t('profile.agents.pendingRequests.denied'));
-    } catch { /* ignore */ }
+      loadData();
+    } catch (e) {
+      showToast(e.message || 'Deny failed', true);
+    }
   }
 
   async function downloadTier1() {
@@ -381,7 +393,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
                 <button class="btn-success" onClick=${() => setApprovingCode(req.user_code)}>
                   ${t('profile.agents.pendingRequests.approve')}
                 </button>
-                <button class="btn-danger" onClick=${() => handleDeny(req.user_code)}>
+                <button class="btn-danger-solid" onClick=${() => handleDeny(req.user_code)}>
                   ${t('profile.agents.pendingRequests.deny')}
                 </button>
               </div>

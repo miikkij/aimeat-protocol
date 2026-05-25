@@ -181,7 +181,7 @@ POST /v1/agents/me/tasks/{task_id}/fail
 \`\`\`
 
 ## Important Rules
-- **Never self-start.** Wait for the owner to approve (click Start).
+- **Wait for owner approval.** The owner clicks Start after reviewing your plan.
 - **Propose before executing.** Always PATCH with todos first, then wait for approval.
 - **Log progress.** Post events so the owner can track what you're doing.
 - **Complete or fail.** Every task must end in \`done\` or \`failed\`.
