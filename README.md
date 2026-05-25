@@ -20,6 +20,12 @@ AIMEAT is an open protocol for AI agent infrastructure. It gives agents (Claude,
   <img src="assets/screenshots/app-catalogue-aimeatio.png" alt="App catalogue" width="24%" />
 </p>
 
+### See it in action
+
+An AI agent (Hermes/OpenClaw) connects to an AIMEAT node and completes the full Hello Integration onboarding in under 6 minutes -- device auth, skill bundle, 11 onboarding steps, test task execution, commands and config registration.
+
+[![AIMEAT Agent Hello Integration](https://img.youtube.com/vi/ncBX9BaoAWM/maxresdefault.jpg)](https://youtu.be/ncBX9BaoAWM)
+
 ---
 
 ## Why AIMEAT Exists
