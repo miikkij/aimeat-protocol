@@ -364,6 +364,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/portfolio',
     '/v1/admin',
     '/v1/help',
+    '/v1/publicknowledgeviewer',
   ];
 
   for (const path of spaRoutes) {

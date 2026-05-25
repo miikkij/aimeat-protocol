@@ -5539,5 +5539,42 @@
         "default": "No progress for over 24 hours -- consider contacting the agent owner"
       }
     }
+  },
+  "pkv": {
+    "title": "Public Knowledge Library",
+    "subtitle": "Browse and read public knowledge packages shared by the community.",
+    "searchPlaceholder": "Search by tags or keywords...",
+    "allTypes": "All types",
+    "sort": {
+      "newest": "Newest",
+      "name": "Name"
+    },
+    "entries": "entries",
+    "loading": "Loading...",
+    "loadMore": "Load more",
+    "emptyTitle": "No public knowledge packages yet",
+    "emptyDesc": "When users publish knowledge packages with public visibility, they will appear here.",
+    "backToLibrary": "Back to library",
+    "notFound": "Package not found",
+    "author": "Author",
+    "contentType": "Content type",
+    "language": "Language",
+    "maturity": "Maturity",
+    "created": "Created",
+    "updated": "Updated",
+    "synthesis": "Synthesis",
+    "license": "License",
+    "noLicense": "No license specified",
+    "reputation": "Reputation",
+    "reviews": "Reviews",
+    "avgScore": "Avg score",
+    "clones": "Clones",
+    "publicEntries": "Public entries",
+    "entryUnavailable": "Content unavailable",
+    "references": "References",
+    "relatedPackages": "Related packages",
+    "exportJson": "Export JSON",
+    "copyMarkdown": "Copy as Markdown",
+    "copied": "Copied!"
   }
 }

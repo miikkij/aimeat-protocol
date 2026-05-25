@@ -5539,5 +5539,42 @@
         "default": "Ei edistymistä yli 24 tuntiin -- harkitse yhteydenottoa agentin omistajaan"
       }
     }
+  },
+  "pkv": {
+    "title": "Julkinen tietokirjasto",
+    "subtitle": "Selaa ja lue yhteisön jakamia julkisia tietopaketteja.",
+    "searchPlaceholder": "Hae tageilla tai avainsanoilla...",
+    "allTypes": "Kaikki tyypit",
+    "sort": {
+      "newest": "Uusimmat",
+      "name": "Nimi"
+    },
+    "entries": "merkintää",
+    "loading": "Ladataan...",
+    "loadMore": "Lataa lisää",
+    "emptyTitle": "Ei julkisia tietopaketteja vielä",
+    "emptyDesc": "Kun käyttäjät julkaisevat tietopaketteja julkisella näkyvyydellä, ne näkyvät täällä.",
+    "backToLibrary": "Takaisin kirjastoon",
+    "notFound": "Pakettia ei löytynyt",
+    "author": "Tekijä",
+    "contentType": "Sisältötyyppi",
+    "language": "Kieli",
+    "maturity": "Kypsyys",
+    "created": "Luotu",
+    "updated": "Päivitetty",
+    "synthesis": "Synteesi",
+    "license": "Lisenssi",
+    "noLicense": "Lisenssiä ei määritelty",
+    "reputation": "Maine",
+    "reviews": "Arvostelut",
+    "avgScore": "Keskiarvo",
+    "clones": "Kloonaukset",
+    "publicEntries": "Julkiset merkinnät",
+    "entryUnavailable": "Sisältö ei saatavilla",
+    "references": "Lähteet",
+    "relatedPackages": "Liittyvät paketit",
+    "exportJson": "Vie JSON",
+    "copyMarkdown": "Kopioi Markdownina",
+    "copied": "Kopioitu!"
   }
 }

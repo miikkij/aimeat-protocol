@@ -685,17 +685,29 @@ export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router 
       ? (req.query.entries as string).split(',').map(e => e.trim())
       : null;
 
-    // Find public manifest
-    const allAgents = await storage.listAgents();
+    // Find public manifest — check owners (GHIIs) first, then agents
     let sourceManifest: any = null;
     let sourceOwnerGaii = '';
 
-    for (const agent of allAgents) {
-      const mem = await storage.getMemory(agent.gaii, manifestKey);
-      if (mem && mem.visibility === 'public') {
-        sourceManifest = mem;
-        sourceOwnerGaii = agent.gaii;
+    const allOwners = await storage.listOwners();
+    for (const owner of allOwners) {
+      const ghii = `${owner.name}@${config.nodeId}`;
+      const hits = await storage.listMemory(ghii, { prefix: manifestKey, visibility: 'public' });
+      if (hits.length > 0) {
+        sourceManifest = hits[0];
+        sourceOwnerGaii = ghii;
         break;
+      }
+    }
+    if (!sourceManifest) {
+      const allAgents = await storage.listAgents();
+      for (const agent of allAgents) {
+        const mem = await storage.getMemory(agent.gaii, manifestKey);
+        if (mem && mem.visibility === 'public') {
+          sourceManifest = mem;
+          sourceOwnerGaii = agent.gaii;
+          break;
+        }
       }
     }
 

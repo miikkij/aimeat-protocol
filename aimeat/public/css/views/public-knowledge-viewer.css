@@ -1,0 +1,479 @@
+/**
+ * @file public-knowledge-viewer.css
+ * @description Styles for the public knowledge package viewer (no-auth browsing)
+ * @version-history v1.0.0 — 2026-05-26 — Initial implementation
+ */
+
+/* ── Layout ── */
+
+.pkv-container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+  min-height: 60vh;
+}
+
+.pkv-header {
+  margin-bottom: 2rem;
+}
+
+.pkv-header h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--text, #1A1A2E);
+  margin: 0 0 0.25rem;
+}
+
+.pkv-header p {
+  color: var(--text-dim, #6B7280);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+/* ── Search & Filters ── */
+
+.pkv-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  align-items: center;
+}
+
+.pkv-search {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 8px;
+  background: var(--card-bg, #FFFFFF);
+  color: var(--text, #1A1A2E);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.pkv-search:focus {
+  border-color: var(--accent, #7c5cff);
+}
+
+.pkv-filter-select {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 8px;
+  background: var(--card-bg, #FFFFFF);
+  color: var(--text, #1A1A2E);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+/* ── Package Cards Grid ── */
+
+.pkv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.pkv-card {
+  background: var(--card-bg, #FFFFFF);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 12px;
+  padding: 1.25rem;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.pkv-card:hover {
+  border-color: var(--accent, #7c5cff);
+  box-shadow: 0 2px 8px var(--shadow, rgba(0,0,0,0.06));
+}
+
+.pkv-card-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text, #1A1A2E);
+  margin: 0 0 0.4rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pkv-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--text-dim, #6B7280);
+}
+
+.pkv-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.pkv-tag {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  background: var(--bg-dim, #F3F4F6);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: var(--text-dim, #6B7280);
+}
+
+.pkv-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.pkv-badge-type {
+  background: var(--accent-faint, #EDE9FE);
+  color: var(--accent, #7c5cff);
+}
+
+.pkv-badge-maturity {
+  background: var(--success-faint, #ECFDF5);
+  color: var(--success, #059669);
+}
+
+.pkv-badge-lang {
+  background: var(--bg-dim, #F3F4F6);
+  color: var(--text-dim, #6B7280);
+}
+
+/* ── Detail View ── */
+
+.pkv-detail {
+  background: var(--card-bg, #FFFFFF);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.pkv-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--accent, #7c5cff);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: 1.25rem;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.pkv-back:hover {
+  text-decoration: underline;
+}
+
+.pkv-detail-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text, #1A1A2E);
+  margin: 0 0 0.25rem;
+}
+
+.pkv-detail-version {
+  font-size: 0.85rem;
+  color: var(--text-dim, #6B7280);
+  margin-bottom: 1rem;
+}
+
+.pkv-detail-section {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border, #E5E7EB);
+}
+
+.pkv-detail-section h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text, #1A1A2E);
+  margin: 0 0 0.75rem;
+}
+
+.pkv-detail-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.pkv-meta-item {
+  font-size: 0.85rem;
+}
+
+.pkv-meta-label {
+  color: var(--text-dim, #6B7280);
+  display: block;
+  margin-bottom: 0.15rem;
+}
+
+.pkv-meta-value {
+  color: var(--text, #1A1A2E);
+  font-weight: 500;
+}
+
+/* ── Entries ── */
+
+.pkv-entries-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pkv-entry {
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.pkv-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  background: var(--bg-dim, #F9FAFB);
+  transition: background 0.1s;
+}
+
+.pkv-entry-header:hover {
+  background: var(--bg-hover, #F3F4F6);
+}
+
+.pkv-entry-arrow {
+  font-size: 0.75rem;
+  color: var(--text-dim, #6B7280);
+  transition: transform 0.15s;
+}
+
+.pkv-entry-arrow.expanded {
+  transform: rotate(90deg);
+}
+
+.pkv-entry-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text, #1A1A2E);
+}
+
+.pkv-entry-content {
+  padding: 1.25rem;
+  font-size: 0.88rem;
+  line-height: 1.7;
+  color: var(--text, #1A1A2E);
+  border-top: 1px solid var(--border, #E5E7EB);
+}
+
+.pkv-entry-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.pkv-entry-readable h4.pkv-entry-h {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text, #1A1A2E);
+  margin: 0 0 0.5rem;
+}
+
+.pkv-entry-summary {
+  color: var(--text, #1A1A2E);
+  margin: 0 0 1rem;
+  line-height: 1.6;
+  font-size: 0.9rem;
+}
+
+.pkv-entry-unavailable {
+  color: var(--text-dim, #6B7280);
+  font-style: italic;
+}
+
+/* ── Readable value rendering ── */
+
+.pkv-val-obj,
+.pkv-val-nested {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.pkv-val-nested {
+  padding-left: 1rem;
+  border-left: 2px solid var(--border, #E5E7EB);
+  margin-top: 0.25rem;
+}
+
+.pkv-val-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.pkv-val-key {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent, #7c5cff);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.pkv-val-value {
+  color: var(--text, #1A1A2E);
+}
+
+.pkv-val-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pkv-val-list-item {
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-dim, #F9FAFB);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+/* ── References ── */
+
+.pkv-references {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.pkv-references li {
+  padding: 0.4rem 0;
+  font-size: 0.85rem;
+  color: var(--text, #1A1A2E);
+}
+
+.pkv-references a {
+  color: var(--accent, #7c5cff);
+  text-decoration: none;
+}
+
+.pkv-references a:hover {
+  text-decoration: underline;
+}
+
+/* ── Links (related packages) ── */
+
+.pkv-links-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.pkv-link-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text, #1A1A2E);
+}
+
+.pkv-link-relation {
+  font-size: 0.75rem;
+  color: var(--text-dim, #6B7280);
+  background: var(--bg-dim, #F3F4F6);
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+}
+
+/* ── Actions ── */
+
+.pkv-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+/* ── Empty / Loading / Error States ── */
+
+.pkv-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-dim, #6B7280);
+}
+
+.pkv-empty h3 {
+  color: var(--text, #1A1A2E);
+  margin: 0 0 0.5rem;
+}
+
+.pkv-loading {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-dim, #6B7280);
+}
+
+.pkv-error {
+  text-align: center;
+  padding: 2rem;
+  color: var(--danger, #DC2626);
+}
+
+/* ── Reputation ── */
+
+.pkv-reputation {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.pkv-rep-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pkv-rep-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text, #1A1A2E);
+}
+
+.pkv-rep-label {
+  color: var(--text-dim, #6B7280);
+  font-size: 0.75rem;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 640px) {
+  .pkv-container {
+    padding: 1.25rem 1rem;
+  }
+
+  .pkv-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pkv-controls {
+    flex-direction: column;
+  }
+
+  .pkv-search {
+    min-width: unset;
+    width: 100%;
+  }
+
+  .pkv-detail-meta {
+    grid-template-columns: 1fr;
+  }
+}
