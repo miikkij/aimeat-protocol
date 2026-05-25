@@ -181,7 +181,7 @@ PATCH /v1/agents/me/tasks/{id}
 
 POST /v1/agents/me/tasks/{id}/start
   Transition queued -> active. The OWNER calls this from the dashboard after reviewing your plan.
-  The owner calls this from the dashboard. Only call it yourself in automated/unattended workflows.
+  The owner calls this from the dashboard. During onboarding, GET /onboarding auto-starts the test task -- check task status instead of calling this endpoint.
 
 PATCH /v1/agents/me/tasks/{id}/todos/{todoId}
   Update a single todo's status during execution. This is the PRIMARY way to mark todos done/failed.

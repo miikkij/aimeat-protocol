@@ -90,7 +90,7 @@ export function agentSkillBundleRouter(config: AimeatConfig, storage: Storage): 
       return;
     }
 
-    const runtimeParam = (req.query.runtime as string)?.toLowerCase() ?? 'generic';
+    const runtimeParam = (req.query.runtime as string)?.toLowerCase() || agent?.platform?.toLowerCase() || 'generic';
     const adapter = ADAPTERS[runtimeParam] ?? ADAPTERS.generic;
 
     const ctx = await buildContext(agentName, agentGaii);
@@ -136,7 +136,7 @@ export function agentSkillBundleRouter(config: AimeatConfig, storage: Storage): 
       return;
     }
 
-    const runtimeParam = (req.query.runtime as string)?.toLowerCase() ?? 'generic';
+    const runtimeParam = (req.query.runtime as string)?.toLowerCase() || agent?.platform?.toLowerCase() || 'generic';
     const adapter = ADAPTERS[runtimeParam] ?? ADAPTERS.generic;
 
     const ctx = await buildContext(agentName, agentGaii);

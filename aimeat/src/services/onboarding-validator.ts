@@ -211,7 +211,7 @@ export async function checkAutoSteps(
   storage: Storage,
 ): Promise<AgentOnboardingStep[]> {
   const autoStepIds: OnboardingStepId[] = [
-    'authenticate', 'report_capabilities', 'send_test_message',
+    'authenticate', 'report_capabilities', 'read_directives', 'send_test_message',
     'configure_delivery', 'report_telemetry', 'accept_test_task', 'complete_test_task',
   ];
 
