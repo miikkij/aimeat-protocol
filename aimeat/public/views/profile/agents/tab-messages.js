@@ -76,7 +76,7 @@ function CommandPalette({ commands, onSend }) {
   `;
 }
 
-export default function TabMessages({ agentName, session, showToast }) {
+export default function TabMessages({ agent, agentName, session, showToast }) {
   const [commands, setCommands] = useState([]);
   const [messages, setMessages] = useState([]);
   const [threads, setThreads] = useState([]);
