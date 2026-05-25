@@ -153,13 +153,18 @@ TASK STATES: draft -> queued -> active -> done|failed|stalled
   - failed: You could not complete it
   - stalled: Task is stuck (no progress for too long)
 
-== WORKFLOW: PROPOSE THEN EXECUTE ==
+== WORKFLOW: PROPOSE THEN WAIT ==
 
 When you see a queued task:
-1. Propose your plan by PATCHing todos onto the task.
-2. GET /v1/agents/me/onboarding to trigger auto-validation.
-3. Check the task status -- if it is active, execute the todos immediately.
-4. If it is still queued, your owner will start it from the dashboard.
+1. Read the task details: GET /v1/agents/me/tasks/{id}
+2. Break the work into steps. PATCH your proposed todos onto the task.
+3. Send a message to your owner summarizing your plan: POST /v1/agents/me/messages
+   Include: what you plan to do, how many steps, estimated scope, any questions.
+4. STOP. The task stays queued. Your owner reviews your plan in the dashboard.
+5. When the owner clicks "Start", the task becomes active. You will see it in your inbox as an active task.
+6. Only then: execute the todos one by one, marking each done/failed.
+
+The owner sees your proposed todos and your message before approving. This gives full transparency.
 
 == ENDPOINTS ==
 
