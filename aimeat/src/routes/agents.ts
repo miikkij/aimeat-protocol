@@ -198,7 +198,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
               auth: 'Authorization: Bearer <your token from above>',
             },
             step_3_hello_integration: {
-              action: 'Check your onboarding status and complete the Hello Integration steps.',
+              action: 'Check your onboarding status and complete the Hello Integration steps. A test task is already created for you. GET this endpoint auto-validates steps and auto-starts the test task after you propose todos -- always re-check here instead of trying POST /start.',
               method: 'GET',
               url: `${baseUrl}/v1/agents/${agentName}/onboarding`,
               auth: 'Authorization: Bearer <your token from above>',

@@ -16,7 +16,7 @@ import { apiGet, apiPut } from '/js/api.js';
 
 const html = htm.bind(h);
 
-export default function TabAgentConfig({ agentName, session, showToast }) {
+export default function TabAgentConfig({ agent, agentName, session, showToast }) {
   const [files, setFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
   const [preview, setPreview] = useState('');
@@ -28,11 +28,12 @@ export default function TabAgentConfig({ agentName, session, showToast }) {
   async function loadFiles() {
     setLoading(true);
     try {
-      const resp = await apiGet(`/v1/memory?prefix=agents.${encodeURIComponent(agentName)}.config.`);
+      const gaii = agent?.gaii || agentName;
+      const resp = await apiGet(`/v1/memory?prefix=agents.config.&agent=${encodeURIComponent(gaii)}`);
       const items = resp?.data?.items || resp?.data?.memories || [];
       const configFiles = items.map(item => ({
         key: item.key,
-        filename: item.key.replace(`agents.${agentName}.config.`, ''),
+        filename: item.key.replace(/^agents\.(?:config\.|[^.]+\.config\.)/, ''),
         content: typeof item.value === 'string' ? item.value : JSON.stringify(item.value, null, 2),
         updatedAt: item.updated_at || item.updatedAt,
         description: item.description,

@@ -88,13 +88,14 @@ Owner: ${sess.owner}
 Node: ${url}
 
 Step 1: Authenticate
-  POST ${url}/v1/agents/device-authorize
+  If you already have a saved AIMEAT token, verify it works with GET ${url}/v1/agents/me/inbox first. If it works, skip to Step 2.
+  Otherwise: POST ${url}/v1/agents/device-authorize
   Body: { "agent_name": "your-name", "owner": "${sess.owner}" }
   Tell me the verification code so I can approve you.
   Then poll POST ${url}/v1/agents/device-token every 5 seconds with:
     { "device_code": "<from step above>", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" }
   Keep polling until you get a token back (I will approve in the meantime).
-  Save the token -- use it for all subsequent requests.
+  Save the token to a file and use it for all subsequent requests. Only do ONE auth cycle -- once saved, re-read from file.
 
 Step 2: Download your skill bundle (first thing after auth)
   GET ${url}/v1/agents/your-name/skill-bundle
