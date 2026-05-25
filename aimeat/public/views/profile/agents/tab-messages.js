@@ -128,7 +128,8 @@ export default function TabMessages({ agent, agentName, session, showToast }) {
   useEffect(() => {
     const handler = () => { loadMessages(); loadThreads(); loadCommands(); };
     window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
+    const poller = setInterval(handler, 10000);
+    return () => { window.removeEventListener('aimeat-live-update', handler); clearInterval(poller); };
   }, [agentName, activeThread]);
 
   useEffect(() => {
