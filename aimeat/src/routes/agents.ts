@@ -178,6 +178,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
           name: agentName,
           owner: request.ownerName,
           token: creds.token,
+          access_token: creds.token,
           expires_at: creds.expires_at,
           privateKey: creds.privateKey,
           publicKey: creds.publicKey,
