@@ -39,12 +39,12 @@ async function _open() {
       reconnectDelay = 5000; // reset on successful connection
     };
 
-    es.onmessage = () => {
-      reconnectDelay = 5000; // reset on successful message
+    es.onmessage = (event) => {
+      reconnectDelay = 5000;
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         listeners.forEach(fn => fn());
-      }, 2000);
+      }, 500);
     };
 
     es.onerror = () => {

@@ -777,7 +777,7 @@
         "empty": {
           "tasks": "No tasks yet. Create a task to give this agent work.",
           "messages": "No messages yet. Send a message or use a command.",
-          "data_access": "No data access configured. Add memory areas or tags using the controls above.",
+          "data_access": "No data access configured. Use the buttons below to add tags, memory areas, or knowledge packages.",
           "agent_config": "No configuration files. The agent will push its config files after the skill bundle is installed.",
           "activity": "No activity recorded yet. Events will appear here once the agent starts working.",
           "services": "No services declared. The agent can declare services during Hello Integration Step 11."
