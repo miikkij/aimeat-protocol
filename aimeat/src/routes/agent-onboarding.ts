@@ -291,6 +291,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
       });
     }
 
+    const testTaskAutoStarted = stepId === 'accept_test_task' && result.passed && result.details?.autoStarted;
     res.json(success(config.nodeId, {
       step,
       progress: onboarding.steps.filter(s => s.status === 'passed').length,
@@ -298,6 +299,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
       completed: !!completedOnboarding,
       readinessScore: completedOnboarding?.readinessScore,
       readinessLevel: completedOnboarding?.readinessLevel,
+      ...(testTaskAutoStarted ? { next_action: 'Test task auto-started. Execute the todos now and then POST /complete.' } : {}),
     }));
   });
 

@@ -195,7 +195,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   // Optional ?agent=GAII — owner can view any of their own agents' memory
   // Optional ?owner_scope=true — list owner-visible keys across all owner's agents
   // Owner sessions automatically use owner_scope (see all agents' memory)
-  router.get('/v1/memory', requireAuth(), requireRole('agent'), requireScope('memory:read'), async (req, res) => {
+  router.get('/v1/memory', requireAuth(), async (req, res) => {
     let gaii = req.auth!.sub;
     const agentParam = req.query.agent as string | undefined;
     // Owner sessions (human user) automatically see all their agents' memory
@@ -284,7 +284,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
   // GET /v1/memory/search — search memory entries (MUST be before :key to avoid capture)
   // Owner sessions search across all their agents' memory
-  router.get('/v1/memory/search', requireAuth(), requireRole('agent'), requireScope('memory:read'), async (req, res) => {
+  router.get('/v1/memory/search', requireAuth(), async (req, res) => {
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
     let gaii = req.auth!.sub;
     const agentParam = req.query.agent as string | undefined;

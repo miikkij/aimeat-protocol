@@ -37,13 +37,13 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
     try {
       const [dirResp, memResp] = await Promise.all([
         getDirectives(agentName).catch(() => null),
-        apiGet(`/v1/memory?prefix=&per_page=100`).catch(() => null),
+        apiGet(`/v1/memory?prefix=&per_page=100&agent=${encodeURIComponent(agent.gaii || agentName)}`).catch(() => null),
       ]);
       const data = dirResp?.data || {};
       setMemoryAreas(data.memory_areas || []);
       setResources(data.resources || []);
-      const keys = (memResp?.data?.items || memResp?.data || [])
-        .filter(item => item.ownerGaii?.includes(agentName) || item.key?.startsWith(`agents.${agentName}`))
+      const items = memResp?.data?.items || memResp?.data || [];
+      const keys = (Array.isArray(items) ? items : [])
         .map(item => ({ key: item.key, visibility: item.visibility, updatedAt: item.updatedAt }));
       setMemoryKeys(keys);
     } catch {

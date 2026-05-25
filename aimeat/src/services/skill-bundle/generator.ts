@@ -182,6 +182,7 @@ POST /v1/agents/me/tasks/{task_id}/fail
 
 ## Important Rules
 - **Wait for owner approval.** The owner clicks Start after reviewing your plan.
+- **Exception: onboarding test tasks auto-start.** After you propose todos on the Hello Integration test task, the system starts it automatically. Check the task status and proceed to execute.
 - **Propose before executing.** Always PATCH with todos first, then wait for approval.
 - **Log progress.** Post events so the owner can track what you're doing.
 - **Complete or fail.** Every task must end in \`done\` or \`failed\`.
