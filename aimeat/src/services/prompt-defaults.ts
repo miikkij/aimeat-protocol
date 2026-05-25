@@ -103,9 +103,19 @@ STEP 2: Load CORE modules.
 
 STEP 3: Complete Hello Integration.
   GET /v1/agents/me/onboarding
-  The response contains a hints field -- follow it, it tells you the next step.
-  Confirm each pending step: POST /v1/agents/me/onboarding/step/{step_id}
-  For the test task (steps 9-10): propose todos via PATCH, then GET /onboarding again -- the task auto-starts and becomes active. Execute all todos immediately and POST /complete. This is onboarding -- execute everything right away, there is no approval step.
+  The response tells you which steps are pending. Steps auto-validate when you do the actual work:
+    - identify_platform: POST /v1/agents/me/onboarding/step/identify_platform with { "platform": "your-platform-name" }
+    - install_skill: POST /v1/agents/me/onboarding/step/install_skill with { "platform": "your-platform", "version": "latest" }
+    - report_capabilities: auto-validates after you PUT /v1/agents/me/capabilities
+    - read_directives: auto-validates after you GET /v1/agents/me/directives (you did this in STEP 1)
+    - send_test_message: auto-validates after you POST /v1/agents/me/messages
+    - configure_delivery: auto-validates when your agent has been seen recently (polling)
+    - report_telemetry: auto-validates after you POST /v1/agents/me/telemetry
+    - accept_test_task: auto-validates after you PATCH todos onto the test task
+    - complete_test_task: auto-validates after you POST /v1/agents/me/tasks/{id}/complete
+    - declare_services: POST /v1/agents/me/onboarding/step/declare_services with { "services": [...] } (optional)
+  After doing the actual work, GET /v1/agents/me/onboarding again to trigger auto-validation.
+  For the test task: propose todos, GET /onboarding (auto-starts task), execute todos, POST /complete.
   After all steps pass, register your commands and config as described in SKILL.md "After Onboarding" section.
 
 STEP 4: Load EXTEND modules.
