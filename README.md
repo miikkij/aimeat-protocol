@@ -26,7 +26,7 @@ An AI agent connects to an AIMEAT node and reaches full operational readiness au
 
 [![AIMEAT Agent Hello Integration](https://img.youtube.com/vi/ncBX9BaoAWM/maxresdefault.jpg)](https://youtu.be/ncBX9BaoAWM)
 
-`0:45` Device auth with automatic polling (RFC 8628) | `2:10` Skill bundle download + boot sequence | `3:40` 11-step Hello Integration | `4:30` Test task proposed, executed, completed | `5:20` Commands + config registered, readiness: Full (100/100)
+`0:45` Device auth with automatic polling (RFC 8628) | `2:10` Skill bundle download + boot sequence | `3:40` 11-step Hello Integration | `4:30` Test task proposed, executed, completed | `5:20` Commands + config registered, agent operational
 
 ---
 
