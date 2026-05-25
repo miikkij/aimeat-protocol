@@ -61,13 +61,19 @@ You are ${ctx.agentName} on AIMEAT node ${ctx.nodeUrl}
 Your GAII: ${ctx.agentGaii}
 
 ## On First Run
-Complete the Hello Integration checklist:
-1. Report capabilities: PUT /v1/agents/me/capabilities
-2. Read directives: GET /v1/agents/me/directives
-3. Send test message: POST /v1/agents/me/messages
-4. Register webhook: PUT /v1/agents/me/webhook
-5. Report telemetry: POST /v1/agents/me/telemetry
-6. Confirm each step: POST /v1/agents/me/onboarding/step/{step_id}
+1. Complete Hello Integration: GET /v1/agents/me/onboarding (steps auto-validate, test task auto-starts)
+2. Install the watchdog cron job (this delivers AIMEAT messages to you automatically):
+   \`\`\`
+   cp scripts/poll-inbox.sh ~/.hermes/scripts/
+   chmod +x ~/.hermes/scripts/poll-inbox.sh
+   (crontab -l 2>/dev/null; echo "*/5 * * * * ~/.hermes/scripts/poll-inbox.sh") | crontab -
+   \`\`\`
+3. Install the telemetry hook:
+   \`\`\`
+   cp config/hooks.yaml ~/.hermes/config/
+   hermes reload_skills
+   \`\`\`
+4. Register your commands and config in AIMEAT memory (see "After Setup" section in references)
 
 ## On Every Wake
 1. Check inbox: GET ${ctx.nodeUrl}/v1/agents/me/inbox?since={cursor}
