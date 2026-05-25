@@ -170,9 +170,11 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         const creds = request.agentCredentials;
         await storage.updateDeviceAuth(device_code, { agentCredentials: null as any });
 
+        const baseUrl = config.baseUrl;
+        const agentName = request.agentName;
         res.json({
           gaii: creds.gaii,
-          name: request.agentName,
+          name: agentName,
           owner: request.ownerName,
           token: creds.token,
           expires_at: creds.expires_at,
@@ -180,7 +182,27 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
           publicKey: creds.publicKey,
           scopes: request.scopes,
           morselBalance: 0,
-          note: 'Use the token directly: Authorization: Bearer <token>. The privateKey is provided for advanced use (Ed25519 signing) but is not required.',
+          next_steps: {
+            message: 'Authentication successful. Your MANDATORY first action: download and read your skill bundle.',
+            step_1_skill_bundle: {
+              action: 'Download your skill bundle ZIP, extract it, and read SKILL.md. It contains your personalized operating instructions, directives, rules, and complete API reference.',
+              method: 'GET',
+              url: `${baseUrl}/v1/agents/${agentName}/skill-bundle`,
+              auth: 'Authorization: Bearer <your token from above>',
+            },
+            step_2_system_prompt: {
+              action: 'Read your system prompt for additional operating context.',
+              method: 'GET',
+              url: `${baseUrl}/v1/prompts/tier1`,
+              auth: 'Authorization: Bearer <your token from above>',
+            },
+            step_3_hello_integration: {
+              action: 'Check your onboarding status and complete the Hello Integration steps.',
+              method: 'GET',
+              url: `${baseUrl}/v1/agents/${agentName}/onboarding`,
+              auth: 'Authorization: Bearer <your token from above>',
+            },
+          },
         });
         return;
       }
