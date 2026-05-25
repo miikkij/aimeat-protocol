@@ -70,7 +70,11 @@ export async function getDeliveryLog(agentName, limit = 20) {
 
 export async function getAgentCommands(agentName, agentGaii) {
   if (agentGaii) {
-    return apiGet(`/v1/memory/${encodeURIComponent(agentGaii)}/agents.${encodeURIComponent(agentName)}.commands`);
+    const resp = await apiGet(`/v1/memory?agent=${encodeURIComponent(agentGaii)}&prefix=agents.${encodeURIComponent(agentName)}.commands`);
+    const items = resp?.data?.items || resp?.data || [];
+    const cmdItem = Array.isArray(items) ? items.find(i => i.key === `agents.${agentName}.commands`) : null;
+    if (cmdItem) return { ok: true, data: { key: cmdItem.key, value: cmdItem.value } };
+    return { ok: true, data: { value: [] } };
   }
   return apiGet(`/v1/memory/agents.${encodeURIComponent(agentName)}.commands`);
 }

@@ -221,7 +221,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     const maxFlags = maxFlagsParam !== undefined ? parseInt(maxFlagsParam, 10) : undefined;
 
     let records: MemoryRecord[];
-    if (ownerScope) {
+    if (ownerScope && !agentParam) {
       // Collect keys from owner's GHII + all agents (any visibility)
       const callerOwner = req.auth!.owner;
       const ownerGhii = `${callerOwner}@${config.nodeId}`;
