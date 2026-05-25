@@ -505,13 +505,18 @@ await test('24. Step 11: declare_services (optional) BEFORE last required step',
 });
 
 await test('25. Step 10: complete_test_task -- triggers auto-complete with all steps passed', async () => {
-    // Start the task (queued -> active)
-    const { status: startStatus, body: startBody } = await json(`/v1/agents/${agentName}/tasks/${fullTestTaskId}/start`, {
-        method: 'POST',
+    // Task may already be auto-started by onboarding validator -- check status first
+    const { body: taskCheck } = await json(`/v1/agents/${agentName}/tasks/${fullTestTaskId}`, {
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
-    assert(startStatus === 200, `POST start status ${startStatus}: ${JSON.stringify(startBody)}`);
-    assert(startBody.data.task.status === 'active', `expected active, got ${startBody.data.task.status}`);
+    if (taskCheck.data.task.status === 'queued') {
+        const { status: startStatus } = await json(`/v1/agents/${agentName}/tasks/${fullTestTaskId}/start`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${ownerToken}` },
+        });
+        assert(startStatus === 200, `POST start status ${startStatus}`);
+    }
+    // Task should now be active (either auto-started or manually started above)
 
     // Complete the task (active -> done)
     const { status: completeStatus, body: completeBody } = await json(`/v1/agents/${agentName}/tasks/${fullTestTaskId}/complete`, {
