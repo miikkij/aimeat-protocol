@@ -86,6 +86,24 @@ export function agentActivityRouter(config: AimeatConfig, storage: Storage): Rou
       }
     }
 
+    // Include onboarding step events
+    const onboarding = await storage.getOnboarding(agentGaii);
+    if (onboarding?.steps) {
+      for (const step of onboarding.steps) {
+        if (step.validatedAt) {
+          allEvents.push({
+            id: `onboarding-${step.id}`,
+            taskId: '',
+            taskTitle: 'Hello Integration',
+            type: step.status === 'passed' ? 'onboarding_passed' : step.status === 'failed' ? 'onboarding_failed' : 'onboarding_step',
+            message: `Step ${step.order}: ${step.title} -- ${step.status}`,
+            details: { stepId: step.id, validationMethod: step.validationMethod, ...step.details as Record<string, unknown> },
+            timestamp: step.validatedAt,
+          });
+        }
+      }
+    }
+
     // Sort by timestamp descending
     allEvents.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 

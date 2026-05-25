@@ -29,18 +29,27 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
   const [addingPackage, setAddingPackage] = useState(false);
   const [newPkgName, setNewPkgName] = useState('');
   const [newPkgDesc, setNewPkgDesc] = useState('');
+  const [memoryKeys, setMemoryKeys] = useState([]);
   const [loading, setLoading] = useState(true);
 
   async function loadData() {
     setLoading(true);
     try {
-      const resp = await getDirectives(agentName);
-      const data = resp?.data || {};
+      const [dirResp, memResp] = await Promise.all([
+        getDirectives(agentName).catch(() => null),
+        apiGet(`/v1/memory?prefix=&per_page=100`).catch(() => null),
+      ]);
+      const data = dirResp?.data || {};
       setMemoryAreas(data.memory_areas || []);
       setResources(data.resources || []);
+      const keys = (memResp?.data?.items || memResp?.data || [])
+        .filter(item => item.ownerGaii?.includes(agentName) || item.key?.startsWith(`agents.${agentName}`))
+        .map(item => ({ key: item.key, visibility: item.visibility, updatedAt: item.updatedAt }));
+      setMemoryKeys(keys);
     } catch {
       setMemoryAreas([]);
       setResources([]);
+      setMemoryKeys([]);
     }
     setTags(agent.tags ?? []);
     setLoading(false);
@@ -237,6 +246,21 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
           <div class="pf-agd-empty">${t('profile.agents.detail.data_access.noPackages')}</div>
         `}
       </div>
+
+      <!-- STORED MEMORY KEYS -->
+      ${memoryKeys.length > 0 && html`
+        <div class="pf-agd-data-section">
+          <div class="pf-agd-section-header">
+            <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.storedKeysTitle')}</span>
+          </div>
+          ${memoryKeys.map(mk => html`
+            <div key=${mk.key} class="pf-agd-area-row">
+              <span class="pf-agd-area-key">${mk.key}</span>
+              <span class="pf-agd-area-perm pf-agd-area-perm--${mk.visibility === 'public' ? 'rw' : 'ro'}">${mk.visibility}</span>
+            </div>
+          `)}
+        </div>
+      `}
 
       <!-- EFFECTIVE SCOPE SUMMARY -->
       <div class="pf-agd-scope-summary">

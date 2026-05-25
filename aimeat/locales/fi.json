@@ -710,6 +710,7 @@
           "permReadOnly": "Vain luku",
           "docCount": "dokumenttia",
           "noPackages": "Ei tietopaketteja linkitetty",
+          "storedKeysTitle": "Tallennetut muistiavaimet",
           "scopeNote": "Tämä laajuusyhteenveto sisältyy agentin taitopakettiin, jotta se tietää tietorajansa.",
           "scopeFooter": "Tämä yhteenveto sisällytetään agentin taitopakettiin, jotta se tietää datarajansa.",
           "addAreaError": "Muistialueen lisäys epäonnistui",

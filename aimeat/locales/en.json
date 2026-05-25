@@ -710,6 +710,7 @@
           "permReadOnly": "Read only",
           "docCount": "docs",
           "noPackages": "No knowledge packages linked",
+          "storedKeysTitle": "Stored Memory Keys",
           "scopeNote": "This scope summary is included in the agent's skill bundle so it knows its data boundaries.",
           "scopeFooter": "This summary is included in the agent's skill bundle so it knows its data boundaries.",
           "addAreaError": "Failed to add memory area",
