@@ -154,14 +154,16 @@ export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Rout
       return;
     }
 
+    // Use null (cast through any) to clear nullable fields in MongoDB/Prisma.
+    // Prisma treats undefined as "don't update" but null as "set to null".
     await storage.updateAgent(agentGaii, {
-      webhookUrl: undefined,
-      webhookSecret: undefined,
+      webhookUrl: null,
+      webhookSecret: null,
       webhookEnabled: false,
       webhookFailCount: 0,
-      webhookLastSuccess: undefined,
-      webhookLastFailure: undefined,
-    });
+      webhookLastSuccess: null,
+      webhookLastFailure: null,
+    } as any);
 
     emitChange('agents');
 

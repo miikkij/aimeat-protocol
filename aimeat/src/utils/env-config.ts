@@ -124,8 +124,14 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
       entries: [
         {
           envVar: 'AIMEAT_DEV_MODE',
-          description: 'Developer mode — bypasses some security checks for testing',
+          description: 'Developer mode — localhost webhooks, credential reset preserves data',
           value: config.devMode ? 'true' : 'false',
+          defaultVal: 'false',
+        },
+        {
+          envVar: 'AIMEAT_TEST_MODE',
+          description: 'Test mode — re-registration wipes account (E2E test isolation)',
+          value: config.testMode ? 'true' : 'false',
           defaultVal: 'false',
         },
         {

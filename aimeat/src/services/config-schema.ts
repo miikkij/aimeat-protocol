@@ -190,7 +190,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Node (immutable, additional) ──
   { key: 'baseUrl', dotPath: 'node.base_url', envVar: 'AIMEAT_BASE_URL', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'Public base URL of this node' },
-  { key: 'devMode', dotPath: 'node.dev_mode', envVar: 'AIMEAT_DEV_MODE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Development mode (relaxes security checks)', adminDisplay: 'visible' },
+  { key: 'devMode', dotPath: 'node.dev_mode', envVar: 'AIMEAT_DEV_MODE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Development mode (localhost webhooks, credential reset preserves data)', adminDisplay: 'visible' },
+  { key: 'testMode', dotPath: 'node.test_mode', envVar: 'AIMEAT_TEST_MODE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Test mode (re-registration wipes account for E2E test isolation)', adminDisplay: 'visible' },
   { key: 'anonymousMode', dotPath: 'node.anonymous_mode', envVar: 'AIMEAT_ANONYMOUS', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Allow anonymous access without authentication' },
 
   // ── Federation (mutable, additional) ──

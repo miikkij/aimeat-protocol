@@ -79,8 +79,8 @@ const agentName = 'webhookbot';
 
 // A publicly routable test URL that will accept POST (used for registration, not for delivery)
 const WEBHOOK_URL = 'https://httpbin.org/post';
-// A non-routable address for testing failed delivery
-const UNREACHABLE_URL = 'https://192.0.2.1/webhook-test';
+// A valid public domain that refuses connections (port 12345 not open)
+const UNREACHABLE_URL = 'https://httpbin.org:12345/webhook-test';
 
 console.log('\n=== AIMEAT Agent Webhook E2E Test ===\n');
 

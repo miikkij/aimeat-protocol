@@ -1320,7 +1320,7 @@ model AgentActivity {
 }
 
 model TelemetryEvent {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  id        String   @id @map("_id")
   agentGaii String
   type      String
   data      Json
@@ -1332,7 +1332,7 @@ model TelemetryEvent {
 }
 
 model WebhookDeliveryLog {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  id           String   @id @map("_id")
   agentGaii    String
   event        String
   payload      Json
