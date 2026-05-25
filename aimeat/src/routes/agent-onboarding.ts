@@ -98,7 +98,27 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
       }
     }
 
-    res.json(success(config.nodeId, { onboarding }));
+    const pendingSteps = onboarding.steps.filter(s => s.status === 'pending');
+    const testTaskStep = onboarding.steps.find(s => s.id === 'accept_test_task');
+    const testTaskId = (testTaskStep?.details as Record<string, unknown> | undefined)?.testTaskId as string | undefined;
+    let testTaskStatus: string | undefined;
+    if (testTaskId) {
+      const task = await storage.getAgentTask(testTaskId);
+      testTaskStatus = task?.status;
+    }
+    const hints: Record<string, unknown> = {};
+    if (testTaskStatus === 'active') {
+      hints.test_task_active = true;
+      hints.test_task_id = testTaskId;
+      hints.message = 'Your test task is active. Execute the todos and POST /complete to finish steps 9-10.';
+    } else if (testTaskStatus === 'queued' && testTaskStep?.status === 'pending') {
+      hints.message = 'Propose todos on your test task (PATCH /v1/agents/me/tasks/' + testTaskId + ') to proceed with step 9.';
+      hints.test_task_id = testTaskId;
+    }
+    if (pendingSteps.length > 0) {
+      hints.next_step = pendingSteps[0].id;
+    }
+    res.json(success(config.nodeId, { onboarding, hints }));
   });
 
   /* -- POST /v1/agents/:name/onboarding/start -- */

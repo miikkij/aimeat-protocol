@@ -674,10 +674,13 @@
   padding: 0.75rem 0;
   border-top: 1px solid var(--border, #E5E7EB);
   margin-top: 0.75rem;
+  align-items: flex-end;
+  width: 100%;
 }
 .pf .agd-msg-input textarea ,
 .pf .pf-agd-msg-input textarea  {
-  flex: 1;
+  width: 100%;
+  min-width: 0;
   resize: none;
   border: 1px solid var(--border, #E5E7EB);
   border-radius: 8px;
@@ -1260,6 +1263,28 @@
   margin-left: auto;
   font-size: 0.75rem;
   color: var(--text-dim, #6B7280);
+}
+
+/* Capabilities badges */
+.pf .pf-agd-capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem 0.5rem;
+}
+.pf .pf-agd-cap-badge {
+  font-size: 0.675rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 500;
+}
+.pf .pf-agd-cap-badge--tech {
+  background: var(--success-bg, #ECFDF5);
+  color: var(--success, #10B981);
+}
+.pf .pf-agd-cap-badge--domain {
+  background: var(--info-bg, #EFF6FF);
+  color: var(--info, #3B82F6);
 }
 
 /* Zone 2: Status (state-dependent) */

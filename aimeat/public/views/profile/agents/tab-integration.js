@@ -243,7 +243,7 @@ function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, han
             <span class="pf-agd-step-icon">
               ${step.status === 'passed' ? '✓' : step.status === 'failed' ? '✗' : '○'}
             </span>
-            <span class="pf-agd-step-name">${i + 1}. ${step.name || step.id}</span>
+            <span class="pf-agd-step-name">${i + 1}. ${t('agentOnboarding.steps.' + step.id) || step.title || step.id}</span>
             <span class="pf-agd-step-detail">
               ${step.validatedAt ? timeAgo(step.validatedAt) : ''}
               ${step.validationDetail ? ` -- ${step.validationDetail}` : ''}

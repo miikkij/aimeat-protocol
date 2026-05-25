@@ -94,6 +94,18 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
           </span>
         </div>
 
+        <!-- Capabilities -->
+        ${(agent.technical_capabilities?.length > 0 || agent.domain_capabilities?.length > 0) && html`
+          <div class="pf-agd-capabilities">
+            ${(agent.technical_capabilities || []).map(c => html`
+              <span key=${c.name || c} class="pf-agd-cap-badge pf-agd-cap-badge--tech">${c.name || c}</span>
+            `)}
+            ${(agent.domain_capabilities || []).map(c => html`
+              <span key=${c} class="pf-agd-cap-badge pf-agd-cap-badge--domain">${c}</span>
+            `)}
+          </div>
+        `}
+
         <!-- Zone 2: Status -->
         ${renderZone2(state, agent, onboarding, setActiveTab, showToast)}
 
@@ -201,7 +213,7 @@ function renderCollapsedStats(state, agent, onboarding) {
       return html`${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''} | ${t('profile.agents.detail.state.newSummary')}`;
     case 'onboarding': {
       const nextStep = onboarding?.steps?.find(s => s.status === 'pending');
-      return html`${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''} ${nextStep ? `| ${t('profile.agents.detail.state.next')}: ${nextStep.title || nextStep.id}` : ''}`;
+      return html`${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''} ${nextStep ? `| ${t('profile.agents.detail.state.next')}: ${t('agentOnboarding.steps.' + nextStep.id) || nextStep.title || nextStep.id}` : ''}`;
     }
     case 'problem':
       return html`${t('profile.agents.detail.state.problemSummary')} | ${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''}`;
@@ -244,7 +256,7 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
         <div class="pf-agd-zone2 pf-agd-zone2--onboarding">
           <div class="pf-agd-zone2-title">
             ${t('profile.agents.detail.zone2.onboardingTitle')}: ${passed} / ${total}
-            ${nextStep ? html`<span class="pf-agd-zone2-desc"> ${t('profile.agents.detail.state.next')}: ${nextStep.title || nextStep.id}</span>` : ''}
+            ${nextStep ? html`<span class="pf-agd-zone2-desc"> ${t('profile.agents.detail.state.next')}: ${t('agentOnboarding.steps.' + nextStep.id) || nextStep.title || nextStep.id}</span>` : ''}
           </div>
           <div class="pf-agd-progress-bar">
             <div class="pf-agd-progress-fill" style="width: ${pct}%"></div>
@@ -252,7 +264,7 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
           <div class="pf-agd-step-pills">
             ${steps.map(s => html`
               <span key=${s.id} class="pf-agd-step-pill pf-agd-step-pill--${s.status}">
-                ${s.status === 'passed' ? '✓' : '○'} ${s.title || s.id}
+                ${s.status === 'passed' ? '✓' : '○'} ${t('agentOnboarding.steps.' + s.id) || s.title || s.id}
               </span>
             `)}
           </div>

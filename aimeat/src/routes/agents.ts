@@ -808,6 +808,8 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         display_name: a.displayName,
         description: a.description,
         capabilities: a.capabilities,
+        technical_capabilities: a.technicalCapabilities,
+        domain_capabilities: a.domainCapabilities,
         default_scopes: a.defaultScopes ?? ['*'],
         trust_score: a.trustScore,
         morsel_balance: a.morselBalance,

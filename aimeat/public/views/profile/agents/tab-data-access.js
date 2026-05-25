@@ -136,8 +136,9 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
   const hasTags = tags.length > 0;
   const hasAreas = memoryAreas.length > 0;
   const hasResources = resources.length > 0;
+  const hasKeys = memoryKeys.length > 0;
 
-  if (!hasTags && !hasAreas && !hasResources && !addingTag && !addingArea && !addingPackage) {
+  if (!hasTags && !hasAreas && !hasResources && !hasKeys && !addingTag && !addingArea && !addingPackage) {
     return html`
       <div>
         <div class="pf-agd-empty">${t('profile.agents.detail.empty.data_access')}</div>
