@@ -233,13 +233,17 @@ export default function AgentsTab({ session, showToast, onStats }) {
     } catch { setAgents([]); }
   }
 
-  // Live update listener
+  // Live update listener + fallback polling every 10s
   const loadRef = useRef(loadData);
   loadRef.current = loadData;
   useEffect(() => {
     const handler = () => loadRef.current();
     window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
+    const poller = setInterval(() => loadRef.current(), 10000);
+    return () => {
+      window.removeEventListener('aimeat-live-update', handler);
+      clearInterval(poller);
+    };
   }, []);
 
   function toggleAgent(name) {
