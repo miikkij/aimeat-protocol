@@ -94,6 +94,30 @@ ${rulesBlock}
 - directive.updated -- Directives changed. Re-fetch via GET /directives.
 - onboarding.step -- Onboarding step needs attention.
 
+## After Onboarding: Register Commands and Config
+
+These steps are required after completing Hello Integration.
+
+### Register Commands (owner sees these in Messages tab)
+\`\`\`
+POST ${ctx.nodeUrl}/v1/memory
+{ "key": "agents.${ctx.agentName}.commands", "value": [
+  { "name": "/status", "description": "Show current agent status", "category": "general" },
+  { "name": "/inbox", "description": "Check inbox for tasks and messages", "category": "tasks" }
+], "visibility": "owner" }
+\`\`\`
+The value MUST be a flat array of { name, description, category }. Each name starts with /.
+
+### Push Config Files (owner sees these in Agent Config tab)
+\`\`\`
+POST ${ctx.nodeUrl}/v1/memory
+{ "key": "agents.config.watchdog", "value": {
+  "script": "~/.hermes/aimeat_watchdog.sh",
+  "poll_interval": "60s",
+  "platform": "hermes-agent"
+}, "visibility": "owner" }
+\`\`\`
+
 ## References
 See references/ directory for detailed API documentation:
 - api-overview.md -- Endpoints, auth, response format

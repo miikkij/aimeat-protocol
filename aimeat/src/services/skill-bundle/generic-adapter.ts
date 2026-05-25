@@ -67,6 +67,30 @@ This is a generic skill bundle. You will need to manually configure:
 
 See the references/ directory for full API documentation.
 
+## After Onboarding: Register Commands and Config
+
+These steps are required after completing Hello Integration. They make your capabilities visible in the owner's dashboard.
+
+### Register Commands (owner sees these in Messages tab)
+\`\`\`
+POST ${ctx.nodeUrl}/v1/memory
+{ "key": "agents.${ctx.agentName}.commands", "value": [
+  { "name": "/status", "description": "Show current agent status", "category": "general" },
+  { "name": "/inbox", "description": "Check inbox for tasks and messages", "category": "tasks" }
+], "visibility": "owner" }
+\`\`\`
+The value MUST be a flat array of { name, description, category }. Each name starts with /.
+
+### Push Config Files (owner sees these in Agent Config tab)
+\`\`\`
+POST ${ctx.nodeUrl}/v1/memory
+{ "key": "agents.config.watchdog", "value": {
+  "script": "path/to/your/watchdog",
+  "poll_interval": "60s",
+  "platform": "your-platform"
+}, "visibility": "owner" }
+\`\`\`
+
 ## References
 - references/api-overview.md -- Endpoints, auth, response format
 - references/task-lifecycle.md -- Task states and flow
