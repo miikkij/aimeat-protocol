@@ -91,12 +91,13 @@ Step 1: Authenticate
   If you already have a saved AIMEAT token, verify it works with GET ${url}/v1/agents/me/inbox first. If it works, skip to Step 2.
   Otherwise: POST ${url}/v1/agents/device-authorize
   Body: { "agent_name": "your-name", "owner": "${sess.owner}" }
-  Show me the verification code, then IMMEDIATELY start polling (in the same turn, in a background loop or inline loop).
-  Poll: POST ${url}/v1/agents/device-token every 5 seconds with:
-    { "device_code": "<from step above>", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" }
-  I will approve while you poll. Keep polling until HTTP 200 with a token (ignore 400 authorization_pending responses).
-  Save the token to a file. Only do ONE auth cycle -- once saved, re-read from file.
-  IMPORTANT: Start polling right away in the same message. I do not need to tell you "approved" -- the poll will detect it automatically.
+  Show me the verification code, then IMMEDIATELY start polling in the same turn.
+  Poll command (run this in a loop every 5 seconds until it returns HTTP 200):
+    curl -s -X POST ${url}/v1/agents/device-token -H "Content-Type: application/json" -d '{"device_code":"YOUR_DEVICE_CODE","grant_type":"urn:ietf:params:oauth:grant-type:device_code"}'
+  When HTTP 200: the response JSON has access_token at the top level. Save it:
+    echo 'RESPONSE' | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])" > ~/.aimeat_token.txt
+  I will approve while you poll. Keep polling until success. Only do ONE auth cycle.
+  IMPORTANT: Start polling right away. I do not need to tell you "approved".
 
 Step 2: Download your skill bundle (first thing after auth)
   GET ${url}/v1/agents/your-name/skill-bundle
