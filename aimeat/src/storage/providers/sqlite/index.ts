@@ -272,6 +272,11 @@ export class SqliteStorage implements Storage {
     return row ? this.deserializeAgent(row) : null;
   }
 
+  async getAgentByName(name: string, _nodeId: string): Promise<AgentRecord | null> {
+    const row = this.db.prepare('SELECT * FROM agents WHERE name = ? LIMIT 1').get(name) as Record<string, unknown> | undefined;
+    return row ? this.deserializeAgent(row) : null;
+  }
+
   async getAgentsByOwner(owner: string): Promise<AgentRecord[]> {
     const rows = this.db.prepare('SELECT * FROM agents WHERE owner = ?').all(owner) as Record<string, unknown>[];
     return rows.map(r => this.deserializeAgent(r));

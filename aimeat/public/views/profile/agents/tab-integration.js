@@ -42,6 +42,7 @@ export default function TabIntegration({ agent, onboarding, session, showToast, 
   const [webhookDraft, setWebhookDraft] = useState('');
   const [savingWebhook, setSavingWebhook] = useState(false);
   const [updatingBundle, setUpdatingBundle] = useState(false);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
 
   async function loadData() {
     setLoading(true);
@@ -120,6 +121,37 @@ export default function TabIntegration({ agent, onboarding, session, showToast, 
     copyToClipboard(cmd).then(() => {
       setCopiedInstall(true);
       setTimeout(() => setCopiedInstall(false), 2000);
+    });
+  }
+
+  function handleCopyAgentPrompt(e) {
+    e.stopPropagation();
+    const url = `${location.origin}${getSkillBundleUrl(agentName)}`;
+    const prompt = `Download and install your skill bundle from AIMEAT.
+
+Your skill bundle URL: ${url}
+
+Steps:
+1. Authenticate with your agent token: POST ${location.origin}/v1/auth/token
+   Sign the challenge with your private key to get a JWT.
+
+2. Download the skill bundle ZIP:
+   GET ${url}
+   Header: Authorization: Bearer <your-jwt>
+   Save the response as a ZIP file.
+
+3. Extract the ZIP. It contains:
+   - SKILL.md -- your operating instructions, directives, and API reference
+   - Reference documents for task lifecycle, messaging, telemetry protocols
+   - Platform-specific scripts (if applicable)
+
+4. Read SKILL.md first -- it has your personalized directives, rules, and all the API endpoints you need.
+
+If you already have a JWT token, you can do this in one step:
+curl -H "Authorization: Bearer <jwt>" -o skill-bundle.zip "${url}" && unzip skill-bundle.zip && cat */SKILL.md`;
+    copyToClipboard(prompt).then(() => {
+      setCopiedPrompt(true);
+      setTimeout(() => setCopiedPrompt(false), 3000);
     });
   }
 
@@ -223,6 +255,9 @@ function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, han
       <div class="pf-agd-section">
         <div class="pf-agd-section-label">${t('profile.agents.skillBundle.title')}</div>
         <div class="pf-agd-form-actions">
+          <button class="btn-primary btn-sm" onClick=${handleCopyAgentPrompt}>
+            ${copiedPrompt ? '✓ ' + t('profile.agents.detail.integration.promptCopied') : t('profile.agents.detail.integration.copyAgentPrompt')}
+          </button>
           <button class="btn-outline btn-sm" onClick=${handleCopyInstallCommand}>
             ${copiedInstall ? '✓ ' + t('profile.agents.detail.integration.installCommandCopied') : t('profile.agents.detail.integration.copyInstallCommand')}
           </button>

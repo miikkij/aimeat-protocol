@@ -30,21 +30,6 @@ const ADAPTERS: Record<string, RuntimeAdapter> = {
 export function agentSkillBundleRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
-  function resolveAgentGaii(req: Express.Request, agentName: string): string {
-    const owner = req.auth!.owner as string;
-    return buildGAII(agentName, owner, config.nodeId);
-  }
-
-  function canAccessAgent(req: Express.Request, agentName: string): boolean {
-    const roles = req.auth!.roles as string[];
-    const isOwnerSession = roles.includes('owner') && !roles.includes('agent');
-    if (isOwnerSession) return true;
-    if (roles.includes('agent')) {
-      return req.auth!.sub === resolveAgentGaii(req, agentName);
-    }
-    return false;
-  }
-
   async function buildContext(agentName: string, agentGaii: string): Promise<BundleContext> {
     const agent = await storage.getAgent(agentGaii);
 
@@ -80,16 +65,25 @@ export function agentSkillBundleRouter(config: AimeatConfig, storage: Storage): 
     };
   }
 
-  /* -- GET /v1/agents/:name/skill-bundle -- Download ZIP bundle -- */
+  function resolveAndAuthorize(req: Express.Request, agentName: string): string | null {
+    const roles = req.auth!.roles as string[];
+    const isOwner = roles.includes('owner') && !roles.includes('agent');
+    if (isOwner) return buildGAII(agentName, req.auth!.owner as string, config.nodeId);
+    if (roles.includes('agent')) {
+      const agentGaii = buildGAII(agentName, req.auth!.owner as string, config.nodeId);
+      return req.auth!.sub === agentGaii ? agentGaii : null;
+    }
+    return null;
+  }
+
+  /* -- GET /v1/agents/:name/skill-bundle -- Download ZIP bundle (owner + own agent) -- */
   router.get('/v1/agents/:name/skill-bundle', requireAuth(), async (req, res) => {
     const agentName = req.params.name as string;
-
-    if (!canAccessAgent(req, agentName)) {
+    const agentGaii = resolveAndAuthorize(req, agentName);
+    if (!agentGaii) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
       return;
     }
-
-    const agentGaii = resolveAgentGaii(req, agentName);
     const agent = await storage.getAgent(agentGaii);
     if (!agent) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
@@ -128,16 +122,14 @@ export function agentSkillBundleRouter(config: AimeatConfig, storage: Storage): 
     await archive.finalize();
   });
 
-  /* -- GET /v1/agents/:name/skill-bundle/version -- Lightweight version check -- */
+  /* -- GET /v1/agents/:name/skill-bundle/version -- Version check (owner + own agent) -- */
   router.get('/v1/agents/:name/skill-bundle/version', requireAuth(), async (req, res) => {
     const agentName = req.params.name as string;
-
-    if (!canAccessAgent(req, agentName)) {
+    const agentGaii = resolveAndAuthorize(req, agentName);
+    if (!agentGaii) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
       return;
     }
-
-    const agentGaii = resolveAgentGaii(req, agentName);
     const agent = await storage.getAgent(agentGaii);
     if (!agent) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));

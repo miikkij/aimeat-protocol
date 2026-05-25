@@ -663,6 +663,8 @@
           "noGaps": "Ei mitään",
           "roles": "Roolit",
           "readinessScore": "Valmius",
+          "copyAgentPrompt": "Kopioi ohje agentille",
+          "promptCopied": "Ohje kopioitu",
           "copyInstallCommand": "Kopioi asennuskomento",
           "installCommandCopied": "Asennuskomento kopioitu",
           "noDeliveries": "Ei toimituksia vielä."

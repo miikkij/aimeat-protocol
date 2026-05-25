@@ -291,6 +291,12 @@ export class MongoStorage implements Storage {
         return row ? this.toAgentRecord(row) : null;
     }
 
+    async getAgentByName(name: string, nodeId: string): Promise<AgentRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.agent.findFirst({ where: { name } });
+        return row ? this.toAgentRecord(row) : null;
+    }
+
     async getAgentsByOwner(owner: string): Promise<AgentRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.agent.findMany({ where: { owner } });

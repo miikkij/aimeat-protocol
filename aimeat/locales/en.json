@@ -663,6 +663,8 @@
           "noGaps": "None",
           "roles": "Roles",
           "readinessScore": "Readiness",
+          "copyAgentPrompt": "Copy prompt for agent",
+          "promptCopied": "Prompt copied",
           "copyInstallCommand": "Copy install command",
           "installCommandCopied": "Install command copied",
           "noDeliveries": "No deliveries recorded yet."
