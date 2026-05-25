@@ -408,6 +408,22 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
 
     const existingOnboarding = await storage.getOnboarding(gaii);
     if (!existingOnboarding) {
+      const testTaskId = randomUUID();
+      await storage.createAgentTask({
+        id: testTaskId,
+        agentGaii: gaii,
+        ownerGaii: `${ownerPayload.owner}@${config.nodeId}`,
+        title: 'Onboarding verification',
+        description: 'This is a test task created during Hello Integration. Propose todos, get approval, execute, and complete.',
+        status: 'queued',
+        scope: [],
+        rules: [],
+        todos: [],
+        verification: { userExpects: 'Agent completes the onboarding test task successfully', technicalChecks: [] },
+        createdAt: now,
+        updatedAt: now,
+      });
+      onboardingSteps[8].details = { testTaskId };
       await storage.createOnboarding({
         agentGaii: gaii,
         status: 'in_progress',

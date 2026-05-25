@@ -90,7 +90,11 @@ Node: ${url}
 Step 1: Authenticate
   POST ${url}/v1/agents/device-authorize
   Body: { "agent_name": "your-name", "owner": "${sess.owner}" }
-  Show me the verification URL so I can approve you.
+  Tell me the verification code so I can approve you.
+  Then poll POST ${url}/v1/agents/device-token every 5 seconds with:
+    { "device_code": "<from step above>", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" }
+  Keep polling until you get a token back (I will approve in the meantime).
+  Save the token -- use it for all subsequent requests.
 
 Step 2: Download your skill bundle (first thing after auth)
   GET ${url}/v1/agents/your-name/skill-bundle

@@ -89,7 +89,7 @@ export default function TabMessages({ agentName, session, showToast }) {
 
   async function loadCommands() {
     try {
-      const resp = await getAgentCommands(agentName);
+      const resp = await getAgentCommands(agentName, agent.gaii);
       const data = resp?.data?.value;
       if (Array.isArray(data)) setCommands(data);
       else if (typeof data === 'string') {

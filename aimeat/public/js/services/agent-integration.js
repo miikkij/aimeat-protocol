@@ -68,6 +68,9 @@ export async function getDeliveryLog(agentName, limit = 20) {
   return apiGet(`/v1/agents/${encodeURIComponent(agentName)}/webhook/log?limit=${limit}`);
 }
 
-export async function getAgentCommands(agentName) {
+export async function getAgentCommands(agentName, agentGaii) {
+  if (agentGaii) {
+    return apiGet(`/v1/memory/${encodeURIComponent(agentGaii)}/agents.${encodeURIComponent(agentName)}.commands`);
+  }
   return apiGet(`/v1/memory/agents.${encodeURIComponent(agentName)}.commands`);
 }
