@@ -272,6 +272,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
       });
       if (resp?.ok !== false) {
         showToast(t('profile.agents.pendingRequests.approved'));
+        setPendingRequests(prev => prev.filter(r => r.user_code !== userCode));
         setApprovingCode(null);
         setApprovePreset('standard');
         loadData();
@@ -301,6 +302,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
         owner_token: session.jwt,
       });
       showToast(t('profile.agents.pendingRequests.denied'));
+      setPendingRequests(prev => prev.filter(r => r.user_code !== userCode));
       loadData();
     } catch (e) {
       showToast(e.message || 'Deny failed', true);

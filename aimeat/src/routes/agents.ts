@@ -96,8 +96,9 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       verification_uri_complete: verificationUriComplete,
       expires_in: 1800,
       interval: 5,
+      user_instructions: `Tell your owner to approve this request. They can find it in their AIMEAT profile under Agents (${baseUrl}/v1/profile -> Agents tab). The verification code is: ${userCode}. Once approved, poll POST /v1/agents/device-token with { "device_code": "${deviceCode}", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" } every 5 seconds until you receive your token.`,
     }, [
-      { description: 'Open this URL in a browser', method: 'GET', url: `/v1/agents/verify?code=${userCode}` },
+      { description: 'Owner approves in AIMEAT profile -> Agents tab', method: 'GET', url: `${baseUrl}/v1/profile` },
       { description: 'Poll for authorization result', method: 'POST', url: '/v1/agents/device-token' },
     ]));
     emitChange('agents');

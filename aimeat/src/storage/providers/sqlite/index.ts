@@ -223,6 +223,26 @@ export class SqliteStorage implements Storage {
     // OAuth refresh tokens and approvals for this agent
     this.db.prepare('DELETE FROM oauth_refresh_tokens WHERE gaii = ?').run(gaii);
     this.db.prepare('DELETE FROM oauth_approvals WHERE gaii = ?').run(gaii);
+    // Agent tasks and events
+    const taskRows = this.db.prepare('SELECT id FROM agent_tasks WHERE agentGaii = ?').all(gaii) as { id: string }[];
+    for (const t of taskRows) {
+      this.db.prepare('DELETE FROM agent_task_events WHERE taskId = ?').run(t.id);
+    }
+    this.db.prepare('DELETE FROM agent_tasks WHERE agentGaii = ?').run(gaii);
+    // Agent directives
+    this.db.prepare('DELETE FROM agent_directives WHERE agentGaii = ?').run(gaii);
+    // Agent activity
+    this.db.prepare('DELETE FROM agent_activity WHERE agentGaii = ?').run(gaii);
+    // Agent messages
+    this.db.prepare('DELETE FROM agent_messages WHERE agentGaii = ?').run(gaii);
+    // Telemetry events
+    this.db.prepare('DELETE FROM telemetry_events WHERE agentGaii = ?').run(gaii);
+    // Webhook delivery logs
+    this.db.prepare('DELETE FROM webhook_delivery_logs WHERE agentGaii = ?').run(gaii);
+    // Onboarding record
+    this.db.prepare('DELETE FROM agent_onboarding WHERE agentGaii = ?').run(gaii);
+    // Sharing groups
+    this.db.prepare('DELETE FROM sharing_groups WHERE ownerGaii = ?').run(gaii);
   }
 
   private deserializeOwner(row: Record<string, unknown>): OwnerRecord {

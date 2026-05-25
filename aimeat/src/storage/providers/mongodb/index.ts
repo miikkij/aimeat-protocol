@@ -391,6 +391,16 @@ export class MongoStorage implements Storage {
         try { await this.prisma.agentDirective.delete({ where: { agentGaii: gaii } }); } catch { /* not found */ }
         // Agent activity
         await this.prisma.agentActivity.deleteMany({ where: { agentGaii: gaii } });
+        // Agent messages
+        await this.prisma.agentMessage.deleteMany({ where: { agentGaii: gaii } });
+        // Telemetry events
+        await this.prisma.telemetryEvent.deleteMany({ where: { agentGaii: gaii } });
+        // Webhook delivery logs
+        await this.prisma.webhookDeliveryLog.deleteMany({ where: { agentGaii: gaii } });
+        // Onboarding record
+        try { await this.prisma.agentOnboarding.delete({ where: { agentGaii: gaii } }); } catch { /* not found */ }
+        // Sharing groups
+        await this.prisma.sharingGroup.deleteMany({ where: { ownerGaii: gaii } });
     }
 
     async listAgents(): Promise<AgentRecord[]> {
