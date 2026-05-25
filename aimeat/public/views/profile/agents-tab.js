@@ -91,11 +91,12 @@ Step 1: Authenticate
   If you already have a saved AIMEAT token, verify it works with GET ${url}/v1/agents/me/inbox first. If it works, skip to Step 2.
   Otherwise: POST ${url}/v1/agents/device-authorize
   Body: { "agent_name": "your-name", "owner": "${sess.owner}" }
-  Tell me the verification code so I can approve you.
-  Then poll POST ${url}/v1/agents/device-token every 5 seconds with:
+  Show me the verification code, then IMMEDIATELY start polling (in the same turn, in a background loop or inline loop).
+  Poll: POST ${url}/v1/agents/device-token every 5 seconds with:
     { "device_code": "<from step above>", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" }
-  Keep polling until you get a token back (I will approve in the meantime).
-  Save the token to a file and use it for all subsequent requests. Only do ONE auth cycle -- once saved, re-read from file.
+  I will approve while you poll. Keep polling until HTTP 200 with a token (ignore 400 authorization_pending responses).
+  Save the token to a file. Only do ONE auth cycle -- once saved, re-read from file.
+  IMPORTANT: Start polling right away in the same message. I do not need to tell you "approved" -- the poll will detect it automatically.
 
 Step 2: Download your skill bundle (first thing after auth)
   GET ${url}/v1/agents/your-name/skill-bundle
