@@ -30,6 +30,8 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
   const [newPkgName, setNewPkgName] = useState('');
   const [newPkgDesc, setNewPkgDesc] = useState('');
   const [memoryKeys, setMemoryKeys] = useState([]);
+  const [expandedKey, setExpandedKey] = useState(null);
+  const [expandedValue, setExpandedValue] = useState(null);
   const [loading, setLoading] = useState(true);
 
   async function loadData() {
@@ -121,6 +123,27 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
       showToast(t('profile.agents.detail.data_access.packageLinked'));
     } catch (err) {
       showToast(err.message || t('profile.agents.detail.data_access.linkPackageError'), true);
+    }
+  }
+
+  async function toggleExpandKey(mk) {
+    if (expandedKey === mk.key) {
+      setExpandedKey(null);
+      setExpandedValue(null);
+      return;
+    }
+    setExpandedKey(mk.key);
+    setExpandedValue('...');
+    try {
+      const gaii = agent?.gaii || agentName;
+      const resp = await apiGet(`/v1/memory/${encodeURIComponent(gaii)}/${encodeURIComponent(mk.key)}`);
+      const val = resp?.data?.value;
+      setExpandedValue(typeof val === 'string' ? val : JSON.stringify(val, null, 2));
+    } catch {
+      const resp2 = await apiGet(`/v1/memory?agent=${encodeURIComponent(agent?.gaii || agentName)}&prefix=${encodeURIComponent(mk.key)}`);
+      const items = resp2?.data?.items || resp2?.data || [];
+      const found = Array.isArray(items) ? items.find(i => i.key === mk.key) : null;
+      setExpandedValue(found ? (typeof found.value === 'string' ? found.value : JSON.stringify(found.value, null, 2)) : 'Could not load value');
     }
   }
 
@@ -255,9 +278,15 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
             <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.storedKeysTitle')}</span>
           </div>
           ${memoryKeys.map(mk => html`
-            <div key=${mk.key} class="pf-agd-area-row">
-              <span class="pf-agd-area-key">${mk.key}</span>
-              <span class="pf-agd-area-perm pf-agd-area-perm--${mk.visibility === 'public' ? 'rw' : 'ro'}">${mk.visibility}</span>
+            <div key=${mk.key}>
+              <div class="pf-agd-area-row pf-agd-area-row--clickable" onClick=${() => toggleExpandKey(mk)}>
+                <span class="pf-agd-expand-icon">${expandedKey === mk.key ? '▼' : '▶'}</span>
+                <span class="pf-agd-area-key">${mk.key}</span>
+                <span class="pf-agd-area-perm pf-agd-area-perm--${mk.visibility === 'public' ? 'rw' : 'ro'}">${mk.visibility}</span>
+              </div>
+              ${expandedKey === mk.key && html`
+                <pre class="pf-agd-memory-preview">${expandedValue}</pre>
+              `}
             </div>
           `)}
         </div>

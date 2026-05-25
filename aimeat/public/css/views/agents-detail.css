@@ -1626,6 +1626,20 @@
   border-bottom: 1px solid var(--border-subtle, #F3F4F6);
 }
 .pf .pf-agd-area-row:last-child { border-bottom: none; }
+.pf .pf-agd-area-row--clickable { cursor: pointer; }
+.pf .pf-agd-area-row--clickable:hover { background: var(--bg-dim, #F9FAFB); }
+.pf .pf-agd-memory-preview {
+  background: var(--bg-dim, #F3F4F6);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin: 0.25rem 0 0.5rem 1.5rem;
+  font-size: 0.75rem;
+  font-family: 'JetBrains Mono', monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 300px;
+  overflow-y: auto;
+}
 .pf .pf-agd-area-key {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.78rem;
