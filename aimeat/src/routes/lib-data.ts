@@ -54,7 +54,10 @@ const data = {
     var creator = document.querySelector('meta[name="aimeat-creator"]')?.getAttribute('content');
     if (!creator) {
       var m = location.pathname.match(/\\/v1\\/apps\\/([^/]+)\\//);
-      if (m) creator = decodeURIComponent(m[1]);
+      if (m) {
+        creator = decodeURIComponent(m[1]);
+        if (creator && !creator.includes('@')) creator = creator + '@${config.nodeId}';
+      }
     }
     if (creator) {
       try {
