@@ -1045,27 +1045,8 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       }
     }
     if (!record) {
-      // Anonymous agents should get 404 for missing keys (no auto-create)
-      if (isAnonymousGaii(gaii)) {
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key not found: ${key}`));
-        return;
-      }
-      // Auto-create empty memory key (upsert on read)
-      const now = new Date().toISOString();
-      record = await storage.setMemory({
-        key,
-        ownerGaii: gaii,
-        value: {},
-        visibility: 'private',
-        tags: [],
-        ttlHours: null,
-        version: 1,
-        createdAt: now,
-        updatedAt: now,
-      });
-
-      emitResourceUpdated(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
-      emitResourceListChanged(gaii);
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key not found: ${key}`));
+      return;
     }
 
     stats?.increment('memory_reads');
