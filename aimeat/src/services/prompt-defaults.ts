@@ -1005,6 +1005,19 @@ If you have MCP access, these tools manage apps and extensions:
 
 Without MCP, use the REST endpoints directly.
 
+== BEST PRACTICES ==
+
+When updating an app:
+- Rebuild the entire HTML file from scratch rather than patching parts of it. Regex replacements inside HTML+JS files often break surrounding code.
+- Validate the file before publishing: check that all functions exist, JSON parses correctly, and the closing tags are intact.
+- Test locally before publishing to AIMEAT.
+
+When the user provides data:
+- Use it directly. Do not search the web for the same data the user just gave you.
+
+When something fails:
+- If a web request returns 404, try once with a different URL. If that also fails, ask the user for help instead of looping.
+
 == CAPABILITY REPORT ==
 
 After reading this module, add to your capabilities PUT:
