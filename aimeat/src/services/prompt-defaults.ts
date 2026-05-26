@@ -1016,7 +1016,7 @@ When the user provides data:
 - Use it directly. Do not search the web for the same data the user just gave you.
 
 When something fails:
-- If a web request returns 404, try once with a different URL. If that also fails, ask the user for help instead of looping.
+- If a web request returns 404, try once with a different URL. If that also fails, tell the user what you tried and propose options to solve it.
 
 == CAPABILITY REPORT ==
 
