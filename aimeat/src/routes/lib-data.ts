@@ -44,26 +44,25 @@ const data = {
     return res.data;
   },
 
-  // Read a single entry (falls back to public read from app creator if not found in own namespace)
+  // Read a single entry (falls back to public read from app creator if not found or empty)
   async get(key) {
     const res = await authFetch('/v1/memory/' + encodeURIComponent(key));
-    if (res.ok) return res.data.value;
-    if (res.error?.code === 'NOT_FOUND') {
-      // Fallback: try public read from app creator's namespace
-      var creator = document.querySelector('meta[name="aimeat-creator"]')?.getAttribute('content');
-      if (!creator) {
-        var m = location.pathname.match(/\\/v1\\/apps\\/([^/]+)\\//);
-        if (m) creator = decodeURIComponent(m[1]);
-      }
-      if (creator) {
-        try {
-          var pub = await data.getPublic(creator, key);
-          if (pub != null) return pub;
-        } catch(e) {}
-      }
-      return null;
+    var val = res.ok ? res.data.value : null;
+    var isEmpty = val == null || (typeof val === 'object' && Object.keys(val).length === 0);
+    if (!isEmpty) return val;
+    // Fallback: try public read from app creator's namespace
+    var creator = document.querySelector('meta[name="aimeat-creator"]')?.getAttribute('content');
+    if (!creator) {
+      var m = location.pathname.match(/\\/v1\\/apps\\/([^/]+)\\//);
+      if (m) creator = decodeURIComponent(m[1]);
     }
-    throw new Error(res.error?.message || 'Failed to get memory');
+    if (creator) {
+      try {
+        var pub = await data.getPublic(creator, key);
+        if (pub != null) return pub;
+      } catch(e) {}
+    }
+    return val;
   },
 
   // Read full entry metadata
