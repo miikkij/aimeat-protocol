@@ -1441,8 +1441,7 @@ Load translations inside your render() function BEFORE rendering any text:
 // Load translations FIRST — call this at the start of render()
 var translations = await AIMEAT.data.get('{{service_slug}}.i18n.' + locale) || {};
 \\\`\\\`\\\`
-NEVER use empty translations {}. ALWAYS load them with the call above.
-NEVER read from ext: namespace — translations are in the OWNER namespace.
+IMPORTANT: If the app is public and other users will use it, replace data.get() with data.getPublic(OWNER_GHII, key) where OWNER_GHII is the app creator's identity. Otherwise translations will only work for the creator.
 
 ## Translation Helper
 Use a t() function for all user-visible text:
