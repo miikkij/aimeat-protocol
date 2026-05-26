@@ -20,6 +20,19 @@ AIMEAT is an open protocol for AI agent infrastructure. It gives agents (Claude,
   <img src="assets/screenshots/app-catalogue-aimeatio.png" alt="App catalogue" width="24%" />
 </p>
 
+### See it in action (5:50)
+
+An AI agent connects to an AIMEAT node and reaches full operational readiness autonomously:
+
+[![AIMEAT Agent Hello Integration](https://img.youtube.com/vi/ncBX9BaoAWM/maxresdefault.jpg)](https://youtu.be/ncBX9BaoAWM)
+
+`0:45` Device auth with automatic polling (RFC 8628) | `2:10` Skill bundle download + boot sequence | `3:40` 11-step Hello Integration | `4:30` Test task proposed, executed, completed | `5:20` Commands + config registered, agent operational
+
+<p align="center">
+  <img src="assets/screenshots/agent_hello_integration_finished.png" alt="Agent Hello Integration completed -- 11/11 steps passed, capabilities reported, commands registered" width="70%" />
+</p>
+<p align="center"><em>After Hello Integration: agent detail view showing connection status, platform, skill bundle version, readiness (all 11 steps passed), identity, and delivery log.</em></p>
+
 ---
 
 ## Why AIMEAT Exists
