@@ -949,15 +949,61 @@ PURPOSE: You can build three types of applications on AIMEAT. Start with standal
 
 Apps are single-file HTML pages that use AIMEAT memory as their data layer. They require no server-side code.
 
-How to build one:
-1. Write a single HTML file using the starter template from GET /llms.txt
-2. The template includes the login bar, SDK libraries, and DaisyUI styling
+Every AIMEAT app MUST use this starter template:
+\`\`\`html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>App Name</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-base-100 min-h-screen flex flex-col">
+  <nav class="navbar bg-base-200 shadow-sm px-4">
+    <div class="flex-1"><span class="text-lg font-bold">App Name</span></div>
+    <div class="flex-none"><span id="header-auth"></span></div>
+  </nav>
+  <div id="app" class="flex-1 p-4">Loading...</div>
+  <script>
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src; s.onload = resolve; s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+    async function boot() {
+      await loadScript('/v1/libs/aimeat-auth.js');
+      await loadScript('/v1/libs/aimeat-data.js');
+      AIMEAT.auth.mountLoginButton('#header-auth', {
+        onLogin: (session) => startApp(session),
+        onLogout: () => location.reload(),
+      });
+    }
+    function startApp(session) {
+      // Your app logic here. Use:
+      // AIMEAT.data.set(key, value) -- save to memory
+      // AIMEAT.data.get(key) -- read from memory
+      document.getElementById('app').innerHTML = '<p>Hello ' + session.owner + '!</p>';
+    }
+    boot();
+  </script>
+</body>
+</html>
+\`\`\`
+
+The login bar is mandatory -- it handles authentication and gives you a session with the user's identity.
+
+How to build:
+1. Start with the template above
+2. Add your UI inside startApp()
 3. Use AIMEAT.data.set/get for persistent storage
-4. Use AIMEAT.auth.mountLoginButton for authentication
-5. Publish: POST /v1/apps with the HTML content
+4. Publish: POST /v1/apps or use MCP aimeat_app_publish
 
 Key SDK libraries (loaded via script tags):
-- /v1/libs/aimeat-auth.js -- login, session management
+- /v1/libs/aimeat-auth.js -- login, session management (REQUIRED)
 - /v1/libs/aimeat-data.js -- memory CRUD, micro-memory
 - /v1/libs/aimeat-storage.js -- file uploads
 - /v1/libs/aimeat-social.js -- boards, posts, reactions
