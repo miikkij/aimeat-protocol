@@ -205,11 +205,11 @@ export default function TabMessages({ agent, agentName, session, showToast }) {
                   onClick=${() => setActiveThread(null)}>
             ${t('profile.agents.messages.threads')}
           </button>
-          ${threads.map(thread => html`
+          ${threads.filter(thread => thread.title || thread.messageCount > 1).map(thread => html`
             <button key=${thread.id}
                     class="pf-agd-msg-thread-btn ${activeThread === thread.id ? 'pf-agd-msg-thread-btn-active' : ''}"
                     onClick=${() => setActiveThread(thread.id)}>
-              ${thread.title || thread.id?.slice(0, 8) || '...'}
+              ${thread.title || thread.preview?.slice(0, 20) || 'Thread'}
             </button>
           `)}
         </div>
