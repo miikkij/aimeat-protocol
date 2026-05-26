@@ -19,7 +19,7 @@ import { parseGaiiLoose } from '../utils/gaii.js';
 export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
-  const VALID_MODULES = ['tasks', 'messages', 'work', 'services', 'memory', 'activity', 'social'] as const;
+  const VALID_MODULES = ['tasks', 'messages', 'work', 'services', 'memory', 'activity', 'social', 'collaboration', 'appdev', 'mcp'] as const;
 
   // GET /v1/prompts/tier1/:module -- Feature module prompts (auth required)
   router.get('/v1/prompts/tier1/:module', requireAuth(), async (req, res) => {
