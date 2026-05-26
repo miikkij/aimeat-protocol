@@ -44,14 +44,26 @@ const data = {
     return res.data;
   },
 
-  // Read a single entry
+  // Read a single entry (falls back to public read from app creator if not found in own namespace)
   async get(key) {
     const res = await authFetch('/v1/memory/' + encodeURIComponent(key));
-    if (!res.ok) {
-      if (res.error?.code === 'NOT_FOUND') return null;
-      throw new Error(res.error?.message || 'Failed to get memory');
+    if (res.ok) return res.data.value;
+    if (res.error?.code === 'NOT_FOUND') {
+      // Fallback: try public read from app creator's namespace
+      var creator = document.querySelector('meta[name="aimeat-creator"]')?.getAttribute('content');
+      if (!creator) {
+        var m = location.pathname.match(/\\/v1\\/apps\\/([^/]+)\\//);
+        if (m) creator = decodeURIComponent(m[1]);
+      }
+      if (creator) {
+        try {
+          var pub = await data.getPublic(creator, key);
+          if (pub != null) return pub;
+        } catch(e) {}
+      }
+      return null;
     }
-    return res.data.value;
+    throw new Error(res.error?.message || 'Failed to get memory');
   },
 
   // Read full entry metadata
