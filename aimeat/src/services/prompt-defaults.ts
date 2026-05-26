@@ -1010,22 +1010,42 @@ Key SDK libraries (loaded via script tags):
 
 Example: a grocery price tracker that stores prices in AIMEAT memory and displays charts.
 
-== LEVEL 2: EXTENSIONS (Server-Side V8 Sandbox) ==
+== LEVEL 2: EXTENSIONS (Server-Side QuickJS WASM Sandbox) ==
 
-Extensions run server-side in an isolated V8 sandbox. They can fetch external APIs, process data on schedule, and store results in extension memory.
+Extensions run server-side in an isolated QuickJS WASM sandbox. They can fetch external APIs, process data on schedule, and store results in extension memory.
+
+CRITICAL SANDBOX CONSTRAINT: The ONLY allowed top-level statement is \`export default async function(ctx, input) { ... }\`.
+ALL other code (constants, helpers, utility functions) MUST be INSIDE the default function body.
+Top-level const, let, var, function, or class declarations WILL CRASH the sandbox.
+
+CORRECT:
+  export default async function(ctx, input) {
+    const GENRES = ['action', 'comedy'];
+    function validate(x) { return !!x; }
+    const result = validate(input.name);
+    return { ok: result };
+  }
+
+WRONG (crashes):
+  const GENRES = ['action', 'comedy'];
+  function validate(x) { return !!x; }
+  export default async function(ctx, input) { ... }
 
 How to build one:
 1. Create a manifest.yaml with name, version, actions
-2. Write action scripts as ES module default exports: export default async function(ctx, input) { ... }
+2. Write action scripts -- ONLY export default at top level, everything else inside
 3. Install: POST /v1/extensions with manifest + scripts
 4. Activate: POST /v1/extensions/{name}/activate
 5. Invoke: POST /v1/ext/{name}/{action}
 
-Extension capabilities:
+Extension capabilities (available inside the default function via ctx):
 - ctx.fetch(url) -- make external HTTP requests (sandboxed)
-- ctx.memory.set/get/list -- extension-scoped memory (ext:{name}/*)
-- ctx.memory.getPublic(gaii, key) -- read user's public memory
+- ctx.memory.set/get/search/delete -- extension-scoped memory (ext:{name}/*)
+- ctx.memory.getPublic(gaii, key) -- read any namespace's public memory
 - ctx.wallet.consume(amount, reason) -- charge morsels
+- ctx.caller.gaii -- who is calling (GHII or GAII)
+- ctx.config -- extension-level config from manifest
+- ctx.log.info/warn/error -- logging
 
 Example: a K-Market price scraper extension that fetches prices daily and stores them.
 

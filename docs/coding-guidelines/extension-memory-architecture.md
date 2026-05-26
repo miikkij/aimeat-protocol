@@ -22,7 +22,9 @@ An extension's `ctx.memory.set(key, value)` writes to `ext:{extensionName}` with
 
 ## How Each Layer Accesses Data
 
-### Extension (V8 sandbox, server-side)
+### Extension (QuickJS WASM sandbox, server-side)
+
+**Critical:** The ONLY allowed top-level statement in action scripts is `export default async function(ctx, input) { ... }`. All constants, helpers, and variables must be INSIDE the default function. Top-level `const`/`let`/`var`/`function`/`class` declarations crash the sandbox.
 
 ```
 ctx.memory.get(key)           → reads from ext:{name} namespace (own data)

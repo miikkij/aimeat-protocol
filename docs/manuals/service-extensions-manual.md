@@ -171,18 +171,47 @@ federation:
 
 Each action in the manifest references a JavaScript file via the `script` field. This file exports a default async function that receives a `ctx` object and the action's `input`.
 
+### Critical Sandbox Constraint
+
+The QuickJS WASM sandbox enforces a strict rule: **the ONLY allowed top-level statement is `export default async function(ctx, input) { ... }`.** All other code -- constants, helper functions, utility variables -- MUST be placed INSIDE the default function body. Top-level `const`, `let`, `var`, `function`, or `class` declarations will crash the sandbox at runtime.
+
+```javascript
+// CORRECT -- everything inside the default function:
+export default async function(ctx, input) {
+  const CATEGORIES = ['fiction', 'non-fiction', 'reference'];
+  function validateTitle(t) { return typeof t === 'string' && t.length > 0; }
+
+  if (!validateTitle(input.title)) {
+    return { error: 'Title is required' };
+  }
+  await ctx.memory.set('item.' + input.id, { title: input.title });
+  return { ok: true };
+}
+```
+
+```javascript
+// WRONG -- top-level declarations crash the sandbox:
+const CATEGORIES = ['fiction', 'non-fiction', 'reference'];
+function validateTitle(t) { return typeof t === 'string' && t.length > 0; }
+
+export default async function(ctx, input) {
+  // This script will fail before reaching this line
+}
+```
+
 ### Action Script Template
 
 ```javascript
 export default async function(ctx, input) {
-  // ctx.caller   — { gaii, owner, roles } — who is calling
-  // ctx.config   — extension-level config values
-  // ctx.instance — { id, config } — which instance (if multi-instance)
-  // ctx.memory   — { get, set, search, delete }
-  // ctx.wallet   — { consume, getBalance }
-  // ctx.consent  — { check, require }
-  // ctx.trust    — { getScore }
-  // ctx.log      — { info, warn, error }
+  // ctx.caller   -- { gaii, owner, roles } -- who is calling
+  // ctx.config   -- extension-level config values
+  // ctx.instance -- { id, config } -- which instance (if multi-instance)
+  // ctx.memory   -- { get, set, search, delete, getPublic }
+  // ctx.wallet   -- { consume, getBalance }
+  // ctx.consent  -- { check, require }
+  // ctx.trust    -- { getScore }
+  // ctx.fetch    -- HTTP requests to external APIs (sandboxed)
+  // ctx.log      -- { info, warn, error }
 
   // Your business logic here
   return { result: "value" };
