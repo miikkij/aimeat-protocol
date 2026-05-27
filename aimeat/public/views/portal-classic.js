@@ -119,7 +119,7 @@ After giving the user the HTML file, always add:
 
 function buildAgentPrompt() {
   const n = NODE_URL;
-  return `You are helping me set up an AI agent workflow using AIMEAT, an open protocol for AI memory, coordination and task management.
+  return `I'd like to build an AI agent workflow using AIMEAT, an open protocol for AI memory, coordination and task management.
 
 The AIMEAT server is at: ${n}
 
@@ -180,7 +180,7 @@ Deliver result: POST ${n}/v1/work/{id}/deliver {result}
 - Python script to run on a schedule
 - Node.js script for scheduled execution
 
-This is a LIVE server \u2014 the URLs work right now. Build a real, working agent.`;
+These endpoints are live.`;
 }
 
 function buildConnectPrompt() {

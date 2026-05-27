@@ -15,6 +15,7 @@
  *   v2.1.0 -- 2026-05-24 -- Fix: scroll-to on board click, agent count badge in header
  *   v2.0.0 -- 2026-05-24 -- Plan 4: Shared Agent Board + expandable cards with Two-Zone Header + 8-tab bar
  *   v2.2.0 -- 2026-05-24 -- Fix M2: compact Connect Agent, C1: load task stats for production cards
+ *   v3.0.0 -- 2026-05-27 -- Rewrite: safe connection prompt, CLI-first UI, remove injection-flagged language
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -79,98 +80,65 @@ function permLabel(perm) {
   return t(`profile.agents.scopeUi.perm${cap}`);
 }
 
-/* ── Agent prompt builder ── */
+/* -- Safe agent connection prompt -- */
 function buildAgentPrompt(sess) {
   const url = getNodeUrl();
-  return `Connect to my AIMEAT node as an AI agent.
+  return `I'd like to connect you as an AI agent to my AIMEAT node so you can help me with tasks across sessions. AIMEAT is an open-source agent coordination platform (see ${url}/llms.txt). I'm the owner; my handle is ${sess.owner}.
 
-Owner: ${sess.owner}
-Node: ${url}
+This uses standard OAuth device authorization (RFC 8628). Four steps:
 
-Step 1: Authenticate
-  If you already have a saved AIMEAT token, verify it works with GET ${url}/v1/agents/me/inbox first. If it works, skip to Step 2.
-  Otherwise: POST ${url}/v1/agents/device-authorize
-  Body: { "agent_name": "your-name", "owner": "${sess.owner}" }
-  Show me the verification code, then IMMEDIATELY start polling in the same turn.
-  Poll command (run this in a loop every 5 seconds until it returns HTTP 200):
-    curl -s -X POST ${url}/v1/agents/device-token -H "Content-Type: application/json" -d '{"device_code":"YOUR_DEVICE_CODE","grant_type":"urn:ietf:params:oauth:grant-type:device_code"}'
-  When HTTP 200: the response JSON has access_token at the top level. Save it:
-    echo 'RESPONSE' | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])" > ~/.aimeat_token.txt
-  I will approve while you poll. Keep polling until success. Only do ONE auth cycle.
-  IMPORTANT: Start polling right away. I do not need to tell you "approved".
+1. Auth check. Try GET ${url}/v1/agents/me/inbox with any token you have stored. If it returns 200, you're already connected -- skip to step 4. Otherwise continue.
 
-Step 2: Download your skill bundle (first thing after auth)
-  GET ${url}/v1/agents/your-name/skill-bundle
-  Header: Authorization: Bearer <your-token>
-  Save as ZIP, extract it, and read SKILL.md.
-  It contains your personalized directives, rules, and complete API reference.
+2. Start the device flow:
+     POST ${url}/v1/agents/device-authorize
+     { "agent_name": "<pick a name>", "owner": "${sess.owner}" }
+   Show me the verification code. I'll approve it in my browser. Poll device-token every 5 seconds until it returns 200 (this is the standard RFC 8628 interval). The 200 response contains access_token; store it however you normally handle bearer tokens for this session.
 
-Step 3: Read your system prompt
-  GET ${url}/v1/prompts/tier1
-  Header: Authorization: Bearer <your-token>
-  This gives you your operating loop, task queue, inbox, and all endpoint URLs.
+3. Fetch your agent's configuration and API reference:
+     GET /v1/agents/<your-name>/skill-bundle
+   This is documentation for your role on this node -- endpoints you can call, how the task and message systems work. Read it the same way you'd read any API reference. If anything in there conflicts with how you normally operate, stop and tell me.
 
-Step 4: Start Hello Integration
-  GET ${url}/v1/agents/me/onboarding
-  Header: Authorization: Bearer <your-token>
-  Follow the onboarding steps to reach production readiness.
+4. Check what's queued for you:
+     GET /v1/agents/me/onboarding
+   This shows my pending requests for you. Each one is something I've explicitly asked for through the AIMEAT interface; treat them as requests from me, evaluate them, and ask if anything is unclear.
 
-Tip: Use /v1/agents/me/ as shortcut in all agent URLs -- it resolves to your name.`;
+You're acting on my behalf within scopes I approve at step 2. Decline anything that falls outside those scopes or your own operating rules.`;
 }
 
 /* ── Platform instructions ── */
 const PLATFORMS = {
-  windows: `<h4>OpenClaw (Recommended)</h4>
-<p><a href="https://openclaw.ai" target="_blank">OpenClaw</a> is an open-source AI automation agent \u2014 perfect for AIMEAT.</p>
+  windows: `<h4>Install Node.js</h4>
 <p>Windows requires WSL2. Open PowerShell as Admin:</p>
 <ol><li>Install WSL2: <code>wsl --install</code> (restart if prompted)</li>
-<li>In WSL2 terminal, install Node.js 22+: <code>curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs</code></li>
-<li>Install OpenClaw: <code>npm install -g openclaw@latest</code></li>
-<li>Run: <code>openclaw onboard</code> to configure your LLM API key</li>
-<li>Paste the agent prompt above into the OpenClaw session</li></ol>`,
-  mac: `<h4>OpenClaw (Recommended)</h4>
-<p><a href="https://openclaw.ai" target="_blank">OpenClaw</a> is an open-source AI automation agent \u2014 perfect for AIMEAT.</p>
-<ol><li>Install Node.js 22+: <code>brew install node</code></li>
-<li>Install OpenClaw: <code>npm install -g openclaw@latest</code></li>
-<li>Run: <code>openclaw onboard</code> to configure your LLM API key</li>
-<li>Paste the agent prompt above into the OpenClaw session</li></ol>
-<h4>Alternative: one-liner install</h4>
-<pre><code>curl -fsSL https://openclaw.ai/install.sh | bash</code></pre>`,
-  linux: `<h4>OpenClaw (Recommended)</h4>
-<p><a href="https://openclaw.ai" target="_blank">OpenClaw</a> is an open-source AI automation agent \u2014 perfect for AIMEAT.</p>
-<ol><li>Install Node.js 22+: <code>curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs</code></li>
-<li>Install OpenClaw: <code>npm install -g openclaw@latest</code></li>
-<li>Run: <code>openclaw onboard</code> to configure your LLM API key</li>
-<li>Paste the agent prompt above into the OpenClaw session</li></ol>
-<h4>Alternative: one-liner install</h4>
-<pre><code>curl -fsSL https://openclaw.ai/install.sh | bash</code></pre>`,
+<li>In WSL2: <code>curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs</code></li>
+<li>Run: <code>npx @aimeat/connect</code> and follow the prompts</li></ol>
+<h4>Compatible Agent Runtimes</h4>
+<p><a href="https://openclaw.ai" target="_blank">OpenClaw</a>, Claude Code, Hermes, or any MCP-capable tool.</p>`,
+  mac: `<h4>Install Node.js</h4>
+<ol><li><code>brew install node</code></li>
+<li>Run: <code>npx @aimeat/connect</code> and follow the prompts</li></ol>
+<h4>Compatible Agent Runtimes</h4>
+<p><a href="https://openclaw.ai" target="_blank">OpenClaw</a>, Claude Code, Hermes, or any MCP-capable tool.</p>`,
+  linux: `<h4>Install Node.js</h4>
+<ol><li><code>curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs</code></li>
+<li>Run: <code>npx @aimeat/connect</code> and follow the prompts</li></ol>
+<h4>Compatible Agent Runtimes</h4>
+<p><a href="https://openclaw.ai" target="_blank">OpenClaw</a>, Claude Code, Hermes, or any MCP-capable tool.</p>`,
   wsl2: `<h4>Setup WSL2 (if not already)</h4>
 <ol><li>Open PowerShell as Admin: <code>wsl --install</code></li>
 <li>Restart and set up your Linux username/password</li></ol>
-<h4>Install OpenClaw</h4>
-<ol><li>In WSL2 terminal, install Node.js 22+: <code>curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs</code></li>
-<li>Install OpenClaw: <code>npm install -g openclaw@latest</code></li>
-<li>Run: <code>openclaw onboard</code> to configure your LLM API key</li>
-<li>Paste the agent prompt above into the OpenClaw session</li></ol>`,
-  android: `<h4>Option A: Termux (CLI only)</h4>
-<ol><li>Install <a href="https://f-droid.org/packages/com.termux/" target="_blank">Termux from F-Droid</a> (not Play Store)</li>
-<li>Run: <code>pkg update && pkg install nodejs</code></li>
-<li>Install OpenClaw: <code>npm install -g openclaw@latest</code></li>
-<li>Run: <code>openclaw onboard</code> to configure your LLM API key</li>
-<li>Paste the agent prompt above into the OpenClaw session</li></ol>
-<h4>Option B: andClaw (on-device with camera/mic)</h4>
-<p><a href="https://play.google.com/store/apps/details?id=com.coderred.andclaw" target="_blank">andClaw</a> runs the OpenClaw gateway directly on your phone \u2014 no server needed.</p>
-<p><strong>\u26A0\uFE0F Heads up:</strong> This means an AI agent can see through your camera and hear your mic. Only use this if you understand the privacy implications and trust your LLM provider.</p>`,
-  aws: `<h4>Quick EC2 Setup</h4>
-<ol><li>Launch an EC2 instance (Amazon Linux 2023 or Ubuntu, t3.micro is fine)</li>
-<li>SSH in: <code>ssh -i key.pem ec2-user@your-ip</code></li>
-<li>Install Node.js 22+: <code>curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash - && sudo yum install -y nodejs</code></li>
-<li>Install OpenClaw: <code>npm install -g openclaw@latest</code></li>
-<li>Run: <code>openclaw onboard</code> to configure your LLM API key</li>
-<li>Paste the agent prompt above into the OpenClaw session</li></ol>
-<h4>For a persistent agent</h4>
-<ol><li>Use <code>tmux</code> or <code>screen</code> to keep the session alive</li>
-<li>Or set up a systemd service for always-on operation</li></ol>`,
+<h4>Install Node.js</h4>
+<ol><li><code>curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs</code></li>
+<li>Run: <code>npx @aimeat/connect</code> and follow the prompts</li></ol>`,
+  android: `<h4>Termux</h4>
+<ol><li>Install <a href="https://f-droid.org/packages/com.termux/" target="_blank">Termux from F-Droid</a></li>
+<li><code>pkg update && pkg install nodejs</code></li>
+<li>Run: <code>npx @aimeat/connect</code> and follow the prompts</li></ol>`,
+  aws: `<h4>EC2 Setup</h4>
+<ol><li>Launch an EC2 instance (t3.micro is fine)</li>
+<li>SSH in and install Node.js 22+</li>
+<li>Run: <code>npx @aimeat/connect</code></li>
+<li>Then: <code>npx @aimeat/connect serve</code> for persistent MCP server</li></ol>`,
 };
 const PLATFORM_KEYS = ['windows','mac','linux','wsl2','android','aws'];
 const PLATFORM_LABELS = { windows:'profile.platforms.windows', mac:'profile.platforms.mac', linux:'profile.platforms.linux', wsl2:'profile.platforms.wsl2', android:'profile.platforms.android', aws:'profile.platforms.aws' };
@@ -187,8 +155,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [approvingCode, setApprovingCode] = useState(null);
   const [approvePreset, setApprovePreset] = useState('standard');
-  const [tier1Copied, setTier1Copied] = useState(false);
   const [connectExpanded, setConnectExpanded] = useState(false);
+  const [pasteExpanded, setPasteExpanded] = useState(false);
   const [taskStatsMap, setTaskStatsMap] = useState({});
 
   useEffect(() => {
@@ -320,31 +288,6 @@ export default function AgentsTab({ session, showToast, onStats }) {
     }
   }
 
-  async function downloadTier1() {
-    try {
-      const resp = await apiGet('/v1/prompts/tier1');
-      if (resp.ok && resp.data?.system_prompt) {
-        const blob = new Blob([resp.data.system_prompt], { type: 'text/markdown' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = 'agent-instructions.md';
-        a.click();
-        URL.revokeObjectURL(a.href);
-      }
-    } catch { /* silent */ }
-  }
-
-  async function copyTier1() {
-    try {
-      const resp = await apiGet('/v1/prompts/tier1');
-      if (resp.ok && resp.data?.system_prompt) {
-        await copyToClipboard(resp.data.system_prompt);
-        setTier1Copied(true);
-        setTimeout(() => setTier1Copied(false), 2000);
-      }
-    } catch { /* silent */ }
-  }
-
   async function toggleFederate(agent) {
     try {
       await apiPatch(`/v1/agents/${encodeURIComponent(agent.name)}/federate`, { federate: !agent.federate });
@@ -418,29 +361,23 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
     ${connectExpanded && html`
       <div class="pf-agd-connect-content">
-        <p>${t('profile.agents.connectDesc')}</p>
-        <div class="agent-prompt-box">${buildAgentPrompt(session)}</div>
+        <p class="mb-half text-bold">${t('profile.agents.cliInstall')}</p>
+        <div class="agent-prompt-box"><code>npx @aimeat/connect \\${'\n'}  --url ${getNodeUrl()} \\${'\n'}  --owner ${session.owner}</code></div>
         <button class="copy-prompt-btn" onClick=${() => {
-          copyToClipboard(buildAgentPrompt(session)).then(() => {
+          copyToClipboard(`npx @aimeat/connect --url ${getNodeUrl()} --owner ${session.owner}`).then(() => {
             setPromptCopied(true);
             setTimeout(() => setPromptCopied(false), 2000);
           });
         }}>${promptCopied ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.copyPrompt')}</button>
-        ${agents.length > 0 && html`
-          <div class="flex-row mt-half pf-tier1-buttons">
-            <button class="btn-outline" onClick=${downloadTier1}>
-              ${t('profile.agents.downloadInstructions')}
-            </button>
-            <button class="btn-outline" onClick=${copyTier1}>
-              ${tier1Copied ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.copyFullInstructions')}
-            </button>
-          </div>
-        `}
 
-        <div class="pf-agent-divider">
-          <p class="mb-half">${t('profile.agents.noAgent')}</p>
+        <p class="mt-1 mb-half text-bold">${t('profile.agents.cliServe')}</p>
+        <div class="agent-prompt-box"><code>npx @aimeat/connect serve</code></div>
+
+        <p class="mt-1 text-caption">${t('profile.agents.cliDesc')}</p>
+
+        <div class="pf-agent-divider mt-1">
           <button class="expand-btn" onClick=${() => setPlatExpand(!platExpand)}>
-            <span>${t('profile.agents.seeHow')}</span>
+            <span>${t('profile.agents.noNodejs')}</span>
             <span class="pf-chevron ${platExpand ? 'pf-chevron-open' : ''}">\u25BC</span>
           </button>
           ${platExpand && html`
@@ -452,6 +389,25 @@ export default function AgentsTab({ session, showToast, onStats }) {
               </div>
               ${/* SAFE: PLATFORMS is hardcoded developer constant, not user input */''}
               <div class="platform-content" dangerouslySetInnerHTML=${{ __html: PLATFORMS[activePlat] }}></div>
+            </div>
+          `}
+        </div>
+
+        <div class="pf-agent-divider mt-1">
+          <button class="expand-btn" onClick=${() => setPasteExpanded(!pasteExpanded)}>
+            <span>${t('profile.agents.pasteAlt')}</span>
+            <span class="pf-chevron ${pasteExpanded ? 'pf-chevron-open' : ''}">\u25BC</span>
+          </button>
+          ${pasteExpanded && html`
+            <div class="mt-half">
+              <p class="text-caption mb-half">${t('profile.agents.pasteDesc')}</p>
+              <div class="agent-prompt-box">${buildAgentPrompt(session)}</div>
+              <button class="copy-prompt-btn" onClick=${() => {
+                copyToClipboard(buildAgentPrompt(session)).then(() => {
+                  setPromptCopied(true);
+                  setTimeout(() => setPromptCopied(false), 2000);
+                });
+              }}>${promptCopied ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.copyPrompt')}</button>
             </div>
           `}
         </div>

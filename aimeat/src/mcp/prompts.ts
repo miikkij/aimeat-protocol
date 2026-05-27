@@ -1,14 +1,15 @@
 /**
  * @file prompts.ts
- * @description MCP prompts tool registration. Provides 1 tool for retrieving managed
- *   system prompts by tier. No resource — prompts are fetched on-demand.
+ * @description MCP handbook tool registration. Provides 1 tool for retrieving the agent
+ *   operating handbook or managed prompts by tier. No resource -- fetched on-demand.
  * @structure
  *   - registerPromptsTools() — registers the prompts get tool on an McpServer instance
  * @usage
  *   import { registerPromptsTools } from './prompts.js';
  *   registerPromptsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
- *   v1.0.0 — 2026-03-21 — Initial creation: 1 tool for managed system prompt retrieval via MCP
+ *   v1.0.0 -- 2026-03-21 -- Initial creation: 1 tool for managed system prompt retrieval via MCP
+ *   v1.1.0 -- 2026-05-27 -- Rename tool from aimeat_prompts_get to aimeat_handbook_get
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -25,10 +26,10 @@ export function registerPromptsTools(
     _emitResourceListChanged: (agentGaii: string) => void,
 ): void {
 
-    // ── Tool 1: aimeat_prompts_get ──
+    // ── Tool 1: aimeat_handbook_get ──
     mcp.tool(
-        'aimeat_prompts_get',
-        'Get a managed system prompt by tier or ID',
+        'aimeat_handbook_get',
+        'Get the agent operating handbook or a managed prompt by tier or ID',
         {
             tier: z.string().describe('Prompt tier or ID (e.g. "tier1", "tier2", "tier-1", or a custom prompt ID)'),
         },

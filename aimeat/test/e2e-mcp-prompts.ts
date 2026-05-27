@@ -218,23 +218,23 @@ console.log('\nPhase 1 — Tool Registration');
 await test('1. Prompts tool appears in tools/list', async () => {
     const { body } = await mcpRpc('tools/list', {}, 100);
     const toolNames = body.result.tools.map((t: any) => t.name);
-    assert(toolNames.includes('aimeat_prompts_get'), 'has aimeat_prompts_get');
+    assert(toolNames.includes('aimeat_handbook_get'), 'has aimeat_handbook_get');
 });
 
 // ─── Phase 2: Prompt Retrieval ───
 console.log('\nPhase 2 — Prompt Retrieval');
 
-await test('2. aimeat_prompts_get returns error for nonexistent tier', async () => {
+await test('2. aimeat_handbook_get returns error for nonexistent tier', async () => {
     const { body } = await mcpRpc('tools/call', {
-        name: 'aimeat_prompts_get',
+        name: 'aimeat_handbook_get',
         arguments: { tier: 'tier-nonexistent-xyz' },
     }, 101);
     assert(body.result?.isError === true, 'returns isError for nonexistent tier');
 });
 
-await test('3. aimeat_prompts_get attempts to fetch tier1 prompt (may or may not exist in test env)', async () => {
+await test('3. aimeat_handbook_get attempts to fetch tier1 prompt (may or may not exist in test env)', async () => {
     const { body } = await mcpRpc('tools/call', {
-        name: 'aimeat_prompts_get',
+        name: 'aimeat_handbook_get',
         arguments: { tier: 'tier1' },
     }, 102);
     // The result is either a prompt record or an isError — both are valid depending on test data
@@ -250,13 +250,13 @@ await test('3. aimeat_prompts_get attempts to fetch tier1 prompt (may or may not
     }
 });
 
-await test('4. aimeat_prompts_get handles both "tier1" and "tier-1" notation', async () => {
+await test('4. aimeat_handbook_get handles both "tier1" and "tier-1" notation', async () => {
     const { body: b1 } = await mcpRpc('tools/call', {
-        name: 'aimeat_prompts_get',
+        name: 'aimeat_handbook_get',
         arguments: { tier: 'tier1' },
     }, 103);
     const { body: b2 } = await mcpRpc('tools/call', {
-        name: 'aimeat_prompts_get',
+        name: 'aimeat_handbook_get',
         arguments: { tier: 'tier-1' },
     }, 104);
     // Both should produce the same outcome (both found or both not found)
