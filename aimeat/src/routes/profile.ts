@@ -1682,7 +1682,7 @@ function updateAgentPrompt() {
     + '   POST ' + nodeUrl + '/v1/memory \\u2014 Store/retrieve memories\\n'
     + '   GET ' + nodeUrl + '/v1/wallet \\u2014 Check balance\\n'
     + '   Full API spec: ' + nodeUrl + '/v1/spec\\n'
-    + '   Operating instructions: ' + nodeUrl + '/v1/prompts/tier1';
+    + '   Operating instructions: ' + nodeUrl + '/v1/agents/me/handbook';
 }
 
 function copyAgentPrompt() {

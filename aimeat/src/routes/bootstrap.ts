@@ -368,7 +368,7 @@ export function bootstrapRouter(
             },
           },
         },
-        operating_instructions: `${base}/v1/prompts/tier1`,
+        operating_instructions: `${base}/v1/agents/me/handbook`,
         full_api_spec: `${base}/v1/spec`,
       },
 

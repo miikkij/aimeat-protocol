@@ -207,6 +207,7 @@ export async function mountRoutes(
     if (!req.url.startsWith('/v1/agents/me') && !req.originalUrl.startsWith('/v1/agents/me')) { next(); return; }
     const tail = req.originalUrl.slice('/v1/agents/me'.length);
     if (tail && !tail.startsWith('/')) { next(); return; } // /v1/agents/memory etc.
+    if (tail.startsWith('/handbook')) { next(); return; } // /v1/agents/me/handbook is a fixed route, not an alias
     const auth = req.headers.authorization;
     if (!auth?.startsWith('Bearer ')) { next(); return; }
     try {

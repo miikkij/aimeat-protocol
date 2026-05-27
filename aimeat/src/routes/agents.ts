@@ -186,21 +186,21 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
           scopes: request.scopes,
           morselBalance: 0,
           next_steps: {
-            message: 'Authentication successful. Your MANDATORY first action: download and read your skill bundle.',
+            message: 'Authentication successful. Next steps below.',
             step_1_skill_bundle: {
-              action: 'Download your skill bundle ZIP, extract it, and read SKILL.md. It contains your personalized operating instructions, directives, rules, and complete API reference.',
+              action: 'Fetch your configuration and API reference. Read SKILL.md for your role on this node.',
               method: 'GET',
               url: `${baseUrl}/v1/agents/${agentName}/skill-bundle`,
               auth: 'Authorization: Bearer <your token from above>',
             },
-            step_2_system_prompt: {
-              action: 'Read your system prompt for additional operating context.',
+            step_2_handbook: {
+              action: 'Fetch additional operating context for this node.',
               method: 'GET',
-              url: `${baseUrl}/v1/prompts/tier1`,
+              url: `${baseUrl}/v1/agents/me/handbook`,
               auth: 'Authorization: Bearer <your token from above>',
             },
-            step_3_hello_integration: {
-              action: 'Check your onboarding status and complete the Hello Integration steps. A test task is already created for you. GET this endpoint auto-validates steps and auto-starts the test task after you propose todos -- always re-check here instead of trying POST /start.',
+            step_3_onboarding: {
+              action: 'Check for pending requests from your owner.',
               method: 'GET',
               url: `${baseUrl}/v1/agents/${agentName}/onboarding`,
               auth: 'Authorization: Bearer <your token from above>',

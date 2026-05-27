@@ -363,7 +363,7 @@ Even if there are no console errors \u2014 just describe what's wrong and I'll i
 
 function buildAgentPrompt() {
   const n = NODE_URL;
-  return `You are helping me set up an AI agent workflow using AIMEAT, an open protocol for AI memory, coordination and task management.
+  return `I'd like to build an AI agent workflow using AIMEAT, an open protocol for AI memory, coordination and task management.
 
 The AIMEAT server is at: ${n}
 
@@ -423,11 +423,10 @@ Use header: Authorization: Bearer {token}
 - Python script to run on a schedule
 - Node.js script for scheduled execution
 
-This is a LIVE server \u2014 the URLs work right now.
+These endpoints are live.
 
 ## If Something Doesn't Work
-After delivering the agent code, always add this message:
-"If something doesn't work, tell me what happened and we'll fix it together!"`;
+If the agent code doesn't work as expected, check the browser console (F12) or script output for errors and share them so we can troubleshoot together.`;
 }
 
 function buildConnectPrompt() {

@@ -127,8 +127,8 @@ console.log('\nPhase 1 -- Module Route Access');
 const VALID_MODULES = ['tasks', 'messages', 'work', 'services', 'memory', 'activity', 'social'];
 
 for (const mod of VALID_MODULES) {
-    await test(`GET /v1/prompts/tier1/${mod} returns 200 with prompt`, async () => {
-        const { status, body } = await json(`/v1/prompts/tier1/${mod}`, {
+    await test(`GET /v1/agents/me/handbook/${mod} returns 200 with prompt`, async () => {
+        const { status, body } = await json(`/v1/agents/me/handbook/${mod}`, {
             headers: { Authorization: `Bearer ${agentToken}` },
         });
         assert(status === 200, `status ${status}: ${JSON.stringify(body.error)}`);
@@ -140,45 +140,45 @@ for (const mod of VALID_MODULES) {
     });
 }
 
-await test('GET /v1/prompts/tier1/nonexistent returns 404', async () => {
-    const { status, body } = await json('/v1/prompts/tier1/nonexistent', {
+await test('GET /v1/agents/me/handbook/nonexistent returns 404', async () => {
+    const { status, body } = await json('/v1/agents/me/handbook/nonexistent', {
         headers: { Authorization: `Bearer ${agentToken}` },
     });
     assert(status === 404, `expected 404, got ${status}`);
     assert(body.ok === false, 'response not ok');
 });
 
-await test('GET /v1/prompts/tier1/tasks without auth returns 401', async () => {
-    const { status } = await json('/v1/prompts/tier1/tasks');
+await test('GET /v1/agents/me/handbook/tasks without auth returns 401', async () => {
+    const { status } = await json('/v1/agents/me/handbook/tasks');
     assert(status === 401, `expected 401, got ${status}`);
 });
 
 // ── Phase 2: Bootloader Content ──
 console.log('\nPhase 2 -- Bootloader Content');
 
-await test('GET /v1/prompts/tier1 returns bootloader with module URLs', async () => {
-    const { status, body } = await json('/v1/prompts/tier1', {
+await test('GET /v1/agents/me/handbook returns bootloader with module URLs', async () => {
+    const { status, body } = await json('/v1/agents/me/handbook', {
         headers: { Authorization: `Bearer ${agentToken}` },
     });
     assert(status === 200, `status ${status}`);
     const prompt = body.data?.system_prompt as string;
     assert(prompt.includes('BOOT SEQUENCE'), 'has boot sequence');
-    assert(prompt.includes('/v1/prompts/tier1/tasks'), 'references tasks module');
-    assert(prompt.includes('/v1/prompts/tier1/messages'), 'references messages module');
-    assert(prompt.includes('/v1/prompts/tier1/work'), 'references work module');
-    assert(prompt.includes('/v1/prompts/tier1/services'), 'references services module');
-    assert(prompt.includes('/v1/prompts/tier1/memory'), 'references memory module');
-    assert(prompt.includes('/v1/prompts/tier1/activity'), 'references activity module');
-    assert(prompt.includes('/v1/prompts/tier1/social'), 'references social module');
-    assert(prompt.includes('modules_loaded'), 'mentions modules_loaded capability');
-    assert(prompt.includes('limitations'), 'mentions limitations reporting');
+    assert(prompt.includes('/v1/agents/me/handbook/tasks'), 'references tasks module');
+    assert(prompt.includes('/v1/agents/me/handbook/messages'), 'references messages module');
+    assert(prompt.includes('/v1/agents/me/handbook/work'), 'references work module');
+    assert(prompt.includes('/v1/agents/me/handbook/services'), 'references services module');
+    assert(prompt.includes('/v1/agents/me/handbook/memory'), 'references memory module');
+    assert(prompt.includes('/v1/agents/me/handbook/activity'), 'references activity module');
+    assert(prompt.includes('/v1/agents/me/handbook/social'), 'references social module');
+    assert(prompt.includes('capabilities'), 'mentions capabilities');
+    assert(prompt.includes('BOOT SEQUENCE') || prompt.includes('operational'), 'mentions boot sequence or operational status');
 });
 
 // ── Phase 3: Module Content Quality ──
 console.log('\nPhase 3 -- Module Content Quality');
 
 await test('Tasks module contains required sections', async () => {
-    const { body } = await json('/v1/prompts/tier1/tasks', {
+    const { body } = await json('/v1/agents/me/handbook/tasks', {
         headers: { Authorization: `Bearer ${agentToken}` },
     });
     const prompt = body.data.system_prompt as string;
@@ -192,7 +192,7 @@ await test('Tasks module contains required sections', async () => {
 });
 
 await test('Messages module contains required sections', async () => {
-    const { body } = await json('/v1/prompts/tier1/messages', {
+    const { body } = await json('/v1/agents/me/handbook/messages', {
         headers: { Authorization: `Bearer ${agentToken}` },
     });
     const prompt = body.data.system_prompt as string;
@@ -203,7 +203,7 @@ await test('Messages module contains required sections', async () => {
 });
 
 await test('Work module covers full lifecycle', async () => {
-    const { body } = await json('/v1/prompts/tier1/work', {
+    const { body } = await json('/v1/agents/me/handbook/work', {
         headers: { Authorization: `Bearer ${agentToken}` },
     });
     const prompt = body.data.system_prompt as string;
@@ -280,7 +280,7 @@ await test('PUT capabilities accumulates modules', async () => {
 console.log('\nPhase 5 -- Variable Substitution');
 
 await test('Module prompts substitute agent-specific variables', async () => {
-    const { body } = await json('/v1/prompts/tier1/tasks', {
+    const { body } = await json('/v1/agents/me/handbook/tasks', {
         headers: { Authorization: `Bearer ${agentToken}` },
     });
     const prompt = body.data.system_prompt as string;

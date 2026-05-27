@@ -7,6 +7,7 @@
  *   v1.0.0 -- 2026-03-01 -- Initial tiered prompts (0, 1, 2, anonymous)
  *   v1.1.0 -- 2026-05-21 -- Extend tier1 response with directives, task queue, and agent endpoints
  *   v1.2.0 -- 2026-05-22 -- Add GET /v1/prompts/tier1/:module for modular prompt system
+ *   v1.3.0 -- 2026-05-27 -- Add /v1/agents/me/handbook routes, 301 redirects from old tier1 paths
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -21,8 +22,10 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
 
   const VALID_MODULES = ['tasks', 'messages', 'work', 'services', 'memory', 'activity', 'social', 'collaboration', 'appdev', 'mcp'] as const;
 
-  // GET /v1/prompts/tier1/:module -- Feature module prompts (auth required)
-  router.get('/v1/prompts/tier1/:module', requireAuth(), async (req, res) => {
+  // ── Handbook routes (replace /v1/prompts/tier1) ──
+
+  // GET /v1/agents/me/handbook/:module -- Feature module handbooks (auth required)
+  router.get('/v1/agents/me/handbook/:module', requireAuth(), async (req, res) => {
     const mod = req.params.module as string;
     if (!(VALID_MODULES as readonly string[]).includes(mod)) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND',
@@ -32,7 +35,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
 
     const record = await storage.getSystemPrompt(`tier-1-${mod}`);
     if (!record || !record.active) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Module prompt not available'));
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Module handbook not available'));
       return;
     }
 
@@ -54,6 +57,89 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
       module: mod,
       system_prompt,
     }));
+  });
+
+  // GET /v1/agents/me/handbook -- Agent operating handbook
+  router.get('/v1/agents/me/handbook', async (req, res) => {
+    const gaii = req.auth?.sub ?? 'unknown';
+    const agent = req.auth?.sub ? await storage.getAgent(req.auth.sub) : null;
+    const record = await storage.getSystemPrompt('tier-1');
+    if (!record || !record.active) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Handbook not available')); return; }
+    const promptContent = resolvePromptContent(record, req.headers['accept-language'] as string);
+    const parsedSelf = parseGaiiLoose(gaii);
+    const selfAgentName = parsedSelf.agent || 'unknown';
+    const system_prompt = substituteVariables(promptContent, {
+      node_url: config.baseUrl,
+      node_id: config.nodeId,
+      gaii,
+      agent_name: selfAgentName,
+      owner_name: req.auth?.owner ?? 'unknown',
+      trust_score: agent?.trustScore ?? 50,
+      morsel_balance: agent?.morselBalance ?? 0,
+      daily_allowance: config.dailyAllowance,
+    });
+    const directives = gaii !== 'unknown' ? await storage.getAgentDirectives(gaii) : null;
+    const ownerGhii = req.auth?.owner ? `${req.auth.owner}@${config.nodeId}` : '';
+    const ownerDefaults = ownerGhii ? await storage.getOwnerAgentDefaults(ownerGhii) : null;
+    const queuedTasks = gaii !== 'unknown' ? await storage.listAgentTasks(gaii, { status: 'queued' }) : { tasks: [], total: 0 };
+    const activeTasks = gaii !== 'unknown' ? await storage.listAgentTasks(gaii, { status: 'active' }) : { tasks: [], total: 0 };
+    const parsed = parseGaiiLoose(gaii);
+    const agentName = parsed.agent || '{name}';
+
+    res.json(success(config.nodeId, {
+      tier: '1',
+      agent_name: selfAgentName,
+      system_prompt,
+      available_operations: ['memory_crud', 'action_publish', 'action_execute', 'work_queue', 'wallet', 'boards', 'catalogue', 'task_lifecycle', 'directives', 'capabilities_report', 'message_handling'],
+      economics: {
+        note: 'Agents share the owner\'s wallet. This balance belongs to your owner, not you individually.',
+        daily_allowance: config.dailyAllowance,
+        current_balance: ownerGhii ? (await storage.getGHIIByOwner(req.auth?.owner as string))?.morselBalance ?? 0 : 0,
+      },
+      directives: {
+        purpose: directives?.purpose ?? '',
+        system_rules: config.agentSystemPrinciples.map((desc, i) => ({ id: `system-${i + 1}`, description: desc })),
+        owner_rules: (ownerDefaults?.rules ?? []).map(r => ({ id: r.id, description: r.description })),
+        agent_rules: (directives?.rules ?? []).map(r => ({ id: r.id, description: r.description })),
+        memory_areas: directives?.memoryAreas ?? [],
+        resources: directives?.resources ?? [],
+        max_tokens_per_task: config.agentMaxTokensPerTask,
+        mandatory_logging: config.agentMandatoryLogging,
+        aimeat_first: config.agentAimeatFirstEnabled,
+      },
+      task_queue: {
+        queued: queuedTasks.tasks.map(t => ({ id: t.id, title: t.title, status: t.status })),
+        active: activeTasks.tasks.map(t => ({ id: t.id, title: t.title, status: t.status })),
+        endpoints: {
+          inbox: `/v1/agents/${encodeURIComponent(agentName)}/inbox`,
+          start: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/start`,
+          event: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/event`,
+          complete: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/complete`,
+          fail: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/fail`,
+          wait: `/v1/agents/${encodeURIComponent(agentName)}/tasks/wait`,
+        },
+      },
+      capabilities: {
+        report_endpoint: `/v1/agents/${encodeURIComponent(agentName)}/capabilities`,
+        current: {
+          technical: agent?.technicalCapabilities ?? [],
+          domain: agent?.domainCapabilities ?? [],
+        },
+        instructions: 'Report your capabilities on first connect and when they change. PUT to the report_endpoint with: { technical: [{ name, type }], domain: [string], languages: [string] }',
+      },
+      messages: {
+        inbox_endpoint: `GET ${config.baseUrl}/v1/agents/${encodeURIComponent(agentName)}/messages/inbox`,
+        send_endpoint: `POST ${config.baseUrl}/v1/agents/${encodeURIComponent(agentName)}/messages`,
+        instructions: 'Poll inbox for pending messages. For each: read content, process, send response as outbound message. If user asks you to do something, include proposedTask in metadata.',
+      },
+    }));
+  });
+
+  // ── 301 Redirects from old tier1 paths ──
+
+  // Old: /v1/prompts/tier1/:module -> New: /v1/agents/me/handbook/:module
+  router.get('/v1/prompts/tier1/:module', (req, res) => {
+    res.redirect(301, `/v1/agents/me/handbook/${req.params.module as string}`);
   });
 
   // GET /v1/prompts/:tier — unified prompts endpoint (Tier 0)
@@ -108,85 +194,8 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
       }
       case '1':
       case 'tier1': {
-        const gaii = req.auth?.sub ?? 'unknown';
-        const agent = req.auth?.sub ? await storage.getAgent(req.auth.sub) : null;
-        const record = await storage.getSystemPrompt('tier-1');
-        if (!record || !record.active) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Prompt not available')); return; }
-        const promptContent = resolvePromptContent(record, req.headers['accept-language'] as string);
-        // Extract agent name from GAII for template
-        const parsedSelf = parseGaiiLoose(gaii);
-        const selfAgentName = parsedSelf.agent || 'unknown';
-        const system_prompt = substituteVariables(promptContent, {
-          node_url: config.baseUrl,
-          node_id: config.nodeId,
-          gaii,
-          agent_name: selfAgentName,
-          owner_name: req.auth?.owner ?? 'unknown',
-          trust_score: agent?.trustScore ?? 50,
-          morsel_balance: agent?.morselBalance ?? 0,
-          daily_allowance: config.dailyAllowance,
-        });
-        // Fetch directives for this agent
-        const directives = gaii !== 'unknown' ? await storage.getAgentDirectives(gaii) : null;
-        const ownerGhii = req.auth?.owner ? `${req.auth.owner}@${config.nodeId}` : '';
-        const ownerDefaults = ownerGhii ? await storage.getOwnerAgentDefaults(ownerGhii) : null;
-
-        // Fetch queued and active tasks
-        const queuedTasks = gaii !== 'unknown' ? await storage.listAgentTasks(gaii, { status: 'queued' }) : { tasks: [], total: 0 };
-        const activeTasks = gaii !== 'unknown' ? await storage.listAgentTasks(gaii, { status: 'active' }) : { tasks: [], total: 0 };
-
-        // Extract agent name from GAII for endpoint URLs
-        const parsed = parseGaiiLoose(gaii);
-        const agentName = parsed.agent || '{name}';
-
-        res.json(success(config.nodeId, {
-          tier: '1',
-          agent_name: selfAgentName,
-          system_prompt,
-          available_operations: ['memory_crud', 'action_publish', 'action_execute', 'work_queue', 'wallet', 'boards', 'catalogue', 'task_lifecycle', 'directives', 'capabilities_report', 'message_handling'],
-          economics: {
-            note: 'Agents share the owner\'s wallet. This balance belongs to your owner, not you individually.',
-            daily_allowance: config.dailyAllowance,
-            current_balance: ownerGhii ? (await storage.getGHIIByOwner(req.auth?.owner as string))?.morselBalance ?? 0 : 0,
-          },
-          directives: {
-            purpose: directives?.purpose ?? '',
-            system_rules: config.agentSystemPrinciples.map((desc, i) => ({ id: `system-${i + 1}`, description: desc })),
-            owner_rules: (ownerDefaults?.rules ?? []).map(r => ({ id: r.id, description: r.description })),
-            agent_rules: (directives?.rules ?? []).map(r => ({ id: r.id, description: r.description })),
-            memory_areas: directives?.memoryAreas ?? [],
-            resources: directives?.resources ?? [],
-            max_tokens_per_task: config.agentMaxTokensPerTask,
-            mandatory_logging: config.agentMandatoryLogging,
-            aimeat_first: config.agentAimeatFirstEnabled,
-          },
-          task_queue: {
-            queued: queuedTasks.tasks.map(t => ({ id: t.id, title: t.title, status: t.status })),
-            active: activeTasks.tasks.map(t => ({ id: t.id, title: t.title, status: t.status })),
-            endpoints: {
-              inbox: `/v1/agents/${encodeURIComponent(agentName)}/inbox`,
-              start: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/start`,
-              event: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/event`,
-              complete: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/complete`,
-              fail: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/fail`,
-              wait: `/v1/agents/${encodeURIComponent(agentName)}/tasks/wait`,
-            },
-          },
-          capabilities: {
-            report_endpoint: `/v1/agents/${encodeURIComponent(agentName)}/capabilities`,
-            current: {
-              technical: agent?.technicalCapabilities ?? [],
-              domain: agent?.domainCapabilities ?? [],
-            },
-            instructions: 'Report your capabilities on first connect and when they change. PUT to the report_endpoint with: { technical: [{ name, type }], domain: [string], languages: [string] }',
-          },
-          messages: {
-            inbox_endpoint: `GET ${config.baseUrl}/v1/agents/${encodeURIComponent(agentName)}/messages/inbox`,
-            send_endpoint: `POST ${config.baseUrl}/v1/agents/${encodeURIComponent(agentName)}/messages`,
-            instructions: 'Poll inbox for pending messages. For each: read content, process, send response as outbound message. If user asks you to do something, include proposedTask in metadata.',
-          },
-        }));
-        break;
+        res.redirect(301, '/v1/agents/me/handbook');
+        return;
       }
       case '2':
       case 'tier2': {

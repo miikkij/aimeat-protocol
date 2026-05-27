@@ -1900,7 +1900,7 @@ Retrieve tiered system prompts with operating instructions.
 GET {{BASE_URL}}/v1/prompts/tier0 — Tier 0 prompt (anonymous, no auth)
   → 200: { "ok": true, "data": { "tier": "0", "system_prompt": "...", "available_endpoints": [...], "upgrade_paths": { "mcp": "/v1/mcp", "jwt": "POST /v1/auth/token" } } }
 
-GET {{BASE_URL}}/v1/prompts/tier1 — Tier 1 prompt (registered agent, no auth)
+GET {{BASE_URL}}/v1/agents/me/handbook — Agent operating handbook (registered agent)
   → 200: { "ok": true, "data": { "tier": "1", "system_prompt": "...", "available_operations": [...], "economics": { "daily_allowance": 50, "current_balance": 100 } } }
 
 GET {{BASE_URL}}/v1/prompts/tier2 — Tier 2 prompt (advanced, no auth)
@@ -1937,7 +1937,7 @@ GET {{BASE_URL}}/v1/docs — Interactive API documentation (Swagger UI)
 
 - Full OpenAPI spec: {{BASE_URL}}/v1/spec
 - Interactive docs: {{BASE_URL}}/v1/docs
-- System prompt (after registration): {{BASE_URL}}/v1/prompts/tier1
+- Agent handbook (after registration): {{BASE_URL}}/v1/agents/me/handbook
 - Node discovery: {{BASE_URL}}/.well-known/aimeat
 - Public catalogue: {{BASE_URL}}/v1/catalogue
 - Help prompt: {{BASE_URL}}/v1/help/prompt

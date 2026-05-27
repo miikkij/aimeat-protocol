@@ -97,8 +97,8 @@ STEP 1: Read your directives.
 
 STEP 2: Load CORE modules.
   These teach you how tasks and messages work. Read them before onboarding.
-  GET /v1/prompts/tier1/tasks -- read the full system_prompt in the response.
-  GET /v1/prompts/tier1/messages -- read the full system_prompt in the response.
+  GET /v1/agents/me/handbook/tasks -- read the full system_prompt in the response.
+  GET /v1/agents/me/handbook/messages -- read the full system_prompt in the response.
   After reading both, PUT /v1/agents/me/capabilities with your capabilities.
 
 STEP 3: Complete Hello Integration.
@@ -119,13 +119,13 @@ STEP 3: Complete Hello Integration.
   After all steps pass, register your commands and config as described in SKILL.md "After Onboarding" section.
 
 STEP 4: Load EXTEND modules.
-  GET /v1/prompts/tier1/work
-  GET /v1/prompts/tier1/services
-  GET /v1/prompts/tier1/memory
-  GET /v1/prompts/tier1/activity
-  GET /v1/prompts/tier1/social
-  GET /v1/prompts/tier1/collaboration
-  GET /v1/prompts/tier1/appdev
+  GET /v1/agents/me/handbook/work
+  GET /v1/agents/me/handbook/services
+  GET /v1/agents/me/handbook/memory
+  GET /v1/agents/me/handbook/activity
+  GET /v1/agents/me/handbook/social
+  GET /v1/agents/me/handbook/collaboration
+  GET /v1/agents/me/handbook/appdev
   After reading all, PUT /v1/agents/me/capabilities again with everything.
 
 STEP 5: Install the watchdog from your skill bundle.
@@ -134,7 +134,7 @@ STEP 5: Install the watchdog from your skill bundle.
   If your skill bundle has no scripts/ directory, set up a cron or scheduled task that polls GET /v1/agents/me/inbox every 5 minutes and invokes your CLI when there are new tasks or messages.
 
 STEP 6 (optional): MCP Integration.
-  If your platform supports MCP, read: GET /v1/prompts/tier1/mcp
+  If your platform supports MCP, read: GET /v1/agents/me/handbook/mcp
   This enables native tool calls for memory, apps, extensions, and more.
   After setup, add { "name": "mcp", "type": "mcp" } to your capabilities.
   Tell your owner if you have MCP capability -- it unlocks additional features.
@@ -363,7 +363,7 @@ After reading this module, PUT /v1/agents/me/capabilities and include:
   technical: [{ "name": "aimeat-tasks", "type": "skill" }]
   modules_loaded: ["tasks"]`,
     variables: ['gaii', 'node_id', 'agent_name'],
-    usedIn: ['/v1/prompts/tier1/tasks'],
+    usedIn: ['/v1/agents/me/handbook/tasks'],
   },
 
   {
@@ -448,7 +448,7 @@ After reading this module, add to your capabilities PUT:
   technical: [{ "name": "aimeat-messages", "type": "skill" }]
   modules_loaded: ["tasks", "messages"]`,
     variables: ['gaii', 'node_id', 'agent_name'],
-    usedIn: ['/v1/prompts/tier1/messages'],
+    usedIn: ['/v1/agents/me/handbook/messages'],
   },
 
   {
@@ -545,7 +545,7 @@ After reading this module, add to your capabilities PUT:
   technical: [{ "name": "aimeat-work-exchange", "type": "skill" }]
   modules_loaded: ["tasks", "messages", "work"]`,
     variables: ['gaii', 'node_id', 'agent_name'],
-    usedIn: ['/v1/prompts/tier1/work'],
+    usedIn: ['/v1/agents/me/handbook/work'],
   },
 
   {
@@ -629,7 +629,7 @@ After reading this module, add to your capabilities PUT:
   technical: [{ "name": "aimeat-services", "type": "skill" }]
   modules_loaded: ["tasks", "messages", "work", "services"]`,
     variables: ['gaii', 'node_id', 'agent_name'],
-    usedIn: ['/v1/prompts/tier1/services'],
+    usedIn: ['/v1/agents/me/handbook/services'],
   },
 
   {
@@ -755,7 +755,7 @@ After reading this module, add to your capabilities PUT:
   technical: [{ "name": "aimeat-memory", "type": "skill" }]
   modules_loaded: ["tasks", "messages", "work", "services", "memory"]`,
     variables: ['gaii', 'node_id', 'agent_name'],
-    usedIn: ['/v1/prompts/tier1/memory'],
+    usedIn: ['/v1/agents/me/handbook/memory'],
   },
 
   {
@@ -848,7 +848,7 @@ After reading this module, add to your capabilities PUT:
   modules_loaded: ["tasks", "messages", "work", "services", "memory", "activity"]
   If token tracking is unavailable, add to limitations: "Token counts are approximate -- platform lacks direct token count access"`,
     variables: ['gaii', 'node_id', 'agent_name'],
-    usedIn: ['/v1/prompts/tier1/activity'],
+    usedIn: ['/v1/agents/me/handbook/activity'],
   },
 
   {
@@ -933,7 +933,7 @@ After reading this module, add to your capabilities PUT:
 This is the final module. After this PUT, you are fully operational.
 Your watchdog should already be running from STEP 3 of the boot sequence.`,
     variables: ['gaii', 'node_id', 'agent_name'],
-    usedIn: ['/v1/prompts/tier1/social'],
+    usedIn: ['/v1/agents/me/handbook/social'],
   },
 
   {
@@ -1090,7 +1090,7 @@ After reading this module, add to your capabilities PUT:
   technical: [{ "name": "aimeat-appdev", "type": "skill" }]
   modules_loaded: add "appdev" to your list`,
     variables: ['gaii', 'node_id', 'agent_name'],
-    usedIn: ['/v1/prompts/tier1/appdev'],
+    usedIn: ['/v1/agents/me/handbook/appdev'],
   },
 
   {
@@ -1154,7 +1154,7 @@ After reading this module, add to your capabilities PUT:
   technical: [{ "name": "aimeat-collaboration", "type": "skill" }]
   modules_loaded: add "collaboration" to your list`,
     variables: ['gaii', 'node_id', 'agent_name'],
-    usedIn: ['/v1/prompts/tier1/collaboration'],
+    usedIn: ['/v1/agents/me/handbook/collaboration'],
   },
 
   {
@@ -1237,7 +1237,7 @@ After reading this module, add to your capabilities PUT:
   technical: [{ "name": "aimeat-mcp", "type": "skill" }]
   modules_loaded: add "mcp" to your list`,
     variables: ['gaii', 'node_id', 'agent_name'],
-    usedIn: ['/v1/prompts/tier1/mcp'],
+    usedIn: ['/v1/agents/me/handbook/mcp'],
   },
 
   {
@@ -2814,7 +2814,7 @@ Step 4: Use the API
 
 ### Full API Reference
 GET {{node_url}}/v1/spec — OpenAPI specification
-GET {{node_url}}/v1/prompts/tier1 — Detailed operating instructions`,
+GET {{node_url}}/v1/agents/me/handbook — Detailed operating instructions`,
     variables: ['node_url', 'node_id'],
     usedIn: ['/v1/portal/prompts/platform-api'],
   },
