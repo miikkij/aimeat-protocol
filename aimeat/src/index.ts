@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+/**
+ * @file index.ts
+ * @description Main AIMEAT CLI entry point, including node management commands and agent connector dispatch.
+ * @structure Parses top-level CLI flags, routes subcommands, starts the server, and delegates connector commands.
+ * @usage Executed through the published `aimeat` binary.
+ * @version-history v1.9.4 — 2026-05-28 — Allow agent connector flags and drain async auth handles before exit.
+ */
 import { parseArgs } from 'node:util';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -31,6 +38,11 @@ const { values, positionals } = parseArgs({
     format: { type: 'string' },
     file: { type: 'string' },
     from: { type: 'string' },
+    url: { type: 'string' },
+    owner: { type: 'string' },
+    agent: { type: 'string' },
+    to: { type: 'string' },
+    body: { type: 'string' },
     help: { type: 'boolean', short: 'h' },
     version: { type: 'boolean', short: 'v' },
   },
@@ -346,6 +358,8 @@ if (subcommand === 'config') {
   });
 } else if (subcommand === 'connect') {
   const connectAction = positionals[1];
+  let shouldExitAfterConnect = true;
+  let connectExitDelayMs = 0;
   // Parse --url, --owner, --agent, --to, --body from raw argv
   const rawArgs = process.argv.slice(2);
   const connectFlags: Record<string, string> = {};
@@ -358,6 +372,7 @@ if (subcommand === 'config') {
   if (connectAction === 'serve') {
     const { runServe } = await import('./cli/connect/mcp/server.js');
     await runServe(connectFlags);
+    shouldExitAfterConnect = false;
   } else if (connectAction === 'inbox') {
     const { runInbox } = await import('./cli/connect/inbox.js');
     await runInbox();
@@ -378,10 +393,15 @@ if (subcommand === 'config') {
     const { downloadSkillBundle } = await import('./cli/connect/skill-bundle.js');
     const { loadConfig, getConfigDir } = await import('./cli/connect/config.js');
     const cfg = loadConfig();
-    if (!cfg) { console.error('Not configured. Run: aimeat connect'); process.exit(1); }
-    const cl = await AimeatClient.fromConfig();
-    await downloadSkillBundle(cl, cfg.agent);
-    console.log(`Skill bundle refreshed at ${getConfigDir()}/${cfg.agent}/`);
+    if (!cfg) { console.error('Not configured. Run: npx aimeat connect'); process.exit(1); }
+    try {
+      const cl = await AimeatClient.fromConfig();
+      await downloadSkillBundle(cl, cfg.agent);
+      console.log(`Skill bundle refreshed at ${getConfigDir()}/${cfg.agent}/`);
+    } catch (e) {
+      console.error((e as Error).message);
+      process.exit(1);
+    }
   } else if (connectAction === 'logout') {
     const { deleteToken } = await import('./cli/connect/keychain.js');
     const { loadConfig } = await import('./cli/connect/config.js');
@@ -401,8 +421,12 @@ if (subcommand === 'config') {
       owner: connectFlags.owner,
       agent: connectFlags.agent,
     });
+    connectExitDelayMs = 250;
   }
-  process.exit(0);
+  if (shouldExitAfterConnect) {
+    if (connectExitDelayMs > 0) await new Promise(resolve => setTimeout(resolve, connectExitDelayMs));
+    process.exit(process.exitCode ?? 0);
+  }
 } else if (subcommand === 'seed') {
   const baseUrl = `http://localhost:${config.port}`;
   const adminPw = config.adminPassword ?? '';

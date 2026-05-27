@@ -1,6 +1,9 @@
 /**
  * @file skill-bundle.ts
  * @description Download and cache the agent's skill bundle ZIP.
+ * @structure Fetches the authenticated skill bundle archive and stores the ZIP plus a local SKILL.md pointer.
+ * @usage Called after `aimeat connect` auth and by `aimeat connect refresh`.
+ * @version-history v1.9.4 — 2026-05-28 — Close one-shot CLI HTTP connections after bundle downloads.
  */
 import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -13,7 +16,7 @@ export async function downloadSkillBundle(client: AimeatClient, agentName: strin
 
   const url = `${client.getBaseUrl()}/v1/agents/${encodeURIComponent(agentName)}/skill-bundle`;
   const token = client.getTokenValue();
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { Connection: 'close' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(url, { headers });

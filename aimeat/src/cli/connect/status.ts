@@ -1,13 +1,16 @@
 /**
  * @file status.ts
  * @description CLI subcommand: show agent status
+ * @structure Loads connector config, verifies the stored token, and prints the current agent identity.
+ * @usage Called by `aimeat connect status` and `aimeat connect whoami`.
+ * @version-history v1.9.4 — 2026-05-28 — Update connector guidance and use the name-based inbox endpoint.
  */
 import { AimeatClient } from './api-client.js';
 import { loadConfig } from './config.js';
 
 export async function runStatus(): Promise<void> {
   const config = loadConfig();
-  if (!config) { console.log('Not configured. Run: npx @aimeat/connect'); return; }
+  if (!config) { console.log('Not configured. Run: npx aimeat connect'); return; }
   console.log(`Agent: ${config.agent}`);
   console.log(`Owner: ${config.owner}`);
   console.log(`Node:  ${config.node_url}`);
@@ -19,7 +22,7 @@ export async function runStatus(): Promise<void> {
       const wallet = resp.data as { balance?: number };
       console.log(`Balance: ${wallet.balance ?? 'unknown'} morsels`);
     }
-    const me = await client.get('/v1/agents/me/inbox');
+    const me = await client.get(`/v1/agents/${encodeURIComponent(config.agent)}/inbox`);
     console.log(`Status: ${me.ok ? 'Connected' : 'Token invalid'}`);
   } catch { console.log('Status: Not connected'); }
 }

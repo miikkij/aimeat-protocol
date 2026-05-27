@@ -1,6 +1,9 @@
 /**
  * @file server.ts
  * @description MCP server entry point. Registers all tools and resources, starts transport.
+ * @structure Loads connector credentials, registers MCP tools/resources, starts polling, and connects stdio transport.
+ * @usage Called by `aimeat connect serve`.
+ * @version-history v1.9.4 — 2026-05-28 — Update connector guidance and fail missing credentials without a stack trace.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -13,11 +16,17 @@ import { startPoller } from './poller.js';
 export async function runServe(_flags: Record<string, string>): Promise<void> {
   const config = loadConfig();
   if (!config) {
-    console.error('Not configured. Run: npx @aimeat/connect');
+    console.error('Not configured. Run: npx aimeat connect');
     process.exit(1);
   }
 
-  const client = await AimeatClient.fromConfig();
+  let client: AimeatClient;
+  try {
+    client = await AimeatClient.fromConfig();
+  } catch (e) {
+    console.error((e as Error).message);
+    process.exit(1);
+  }
 
   const mcp = new McpServer({
     name: 'aimeat-connect',

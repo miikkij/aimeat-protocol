@@ -1,6 +1,9 @@
 /**
  * @file api-client.ts
  * @description HTTP client for AIMEAT node API with automatic auth header injection.
+ * @structure Wraps fetch, response-envelope handling, and stored-token based client construction.
+ * @usage Imported by `aimeat connect` subcommands and MCP tools.
+ * @version-history v1.9.4 — 2026-05-28 — Update connector guidance and close one-shot CLI HTTP connections.
  */
 import { getToken } from './keychain.js';
 import { loadConfig } from './config.js';
@@ -22,14 +25,14 @@ export class AimeatClient {
 
   static async fromConfig(): Promise<AimeatClient> {
     const config = loadConfig();
-    if (!config) throw new Error('Not configured. Run: npx @aimeat/connect');
+    if (!config) throw new Error('Not configured. Run: npx aimeat connect');
     const token = await getToken(config.agent, config.owner);
-    if (!token) throw new Error('No stored token. Run: npx @aimeat/connect');
+    if (!token) throw new Error('No stored token. Run: npx aimeat connect');
     return new AimeatClient(config.node_url, token);
   }
 
   private headers(): Record<string, string> {
-    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    const h: Record<string, string> = { 'Content-Type': 'application/json', Connection: 'close' };
     if (this.token) h['Authorization'] = `Bearer ${this.token}`;
     return h;
   }

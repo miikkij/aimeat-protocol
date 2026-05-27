@@ -1,6 +1,9 @@
 /**
  * @file resources.ts
  * @description MCP resource providers for handbook, skill bundle, and reference docs.
+ * @structure Registers connector-local handbook and skill bundle resources for MCP clients.
+ * @usage Called by the `aimeat connect serve` MCP server.
+ * @version-history v1.9.4 — 2026-05-28 — Update connector guidance to the integrated AIMEAT CLI command.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatClient } from '../api-client.js';
@@ -41,7 +44,7 @@ export function registerResources(mcp: McpServer, client: AimeatClient): void {
       const config = loadConfig();
       if (!config) return { contents: [{ uri: uri.toString(), text: 'Not configured.' }] };
       const path = join(getConfigDir(), config.agent, 'SKILL.md');
-      const text = existsSync(path) ? readFileSync(path, 'utf-8') : 'No skill bundle cached. Run: npx @aimeat/connect refresh';
+      const text = existsSync(path) ? readFileSync(path, 'utf-8') : 'No skill bundle cached. Run: npx aimeat connect refresh';
       return { contents: [{ uri: uri.toString(), text, mimeType: 'text/markdown' }] };
     },
   );

@@ -1,6 +1,9 @@
 /**
  * @file poller.ts
  * @description Background poller for new tasks and messages. Triggers agent wake-up.
+ * @structure Polls queued tasks and pending messages, compares counts, and calls the wake-up adapter on new work.
+ * @usage Started by `aimeat connect serve` after MCP server registration.
+ * @version-history v1.9.4 — 2026-05-28 — Use the name-based message inbox endpoint.
  */
 import type { AimeatClient } from '../api-client.js';
 import type { AimeatConnectConfig } from '../config.js';
@@ -24,7 +27,7 @@ export function startPoller(client: AimeatClient, config: AimeatConnectConfig): 
         lastTaskCount = tasks.length;
       }
 
-      const msgResp = await client.get('/v1/agents/me/messages/inbox');
+      const msgResp = await client.get(`/v1/agents/${enc}/messages/inbox`);
       if (msgResp.ok) {
         const messages = (msgResp.data as { messages?: unknown[] })?.messages ?? [];
         if (lastMessageCount >= 0 && messages.length > lastMessageCount) {
