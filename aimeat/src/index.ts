@@ -53,6 +53,7 @@ USAGE
   aimeat maintenance on [MSG]    Enable maintenance mode (optional message)
   aimeat maintenance off         Disable maintenance mode
   aimeat maintenance             Show maintenance status
+  aimeat connect [opts]          Connect an AI agent (device auth flow)
   aimeat seed                    Seed example packages (digital signage, etc.)
   aimeat backup  [FILE]          Export all data to JSON
   aimeat restore <FILE>          Import data from JSON backup
@@ -335,6 +336,27 @@ if (subcommand === 'config') {
       server.close();
     }
   });
+} else if (subcommand === 'connect') {
+  const connectAction = positionals[1];
+  if (connectAction === 'serve') {
+    console.log('MCP server mode is planned. Use: npx @aimeat/connect serve');
+    process.exit(1);
+  }
+  // Parse --url, --owner, --agent from raw argv (not in main parseArgs)
+  const rawArgs = process.argv.slice(2);
+  const connectFlags: Record<string, string> = {};
+  for (let i = 0; i < rawArgs.length; i++) {
+    if (rawArgs[i] === '--url' && rawArgs[i + 1]) connectFlags.url = rawArgs[++i];
+    if (rawArgs[i] === '--owner' && rawArgs[i + 1]) connectFlags.owner = rawArgs[++i];
+    if (rawArgs[i] === '--agent' && rawArgs[i + 1]) connectFlags.agent = rawArgs[++i];
+  }
+  const { runAuth } = await import('./cli/connect/auth.js');
+  await runAuth({
+    url: connectFlags.url,
+    owner: connectFlags.owner,
+    agent: connectFlags.agent,
+  });
+  process.exit(0);
 } else if (subcommand === 'seed') {
   const baseUrl = `http://localhost:${config.port}`;
   const adminPw = config.adminPassword ?? '';

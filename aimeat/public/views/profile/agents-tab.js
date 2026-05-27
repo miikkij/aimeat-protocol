@@ -111,17 +111,17 @@ const PLATFORMS = {
 <p>Windows requires WSL2. Open PowerShell as Admin:</p>
 <ol><li>Install WSL2: <code>wsl --install</code> (restart if prompted)</li>
 <li>In WSL2: <code>curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs</code></li>
-<li>Run: <code>npx @aimeat/connect</code> and follow the prompts</li></ol>
+<li>Run: <code>npx aimeat connect</code> and follow the prompts</li></ol>
 <h4>Compatible Agent Runtimes</h4>
 <p><a href="https://openclaw.ai" target="_blank">OpenClaw</a>, Claude Code, Hermes, or any MCP-capable tool.</p>`,
   mac: `<h4>Install Node.js</h4>
 <ol><li><code>brew install node</code></li>
-<li>Run: <code>npx @aimeat/connect</code> and follow the prompts</li></ol>
+<li>Run: <code>npx aimeat connect</code> and follow the prompts</li></ol>
 <h4>Compatible Agent Runtimes</h4>
 <p><a href="https://openclaw.ai" target="_blank">OpenClaw</a>, Claude Code, Hermes, or any MCP-capable tool.</p>`,
   linux: `<h4>Install Node.js</h4>
 <ol><li><code>curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs</code></li>
-<li>Run: <code>npx @aimeat/connect</code> and follow the prompts</li></ol>
+<li>Run: <code>npx aimeat connect</code> and follow the prompts</li></ol>
 <h4>Compatible Agent Runtimes</h4>
 <p><a href="https://openclaw.ai" target="_blank">OpenClaw</a>, Claude Code, Hermes, or any MCP-capable tool.</p>`,
   wsl2: `<h4>Setup WSL2 (if not already)</h4>
@@ -129,16 +129,16 @@ const PLATFORMS = {
 <li>Restart and set up your Linux username/password</li></ol>
 <h4>Install Node.js</h4>
 <ol><li><code>curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs</code></li>
-<li>Run: <code>npx @aimeat/connect</code> and follow the prompts</li></ol>`,
+<li>Run: <code>npx aimeat connect</code> and follow the prompts</li></ol>`,
   android: `<h4>Termux</h4>
 <ol><li>Install <a href="https://f-droid.org/packages/com.termux/" target="_blank">Termux from F-Droid</a></li>
 <li><code>pkg update && pkg install nodejs</code></li>
-<li>Run: <code>npx @aimeat/connect</code> and follow the prompts</li></ol>`,
+<li>Run: <code>npx aimeat connect</code> and follow the prompts</li></ol>`,
   aws: `<h4>EC2 Setup</h4>
 <ol><li>Launch an EC2 instance (t3.micro is fine)</li>
 <li>SSH in and install Node.js 22+</li>
-<li>Run: <code>npx @aimeat/connect</code></li>
-<li>Then: <code>npx @aimeat/connect serve</code> for persistent MCP server</li></ol>`,
+<li>Run: <code>npx aimeat connect</code></li>
+<li>Then: <code>npx aimeat connect serve</code> for persistent MCP server</li></ol>`,
 };
 const PLATFORM_KEYS = ['windows','mac','linux','wsl2','android','aws'];
 const PLATFORM_LABELS = { windows:'profile.platforms.windows', mac:'profile.platforms.mac', linux:'profile.platforms.linux', wsl2:'profile.platforms.wsl2', android:'profile.platforms.android', aws:'profile.platforms.aws' };
@@ -362,16 +362,16 @@ export default function AgentsTab({ session, showToast, onStats }) {
     ${connectExpanded && html`
       <div class="pf-agd-connect-content">
         <p class="mb-half text-bold">${t('profile.agents.cliInstall')}</p>
-        <div class="agent-prompt-box"><code>npx @aimeat/connect \\${'\n'}  --url ${getNodeUrl()} \\${'\n'}  --owner ${session.owner}</code></div>
+        <div class="agent-prompt-box"><code>npx aimeat connect \\${'\n'}  --url ${getNodeUrl()} \\${'\n'}  --owner ${session.owner}</code></div>
         <button class="copy-prompt-btn" onClick=${() => {
-          copyToClipboard(`npx @aimeat/connect --url ${getNodeUrl()} --owner ${session.owner}`).then(() => {
+          copyToClipboard(`npx aimeat connect --url ${getNodeUrl()} --owner ${session.owner}`).then(() => {
             setPromptCopied(true);
             setTimeout(() => setPromptCopied(false), 2000);
           });
         }}>${promptCopied ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.copyPrompt')}</button>
 
         <p class="mt-1 mb-half text-bold">${t('profile.agents.cliServe')}</p>
-        <div class="agent-prompt-box"><code>npx @aimeat/connect serve</code></div>
+        <div class="agent-prompt-box"><code>npx aimeat connect serve</code></div>
 
         <p class="mt-1 text-caption">${t('profile.agents.cliDesc')}</p>
 
