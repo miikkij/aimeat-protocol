@@ -418,6 +418,7 @@ function createSession(data) {
     ghii: data.ghii || null,
     owner: data.owner,
     gaii: data.gaii || null,
+    identity: data.gaii || data.ghii || null,
     jwt: data.jwt,
     roles: jwtPayload?.roles || data.roles || [],
     displayName: data.displayName || '',
@@ -734,6 +735,7 @@ const auth = {
           owner: null,
           gaii: null,
           ghii: null,
+          identity: null,
           get valid() { return jwt && !isExpired(jwt); },
           async fetch(path, opts = {}) {
             const url = effectiveNodeUrl + path;
@@ -748,6 +750,7 @@ const auth = {
         if (payload) {
           session.gaii = payload.sub || null;
           session.owner = payload.owner || null;
+          session.identity = session.gaii || session.ghii || null;
         }
 
         currentSession = session;
