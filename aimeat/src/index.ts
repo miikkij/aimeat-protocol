@@ -54,6 +54,14 @@ USAGE
   aimeat maintenance off         Disable maintenance mode
   aimeat maintenance             Show maintenance status
   aimeat connect [opts]          Connect an AI agent (device auth flow)
+  aimeat connect serve           Start MCP server for connected agent
+  aimeat connect status          Show agent connection status
+  aimeat connect inbox           Check message inbox
+  aimeat connect tasks           List assigned tasks
+  aimeat connect send [opts]     Send a message (--to GAII --body "text")
+  aimeat connect docs [module]   View agent handbook / module docs
+  aimeat connect refresh         Re-download skill bundle
+  aimeat connect logout          Remove stored credentials
   aimeat seed                    Seed example packages (digital signage, etc.)
   aimeat backup  [FILE]          Export all data to JSON
   aimeat restore <FILE>          Import data from JSON backup
@@ -338,24 +346,62 @@ if (subcommand === 'config') {
   });
 } else if (subcommand === 'connect') {
   const connectAction = positionals[1];
-  if (connectAction === 'serve') {
-    console.log('MCP server mode is planned. Use: npx @aimeat/connect serve');
-    process.exit(1);
-  }
-  // Parse --url, --owner, --agent from raw argv (not in main parseArgs)
+  // Parse --url, --owner, --agent, --to, --body from raw argv
   const rawArgs = process.argv.slice(2);
   const connectFlags: Record<string, string> = {};
   for (let i = 0; i < rawArgs.length; i++) {
-    if (rawArgs[i] === '--url' && rawArgs[i + 1]) connectFlags.url = rawArgs[++i];
-    if (rawArgs[i] === '--owner' && rawArgs[i + 1]) connectFlags.owner = rawArgs[++i];
-    if (rawArgs[i] === '--agent' && rawArgs[i + 1]) connectFlags.agent = rawArgs[++i];
+    if (rawArgs[i].startsWith('--') && rawArgs[i + 1] && !rawArgs[i + 1].startsWith('--')) {
+      connectFlags[rawArgs[i].slice(2)] = rawArgs[++i];
+    }
   }
-  const { runAuth } = await import('./cli/connect/auth.js');
-  await runAuth({
-    url: connectFlags.url,
-    owner: connectFlags.owner,
-    agent: connectFlags.agent,
-  });
+
+  if (connectAction === 'serve') {
+    const { runServe } = await import('./cli/connect/mcp/server.js');
+    await runServe(connectFlags);
+  } else if (connectAction === 'inbox') {
+    const { runInbox } = await import('./cli/connect/inbox.js');
+    await runInbox();
+  } else if (connectAction === 'tasks') {
+    const { runTasks } = await import('./cli/connect/tasks.js');
+    await runTasks();
+  } else if (connectAction === 'send') {
+    const { runSend } = await import('./cli/connect/send.js');
+    await runSend(connectFlags);
+  } else if (connectAction === 'status' || connectAction === 'whoami') {
+    const { runStatus } = await import('./cli/connect/status.js');
+    await runStatus();
+  } else if (connectAction === 'docs') {
+    const { runDocs } = await import('./cli/connect/docs.js');
+    await runDocs(positionals[2]);
+  } else if (connectAction === 'refresh') {
+    const { AimeatClient } = await import('./cli/connect/api-client.js');
+    const { downloadSkillBundle } = await import('./cli/connect/skill-bundle.js');
+    const { loadConfig, getConfigDir } = await import('./cli/connect/config.js');
+    const cfg = loadConfig();
+    if (!cfg) { console.error('Not configured. Run: aimeat connect'); process.exit(1); }
+    const cl = await AimeatClient.fromConfig();
+    await downloadSkillBundle(cl, cfg.agent);
+    console.log(`Skill bundle refreshed at ${getConfigDir()}/${cfg.agent}/`);
+  } else if (connectAction === 'logout') {
+    const { deleteToken } = await import('./cli/connect/keychain.js');
+    const { loadConfig } = await import('./cli/connect/config.js');
+    const cfg = loadConfig();
+    if (cfg) { await deleteToken(cfg.agent, cfg.owner); console.log('Credentials removed.'); }
+    else console.log('Not configured.');
+  } else if (connectAction === 'config') {
+    const { loadConfig, getConfigDir } = await import('./cli/connect/config.js');
+    const c = loadConfig();
+    if (c) console.log(JSON.stringify(c, null, 2));
+    else console.log(`No config found. Expected at: ${getConfigDir()}/config.yaml`);
+  } else {
+    // Default: run auth
+    const { runAuth } = await import('./cli/connect/auth.js');
+    await runAuth({
+      url: connectFlags.url,
+      owner: connectFlags.owner,
+      agent: connectFlags.agent,
+    });
+  }
   process.exit(0);
 } else if (subcommand === 'seed') {
   const baseUrl = `http://localhost:${config.port}`;
