@@ -44,7 +44,12 @@ const storage = {
       mime_type = opts?.mime_type || file.type || 'application/octet-stream';
       visibility = opts?.visibility || 'private';
       const buf = await file.arrayBuffer();
-      data = btoa(String.fromCharCode(...new Uint8Array(buf)));
+      const bytes = new Uint8Array(buf);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 8192) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+      }
+      data = btoa(binary);
     } else if (typeof fileOrData === 'string') {
       // Assume base64
       key = opts?.key || ('file-' + Date.now());
