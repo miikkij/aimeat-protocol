@@ -178,7 +178,7 @@ The `aimeat/src/` directory follows a strict separation of concerns:
 
 **Services** (`src/services/`, 60 files) contain all business logic. They are pure functions or classes that operate on data, perform calculations, and orchestrate storage operations. Services are framework-agnostic and testable in isolation.
 
-**Storage** (`src/storage/`) provides the data access layer. The `interface.ts` file defines the `Storage` interface with 40+ methods. Three implementations exist: in-memory, SQLite, and MongoDB. The repository pattern (`src/storage/repositories/`, 38 files) provides domain-specific data access abstractions.
+**Storage** (`src/storage/`) provides the data access layer. The `interface.ts` file defines the `Storage` interface with 40+ methods. Two production implementations exist: SQLite (for personal nodes and local development; supports `:memory:` for true in-RAM speed using the real SQL code path) and MongoDB (for production deployments). A legacy in-memory backend also exists but is deprecated and should not be relied on for verification. The repository pattern (`src/storage/repositories/`, 38 files) provides domain-specific data access abstractions.
 
 **Auth** (`src/auth/`) manages Ed25519 keypair generation, JWT creation/validation, and authentication middleware. The `requireAuth()` and `requireRole()` middleware functions gate route access.
 

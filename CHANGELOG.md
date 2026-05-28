@@ -2,6 +2,100 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.10.0] - 2026-05-28
+
+Headline: a single `aimeat connect` CLI that any AI runtime can use to attach
+to a node in seconds, plus onboarding that no longer lets agents lie about
+being "done" -- they must publish commands and config before the system agrees
+they are finished.
+
+### Added
+
+#### AIMEAT Connect CLI + MCP Server
+- **`aimeat connect` subcommand in the main CLI** -- previously a separate `@aimeat/connect` package, now merged into the canonical `aimeat` binary so a global `aimeat` install gives every AI runtime the same toolset (`6bb7b06`, `46fecd5`, `322163e`).
+- **RFC 8628 device-authorization flow** -- non-interactive `aimeat connect --url <node> --owner <name> [--agent <name>]` requests a device code, polls for owner approval, stores the issued token, downloads the runtime-specific skill bundle, and prints a paste-ready Hello Integration instruction.
+- **`aimeat connect serve` MCP server** -- stdio-attached MCP server registering ~41 AIMEAT tools (handbook, onboarding, capabilities, tasks, telemetry, messages, memory, work queue, wallet, boards, knowledge, storage, admin) with background poller that wakes the agent via shell command or webhook when new tasks/messages arrive.
+- **Shell fallback for non-MCP runtimes** -- `aimeat connect tools` lists every tool, `aimeat connect schema <tool>` returns its input schema, `aimeat connect call <tool> --json '<input>'` invokes it. For CLI-only or shell-driven agents where MCP stdio cannot attach, every Hello Integration step is reachable via one-shot commands.
+- **Token keychain** -- file-based credential store at `~/.aimeat/tokens/{agent}@{owner}.token` with `mode 0600`; config at `~/.aimeat/config.yaml`; skill bundle extracted to `~/.aimeat/{agent}/` with proper Zip-Slip defenses (100 file cap, 20 MB total cap, 5 MB per-file cap, path-traversal rejection).
+- **Runtime-specific skill bundles** -- generic adapter (default) and Hermes adapter ship a `SKILL.md` + `BUNDLE.md` + `references/` tree appropriate for each platform. Post-connect output documents both the MCP stdio path (Option A) and the shell fallback path (Option B), so agents that cannot do stdio still know how to onboard.
+- **`aimeat connect status`, `inbox`, `tasks`, `send`, `docs`, `refresh`** -- one-shot operational subcommands for diagnosing the connection, polling inbox, listing tasks, sending messages, fetching docs, and refreshing the skill bundle.
+
+#### Hello Integration Tightening (post-onboarding gating)
+- **`publish_commands` onboarding step (required)** -- onboarding stays `in_progress` until the agent writes a non-empty `agents.{name}.commands` memory entry shaped as `[{ name, description, category }, ...]`. The validator rejects empty arrays and missing-field entries, so agents cannot stub out the SKILL.md "After Onboarding" instruction.
+- **`publish_config` onboarding step (required)** -- same gating for runtime/config descriptors: at least one `agents.config.{name}.*` memory entry must exist (e.g. `agents.config.{name}.connector`). Agents that only run `aimeat connect serve` describe that accurately; no invented watchdog files.
+- **`post_onboarding_checklist` in `GET /onboarding`** -- response now includes `{ commands_registered, config_published, shared_tags_in_use, knowledge_packages_published }`. `shared_tags_in_use` is `null` when the owner has not assigned shared tag areas (not applicable); the other three are booleans. Stays visible after `status` flips to `completed` so the signal does not disappear once Hello Integration finishes.
+- **Auto-validation on POST step** -- POSTing the last manual step now also re-runs `checkAutoSteps()` against all auto-validatable steps before evaluating `allRequiredPassed`. Previously the agent had to do an extra `GET /onboarding` to trigger memory-backed step validation; POST and GET now behave symmetrically.
+- **Post-Onboarding Setup panel in Integration tab** -- new UI section between Readiness and Identity showing the four checklist items as labeled rows with status dots, so the owner can see at a glance that commands are registered and config is published.
+
+#### `/v1/agents/me/*` Universal Alias
+- **Path rewriter middleware** -- `agentMeAliasMiddleware` resolves `/v1/agents/me/...` to `/v1/agents/{agentName}/...` based on the authenticated agent's JWT (handbook routes are excluded because they intentionally serve the literal `me`). The tier-1 handbook tells agents "all agent URLs use /v1/agents/me/ which resolves to your name", and that promise is now true for every route, not only handbook.
+
+#### Agent Languages Capability
+- **`languages: string[]` as a first-class agent field** -- BCP-47 short codes stored separately from `domainCapabilities` instead of being concatenated as `"Language: xx"` strings. Persisted in SQLite (`languages` column) and MongoDB (`languages Json?` column on `agent`). PUT/GET capabilities responses return `languages` as its own array. UI renders language chips from this field, with backward compatibility for older agents whose languages still live inside `domainCapabilities`.
+
+#### Tier-1 Module Expansion
+- **Three new tier-1 modules** -- `appdev`, `collaboration`, `mcp` added to the loadable module catalogue. Agents can now fetch operational knowledge for app development, multi-agent coordination, and MCP attachment incrementally instead of via the monolithic tier-1 prompt.
+- **`appdev` module best practices** -- iterated from real agent feedback during early-access pilots; starter template embedded directly in the module instead of fetched separately.
+
+#### Public Knowledge Viewer
+- **Browser-side public knowledge browser** -- new view for browsing, searching, and rendering knowledge entries with no auth required, so visitors can read public packages before signing up.
+
+### Fixed
+
+#### Hello Integration Friction Points
+- **Telemetry counted in Activity stats** -- POST `/v1/agents/:name/telemetry` now calls `recordTelemetryEvent()` which bumps the daily `telemetry_events` counter and (for `llm_call` events with `tokens_in`/`tokens_out`/`tokens_used` data) accumulates into `tokensUsed30d` and `aiCalls30d`. Activity tab no longer shows zeros when telemetry is actively being reported.
+- **Telemetry UI field name** -- profile activity tab read `telResp.data.entries` but the route returns `telResp.data.events`; the `entries` lookup always came up empty so "Telemetry events today" was permanently `0`. Fixed to read `events` (with `entries` fallback for older deployments).
+- **Telemetry token extraction** -- UI now reads tokens from `event.data.tokens_used` (or `tokens_in + tokens_out`) instead of `event.tokens_used`, matching the actual telemetry storage shape.
+- **Capabilities `type` enum exposed in MCP schema** -- `aimeat_agent_capabilities_report` MCP tool now declares `technical[].type` as `z.enum(['mcp', 'skill', 'tool'])` instead of `z.string()`. Agents that previously had to guess and retry on `INVALID_INPUT` now see the constraint in the schema.
+- **Languages no longer mutated into domain capabilities** -- PUT capabilities used to concatenate `["en", "fi"]` as `"Language: en"`, `"Language: fi"` strings into `domainCapabilities`. The languages array is now preserved verbatim in a dedicated field, returned as `languages` by GET, and rendered as a separate language chip group by the UI.
+- **Handbook response deduplication** -- `GET /v1/agents/me/handbook` no longer returns both `content` and `system_prompt` with identical text. Only `system_prompt` is returned now; agents and clients that read `content` should switch to `system_prompt`.
+- **Optional steps marked `skipped` on auto-complete** -- when onboarding auto-completes via "all required passed", untouched optional steps (like `declare_services`) now transition from `pending` to `skipped`, so a completed onboarding does not visually still show pending work.
+- **`/v1/agents/me/tasks/*` actually works** -- previously only `/v1/agents/me/handbook` resolved the `me` alias; task PATCH/POST routes 404'd. The new path rewriter middleware makes the alias universal (handbook excluded as a literal).
+- **Onboarding hint uses real agent name** -- `agentOnboarding.routeHint` now says `PATCH /v1/agents/{actualName}/tasks/{id}` instead of the broken `/me/` reference. (Both work post-rewriter, but the hint is now accurate for owner sessions too.)
+
+#### Connector / CLI Robustness
+- **Poller tracks task and message IDs, not counts** -- background poller in `aimeat connect serve` now diffs ID sets between polls; an interleaved task complete + new task arrival in the same window no longer goes silent (was missed by the old `tasks.length > lastTaskCount` heuristic).
+- **Poller uses recursive `setTimeout` instead of `setInterval`** -- prevents overlapping polls if a single round trip slows.
+- **Poller stops on stale token** -- `UNAUTHORIZED`, `INVALID_TOKEN`, `TOKEN_EXPIRED`, `FORBIDDEN` envelope codes now stop the poller with a clear `Run: aimeat connect` instruction instead of spinning silently.
+- **Wake command security warning** -- `wake.command` in `config.yaml` is executed via `child_process.exec`. The CLI's connector now documents this loudly in both the type definition and the runtime adapter so users do not paste untrusted configs.
+
+#### Storage & Data
+- **MongoDB `toAgentRecord()` deserializes `languages`** -- field was being written by Prisma but stripped from the read path, so PUT capabilities looked like a no-op for languages on MongoDB until the deserializer was fixed.
+- **SQLite cascade delete table name** -- corrected `webhook_delivery_logs` (was `webhookDeliveryLog`); orphaned rows on agent deletion are gone.
+- **Storage chunked base64 conversion** -- 64 KB file uploads via `lib-storage.ts` no longer overflow the JavaScript stack; conversion now chunks the binary instead of `String.fromCharCode(...spread)`-ing the whole buffer.
+- **Body parsing limit for `/v1/storage`** -- middleware extended to accept larger payloads for direct file uploads via the storage endpoint.
+
+#### UI
+- **Delivery method label honest about polling** -- Integration tab's "Delivery method" row used to show "● Webhook" with a green dot whenever a webhook record existed, even if `webhook.url` was empty. It now checks the URL and shows "● Polling" (gray dot) when no URL is configured. The Edit/Test webhook buttons remain so the owner can still add a URL.
+- **Today's Governance counts task lifecycle events** -- Activity tab's tasks-today filter used to require the event `type` to contain the substring `"task"` or `"todo"`, but task lifecycle events emit types like `"completed"` and `"progress"` that have neither. The categorizer now keys off `event.taskId` instead, so completed tasks count.
+- **Agent card language chips render from `languages` field** -- previously the `Language: xx` chips came from the polluted `domainCapabilities` array; now they read from the dedicated `languages` array with a fallback for legacy entries.
+
+#### Data Access / Generator
+- **`data.get()` public fallback** -- the lib's `data.get(key)` now falls back to a public read from the app's creator when the caller has no private entry, with the bare-username case appending `nodeId` correctly and the empty-`{}` value also triggering fallback (was failing silently).
+- **`GET /v1/memory/:key` no longer auto-creates** -- previously a 404 on read would side-effect a new empty entry; the auto-create was removed so missing keys stay missing.
+- **App-builder starter template embedded in `appdev` module** -- no more external fetch at module load.
+
+### Changed
+
+#### Testing Policy (CLAUDE.md Rule 1 and 1b rewrite)
+- **In-memory backend deprecated** -- `pnpm test:e2e` and `pnpm test:e2e:memory` are no longer the recommended verification path. SQLite (with `AIMEAT_DB_PATH=:memory:` for true in-RAM speed) covers the fast-iteration role using the real production code path. The `.env.test.memory` env file may not even exist in the repo.
+- **Scoped suites by default** -- documented in CLAUDE.md and `docs/coding-guidelines/testing-requirements.md`: run only the suites the change can plausibly affect via `pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=<suite>`. Full sweep on both persistent backends only at the end of a multi-step plan or before a PR.
+- **Pre-existing failure protocol** -- when an unrelated suite fails, verify it pre-exists on `main` (e.g. `git stash`) and report as pre-existing; do not fix as part of the current work.
+
+#### Skill Bundle Documentation
+- **Onboarding instruction extracted to a shared module** -- the long Hello Integration paste-into-agent text used to be duplicated across `cli/connect/auth.ts` and `cli/connect/skill-bundle.ts`. Now lives in `cli/connect/onboarding-prompt.ts` as a single source of truth that both consumers import.
+- **Post-connect output documents both MCP and shell paths** -- the terminal output after a successful `aimeat connect` now explains Option A (MCP stdio, for runtimes that can attach) and Option B (shell fallback via `aimeat connect call`, for runtimes that cannot). Eliminates the "agent stares at `aimeat connect serve` blocking forever" failure mode.
+- **BUNDLE.md compatibility guide uses the canonical tool sequence** -- the fallback BUNDLE.md generator now pulls the Hello Integration MCP tool list from `HELLO_INTEGRATION_TOOL_SEQUENCE`, so drift between the generated bundle and the auth-time instruction is impossible.
+
+#### Agent Sessions
+- **Auth lib `session.identity`** -- unified field returns GAII for agents and GHII for owners, so libs do not need to handle `session.gaii` vs `session.ghii` separately.
+- **Cortex `myGaii()` falls through identity sources** -- returns `s.gaii ?? s.ghii ?? s.identity ?? null` so owner sessions get a usable identifier.
+
+### Documentation
+- **Audit report on Connect work** -- internal audit of the GPT-5.5-built Connect system documented findings F1-F7 and the A+C onboarding-gating proposal; all findings closed in this release.
+- **Three end-to-end simulation runs** -- assistant, scout, and ranger agent simulations verified Hello Integration end-to-end through the CLI shell fallback; final ranger run validated the publish-gating works (onboarding stayed `in_progress` until the agent wrote `agents.{name}.commands` and `agents.config.{name}.*` memory entries).
+- **CLAUDE.md updates** -- Rule 1 and Rule 1b rewritten for SQLite-default + scoped-suites testing policy; testing-requirements.md updated to match.
+
 ## [1.9.0] - 2026-05-25
 
 ### Added

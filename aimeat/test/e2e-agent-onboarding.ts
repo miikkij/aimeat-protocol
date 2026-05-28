@@ -155,7 +155,7 @@ await test('2. POST start returns in_progress with 11 steps', async () => {
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     const ob = body.data.onboarding;
     assert(ob.status === 'in_progress', `expected in_progress, got ${ob.status}`);
-    assert(ob.steps.length === 11, `expected 11 steps, got ${ob.steps.length}`);
+    assert(ob.steps.length === 13, `expected 13 steps, got ${ob.steps.length}`);
 
     // First step (authenticate) should already be passed
     const authStep = ob.steps[0];
@@ -330,7 +330,7 @@ await test('14. POST start to get a fresh onboarding with test task', async () =
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     const ob = body.data.onboarding;
     assert(ob.status === 'in_progress', `expected in_progress, got ${ob.status}`);
-    assert(ob.steps.length === 11, `expected 11 steps, got ${ob.steps.length}`);
+    assert(ob.steps.length === 13, `expected 13 steps, got ${ob.steps.length}`);
 
     // Extract the test task ID from step 9 (accept_test_task)
     const taskStep = ob.steps.find((s: any) => s.id === 'accept_test_task');
@@ -527,6 +527,29 @@ await test('25. Step 10: complete_test_task -- triggers auto-complete with all s
     assert(completeStatus === 200, `POST complete status ${completeStatus}: ${JSON.stringify(completeBody)}`);
     assert(completeBody.data.task.status === 'done', `expected done, got ${completeBody.data.task.status}`);
 
+    // Required post-onboarding setup: publish_commands + publish_config now gate auto-complete.
+    // Write the memory entries so the validators pass.
+    const { status: cmdStatus } = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({
+            key: `agents.${agentName}.commands`,
+            value: [{ name: '/help', description: 'List commands', category: 'meta' }],
+            visibility: 'owner',
+        }),
+    });
+    assert(cmdStatus === 201 || cmdStatus === 200, `POST commands memory status ${cmdStatus}`);
+    const { status: cfgStatus } = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({
+            key: `agents.config.${agentName}.connector`,
+            value: { filename: 'test-connector', content: 'e2e test descriptor', platform: 'test' },
+            visibility: 'owner',
+        }),
+    });
+    assert(cfgStatus === 201 || cfgStatus === 200, `POST config memory status ${cfgStatus}`);
+
     // Now POST the step -- this is the last required step, should trigger auto-complete
     const { status, body } = await json(`/v1/agents/${agentName}/onboarding/step/complete_test_task`, {
         method: 'POST',
@@ -538,7 +561,7 @@ await test('25. Step 10: complete_test_task -- triggers auto-complete with all s
     assert(body.data.completed === true, `expected auto-complete, got completed=${body.data.completed}`);
 });
 
-await test('26. GET onboarding shows completed status after all 11 steps', async () => {
+await test('26. GET onboarding shows completed status after all steps', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/onboarding`, {
         method: 'GET',
         headers: { Authorization: `Bearer ${ownerToken}` },
@@ -547,12 +570,20 @@ await test('26. GET onboarding shows completed status after all 11 steps', async
     const ob = body.data.onboarding;
     assert(ob.status === 'completed', `expected completed, got ${ob.status}`);
 
-    // All 11 steps should be passed
+    // All 13 steps should be passed (12 required + optional declare_services filled in test 24).
     const passedSteps = ob.steps.filter((s: any) => s.status === 'passed');
-    assert(passedSteps.length === 11, `expected 11 passed steps, got ${passedSteps.length}`);
+    assert(passedSteps.length === 13, `expected 13 passed steps, got ${passedSteps.length}`);
 
     // completedAt should be set
     assert(typeof ob.completedAt === 'string', `completedAt should be set, got ${ob.completedAt}`);
+
+    // post_onboarding_checklist is included alongside onboarding
+    const checklist = body.data.post_onboarding_checklist;
+    assert(checklist, 'post_onboarding_checklist present');
+    assert(checklist.commands_registered === true, `commands_registered should be true, got ${checklist.commands_registered}`);
+    assert(checklist.config_published === true, `config_published should be true, got ${checklist.config_published}`);
+    assert(checklist.shared_tags_in_use === null, `shared_tags_in_use null when owner has not assigned tags, got ${checklist.shared_tags_in_use}`);
+    assert(checklist.knowledge_packages_published === false, `knowledge_packages_published false (none authored), got ${checklist.knowledge_packages_published}`);
 });
 
 // ─── Phase 8: Readiness score tests ───
@@ -749,6 +780,26 @@ await test('35. Provision server state for auto-checkable steps (no POST step ye
         body: JSON.stringify({ message: 'Auto-check task done' }),
     });
     assert(doneStatus === 200, `POST task complete failed: ${doneStatus}`);
+
+    // Write the commands + config memory keys so publish_commands and publish_config auto-pass.
+    await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agent2Token}` },
+        body: JSON.stringify({
+            key: `agents.${agent2Name}.commands`,
+            value: [{ name: '/ping', description: 'Auto-check ping', category: 'meta' }],
+            visibility: 'owner',
+        }),
+    });
+    await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agent2Token}` },
+        body: JSON.stringify({
+            key: `agents.config.${agent2Name}.connector`,
+            value: { filename: 'auto-check', content: 'auto-validate descriptor', platform: 'test' },
+            visibility: 'owner',
+        }),
+    });
 });
 
 await test('36. GET auto-validates automatic steps and completes onboarding', async () => {
@@ -766,6 +817,7 @@ await test('36. GET auto-validates automatic steps and completes onboarding', as
     const autoStepIds = [
         'report_capabilities', 'send_test_message', 'configure_delivery',
         'report_telemetry', 'accept_test_task', 'complete_test_task',
+        'publish_commands', 'publish_config',
     ];
     for (const stepId of autoStepIds) {
         const step = ob.steps.find((s: any) => s.id === stepId);

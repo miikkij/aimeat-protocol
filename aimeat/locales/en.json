@@ -12,7 +12,9 @@
     "noData": "No data available",
     "id": "ID",
     "name": "Name",
-    "add": "Add"
+    "add": "Add",
+    "yes": "Yes",
+    "no": "No"
   },
   "nav": {
     "try": "Try it",
@@ -646,6 +648,12 @@
         },
         "integration": {
           "checklistTitle": "Hello Integration",
+          "postOnboardingSetup": "Post-Onboarding Setup",
+          "commandsRegistered": "Commands registered",
+          "configPublished": "Config published",
+          "sharedTagsInUse": "Shared tags in use",
+          "knowledgePackages": "Knowledge packages",
+          "notApplicable": "Not applicable",
           "progress": "Progress",
           "rerun": "Re-run Hello Integration",
           "rerunStarted": "Hello Integration re-started",
@@ -5426,6 +5434,8 @@
       "report_telemetry": "Report Telemetry",
       "accept_test_task": "Accept Test Task",
       "complete_test_task": "Complete Test Task",
+      "publish_commands": "Publish Slash Commands",
+      "publish_config": "Publish Runtime Config",
       "declare_services": "Declare Services"
     },
     "stepDescriptions": {
@@ -5439,6 +5449,8 @@
       "report_telemetry": "At least one telemetry event with non-zero data",
       "accept_test_task": "Agent proposes todos for the test task",
       "complete_test_task": "Agent executes and completes the test task",
+      "publish_commands": "agents.{name}.commands memory has a non-empty array of { name, description, category }",
+      "publish_config": "At least one agents.config.{name}.* memory entry exists describing this runtime",
       "declare_services": "Agent declares offered services (optional)"
     },
     "errors": {

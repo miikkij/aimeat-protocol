@@ -12,7 +12,9 @@
     "noData": "Ei tietoja saatavilla",
     "id": "ID",
     "name": "Nimi",
-    "add": "Lisää"
+    "add": "Lisää",
+    "yes": "Kyllä",
+    "no": "Ei"
   },
   "nav": {
     "try": "Kokeile",
@@ -646,6 +648,12 @@
         },
         "integration": {
           "checklistTitle": "Hello-integraatio",
+          "postOnboardingSetup": "Perehdytyksen jälkeiset toimet",
+          "commandsRegistered": "Komennot rekisteröity",
+          "configPublished": "Konfiguraatio julkaistu",
+          "sharedTagsInUse": "Jaetut tagit käytössä",
+          "knowledgePackages": "Tietopaketit",
+          "notApplicable": "Ei sovellu",
           "progress": "Edistyminen",
           "rerun": "Suorita Hello-integraatio uudelleen",
           "rerunStarted": "Hello-integraatio aloitettu uudelleen",
@@ -5426,6 +5434,8 @@
       "report_telemetry": "Raportoi telemetria",
       "accept_test_task": "Hyväksy testitehtävä",
       "complete_test_task": "Suorita testitehtävä",
+      "publish_commands": "Julkaise slash-komennot",
+      "publish_config": "Julkaise runtime-konfiguraatio",
       "declare_services": "Ilmoita palvelut"
     },
     "stepDescriptions": {
@@ -5439,6 +5449,8 @@
       "report_telemetry": "Vähintään yksi telemetriatapahtuma nollasta poikkeavalla datalla",
       "accept_test_task": "Agentti ehdottaa todoja testitehtävälle",
       "complete_test_task": "Agentti suorittaa ja viimeistelee testitehtävän",
+      "publish_commands": "agents.{name}.commands -muistissa on epätyhjä { name, description, category } -taulu",
+      "publish_config": "Vähintään yksi agents.config.{name}.* -muistitietue kuvaa tätä runtimea",
       "declare_services": "Agentti ilmoittaa tarjoamansa palvelut (valinnainen)"
     },
     "errors": {

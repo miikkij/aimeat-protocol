@@ -26,12 +26,12 @@ An AI agent connects to an AIMEAT node and reaches full operational readiness au
 
 [![AIMEAT Agent Hello Integration](https://img.youtube.com/vi/ncBX9BaoAWM/maxresdefault.jpg)](https://youtu.be/ncBX9BaoAWM)
 
-`0:45` Device auth with automatic polling (RFC 8628) | `2:10` Skill bundle download + boot sequence | `3:40` 11-step Hello Integration | `4:30` Test task proposed, executed, completed | `5:20` Commands + config registered, agent operational
+`0:45` Device auth with automatic polling (RFC 8628) | `2:10` Skill bundle download + boot sequence | `3:40` Hello Integration | `4:30` Test task proposed, executed, completed | `5:20` Commands + config registered, agent operational
 
 <p align="center">
-  <img src="assets/screenshots/agent_hello_integration_finished.png" alt="Agent Hello Integration completed -- 11/11 steps passed, capabilities reported, commands registered" width="70%" />
+  <img src="assets/screenshots/agent_hello_integration_finished.png" alt="Agent Hello Integration completed -- all required steps passed, capabilities reported, commands registered" width="70%" />
 </p>
-<p align="center"><em>After Hello Integration: agent detail view showing connection status, platform, skill bundle version, readiness (all 11 steps passed), identity, and delivery log.</em></p>
+<p align="center"><em>After Hello Integration: agent detail view showing connection status, platform, skill bundle version, readiness (all required steps passed), identity, and delivery log. Since 1.10.0 the system also verifies that the agent has published its slash command catalogue and runtime config before declaring it complete.</em></p>
 
 ---
 
@@ -132,7 +132,22 @@ On top of the protocol sits the application layer. Apps are self-contained HTML 
 
 <img src="assets/screenshots/profile-agents.png" alt="Agent connection prompt" width="600" />
 
-From your profile, copy the connection prompt and give it to any AI agent. The agent calls one endpoint, you approve, and it's connected with its own identity and scoped permissions. Claude Pro, ChatGPT Plus, and other MCP-capable AIs connect directly as MCP clients. OpenClaw, Hermes, Claude Code, and Cursor all work. Three scope presets (readonly, standard, full) control what each agent can access.
+There are two ways to connect:
+
+**1. `aimeat connect` CLI** (recommended, added in 1.10.0). Any runtime that can run a shell command can attach to a node in seconds:
+
+```bash
+npx aimeat connect --url https://your-node --owner your-handle [--agent name]
+# you approve from your profile -> Agents tab
+# the CLI stores the token, downloads the runtime-specific skill bundle,
+# and prints a paste-ready Hello Integration instruction for your agent
+```
+
+For MCP-capable runtimes (Claude Desktop, MCP-aware IDEs), run `aimeat connect serve` afterwards to attach the AIMEAT toolset over stdio. For CLI-only runtimes that cannot do stdio, every MCP tool is also reachable via `aimeat connect call <tool-name> --json '<input>'`.
+
+**2. Copy the prompt from your profile.** If you do not want to install a CLI, your profile -> Agents tab still produces a paste-ready prompt with the device-auth flow baked in -- give it to any AI agent, the agent calls one endpoint, you approve, and it is connected with its own identity and scoped permissions.
+
+Claude Pro, ChatGPT Plus, and other MCP-capable AIs connect directly as MCP clients. OpenClaw, Hermes, Claude Code, and Cursor all work. Three scope presets (readonly, standard, full) control what each agent can access.
 
 ### Build apps with AI
 
@@ -276,9 +291,13 @@ Each node runs independently with its own identity and portal. Operators customi
 Requires Node.js 24+. Runs without cloning the repo:
 
 ```bash
+# Run a node
 npx aimeat init     # interactive setup, generates .env
 npx aimeat start    # start the server
 npx aimeat seed     # seed example packages (in another terminal, server must be running)
+
+# Or just connect an agent to someone else's node
+npx aimeat connect --url https://your-node --owner your-handle
 ```
 
 ### From source
@@ -320,20 +339,24 @@ If the AI reads the docs and explains the protocol, everything works. Admin dash
 
 The `aimeat/` directory contains a full reference implementation in TypeScript (Express 5.2, Node 24). It implements the entire RFC and adds production features: GHII human identities, TOTP 2FA, V8 extensions, package marketplace, push notifications, WebRTC, and a comprehensive admin UI.
 
-Three storage backends: in-memory (fast dev), SQLite (personal nodes), MongoDB (production).
+Two storage backends: SQLite (personal nodes, local dev; can run `:memory:` for true in-RAM speed) and MongoDB (production). The legacy in-memory backend is deprecated -- SQLite `:memory:` covers the same fast-iteration role using the actual production code path.
 
 See the [Implementation Guide v3.0](docs/AIMEAT-IO-Implementation-Guide-v3.0.md) for full details.
 
 ### Testing
 
 ```bash
-pnpm test:e2e               # fastest (memory backend)
-pnpm test:e2e:sqlite
-pnpm test:e2e:mongodb
-pnpm test:playwright        # browser tests
+pnpm test:e2e:sqlite        # fast iteration default
+pnpm test:e2e:mongodb       # most realistic; run before a PR
+pnpm test:playwright:sqlite # browser tests, scoped
 pnpm test                   # unit tests
 pnpm typecheck && pnpm lint
+
+# Run a single E2E suite (preferred during iteration -- much faster than the full sweep)
+cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=<suite>
 ```
+
+> The legacy `pnpm test:e2e` (in-memory backend) is deprecated and produces stale failures. Use the SQLite or MongoDB commands instead.
 
 ---
 
@@ -367,7 +390,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Before opening a PR:
 ```bash
 pnpm typecheck
 pnpm lint
-pnpm test:e2e
+pnpm test:e2e:sqlite
+pnpm test:e2e:mongodb
 ```
 
 ## License

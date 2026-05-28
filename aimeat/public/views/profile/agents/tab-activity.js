@@ -31,8 +31,14 @@ const FILTERS = [
 ];
 
 function eventCategory(event) {
+  // Task-lifecycle events come back from /activity/log with a non-empty
+  // taskId set by the route. Use that as the primary signal -- the event
+  // type itself is whatever the agent set ("progress") or the lifecycle
+  // emitted ("completed", "failed"), none of which include "task" as a
+  // substring. Fall back to type-substring checks for everything else.
+  if (event.taskId) return 'tasks';
   const type = (event.type || event.event || '').toLowerCase();
-  if (type.includes('task') || type.includes('todo')) return 'tasks';
+  if (type.includes('todo')) return 'tasks';
   if (type.includes('message') || type.includes('msg')) return 'messages';
   if (type.includes('approve') || type.includes('scope') || type.includes('permission') || type.includes('governance') || type.includes('policy') || type.includes('readiness') || type.includes('override')) return 'governance';
   return 'system';

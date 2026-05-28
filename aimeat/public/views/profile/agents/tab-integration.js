@@ -4,6 +4,9 @@
  *   during onboarding or production status (connection, platform, readiness,
  *   identity, delivery log) after completion.
  * @version-history
+ *   v1.4.0 -- 2026-05-28 -- Treat webhook with empty url as polling: status dot, label, and
+ *                            the webhook section all key off (webhook && webhook.url), not just
+ *                            the webhook object existing. A record with url="" is still polling.
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  *   v1.1.0 -- 2026-05-24 -- Fix 9 UI audit findings: pending icon, readiness score, webhook edit,
  *     strengths/gaps, last validated, roles badge, platform version, bundle update, copy install cmd
@@ -31,6 +34,7 @@ export default function TabIntegration({ agent, onboarding, session, showToast, 
   const [webhook, setWebhook] = useState(null);
   const [bundleVersion, setBundleVersion] = useState(null);
   const [deliveries, setDeliveries] = useState([]);
+  const [postChecklist, setPostChecklist] = useState(null);
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
   const [rerunning, setRerunning] = useState(false);
@@ -47,14 +51,16 @@ export default function TabIntegration({ agent, onboarding, session, showToast, 
   async function loadData() {
     setLoading(true);
     try {
-      const [whResp, sbResp, dlResp] = await Promise.all([
+      const [whResp, sbResp, dlResp, obResp] = await Promise.all([
         getWebhookConfig(agentName).catch(() => null),
         getSkillBundleVersion(agentName).catch(() => null),
         getDeliveryLog(agentName, 10).catch(() => null),
+        getOnboarding(agentName).catch(() => null),
       ]);
       setWebhook(whResp?.data || null);
       setBundleVersion(sbResp?.data || null);
       setDeliveries(dlResp?.data?.deliveries || []);
+      setPostChecklist(obResp?.data?.post_onboarding_checklist || null);
     } catch { /* silent */ }
     setLoading(false);
   }
@@ -212,7 +218,7 @@ curl -H "Authorization: Bearer <jwt>" -o skill-bundle.zip "${url}" && unzip skil
 
   const displayDeliveries = showAllDeliveries && allDeliveries ? allDeliveries : deliveries;
 
-  return renderProductionView(agent, onboarding, webhook, bundleVersion, displayDeliveries, handleTestWebhook, testing, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleShowAll, showAllDeliveries, editingWebhook, webhookDraft, setWebhookDraft, handleEditWebhook, handleSaveWebhook, handleCancelWebhook, savingWebhook, handleUpdateBundle, updatingBundle, handleCopyInstallCommand, copiedInstall, handleCopyAgentPrompt, copiedPrompt);
+  return renderProductionView(agent, onboarding, webhook, bundleVersion, displayDeliveries, handleTestWebhook, testing, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleShowAll, showAllDeliveries, editingWebhook, webhookDraft, setWebhookDraft, handleEditWebhook, handleSaveWebhook, handleCancelWebhook, savingWebhook, handleUpdateBundle, updatingBundle, handleCopyInstallCommand, copiedInstall, handleCopyAgentPrompt, copiedPrompt, postChecklist);
 }
 
 function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleCopyInstallCommand, copiedInstall, handleCopyAgentPrompt, copiedPrompt) {
@@ -279,7 +285,7 @@ function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, han
   `;
 }
 
-function renderProductionView(agent, onboarding, webhook, bundleVersion, displayDeliveries, handleTestWebhook, testing, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleShowAll, showAllDeliveries, editingWebhook, webhookDraft, setWebhookDraft, handleEditWebhook, handleSaveWebhook, handleCancelWebhook, savingWebhook, handleUpdateBundle, updatingBundle, handleCopyInstallCommand, copiedInstall, handleCopyAgentPrompt, copiedPrompt) {
+function renderProductionView(agent, onboarding, webhook, bundleVersion, displayDeliveries, handleTestWebhook, testing, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleShowAll, showAllDeliveries, editingWebhook, webhookDraft, setWebhookDraft, handleEditWebhook, handleSaveWebhook, handleCancelWebhook, savingWebhook, handleUpdateBundle, updatingBundle, handleCopyInstallCommand, copiedInstall, handleCopyAgentPrompt, copiedPrompt, postChecklist) {
   const steps = onboarding?.steps || [];
   const agentName = agent.name;
 
@@ -307,8 +313,8 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
         <div class="pf-agd-info-row">
           <span class="pf-agd-info-label">${t('profile.agents.detail.integration.deliveryMethod')}</span>
           <span class="pf-agd-info-value">
-            <span class="pf-agd-status-dot ${webhook && (webhook.failCount ?? 0) < 5 ? 'pf-agd-status-dot--active' : webhook && (webhook.failCount ?? 0) >= 5 ? 'pf-agd-status-dot--error' : 'pf-agd-status-dot--inactive'}"></span>
-            ${webhook ? t('profile.agents.detail.deliveryWebhook') : t('profile.agents.detail.deliveryPolling')}
+            <span class="pf-agd-status-dot ${(webhook && webhook.url && (webhook.failCount ?? 0) < 5) ? 'pf-agd-status-dot--active' : (webhook && webhook.url && (webhook.failCount ?? 0) >= 5) ? 'pf-agd-status-dot--error' : 'pf-agd-status-dot--inactive'}"></span>
+            ${(webhook && webhook.url) ? t('profile.agents.detail.deliveryWebhook') : t('profile.agents.detail.deliveryPolling')}
           </span>
         </div>
         ${webhook ? html`
@@ -433,6 +439,43 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
           </button>
         </div>
       </div>
+
+      <!-- POST-ONBOARDING SETUP -->
+      ${postChecklist && html`
+        <div class="pf-agd-section">
+          <div class="pf-agd-section-label">${t('profile.agents.detail.integration.postOnboardingSetup')}</div>
+          <div class="pf-agd-info-row">
+            <span class="pf-agd-info-label">${t('profile.agents.detail.integration.commandsRegistered')}</span>
+            <span class="pf-agd-info-value">
+              <span class="pf-agd-status-dot ${postChecklist.commands_registered ? 'pf-agd-status-dot--active' : 'pf-agd-status-dot--inactive'}"></span>
+              ${postChecklist.commands_registered ? t('common.yes') : t('common.no')}
+            </span>
+          </div>
+          <div class="pf-agd-info-row">
+            <span class="pf-agd-info-label">${t('profile.agents.detail.integration.configPublished')}</span>
+            <span class="pf-agd-info-value">
+              <span class="pf-agd-status-dot ${postChecklist.config_published ? 'pf-agd-status-dot--active' : 'pf-agd-status-dot--inactive'}"></span>
+              ${postChecklist.config_published ? t('common.yes') : t('common.no')}
+            </span>
+          </div>
+          <div class="pf-agd-info-row">
+            <span class="pf-agd-info-label">${t('profile.agents.detail.integration.sharedTagsInUse')}</span>
+            <span class="pf-agd-info-value">
+              ${postChecklist.shared_tags_in_use === null
+                ? html`<span class="pf-agd-status-dot pf-agd-status-dot--inactive"></span> ${t('profile.agents.detail.integration.notApplicable')}`
+                : html`<span class="pf-agd-status-dot ${postChecklist.shared_tags_in_use ? 'pf-agd-status-dot--active' : 'pf-agd-status-dot--inactive'}"></span> ${postChecklist.shared_tags_in_use ? t('common.yes') : t('common.no')}`
+              }
+            </span>
+          </div>
+          <div class="pf-agd-info-row">
+            <span class="pf-agd-info-label">${t('profile.agents.detail.integration.knowledgePackages')}</span>
+            <span class="pf-agd-info-value">
+              <span class="pf-agd-status-dot ${postChecklist.knowledge_packages_published ? 'pf-agd-status-dot--active' : 'pf-agd-status-dot--inactive'}"></span>
+              ${postChecklist.knowledge_packages_published ? t('common.yes') : t('common.no')}
+            </span>
+          </div>
+        </div>
+      `}
 
       <!-- IDENTITY -->
       <div class="pf-agd-section">

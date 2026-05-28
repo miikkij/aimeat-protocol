@@ -3,11 +3,16 @@
  * @description Onboarding step definitions and Zod validation schemas for
  *   Hello Integration step confirmation payloads.
  * @structure
- *   - ONBOARDING_STEPS -- constant array defining all 11 steps
+ *   - ONBOARDING_STEPS -- constant array defining all onboarding steps
  *   - Step-specific confirmation schemas (IdentifyPlatformSchema, etc.)
  *   - createDefaultSteps() -- factory for fresh onboarding step list
  * @version-history
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Integration Phase B
+ *   v1.1.0 -- 2026-05-28 -- Add publish_commands + publish_config as required
+ *                            post-onboarding steps (machine-validated by reading
+ *                            agents.{name}.commands and agents.config.{name}.*
+ *                            memory). Closes the gap where agents skipped the
+ *                            "After Onboarding" SKILL.md section.
  */
 
 import { z } from 'zod';
@@ -24,6 +29,8 @@ export const ONBOARDING_STEP_IDS = [
   'report_telemetry',
   'accept_test_task',
   'complete_test_task',
+  'publish_commands',
+  'publish_config',
   'declare_services',
 ] as const;
 
@@ -51,6 +58,8 @@ const STEP_DESCRIPTIONS: Record<string, string> = {
   report_telemetry: 'agentOnboarding.stepDescriptions.report_telemetry',
   accept_test_task: 'agentOnboarding.stepDescriptions.accept_test_task',
   complete_test_task: 'agentOnboarding.stepDescriptions.complete_test_task',
+  publish_commands: 'agentOnboarding.stepDescriptions.publish_commands',
+  publish_config: 'agentOnboarding.stepDescriptions.publish_config',
   declare_services: 'agentOnboarding.stepDescriptions.declare_services',
 };
 
@@ -65,7 +74,9 @@ const STEP_DEFINITIONS: StepDefinition[] = [
   { id: 'report_telemetry', order: 8, title: 'Report Telemetry', description: STEP_DESCRIPTIONS.report_telemetry, required: true, validationMethod: 'automatic' },
   { id: 'accept_test_task', order: 9, title: 'Accept Test Task', description: STEP_DESCRIPTIONS.accept_test_task, required: true, validationMethod: 'automatic' },
   { id: 'complete_test_task', order: 10, title: 'Complete Test Task', description: STEP_DESCRIPTIONS.complete_test_task, required: true, validationMethod: 'automatic' },
-  { id: 'declare_services', order: 11, title: 'Declare Services', description: STEP_DESCRIPTIONS.declare_services, required: false, validationMethod: 'api_call' },
+  { id: 'publish_commands', order: 11, title: 'Publish Slash Commands', description: STEP_DESCRIPTIONS.publish_commands, required: true, validationMethod: 'automatic' },
+  { id: 'publish_config', order: 12, title: 'Publish Runtime Config', description: STEP_DESCRIPTIONS.publish_config, required: true, validationMethod: 'automatic' },
+  { id: 'declare_services', order: 13, title: 'Declare Services', description: STEP_DESCRIPTIONS.declare_services, required: false, validationMethod: 'api_call' },
 ];
 
 export function createDefaultSteps(): AgentOnboardingStep[] {

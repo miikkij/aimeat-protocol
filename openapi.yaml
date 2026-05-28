@@ -17660,7 +17660,46 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/AgentOnboardingRecord'
+                        type: object
+                        properties:
+                          onboarding:
+                            $ref: '#/components/schemas/AgentOnboardingRecord'
+                          hints:
+                            type: object
+                            description: |
+                              Next-step guidance for the agent. May include
+                              `next_step` (step id), `message` (human-readable),
+                              `test_task_id`, `test_task_active`.
+                            additionalProperties: true
+                          post_onboarding_checklist:
+                            type: object
+                            description: |
+                              Machine-readable status of the SKILL.md "After Onboarding"
+                              items. Stays visible after onboarding completes so the
+                              signal does not disappear. `shared_tags_in_use` is null when
+                              the owner has not assigned shared tag areas to this agent
+                              (not applicable).
+                            properties:
+                              commands_registered:
+                                type: boolean
+                                description: agents.{name}.commands memory exists with non-empty array
+                              config_published:
+                                type: boolean
+                                description: at least one agents.config.{name}.* memory entry exists
+                              shared_tags_in_use:
+                                type: boolean
+                                nullable: true
+                                description: null when owner has not assigned shared tags
+                              knowledge_packages_published:
+                                type: boolean
+                                description: at least one knowledge package authored by this agent exists
+                            required:
+                              - commands_registered
+                              - config_published
+                              - shared_tags_in_use
+                              - knowledge_packages_published
+                        required:
+                          - onboarding
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -17764,6 +17803,8 @@ paths:
               - report_telemetry
               - accept_test_task
               - complete_test_task
+              - publish_commands
+              - publish_config
               - declare_services
           description: Onboarding step identifier
       requestBody:

@@ -8,11 +8,15 @@
  *   - checkAutoSteps(agentGaii, onboarding, storage) -- checks all auto-validatable steps
  * @version-history
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Integration Phase B
+ *   v1.1.0 -- 2026-05-28 -- Add validators for publish_commands and publish_config
+ *                            (machine-validated by reading agents.{name}.commands and
+ *                            agents.config.{name}.* memory keys).
  */
 
 import type { Storage, AgentOnboardingRecord, AgentOnboardingStep } from '../storage/interface.js';
 import type { OnboardingStepId } from '../models/agent-onboarding-schemas.js';
 import { STEP_SCHEMAS } from '../models/agent-onboarding-schemas.js';
+import { parseGaiiLoose } from '../utils/gaii.js';
 
 export interface StepValidationResult {
   passed: boolean;
@@ -48,6 +52,10 @@ export async function validateStep(
       return validateAcceptTestTask(agentGaii, storage);
     case 'complete_test_task':
       return validateCompleteTestTask(agentGaii, storage);
+    case 'publish_commands':
+      return validatePublishCommands(agentGaii, storage);
+    case 'publish_config':
+      return validatePublishConfig(agentGaii, storage);
     case 'declare_services':
       return validateDeclareServices(body);
     default:
@@ -192,6 +200,76 @@ async function validateCompleteTestTask(agentGaii: string, storage: Storage): Pr
   };
 }
 
+/**
+ * publish_commands passes when the agent has written a non-empty
+ * `agents.{agentName}.commands` memory entry. Validates the entry exists, has
+ * an array value, and at least one entry has the required `{ name, description, category }`
+ * shape -- agents that just write `[]` to silence the check fail validation.
+ */
+async function validatePublishCommands(agentGaii: string, storage: Storage): Promise<StepValidationResult> {
+  const agentName = parseGaiiLoose(agentGaii).agent;
+  const key = `agents.${agentName}.commands`;
+  const record = await storage.getMemory(agentGaii, key);
+  if (!record) {
+    return {
+      passed: false,
+      validationMethod: 'automatic',
+      details: { key, found: false },
+      failureReason: `Write your owner-facing slash command catalogue to ${key} as a flat array of { name, description, category } before onboarding can complete. See SKILL.md "After Onboarding".`,
+    };
+  }
+  const value = record.value;
+  if (!Array.isArray(value) || value.length === 0) {
+    return {
+      passed: false,
+      validationMethod: 'automatic',
+      details: { key, found: true, type: typeof value, length: Array.isArray(value) ? value.length : null },
+      failureReason: `${key} must be a non-empty array of { name, description, category }. Empty arrays do not count.`,
+    };
+  }
+  const shaped = value.some(v =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      && typeof (v as Record<string, unknown>).name === 'string'
+      && typeof (v as Record<string, unknown>).description === 'string',
+  );
+  if (!shaped) {
+    return {
+      passed: false,
+      validationMethod: 'automatic',
+      details: { key, found: true, length: value.length, shapeOk: false },
+      failureReason: `${key} entries must include name and description fields.`,
+    };
+  }
+  return {
+    passed: true,
+    validationMethod: 'automatic',
+    details: { key, count: value.length },
+  };
+}
+
+/**
+ * publish_config passes when the agent has written at least one
+ * `agents.config.{agentName}.*` memory entry describing how this runtime is set up.
+ */
+async function validatePublishConfig(agentGaii: string, storage: Storage): Promise<StepValidationResult> {
+  const agentName = parseGaiiLoose(agentGaii).agent;
+  const prefix = `agents.config.${agentName}.`;
+  const records = await storage.listMemory(agentGaii, { prefix });
+  if (records.length === 0) {
+    return {
+      passed: false,
+      validationMethod: 'automatic',
+      details: { prefix, found: 0 },
+      failureReason: `Publish at least one runtime/config descriptor under ${prefix}* (e.g. ${prefix}connector) before onboarding can complete. If your setup only uses "aimeat connect serve", describe that accurately.`,
+    };
+  }
+  return {
+    passed: true,
+    validationMethod: 'automatic',
+    details: { prefix, count: records.length, keys: records.map(r => r.key) },
+  };
+}
+
 function validateDeclareServices(body?: Record<string, unknown>): StepValidationResult {
   const schema = STEP_SCHEMAS.declare_services!;
   const result = schema.safeParse(body ?? { services: [] });
@@ -213,6 +291,7 @@ export async function checkAutoSteps(
   const autoStepIds: OnboardingStepId[] = [
     'authenticate', 'report_capabilities', 'read_directives', 'send_test_message',
     'configure_delivery', 'report_telemetry', 'accept_test_task', 'complete_test_task',
+    'publish_commands', 'publish_config',
   ];
 
   const updatedSteps = [...onboarding.steps];
