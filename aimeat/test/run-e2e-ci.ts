@@ -1,15 +1,12 @@
 /**
- * Cross-platform E2E test runner with automatic server lifecycle.
- *
- * Usage:
- *   node --import tsx test/run-e2e-ci.ts                 # run all suites
- *   node --import tsx test/run-e2e-ci.ts --all           # run all suites
- *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp  # run one suite
- *   node --import tsx test/run-e2e-ci.ts --test=api-full --test=e2e-mcp  # run selected
- *
- * Environment variables:
- *   AIMEAT_BASE_URL — base URL of a running server (skips auto-start)
- *   AIMEAT_PORT     — port for auto-started server (default 40251)
+ * @file run-e2e-ci.ts
+ * @description Cross-platform E2E test runner with automatic server lifecycle and backend cleanup.
+ * @structure Suite list, server lifecycle helpers, database cleanup, per-suite execution, and summary reporting.
+ * @usage
+ *   node --import tsx test/run-e2e-ci.ts
+ *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
+ * @version-history
+ *   v1.0.0 -- 2026-05-28 -- Add redacted MongoDB cleanup error details.
  */
 
 import { spawn, execSync, type ChildProcess } from 'node:child_process';
@@ -80,6 +77,37 @@ const PORT = process.env.AIMEAT_PORT ?? '40251';
 const BASE_URL = process.env.AIMEAT_BASE_URL ?? `http://localhost:${PORT}`;
 const USE_EXTERNAL_SERVER = !!process.env.AIMEAT_BASE_URL;
 const DB_TYPE = process.env.AIMEAT_DB ?? 'memory';
+
+interface SyncCommandError {
+    message?: string;
+    status?: number | null;
+    signal?: string | null;
+    stdout?: Buffer | string;
+    stderr?: Buffer | string;
+}
+
+function redactMongoCredentials(text: string): string {
+    return text.replace(/(mongodb(?:\+srv)?:\/\/)([^@\s/]+)@/gi, '$1<credentials>@');
+}
+
+function commandOutputText(value: unknown): string {
+    if (Buffer.isBuffer(value)) return value.toString('utf8');
+    return typeof value === 'string' ? value : '';
+}
+
+function warnMongoCleanupFailure(error: unknown): void {
+    const commandError = error as SyncCommandError;
+    const message = redactMongoCredentials(commandError.message ?? String(error));
+    const stderr = redactMongoCredentials(commandOutputText(commandError.stderr).trim());
+    const stdout = redactMongoCredentials(commandOutputText(commandError.stdout).trim());
+
+    console.warn('Could not drop MongoDB test database. Tests may fail if stale data exists.');
+    console.warn(`MongoDB cleanup error: ${message}`);
+    if (commandError.status !== undefined && commandError.status !== null) console.warn(`MongoDB cleanup exit status: ${commandError.status}`);
+    if (commandError.signal) console.warn(`MongoDB cleanup signal: ${commandError.signal}`);
+    if (stderr) console.warn(`mongosh stderr:\n${stderr}`);
+    if (stdout) console.warn(`mongosh stdout:\n${stdout}`);
+}
 
 // ── Parse CLI args ──
 function parseArgs(): string[] {
@@ -177,7 +205,9 @@ function cleanDatabase(): void {
                     cwd: process.cwd(),
                     stdio: ['pipe', 'pipe', 'pipe'],
                 });
-            } catch { /* mongosh may not be available */ }
+            } catch (error) {
+                warnMongoCleanupFailure(error);
+            }
         }
     }
 }
@@ -267,9 +297,8 @@ async function main() {
                     stdio: ['pipe', 'pipe', 'pipe'],
                 });
                 console.log('MongoDB test database dropped.');
-            } catch {
-                // mongosh may not be installed — try to continue anyway
-                console.warn('Could not drop MongoDB database (mongosh not available?). Tests may fail if stale data exists.');
+            } catch (error) {
+                warnMongoCleanupFailure(error);
             }
         }
     }

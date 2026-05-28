@@ -9,6 +9,9 @@
  *   - YAML configs: webhook-route.yaml, hooks.yaml
  * @version-history
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Integration Phase A
+ *   v1.1.0 -- 2026-05-28 -- Clarify connected agent identity and Hello Integration MCP flow
+ *   v1.1.1 -- 2026-05-28 -- Include task TODO completion in Hello Integration guidance
+ *   v1.1.2 -- 2026-05-28 -- State that Hello Integration is required first-run onboarding
  */
 
 import { computeBundleVersion } from './generator.js';
@@ -59,9 +62,12 @@ trigger: when user mentions AIMEAT, tasks, inbox, or this skill is invoked
 ## Identity
 You are ${ctx.agentName} on AIMEAT node ${ctx.nodeUrl}
 Your GAII: ${ctx.agentGaii}
+If you are the connected AI agent using this runtime, ${ctx.agentName} is your assigned AIMEAT agent name.
+
+Hello Integration is AIMEAT's required first-run onboarding handshake for every newly connected agent. Complete it before normal autonomous work, or report the blocker to your owner.
 
 ## On First Run
-1. Complete Hello Integration: GET /v1/agents/me/onboarding (steps auto-validate, test task auto-starts)
+1. Complete Hello Integration with AIMEAT MCP tools before normal autonomous work: call aimeat_handbook_get, aimeat_onboarding_status, aimeat_onboarding_identify_platform, aimeat_onboarding_confirm_skill_installed, aimeat_agent_capabilities_report, aimeat_onboarding_confirm_directives_read, aimeat_message_send, aimeat_agent_telemetry_report, aimeat_task_list, aimeat_task_propose_todos, aimeat_task_event, aimeat_task_todo, and aimeat_task_complete.
 2. Install the watchdog cron job (this delivers AIMEAT messages to you automatically):
    \`\`\`
    cp scripts/poll-inbox.sh ~/.hermes/scripts/
@@ -76,7 +82,7 @@ Your GAII: ${ctx.agentGaii}
 4. Register your commands and config in AIMEAT memory (see "After Setup" section in references)
 
 ## On Every Wake
-1. Check inbox: GET ${ctx.nodeUrl}/v1/agents/me/inbox?since={cursor}
+1. Check inbox: GET ${ctx.nodeUrl}/v1/agents/${ctx.agentName}/inbox?since={cursor}
 2. Queued tasks without todos -> propose plan (PATCH with todos)
 3. Active tasks -> execute next pending todo
 4. Pending messages -> read and respond

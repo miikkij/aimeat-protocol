@@ -6,6 +6,7 @@
  *   components → archive → delete) works correctly against the backend.
  * @version-history
  *   v1.0.0 — 2026-03-26 — Initial foundry E2E test suite (copied from e2e-generator.ts)
+ *   v1.1.0 — 2026-05-28 — Verify owner-scoped foundry artifacts through the project API instead of missing-key memory reads
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-foundry.ts
@@ -612,11 +613,12 @@ await test('Agent: save interview spec (must be readable back with agent token)'
     });
     assert(status === 200, `Interview spec save: expected 200, got ${status}`);
 
-    // Verify agent can read it back via memory API (visibility: 'owner' allows agents of same owner)
-    const { status: readStatus } = await json(`/v1/memory/foundry.${foundryApiProjectId}.interview-spec`, {
+    // Foundry artifacts are owner-scoped; agents read them through the foundry project endpoint.
+    const { status: readStatus, body: readBody } = await json(`/v1/foundry/${foundryApiProjectId}`, {
         headers: { Authorization: `Bearer ${foundryAgentToken}` },
     });
-    assert(readStatus === 200, `Agent should read interview-spec (visibility: owner), got ${readStatus}`);
+    assert(readStatus === 200, `Agent should read foundry project, got ${readStatus}`);
+    assert(readBody.data?.interviewSpec?.projectName === 'API Test', `Interview spec not returned: ${JSON.stringify(readBody.data?.interviewSpec)}`);
 });
 
 await test('Agent: blueprint submit returns validation errors for invalid YAML', async () => {
@@ -666,11 +668,14 @@ consent_requirements:
     assert(status === 200, `Component submit: expected 200, got ${status}`);
     assert(body.data?.valid === true, `Expected valid:true, errors: ${JSON.stringify(body.data?.errors)}`);
 
-    // Verify the component is stored in memory
-    const { status: memStatus } = await json(`/v1/memory/foundry.${foundryApiProjectId}.component.csm-main`, {
+    // Verify the component is returned from owner-scoped project state.
+    const { status: memStatus, body: memBody } = await json(`/v1/foundry/${foundryApiProjectId}`, {
         headers: { Authorization: `Bearer ${foundryAgentToken}` },
     });
-    assert(memStatus === 200, `Component should be stored in memory after valid submit, got ${memStatus}`);
+    const components = memBody.data?.components ?? [];
+    assert(memStatus === 200, `Component project readback expected 200, got ${memStatus}`);
+    assert(components.some((component: any) => component.id === 'csm-main' && component.status === 'ready'),
+        `Component should be stored in project state after valid submit, got ${JSON.stringify(components)}`);
 });
 
 // Session claim/heartbeat/release tests removed — agent session endpoints removed in OpenRouter autopilot refactor
@@ -747,14 +752,14 @@ await test('GET /v1/foundry/:projectId/settings returns empty for no settings', 
 console.log('\nTest Execution');
 
 await test('POST /v1/foundry/:projectId/test with level none returns empty', async () => {
-  const res = await json(`/v1/foundry/${foundryApiProjectId}/test`, {
-    method: 'POST',
-    body: JSON.stringify({ level: 'none' }),
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
-  });
-  assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
-  assert(res.body.data?.report?.overall === 'passed', `None level should pass, got: ${res.body.data?.report?.overall}`);
-  assert(res.body.data?.report?.components?.length === 0, `None level no components, got: ${res.body.data?.report?.components?.length}`);
+    const res = await json(`/v1/foundry/${foundryApiProjectId}/test`, {
+        method: 'POST',
+        body: JSON.stringify({ level: 'none' }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert(res.body.data?.report?.overall === 'passed', `None level should pass, got: ${res.body.data?.report?.overall}`);
+    assert(res.body.data?.report?.components?.length === 0, `None level no components, got: ${res.body.data?.report?.components?.length}`);
 });
 
 // Create a fresh test project with blueprint stored as a parsed object so the test endpoint can read it
@@ -778,35 +783,35 @@ await json('/v1/memory', {
 });
 
 await test('POST /v1/foundry/:projectId/test with level basic runs', async () => {
-  const res = await json(`/v1/foundry/${testExecProjectId}/test`, {
-    method: 'POST',
-    body: JSON.stringify({ level: 'basic' }),
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
-  });
-  assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
-  assert(res.body.data?.report, `Expected test report, got: ${JSON.stringify(res.body.data)}`);
-  assert(res.body.data?.report?.level === 'basic', `Expected basic level, got: ${res.body.data?.report?.level}`);
-  assert(Array.isArray(res.body.data?.report?.components), `Expected components array`);
-  assert(['passed', 'failed'].includes(res.body.data?.report?.overall), `Expected overall passed/failed, got: ${res.body.data?.report?.overall}`);
+    const res = await json(`/v1/foundry/${testExecProjectId}/test`, {
+        method: 'POST',
+        body: JSON.stringify({ level: 'basic' }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert(res.body.data?.report, `Expected test report, got: ${JSON.stringify(res.body.data)}`);
+    assert(res.body.data?.report?.level === 'basic', `Expected basic level, got: ${res.body.data?.report?.level}`);
+    assert(Array.isArray(res.body.data?.report?.components), `Expected components array`);
+    assert(['passed', 'failed'].includes(res.body.data?.report?.overall), `Expected overall passed/failed, got: ${res.body.data?.report?.overall}`);
 });
 
 await test('POST /v1/foundry/:projectId/test rejects invalid level', async () => {
-  const res = await json(`/v1/foundry/${foundryApiProjectId}/test`, {
-    method: 'POST',
-    body: JSON.stringify({ level: 'invalid' }),
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
-  });
-  assert(res.status === 400, `Expected 400, got ${res.status}`);
+    const res = await json(`/v1/foundry/${foundryApiProjectId}/test`, {
+        method: 'POST',
+        body: JSON.stringify({ level: 'invalid' }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(res.status === 400, `Expected 400, got ${res.status}`);
 });
 
 await test('POST /v1/foundry/:projectId/test returns 404 for non-existent project', async () => {
-  const res = await json('/v1/foundry/nonexistent-proj-xyz/test', {
-    method: 'POST',
-    body: JSON.stringify({ level: 'basic' }),
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
-  });
-  // 404 or 400 (no blueprint) are both acceptable; not 200
-  assert(res.status === 404 || res.status === 400, `Expected 404 or 400, got ${res.status}`);
+    const res = await json('/v1/foundry/nonexistent-proj-xyz/test', {
+        method: 'POST',
+        body: JSON.stringify({ level: 'basic' }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
+    });
+    // 404 or 400 (no blueprint) are both acceptable; not 200
+    assert(res.status === 404 || res.status === 400, `Expected 404 or 400, got ${res.status}`);
 });
 
 await test('Agent: cleanup foundry API test project', async () => {
@@ -827,41 +832,41 @@ await test('Agent: cleanup foundry API test project', async () => {
 console.log('\nProvider Settings');
 
 await test('PUT /v1/openrouter/settings with lmstudio provider (no API key)', async () => {
-  const res = await json('/v1/openrouter/settings', {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${ownerToken}` },
-    body: JSON.stringify({ provider: 'lmstudio', baseUrl: 'http://localhost:1234/v1', model: 'local-model' }),
-  });
-  assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    const res = await json('/v1/openrouter/settings', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ provider: 'lmstudio', baseUrl: 'http://localhost:1234/v1', model: 'local-model' }),
+    });
+    assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
 });
 
 await test('PUT /v1/openrouter/settings with lmstudio + API key', async () => {
-  const res = await json('/v1/openrouter/settings', {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${ownerToken}` },
-    body: JSON.stringify({ provider: 'lmstudio', baseUrl: 'http://localhost:1234/v1', model: 'local-model', apiKey: 'lms-key-123' }),
-  });
-  // Without AIMEAT_ENCRYPTION_KEY configured, storing an API key returns 503.
-  // With encryption configured, it returns 200. Both are valid outcomes.
-  assert(res.status === 200 || res.status === 503, `Expected 200 or 503, got ${res.status}: ${JSON.stringify(res.body)}`);
+    const res = await json('/v1/openrouter/settings', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ provider: 'lmstudio', baseUrl: 'http://localhost:1234/v1', model: 'local-model', apiKey: 'lms-key-123' }),
+    });
+    // Without AIMEAT_ENCRYPTION_KEY configured, storing an API key returns 503.
+    // With encryption configured, it returns 200. Both are valid outcomes.
+    assert(res.status === 200 || res.status === 503, `Expected 200 or 503, got ${res.status}: ${JSON.stringify(res.body)}`);
 });
 
 await test('GET /v1/openrouter/settings returns provider info', async () => {
-  const res = await json('/v1/openrouter/settings', {
-    headers: { Authorization: `Bearer ${ownerToken}` },
-  });
-  assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
-  assert(res.body.data?.provider === 'lmstudio', `Expected lmstudio, got ${res.body.data?.provider}`);
-  assert(res.body.data?.baseUrl === 'http://localhost:1234/v1', `Bad baseUrl: ${res.body.data?.baseUrl}`);
+    const res = await json('/v1/openrouter/settings', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(res.status === 200, `Expected 200, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert(res.body.data?.provider === 'lmstudio', `Expected lmstudio, got ${res.body.data?.provider}`);
+    assert(res.body.data?.baseUrl === 'http://localhost:1234/v1', `Bad baseUrl: ${res.body.data?.baseUrl}`);
 });
 
 await test('PUT /v1/openrouter/settings rejects insecure remote URL', async () => {
-  const res = await json('/v1/openrouter/settings', {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${ownerToken}` },
-    body: JSON.stringify({ provider: 'custom', baseUrl: 'http://evil.com/v1' }),
-  });
-  assert(res.status === 400, `Expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
+    const res = await json('/v1/openrouter/settings', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ provider: 'custom', baseUrl: 'http://evil.com/v1' }),
+    });
+    assert(res.status === 400, `Expected 400, got ${res.status}: ${JSON.stringify(res.body)}`);
 });
 
 // ─── Foundry Cleanup ───

@@ -6,6 +6,7 @@
  *   This test suite catches bugs like using PUT to create new keys (should 404).
  * @version-history
  *   v1.0.0 — 2026-03-14 — Initial comprehensive memory E2E test suite
+ *   v1.1.0 — 2026-05-28 — Expect missing memory reads to return 404 without auto-creating records
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-memory-full.ts
@@ -265,10 +266,9 @@ await test('GET single key returns correct value', async () => {
     assert(body.data?.version === 2, 'correct version after upsert');
 });
 
-await test('GET non-existent key (agent behavior)', async () => {
+await test('GET non-existent key returns 404', async () => {
     const { status } = await json('/v1/memory/test.does.not.exist', { headers: auth1() });
-    // Non-anonymous agents get auto-created empty key or 200 with empty value
-    assert(status === 200, `expected 200 (auto-create for agent), got ${status}`);
+    assert(status === 404, `expected 404 for missing key, got ${status}`);
 });
 
 await test('GET list with prefix filter', async () => {
@@ -433,14 +433,9 @@ await test('DELETE non-existent key returns 404', async () => {
     assert(status === 404, `expected 404, got ${status}`);
 });
 
-await test('GET after DELETE returns fresh auto-created entry', async () => {
-    const { status, body } = await json('/v1/memory/test.deleteme', { headers: auth1() });
-    // Non-anonymous agent: auto-creates empty entry
-    assert(status === 200, `status ${status}`);
-    // Value should be empty (auto-created), not "bye"
-    const val = body.data?.value;
-    assert(val === null || val === undefined || (typeof val === 'object' && Object.keys(val).length === 0),
-        `expected empty value after delete+re-read, got: ${JSON.stringify(val)}`);
+await test('GET after DELETE returns 404', async () => {
+    const { status } = await json('/v1/memory/test.deleteme', { headers: auth1() });
+    assert(status === 404, `expected 404 after delete, got ${status}`);
 });
 
 // ═══════════════════════════════════════════════════════
@@ -456,7 +451,7 @@ await test('Agent 1 private key not visible to Agent 2', async () => {
         body: JSON.stringify({ key: 'test.private.a1', value: 'secret', visibility: 'private' }),
     });
 
-    // Agent 2 tries to read it — should get auto-created empty, not agent 1's data
+    // Agent 2 tries to read it — should not see agent 1's data.
     const { body } = await json('/v1/memory/test.private.a1', { headers: auth2() });
     const val = body.data?.value;
     assert(val !== 'secret', `agent 2 should not see agent 1 private data, got: ${JSON.stringify(val)}`);

@@ -1,4 +1,13 @@
-import { Router } from 'express';
+/**
+ * @file libs.ts
+ * @description Serves browser helper libraries used by AIMEAT apps, including auth, data, storage, social, wallet, and capability clients.
+ * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
+ * @usage app.use(libsRouter(config, storage)) from the server setup.
+ * @version-history
+ * v1.9.7 - 2026-05-28 - Disable browser caching for generated helper libraries.
+ * v1.9.6 - 2026-05-28 - Handle dev-mode auth reset responses in browser auth registration.
+ */
+import { Router, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { aimeatDataLib } from './lib-data.js';
@@ -11,6 +20,12 @@ import { aimeatAudioLib } from './lib-audio.js';
 import { aimeatSpeechLib } from './lib-speech.js';
 import { aimeatCapabilitiesLib } from './lib-capabilities.js';
 
+function sendJavascriptLibrary(res: Response, source: string): void {
+  res.set('Cache-Control', 'no-store');
+  res.set('Pragma', 'no-cache');
+  res.type('application/javascript').send(source);
+}
+
 /**
  * Serves helper JavaScript libraries at /v1/libs/*
  * These are self-contained scripts that AI-generated apps include via <script> tag.
@@ -21,52 +36,52 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
 
   // GET /v1/libs/aimeat-auth.js — Auth helper library
   router.get('/v1/libs/aimeat-auth.js', (_req, res) => {
-    res.type('application/javascript').send(aimeatAuthLib(config));
+    sendJavascriptLibrary(res, aimeatAuthLib(config));
   });
 
   // GET /v1/libs/aimeat-data.js — Memory & Micro-Memory library
   router.get('/v1/libs/aimeat-data.js', (_req, res) => {
-    res.type('application/javascript').send(aimeatDataLib(config));
+    sendJavascriptLibrary(res, aimeatDataLib(config));
   });
 
   // GET /v1/libs/aimeat-storage.js — File storage library
   router.get('/v1/libs/aimeat-storage.js', (_req, res) => {
-    res.type('application/javascript').send(aimeatStorageLib(config));
+    sendJavascriptLibrary(res, aimeatStorageLib(config));
   });
 
   // GET /v1/libs/aimeat-social.js — Boards & social library
   router.get('/v1/libs/aimeat-social.js', (_req, res) => {
-    res.type('application/javascript').send(aimeatSocialLib(config));
+    sendJavascriptLibrary(res, aimeatSocialLib(config));
   });
 
   // GET /v1/libs/aimeat-wallet.js — Wallet library
   router.get('/v1/libs/aimeat-wallet.js', (_req, res) => {
-    res.type('application/javascript').send(aimeatWalletLib(config));
+    sendJavascriptLibrary(res, aimeatWalletLib(config));
   });
 
   // GET /v1/libs/aimeat-work.js — Actions & work exchange library
   router.get('/v1/libs/aimeat-work.js', (_req, res) => {
-    res.type('application/javascript').send(aimeatWorkLib(config));
+    sendJavascriptLibrary(res, aimeatWorkLib(config));
   });
 
   // GET /v1/libs/aimeat-tunnel.js — Personal node tunnel client
   router.get('/v1/libs/aimeat-tunnel.js', (_req, res) => {
-    res.type('application/javascript').send(aimeatTunnelLib(config));
+    sendJavascriptLibrary(res, aimeatTunnelLib(config));
   });
 
   // GET /v1/libs/aimeat-audio.js — Audio engine library
   router.get('/v1/libs/aimeat-audio.js', (_req, res) => {
-    res.type('application/javascript').send(aimeatAudioLib(config));
+    sendJavascriptLibrary(res, aimeatAudioLib(config));
   });
 
   // GET /v1/libs/aimeat-speech.js — Speech library
   router.get('/v1/libs/aimeat-speech.js', (_req, res) => {
-    res.type('application/javascript').send(aimeatSpeechLib(config));
+    sendJavascriptLibrary(res, aimeatSpeechLib(config));
   });
 
   // GET /v1/libs/aimeat-capabilities.js — Capability discovery, invoke, management
   router.get('/v1/libs/aimeat-capabilities.js', (_req, res) => {
-    res.type('application/javascript').send(aimeatCapabilitiesLib(config));
+    sendJavascriptLibrary(res, aimeatCapabilitiesLib(config));
   });
 
   // GET /v1/libs/ — List available libraries
@@ -256,12 +271,21 @@ async function importEd25519Key(privateKeyBase64) {
   return cryptoKey;
 }
 
+function isCryptoKey(value) {
+  if (!value || typeof value !== 'object') return false;
+  if (typeof CryptoKey !== 'undefined' && value instanceof CryptoKey) return true;
+  return Object.prototype.toString.call(value) === '[object CryptoKey]';
+}
+
 // Sign using CryptoKey (preferred) or base64 key string (fallback)
 async function sign(keyOrB64, message) {
   let key = keyOrB64;
   if (typeof keyOrB64 === 'string') {
     // Legacy path: raw base64 key → import as CryptoKey
     key = await importEd25519Key(keyOrB64);
+  }
+  if (!isCryptoKey(key)) {
+    throw new Error('AIMEAT signing key is missing or invalid. Please sign in again.');
   }
   const msgBytes = new TextEncoder().encode(message);
   const sigBytes = await crypto.subtle.sign('Ed25519', key, msgBytes);
@@ -530,18 +554,25 @@ const auth = {
 
     const ownerName = regData.data.owner.name;
     const ghii = regData.data.ghii.ghii;
-    // The server generated keys — use those
-    const serverPrivateKey = regData.data.private_key;
-    const serverPublicKey = regData.data.public_key;
+    // Normal registration returns private_key/public_key; dev-mode reset returns owner_private_key/owner_public_key.
+    const serverPrivateKey = regData.data.private_key || regData.data.owner_private_key;
+    const serverPublicKey = regData.data.public_key || regData.data.owner_public_key || '';
+    if (!serverPrivateKey) {
+      throw new Error('Server did not return an owner signing key. Please try signing in again.');
+    }
 
-    // Get an owner JWT (human users authenticate as owners, not agents)
-    const ownerTimestamp = new Date().toISOString();
-    const ownerMessage = ownerName + NODE_ID + ownerTimestamp;
-    const ownerSig = await sign(serverPrivateKey, ownerMessage);
-    const ownerTokenData = await api('/v1/auth/token', {
-      method: 'POST',
-      body: JSON.stringify({ owner: ownerName, timestamp: ownerTimestamp, signature: ownerSig }),
-    });
+    // Dev-mode reset already returns an owner JWT. Fresh registration still needs to mint one.
+    let ownerToken = regData.data.token || null;
+    if (!ownerToken) {
+      const ownerTimestamp = new Date().toISOString();
+      const ownerMessage = ownerName + NODE_ID + ownerTimestamp;
+      const ownerSig = await sign(serverPrivateKey, ownerMessage);
+      const ownerTokenData = await api('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: ownerName, timestamp: ownerTimestamp, signature: ownerSig }),
+      });
+      ownerToken = ownerTokenData.data.token;
+    }
 
     // SECURITY: Import owner private key as non-extractable CryptoKey in IndexedDB
     const ownerCryptoKey = await importEd25519Key(serverPrivateKey);
@@ -550,7 +581,7 @@ const auth = {
     // Owner session — agents are connected later via device auth
     const session = createSession({
       ghii, owner: ownerName, gaii: null,
-      jwt: ownerTokenData.data.token,
+      jwt: ownerToken,
       _cryptoKey: ownerCryptoKey, publicKey: serverPublicKey,
       displayName: regData.data.ghii.display_name || '',
     });
@@ -1112,7 +1143,7 @@ function showLoginModal(opts, renderBtn) {
 // ── Expose globally ──
 if (!global.AIMEAT) global.AIMEAT = {};
 global.AIMEAT.auth = auth;
-global.AIMEAT.version = '2026-02-27-001';
+global.AIMEAT.version = '2026-05-28-002';
 
 })(typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : this);
 `;

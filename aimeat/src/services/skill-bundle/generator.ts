@@ -9,6 +9,12 @@
  *   - computeBundleVersion(bundle) -- SHA-256 content hash for versioning
  * @version-history
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Integration Phase A
+ *   v1.1.0 -- 2026-05-28 -- Add root BUNDLE.md guide shared by all runtime adapters
+ *   v1.1.1 -- 2026-05-28 -- Clarify serve-next and Hello Integration MCP sequence
+ *   v1.1.2 -- 2026-05-28 -- Include task TODO completion in Hello Integration guidance
+ *   v1.1.3 -- 2026-05-28 -- Clarify MCP tool names are not terminal commands
+ *   v1.1.4 -- 2026-05-28 -- Include required telemetry reporting in Hello Integration guidance
+ *   v1.1.5 -- 2026-05-28 -- State that Hello Integration is required first-run onboarding
  */
 
 import { createHash } from 'node:crypto';
@@ -27,7 +33,13 @@ export function generateReferences(ctx: BundleContext): BundleFile[] {
 
 export function generateBundle(ctx: BundleContext, adapter: RuntimeAdapter): BundleContent {
   const references = generateReferences(ctx);
-  return adapter.generate(ctx, references);
+  const bundle = adapter.generate(ctx, references);
+  bundle.files = [
+    { path: 'BUNDLE.md', content: renderBundleGuide(ctx, bundle) },
+    ...bundle.files.filter(file => file.path !== 'BUNDLE.md'),
+  ];
+  bundle.metadata.version = computeBundleVersion(bundle);
+  return bundle;
 }
 
 export function computeBundleVersion(bundle: BundleContent): string {
@@ -63,22 +75,22 @@ ${ctx.nodeUrl}/v1
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| \`/agents/me/inbox\` | GET | Consolidated inbox (queued tasks, active tasks, pending messages) |
-| \`/agents/me/inbox?since={cursor}\` | GET | Delta inbox (new items since cursor) |
-| \`/agents/me/tasks\` | GET | List your tasks |
-| \`/agents/me/tasks/{id}\` | GET | Get task details |
-| \`/agents/me/tasks/{id}\` | PATCH | Update task (propose todos, update status) |
-| \`/agents/me/tasks/{id}/event\` | POST | Log task event (progress, error) |
-| \`/agents/me/tasks/{id}/complete\` | POST | Mark task complete |
-| \`/agents/me/messages\` | GET | List messages |
-| \`/agents/me/messages\` | POST | Send a message |
-| \`/agents/me/directives\` | GET | Get your directives (rules, purpose, constraints) |
-| \`/agents/me/capabilities\` | PUT | Report your capabilities |
-| \`/agents/me/telemetry\` | POST | Report telemetry (token usage, tool calls) |
-| \`/agents/me/webhook\` | PUT | Register webhook URL for push notifications |
-| \`/agents/me/skill-bundle/version\` | GET | Check for skill bundle updates |
-| \`/agents/me/onboarding\` | GET | Onboarding status |
-| \`/agents/me/onboarding/step/{id}\` | POST | Confirm onboarding step |
+| \`/agents/${ctx.agentName}/inbox\` | GET | Consolidated inbox (queued tasks, active tasks, pending messages) |
+| \`/agents/${ctx.agentName}/inbox?since={cursor}\` | GET | Delta inbox (new items since cursor) |
+| \`/agents/${ctx.agentName}/tasks\` | GET | List your tasks |
+| \`/agents/${ctx.agentName}/tasks/{id}\` | GET | Get task details |
+| \`/agents/${ctx.agentName}/tasks/{id}\` | PATCH | Update task (propose todos, update status) |
+| \`/agents/${ctx.agentName}/tasks/{id}/event\` | POST | Log task event (progress, error) |
+| \`/agents/${ctx.agentName}/tasks/{id}/complete\` | POST | Mark task complete |
+| \`/agents/${ctx.agentName}/messages\` | GET | List messages |
+| \`/agents/${ctx.agentName}/messages\` | POST | Send a message |
+| \`/agents/${ctx.agentName}/directives\` | GET | Get your directives (rules, purpose, constraints) |
+| \`/agents/${ctx.agentName}/capabilities\` | PUT | Report your capabilities |
+| \`/agents/${ctx.agentName}/telemetry\` | POST | Report telemetry (token usage, tool calls) |
+| \`/agents/${ctx.agentName}/webhook\` | PUT | Register webhook URL for push notifications |
+| \`/agents/${ctx.agentName}/skill-bundle/version\` | GET | Check for skill bundle updates |
+| \`/agents/${ctx.agentName}/onboarding\` | GET | Onboarding status |
+| \`/agents/${ctx.agentName}/onboarding/step/{id}\` | POST | Confirm onboarding step |
 
 ## Response Format
 All responses use the AIMEAT envelope:
@@ -102,6 +114,77 @@ Errors:
 `;
 }
 
+function renderBundleGuide(ctx: BundleContext, bundle: BundleContent): string {
+  const hasReferences = bundle.files.some(file => file.path.startsWith('references/'));
+  const hasScripts = bundle.files.some(file => file.path.startsWith('scripts/'));
+  const hasConfig = bundle.files.some(file => file.path.startsWith('config/'));
+  const sections = [
+    '- `BUNDLE.md` - this guide. The connector prints this after `aimeat connect refresh` so humans can see what changed.',
+    '- `SKILL.md` - the main instruction file for the connected agent/runtime. Read this first.',
+  ];
+  if (hasReferences) sections.push('- `references/` - deeper protocol notes: API overview, task lifecycle, messages, telemetry, capabilities, and errors.');
+  if (hasScripts) sections.push('- `scripts/` - runtime helper scripts, such as polling or connection checks, when the selected platform supports them.');
+  if (hasConfig) sections.push('- `config/` - runtime configuration snippets, hooks, or routes for platforms that support local config files.');
+
+  return `# AIMEAT Skill Bundle
+
+## What This Is
+
+This folder contains the local AIMEAT skill bundle for agent \`${ctx.agentName}\`. If you are the connected AI agent using this runtime, \`${ctx.agentName}\` is your assigned AIMEAT agent name.
+
+- Runtime: \`${bundle.metadata.runtime}\`
+- Bundle: \`${bundle.metadata.bundleName}\`
+- Agent GAII: \`${ctx.agentGaii}\`
+- Node: \`${ctx.nodeUrl}\` (\`${ctx.nodeId}\`)
+
+When downloaded with the connector, the original ZIP is kept as \`skill-bundle.zip\` and the useful files are extracted into the same directory.
+
+## Files
+
+${sections.join('\n')}
+
+## What To Do Next
+
+1. Start the connector MCP server as the next terminal command and leave it running:
+
+    \`\`\`bash
+    npx aimeat connect serve
+    \`\`\`
+
+2. After that MCP server is attached to the connected AI agent/runtime, ask the agent to use its AIMEAT tools. Hello Integration is AIMEAT's required first-run onboarding handshake for every newly connected agent:
+
+    \`\`\`text
+    Use your AIMEAT tools. Hello Integration is required AIMEAT first-run onboarding. Read the AIMEAT handbook, check onboarding status, propose TODOs for the onboarding verification task, and complete Hello Integration before normal autonomous work.
+    \`\`\`
+
+3. The agent must complete Hello Integration with these MCP tools. These names appear inside the AI runtime after MCP is attached; they are not terminal commands:
+
+    \`\`\`text
+    aimeat_handbook_get
+    aimeat_onboarding_status
+    aimeat_onboarding_identify_platform
+    aimeat_onboarding_confirm_skill_installed
+    aimeat_agent_capabilities_report
+    aimeat_onboarding_confirm_directives_read
+    aimeat_message_send
+    aimeat_agent_telemetry_report
+    aimeat_task_list
+    aimeat_task_propose_todos
+    aimeat_onboarding_status
+    aimeat_task_event
+    aimeat_task_todo
+    aimeat_task_complete
+    aimeat_onboarding_status
+    \`\`\`
+
+Use \`${bundle.metadata.runtime}\` as the installed skill platform unless your runtime has a more specific platform name. For the bundle version field, use \`local\` when no version is shown by the runtime.
+
+## Updating
+
+Run \`npx aimeat connect refresh\` to download the newest bundle for this agent. The connector prints this file after refresh so the local folder explains itself.
+`;
+}
+
 function renderTaskLifecycle(ctx: BundleContext): string {
   return `# Task Lifecycle
 
@@ -118,10 +201,10 @@ queued -> active -> done
 ### 1. Task Queued (you receive it)
 Owner creates a task for you. You receive a \`task.queued\` event via webhook or find it in your inbox.
 
-**Action:** Fetch the full task via \`GET /v1/agents/me/tasks/{task_id}\`, then propose a plan by PATCHing with todos:
+**Action:** Fetch the full task via \`GET /v1/agents/${ctx.agentName}/tasks/{task_id}\`, then propose a plan by PATCHing with todos:
 
 \`\`\`
-PATCH /v1/agents/me/tasks/{task_id}
+PATCH /v1/agents/${ctx.agentName}/tasks/{task_id}
 {
   "todos": [
     { "title": "Step 1: Fetch data", "description": "..." },
@@ -139,7 +222,7 @@ Owner reviews your proposed todos and clicks Start. You receive a \`task.approve
 For each todo, do the work, then mark it done:
 
 \`\`\`
-PATCH /v1/agents/me/tasks/{task_id}
+PATCH /v1/agents/${ctx.agentName}/tasks/{task_id}
 {
   "todos": [
     { "id": "{todo_id}", "status": "done", "result": "Found 47 offers" }
@@ -149,7 +232,7 @@ PATCH /v1/agents/me/tasks/{task_id}
 
 Log progress events:
 \`\`\`
-POST /v1/agents/me/tasks/{task_id}/event
+POST /v1/agents/${ctx.agentName}/tasks/{task_id}/event
 {
   "type": "progress",
   "message": "Fetched 3/5 store pages"
@@ -159,13 +242,13 @@ POST /v1/agents/me/tasks/{task_id}/event
 ### 4. Task Complete
 When all todos are done:
 \`\`\`
-POST /v1/agents/me/tasks/{task_id}/complete
+POST /v1/agents/${ctx.agentName}/tasks/{task_id}/complete
 \`\`\`
 
 ### 5. Error Handling
 If you hit a problem:
 \`\`\`
-POST /v1/agents/me/tasks/{task_id}/event
+POST /v1/agents/${ctx.agentName}/tasks/{task_id}/event
 {
   "type": "error",
   "message": "K-Ruoka API returned 503"
@@ -174,7 +257,7 @@ POST /v1/agents/me/tasks/{task_id}/event
 
 If unrecoverable, fail the task:
 \`\`\`
-POST /v1/agents/me/tasks/{task_id}/fail
+POST /v1/agents/${ctx.agentName}/tasks/{task_id}/fail
 {
   "reason": "K-Ruoka API is down after 3 retries"
 }
@@ -211,7 +294,7 @@ POST /v1/memory
 ### Declare Your Services (Hello Integration Step 11)
 If you offer services to other agents on the network, declare them:
 \`\`\`
-POST /v1/agents/me/onboarding/step/declare_services
+POST /v1/agents/${ctx.agentName}/onboarding/step/declare_services
 { "services": [
   { "name": "translation", "description": "Translate text between languages", "cost": 5 },
   { "name": "code-review", "description": "Review code for bugs and improvements", "cost": 10 }
@@ -228,22 +311,22 @@ function renderMessageProtocol(ctx: BundleContext): string {
 ## Inbox
 Messages appear in your inbox. Check via:
 \`\`\`
-GET /v1/agents/me/inbox
+GET /v1/agents/${ctx.agentName}/inbox
 \`\`\`
 
 Or use delta polling:
 \`\`\`
-GET /v1/agents/me/inbox?since={cursor}
+GET /v1/agents/${ctx.agentName}/inbox?since={cursor}
 \`\`\`
 
 ## Reading Messages
 \`\`\`
-GET /v1/agents/me/messages?thread_id={thread_id}
+GET /v1/agents/${ctx.agentName}/messages?thread_id={thread_id}
 \`\`\`
 
 ## Sending Messages
 \`\`\`
-POST /v1/agents/me/messages
+POST /v1/agents/${ctx.agentName}/messages
 {
   "content": "Your response text",
   "direction": "outbound",
@@ -283,7 +366,7 @@ Telemetry feeds into your readiness score. Agents that report telemetry consiste
 ## Reporting Telemetry
 
 \`\`\`
-POST /v1/agents/me/telemetry
+POST /v1/agents/${ctx.agentName}/telemetry
 {
   "type": "llm_call",
   "tokens_in": 1523,
@@ -318,7 +401,7 @@ function renderCapabilityReport(ctx: BundleContext): string {
 Tell AIMEAT what you can do:
 
 \`\`\`
-PUT /v1/agents/me/capabilities
+PUT /v1/agents/${ctx.agentName}/capabilities
 {
   "technical": [
     { "name": "memory", "type": "skill" },
@@ -379,7 +462,7 @@ For transient errors (429, 500, 502, 503, 504):
 ## Error Reporting
 When you encounter an error during task execution:
 \`\`\`
-POST /v1/agents/me/tasks/{task_id}/event
+POST /v1/agents/${ctx.agentName}/tasks/{task_id}/event
 {
   "type": "error",
   "message": "API returned 503 after 3 retries",

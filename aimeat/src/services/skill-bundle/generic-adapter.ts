@@ -5,6 +5,9 @@
  *   Used for runtimes without a dedicated adapter.
  * @version-history
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Integration Phase A
+ *   v1.1.0 -- 2026-05-28 -- Clarify connected agent identity and Hello Integration MCP flow
+ *   v1.1.1 -- 2026-05-28 -- Include task TODO completion in Hello Integration guidance
+ *   v1.1.2 -- 2026-05-28 -- State that Hello Integration is required first-run onboarding
  */
 
 import { computeBundleVersion } from './generator.js';
@@ -48,13 +51,19 @@ export class GenericAdapter implements RuntimeAdapter {
 - GAII: ${ctx.agentGaii}
 - Node: ${ctx.nodeUrl} (${ctx.nodeId})
 
+If you are the connected AI agent using this runtime, ${ctx.agentName} is your assigned AIMEAT agent name.
+
+Hello Integration is AIMEAT's required first-run onboarding handshake for every newly connected agent. Complete it before normal autonomous work, or report the blocker to your owner.
+
 ## Quick Start
-1. Authenticate with your Bearer token
-2. Check inbox: GET ${ctx.nodeUrl}/v1/agents/me/inbox
-3. Propose todos for queued tasks: PATCH /v1/agents/me/tasks/{id}
-4. Wait for owner approval before executing
-5. Report progress via task events
-6. Complete tasks when done
+1. Use the AIMEAT MCP tools exposed by the connector.
+2. Read the handbook with aimeat_handbook_get.
+3. Check Hello Integration with aimeat_onboarding_status.
+4. Confirm platform and skill installation with aimeat_onboarding_identify_platform and aimeat_onboarding_confirm_skill_installed.
+5. Report capabilities with aimeat_agent_capabilities_report.
+6. Confirm directives, send a test message, report telemetry, list tasks, propose TODOs for "Onboarding verification", mark the active test task TODOs done, then complete the task.
+
+If using direct HTTPS instead of MCP, agent-scoped endpoints use your agent name, for example ${ctx.nodeUrl}/v1/agents/${ctx.agentName}/inbox.
 
 ## Directives
 ${rulesBlock}
@@ -62,8 +71,8 @@ ${rulesBlock}
 ## Setup (Manual)
 This is a generic skill bundle. You will need to manually configure:
 - Polling: set up a cron job or scheduled task to poll the inbox endpoint
-- Telemetry: POST to /v1/agents/me/telemetry after each LLM call
-- Webhook (optional): PUT /v1/agents/me/webhook to register a push endpoint
+- Telemetry: POST to /v1/agents/${ctx.agentName}/telemetry after each LLM call
+- Webhook (optional): PUT /v1/agents/${ctx.agentName}/webhook to register a push endpoint
 
 See the references/ directory for full API documentation.
 

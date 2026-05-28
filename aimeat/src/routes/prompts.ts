@@ -8,6 +8,7 @@
  *   v1.1.0 -- 2026-05-21 -- Extend tier1 response with directives, task queue, and agent endpoints
  *   v1.2.0 -- 2026-05-22 -- Add GET /v1/prompts/tier1/:module for modular prompt system
  *   v1.3.0 -- 2026-05-27 -- Add /v1/agents/me/handbook routes, 301 redirects from old tier1 paths
+ *   v1.3.1 -- 2026-05-28 -- Add neutral handbook content aliases and stop advertising owner-only task start to agents
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -55,6 +56,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, {
       tier: '1',
       module: mod,
+      content: system_prompt,
       system_prompt,
     }));
   });
@@ -89,6 +91,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, {
       tier: '1',
       agent_name: selfAgentName,
+      content: system_prompt,
       system_prompt,
       available_operations: ['memory_crud', 'action_publish', 'action_execute', 'work_queue', 'wallet', 'boards', 'catalogue', 'task_lifecycle', 'directives', 'capabilities_report', 'message_handling'],
       economics: {
@@ -112,7 +115,6 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
         active: activeTasks.tasks.map(t => ({ id: t.id, title: t.title, status: t.status })),
         endpoints: {
           inbox: `/v1/agents/${encodeURIComponent(agentName)}/inbox`,
-          start: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/start`,
           event: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/event`,
           complete: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/complete`,
           fail: `/v1/agents/${encodeURIComponent(agentName)}/tasks/{id}/fail`,

@@ -251,8 +251,8 @@ export function agentIntegrationRouter(config: AimeatConfig, storage: Storage): 
       watchdog_spec: {
         poll_interval_seconds: 60,
         inbox_endpoint: `/v1/agents/${agentName}/inbox`,
-        task_start_endpoint: `/v1/agents/${agentName}/tasks/{id}/start`,
         task_event_endpoint: `/v1/agents/${agentName}/tasks/{id}/event`,
+        task_todo_endpoint: `/v1/agents/${agentName}/tasks/{id}/todos/{todoId}`,
         task_complete_endpoint: `/v1/agents/${agentName}/tasks/{id}/complete`,
         task_fail_endpoint: `/v1/agents/${agentName}/tasks/{id}/fail`,
       },

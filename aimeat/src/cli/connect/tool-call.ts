@@ -1,0 +1,883 @@
+/**
+ * @file tool-call.ts
+ * @description Shell fallback for connector tools. Provides `aimeat connect tools`,
+ *   `aimeat connect schema`, and `aimeat connect call` for runtimes that can run
+ *   commands but cannot use MCP directly.
+ * @structure
+ *   - CONNECT_CLI_TOOLS -- initial REST-backed tool catalog for Hello Integration
+ *   - runToolList() -- prints CLI-callable tool names
+ *   - runToolSchema() -- prints plain JSON input schema metadata
+ *   - runToolCall() -- loads JSON input and invokes the matching REST-backed handler
+ * @usage
+ *   aimeat connect tools
+ *   aimeat connect schema aimeat_onboarding_status
+ *   aimeat connect call aimeat_message_send --json input.json
+ * @version-history
+ *   v1.0.0 -- 2026-05-28 -- Add initial shell fallback for agent lifecycle tools
+ *   v1.1.0 -- 2026-05-28 -- Read public tool metadata from the shared MCP catalog
+ *   v1.2.0 -- 2026-05-28 -- Add app, extension, and cortex CLI fallback handlers
+ *   v1.3.0 -- 2026-05-28 -- Add core memory, work, wallet, board, storage, and admin handlers
+ *   v1.4.0 -- 2026-05-28 -- Add remaining connector MCP handlers to CLI fallback
+ */
+
+import { existsSync, readFileSync } from 'node:fs';
+import { CLI_FALLBACK_TOOL_DEFINITIONS, getAimeatToolDefinition, type ToolInputField } from '../../mcp/catalog/definitions.js';
+import type { AimeatClient, ApiResponse } from './api-client.js';
+import { AimeatClient as Client } from './api-client.js';
+import { loadConfig, type AimeatConnectConfig } from './config.js';
+
+type JsonObject = Record<string, unknown>;
+
+interface ConnectCliToolDefinition {
+    name: string;
+    description?: string;
+    input?: Record<string, ToolInputField>;
+    handler: (ctx: ToolCallContext, input: JsonObject) => Promise<ApiResponse>;
+}
+
+interface ToolCallContext {
+    client: AimeatClient;
+    config: AimeatConnectConfig;
+    agentPath: string;
+}
+
+function requiredString(input: JsonObject, key: string): string {
+    const value = input[key];
+    if (typeof value !== 'string' || value.trim() === '') throw new Error(`Missing required string field: ${key}`);
+    return value;
+}
+
+function optionalString(input: JsonObject, key: string): string | undefined {
+    const value = input[key];
+    return typeof value === 'string' && value.trim() !== '' ? value : undefined;
+}
+
+function optionalNumber(input: JsonObject, key: string): number | undefined {
+    const value = input[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() !== '') {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    return undefined;
+}
+
+function requiredValue(input: JsonObject, key: string): unknown {
+    if (!(key in input)) throw new Error(`Missing required field: ${key}`);
+    return input[key];
+}
+
+function optionalRecord(input: JsonObject, key: string): JsonObject | undefined {
+    const value = input[key];
+    return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as JsonObject : undefined;
+}
+
+function requiredRecord(input: JsonObject, key: string): JsonObject {
+    const value = input[key];
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) return value as JsonObject;
+    if (typeof value === 'string') {
+        const parsed = JSON.parse(value) as unknown;
+        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) return parsed as JsonObject;
+    }
+    throw new Error(`Missing required object field: ${key}`);
+}
+
+function optionalArray(input: JsonObject, key: string): unknown[] | undefined {
+    const value = input[key];
+    return Array.isArray(value) ? value : undefined;
+}
+
+function requiredArray(input: JsonObject, key: string): unknown[] {
+    const value = input[key];
+    if (Array.isArray(value)) return value;
+    throw new Error(`Missing required array field: ${key}`);
+}
+
+function query(params: Record<string, string | number | undefined>): string {
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined) search.set(key, String(value));
+    }
+    const serialized = search.toString();
+    return serialized ? `?${serialized}` : '';
+}
+
+function taskTodoPayload(input: JsonObject): JsonObject {
+    const todos = optionalArray(input, 'todos') ?? [];
+    return {
+        todos: todos.map((rawTodo, index) => {
+            const todo = typeof rawTodo === 'object' && rawTodo !== null ? rawTodo as JsonObject : {};
+            const title = typeof todo.title === 'string' ? todo.title : `TODO ${index + 1}`;
+            return {
+                id: `todo-${index + 1}`,
+                order: index + 1,
+                title,
+                description: typeof todo.description === 'string' ? todo.description : '',
+                environment: 'agent',
+                environment_reason: 'The connected agent can perform this step through AIMEAT tools.',
+                verification: typeof todo.verification === 'string' ? todo.verification : '',
+                estimate_minutes: typeof todo.estimate_minutes === 'number' ? todo.estimate_minutes : undefined,
+                status: 'pending',
+            };
+        }),
+    };
+}
+
+export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
+    {
+        name: 'aimeat_handbook_get',
+        description: 'Get the agent operating handbook or one handbook module.',
+        input: { module: { type: 'string', description: 'Optional handbook module name, such as tasks or messages.' } },
+        handler: ({ client }, input) => client.get(optionalString(input, 'module')
+            ? `/v1/agents/me/handbook/${encodeURIComponent(optionalString(input, 'module')!)}`
+            : '/v1/agents/me/handbook'),
+    },
+    {
+        name: 'aimeat_onboarding_status',
+        description: 'View required Hello Integration status and next-step hints.',
+        input: {},
+        handler: ({ client, agentPath }) => client.get(`/v1/agents/${agentPath}/onboarding`),
+    },
+    {
+        name: 'aimeat_onboarding_identify_platform',
+        description: 'Confirm the connected agent runtime/platform for Hello Integration.',
+        input: {
+            platform: { type: 'string', required: true, description: 'Runtime/platform name, for example hermes, claude, vscode, or generic.' },
+            platform_version: { type: 'string', description: 'Runtime/platform version if known.' },
+        },
+        handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/onboarding/step/identify_platform`, {
+            platform: requiredString(input, 'platform'),
+            ...(optionalString(input, 'platform_version') ? { platform_version: optionalString(input, 'platform_version') } : {}),
+        }),
+    },
+    {
+        name: 'aimeat_onboarding_confirm_skill_installed',
+        description: 'Confirm the local skill bundle is available for Hello Integration.',
+        input: {
+            platform: { type: 'string', required: true, description: 'Runtime/platform using the bundle.' },
+            version: { type: 'string', required: true, description: 'Bundle version, or local when no version is shown.' },
+        },
+        handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/onboarding/step/install_skill`, {
+            platform: requiredString(input, 'platform'),
+            version: requiredString(input, 'version'),
+        }),
+    },
+    {
+        name: 'aimeat_onboarding_confirm_directives_read',
+        description: 'Confirm the agent has read its AIMEAT handbook/directives.',
+        input: { confirmed: { type: 'boolean', description: 'Set true after reading the handbook/directives.' } },
+        handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/onboarding/step/read_directives`, {
+            confirmed: typeof input.confirmed === 'boolean' ? input.confirmed : true,
+        }),
+    },
+    {
+        name: 'aimeat_onboarding_declare_services',
+        description: 'Optionally declare services/capabilities exposed by this agent.',
+        input: { services: { type: 'array', description: 'Optional array of service objects with name and description.' } },
+        handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/onboarding/step/declare_services`, {
+            services: optionalArray(input, 'services') ?? [],
+        }),
+    },
+    {
+        name: 'aimeat_agent_capabilities_report',
+        description: 'Report technical and domain capabilities to the node.',
+        input: {
+            technical: { type: 'array', description: 'Array of technical capabilities: { name, type }.' },
+            domain: { type: 'array', description: 'Array of domain expertise strings.' },
+            languages: { type: 'array', description: 'Array of language codes.' },
+            modules_loaded: { type: 'array', description: 'Optional loaded handbook/module names.' },
+            limitations: { type: 'array', description: 'Optional known limitations.' },
+        },
+        handler: ({ client, agentPath }, input) => client.put(`/v1/agents/${agentPath}/capabilities`, {
+            technical: optionalArray(input, 'technical') ?? [],
+            domain: optionalArray(input, 'domain') ?? [],
+            ...(optionalArray(input, 'languages') ? { languages: optionalArray(input, 'languages') } : {}),
+            ...(optionalArray(input, 'modules_loaded') ? { modules_loaded: optionalArray(input, 'modules_loaded') } : {}),
+            ...(optionalArray(input, 'limitations') ? { limitations: optionalArray(input, 'limitations') } : {}),
+        }),
+    },
+    {
+        name: 'aimeat_agent_activity',
+        description: 'View agent activity statistics.',
+        input: {
+            days: { type: 'number', description: 'Number of days of history to retrieve.' },
+            granularity: { type: 'string', enum: ['daily', 'hourly'], description: 'History granularity.' },
+        },
+        handler: ({ client, agentPath }, input) => client.get(`/v1/agents/${agentPath}/activity${query({
+            days: typeof input.days === 'number' ? input.days : undefined,
+            granularity: optionalString(input, 'granularity'),
+        })}`),
+    },
+    {
+        name: 'aimeat_agent_telemetry_report',
+        description: 'Report agent telemetry to the node.',
+        input: {
+            type: { type: 'string', enum: ['llm_call', 'tool_call', 'agent_report'], description: 'Telemetry event type.' },
+            data: { type: 'object', description: 'Telemetry data such as tokens, duration, or tool name.' },
+            session_id: { type: 'string', description: 'Optional runtime session identifier.' },
+            task_id: { type: 'string', description: 'Optional related AIMEAT task id.' },
+        },
+        handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/telemetry`, {
+            type: optionalString(input, 'type') ?? 'agent_report',
+            data: optionalRecord(input, 'data') ?? {},
+            ...(optionalString(input, 'session_id') ? { session_id: optionalString(input, 'session_id') } : {}),
+            ...(optionalString(input, 'task_id') ? { task_id: optionalString(input, 'task_id') } : {}),
+        }),
+    },
+    {
+        name: 'aimeat_message_inbox',
+        description: 'Get pending inbound messages.',
+        input: {},
+        handler: ({ client, agentPath }) => client.get(`/v1/agents/${agentPath}/messages/inbox`),
+    },
+    {
+        name: 'aimeat_message_send',
+        description: 'Send an outbound message from the connected agent to the owner conversation.',
+        input: {
+            content: { type: 'string', description: 'Message content.' },
+            body: { type: 'string', description: 'Message content alias for older callers.' },
+            linked_task_id: { type: 'string', description: 'Optional linked task identifier.' },
+            metadata: { type: 'object', description: 'Optional metadata object.' },
+        },
+        handler: ({ client, agentPath }, input) => {
+            const content = optionalString(input, 'content') ?? optionalString(input, 'body');
+            if (!content) throw new Error('Missing required field: content');
+            return client.post(`/v1/agents/${agentPath}/messages`, {
+                content,
+                direction: 'outbound',
+                ...(optionalString(input, 'linked_task_id') ? { linked_task_id: optionalString(input, 'linked_task_id') } : {}),
+                ...(optionalRecord(input, 'metadata') ? { metadata: optionalRecord(input, 'metadata') } : {}),
+            });
+        },
+    },
+    {
+        name: 'aimeat_task_list',
+        description: 'List tasks for the connected agent.',
+        input: { status: { type: 'string', description: 'Optional task status filter.' } },
+        handler: ({ client, agentPath }, input) => client.get(`/v1/agents/${agentPath}/tasks${query({ status: optionalString(input, 'status') })}`),
+    },
+    {
+        name: 'aimeat_task_get',
+        description: 'Get task detail.',
+        input: { task_id: { type: 'string', required: true, description: 'Task identifier.' } },
+        handler: ({ client, agentPath }, input) => client.get(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}`),
+    },
+    {
+        name: 'aimeat_task_propose_todos',
+        description: 'Propose TODOs for a queued task before owner approval or onboarding auto-start.',
+        input: {
+            task_id: { type: 'string', required: true, description: 'Task identifier.' },
+            todos: { type: 'array', required: true, description: 'Array of TODOs with title, optional description, verification, and estimate_minutes.' },
+        },
+        handler: ({ client, agentPath }, input) => client.patch(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}`, taskTodoPayload(input)),
+    },
+    {
+        name: 'aimeat_task_event',
+        description: 'Append a progress event to a task.',
+        input: {
+            task_id: { type: 'string', required: true, description: 'Task identifier.' },
+            type: { type: 'string', required: true, description: 'Event type.' },
+            message: { type: 'string', required: true, description: 'Event message.' },
+            details: { type: 'object', description: 'Optional event details.' },
+        },
+        handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}/event`, {
+            type: requiredString(input, 'type'),
+            message: requiredString(input, 'message'),
+            ...(optionalRecord(input, 'details') ? { details: optionalRecord(input, 'details') } : {}),
+        }),
+    },
+    {
+        name: 'aimeat_task_todo',
+        description: 'Update a TODO item status within a task.',
+        input: {
+            task_id: { type: 'string', required: true, description: 'Task identifier.' },
+            todo_id: { type: 'string', required: true, description: 'TODO item identifier.' },
+            status: { type: 'string', required: true, enum: ['pending', 'active', 'done', 'failed', 'skipped'], description: 'New TODO status.' },
+        },
+        handler: ({ client, agentPath }, input) => client.patch(
+            `/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}/todos/${encodeURIComponent(requiredString(input, 'todo_id'))}`,
+            { status: requiredString(input, 'status') },
+        ),
+    },
+    {
+        name: 'aimeat_task_complete',
+        description: 'Complete an active task.',
+        input: {
+            task_id: { type: 'string', required: true, description: 'Task identifier.' },
+            message: { type: 'string', description: 'Completion message.' },
+            summary: { type: 'string', description: 'Completion message alias for older callers.' },
+        },
+        handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}/complete`, {
+            message: optionalString(input, 'message') ?? optionalString(input, 'summary') ?? 'Task completed',
+        }),
+    },
+    {
+        name: 'aimeat_task_fail',
+        description: 'Fail an active task with a reason.',
+        input: {
+            task_id: { type: 'string', required: true, description: 'Task identifier.' },
+            reason: { type: 'string', description: 'Failure reason alias for message.' },
+            message: { type: 'string', description: 'Failure message.' },
+        },
+        handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}/fail`, {
+            message: optionalString(input, 'message') ?? optionalString(input, 'reason') ?? 'Task failed',
+        }),
+    },
+    {
+        name: 'aimeat_memory_read',
+        handler: ({ client }, input) => client.get(`/v1/memory/${encodeURIComponent(requiredString(input, 'key'))}`),
+    },
+    {
+        name: 'aimeat_memory_write',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { key: requiredString(input, 'key'), value: requiredValue(input, 'value') };
+            const visibility = optionalString(input, 'visibility');
+            const ttlHours = optionalNumber(input, 'ttl_hours');
+            if (visibility) body.visibility = visibility;
+            if (ttlHours !== undefined) body.ttl_hours = ttlHours;
+            return client.post('/v1/memory', body);
+        },
+    },
+    {
+        name: 'aimeat_memory_list',
+        handler: ({ client }, input) => client.get(`/v1/memory${query({ prefix: optionalString(input, 'prefix'), limit: optionalNumber(input, 'limit') })}`),
+    },
+    {
+        name: 'aimeat_memory_search',
+        handler: ({ client }, input) => client.get(`/v1/memory/search${query({ q: requiredString(input, 'query') })}`),
+    },
+    {
+        name: 'aimeat_catalogue_search',
+        handler: ({ client }, input) => client.get(`/v1/catalogue${query({ q: optionalString(input, 'query') })}`),
+    },
+    {
+        name: 'aimeat_agent_profile',
+        handler: ({ client }, input) => client.get(`/v1/agents/${encodeURIComponent(requiredString(input, 'gaii'))}`),
+    },
+    {
+        name: 'aimeat_action_execute',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { action_id: requiredString(input, 'action_id') };
+            const actionInput = optionalRecord(input, 'input');
+            if (actionInput) body.input = actionInput;
+            return client.post('/v1/work/request', body);
+        },
+    },
+    {
+        name: 'aimeat_work_inbox',
+        handler: ({ client }) => client.get('/v1/work/inbox'),
+    },
+    {
+        name: 'aimeat_work_accept',
+        handler: ({ client }, input) => client.post(`/v1/work/${encodeURIComponent(requiredString(input, 'tracking_code'))}/accept`),
+    },
+    {
+        name: 'aimeat_work_deliver',
+        handler: ({ client }, input) => client.post(
+            `/v1/work/${encodeURIComponent(requiredString(input, 'tracking_code'))}/deliver`,
+            { result: requiredValue(input, 'result') },
+        ),
+    },
+    {
+        name: 'aimeat_wallet_balance',
+        handler: ({ client }) => client.get('/v1/wallet'),
+    },
+    {
+        name: 'aimeat_board_read',
+        handler: ({ client }, input) => client.get(`/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts`),
+    },
+    {
+        name: 'aimeat_board_post',
+        handler: ({ client }, input) => client.post(
+            `/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts`,
+            { title: requiredString(input, 'title'), body: requiredString(input, 'body') },
+        ),
+    },
+    {
+        name: 'aimeat_storage_upload',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { key: requiredString(input, 'key'), content: requiredString(input, 'content') };
+            const mimeType = optionalString(input, 'mime_type');
+            if (mimeType) body.mime_type = mimeType;
+            return client.post('/v1/storage', body);
+        },
+    },
+    {
+        name: 'aimeat_storage_download',
+        handler: ({ client }, input) => client.get(`/v1/storage/${encodeURIComponent(requiredString(input, 'key'))}`),
+    },
+    {
+        name: 'aimeat_admin_stats',
+        handler: ({ client }) => client.get('/v1/admin/stats'),
+    },
+    {
+        name: 'aimeat_admin_agents',
+        handler: ({ client }) => client.get('/v1/admin/agents'),
+    },
+    {
+        name: 'aimeat_admin_config',
+        handler: ({ client }) => client.get('/v1/admin/config'),
+    },
+    {
+        name: 'aimeat_board_list',
+        handler: ({ client }) => client.get('/v1/boards'),
+    },
+    {
+        name: 'aimeat_board_create',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { name: requiredString(input, 'name') };
+            const description = optionalString(input, 'description');
+            const visibility = optionalString(input, 'visibility');
+            if (description) body.description = description;
+            if (visibility) body.visibility = visibility;
+            return client.post('/v1/boards', body);
+        },
+    },
+    {
+        name: 'aimeat_board_subscribe',
+        handler: ({ client }, input) => client.post(`/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/subscribe`),
+    },
+    {
+        name: 'aimeat_board_react',
+        handler: ({ client }, input) => client.post(
+            `/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts/${encodeURIComponent(requiredString(input, 'post_id'))}/react`,
+            { emoji: requiredString(input, 'emoji') },
+        ),
+    },
+    {
+        name: 'aimeat_board_reply',
+        handler: ({ client }, input) => client.post(
+            `/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts/${encodeURIComponent(requiredString(input, 'post_id'))}/replies`,
+            { body: requiredString(input, 'body') },
+        ),
+    },
+    {
+        name: 'aimeat_board_members',
+        handler: ({ client }, input) => client.patch(
+            `/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/members`,
+            { members: requiredArray(input, 'members') },
+        ),
+    },
+    {
+        name: 'aimeat_board_delete',
+        handler: ({ client }, input) => client.delete(`/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}`),
+    },
+    {
+        name: 'aimeat_capabilities_list',
+        handler: ({ client }, input) => client.get(`/v1/capabilities${query({ q: optionalString(input, 'query') })}`),
+    },
+    {
+        name: 'aimeat_capabilities_get',
+        handler: ({ client }, input) => client.get(`/v1/capabilities/${encodeURIComponent(requiredString(input, 'id'))}`),
+    },
+    {
+        name: 'aimeat_capabilities_invoke',
+        handler: ({ client }, input) => client.post(
+            `/v1/capabilities/${encodeURIComponent(requiredString(input, 'id'))}/invoke`,
+            optionalRecord(input, 'input') ?? {},
+        ),
+    },
+    {
+        name: 'aimeat_capabilities_create',
+        handler: ({ client }, input) => client.post('/v1/capabilities', {
+            name: requiredString(input, 'name'),
+            description: requiredString(input, 'description'),
+            type: requiredString(input, 'type'),
+        }),
+    },
+    {
+        name: 'aimeat_capabilities_update',
+        handler: ({ client }, input) => {
+            const body: JsonObject = {};
+            const name = optionalString(input, 'name');
+            const description = optionalString(input, 'description');
+            if (name) body.name = name;
+            if (description) body.description = description;
+            return client.put(`/v1/capabilities/${encodeURIComponent(requiredString(input, 'id'))}`, body);
+        },
+    },
+    {
+        name: 'aimeat_capabilities_delete',
+        handler: ({ client }, input) => client.delete(`/v1/capabilities/${encodeURIComponent(requiredString(input, 'id'))}`),
+    },
+    {
+        name: 'aimeat_capabilities_vouch',
+        handler: ({ client }, input) => client.post(`/v1/capabilities/${encodeURIComponent(requiredString(input, 'id'))}/vouch`, {}),
+    },
+    {
+        name: 'aimeat_catalogue_agents',
+        handler: ({ client }, input) => client.get(`/v1/catalogue/agents${query({ q: optionalString(input, 'query') })}`),
+    },
+    {
+        name: 'aimeat_catalogue_boards',
+        handler: ({ client }) => client.get('/v1/catalogue/boards'),
+    },
+    {
+        name: 'aimeat_catalogue_directory',
+        handler: ({ client }, input) => client.get(`/v1/catalogue/directory${query({ q: optionalString(input, 'query') })}`),
+    },
+    {
+        name: 'aimeat_consent_grant',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { recipient: requiredString(input, 'recipient'), keys: requiredArray(input, 'keys') };
+            const purpose = optionalString(input, 'purpose');
+            if (purpose) body.purpose = purpose;
+            return client.post('/v1/consent', body);
+        },
+    },
+    {
+        name: 'aimeat_consent_list',
+        handler: ({ client }) => client.get('/v1/consent'),
+    },
+    {
+        name: 'aimeat_consent_revoke',
+        handler: ({ client }, input) => client.delete(`/v1/consent/${encodeURIComponent(requiredString(input, 'id'))}`),
+    },
+    {
+        name: 'aimeat_flag_report',
+        handler: ({ client }, input) => client.post('/v1/flags', {
+            target_type: requiredString(input, 'target_type'),
+            target_id: requiredString(input, 'target_id'),
+            reason: requiredString(input, 'reason'),
+        }),
+    },
+    {
+        name: 'aimeat_group_list',
+        handler: ({ client }) => client.get('/v1/groups'),
+    },
+    {
+        name: 'aimeat_group_get',
+        handler: ({ client }, input) => client.get(`/v1/groups/${encodeURIComponent(requiredString(input, 'id'))}`),
+    },
+    {
+        name: 'aimeat_group_create',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { name: requiredString(input, 'name') };
+            const description = optionalString(input, 'description');
+            if (description) body.description = description;
+            return client.post('/v1/groups', body);
+        },
+    },
+    {
+        name: 'aimeat_group_add_member',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { identifier: requiredString(input, 'identifier') };
+            const role = optionalString(input, 'role');
+            if (role) body.role = role;
+            return client.post(`/v1/groups/${encodeURIComponent(requiredString(input, 'id'))}/members`, body);
+        },
+    },
+    {
+        name: 'aimeat_group_remove_member',
+        handler: ({ client }, input) => client.delete(`/v1/groups/${encodeURIComponent(requiredString(input, 'id'))}/members/${encodeURIComponent(requiredString(input, 'identifier'))}`),
+    },
+    {
+        name: 'aimeat_instance_list',
+        handler: ({ client }) => client.get('/v1/instances'),
+    },
+    {
+        name: 'aimeat_instance_create',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { name: requiredString(input, 'name') };
+            const template = optionalString(input, 'template');
+            if (template) body.template = template;
+            return client.post('/v1/instances', body);
+        },
+    },
+    {
+        name: 'aimeat_instance_status',
+        handler: ({ client }, input) => client.get(`/v1/instances/${encodeURIComponent(requiredString(input, 'id'))}/status`),
+    },
+    {
+        name: 'aimeat_knowledge_list',
+        handler: ({ client }) => client.get('/v1/catalogue/knowledge'),
+    },
+    {
+        name: 'aimeat_knowledge_get',
+        handler: ({ client }, input) => client.get(`/v1/knowledge/${encodeURIComponent(requiredString(input, 'id'))}`),
+    },
+    {
+        name: 'aimeat_knowledge_contribute',
+        handler: ({ client }, input) => client.post(`/v1/knowledge/${encodeURIComponent(requiredString(input, 'id'))}/contribute`, {
+            entry_key: requiredString(input, 'entry_key'),
+            content: requiredString(input, 'content'),
+        }),
+    },
+    {
+        name: 'aimeat_knowledge_links',
+        handler: ({ client }, input) => client.get(`/v1/knowledge/${encodeURIComponent(requiredString(input, 'id'))}/links`),
+    },
+    {
+        name: 'aimeat_memory_read_public',
+        handler: ({ client }, input) => client.get(`/v1/memory/${encodeURIComponent(requiredString(input, 'gaii'))}/${encodeURIComponent(requiredString(input, 'key'))}`),
+    },
+    {
+        name: 'aimeat_organism_list',
+        handler: ({ client }) => client.get('/v1/organisms'),
+    },
+    {
+        name: 'aimeat_organism_get',
+        handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'id'))}`),
+    },
+    {
+        name: 'aimeat_organism_join',
+        handler: ({ client }, input) => client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'id'))}/join`),
+    },
+    {
+        name: 'aimeat_organism_leave',
+        handler: ({ client }, input) => client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'id'))}/leave`),
+    },
+    {
+        name: 'aimeat_organism_members',
+        handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'id'))}/members`),
+    },
+    {
+        name: 'aimeat_wallet_transactions',
+        handler: ({ client }, input) => client.get(`/v1/wallet/transactions${query({ limit: optionalNumber(input, 'limit') })}`),
+    },
+    {
+        name: 'aimeat_app_publish',
+        description: 'Publish an app package.',
+        input: {
+            name: { type: 'string', required: true, description: 'App name.' },
+            description: { type: 'string', required: true, description: 'App description.' },
+            content: { type: 'string', required: true, description: 'App content.' },
+        },
+        handler: ({ client }, input) => client.post('/v1/packages', {
+            name: requiredString(input, 'name'),
+            description: requiredString(input, 'description'),
+            content: requiredString(input, 'content'),
+        }),
+    },
+    {
+        name: 'aimeat_app_list',
+        description: 'List available apps.',
+        input: { query: { type: 'string', description: 'Search query.' } },
+        handler: ({ client }, input) => client.get(`/v1/packages${query({ q: optionalString(input, 'query') })}`),
+    },
+    {
+        name: 'aimeat_app_get',
+        description: 'Get app detail by group ID.',
+        input: { group_id: { type: 'string', required: true, description: 'App group identifier.' } },
+        handler: ({ client }, input) => client.get(`/v1/packages/${encodeURIComponent(requiredString(input, 'group_id'))}`),
+    },
+    {
+        name: 'aimeat_app_delete',
+        description: 'Archive an app version.',
+        input: {
+            group_id: { type: 'string', required: true, description: 'App group identifier.' },
+            version: { type: 'string', required: true, description: 'Version to archive.' },
+        },
+        handler: ({ client }, input) => client.delete(`/v1/packages/${encodeURIComponent(requiredString(input, 'group_id'))}/versions/${encodeURIComponent(requiredString(input, 'version'))}`),
+    },
+    {
+        name: 'aimeat_app_versions',
+        description: 'List app version history.',
+        input: { group_id: { type: 'string', required: true, description: 'App group identifier.' } },
+        handler: ({ client }, input) => client.get(`/v1/packages/${encodeURIComponent(requiredString(input, 'group_id'))}/versions`),
+    },
+    {
+        name: 'aimeat_extension_list',
+        description: 'List installed extensions.',
+        input: {},
+        handler: ({ client }) => client.get('/v1/extensions'),
+    },
+    {
+        name: 'aimeat_extension_invoke',
+        description: 'Invoke an extension action.',
+        input: {
+            name: { type: 'string', required: true, description: 'Extension name.' },
+            action_id: { type: 'string', required: true, description: 'Action identifier.' },
+            input: { type: 'object', description: 'Input parameters.' },
+        },
+        handler: ({ client }, input) => client.post(
+            `/v1/ext/${encodeURIComponent(requiredString(input, 'name'))}/${encodeURIComponent(requiredString(input, 'action_id'))}`,
+            optionalRecord(input, 'input') ?? {},
+        ),
+    },
+    {
+        name: 'aimeat_extension_install',
+        description: 'Install an extension from a manifest.',
+        input: {
+            name: { type: 'string', required: true, description: 'Extension name.' },
+            manifest: { type: 'object', required: true, description: 'Extension manifest object.' },
+        },
+        handler: ({ client }, input) => client.post('/v1/extensions', {
+            name: requiredString(input, 'name'),
+            manifest: requiredRecord(input, 'manifest'),
+        }),
+    },
+    {
+        name: 'aimeat_extension_activate',
+        description: 'Activate an installed extension.',
+        input: { name: { type: 'string', required: true, description: 'Extension name.' } },
+        handler: ({ client }, input) => client.post(`/v1/extensions/${encodeURIComponent(requiredString(input, 'name'))}/activate`),
+    },
+    {
+        name: 'aimeat_extension_deactivate',
+        description: 'Deactivate an extension.',
+        input: { name: { type: 'string', required: true, description: 'Extension name.' } },
+        handler: ({ client }, input) => client.post(`/v1/extensions/${encodeURIComponent(requiredString(input, 'name'))}/deactivate`),
+    },
+    {
+        name: 'aimeat_extension_delete',
+        description: 'Uninstall an extension.',
+        input: { name: { type: 'string', required: true, description: 'Extension name.' } },
+        handler: ({ client }, input) => client.delete(`/v1/extensions/${encodeURIComponent(requiredString(input, 'name'))}`),
+    },
+    {
+        name: 'aimeat_extension_get',
+        description: 'Get extension details.',
+        input: { name: { type: 'string', required: true, description: 'Extension name.' } },
+        handler: ({ client }, input) => client.get(`/v1/extensions/${encodeURIComponent(requiredString(input, 'name'))}`),
+    },
+    {
+        name: 'aimeat_cortex_list',
+        description: 'List installed cortex models.',
+        input: {},
+        handler: ({ client }) => client.get('/v1/cortex'),
+    },
+    {
+        name: 'aimeat_cortex_install',
+        description: 'Install a cortex model from a manifest.',
+        input: {
+            name: { type: 'string', required: true, description: 'Cortex name.' },
+            manifest: { type: 'object', required: true, description: 'Cortex manifest object.' },
+        },
+        handler: ({ client }, input) => client.post('/v1/cortex', {
+            name: requiredString(input, 'name'),
+            manifest: requiredRecord(input, 'manifest'),
+        }),
+    },
+    {
+        name: 'aimeat_cortex_activate',
+        description: 'Activate a cortex model.',
+        input: { name: { type: 'string', required: true, description: 'Cortex name.' } },
+        handler: ({ client }, input) => client.post(`/v1/cortex/${encodeURIComponent(requiredString(input, 'name'))}/activate`),
+    },
+    {
+        name: 'aimeat_cortex_deactivate',
+        description: 'Deactivate a cortex model.',
+        input: { name: { type: 'string', required: true, description: 'Cortex name.' } },
+        handler: ({ client }, input) => client.post(`/v1/cortex/${encodeURIComponent(requiredString(input, 'name'))}/deactivate`),
+    },
+    {
+        name: 'aimeat_cortex_delete',
+        description: 'Delete a cortex model.',
+        input: { name: { type: 'string', required: true, description: 'Cortex name.' } },
+        handler: ({ client }, input) => client.delete(`/v1/cortex/${encodeURIComponent(requiredString(input, 'name'))}`),
+    },
+];
+
+function getTool(name: string): ConnectCliToolDefinition | undefined {
+    return CONNECT_CLI_TOOLS.find(tool => tool.name === name);
+}
+
+function getCliToolMetadata(name: string) {
+    const definition = getAimeatToolDefinition(name);
+    return definition?.visibility.cliFallback ? definition : undefined;
+}
+
+function printJson(value: unknown): void {
+    console.log(JSON.stringify(value, null, 2));
+}
+
+function loadJsonSource(flags: Record<string, string>): string | null {
+    if (flags.stdin === 'true') return null;
+    const source = flags.json ?? flags.data;
+    if (!source || source === 'true') return '{}';
+    const trimmed = source.trim();
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) return trimmed;
+    if (!existsSync(source)) throw new Error(`Input JSON file not found: ${source}`);
+    return readFileSync(source, 'utf-8');
+}
+
+async function readStdin(): Promise<string> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of process.stdin) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks).toString('utf-8');
+}
+
+function expandFileReferences(value: unknown): unknown {
+    if (typeof value === 'string' && value.startsWith('@file:')) {
+        return readFileSync(value.slice('@file:'.length), 'utf-8');
+    }
+    if (Array.isArray(value)) return value.map(item => expandFileReferences(item));
+    if (typeof value === 'object' && value !== null) {
+        const expanded: JsonObject = {};
+        for (const [key, child] of Object.entries(value)) expanded[key] = expandFileReferences(child);
+        return expanded;
+    }
+    return value;
+}
+
+async function readInput(flags: Record<string, string>): Promise<JsonObject> {
+    const raw = flags.stdin === 'true' ? await readStdin() : loadJsonSource(flags);
+    const trimmed = raw?.trim() ?? '{}';
+    if (!trimmed) return {};
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        throw new Error('Tool input must be a JSON object.');
+    }
+    return expandFileReferences(parsed) as JsonObject;
+}
+
+export function runToolList(flags: Record<string, string>): void {
+    const tools = CLI_FALLBACK_TOOL_DEFINITIONS
+        .filter(tool => tool.visibility.cliFallback)
+        .map(tool => ({ name: tool.name, description: tool.description }));
+    if (flags.json === 'true') {
+        printJson({ tools });
+        return;
+    }
+    for (const tool of tools) console.log(`${tool.name}\n  ${tool.description}`);
+}
+
+export function runToolSchema(toolName: string | undefined): void {
+    if (!toolName) {
+        console.error('Usage: aimeat connect schema <tool-name>');
+        process.exitCode = 1;
+        return;
+    }
+    const tool = getCliToolMetadata(toolName);
+    if (!tool || !getTool(toolName)) {
+        console.error(`Unknown CLI-callable tool: ${toolName}`);
+        process.exitCode = 1;
+        return;
+    }
+    printJson(tool);
+}
+
+export async function runToolCall(toolName: string | undefined, flags: Record<string, string>): Promise<void> {
+    if (!toolName) {
+        console.error('Usage: aimeat connect call <tool-name> --json input.json');
+        process.exitCode = 1;
+        return;
+    }
+    const tool = getTool(toolName);
+    const metadata = getCliToolMetadata(toolName);
+    if (!tool || !metadata) {
+        console.error(`Unknown CLI-callable tool: ${toolName}`);
+        process.exitCode = 1;
+        return;
+    }
+
+    try {
+        const config = loadConfig();
+        if (!config) throw new Error('Not configured. Run: npx aimeat connect');
+        const client = await Client.fromConfig();
+        const input = await readInput(flags);
+        const response = await tool.handler({ client, config, agentPath: encodeURIComponent(config.agent) }, input);
+        if (!response.ok) {
+            console.error(JSON.stringify(response.error ?? response, null, 2));
+            process.exitCode = 1;
+            return;
+        }
+        printJson(response.data ?? response);
+    } catch (error) {
+        console.error((error as Error).message);
+        process.exitCode = 1;
+    }
+}

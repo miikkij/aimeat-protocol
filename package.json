@@ -1,6 +1,6 @@
 {
   "name": "aimeat-protocol",
-  "version": "1.9.4",
+  "version": "1.9.5",
   "private": true,
   "description": "AIME AT — AI Memory Exchange and Action Transfer — love what you build, share what you know",
   "type": "module",
@@ -39,6 +39,7 @@
     "test:playwright:sqlite": "cd aimeat && pnpm test:playwright:sqlite",
     "test:playwright:mongodb": "cd aimeat && pnpm test:playwright:mongodb",
     "test:ci": "cd aimeat && node --import tsx test/run-e2e-ci.ts --all",
-    "generate:types": "cd aimeat && pnpm generate:types"
+    "generate:types": "cd aimeat && pnpm generate:types",
+    "audit:mcp-tools": "cd aimeat && pnpm audit:mcp-tools"
   }
 }

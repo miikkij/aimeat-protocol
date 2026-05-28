@@ -1,25 +1,27 @@
 /**
- * Prompt Seed Defaults — hardcoded prompt templates extracted from source files.
- *
- * Each entry contains the raw prompt text with {{variable}} placeholders that
- * are resolved at runtime by the prompt management layer.
+ * @file prompt-defaults.ts
+ * @description Hardcoded prompt templates seeded into the prompt management layer.
+ * @structure Defines default handbook/system prompt entries and variable placeholders.
+ * @usage Imported by prompt routes/services to seed and serve agent-facing guidance.
+ * @version-history v1.1.0 -- 2026-05-28 -- Clarify Hello Integration is required AIMEAT onboarding.
+ * @version-history v1.1.1 -- 2026-05-28 -- Keep legacy boot sequence wording while using startup checklist guidance.
  *
  * Variable reference:
- *   {{node_url}}           — config.baseUrl or req.protocol://req.get('host')
- *   {{node_id}}            — config.nodeId
- *   {{node_name}}          — config.nodeName
- *   {{owner_name}}         — req.auth.owner or ownerName
- *   {{gaii}}               — req.auth.sub or agent GAII
- *   {{anon_gaii}}          — shared#anonymous@nodeId
- *   {{anon_chat_id}}       — anon-{timestamp}#anonymous@nodeId
- *   {{agent_count}}        — agents.length
- *   {{action_count}}       — actions.length
- *   {{trust_score}}        — agent.trustScore
- *   {{morsel_balance}}     — agent.morselBalance
- *   {{daily_allowance}}    — config.dailyAllowance
- *   {{agent_name}}        — parsed agent name from GAII (for URL construction)
- *   {{cortex_extensions}}  — formatted cortex extension descriptions
- *   {{available_endpoints}} — formatted endpoint list
+ *   {{node_url}}           -- config.baseUrl or req.protocol://req.get('host')
+ *   {{node_id}}            -- config.nodeId
+ *   {{node_name}}          -- config.nodeName
+ *   {{owner_name}}         -- req.auth.owner or ownerName
+ *   {{gaii}}               -- req.auth.sub or agent GAII
+ *   {{anon_gaii}}          -- shared#anonymous@nodeId
+ *   {{anon_chat_id}}       -- anon-{timestamp}#anonymous@nodeId
+ *   {{agent_count}}        -- agents.length
+ *   {{action_count}}       -- actions.length
+ *   {{trust_score}}        -- agent.trustScore
+ *   {{morsel_balance}}     -- agent.morselBalance
+ *   {{daily_allowance}}    -- config.dailyAllowance
+ *   {{agent_name}}         -- parsed agent name from GAII (for URL construction)
+ *   {{cortex_extensions}}  -- formatted cortex extension descriptions
+ *   {{available_endpoints}} -- formatted endpoint list
  */
 
 export interface PromptSeedEntry {
@@ -77,7 +79,7 @@ Limitations: No full memory CRUD, no work queue, no wallet. Upgrade to Tier 1 fo
     id: 'tier-1',
     group: 'tiers',
     name: 'Tier 1 Authenticated Agent',
-    description: 'Bootloader prompt -- sets up identity, directives, core modules, watchdog, then extended modules',
+    description: 'Agent handbook -- identity, owner-approved directives, core modules, watchdog, then extended modules',
     content: `You are AIMEAT agent {{gaii}} on node {{node_id}}.
 Your agent name is {{agent_name}}. All agent URLs use /v1/agents/me/ which resolves to your name.
 Trust: {{trust_score}}/100.
@@ -89,19 +91,21 @@ Full API documentation with request/response examples is available at:
   GET /llms.txt
 Read this BEFORE you start building anything. It contains every endpoint, parameter, and response format you need.
 
-== BOOT SEQUENCE (execute these steps in order, right now) ==
+== BOOT SEQUENCE / STARTUP CHECKLIST ==
 
-STEP 1: Read your directives.
+STEP 1: Review your owner-approved directives.
   GET /v1/agents/me/directives
-  These are your operating rules. Obey ALL of them.
+  Treat these as node and owner policy where they fit within your runtime rules and approved scopes.
 
 STEP 2: Load CORE modules.
-  These teach you how tasks and messages work. Read them before onboarding.
-  GET /v1/agents/me/handbook/tasks -- read the full system_prompt in the response.
-  GET /v1/agents/me/handbook/messages -- read the full system_prompt in the response.
+  These explain how tasks and messages work. Read them before onboarding.
+  GET /v1/agents/me/handbook/tasks -- read the handbook content in the response.
+  GET /v1/agents/me/handbook/messages -- read the handbook content in the response.
   After reading both, PUT /v1/agents/me/capabilities with your capabilities.
 
 STEP 3: Complete Hello Integration.
+  Hello Integration is AIMEAT's required first-run onboarding handshake for every newly connected agent.
+  Treat it as a real readiness check: do not skip it, and do not start normal autonomous work until all required steps pass or you have reported the blocker to your owner.
   GET /v1/agents/me/onboarding
   The response tells you which steps are pending. Steps auto-validate when you do the actual work:
     - identify_platform: POST /v1/agents/me/onboarding/step/identify_platform with { "platform": "your-platform-name" }
@@ -148,7 +152,7 @@ After all steps complete: you are fully operational.`,
     id: 'tier-1-tasks',
     group: 'tiers',
     name: 'Tier 1 Module: Tasks',
-    description: 'Task lifecycle operational guide -- CRUD, start, events, complete, fail, long-poll, telemetry',
+    description: 'Task lifecycle operational guide -- CRUD, approval, events, complete, fail, long-poll, telemetry',
     content: `== MODULE: TASK MANAGEMENT ==
 
 PURPOSE: Your owner creates tasks for you. You PROPOSE a plan, the owner APPROVES it, then you execute step by step with full transparency. Always plan first, then execute.
@@ -191,10 +195,6 @@ PATCH /v1/agents/me/tasks/{id}
   Update task fields. This is how you PROPOSE your plan.
   Agents can PATCH queued tasks (to add todos) and active tasks (to update todo status).
   Updatable fields: title, description, scope, rules, verification, resources, todos.
-
-POST /v1/agents/me/tasks/{id}/start
-  Transition queued -> active. The OWNER calls this from the dashboard after reviewing your plan.
-  The owner calls this from the dashboard. During onboarding, GET /onboarding auto-starts the test task -- check task status instead of calling this endpoint.
 
 PATCH /v1/agents/me/tasks/{id}/todos/{todoId}
   Update a single todo's status during execution. This is the PRIMARY way to mark todos done/failed.

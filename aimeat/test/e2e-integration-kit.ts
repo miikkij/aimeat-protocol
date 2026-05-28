@@ -278,8 +278,8 @@ await test('10. Integration kit has correct endpoints', async () => {
     const ws = body.data.kit.watchdog_spec;
     assert(typeof ws.poll_interval_seconds === 'number', 'has poll_interval_seconds');
     assert(ws.inbox_endpoint === `/v1/agents/${agentName}/inbox`, `inbox_endpoint: ${ws.inbox_endpoint}`);
-    assert(ws.task_start_endpoint === `/v1/agents/${agentName}/tasks/{id}/start`, `task_start_endpoint: ${ws.task_start_endpoint}`);
     assert(ws.task_event_endpoint === `/v1/agents/${agentName}/tasks/{id}/event`, `task_event_endpoint: ${ws.task_event_endpoint}`);
+    assert(ws.task_todo_endpoint === `/v1/agents/${agentName}/tasks/{id}/todos/{todoId}`, `task_todo_endpoint: ${ws.task_todo_endpoint}`);
     assert(ws.task_complete_endpoint === `/v1/agents/${agentName}/tasks/{id}/complete`, `task_complete_endpoint: ${ws.task_complete_endpoint}`);
     assert(ws.task_fail_endpoint === `/v1/agents/${agentName}/tasks/{id}/fail`, `task_fail_endpoint: ${ws.task_fail_endpoint}`);
 

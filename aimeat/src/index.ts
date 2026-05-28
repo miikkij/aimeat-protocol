@@ -5,6 +5,12 @@
  * @structure Parses top-level CLI flags, routes subcommands, starts the server, and delegates connector commands.
  * @usage Executed through the published `aimeat` binary.
  * @version-history v1.9.4 — 2026-05-28 — Allow agent connector flags and drain async auth handles before exit.
+ * @version-history v1.9.5 — 2026-05-28 — Drain async handles before exiting one-shot connector commands on Windows.
+ * @version-history v1.9.6 — 2026-05-28 — Print extracted skill bundle guidance after refresh.
+ * @version-history v1.9.7 — 2026-05-28 — Add connector-specific help and prevent `aimeat connect help` from starting auth.
+ * @version-history v1.9.8 — 2026-05-28 — Add connector CLI tools/schema/call fallback commands.
+ * @version-history v1.9.9 — 2026-05-28 — Allow connector fallback flags through top-level parsing.
+ * @version-history v1.9.10 — 2026-05-28 — Narrow permissive parseArgs values before applying node CLI string flags.
  */
 import { parseArgs } from 'node:util';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -24,6 +30,8 @@ process.on('unhandledRejection', (reason) => {
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
+  // Connector subcommands parse their own flags so tool input flags can evolve without touching the node CLI parser.
+  strict: false,
   options: {
     port: { type: 'string', short: 'p' },
     db: { type: 'string' },
@@ -47,6 +55,10 @@ const { values, positionals } = parseArgs({
     version: { type: 'boolean', short: 'v' },
   },
 });
+
+function stringFlag(value: string | boolean | undefined): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
 
 const HELP_TEXT = `
 aimeat — AI Memory Exchange and Action Transfer protocol node
@@ -124,8 +136,62 @@ MULTIPLE ENVIRONMENTS
     aimeat start --config staging.json
 `;
 
+const CONNECT_HELP_TEXT = `
+AIMEAT Agent Connector
+
+USAGE
+  aimeat connect --url <node-url> --owner <owner> [--agent <name>]
+      Authenticate an AI agent with OAuth device authorization.
+
+  aimeat connect serve
+      Start the local MCP server for the connected agent. Configure your AI
+      runtime to launch this command so it can see AIMEAT tools.
+
+  aimeat connect status
+      Show the connected agent, owner, node, and token status.
+
+  aimeat connect inbox
+      Show pending agent messages.
+
+  aimeat connect tasks
+      List assigned tasks.
+
+  aimeat connect send --body "message"
+      Send an outbound message from the connected agent.
+
+  aimeat connect docs [module]
+      Print the agent handbook or one module: tasks, messages, work, services,
+      memory, activity, social, collaboration, appdev, or mcp.
+
+    aimeat connect tools [--json]
+      List shell-callable AIMEAT tools for runtimes without MCP access.
+
+    aimeat connect schema <tool-name>
+      Print JSON input metadata for a shell-callable tool.
+
+    aimeat connect call <tool-name> --json input.json
+      Call a shell-callable tool using the stored connector token. Use --stdin
+      to read the JSON object from standard input.
+
+  aimeat connect refresh
+      Re-download and extract the local skill bundle.
+
+  aimeat connect logout
+      Remove stored credentials for the configured agent.
+
+EXAMPLES
+  aimeat connect --url http://localhost:40050 --owner happyadmin --agent hermes
+  aimeat connect serve
+  aimeat connect docs tasks
+  aimeat connect call aimeat_onboarding_status
+
+NOTES
+  MCP tool names such as aimeat_handbook_get are not terminal commands. They
+  appear inside an AI runtime after it attaches to \`aimeat connect serve\`.
+`;
+
 if (values.help) {
-  console.log(HELP_TEXT);
+  console.log(positionals[0] === 'connect' ? CONNECT_HELP_TEXT : HELP_TEXT);
   process.exit(0);
 }
 
@@ -176,21 +242,31 @@ if (envPath) {
 
 // Build CLI overrides from flags (dot-path keyed for unified config)
 const cliOverrides: Record<string, string> = {};
-if (values.port) cliOverrides['node.port'] = values.port;
-if (values.db) cliOverrides['storage.type'] = values.db;
-if (values['db-url']) cliOverrides['database_url'] = values['db-url'];
-if (values['db-path']) cliOverrides['sqlite_path'] = values['db-path'];
-if (values['node-id']) cliOverrides['node.id'] = values['node-id'];
-if (values['admin-password']) cliOverrides['admin_password'] = values['admin-password'];
-if (values.consul) {
+const portFlag = stringFlag(values.port);
+const dbFlag = stringFlag(values.db);
+const dbUrlFlag = stringFlag(values['db-url']);
+const dbPathFlag = stringFlag(values['db-path']);
+const nodeIdFlag = stringFlag(values['node-id']);
+const adminPasswordFlag = stringFlag(values['admin-password']);
+const consulFlag = stringFlag(values.consul);
+const consulPrefixFlag = stringFlag(values['consul-prefix']);
+const consulTokenFlag = stringFlag(values['consul-token']);
+
+if (portFlag) cliOverrides['node.port'] = portFlag;
+if (dbFlag) cliOverrides['storage.type'] = dbFlag;
+if (dbUrlFlag) cliOverrides['database_url'] = dbUrlFlag;
+if (dbPathFlag) cliOverrides['sqlite_path'] = dbPathFlag;
+if (nodeIdFlag) cliOverrides['node.id'] = nodeIdFlag;
+if (adminPasswordFlag) cliOverrides['admin_password'] = adminPasswordFlag;
+if (consulFlag) {
   cliOverrides['consul.enabled'] = 'true';
-  cliOverrides['consul.url'] = values.consul;
+  cliOverrides['consul.url'] = consulFlag;
 }
-if (values['consul-prefix']) cliOverrides['consul.prefix'] = values['consul-prefix'];
-if (values['consul-token']) cliOverrides['consul.token'] = values['consul-token'];
+if (consulPrefixFlag) cliOverrides['consul.prefix'] = consulPrefixFlag;
+if (consulTokenFlag) cliOverrides['consul.token'] = consulTokenFlag;
 
 const { config, envKeys, fileKeys, cliKeys, fileName } = loadConfig({
-  configPath: values.config,
+  configPath: stringFlag(values.config),
   cliOverrides: Object.keys(cliOverrides).length > 0 ? cliOverrides : undefined,
 });
 const subcommand = positionals[0];
@@ -359,17 +435,23 @@ if (subcommand === 'config') {
 } else if (subcommand === 'connect') {
   const connectAction = positionals[1];
   let shouldExitAfterConnect = true;
-  let connectExitDelayMs = 0;
-  // Parse --url, --owner, --agent, --to, --body from raw argv
+  const connectExitDelayMs = 250;
+  // Parse connector flags from raw argv. Boolean flags are stored as "true".
   const rawArgs = process.argv.slice(2);
   const connectFlags: Record<string, string> = {};
   for (let i = 0; i < rawArgs.length; i++) {
-    if (rawArgs[i].startsWith('--') && rawArgs[i + 1] && !rawArgs[i + 1].startsWith('--')) {
-      connectFlags[rawArgs[i].slice(2)] = rawArgs[++i];
+    if (rawArgs[i].startsWith('--')) {
+      if (rawArgs[i + 1] && !rawArgs[i + 1].startsWith('--')) {
+        connectFlags[rawArgs[i].slice(2)] = rawArgs[++i];
+      } else {
+        connectFlags[rawArgs[i].slice(2)] = 'true';
+      }
     }
   }
 
-  if (connectAction === 'serve') {
+  if (connectAction === 'help') {
+    console.log(CONNECT_HELP_TEXT);
+  } else if (connectAction === 'serve') {
     const { runServe } = await import('./cli/connect/mcp/server.js');
     await runServe(connectFlags);
     shouldExitAfterConnect = false;
@@ -388,16 +470,28 @@ if (subcommand === 'config') {
   } else if (connectAction === 'docs') {
     const { runDocs } = await import('./cli/connect/docs.js');
     await runDocs(positionals[2]);
+  } else if (connectAction === 'tools') {
+    const { runToolList } = await import('./cli/connect/tool-call.js');
+    runToolList(connectFlags);
+  } else if (connectAction === 'schema') {
+    const { runToolSchema } = await import('./cli/connect/tool-call.js');
+    runToolSchema(positionals[2]);
+  } else if (connectAction === 'call') {
+    const { runToolCall } = await import('./cli/connect/tool-call.js');
+    await runToolCall(positionals[2], connectFlags);
   } else if (connectAction === 'refresh') {
     const { AimeatClient } = await import('./cli/connect/api-client.js');
-    const { downloadSkillBundle } = await import('./cli/connect/skill-bundle.js');
-    const { loadConfig, getConfigDir } = await import('./cli/connect/config.js');
+    const { downloadSkillBundle, readSkillBundleGuide } = await import('./cli/connect/skill-bundle.js');
+    const { loadConfig } = await import('./cli/connect/config.js');
     const cfg = loadConfig();
     if (!cfg) { console.error('Not configured. Run: npx aimeat connect'); process.exit(1); }
     try {
       const cl = await AimeatClient.fromConfig();
-      await downloadSkillBundle(cl, cfg.agent);
-      console.log(`Skill bundle refreshed at ${getConfigDir()}/${cfg.agent}/`);
+      const bundle = await downloadSkillBundle(cl, cfg.agent);
+      console.log(`Skill bundle downloaded and extracted to ${bundle.bundleDir}/`);
+      console.log(`Main skill file: ${bundle.skillPath}`);
+      console.log('');
+      console.log(readSkillBundleGuide(bundle));
     } catch (e) {
       console.error((e as Error).message);
       process.exit(1);
@@ -421,7 +515,6 @@ if (subcommand === 'config') {
       owner: connectFlags.owner,
       agent: connectFlags.agent,
     });
-    connectExitDelayMs = 250;
   }
   if (shouldExitAfterConnect) {
     if (connectExitDelayMs > 0) await new Promise(resolve => setTimeout(resolve, connectExitDelayMs));

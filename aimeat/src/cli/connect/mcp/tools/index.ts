@@ -3,6 +3,8 @@
  * @description Registry that wires all MCP tool modules to an McpServer instance.
  *   Each module registers its own tools; this file orchestrates the registration
  *   order and passes the shared AimeatClient and agent name.
+ * @version-history v1.1.0 -- 2026-05-28 -- Register Hello Integration onboarding MCP tools.
+ * @version-history v1.1.1 -- 2026-05-28 -- Register connector telemetry reporting MCP tool.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatClient } from '../../api-client.js';
@@ -11,6 +13,7 @@ import { registerCoreTools } from './core.js';
 import { registerAgentTasksTools } from './agent-tasks.js';
 import { registerAgentMessagesTools } from './agent-messages.js';
 import { registerAgentCapsTools } from './agent-caps.js';
+import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerBoardsTools } from './boards.js';
 import { registerCatalogueTools } from './catalogue.js';
 import { registerCapabilitiesTools } from './capabilities.js';
@@ -26,12 +29,14 @@ import { registerMemoryExtTools } from './memory-ext.js';
 import { registerWalletExtTools } from './wallet-ext.js';
 import { registerFlagsTools } from './flags.js';
 import { registerHandbookTools } from './handbook.js';
+import { registerOnboardingTools } from './onboarding.js';
 
 export function registerAllTools(mcp: McpServer, client: AimeatClient, agentName: string): void {
   registerCoreTools(mcp, client, agentName);
   registerAgentTasksTools(mcp, client, agentName);
   registerAgentMessagesTools(mcp, client, agentName);
   registerAgentCapsTools(mcp, client, agentName);
+  registerAgentTelemetryTools(mcp, client, agentName);
   registerBoardsTools(mcp, client);
   registerCatalogueTools(mcp, client);
   registerCapabilitiesTools(mcp, client);
@@ -47,4 +52,5 @@ export function registerAllTools(mcp: McpServer, client: AimeatClient, agentName
   registerWalletExtTools(mcp, client);
   registerFlagsTools(mcp, client);
   registerHandbookTools(mcp, client);
+  registerOnboardingTools(mcp, client, agentName);
 }

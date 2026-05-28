@@ -15,6 +15,7 @@
  *   v1.3.0 — 2026-03-21 — Added registerExtensionsTools registration (2 tools + 1 resource)
  *   v1.4.0 — 2026-03-21 — Added registerCatalogueTools (3), registerMemoryExtendedTools (2), registerWalletExtendedTools (1)
  *   v1.5.0 — 2026-03-21 — Added registerConsentTools (3), registerChatInstancesTools (3), registerFlagsTools (1), registerPromptsTools (1)
+ *   v1.6.0 — 2026-05-28 — Added public MCP Hello Integration onboarding and telemetry tools
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -48,6 +49,8 @@ import { registerSharingGroupTools } from './sharing-groups.js';
 import { registerAgentTaskTools } from './agent-tasks.js';
 import { registerAgentCapabilityTools } from './agent-capabilities.js';
 import { registerAgentMessageTools } from './agent-messages.js';
+import { registerAgentOnboardingTools } from './agent-onboarding.js';
+import { registerAgentTelemetryTools } from './agent-telemetry.js';
 
 // ── Resource change event bus ──
 // Allows REST routes and MCP tools to emit resource change events
@@ -123,6 +126,8 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         registerAgentTaskTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentCapabilityTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentMessageTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerAgentTelemetryTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerAgentOnboardingTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
 
         return mcp;
     }
@@ -154,7 +159,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             // Existing session — update lastSeen for session tracking
             const ciId = sessionChatInstances.get(sessionId);
             if (ciId) {
-                storage.updateChatInstance(ciId, { lastSeen: new Date().toISOString() }).catch(() => {});
+                storage.updateChatInstance(ciId, { lastSeen: new Date().toISOString() }).catch(() => { });
             }
             const transport = transports.get(sessionId)!;
             await transport.handleRequest(req as unknown as IncomingMessage, res as unknown as ServerResponse, req.body);

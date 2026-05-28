@@ -4,11 +4,24 @@
  * @structure Prompts for connection details, starts RFC 8628 device auth, stores the issued token, and downloads the skill bundle.
  * @usage Called by `aimeat connect`.
  * @version-history v1.9.4 — 2026-05-28 — Update connector guidance, name-based inbox checks, network errors, and lazy interactive prompts.
+ * @version-history v1.9.5 — 2026-05-28 — Validate and default the interactive node URL prompt.
+ * @version-history v1.9.6 — 2026-05-28 — Accept raw OAuth token responses and avoid logging credentials.
+ * @version-history v1.9.7 — 2026-05-28 — Print post-connection MCP and onboarding next steps.
+ * @version-history v1.9.8 — 2026-05-28 — Include a paste-ready Hello Integration instruction for agents.
+ * @version-history v1.9.9 — 2026-05-28 — Report the actual extracted SKILL.md path after bundle download.
+ * @version-history v1.9.10 — 2026-05-28 — Clarify that skill bundles are downloaded and extracted locally.
+ * @version-history v1.9.11 — 2026-05-28 — Print the extracted BUNDLE.md guide after download.
+ * @version-history v1.9.12 — 2026-05-28 — Give agents the concrete Hello Integration MCP sequence.
+ * @version-history v1.9.13 — 2026-05-28 — Print serve and Hello Integration next steps even when already connected.
+ * @version-history v1.9.14 — 2026-05-28 — Default missing non-interactive agent names so the short connect command works.
+ * @version-history v1.9.15 — 2026-05-28 — Clarify MCP tool names are not terminal commands.
+ * @version-history v1.9.16 — 2026-05-28 — Include required telemetry reporting in Hello Integration guidance.
+ * @version-history v1.9.17 — 2026-05-28 — State that Hello Integration is required first-run onboarding.
  */
 import { AimeatClient } from './api-client.js';
 import { storeToken, getToken } from './keychain.js';
-import { saveConfig, getConfigDir } from './config.js';
-import { downloadSkillBundle } from './skill-bundle.js';
+import { saveConfig } from './config.js';
+import { downloadSkillBundle, readSkillBundleGuide } from './skill-bundle.js';
 
 type Prompts = typeof import('@clack/prompts');
 
@@ -21,6 +34,102 @@ interface AuthArgs {
 interface ProgressHandle {
   start(message: string): void;
   stop(message?: string): void;
+}
+
+interface DeviceTokenResponse {
+  access_token: string;
+  gaii: string;
+  name: string;
+}
+
+interface OAuthErrorResponse {
+  error: string;
+  error_description?: string;
+}
+
+const DEFAULT_NODE_URL = 'https://aimeat.io';
+const DEFAULT_AGENT_NAME = 'assistant';
+
+function normalizeNodeUrl(value: string | undefined): string | null {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return null;
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const url = new URL(withProtocol);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return null;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isDeviceTokenResponse(value: unknown): value is DeviceTokenResponse {
+  return isRecord(value)
+    && typeof value.access_token === 'string'
+    && typeof value.gaii === 'string'
+    && typeof value.name === 'string';
+}
+
+function getOAuthError(value: unknown): OAuthErrorResponse | null {
+  if (!isRecord(value) || typeof value.error !== 'string') return null;
+  return {
+    error: value.error,
+    error_description: typeof value.error_description === 'string' ? value.error_description : undefined,
+  };
+}
+
+function buildAgentOnboardingInstruction(): string {
+  return `You are connected to AIMEAT through MCP in this runtime.
+
+Use the available AIMEAT tools now. Hello Integration is AIMEAT's required first-run onboarding handshake for every newly connected agent. The names below are MCP tools shown by your AI runtime; do not type them as terminal commands. Complete Hello Integration in this order:
+1. Call aimeat_handbook_get and read the operating handbook.
+2. Call aimeat_onboarding_status and follow its next-step hints.
+3. Call aimeat_onboarding_identify_platform with your runtime/platform name.
+4. Call aimeat_onboarding_confirm_skill_installed after confirming the local skill bundle is available.
+5. Call aimeat_agent_capabilities_report with your useful capabilities.
+6. Call aimeat_onboarding_confirm_directives_read after reading the handbook/directives.
+7. Call aimeat_message_send with a short Hello Integration test message.
+8. Call aimeat_agent_telemetry_report with an agent_report event.
+9. Call aimeat_task_list and find the task named "Onboarding verification".
+10. Call aimeat_task_propose_todos with a short TODO plan for that task.
+11. Call aimeat_onboarding_status again. If the test task is active, use aimeat_task_event, aimeat_task_todo, and aimeat_task_complete to finish it.
+12. Call aimeat_onboarding_status one final time and report any remaining pending step.
+
+If AIMEAT tools are not available in this runtime, tell me the MCP server is not attached yet.`;
+}
+
+function buildNextStepsMessage(agentInstruction: string): string {
+  return `Done. Your agent is connected.
+
+NEXT TERMINAL COMMAND FOR THE AGENT
+Run this command now and leave it running:
+
+  npx aimeat connect serve
+
+After that MCP server is attached to the AI runtime, paste this instruction into the connected agent:
+
+${agentInstruction}`;
+}
+
+async function downloadAndPrintBundleGuide(
+  client: AimeatClient,
+  agentName: string,
+  success: (message: string) => void,
+  info: (message: string) => void,
+  warn: (message: string) => void,
+): Promise<void> {
+  try {
+    const bundle = await downloadSkillBundle(client, agentName);
+    success(`Skill bundle downloaded and extracted to ${bundle.bundleDir}`);
+    info(`Main skill file: ${bundle.skillPath}`);
+    info(readSkillBundleGuide(bundle));
+  } catch {
+    warn('Could not download skill bundle. Run: npx aimeat connect refresh');
+  }
 }
 
 function createProgress(interactive: boolean, prompts: Prompts | null): ProgressHandle {
@@ -43,22 +152,46 @@ export async function runAuth(args: AuthArgs): Promise<void> {
 
   intro('AIMEAT Agent Connector');
 
-  if (!interactive && (!args.url || !args.owner || !args.agent)) {
-    fail('Missing required options. Usage: npx aimeat connect --url <node-url> --owner <owner> --agent <agent-name>');
+  if (!interactive && (!args.url || !args.owner)) {
+    fail('Missing required options. Usage: npx aimeat connect --url <node-url> --owner <owner> [--agent <agent-name>]');
     process.exit(1);
   }
 
-  const nodeUrlInput = args.url ?? await prompts!.text({ message: 'AIMEAT node URL:', placeholder: 'https://aimeat.io' });
+  const nodeUrlInput = args.url ?? await prompts!.text({
+    message: 'AIMEAT node URL:',
+    placeholder: DEFAULT_NODE_URL,
+    defaultValue: DEFAULT_NODE_URL,
+    validate(value) {
+      return normalizeNodeUrl(value) ? undefined : 'Enter a valid AIMEAT node URL, for example https://aimeat.io';
+    },
+  });
   if (prompts?.isCancel(nodeUrlInput)) { prompts.cancel('Cancelled.'); process.exit(0); }
-  const nodeUrl = nodeUrlInput as string;
+  const nodeUrl = normalizeNodeUrl(nodeUrlInput as string);
+  if (!nodeUrl) {
+    fail('Missing or invalid node URL. Usage: npx aimeat connect --url https://aimeat.io --owner <owner> [--agent <agent-name>]');
+    process.exit(1);
+  }
 
   const ownerInput = args.owner ?? await prompts!.text({ message: 'Your owner handle:' });
   if (prompts?.isCancel(ownerInput)) { prompts.cancel('Cancelled.'); process.exit(0); }
-  const owner = ownerInput as string;
+  const owner = (ownerInput as string).trim();
+  if (!owner) {
+    fail('Missing owner handle. Usage: npx aimeat connect --url https://aimeat.io --owner <owner> [--agent <agent-name>]');
+    process.exit(1);
+  }
 
-  const agentInput = args.agent ?? await prompts!.text({ message: 'Agent name:', placeholder: 'claude' });
+  const agentInput = args.agent ?? (interactive
+    ? await prompts!.text({ message: 'Agent name:', placeholder: DEFAULT_AGENT_NAME, defaultValue: DEFAULT_AGENT_NAME })
+    : (process.env.AIMEAT_AGENT_NAME || DEFAULT_AGENT_NAME));
   if (prompts?.isCancel(agentInput)) { prompts.cancel('Cancelled.'); process.exit(0); }
-  const agentName = agentInput as string;
+  const agentName = (agentInput as string).trim();
+  if (!agentName) {
+    fail('Missing agent name. Usage: npx aimeat connect --url https://aimeat.io --owner <owner> [--agent <agent-name>]');
+    process.exit(1);
+  }
+  if (!args.agent && !interactive) {
+    info(`No --agent provided; using agent name "${agentName}". To choose another name, rerun with --agent <name>.`);
+  }
 
   const client = new AimeatClient(nodeUrl);
 
@@ -69,7 +202,9 @@ export async function runAuth(args: AuthArgs): Promise<void> {
       const check = await client.get(`/v1/agents/${encodeURIComponent(agentName)}/inbox`);
       if (check.ok) {
         success('Already connected! Token is valid.');
-        outro('Done.');
+        saveConfig({ node_url: nodeUrl, agent: agentName, owner });
+        await downloadAndPrintBundleGuide(client, agentName, success, info, warn);
+        outro(buildNextStepsMessage(buildAgentOnboardingInstruction()));
         return;
       }
     } catch {
@@ -110,7 +245,7 @@ export async function runAuth(args: AuthArgs): Promise<void> {
 
   s.start('Polling for approval (every 5s)...');
   const interval = (authData.interval ?? 5) * 1000;
-  let tokenData: { access_token: string; gaii: string; name: string } | null = null;
+  let tokenData: DeviceTokenResponse | null = null;
 
   for (let i = 0; i < 360; i++) {
     await new Promise(r => setTimeout(r, interval));
@@ -125,11 +260,16 @@ export async function runAuth(args: AuthArgs): Promise<void> {
       fail((e as Error).message);
       process.exit(1);
     }
-    if (pollResp.ok) {
-      tokenData = pollResp.data as typeof tokenData;
+    if (isDeviceTokenResponse(pollResp)) {
+      tokenData = pollResp;
       break;
     }
-    const errCode = (pollResp as unknown as { error?: string }).error;
+    if (pollResp.ok && isDeviceTokenResponse(pollResp.data)) {
+      tokenData = pollResp.data;
+      break;
+    }
+    const oauthError = getOAuthError(pollResp);
+    const errCode = oauthError?.error;
     if (errCode === 'access_denied') {
       s.stop('Authorization denied.');
       fail('The owner denied the authorization request.');
@@ -137,7 +277,7 @@ export async function runAuth(args: AuthArgs): Promise<void> {
     }
     if (errCode !== 'authorization_pending' && errCode !== 'slow_down') {
       s.stop('Unexpected error.');
-      fail(JSON.stringify(pollResp));
+      fail(oauthError?.error_description ?? 'Token endpoint returned an unrecognized response. No credentials were printed.');
       process.exit(1);
     }
   }
@@ -147,7 +287,7 @@ export async function runAuth(args: AuthArgs): Promise<void> {
     process.exit(1);
   }
 
-  const token = tokenData as { access_token: string; gaii: string; name: string };
+  const token = tokenData;
   s.stop('Approved!');
 
   await storeToken(agentName, owner, token.access_token);
@@ -156,12 +296,7 @@ export async function runAuth(args: AuthArgs): Promise<void> {
   saveConfig({ node_url: nodeUrl, agent: agentName, owner });
 
   client.setToken(token.access_token);
-  try {
-    await downloadSkillBundle(client, agentName);
-    success(`Skill bundle downloaded to ${getConfigDir()}/${agentName}/SKILL.md`);
-  } catch {
-    warn('Could not download skill bundle. Run: npx aimeat connect refresh');
-  }
+  await downloadAndPrintBundleGuide(client, agentName, success, info, warn);
 
-  outro('Done. Your agent is connected.');
+  outro(buildNextStepsMessage(buildAgentOnboardingInstruction()));
 }

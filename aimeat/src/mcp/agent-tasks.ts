@@ -1,6 +1,6 @@
 /**
  * @file agent-tasks.ts
- * @description MCP tools for agent task management (list, get, start, event, todo, complete, fail)
+ * @description MCP tools for agent task management (list, get, propose todos, event, todo, complete, fail)
  * @structure
  *   - registerAgentTaskTools() -- registers all agent task tools on an McpServer instance
  * @usage
@@ -8,6 +8,8 @@
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
+ *   v1.1.0 -- 2026-05-28 -- Remove legacy agent-side task start tool; owners start queued tasks
+ *   v1.2.0 -- 2026-05-28 -- Add TODO proposal tool for public MCP parity with connector MCP
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -15,7 +17,6 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
 
 export function registerAgentTaskTools(
     mcp: McpServer,
@@ -23,17 +24,9 @@ export function registerAgentTaskTools(
     config: AimeatConfig,
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
-    emitResourceListChanged: (agentGaii: string) => void,
+    _emitResourceListChanged: (agentGaii: string) => void,
 ): void {
     const agentGaii = getAgentGaii();
-
-    /** Resolve the owner's GHII (owner@nodeId) from the agent's GAII. */
-    function getOwnerGhii(): string {
-        const parsed = parseGAII(agentGaii);
-        if (parsed) return `${parsed.owner}@${config.nodeId}`;
-        // Fallback: treat agentGaii as an owner name
-        return `${agentGaii}@${config.nodeId}`;
-    }
 
     /** Check if a task belongs to the current agent. */
     function isOwnTask(task: AgentTaskRecord): boolean {
@@ -134,14 +127,20 @@ export function registerAgentTaskTools(
         },
     );
 
-    // ── Tool 3: aimeat_task_start ──
+    // ── Tool 3: aimeat_task_propose_todos ──
     mcp.tool(
-        'aimeat_task_start',
-        'Start a queued task (transitions queued -> active)',
+        'aimeat_task_propose_todos',
+        'Propose TODOs for a queued task before owner approval or onboarding auto-start',
         {
-            task_id: z.string().describe('The task ID to start'),
+            task_id: z.string().describe('The task ID'),
+            todos: z.array(z.object({
+                title: z.string().describe('TODO title'),
+                description: z.string().optional().describe('TODO details'),
+                verification: z.string().optional().describe('How completion can be verified'),
+                estimate_minutes: z.number().optional().describe('Estimated work time in minutes'),
+            })).describe('Proposed TODO plan'),
         },
-        async ({ task_id }) => {
+        async ({ task_id, todos }) => {
             const task = await storage.getAgentTask(task_id);
             if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
 
@@ -149,14 +148,25 @@ export function registerAgentTaskTools(
                 return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
             }
 
-            if (task.status !== 'queued') {
-                return { content: [{ type: 'text' as const, text: `Only queued tasks can be started (current: ${task.status})` }], isError: true };
+            if (!['queued', 'active'].includes(task.status)) {
+                return { content: [{ type: 'text' as const, text: `TODOs can only be proposed on queued or active tasks (current: ${task.status})` }], isError: true };
             }
 
             const now = new Date().toISOString();
+            const proposedTodos: AgentTaskTodo[] = todos.map((todo, index) => ({
+                id: `todo-${index + 1}`,
+                order: index + 1,
+                title: todo.title,
+                description: todo.description ?? '',
+                environment: 'agent',
+                environmentReason: 'The connected agent can perform this onboarding verification step through AIMEAT MCP tools.',
+                verification: todo.verification ?? '',
+                estimateMinutes: todo.estimate_minutes,
+                status: 'pending',
+            }));
 
             const updated = await storage.updateAgentTask(task_id, {
-                status: 'active',
+                todos: proposedTodos,
                 lastEventAt: now,
                 updatedAt: now,
             });
@@ -164,8 +174,9 @@ export function registerAgentTaskTools(
             await storage.appendTaskEvent({
                 id: randomUUID(),
                 taskId: task_id,
-                type: 'started',
-                message: 'Task started',
+                type: 'progress',
+                message: 'TODO plan proposed',
+                details: { todo_count: proposedTodos.length },
                 timestamp: now,
             });
 
@@ -175,9 +186,16 @@ export function registerAgentTaskTools(
                 content: [{
                     type: 'text' as const,
                     text: JSON.stringify({
-                        started: true,
+                        updated: true,
                         task_id,
-                        status: updated?.status ?? 'active',
+                        status: updated?.status ?? task.status,
+                        todo_count: proposedTodos.length,
+                        todos: proposedTodos.map(todo => ({
+                            id: todo.id,
+                            order: todo.order,
+                            title: todo.title,
+                            status: todo.status,
+                        })),
                     }, null, 2),
                 }],
             };
@@ -300,7 +318,7 @@ export function registerAgentTaskTools(
             // Append appropriate event
             const eventType = status === 'done' ? 'todo_completed' as const
                 : status === 'failed' ? 'todo_failed' as const
-                : 'progress' as const;
+                    : 'progress' as const;
             const todoTitle = task.todos[todoIdx].title;
 
             await storage.appendTaskEvent({
@@ -329,7 +347,7 @@ export function registerAgentTaskTools(
         },
     );
 
-    // ── Tool 6: aimeat_task_complete ──
+    // ── Tool 7: aimeat_task_complete ──
     mcp.tool(
         'aimeat_task_complete',
         'Complete an active task (transitions active -> done)',
@@ -383,7 +401,7 @@ export function registerAgentTaskTools(
         },
     );
 
-    // ── Tool 7: aimeat_task_fail ──
+    // ── Tool 8: aimeat_task_fail ──
     mcp.tool(
         'aimeat_task_fail',
         'Fail an active task (transitions active -> failed)',
