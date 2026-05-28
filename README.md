@@ -246,6 +246,19 @@ On the left: Telegram chat with the agent. The user asks it to build things ("bu
 
 The app prompts the agent with the current world state so it can make informed decisions about what to build and where. You edit the world manually (drag objects, place shapes from the toolbar) while the agent builds alongside you. Everything syncs through AIMEAT memory.
 
+### Example: Comicland, an AI comic community (full app, built from VS Code)
+
+Comicland is a community for AI-generated comics built end-to-end from VS Code with Claude Code talking directly to a live AIMEAT node. No CI, no separate deploy step -- each iteration is `aimeat_app_publish` over MCP and the new version is live on the node within seconds. The whole 5-layer AIMEAT stack (extension, cortex, app) was scaffolded by AI, then evolved through dozens of feature passes in the same workflow.
+
+<p align="center">
+  <img src="assets/screenshots/comic-land-series-view.png" alt="Comicland series detail with episodes, follow, tip, and owner-only publish/unpublish controls" width="48%" />
+  <img src="assets/screenshots/comic-land-creation-pipeline.png" alt="Comicland creation pipeline: AI interview -> script JSON -> per-page image prompts -> overlay editor -> publish" width="48%" />
+</p>
+
+What's in there: a prompt-driven creation pipeline (AI interview produces a script, the app generates per-page Nano-Banana-style image prompts with character/environment references, the user pastes the resulting images back); a 3-step episode wizard with page or panel images; a drag-and-drop speech-bubble overlay editor with language-keyed translations; multi-tenant reading where any logged-in user can read another author's published series from their own GHII namespace; characters and environments with multiple reference images and a chosen showcase; follow/tip/comment social actions; per-series public/private toggle and per-episode draft/published toggle so authors can prepare quietly and roll out when ready; full FI/EN i18n. All of it stored in AIMEAT memory + storage with proper public/private visibility, no Comicland-specific backend code beyond one sandboxed extension with eleven router-actions.
+
+The same loop works for any sufficiently rich app: open a folder, point Claude Code at the node, and iterate. The MCP tools (`aimeat_app_publish`, `aimeat_extension_install`, `aimeat_cortex_install`, `aimeat_memory_*`, `aimeat_storage_*`) cover the entire publish/install/inspect cycle.
+
 ### Calibrate prompts
 
 <img src="assets/screenshots/profile-generator.png" alt="Generator and calibrator" width="600" />
