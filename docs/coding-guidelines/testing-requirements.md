@@ -4,18 +4,34 @@
 
 ### Rule 1: E2E Tests Must Pass After Major Changes
 
-When any major feature, bugfix, or structural change is completed and thought to be ready:
+**Valid backends: SQLite and MongoDB ONLY.** The in-memory backend is deprecated and produces stale failures. SQLite with `:memory:` (`AIMEAT_DB_PATH=:memory:`) covers the same fast-iteration role with the actual production code path. Treat `pnpm test:e2e` and `pnpm test:e2e:memory` as deprecated — do not use them for verification, and do not report their failures as findings.
 
-1. **Run E2E tests on both storage backends:**
+When a feature, bugfix, or structural change is completed:
+
+1. **Iterate against only the suites your change can plausibly affect** — not the whole sweep. Use the filter runner:
    ```bash
    cd aimeat
-   pnpm test:e2e:mongodb
-   pnpm test:e2e:sqlite
+
+   # Single suite, fastest backend:
+   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding
+
+   # Multiple suites at once:
+   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding --test=agent-skill-bundle
    ```
-2. **Target: 0 failures.** All tests must pass on both backends.
-3. **If tests fail in areas affected by the change**, the change is NOT complete — fix the failures first.
-4. **If failures are unrelated to the change**, investigate briefly. If complicated or ambiguous, ask the user how to proceed before continuing.
-5. **Full test runs are required at the end of any multi-step plan execution.**
+   For changes scoped to one layer (CLI-only, single route, single view), state explicitly which suites you ran and why others were not needed.
+
+2. **End of a multi-step plan — full sweep on both backends:**
+   ```bash
+   pnpm test:e2e:sqlite
+   pnpm test:e2e:mongodb
+   ```
+
+3. **Target: 0 failures in the suites you ran.**
+   - Failures in an area your change touches → change is NOT complete; fix it.
+   - Failures in an unrelated suite → verify they pre-exist on `main` (e.g. `git stash && pnpm test:e2e:sqlite -- --test=<suite>` then `git stash pop`). Report as pre-existing; do not fix them as part of the current work.
+   - Complicated or ambiguous → ask the user before continuing.
+
+4. **Full test runs are required at the end of any multi-step plan execution.**
 
 ### Rule 2: New Features Must Have Tests
 
@@ -49,25 +65,21 @@ npx tsc --noEmit
 # Unit tests
 pnpm test
 
-# Full E2E suite (in-memory, fastest)
-pnpm test:e2e:memory
-
-# E2E with SQLite backend
+# E2E with SQLite backend -- fast iteration, the default
 pnpm test:e2e:sqlite
 
-# E2E with MongoDB backend (requires MongoDB running)
+# E2E with MongoDB backend -- realistic, run before end-of-plan
 pnpm test:e2e:mongodb
 
-# All three backends sequentially
-pnpm test:e2e:all-backends
+# DEPRECATED -- do not use:
+#   pnpm test:e2e             (memory backend, not a valid environment)
+#   pnpm test:e2e:memory      (same as above)
+#   pnpm test:e2e:all-backends (includes the deprecated memory pass)
 
-# Individual E2E suites
-pnpm test:e2e:security
-pnpm test:e2e:admin-features
-pnpm test:e2e:federation
-# ... see package.json for full list
+# Run a single suite (preferred during iteration -- much faster than the full sweep):
+pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding
 
-# Run specific suite with CI runner
+# Or via the filter alias (uses whichever env-file is currently set):
 pnpm test:e2e:ci:filter -- --test=security
 ```
 
@@ -216,28 +228,32 @@ run().catch(err => { console.error(err); process.exit(1); });
 
 ### Multi-Backend Testing
 
-Tests must pass on all three storage backends:
+Tests must pass on both **persistent** storage backends:
 
-| Backend | Env File | Command |
-|---------|----------|---------|
-| In-memory | `.env.test.memory` | `pnpm test:e2e:memory` |
-| SQLite | `.env.test.sqlite` | `pnpm test:e2e:sqlite` |
-| MongoDB | `.env.test.mongodb` | `pnpm test:e2e:mongodb` |
+| Backend | Env File | Command | Notes |
+|---------|----------|---------|-------|
+| SQLite | `.env.test.sqlite` | `pnpm test:e2e:sqlite` | Fast iteration default. Set `AIMEAT_DB_PATH=:memory:` for true in-memory speed without giving up the real SQL code path. |
+| MongoDB | `.env.test.mongodb` | `pnpm test:e2e:mongodb` | Most realistic. Required before end-of-plan and before any PR. |
 
-The CI runner (`test/run-e2e-ci.ts`) handles server lifecycle automatically — it starts the server, runs all suites, then shuts down.
+The in-memory backend (`pnpm test:e2e:memory`, the unsuffixed `pnpm test:e2e`) is **deprecated** and not a supported environment — its `.env.test.memory` file may not even exist in the repo. AIMEAT outgrew the pure-in-memory storage path long ago; SQLite `:memory:` covers that role using the production code path.
+
+The CI runner (`test/run-e2e-ci.ts`) handles server lifecycle automatically — it starts the server, runs the requested suites, then shuts down.
 
 ---
 
 ## When to Run What
 
+Default is **scoped, not exhaustive** — run the minimum that gives confidence in the change. Full sweeps belong at the end of a plan, not during iteration.
+
 | Situation | What to Run |
 |-----------|-------------|
-| After any code change | `npx tsc --noEmit` |
-| After changing a route/service | `pnpm test:e2e:memory` + relevant suite |
+| After any code change | `npx tsc --noEmit` + `pnpm lint` |
+| After changing a single route/service | `--test=<suite>` for the affected suite(s) on SQLite |
+| After changing a CLI subcommand | The CLI's own integration test, if any. Server suites do not exercise CLI code. |
 | After changing storage layer | `pnpm test:e2e:sqlite` + `pnpm test:e2e:mongodb` |
-| Before claiming a feature is done | Full E2E on memory + at least one persistent backend |
-| End of a multi-step plan | `pnpm test:e2e:mongodb` + `pnpm test:e2e:sqlite` |
-| Before creating a PR | `pnpm test:e2e:all-backends` |
+| Before claiming a feature is done | The affected suites on SQLite, plus the same suites on MongoDB if storage was touched |
+| End of a multi-step plan | `pnpm test:e2e:sqlite` + `pnpm test:e2e:mongodb` (both, full sweep) |
+| Before creating a PR | Both backends, full sweep |
 
 ---
 

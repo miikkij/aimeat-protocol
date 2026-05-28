@@ -219,6 +219,11 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         const mode = req.query.mode as string | undefined;
         if (mode === 'inline') {
             res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*; frame-ancestors 'self'");
+            // Force browsers to always validate with the server (ETag round-trip).
+            // Without this, heuristic caching can keep users on a stale app
+            // version for hours after a republish. We still respond 304 when
+            // the ETag matches, so the bandwidth cost is just a HEAD-sized hit.
+            res.setHeader('Cache-Control', 'no-cache, must-revalidate');
         } else {
             res.setHeader('Content-Disposition', `attachment; filename="${filename.replace(/["\\]/g, '_')}"`);
         }

@@ -11,6 +11,10 @@ export interface AimeatConnectConfig {
   node_url: string;
   agent: string;
   owner: string;
+  // SECURITY: `wake.command` is passed to child_process.exec — anyone able to
+  // write this file (or anyone who tricks the user into pasting a config) gets
+  // code execution on every poll cycle. Prefer `webhook` when the local config
+  // is not fully under the operator's control.
   wake?: {
     command?: string;
     webhook?: string;

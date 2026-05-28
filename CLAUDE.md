@@ -6,49 +6,64 @@ These rules MUST be followed at all times during development. They override any 
 
 ### Rule 1: E2E Tests Must Pass After Major Changes
 
-When any major feature, bugfix, or structural change is completed:
+**Valid backends: SQLite and MongoDB ONLY.** The in-memory backend (`pnpm test:e2e`, `pnpm test:e2e:memory`) is deprecated and produces stale failures — SQLite with `:memory:` covers the same fast-iteration role. Do not use the memory commands for verification, and do not report their failures as findings.
 
-1. **Run E2E tests on both persistent backends** (from project root):
+When any feature, bugfix, or structural change is completed:
+
+1. **Run only the suites your change can plausibly affect** — not the whole sweep. Use the filter runner (must `cd aimeat` first because the runner uses relative paths):
    ```bash
-   pnpm test:e2e:mongodb
-   pnpm test:e2e:sqlite
+   cd aimeat
+
+   # Single suite, SQLite backend:
+   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding
+
+   # Multiple suites at once:
+   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding --test=agent-skill-bundle
    ```
-2. **Target: 0 failures.** All tests must pass.
-3. **If tests fail in areas affected by the change**, the change is NOT complete — fix the failures first.
-4. **If failures are complicated or need user input**, ask the user how to proceed before continuing.
-5. **Full test runs are required at the end of any multi-step plan execution.**
-6. **New features must include quality E2E tests** that verify correctness and prevent future regressions.
-7. **Never claim work is done without running tests.** Evidence before assertions.
+   For CLI-only changes (e.g. `src/cli/`), the server suites do not exercise CLI code — say so explicitly instead of running them just to fill the report.
+
+2. **End of a multi-step plan: full sweep on both persistent backends** (from project root):
+   ```bash
+   pnpm test:e2e:sqlite
+   pnpm test:e2e:mongodb
+   ```
+
+3. **Target: 0 failures in the suites you ran.** If something fails:
+   - In an area your change touches → the change is NOT complete; fix it.
+   - In an unrelated suite → check `git status` and `git log -1` first to confirm the failure pre-exists on `main`. If it does, mention it but don't try to "fix" it as part of the current work.
+   - Complicated or ambiguous → ask the user before continuing.
+
+4. **New features must include E2E tests** covering the happy path and at least one failure mode.
+5. **Never claim work is done without running tests.** Evidence before assertions.
 
 Full guide: `docs/coding-guidelines/testing-requirements.md`
 
 ### Rule 1b: Playwright Tests Must Pass After Frontend Changes
 
+**Valid backends: SQLite and MongoDB ONLY.** Same reasoning as Rule 1 — memory backend is deprecated.
+
 When frontend work is **finished** (a view, component, or feature is done — not mid-development):
 
-1. **Run Playwright browser tests** (from project root):
+1. **Run only the spec files your change touches**, on SQLite for speed:
    ```bash
-   # All Playwright tests (starts server automatically):
-   pnpm test:playwright:mongodb
-
-   # Single test file:
-   pnpm test:playwright:mongodb -- profile-agents
+   # Single spec file:
+   pnpm test:playwright:sqlite -- profile-agents
 
    # Single test by name:
-   pnpm test:playwright:mongodb -- --grep "shows agent cards"
+   pnpm test:playwright:sqlite -- --grep "shows agent cards"
 
    # Headed mode (see the browser):
-   pnpm test:playwright:mongodb -- --headed
-
-   # Other backends:
-   pnpm test:playwright           # memory (fastest)
-   pnpm test:playwright:sqlite
-   pnpm test:playwright:mongodb   # most realistic
+   pnpm test:playwright:sqlite -- --headed
    ```
-2. **Target: 0 failures.** All browser tests must pass.
-3. **Trigger:** Any completed change to `public/views/`, `public/components/`, `public/js/`, `public/css/`, `public/locales/`, or `*.html` files.
-4. **New frontend features must include Playwright tests** that confirm the feature renders, navigates, and behaves correctly — not just that it loads without error.
-5. **Run on MongoDB backend** for realistic behavior — Playwright tests hit a live server.
+
+2. **End of a multi-step plan: full sweep on MongoDB** for realistic behavior:
+   ```bash
+   pnpm test:playwright:mongodb
+   ```
+
+3. **Target: 0 failures.** All browser tests in the suites you ran must pass.
+4. **Trigger:** Any completed change to `public/views/`, `public/components/`, `public/js/`, `public/css/`, `public/locales/`, or `*.html` files.
+5. **New frontend features must include Playwright tests** that confirm the feature renders, navigates, and behaves correctly — not just that it loads without error.
 6. **Maintain test quality:** Playwright tests must verify that things actually happen (elements appear, data loads, interactions work), not just that the page doesn't crash.
 
 ### Rule 2: Source File Headers Required
@@ -341,13 +356,17 @@ pnpm typecheck           # or: npx tsc --noEmit
 pnpm lint
 
 # ── E2E API tests (starts server automatically) ──
-pnpm test:e2e            # memory backend (fastest)
-pnpm test:e2e:sqlite     # SQLite backend
-pnpm test:e2e:mongodb    # MongoDB backend (most realistic)
+# Memory backend is DEPRECATED -- do not use `pnpm test:e2e` or `pnpm test:e2e:memory`.
+pnpm test:e2e:sqlite     # SQLite -- fast iteration, the new default
+pnpm test:e2e:mongodb    # MongoDB -- realistic, run before end-of-plan
+
+# Single suite (faster than full sweep -- prefer this during iteration):
+cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding
 
 # ── Playwright browser tests (starts server automatically) ──
-pnpm test:playwright              # memory backend (fastest)
-pnpm test:playwright:mongodb      # MongoDB backend (most realistic)
+# Memory backend is DEPRECATED -- do not use `pnpm test:playwright`.
+pnpm test:playwright:sqlite       # SQLite -- fast iteration
+pnpm test:playwright:mongodb      # MongoDB -- realistic, run before end-of-plan
 
 # Single test file:
 pnpm test:playwright -- profile-agents

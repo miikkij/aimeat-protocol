@@ -13,12 +13,14 @@
  * @version-history v1.9.11 — 2026-05-28 — State that Hello Integration is required first-run onboarding.
  * @version-history v1.9.12 -- 2026-05-28 -- Add correct post-onboarding setup guidance for actual commands, config, and knowledge artifacts.
  * @version-history v1.9.13 -- 2026-05-28 -- Add shared owner-memory tag guidance.
+ * @version-history v1.9.14 -- 2026-05-28 -- Pull MCP tool sequence from shared onboarding-prompt.ts (removes hardcoded duplicate).
  */
 import { writeFileSync, mkdirSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import yauzl from 'yauzl';
 import { getConfigDir } from './config.js';
 import type { AimeatClient } from './api-client.js';
+import { HELLO_INTEGRATION_TOOL_SEQUENCE } from './onboarding-prompt.js';
 
 export interface DownloadedSkillBundle {
   bundleDir: string;
@@ -178,21 +180,7 @@ ${sections.join('\n')}
 3. The agent must complete Hello Integration with these MCP tools. These names appear inside the AI runtime after MCP is attached; they are not terminal commands:
 
   \`\`\`text
-  aimeat_handbook_get
-  aimeat_onboarding_status
-  aimeat_onboarding_identify_platform
-  aimeat_onboarding_confirm_skill_installed
-  aimeat_agent_capabilities_report
-  aimeat_onboarding_confirm_directives_read
-  aimeat_message_send
-  aimeat_agent_telemetry_report
-  aimeat_task_list
-  aimeat_task_propose_todos
-  aimeat_onboarding_status
-  aimeat_task_event
-  aimeat_task_todo
-  aimeat_task_complete
-  aimeat_onboarding_status
+${HELLO_INTEGRATION_TOOL_SEQUENCE.map(tool => `  ${tool}`).join('\n')}
   \`\`\`
 
 Use \`generic\` as the installed skill platform unless your runtime has a more specific platform name. For the bundle version field, use \`local\` when no version is shown by the runtime.
