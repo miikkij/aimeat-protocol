@@ -39,6 +39,7 @@ model Agent {
   activityStats         Json?
   modulesLoaded         Json?
   agentLimitations      Json?
+  languages             Json?
   webhookUrl        String?
   webhookSecret     String?
   webhookEnabled    Boolean  @default(false)

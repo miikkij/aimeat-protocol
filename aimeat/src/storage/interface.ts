@@ -32,6 +32,8 @@ export interface AgentRecord {
   federate?: boolean;
   technicalCapabilities?: AgentTechnicalCapability[];
   domainCapabilities?: string[];
+  /** BCP-47 language codes the agent supports (kept separate from domainCapabilities). */
+  languages?: string[];
   activityStats?: AgentActivityStats;
   modulesLoaded?: string[];
   agentLimitations?: string[];

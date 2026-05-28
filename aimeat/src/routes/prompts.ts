@@ -91,7 +91,6 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, {
       tier: '1',
       agent_name: selfAgentName,
-      content: system_prompt,
       system_prompt,
       available_operations: ['memory_crud', 'action_publish', 'action_execute', 'work_queue', 'wallet', 'boards', 'catalogue', 'task_lifecycle', 'directives', 'capabilities_report', 'message_handling'],
       economics: {

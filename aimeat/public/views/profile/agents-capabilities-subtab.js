@@ -46,11 +46,14 @@ function TechnicalSkills({ capabilities }) {
   `;
 }
 
-function DomainKnowledge({ domains }) {
-  if (!domains || domains.length === 0) return null;
+function DomainKnowledge({ domains, languages: separateLanguages }) {
+  // Backward compatibility: older agents have `Language: xx` mixed into domains.
+  // Prefer the dedicated `languages` prop when present, fall back to filtering.
+  const legacyLanguages = (domains ?? []).filter(d => d.startsWith('Language: ')).map(d => d.replace('Language: ', ''));
+  const languages = separateLanguages?.length ? separateLanguages : legacyLanguages;
+  const otherDomains = (domains ?? []).filter(d => !d.startsWith('Language: '));
 
-  const languages = domains.filter(d => d.startsWith('Language: '));
-  const otherDomains = domains.filter(d => !d.startsWith('Language: '));
+  if (otherDomains.length === 0 && languages.length === 0) return null;
 
   return html`
     <div class="agd-directive-section">
@@ -66,7 +69,7 @@ function DomainKnowledge({ domains }) {
         <div class="agd-cap-langs">
           <span class="agd-cap-lang-label">${tFallback('profile.agents.capabilities.languages', 'Languages')}:</span>
           ${languages.map(l => html`
-            <span class="agd-cap-badge agd-cap-lang">${l.replace('Language: ', '')}</span>
+            <span class="agd-cap-badge agd-cap-lang">${l}</span>
           `)}
         </div>
       `}
@@ -106,6 +109,7 @@ function ActionQueueSupport({ scopes }) {
 export default function AgentCapabilitiesSubtab({ agentName, session, showToast, agent }) {
   const [techCaps, setTechCaps] = useState(null);
   const [domainCaps, setDomainCaps] = useState(null);
+  const [languages, setLanguages] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -117,10 +121,12 @@ export default function AgentCapabilitiesSubtab({ agentName, session, showToast,
         if (cancelled) return;
         setTechCaps(resp?.data?.technical_capabilities ?? []);
         setDomainCaps(resp?.data?.domain_capabilities ?? []);
+        setLanguages(resp?.data?.languages ?? []);
       } catch {
         if (!cancelled) {
           setTechCaps([]);
           setDomainCaps([]);
+          setLanguages([]);
         }
       }
       if (!cancelled) setLoading(false);
@@ -136,6 +142,7 @@ export default function AgentCapabilitiesSubtab({ agentName, session, showToast,
         const resp = await getCapabilities(agentName);
         setTechCaps(resp?.data?.technical_capabilities ?? []);
         setDomainCaps(resp?.data?.domain_capabilities ?? []);
+        setLanguages(resp?.data?.languages ?? []);
       } catch { /* ignore */ }
     };
     window.addEventListener('aimeat-live-update', handler);
@@ -148,7 +155,7 @@ export default function AgentCapabilitiesSubtab({ agentName, session, showToast,
 
   const scopes = agent?.default_scopes ?? [];
   const hasTech = techCaps && techCaps.length > 0;
-  const hasDomain = domainCaps && domainCaps.length > 0;
+  const hasDomain = (domainCaps && domainCaps.length > 0) || (languages && languages.length > 0);
   const hasQueue = scopes.includes('*') || scopes.includes('work:accept') || scopes.includes('work:deliver');
 
   if (!hasTech && !hasDomain && !hasQueue) {
@@ -158,7 +165,7 @@ export default function AgentCapabilitiesSubtab({ agentName, session, showToast,
   return html`
     <div>
       <${TechnicalSkills} capabilities=${techCaps} />
-      <${DomainKnowledge} domains=${domainCaps} />
+      <${DomainKnowledge} domains=${domainCaps} languages=${languages} />
       <${ActionQueueSupport} scopes=${scopes} />
     </div>
   `;

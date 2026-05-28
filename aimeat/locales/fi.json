@@ -2791,7 +2791,7 @@
     "usernamePlaceholder": "Käyttäjänimi",
     "passwordPlaceholder": "Salasana (vähintään 4 merkkiä)",
     "displayNamePlaceholder": "Näyttönimi (valinnainen, uusille tileille)",
-    "signInBtn": "Kirjaudu",
+    "signInBtn": "Kirjaudu / Rekisteröidy",
     "cancelBtn": "Peruuta",
     "working": "Käsitellään...",
     "errUserShort": "Käyttäjänimen tulee olla vähintään 3 merkkiä",

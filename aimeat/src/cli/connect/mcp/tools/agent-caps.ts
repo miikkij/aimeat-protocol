@@ -13,10 +13,10 @@ export function registerAgentCapsTools(mcp: McpServer, client: AimeatClient, age
   mcp.tool('aimeat_agent_capabilities_report', 'Report agent capabilities to the node', {
     technical: z.array(z.object({
       name: z.string(),
-      type: z.string(),
-    })).optional().describe('Technical capabilities'),
-    domain: z.array(z.string()).optional().describe('Domain expertise areas'),
-    languages: z.array(z.string()).optional().describe('Supported languages'),
+      type: z.enum(['mcp', 'skill', 'tool']).describe("Capability type: 'mcp' (an MCP server/tool), 'skill' (a built-in skill or module), or 'tool' (a generic tool the agent can call)."),
+    })).optional().describe('Technical capabilities, each with a name and a type from the enum mcp|skill|tool.'),
+    domain: z.array(z.string()).optional().describe('Domain expertise areas, free-form short labels.'),
+    languages: z.array(z.string()).optional().describe('Supported language codes (BCP-47 short form), e.g. "en", "fi".'),
   }, async ({ technical, domain, languages }) => {
     const body: Record<string, unknown> = {};
     if (technical) body.technical = technical;

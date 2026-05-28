@@ -90,13 +90,27 @@ function buildNextStepsMessage(agentInstruction: string): string {
   return `Done. Your agent is connected.
 
 NEXT TERMINAL COMMAND FOR THE AGENT
-Run this command now and leave it running:
+For AI runtimes that can attach an MCP stdio server (Claude Desktop, MCP-aware
+IDEs, OpenClaw with mcp config, etc.), run this and leave it running:
 
-  npx aimeat connect serve
+  aimeat connect serve
 
-After that MCP server is attached to the AI runtime, paste this instruction into the connected agent:
+After that MCP server is attached to the AI runtime, paste this instruction
+into the connected agent:
 
-${agentInstruction}`;
+${agentInstruction}
+
+IF YOUR RUNTIME CANNOT ATTACH MCP VIA STDIO
+(e.g. you are a CLI-only agent, a shell-driven assistant, or a runtime where
+"aimeat connect serve" would just block without exposing tools to you):
+use the shell fallback instead. Every MCP tool is also callable directly:
+
+  aimeat connect tools                              # list available tool names
+  aimeat connect schema <tool-name>                 # show the tool's input schema
+  aimeat connect call <tool-name> --json '<input>'  # invoke a tool
+
+Walk through the same Hello Integration sequence with these commands. Start
+with: aimeat connect call aimeat_handbook_get --json '{}'`;
 }
 
 async function downloadAndPrintBundleGuide(

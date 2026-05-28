@@ -3,6 +3,7 @@
  * @description Enhanced Activity tab with governance filter and category badges.
  *   Wraps the existing activity subtab with additional filter pills.
  * @version-history
+ *   v1.5.0 -- 2026-05-28 -- Fix governance card: telemetry response field is `events` (not `entries`), and per-event tokens live in e.data.tokens_used / e.data.tokens_in+out
  *   v1.4.0 -- 2026-05-24 -- Audit fix: two-line event layout with secondary detail row
  *   v1.3.0 -- 2026-05-24 -- Wire up MCP status in delivery health from agent data
  *   v1.2.0 -- 2026-05-24 -- Fix: F17 task breakdown, F18 violation red badge, M5 governance i18n namespace
@@ -71,11 +72,18 @@ export default function TabActivity({ agent, agentName, session, showToast }) {
       const tasksFailed = taskEvents.filter(e => { const tp = (e.type || '').toLowerCase(); return tp.includes('failed') || tp.includes('error'); }).length;
       const budget = dirResp?.data?.budget_limits;
       const wh = whResp?.data?.webhook;
-      const telemetryEntries = telResp?.data?.entries || [];
+      // GET /v1/agents/:name/telemetry returns { events, count, per_page }, and per-event
+      // numbers live inside event.data ({ tokens_used } OR { tokens_in + tokens_out }).
+      const telemetryEntries = telResp?.data?.events || telResp?.data?.entries || [];
+      const eventTokens = (e) => {
+        const d = e?.data || {};
+        const used = Number(d.tokens_used) || 0;
+        return used > 0 ? used : (Number(d.tokens_in) || 0) + (Number(d.tokens_out) || 0);
+      };
 
       setGovernance({
         budget,
-        tokensUsedToday: telemetryEntries.reduce((sum, e) => sum + (e.tokens_used || 0), 0),
+        tokensUsedToday: telemetryEntries.reduce((sum, e) => sum + eventTokens(e), 0),
         tasksToday: taskEvents.length,
         tasksCompleted,
         tasksActive,

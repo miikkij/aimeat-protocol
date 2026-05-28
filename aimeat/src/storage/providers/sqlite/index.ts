@@ -311,7 +311,7 @@ export class SqliteStorage implements Storage {
        publicKey = ?, trustScore = ?, morselBalance = ?, createdAt = ?, lastSeen = ?, semantic = ?,
        allowedOrigins = ?, defaultScopes = ?, federate = ?,
        technicalCapabilities = ?, domainCapabilities = ?, activityStats = ?,
-       modulesLoaded = ?, agentLimitations = ?,
+       modulesLoaded = ?, agentLimitations = ?, languages = ?,
        webhookUrl = ?, webhookSecret = ?, webhookEnabled = ?, webhookLastSuccess = ?, webhookLastFailure = ?, webhookFailCount = ?,
        platform = ?, platformVersion = ?, platformDetectedBy = ?, tags = ?
        WHERE gaii = ?`
@@ -330,6 +330,7 @@ export class SqliteStorage implements Storage {
       JSON.stringify(updated.activityStats ?? {}),
       JSON.stringify(updated.modulesLoaded ?? []),
       JSON.stringify(updated.agentLimitations ?? []),
+      JSON.stringify(updated.languages ?? []),
       updated.webhookUrl ?? null, updated.webhookSecret ?? null, updated.webhookEnabled ? 1 : 0,
       updated.webhookLastSuccess ?? null, updated.webhookLastFailure ?? null, updated.webhookFailCount ?? 0,
       updated.platform ?? null, updated.platformVersion ?? null, updated.platformDetectedBy ?? null,
@@ -452,6 +453,7 @@ export class SqliteStorage implements Storage {
     if (row.activityStats) record.activityStats = JSON.parse(row.activityStats as string);
     if (row.modulesLoaded) record.modulesLoaded = JSON.parse(row.modulesLoaded as string);
     if (row.agentLimitations) record.agentLimitations = JSON.parse(row.agentLimitations as string);
+    if (row.languages) record.languages = JSON.parse(row.languages as string);
     if (row.webhookUrl) record.webhookUrl = row.webhookUrl as string;
     if (row.webhookSecret) record.webhookSecret = row.webhookSecret as string;
     record.webhookEnabled = (row as any).webhookEnabled === 1;

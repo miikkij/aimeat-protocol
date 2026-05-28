@@ -8,6 +8,7 @@ import { rateLimit } from './middleware/rate-limit.js';
 import { idempotency } from './middleware/idempotency.js';
 import { cookieConsentMiddleware } from './middleware/cookie-consent.js';
 import { requestIdMiddleware } from './middleware/request-id.js';
+import { agentMeAliasMiddleware } from './middleware/agent-me-alias.js';
 import { logger } from './utils/logger.js';
 import { TunnelManager } from './services/personal-tunnel.js';
 import { RealtimeManager } from './services/realtime-manager.js';
@@ -83,6 +84,11 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
 
   // optionalAuth() runs before CORS so req.auth is available for per-entity origin resolution
   app.use(optionalAuth());
+
+  // Rewrite /v1/agents/me/... to /v1/agents/{agentName}/... when the caller is an
+  // agent. The handbook tells agents to use "/me/" everywhere; this middleware
+  // makes that promise true for all routes (handbook itself is excluded).
+  app.use(agentMeAliasMiddleware());
 
   // CORS after auth — can look up GHII-level origins for authenticated requests.
   // OPTIONS preflights bypass rate limiting since CORS responds with 204.

@@ -95,13 +95,16 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
         </div>
 
         <!-- Capabilities -->
-        ${(agent.technical_capabilities?.length > 0 || agent.domain_capabilities?.length > 0) && html`
+        ${(agent.technical_capabilities?.length > 0 || agent.domain_capabilities?.length > 0 || agent.languages?.length > 0) && html`
           <div class="pf-agd-capabilities">
             ${(agent.technical_capabilities || []).map(c => html`
               <span key=${c.name || c} class="pf-agd-cap-badge pf-agd-cap-badge--tech">${c.name || c}</span>
             `)}
-            ${(agent.domain_capabilities || []).map(c => html`
+            ${(agent.domain_capabilities || []).filter(c => !String(c).startsWith('Language: ')).map(c => html`
               <span key=${c} class="pf-agd-cap-badge pf-agd-cap-badge--domain">${c}</span>
+            `)}
+            ${(agent.languages || []).map(l => html`
+              <span key=${'lang-' + l} class="pf-agd-cap-badge pf-agd-cap-badge--domain">${'Language: ' + l}</span>
             `)}
           </div>
         `}

@@ -79,6 +79,15 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
       const allRequiredPassed = updatedSteps.filter(s => s.required).every(s => s.status === 'passed');
 
       if (allRequiredPassed) {
+        // Mark untouched optional steps as 'skipped' so they don't show up
+        // in pendingSteps after the onboarding is completed. They're optional
+        // and the agent chose not to do them; that's a final state, not pending.
+        for (const s of updatedSteps) {
+          if (!s.required && s.status === 'pending') {
+            s.status = 'skipped';
+            s.validatedAt = new Date().toISOString();
+          }
+        }
         const readiness = await calculateReadiness(agentGaii, updatedSteps, storage, onboarding.readinessOverride);
         onboarding = (await storage.updateOnboarding(agentGaii, {
           steps: updatedSteps,
@@ -112,7 +121,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
       hints.test_task_id = testTaskId;
       hints.message = 'Your test task is active. Execute the todos and POST /complete to finish steps 9-10.';
     } else if (testTaskStatus === 'queued' && testTaskStep?.status === 'pending') {
-      hints.message = 'Propose todos on your test task (PATCH /v1/agents/me/tasks/' + testTaskId + ') to proceed with step 9.';
+      hints.message = `Propose todos on your test task (PATCH /v1/agents/${agentName}/tasks/${testTaskId}) to proceed with step 9.`;
       hints.test_task_id = testTaskId;
     }
     if (pendingSteps.length > 0) {
@@ -275,6 +284,13 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
     const allRequiredPassed = onboarding.steps.filter(s => s.required).every(s => s.status === 'passed');
     let completedOnboarding = null;
     if (result.passed && allRequiredPassed) {
+      // Mark untouched optional steps as 'skipped' on completion (see GET handler).
+      for (const s of onboarding.steps) {
+        if (!s.required && s.status === 'pending') {
+          s.status = 'skipped';
+          s.validatedAt = new Date().toISOString();
+        }
+      }
       const readiness = await calculateReadiness(agentGaii, onboarding.steps, storage, onboarding.readinessOverride);
       completedOnboarding = await storage.updateOnboarding(agentGaii, {
         steps: onboarding.steps,

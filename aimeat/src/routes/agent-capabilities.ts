@@ -8,6 +8,8 @@
  *   - PUT  /v1/agents/:name/capabilities -- Agent reports its capabilities
  *   - GET  /v1/agents/:name/capabilities -- Get agent capabilities + activity stats
  * @version-history
+ *   v1.2.0 -- 2026-05-28 -- Stop merging languages into domain_capabilities; persist
+ *                            and return them as a dedicated languages array.
  *   v1.1.0 -- 2026-05-22 -- Add modules_loaded and limitations to PUT/GET
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 2
  */
@@ -75,20 +77,15 @@ export function agentCapabilitiesRouter(config: AimeatConfig, storage: Storage):
       verified: isAgentSession && cap.type === 'mcp',
     }));
 
-    // Build domain capabilities, merging language entries if provided
     const domainCapabilities = [...body.domain];
-    if (body.languages) {
-      for (const lang of body.languages) {
-        domainCapabilities.push(`Language: ${lang}`);
-      }
-    }
-
+    const languages = body.languages ?? undefined;
     const modulesLoaded = body.modules_loaded ?? undefined;
     const agentLimitations = body.limitations ?? undefined;
 
     const updated = await storage.updateAgent(agentGaii, {
       technicalCapabilities,
       domainCapabilities,
+      ...(languages !== undefined && { languages }),
       ...(modulesLoaded !== undefined && { modulesLoaded }),
       ...(agentLimitations !== undefined && { agentLimitations }),
     });
@@ -103,6 +100,7 @@ export function agentCapabilitiesRouter(config: AimeatConfig, storage: Storage):
     res.json(success(config.nodeId, {
       technical_capabilities: updated.technicalCapabilities ?? [],
       domain_capabilities: updated.domainCapabilities ?? [],
+      languages: updated.languages ?? [],
       modules_loaded: updated.modulesLoaded ?? [],
       limitations: updated.agentLimitations ?? [],
     }, [
@@ -129,6 +127,7 @@ export function agentCapabilitiesRouter(config: AimeatConfig, storage: Storage):
     res.json(success(config.nodeId, {
       technical_capabilities: agent.technicalCapabilities ?? [],
       domain_capabilities: agent.domainCapabilities ?? [],
+      languages: agent.languages ?? [],
       modules_loaded: agent.modulesLoaded ?? [],
       limitations: agent.agentLimitations ?? [],
       activity_stats: agent.activityStats ?? null,

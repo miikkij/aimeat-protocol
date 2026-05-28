@@ -194,9 +194,9 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
         name: 'aimeat_agent_capabilities_report',
         description: 'Report technical and domain capabilities to the node.',
         input: {
-            technical: { type: 'array', description: 'Array of technical capabilities: { name, type }.' },
+            technical: { type: 'array', description: "Array of { name: string, type: 'mcp'|'skill'|'tool' }. Type is enforced as an enum -- other values are rejected with INVALID_INPUT." },
             domain: { type: 'array', description: 'Array of domain expertise strings.' },
-            languages: { type: 'array', description: 'Array of language codes.' },
+            languages: { type: 'array', description: 'Array of language codes (BCP-47 short form), e.g. ["en","fi"]. Stored separately from domain.' },
             modules_loaded: { type: 'array', description: 'Optional loaded handbook/module names.' },
             limitations: { type: 'array', description: 'Optional known limitations.' },
         },

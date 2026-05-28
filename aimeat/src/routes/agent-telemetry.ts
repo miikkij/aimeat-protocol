@@ -7,6 +7,9 @@
  *   - GET  /v1/agents/:name/telemetry  -- List telemetry events (with filtering)
  * @version-history
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Dashboard telemetry
+ *   v1.1.0 -- 2026-05-28 -- Wire POST handler into activity-recorder so telemetry
+ *                            bumps the daily telemetry_events counter and llm_call
+ *                            tokens flow into the agent's activityStats.
  */
 
 import { Router } from 'express';
@@ -18,6 +21,7 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
 import { buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
+import { recordTelemetryEvent } from '../services/activity-recorder.js';
 
 /* ── Zod validation schema ── */
 const TelemetryAppendSchema = z.object({
@@ -86,6 +90,7 @@ export function agentTelemetryRouter(config: AimeatConfig, storage: Storage): Ro
     };
 
     await storage.appendTelemetry(event);
+    await recordTelemetryEvent(storage, agentGaii, { type, data });
 
     emitChange('agents');
 

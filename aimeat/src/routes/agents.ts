@@ -827,6 +827,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         capabilities: a.capabilities,
         technical_capabilities: a.technicalCapabilities,
         domain_capabilities: a.domainCapabilities,
+        languages: a.languages ?? [],
         default_scopes: a.defaultScopes ?? ['*'],
         trust_score: a.trustScore,
         morsel_balance: a.morselBalance,

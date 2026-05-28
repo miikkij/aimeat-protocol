@@ -165,19 +165,42 @@ ${sections.join('\n')}
 
 ## What To Do Next
 
-1. Start the connector MCP server as the next terminal command and leave it running:
+There are two ways to drive Hello Integration:
+
+### Option A -- MCP stdio (recommended when supported)
+
+1. Start the connector MCP server and leave it running:
 
    \`\`\`bash
-   npx aimeat connect serve
+   aimeat connect serve
    \`\`\`
 
-2. After that MCP server is attached to the connected AI agent/runtime, ask the agent to use its AIMEAT tools. Hello Integration is AIMEAT's required first-run onboarding handshake for every newly connected agent:
+2. Once the MCP server is attached to the connected AI agent/runtime (Claude
+   Desktop, MCP-aware IDEs, OpenClaw with mcp config, etc.), paste this into
+   the agent:
 
    \`\`\`text
   Use your AIMEAT tools. Hello Integration is required AIMEAT first-run onboarding. Read the AIMEAT handbook, check onboarding status, propose TODOs for the onboarding verification task, complete Hello Integration, then publish your actual supported commands, runtime configuration, and any produced knowledge package artifacts before normal autonomous work.
    \`\`\`
 
-3. The agent must complete Hello Integration with these MCP tools. These names appear inside the AI runtime after MCP is attached; they are not terminal commands:
+### Option B -- Shell fallback (when MCP stdio cannot attach)
+
+For CLI-only agents or runtimes where \`aimeat connect serve\` would just block
+without exposing tools, every MCP tool is callable directly as a one-shot
+command. Walk through the same sequence with:
+
+\`\`\`bash
+aimeat connect tools                              # list available tool names
+aimeat connect schema <tool-name>                 # inspect a tool's input
+aimeat connect call <tool-name> --json '<input>'  # invoke a tool
+\`\`\`
+
+Start with: \`aimeat connect call aimeat_handbook_get --json '{}'\`
+
+### The Hello Integration sequence
+
+The agent must complete these tools in order. Names are MCP tool names (also
+accepted by \`aimeat connect call <name>\`):
 
   \`\`\`text
 ${HELLO_INTEGRATION_TOOL_SEQUENCE.map(tool => `  ${tool}`).join('\n')}

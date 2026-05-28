@@ -2791,7 +2791,7 @@
     "usernamePlaceholder": "Username",
     "passwordPlaceholder": "Password (min 4 chars)",
     "displayNamePlaceholder": "Display Name (optional, for new accounts)",
-    "signInBtn": "Sign In",
+    "signInBtn": "Sign In / Register",
     "cancelBtn": "Cancel",
     "working": "Working...",
     "errUserShort": "Username must be at least 3 characters",

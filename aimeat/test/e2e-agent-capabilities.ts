@@ -146,11 +146,17 @@ await test('1. PUT capabilities with technical + domain + languages', async () =
 
     const domain = body.data.domain_capabilities;
     assert(Array.isArray(domain), 'domain_capabilities is array');
-    // domain entries + language entries merged: 2 domain + 3 languages = 5
-    assert(domain.length === 5, `expected 5 domain caps, got ${domain.length}`);
+    // Languages are now stored as a separate field (not merged into domain).
+    assert(domain.length === 2, `expected 2 domain caps, got ${domain.length}`);
     assert(domain.includes('software-engineering'), 'has software-engineering domain');
-    assert(domain.includes('Language: en'), 'has Language: en');
-    assert(domain.includes('Language: fi'), 'has Language: fi');
+    assert(domain.includes('data-analysis'), 'has data-analysis domain');
+
+    const languages = body.data.languages;
+    assert(Array.isArray(languages), 'languages is array');
+    assert(languages.length === 3, `expected 3 languages, got ${languages.length}`);
+    assert(languages.includes('en'), 'has language en');
+    assert(languages.includes('fi'), 'has language fi');
+    assert(languages.includes('sv'), 'has language sv');
 });
 
 // ─── Phase 2: GET capabilities ───
@@ -170,9 +176,12 @@ await test('2. GET capabilities returns what was set', async () => {
     assert(tech.some((c: any) => c.name === 'code-review' && c.type === 'skill'), 'has code-review skill');
 
     const domain = body.data.domain_capabilities;
-    assert(domain.length === 5, `expected 5 domain caps, got ${domain.length}`);
+    assert(domain.length === 2, `expected 2 domain caps, got ${domain.length}`);
     assert(domain.includes('data-analysis'), 'has data-analysis domain');
-    assert(domain.includes('Language: sv'), 'has Language: sv');
+
+    const languages = body.data.languages;
+    assert(Array.isArray(languages) && languages.length === 3, `expected 3 languages, got ${languages?.length}`);
+    assert(languages.includes('sv'), 'has language sv');
 
     // activity_stats should be present (possibly null if no tasks run)
     assert('activity_stats' in body.data, 'response has activity_stats field');
@@ -202,13 +211,17 @@ await test('3. Overwrite capabilities (full replace, not merge)', async () => {
     assert(tech[0].type === 'tool', `tech type: ${tech[0].type}`);
 
     const domain = body.data.domain_capabilities;
-    // 1 domain + 1 language = 2
-    assert(domain.length === 2, `expected 2 domain caps after overwrite, got ${domain.length}`);
+    // Languages are no longer merged into domain.
+    assert(domain.length === 1, `expected 1 domain cap after overwrite, got ${domain.length}`);
     assert(domain.includes('devops'), 'has devops');
-    assert(domain.includes('Language: de'), 'has Language: de');
+
+    const languages = body.data.languages;
+    assert(Array.isArray(languages) && languages.length === 1, `expected 1 language, got ${languages?.length}`);
+    assert(languages.includes('de'), 'has language de');
 
     // Verify old capabilities are gone
     assert(!domain.includes('software-engineering'), 'old domain removed');
+    assert(!languages.includes('en'), 'old language removed');
     assert(!tech.some((c: any) => c.name === 'filesystem'), 'old tech removed');
 
     // Verify via GET as well
@@ -216,7 +229,8 @@ await test('3. Overwrite capabilities (full replace, not merge)', async () => {
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(getBody.data.technical_capabilities.length === 1, 'GET confirms 1 tech cap');
-    assert(getBody.data.domain_capabilities.length === 2, 'GET confirms 2 domain caps');
+    assert(getBody.data.domain_capabilities.length === 1, 'GET confirms 1 domain cap');
+    assert(getBody.data.languages.length === 1, 'GET confirms 1 language');
 });
 
 // ─── Phase 4: Empty arrays clear capabilities ───

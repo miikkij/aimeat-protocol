@@ -1375,6 +1375,7 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('agents', 'activityStats', "TEXT DEFAULT '{}'");
   safeAddColumn('agents', 'modulesLoaded', "TEXT DEFAULT '[]'");
   safeAddColumn('agents', 'agentLimitations', "TEXT DEFAULT '[]'");
+  safeAddColumn('agents', 'languages', "TEXT DEFAULT '[]'");
   safeAddColumn('extensions', 'createdByAgent', 'TEXT');
 
   // Governance Phase C — budget limits on agent directives

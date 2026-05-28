@@ -4,6 +4,7 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.9.8 - 2026-05-28 - Modal submit button now reads "Sign In / Register" to surface upsert behavior.
  * v1.9.7 - 2026-05-28 - Disable browser caching for generated helper libraries.
  * v1.9.6 - 2026-05-28 - Handle dev-mode auth reset responses in browser auth registration.
  */
@@ -898,7 +899,7 @@ function showLoginModal(opts, renderBtn) {
     + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.displayNameLabel || 'Display Name') + ' <span style="font-weight:400;text-transform:none;letter-spacing:0">(' + escHtml(i.displayNameHint || 'optional, for new accounts') + ')</span></label>'
     + '<input id="aimeat-displayname" class="aimeat-inp" placeholder="' + escHtml(i.displayNamePlaceholder || 'Display Name') + '"></div>'
     + '<div style="display:flex;gap:10px;margin-top:20px">'
-    + '<button id="aimeat-go-btn" class="aimeat-go">' + escHtml(i.signInBtn || 'Sign In') + '</button>'
+    + '<button id="aimeat-go-btn" class="aimeat-go">' + escHtml(i.signInBtn || 'Sign In / Register') + '</button>'
     + '<button id="aimeat-cancel-btn" class="aimeat-cancel">' + escHtml(i.cancelBtn || 'Cancel') + '</button>'
     + '</div>'
     + '<p id="aimeat-error" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p>'
@@ -1102,7 +1103,7 @@ function showLoginModal(opts, renderBtn) {
           ? (i.errWrongPass || 'Wrong password for that username.')
           : e2.message;
         errEl.style.display = 'block';
-        btn.textContent = i.signInBtn || 'Sign In';
+        btn.textContent = i.signInBtn || 'Sign In / Register';
         btn.disabled = false;
       }
       return;
@@ -1133,7 +1134,7 @@ function showLoginModal(opts, renderBtn) {
       } else {
         errEl.textContent = e.message;
         errEl.style.display = 'block';
-        btn.textContent = i.signInBtn || 'Sign In';
+        btn.textContent = i.signInBtn || 'Sign In / Register';
         btn.disabled = false;
       }
     }
