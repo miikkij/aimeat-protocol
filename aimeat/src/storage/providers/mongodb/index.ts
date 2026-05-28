@@ -12,6 +12,10 @@
  * @version-history
  *   v1.0.0 — 2025-01-15 — Initial MongoDB storage implementation
  *   v1.1.0 — 2026-05-21 — Auto-sync Prisma schema on startup (prisma db push)
+ *   v1.1.1 — 2026-05-28 — createStorageFile uses upsert to match SQLite's
+ *                          INSERT OR REPLACE semantics (re-uploads to the same
+ *                          key now replace the file instead of throwing on the
+ *                          (ownerGaii, key) unique constraint).
  */
 
 import { execSync } from 'node:child_process';
@@ -1323,10 +1327,24 @@ export class MongoStorage implements Storage {
 
     async createStorageFile(file: StorageFileRecord): Promise<StorageFileRecord> {
         this.ensureReady();
-        await this.prisma.storageFile.create({
-            data: {
+        // Upsert semantics to match SQLite's INSERT OR REPLACE — re-uploading to
+        // the same (ownerGaii, key) replaces the existing file rather than
+        // failing on the unique constraint.
+        await this.prisma.storageFile.upsert({
+            where: { ownerGaii_key: { ownerGaii: file.ownerGaii, key: file.key } },
+            create: {
                 key: file.key,
                 ownerGaii: file.ownerGaii,
+                visibility: file.visibility,
+                mimeType: file.mimeType,
+                size: file.size,
+                data: file.data,
+                tags: file.tags || [],
+                federate: file.federate ?? false,
+                groupId: file.groupId ?? null,
+                createdAt: new Date(file.createdAt),
+            },
+            update: {
                 visibility: file.visibility,
                 mimeType: file.mimeType,
                 size: file.size,

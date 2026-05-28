@@ -55,7 +55,10 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   // Global body parsing middleware (skip for presigned upload — it reads raw body)
   app.use((req, res, next) => {
     if (req.path.startsWith('/v1/upload/')) return next();
-    const needsLargeBody = req.path.startsWith('/v1/apps') || req.path.startsWith('/v1/extensions') || req.path.startsWith('/v1/cortex');
+    // /v1/storage accepts base64-encoded files in JSON; sized at the same envelope
+    // as apps/extensions/cortex so it can carry files up to storageMaxFileSizeMb
+    // without 413s. (Raw-body and chunked paths are unaffected by this limit.)
+    const needsLargeBody = req.path.startsWith('/v1/apps') || req.path.startsWith('/v1/extensions') || req.path.startsWith('/v1/cortex') || req.path.startsWith('/v1/storage');
     const limit = needsLargeBody ? `${config.jsonBodyLimitLargeMb}mb` : `${config.jsonBodyLimitMb}mb`;
     express.json({ limit })(req, res, next);
   });
