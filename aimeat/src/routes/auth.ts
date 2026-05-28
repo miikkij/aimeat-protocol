@@ -1,3 +1,17 @@
+/**
+ * @file auth.ts
+ * @description Authentication routes for challenge signing, JWT issuance,
+ *   refresh, revocation, and session OTK flows.
+ * @structure
+ *   - authRouter() -- Express router for authentication endpoints
+ *   - checkOtkSession() -- inactivity guard for session-bound OTKs
+ *   - Challenge/session stores for interactive auth flows
+ * @usage
+ *   app.use(authRouter(config, storage));
+ * @version-history
+ *   v1.0.0 -- 2026-02-25 -- Initial authentication routes
+ *   v1.1.0 -- 2026-05-28 -- Preserve agent identity and scopes during JWT refresh
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -362,13 +376,19 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     let freshRoles: string[];
-    if (req.auth!.roles.includes('agent') && !req.auth!.roles.includes('owner')) {
+    let freshScopes: string[] | undefined;
+    const isAgentSession = req.auth!.roles.includes('agent') && parseGAII(req.auth!.sub) !== null;
+
+    if (isAgentSession) {
       const agent = await storage.getAgent(req.auth!.sub);
       if (!agent) {
         res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Agent no longer active'));
         return;
       }
       freshRoles = ['agent'];
+      if (ownerRecord.roles.includes('owner')) freshRoles.push('owner');
+      if (ownerRecord.roles.includes('operator')) freshRoles.push('operator');
+      freshScopes = agent.defaultScopes;
     } else {
       freshRoles = ownerRecord.roles ?? ['owner'];
     }
@@ -383,6 +403,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       owner: req.auth!.owner,
       node: config.nodeId,
       roles: freshRoles,
+      ...(freshScopes !== undefined ? { scopes: freshScopes } : {}),
     }, config.jwtTtlSeconds, refreshSessionId);
 
     await storage.createSession({
