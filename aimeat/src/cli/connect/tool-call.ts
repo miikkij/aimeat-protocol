@@ -18,6 +18,7 @@
  *   v1.2.0 -- 2026-05-28 -- Add app, extension, and cortex CLI fallback handlers
  *   v1.3.0 -- 2026-05-28 -- Add core memory, work, wallet, board, storage, and admin handlers
  *   v1.4.0 -- 2026-05-28 -- Add remaining connector MCP handlers to CLI fallback
+ *   v1.5.0 -- 2026-05-28 -- Add memory tags and owner-scope listing support
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -62,6 +63,17 @@ function optionalNumber(input: JsonObject, key: string): number | undefined {
     return undefined;
 }
 
+function optionalBoolean(input: JsonObject, key: string): boolean | undefined {
+    const value = input[key];
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === 'true') return true;
+        if (normalized === 'false') return false;
+    }
+    return undefined;
+}
+
 function requiredValue(input: JsonObject, key: string): unknown {
     if (!(key in input)) throw new Error(`Missing required field: ${key}`);
     return input[key];
@@ -93,7 +105,7 @@ function requiredArray(input: JsonObject, key: string): unknown[] {
     throw new Error(`Missing required array field: ${key}`);
 }
 
-function query(params: Record<string, string | number | undefined>): string {
+function query(params: Record<string, string | number | boolean | undefined>): string {
     const search = new URLSearchParams();
     for (const [key, value] of Object.entries(params)) {
         if (value !== undefined) search.set(key, String(value));
@@ -334,13 +346,24 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
             const visibility = optionalString(input, 'visibility');
             const ttlHours = optionalNumber(input, 'ttl_hours');
             if (visibility) body.visibility = visibility;
+            const tags = optionalArray(input, 'tags');
+            if (tags) body.tags = tags;
             if (ttlHours !== undefined) body.ttl_hours = ttlHours;
             return client.post('/v1/memory', body);
         },
     },
     {
         name: 'aimeat_memory_list',
-        handler: ({ client }, input) => client.get(`/v1/memory${query({ prefix: optionalString(input, 'prefix'), limit: optionalNumber(input, 'limit') })}`),
+        handler: ({ client }, input) => {
+            const tags = optionalArray(input, 'tags')?.filter((tag): tag is string => typeof tag === 'string');
+            return client.get(`/v1/memory${query({
+                prefix: optionalString(input, 'prefix'),
+                visibility: optionalString(input, 'visibility'),
+                tags: tags?.length ? tags.join(',') : undefined,
+                owner_scope: optionalBoolean(input, 'owner_scope') ? 'true' : undefined,
+                limit: optionalNumber(input, 'limit'),
+            })}`);
+        },
     },
     {
         name: 'aimeat_memory_search',

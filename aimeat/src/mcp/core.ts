@@ -10,6 +10,7 @@
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
  *   v1.0.0 — 2026-03-20 — Extracted from src/routes/mcp.ts (pure refactor, no logic changes)
+ *   v1.1.0 -- 2026-05-28 -- Add memory tags and owner-scope listing support
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -230,15 +231,42 @@ export function registerCoreTools(
     // ── Tool 5: aimeat_memory_list ──
     mcp.tool(
         'aimeat_memory_list',
-        'List memory entries for the current agent',
-        { prefix: z.string().optional(), visibility: z.string().optional() },
-        async ({ prefix, visibility }) => {
-            const entries = await storage.listMemory(agentGaii, { prefix, visibility });
+        'List memory entries for the current agent, or same-owner memory when owner_scope is true',
+        {
+            prefix: z.string().optional(),
+            visibility: z.string().optional(),
+            tags: z.array(z.string()).optional().describe('Optional tag filters'),
+            owner_scope: z.boolean().optional().describe('When true, list same-owner GHII and agent memory'),
+        },
+        async ({ prefix, visibility, tags, owner_scope }) => {
+            let entries: Awaited<ReturnType<Storage['listMemory']>>;
+            if (owner_scope) {
+                const parsed = parseGAII(agentGaii);
+                if (!parsed) {
+                    return {
+                        content: [{
+                            type: 'text' as const,
+                            text: JSON.stringify({ error: 'Invalid agent GAII', gaii: agentGaii }, null, 2),
+                        }],
+                    };
+                }
+                const ownerGhii = `${parsed.owner}@${config.nodeId}`;
+                const agents = await storage.getAgentsByOwner(parsed.owner);
+                entries = [
+                    ...await storage.listMemory(ownerGhii, { prefix, visibility, tags }),
+                ];
+                for (const agent of agents) {
+                    entries.push(...await storage.listMemory(agent.gaii, { prefix, visibility, tags }));
+                }
+            } else {
+                entries = await storage.listMemory(agentGaii, { prefix, visibility, tags });
+            }
             return {
                 content: [{
                     type: 'text' as const,
                     text: JSON.stringify(entries.map(e => ({
                         key: e.key,
+                        owner_gaii: e.ownerGaii,
                         visibility: e.visibility,
                         tags: e.tags,
                         version: e.version,

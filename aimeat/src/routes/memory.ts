@@ -6,6 +6,7 @@
  *   v1.0.0 — 2026-03-15 — Initial memory routes
  *   v1.1.0 — 2026-05-22 — Add list-home, list-remote, pull-remote federation endpoints
  *   v1.2.0 — 2026-05-22 — Add discover and copy endpoints for cross-user public memory
+ *   v1.3.0 -- 2026-05-28 -- Include owner_gaii in memory listing responses
  */
 
 import { Router } from 'express';
@@ -193,7 +194,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
   // GET /v1/memory — list memory keys (agent auth required)
   // Optional ?agent=GAII — owner can view any of their own agents' memory
-  // Optional ?owner_scope=true — list owner-visible keys across all owner's agents
+  // Optional ?owner_scope=true — list keys across the owner's GHII and agents
   // Owner sessions automatically use owner_scope (see all agents' memory)
   router.get('/v1/memory', requireAuth(), async (req, res) => {
     let gaii = req.auth!.sub;
@@ -256,6 +257,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     res.json(success(config.nodeId, {
       items: records.map(r => ({
         key: r.key,
+        owner_gaii: r.ownerGaii,
         value: r.value,
         visibility: r.visibility,
         zone: visibilityToZone(r.visibility),

@@ -11,6 +11,8 @@
  * @version-history v1.9.9 — 2026-05-28 — Clarify MCP tool names are not terminal commands.
  * @version-history v1.9.10 — 2026-05-28 — Include required telemetry reporting in Hello Integration guidance.
  * @version-history v1.9.11 — 2026-05-28 — State that Hello Integration is required first-run onboarding.
+ * @version-history v1.9.12 -- 2026-05-28 -- Add correct post-onboarding setup guidance for actual commands, config, and knowledge artifacts.
+ * @version-history v1.9.13 -- 2026-05-28 -- Add shared owner-memory tag guidance.
  */
 import { writeFileSync, mkdirSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -170,7 +172,7 @@ ${sections.join('\n')}
 2. After that MCP server is attached to the connected AI agent/runtime, ask the agent to use its AIMEAT tools. Hello Integration is AIMEAT's required first-run onboarding handshake for every newly connected agent:
 
    \`\`\`text
-  Use your AIMEAT tools. Hello Integration is required AIMEAT first-run onboarding. Read the AIMEAT handbook, check onboarding status, propose TODOs for the onboarding verification task, and complete Hello Integration before normal autonomous work.
+  Use your AIMEAT tools. Hello Integration is required AIMEAT first-run onboarding. Read the AIMEAT handbook, check onboarding status, propose TODOs for the onboarding verification task, complete Hello Integration, then publish your actual supported commands, runtime configuration, and any produced knowledge package artifacts before normal autonomous work.
    \`\`\`
 
 3. The agent must complete Hello Integration with these MCP tools. These names appear inside the AI runtime after MCP is attached; they are not terminal commands:
@@ -195,7 +197,14 @@ ${sections.join('\n')}
 
 Use \`generic\` as the installed skill platform unless your runtime has a more specific platform name. For the bundle version field, use \`local\` when no version is shown by the runtime.
 
-4. Run \`npx aimeat connect refresh\` later to download updated bundle content.
+4. After Hello Integration completes, publish real post-onboarding setup:
+
+  - Commands: write \`agents.${agentName}.commands\` with the full owner-facing slash command catalogue this agent can actually handle. Use a flat array of \`{ name, description, category }\`. Do not copy examples or list internal MCP tools as message commands.
+  - Config: write actual runtime/config artifacts under \`agents.config.*\`. If this setup only uses \`aimeat connect serve\`, describe that connector accurately; do not invent a watchdog file.
+  - Shared memory: if the owner assigned shared tags in Data Access/directives, use \`agents.tag.<tag>.*\` with visibility \`owner\` and tags \`["<tag>"]\` for same-owner handoff notes, project state, queues, and team context. List shared areas with \`owner_scope=true\` plus prefix \`agents.tag.<tag>.\`.
+  - Knowledge: when you produce research, docs, datasets, or reusable knowledge, create or update a real knowledge package with \`POST /v1/knowledge/import\` from \`/llms.txt\`, \`aimeat_knowledge_contribute\`, and \`aimeat_storage_upload\` as appropriate. Do not use a placeholder \`research.*\` memory key as a substitute.
+
+5. Run \`npx aimeat connect refresh\` later to download updated bundle content.
 `;
 }
 

@@ -3,6 +3,11 @@
  * @description Core MCP tool registrations for memory, catalogue, work, wallet,
  *   boards, storage, and admin endpoints. These cover the most commonly used
  *   AIMEAT API surface.
+ * @structure
+ *   - registerCoreTools() -- Registers core REST-backed connector MCP tools
+ * @version-history
+ *   v1.0.0 -- 2026-05-28 -- Initial connector MCP core tools
+ *   v1.1.0 -- 2026-05-28 -- Add memory tags and owner-scope listing support
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -23,21 +28,29 @@ export function registerCoreTools(mcp: McpServer, client: AimeatClient, _agentNa
     key: z.string().describe('Memory entry key'),
     value: z.unknown().describe('Value to store'),
     visibility: z.string().optional().describe('Visibility level (default: private)'),
+    tags: z.array(z.string()).optional().describe('Optional tags for filtering/shared areas'),
     ttl_hours: z.number().optional().describe('Time-to-live in hours'),
-  }, async ({ key, value, visibility, ttl_hours }) => {
+  }, async ({ key, value, visibility, tags, ttl_hours }) => {
     const body: Record<string, unknown> = { key, value };
     if (visibility) body.visibility = visibility;
+    if (tags) body.tags = tags;
     if (ttl_hours !== undefined) body.ttl_hours = ttl_hours;
     const resp = await client.post('/v1/memory', body);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_memory_list', 'List memory entries', {
+  mcp.tool('aimeat_memory_list', 'List memory entries for this agent, or same-owner memory when owner_scope is true', {
     prefix: z.string().optional().describe('Key prefix filter'),
+    visibility: z.string().optional().describe('Optional visibility filter'),
+    tags: z.array(z.string()).optional().describe('Optional tag filters'),
+    owner_scope: z.boolean().optional().describe('When true, list same-owner GHII and agent memory'),
     limit: z.number().optional().describe('Maximum entries to return'),
-  }, async ({ prefix, limit }) => {
+  }, async ({ prefix, visibility, tags, owner_scope, limit }) => {
     const params = new URLSearchParams();
     if (prefix) params.set('prefix', prefix);
+    if (visibility) params.set('visibility', visibility);
+    if (tags?.length) params.set('tags', tags.join(','));
+    if (owner_scope) params.set('owner_scope', 'true');
     if (limit !== undefined) params.set('limit', String(limit));
     const qs = params.toString();
     const resp = await client.get(`/v1/memory${qs ? `?${qs}` : ''}`);

@@ -1,3 +1,17 @@
+/**
+ * @file agents.ts
+ * @description Agent registration, device authorization, public profiles,
+ *   owner-managed metadata, heartbeat, portability, and import/export routes.
+ * @structure
+ *   - agentsRouter() -- Express router for agent identity and lifecycle APIs
+ *   - RFC 8628 device authorization endpoints
+ *   - Agent listing/profile/tag metadata endpoints
+ * @usage
+ *   app.use(agentsRouter(config, storage));
+ * @version-history
+ *   v1.0.0 -- 2026-03-15 -- Initial agent routes
+ *   v1.1.0 -- 2026-05-28 -- Expose owner-managed shared-memory tags
+ */
 import { Router } from 'express';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFileSync, existsSync } from 'node:fs';
@@ -787,6 +801,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         age_days: trust.ageDays,
       },
       actions_published: actionsPublished,
+      tags: agent.tags ?? [],
       semantic: agent.semantic,
       federate: agent.federate ?? false,
       home_node: config.nodeId,
@@ -819,10 +834,65 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         last_seen: a.lastSeen,
         public_key: a.publicKey,
         federate: a.federate ?? false,
+        tags: a.tags ?? [],
       })),
     }, [
       { description: 'Register a new agent', method: 'POST', url: '/v1/agents' },
     ]));
+  });
+
+  // PATCH /v1/agents/:name/tags — update owner-managed sharing tags
+  router.patch('/v1/agents/:name/tags', requireAuth(), requireRole('owner'), async (req, res) => {
+    const identifier = decodeURIComponent(req.params.name as string);
+    const gaii = identifier.includes('#') ? identifier : buildGAII(identifier, req.auth!.owner, config.nodeId);
+    const agent = await storage.getAgent(gaii);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${identifier}`));
+      return;
+    }
+    if (agent.owner !== req.auth!.owner) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only update tags for your own agents'));
+      return;
+    }
+
+    const rawTags = req.body?.tags;
+    if (!Array.isArray(rawTags)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'tags must be an array of strings'));
+      return;
+    }
+
+    const tags: string[] = [];
+    for (const value of rawTags) {
+      if (typeof value !== 'string') {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'tags must be an array of strings'));
+        return;
+      }
+      const tag = value.trim().toLowerCase();
+      if (!tag) continue;
+      if (!/^[a-z0-9][a-z0-9._-]{0,63}$/.test(tag)) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Invalid tag: ${value}`));
+        return;
+      }
+      if (!tags.includes(tag)) tags.push(tag);
+    }
+
+    if (tags.length > 20) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'An agent can have at most 20 tags'));
+      return;
+    }
+
+    const updated = await storage.updateAgent(gaii, { tags });
+    if (!updated) {
+      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${identifier}`));
+      return;
+    }
+
+    res.json(success(config.nodeId, {
+      gaii: updated.gaii,
+      name: updated.name,
+      tags: updated.tags ?? [],
+    }));
+    emitChange('agents');
   });
 
   // POST /v1/checkin — agent heartbeat (agent auth)
@@ -877,6 +947,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         trust_score: trust.score,
         morsel_balance: agent.morselBalance,
         semantic: agent.semantic,
+        tags: agent.tags ?? [],
         created_at: agent.createdAt,
       },
       memory: memories.map(m => ({
@@ -947,6 +1018,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       publicKey: keyPair.publicKey,
       trustScore: importedTrust,
       morselBalance: 0, // agents use GHII owner balance
+      tags: Array.isArray(agentData.tags) ? agentData.tags : [],
       createdAt: now,
       lastSeen: now,
     });

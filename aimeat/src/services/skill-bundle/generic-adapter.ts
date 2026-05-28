@@ -8,6 +8,8 @@
  *   v1.1.0 -- 2026-05-28 -- Clarify connected agent identity and Hello Integration MCP flow
  *   v1.1.1 -- 2026-05-28 -- Include task TODO completion in Hello Integration guidance
  *   v1.1.2 -- 2026-05-28 -- State that Hello Integration is required first-run onboarding
+ *   v1.1.3 -- 2026-05-28 -- Clarify post-onboarding setup publishes actual commands, config, and knowledge artifacts
+ *   v1.1.4 -- 2026-05-28 -- Add shared owner-memory tag guidance
  */
 
 import { computeBundleVersion } from './generator.js';
@@ -62,6 +64,7 @@ Hello Integration is AIMEAT's required first-run onboarding handshake for every 
 4. Confirm platform and skill installation with aimeat_onboarding_identify_platform and aimeat_onboarding_confirm_skill_installed.
 5. Report capabilities with aimeat_agent_capabilities_report.
 6. Confirm directives, send a test message, report telemetry, list tasks, propose TODOs for "Onboarding verification", mark the active test task TODOs done, then complete the task.
+7. Publish post-onboarding setup: your actual owner-facing command catalogue, real runtime/config artifacts, and any knowledge packages or uploaded artifacts you produced.
 
 If using direct HTTPS instead of MCP, agent-scoped endpoints use your agent name, for example ${ctx.nodeUrl}/v1/agents/${ctx.agentName}/inbox.
 
@@ -76,29 +79,37 @@ This is a generic skill bundle. You will need to manually configure:
 
 See the references/ directory for full API documentation.
 
-## After Onboarding: Register Commands and Config
+## After Onboarding: Publish Real Commands, Config, and Knowledge
 
-These steps are required after completing Hello Integration. They make your capabilities visible in the owner's dashboard.
+These steps are required after completing Hello Integration. They make your capabilities visible in the owner's dashboard. Do not copy sample commands or config; publish what this runtime actually supports.
 
 ### Register Commands (owner sees these in Messages tab)
+Introspect your runtime, skills, plugins, and built-in command handling. Register every stable slash command the owner can send to you in AIMEAT Messages. This is your command catalogue, not the AIMEAT MCP tool list.
 \`\`\`
 POST ${ctx.nodeUrl}/v1/memory
 { "key": "agents.${ctx.agentName}.commands", "value": [
-  { "name": "/status", "description": "Show current agent status", "category": "general" },
-  { "name": "/inbox", "description": "Check inbox for tasks and messages", "category": "tasks" }
+  { "name": "/<actual-command>", "description": "<what this command makes the agent do>", "category": "<category>" }
 ], "visibility": "owner" }
 \`\`\`
 The value MUST be a flat array of { name, description, category }. Each name starts with /.
+When the owner sends a slash-prefixed message, treat it as a command and answer with the promised information or action result.
 
 ### Push Config Files (owner sees these in Agent Config tab)
+Publish actual config files, hooks, routes, connector descriptors, or runtime setup snippets under \`agents.config.*\`. If you only use \`aimeat connect serve\` and have no extra config, publish a truthful descriptor for that connector; do not invent a watchdog file.
 \`\`\`
 POST ${ctx.nodeUrl}/v1/memory
-{ "key": "agents.config.watchdog", "value": {
-  "script": "path/to/your/watchdog",
-  "poll_interval": "60s",
+{ "key": "agents.config.<name>", "value": {
+  "filename": "<actual-file-or-descriptor>",
+  "content": "<actual config or descriptor>",
   "platform": "your-platform"
 }, "visibility": "owner" }
 \`\`\`
+
+### Use Shared Tag Memory When Assigned
+If the owner assigns shared tags in the Data Access tab, those tags are collaboration labels for same-owner agents. Use \`agents.tag.<tag>.*\` keys for shared project state, handoff notes, queues, and team context. Write shared entries with \`visibility: "owner"\` and \`tags: ["<tag>"]\`, then list the area with \`owner_scope=true\`, \`prefix=agents.tag.<tag>.\`, and the same tag filter. Do not store private agent-local secrets in shared tag memory.
+
+### Publish Knowledge Artifacts
+If setup or work produced structured research, documentation, datasets, or reusable knowledge, create a real knowledge package instead of a placeholder memory key. Follow \`/llms.txt\`: use \`POST /v1/knowledge/import\` for new packages, \`aimeat_knowledge_contribute\` for entries in existing packages, and \`aimeat_storage_upload\` for large source files or attachments. Report the package ID and manifest key to the owner.
 
 ## References
 - references/api-overview.md -- Endpoints, auth, response format

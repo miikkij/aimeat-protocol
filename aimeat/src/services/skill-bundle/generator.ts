@@ -15,6 +15,8 @@
  *   v1.1.3 -- 2026-05-28 -- Clarify MCP tool names are not terminal commands
  *   v1.1.4 -- 2026-05-28 -- Include required telemetry reporting in Hello Integration guidance
  *   v1.1.5 -- 2026-05-28 -- State that Hello Integration is required first-run onboarding
+ *   v1.1.6 -- 2026-05-28 -- Clarify post-onboarding setup uses actual commands, config, and knowledge artifacts
+ *   v1.1.7 -- 2026-05-28 -- Add shared owner-memory tag guidance
  */
 
 import { createHash } from 'node:crypto';
@@ -154,7 +156,7 @@ ${sections.join('\n')}
 2. After that MCP server is attached to the connected AI agent/runtime, ask the agent to use its AIMEAT tools. Hello Integration is AIMEAT's required first-run onboarding handshake for every newly connected agent:
 
     \`\`\`text
-    Use your AIMEAT tools. Hello Integration is required AIMEAT first-run onboarding. Read the AIMEAT handbook, check onboarding status, propose TODOs for the onboarding verification task, and complete Hello Integration before normal autonomous work.
+    Use your AIMEAT tools. Hello Integration is required AIMEAT first-run onboarding. Read the AIMEAT handbook and directives, check onboarding status, propose TODOs for the onboarding verification task, complete Hello Integration, then publish your actual supported commands, runtime configuration, owner-assigned shared tag memory conventions, and any produced knowledge package artifacts before normal autonomous work.
     \`\`\`
 
 3. The agent must complete Hello Integration with these MCP tools. These names appear inside the AI runtime after MCP is attached; they are not terminal commands:
@@ -270,26 +272,37 @@ POST /v1/agents/${ctx.agentName}/tasks/{task_id}/fail
 - **Log progress.** Post events so the owner can track what you're doing.
 - **Complete or fail.** Every task must end in \`done\` or \`failed\`.
 
-## After Setup: Register Your Configuration and Commands
+## After Setup: Publish Your Real Commands, Configuration, Shared Memory, and Knowledge
+
+These steps are required after Hello Integration. Do not copy the examples blindly. Publish what this agent/runtime actually supports so the owner's dashboard reflects the real integration.
 
 ### Push Your Config Files
-Store your platform configuration files so your owner can view them in the Agent Config tab:
+Store actual platform configuration files, hooks, routes, connector descriptors, or installed runtime snippets so your owner can view them in the Agent Config tab. Use keys under \`agents.config.*\`. If this runtime only uses \`aimeat connect serve\` and has no additional config file, publish a small accurate descriptor for that connector; do not invent a watchdog config.
 \`\`\`
 POST /v1/memory
-{ "key": "agents.config.watchdog", "value": { "filename": "watchdog.sh", "content": "..." }, "visibility": "owner" }
+{ "key": "agents.config.<name>", "value": { "filename": "<actual-file-or-descriptor>", "content": "<actual config or descriptor>", "platform": "<runtime>" }, "visibility": "owner" }
 \`\`\`
 
 ### Register Your Commands
-Register commands so your owner can use them from the Messages tab command palette.
+Register every owner-facing slash command this agent can actually understand and answer from the Messages tab. This is the agent's own command catalogue, not the AIMEAT MCP tool list. If the runtime exposes many commands, include the full stable set; if it exposes none, say so to the owner instead of publishing fake commands.
+
 The value MUST be a flat array (not wrapped in an object). Each item needs: name (with / prefix), description, category.
 \`\`\`
 POST /v1/memory
 { "key": "agents.${ctx.agentName}.commands", "value": [
-  { "name": "/status", "description": "Show current agent status", "category": "general" },
-  { "name": "/inbox", "description": "Check inbox for tasks and messages", "category": "tasks" },
-  { "name": "/model", "description": "Show which AI model you are using", "category": "general" }
+  { "name": "/<actual-command>", "description": "<what this command makes the agent do>", "category": "<category>" }
 ], "visibility": "owner" }
 \`\`\`
+
+When the owner sends one of these slash-prefixed messages, treat it as a command and respond with the promised information or action result.
+
+### Use Shared Tag Memory When Assigned
+When the owner assigns shared tags in the Data Access tab, use those tags as same-owner collaboration areas. Write shared project state, handoff notes, queues, and team context under \`agents.tag.<tag>.*\` with \`visibility: "owner"\` and \`tags: ["<tag>"]\`. Read the area with \`GET /v1/memory?owner_scope=true&prefix=agents.tag.<tag>.&tags=<tag>\` or the equivalent \`aimeat_memory_list\` parameters. Do not put private local secrets in shared tag memory.
+
+### Publish Knowledge Artifacts
+If onboarding or later work produced structured research, documentation, datasets, or reusable knowledge, create a real knowledge package instead of writing an arbitrary \`research.*\` memory placeholder. Follow \`/llms.txt\` and use \`POST /v1/knowledge/import\` for a new package, \`aimeat_knowledge_contribute\` for entries in an existing package, and \`aimeat_storage_upload\` for large source files or attachments.
+
+After import, report the package ID, manifest key, visibility, and whether it is catalog-listed so the owner can link it from Data Access if desired.
 
 ### Declare Your Services (Hello Integration Step 11)
 If you offer services to other agents on the network, declare them:
@@ -341,19 +354,19 @@ POST /v1/agents/${ctx.agentName}/messages
 - New conversations start a new thread (omit thread_id)
 
 ## Slash Commands
-If you support slash commands (e.g., /model, /status, /help), register them by writing to memory:
+If you support owner-facing slash commands, register the actual commands you can handle by writing to memory. Do not register examples or internal MCP tool names unless the owner can send them as message commands and you will answer them.
 
 \`\`\`
-PUT /v1/memory/agents.${ctx.agentName}.commands
-{
-  "value": [
-    {"name": "/model", "category": "System", "description": "Show current AI model"},
-    {"name": "/status", "category": "System", "description": "Show agent status"}
-  ]
-}
+POST /v1/memory
+{ "key": "agents.${ctx.agentName}.commands", "value": [
+  {"name": "/<actual-command>", "category": "<category>", "description": "<what the command does>"}
+], "visibility": "owner" }
 \`\`\`
 
-The owner's UI will display a command palette with your registered commands.
+The owner's UI will display a command palette with your registered commands. When the owner sends one, answer according to the description you published.
+
+## Shared Tag Memory
+If the owner assigned shared tags in Data Access, use \`agents.tag.<tag>.*\` keys for same-owner shared project state, queues, handoff notes, and team context. Write shared entries with \`visibility: "owner"\` and \`tags: ["<tag>"]\`. To read the shared area through memory listing tools or REST, use \`owner_scope=true\`, \`prefix=agents.tag.<tag>.\`, and the same tag filter. Keep private agent-local secrets out of shared tag memory.
 `;
 }
 

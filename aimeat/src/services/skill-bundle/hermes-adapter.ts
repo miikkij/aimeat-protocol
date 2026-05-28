@@ -12,6 +12,8 @@
  *   v1.1.0 -- 2026-05-28 -- Clarify connected agent identity and Hello Integration MCP flow
  *   v1.1.1 -- 2026-05-28 -- Include task TODO completion in Hello Integration guidance
  *   v1.1.2 -- 2026-05-28 -- State that Hello Integration is required first-run onboarding
+ *   v1.1.3 -- 2026-05-28 -- Clarify post-onboarding setup publishes actual commands, config, and knowledge artifacts
+ *   v1.1.4 -- 2026-05-28 -- Add shared owner-memory tag guidance
  */
 
 import { computeBundleVersion } from './generator.js';
@@ -79,7 +81,7 @@ Hello Integration is AIMEAT's required first-run onboarding handshake for every 
    cp config/hooks.yaml ~/.hermes/config/
    hermes reload_skills
    \`\`\`
-4. Register your commands and config in AIMEAT memory (see "After Setup" section in references)
+4. Register your actual commands, installed config files, and knowledge artifacts in AIMEAT (see "After Onboarding" below and "After Setup" in references)
 
 ## On Every Wake
 1. Check inbox: GET ${ctx.nodeUrl}/v1/agents/${ctx.agentName}/inbox?since={cursor}
@@ -100,29 +102,37 @@ ${rulesBlock}
 - directive.updated -- Directives changed. Re-fetch via GET /directives.
 - onboarding.step -- Onboarding step needs attention.
 
-## After Onboarding: Register Commands and Config
+## After Onboarding: Publish Real Commands, Config, and Knowledge
 
-These steps are required after completing Hello Integration.
+These steps are required after completing Hello Integration. Do not copy sample commands or config; publish what this Hermes runtime actually supports and installed.
 
 ### Register Commands (owner sees these in Messages tab)
+Introspect Hermes skills, hooks, routes, and command handling. Register every stable slash command the owner can send to you in AIMEAT Messages. This is your command catalogue, not the AIMEAT MCP tool list.
 \`\`\`
 POST ${ctx.nodeUrl}/v1/memory
 { "key": "agents.${ctx.agentName}.commands", "value": [
-  { "name": "/status", "description": "Show current agent status", "category": "general" },
-  { "name": "/inbox", "description": "Check inbox for tasks and messages", "category": "tasks" }
+  { "name": "/<actual-command>", "description": "<what this command makes the agent do>", "category": "<category>" }
 ], "visibility": "owner" }
 \`\`\`
 The value MUST be a flat array of { name, description, category }. Each name starts with /.
+When the owner sends a slash-prefixed message, treat it as a command and answer with the promised information or action result.
 
 ### Push Config Files (owner sees these in Agent Config tab)
+Publish the actual Hermes config files, hook files, route files, or installed script descriptors under \`agents.config.*\`. The examples below refer to real bundle files; replace content with what was actually installed.
 \`\`\`
 POST ${ctx.nodeUrl}/v1/memory
-{ "key": "agents.config.watchdog", "value": {
-  "script": "~/.hermes/aimeat_watchdog.sh",
-  "poll_interval": "60s",
+{ "key": "agents.config.hermes-hooks", "value": {
+  "filename": "config/hooks.yaml",
+  "content": "<actual hooks.yaml content>",
   "platform": "hermes-agent"
 }, "visibility": "owner" }
 \`\`\`
+
+### Use Shared Tag Memory When Assigned
+If the owner assigns shared tags in the Data Access tab, those tags are collaboration labels for same-owner agents. Use \`agents.tag.<tag>.*\` keys for shared project state, handoff notes, queues, and team context. Write shared entries with \`visibility: "owner"\` and \`tags: ["<tag>"]\`, then list the area with \`owner_scope=true\`, \`prefix=agents.tag.<tag>.\`, and the same tag filter. Do not store private agent-local secrets in shared tag memory.
+
+### Publish Knowledge Artifacts
+If setup or work produced structured research, documentation, datasets, or reusable knowledge, create a real knowledge package instead of a placeholder memory key. Follow \`/llms.txt\`: use \`POST /v1/knowledge/import\` for new packages, \`aimeat_knowledge_contribute\` for entries in existing packages, and \`aimeat_storage_upload\` for large source files or attachments. Report the package ID and manifest key to the owner.
 
 ## References
 See references/ directory for detailed API documentation:

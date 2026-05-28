@@ -5,6 +5,8 @@
  * @usage Imported by prompt routes/services to seed and serve agent-facing guidance.
  * @version-history v1.1.0 -- 2026-05-28 -- Clarify Hello Integration is required AIMEAT onboarding.
  * @version-history v1.1.1 -- 2026-05-28 -- Keep legacy boot sequence wording while using startup checklist guidance.
+ * @version-history v1.1.2 -- 2026-05-28 -- Clarify post-onboarding setup uses actual commands, config, and knowledge artifacts.
+ * @version-history v1.1.3 -- 2026-05-28 -- Add shared owner-memory tag guidance.
  *
  * Variable reference:
  *   {{node_url}}           -- config.baseUrl or req.protocol://req.get('host')
@@ -120,7 +122,11 @@ STEP 3: Complete Hello Integration.
     - declare_services: POST /v1/agents/me/onboarding/step/declare_services with { "services": [...] } (optional)
   After doing the actual work, GET /v1/agents/me/onboarding again to trigger auto-validation.
   For the test task: propose todos, GET /onboarding (auto-starts task), execute todos, POST /complete.
-  After all steps pass, register your commands and config as described in SKILL.md "After Onboarding" section.
+  After all steps pass, perform post-onboarding setup as described in SKILL.md "After Onboarding" section:
+    - Register the actual owner-facing slash commands you can handle at agents.{{agent_name}}.commands. Use a flat array of { name, description, category }. Do not copy sample commands or list internal MCP tools as message commands.
+    - Publish actual runtime/config artifacts under agents.config.*. If you only use aimeat connect serve, describe that connector accurately; do not invent a watchdog file.
+    - If the owner assigned shared tags in Data Access, use agents.tag.<tag>.* keys for same-owner handoff notes, project state, queues, and team context. Write shared entries with visibility "owner" and tags ["<tag>"], then list with owner_scope=true plus prefix agents.tag.<tag>. when coordinating with sibling agents.
+    - If you produced research, docs, datasets, or reusable knowledge, create or update a real knowledge package using /llms.txt, POST /v1/knowledge/import, aimeat_knowledge_contribute, and aimeat_storage_upload as appropriate. Do not use a placeholder research.* key as a substitute.
 
 STEP 4: Load EXTEND modules.
   GET /v1/agents/me/handbook/work
@@ -1104,15 +1110,15 @@ PURPOSE: AIMEAT agents can share memory, discover each other's services, and exc
 
 == SHARED MEMORY VIA TAGS ==
 
-Tags create shared memory namespaces between agents. When two agents have the same tag, they can both read and write to agents.tag.{name}.* keys.
+Owner-assigned tags create lightweight shared memory areas for agents under the same GHII owner. When the owner gives two agents the same tag in the Data Access tab, use agents.tag.{tag}.* keys for data both agents should coordinate around.
 
 How it works:
 1. Owner assigns tag "grocery" to Agent A and Agent B (in Data Access tab)
-2. Agent A writes: POST /v1/memory { "key": "agents.tag.grocery.prices", "value": {...} }
-3. Agent B reads: GET /v1/memory/agents.tag.grocery.prices
-4. Both agents see each other's data automatically
+2. Agent A writes: POST /v1/memory { "key": "agents.tag.grocery.prices", "value": {...}, "visibility": "owner", "tags": ["grocery"] }
+3. Agent B lists the shared area: GET /v1/memory?owner_scope=true&prefix=agents.tag.grocery.&tags=grocery
+4. Both agents use that area for shared project state, handoff notes, queues, and team context
 
-Check your tags: they are included in your directives (GET /v1/agents/me/directives).
+Check your tags and shared prefixes in your directives: GET /v1/agents/me/directives. Do not store private agent-local secrets in shared tag memory.
 
 == DISCOVERING OTHER AGENTS ==
 

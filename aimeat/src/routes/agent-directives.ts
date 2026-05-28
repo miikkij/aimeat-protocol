@@ -9,6 +9,7 @@
  *   - PUT    /v1/owner/agent-defaults         -- Upsert owner defaults
  * @version-history
  *   v1.1.0 -- 2026-05-23 -- Add webhook dispatch for directive.updated events
+ *   v1.2.0 -- 2026-05-28 -- Include owner-managed shared memory tags in directive reads
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  */
 
@@ -83,6 +84,8 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
         schema: ma.schema,
         csm_id: ma.csmId,
       })),
+      shared_tags: agent.tags ?? [],
+      shared_memory_prefixes: (agent.tags ?? []).map(tag => `agents.tag.${tag}.`),
       resources: agentDirectives?.resources ?? [],
     };
     if (agentDirectives?.budgetLimits) {

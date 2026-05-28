@@ -17,6 +17,8 @@
  * @version-history v1.9.15 — 2026-05-28 — Clarify MCP tool names are not terminal commands.
  * @version-history v1.9.16 — 2026-05-28 — Include required telemetry reporting in Hello Integration guidance.
  * @version-history v1.9.17 — 2026-05-28 — State that Hello Integration is required first-run onboarding.
+ * @version-history v1.9.18 -- 2026-05-28 -- Add correct post-onboarding setup instruction for actual commands, config, and knowledge artifacts.
+ * @version-history v1.9.19 -- 2026-05-28 -- Add shared owner-memory tag guidance after onboarding.
  */
 import { AimeatClient } from './api-client.js';
 import { storeToken, getToken } from './keychain.js';
@@ -98,6 +100,11 @@ Use the available AIMEAT tools now. Hello Integration is AIMEAT's required first
 10. Call aimeat_task_propose_todos with a short TODO plan for that task.
 11. Call aimeat_onboarding_status again. If the test task is active, use aimeat_task_event, aimeat_task_todo, and aimeat_task_complete to finish it.
 12. Call aimeat_onboarding_status one final time and report any remaining pending step.
+13. After Hello Integration is complete, publish post-onboarding setup from SKILL.md:
+  - Register your actual owner-facing slash commands at the memory key agents.{your-agent-name}.commands. Use a flat array of { name, description, category }. Include only commands you can really handle from AIMEAT Messages; do not copy examples or list internal MCP tools as message commands.
+  - Publish actual runtime/config artifacts under agents.config.*. If this runtime only uses aimeat connect serve, describe that connector accurately; do not invent a watchdog file.
+  - If the owner assigned shared tags in Data Access, use agents.tag.<tag>.* for same-owner handoff notes, project state, queues, or team context. Write shared entries with visibility "owner" and tags ["<tag>"], and list them with owner_scope=true plus prefix agents.tag.<tag>. when coordinating with sibling agents.
+  - If you produced research, docs, datasets, or reusable knowledge, create or update a real knowledge package using /llms.txt guidance, POST /v1/knowledge/import, aimeat_knowledge_contribute, and aimeat_storage_upload as appropriate. Do not use a placeholder research.* memory key as a substitute.
 
 If AIMEAT tools are not available in this runtime, tell me the MCP server is not attached yet.`;
 }

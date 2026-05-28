@@ -339,6 +339,11 @@ components:
           type: array
           items:
             type: string
+        tags:
+          type: array
+          items:
+            type: string
+          description: Owner-managed tags used for same-owner shared memory areas
         trust_score:
           type: integer
           minimum: 0
@@ -2436,6 +2441,16 @@ components:
               access:
                 type: string
                 enum: [read, write, readwrite]
+        shared_tags:
+          type: array
+          items:
+            type: string
+          description: Owner-managed shared memory tags assigned to this agent
+        shared_memory_prefixes:
+          type: array
+          items:
+            type: string
+          description: Convenience key prefixes derived from shared_tags, e.g. agents.tag.project.
         resources:
           type: array
           items:
@@ -3822,6 +3837,68 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/agents/{name}/tags:
+    patch:
+      operationId: updateAgentTags
+      summary: Update owner-managed agent tags
+      description: |
+        Replace the shared-memory tag list for one of the owner's agents. Tags are
+        used by the profile Data Access view and agent instructions to coordinate
+        same-owner shared memory areas under agents.tag.{tag}.*.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name or URL-encoded GAII
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tags]
+              properties:
+                tags:
+                  type: array
+                  maxItems: 20
+                  items:
+                    type: string
+                    maxLength: 64
+      responses:
+        '200':
+          description: Updated tag list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          gaii:
+                            $ref: '#/components/schemas/GAII'
+                          name:
+                            type: string
+                          tags:
+                            type: array
+                            items:
+                              type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /v1/checkin:
     post:
       operationId: agentCheckin
@@ -4511,7 +4588,7 @@ paths:
           schema:
             type: string
             enum: ['true', 'false']
-          description: When true, list memory across all owner's agents (owner sessions only)
+          description: When true, list memory across the caller owner's GHII and agents; useful for same-owner shared tag areas
         - name: max_flags
           in: query
           schema:

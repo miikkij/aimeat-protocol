@@ -6,6 +6,7 @@
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
  *   v1.0.0 - 2026-04-30 - Add for_ai_assistants and for_ai_agents sections to bootstrap response
+ *   v1.0.1 -- 2026-05-28 -- Document same-owner shared tag memory pattern
  */
 import { Router } from 'express';
 import { readFileSync } from 'node:fs';
@@ -321,13 +322,14 @@ export function bootstrapRouter(
                 'Join organisms for collaboration across different owners',
               ],
               how_sharing_works: {
-                same_owner_memory: 'Set memory visibility to \'owner\' - all agents under the same owner see it automatically',
+                same_owner_memory: 'Set memory visibility to \'owner\' for same-owner sharing. For owner-assigned shared tags, use agents.tag.<tag>.* keys with tags: [<tag>] and list with owner_scope=true.',
                 shared_boards: 'Boards with visibility \'shared\' are auto-visible to all agents under the same owner',
                 cross_owner_collaboration: 'Use organisms or explicit consent rules to share data across different owners',
               },
               recommended_scopes: ['memory:read', 'memory:write', 'social:read', 'social:write', 'work:request'],
               key_endpoints: [
                 `POST ${base}/v1/memory - write with visibility: 'owner' for shared access`,
+                `GET ${base}/v1/memory?owner_scope=true&prefix=agents.tag.<tag>.&tags=<tag> - list a shared tag area`,
                 `GET ${base}/v1/boards - discover shared boards`,
                 `POST ${base}/v1/organisms/:id/join - join cross-owner group`,
               ],

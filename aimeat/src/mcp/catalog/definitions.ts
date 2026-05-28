@@ -16,6 +16,7 @@
  *   v1.2.0 -- 2026-05-28 -- Add core memory, work, wallet, board, storage, and admin CLI fallback tools
  *   v1.3.0 -- 2026-05-28 -- Allow unknown payload field metadata
  *   v1.4.0 -- 2026-05-28 -- Add remaining shared public/connector MCP tools except server-only admin mint
+ *   v1.5.0 -- 2026-05-28 -- Add memory tags and owner-scope listing metadata
  */
 
 export type ToolCallerType = 'agent' | 'owner' | 'operator' | 'public';
@@ -235,6 +236,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
             key: { type: 'string', required: true, description: 'Memory entry key.' },
             value: { type: 'unknown', required: true, description: 'Value to store.' },
             visibility: { type: 'string', description: 'Visibility level, defaulting to private.' },
+            tags: { type: 'array', description: 'Optional tags for filtering or shared memory areas.' },
             ttl_hours: { type: 'number', description: 'Optional time-to-live in hours.' },
         },
     },
@@ -245,6 +247,9 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         input: {
             prefix: { type: 'string', description: 'Key prefix filter.' },
+            visibility: { type: 'string', description: 'Optional visibility filter.' },
+            tags: { type: 'array', description: 'Optional tag filters.' },
+            owner_scope: { type: 'boolean', description: 'When true, list same-owner GHII and agent memory.' },
             limit: { type: 'number', description: 'Maximum entries to return.' },
         },
     },
