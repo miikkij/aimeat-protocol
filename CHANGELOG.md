@@ -2,6 +2,26 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.13.0] - 2026-05-29
+
+### Changed (task-runner Hello Integration)
+
+- **Task-runner reduced flow is now 7 steps, not 5. `accept_test_task` and `complete_test_task` are kept.** The original 1.12.0 rationale ("task-runners have no interactive surface, skip the test task") was wrong on inspection: a task-runner agent's ENTIRE purpose is to execute queued tasks. The onboarding test task is the natural, server-driven smoke test that proves the operator's `runner:` block in `config.yaml` is wired correctly, the subprocess starts, and stdout round-trips back as the deliverable. Onboarding now does not flip to `completed` until the agent's subprocess has actually executed a real task end-to-end. The previously documented "Step 4 smoke test" disappears as a manual step -- it is built into onboarding. New skipped set for task-runner: `send_test_message`, `configure_delivery`, `report_telemetry`, `publish_commands`, `declare_services`, `read_directives` (the truly interactive-only steps).
+
+### Changed (paste prompt + CLI hint)
+
+- **Profile -> Agents -> "Connect a task-runner agent" paste rewritten.** Step 4 (manual smoke test through the browser) is removed. Verification at the end now lists the expected 7-step progression and explains that `complete_test_task` staying pending after `accept_test_task` passes is the canonical "your subprocess didn't run" signal -- with the actual diagnostic command (`aimeat_task_list`) to inspect the server-side task state.
+- **`aimeat connect add --mode task-runner`** post-auth hint now says "reduced 7-step flow (the test-task pair is kept so onboarding doubles as a smoke test for your subprocess)" instead of the misleading "5-step".
+
+### Updated tests
+
+- **`e2e-agent-onboarding` test 40** asserts exactly 7 steps for task-runner (was 5), and verifies the expected ID set includes `accept_test_task` + `complete_test_task`.
+- **Test 41** renamed from "auto-completes when all 5 steps pass" to "non-test-task steps pass; test-task pair stays pending until subprocess runs" -- it now asserts the 5 non-test-task steps reach `passed`, the test-task pair stays `pending`, and overall onboarding stays `in_progress`. This is the correct shape: the E2E cannot simulate a real subprocess, and the new design is explicit that onboarding waits for a real task round-trip before flipping to `completed`. 44/44 onboarding tests passing on SQLite.
+
+### Migration
+
+- **Existing task-runner agents under 1.12.4 have only 5 onboarding steps.** They show `completed` once those 5 pass, which under the new shape would correspond to "5/7 done, subprocess never verified". The cleanest path is to delete + recreate the agent under 1.13.0 so onboarding adopts the new shape. Alternatively, leave them alone -- the onboarding record is immutable for completed agents and the new step list only affects newly-onboarded agents.
+
 ## [1.12.5] - 2026-05-29
 
 ### Fixed (documentation)
