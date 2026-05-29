@@ -108,6 +108,41 @@ Hello Integration is AIMEAT's required first-run onboarding handshake for every 
 
 If using direct HTTPS instead of MCP, agent-scoped endpoints use your agent name, for example ${ctx.nodeUrl}/v1/agents/${ctx.agentName}/inbox.
 
+## Hello Integration -- exact parameter values
+
+The following step parameters MUST be exact for the server to accept the step. Do NOT substitute, simplify, or default these values.
+
+### identify_platform + confirm_skill_installed -- platform name
+
+The \`platform\` parameter is the name of YOUR runtime/framework, NOT the AIMEAT skill bundle's adapter name. Examples: \`crewai\`, \`langgraph\`, \`autogen\`, \`hermes\`, \`claude\`, \`cursor\`. The metadata field \`aimeat_runtime: generic\` in this SKILL.md's frontmatter refers to which AIMEAT bundle generated this file (generic = fallback adapter); it is NOT the value you pass to \`platform\`.
+
+Use the SAME platform string in both calls:
+\`\`\`
+aimeat_onboarding_identify_platform({ platform: "<your-runtime>", platform_version: "<version-string>" })
+aimeat_onboarding_confirm_skill_installed({ platform: "<your-runtime>", version: "v2" })
+\`\`\`
+
+If you genuinely have no framework (raw shell script, hand-rolled HTTPS), use \`"generic"\` for both -- but that is the rare case, not the default.
+
+### publish_config -- memory key MUST include the agent name segment
+
+Write the config to memory key \`agents.config.${ctx.agentName}.runtime\` (literal -- substitute your runtime details into the VALUE, not the key). Do NOT use \`agents.config.runtime\` or any other variant: the publish_config validator checks for that exact key.
+
+\`\`\`
+aimeat_memory_write({
+  key: "agents.config.${ctx.agentName}.runtime",
+  value: { runtime: "<your-runtime>", version: "<runtime-version>", ...extra },
+  visibility: "owner"
+})
+\`\`\`
+
+## Calling conventions
+
+- **Trust per-step API responses.** When \`aimeat_onboarding_*\` returns \`{ ok: true, ... }\` or a step body with \`status: passed\`, that step IS now passed on the server. Do NOT call \`aimeat_onboarding_status\` immediately to "confirm" -- a fresh status snapshot may briefly still show pending due to eventual consistency, and re-running the step wastes tool calls. Use your original status snapshot to find the next pending step.
+- **Omit optional parameters instead of passing null.** MCP schema validation rejects explicit null.
+- **For \`agent_name\` parameters, always pass \`${ctx.agentName}\`.** Never guess.
+- **On \`STEP_NOT_IN_FLOW\` or \`INVALID_STEP\` for an onboarding step:** treat as no-op (your agent's reduced flow doesn't include that step) and continue to the next pending step.
+
 ## Directives
 ${rulesBlock}
 

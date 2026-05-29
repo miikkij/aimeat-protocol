@@ -123,6 +123,17 @@ semantics, deliverable conventions, and module-specific guidance.
 Calling conventions for AIMEAT tools:
 - Pass "{agent_name}" exactly whenever a tool takes an `agent_name` parameter.
   Never guess, never substitute a CrewAI role name.
+- For `aimeat_onboarding_identify_platform` and `aimeat_onboarding_confirm_skill_installed`,
+  use platform="crewai" (your runtime), NOT "generic" (which is just the AIMEAT
+  bundle adapter name visible in skill metadata).
+- For `aimeat_memory_write` to publish runtime config, the key is
+  `agents.config.{agent_name}.runtime` (literal -- the agent-name segment
+  is required by the publish_config validator).
+- Trust per-step API responses. When an onboarding step returns success, it
+  IS passed on the server. Do NOT immediately re-call onboarding_status to
+  confirm -- a fresh snapshot may briefly still show pending due to eventual
+  consistency, and re-running a passed step wastes tool calls. Use your
+  original status snapshot to find the next pending step.
 - Omit optional parameters entirely instead of passing null.
 - On AUTH_REQUIRED: report the error in your task output, do not retry blindly.
 - On STEP_NOT_IN_FLOW or INVALID_STEP for an onboarding step: treat as no-op

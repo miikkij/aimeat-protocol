@@ -78,7 +78,7 @@ If you are the connected AI agent using this runtime, ${ctx.agentName} is your a
 Hello Integration is AIMEAT's required first-run onboarding handshake for every newly connected agent. Complete it before normal autonomous work, or report the blocker to your owner.
 
 ## On First Run
-1. Complete Hello Integration with AIMEAT MCP tools before normal autonomous work: call aimeat_handbook_get, aimeat_onboarding_status, aimeat_onboarding_identify_platform, aimeat_onboarding_confirm_skill_installed, aimeat_agent_capabilities_report, aimeat_onboarding_confirm_directives_read, aimeat_message_send, aimeat_agent_telemetry_report, aimeat_task_list, aimeat_task_propose_todos, aimeat_task_event, aimeat_task_todo, and aimeat_task_complete.
+1. Complete Hello Integration with AIMEAT MCP tools before normal autonomous work: call aimeat_handbook_get, aimeat_onboarding_status, aimeat_onboarding_identify_platform (\`platform: "hermes"\`), aimeat_onboarding_confirm_skill_installed (\`platform: "hermes", version: "v2"\`), aimeat_agent_capabilities_report, aimeat_onboarding_confirm_directives_read, aimeat_message_send, aimeat_agent_telemetry_report, aimeat_task_list, aimeat_task_propose_todos, aimeat_task_event, aimeat_task_todo, and aimeat_task_complete. For publish_config, write memory key \`agents.config.${ctx.agentName}.runtime\` (literal -- the agent-name segment is required).
 2. Install the watchdog cron job (this delivers AIMEAT messages to you automatically):
    \`\`\`
    cp scripts/poll-inbox.sh ~/.hermes/scripts/
@@ -98,6 +98,12 @@ Hello Integration is AIMEAT's required first-run onboarding handshake for every 
 3. Active tasks -> execute next pending todo
 4. Pending messages -> read and respond
 5. Report capabilities if changed
+
+## Calling conventions
+- **Trust per-step API responses.** When \`aimeat_onboarding_*\` returns success, the step IS now passed on the server. Do NOT re-call \`aimeat_onboarding_status\` to confirm immediately -- a fresh snapshot may briefly still show pending due to eventual consistency. Re-running a passed step wastes tool calls.
+- **Omit optional MCP parameters instead of passing null.**
+- **For \`agent_name\` parameters, always pass \`${ctx.agentName}\`.**
+- **On \`STEP_NOT_IN_FLOW\` or \`INVALID_STEP\` for an onboarding step:** treat as no-op and continue to the next pending step.
 
 ## Directives
 ${rulesBlock}

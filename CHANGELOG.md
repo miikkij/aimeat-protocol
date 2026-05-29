@@ -2,6 +2,26 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.13.6] - 2026-05-29
+
+### Fixed (skill bundle SKILL.md body lacked exact onboarding values)
+
+When CrewAI Claude's 0.2.1 verification ran the slim-persona flow against the full skill bundle, the LLM got the mechanics right (skill bound, persona slim, MCP calls clean) but two onboarding steps did not advance because the SKILL.md body left two values implicit:
+
+- **`identify_platform` / `confirm_skill_installed`**: the LLM read `aimeat_runtime: generic` from the frontmatter metadata and passed `platform="generic"` to the onboarding tools. The server's step validator expects the actual RUNTIME name (`crewai`, `langgraph`, `hermes`, `claude`...) -- "generic" is the AIMEAT skill-bundle ADAPTER name, not a runtime. The body never said this, so the LLM made the wrong inference.
+- **`publish_config`**: the LLM wrote memory key `agents.config.runtime` (no agent-name segment). The validator checks for `agents.config.<agent_name>.runtime` specifically. The slim persona didn't carry this and the body's "After Onboarding" section used a generic `agents.config.<name>` placeholder that the LLM didn't substitute correctly.
+- **Retry spiral on eventual consistency**: the LLM saw a step still as `pending` in `aimeat_onboarding_status` after the POST returned success and re-ran the step, doubling tool calls. The body had no instruction to trust the per-step response.
+
+1.13.6 adds an explicit **Hello Integration -- exact parameter values** section to the bundle body of both `generic-adapter` and `hermes-adapter`. It states the platform-name rule plainly (use your runtime name, NOT "generic"), the publish_config key with the agent name pre-substituted (`agents.config.<actual_agent_name>.runtime`), and a calling-conventions block that includes "trust per-step API responses; do not re-call onboarding_status to confirm" plus the same `agent_name` / null-omission / STEP_NOT_IN_FLOW guidance the Python liaison carries.
+
+The body is now precise enough that an LLM-only onboarding run (no out-of-band Python persona) reaches 7/7 completion without retry spirals.
+
+## aimeat-crewai 0.2.2 - 2026-05-29
+
+### Changed
+
+- **SLIM_BACKSTORY_TEMPLATE expanded** with the same precision guidance the AIMEAT 1.13.6 SKILL.md body added (use `platform="crewai"` not `"generic"`, full `agents.config.<agent_name>.runtime` memory key, trust per-step API responses). Belt-and-suspenders: the bundle already carries the canonical version, but mirroring it in the slim persona means the LLM sees the same exact values whether it reads the persona or activates the skill.
+
 ## aimeat-crewai 0.2.1 - 2026-05-29
 
 ### Fixed
