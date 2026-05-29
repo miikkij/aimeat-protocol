@@ -2,6 +2,17 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.12.4] - 2026-05-29
+
+### Fixed
+
+- **CRITICAL: `--mode task-runner` was silently dropped during device-auth registration.** The mode field was added to `DeviceAuthorizationRecord` in 1.12.0 but the SQLite + MongoDB storage layers never persisted it. SQLite `createDeviceAuth` INSERT statement omitted the column; MongoDB `createDeviceAuth` omitted it from the Prisma `data` block; both `deserializeDeviceAuth` / `toDeviceAuthRecord` returned `mode: undefined` no matter what the route stored. Net effect: every `aimeat connect add --mode task-runner` request looked successful (server returned `ok: true`, agent got approved, token issued), but the verify-route's `request.mode` was `undefined`, so `createAgent` defaulted to `'interactive'` and `createDefaultSteps()` produced the full 13-step Hello Integration. Operators saw `INTERACTIVE` badges and 13-step onboarding for agents they had explicitly registered as `task-runner` -- the entire mode field was a no-op for device-auth registrations from 1.12.0 through 1.12.3. Fix: SQLite `device_auth` table gets a `mode` column via `safeAddColumn` migration (auto-applied on server start); MongoDB Prisma `DeviceAuth` model gets a `mode String?` field (run `prisma generate` + redeploy); both `createDeviceAuth` and the deserializers now round-trip the field. The owner-only `PATCH /v1/agents/:name/mode` route was unaffected and worked all along -- it just was not a viable single-call path because of the runToolCall agent-routing bug (also in 1.12.3).
+- **Operator migration:** Any agent created with 1.12.0-1.12.3 and registered as `task-runner` is actually `interactive` on the server. The clean fix is to delete + recreate with 1.12.4. Alternatively, the owner can use the browser DevTools console workaround (`fetch('/v1/agents/<name>/mode', { method: 'PATCH', ... })` with their own owner JWT) to re-classify in place -- the storage layer reads/writes the agent table's `mode` column correctly (only the device-auth pathway was broken).
+
+### Changed
+
+- **`device_auth` table gains a `mode` column** (SQLite + MongoDB). Existing pending device-auth requests created before 1.12.4 default to `'interactive'`; if the operator wants a pending request to become task-runner, they should cancel + re-register.
+
 ## [1.12.3] - 2026-05-29
 
 ### Fixed

@@ -4628,8 +4628,8 @@ export class SqliteStorage implements Storage {
 
   async createDeviceAuth(req: DeviceAuthorizationRecord): Promise<void> {
     this.db.prepare(
-      `INSERT INTO device_auth (deviceCode, userCode, ownerName, agentName, displayName, description, status, scopes, createdAt, expiresAt, lastPolledAt, pollInterval, approvedBy, agentCredentials)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO device_auth (deviceCode, userCode, ownerName, agentName, displayName, description, status, scopes, createdAt, expiresAt, lastPolledAt, pollInterval, approvedBy, agentCredentials, mode)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       req.deviceCode, req.userCode, req.ownerName, req.agentName,
       req.displayName ?? null, req.description ?? null,
@@ -4637,6 +4637,7 @@ export class SqliteStorage implements Storage {
       req.createdAt, req.expiresAt, req.lastPolledAt ?? null,
       req.pollInterval, req.approvedBy ?? null,
       req.agentCredentials ? JSON.stringify(req.agentCredentials) : null,
+      req.mode ?? 'interactive',
     );
   }
 
@@ -4706,6 +4707,7 @@ export class SqliteStorage implements Storage {
       pollInterval: row.pollInterval as number,
       approvedBy: row.approvedBy as string | undefined,
       agentCredentials: row.agentCredentials ? JSON.parse(row.agentCredentials as string) : undefined,
+      mode: row.mode ? (row.mode as DeviceAuthorizationRecord['mode']) : undefined,
     };
   }
 

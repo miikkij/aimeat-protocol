@@ -4216,6 +4216,7 @@ export class MongoStorage implements Storage {
                 pollInterval: req.pollInterval,
                 approvedBy: req.approvedBy,
                 agentCredentials: req.agentCredentials ?? undefined,
+                mode: req.mode ?? 'interactive',
             },
         });
     }
@@ -4290,6 +4291,7 @@ export class MongoStorage implements Storage {
             pollInterval: row.pollInterval,
             approvedBy: row.approvedBy ?? undefined,
             agentCredentials: row.agentCredentials ?? undefined,
+            mode: row.mode ?? undefined,
         };
     }
 

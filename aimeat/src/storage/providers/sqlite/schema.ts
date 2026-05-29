@@ -1397,4 +1397,12 @@ export function initializeSchema(db: Database.Database): void {
   // Default 'interactive' = backward-compatible: all existing agents went through
   // the full 13-step Hello Integration which matches interactive semantics.
   safeAddColumn('agents', 'mode', "TEXT DEFAULT 'interactive'");
+
+  // device_auth.mode -- mode the CLI passed to /v1/agents/device-authorize.
+  // verify-route reads this when the owner approves, and propagates it to
+  // storage.createAgent so the new agent ends up with the right server-side
+  // mode. Without this column the mode silently dropped, the agent was always
+  // created as 'interactive', and Hello Integration ran the full 13 steps even
+  // when the operator clearly asked for task-runner.
+  safeAddColumn('device_auth', 'mode', "TEXT DEFAULT 'interactive'");
 }

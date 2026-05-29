@@ -983,6 +983,7 @@ model DeviceAuth {
   pollInterval     Int      @default(5)
   approvedBy       String?
   agentCredentials Json?
+  mode             String?
 }
 
 model OAuthClient {
