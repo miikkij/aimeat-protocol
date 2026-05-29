@@ -56,19 +56,34 @@ export class GenericAdapter implements RuntimeAdapter {
       : 'No specific rules configured.';
 
     // Frontmatter is required for frameworks that auto-discover skills (CrewAI's
-    // discover_skills(), Anthropic Agent Skills, etc.). `name` must be a stable
-    // slug; `description` is a one-liner the LLM reads BEFORE deciding to load
-    // the full body, so it should describe what activating this skill enables.
-    // `trigger` is a CrewAI/Anthropic convention listing intents that should
-    // bring the skill into context.
+    // discover_skills(), Anthropic Agent Skills). CrewAI's strict validation:
+    //   - REQUIRED: name (str), description (str)
+    //   - OPTIONAL: license, compatibility, metadata (dict), allowed_tools (list)
+    //   - DIRECTORY name MUST equal frontmatter `name` -- CrewAI rejects with
+    //     "Directory name X does not match skill name Y"
+    //
+    // Because the bundle is downloaded into ~/.aimeat/agents/<agent_name>/, we
+    // set `name` to <agent_name> so the directory-vs-name check passes. Each
+    // agent's bundle is therefore its OWN distinct Skill in CrewAI -- e.g. a
+    // demo-crew Skill, a company-crew Skill, etc. This is actually useful:
+    // crews with multiple AIMEAT identities (rare but legal) get distinct skill
+    // namespaces.
+    //
+    // `trigger` and `tags` are AIMEAT/Anthropic conventions that CrewAI does
+    // NOT understand as top-level keys (it just ignores them harmlessly).
+    // Stuffed into `metadata: {...}` they survive into the loaded Skill object
+    // as inspectable data, AND they remain present as YAML so an LLM reading
+    // the raw SKILL.md still sees them.
     return `---
-name: aimeat-agent
-description: AIMEAT node integration -- gives the agent identity, shared memory, task lifecycle, capabilities catalog, and federation access on ${ctx.nodeUrl}
-trigger: when the agent needs to call any AIMEAT tool, check onboarding status, write to memory, contribute knowledge, complete tasks, or coordinate with other agents on the AIMEAT node
-tags:
-  - aimeat
-  - agent-orchestration
-  - mcp
+name: ${ctx.agentName}
+description: AIMEAT node integration for agent ${ctx.agentName} on ${ctx.nodeUrl} -- identity, shared memory, task lifecycle, capabilities catalog, federation. Activate when the agent needs to call any AIMEAT tool, check onboarding status, write to memory, contribute knowledge, complete tasks, or coordinate with other agents.
+metadata:
+  trigger: when the agent needs to call any AIMEAT tool, check onboarding status, write to memory, contribute knowledge, complete tasks, or coordinate with other agents on the AIMEAT node
+  tags: [aimeat, agent-orchestration, mcp]
+  aimeat_node_id: ${ctx.nodeId}
+  aimeat_node_url: ${ctx.nodeUrl}
+  aimeat_agent_gaii: ${ctx.agentGaii}
+  aimeat_runtime: generic
 ---
 
 # AIMEAT Agent Integration

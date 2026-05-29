@@ -2,6 +2,22 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.13.4] - 2026-05-29
+
+### Fixed (SKILL.md frontmatter rejected by CrewAI's strict validator)
+
+CrewAI Claude's first end-to-end Skills test against 1.13.3's bundles revealed two CrewAI-strict-validator violations:
+
+- **Directory name must equal frontmatter `name`.** 1.13.3 set `name: aimeat-agent` for every agent, but the bundle is extracted into `~/.aimeat/agents/<agent_name>/`. CrewAI's `load_skill_metadata` rejected it with `Directory name 'falcon' does not match skill name 'aimeat-agent'`. 1.13.4 sets `name: <agent_name>` so each agent's bundle is its own CrewAI Skill (e.g. a `demo-crew` Skill, a `company-crew` Skill). Crews with multiple AIMEAT identities get distinct skill namespaces, which is the correct semantics.
+- **`trigger` and `tags` are not CrewAI-recognised top-level frontmatter keys.** CrewAI's `SkillFrontmatter` recognises `name` (required), `description` (required), `license`, `compatibility`, `metadata: dict`, `allowed_tools: list`. It ignored `trigger` and `tags` silently in 1.13.3, but they were also lost from the loaded Skill object's introspectable surface. 1.13.4 moves them into `metadata: {...}` so they survive into the loaded Skill while remaining present in the raw markdown for non-CrewAI consumers (LLMs reading SKILL.md directly).
+- **Added richer `metadata`** alongside `trigger` / `tags`: `aimeat_node_id`, `aimeat_node_url`, `aimeat_agent_gaii`, `aimeat_runtime`. Lets a CrewAI-driven LLM (or any other Skills consumer) inspect which AIMEAT node / agent / runtime a Skill represents without re-parsing the markdown body.
+
+Both `generic-adapter` and `hermes-adapter` updated to the same shape. Bundle body below the frontmatter is unchanged.
+
+### Operator note
+
+Existing bundles cached in `~/.aimeat/agents/*/SKILL.md` from pre-1.13.4 nodes will not auto-update without an explicit `aimeat connect refresh --agent <name>` against an upgraded node. If `discover_skills()` returns `found: 0`, check that (a) the node is on 1.13.4+, (b) `aimeat connect refresh` has been run, and (c) `discover_skills()` is pointed at `~/.aimeat/agents` (the parent of per-agent directories) rather than `~/.aimeat` (which only contains the global config, no SKILL.md at its top level).
+
 ## [1.13.3] - 2026-05-29
 
 ### Changed (skill bundle SKILL.md frontmatter)
