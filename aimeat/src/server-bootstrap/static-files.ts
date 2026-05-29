@@ -1,3 +1,19 @@
+/**
+ * @file static-files.ts
+ * @description Wires static asset serving (CSP nonce, public/ via express.static,
+ *   locales/, PWA assets) onto the Express app. Also redirects direct access to
+ *   the underlying `.html` files of any templated page (privacy, connect) to
+ *   the canonical `/v1/...` route, so users and search engines never see a
+ *   page with unresolved `{{placeholder}}` tokens.
+ * @structure
+ *   - setupStaticFiles() -- main entry, applied during server bootstrap
+ *   - STATIC_HTML_REDIRECTS -- map of legacy .html paths to canonical /v1/ routes
+ * @version-history
+ *   v1.0.0 -- pre-2026-05 -- Initial static file bootstrap with /wizard.html redirect
+ *   v1.1.0 -- 2026-05-29 -- Add 301 redirects for /privacy.html, /privacy.fi.html,
+ *     /connect.html, /connect.fi.html to their /v1/ canonical routes so the
+ *     {{placeholder}}-tokenised raw templates are never served directly.
+ */
 import express from 'express';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -38,11 +54,24 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
 
   const publicDir = publicCandidates.find(p => existsSync(p));
   if (publicDir) {
-    // Redirect legacy HTML URLs to canonical /v1/ routes
+    // Redirect legacy and template HTML URLs to canonical /v1/ routes.
+    // The privacy and connect pages are TEMPLATES with {{placeholder}} tokens
+    // substituted server-side at /v1/privacy and /v1/connect — direct
+    // access to the underlying .html file would serve the raw template with
+    // unresolved tokens visible to users + search engines. 301-redirect
+    // forces everyone through the substituted route.
+    const STATIC_HTML_REDIRECTS: Record<string, string> = {
+      '/wizard.html':       '/v1/setup/wizard',
+      '/privacy.html':      '/v1/privacy',
+      '/privacy.fi.html':   '/v1/privacy/fi',
+      '/connect.html':      '/v1/connect',
+      '/connect.fi.html':   '/v1/connect/fi',
+    };
     app.use((req, res, next) => {
-      if (req.path === '/wizard.html') {
+      const target = STATIC_HTML_REDIRECTS[req.path];
+      if (target) {
         const qs = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
-        res.redirect(301, '/v1/setup/wizard' + qs);
+        res.redirect(301, target + qs);
         return;
       }
       next();

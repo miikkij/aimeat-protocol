@@ -2,6 +2,51 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.12.0] - 2026-05-29
+
+Headline: agents are now classified by **operational mode** and can carry
+**owner-managed tags**. Mode picks the Hello Integration flow -- a
+**task-runner** agent (CrewAI crew, triggered worker) gets a reduced
+5-step onboarding instead of the full 13, because it has no interactive
+command surface, never sends messages, and never runs a test task. Tags
+drive a new filter bar + group-by selector on the Your Agents tab so a
+fleet of 2-20 mixed agents stays navigable.
+
+### Added
+
+#### Agent Mode Classification (`autonomous` / `interactive` / `task-runner` / `coordinator`)
+- **`AgentRecord.mode` field** -- new strict union persisted on every agent record. `autonomous` runs continuously (Hermes, OpenClaw). `interactive` (default) responds to user requests (Claude Code, Cursor, Cline). `task-runner` is triggered, runs one task, exits (CrewAI crews, Inngest-style workers). `coordinator` orchestrates other agents (Claude Desktop, LangGraph supervisor) and shares the interactive onboarding. SQLite gets a `mode TEXT DEFAULT 'interactive'` column via `safeAddColumn`; MongoDB gets `mode String?` on the Prisma `Agent` model. Existing agents fall back to `interactive` on read (they already completed the full flow).
+- **Mode wired through registration + management** -- `POST /v1/agents/device-authorize`, legacy `POST /v1/agents`, and the new `PATCH /v1/agents/:name/mode` route (owner-only) all accept and validate against the closed `VALID_MODES` set. `AgentRegistrationSchema` enforces the enum at the zod layer. `GET /v1/agents` returns `mode` for every listed agent.
+- **Mode-aware Hello Integration** -- `createDefaultSteps(mode)` in `agent-onboarding-schemas.ts` filters the 13-step canonical list down to 5 for `task-runner` (`authenticate`, `identify_platform`, `install_skill`, `report_capabilities`, `publish_config`). Omitted steps are absent from the record -- not pending, not skipped, just not there. `agent-onboarding.ts` switched array-indexed step access to `.find()` so missing steps no longer crash test-task creation; the test task is only created when `accept_test_task` exists.
+
+#### Owner-Managed Tags Surfaced in UI (Your Agents tab)
+- **Tag chip strip on every expanded agent card** -- `agent-card.js` renders `agent.tags` as small rounded chips above the capabilities row. Replaces the previous text-only "Shared tags: [x]" line in zone2.
+- **Mode badge on every agent card** (collapsed + expanded) -- four distinct colors (violet / blue / orange / green) corresponding to autonomous / interactive / task-runner / coordinator. CSS classes `.pf-agd-badge--mode-*` defined in `agents-detail.css`.
+- **Tag filter bar** -- multi-select chip row at the top of the agent list. Selecting multiple tags applies an AND filter (agent must carry all selected tags). A "Clear" link appears when any filter is active.
+- **Group-by selector** with three options: `none` (flat list, default), `tag` (one section per tag with an "Untagged" catch-all), `mode` (one section per mode in canonical order). Filtering applies before grouping, so e.g. tag=`crew:marketing-001` + groupBy=mode shows the mode breakdown of just that crew.
+
+#### MCP Tools (owner-only)
+- **`aimeat_agent_tags_set`** -- replaces an agent's tag list (max 20). Wraps `PATCH /v1/agents/:name/tags`.
+- **`aimeat_agent_mode_set`** -- sets an agent's operational mode. Wraps `PATCH /v1/agents/:name/mode`.
+- Both registered in a new `mcp/tools/agent-management.ts` module + mirrored in the `aimeat connect call` shell-fallback tool list.
+
+#### Documentation
+- **`docs/coding-guidelines/agent-tags.md`** -- new file documenting the mode union, the recommended tag conventions (`crew:`, `source:`, `role:`, `project:`), how to set both via UI/MCP/REST, and the UI grouping behaviour. Closes with explicit "Don't" rules (don't gate scopes by tag, don't reuse mode for grouping things tags should handle).
+- **`docs/coding-guidelines/architecture.md`** -- Identity Model section now includes the four-mode table and points to `agent-tags.md`.
+- **README.md** -- Connect AI agents section now mentions modes, the reduced task-runner Hello Integration, and tag conventions.
+
+#### E2E Coverage
+- **4 new `e2e-agent-onboarding.ts` tests** -- create a `mode: 'task-runner'` agent, verify mode persists across reads, verify exactly 5 steps appear (with the correct IDs and the right omissions), and verify the onboarding auto-completes when all 5 task-runner steps pass. 44/44 passing on both SQLite and MongoDB.
+
+### Changed
+
+- **`AgentRegistrationSchema`** -- now accepts an optional `mode` enum field; rejects values outside the strict union.
+- **`createDefaultSteps()`** -- signature changed from `()` to `(mode?: AgentMode)`. Callers in `agents.ts` and `agent-onboarding.ts` updated to pass the agent's mode.
+- **`renderZone2()` production/idle path** -- no longer renders an inline `Shared tags: [x]` text line; tags are now rendered above the zone via the dedicated `renderTagStrip()` so they don't fight with the delivery/stats row.
+
+### i18n
+- **EN + FI updated together** -- new `profile.agents.mode.{autonomous,interactive,task-runner,coordinator,tooltip}` and `profile.agents.filter.{byTag,groupBy,groupByNone,groupByTag,groupByMode,clear,untagged,noMatches}` keys added to both `locales/en.json` and `locales/fi.json`.
+
 ## [1.11.0] - 2026-05-29
 
 Headline: submission-ready for the **Anthropic Connectors Directory**. Every
@@ -55,6 +100,9 @@ upstream author's information.
 
 #### Production OAuth Discovery
 - **nginx `/.well-known/*` blocked by dotfile-deny rule** -- production nginx config was rejecting `/.well-known/oauth-authorization-server` and `/.well-known/oauth-protected-resource` with 403 because the standard `location ~ /\. { deny all; }` rule matched. The Express MCP handlers were returning correct JSON on `localhost:40050` but reviewers and clients could not auto-discover OAuth on prod. Fixed on the operator side (nginx config) with an explicit `location ^~ /.well-known/` allow block. End-to-end OAuth chain (`401` -> `WWW-Authenticate: Bearer resource_metadata="..."` -> `/.well-known/oauth-protected-resource` -> `/.well-known/oauth-authorization-server` -> authorize/token endpoints) now traversable by any conforming MCP client.
+
+#### Templated Pages Served Raw via Static Middleware
+- **`/privacy.html` and `/connect.html` showed unresolved `{{placeholder}}` tokens** -- the templated HTML files live in `public/`, which Express's `express.static` serves directly. Direct access to `https://aimeat.io/privacy.html` returned the raw template (`{{nodeName}}`, `{{operatorName}}`, etc.) instead of the substituted content available at `/v1/privacy`. Catastrophic if a search engine or reviewer landed on the legacy URL. Fixed by extending the redirect middleware in `server-bootstrap/static-files.ts` with a `STATIC_HTML_REDIRECTS` map: `/privacy.html`, `/privacy.fi.html`, `/connect.html`, `/connect.fi.html` now 301-redirect to their `/v1/` canonical routes. Pattern is now generalised so future templated pages can be added in one line.
 
 ### Documentation
 - **Connectors Directory submission plan** -- single source of truth for every form field, all 94 tools' annotation classifications with hint reasoning, pre-submission technical pre-flight verified against live aimeat.io, nginx fix snippet, reviewer-test-account seeding instructions deferred to Section E.
