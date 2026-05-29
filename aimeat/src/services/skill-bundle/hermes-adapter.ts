@@ -57,8 +57,13 @@ export class HermesAdapter implements RuntimeAdapter {
 
     return `---
 name: aimeat-hermes
-description: AIMEAT node integration for ${ctx.nodeId}
-trigger: when user mentions AIMEAT, tasks, inbox, or this skill is invoked
+description: AIMEAT node integration for Hermes runtime on ${ctx.nodeUrl} -- on-wake protocol, watchdog cron job, MCP tool catalogue, Hello Integration handshake
+trigger: when the agent needs to call any AIMEAT tool, check onboarding status, write to memory, contribute knowledge, complete tasks, or coordinate with other agents on the AIMEAT node
+tags:
+  - aimeat
+  - agent-orchestration
+  - mcp
+  - hermes
 ---
 
 ## Identity

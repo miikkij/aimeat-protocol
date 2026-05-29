@@ -1,241 +1,242 @@
 # CrewAI integration
 
-CrewAI crews are **task runners**: triggered by a task arrival, they do one job, exit. They are not autonomous (they don't run continuously like Hermes) and they are not interactive (they don't respond to user chat like Claude Code). AIMEAT's connector supports them natively without requiring a Python package — the connector launches your CrewAI script as a subprocess and posts back whatever the subprocess produces as the task completion summary.
+The recommended way to connect a CrewAI crew to an AIMEAT node is the **AIMEAT Liaison Agent** pattern: drop a single dedicated crew member -- the liaison -- whose tools are the AIMEAT MCP surface. The liaison handles all AIMEAT-side coordination (Hello Integration handshake, capability reporting, memory writes, knowledge publishing, task lifecycle updates, telemetry) so the rest of the crew can focus on its actual domain work.
 
-## How it fits together
-
-```
-  ┌─────────────────┐    user creates task     ┌─────────────────────┐
-  │ Claude Desktop  │ ───────────────────────▶ │ AIMEAT node         │
-  │ (orchestrator)  │                          │ task queued for     │
-  └─────────────────┘                          │ marketing-crew      │
-                                               └──────────┬──────────┘
-                                                          │ poll
-                                                          ▼
-                                         ┌─────────────────────────────┐
-                                         │ aimeat connect serve        │
-                                         │ (one process, N agents)     │
-                                         │                             │
-                                         │ marketing-crew is task-     │
-                                         │ runner → spawn subprocess   │
-                                         └──────────┬──────────────────┘
-                                                    │ AIMEAT_TASK_PROMPT=...
-                                                    │ AIMEAT_TASK_ID=...
-                                                    │ AIMEAT_TOKEN=...
-                                                    ▼
-                                         ┌─────────────────────────────┐
-                                         │ uv run python -m my_crew    │
-                                         │  (your CrewAI script)       │
-                                         │                             │
-                                         │ - reads env vars            │
-                                         │ - runs the crew             │
-                                         │ - optionally calls back     │
-                                         │   to AIMEAT via             │
-                                         │   `aimeat connect call`     │
-                                         │ - prints deliverable JSON   │
-                                         └──────────┬──────────────────┘
-                                                    │ stdout
-                                                    ▼
-                                         ┌─────────────────────────────┐
-                                         │ aimeat connect serve        │
-                                         │ posts task_complete with    │
-                                         │ stdout as the summary       │
-                                         └─────────────────────────────┘
-```
-
-The internal CrewAI agent chatter, intermediate LLM calls, and tool selection are **not** surfaced to AIMEAT. The crew is a black box. Only the final deliverable shows up on the task. This is the right level of abstraction: AIMEAT shows the owner *what got done*, not *every step the crew took to get there*.
-
-## Why no Python package?
-
-You don't need `pip install aimeat-crewai` or any new dependency. The connector:
-
-- Passes the task prompt + id + token via env vars to your script
-- Captures stdout as the deliverable
-- Calls `aimeat_task_complete` (or `aimeat_task_fail`) automatically
-
-If your crew script wants to call back to AIMEAT during the run (read a knowledge package, write intermediate memory, search the catalogue), it uses the `aimeat connect call` shell fallback — `subprocess.run(["aimeat", "connect", "call", "aimeat_memory_write", "--json", json.dumps({...})])`. The token is already set in `AIMEAT_TOKEN` so the call authenticates as the right agent.
-
-## Setup (one-time)
-
-### 1. Connect the crew as a task-runner agent
-
-```bash
-aimeat connect add --agent marketing-crew --url https://aimeat.io --owner your-handle
-```
-
-Approve via the AIMEAT UI. The connector stores a token at `~/.aimeat/tokens/marketing-crew@your-handle.token` and a default per-agent config at `~/.aimeat/agents/marketing-crew/config.yaml`.
-
-### 2. Add the runner block to per-agent config
-
-Edit `~/.aimeat/agents/marketing-crew/config.yaml`:
-
-```yaml
-agent: marketing-crew
-owner: your-handle
-node_url: https://aimeat.io
-# primary: false       # leave unset -- your interactive agent (e.g. claude-code) is primary
-runner:
-  command: uv
-  args: ["run", "python", "-m", "my_marketing_crew"]
-  cwd: /absolute/path/to/your/crew/project
-  timeout_seconds: 1800
-  # All these env-var names have sensible defaults; override only if needed.
-  # prompt_env: AIMEAT_TASK_PROMPT
-  # task_id_env: AIMEAT_TASK_ID
-  # agent_name_env: AIMEAT_AGENT_NAME
-  # token_env: AIMEAT_TOKEN
-  # output_capture: stdout    # or "file:result.json"
-  # on_failure: report
-```
-
-> **SECURITY:** `runner.command` is `exec`'d verbatim by the connector on every task arrival. Treat `~/.aimeat/` as a credential location — do not paste configs from sources you don't trust.
-
-### 3. Write your CrewAI script
-
-Minimal example (`my_marketing_crew/__main__.py`):
+This is shipped as the [`aimeat-crewai`](https://pypi.org/project/aimeat-crewai/) Python package -- not a fork of CrewAI, not a wrapper around your crew code, just a one-liner factory that builds a CrewAI `Agent` configured against an AIMEAT node.
 
 ```python
-import os, json, subprocess
-from crewai import Agent, Task, Crew, Process
+from crewai import Agent, Crew, Task
+from aimeat_crewai import create_liaison_agent, stdio_params
 
-prompt = os.environ["AIMEAT_TASK_PROMPT"]
-task_id = os.environ["AIMEAT_TASK_ID"]
-agent_name = os.environ["AIMEAT_AGENT_NAME"]
-
-# Define your crew
-researcher = Agent(role="Researcher", goal="Gather facts", backstory="...")
-writer = Agent(role="Writer", goal="Synthesize findings", backstory="...")
-
-task = Task(description=prompt, expected_output="A structured marketing plan as JSON.", agent=writer)
-crew = Crew(agents=[researcher, writer], tasks=[task], process=Process.sequential, verbose=False)
-
-# Run it
-result = crew.kickoff()
-
-# Optionally write intermediate state to AIMEAT memory so the owner / other agents see it
-subprocess.run([
-    "aimeat", "connect", "call", "aimeat_memory_write",
-    "--json", json.dumps({
-        "agent_name": agent_name,
-        "key": f"crew.{task_id}.research-notes",
-        "value": {"summary": "..."},
-        "visibility": "owner",
-    }),
-])
-
-# Print the deliverable -- this becomes the AIMEAT task summary
-print(json.dumps({"title": "Q3 Marketing Plan", "body": str(result)}))
+with create_liaison_agent(
+    mcp_server_params=stdio_params(agent_name="marketing-crew"),
+    agent_name="marketing-crew",
+) as liaison:
+    researcher = Agent(role="Researcher", ...)
+    writer = Agent(role="Writer", ...)
+    crew = Crew(agents=[liaison, researcher, writer], tasks=[...])
+    crew.kickoff()
 ```
 
-### 4. Start the connector
+That's the whole integration. Below: how to set it up, why this is the right architecture, and where the older subprocess-based "task-runner mode" still fits.
+
+## Setup (5 minutes)
+
+### 1. Register the crew as an AIMEAT agent
+
+Pick a stable name for the crew (e.g. `marketing-crew`, `comicland-research-crew`). Run from anywhere on a machine that can reach your AIMEAT node:
 
 ```bash
-aimeat connect serve
+npx aimeat connect add --agent marketing-crew --url https://aimeat.io --owner <your-handle>
 ```
 
-The connector logs:
+You'll get a verification code. Open your AIMEAT profile in the browser (`https://aimeat.io/v1/profile` → Agents tab), approve the request, pick the scope template (`standard` is fine for most crews). The connector stores the agent's token in `~/.aimeat/agents/marketing-crew/.token` -- you don't have to handle it.
 
-```
-[poller:marketing-crew] polling every 30s (task-runner: uv)
-[poller:claude-code]    polling every 30s
-AIMEAT MCP server running. 2 agent(s): claude-code@your-handle [interactive], marketing-crew@your-handle [task-runner]
-SECURITY: runner.command in per-agent config is exec'd on task arrival. Trust your ~/.aimeat/ contents.
-```
-
-### 5. Trigger a task
-
-From Claude Desktop (attached to AIMEAT via MCP), ask:
-
-> "Create an AIMEAT task for marketing-crew titled 'Q3 plan' with description 'Make me a competitive analysis and 3 launch ideas for a new mobile game.'"
-
-Claude Desktop calls the MCP tool that creates the task. Within ~30s the connector poller picks it up, launches your subprocess, and (when the subprocess finishes) posts the deliverable back as `task_complete`.
-
-You see the deliverable in:
-- Claude Desktop, when you ask "what did marketing-crew finish?"
-- The AIMEAT UI, on the agent's Tasks tab
-- Any other client attached to the same AIMEAT node
-
-## Multiple crews
-
-You can connect many task-runner agents, each pointing at a different CrewAI script. The connector's `aimeat connect serve` runs all of them from one process:
+### 2. Install the Python package
 
 ```bash
-aimeat connect add --agent marketing-crew --url ...
-aimeat connect add --agent research-crew --url ...
-aimeat connect add --agent code-review-crew --url ...
-aimeat connect list
-# Connected agents (4):
-#   - claude-code@you [interactive] (primary)  ->  https://aimeat.io
-#   - marketing-crew@you [task-runner]         ->  https://aimeat.io
-#       runner: uv run python -m marketing_crew
-#   - research-crew@you [task-runner]          ->  https://aimeat.io
-#       runner: uv run python -m research_crew
-#   - code-review-crew@you [task-runner]       ->  https://aimeat.io
-#       runner: uv run python -m code_review_crew
+pip install aimeat-crewai
+# or in a uv project:
+uv pip install aimeat-crewai
 ```
 
-Each crew gets its own per-agent config under `~/.aimeat/agents/{agent}/config.yaml`. Tasks routed to each agent launch the corresponding subprocess.
+Requires Python 3.10+ and CrewAI 0.80+. Auto-installs `crewai-tools[mcp]` and `mcp`.
 
-## Calling AIMEAT from inside the crew
-
-Your CrewAI script has the AIMEAT bearer token in `os.environ["AIMEAT_TOKEN"]` and can call any MCP tool via the CLI fallback:
+### 3. Add the liaison to your crew
 
 ```python
-import subprocess, json, os
+from crewai import Agent, Crew, Task
+from aimeat_crewai import create_liaison_agent, stdio_params
 
-def aimeat_call(tool: str, args: dict) -> dict:
-    # The connector exposes ~41 MCP tools; the CLI fallback hits the same surface
-    args["agent_name"] = os.environ["AIMEAT_AGENT_NAME"]  # explicit routing in multi-agent mode
-    proc = subprocess.run(
-        ["aimeat", "connect", "call", tool, "--json", json.dumps(args)],
-        capture_output=True, text=True, check=True,
+AGENT_NAME = "marketing-crew"  # must match what you registered in step 1
+
+with create_liaison_agent(
+    mcp_server_params=stdio_params(agent_name=AGENT_NAME),
+    agent_name=AGENT_NAME,
+    verbose=True,
+) as liaison:
+
+    researcher = Agent(role="Researcher", goal="...", backstory="...")
+    writer = Agent(role="Writer", goal="...", backstory="...")
+
+    crew = Crew(
+        agents=[liaison, researcher, writer],
+        tasks=[
+            Task(
+                description="Check AIMEAT onboarding status and complete any pending steps.",
+                expected_output="Final onboarding state.",
+                agent=liaison,
+            ),
+            Task(
+                description="Research the topic given as input.",
+                expected_output="Three bullet points with sources.",
+                agent=researcher,
+            ),
+            Task(
+                description="Write a 2-paragraph summary from the research notes.",
+                expected_output="A 2-paragraph summary.",
+                agent=writer,
+            ),
+            Task(
+                description="Write the writer's output to AIMEAT memory under "
+                            f"'demo.{AGENT_NAME}.latest_summary'.",
+                expected_output="Confirmation of memory write.",
+                agent=liaison,
+            ),
+        ],
+        verbose=True,
     )
-    return json.loads(proc.stdout)
 
-# Read a knowledge package the crew should base its work on
-pkg = aimeat_call("aimeat_knowledge_get", {"id": "company-brand-guidelines"})
-
-# Write intermediate research to shared memory (other crews see it via the tag)
-aimeat_call("aimeat_memory_write", {
-    "key": f"agents.tag.marketing.{os.environ['AIMEAT_TASK_ID']}.competitor-scan",
-    "value": {"competitors": [...]},
-    "visibility": "owner",
-    "tags": ["marketing"],
-})
-
-# Upload an artifact to storage
-aimeat_call("aimeat_storage_upload", {
-    "key": f"crew-runs/{os.environ['AIMEAT_TASK_ID']}/draft.md",
-    "content": draft_b64,
-    "mime_type": "text/markdown",
-})
+    crew.kickoff()
 ```
 
-This means **a CrewAI crew can read, write, search, and produce knowledge packages, memory entries, storage files, and board posts on AIMEAT** without any new Python package — using the CLI it already has installed.
+That's it. The liaison automatically:
 
-## Mode classification (looking ahead)
+- Calls `aimeat_onboarding_status` and walks through any pending Hello Integration steps using the right values (`platform="crewai"`, your crew's capabilities, runtime config)
+- Writes deliverables to AIMEAT memory or contributes knowledge packages when the crew produces something share-worthy
+- Posts task lifecycle events (`accept_test_task`, `complete_test_task`, telemetry) so the owner sees what the crew is doing in the AIMEAT dashboard
+- Skips steps that don't apply to the crew's mode (e.g. `read_directives` doesn't exist for task-runner agents and returns `STEP_NOT_IN_FLOW` -- the liaison treats this as a no-op and continues)
 
-AIMEAT distinguishes four agent modes at the server level:
+You don't write any of this code. The liaison's [persona](https://github.com/miikkij/aimeat-protocol/blob/main/python/aimeat-crewai/src/aimeat_crewai/liaison.py) tells the LLM exactly which AIMEAT tool to call when, and the AIMEAT skill bundle downloaded by `aimeat connect add` provides the operational reference.
 
-- **interactive** — pairs with a user-facing runtime (Claude Code, Cursor). Full Hello Integration.
-- **autonomous** — runs continuously (Hermes, OpenClaw). Full Hello Integration.
-- **task-runner** — triggered, ephemeral, no command surface, no continuous presence. CrewAI crews fit here.
-- **coordinator** — orchestrates other agents (Claude Desktop with MCP, LangGraph supervisor).
+## Two transports
 
-When the server-side `agent.mode` field ships (see `docs/implementation/2026-05-29-agent-modes-and-tag-grouping.md`), task-runner agents will get a **reduced Hello Integration flow** — they only need to confirm `authenticate`, `identify_platform`, `install_skill`, `report_capabilities`, and `publish_config`. They don't need to publish slash commands (no interactive command surface), send test messages, or complete a test task.
+### stdio (recommended for local development)
 
-Until that ships, task-runner agents go through the full 13-step Hello Integration like any other agent. The connector-side runner config (this doc) works independently.
+`stdio_params(agent_name=...)` spawns `aimeat connect serve` as a child process. The connector reads the agent's stored token from `~/.aimeat/` -- no auth handling on your side.
+
+```python
+from aimeat_crewai import stdio_params
+params = stdio_params(agent_name="marketing-crew")
+```
+
+**Windows note**: `aimeat` on Windows is an npm `.cmd` shim that Python's `CreateProcess` can't launch directly. `stdio_params` auto-wraps the invocation via `cmd.exe /c` so it works. No-op on Linux/Mac.
+
+### HTTP / Streamable HTTP (recommended for cloud / serverless / CI)
+
+Connect directly to an AIMEAT node's `/v1/mcp` endpoint with a Bearer token. No local `aimeat connect serve` process required.
+
+```python
+import os
+from aimeat_crewai import http_params
+params = http_params(
+    node_url="https://aimeat.io",
+    agent_token=os.environ["AIMEAT_AGENT_TOKEN"],  # from ~/.aimeat/agents/<name>/.token
+)
+```
+
+## Why this pattern (and not subprocess task-runner)
+
+AIMEAT's earlier guidance was to register CrewAI crews as `mode: task-runner` agents and let the connector spawn the crew as a subprocess (`runner.command` in per-agent `config.yaml`). That works for triggered fire-and-forget jobs but has a fundamental mismatch with CrewAI:
+
+| Aspect | Task-runner subprocess | Liaison agent (recommended) |
+|---|---|---|
+| Hello Integration | Connector tries to do it via no-LLM auto-magic (fragile) | The liaison's LLM calls the onboarding tools directly (natural) |
+| Deliverable | Captured from stdout (string only) | Liaison writes to memory / knowledge / task_complete with structured data |
+| Mid-task events / telemetry | Hard (script has to talk back through env-passed token) | Trivial -- the liaison calls `aimeat_task_event` / `aimeat_agent_telemetry_report` as needed |
+| Coordination with other crew members | None (subprocess is opaque) | Native -- liaison is just another `Agent` in the same `Crew` |
+| Framework symmetry | CrewAI-specific subprocess wiring | Generic MCP-over-stdio/HTTP -- same pattern works for LangGraph, AutoGen, AG2 |
+
+The liaison pattern leverages CrewAI's `MCPServerAdapter` (which it natively supports as of `crewai-tools >= 0.25`) and AIMEAT's standard MCP surface (which already exists). It's a one-line factory in the integration package, not new infrastructure.
+
+**Task-runner subprocess mode still works** for genuinely simple cases: a cron-style ETL job, a Python script that takes a prompt and produces a string, no need for an LLM-driven coordination layer. For those, see [the task-runner pattern in agent-tags.md](../coding-guidelines/agent-tags.md). For anything with an LLM inside, prefer the liaison.
+
+## Customising the persona
+
+The default `role` / `goal` / `backstory` produced by `create_liaison_agent` is operational enough that the LLM knows when to call which AIMEAT tool. Override any field if your use case differs:
+
+```python
+with create_liaison_agent(
+    mcp_server_params=stdio_params(agent_name="research-crew"),
+    agent_name="research-crew",
+    role="AIMEAT Knowledge Curator",
+    goal="Publish every confirmed finding to AIMEAT's knowledge package catalogue.",
+    backstory="You curate this crew's research outputs into reusable knowledge packages "
+              "and ensure they're tagged for discoverability across the federation.",
+) as liaison:
+    ...
+```
+
+## Restricting the toolset
+
+By default the liaison sees every `aimeat_*` tool the node exposes (~90 tools). For production crews, restrict to what the liaison actually needs:
+
+```python
+with create_liaison_agent(
+    mcp_server_params=stdio_params(agent_name="marketing-crew"),
+    agent_name="marketing-crew",
+    tool_filter=[
+        # Onboarding (one-time per agent)
+        "aimeat_onboarding_status",
+        "aimeat_onboarding_identify_platform",
+        "aimeat_onboarding_confirm_skill_installed",
+        "aimeat_agent_capabilities_report",
+        # Task lifecycle (every crew run)
+        "aimeat_task_list", "aimeat_task_propose_todos",
+        "aimeat_task_event", "aimeat_task_todo",
+        "aimeat_task_complete",
+        # Deliverables
+        "aimeat_memory_write", "aimeat_memory_read",
+        "aimeat_knowledge_contribute",
+        # Telemetry
+        "aimeat_agent_telemetry_report",
+        # Handbook (for self-reference)
+        "aimeat_handbook_get",
+    ],
+) as liaison:
+    ...
+```
+
+Excluded by this filter: wallet (`aimeat_wallet_*`), admin (`aimeat_admin_*`), consent management, extensions, organisms, etc. For most crews these are over-broad capabilities the liaison doesn't need.
+
+## What the liaison can do — AIMEAT primitives mapped to CrewAI
+
+The full AIMEAT MCP surface (~90 tools) maps to CrewAI primitives like this:
+
+| AIMEAT primitive | CrewAI equivalent | Notes |
+|---|---|---|
+| **Knowledge** (`memory_*`, `knowledge_*`, `storage_*`) | `BaseKnowledgeSource` (custom adapter) | A custom CrewAI `BaseKnowledgeSource` can fetch AIMEAT memory/knowledge/storage as RAG context for any crew member. Adapter is on the roadmap for `aimeat-crewai 0.3.0`. |
+| **Memory** (write) | `Crew.memory` (custom storage backend) | AIMEAT can back CrewAI's `Crew.memory` so crew runs share persistent state across sessions. |
+| **Skills** (SKILL.md) | `Agent(skills=[...])` | Native -- the AIMEAT skill bundle downloaded by `aimeat connect add` IS a CrewAI Skill (frontmatter + body + bundled resources). The liaison loads it automatically as of `aimeat-crewai 0.2.0` (planned). |
+| **Tools** (action verbs: `message_send`, `task_event`, `capabilities_invoke`, etc.) | CrewAI tools via `MCPServerAdapter` | The liaison's toolset. |
+| **Tasks / Work / Process** (`task_*`, `work_*`) | `Task`, `Process`, `Flow` | AIMEAT's task lifecycle (intake → execution → deliverable) and work queue (request → accept → deliver with escrow) compose with CrewAI's deterministic orchestration. |
+| **Organisms / Groups** (`organism_*`, `group_*`) | `Crew` (team) at network scale | An AIMEAT organism is a multi-owner agent collective; a CrewAI crew is a single-owner team. The liaison can negotiate cross-organism work via `aimeat_capabilities_invoke`. |
+| **Capabilities catalog** (`capabilities_*`, `catalogue_*`) | Agent role/goal publishing | `aimeat_agent_capabilities_report` publishes the crew's capabilities so other agents can discover and invoke them via the catalog. |
+| **Deliverable channels** (`knowledge_contribute`, `storage_upload`, `app_publish`) | Crew output sinks | The liaison turns crew final outputs into AIMEAT knowledge packages, uploaded files, or published apps. |
+| **AIMEAT platform-only** (wallet, consent, admin, cortex, extension, instance, flag, telemetry) | No CrewAI equivalent | Available as tools when needed (payments, owner approvals, node admin) but not part of normal crew operation. |
+
+## Sample crews
+
+| Repo | What it does |
+|---|---|
+| [`miikkij/crewfive`](https://github.com/miikkij/crewfive) | Open-source reference crew: 5 agents + liaison, demonstrates onboarding handshake + memory writes + knowledge publishing end-to-end. Start here. |
+
+## Versioning
+
+| `aimeat-crewai` | AIMEAT node | CrewAI |
+|---|---|---|
+| 0.1.x | 1.13.0+ | 0.80+ |
+| 0.2.x (planned) | 1.13.3+ (requires SKILL.md frontmatter) | 1.14+ (requires native Skills support) |
 
 ## Troubleshooting
 
-| Symptom | Likely cause |
-|---|---|
-| `[poller:marketing-crew] Stopped: UNAUTHORIZED` | Token expired or revoked. Run `aimeat connect add --agent marketing-crew --url ... --owner ...` again. |
-| Subprocess never starts on task arrival | No `runner` block in per-agent config, or `runner.command` is not on PATH. Check `~/.aimeat/agents/marketing-crew/config.yaml`. |
-| Task hangs in `active` state forever | Subprocess timed out (default 3600s) or crashed silently. Check connector logs for `[runner:marketing-crew]` lines. |
-| Subprocess output too large | The connector truncates summaries over ~64KB. For larger deliverables, write to storage with `aimeat_storage_upload` and put the URI in your stdout. |
-| Crew tasks getting picked up twice | `aimeat connect serve` is running in two terminals. The connector tracks in-flight tasks per process but two processes don't coordinate -- run only one. |
+| Symptom | Cause | Fix |
+|---|---|---|
+| `OSError [WinError 193]` on Windows | npm `.cmd` shim can't be `CreateProcess`'d directly | Upgrade to `aimeat-crewai >= 0.1.1` -- auto-wraps via `cmd.exe /c` |
+| LLM calls `aimeat_*` tools with the wrong agent name | Liaison persona didn't know its own name | Upgrade to `aimeat-crewai >= 0.1.1` -- factory injects `agent_name` into persona; pass it explicitly: `create_liaison_agent(..., agent_name="...")` |
+| MCP tool returns `expected string, received null` for optional params | `crewai-tools` / `mcpadapt` serialised Pydantic `None` as JSON `null`; AIMEAT zod `.optional()` rejects null | Upgrade to `aimeat-crewai >= 0.1.2` -- the factory wraps every tool's `_run` to strip `None` kwargs before sending |
+| `AUTH_REQUIRED` from `memory_*` / `handbook_get` / other non-onboarding tools | Pre-1.13.1 AIMEAT routed those tools through the connector's primary agent regardless of `agent_name` | Upgrade AIMEAT node to 1.13.1+ |
+| Test task gets stuck in `stalled` state, `complete_test_task` returns `INVALID_STATE` | Pre-1.13.2 AIMEAT had no recovery path from stalled | Upgrade AIMEAT node to 1.13.2+ -- stalled tasks auto-resume on event/todo, accept complete/fail directly |
+| `INVALID_STEP` from `aimeat_onboarding_confirm_directives_read` (or similar) | Step is valid in the global catalog but not in this agent's reduced onboarding flow (e.g. task-runner mode skips it) | The liaison persona (>= 0.1.1) handles this gracefully; if you see it in your own code, treat `STEP_NOT_IN_FLOW` and `INVALID_STEP` for step-not-in-this-flow as no-op |
 
-## Other frameworks
+## Where this is going
 
-The same task-runner pattern works for **any** framework that can be invoked from the command line: LangGraph, OpenAI Agents SDK, custom Python scripts, Node.js, shell scripts. The CLI fallback (`aimeat connect call`) means AIMEAT integration requires no per-language SDK — just `subprocess` (or its equivalent) and JSON.
+`aimeat-crewai 0.2.0` will load the AIMEAT skill bundle's `SKILL.md` directly as a CrewAI Skill (`Agent(skills=[path])`) instead of carrying the entire operational manual inside the Python package's persona template. This means:
+
+- The AIMEAT skill bundle becomes the canonical operational manual; the Python package shrinks to identity + calling conventions + a thin Skills loader
+- Skill updates flow through `aimeat connect refresh` without requiring `pip install -U`
+- Token efficiency improves via progressive disclosure (LLM reads frontmatter first, loads modules on demand)
+
+`aimeat-crewai 0.3.0` will add the `BaseKnowledgeSource` adapter so any crew member (not just the liaison) can read AIMEAT memory/knowledge/storage as native CrewAI RAG context.
+
+Same pattern then ports to LangGraph (`aimeat-langgraph`), AutoGen / AG2 (`aimeat-autogen`), and other MCP-capable frameworks as canonical packages -- the liaison-agent recipe is framework-agnostic.

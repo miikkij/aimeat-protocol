@@ -2,6 +2,17 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.13.3] - 2026-05-29
+
+### Changed (skill bundle SKILL.md frontmatter)
+
+- **`generic-adapter` SKILL.md now ships Anthropic Agent-Skill style YAML frontmatter** (`name`, `description`, `trigger`, `tags`) at the top of the file. Previously it started directly with the `# AIMEAT Agent Integration` heading and was just free-form markdown. The frontmatter lets frameworks that natively auto-discover skills register the bundle as a first-class skill instead of reading it as opaque text -- specifically CrewAI >= 1.14's `discover_skills()` (and `Agent(skills=[path])`), Anthropic's own Claude Agent Skills, and future LangGraph/AutoGen adapters that adopt the same convention. The bundle body below the frontmatter is unchanged, so existing LLM-driven flows that parse the body as text continue to work. `aimeat-hermes` adapter already shipped with frontmatter since v1.0; this brings the generic (CrewAI / LangGraph / AutoGen / generic MCP) adapter to parity.
+- **`hermes-adapter` SKILL.md frontmatter expanded** with a fuller `description`, the same standardised `trigger`, and a `tags` block (`aimeat`, `agent-orchestration`, `mcp`, `hermes`). The old shorter form ("AIMEAT node integration for {nodeId}") was too terse for token-aware skill discovery -- LLMs read the description before deciding to activate the skill, so describing what activation enables matters.
+
+### Why this matters
+
+The next architectural step on the CrewAI integration side is `aimeat-crewai 0.2.0`, which will load the AIMEAT skill bundle as a CrewAI Skill (`Agent(skills=[skill_path])`) instead of carrying the entire operational manual inside the Python package's persona template. With this change in place, the bundle that AIMEAT already distributes IS the canonical operational manual -- the Python package shrinks to just identity + calling-conventions, and skill updates flow naturally through `aimeat connect refresh` without requiring a `pip install -U`.
+
 ## aimeat-crewai 0.1.2 - 2026-05-29
 
 ### Fixed

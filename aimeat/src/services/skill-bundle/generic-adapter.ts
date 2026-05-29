@@ -2,7 +2,8 @@
  * @file generic-adapter.ts
  * @description Generic fallback runtime adapter for skill bundle generation.
  *   Produces aimeat-agent bundle with minimal SKILL.md + references only.
- *   Used for runtimes without a dedicated adapter.
+ *   Used for runtimes without a dedicated adapter (e.g. crewai, langgraph,
+ *   autogen, hand-rolled MCP-capable agents).
  * @version-history
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Integration Phase A
  *   v1.1.0 -- 2026-05-28 -- Clarify connected agent identity and Hello Integration MCP flow
@@ -10,6 +11,14 @@
  *   v1.1.2 -- 2026-05-28 -- State that Hello Integration is required first-run onboarding
  *   v1.1.3 -- 2026-05-28 -- Clarify post-onboarding setup publishes actual commands, config, and knowledge artifacts
  *   v1.1.4 -- 2026-05-28 -- Add shared owner-memory tag guidance
+ *   v1.2.0 -- 2026-05-29 -- Add Anthropic Agent-Skill style YAML frontmatter
+ *     (name/description/trigger) so frameworks that natively load SKILL.md as a
+ *     skill (CrewAI >= 1.14 via discover_skills(), Claude Agent Skills, future
+ *     LangGraph/AutoGen adapters) can register the bundle as a first-class
+ *     skill rather than reading it as free-form text. Bundle content below the
+ *     frontmatter is unchanged; existing LLM-driven flows that parse the body
+ *     are unaffected. The hermes-adapter has shipped with frontmatter since
+ *     v1.0.0 and proved the format is non-breaking for downstream consumers.
  */
 
 import { computeBundleVersion } from './generator.js';
@@ -46,7 +55,23 @@ export class GenericAdapter implements RuntimeAdapter {
       ? ctx.directives.rules.map((r, i) => `${i + 1}. ${r.description}`).join('\n')
       : 'No specific rules configured.';
 
-    return `# AIMEAT Agent Integration
+    // Frontmatter is required for frameworks that auto-discover skills (CrewAI's
+    // discover_skills(), Anthropic Agent Skills, etc.). `name` must be a stable
+    // slug; `description` is a one-liner the LLM reads BEFORE deciding to load
+    // the full body, so it should describe what activating this skill enables.
+    // `trigger` is a CrewAI/Anthropic convention listing intents that should
+    // bring the skill into context.
+    return `---
+name: aimeat-agent
+description: AIMEAT node integration -- gives the agent identity, shared memory, task lifecycle, capabilities catalog, and federation access on ${ctx.nodeUrl}
+trigger: when the agent needs to call any AIMEAT tool, check onboarding status, write to memory, contribute knowledge, complete tasks, or coordinate with other agents on the AIMEAT node
+tags:
+  - aimeat
+  - agent-orchestration
+  - mcp
+---
+
+# AIMEAT Agent Integration
 
 ## Identity
 - Agent: ${ctx.agentName}
