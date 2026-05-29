@@ -2,6 +2,27 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.14.2] - 2026-05-29
+
+### Fixed (MCP public/connector parity)
+
+Closed pre-existing drift between public MCP (/v1/mcp) and connector MCP
+(aimeat connect serve). The audit script pnpm audit:mcp-tools is now
+required-pre-commit per the MCP Tool Unification Plan
+(aimeat/docs/plans/2026-05-28-mcp-tool-unification-plan.md):
+
+- aimeat_agents_list — added to public MCP (was connector-only since 6043fdc)
+- aimeat_task_create — added to public MCP (was connector-only since 1.14.0)
+- aimeat_agent_mode_set — added to public MCP (was connector-only since 1.12.1)
+- aimeat_agent_tags_set — added to public MCP (was connector-only since 1.12.1)
+
+After 1.14.2 the audit reports zero drift across all surfaces
+(audit-mcp-tools, exit 0). aimeat_admin_mint remains intentionally
+server-only (operator-gated administration).
+
+Net effect: Claude Desktop and other public-MCP clients now have parity
+with what aimeat-crewai liaisons see via the local connector.
+
 ## [1.14.0] - 2026-05-29
 
 ### Added (the missing piece for cross-agent task delegation)

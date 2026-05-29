@@ -173,6 +173,48 @@ export function registerCoreTools(
         },
     );
 
+    // ── Tool 2b: aimeat_agents_list ──
+    // Lists the calling owner's agents. Used by Claude Desktop and other
+    // owner-scoped MCP clients to discover who they can delegate to via
+    // aimeat_task_create. Mirrors the REST endpoint GET /v1/agents.
+    mcp.tool(
+        'aimeat_agents_list',
+        "List the calling owner's agents on the node (name, mode, capabilities, tags, last_seen, etc.). Use this to discover which agents you can delegate to via aimeat_task_create.",
+        {},
+        annotationsFor('aimeat_agents_list'),
+        async () => {
+            const parsed = parseGAII(agentGaii);
+            if (!parsed) {
+                return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
+            }
+            const agents = await storage.getAgentsByOwner(parsed.owner);
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                        agents: agents.map(a => ({
+                            gaii: a.gaii,
+                            name: a.name,
+                            owner: a.owner,
+                            display_name: a.displayName,
+                            description: a.description,
+                            capabilities: a.capabilities,
+                            technical_capabilities: a.technicalCapabilities,
+                            domain_capabilities: a.domainCapabilities,
+                            languages: a.languages ?? [],
+                            trust_score: a.trustScore,
+                            created_at: a.createdAt,
+                            last_seen: a.lastSeen,
+                            federate: a.federate ?? false,
+                            tags: a.tags ?? [],
+                            mode: a.mode ?? 'interactive',
+                        })),
+                    }, null, 2),
+                }],
+            };
+        },
+    );
+
     // ── Tool 3: aimeat_memory_read ──
     mcp.tool(
         'aimeat_memory_read',

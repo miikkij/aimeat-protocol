@@ -20,6 +20,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
+import { parseGAII, buildGAII } from '../utils/gaii.js';
 
 export function registerAgentTaskTools(
     mcp: McpServer,
@@ -35,6 +36,65 @@ export function registerAgentTaskTools(
     function isOwnTask(task: AgentTaskRecord): boolean {
         return task.agentGaii === agentGaii;
     }
+
+    // ── Tool 0: aimeat_task_create ──
+    // Lets the calling agent create a task for ANY same-owner agent. Used by
+    // Claude Desktop and other orchestrator agents to delegate work to crew-style
+    // agents (e.g. demo-crew). The target agent must belong to the same owner.
+    mcp.tool(
+        'aimeat_task_create',
+        "Queue a task for one of your owner's agents (yourself or any same-owner agent). The owner sees it in their dashboard. Use this to ask another crew or worker to do something.",
+        {
+            target_agent: z.string().describe('Name of the agent the task is FOR. Must be owned by the same owner as the calling agent.'),
+            title: z.string().describe('Short human-readable title for the task.'),
+            description: z.string().describe('The actual prompt / instruction for the target agent.'),
+            status: z.enum(['draft', 'queued']).optional().describe('Default "queued" (visible to target immediately).'),
+        },
+        annotationsFor('aimeat_task_create'),
+        async ({ target_agent, title, description, status }) => {
+            const callerParsed = parseGAII(agentGaii);
+            if (!callerParsed) {
+                return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
+            }
+            const targetGaii = buildGAII(target_agent, callerParsed.owner, config.nodeId);
+            const targetAgent = await storage.getAgent(targetGaii);
+            if (!targetAgent) {
+                return {
+                    content: [{ type: 'text' as const, text: `Target agent '${target_agent}' not found under owner '${callerParsed.owner}'. Use aimeat_agents_list to see available agents.` }],
+                    isError: true,
+                };
+            }
+            const now = new Date().toISOString();
+            const id = randomUUID();
+            const record: AgentTaskRecord = {
+                id,
+                agentGaii: targetGaii,
+                ownerGaii: `${callerParsed.owner}@${config.nodeId}`,
+                title: title.trim(),
+                description: description.trim(),
+                scope: [],
+                rules: [],
+                verification: { userExpects: '', technicalChecks: [] },
+                todos: [],
+                status: (status ?? 'queued') as AgentTaskRecord['status'],
+                createdAt: now,
+                updatedAt: now,
+            };
+            const created = await storage.createAgentTask(record);
+            emitResourceUpdated(targetGaii, `aimeat://agents/${target_agent}/tasks/${id}`);
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                        task_id: created.id,
+                        target_agent,
+                        status: created.status,
+                        created_at: created.createdAt,
+                    }, null, 2),
+                }],
+            };
+        },
+    );
 
     // ── Tool 1: aimeat_task_list ──
     mcp.tool(
