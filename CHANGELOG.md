@@ -2,6 +2,65 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.11.0] - 2026-05-29
+
+Headline: submission-ready for the **Anthropic Connectors Directory**. Every
+registered MCP tool now carries the `title` + read-only/destructive/idempotent/open-world
+annotations the directory requires. Privacy policy and `/v1/connect` attach
+page are operator-configurable so every self-hosted AIMEAT node can identify
+itself as the GDPR controller without forking the HTML. Default `/v1/privacy`
+behaviour is **fail-loud (HTTP 503)** when the operator has not filled in the
+required identity fields -- no AIMEAT node should ever silently ship the
+upstream author's information.
+
+### Added
+
+#### Connectors Directory Submission Package
+- **94-tool MCP annotation registry** -- new `aimeat/src/mcp/annotations.ts` exports `TOOL_ANNOTATIONS` (single source of truth) and `annotationsFor(name)` (throws on missing entry so new tools cannot ship without classification). Every `mcp.tool(...)` call across the 21 public server files and 21 local connector files now passes `annotationsFor(name)` as the 5th SDK argument (verified in `@modelcontextprotocol/sdk@1.27.1`). 0 unannotated tools confirmed by extended `pnpm audit:mcp-tools`. The directory's #1 rejection cause (~30% per public review-criteria analysis) is closed.
+- **`audit:mcp-tools` script extension** -- the existing surface-parity audit now also reports `registeredWithoutAnnotation` and `annotationWithoutRegistration` so future drift is visible in CI. Current report: 94 entries, 0 missing, 0 orphan, with `aimeat_admin_mint` correctly flagged as server-only operator endpoint.
+- **Submission plan + classification table** -- `docs/plans/2026-05-29-connectors-directory-submission.md` documents all 27 form fields, the per-tool annotation decisions (readOnly / destructive / idempotent / openWorld with reasoning), 8 file-level pre-submission checks, and the nginx fix for `.well-known/*`.
+
+#### Privacy Policy (operator-configurable, fail-loud)
+- **`AIMEAT_OPERATOR_*` env-var family** -- 13 fields in `src/config.ts` (name, type, address, country, email, security email, hosting name/url/location, supervisory authority name/url, effective date, policy version). Loaded into `config.operator`. Helpers `missingOperatorConfig()` and `operatorTypeLabel(type, locale)`. Required fields documented in `.env.example` as a clearly labelled REQUIRED/OPTIONAL block.
+- **`/v1/privacy` template substitution** -- `aimeat/public/privacy.html` (EN) and `privacy.fi.html` (FI) are templates with `{{placeholder}}` tokens. `serveStaticPage()` in `src/routes/portal.ts` substitutes them per-request using `config.operator` + the locale-resolved operator-type label ("a natural person" / "luonnollinen henkilö"). Each self-hosted node renders its own policy with no source-tree changes.
+- **Fail-loud guard** -- if any required `AIMEAT_OPERATOR_*` is missing, `/v1/privacy` returns **HTTP 503** with an operator-facing fallback page that lists exactly which env vars to set + links to `.env.example`. Prevents silent shipping of half-configured policies and shifts the responsibility to the right person (the operator, not the upstream author).
+- **14-section policy content** -- TL;DR with "you own your data" framing, genesis-network callout (protocol-level, applies to every node), controller info, data categories (direct / generated / automatic), legal bases table, recipients, single-row sub-processors table (Scaleway only on aimeat.io -- self-hosters fill their own), international transfers, retention table, cookies (no analytics, no trackers, no advertising, no fingerprinting), GDPR rights with Data Wallet links, security, children (EU GDPR 16 default), self-hosting, changes, contact. Neutral third-person voice ("the operator") throughout so the template works for any operator.
+- **BYOK clarification in section 4** -- "AIMEAT does not automatically send your data to third-party AI inference providers" but the *generator* feature is explicitly bring-your-own-key: if the user provides their own OpenRouter / OpenAI key, the server calls that provider under THE USER's contract with that provider. If no key, no outbound calls.
+
+#### `/v1/connect` MCP Attach Page (EN + FI)
+- **6 client cards with attach instructions** -- Cursor (1-click `cursor://anysphere.cursor-deeplink/mcp/install?...` URL with server-rendered base64 config), Claude Code CLI (`claude mcp add aimeat --transport http <mcpUrl>`), VS Code Copilot (`code --add-mcp '{...}'`), Claude Desktop (4-step Settings → Connectors), claude.ai web (4-step + plan-tier note), ChatGPT generic custom-connector flow.
+- **4 worked example prompts** -- each exercises real AIMEAT tools end-to-end: memory write, memory list+read in a fresh chat (cross-AI persistence), people directory search, organism + boards browsing.
+- **"What you get" + collapsible tech details** -- 94-tool count, persistent GAII identity, GDPR-tooling-as-core-protocol-feature, federation. Collapsible sections for protocol/transport spec, reference manifest pointing at `annotations.ts` and the submission plan, self-host CLI walkthrough, data-handling summary cross-linking the privacy page.
+- **Template substitution** -- `templateVars()` in `portal.ts` was generalised to cover both privacy and connect pages: emits `nodeName`, `nodeUrl`, `nodeId`, `mcpUrl = baseUrl + '/v1/mcp'`, `cursorDeeplinkConfig = base64({url:mcpUrl})`. Self-hosters get their own URLs everywhere on the connect page; aimeat.io's existing setup behaviour is unchanged.
+
+#### Init Wizard Operator Prompts (`aimeat init`)
+- **`askOperatorSettings()` function** -- 13 prompts gather the same fields documented in `.env.example`. Skipped entirely for `dev` use case (privacy 503 is fine in dev); ask-with-confirm for `personal`; required for `public`/`custom`. Reasonable placeholders shown (Scaleway, France, tietosuoja.fi) so new self-hosters see plausible examples; required fields refuse to advance with empty input.
+- **27 new `init.operator*` translation keys** -- localised prompts, validation errors, and the intro note explaining why the wizard is collecting these fields. Both `locales/en.json` and `locales/fi.json` updated.
+- **`CONFIG_DEFAULTS` extended** -- so the wizard's change summary correctly flags operator fields as "Changed from default" when the operator fills them in.
+
+#### Public Research Reports
+- **MCP rich rendering report** (`docs/research/2026-05-29-mcp-rich-rendering-and-one-click-setup-REPORT.md`) -- ~2200 words on the MCP 2025-11-25 spec's five content types (text / image / audio / resource_link / embedded resource) + `structuredContent` field, MCP Apps extension 2026-01-26 client matrix (8 supporting clients), per-client rendering capability matrix (Claude Desktop / Cursor / Claude Code / Cline / Continue / Zed), copy-paste config snippets, and AIMEAT-specific recommendations for adopting `structuredContent` + first-class MCP Resources.
+- **Agent visibility reframe report** (`docs/research/2026-05-29-agent-visibility-reframe-REPORT.md`) -- ~3000 words taking a defensible contrarian position on the Manus-style "computer window" pattern. Recommendation: build a **structured execution view** (Camunda-Cockpit-shaped: BPMN diagram + activity tree + tabbed detail) as AIMEAT's front door, NOT live screen replay. Evidence: 8 mature categories (Temporal, Airflow, Camunda, Rundeck, AWX, GitHub Actions, Jenkins, GitLab CI) independently converged on graph-and-state views, never video.
+
+### Changed
+
+#### Privacy / Connect Plumbing
+- **`servePrivacyPage` -> `serveStaticPage`** -- the helper in `portal.ts` was renamed and generalised. It now handles both privacy and connect pages, detects the locale from the filename (`.fi.html` -> Finnish operator-type label), runs the fail-loud guard only for privacy pages, and substitutes `{{var}}` tokens for any templatable page.
+- **Genesis-network framing moved out of operator-specific voice** -- the privacy policy's section 12 was rewritten from first-person aimeat.io-specific ("I run this to promote AIMEAT...") into third-person protocol-level prose ("AIMEAT is an open, federated network... the aimeat.io node is the public 'genesis' reference deployment..."). Works for every operator; aimeat.io's marketing message stays accurate.
+
+#### CORS Architecture Clarification
+- **`AIMEAT_CORS_ALLOWED_ORIGINS=*` documented as intentional** -- `.env.example` now explains the architectural reason: AIMEAT is Bearer-token-only with no cookies, so CORS is not the protection layer; apps published via `aimeat_app_publish` can attach from arbitrary browser origins. Prevents future contributors from "tightening" the default and breaking the platform model.
+
+### Fixed
+
+#### Production OAuth Discovery
+- **nginx `/.well-known/*` blocked by dotfile-deny rule** -- production nginx config was rejecting `/.well-known/oauth-authorization-server` and `/.well-known/oauth-protected-resource` with 403 because the standard `location ~ /\. { deny all; }` rule matched. The Express MCP handlers were returning correct JSON on `localhost:40050` but reviewers and clients could not auto-discover OAuth on prod. Fixed on the operator side (nginx config) with an explicit `location ^~ /.well-known/` allow block. End-to-end OAuth chain (`401` -> `WWW-Authenticate: Bearer resource_metadata="..."` -> `/.well-known/oauth-protected-resource` -> `/.well-known/oauth-authorization-server` -> authorize/token endpoints) now traversable by any conforming MCP client.
+
+### Documentation
+- **Connectors Directory submission plan** -- single source of truth for every form field, all 94 tools' annotation classifications with hint reasoning, pre-submission technical pre-flight verified against live aimeat.io, nginx fix snippet, reviewer-test-account seeding instructions deferred to Section E.
+- **Plan doc Section F audit** -- documented that CORS=* is intentional (Bearer-token model), MCP spec 2025-11-25 supported, rate limiting + HSTS + CSP + nonce all verified live on prod, `AIMEAT_BASE_URL` correctly set in prod.
+- **CLAUDE.md still valid** -- no rules changed; this release reinforces Rule 2 (file headers updated on every touched file) and Rule 1 (37/37 MCP e2e passing on SQLite after the bulk migration).
+
 ## [1.10.0] - 2026-05-28
 
 Headline: a single `aimeat connect` CLI that any AI runtime can use to attach
