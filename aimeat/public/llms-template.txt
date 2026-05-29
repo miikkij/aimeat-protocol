@@ -103,6 +103,7 @@ entry: index.html
 | AimeatRealtime | `loadScript('/lib/realtime.js')` | P2P rooms, multiplayer, chat |
 | aimeat-social | `loadScript('/v1/libs/aimeat-social.js')` | Discussion boards |
 | aimeat-wallet | `loadScript('/v1/libs/aimeat-wallet.js')` | Morsel balance display |
+| aimeat-ai | `loadScript('/v1/libs/aimeat-ai.js')` | `AIMEAT.ai.complete/completeJson/isAvailable` — runs LLM completions using the user's own OpenRouter key (zero cost to AIMEAT, user-owned spend budget) |
 
 ### Key rules
 
@@ -276,6 +277,7 @@ The node serves browser-ready JavaScript libraries. Load them via `<script src="
 | AimeatRealtime | `/lib/realtime.js` | WebSocket P2P rooms, WebRTC data channels, Yjs CRDT |
 | aimeat-audio | `/v1/libs/aimeat-audio.js` | Audio: 6 instruments, custom synth, soundboard, sample loader |
 | aimeat-speech | `/v1/libs/aimeat-speech.js` | Speech: TTS, STT, voice commands, pluggable providers |
+| aimeat-ai | `/v1/libs/aimeat-ai.js` | LLM completions through the user's own OpenRouter key (`AIMEAT.ai.complete`, `completeJson`, `isAvailable`, `models`, `usage`). Server enforces daily USD budget + per-app quota; rejects with descriptive `err.code` (NO_API_KEY / QUOTA_EXHAUSTED / APP_QUOTA_EXHAUSTED / APP_NOT_ALLOWED / etc.). Pattern: **detect** with `isAvailable()`, **compose** the prompt yourself from app data, **call** with `app_id` so spend is attributable, **render** the result into an editable field so the human stays in the loop. Never bundle your own API key — use the user's. |
 
 ### Standard App Template
 
@@ -540,6 +542,15 @@ the response to a Blob, and use `URL.createObjectURL(blob)` as the src.
 ### SDK Library API Quick Reference
 
 When building apps, prefer the SDK libraries over raw `session.fetch()` calls.
+
+For AI-assisted features in your app (suggest tags, polish summaries, translate,
+quality checks, etc.) read the full guide before wiring anything up:
+
+- **App Developer AI Guide:** `docs/app-developer-ai-guide.md` — patterns, prompt
+  composition, error codes, spend safety, cookbook examples. The capability uses
+  the user's own OpenRouter key (configured once in their AIMEAT profile) so apps
+  never bundle their own; spend is bounded by a per-user daily USD budget and
+  optional per-app quota.
 Load each library via `<script src="..."></script>`. All require `aimeat-auth.js` first.
 
 **AIMEAT.auth** (`/v1/libs/aimeat-auth.js`):

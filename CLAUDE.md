@@ -165,6 +165,7 @@ All development standards are collected in `docs/coding-guidelines/`:
 | [Storage Sync](docs/coding-guidelines/storage-sync.md) | Multi-backend sync process, adding fields/tables |
 | [MCP Uploads](docs/coding-guidelines/mcp-uploads.md) | Presigned upload URLs, adding upload-capable tools |
 | [Frontend Guide](docs/frontend-development-guide.md) | Preact + HTM SPA, admin dashboard conventions |
+| [App Developer AI Guide](docs/app-developer-ai-guide.md) | How AIMEAT apps use the user's OpenRouter key via `AIMEAT.ai.complete()` (`/v1/libs/aimeat-ai.js`). Patterns, prompt composition, error codes, spend safety, cookbook. **Use this — don't reinvent prompt-engineering boilerplate per app.** |
 | [Known Gaps](docs/known_gaps.md) | Deferred technical gaps with structured tracking |
 
 ### Rule 8: Known Gaps Must Be Developer-Approved
