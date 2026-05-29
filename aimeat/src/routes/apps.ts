@@ -1,3 +1,24 @@
+/**
+ * @file apps.ts
+ * @description App Catalog routes -- single-file HTML apps with manifest, version
+ *   history, search, screenshot, and access-code-gated download. Apps are stored
+ *   in the dedicated apps table. Each publish auto-increments the version number;
+ *   old versions are preserved. Screenshots use the storage system with key prefix
+ *   `apps/screenshots/`.
+ * @structure
+ *   - appsRouter() -- main router factory
+ *   - GET /v1/apps -- catalogue listing
+ *   - POST /v1/apps -- inline-upload OR presigned-upload publish
+ *   - GET /v1/apps/:owner/:filename -- download
+ *   - (plus version, delete, screenshot routes)
+ * @version-history
+ *   v1.0.0 -- pre-2026-05 -- Initial app catalog with versions, manifest, search
+ *   v1.1.0 -- 2026-05-29 -- Add strict base64 validation to POST /v1/apps inline
+ *     content path. Buffer.from(str, 'base64') silently dropped non-base64 chars
+ *     and accepted raw HTML, yielding successful publishes with tiny garbage
+ *     payloads served as 200 to downloaders. Now rejects with 400 INVALID_INPUT
+ *     before storage write.
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppManifest } from '../storage/interface.js';
@@ -9,15 +30,7 @@ import { generateUploadToken } from '../services/upload-token.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { randomBytes } from 'node:crypto';
 import { validateOutboundUrl } from '../utils/url-validator.js';
-
-/**
- * App Catalog routes — versioned apps with manifest and search.
- *
- * Apps are single-file HTML apps stored in the dedicated apps table.
- * Each publish auto-increments the version number.
- * Old versions are preserved. Download counter is tracked separately.
- * Screenshots use the existing storage system with key prefix "apps/screenshots/".
- */
+import { decodeStrictBase64 } from '../utils/base64.js';
 export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
 
@@ -282,7 +295,15 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             return;
         }
 
-        const data = Buffer.from(content, 'base64');
+        const data = decodeStrictBase64(content);
+        if (!data) {
+            res.status(400).json(error(
+                config.nodeId,
+                'INVALID_INPUT',
+                'content must be base64-encoded. Encode with Buffer.from(html).toString("base64") (Node) or btoa(html) (browser). For files larger than 1 KB, prefer the presigned upload mode (mode: "presigned").',
+            ));
+            return;
+        }
         const MAX_APP_SIZE = config.appMaxSizeMb * 1024 * 1024;
         if (data.length > MAX_APP_SIZE) {
             res.status(413).json(error(config.nodeId, 'TOO_LARGE', `App file exceeds ${config.appMaxSizeMb}MB limit (${data.length} bytes)`));
@@ -341,7 +362,11 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         // Handle optional screenshot upload (still uses file storage)
         let hasScreenshot = false;
         if (screenshot && typeof screenshot === 'string') {
-            const screenshotData = Buffer.from(screenshot, 'base64');
+            const screenshotData = decodeStrictBase64(screenshot);
+            if (!screenshotData) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'screenshot must be base64-encoded image data'));
+                return;
+            }
             const MAX_SCREENSHOT_SIZE = 2 * 1024 * 1024;
             if (screenshotData.length > MAX_SCREENSHOT_SIZE) {
                 res.status(413).json(error(config.nodeId, 'TOO_LARGE', `Screenshot exceeds 2MB limit (${screenshotData.length} bytes)`));

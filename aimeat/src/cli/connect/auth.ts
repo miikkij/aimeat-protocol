@@ -30,10 +30,14 @@ import { buildAgentOnboardingInstruction } from './onboarding-prompt.js';
 
 type Prompts = typeof import('@clack/prompts');
 
+type AgentMode = 'autonomous' | 'interactive' | 'task-runner' | 'coordinator';
+const VALID_MODES: ReadonlyArray<AgentMode> = ['autonomous', 'interactive', 'task-runner', 'coordinator'];
+
 interface AuthArgs {
   url?: string;
   owner?: string;
   agent?: string;
+  mode?: string;
 }
 
 interface ProgressHandle {

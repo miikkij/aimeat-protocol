@@ -6,6 +6,7 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
 import { randomBytes } from 'node:crypto';
+import { decodeStrictBase64 } from '../utils/base64.js';
 import { ChunkedUploadInitSchema, validateBody } from '../models/schemas.js';
 import { checkStorageQuota, chargeOverage } from '../services/quota.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
@@ -80,10 +81,15 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key and data (base64) are required'));
                 return;
             }
+            const decoded = decodeStrictBase64(data);
+            if (!decoded) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'data must be base64-encoded'));
+                return;
+            }
             key = k;
             visibility = v ?? 'private';
             groupId = visibility === 'group' ? reqGroupId : undefined;
-            fileData = Buffer.from(data, 'base64');
+            fileData = decoded;
             mimeType = mime_type ?? 'application/octet-stream';
         } else {
             // Raw body upload

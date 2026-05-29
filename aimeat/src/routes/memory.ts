@@ -23,6 +23,7 @@ import { enqueueMemoryReplication } from '../services/memory-replication.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
+import { decodeStrictBase64 } from '../utils/base64.js';
 
 /** Anonymous agents (shared#anonymous@...) may only write to keys prefixed with "anonymous." */
 function isAnonymousGaii(gaii: string): boolean {
@@ -858,7 +859,11 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       return;
     }
 
-    const fileData = Buffer.from(content, 'base64');
+    const fileData = decodeStrictBase64(content);
+    if (!fileData) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'content must be base64-encoded'));
+      return;
+    }
 
     // Per-file size limit
     if (fileData.length > config.storageMaxFileSizeMb * 1024 * 1024) {

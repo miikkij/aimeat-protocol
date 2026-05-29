@@ -4,6 +4,8 @@
  *   Tests the full flow: request upload URL via REST, then PUT file to it.
  * @version-history
  *   v1.0.0 — 2026-05-02 — Initial creation
+ *   v1.1.0 -- 2026-05-29 -- Add Phase 3.5 regression tests for inline-upload
+ *     base64 validation (POST /v1/apps with raw HTML / malformed input must 400).
  */
 
 import * as ed from '@noble/ed25519';
@@ -258,6 +260,56 @@ await test('Invalid token returns 401', async () => {
     assert(res.status === 401, `Expected 401, got ${res.status}`);
     const result = await res.json() as any;
     assert(result.error === 'TOKEN_INVALID', `error should be TOKEN_INVALID, got ${result.error}`);
+});
+
+// ── Phase 3.5: Inline-upload base64 validation ──
+// Regression: Buffer.from(str, 'base64') is permissive and silently drops
+// characters outside the base64 alphabet. Raw HTML POSTed as `content`
+// used to succeed with a tiny garbage buffer (e.g. size: 14 for a ~1.2 KB
+// HTML body) because most of the source got stripped. These tests pin the
+// upload boundary so any future regression is caught immediately.
+console.log('\nPhase 3.5: Inline-upload base64 validation');
+
+await test('POST /v1/apps with raw HTML in content -> 400 INVALID_INPUT', async () => {
+    const { status, body } = await json('/v1/apps', authed({
+        method: 'POST',
+        body: JSON.stringify({
+            filename: 'raw-html-test.html',
+            name: 'Raw HTML test',
+            content: '<!doctype html><html><body><h1>this is not base64</h1></body></html>',
+        }),
+    }));
+    assert(status === 400, `Expected 400, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'INVALID_INPUT', `Expected INVALID_INPUT, got ${body.error?.code}`);
+    assert(/base64/i.test(body.error?.message ?? ''), `Expected base64-related message, got ${body.error?.message}`);
+});
+
+await test('POST /v1/apps with valid base64 content -> success, size matches raw bytes', async () => {
+    const html = '<!doctype html><html lang="en"><body><h1>Hello</h1><p>Inline base64 upload smoke test.</p></body></html>';
+    const content_b64 = Buffer.from(html, 'utf8').toString('base64');
+    const { status, body } = await json('/v1/apps', authed({
+        method: 'POST',
+        body: JSON.stringify({
+            filename: 'valid-b64-test.html',
+            name: 'Valid base64 test',
+            content: content_b64,
+        }),
+    }));
+    assert(status === 200 || status === 201, `Expected 2xx success, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.data?.size === html.length, `Expected size ${html.length} (round-trip from base64), got ${body.data?.size}`);
+});
+
+await test('POST /v1/apps with malformed base64 (random non-alphabet chars) -> 400', async () => {
+    const { status, body } = await json('/v1/apps', authed({
+        method: 'POST',
+        body: JSON.stringify({
+            filename: 'malformed-test.html',
+            name: 'Malformed base64',
+            content: 'this contains ###spaces$$$ and@@@symbols!!! not base64',
+        }),
+    }));
+    assert(status === 400, `Expected 400, got ${status}`);
+    assert(body.error?.code === 'INVALID_INPUT', `Expected INVALID_INPUT, got ${body.error?.code}`);
 });
 
 // ── Phase 4: Cleanup ──
