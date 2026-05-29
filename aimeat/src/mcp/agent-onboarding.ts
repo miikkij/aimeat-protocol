@@ -34,7 +34,12 @@ function asText(value: unknown): ToolTextResult {
 }
 
 function asError(message: string): ToolTextResult {
-    return { content: [{ type: 'text' as const, text: message }], isError: true };
+    // Wrap error messages as JSON so downstream MCP clients (Python crewai-tools,
+    // aimeat connect call, shell pipelines) can parse the response uniformly --
+    // before this, asError emitted raw text which made daemons crash with
+    // `Expecting value: line 1 column 1 (char 0)` when they tried json.loads()
+    // on the tool result.
+    return { content: [{ type: 'text' as const, text: JSON.stringify({ error: message }) }], isError: true };
 }
 
 function getAgentName(agentGaii: string): string {
@@ -43,7 +48,16 @@ function getAgentName(agentGaii: string): string {
 
 async function buildOnboardingStatus(agentGaii: string, storage: Storage): Promise<Record<string, unknown>> {
     const agent = await storage.getAgent(agentGaii);
-    if (!agent) return { error: 'Agent not found' };
+    if (!agent) {
+        // Clearer signal than bare "Agent not found": when the caller is the
+        // agent itself but the record is missing, the local token outlived a
+        // server-side delete. Surface a recovery code so connectors can self-
+        // diagnose without having to grep for substrings in the message.
+        return {
+            error: `Agent record for ${agentGaii} not found on this node. Re-run 'aimeat connect add' to re-register.`,
+            code: 'AGENT_NOT_REGISTERED',
+        };
+    }
 
     let onboarding = await storage.getOnboarding(agentGaii);
     if (!onboarding) return { onboarding: null, status: 'not_started' };

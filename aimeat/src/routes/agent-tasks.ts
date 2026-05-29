@@ -27,7 +27,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo, AgentTaskScope } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope, agentNotFoundResponse } from '../auth/middleware.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
@@ -82,10 +82,14 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     const agentName = req.params.name as string;
     const agentGaii = resolveAgentGaii(req, agentName);
 
-    // Verify agent exists
+    // Verify agent exists. Use agentNotFoundResponse so that an agent whose
+    // local token outlived its server record gets a clear AGENT_NOT_REGISTERED
+    // hint instead of generic NOT_FOUND -- without that hint the connector
+    // looks healthy (token validates) while every action 404s.
     const agent = await storage.getAgent(agentGaii);
     if (!agent) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
+      const notFound = agentNotFoundResponse(req, agentName, agentGaii, { nodeId: config.nodeId, baseUrl: config.baseUrl });
+      res.status(notFound.status).json(error(config.nodeId, notFound.code, notFound.message));
       return;
     }
 
@@ -135,6 +139,16 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
       status: t.status,
     }));
 
+    // Auto-active for task-runner mode (since 1.14.4): if the target agent's
+    // mode is 'task-runner', tasks created in 'queued' status are flipped to
+    // 'active' immediately so the agent's autonomous daemon can pick them up
+    // without manual owner approval. 'task-runner' is the explicit signal that
+    // the owner has pre-authorized this agent to start work without per-task
+    // gating; interactive/autonomous/coordinator modes still go through the
+    // standard queued -> (owner /start) -> active gate.
+    const autoActivated = body.status === 'queued' && agent.mode === 'task-runner';
+    const effectiveStatus: AgentTaskRecord['status'] = autoActivated ? 'active' : body.status;
+
     const record: AgentTaskRecord = {
       id,
       agentGaii,
@@ -153,18 +167,38 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
         memoryPrefixes: body.resources.memory_prefixes,
       } : undefined,
       todos,
-      status: body.status,
+      status: effectiveStatus,
       parentTaskId: body.parent_task_id,
       createdAt: now,
       updatedAt: now,
+      lastEventAt: autoActivated ? now : undefined,
     };
 
     const created = await storage.createAgentTask(record);
 
-    // Push: webhook + MCP notification (parallel, fire-and-forget)
-    if (record.status === 'queued') {
+    // Append the matching 'started' event so the task history shows the same
+    // transition that POST /start would have appended. Keeps auto-activated
+    // tasks indistinguishable from owner-approved tasks in event reports.
+    if (autoActivated) {
+      await storage.appendTaskEvent({
+        id: randomUUID(),
+        taskId: record.id,
+        type: 'started',
+        message: 'Task auto-activated (agent mode: task-runner)',
+        timestamp: now,
+      });
+    }
+
+    // Push: webhook + MCP notification (parallel, fire-and-forget). Both
+    // 'queued' and auto-activated 'active' creations notify the agent so the
+    // daemon polls without waiting for the next interval. Auto-activated tasks
+    // share the same webhook event name as owner-approved tasks (task.approved)
+    // because subscribers usually want to react to "this task is now runnable"
+    // regardless of which gate flipped it.
+    if (record.status === 'queued' || autoActivated) {
+      const eventName = autoActivated ? 'task.approved' : 'task.queued';
       if (webhookDispatcher) {
-        webhookDispatcher.dispatchWebhookEvent(agentGaii, 'task.queued', {
+        webhookDispatcher.dispatchWebhookEvent(agentGaii, eventName, {
           task_id: record.id,
           title: record.title,
           description: record.description ?? '',
@@ -172,6 +206,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
           todo_count: record.todos?.length ?? 0,
           scope_summary: (record.scope ?? []).slice(0, 5).map((s: AgentTaskScope) => `${s.type || s.name}:${s.value}`),
           created_at: record.createdAt,
+          auto_activated: autoActivated,
         });
       }
       try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/tasks`); } catch { /* MCP not connected */ }

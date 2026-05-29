@@ -166,23 +166,58 @@ def _poll_messages(token: str, node_url: str, agent_name: str) -> list[dict[str,
         return []
 
 
-def _mark_task_active(token: str, node_url: str, agent_name: str, task_id: str) -> None:
-    """Transition task from queued -> active before the crew starts. Best-effort."""
-    try:
-        url = f"{node_url.rstrip('/')}/v1/agents/{agent_name}/tasks/{task_id}/start"
-        requests.post(
-            url,
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=10,
-        )
-    except Exception:
-        pass
-
-
 # Type alias: function the caller provides to build a Crew for one task.
 # Receives the AIMEAT task dict (id, title, description, ...) and the
 # already-instantiated liaison Agent. Must return a crewai.Crew instance.
 BuildCrewCallback = Callable[[dict[str, Any], Any], Any]
+
+
+def _default_propose_crew(task: dict[str, Any], liaison: Any) -> Any:
+    """
+    Default PROPOSE-phase crew used by run_crew_daemon when the caller
+    does not supply `build_propose_crew`. The liaison alone, one task:
+    call `aimeat_task_propose_todos` ONCE with a TODO plan for the AIMEAT
+    task, then stop. The crew does NOT start work, mark TODOs done, or
+    complete the task -- those happen later, in the EXECUTE phase, after
+    the owner has approved the proposed plan (or auto-approval kicks in
+    for task-runner mode agents).
+
+    Defined lazily so importing aimeat_crewai does not force a CrewAI
+    import at module load time -- CrewAI is only required when actually
+    spinning up a crew.
+    """
+    from crewai import Crew, Task  # local import keeps module-load light
+
+    task_id = task.get("id", "(unknown id)")
+    title = task.get("title", "(no title)")
+    description = task.get("description") or title
+
+    return Crew(
+        agents=[liaison],
+        tasks=[
+            Task(
+                description=(
+                    f"You are the AIMEAT Liaison. AIMEAT task {task_id} is queued for "
+                    f"this crew (title: {title}).\n\n"
+                    f"---\n{description}\n---\n\n"
+                    f"Propose a TODO plan for completing this task. Call "
+                    f"`aimeat_task_propose_todos` ONCE with task_id='{task_id}' and a "
+                    f"todos array of 2-6 concrete steps that this crew will take to "
+                    f"deliver. Each todo should be one specific action with a clear "
+                    f"verification criterion.\n\n"
+                    f"After the propose call returns successfully, your job for this "
+                    f"phase is done -- report the proposed plan and stop. Do not start "
+                    f"working on the task, do not mark todos done, and do not call "
+                    f"`aimeat_task_complete`. Those happen in the next phase, after "
+                    f"the owner approves the plan (or auto-approval activates the task "
+                    f"for task-runner mode agents)."
+                ),
+                expected_output="Confirmation that aimeat_task_propose_todos was called and the proposed TODO plan.",
+                agent=liaison,
+            ),
+        ],
+        verbose=False,
+    )
 
 
 # Curated subset of AIMEAT MCP tools that a daemon-mode liaison actually
@@ -242,7 +277,9 @@ def run_crew_daemon(
     *,
     agent_name: str,
     build_crew: BuildCrewCallback,
+    build_propose_crew: BuildCrewCallback | None = None,
     owner: str | None = None,
+    llm: Any = None,
     tool_filter: Any = _USE_DAEMON_DEFAULT_FILTER,
     poll_interval_seconds: int = 30,
     listen_for: Iterable[str] = ("tasks",),
@@ -254,17 +291,45 @@ def run_crew_daemon(
     Run a long-lived daemon that polls AIMEAT for work and dispatches it to
     a crew built fresh per task.
 
+    The daemon runs the AIMEAT task lifecycle in two phases per poll cycle:
+
+      PROPOSE: Pick up tasks in status='queued' that the daemon has not
+        proposed yet, run the propose-phase crew (which calls
+        aimeat_task_propose_todos once and stops). Owner approval (or
+        task-runner mode's auto-activation) then flips the task to 'active'.
+      EXECUTE: Pick up tasks in status='active' (or 'stalled') the daemon
+        has not yet completed, run the caller's build_crew (which should
+        finish the work and call aimeat_task_complete).
+
+    For task-runner mode agents the AIMEAT node auto-activates tasks on
+    create, so the daemon's PROPOSE phase still runs (idempotent propose
+    of todos) and the same task is picked up by EXECUTE in the SAME cycle
+    or the next one -- no owner approval required.
+
     Args:
         agent_name: The AIMEAT agent name (e.g. "demo-crew"). Must have a
             stored token from `aimeat connect add`.
         build_crew: Callback that takes (task_dict, liaison_agent) and
-            returns a `crewai.Crew` instance. The Crew should have the
-            liaison as one of its agents and at least one Task that asks
-            the liaison to call `aimeat_task_complete` with the deliverable
-            (the liaison's persona explains this).
+            returns a `crewai.Crew` instance for the EXECUTE phase. The
+            Crew should have the liaison as one of its agents and at least
+            one Task that asks the liaison to mark each todo done with
+            aimeat_task_todo and then call aimeat_task_complete (the
+            liaison's persona explains this).
+        build_propose_crew: Optional override for the PROPOSE phase crew.
+            Defaults to a liaison-only crew that calls
+            aimeat_task_propose_todos once with a 2-6 step TODO plan and
+            stops. Override if you want a richer plan (e.g. the same
+            domain agents from build_crew running in 'plan only' mode).
         owner: Optional. If two or more owners have an agent with the same
             name in your local connector, pass `owner` to disambiguate.
             With a single-owner install you can omit it.
+        llm: CrewAI-compatible LLM to use for the liaison's reasoning.
+            Forwarded to create_liaison_agent. When None, CrewAI's default
+            LLM resolution applies -- which falls back to the OpenAI native
+            provider and crashes the daemon's finalize step if
+            OPENAI_API_KEY is not set. Pass an explicit LLM
+            (e.g. crewai.LLM(model="openrouter/...", api_key=...)) for any
+            non-OpenAI runtime.
         tool_filter: Which AIMEAT MCP tools the liaison should load.
             Defaults to `DAEMON_DEFAULT_TOOL_FILTER` (a curated ~25-tool
             set covering Hello Integration, task lifecycle, memory,
@@ -326,12 +391,58 @@ def run_crew_daemon(
     else:
         print(f"[daemon:{agent_name}] loading liaison with NO tool_filter (every available MCP tool)")
 
+    # Resolve PROPOSE crew builder: caller's override or the package default.
+    propose_builder: BuildCrewCallback = build_propose_crew or _default_propose_crew
+
+    # Idempotency sets, process-local. A task is proposed at most once and
+    # executed at most once per daemon lifetime. Server-side the AIMEAT task
+    # has a single lifecycle (queued -> active -> done|failed), so re-running
+    # the same phase on the same task would just churn the LLM. On daemon
+    # restart these sets are lost; the persona's "trust every success
+    # response" rule + the server's idempotent propose/complete semantics
+    # cover the small remaining churn surface.
+    proposed_ids: set[str] = set()
+    done_ids: set[str] = set()
+
+    def _dispatch(phase_label: str, task: dict[str, Any], builder: BuildCrewCallback) -> bool:
+        """Run one crew against one task. Returns True on success, False on error."""
+        task_id = task.get("id", "(unknown id)")
+        title = task.get("title", "(no title)")
+        print(f"[daemon:{agent_name}] {phase_label} task {task_id}: {title}")
+        crew = builder(task, liaison)
+        try:
+            result = crew.kickoff()
+            print(f"[daemon:{agent_name}] {phase_label} task {task_id} done; first 200 chars: {str(result)[:200]}")
+            return True
+        except Exception as inner:
+            print(f"[daemon:{agent_name}] {phase_label} task {task_id} crashed: {inner}")
+            if on_error:
+                try:
+                    on_error(inner)
+                except Exception:
+                    pass
+            # Only mark failed during the EXECUTE phase. A PROPOSE-phase crash
+            # is recoverable -- the task is still queued, the next poll cycle
+            # will retry. Marking it failed would close it off prematurely.
+            if phase_label == "EXECUTE":
+                try:
+                    requests.post(
+                        f"{node_url.rstrip('/')}/v1/agents/{agent_name}/tasks/{task_id}/fail",
+                        headers={"Authorization": f"Bearer {token}"},
+                        json={"message": f"Crew crashed: {inner}"},
+                        timeout=10,
+                    )
+                except Exception:
+                    pass
+            return False
+
     # The liaison's MCP connection stays open for the whole daemon's lifetime.
     # Each crew.kickoff() reuses the same liaison instance.
     with create_liaison_agent(
         mcp_server_params=stdio_params(agent_name=agent_name),
         agent_name=agent_name,
         tool_filter=resolved_tool_filter,
+        llm=llm,
     ) as liaison:
         print(f"[daemon:{agent_name}] liaison ready, entering poll loop")
 
@@ -340,36 +451,36 @@ def run_crew_daemon(
 
             try:
                 if "tasks" in listen_set:
-                    tasks = _poll_tasks(token, node_url, agent_name)
-                    for task in tasks:
+                    # PROPOSE phase: queued tasks the daemon hasn't proposed yet.
+                    # Owner-created tasks land in 'queued'; the daemon proposes a
+                    # plan and waits for owner approval (or for task-runner mode's
+                    # auto-active route to flip the task to 'active' directly).
+                    for task in _poll_tasks(token, node_url, agent_name, status="queued"):
                         if stop["flag"]:
                             break
                         task_id = task.get("id")
-                        title = task.get("title", "(no title)")
-                        print(f"[daemon:{agent_name}] dispatching task {task_id}: {title}")
-                        _mark_task_active(token, node_url, agent_name, task_id)
-                        crew = build_crew(task, liaison)
-                        try:
-                            result = crew.kickoff()
-                            print(f"[daemon:{agent_name}] task {task_id} kickoff done; first 200 chars of result: {str(result)[:200]}")
-                        except Exception as inner:
-                            print(f"[daemon:{agent_name}] task {task_id} crashed: {inner}")
-                            if on_error:
-                                try:
-                                    on_error(inner)
-                                except Exception:
-                                    pass
-                            # Mark the task failed so it doesn't stay stuck.
-                            try:
-                                requests.post(
-                                    f"{node_url.rstrip('/')}/v1/agents/{agent_name}/tasks/{task_id}/fail",
-                                    headers={"Authorization": f"Bearer {token}"},
-                                    json={"message": f"Crew crashed: {inner}"},
-                                    timeout=10,
-                                )
-                            except Exception:
-                                pass
+                        if not task_id or task_id in proposed_ids:
+                            continue
+                        _dispatch("PROPOSE", task, propose_builder)
+                        proposed_ids.add(task_id)
                         dispatched_this_cycle = True
+
+                    # EXECUTE phase: tasks the owner has approved (active) and any
+                    # the stall detector flagged (stalled -- the owner can resume by
+                    # re-starting in the dashboard, which keeps them as 'active'
+                    # again, but we also pick them up here so a daemon restart
+                    # mid-task doesn't lose the task).
+                    for task_status in ("active", "stalled"):
+                        for task in _poll_tasks(token, node_url, agent_name, status=task_status):
+                            if stop["flag"]:
+                                break
+                            task_id = task.get("id")
+                            if not task_id or task_id in done_ids:
+                                continue
+                            ok = _dispatch("EXECUTE", task, build_crew)
+                            if ok:
+                                done_ids.add(task_id)
+                            dispatched_this_cycle = True
 
                 if "messages" in listen_set:
                     messages = _poll_messages(token, node_url, agent_name)

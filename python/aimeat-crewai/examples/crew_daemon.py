@@ -82,18 +82,24 @@ def build_crew_for_task(task: dict[str, Any], liaison: Agent) -> Crew:
             Task(
                 description=(
                     f"You are the AIMEAT Liaison. The crew has produced a summary "
-                    f"(see the previous task's output). Do TWO things in order:\n\n"
-                    f"1. Write the summary to AIMEAT memory using aimeat_memory_write "
-                    f"with key='deliverables.{AGENT_NAME}.{task_id}', value being a JSON "
-                    f"object with fields 'title' (from the task), 'prompt', 'summary' (the "
-                    f"writer's output), and 'completed_at' (current ISO timestamp). "
-                    f"Set visibility='owner'.\n\n"
-                    f"2. Mark the AIMEAT task complete using aimeat_task_complete "
-                    f"with task_id='{task_id}' and message=<the summary>.\n\n"
-                    f"Report back with the IDs / confirmations you got from those two "
-                    f"tool calls. Do NOT call any other AIMEAT tools beyond these two."
+                    f"(see the previous task's output) and the AIMEAT task is already "
+                    f"in 'active' status with a proposed TODO list. Complete the task "
+                    f"in three steps:\n\n"
+                    f"1. Read the current task with aimeat_task_get task_id='{task_id}' "
+                    f"to see the TODOs that were proposed in the PROPOSE phase.\n\n"
+                    f"2. For each TODO whose verification is now satisfied by the crew's "
+                    f"work, call aimeat_task_todo with task_id='{task_id}', the todo's "
+                    f"id, and status='done'. One call per TODO.\n\n"
+                    f"3. Write the summary to AIMEAT memory with aimeat_memory_write: "
+                    f"key='deliverables.{AGENT_NAME}.{task_id}', value being a JSON "
+                    f"object with fields 'title' (from the task), 'prompt', 'summary' "
+                    f"(the writer's output), and 'completed_at' (ISO timestamp). Set "
+                    f"visibility='owner'.\n\n"
+                    f"4. Call aimeat_task_complete ONCE with task_id='{task_id}' and "
+                    f"message=<the summary>. That is the final action -- trust the "
+                    f"success response."
                 ),
-                expected_output="Confirmation of memory write and task completion.",
+                expected_output="Confirmation of TODO updates, memory write, and task completion.",
                 agent=liaison,
             ),
         ],

@@ -24,7 +24,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, agentNotFoundResponse } from '../auth/middleware.js';
 import { buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
@@ -114,7 +114,8 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
     const agentGaii = resolveAgentGaii(req, agentName);
     const agent = await storage.getAgent(agentGaii);
     if (!agent) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', t(req, 'agentOnboarding.errors.agentNotFound', { name: agentName })));
+      const notFound = agentNotFoundResponse(req, agentName, agentGaii, { nodeId: config.nodeId, baseUrl: config.baseUrl });
+      res.status(notFound.status).json(error(config.nodeId, notFound.code, notFound.message));
       return;
     }
 

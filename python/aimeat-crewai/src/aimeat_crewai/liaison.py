@@ -87,6 +87,26 @@ def _strip_none_kwargs(tool: Any) -> Any:
         return original_run(*args, **clean)
 
     tool._run = wrapped_run
+
+    # Disable CrewAI's cache for AIMEAT tools. CrewAI defaults to caching
+    # every tool result by (tool_name, args) and only the agent itself can
+    # opt out per-tool. That default is correct for pure, idempotent tools
+    # (a calculator) but wrong for every category AIMEAT exposes:
+    #   - Time-varying reads (aimeat_onboarding_status, aimeat_task_list,
+    #     aimeat_memory_list, aimeat_message_inbox) return different data on
+    #     identical args as the world progresses. With cache on, the liaison
+    #     calls onboarding_status, sees "all pending", marks a step passed
+    #     server-side, calls onboarding_status again -- and gets the CACHED
+    #     "all pending" back forever, never observes its own progress, and
+    #     loops until max_iter.
+    #   - Side-effecting writes (aimeat_memory_write, aimeat_task_complete,
+    #     aimeat_*_set) should always reach the server.
+    # Caching is therefore wrong on every axis for this tool surface.
+    try:
+        tool.cache_function = lambda *_args, **_kwargs: False
+    except Exception:  # pragma: no cover -- defensive; CrewAI may rename later
+        pass
+
     return tool
 
 

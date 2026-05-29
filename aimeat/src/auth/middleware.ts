@@ -215,6 +215,48 @@ export function requireRole(role: string) {
 }
 
 /**
+ * Build an "agent record missing" response. Use this in route handlers AFTER
+ * `storage.getAgent(...)` returns null, when the request is authenticated.
+ *
+ * Why this exists: a signed agent JWT can outlive the agent record itself --
+ * the owner can delete an agent from the Profile UI without revoking the
+ * token, and the token will keep authenticating fine (valid signature, valid
+ * exp, no revocation entry) while every storage.getAgent() lookup returns
+ * null. Bare "Agent not found" is misleading in that state because it sounds
+ * like the agent name was mistyped; the real cause is that the local
+ * connector cache + token are stale relative to the server. This helper
+ * detects the desync (caller's GAII matches the missing agent) and returns
+ * AGENT_NOT_REGISTERED with a concrete recovery hint pointing at
+ * `aimeat connect add`. For all other callers (owner sessions looking up
+ * someone else's agent, or genuine unknown names) the standard NOT_FOUND is
+ * returned.
+ */
+export function agentNotFoundResponse(
+  req: Request,
+  agentName: string,
+  expectedGaii: string,
+  config: { nodeId: string; baseUrl: string },
+): { status: number; code: string; message: string } {
+  const isAgentSession = req.auth?.roles.includes('agent') === true;
+  const callerGaii = req.auth?.sub;
+  if (isAgentSession && callerGaii === expectedGaii) {
+    return {
+      status: 404,
+      code: 'AGENT_NOT_REGISTERED',
+      message:
+        `Your token is valid but agent '${agentName}' has no record on node ${config.nodeId}. ` +
+        `The agent was likely deleted server-side. Re-register with: ` +
+        `aimeat connect add --agent ${agentName} --owner ${req.auth?.owner ?? '<owner>'} --url ${config.baseUrl}`,
+    };
+  }
+  return {
+    status: 404,
+    code: 'NOT_FOUND',
+    message: `Agent '${agentName}' not found`,
+  };
+}
+
+/**
  * Require a local (non-federated) session. Returns 403 for federated sessions.
  * Use on endpoints that should not be accessible to federated users
  * (e.g., agent creation on remote nodes).

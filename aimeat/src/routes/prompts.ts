@@ -23,14 +23,29 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
 
   const VALID_MODULES = ['tasks', 'messages', 'work', 'services', 'memory', 'activity', 'social', 'collaboration', 'appdev', 'mcp'] as const;
 
+  // Aliases for module names agents commonly guess that aren't backed by a
+  // dedicated tier-1-<name> prompt. Each alias maps to the closest valid
+  // module so the response is useful instead of returning 404 + a "valid:
+  // ..." hint that agents have to recover from. Keep this list small and
+  // motivated -- it's a backstop, not a permission to invent new names.
+  const MODULE_ALIASES: Record<string, string> = {
+    // 'onboarding' is the most common guess after a freshly connected agent
+    // calls aimeat_onboarding_status and then asks for "the onboarding
+    // handbook". The handbook covers onboarding in the overview + tasks
+    // sections; tasks is the better drill-down because Hello Integration
+    // culminates in completing the onboarding test task.
+    onboarding: 'tasks',
+  };
+
   // ── Handbook routes (replace /v1/prompts/tier1) ──
 
   // GET /v1/agents/me/handbook/:module -- Feature module handbooks (auth required)
   router.get('/v1/agents/me/handbook/:module', requireAuth(), async (req, res) => {
-    const mod = req.params.module as string;
+    const rawMod = req.params.module as string;
+    const mod = MODULE_ALIASES[rawMod] ?? rawMod;
     if (!(VALID_MODULES as readonly string[]).includes(mod)) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND',
-        `Unknown module: ${mod}. Valid: ${VALID_MODULES.join(', ')}`));
+        `Unknown module: ${rawMod}. Valid: ${VALID_MODULES.join(', ')}`));
       return;
     }
 
