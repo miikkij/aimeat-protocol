@@ -406,12 +406,19 @@ def create_liaison_agent(
         if llm is not None:
             agent_args["llm"] = llm
         if resolved_skill_path is not None:
-            # CrewAI Skills entry: pass the agent's bundle directory. The Skills
-            # loader (>= CrewAI 1.14) reads SKILL.md + frontmatter + body and
-            # makes it available to the agent through progressive disclosure --
-            # the LLM sees the description first and loads the body when relevant.
-            # Requires AIMEAT >= 1.13.5 on the server (CrewAI-strict frontmatter).
-            agent_args["skills"] = [str(resolved_skill_path)]
+            # CrewAI Skills entry: pre-load the bundle into a Skill object and
+            # pass that. Passing the directory path as a string would make
+            # CrewAI treat it as a discovery PARENT (scanning subdirs for
+            # */SKILL.md) -- our bundle has SKILL.md AT THE DIRECTORY ROOT,
+            # so the discovery-parent interpretation finds nothing and the
+            # agent's .skills attribute ends up None. Going through
+            # load_skill_metadata explicitly says "this directory IS the
+            # skill" so the bundle is registered properly.
+            #
+            # Import lazily so the package still loads on CrewAI versions
+            # that don't have Skills support (skill_path=None covers that path).
+            from crewai.skills.parser import load_skill_metadata  # type: ignore[import-not-found]
+            agent_args["skills"] = [load_skill_metadata(resolved_skill_path)]
         agent_args.update(agent_kwargs)
 
         agent = Agent(**agent_args)

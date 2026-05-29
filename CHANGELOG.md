@@ -2,6 +2,14 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## aimeat-crewai 0.2.1 - 2026-05-29
+
+### Fixed
+
+- **`agent.skills` was None despite a valid skill bundle on disk.** 0.2.0 passed the bundle directory as a string: `agent_args["skills"] = [str(resolved_skill_path)]`. CrewAI's `Agent` constructor interprets a string skills entry as a **discovery parent** -- it scans the directory for `*/SKILL.md` subdirectories. Our bundle has `SKILL.md` AT the directory root (the per-agent dir IS the skill), so the discovery scan finds nothing and the agent ends up with `skills=None`. The agent then runs on the SLIM persona without the Skill behind it -- LESS context than 0.1.x because we trimmed the manual out of the persona expecting it to come from the Skill.
+- Fix: pre-load the bundle into a Skill object via `crewai.skills.parser.load_skill_metadata(path)` and pass that. Verified by CrewAI Claude with the same fix applied locally -- `Agent.skills` now contains the loaded skill (`['<agent_name>']`) and the LLM reads it through CrewAI's normal Skills mechanism.
+- Import of `load_skill_metadata` is lazy (inside the if-skill_path-block) so the package still loads cleanly on CrewAI versions that don't have Skills support. Those callers should pass `skill_path=None` to skip the Skill path entirely and fall back to the FULL persona.
+
 ## aimeat-crewai 0.2.0 - 2026-05-29
 
 ### Added (CrewAI Skills support)
