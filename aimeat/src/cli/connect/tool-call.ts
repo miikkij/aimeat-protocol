@@ -299,6 +299,26 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
         handler: ({ client, agentPath }, input) => client.get(`/v1/agents/${agentPath}/tasks${query({ status: optionalString(input, 'status') })}`),
     },
     {
+        name: 'aimeat_task_create',
+        description: "Queue a task for one of your owner's agents (yourself or any same-owner agent). The owner sees it in their dashboard.",
+        input: {
+            target_agent: { type: 'string', required: true, description: 'Name of the agent the task is FOR (must share the calling agent\'s owner).' },
+            title: { type: 'string', required: true, description: 'Short human-readable title.' },
+            description: { type: 'string', required: true, description: 'The actual prompt / instruction.' },
+            status: { type: 'string', enum: ['draft', 'queued'], description: 'Default "queued".' },
+        },
+        handler: ({ client }, input) => {
+            const target = requiredString(input, 'target_agent');
+            return client.post(`/v1/agents/${encodeURIComponent(target)}/tasks`, {
+                title: requiredString(input, 'title'),
+                description: requiredString(input, 'description'),
+                status: optionalString(input, 'status') ?? 'queued',
+                verification: { user_expects: '', technical_checks: [] },
+                todos: [],
+            });
+        },
+    },
+    {
         name: 'aimeat_task_get',
         description: 'Get task detail.',
         input: { task_id: { type: 'string', required: true, description: 'Task identifier.' } },

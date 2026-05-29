@@ -61,10 +61,25 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     return task.agentGaii === req.auth!.sub;
   }
 
-  /* ── POST /v1/agents/:name/tasks -- Create a task for an agent ── */
-  router.post('/v1/agents/:name/tasks', requireAuth(), requireRole('owner'), async (req, res) => {
+  /* ── POST /v1/agents/:name/tasks -- Create a task for an agent ──
+   *
+   * Authorization (since 1.14.0):
+   *   - Owner JWT  -> always allowed (any of the owner's agents can be targeted)
+   *   - Agent JWT  -> allowed if the calling agent and the target agent share
+   *                   the same owner. Lets one agent (e.g. Claude Desktop, an
+   *                   orchestrator agent) queue work for a same-owner crew
+   *                   agent (e.g. demo-crew) without going through the browser
+   *                   or generating an owner token. The owner remains in
+   *                   charge: any caller still must be one of the owner's
+   *                   registered agents.
+   *   - Anything else -> 403.
+   *
+   * The created task's ownerGaii is always the OWNER's GHII, never the
+   * calling agent's GAII. So the task appears in the owner's profile
+   * dashboard exactly as if the owner had queued it themselves.
+   */
+  router.post('/v1/agents/:name/tasks', requireAuth(), async (req, res) => {
     const agentName = req.params.name as string;
-    const ownerGaii = resolve(req);
     const agentGaii = resolveAgentGaii(req, agentName);
 
     // Verify agent exists
@@ -73,6 +88,27 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
       return;
     }
+
+    // Authorize: owner JWT OR same-owner agent JWT.
+    const callerRoles = req.auth!.roles as string[];
+    const isOwner = callerRoles.includes('owner') && !callerRoles.includes('agent');
+    const isAgent = callerRoles.includes('agent');
+    if (!isOwner && !isAgent) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only owners or agents may create tasks'));
+      return;
+    }
+    if (isAgent && agent.owner !== req.auth!.owner) {
+      res.status(403).json(error(
+        config.nodeId, 'FORBIDDEN',
+        `Agent '${req.auth!.sub}' cannot create tasks for '${agentName}' -- different owner`,
+      ));
+      return;
+    }
+
+    // ownerGaii is always the OWNER's GHII (not the calling agent's GAII),
+    // so the task surfaces in the owner's dashboard the same way regardless
+    // of who actually queued it.
+    const ownerGaii = `${agent.owner}@${config.nodeId}`;
 
     // Validate body
     const parsed = AgentTaskCreateSchema.safeParse(req.body);

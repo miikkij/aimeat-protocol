@@ -35,8 +35,12 @@ from .mcp_client import (
     http_params,
     sse_params,
 )
+from .daemon import (
+    run_crew_daemon,
+    BuildCrewCallback,
+)
 
-__version__ = "0.2.2"
+__version__ = "0.3.0"
 
 __all__ = [
     "__version__",
@@ -46,4 +50,6 @@ __all__ = [
     "stdio_params",
     "http_params",
     "sse_params",
+    "run_crew_daemon",
+    "BuildCrewCallback",
 ]

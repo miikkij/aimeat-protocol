@@ -179,6 +179,18 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         input: { status: { type: 'string', description: 'Optional task status filter.' } },
     },
     {
+        name: 'aimeat_task_create',
+        description: 'Queue a task for one of your owner\'s agents (yourself or any same-owner agent). The owner sees it in their dashboard. Use this to ask another crew or worker to do something.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            target_agent: { type: 'string', required: true, description: 'Name of the agent the task is FOR. Must be owned by the same owner as the calling agent.' },
+            title: { type: 'string', required: true, description: 'Short human-readable title for the task.' },
+            description: { type: 'string', required: true, description: 'The actual prompt / instruction for the target agent.' },
+            status: { type: 'string', enum: ['draft', 'queued'], description: 'Default "queued" (visible to target immediately). Use "draft" for owner-review-first.' },
+        },
+    },
+    {
         name: 'aimeat_task_get',
         description: 'Get task detail.',
         caller: 'agent',

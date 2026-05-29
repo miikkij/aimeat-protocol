@@ -2,6 +2,37 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.14.0] - 2026-05-29
+
+### Added (the missing piece for cross-agent task delegation)
+
+- **`aimeat_task_create` MCP tool** + same-owner authorization on `POST /v1/agents/:name/tasks`. The REST endpoint was previously owner-JWT-only, which meant a CrewAI-Claude or Hermes-like agent could not queue work for a same-owner crew (like `demo-crew`) without the human owner being in the loop. Now any agent JWT is accepted **provided the calling agent's owner === the target agent's owner**. This unblocks the canonical AIMEAT story: "owner sits in Claude Desktop → asks for research → Claude Desktop calls `aimeat_task_create` for demo-crew → demo-crew's daemon picks it up → result lands in AIMEAT memory under the owner's account". The created task's `ownerGaii` is always the OWNER's GHII regardless of which agent queued it, so the task surfaces in the owner's dashboard exactly the same way.
+- **Tool registered in 3 surfaces:** MCP `aimeat_task_create` (via `agent-tasks.ts`), CLI fallback via `aimeat connect call aimeat_task_create`, and central catalog `mcp/catalog/definitions.ts`. Annotated as non-read-only, non-destructive, non-idempotent, closed-world.
+- **Profile -> Agents -> "Connect a CrewAI crew" paste prompt** updated to mention the new `aimeat_task_create` MCP tool as one of the three ways to queue work for a daemon-mode crew (alongside the browser and direct REST). The paste also gained Step 4b (`run_crew_daemon`) explaining the daemon pattern alongside the one-shot Step 4a.
+
+### Why this matters
+
+Before this, AIMEAT's MCP surface could **read** the entire task lifecycle but could not **create** tasks. The only way to queue work was the browser or a hand-crafted REST call with an owner token. That meant the canonical "Claude Desktop orchestrates a CrewAI crew" flow was technically impossible -- the bridge agent had no way to actually delegate. 1.14.0 closes that gap. Setup AI (Claude Code, Codex, etc.) can now wire up a crew daemon, and the operator's Claude Desktop can drive it via MCP from then on.
+
+## aimeat-crewai 0.3.0 - 2026-05-29
+
+### Added
+
+- **`run_crew_daemon`** — long-running supervisor that keeps the liaison alive and polls AIMEAT for queued tasks (and optionally inbox messages). For each arrival, calls a user-supplied `build_crew(task, liaison)` callback, runs the resulting Crew, and lets the liaison report results back via its tools. This is what turns a CrewAI crew from "a one-shot script you `python crew_runner.py` manually" into "a reachable agent that picks up tasks from across the AIMEAT network". Requires AIMEAT 1.14.0+ on the node side for `aimeat_task_create` to be available to remote callers.
+- Signal handling: SIGINT/SIGTERM trigger clean shutdown with the liaison's MCP connection properly closed.
+- Error containment: poll-cycle exceptions are logged and surfaced via the optional `on_error` callback, but do not crash the daemon -- it stays alive so the OS-level supervisor's crash-loop detector doesn't get spurious restarts. Tasks that crash mid-run are explicitly marked `failed` on AIMEAT so they don't stay stuck.
+- Optional `one_shot=True` for testing without a long-running process.
+
+### Added examples
+
+- **`examples/crew_daemon.py`** — runnable starter for a 3-agent crew (Researcher + Writer + Liaison) wrapped in `run_crew_daemon`. Polls AIMEAT every 30s for queued tasks, builds the crew on demand, writes deliverables to `deliverables.<agent>.<task_id>` memory key, marks the task complete.
+- **`examples/watchdog.sh`** (Bash) and **`examples/watchdog.ps1`** (PowerShell) — supervisor wrappers with crash-loop protection (default: gives up after 5 fast crashes in <30s each, exponential backoff between restarts). For production prefer systemd / launchd / pm2; the examples are for local dev and as a reference for what supervisor semantics should look like.
+
+### Changed
+
+- **`requests` added to dependencies** (used by daemon to poll the REST API directly without going through MCP for the polling path).
+- **README and examples README rewritten** to position `run_crew_daemon` as the recommended pattern and `create_liaison_agent` as the "one-shot test" pattern.
+
 ## [1.13.7] - 2026-05-29
 
 ### Fixed (profile "Connect a CrewAI crew" paste taught the wrong pattern)

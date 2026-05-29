@@ -162,12 +162,60 @@ with create_liaison_agent(
 
 **Requires** AIMEAT node 1.13.5+ (CrewAI-strict frontmatter) and CrewAI 1.14+ (native Skills support). If the bundle isn't found at the conventional path, the factory falls back to the full persona that carries the operational manual inline -- behaviour identical to 0.1.x.
 
+## Daemon mode (0.3.0+)
+
+`create_liaison_agent` is a one-shot context manager: the liaison runs for the duration of one `crew.kickoff()` and exits. To turn a crew into a **reachable target in the AIMEAT network** — i.e. other agents (Claude Desktop, Hermes, another crew) can queue tasks for it remotely and it picks them up automatically — wrap it in `run_crew_daemon`:
+
+```python
+from aimeat_crewai import run_crew_daemon
+from crewai import Agent, Crew, Task
+
+def build_crew_for_task(task, liaison):
+    researcher = Agent(role="Researcher", ...)
+    writer     = Agent(role="Writer", ...)
+    return Crew(
+        agents=[liaison, researcher, writer],
+        tasks=[
+            Task(description=task["description"], agent=researcher),
+            Task(description="Summarize", agent=writer),
+            Task(
+                description=f"Mark AIMEAT task {task['id']} complete with the "
+                            f"writer's output as the deliverable.",
+                agent=liaison,
+            ),
+        ],
+    )
+
+run_crew_daemon(
+    agent_name="demo-crew",
+    build_crew=build_crew_for_task,
+    poll_interval_seconds=30,
+    listen_for=("tasks",),
+)
+```
+
+The daemon:
+- Keeps the liaison's MCP connection open for its entire lifetime
+- Polls AIMEAT every `poll_interval_seconds` for queued tasks
+- For each, calls `build_crew(task, liaison)` and runs the resulting Crew
+- Lets the liaison handle `aimeat_task_complete` per its persona
+- Traps SIGINT / SIGTERM for clean shutdown
+- Does NOT manage its own restart — wrap in a supervisor (`examples/watchdog.sh`, systemd, pm2, etc.) with crash-loop protection
+
+To queue work for the daemon from elsewhere:
+- Browser: Profile → Agents → expand the crew → Tasks tab → "+ New Task"
+- Claude Desktop / any AIMEAT-connected agent: `aimeat_task_create` MCP tool (AIMEAT 1.14.0+)
+- REST: `POST /v1/agents/<name>/tasks` with an owner JWT
+
+See [`examples/crew_daemon.py`](examples/crew_daemon.py) for a runnable starter.
+
 ## Compatibility
 
 | `aimeat-crewai` | AIMEAT node | CrewAI |
 |---|---|---|
 | 0.1.x | 1.13.0+ | 0.80+ |
 | 0.2.x | 1.13.5+ | 1.14+ (Skills); 0.80+ if `skill_path=None` |
+| 0.3.x | 1.14.0+ (for `aimeat_task_create`) | 0.80+ |
 
 ## License
 

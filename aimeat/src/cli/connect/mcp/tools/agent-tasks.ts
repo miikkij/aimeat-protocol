@@ -31,6 +31,33 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
+  mcp.tool(
+    'aimeat_task_create',
+    'Queue a task for one of your owner\'s agents (yourself, or any other agent owned by the same owner). Use this to ask another crew or worker to do something. The task lands in the target agent\'s queue and the owner sees it in their dashboard.',
+    {
+      agent_name: agentNameSchema,
+      target_agent: z.string().describe('Name of the agent the task is FOR. Must be owned by the same owner as the calling agent. Example: "demo-crew".'),
+      title: z.string().describe('Short human-readable title for the task. Shows up in the owner\'s dashboard. Example: "Research 2026 agent orchestration trends".'),
+      description: z.string().describe('The actual prompt / instruction for the target agent. This is what its liaison / runtime will read and act on.'),
+      status: z.enum(['draft', 'queued']).optional().describe('Default "queued" (visible to the target agent immediately). Use "draft" if you want the owner to review before it goes live.'),
+    },
+    annotationsFor('aimeat_task_create'),
+    async ({ agent_name, target_agent, title, description, status }) => {
+      const { client } = pickAgent(registry, agent_name);
+      const body = {
+        title,
+        description,
+        status: status ?? 'queued',
+        // Minimal task shape -- server schema requires verification block + todos array
+        // but they accept defaults. Caller can use aimeat_task_propose_todos later if needed.
+        verification: { user_expects: '', technical_checks: [] },
+        todos: [],
+      };
+      const resp = await client.post(`/v1/agents/${encodeURIComponent(target_agent)}/tasks`, body);
+      return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    },
+  );
+
   mcp.tool('aimeat_task_get', 'Get task detail', {
     agent_name: agentNameSchema,
     task_id: z.string().describe('Task identifier'),

@@ -138,7 +138,7 @@ function buildTaskRunnerPrompt(sess, agentName) {
   const name = agentName || '<your-crew-name>';
   return `You are connecting a CrewAI crew to an AIMEAT node using the AIMEAT Liaison Agent pattern. The liaison is a single crew member (a CrewAI Agent) whose tools are the AIMEAT MCP surface. It handles ALL AIMEAT coordination -- Hello Integration handshake, capability reporting, memory writes, knowledge publishing, task lifecycle -- so the rest of your crew focuses on its domain work. The liaison is LLM-driven; you do NOT write subprocess scripts or runner blocks.
 
-Required: aimeat >= 1.13.6 (npm), aimeat-crewai >= 0.2.2 (PyPI), CrewAI >= 0.80.
+Required: aimeat >= 1.14.0 (npm) for aimeat_task_create, aimeat-crewai >= 0.3.0 (PyPI) for run_crew_daemon, CrewAI >= 0.80.
 
 == Step 1 -- Connect the agent identity ==
 This registers "${name}" as an AIMEAT agent and stores its token locally
@@ -200,10 +200,10 @@ connection is cleaned up correctly.
       result = crew.kickoff()
       print(result)
 
-== Step 4 -- Run it ==
+== Step 4a -- Test it once ==
   python your_crew.py
 
-What you should see:
+What you should see on this first run:
 - The liaison calls aimeat_onboarding_status, sees pending steps, and
   walks through them: identify_platform (platform="crewai"),
   install_skill, report_capabilities, publish_config, accept_test_task
@@ -219,6 +219,63 @@ You do NOT need to:
 - Call aimeat_task_complete yourself
 - Write any AIMEAT REST or MCP code by hand
 
+== Step 4b -- Run as a daemon (this is what you really want) ==
+The one-shot above proves the wiring works, but to make the crew a
+REACHABLE TARGET in the AIMEAT network -- so other agents (Claude
+Desktop, Hermes, another crew) can queue tasks for it via the
+aimeat_task_create MCP tool and the crew picks them up automatically --
+swap the one-shot for run_crew_daemon:
+
+  from aimeat_crewai import run_crew_daemon
+  from crewai import Agent, Crew, Task
+
+  AGENT_NAME = "${name}"
+
+  def build_crew_for_task(task, liaison):
+      researcher = Agent(role="Researcher", goal="...", backstory="...")
+      writer     = Agent(role="Writer",     goal="...", backstory="...")
+      return Crew(
+          agents=[liaison, researcher, writer],
+          tasks=[
+              Task(description=task["description"], agent=researcher),
+              Task(description="Summarize the research.", agent=writer),
+              Task(
+                  description=(
+                      f"Mark AIMEAT task {task['id']} complete with the "
+                      f"writer's output as the deliverable. Use "
+                      f"aimeat_task_complete."
+                  ),
+                  agent=liaison,
+              ),
+          ],
+      )
+
+  run_crew_daemon(
+      agent_name=AGENT_NAME,
+      build_crew=build_crew_for_task,
+      poll_interval_seconds=30,
+      listen_for=("tasks",),
+  )
+
+Then start it under a supervisor with crash-loop protection. Example
+wrappers ship with the package -- see examples/watchdog.sh (Linux/macOS)
+and examples/watchdog.ps1 (Windows). For production prefer systemd,
+launchd, or pm2.
+
+Once the daemon is up, the owner (or any same-owner agent) can queue
+work for it from THREE places:
+
+  1. Browser: Profile -> Agents -> expand "${name}" -> Tasks tab ->
+     "+ New Task" -> type a prompt.
+  2. Claude Desktop (or any AIMEAT-connected agent in this owner's
+     account): use the aimeat_task_create MCP tool, target_agent="${name}".
+  3. REST with owner JWT: POST ${url}/v1/agents/${name}/tasks.
+
+The daemon picks up the queued task within ~30s, runs the crew, and
+the liaison writes the deliverable to AIMEAT memory + marks the task
+complete. The owner sees the result in the Tasks tab.
+
+== Notes ==
 If a step breaks, report the exact step number, the error output, and
 which AIMEAT tool returned it. The liaison's persona already handles
 common idiosyncrasies (omit-null-optionals, AUTH_REQUIRED, STEP_NOT_IN_FLOW,

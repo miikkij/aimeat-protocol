@@ -100,6 +100,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Tasks ──
     aimeat_task_list: { title: 'List Tasks', readOnlyHint: true },
     aimeat_task_get: { title: 'Get Task', readOnlyHint: true },
+    aimeat_task_create: { title: 'Create Task', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_task_propose_todos: { title: 'Propose Task TODOs', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_task_event: { title: 'Append Task Event', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_task_todo: { title: 'Update Task TODO', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
