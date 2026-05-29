@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aimeat-crewai"
-version = "0.3.1"
+version = "0.3.2"
 description = "AIMEAT Liaison Agent for CrewAI -- drop-in crew member that handles all communication with an AIMEAT node (Hello Integration handshake, capability reporting, memory writes, knowledge publishing, task lifecycle) so the rest of the crew can focus on domain work."
 readme = "README.md"
 requires-python = ">=3.10"

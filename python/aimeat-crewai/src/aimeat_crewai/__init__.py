@@ -38,9 +38,10 @@ from .mcp_client import (
 from .daemon import (
     run_crew_daemon,
     BuildCrewCallback,
+    DAEMON_DEFAULT_TOOL_FILTER,
 )
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 
 __all__ = [
     "__version__",
@@ -52,4 +53,5 @@ __all__ = [
     "sse_params",
     "run_crew_daemon",
     "BuildCrewCallback",
+    "DAEMON_DEFAULT_TOOL_FILTER",
 ]

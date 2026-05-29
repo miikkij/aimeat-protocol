@@ -185,11 +185,65 @@ def _mark_task_active(token: str, node_url: str, agent_name: str, task_id: str) 
 BuildCrewCallback = Callable[[dict[str, Any], Any], Any]
 
 
+# Curated subset of AIMEAT MCP tools that a daemon-mode liaison actually
+# needs. Loading all ~95 AIMEAT tools into a CrewAI agent overflows some LLM
+# adapters (litellm / smaller models choke on the schema package) and slows
+# down even the ones that don't. This list covers the canonical liaison flow:
+# Hello Integration, capability self-reporting, task lifecycle (read + take a
+# task, propose+update TODOs, complete/fail), deliverable persistence
+# (memory + knowledge), telemetry, and handbook self-reference. Wallet,
+# admin, consent, cortex, extension, organism, board, app, and group tools
+# are excluded because a default liaison doesn't need them.
+#
+# Override by passing `tool_filter=[...]` explicitly to run_crew_daemon, or
+# `tool_filter=None` for the unfiltered ~95-tool set.
+DAEMON_DEFAULT_TOOL_FILTER: tuple[str, ...] = (
+    # Onboarding (Hello Integration)
+    "aimeat_handbook_get",
+    "aimeat_onboarding_status",
+    "aimeat_onboarding_identify_platform",
+    "aimeat_onboarding_confirm_skill_installed",
+    "aimeat_onboarding_confirm_directives_read",
+    "aimeat_onboarding_declare_services",
+    # Capabilities + identity (what this crew can do, who it is)
+    "aimeat_agent_capabilities_report",
+    "aimeat_agents_list",
+    # Task lifecycle (the daemon's core loop)
+    "aimeat_task_list",
+    "aimeat_task_get",
+    "aimeat_task_propose_todos",
+    "aimeat_task_todo",
+    "aimeat_task_event",
+    "aimeat_task_complete",
+    "aimeat_task_fail",
+    "aimeat_task_create",  # for crew-to-crew delegation
+    # Deliverables
+    "aimeat_memory_write",
+    "aimeat_memory_read",
+    "aimeat_memory_list",
+    "aimeat_knowledge_contribute",
+    "aimeat_knowledge_get",
+    # Telemetry
+    "aimeat_agent_telemetry_report",
+    # Messages (so the daemon can listen for owner messages too)
+    "aimeat_message_inbox",
+    "aimeat_message_send",
+)
+
+
+# Sentinel marker. `run_crew_daemon(..., tool_filter=<SENTINEL>)` (the
+# default) means "use DAEMON_DEFAULT_TOOL_FILTER". Passing `None` explicitly
+# means "no filter, give me every tool the connector exposes". Passing a
+# concrete iterable uses that exact set.
+_USE_DAEMON_DEFAULT_FILTER = object()
+
+
 def run_crew_daemon(
     *,
     agent_name: str,
     build_crew: BuildCrewCallback,
     owner: str | None = None,
+    tool_filter: Any = _USE_DAEMON_DEFAULT_FILTER,
     poll_interval_seconds: int = 30,
     listen_for: Iterable[str] = ("tasks",),
     on_idle: Callable[[], None] | None = None,
@@ -211,6 +265,12 @@ def run_crew_daemon(
         owner: Optional. If two or more owners have an agent with the same
             name in your local connector, pass `owner` to disambiguate.
             With a single-owner install you can omit it.
+        tool_filter: Which AIMEAT MCP tools the liaison should load.
+            Defaults to `DAEMON_DEFAULT_TOOL_FILTER` (a curated ~25-tool
+            set covering Hello Integration, task lifecycle, memory,
+            knowledge, telemetry, and messages). Pass `None` for the
+            unfiltered ~95-tool set (some LLM adapters choke on it). Pass
+            a list of tool names to use that exact subset.
         poll_interval_seconds: How often to check AIMEAT for new work
             when idle. Default 30s; raise for low-priority crews, lower
             for snappy interactive feel (but mind rate limits).
@@ -246,11 +306,32 @@ def run_crew_daemon(
 
     print(f"[daemon:{agent_name}] starting against {node_url}, polling every {poll_interval_seconds}s, listening for {sorted(listen_set)}")
 
+    # Resolve tool_filter:
+    #   sentinel (default) -> DAEMON_DEFAULT_TOOL_FILTER (curated ~25 tools)
+    #   None               -> no filter, every MCP tool the connector exposes
+    #   iterable           -> use as-is
+    if tool_filter is _USE_DAEMON_DEFAULT_FILTER:
+        resolved_tool_filter: Iterable[str] | None = DAEMON_DEFAULT_TOOL_FILTER
+    else:
+        resolved_tool_filter = tool_filter
+
+    if resolved_tool_filter is not None:
+        try:
+            count = len(list(resolved_tool_filter))  # iterable -> list (consumes generators)
+            # Re-create as tuple for re-use below; lists are also fine.
+            resolved_tool_filter = tuple(resolved_tool_filter) if not isinstance(resolved_tool_filter, (list, tuple)) else resolved_tool_filter
+            print(f"[daemon:{agent_name}] loading liaison with {count} tool(s) via tool_filter")
+        except TypeError:
+            pass  # not a sized iterable, let create_liaison_agent surface the error
+    else:
+        print(f"[daemon:{agent_name}] loading liaison with NO tool_filter (every available MCP tool)")
+
     # The liaison's MCP connection stays open for the whole daemon's lifetime.
     # Each crew.kickoff() reuses the same liaison instance.
     with create_liaison_agent(
         mcp_server_params=stdio_params(agent_name=agent_name),
         agent_name=agent_name,
+        tool_filter=resolved_tool_filter,
     ) as liaison:
         print(f"[daemon:{agent_name}] liaison ready, entering poll loop")
 

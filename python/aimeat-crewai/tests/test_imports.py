@@ -198,6 +198,32 @@ def test_read_token_missing_raises(tmp_path, monkeypatch) -> None:
         _read_token("nonexistent-agent")
 
 
+def test_daemon_default_tool_filter_exported_and_curated() -> None:
+    """0.3.2 ships a curated default tool list for daemon liaisons so the LLM
+    schema package stays small enough for litellm / smaller models."""
+    from aimeat_crewai import DAEMON_DEFAULT_TOOL_FILTER
+
+    # Should be a tuple-like, reasonable in size.
+    names = tuple(DAEMON_DEFAULT_TOOL_FILTER)
+    assert 10 <= len(names) <= 40, f"unexpected default tool count: {len(names)}"
+
+    # Must include the canonical liaison-flow tools.
+    must_have = {
+        "aimeat_onboarding_status",
+        "aimeat_task_list",
+        "aimeat_task_complete",
+        "aimeat_memory_write",
+        "aimeat_handbook_get",
+    }
+    missing = must_have - set(names)
+    assert not missing, f"default filter missing essential tools: {missing}"
+
+    # Must NOT include known-risky / out-of-scope-for-liaison tools.
+    must_not_have = {"aimeat_admin_mint", "aimeat_admin_config", "aimeat_wallet_balance"}
+    overlap = must_not_have & set(names)
+    assert not overlap, f"default filter includes tools that should be excluded: {overlap}"
+
+
 def test_slim_vs_full_backstory_templates_exist() -> None:
     """0.2.0 ships two templates; default selection is auto based on skill presence."""
     from aimeat_crewai.liaison import SLIM_BACKSTORY_TEMPLATE, FULL_BACKSTORY_TEMPLATE

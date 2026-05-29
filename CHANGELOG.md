@@ -23,6 +23,18 @@ server-only (operator-gated administration).
 Net effect: Claude Desktop and other public-MCP clients now have parity
 with what aimeat-crewai liaisons see via the local connector.
 
+## aimeat-crewai 0.3.2 - 2026-05-29
+
+### Added
+
+- **`tool_filter` parameter on `run_crew_daemon`** with a curated default. 0.3.0/0.3.1 loaded all ~95 AIMEAT MCP tools into the daemon's liaison, which is too much schema for many LLM adapters (litellm + smaller models choke on the full package; field test showed liaison crashing in the daemon's finalize phase). 0.3.2 defaults to `DAEMON_DEFAULT_TOOL_FILTER` (~25 tools) covering Hello Integration, capability reporting, task lifecycle (read/create/propose/update/complete/fail), memory + knowledge deliverables, telemetry, and messages. Wallet, admin, consent, cortex, extension, organism, board, app, and group tools are excluded -- a default liaison doesn't need them.
+- `DAEMON_DEFAULT_TOOL_FILTER` exported from `aimeat_crewai` for inspection. Pass `tool_filter=DAEMON_DEFAULT_TOOL_FILTER + ("aimeat_extra_tool",)` to extend, or `tool_filter=["only-these"]` to override entirely, or `tool_filter=None` to disable filtering and load the full ~95-tool set.
+
+### Changed
+
+- `examples/crew_daemon.py` documents the default + override semantics with an inline comment.
+- Added a regression test verifying the default list size + presence of essential liaison tools + absence of wallet/admin/etc.
+
 ## aimeat-crewai 0.3.1 - 2026-05-29
 
 ### Fixed
