@@ -48,6 +48,7 @@ model Agent {
   webhookFailCount  Int      @default(0)
   platform          String?
   platformVersion   String?
+  mode              String?
   platformDetectedBy String?
   tags              String[]
   createdAt     DateTime @default(now())

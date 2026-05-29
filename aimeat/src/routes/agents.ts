@@ -38,12 +38,14 @@ import { detectPlatform } from '../services/platform-detector.js';
 /** Device authorization code expires after 30 minutes */
 const DEVICE_AUTH_EXPIRY_MS = 1_800_000;
 
+const VALID_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator'] as const;
+
 export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   // POST /v1/agents/device-authorize — start device authorization flow (RFC 8628)
   router.post('/v1/agents/device-authorize', async (req, res) => {
-    const { agent_name, display_name, description, owner } = req.body ?? {};
+    const { agent_name, display_name, description, owner, mode } = req.body ?? {};
 
     if (!owner) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'owner is required'));
@@ -51,6 +53,11 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     }
     if (!agent_name) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'agent_name is required'));
+      return;
+    }
+    if (mode !== undefined && !VALID_MODES.includes(mode)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        `mode must be one of: ${VALID_MODES.join(', ')}`));
       return;
     }
 
@@ -95,6 +102,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       createdAt: now.toISOString(),
       expiresAt: expiresAt.toISOString(),
       pollInterval: 5,
+      mode: mode ?? 'interactive',
     });
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -362,6 +370,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         morselBalance: 0,
         createdAt: now,
         lastSeen: now,
+        mode: request.mode ?? 'interactive',
       });
 
       // Post-registration hook
@@ -403,18 +412,19 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
     emitChange('agents');
 
     // ── Auto-start Hello Integration onboarding ──
-    const onboardingSteps = createDefaultSteps();
+    const onboardingSteps = createDefaultSteps(request.mode ?? 'interactive');
     onboardingSteps[0].status = 'passed';
     onboardingSteps[0].validatedAt = now;
     onboardingSteps[0].validationMethod = 'automatic';
     onboardingSteps[0].details = { createdAt: existing?.createdAt ?? now };
 
     const detectedPlatform = detectPlatform(req.headers['user-agent'] as string | undefined);
-    if (detectedPlatform) {
-      onboardingSteps[1].status = 'passed';
-      onboardingSteps[1].validatedAt = now;
-      onboardingSteps[1].validationMethod = 'automatic';
-      onboardingSteps[1].details = { platform: detectedPlatform.id, version: detectedPlatform.version };
+    const platformStepDA = onboardingSteps.find(s => s.id === 'identify_platform');
+    if (detectedPlatform && platformStepDA) {
+      platformStepDA.status = 'passed';
+      platformStepDA.validatedAt = now;
+      platformStepDA.validationMethod = 'automatic';
+      platformStepDA.details = { platform: detectedPlatform.id, version: detectedPlatform.version };
       await storage.updateAgent(gaii, {
         platform: detectedPlatform.id,
         platformVersion: detectedPlatform.version,
@@ -424,22 +434,26 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
 
     const existingOnboarding = await storage.getOnboarding(gaii);
     if (!existingOnboarding) {
-      const testTaskId = randomUUID();
-      await storage.createAgentTask({
-        id: testTaskId,
-        agentGaii: gaii,
-        ownerGaii: `${ownerPayload.owner}@${config.nodeId}`,
-        title: 'Onboarding verification',
-        description: 'This is a test task created during Hello Integration. Propose todos, get approval, execute, and complete.',
-        status: 'queued',
-        scope: [],
-        rules: [],
-        todos: [],
-        verification: { userExpects: 'Agent completes the onboarding test task successfully', technicalChecks: [] },
-        createdAt: now,
-        updatedAt: now,
-      });
-      onboardingSteps[8].details = { testTaskId };
+      // Test task only when the agent's Hello Integration includes accept_test_task
+      const acceptStepDA = onboardingSteps.find(s => s.id === 'accept_test_task');
+      if (acceptStepDA) {
+        const testTaskId = randomUUID();
+        await storage.createAgentTask({
+          id: testTaskId,
+          agentGaii: gaii,
+          ownerGaii: `${ownerPayload.owner}@${config.nodeId}`,
+          title: 'Onboarding verification',
+          description: 'This is a test task created during Hello Integration. Propose todos, get approval, execute, and complete.',
+          status: 'queued',
+          scope: [],
+          rules: [],
+          todos: [],
+          verification: { userExpects: 'Agent completes the onboarding test task successfully', technicalChecks: [] },
+          createdAt: now,
+          updatedAt: now,
+        });
+        acceptStepDA.details = { testTaskId };
+      }
       await storage.createOnboarding({
         agentGaii: gaii,
         status: 'in_progress',
@@ -568,7 +582,13 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
 
   // POST /v1/agents — register a new agent (requires owner JWT, local session only)
   router.post('/v1/agents', requireAuth(), requireLocalSession(), requireRole('owner'), validateBody(AgentRegistrationSchema, config.nodeId), async (req, res) => {
-    const { name, owner, display_name, description, capabilities, scopes } = req.body ?? {};
+    const { name, owner, display_name, description, capabilities, scopes, mode } = req.body ?? {};
+
+    if (mode !== undefined && !VALID_MODES.includes(mode)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        `mode must be one of: ${VALID_MODES.join(', ')}`));
+      return;
+    }
 
     // Extension hook: pre_agent_registration
     const hookResult = await executeHooks(config, storage, 'pre_agent_registration', { name, owner, display_name });
@@ -637,6 +657,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       morselBalance: 0,
       createdAt: now,
       lastSeen: now,
+      mode: mode ?? 'interactive',
     });
 
     // Extension hook: post_agent_registration (fire-and-forget)
@@ -836,6 +857,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         public_key: a.publicKey,
         federate: a.federate ?? false,
         tags: a.tags ?? [],
+        mode: a.mode ?? 'interactive',
       })),
     }, [
       { description: 'Register a new agent', method: 'POST', url: '/v1/agents' },
@@ -892,6 +914,43 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       gaii: updated.gaii,
       name: updated.name,
       tags: updated.tags ?? [],
+    }));
+    emitChange('agents');
+  });
+
+  // PATCH /v1/agents/:name/mode — owner sets agent operational mode
+  // (autonomous | interactive | task-runner | coordinator). Affects Hello
+  // Integration step set: task-runner gets a reduced 5-step flow.
+  router.patch('/v1/agents/:name/mode', requireAuth(), requireRole('owner'), async (req, res) => {
+    const identifier = decodeURIComponent(req.params.name as string);
+    const gaii = identifier.includes('#') ? identifier : buildGAII(identifier, req.auth!.owner, config.nodeId);
+    const agent = await storage.getAgent(gaii);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${identifier}`));
+      return;
+    }
+    if (agent.owner !== req.auth!.owner) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only update the mode of your own agents'));
+      return;
+    }
+
+    const newMode = req.body?.mode;
+    if (!VALID_MODES.includes(newMode)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        `mode must be one of: ${VALID_MODES.join(', ')}`));
+      return;
+    }
+
+    const updated = await storage.updateAgent(gaii, { mode: newMode });
+    if (!updated) {
+      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${identifier}`));
+      return;
+    }
+
+    res.json(success(config.nodeId, {
+      gaii: updated.gaii,
+      name: updated.name,
+      mode: updated.mode ?? 'interactive',
     }));
     emitChange('agents');
   });

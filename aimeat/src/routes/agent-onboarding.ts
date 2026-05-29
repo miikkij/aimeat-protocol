@@ -200,19 +200,24 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
       return;
     }
 
-    const steps = createDefaultSteps();
-    steps[0].status = 'passed';
-    steps[0].validatedAt = new Date().toISOString();
-    steps[0].validationMethod = 'automatic';
-    steps[0].details = { createdAt: agent.createdAt };
+    const steps = createDefaultSteps(agent.mode);
+    // First step is always `authenticate` -- auto-pass it from the agent record
+    const authStep = steps.find(s => s.id === 'authenticate');
+    if (authStep) {
+      authStep.status = 'passed';
+      authStep.validatedAt = new Date().toISOString();
+      authStep.validationMethod = 'automatic';
+      authStep.details = { createdAt: agent.createdAt };
+    }
 
     const userAgent = req.headers['user-agent'];
     const detected = detectPlatform(userAgent as string | undefined);
-    if (detected) {
-      steps[1].status = 'passed';
-      steps[1].validatedAt = new Date().toISOString();
-      steps[1].validationMethod = 'automatic';
-      steps[1].details = { platform: detected.id, version: detected.version };
+    const platformStep = steps.find(s => s.id === 'identify_platform');
+    if (detected && platformStep) {
+      platformStep.status = 'passed';
+      platformStep.validatedAt = new Date().toISOString();
+      platformStep.validationMethod = 'automatic';
+      platformStep.details = { platform: detected.id, version: detected.version };
       await storage.updateAgent(agentGaii, {
         platform: detected.id,
         platformVersion: detected.version,
@@ -220,27 +225,31 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
       });
     }
 
-    const testTaskId = randomUUID();
-    const testTask = {
-      id: testTaskId,
-      agentGaii,
-      ownerGaii: `${req.auth!.owner}@${config.nodeId}`,
-      title: t(req, 'agentOnboarding.errors.testTaskTitle'),
-      description: t(req, 'agentOnboarding.errors.testTaskDescription'),
-      status: 'queued' as const,
-      scope: [],
-      rules: [],
-      todos: [],
-      verification: {
-        userExpects: 'Agent completes the onboarding test task successfully',
-        technicalChecks: [],
-      },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    await storage.createAgentTask(testTask);
-
-    steps[8].details = { testTaskId };
+    // Create a test task only when the agent's Hello Integration includes
+    // accept_test_task / complete_test_task (i.e. non-task-runner modes).
+    const acceptStep = steps.find(s => s.id === 'accept_test_task');
+    if (acceptStep) {
+      const testTaskId = randomUUID();
+      const testTask = {
+        id: testTaskId,
+        agentGaii,
+        ownerGaii: `${req.auth!.owner}@${config.nodeId}`,
+        title: t(req, 'agentOnboarding.errors.testTaskTitle'),
+        description: t(req, 'agentOnboarding.errors.testTaskDescription'),
+        status: 'queued' as const,
+        scope: [],
+        rules: [],
+        todos: [],
+        verification: {
+          userExpects: 'Agent completes the onboarding test task successfully',
+          technicalChecks: [],
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      await storage.createAgentTask(testTask);
+      acceptStep.details = { testTaskId };
+    }
 
     const existing = await storage.getOnboarding(agentGaii);
     const now = new Date().toISOString();

@@ -13,6 +13,11 @@
  *                            agents.{name}.commands and agents.config.{name}.*
  *                            memory). Closes the gap where agents skipped the
  *                            "After Onboarding" SKILL.md section.
+ *   v1.2.0 -- 2026-05-29 -- Mode-aware step lists: task-runner agents get a
+ *                            reduced 5-step flow (auth + platform + skill +
+ *                            capabilities + config) -- they have no interactive
+ *                            command surface, never send messages, and don't run
+ *                            test tasks. Other modes keep the full 13-step list.
  */
 
 import { z } from 'zod';
@@ -79,16 +84,48 @@ const STEP_DEFINITIONS: StepDefinition[] = [
   { id: 'declare_services', order: 13, title: 'Declare Services', description: STEP_DESCRIPTIONS.declare_services, required: false, validationMethod: 'api_call' },
 ];
 
-export function createDefaultSteps(): AgentOnboardingStep[] {
-  return STEP_DEFINITIONS.map(def => ({
-    id: def.id,
-    order: def.order,
-    title: def.title,
-    description: def.description,
-    status: 'pending' as const,
-    required: def.required,
-    validationMethod: def.validationMethod,
-  }));
+/**
+ * Steps included when a task-runner agent is onboarded. Task-runners have no
+ * interactive command surface, never send messages, never run test tasks, and
+ * don't declare services -- they just execute a configured subprocess when a
+ * task arrives. This reduced flow gates them on the bare minimum: authenticated,
+ * platform identified, skill bundle installed, capabilities reported, and
+ * runtime config published (so the owner can see what runner is configured).
+ */
+const TASK_RUNNER_STEP_IDS: ReadonlyArray<OnboardingStepId> = [
+  'authenticate',
+  'identify_platform',
+  'install_skill',
+  'report_capabilities',
+  'publish_config',
+];
+
+export type AgentMode = 'autonomous' | 'interactive' | 'task-runner' | 'coordinator';
+
+/**
+ * Build the Hello Integration step list for a new onboarding record. The
+ * `mode` parameter selects which subset of STEP_DEFINITIONS applies:
+ *
+ *   - 'task-runner'                       -> TASK_RUNNER_STEP_IDS (5 steps)
+ *   - 'autonomous' / 'interactive' /
+ *     'coordinator' / undefined (default) -> full 13-step list
+ *
+ * Order numbers are preserved from STEP_DEFINITIONS so the UI keeps a stable
+ * progression label even when steps are filtered out.
+ */
+export function createDefaultSteps(mode?: AgentMode): AgentOnboardingStep[] {
+  const allowed = mode === 'task-runner' ? new Set<OnboardingStepId>(TASK_RUNNER_STEP_IDS) : null;
+  return STEP_DEFINITIONS
+    .filter(def => !allowed || allowed.has(def.id))
+    .map(def => ({
+      id: def.id,
+      order: def.order,
+      title: def.title,
+      description: def.description,
+      status: 'pending' as const,
+      required: def.required,
+      validationMethod: def.validationMethod,
+    }));
 }
 
 export const IdentifyPlatformSchema = z.object({

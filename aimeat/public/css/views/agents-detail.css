@@ -1227,6 +1227,114 @@
   color: var(--success, #10b981);
 }
 
+/* Mode badge -- distinguishes how the agent is used (added 2026-05-29) */
+.pf .pf-agd-badge--mode {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.pf .pf-agd-badge--mode-autonomous {
+  background: var(--accent-subtle, rgba(139, 92, 246, 0.1));
+  color: var(--violet, #8B5CF6);
+}
+.pf .pf-agd-badge--mode-interactive {
+  background: var(--accent-subtle, rgba(59, 130, 246, 0.1));
+  color: var(--blue, #3B82F6);
+}
+.pf .pf-agd-badge--mode-task-runner {
+  background: var(--accent-subtle, rgba(245, 158, 11, 0.1));
+  color: var(--warn, #F59E0B);
+}
+.pf .pf-agd-badge--mode-coordinator {
+  background: var(--accent-subtle, rgba(16, 185, 129, 0.1));
+  color: var(--success, #10b981);
+}
+
+/* Tag chip strip on expanded card */
+.pf .pf-agd-tag-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem 0;
+}
+.pf .pf-agd-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 9999px;
+  background: var(--bg-dim, #F3F4F6);
+  color: var(--text-muted, #6B7280);
+  border: 1px solid var(--border, #E5E7EB);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pf .pf-agd-tag-chip--active {
+  background: var(--accent-subtle, rgba(59, 130, 246, 0.1));
+  color: var(--blue, #3B82F6);
+  border-color: var(--blue, #3B82F6);
+}
+
+/* Tag filter bar + group-by control */
+.pf .pf-agd-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border, #E5E7EB);
+}
+.pf .pf-agd-filter-tags,
+.pf .pf-agd-filter-groupby {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.pf .pf-agd-filter-label {
+  font-size: 0.8rem;
+  color: var(--text-muted, #6B7280);
+  font-weight: 500;
+}
+.pf .pf-agd-filter-select {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 4px;
+  background: var(--card-bg, #FFFFFF);
+  color: var(--text, #111827);
+}
+.pf .pf-agd-filter-clear {
+  background: none;
+  border: none;
+  color: var(--blue, #3B82F6);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0.15rem 0.3rem;
+}
+.pf .pf-agd-filter-clear:hover { text-decoration: underline; }
+
+.pf .pf-agd-group { margin-bottom: 1.25rem; }
+.pf .pf-agd-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px dashed var(--border, #E5E7EB);
+}
+.pf .pf-agd-group-count {
+  font-size: 0.8rem;
+  color: var(--text-muted, #6B7280);
+}
+.pf .pf-agd-group-untagged {
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--text-muted, #6B7280);
+}
+
 /* ── Expanded Card ── */
 
 .pf .pf-agd-expanded {

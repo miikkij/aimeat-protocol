@@ -26,6 +26,7 @@
  *   v3.0.8 -- 2026-05-28 -- State that Hello Integration is required first-run onboarding
  *   v3.0.9 -- 2026-05-28 -- Explain connector benefits and shared tag memory in agent prompts
  *   v3.1.0 -- 2026-05-28 -- Explain connector and fallback connection options before commands
+ *   v3.2.0 -- 2026-05-29 -- Tag filter bar + group-by toggle (none / tag / mode)
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -196,6 +197,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [connectExpanded, setConnectExpanded] = useState(false);
   const [pasteExpanded, setPasteExpanded] = useState(false);
   const [taskStatsMap, setTaskStatsMap] = useState({});
+  const [tagFilter, setTagFilter] = useState(new Set());
+  const [groupBy, setGroupBy] = useState('none'); // 'none' | 'tag' | 'mode'
 
   const markCopied = (action) => {
     setCopiedAction(action);
@@ -482,23 +485,21 @@ export default function AgentsTab({ session, showToast, onStats }) {
             });
           }}
         />
-        ${agents.map(a => html`
-          <div data-agent-name=${a.name}>
-          <${AgentCard}
-            key=${a.name}
-            agent=${{ ...a, taskStats: taskStatsMap[a.name] || null }}
-            onboarding=${onboardings[a.name]}
-            expanded=${expandedAgent === a.name}
-            onToggle=${toggleAgent}
-            session=${session}
-            showToast=${showToast}
-            allAgents=${agents}
-            onScopesClick=${(agent) => setScopesModal(agent)}
-            onDeleteClick=${handleDeleteAgent}
-            onFederateToggle=${toggleFederate}
-          />
-          </div>
-        `)}
+        ${renderFilterBar(agents, tagFilter, setTagFilter, groupBy, setGroupBy)}
+        ${renderAgentGroups({
+          agents,
+          tagFilter,
+          groupBy,
+          onboardings,
+          taskStatsMap,
+          expandedAgent,
+          toggleAgent,
+          session,
+          showToast,
+          setScopesModal,
+          handleDeleteAgent,
+          toggleFederate,
+        })}
       `
     }
 
@@ -509,6 +510,150 @@ export default function AgentsTab({ session, showToast, onStats }) {
       onCancel=${() => setScopesModal(null)} />`}
     <${ConfirmUI} />
   `;
+}
+
+const AGENT_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator'];
+
+function collectTags(agents) {
+  const set = new Set();
+  for (const a of agents) {
+    for (const tag of (a.tags ?? [])) set.add(tag);
+  }
+  return [...set].sort();
+}
+
+function renderFilterBar(agents, tagFilter, setTagFilter, groupBy, setGroupBy) {
+  const tags = collectTags(agents);
+  if (tags.length === 0 && groupBy === 'none') return null;
+
+  function toggleTag(tag) {
+    const next = new Set(tagFilter);
+    if (next.has(tag)) next.delete(tag);
+    else next.add(tag);
+    setTagFilter(next);
+  }
+
+  return html`
+    <div class="pf-agd-filter-bar">
+      ${tags.length > 0 && html`
+        <div class="pf-agd-filter-tags">
+          <span class="pf-agd-filter-label">${t('profile.agents.filter.byTag')}</span>
+          ${tags.map(tag => html`
+            <button key=${tag}
+                    class="pf-agd-tag-chip ${tagFilter.has(tag) ? 'pf-agd-tag-chip--active' : ''}"
+                    onClick=${() => toggleTag(tag)}>
+              ${tag}
+            </button>
+          `)}
+          ${tagFilter.size > 0 && html`
+            <button class="pf-agd-filter-clear" onClick=${() => setTagFilter(new Set())}>
+              ${t('profile.agents.filter.clear')}
+            </button>
+          `}
+        </div>
+      `}
+      <div class="pf-agd-filter-groupby">
+        <span class="pf-agd-filter-label">${t('profile.agents.filter.groupBy')}</span>
+        <select class="pf-agd-filter-select" value=${groupBy} onChange=${(e) => setGroupBy(e.target.value)}>
+          <option value="none">${t('profile.agents.filter.groupByNone')}</option>
+          <option value="tag">${t('profile.agents.filter.groupByTag')}</option>
+          <option value="mode">${t('profile.agents.filter.groupByMode')}</option>
+        </select>
+      </div>
+    </div>
+  `;
+}
+
+function renderAgentGroups({ agents, tagFilter, groupBy, onboardings, taskStatsMap, expandedAgent, toggleAgent, session, showToast, setScopesModal, handleDeleteAgent, toggleFederate }) {
+  // Tag filter: agent must have ALL selected tags (intersection)
+  const filtered = tagFilter.size === 0
+    ? agents
+    : agents.filter(a => {
+        const at = new Set(a.tags ?? []);
+        for (const want of tagFilter) if (!at.has(want)) return false;
+        return true;
+      });
+
+  if (filtered.length === 0) {
+    return html`<div class="empty">${t('profile.agents.filter.noMatches')}</div>`;
+  }
+
+  const renderCard = (a) => html`
+    <div data-agent-name=${a.name} key=${a.name}>
+      <${AgentCard}
+        agent=${{ ...a, taskStats: taskStatsMap[a.name] || null }}
+        onboarding=${onboardings[a.name]}
+        expanded=${expandedAgent === a.name}
+        onToggle=${toggleAgent}
+        session=${session}
+        showToast=${showToast}
+        allAgents=${agents}
+        onScopesClick=${(agent) => setScopesModal(agent)}
+        onDeleteClick=${handleDeleteAgent}
+        onFederateToggle=${toggleFederate}
+      />
+    </div>
+  `;
+
+  if (groupBy === 'none') {
+    return filtered.map(renderCard);
+  }
+
+  if (groupBy === 'mode') {
+    const byMode = new Map();
+    for (const a of filtered) {
+      const m = a.mode || 'interactive';
+      if (!byMode.has(m)) byMode.set(m, []);
+      byMode.get(m).push(a);
+    }
+    const order = AGENT_MODES.filter(m => byMode.has(m));
+    return order.map(mode => html`
+      <div class="pf-agd-group" key=${'mode-' + mode}>
+        <div class="pf-agd-group-header">
+          <span class="pf-agd-badge pf-agd-badge--mode pf-agd-badge--mode-${mode}">${t('profile.agents.mode.' + mode) || mode}</span>
+          <span class="pf-agd-group-count">${byMode.get(mode).length}</span>
+        </div>
+        ${byMode.get(mode).map(renderCard)}
+      </div>
+    `);
+  }
+
+  // groupBy === 'tag' -- an agent appears under every tag it carries; untagged agents grouped at end
+  const byTag = new Map();
+  const untagged = [];
+  for (const a of filtered) {
+    const ts = a.tags ?? [];
+    if (ts.length === 0) {
+      untagged.push(a);
+    } else {
+      for (const tag of ts) {
+        if (!byTag.has(tag)) byTag.set(tag, []);
+        byTag.get(tag).push(a);
+      }
+    }
+  }
+  const sortedTags = [...byTag.keys()].sort();
+  const sections = sortedTags.map(tag => html`
+    <div class="pf-agd-group" key=${'tag-' + tag}>
+      <div class="pf-agd-group-header">
+        <span class="pf-agd-tag-chip">${tag}</span>
+        <span class="pf-agd-group-count">${byTag.get(tag).length}</span>
+      </div>
+      ${byTag.get(tag).map(renderCard)}
+    </div>
+  `);
+  if (untagged.length > 0) {
+    sections.push(html`
+      <div class="pf-agd-group" key="tag-untagged">
+        <div class="pf-agd-group-header">
+          <span class="pf-agd-group-untagged">${t('profile.agents.filter.untagged')}</span>
+          <span class="pf-agd-group-count">${untagged.length}</span>
+        </div>
+        ${untagged.map(renderCard)}
+      </div>
+    `);
+  }
+  return sections;
 }
 
 function ScopesModal({ agent, session, onSave, onCancel }) {

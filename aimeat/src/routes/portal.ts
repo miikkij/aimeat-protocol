@@ -18,12 +18,18 @@
  *   v1.2.1 — 2026-03-14 — Marketplace route renamed to app-store
  *   v1.3.0 -- 2026-05-29 -- Add /v1/privacy (en) and /v1/privacy/fi (fi) routes serving
  *     static privacy policy pages for Connectors Directory submission compliance.
+ *   v1.4.0 -- 2026-05-29 -- Add /v1/connect (en) and /v1/connect/fi (fi) routes serving
+ *     the MCP attach page (one-click setup + 4 example prompts + technical details).
+ *   v1.5.0 -- 2026-05-29 -- Privacy pages now template-substitute AIMEAT_OPERATOR_*
+ *     env vars and fail-loud (503) if required fields are missing. Lets self-hosters
+ *     identify themselves as the GDPR controller without forking the HTML.
  */
 import { Router } from 'express';
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
+import { missingOperatorConfig, operatorTypeLabel } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
@@ -31,6 +37,75 @@ import { substituteVariables, resolvePromptContent } from '../services/prompt-va
 import { PROMPT_SEEDS } from '../services/prompt-defaults.js';
 // i18n imports removed — SPA handles translations client-side
 import { buildStandaloneSnippetJs } from '../middleware/cookie-consent.js';
+
+/**
+ * Returns a Record<placeholder, value> for the templated static pages
+ * (`privacy*.html`, `connect*.html`). Placeholders are `{{var}}` tokens
+ * inside the HTML. Locale picks the natural-language operator type label
+ * ("a natural person" / "luonnollinen henkilö" / ...).
+ *
+ * Includes:
+ *  - nodeName / nodeUrl / nodeId -- this node's identity
+ *  - mcpUrl -- the public Streamable HTTP MCP endpoint
+ *  - cursorDeeplinkConfig -- base64 of `{"url": mcpUrl}` for the
+ *    `cursor://anysphere.cursor-deeplink/mcp/install?config=...` button
+ *    on the connect page
+ *  - operator* -- privacy-page legal fields from `config.operator`
+ */
+function templateVars(config: AimeatConfig, locale: 'en' | 'fi'): Record<string, string> {
+  // Derive nodeName from baseUrl host (e.g. "https://aimeat.io" -> "aimeat.io").
+  let nodeName = config.nodeId;
+  try { nodeName = new URL(config.baseUrl).host; } catch { /* keep nodeId fallback */ }
+
+  const mcpUrl = `${config.baseUrl}/v1/mcp`;
+  const cursorDeeplinkConfig = Buffer.from(JSON.stringify({ url: mcpUrl })).toString('base64');
+
+  return {
+    nodeName,
+    nodeUrl: config.baseUrl,
+    nodeId: config.nodeId,
+    mcpUrl,
+    cursorDeeplinkConfig,
+    operatorName: config.operator.name,
+    operatorTypeLabel: operatorTypeLabel(config.operator.type, locale),
+    operatorAddress: config.operator.address,
+    operatorCountry: config.operator.country,
+    operatorEmail: config.operator.email,
+    operatorSecurityEmail: config.operator.securityEmail || config.operator.email,
+    hostingName: config.operator.hostingName,
+    hostingUrl: config.operator.hostingUrl,
+    hostingLocation: config.operator.hostingLocation,
+    supervisoryName: config.operator.supervisoryName,
+    supervisoryUrl: config.operator.supervisoryUrl,
+    effectiveDate: config.operator.effectiveDate,
+    policyVersion: config.operator.policyVersion,
+  };
+}
+
+/**
+ * Render a 503 "Privacy policy not configured" fallback page when the
+ * operator has not filled in the required env vars. Aimed at the operator,
+ * not the end user -- it tells them which AIMEAT_OPERATOR_* fields to set.
+ */
+function renderPrivacyNotConfiguredPage(missing: string[], locale: 'en' | 'fi'): string {
+  const envVars = missing.map(field => {
+    const upper = field.replace(/[A-Z]/g, c => '_' + c).toUpperCase();
+    return `AIMEAT_OPERATOR_${upper}`;
+  });
+  const title = locale === 'fi' ? 'Tietosuojaseloste ei ole konfiguroitu' : 'Privacy policy not configured';
+  const body = locale === 'fi'
+    ? `<p>Tämän AIMEAT-solmun ylläpitäjä ei ole määrittänyt vaadittuja tietosuojaselosteen kenttiä. Älä tallenna henkilötietoja tälle solmulle ennen kuin ylläpitäjä on korjannut tämän.</p>
+       <p><strong>Ylläpitäjälle:</strong> aseta seuraavat ympäristömuuttujat ja käynnistä solmu uudelleen. Tarkemmat tiedot: <a href="https://github.com/miikkij/aimeat-protocol/blob/main/aimeat/.env.example"><code>.env.example</code></a>.</p>`
+    : `<p>The operator of this AIMEAT node has not filled in the required privacy policy fields. Do not store personal data on this node until the operator has fixed this.</p>
+       <p><strong>For the operator:</strong> set the environment variables below and restart the node. Details in <a href="https://github.com/miikkij/aimeat-protocol/blob/main/aimeat/.env.example"><code>.env.example</code></a>.</p>`;
+  return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8"><title>${title}</title>
+    <style>body{font-family:system-ui,sans-serif;max-width:680px;margin:60px auto;padding:0 24px;line-height:1.6;color:#1a1a18}
+    h1{font-size:24px;margin-bottom:16px}pre{background:#f4f4f0;padding:14px 16px;border-radius:6px;font-size:13px;overflow-x:auto}
+    .warn{background:#fff5f4;border-left:3px solid #E8564A;padding:12px 16px;border-radius:4px;margin:18px 0}</style>
+    </head><body><h1>${title}</h1><div class="warn">${body}</div>
+    <pre>${envVars.join('\n')}</pre>
+    </body></html>`;
+}
 
 const __dirname_portal = dirname(fileURLToPath(import.meta.url));
 
@@ -413,25 +488,56 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     }
   });
 
-  // Privacy policy pages — standalone static HTML (not SPA).
-  // Required by the Anthropic Connectors Directory; missing/incomplete privacy
-  // policies cause immediate rejection of directory submissions.
-  const servePrivacyPage = (filename: string) => (_req: import('express').Request, res: import('express').Response) => {
+  // Reusable helper for serving static HTML pages from public/ with CSP nonce
+  // injection. Used for privacy policy, connect/MCP docs, and other public-
+  // facing static pages required by the Anthropic Connectors Directory.
+  //
+  // For privacy pages specifically: if any required AIMEAT_OPERATOR_* env
+  // var is missing, the helper returns 503 with an operator-facing fallback
+  // page that lists the missing fields. This is intentional fail-loud so a
+  // self-hoster cannot accidentally ship a partly-filled-in policy that
+  // still names the upstream author. See `missingOperatorConfig()` in
+  // `src/config.ts` for the validation rule.
+  const serveStaticPage = (filename: string) => (_req: import('express').Request, res: import('express').Response) => {
     const htmlPath = resolvePublicFile(filename);
-    if (htmlPath) {
-      let html = readFileSync(htmlPath, 'utf-8');
-      const nonce = res.locals.cspNonce as string || '';
-      if (nonce) {
-        html = html.replace(/<script(?=[ >])/g, `<script nonce="${nonce}"`);
-        html = html.replace(/<style(?=[ >])/g, `<style nonce="${nonce}"`);
-      }
-      res.type('text/html').send(html);
-    } else {
-      res.status(404).type('text/plain').send('Privacy policy page not found');
+    if (!htmlPath) {
+      res.status(404).type('text/plain').send('Page not found');
+      return;
     }
+    const isPrivacyPage = filename.startsWith('privacy');
+    const isConnectPage = filename.startsWith('connect');
+    const locale: 'en' | 'fi' = filename.endsWith('.fi.html') ? 'fi' : 'en';
+
+    if (isPrivacyPage) {
+      const missing = missingOperatorConfig(config.operator);
+      if (missing.length > 0) {
+        res.status(503).type('text/html').send(renderPrivacyNotConfiguredPage(missing, locale));
+        return;
+      }
+    }
+
+    let html = readFileSync(htmlPath, 'utf-8');
+
+    if (isPrivacyPage || isConnectPage) {
+      const vars = templateVars(config, locale);
+      html = html.replace(/\{\{(\w+)\}\}/g, (_match, key: string) => vars[key] ?? `{{${key}}}`);
+    }
+
+    const nonce = res.locals.cspNonce as string || '';
+    if (nonce) {
+      html = html.replace(/<script(?=[ >])/g, `<script nonce="${nonce}"`);
+      html = html.replace(/<style(?=[ >])/g, `<style nonce="${nonce}"`);
+    }
+    res.type('text/html').send(html);
   };
-  router.get('/v1/privacy', servePrivacyPage('privacy.html'));
-  router.get('/v1/privacy/fi', servePrivacyPage('privacy.fi.html'));
+  router.get('/v1/privacy', serveStaticPage('privacy.html'));
+  router.get('/v1/privacy/fi', serveStaticPage('privacy.fi.html'));
+
+  // Connect / MCP attach page — standalone static HTML. Public-facing docs
+  // required by the Anthropic Connectors Directory (3+ example prompts +
+  // attach instructions for major MCP-aware clients).
+  router.get('/v1/connect', serveStaticPage('connect.html'));
+  router.get('/v1/connect/fi', serveStaticPage('connect.fi.html'));
 
   // Encrypted chat example app — standalone HTML (not SPA)
   router.get('/v1/echat', (_req, res) => {

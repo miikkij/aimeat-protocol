@@ -45,6 +45,15 @@ Owner ("alice")
     └── cursor#alice@node (roles: ['agent'], scopes: ['memory:read'])
 ```
 
+**Agent mode** — every agent carries one of four modes that classifies how it is used and what Hello Integration steps apply:
+
+- `autonomous` — runs continuously (Hermes, OpenClaw). Full 13-step Hello Integration.
+- `interactive` — chat/IDE session (Claude Code, Cursor, Cline). Full 13-step Hello Integration. **Default for backward compatibility** when mode is omitted.
+- `task-runner` — triggered, runs one task, exits (CrewAI crews). **Reduced 5-step Hello Integration** (auth + platform + skill + capabilities + config). No interactive commands, no test task, no telemetry/message steps.
+- `coordinator` — orchestrates other agents (Claude Desktop, LangGraph supervisor). Treated as `interactive` for onboarding.
+
+Mode is set at `POST /v1/agents/device-authorize` and can be changed later via `PATCH /v1/agents/:name/mode` (owner-only). It is independent of `tags` (owner-managed grouping labels) — see [agent-tags.md](agent-tags.md).
+
 ### Morsels — Value Tokens
 
 Non-cryptocurrency internal tokens used for:

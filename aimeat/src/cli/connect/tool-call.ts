@@ -221,6 +221,36 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
         })}`),
     },
     {
+        name: 'aimeat_agent_tags_set',
+        description: "Owner-only. Replace the tag list on an agent. Convention: 'crew:<name>', 'source:<name>', 'role:<name>', 'project:<name>'.",
+        input: {
+            target_agent_name: { type: 'string', description: 'Agent whose tags to update.' },
+            tags: { type: 'array', description: 'Replacement tag list. Empty array clears all tags. Max 20.' },
+        },
+        handler: ({ client }, input) => {
+            const target = optionalString(input, 'target_agent_name');
+            if (!target) throw new Error('target_agent_name is required');
+            return client.patch(`/v1/agents/${encodeURIComponent(target)}/tags`, {
+                tags: optionalArray(input, 'tags') ?? [],
+            });
+        },
+    },
+    {
+        name: 'aimeat_agent_mode_set',
+        description: "Owner-only. Set an agent's operational mode. Modes: 'autonomous', 'interactive', 'task-runner' (reduced 5-step Hello Integration), 'coordinator'.",
+        input: {
+            target_agent_name: { type: 'string', description: 'Agent whose mode to update.' },
+            mode: { type: 'string', enum: ['autonomous', 'interactive', 'task-runner', 'coordinator'], description: 'New mode.' },
+        },
+        handler: ({ client }, input) => {
+            const target = optionalString(input, 'target_agent_name');
+            const mode = optionalString(input, 'mode');
+            if (!target) throw new Error('target_agent_name is required');
+            if (!mode) throw new Error('mode is required');
+            return client.patch(`/v1/agents/${encodeURIComponent(target)}/mode`, { mode });
+        },
+    },
+    {
         name: 'aimeat_agent_telemetry_report',
         description: 'Report agent telemetry to the node.',
         input: {

@@ -854,6 +854,108 @@ await test('37. Auto-check does not re-validate already-passed steps', async () 
     }
 });
 
+// ─── Task-runner mode: reduced 5-step Hello Integration ───
+const runnerName = 'onboard-runner';
+let runnerGaii = '';
+let runnerToken = '';
+let runnerPrivKey = '';
+
+await test('38. Create task-runner agent with mode=task-runner', async () => {
+    const { status, body } = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            name: runnerName,
+            owner: ownerName,
+            capabilities: ['memory'],
+            mode: 'task-runner',
+        }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    runnerGaii = body.data.agent.gaii;
+    runnerPrivKey = body.data.private_key;
+    runnerToken = await getToken(runnerGaii, runnerPrivKey, true);
+});
+
+await test('39. Task-runner mode is persisted across reads', async () => {
+    const { status, body } = await json('/v1/agents', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const runner = body.data.agents.find((a: any) => a.name === runnerName);
+    assert(runner, 'task-runner agent missing from list');
+    assert(runner.mode === 'task-runner', `expected mode=task-runner, got ${runner.mode}`);
+});
+
+await test('40. Task-runner onboarding has exactly 5 steps (reduced flow)', async () => {
+    const { status, body } = await json(`/v1/agents/${runnerName}/onboarding/start`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const steps = body.data.onboarding.steps;
+    assert(steps.length === 5, `expected 5 steps, got ${steps.length} (${steps.map((s: any) => s.id).join(',')})`);
+
+    const expectedIds = ['authenticate', 'identify_platform', 'install_skill', 'report_capabilities', 'publish_config'];
+    for (const id of expectedIds) {
+        assert(steps.find((s: any) => s.id === id), `missing expected step: ${id}`);
+    }
+    // None of the omitted steps should appear
+    const omitted = ['accept_test_task', 'complete_test_task', 'send_test_message', 'configure_delivery', 'report_telemetry', 'publish_commands', 'declare_services', 'read_directives'];
+    for (const id of omitted) {
+        assert(!steps.find((s: any) => s.id === id), `task-runner should not have step: ${id}`);
+    }
+});
+
+await test('41. Task-runner auto-completes onboarding when all 5 steps pass', async () => {
+    // identify_platform + install_skill require step confirmation (api_call validation)
+    for (const [stepId, payload] of [
+        ['identify_platform', { platform: 'crewai', platform_version: '0.1' }],
+        ['install_skill', { version: 'v2', platform: 'crewai' }],
+    ] as [string, Record<string, unknown>][]) {
+        const { status, body } = await json(`/v1/agents/${runnerName}/onboarding/step/${stepId}`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${runnerToken}` },
+            body: JSON.stringify(payload),
+        });
+        assert(status === 200, `step ${stepId}: status ${status}: ${JSON.stringify(body)}`);
+    }
+
+    // report_capabilities + publish_config get auto-validated when underlying state exists
+    const { status: capStatus } = await json(`/v1/agents/${runnerName}/capabilities`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${runnerToken}` },
+        body: JSON.stringify({
+            technical: [{ name: 'task_execution', type: 'tool' }],
+            domain: ['marketing'],
+        }),
+    });
+    assert(capStatus === 200, `PUT capabilities failed: ${capStatus}`);
+
+    // publish_config: write agents.config.<name>.runtime memory
+    const { status: memStatus, body: memBody } = await json(`/v1/memory`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${runnerToken}` },
+        body: JSON.stringify({
+            key: `agents.config.${runnerName}.runtime`,
+            value: { runner: 'crewai', cwd: '/tmp/crew' },
+            visibility: 'owner',
+        }),
+    });
+    assert(memStatus === 200 || memStatus === 201, `POST publish_config memory failed: ${memStatus}: ${JSON.stringify(memBody)}`);
+
+    // GET triggers auto-check -- all 5 should be passed and overall status completed
+    const { status, body } = await json(`/v1/agents/${runnerName}/onboarding`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `GET onboarding status ${status}: ${JSON.stringify(body)}`);
+    const ob = body.data.onboarding;
+    for (const step of ob.steps) {
+        assert(step.status === 'passed', `task-runner step ${step.id} should be passed, got ${step.status}`);
+    }
+    assert(ob.status === 'completed', `expected completed, got ${ob.status}`);
+});
+
 // ─── Summary ───
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
 if (failed > 0) process.exit(1);

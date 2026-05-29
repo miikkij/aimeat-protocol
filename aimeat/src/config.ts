@@ -1,3 +1,22 @@
+/**
+ * @file config.ts
+ * @description Central AimeatConfig type and loadConfig() entry point. Reads
+ *   env vars + optional file source + CLI overrides into a single config
+ *   object consumed by every module. Also defines OperatorConfig (privacy
+ *   policy fields rendered into /v1/privacy) and helpers missingOperatorConfig
+ *   / operatorTypeLabel used by the portal router to fail loud when the
+ *   operator has not identified themselves.
+ * @structure
+ *   - AimeatConfig (interface)
+ *   - OperatorConfig (interface) + OperatorType (union)
+ *   - LoadConfigOptions / LoadConfigResult
+ *   - loadConfig() (function)
+ *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
+ * @version-history
+ *   v1.0.0 -- pre-2026-05 -- Initial central config module
+ *   v1.1.0 -- 2026-05-29 -- Add OperatorConfig section + helpers. Required for
+ *     privacy policy template substitution per CLAUDE.md self-host architecture.
+ */
 import { loadFileSource } from './services/config-loader.js';
 import { CONFIG_FIELDS, DOT_PATH_TO_ENV, MUTABLE_CONFIG_MAP, parseConfigValue, isImmutable } from './services/config-schema.js';
 import type { ConfigProvenance } from './services/config-provenance.js';
@@ -51,6 +70,45 @@ export interface RateLimitsConfig {
 
 export type NodeType = 'full' | 'relay' | 'mirror' | 'personal';
 export type FederationRole = 'operator' | 'contributor' | 'standalone';
+
+/**
+ * Operator info rendered into the public privacy policy at `/v1/privacy`.
+ * AIMEAT is open-source self-hostable -- every node operator becomes the
+ * data controller for their node and MUST identify themselves on the policy.
+ * Defaults are deliberately empty so unconfigured deployments fail loudly
+ * (503 on the privacy page) rather than silently shipping the upstream
+ * author's information.
+ */
+export type OperatorType = 'natural_person' | 'company' | 'organisation' | 'association';
+
+export interface OperatorConfig {
+  /** Legal name of the controller (person or org). */
+  name: string;
+  /** Controller type. Drives display strings ("a natural person" / "a company" ...). */
+  type: OperatorType;
+  /** Postal address. GDPR requires a contact address for the controller. */
+  address: string;
+  /** Country of operation (e.g. "Finland"). Used in international-transfers section. */
+  country: string;
+  /** Primary privacy contact email. */
+  email: string;
+  /** Security contact email. Falls back to `email` when empty. */
+  securityEmail: string;
+  /** Hosting provider name (e.g. "Scaleway SAS"). */
+  hostingName: string;
+  /** Optional URL of the hosting provider for the privacy-page link. */
+  hostingUrl: string;
+  /** Hosting jurisdiction (e.g. "France (EU/EEA)"). */
+  hostingLocation: string;
+  /** Name of the national data-protection supervisory authority. */
+  supervisoryName: string;
+  /** URL of the supervisory authority (e.g. https://tietosuoja.fi). */
+  supervisoryUrl: string;
+  /** Effective date of the privacy policy (YYYY-MM-DD). */
+  effectiveDate: string;
+  /** Privacy policy version string. */
+  policyVersion: string;
+}
 
 export interface AimeatConfig {
   port: number;
@@ -345,6 +403,13 @@ export interface AimeatConfig {
   agentMaxTokensPerTask: number;
   agentMandatoryLogging: boolean;
   agentAimeatFirstEnabled: boolean;
+
+  // Operator info (rendered into the public privacy policy page).
+  // Required by GDPR for any node serving EU users. If a required
+  // field is missing, the privacy page returns 503 "Privacy not
+  // configured" so the operator is forced to fill it in before going
+  // public. See `requireOperatorConfig()` for the validation rule.
+  operator: OperatorConfig;
 
   // CORS
   corsAllowedOrigins: string[];
@@ -692,6 +757,22 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
 
     corsAllowedOrigins: (process.env.AIMEAT_CORS_ALLOWED_ORIGINS ?? '*').split(',').map(s => s.trim()).filter(Boolean),
 
+    operator: {
+      name: process.env.AIMEAT_OPERATOR_NAME ?? '',
+      type: (process.env.AIMEAT_OPERATOR_TYPE as OperatorType) ?? 'natural_person',
+      address: process.env.AIMEAT_OPERATOR_ADDRESS ?? '',
+      country: process.env.AIMEAT_OPERATOR_COUNTRY ?? '',
+      email: process.env.AIMEAT_OPERATOR_EMAIL ?? '',
+      securityEmail: process.env.AIMEAT_OPERATOR_SECURITY_EMAIL ?? '',
+      hostingName: process.env.AIMEAT_OPERATOR_HOSTING_NAME ?? '',
+      hostingUrl: process.env.AIMEAT_OPERATOR_HOSTING_URL ?? '',
+      hostingLocation: process.env.AIMEAT_OPERATOR_HOSTING_LOCATION ?? '',
+      supervisoryName: process.env.AIMEAT_OPERATOR_SUPERVISORY_NAME ?? '',
+      supervisoryUrl: process.env.AIMEAT_OPERATOR_SUPERVISORY_URL ?? '',
+      effectiveDate: process.env.AIMEAT_OPERATOR_EFFECTIVE_DATE ?? '',
+      policyVersion: process.env.AIMEAT_OPERATOR_POLICY_VERSION ?? '1.0',
+    },
+
     // Consul
     consulEnabled: process.env.AIMEAT_CONSUL_ENABLED === 'true',
     consulUrl: process.env.AIMEAT_CONSUL_URL ?? 'http://localhost:8500',
@@ -801,4 +882,45 @@ export async function applyConfigOverrides(
 
   if (applied.length > 0) provenance.markDatabase(applied);
   return { applied, skipped };
+}
+
+/**
+ * Required operator fields that MUST be set for the privacy page to be
+ * served publicly. Returns the list of missing field names, or an empty
+ * array if everything is in place.
+ *
+ * Used by the `/v1/privacy` route handler in `src/routes/portal.ts` to
+ * return 503 instead of silently shipping a partly-filled-in policy.
+ *
+ * Required because every running AIMEAT node identifies the operator as
+ * the GDPR data controller. AIMEAT is self-hostable open source; nodes
+ * must not ship the upstream author's name and address as a default.
+ */
+export function missingOperatorConfig(operator: OperatorConfig): string[] {
+  const required: Array<keyof OperatorConfig> = [
+    'name',
+    'address',
+    'country',
+    'email',
+    'hostingName',
+    'hostingLocation',
+    'supervisoryName',
+    'supervisoryUrl',
+    'effectiveDate',
+  ];
+  return required.filter(key => !operator[key] || operator[key].trim() === '');
+}
+
+/**
+ * Human-readable label for the operator type, used in the privacy policy
+ * Controller section ("Controller: X, a natural person").
+ */
+export function operatorTypeLabel(type: OperatorType, locale: 'en' | 'fi' = 'en'): string {
+  const labels: Record<OperatorType, { en: string; fi: string }> = {
+    natural_person: { en: 'a natural person', fi: 'luonnollinen henkilö' },
+    company: { en: 'a company', fi: 'yritys' },
+    organisation: { en: 'an organisation', fi: 'organisaatio' },
+    association: { en: 'an association', fi: 'yhdistys' },
+  };
+  return labels[type][locale];
 }

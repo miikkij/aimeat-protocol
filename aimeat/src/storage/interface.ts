@@ -48,8 +48,16 @@ export interface AgentRecord {
   platform?: string;
   platformVersion?: string;
   platformDetectedBy?: 'auto' | 'self_report' | 'message_reply';
-  // Tags for inter-agent data sharing
+  // Tags for inter-agent data sharing + UI grouping (crew:*, source:*, role:*, project:*)
   tags?: string[];
+  /**
+   * Agent operational mode. Affects how Hello Integration is gated:
+   * - `autonomous`  : runs continuously, full 13-step Hello Integration
+   * - `interactive` : responds to user requests, full 13-step Hello Integration (default)
+   * - `task-runner` : triggered/ephemeral, reduced 5-step flow (no commands, no messages, no test task)
+   * - `coordinator`: orchestrates other agents, treated like `interactive` for onboarding
+   */
+  mode?: 'autonomous' | 'interactive' | 'task-runner' | 'coordinator';
 }
 
 export interface MemoryRecord {
@@ -191,6 +199,8 @@ export interface DeviceAuthorizationRecord {
   lastPolledAt?: string;
   pollInterval: number;
   approvedBy?: string;
+  /** Optional agent mode the requesting agent declared at device-authorize time. */
+  mode?: 'autonomous' | 'interactive' | 'task-runner' | 'coordinator';
   agentCredentials?: {
     gaii: string;
     privateKey: string;

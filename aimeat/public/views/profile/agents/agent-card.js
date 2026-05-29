@@ -7,6 +7,7 @@
  *   v1.1.0 -- 2026-05-24 -- Fix C6: remove GAII from Zone 1, M1: add Next prefix, C1: production stats, C2: problem action buttons
  *   v1.3.0 -- 2026-05-24 -- Audit fix: use proper down arrow glyph for collapse icon
  *   v1.2.0 -- 2026-05-24 -- Add idle state handling, tokens today display, combined delivery label
+ *   v1.4.0 -- 2026-05-29 -- Add agent mode badge + dedicated tag chip strip
  */
 
 import { h } from 'preact';
@@ -62,6 +63,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
           <span class="pf-agd-collapsed-icon">🤖</span>
           <span class="pf-agd-collapsed-name">${agent.display_name || agent.name}</span>
           <div class="pf-agd-collapsed-badges">
+            ${renderModeBadge(agent)}
             ${renderPlatformBadge(onboarding)}
             ${renderReadinessBadge(state, onboarding)}
             ${agent.federate && html`<span class="pf-agd-badge pf-agd-badge--federation">${t('profile.federated')}</span>`}
@@ -85,6 +87,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
             <span class="pf-agd-zone1-name">${agent.display_name || agent.name}</span>
           </div>
           <div class="pf-agd-zone1-badges">
+            ${renderModeBadge(agent)}
             ${renderPlatformBadge(onboarding)}
             ${renderReadinessBadge(state, onboarding)}
             ${agent.federate && html`<span class="pf-agd-badge pf-agd-badge--federation">${t('profile.federated')}</span>`}
@@ -93,6 +96,9 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
             ${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''}
           </span>
         </div>
+
+        <!-- Tags -->
+        ${renderTagStrip(agent)}
 
         <!-- Capabilities -->
         ${(agent.technical_capabilities?.length > 0 || agent.domain_capabilities?.length > 0 || agent.languages?.length > 0) && html`
@@ -280,7 +286,6 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
     case 'idle':
     case 'production':
     default: {
-      const tags = agent.tags ?? [];
       const hasWebhook = agent.webhookUrl || agent.webhook_url;
       const hasMcp = agent.mcpEnabled || agent.mcp_enabled;
       let deliveryLabel;
@@ -296,12 +301,27 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
             ${agent.last_seen ? html`<span>${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}</span>` : ''}
             ${stats && (stats.done || stats.active) ? html`<span>${t('profile.agents.detail.today')}: ${stats.done || 0} ${t('profile.agents.detail.done')}${stats.active ? `, ${stats.active} ${t('profile.agents.detail.active')}` : ''}</span>` : ''}
             ${agent.tokensUsedToday != null ? html`<span>${t('profile.agents.detail.tokensToday')}: ${agent.tokensUsedToday.toLocaleString()}</span>` : ''}
-            ${tags.length > 0 ? html`<span>${t('profile.agents.detail.sharedTags')}: ${tags.map(tag => `[${tag}]`).join(' ')}</span>` : ''}
           </div>
         </div>
       `;
     }
   }
+}
+
+function renderModeBadge(agent) {
+  const mode = agent.mode || 'interactive';
+  const label = t(`profile.agents.mode.${mode}`) || mode;
+  return html`<span class="pf-agd-badge pf-agd-badge--mode pf-agd-badge--mode-${mode}" title=${t('profile.agents.mode.tooltip') || ''}>${label}</span>`;
+}
+
+function renderTagStrip(agent) {
+  const tags = agent.tags ?? [];
+  if (tags.length === 0) return null;
+  return html`
+    <div class="pf-agd-tag-strip">
+      ${tags.map(tag => html`<span key=${tag} class="pf-agd-tag-chip">${tag}</span>`)}
+    </div>
+  `;
 }
 
 function ProblemZone2({ agent, setActiveTab, showToast }) {

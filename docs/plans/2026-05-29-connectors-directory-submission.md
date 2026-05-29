@@ -211,33 +211,38 @@ Hint legend per [MCP spec ToolAnnotations](https://modelcontextprotocol.io/speci
 - `aimeat_action_execute`, `aimeat_capabilities_invoke`, `aimeat_extension_invoke` get `openWorldHint: true` because they dispatch to third-party or sandboxed extension code whose effects we can't bound.
 - "false / —" pattern: when `readOnlyHint: true`, the other three hints are ignored per spec — emit as `undefined` in the annotations object to avoid noise.
 
-### B. Privacy policy
+### B. Privacy policy — DONE (template-driven, env-configured)
 
 Anthropic requires a privacy policy URL. **Missing or incomplete = immediate rejection** per [submission docs](https://claude.com/docs/connectors/building/submission).
 
-Required coverage: data collection practices, usage and storage, third-party sharing, data retention, contact info.
+- [x] **B.1** Format chosen: static HTML at `aimeat/public/privacy.html` (EN) and `privacy.fi.html` (FI), served at `/v1/privacy` and `/v1/privacy/fi`. Both files are **templates** with `{{placeholder}}` tokens substituted per-request from operator config — every AIMEAT node operator fills in their own info via `AIMEAT_OPERATOR_*` env vars. **No hardcoded operator identity in the repo.**
+- [x] **B.2** Privacy policy drafted covering all required sections: controller, data categories, legal bases, recipients, sub-processors, international transfers, retention, cookies, GDPR rights with Data Wallet links, security, children, self-hosting, changes, contact. Voice is neutral third-person ("the operator") so the template works for any node. Genesis-network framing kept as protocol-level content; aimeat.io-specific personality is not in the template.
+- [x] **B.3** `https://aimeat.io/v1/privacy` and `/v1/privacy/fi` serve over HTTPS via Scaleway + nginx.
+- [x] **B.4** Privacy policy linked from `connect.html` (in the "data handling" details section) and from the directory submission form (field G.20).
+- [x] **B.5** Operator config: 13 env vars (`AIMEAT_OPERATOR_*`) cover legal name, type, postal address, country, email, security email, hosting provider name/url/location, supervisory authority name/url, effective date, policy version. Required fields: name, address, country, email, hostingName, hostingLocation, supervisoryName, supervisoryUrl, effectiveDate. Optional with defaults: type (natural_person), securityEmail (falls back to email), hostingUrl (no link), policyVersion (1.0).
+- [x] **B.6** Fail-loud behavior: if any required `AIMEAT_OPERATOR_*` is missing, `/v1/privacy` returns **HTTP 503** with an operator-facing fallback page listing the missing env vars + linking to `.env.example`. This prevents self-hosters from silently shipping a half-configured policy. Implementation: `missingOperatorConfig()` in `src/config.ts`, wired into `serveStaticPage` in `src/routes/portal.ts`.
+- [x] **B.7** `.env.example` documents all `AIMEAT_OPERATOR_*` vars in a clearly labelled REQUIRED/OPTIONAL block.
+- [x] **B.8** Updated `aimeat init` CLI wizard with `askOperatorSettings()` — 13 prompts covering name/type/address/country/email/security email/hosting (name, url, location)/supervisory authority (name, url)/effective date. Skipped for `dev` use case; ask-with-confirm for `personal`; required for `public`/`custom`. Translations added to `locales/en.json` + `fi.json` under `init.operator*` keys.
+- [x] **B.9** Templated `connect.html` + `connect.fi.html` so self-hosters get their own MCP endpoint URL, Cursor deeplink (base64-config server-rendered), node name + node ID embedded. The same `templateVars()` in `src/routes/portal.ts` feeds both privacy and connect pages.
 
-- [ ] **B.1** Decide format: static `public/privacy.html` page served at `/v1/privacy` (matches the post-SSR-removal pattern documented in `CLAUDE.md`), OR a markdown page rendered through SPA.
-- [ ] **B.2** Draft privacy policy covering: morsel ledger transactions, GHII/GAII identity, memory storage (durable vs. ephemeral), consent records, federation peer data sharing, OAuth client persistence, web push subscriptions, third-party AI inference (none on-server but disclose), GDPR data export/delete via Data Wallet tab. Reference existing GDPR plumbing in `aimeat/src/routes/profile.ts` and `public/views/profile/data-wallet-tab.js`.
-- [ ] **B.3** Verify URL is HTTPS and stays HTTPS (not http-redirect).
-- [ ] **B.4** Link the privacy policy from the AIMEAT landing page footer and from the directory submission form.
-
-### C. Public-facing MCP docs page (3+ example prompts)
+### C. Public-facing MCP docs page (3+ example prompts) — DONE
 
 Anthropic requires at least 3 working example prompts demonstrating core functionality, plus public docs by publish date.
 
-- [ ] **C.1** Create `public/mcp.html` (or `/v1/mcp-docs`) served at a stable HTTPS URL. Content shape:
-  - What AIMEAT is (one paragraph)
-  - The remote MCP endpoint URL
-  - How to attach in Claude Desktop / claude.ai / Cursor / VS Code (use snippets from the research report)
-  - **3+ example prompts** — see C.2
-  - Links to the GitHub repo, this docs page, privacy policy
-- [ ] **C.2** Write the example prompts. Suggested set (each should work end-to-end in Claude Desktop after install):
-  1. "Save a note for me: My favorite hobby is rock climbing." → exercises `aimeat_memory_write`
-  2. "What do you know about me?" → exercises `aimeat_memory_list` + `aimeat_memory_read`
-  3. "Find people interested in rock climbing near Helsinki." → exercises `aimeat_catalogue_directory`
-  4. (Bonus) "Share my climbing notes with the Climbing Helsinki organism." → exercises `aimeat_organism_list` + `aimeat_memory_write` with sharing scope
-- [ ] **C.3** Cross-reference content with `aimeat/public/llms-template.txt` MCP section so the two stay in sync.
+- [x] **C.1** Created `aimeat/public/connect.html` (EN) and `aimeat/public/connect.fi.html` (FI), served at `https://aimeat.io/v1/connect` and `/v1/connect/fi`. Content shape:
+  - Hero with tagline + endpoint URL + protocol version
+  - **6 client cards** with attach instructions: Cursor (1-click deeplink), Claude Code CLI (1-line), VS Code Copilot (1-line via `code --add-mcp`), Claude Desktop (4-step GUI), claude.ai web (4-step GUI), ChatGPT custom connector
+  - 4 worked example prompts (see C.2)
+  - "What you get" bullets (94 MCP tools, persistent identity, GDPR tooling, federation)
+  - Collapsible technical details: protocol/transport, reference manifest, self-host instructions, data handling
+  - Cross-links to privacy policy, GitHub, language switcher
+- [x] **C.2** Example prompts implemented (4 total — one bonus on top of the required 3):
+  1. "Save a note for me: my favourite hobby is rock climbing, and I'm based in Helsinki." → `aimeat_memory_write`
+  2. "What do you know about me from AIMEAT?" → `aimeat_memory_list` + `aimeat_memory_read`
+  3. "Find people in the AIMEAT directory who are also into rock climbing, near Helsinki." → `aimeat_catalogue_directory`
+  4. "What organisms (groups) can I join, and what's happening on the boards?" → `aimeat_organism_list` + `aimeat_catalogue_boards`
+- [x] **C.3** Cursor deeplink base64-encoded: `cursor://anysphere.cursor-deeplink/mcp/install?name=aimeat&config=eyJ1cmwiOiJodHRwczovL2FpbWVhdC5pby92MS9tY3AifQ==` (decodes to `{"url":"https://aimeat.io/v1/mcp"}`).
+- [ ] **C.4** Cross-reference content with `aimeat/public/llms-template.txt` MCP section so the two stay in sync. (Deferred — `llms-template.txt` is for AI assistants discovering the protocol; `connect.html` is for humans attaching their AI.)
 
 ### D. Logo, favicon, screenshots
 
@@ -263,12 +268,42 @@ Anthropic requires a test account with sample data so reviewers can exercise the
 
 ### F. Endpoint & policy hardening (technical pre-flight)
 
-- [ ] **F.1** Audit `aimeat/src/mcp/index.ts` for **Origin-header validation**. Required by Anthropic for the remote MCP endpoint.
-- [ ] **F.2** Verify `/.well-known/oauth-authorization-server` and `/.well-known/oauth-protected-resource` metadata documents exist (RFC 8414 / RFC 9728). Already part of MCP OAuth flow but confirm they serve correct issuer/scopes for `https://aimeat.io`.
-- [ ] **F.3** Verify the MCP endpoint advertises `protocolVersion` at or above `2025-11-25` in the `initialize` response.
-- [ ] **F.4** Confirm rate-limiting on `/v1/mcp` so a reviewer's hot-loop traffic gets `429` not 500.
-- [ ] **F.5** Confirm CORS / OAuth callback URLs accept `https://claude.ai` and `https://*.anthropic.com` origins where required.
-- [ ] **F.6** Run pre-submission checklist at `https://claude.com/docs/connectors/building/review-criteria`.
+**Audit completed 2026-05-29 against local dev (`http://localhost:40050`) and live prod (`https://aimeat.io`).**
+
+- [x] **F.1** Origin-header validation. **Code at `aimeat/src/mcp/index.ts:137-149` is correct.** Production setting `AIMEAT_CORS_ALLOWED_ORIGINS=*` is **intentional by architecture**: AIMEAT is Bearer-token-only (OAuth 2.1), with no cookies/implicit credentials, so CORS is not the protection layer. Apps published via `aimeat_app_publish` run in arbitrary browser origins and must be able to attach. The MCP spec's Origin recommendation targets local stdio servers preventing DNS rebinding; it does not apply to OAuth-protected remote resource servers. **Document this architectural choice in the directory submission notes** to preempt reviewer flags.
+- [x] **F.2** OAuth metadata documents (RFC 8414 / RFC 9728). **Fixed 2026-05-29**: nginx now passes `.well-known/` through to Express. Verified live: both endpoints return 200 with correct `https://aimeat.io` issuer + resource URIs. End-to-end OAuth discovery chain (401 → `WWW-Authenticate` header → `.well-known/oauth-protected-resource` → `oauth-authorization-server` → authorize/token endpoints) is now traversable by any conforming MCP client.
+- [x] **F.3** MCP protocol version. SDK 1.27.1 advertises `LATEST_PROTOCOL_VERSION = '2025-11-25'`, exactly what Anthropic Connectors Directory expects. Backward-compatible negotiation down to `2024-10-07`.
+- [x] **F.4** Rate-limiting on `/v1/mcp`. Confirmed live: `X-RateLimit-Limit: 300` per window. Reviewer hot-loop traffic gets `429`, not 500.
+- [x] **F.5** CORS for Anthropic-origin attachment. Confirmed live: `Access-Control-Allow-Origin: *`, `Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS`, `Access-Control-Allow-Headers: Content-Type, Authorization, Idempotency-Key, mcp-session-id`, `Access-Control-Expose-Headers: mcp-session-id`. Permissive by design (see F.1).
+- [x] **F.6** Production base URL. Live `WWW-Authenticate` header on 401 confirms `AIMEAT_BASE_URL=https://aimeat.io` is set correctly: `Bearer resource_metadata="https://aimeat.io/.well-known/oauth-protected-resource"`.
+- [x] **F.7** Production security headers. Confirmed live: `Strict-Transport-Security: max-age=31536000; includeSubDomains`, CSP with nonce, `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: strict-origin-when-cross-origin`.
+- [ ] **F.8** Run pre-submission checklist at `https://claude.com/docs/connectors/building/review-criteria`.
+
+#### Nginx fix for F.2
+
+The catch-all dotfile-deny rule is blocking `.well-known/`. Add an explicit exception **before** the dotfile-deny block:
+
+```nginx
+# Allow .well-known/ through to the Express app (RFC 8615)
+location ^~ /.well-known/ {
+    proxy_pass http://localhost:40050;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Real-IP $remote_addr;
+}
+
+# Existing dotfile deny (keep as-is) — now applies to everything EXCEPT .well-known/
+location ~ /\. {
+    deny all;
+}
+```
+
+Verify after `nginx -t && systemctl reload nginx`:
+```bash
+curl -sS -o /dev/null -w "%{http_code}\n" https://aimeat.io/.well-known/oauth-authorization-server
+# Must output: 200
+```
 
 ### G. Submission form fields (collect everything before opening the form)
 

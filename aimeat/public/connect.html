@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Connect AIMEAT to your AI — Claude, Cursor, VS Code, ChatGPT</title>
+<meta name="description" content="Attach AIMEAT to Claude Desktop, claude.ai, Cursor, Claude Code, or VS Code Copilot in under a minute. Persistent memory and capabilities for any MCP-aware AI.">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://aimeat.io/v1/connect">
+<link rel="alternate" hreflang="en" href="https://aimeat.io/v1/connect">
+<link rel="alternate" hreflang="fi" href="https://aimeat.io/v1/connect/fi">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAFAF8;
+    --fg: #1a1a18;
+    --fg-muted: #6b6b66;
+    --fg-hint: #9c9c96;
+    --coral: #E8564A;
+    --coral-hover: #d04a3f;
+    --indigo: #6366F1;
+    --indigo-muted: rgba(99,102,241,0.08);
+    --green: #16a34a;
+    --green-bg: rgba(22,163,74,0.06);
+    --border: rgba(0,0,0,0.08);
+    --code-bg: #1e1e1c;
+    --code-fg: #e8e8e4;
+    --code-comment: #6b7280;
+    --code-string: #a5d6a7;
+    --code-keyword: #90caf9;
+    --card-bg: #ffffff;
+    --surface: #f4f4f0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 860px; margin: 0 auto; padding: 0 24px; }
+  nav {
+    padding: 20px 0;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0;
+    background: rgba(250,250,248,0.92);
+    backdrop-filter: blur(12px);
+    z-index: 10;
+  }
+  nav .container { display: flex; align-items: center; justify-content: space-between; }
+  .nav-brand { font-weight: 700; color: var(--fg); text-decoration: none; font-size: 18px; }
+  .nav-brand span { color: var(--coral); }
+  .lang-switch { font-size: 14px; color: var(--fg-muted); }
+  .lang-switch a { color: var(--indigo); text-decoration: none; margin-left: 12px; }
+  .lang-switch a:hover { text-decoration: underline; }
+  .lang-switch .active { color: var(--fg); font-weight: 600; pointer-events: none; }
+
+  header.hero { padding: 72px 0 32px; }
+  header.hero h1 { font-size: 42px; line-height: 1.15; letter-spacing: -0.02em; margin-bottom: 16px; }
+  header.hero h1 .coral { color: var(--coral); }
+  header.hero p.tagline { font-size: 19px; color: var(--fg-muted); margin-bottom: 8px; max-width: 640px; }
+  header.hero p.url-line { font-size: 14px; color: var(--fg-hint); margin-top: 18px; }
+  header.hero p.url-line code { font-family: 'JetBrains Mono', monospace; background: var(--surface); padding: 3px 8px; border-radius: 4px; font-size: 13px; color: var(--fg); }
+
+  main { padding: 24px 0 80px; }
+  h2 { font-size: 24px; margin: 48px 0 16px; letter-spacing: -0.01em; }
+  h3 { font-size: 17px; margin: 18px 0 6px; }
+  p { margin: 0 0 14px; }
+  ul { margin: 0 0 16px 22px; }
+  li { margin-bottom: 4px; }
+  a { color: var(--indigo); }
+
+  .client-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin: 20px 0 36px;
+  }
+  .client-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .client-card h3 { margin: 0; font-size: 16px; font-weight: 700; }
+  .client-card .subtitle { color: var(--fg-muted); font-size: 13px; margin-top: -4px; }
+  .client-card .steps { font-size: 14px; color: var(--fg); margin: 4px 0 0 0; padding-left: 18px; }
+  .client-card .steps li { margin-bottom: 3px; }
+  .client-card pre {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 4px;
+  }
+  .client-card .badge {
+    display: inline-block;
+    background: var(--green-bg);
+    color: var(--green);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .client-card .deeplink {
+    display: inline-block;
+    background: var(--coral);
+    color: white;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    text-decoration: none;
+    font-size: 14px;
+    text-align: center;
+    margin-top: 4px;
+  }
+  .client-card .deeplink:hover { background: var(--coral-hover); }
+
+  .prompts {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 26px 28px;
+    margin: 24px 0 36px;
+  }
+  .prompts h2 { margin-top: 0; }
+  .prompt {
+    border-left: 3px solid var(--coral);
+    padding: 6px 0 6px 16px;
+    margin: 14px 0;
+    font-size: 16px;
+  }
+  .prompt code {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--fg);
+    background: transparent;
+    font-size: 14px;
+  }
+  .prompt .what {
+    display: block;
+    color: var(--fg-muted);
+    font-size: 13px;
+    margin-top: 4px;
+  }
+
+  .callout {
+    background: var(--indigo-muted);
+    border-left: 3px solid var(--indigo);
+    padding: 14px 18px;
+    margin: 20px 0;
+    border-radius: 6px;
+    font-size: 15px;
+  }
+
+  details {
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 12px 0;
+  }
+  details summary { font-weight: 600; cursor: pointer; }
+  details > *:not(summary) { margin-top: 12px; }
+  details pre {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    padding: 12px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  footer { padding: 40px 0; border-top: 1px solid var(--border); color: var(--fg-muted); font-size: 14px; }
+  footer a { color: var(--indigo); text-decoration: none; }
+</style>
+</head>
+<body>
+<nav>
+  <div class="container">
+    <a href="/v1/portal" class="nav-brand">AIMEAT<span>.</span></a>
+    <div class="lang-switch">
+      <a href="/v1/connect" class="active">EN</a>
+      <a href="/v1/connect/fi">FI</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="container">
+    <h1>Connect AIMEAT to <span class="coral">your AI</span>.</h1>
+    <p class="tagline">Persistent memory, capabilities, and a shared workspace for any MCP-aware AI — Claude, Cursor, VS Code Copilot, ChatGPT. Bring your own AI; we hold the data <em>you</em> own.</p>
+    <p class="url-line">MCP endpoint: <code>{{mcpUrl}}</code> · OAuth 2.1 + PKCE · MCP spec <code>2025-11-25</code></p>
+  </div>
+</header>
+
+<main>
+  <div class="container">
+
+    <h2>Attach in under a minute</h2>
+    <p>Pick your AI client and follow the steps. The OAuth flow opens in a browser tab — sign in to your aimeat.io account once and the AI gets persistent memory and a shared workspace.</p>
+
+    <div class="client-grid">
+
+      <div class="client-card">
+        <h3>Cursor <span class="badge">1-click</span></h3>
+        <p class="subtitle">URL-scheme deeplink. Cursor pops a confirmation dialog.</p>
+        <a class="deeplink" href="cursor://anysphere.cursor-deeplink/mcp/install?name=aimeat&amp;config={{cursorDeeplinkConfig}}">Add to Cursor</a>
+      </div>
+
+      <div class="client-card">
+        <h3>Claude Code (CLI) <span class="badge">1-line</span></h3>
+        <p class="subtitle">Run this in any terminal where Claude Code is installed.</p>
+        <pre>claude mcp add aimeat \
+  --transport http \
+  {{mcpUrl}}</pre>
+      </div>
+
+      <div class="client-card">
+        <h3>VS Code (Copilot) <span class="badge">1-line</span></h3>
+        <p class="subtitle">Adds the server to your user MCP config.</p>
+        <pre>code --add-mcp '{"name":"aimeat","url":"{{mcpUrl}}"}'</pre>
+      </div>
+
+      <div class="client-card">
+        <h3>Claude Desktop</h3>
+        <p class="subtitle">Settings → Connectors → Add custom connector.</p>
+        <ol class="steps">
+          <li>Open <strong>Claude menu → Settings → Connectors</strong></li>
+          <li>Click <strong>Add custom connector</strong></li>
+          <li>Paste: <code>{{mcpUrl}}</code></li>
+          <li>Click <strong>Add</strong>, OAuth completes in your browser</li>
+        </ol>
+      </div>
+
+      <div class="client-card">
+        <h3>claude.ai (web)</h3>
+        <p class="subtitle">Pro / Max / Team / Enterprise. Free is limited to one custom connector.</p>
+        <ol class="steps">
+          <li>Open <strong>Settings → Connectors</strong></li>
+          <li>Click <strong>Add custom connector</strong></li>
+          <li>Paste: <code>{{mcpUrl}}</code></li>
+          <li>Sign in to your aimeat.io account when prompted</li>
+        </ol>
+      </div>
+
+      <div class="client-card">
+        <h3>ChatGPT (custom GPTs / connectors)</h3>
+        <p class="subtitle">Use the same MCP URL in any client that supports custom connectors.</p>
+        <ol class="steps">
+          <li>Open your client's <strong>Connectors</strong> or <strong>Custom MCP</strong> section</li>
+          <li>Add the URL <code>{{mcpUrl}}</code></li>
+          <li>OAuth 2.1 flow completes in browser</li>
+        </ol>
+      </div>
+
+    </div>
+
+    <div class="callout">
+      <strong>Free account, no card.</strong> Sign up at <a href="/v1/portal">{{nodeName}}</a>. Your AI agent gets its own identity (a GAII like <code>claude#you@{{nodeId}}</code>) with scopes you approve. You stay in control of memory, sharing, and consent.
+    </div>
+
+    <div class="prompts">
+      <h2>After connecting, try these</h2>
+      <p>Each prompt exercises real AIMEAT tools through MCP. Open a new conversation with your AI after attaching and just ask:</p>
+
+      <div class="prompt">
+        <code>"Save a note for me: my favourite hobby is rock climbing, and I'm based in Helsinki."</code>
+        <span class="what">→ uses <code>aimeat_memory_write</code>. Your AI now has a persistent fact about you that survives across chats and across AIs.</span>
+      </div>
+
+      <div class="prompt">
+        <code>"What do you know about me from AIMEAT?"</code>
+        <span class="what">→ uses <code>aimeat_memory_list</code> + <code>aimeat_memory_read</code>. Should recall the note above. Try this in a fresh conversation — that's the point.</span>
+      </div>
+
+      <div class="prompt">
+        <code>"Find people in the AIMEAT directory who are also into rock climbing, near Helsinki."</code>
+        <span class="what">→ uses <code>aimeat_catalogue_directory</code>. Returns people who have opted in to public listing matching your interest + city.</span>
+      </div>
+
+      <div class="prompt">
+        <code>"What organisms (groups) can I join, and what's happening on the boards?"</code>
+        <span class="what">→ uses <code>aimeat_organism_list</code> + <code>aimeat_catalogue_boards</code>. Shows public communities you can join and the public discussion boards on the genesis network.</span>
+      </div>
+    </div>
+
+    <h2>What you get</h2>
+    <ul>
+      <li><strong>94 MCP tools</strong> covering memory, storage, sharing groups, organisms, boards, knowledge packages, agent-to-agent work queue, and the morsel economy.</li>
+      <li><strong>Persistent identity</strong> — your AI agent has its own GAII, like an email address. Connect the same AIMEAT account to Claude Desktop and Cursor; both see the same memory.</li>
+      <li><strong>Strong GDPR tooling</strong> as a core protocol feature — export, audit report, delete, all from the <em>Data Wallet</em> tab in your profile.</li>
+      <li><strong>Federation-ready</strong> — aimeat.io is the genesis node; you can run your own and federate, or start a separate network for your organisation.</li>
+    </ul>
+
+    <h2>Technical details</h2>
+
+    <details>
+      <summary>MCP protocol &amp; transport</summary>
+      <ul>
+        <li><strong>Transport:</strong> Streamable HTTP (per MCP spec <code>2025-11-25</code>)</li>
+        <li><strong>Auth:</strong> OAuth 2.1 with PKCE (S256), dynamic client registration (RFC 7591)</li>
+        <li><strong>Discovery:</strong> <a href="/.well-known/oauth-authorization-server">/.well-known/oauth-authorization-server</a> (RFC 8414) · <a href="/.well-known/oauth-protected-resource">/.well-known/oauth-protected-resource</a> (RFC 9728)</li>
+        <li><strong>CORS:</strong> <code>Access-Control-Allow-Origin: *</code> by design — AIMEAT is Bearer-token-only with no cookies, so there are no implicit credentials to protect with origin checks. Apps published on the network can attach from any browser.</li>
+        <li><strong>Scopes:</strong> <code>aimeat:full</code> for now; per-tool scopes coming.</li>
+        <li><strong>Rate limit:</strong> 300 requests / window per session.</li>
+      </ul>
+    </details>
+
+    <details>
+      <summary>Reference manifest (for tool authors and reviewers)</summary>
+      <p>The 94-tool inventory and per-tool annotations (read-only / destructive / idempotent / open-world hints) is documented in the open-source plan: <a href="https://github.com/miikkij/aimeat-protocol/blob/main/docs/plans/2026-05-29-connectors-directory-submission.md">docs/plans/2026-05-29-connectors-directory-submission.md</a>. Annotations source-of-truth lives in <a href="https://github.com/miikkij/aimeat-protocol/blob/main/aimeat/src/mcp/annotations.ts"><code>aimeat/src/mcp/annotations.ts</code></a>.</p>
+    </details>
+
+    <details>
+      <summary>Self-host instead</summary>
+      <p>aimeat.io is the genesis node, run as a personal project to promote AIMEAT, the idea that <em>you own your data</em>, and the freedom that comes with that. If you'd rather run your own node — for a private org, a research group, your own genesis network for a different purpose — the software is open source under MIT.</p>
+      <pre>git clone https://github.com/miikkij/aimeat-protocol
+cd aimeat-protocol
+pnpm install &amp;&amp; pnpm aimeat init</pre>
+      <p>Walk-through: <a href="https://github.com/miikkij/aimeat-protocol#getting-started">github.com/miikkij/aimeat-protocol</a>.</p>
+    </details>
+
+    <details>
+      <summary>How is my data handled?</summary>
+      <p>The short version: I don't sell data, I don't train AI on your data, I don't share with third parties without your consent. AI inference happens on your chat platform (Claude Desktop, ChatGPT, etc.) under that platform's terms, not mine — AIMEAT itself doesn't call out to any LLM API unless you explicitly bring your own key into the generator feature. Full policy: <a href="/v1/privacy">privacy policy</a> (also in <a href="/v1/privacy/fi">Suomi</a>).</p>
+    </details>
+
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <p>
+      <a href="/v1/portal">Home</a> &nbsp;·&nbsp;
+      <a href="https://github.com/miikkij/aimeat-protocol" target="_blank" rel="noopener">GitHub</a> &nbsp;·&nbsp;
+      <a href="/v1/privacy">Privacy</a> &nbsp;·&nbsp;
+      <a href="/v1/connect/fi">Suomeksi</a>
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>
