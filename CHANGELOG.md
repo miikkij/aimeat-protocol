@@ -23,6 +23,15 @@ server-only (operator-gated administration).
 Net effect: Claude Desktop and other public-MCP clients now have parity
 with what aimeat-crewai liaisons see via the local connector.
 
+## aimeat-crewai 0.3.1 - 2026-05-29
+
+### Fixed
+
+- **`run_crew_daemon` crashed immediately on startup with `AimeatLiaisonError: No token at ~/.aimeat/<agent>/.token`.** The 0.3.0 `_read_token()` helper assumed tokens were stored in the skill-bundle directory (`~/.aimeat/<agent>/.token`), but the connector (`aimeat connect add` >= 1.10.0) uses a keychain layout: tokens at `~/.aimeat/tokens/<agent>@<owner>.token` and per-agent config at `~/.aimeat/agents/<agent>/config.yaml`. The daemon path therefore never worked on a real connector install; the one-shot `create_liaison_agent` path was unaffected because `stdio_params` delegates to the connector which reads the keychain itself.
+- Rewrote `_read_token(agent_name, owner=None)` to use the correct layout: globs `~/.aimeat/tokens/<agent>@*.token` when `owner` is omitted, errors clearly when zero or multiple owners match, reads `node_url` from `~/.aimeat/agents/<agent>/config.yaml`.
+- `run_crew_daemon` gained an optional `owner` kwarg, threaded through to `_read_token`. Single-owner installs can omit it; multi-owner installs pass it to disambiguate.
+- Added regression tests covering correct keychain layout, owner auto-detect, ambiguous-owner error, and missing-token error.
+
 ## [1.14.0] - 2026-05-29
 
 ### Added (the missing piece for cross-agent task delegation)

@@ -65,30 +65,61 @@ except ImportError as exc:  # pragma: no cover
     ) from exc
 
 
-def _read_token(agent_name: str) -> tuple[str, str]:
+def _read_token(agent_name: str, owner: str | None = None) -> tuple[str, str]:
     """
-    Locate the agent's stored token + node URL from ~/.aimeat/<agent>/.
+    Locate the agent's stored token + node URL from the connector's layout.
 
     The connector (`aimeat connect add`) writes:
-      ~/.aimeat/<agent>/.token      -- the bearer token
-      ~/.aimeat/<agent>/config.yaml -- includes node_url
+      ~/.aimeat/tokens/{agent}@{owner}.token      -- bearer token (mode 0600)
+      ~/.aimeat/agents/{agent}/config.yaml        -- per-agent config (incl. node_url)
+
+    Earlier versions of this helper looked at `~/.aimeat/<agent>/.token` which
+    is the SKILL-BUNDLE directory, not the keychain. That layout never matched
+    a real connector install, so the daemon could never start. This rewrite
+    uses the actual keychain + per-agent config paths.
+
+    If `owner` is provided, looks for `tokens/{agent}@{owner}.token` directly.
+    Otherwise globs `tokens/{agent}@*.token` and uses the single match. Errors
+    if zero matches or more than one (the latter means the agent name is
+    ambiguous and the caller must pass `owner`).
 
     Returns (token, node_url).
     """
-    home_dir = Path(os.environ.get("AIMEAT_HOME") or (Path.home() / ".aimeat"))
-    agent_dir = home_dir / agent_name
-    token_path = agent_dir / ".token"
-    config_path = agent_dir / "config.yaml"
-    if not token_path.is_file():
-        raise AimeatLiaisonError(
-            f"No token at {token_path}. Run: aimeat connect add --agent {agent_name} ..."
-        )
-    token = token_path.read_text(encoding="utf-8").strip()
+    import glob
 
-    # Best-effort node_url extraction from config.yaml.
+    home_dir = Path(os.environ.get("AIMEAT_HOME") or (Path.home() / ".aimeat"))
+    tokens_dir = home_dir / "tokens"
+    agent_config_path = home_dir / "agents" / agent_name / "config.yaml"
+
+    # Locate the token file.
+    if owner:
+        token_path = tokens_dir / f"{agent_name}@{owner}.token"
+        if not token_path.is_file():
+            raise AimeatLiaisonError(
+                f"No token at {token_path}. Run: aimeat connect add --agent {agent_name} --owner {owner} ..."
+            )
+        token_file = token_path
+    else:
+        pattern = str(tokens_dir / f"{agent_name}@*.token")
+        matches = sorted(glob.glob(pattern))
+        if not matches:
+            raise AimeatLiaisonError(
+                f"No token file matching {pattern}. Run: aimeat connect add --agent {agent_name} --owner <owner> --url <node-url>"
+            )
+        if len(matches) > 1:
+            owners = [Path(m).stem.split("@", 1)[1] for m in matches]
+            raise AimeatLiaisonError(
+                f"Multiple owners have an agent named '{agent_name}' ({', '.join(owners)}). "
+                f"Pass `owner=<name>` to disambiguate."
+            )
+        token_file = Path(matches[0])
+
+    token = token_file.read_text(encoding="utf-8").strip()
+
+    # Best-effort node_url extraction from per-agent config.yaml.
     node_url = "https://aimeat.io"
-    if config_path.is_file():
-        text = config_path.read_text(encoding="utf-8")
+    if agent_config_path.is_file():
+        text = agent_config_path.read_text(encoding="utf-8")
         for line in text.splitlines():
             line = line.strip()
             if line.startswith("node_url:"):
@@ -158,6 +189,7 @@ def run_crew_daemon(
     *,
     agent_name: str,
     build_crew: BuildCrewCallback,
+    owner: str | None = None,
     poll_interval_seconds: int = 30,
     listen_for: Iterable[str] = ("tasks",),
     on_idle: Callable[[], None] | None = None,
@@ -176,6 +208,9 @@ def run_crew_daemon(
             liaison as one of its agents and at least one Task that asks
             the liaison to call `aimeat_task_complete` with the deliverable
             (the liaison's persona explains this).
+        owner: Optional. If two or more owners have an agent with the same
+            name in your local connector, pass `owner` to disambiguate.
+            With a single-owner install you can omit it.
         poll_interval_seconds: How often to check AIMEAT for new work
             when idle. Default 30s; raise for low-priority crews, lower
             for snappy interactive feel (but mind rate limits).
@@ -196,7 +231,7 @@ def run_crew_daemon(
     The daemon traps SIGINT and SIGTERM cleanly so Ctrl+C and `kill`
     shut it down with the liaison's MCP connection properly closed.
     """
-    token, node_url = _read_token(agent_name)
+    token, node_url = _read_token(agent_name, owner=owner)
     listen_set = set(listen_for)
 
     stop = {"flag": False}

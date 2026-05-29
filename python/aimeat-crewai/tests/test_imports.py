@@ -136,6 +136,68 @@ def test_resolve_skill_path_finds_bundle(tmp_path, monkeypatch) -> None:
     assert result == agent_dir
 
 
+def test_read_token_uses_connector_keychain_layout(tmp_path, monkeypatch) -> None:
+    """The daemon must read from the connector's keychain layout, not the
+    skill-bundle directory. Regression test for the 0.3.0 bug where _read_token
+    looked at ~/.aimeat/<agent>/.token (which is the skill-bundle dir)
+    instead of ~/.aimeat/tokens/<agent>@<owner>.token (the actual keychain)."""
+    from aimeat_crewai.daemon import _read_token
+
+    # Set up the connector layout under a fake AIMEAT_HOME.
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+    tokens_dir = tmp_path / "tokens"
+    tokens_dir.mkdir()
+    (tokens_dir / "demo-crew@happyowner.token").write_text("test-bearer-token")
+    agent_cfg_dir = tmp_path / "agents" / "demo-crew"
+    agent_cfg_dir.mkdir(parents=True)
+    (agent_cfg_dir / "config.yaml").write_text(
+        "agent: demo-crew\nowner: happyowner\nnode_url: https://node.example\n"
+    )
+
+    token, node_url = _read_token("demo-crew", owner="happyowner")
+    assert token == "test-bearer-token"
+    assert node_url == "https://node.example"
+
+
+def test_read_token_owner_auto_detect(tmp_path, monkeypatch) -> None:
+    """When only one owner exists for the agent, _read_token can auto-detect it."""
+    from aimeat_crewai.daemon import _read_token
+
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+    (tmp_path / "tokens").mkdir()
+    (tmp_path / "tokens" / "demo-crew@happyowner.token").write_text("auto-detected")
+
+    token, _ = _read_token("demo-crew")
+    assert token == "auto-detected"
+
+
+def test_read_token_ambiguous_owner_raises(tmp_path, monkeypatch) -> None:
+    """Multiple owners for the same agent name -> caller must specify owner."""
+    from aimeat_crewai.daemon import _read_token
+    from aimeat_crewai import AimeatLiaisonError
+    import pytest
+
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+    (tmp_path / "tokens").mkdir()
+    (tmp_path / "tokens" / "demo-crew@alice.token").write_text("a")
+    (tmp_path / "tokens" / "demo-crew@bob.token").write_text("b")
+
+    with pytest.raises(AimeatLiaisonError, match="Multiple owners"):
+        _read_token("demo-crew")
+
+
+def test_read_token_missing_raises(tmp_path, monkeypatch) -> None:
+    """No token file -> clear error pointing to the connect-add command."""
+    from aimeat_crewai.daemon import _read_token
+    from aimeat_crewai import AimeatLiaisonError
+    import pytest
+
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+
+    with pytest.raises(AimeatLiaisonError, match="aimeat connect add"):
+        _read_token("nonexistent-agent")
+
+
 def test_slim_vs_full_backstory_templates_exist() -> None:
     """0.2.0 ships two templates; default selection is auto based on skill presence."""
     from aimeat_crewai.liaison import SLIM_BACKSTORY_TEMPLATE, FULL_BACKSTORY_TEMPLATE
