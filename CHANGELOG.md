@@ -2,6 +2,21 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.13.1] - 2026-05-29
+
+### Fixed (multi-agent `aimeat connect serve` routing)
+
+- **`aimeat_memory_*`, `aimeat_handbook_get`, `aimeat_storage_*`, `aimeat_wallet_balance`, `aimeat_action_execute`, `aimeat_work_*`, `aimeat_catalogue_search`, `aimeat_agent_profile`, `aimeat_board_*`, `aimeat_admin_*` all silently routed through the connector's primary-agent token regardless of which `agent_name` the caller passed.** The pattern from `core.ts` and `handbook.ts` was `const { client } = registry.resolve()` at MODULE scope -- once -- which captured a single client and reused it across every tool call. So in a multi-agent install (e.g. one user has `assistant`, `falcon`, `hermes`, `company-crew` all locally), a CrewAI liaison agent calling `aimeat_memory_write --agent company-crew "..."` would write to whoever the connector picked as primary at startup (often `falcon` or `assistant`, NOT `company-crew`), and worse: if the primary's token didn't have valid scopes on the target node, the result was `AUTH_REQUIRED` -- baffling because the same connection's onboarding tools worked fine (those used per-call `pickAgent()`). Fix: every tool in `core.ts` and `handbook.ts` now accepts an `agent_name` parameter and calls `pickAgent(registry, agent_name)` PER CALL. Single-agent installs are unaffected: `agent_name` is optional and defaults to the only loaded agent.
+- **Note:** This patch covers the 17 tools that CrewAI liaison agents typically reach for (memory CRUD, handbook, storage, wallet, work queue, catalogue, agent profile, boards, admin). The remaining 15 tool files (apps, capabilities, cortex, extensions, flags, groups, instances, knowledge, organisms, etc.) still use module-scope client resolution and will be migrated in 1.14.0. They affect fewer typical liaison flows so the patch is staged rather than blocked on a full sweep.
+
+### Changed (onboarding error semantics)
+
+- **`POST /v1/agents/:name/onboarding/step/:id`** now distinguishes two failure modes that previously both returned `INVALID_STEP`: (a) the step ID is not in the canonical step catalog at all -- still `INVALID_STEP` (typo / bad request), and (b) the step ID IS canonical but is not part of THIS agent's onboarding flow (task-runner mode skips interactive-only steps like `read_directives`) -- now `STEP_NOT_IN_FLOW`. The error message explicitly tells LLM-driven liaison agents to treat the second case as "no-op, skip and continue" rather than retrying. The `aimeat-crewai 0.1.1` persona reads this and handles it gracefully; the canonical interactive-mode `INVALID_STEP` behaviour is unchanged.
+
+### Related work in `aimeat-crewai` 0.1.1
+
+The above server-side fixes pair with `aimeat-crewai 0.1.1` (published the same day) which (a) fixes the Windows `.cmd` shim crash in `stdio_params`, (b) injects the agent_name into the liaison persona so the LLM stops guessing it, and (c) tells the liaison to OMIT optional MCP parameters instead of passing null (which the MCP schema rejected). Together these resolve the four blockers observed in the first end-to-end CrewAI field test against aimeat.io. See `python/aimeat-crewai/CHANGELOG`-section above (independent versioning).
+
 ## aimeat-crewai 0.1.1 - 2026-05-29
 
 (Independent versioning for the Python package; see `python/aimeat-crewai/`.)

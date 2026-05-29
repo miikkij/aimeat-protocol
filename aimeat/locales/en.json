@@ -5513,6 +5513,7 @@
       "onboardingNotActive": "Onboarding is not in progress",
       "unknownStep": "Unknown onboarding step: {{stepId}}",
       "stepNotFound": "Step '{{stepId}}' not found",
+      "stepNotInFlow": "Step '{{stepId}}' is valid in the canonical step catalog but is not part of this agent's onboarding flow (e.g. task-runner agents skip interactive-only steps). Treat as a no-op and continue.",
       "stepAlreadyPassed": "Step already passed",
       "noOnboardingRecord": "No onboarding record found",
       "invalidLevel": "level must be one of: basic, standard, full, expert",

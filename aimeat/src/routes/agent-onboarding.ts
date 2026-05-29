@@ -306,7 +306,13 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
 
     const step = onboarding.steps.find(s => s.id === stepId);
     if (!step) {
-      res.status(400).json(error(config.nodeId, 'INVALID_STEP', t(req, 'agentOnboarding.errors.stepNotFound', { stepId })));
+      // Differentiates from INVALID_STEP (line 295 -- unknown stepId entirely):
+      // the stepId IS a valid step in the canonical catalog, but the agent's
+      // reduced onboarding flow does not include it. Task-runner mode for
+      // example skips read_directives / send_test_message / etc. Clients
+      // (especially LLM-driven liaisons) should treat this as "ok, not
+      // applicable -- skip" rather than "the system is broken -- retry".
+      res.status(400).json(error(config.nodeId, 'STEP_NOT_IN_FLOW', t(req, 'agentOnboarding.errors.stepNotInFlow', { stepId })));
       return;
     }
 

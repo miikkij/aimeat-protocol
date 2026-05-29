@@ -5513,6 +5513,7 @@
       "onboardingNotActive": "Perehdytys ei ole käynnissä",
       "unknownStep": "Tuntematon perehdytysvaihe: {{stepId}}",
       "stepNotFound": "Vaihetta '{{stepId}}' ei löydy",
+      "stepNotInFlow": "Vaihe '{{stepId}}' on kanonisessa askelluettelossa, mutta ei kuulu tämän agentin perehdytysvirtaan (esim. task-runner-agentit ohittavat interaktiiviset askeleet). Käsittele no-op:na ja jatka.",
       "stepAlreadyPassed": "Vaihe on jo läpäisty",
       "noOnboardingRecord": "Perehdytystietuetta ei löydy",
       "invalidLevel": "Tason on oltava jokin näistä: basic, standard, full, expert",
