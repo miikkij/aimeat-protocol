@@ -2,6 +2,27 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## aimeat-crewai 0.2.0 - 2026-05-29
+
+### Added (CrewAI Skills support)
+
+- **The liaison now loads the AIMEAT skill bundle as a first-class CrewAI Skill.** Auto-detect path: `~/.aimeat/<agent_name>/SKILL.md` (the same location the connector extracts the bundle into). When found, the factory passes `skills=[<bundle_dir>]` to `crewai.Agent`, so the LLM sees the bundle through CrewAI's progressive-disclosure mechanism: description first, body on demand. The bundle is the canonical operational manual; the Python package no longer duplicates it.
+- **New `skill_path` parameter on `create_liaison_agent`:**
+  - Default (`_AUTO_DETECT`): look in `$AIMEAT_HOME/<agent_name>/` (defaults to `~/.aimeat`)
+  - Explicit `Path` or `str`: use that directory; raises `AimeatLiaisonError` if no SKILL.md found
+  - `None`: explicitly disable skill loading (use the full persona as the manual)
+- **Two-mode persona template:** when a skill bundle is loaded, the factory uses `SLIM_BACKSTORY_TEMPLATE` (~30 lines: identity + calling conventions + "consult the Skill for details"). When no bundle is loaded, the factory uses `FULL_BACKSTORY_TEMPLATE` (~60 lines: the previous 0.1.x manual carried in the persona). Both expose `{agent_name}` as a format placeholder; the factory chooses automatically based on whether `skill_path` resolved to a real file.
+- **`_resolve_skill_path(agent_name)` helper exported from `liaison`** for testing and custom integrations.
+
+### Changed
+
+- **`DEFAULT_BACKSTORY_TEMPLATE` retained as an alias for `FULL_BACKSTORY_TEMPLATE`** so 0.1.x code that imported it still works. New code should let the factory choose, or import `SLIM_*` / `FULL_*` directly.
+- **README compatibility table updated:** 0.2.x requires AIMEAT 1.13.5+ (for CrewAI-strict frontmatter on skill bundles) and CrewAI 1.14+ for native Skills support. If you can't bump CrewAI, pass `skill_path=None` and you get 0.1.x behavior.
+
+### Why this matters
+
+The AIMEAT skill bundle is now the single source of truth for "how do I operate against an AIMEAT node from a CrewAI crew". Bundle updates flow through `aimeat connect refresh --agent <name>` (also fixed in 1.13.5 to actually honour `--agent`) without requiring a `pip install -U`. Same pattern will port to LangGraph and AutoGen in `aimeat-langgraph` / `aimeat-autogen` packages.
+
 ## [1.13.5] - 2026-05-29
 
 ### Fixed

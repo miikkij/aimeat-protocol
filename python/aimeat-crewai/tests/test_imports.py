@@ -112,3 +112,38 @@ def test_windows_stdio_no_op_on_unix() -> None:
     cmd, prefix = _resolve_windows_command("aimeat")
     assert cmd == "aimeat"
     assert prefix == []
+
+
+def test_resolve_skill_path_none_for_missing_agent(tmp_path, monkeypatch) -> None:
+    """Auto-detect returns None if the bundle dir doesn't exist."""
+    from aimeat_crewai.liaison import _resolve_skill_path
+
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+    assert _resolve_skill_path("nonexistent-agent") is None
+    assert _resolve_skill_path(None) is None
+    assert _resolve_skill_path("") is None
+
+
+def test_resolve_skill_path_finds_bundle(tmp_path, monkeypatch) -> None:
+    """Auto-detect returns the agent dir when SKILL.md exists under AIMEAT_HOME."""
+    from aimeat_crewai.liaison import _resolve_skill_path
+
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+    agent_dir = tmp_path / "demo-crew"
+    agent_dir.mkdir()
+    (agent_dir / "SKILL.md").write_text("---\nname: demo-crew\ndescription: x\n---\nbody")
+    result = _resolve_skill_path("demo-crew")
+    assert result == agent_dir
+
+
+def test_slim_vs_full_backstory_templates_exist() -> None:
+    """0.2.0 ships two templates; default selection is auto based on skill presence."""
+    from aimeat_crewai.liaison import SLIM_BACKSTORY_TEMPLATE, FULL_BACKSTORY_TEMPLATE
+
+    # SLIM template references "Skill" because it expects the skill bundle to
+    # carry the manual; FULL template doesn't because it carries the manual itself.
+    assert "Skill" in SLIM_BACKSTORY_TEMPLATE
+    assert len(SLIM_BACKSTORY_TEMPLATE) < len(FULL_BACKSTORY_TEMPLATE)
+    # Both must have {agent_name} placeholder so the factory can format them.
+    assert "{agent_name}" in SLIM_BACKSTORY_TEMPLATE
+    assert "{agent_name}" in FULL_BACKSTORY_TEMPLATE

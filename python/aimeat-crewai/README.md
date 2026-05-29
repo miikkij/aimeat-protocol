@@ -146,11 +146,28 @@ NOTE: `liaison_tools` leaves the MCP adapter open for the process's lifetime. Us
 - **On Windows**, `stdio_params` auto-wraps `aimeat` (an npm `.cmd` shim) through `cmd.exe /c` so the stdio MCP client can launch it. No action needed from you; Linux/Mac are unchanged.
 - **Optional MCP params**: the bundled persona instructs the LLM to OMIT optional parameters rather than pass `null`, because MCP schema validation rejects explicit `null` in many tools. If you write your own persona, keep this rule.
 
+## Skills support (0.2.0+)
+
+As of 0.2.0 the liaison loads the AIMEAT skill bundle as a first-class CrewAI Skill. The skill bundle is downloaded by `aimeat connect add` into `~/.aimeat/<agent_name>/SKILL.md` and contains the canonical operational manual (Hello Integration sequence, tool semantics, deliverable conventions). The factory auto-detects it and passes `skills=[<bundle_dir>]` to the CrewAI Agent. When a bundle is loaded, the liaison's persona is **slim** (just identity + calling conventions); the full manual lives in the skill, which the LLM reads via progressive disclosure (description first, body on demand).
+
+```python
+with create_liaison_agent(
+    mcp_server_params=stdio_params(agent_name="company-crew"),
+    agent_name="company-crew",
+    # skill_path defaults to auto-detect: ~/.aimeat/company-crew/SKILL.md
+    # Pass an explicit Path to override, or `skill_path=None` to disable.
+) as liaison:
+    ...
+```
+
+**Requires** AIMEAT node 1.13.5+ (CrewAI-strict frontmatter) and CrewAI 1.14+ (native Skills support). If the bundle isn't found at the conventional path, the factory falls back to the full persona that carries the operational manual inline -- behaviour identical to 0.1.x.
+
 ## Compatibility
 
 | `aimeat-crewai` | AIMEAT node | CrewAI |
 |---|---|---|
 | 0.1.x | 1.13.0+ | 0.80+ |
+| 0.2.x | 1.13.5+ | 1.14+ (Skills); 0.80+ if `skill_path=None` |
 
 ## License
 

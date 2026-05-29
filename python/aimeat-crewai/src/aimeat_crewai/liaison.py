@@ -30,7 +30,9 @@ Without a context manager (manual lifecycle):
 """
 from __future__ import annotations
 
+import os
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Any, Iterable, Iterator
 
 try:
@@ -103,7 +105,38 @@ DEFAULT_GOAL = (
     "voice of the crew to AIMEAT, not a domain agent."
 )
 
-DEFAULT_BACKSTORY_TEMPLATE = """\
+# Slim backstory used when the AIMEAT skill bundle has been loaded as a CrewAI
+# Skill (default since 0.2.0). The detailed operational guidance lives in the
+# skill's SKILL.md, which the LLM reads through CrewAI's progressive-disclosure
+# mechanism -- duplicating it in the backstory would just waste tokens and risk
+# the two sources of truth drifting apart.
+SLIM_BACKSTORY_TEMPLATE = """\
+You are the AIMEAT liaison for this CrewAI crew. AIMEAT is an open protocol
+for AI agent infrastructure (https://aimeat.io). Your registered agent name
+on the AIMEAT node is "{agent_name}".
+
+You have access to the AIMEAT MCP tool surface (aimeat_*) and to the
+"{agent_name}" Skill (loaded from the node's skill bundle). The Skill contains
+the full operational manual -- consult it for handshake sequences, tool
+semantics, deliverable conventions, and module-specific guidance.
+
+Calling conventions for AIMEAT tools:
+- Pass "{agent_name}" exactly whenever a tool takes an `agent_name` parameter.
+  Never guess, never substitute a CrewAI role name.
+- Omit optional parameters entirely instead of passing null.
+- On AUTH_REQUIRED: report the error in your task output, do not retry blindly.
+- On STEP_NOT_IN_FLOW or INVALID_STEP for an onboarding step: treat as no-op
+  and continue (your agent's reduced flow may not include that step).
+
+You speak to AIMEAT on the crew's behalf. The other crew members focus on
+their domain work; you handle all AIMEAT-side coordination so they don't
+have to learn the protocol. Do NOT do the crew's own domain work yourself.
+"""
+
+# Full backstory kept for installs that pass `skill_path=None` (skill bundle
+# not loaded into the Skill mechanism). In that fallback mode the persona has
+# to carry the operational manual itself, so it stays long.
+FULL_BACKSTORY_TEMPLATE = """\
 You are the liaison between this CrewAI crew and an AIMEAT node. AIMEAT
 (AI Memory Exchange and Action Transfer) is an open protocol that gives every
 AI agent a persistent identity, shared memory, capabilities catalog, work
@@ -130,9 +163,9 @@ CALLING CONVENTIONS (read before any tool call):
   explicit value -- never null.
 - If a tool call returns AUTH_REQUIRED, do NOT retry blindly. Report it back
   in your task output so the operator can investigate the connector token wiring.
-- If a tool call returns INVALID_STEP, the step name you used does not exist
-  in YOUR onboarding flow (task-runner agents have a reduced step list).
-  Skip that step and continue.
+- If a tool call returns INVALID_STEP or STEP_NOT_IN_FLOW, the step name you
+  used does not exist in YOUR onboarding flow (task-runner agents have a
+  reduced step list). Skip that step and continue.
 
 YOUR RESPONSIBILITIES, in priority order:
 
@@ -152,9 +185,9 @@ YOUR RESPONSIBILITIES, in priority order:
    - aimeat_onboarding_confirm_directives_read AFTER first calling
      aimeat_handbook_get (with NO module parameter, just empty input)
 
-   If aimeat_onboarding_confirm_directives_read returns INVALID_STEP, your
-   onboarding flow does not include that step (task-runner mode skips it).
-   Continue to the next step.
+   If aimeat_onboarding_confirm_directives_read returns INVALID_STEP or
+   STEP_NOT_IN_FLOW, your onboarding flow does not include that step
+   (task-runner mode skips it). Continue to the next step.
 
 2. WHEN THE OWNER QUEUES A TASK FOR THIS CREW: Use aimeat_task_list to find
    queued tasks for "{agent_name}". Read the prompt from the task. Pass it
@@ -177,11 +210,50 @@ crew's domain work. You speak to AIMEAT, and let the rest of the crew speak
 to the world.
 """
 
+# Kept as the 0.1.x-era default for backwards compat. 0.2.0+ chooses between
+# SLIM_BACKSTORY_TEMPLATE (when skill bundle loaded) and FULL_BACKSTORY_TEMPLATE
+# (fallback) automatically based on whether skill_path resolves to a real file.
+DEFAULT_BACKSTORY_TEMPLATE = FULL_BACKSTORY_TEMPLATE
+
 # Backwards-compat alias: code that imported DEFAULT_BACKSTORY in 0.1.0
 # still works, but the {agent_name} placeholder will leak through unless they
 # format() it. Most users should pass `agent_name` to create_liaison_agent
 # instead and let the factory format the template.
 DEFAULT_BACKSTORY = DEFAULT_BACKSTORY_TEMPLATE.replace("{agent_name}", "<your-aimeat-agent-name>")
+
+
+def _resolve_skill_path(agent_name: str | None) -> Path | None:
+    """
+    Auto-detect where the AIMEAT connector dropped the agent's skill bundle.
+
+    By convention `aimeat connect add --agent <name>` extracts the bundle into
+    `~/.aimeat/<agent_name>/` with `SKILL.md` at its root. CrewAI's Skills
+    loader treats the parent directory containing a SKILL.md file as a single
+    Skill, so we return the path to the AGENT directory (not the SKILL.md
+    file itself). Passing this path to `Agent(skills=[path])` makes CrewAI
+    load the bundle as a first-class skill named after the agent.
+
+    Returns None if the conventional path doesn't exist -- either the
+    connector hasn't run for this agent, the user has a custom AIMEAT config
+    dir, or HTTP transport is in use (no local bundle). The caller falls
+    back to the longer persona that contains the operational manual inline.
+
+    Args:
+        agent_name: The AIMEAT agent name. If None, we can't guess where to
+            look; returns None.
+
+    Returns:
+        Path to the agent's bundle directory if SKILL.md exists, else None.
+    """
+    if not agent_name:
+        return None
+
+    # Same precedence the connector uses: AIMEAT_HOME env var wins, then
+    # the platform-conventional ~/.aimeat. Cross-platform via Path.home().
+    home_dir = os.environ.get("AIMEAT_HOME") or str(Path.home() / ".aimeat")
+    candidate = Path(home_dir) / agent_name
+    skill_md = candidate / "SKILL.md"
+    return candidate if skill_md.is_file() else None
 
 
 def _extract_agent_name_from_params(mcp_server_params: Any) -> str | None:
@@ -203,11 +275,18 @@ def _extract_agent_name_from_params(mcp_server_params: Any) -> str | None:
     return args[idx + 1]
 
 
+# Sentinel for the `skill_path` kwarg: lets us distinguish "user didn't pass
+# it -> auto-detect" from "user explicitly disabled with None -> use fallback
+# persona, no skill bundle".
+_AUTO_DETECT = object()
+
+
 @contextmanager
 def create_liaison_agent(
     *,
     mcp_server_params: Any,
     agent_name: str | None = None,
+    skill_path: Any = _AUTO_DETECT,
     llm: Any = None,
     role: str = DEFAULT_ROLE,
     goal: str = DEFAULT_GOAL,
@@ -261,17 +340,32 @@ def create_liaison_agent(
     if agent_name is None:
         agent_name = _extract_agent_name_from_params(mcp_server_params)
 
-    # Build the final backstory. If caller provided one, use it verbatim
-    # (assume they templated agent_name themselves if they cared). Otherwise
-    # render the default template -- inject agent_name if we know it, or fall
-    # back to a placeholder + a warning instruction in the prose.
-    if backstory is None:
-        if agent_name:
-            backstory = DEFAULT_BACKSTORY_TEMPLATE.format(agent_name=agent_name)
-        else:
-            backstory = DEFAULT_BACKSTORY_TEMPLATE.format(
-                agent_name="<unknown -- pass agent_name=... to create_liaison_agent>"
+    # Resolve skill_path:
+    #   _AUTO_DETECT (default) -> look in ~/.aimeat/<agent_name>/SKILL.md
+    #   None                   -> explicit "don't load a skill" (fallback persona)
+    #   str / Path             -> use as-is
+    resolved_skill_path: Path | None
+    if skill_path is _AUTO_DETECT:
+        resolved_skill_path = _resolve_skill_path(agent_name)
+    elif skill_path is None:
+        resolved_skill_path = None
+    else:
+        resolved_skill_path = Path(skill_path)
+        if not (resolved_skill_path / "SKILL.md").is_file():
+            # Be strict on explicit paths so typos / wrong dirs surface early.
+            raise AimeatLiaisonError(
+                f"skill_path {resolved_skill_path} does not contain a SKILL.md file. "
+                f"Pass the directory that holds SKILL.md, not the SKILL.md file itself."
             )
+
+    # Build the final backstory. If caller provided one, use it verbatim
+    # (assume they templated agent_name themselves if they cared). Otherwise:
+    #   - skill bundle loaded   -> SLIM template (Skill carries the manual)
+    #   - no skill bundle       -> FULL template (persona carries the manual)
+    if backstory is None:
+        template = SLIM_BACKSTORY_TEMPLATE if resolved_skill_path else FULL_BACKSTORY_TEMPLATE
+        fmt_name = agent_name or "<unknown -- pass agent_name=... to create_liaison_agent>"
+        backstory = template.format(agent_name=fmt_name)
 
     adapter = MCPServerAdapter(mcp_server_params)
     try:
@@ -311,6 +405,13 @@ def create_liaison_agent(
         }
         if llm is not None:
             agent_args["llm"] = llm
+        if resolved_skill_path is not None:
+            # CrewAI Skills entry: pass the agent's bundle directory. The Skills
+            # loader (>= CrewAI 1.14) reads SKILL.md + frontmatter + body and
+            # makes it available to the agent through progressive disclosure --
+            # the LLM sees the description first and loads the body when relevant.
+            # Requires AIMEAT >= 1.13.5 on the server (CrewAI-strict frontmatter).
+            agent_args["skills"] = [str(resolved_skill_path)]
         agent_args.update(agent_kwargs)
 
         agent = Agent(**agent_args)
