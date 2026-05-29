@@ -2,6 +2,18 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.12.3] - 2026-05-29
+
+### Fixed
+
+- **`aimeat connect call --agent <name>` silently routed through the primary agent.** `runToolCall` always loaded the global config (`loadConfig()`) and called `Client.fromConfig()` no matter what `--agent` was passed, then put `config.agent` in the REST URL. Net effect: in any multi-agent install, every `connect call --agent foo` ran as whichever agent `~/.aimeat/config.yaml` happened to point at (the primary). For users whose primary was a remote agent (e.g. `falcon@aimeat.io`) but who had local task-runner agents, every call returned the WRONG agent's data — `aimeat_onboarding_status --agent company-crew` returned falcon's completed 13-step onboarding, masking that company-crew's onboarding was actually fine. Fix: `runToolCall` now resolves `--agent` (and optional `--owner` disambiguator) via the new `loadAgentByName()` helper, builds an `AimeatClient` from that agent's stored token + per-agent `node_url`, and uses the right agent name in REST paths. Without `--agent`, behavior is unchanged (falls back to primary).
+- **`aimeat connect list` showed `[interactive]` for agents registered with `--mode task-runner`.** The label only flipped to `[task-runner]` when the local config.yaml had a `runner:` block, ignoring the server-side `mode` field entirely. Now reads `pa.mode` from per-agent config (written by `connect add --mode`) first, falling back to `runner:` presence for agents predating the field. Also adds a `[missing runner: block]` warning next to task-runner agents whose subprocess command has not been configured yet — a frequent stuck point ("agent is registered but nothing happens when I queue a task").
+
+### Changed
+
+- **`AimeatPerAgentConfig.mode` field** added to `~/.aimeat/agents/<name>/config.yaml`. Written by `aimeat connect add --mode <mode>` so the connector knows what the server thinks this agent is, without an extra REST call. Independent of the `runner:` block (which configures the local subprocess); both are needed for a working task-runner.
+- **`aimeat connect add --mode <mode>` is now idempotent on the local label.** If the agent already has a valid token, rerunning `connect add --mode task-runner` updates only the local `mode` field in per-agent config — no second device-auth round, no server-side change. Use this to retroactively label agents registered with 1.12.2's CLI (which set the server-side mode but did not persist a local label) so they show `[task-runner]` in `connect list`.
+
 ## [1.12.2] - 2026-05-29
 
 ### Fixed

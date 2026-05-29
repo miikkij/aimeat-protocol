@@ -198,6 +198,15 @@ export async function runAuth(args: AuthArgs): Promise<void> {
 
   const client = new AimeatClient(nodeUrl);
 
+  let mode: AgentMode | undefined;
+  if (args.mode !== undefined) {
+    if (!VALID_MODES.includes(args.mode as AgentMode)) {
+      fail(`Invalid --mode: ${args.mode}. Must be one of: ${VALID_MODES.join(', ')}`);
+      process.exit(1);
+    }
+    mode = args.mode as AgentMode;
+  }
+
   const existingToken = await getToken(agentName, owner);
   if (existingToken) {
     client.setToken(existingToken);
@@ -206,6 +215,19 @@ export async function runAuth(args: AuthArgs): Promise<void> {
       if (check.ok) {
         success('Already connected! Token is valid.');
         saveConfig({ node_url: nodeUrl, agent: agentName, owner });
+        // Idempotent --mode: refresh local per-agent config so `connect list` shows
+        // the right label without forcing the user to delete + recreate. Server-side
+        // mode is NOT changed here -- that requires owner role via Profile -> Agents
+        // or PATCH /v1/agents/:name/mode. This path only fixes labels for agents
+        // whose local config.yaml predates the mode field.
+        if (mode) {
+          const existingPerAgent = loadPerAgentConfig(agentName);
+          if (existingPerAgent) {
+            savePerAgentConfig(agentName, { ...existingPerAgent, mode });
+            info(`Local per-agent config updated: mode=${mode}`);
+            info(`(Server-side mode is set separately at registration; this only fixes the local label.)`);
+          }
+        }
         await downloadAndPrintBundleGuide(client, agentName, success, info, warn);
         outro(buildNextStepsMessage(buildAgentOnboardingInstruction()));
         return;
@@ -213,15 +235,6 @@ export async function runAuth(args: AuthArgs): Promise<void> {
     } catch {
       warn('Could not verify stored token. Starting fresh auth.');
     }
-  }
-
-  let mode: AgentMode | undefined;
-  if (args.mode !== undefined) {
-    if (!VALID_MODES.includes(args.mode as AgentMode)) {
-      fail(`Invalid --mode: ${args.mode}. Must be one of: ${VALID_MODES.join(', ')}`);
-      process.exit(1);
-    }
-    mode = args.mode as AgentMode;
   }
 
   const s = createProgress(interactive, prompts);
@@ -321,6 +334,7 @@ export async function runAuth(args: AuthArgs): Promise<void> {
     owner,
     node_url: nodeUrl,
     primary: existingPerAgent?.primary ?? isFirstAgent,
+    mode: mode ?? existingPerAgent?.mode,
     poll_interval: existingPerAgent?.poll_interval,
     wake: existingPerAgent?.wake,
     runner: existingPerAgent?.runner,

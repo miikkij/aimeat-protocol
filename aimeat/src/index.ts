@@ -556,10 +556,18 @@ if (subcommand === 'config') {
       console.log(`Connected agents (${tokens.length}):`);
       for (const t of tokens) {
         const pa = loadPerAgentConfig(t.agent);
-        const mode = pa?.runner?.command ? 'task-runner' : 'interactive';
+        // Server-side mode (what AIMEAT thinks this agent is) -- written by
+        // `connect add --mode <mode>`. Falls back to deriving from runner block
+        // for agents registered before the mode field existed.
+        const mode = pa?.mode ?? (pa?.runner?.command ? 'task-runner' : 'interactive');
+        // Runner readiness: task-runner mode alone is not enough; the connector
+        // needs a `runner:` block to actually spawn the subprocess.
+        const runnerReady = Boolean(pa?.runner?.command);
+        const needsRunner = mode === 'task-runner' && !runnerReady;
         const primary = pa?.primary ? ' (primary)' : '';
         const nodeUrl = pa?.node_url ?? '(no per-agent config)';
-        console.log(`  - ${t.agent}@${t.owner} [${mode}]${primary}  ->  ${nodeUrl}`);
+        const warn = needsRunner ? '  [missing runner: block]' : '';
+        console.log(`  - ${t.agent}@${t.owner} [${mode}]${primary}${warn}  ->  ${nodeUrl}`);
         if (pa?.runner) console.log(`      runner: ${pa.runner.command} ${(pa.runner.args ?? []).join(' ')}`);
       }
     }

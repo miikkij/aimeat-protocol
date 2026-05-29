@@ -81,6 +81,17 @@ export interface AimeatPerAgentConfig {
    * primary interactive agent (e.g. Claude Code), not on task-runner agents.
    */
   primary?: boolean;
+  /**
+   * Server-side operational mode this agent was registered with. Mirrors the
+   * value the AIMEAT node stores on `AgentRecord.mode`. Used by `connect list`
+   * to label the agent without an extra REST call, and by docs/CHANGELOG to
+   * tell operators which onboarding flow the agent went through. Distinct from
+   * `runner` -- `mode: task-runner` says the SERVER treats this agent as a
+   * task-runner (reduced 5-step Hello Integration), while `runner: {...}`
+   * configures the local connector to actually spawn a subprocess. Both are
+   * needed for a working task-runner agent.
+   */
+  mode?: 'autonomous' | 'interactive' | 'task-runner' | 'coordinator';
   /** Optional: poll interval in seconds (default: 30). */
   poll_interval?: number;
   /** Optional: per-agent wake adapter (overrides global). See SECURITY note. */
@@ -193,4 +204,21 @@ export async function loadAllAgents(): Promise<LoadedAgent[]> {
   }
 
   return out;
+}
+
+/**
+ * Find a single registered agent by name. Used by `aimeat connect call --agent <name>`
+ * so the CLI can route the call through the right agent's token + node URL instead
+ * of always falling back to the global "primary" config. Returns null if no token
+ * is stored for that agent name, or if multiple owners have the same agent name and
+ * `owner` was not specified to disambiguate.
+ */
+export async function loadAgentByName(agent: string, owner?: string): Promise<LoadedAgent | null> {
+  const all = await loadAllAgents();
+  const matches = all.filter(a => a.agent === agent && (!owner || a.owner === owner));
+  if (matches.length === 0) return null;
+  if (matches.length > 1) {
+    throw new Error(`Agent "${agent}" exists under multiple owners (${matches.map(m => m.owner).join(', ')}). Pass --owner to disambiguate.`);
+  }
+  return matches[0];
 }

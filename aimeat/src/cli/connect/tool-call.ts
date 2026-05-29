@@ -25,7 +25,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { CLI_FALLBACK_TOOL_DEFINITIONS, getAimeatToolDefinition, type ToolInputField } from '../../mcp/catalog/definitions.js';
 import type { AimeatClient, ApiResponse } from './api-client.js';
 import { AimeatClient as Client } from './api-client.js';
-import { loadConfig, type AimeatConnectConfig } from './config.js';
+import { loadConfig, loadAgentByName, type AimeatConnectConfig } from './config.js';
 
 type JsonObject = Record<string, unknown>;
 
@@ -918,11 +918,38 @@ export async function runToolCall(toolName: string | undefined, flags: Record<st
     }
 
     try {
-        const config = loadConfig();
-        if (!config) throw new Error('Not configured. Run: npx aimeat connect');
-        const client = await Client.fromConfig();
+        // Per-agent selection: if --agent is passed, route the call through THAT agent's
+        // token + node URL. Without --agent, fall back to the global "primary" config
+        // for backward compatibility with single-agent installs. Without this, every
+        // `connect call --agent foo` silently used the primary's token and the primary's
+        // agent name in the REST path -- so a multi-agent install could not target a
+        // specific agent at all (the call always ran as the primary).
+        let agentName: string;
+        let owner: string;
+        let client: AimeatClient;
+        let config: AimeatConnectConfig | { agent: string; owner: string; node_url: string };
+
+        if (flags.agent) {
+            const loaded = await loadAgentByName(flags.agent, flags.owner || undefined);
+            if (!loaded) {
+                throw new Error(`Agent "${flags.agent}" not found in connector. Run: aimeat connect list`);
+            }
+            agentName = loaded.agent;
+            owner = loaded.owner;
+            client = new Client(loaded.config.node_url, loaded.token);
+            config = { agent: loaded.agent, owner: loaded.owner, node_url: loaded.config.node_url };
+        } else {
+            const cfg = loadConfig();
+            if (!cfg) throw new Error('Not configured. Run: npx aimeat connect');
+            agentName = cfg.agent;
+            owner = cfg.owner;
+            client = await Client.fromConfig();
+            config = cfg;
+        }
+
+        void owner; // reserved for future per-tool authorization checks
         const input = await readInput(flags);
-        const response = await tool.handler({ client, config, agentPath: encodeURIComponent(config.agent) }, input);
+        const response = await tool.handler({ client, config, agentPath: encodeURIComponent(agentName) }, input);
         if (!response.ok) {
             console.error(JSON.stringify(response.error ?? response, null, 2));
             process.exitCode = 1;
