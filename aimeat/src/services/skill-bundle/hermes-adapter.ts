@@ -63,7 +63,7 @@ name: ${ctx.agentName}
 description: AIMEAT node integration for Hermes-runtime agent ${ctx.agentName} on ${ctx.nodeUrl} -- on-wake protocol, watchdog cron job, MCP tool catalogue, Hello Integration handshake. Activate when the agent needs to call any AIMEAT tool, check onboarding status, write to memory, contribute knowledge, complete tasks, or coordinate with other agents.
 metadata:
   trigger: when the agent needs to call any AIMEAT tool, check onboarding status, write to memory, contribute knowledge, complete tasks, or coordinate with other agents on the AIMEAT node
-  tags: [aimeat, agent-orchestration, mcp, hermes]
+  tags: "aimeat, agent-orchestration, mcp, hermes"
   aimeat_node_id: ${ctx.nodeId}
   aimeat_node_url: ${ctx.nodeUrl}
   aimeat_agent_gaii: ${ctx.agentGaii}

@@ -2,6 +2,17 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.13.5] - 2026-05-29
+
+### Fixed
+
+- **`metadata.tags` is now a comma-separated string, not a YAML list.** CrewAI's `SkillFrontmatter` declares `metadata` as `dict[str, str]` and rejects any value that isn't a string -- so `tags: [aimeat, agent-orchestration, mcp]` failed validation with `Input should be a valid string`. 1.13.5 emits `tags: "aimeat, agent-orchestration, mcp"` instead. This was the last frontmatter blocker for `aimeat-crewai 0.2.0`. Confirmed by CrewAI Claude's verification: locally patching this single character made `load_skill_metadata` succeed and `discover_skills()` return a usable Skill.
+- **`aimeat connect refresh --agent <name>` silently routed through the primary agent regardless of `--agent`.** Same bug shape as the `runToolCall` issue fixed in 1.13.1, but on the refresh command. In multi-agent installs, `aimeat connect refresh --agent demo-crew` re-downloaded the PRIMARY agent's bundle and overwrote it into the primary's directory, never touching demo-crew. Net effect: per-agent bundle updates didn't happen, so post-1.13.x server upgrades didn't propagate to all locally-registered agents without a workaround (re-`connect add`). Now uses `loadAgentByName(flags.agent, flags.owner)` so the per-agent token + node URL + agent name flow through correctly. Without `--agent`, behavior is unchanged.
+
+### Operator note
+
+If you have agents registered on a pre-1.13.5 connector with frontmatter that contains `tags: [...]` (list), one of two things will happen with CrewAI: (a) `load_skill_metadata` will reject the skill silently and `discover_skills()` will skip it, or (b) older CrewAI versions may accept the list and stringify it badly. After upgrading both the connector AND the AIMEAT node to 1.13.5+, run `aimeat connect refresh --agent <name>` for each agent to re-download with the fixed frontmatter.
+
 ## [1.13.4] - 2026-05-29
 
 ### Fixed (SKILL.md frontmatter rejected by CrewAI's strict validator)

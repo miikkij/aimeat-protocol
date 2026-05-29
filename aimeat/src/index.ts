@@ -522,13 +522,31 @@ if (subcommand === 'config') {
   } else if (connectAction === 'refresh') {
     const { AimeatClient } = await import('./cli/connect/api-client.js');
     const { downloadSkillBundle, readSkillBundleGuide } = await import('./cli/connect/skill-bundle.js');
-    const { loadConfig } = await import('./cli/connect/config.js');
-    const cfg = loadConfig();
-    if (!cfg) { console.error('Not configured. Run: npx aimeat connect'); process.exit(1); }
+    const { loadConfig, loadAgentByName } = await import('./cli/connect/config.js');
+    // Per-agent refresh: if --agent is given, refresh THAT agent's bundle using
+    // that agent's token + node URL. Without --agent, fall back to the global
+    // primary config (single-agent installs work unchanged). The previous
+    // behaviour silently routed every `refresh --agent X` through the primary,
+    // so multi-agent installs never got per-agent bundle updates.
+    let bundleAgent: string;
+    let cl: InstanceType<typeof AimeatClient>;
+    if (connectFlags.agent) {
+      const loaded = await loadAgentByName(connectFlags.agent, connectFlags.owner || undefined);
+      if (!loaded) {
+        console.error(`Agent "${connectFlags.agent}" not found in connector. Run: aimeat connect list`);
+        process.exit(1);
+      }
+      bundleAgent = loaded.agent;
+      cl = new AimeatClient(loaded.config.node_url, loaded.token);
+    } else {
+      const cfg = loadConfig();
+      if (!cfg) { console.error('Not configured. Run: npx aimeat connect'); process.exit(1); }
+      bundleAgent = cfg.agent;
+      cl = await AimeatClient.fromConfig();
+    }
     try {
-      const cl = await AimeatClient.fromConfig();
-      const bundle = await downloadSkillBundle(cl, cfg.agent);
-      console.log(`Skill bundle downloaded and extracted to ${bundle.bundleDir}/`);
+      const bundle = await downloadSkillBundle(cl, bundleAgent);
+      console.log(`Skill bundle for ${bundleAgent} downloaded and extracted to ${bundle.bundleDir}/`);
       console.log(`Main skill file: ${bundle.skillPath}`);
       console.log('');
       console.log(readSkillBundleGuide(bundle));
