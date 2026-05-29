@@ -215,6 +215,15 @@ export async function runAuth(args: AuthArgs): Promise<void> {
     }
   }
 
+  let mode: AgentMode | undefined;
+  if (args.mode !== undefined) {
+    if (!VALID_MODES.includes(args.mode as AgentMode)) {
+      fail(`Invalid --mode: ${args.mode}. Must be one of: ${VALID_MODES.join(', ')}`);
+      process.exit(1);
+    }
+    mode = args.mode as AgentMode;
+  }
+
   const s = createProgress(interactive, prompts);
   s.start('Requesting device authorization...');
 
@@ -223,6 +232,7 @@ export async function runAuth(args: AuthArgs): Promise<void> {
     authResp = await client.post('/v1/agents/device-authorize', {
       agent_name: agentName,
       owner,
+      ...(mode ? { mode } : {}),
     });
   } catch (e) {
     s.stop('Authorization request failed.');
@@ -325,6 +335,12 @@ export async function runAuth(args: AuthArgs): Promise<void> {
 
   client.setToken(token.access_token);
   await downloadAndPrintBundleGuide(client, agentName, success, info, warn);
+
+  if (mode === 'task-runner') {
+    info(`Mode set to task-runner. Hello Integration will be the reduced 5-step flow.`);
+    info(`To make this agent actually run tasks, edit ~/.aimeat/agents/${agentName}/config.yaml`);
+    info(`and add a "runner:" block (command/args/cwd/env). See: aimeat connect docs task-runner`);
+  }
 
   outro(buildNextStepsMessage(buildAgentOnboardingInstruction()));
 }

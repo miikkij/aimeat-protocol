@@ -182,11 +182,20 @@ USAGE
   aimeat connect logout
       Remove stored credentials for the configured agent.
 
-  aimeat connect add [--url <node-url> --owner <owner> --agent <name>]
+  aimeat connect add [--url <node-url> --owner <owner> --agent <name>] [--mode <mode>]
       Alias for the default \`aimeat connect\` flow -- adds another agent to
       the connector so a single \`aimeat connect serve\` process can serve
       multiple agents (e.g. one Claude Code interactive agent plus several
       CrewAI task-runner agents) from one local MCP server.
+
+      --mode <mode>   one of: autonomous | interactive | task-runner | coordinator
+                      Default: interactive. Use task-runner for CrewAI crews
+                      / triggered workers -- the agent gets the reduced
+                      5-step Hello Integration (no commands, no test task,
+                      no test message) and is treated as a subprocess
+                      target. You must still add a \`runner:\` block to
+                      ~/.aimeat/agents/<name>/config.yaml to wire the
+                      subprocess; mode alone does not configure execution.
 
   aimeat connect list
       Show every agent registered with the connector, including their mode
@@ -198,7 +207,7 @@ USAGE
 
 EXAMPLES
   aimeat connect --url http://localhost:40050 --owner happyadmin --agent hermes
-  aimeat connect add --agent marketing-crew --url http://localhost:40050 --owner happyadmin
+  aimeat connect add --agent marketing-crew --mode task-runner --url http://localhost:40050 --owner happyadmin
   aimeat connect list
   aimeat connect serve
   aimeat connect docs tasks
@@ -588,6 +597,7 @@ if (subcommand === 'config') {
       url: connectFlags.url,
       owner: connectFlags.owner,
       agent: connectFlags.agent,
+      mode: connectFlags.mode,
     });
   } else {
     // Default: run auth
@@ -596,6 +606,7 @@ if (subcommand === 'config') {
       url: connectFlags.url,
       owner: connectFlags.owner,
       agent: connectFlags.agent,
+      mode: connectFlags.mode,
     });
   }
   if (shouldExitAfterConnect) {

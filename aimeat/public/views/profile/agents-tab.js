@@ -133,20 +133,20 @@ function buildTaskRunnerPrompt(sess, agentName) {
   const name = agentName || '<your-crew-name>';
   return `You are being attached to an AIMEAT node as a TASK-RUNNER agent (mode: "task-runner"). Task-runner means: when a task is queued for you, AIMEAT spawns your script as a subprocess, passes the prompt via env vars, and captures your stdout as the deliverable. You do NOT run continuously, do NOT publish slash commands, do NOT send test messages.
 
-Required: aimeat@1.12.0 or later (npm).
+Required: aimeat@1.12.2 or later (npm).
 
-== Step 1 -- Connect ==
-  npx aimeat connect add --agent ${name} --url ${url} --owner ${sess.owner}
+== Step 1 -- Connect with mode=task-runner ==
+The --mode flag sets the agent's mode at registration time, so the
+server gives you the reduced 5-step Hello Integration (instead of the
+default 13-step interactive flow). No separate owner-only call needed.
+
+  npx aimeat connect add --agent ${name} --mode task-runner --url ${url} --owner ${sess.owner}
+
 Ask ${sess.owner} to approve in their browser at Profile -> Agents.
-
-== Step 2 -- Switch server-side mode to task-runner ==
-This replaces the 13-step Hello Integration with the 5-step reduced flow
-(no commands, no test task, no messages). Run:
-  npx aimeat connect call aimeat_agent_mode_set --agent ${name} --json '{"target_agent_name":"${name}","mode":"task-runner"}'
-Verify with: npx aimeat connect call aimeat_onboarding_status --agent ${name}
+Verify after approval: npx aimeat connect call aimeat_onboarding_status --agent ${name}
 You should see 5 steps, not 13.
 
-== Step 3 -- Configure your subprocess ==
+== Step 2 -- Configure your subprocess ==
 Edit ~/.aimeat/agents/${name}/config.yaml and add a runner: block:
   runner:
     command: "python"          # or "node", or your binary
@@ -173,11 +173,11 @@ You do NOT call aimeat_task_complete yourself. The connector does it for
 you based on exit code + captured stdout. (For mid-task progress events,
 you may call aimeat_task_event with AIMEAT_TOKEN.)
 
-== Step 4 -- Start serving ==
+== Step 3 -- Start serving ==
   npx aimeat connect serve
 Confirm your agent appears as [task-runner]: npx aimeat connect list
 
-== Step 5 -- Smoke test ==
+== Step 4 -- Smoke test ==
 From another shell or another connected agent:
   npx aimeat connect call aimeat_task_propose_todos --agent <another-agent> --json '{"target_agent":"${name}","title":"Smoke test","prompt":"Reply with the word OK.","todos":[]}'
 Within seconds your subprocess should run. List your completed tasks:

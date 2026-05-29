@@ -2,6 +2,21 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.12.2] - 2026-05-29
+
+### Fixed
+
+- **Task-runner agents could not be created from the CLI without a manual owner-role REST call.** `aimeat connect add` registered every agent as `mode: interactive`, then required the owner to switch it to `task-runner` via `PATCH /v1/agents/:name/mode` (owner-only). But the connector only holds agent tokens, so `aimeat connect call aimeat_agent_mode_set` from the new agent's session returned `Role "owner" required`. The only path was DevTools console / curl, which was a workaround, not a flow. Fix: `aimeat connect [add] --mode <mode>` now propagates the mode all the way to `POST /v1/agents/device-authorize` so the agent is created with the right mode from the start -- the reduced 5-step Hello Integration kicks in immediately, no second call needed.
+
+### Changed
+
+- **Profile -> Agents -> "Connect a task-runner agent" paste prompt** rewritten to use `--mode task-runner` on `connect add` as Step 1, dropping the old broken Step 2 (`aimeat_agent_mode_set`). Steps renumbered 1-4 (was 1-5).
+- **`aimeat connect --help`** updated: `connect add` now documents `--mode <mode>` with the four valid values and a note that `mode` alone does not configure the subprocess -- `~/.aimeat/agents/<name>/config.yaml` still needs a `runner:` block. Example invocation in the help text now shows `--mode task-runner`.
+
+### Migration
+
+If you registered a task-runner-style agent under 1.12.0 / 1.12.1 (it will show `INTERACTIVE` badge in Profile -> Agents and have 13 onboarding steps), the cleanest path is to delete + recreate it with `--mode task-runner`. The `PATCH /v1/agents/:name/mode` endpoint still exists for owner-driven re-classification of existing agents.
+
 ## [1.12.1] - 2026-05-29
 
 ### Fixed
@@ -113,6 +128,9 @@ upstream author's information.
 
 #### Templated Pages Served Raw via Static Middleware
 - **`/privacy.html` and `/connect.html` showed unresolved `{{placeholder}}` tokens** -- the templated HTML files live in `public/`, which Express's `express.static` serves directly. Direct access to `https://aimeat.io/privacy.html` returned the raw template (`{{nodeName}}`, `{{operatorName}}`, etc.) instead of the substituted content available at `/v1/privacy`. Catastrophic if a search engine or reviewer landed on the legacy URL. Fixed by extending the redirect middleware in `server-bootstrap/static-files.ts` with a `STATIC_HTML_REDIRECTS` map: `/privacy.html`, `/privacy.fi.html`, `/connect.html`, `/connect.fi.html` now 301-redirect to their `/v1/` canonical routes. Pattern is now generalised so future templated pages can be added in one line.
+
+#### Silent Base64 Corruption on Inline Uploads
+- **`POST /v1/apps`, `POST /v1/memory/files`, `POST /v1/storage` (inline mode) accepted raw bytes as "base64" and stored a tiny garbage payload** -- Node's `Buffer.from(str, 'base64')` is permissive and silently drops characters outside the base64 alphabet. A caller that POSTed raw HTML (or JSON, or binary) as `content` therefore got a successful publish with whichever few characters of their input happened to be base64-legal -- typically 10-20 bytes of garbage out of a multi-KB upload. The server returned 2xx, the storage layer happily persisted it, and downloaders later hit gibberish at the canonical URL with no diagnostic anywhere. Discovered while seeding the directory-submission reviewer account on aimeat.io: a 1.2 KB HTML app published via `POST /v1/apps` with raw HTML in `content` saved as 14 bytes and served as binary noise. Fixed by introducing a strict `decodeStrictBase64()` helper at `aimeat/src/utils/base64.ts` (rejects empty input; rejects any character outside `[A-Za-z0-9+/_-]` with optional 0-2 `=` padding) and applying it at every inline-upload site: `apps.ts` (`content` + `screenshot`), `memory.ts` (`/v1/memory/files`), `storage-files.ts` (`/v1/storage` inline mode). Three regression tests added in `test/e2e-upload.ts` Phase 3.5 pin the boundary: raw HTML and malformed input now return 400 INVALID_INPUT with a remediation hint pointing to `Buffer.from(html).toString("base64")` and the presigned-upload alternative; valid base64 round-trips to the exact original byte length. Existing presigned-upload mode is unaffected (it uses raw PUT, not base64). e2e-upload: 16/16 passing on SQLite.
 
 ### Documentation
 - **Connectors Directory submission plan** -- single source of truth for every form field, all 94 tools' annotation classifications with hint reasoning, pre-submission technical pre-flight verified against live aimeat.io, nginx fix snippet, reviewer-test-account seeding instructions deferred to Section E.
