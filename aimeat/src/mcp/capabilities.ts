@@ -4,12 +4,15 @@
  * @version-history
  *   v1.1.0 - 2026-05-02 - Add create, update, delete, vouch tools
  *   v1.0.0 - 2026-05-02 - Initial: list, get, invoke
+ *   v1.2.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { randomUUID, createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord } from '../storage/interface.js';
+import { annotationsFor } from './annotations.js';
 
 export function registerCapabilitiesTools(
     mcp: McpServer,
@@ -30,6 +33,7 @@ export function registerCapabilitiesTools(
             authRequired: z.string().optional().describe('Filter by auth level: none, anonymous, registered'),
             source_type: z.string().optional().describe('Filter by source type: extension, action, cortex, manual'),
         },
+        annotationsFor('aimeat_capabilities_list'),
         async (args) => {
             const result = await storage.listCapabilities({
                 ...args,
@@ -52,6 +56,7 @@ export function registerCapabilitiesTools(
         {
             id: z.string().describe('Capability ID'),
         },
+        annotationsFor('aimeat_capabilities_get'),
         async ({ id }) => {
             const cap = await storage.getCapability(id);
             if (!cap) return { content: [{ type: 'text' as const, text: `Capability not found: ${id}` }], isError: true };
@@ -67,6 +72,7 @@ export function registerCapabilitiesTools(
             input: z.record(z.string(), z.unknown()).optional().describe('Input data for the capability'),
             mode: z.enum(['normal', 'raw']).optional().describe('normal = normalized result, raw = original response'),
         },
+        annotationsFor('aimeat_capabilities_invoke'),
         async (args) => {
             const cap = await storage.getCapability(args.id);
             if (!cap) return { content: [{ type: 'text' as const, text: `Capability not found: ${args.id}` }], isError: true };
@@ -110,6 +116,7 @@ export function registerCapabilitiesTools(
             usage: z.string().optional().describe('Usage instructions for consumers'),
             whenToUse: z.string().optional().describe('Guidance on when this capability is appropriate'),
         },
+        annotationsFor('aimeat_capabilities_create'),
         async (args) => {
             const now = new Date().toISOString();
             const ownerGhii = getAgentGaii();
@@ -178,6 +185,7 @@ export function registerCapabilitiesTools(
             whenToUse: z.string().optional().describe('Updated guidance on when to use'),
             whenNotToUse: z.string().optional().describe('Updated guidance on when NOT to use'),
         },
+        annotationsFor('aimeat_capabilities_update'),
         async (args) => {
             const cap = await storage.getCapability(args.id);
             if (!cap) return { content: [{ type: 'text' as const, text: `Capability not found: ${args.id}` }], isError: true };
@@ -207,6 +215,7 @@ export function registerCapabilitiesTools(
         {
             id: z.string().describe('Capability ID to delete'),
         },
+        annotationsFor('aimeat_capabilities_delete'),
         async ({ id }) => {
             const cap = await storage.getCapability(id);
             if (!cap) return { content: [{ type: 'text' as const, text: `Capability not found: ${id}` }], isError: true };
@@ -232,6 +241,7 @@ export function registerCapabilitiesTools(
             id: z.string().describe('Capability ID to vouch for'),
             comment: z.string().optional().describe('Optional comment explaining why you vouch for this capability'),
         },
+        annotationsFor('aimeat_capabilities_vouch'),
         async ({ id, comment: _comment }) => {
             const cap = await storage.getCapability(id);
             if (!cap) return { content: [{ type: 'text' as const, text: `Capability not found: ${id}` }], isError: true };

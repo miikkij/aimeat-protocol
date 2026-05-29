@@ -10,12 +10,15 @@
  *   registerAgentCapabilityTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
  *   v1.0.0 -- 2026-05-20 -- Initial creation for Agent Dashboard Phase 2
+ *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTechnicalCapability } from '../storage/interface.js';
+import { annotationsFor } from './annotations.js';
 
 export function registerAgentCapabilityTools(
     mcp: McpServer,
@@ -39,6 +42,7 @@ export function registerAgentCapabilityTools(
             domain: z.array(z.string()).optional().describe('Domain expertise areas (e.g. "web development", "data analysis")'),
             languages: z.array(z.string()).optional().describe('Human languages the agent can work in (e.g. "fi", "en", "de")'),
         },
+        annotationsFor('aimeat_agent_capabilities_report'),
         async ({ technical, domain, languages }) => {
             const agent = await storage.getAgent(agentGaii);
             if (!agent) {
@@ -91,6 +95,7 @@ export function registerAgentCapabilityTools(
             days: z.number().optional().describe('Number of days of history to retrieve (default 30)'),
             granularity: z.enum(['daily', 'hourly']).optional().describe('Granularity of history records (default daily)'),
         },
+        annotationsFor('aimeat_agent_activity'),
         async ({ days, granularity }) => {
             const agent = await storage.getAgent(agentGaii);
             if (!agent) {

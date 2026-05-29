@@ -12,6 +12,8 @@
  *   registerAgentOnboardingTools(mcp, storage, config, getAgentGaii, emitResourceUpdated);
  * @version-history
  *   v1.0.0 -- 2026-05-28 -- Add public MCP Hello Integration lifecycle tools
+ *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -23,6 +25,7 @@ import { checkAutoSteps, validateStep } from '../services/onboarding-validator.j
 import { calculateReadiness } from '../services/readiness-scorer.js';
 import type { AgentOnboardingRecord, Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
+import { annotationsFor } from './annotations.js';
 
 type ToolTextResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
 
@@ -194,7 +197,7 @@ export function registerAgentOnboardingTools(
 ): void {
     const agentGaii = getAgentGaii();
 
-    mcp.tool('aimeat_onboarding_status', 'View required Hello Integration first-run onboarding status and next-step hints', {}, async () => {
+    mcp.tool('aimeat_onboarding_status', 'View required Hello Integration first-run onboarding status and next-step hints', {}, annotationsFor('aimeat_onboarding_status'), async () => {
         const status = await buildOnboardingStatus(agentGaii, storage);
         if (status.error) return asError(String(status.error));
         emitResourceUpdated(agentGaii, `aimeat://agents/${getAgentName(agentGaii)}/onboarding`);
@@ -204,7 +207,7 @@ export function registerAgentOnboardingTools(
     mcp.tool('aimeat_onboarding_identify_platform', 'Confirm the connected agent runtime/platform for Hello Integration', {
         platform: z.string().describe('Runtime/platform name, for example claude, openclaw, hermes, generic, or vscode'),
         platform_version: z.string().optional().describe('Runtime/platform version if known'),
-    }, async ({ platform, platform_version }) => {
+    }, annotationsFor('aimeat_onboarding_identify_platform'), async ({ platform, platform_version }) => {
         const result = await confirmOnboardingStep(agentGaii, 'identify_platform', { platform, platform_version }, storage, emitResourceUpdated);
         return result.error ? asError(String(result.error)) : asText(result);
     });
@@ -212,14 +215,14 @@ export function registerAgentOnboardingTools(
     mcp.tool('aimeat_onboarding_confirm_skill_installed', 'Confirm this skill bundle has been downloaded/extracted for Hello Integration', {
         platform: z.string().describe('Runtime/platform using the bundle, for example generic, claude, openclaw, or hermes'),
         version: z.string().describe('Bundle version if known; use local when no version is shown'),
-    }, async ({ platform, version }) => {
+    }, annotationsFor('aimeat_onboarding_confirm_skill_installed'), async ({ platform, version }) => {
         const result = await confirmOnboardingStep(agentGaii, 'install_skill', { platform, version }, storage, emitResourceUpdated);
         return result.error ? asError(String(result.error)) : asText(result);
     });
 
     mcp.tool('aimeat_onboarding_confirm_directives_read', 'Confirm the agent has read its AIMEAT handbook/directives', {
         confirmed: z.boolean().optional().describe('Set true after reading the handbook/directives'),
-    }, async ({ confirmed }) => {
+    }, annotationsFor('aimeat_onboarding_confirm_directives_read'), async ({ confirmed }) => {
         const result = await confirmOnboardingStep(agentGaii, 'read_directives', { confirmed: confirmed ?? true }, storage, emitResourceUpdated);
         return result.error ? asError(String(result.error)) : asText(result);
     });
@@ -229,7 +232,7 @@ export function registerAgentOnboardingTools(
             name: z.string().describe('Service name'),
             description: z.string().optional().describe('Short service description'),
         })).optional().describe('Services the agent wants to declare; empty is allowed'),
-    }, async ({ services }) => {
+    }, annotationsFor('aimeat_onboarding_declare_services'), async ({ services }) => {
         const result = await confirmOnboardingStep(agentGaii, 'declare_services', { services: services ?? [] }, storage, emitResourceUpdated);
         return result.error ? asError(String(result.error)) : asText(result);
     });

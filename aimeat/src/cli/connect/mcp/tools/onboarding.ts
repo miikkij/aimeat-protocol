@@ -5,29 +5,41 @@
  * @structure Registers status plus convenience confirmation tools for platform,
  *   skill bundle installation, directives, and optional service declarations.
  * @usage Called by the `aimeat connect serve` MCP server.
- * @version-history v1.0.0 -- 2026-05-28 -- Add onboarding tools for connected agents.
- * @version-history v1.0.1 -- 2026-05-28 -- Describe Hello Integration as required first-run onboarding.
+ * @version-history
+ *   v1.0.0 -- 2026-05-28 -- Add onboarding tools for connected agents
+ *   v1.0.1 -- 2026-05-28 -- Describe Hello Integration as required first-run onboarding
+ *   v2.0.0 -- 2026-05-29 -- Registry-driven, agent_name parameter
+ *   v2.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { AimeatClient } from '../../api-client.js';
+import type { AgentRegistry } from '../../agent-registry.js';
+import { agentNameSchema, pickAgent } from './_registry.js';
+import { annotationsFor } from '../../../../mcp/annotations.js';
 
 function asText(value: unknown): { content: Array<{ type: 'text'; text: string }> } {
     return { content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] };
 }
 
-export function registerOnboardingTools(mcp: McpServer, client: AimeatClient, agentName: string): void {
-    const enc = encodeURIComponent(agentName);
+export function registerOnboardingTools(mcp: McpServer, registry: AgentRegistry): void {
 
-    mcp.tool('aimeat_onboarding_status', 'View required Hello Integration first-run onboarding status and next-step hints', {}, async () => {
+    mcp.tool('aimeat_onboarding_status', 'View required Hello Integration first-run onboarding status and next-step hints', {
+        agent_name: agentNameSchema,
+    }, annotationsFor('aimeat_onboarding_status'), async ({ agent_name }) => {
+        const { client, agent } = pickAgent(registry, agent_name);
+        const enc = encodeURIComponent(agent);
         const resp = await client.get(`/v1/agents/${enc}/onboarding`);
         return asText(resp.data ?? resp);
     });
 
     mcp.tool('aimeat_onboarding_identify_platform', 'Confirm the connected agent runtime/platform for Hello Integration', {
+        agent_name: agentNameSchema,
         platform: z.string().describe('Runtime/platform name, for example claude, openclaw, hermes, generic, or vscode'),
         platform_version: z.string().optional().describe('Runtime/platform version if known'),
-    }, async ({ platform, platform_version }) => {
+    }, annotationsFor('aimeat_onboarding_identify_platform'), async ({ agent_name, platform, platform_version }) => {
+        const { client, agent } = pickAgent(registry, agent_name);
+        const enc = encodeURIComponent(agent);
         const body: Record<string, unknown> = { platform };
         if (platform_version) body.platform_version = platform_version;
         const resp = await client.post(`/v1/agents/${enc}/onboarding/step/identify_platform`, body);
@@ -35,26 +47,35 @@ export function registerOnboardingTools(mcp: McpServer, client: AimeatClient, ag
     });
 
     mcp.tool('aimeat_onboarding_confirm_skill_installed', 'Confirm this skill bundle has been downloaded/extracted for Hello Integration', {
+        agent_name: agentNameSchema,
         platform: z.string().describe('Runtime/platform using the bundle, for example generic, claude, openclaw, or hermes'),
         version: z.string().describe('Bundle version if known; use local when no version is shown'),
-    }, async ({ platform, version }) => {
+    }, annotationsFor('aimeat_onboarding_confirm_skill_installed'), async ({ agent_name, platform, version }) => {
+        const { client, agent } = pickAgent(registry, agent_name);
+        const enc = encodeURIComponent(agent);
         const resp = await client.post(`/v1/agents/${enc}/onboarding/step/install_skill`, { platform, version });
         return asText(resp.data ?? resp);
     });
 
     mcp.tool('aimeat_onboarding_confirm_directives_read', 'Confirm the agent has read its AIMEAT handbook/directives', {
+        agent_name: agentNameSchema,
         confirmed: z.boolean().optional().describe('Set true after reading the handbook/directives'),
-    }, async ({ confirmed }) => {
+    }, annotationsFor('aimeat_onboarding_confirm_directives_read'), async ({ agent_name, confirmed }) => {
+        const { client, agent } = pickAgent(registry, agent_name);
+        const enc = encodeURIComponent(agent);
         const resp = await client.post(`/v1/agents/${enc}/onboarding/step/read_directives`, { confirmed: confirmed ?? true });
         return asText(resp.data ?? resp);
     });
 
     mcp.tool('aimeat_onboarding_declare_services', 'Optionally declare services/capabilities exposed by this agent', {
+        agent_name: agentNameSchema,
         services: z.array(z.object({
             name: z.string().describe('Service name'),
             description: z.string().optional().describe('Short service description'),
         })).optional().describe('Services the agent wants to declare; empty is allowed'),
-    }, async ({ services }) => {
+    }, annotationsFor('aimeat_onboarding_declare_services'), async ({ agent_name, services }) => {
+        const { client, agent } = pickAgent(registry, agent_name);
+        const enc = encodeURIComponent(agent);
         const resp = await client.post(`/v1/agents/${enc}/onboarding/step/declare_services`, { services: services ?? [] });
         return asText(resp.data ?? resp);
     });

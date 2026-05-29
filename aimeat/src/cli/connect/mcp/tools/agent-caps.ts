@@ -2,22 +2,30 @@
  * @file agent-caps.ts
  * @description MCP tool registrations for reporting agent capabilities and
  *   viewing activity statistics.
+ * @version-history
+ *   v2.0.0 -- 2026-05-29 -- Registry-driven, agent_name parameter
+ *   v2.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { AimeatClient } from '../../api-client.js';
+import type { AgentRegistry } from '../../agent-registry.js';
+import { agentNameSchema, pickAgent } from './_registry.js';
+import { annotationsFor } from '../../../../mcp/annotations.js';
 
-export function registerAgentCapsTools(mcp: McpServer, client: AimeatClient, agentName?: string): void {
-  const enc = encodeURIComponent(agentName!);
+export function registerAgentCapsTools(mcp: McpServer, registry: AgentRegistry): void {
 
   mcp.tool('aimeat_agent_capabilities_report', 'Report agent capabilities to the node', {
+    agent_name: agentNameSchema,
     technical: z.array(z.object({
       name: z.string(),
       type: z.enum(['mcp', 'skill', 'tool']).describe("Capability type: 'mcp' (an MCP server/tool), 'skill' (a built-in skill or module), or 'tool' (a generic tool the agent can call)."),
     })).optional().describe('Technical capabilities, each with a name and a type from the enum mcp|skill|tool.'),
     domain: z.array(z.string()).optional().describe('Domain expertise areas, free-form short labels.'),
     languages: z.array(z.string()).optional().describe('Supported language codes (BCP-47 short form), e.g. "en", "fi".'),
-  }, async ({ technical, domain, languages }) => {
+  }, annotationsFor('aimeat_agent_capabilities_report'), async ({ agent_name, technical, domain, languages }) => {
+    const { client, agent } = pickAgent(registry, agent_name);
+    const enc = encodeURIComponent(agent);
     const body: Record<string, unknown> = {};
     if (technical) body.technical = technical;
     if (domain) body.domain = domain;
@@ -26,7 +34,11 @@ export function registerAgentCapsTools(mcp: McpServer, client: AimeatClient, age
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_agent_activity', 'View agent activity statistics', {}, async () => {
+  mcp.tool('aimeat_agent_activity', 'View agent activity statistics', {
+    agent_name: agentNameSchema,
+  }, annotationsFor('aimeat_agent_activity'), async ({ agent_name }) => {
+    const { client, agent } = pickAgent(registry, agent_name);
+    const enc = encodeURIComponent(agent);
     const resp = await client.get(`/v1/agents/${enc}/activity`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });

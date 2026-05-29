@@ -145,6 +145,8 @@ npx aimeat connect --url https://your-node --owner your-handle [--agent name]
 
 For MCP-capable runtimes (Claude Desktop, MCP-aware IDEs), run `aimeat connect serve` afterwards to attach the AIMEAT toolset over stdio. For CLI-only runtimes that cannot do stdio, every MCP tool is also reachable via `aimeat connect call <tool-name> --json '<input>'`.
 
+**Multi-agent connector.** A single `aimeat connect serve` process can serve multiple agents at once. Add more agents with `aimeat connect add --agent <name> --url ... --owner ...`; list them with `aimeat connect list`; remove with `aimeat connect remove <name>`. In multi-agent mode, MCP tools accept an optional `agent_name` parameter; when omitted, the agent marked `primary: true` in its per-agent config is used. This is the path for connecting one interactive agent (Claude Code) plus several **task-runner** agents (e.g. CrewAI crews) from one connector process -- see [docs/integrations/crewai.md](docs/integrations/crewai.md) for the task-runner pattern.
+
 **2. Copy the prompt from your profile.** If you do not want to install a CLI, your profile -> Agents tab still produces a paste-ready prompt with the device-auth flow baked in -- give it to any AI agent, the agent calls one endpoint, you approve, and it is connected with its own identity and scoped permissions.
 
 Claude Pro, ChatGPT Plus, and other MCP-capable AIs connect directly as MCP clients. OpenClaw, Hermes, Claude Code, and Cursor all work. Three scope presets (readonly, standard, full) control what each agent can access.

@@ -10,6 +10,8 @@
  *   registerKnowledgeTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
  *   v1.0.0 — 2026-03-21 — Initial creation: 4 tools + 1 resource for knowledge management via MCP
+ *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -17,6 +19,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
+import { annotationsFor } from './annotations.js';
 
 export function registerKnowledgeTools(
     mcp: McpServer,
@@ -110,6 +113,7 @@ export function registerKnowledgeTools(
         'aimeat_knowledge_list',
         'List knowledge packages accessible to you (your own + owner\'s packages)',
         {},
+        annotationsFor('aimeat_knowledge_list'),
         async () => {
             const entries = await listOwnerScopeMemory({ prefix: 'packages/', tags: ['knowledge-package'] });
             const manifests = entries.filter(e => e.key.endsWith('/manifest'));
@@ -143,6 +147,7 @@ export function registerKnowledgeTools(
         {
             package_id: z.string().describe('The knowledge package ID'),
         },
+        annotationsFor('aimeat_knowledge_get'),
         async ({ package_id }) => {
             const manifestKey = `packages/${package_id}/manifest`;
             const manifest = await storage.getMemory(agentGaii, manifestKey);
@@ -188,6 +193,7 @@ export function registerKnowledgeTools(
             entry_key: z.string().describe('Entry key (short name, e.g. "summary" or "chapter-1")'),
             content: z.string().describe('Entry content as a string (plain text or JSON)'),
         },
+        annotationsFor('aimeat_knowledge_contribute'),
         async ({ package_id, entry_key, content }) => {
             const manifestKey = `packages/${package_id}/manifest`;
             const manifest = await storage.getMemory(agentGaii, manifestKey);
@@ -265,6 +271,7 @@ export function registerKnowledgeTools(
             package_id: z.string().describe('The knowledge package ID'),
             direction: z.enum(['outgoing', 'incoming', 'both']).optional().describe('Link direction (default: both)'),
         },
+        annotationsFor('aimeat_knowledge_links'),
         async ({ package_id, direction }) => {
             const manifestKey = `packages/${package_id}/manifest`;
             const links = await storage.listLinks(manifestKey, {

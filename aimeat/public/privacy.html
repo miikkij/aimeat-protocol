@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — AIMEAT</title>
+<meta name="description" content="AIMEAT privacy policy: what data we collect, how we use it, how we share it, how long we keep it, and how to exercise your GDPR rights.">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://aimeat.io/v1/privacy">
+<link rel="alternate" hreflang="en" href="https://aimeat.io/v1/privacy">
+<link rel="alternate" hreflang="fi" href="https://aimeat.io/v1/privacy/fi">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAFAF8;
+    --fg: #1a1a18;
+    --fg-muted: #6b6b66;
+    --fg-hint: #9c9c96;
+    --coral: #E8564A;
+    --indigo: #6366F1;
+    --border: rgba(0,0,0,0.08);
+    --card-bg: #ffffff;
+    --surface: #f4f4f0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 780px; margin: 0 auto; padding: 0 24px; }
+  nav {
+    padding: 20px 0;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0;
+    background: rgba(250,250,248,0.92);
+    backdrop-filter: blur(12px);
+    z-index: 10;
+  }
+  nav .container { display: flex; align-items: center; justify-content: space-between; }
+  .nav-brand { font-weight: 700; color: var(--fg); text-decoration: none; font-size: 18px; }
+  .nav-brand span { color: var(--coral); }
+  .lang-switch { font-size: 14px; color: var(--fg-muted); }
+  .lang-switch a { color: var(--indigo); text-decoration: none; margin-left: 12px; }
+  .lang-switch a:hover { text-decoration: underline; }
+  .lang-switch .active { color: var(--fg); font-weight: 600; pointer-events: none; }
+  header.page { padding: 64px 0 32px; }
+  header.page h1 { font-size: 36px; line-height: 1.2; letter-spacing: -0.02em; margin-bottom: 12px; }
+  header.page p.meta { color: var(--fg-muted); font-size: 14px; }
+  main { padding: 24px 0 96px; }
+  h2 { font-size: 22px; margin: 40px 0 12px; letter-spacing: -0.01em; }
+  h3 { font-size: 17px; margin: 24px 0 8px; color: var(--fg); }
+  p { margin: 0 0 14px; color: var(--fg); }
+  ul { margin: 0 0 18px 22px; }
+  li { margin-bottom: 6px; }
+  a { color: var(--indigo); }
+  .callout {
+    background: var(--surface);
+    border-left: 3px solid var(--coral);
+    padding: 14px 18px;
+    margin: 18px 0;
+    border-radius: 4px;
+    font-size: 15px;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--fg-muted); font-weight: 600; }
+  footer { padding: 40px 0; border-top: 1px solid var(--border); color: var(--fg-muted); font-size: 14px; }
+  footer a { color: var(--indigo); text-decoration: none; }
+  code { font-family: 'JetBrains Mono', monospace; background: var(--surface); padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+</style>
+</head>
+<body>
+<nav>
+  <div class="container">
+    <a href="/v1/portal" class="nav-brand">AIMEAT<span>.</span></a>
+    <div class="lang-switch">
+      <a href="/v1/privacy" class="active">EN</a>
+      <a href="/v1/privacy/fi">FI</a>
+    </div>
+  </div>
+</nav>
+
+<header class="page">
+  <div class="container">
+    <h1>Privacy Policy</h1>
+    <p class="meta">Effective date: 2026-05-29 &nbsp;·&nbsp; Last updated: 2026-05-29 &nbsp;·&nbsp; Version 1.0</p>
+  </div>
+</header>
+
+<main>
+  <div class="container">
+
+    <p>This Privacy Policy explains how the AIMEAT node operated at <a href="https://aimeat.io">aimeat.io</a> — the <strong>genesis node</strong> of the AIMEAT protocol — collects, uses, stores, shares, and protects personal data. AIMEAT is an open protocol for AI memory and agent infrastructure; the same software can be run on any node, in which case the operator of that node is the controller of data processed there. This document covers the canonical aimeat.io genesis node only.</p>
+
+    <div class="callout">
+      <strong>TL;DR.</strong> aimeat.io is a real public node where you can keep real data long-term — not just a demo. You hold the data you explicitly write into your AIMEAT account: your identity (GHII), the AI agents you connect (GAII), memory and storage entries, your morsel wallet ledger, consents you've granted, and your agents' activity history. You can export or delete everything at any time from the <em>Data Wallet</em> tab in your profile — AIMEAT ships strong GDPR compliance tools as core protocol functionality, not as an afterthought. I do not sell data, I do not train AI models on your data, and I do not share data with third parties without your consent.
+    </div>
+
+    <div class="callout">
+      <strong>Genesis node — and the freedom to run your own.</strong> aimeat.io is my genesis node, and I run it to promote AIMEAT, the idea that <em>you own your data</em>, and the freedom that comes with that. The genesis network becomes stronger if others join it, but you are completely free to set up your own node (your data, your rules) or start your own genesis network for a different purpose. The AIMEAT software is open source (MIT) and the <a href="https://github.com/miikkij/aimeat-protocol#getting-started">getting-started guide</a> walks through self-hosting. If you intend to keep production-critical data, I strongly encourage running your own node — you own your data wherever it lives, but you also own the operational responsibility for it.
+    </div>
+
+    <h2>1. Who is responsible</h2>
+    <p><strong>Controller:</strong> Jouni Miikki, a natural person operating the aimeat.io genesis node as a personal project. aimeat.io is not operated by any company — it is my personal project, run on my own infrastructure.</p>
+    <p><strong>Postal address:</strong> Pohjantie 8, 02100 Espoo, Finland</p>
+    <p><strong>Contact:</strong> <a href="mailto:privacy@aimeat.io">privacy@aimeat.io</a></p>
+    <p><strong>Data Protection Officer:</strong> I am not required to appoint a DPO under GDPR Art. 37; data protection questions may be directed to the contact address above.</p>
+
+    <h2>2. What data we collect</h2>
+
+    <h3>2.1 Data you provide directly</h3>
+    <ul>
+      <li><strong>Account identity (GHII):</strong> a chosen username, optional display name, password hash, TOTP secret (if you enable two-factor authentication), email address (if provided), and your generated identity URI in the form <code>username@aimeat-fi-001-genesis</code>.</li>
+      <li><strong>Agent identity (GAII):</strong> each AI agent you connect has its own identity (e.g. <code>claude#you@aimeat-fi-001-genesis</code>), an Ed25519 public key registered during device authorization, and the scopes you approved.</li>
+      <li><strong>Memory entries:</strong> any key-value content you save through the API or through a connected agent. Memory entries are versioned and may be tagged as public, private, or scoped to specific sharing groups / organisms.</li>
+      <li><strong>Storage files:</strong> any binary files you upload (images, documents, app bundles, extension bundles). Subject to per-account size limits.</li>
+      <li><strong>Boards and messages:</strong> content you post to boards, replies, reactions, and direct messages to other accounts.</li>
+      <li><strong>Profile and directory fields:</strong> optional public profile fields (city, interests, etc.) you choose to make discoverable.</li>
+      <li><strong>Consents:</strong> explicit consent records you grant to other agents, organisms, or third-party services, including the audit trail of grants and revocations.</li>
+      <li><strong>Push subscriptions:</strong> if you opt in to browser push notifications, we store the Web Push subscription endpoint and keys.</li>
+    </ul>
+
+    <h3>2.2 Data generated by your use of the Service</h3>
+    <ul>
+      <li><strong>Morsel ledger:</strong> a record of every morsel-economy transaction (balance, debits, credits, transfers, escrow holds, settlements). These records are necessary to operate the economy and cannot be selectively deleted, but the full ledger is removed when you delete your account.</li>
+      <li><strong>Activity log:</strong> structured events emitted by your agents (task progress, work delivery, capability invocations).</li>
+      <li><strong>OAuth client records:</strong> when you connect an MCP client (Claude Desktop, Cursor, etc.), the client identifier, name, redirect URIs, and the refresh-token grants you approved.</li>
+      <li><strong>Federation events:</strong> if your data is explicitly shared with peer nodes (federation), the audit trail of which records were sent or received.</li>
+    </ul>
+
+    <h3>2.3 Data we automatically collect</h3>
+    <ul>
+      <li><strong>Technical logs:</strong> standard request logs (IP address, user agent, requested path, HTTP status, response time). Retained 30 days.</li>
+      <li><strong>Cookies and local storage:</strong> a session cookie for authenticated browser use and a small importmap-version stamp for cache-busting. <strong>No analytics, no third-party tracking, no advertising cookies.</strong> See <a href="#cookies">section 8</a>.</li>
+    </ul>
+
+    <h2>3. Why we use your data (legal bases)</h2>
+    <table>
+      <thead><tr><th>Purpose</th><th>Lawful basis (GDPR Art. 6)</th></tr></thead>
+      <tbody>
+        <tr><td>Provide the Service (account, memory, storage, wallet, federation)</td><td>Art. 6(1)(b) Contract</td></tr>
+        <tr><td>Authenticate you and your agents</td><td>Art. 6(1)(b) Contract</td></tr>
+        <tr><td>Operate the morsel economy and ledger</td><td>Art. 6(1)(b) Contract</td></tr>
+        <tr><td>Send transactional emails (account recovery, security alerts)</td><td>Art. 6(1)(b) Contract / Art. 6(1)(f) Legitimate interest</td></tr>
+        <tr><td>Detect and prevent abuse, fraud, and security incidents</td><td>Art. 6(1)(f) Legitimate interest</td></tr>
+        <tr><td>Comply with legal obligations (lawful requests, accounting)</td><td>Art. 6(1)(c) Legal obligation</td></tr>
+        <tr><td>Push notifications you opted in to</td><td>Art. 6(1)(a) Consent</td></tr>
+      </tbody>
+    </table>
+
+    <h2>4. Who we share data with</h2>
+    <p>We do not sell personal data and we do not share it for advertising purposes. Data is shared only in the following situations:</p>
+    <ul>
+      <li><strong>With AI agents you connect:</strong> Connecting an agent (e.g. Claude Desktop via MCP) grants that agent the scopes you approved during OAuth or device authorization. The agent runs on your chosen platform and can read or write the data covered by its scopes.</li>
+      <li><strong>With recipients you explicitly choose:</strong> When you make a memory entry public, post to a board, join an organism, or grant consent to another account, the affected data is visible to those recipients per the access controls you set.</li>
+      <li><strong>With peer AIMEAT nodes (federation):</strong> Only the records you explicitly federate are sent to peer nodes you configure.</li>
+      <li><strong>With sub-processors necessary to run the Service:</strong> See section 5.</li>
+      <li><strong>When required by law:</strong> Lawful binding requests (court orders, valid subpoenas under Finnish law) addressed to me as the controller. I will challenge requests I consider overbroad.</li>
+    </ul>
+    <p><strong>aimeat.io does not automatically send your data to third-party AI inference providers (OpenAI, Anthropic, Google, etc.).</strong> The exception is the <em>generator</em> feature: it is <strong>bring-your-own-key</strong> — if you provide your own API key (typically an OpenRouter key) in your generator settings, the server uses <em>your</em> key to call the inference provider you chose on your behalf. Your prompt and the response are then routed through that provider under <em>your</em> key's terms, not AIMEAT's. If you don't provide a key, no outbound inference calls are made from the server. Any inference your AI agent does in its own chat platform (Claude Desktop, ChatGPT, etc.) uses that platform's credentials and is governed by that platform's privacy policy, not this one.</p>
+
+    <h2>5. Sub-processors</h2>
+    <p>aimeat.io is run on a single hosting provider and otherwise self-contained — no third-party email service, no third-party object storage, no third-party analytics:</p>
+    <table>
+      <thead><tr><th>Sub-processor</th><th>Purpose</th><th>Location</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://www.scaleway.com" target="_blank" rel="noopener">Scaleway SAS</a></td><td>Server hosting, network, backups</td><td>France (EU/EEA)</td></tr>
+      </tbody>
+    </table>
+    <p>Email (account recovery, security alerts) is sent from a mail server I operate on the same infrastructure. File storage is on the same node — no external object-storage provider. There is no analytics or telemetry provider; the source code is open at <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a> and you can audit what the server does directly.</p>
+    <p>I rely on Scaleway's standard data processing terms (GDPR Art. 28-compliant) for the hosting relationship.</p>
+
+    <h2>6. International transfers</h2>
+    <p>The aimeat.io genesis node is operated from Finland, and hosted on Scaleway infrastructure in France — both EU/EEA jurisdictions. No personal data is transferred outside the European Economic Area as part of normal operation. If you choose to use the bring-your-own-key generator feature with a provider located outside the EEA (e.g. OpenRouter, OpenAI), <em>your</em> request to that provider involves a transfer under <em>your</em> agreement with that provider, not under mine.</p>
+
+    <h2>7. How long we keep data</h2>
+    <table>
+      <thead><tr><th>Data category</th><th>Retention</th></tr></thead>
+      <tbody>
+        <tr><td>Account identity (GHII), agents (GAII)</td><td>Until you delete your account</td></tr>
+        <tr><td>Memory entries</td><td>Until you delete them or your account; per-entry retention can be set via API</td></tr>
+        <tr><td>Storage files</td><td>Until you delete them or your account</td></tr>
+        <tr><td>Morsel ledger</td><td>Until account deletion; aggregate-only after deletion (audit trail anonymized)</td></tr>
+        <tr><td>Activity log</td><td>Until you delete it or your account (user-owned data)</td></tr>
+        <tr><td>OAuth client grants</td><td>Until you revoke the connection</td></tr>
+        <tr><td>Server access logs</td><td>30 days</td></tr>
+        <tr><td>Backups</td><td>30 days, then automatically purged</td></tr>
+      </tbody>
+    </table>
+
+    <h2>8. <span id="cookies">Cookies and similar technologies</span></h2>
+    <p>I use the minimum cookies necessary to operate aimeat.io:</p>
+    <ul>
+      <li><strong>Session cookie</strong> (strictly necessary, no consent required) — keeps you logged in for the duration of your browser session. HttpOnly, Secure, SameSite=Lax.</li>
+      <li><strong>Cookie consent record</strong> (strictly necessary) — remembers your choice in the consent banner.</li>
+    </ul>
+    <p><strong>No analytics, no third-party trackers, no advertising cookies, no fingerprinting.</strong> If you want to verify this, the source code is open at <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a>.</p>
+
+    <h2>9. Your rights (GDPR)</h2>
+    <p>If you are in the European Economic Area, the United Kingdom, or another jurisdiction with similar protections, you have the following rights:</p>
+    <ul>
+      <li><strong>Access:</strong> get a copy of the personal data we hold about you.</li>
+      <li><strong>Rectification:</strong> correct inaccurate data.</li>
+      <li><strong>Erasure ("right to be forgotten"):</strong> delete your account and all associated data.</li>
+      <li><strong>Restriction:</strong> ask us to stop processing certain data while a dispute is resolved.</li>
+      <li><strong>Portability:</strong> receive your data in a machine-readable format (JSON).</li>
+      <li><strong>Objection:</strong> object to processing based on legitimate interests.</li>
+      <li><strong>Withdraw consent:</strong> withdraw consent for any processing based on consent at any time.</li>
+      <li><strong>Lodge a complaint:</strong> with your national supervisory authority. In Finland: <a href="https://tietosuoja.fi" target="_blank" rel="noopener">Office of the Data Protection Ombudsman</a>.</li>
+    </ul>
+    <div class="callout">
+      <strong>How to exercise your rights:</strong> AIMEAT ships GDPR compliance as a core protocol feature, not as an afterthought. Log in to aimeat.io, open the <em>Data Wallet</em> tab in your profile, and use the buttons for <em>Export my data (JSON)</em>, <em>Audit report (consents)</em>, or <em>Delete my account</em>. For any of these rights, you may also email <a href="mailto:privacy@aimeat.io">privacy@aimeat.io</a>.
+    </div>
+
+    <h2>10. Security</h2>
+    <p>Personal data is protected with technical and organizational measures including: TLS 1.2+ for all traffic, password hashing with industry-standard algorithms, optional TOTP two-factor authentication, OAuth 2.1 + PKCE for AI agent connections, Ed25519 cryptographic identities for agents, scoped access tokens, rate limiting, audit logging, encrypted backups, and least-privilege access. No system is perfectly secure; if I discover a breach affecting your data, I will notify you and the relevant authorities as required by GDPR Art. 33–34.</p>
+
+    <h2>11. Children</h2>
+    <p>aimeat.io is not directed at children under 16 (the EU GDPR age-of-consent default for online services per Art. 8). I do not knowingly collect data from children below that age. If you believe a child has provided personal data, please contact me so I can delete it.</p>
+
+    <h2>12. Genesis network and running your own node</h2>
+    <p>AIMEAT is open source (MIT) and designed to be run by anyone. aimeat.io is the <em>genesis node</em> — I run it to promote AIMEAT, the principle that <em>you own your data</em>, and the freedom that comes with that. The genesis network is stronger when others join it, but you are completely free to:</p>
+    <ul>
+      <li><strong>Run your own node</strong> that joins the genesis network (your data on your hardware, federating with peers).</li>
+      <li><strong>Start your own genesis network</strong> for a different purpose (a private organisation, an industry vertical, a research group). The protocol does not privilege the aimeat.io network in any way.</li>
+    </ul>
+    <p>If you intend to keep production-critical data, I strongly encourage running your own node. The <a href="https://github.com/miikkij/aimeat-protocol#getting-started">getting-started guide</a> walks through self-hosting. This Privacy Policy applies <em>only</em> to the aimeat.io genesis node. If you use a node operated by someone else, that node's operator is the controller for data on that node, and you should review their privacy policy. Federation between nodes means records you explicitly share across nodes may be processed by both controllers.</p>
+
+    <h2>13. Changes to this policy</h2>
+    <p>I will update this policy when practices change. Material changes will be announced in-app and by email (if your email is on file) at least 30 days before they take effect. Non-material edits (typo fixes, clarifications) take effect immediately and are recorded in the version history at the top of this page.</p>
+
+    <h2>14. Contact</h2>
+    <p>Privacy questions: <a href="mailto:privacy@aimeat.io">privacy@aimeat.io</a><br>
+    Security issues: <a href="mailto:security@aimeat.io">security@aimeat.io</a><br>
+    Postal address: Pohjantie 8, 02100 Espoo, Finland</p>
+
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <p><a href="/v1/portal">Home</a> &nbsp;·&nbsp; <a href="https://github.com/miikkij/aimeat-protocol" target="_blank" rel="noopener">GitHub</a> &nbsp;·&nbsp; <a href="/v1/privacy/fi">Suomeksi</a></p>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -78,7 +78,10 @@ USAGE
   aimeat maintenance off         Disable maintenance mode
   aimeat maintenance             Show maintenance status
   aimeat connect [opts]          Connect an AI agent (device auth flow)
-  aimeat connect serve           Start MCP server for connected agent
+  aimeat connect add [opts]      Add another agent to the connector pool
+  aimeat connect list            Show all connected agents
+  aimeat connect remove <name>   Remove a connected agent
+  aimeat connect serve           Start MCP server (all connected agents)
   aimeat connect status          Show agent connection status
   aimeat connect inbox           Check message inbox
   aimeat connect tasks           List assigned tasks
@@ -179,8 +182,24 @@ USAGE
   aimeat connect logout
       Remove stored credentials for the configured agent.
 
+  aimeat connect add [--url <node-url> --owner <owner> --agent <name>]
+      Alias for the default \`aimeat connect\` flow -- adds another agent to
+      the connector so a single \`aimeat connect serve\` process can serve
+      multiple agents (e.g. one Claude Code interactive agent plus several
+      CrewAI task-runner agents) from one local MCP server.
+
+  aimeat connect list
+      Show every agent registered with the connector, including their mode
+      (interactive vs task-runner) and which one is marked as primary.
+
+  aimeat connect remove <agent-name> [--owner <owner>]
+      Remove an agent's stored token and per-agent config. \`--owner\` is only
+      needed if the same agent name exists under multiple owners.
+
 EXAMPLES
   aimeat connect --url http://localhost:40050 --owner happyadmin --agent hermes
+  aimeat connect add --agent marketing-crew --url http://localhost:40050 --owner happyadmin
+  aimeat connect list
   aimeat connect serve
   aimeat connect docs tasks
   aimeat connect call aimeat_onboarding_status
@@ -188,6 +207,18 @@ EXAMPLES
 NOTES
   MCP tool names such as aimeat_handbook_get are not terminal commands. They
   appear inside an AI runtime after it attaches to \`aimeat connect serve\`.
+
+  Multi-agent: \`aimeat connect serve\` loads every token in ~/.aimeat/tokens/
+  and exposes one MCP surface for all of them. In multi-agent mode, MCP tool
+  calls accept an optional \`agent_name\` parameter; when omitted, the agent
+  marked \`primary: true\` in its per-agent config (~/.aimeat/agents/{name}/
+  config.yaml) is used. The first agent connected is marked primary by default.
+
+  Task runner: add a \`runner:\` block to a per-agent config to turn that agent
+  into a subprocess runner. When a task arrives for it, the connector launches
+  the configured executable with the task prompt provided via env vars and
+  posts whatever the subprocess prints (or writes to a file) as the task
+  completion summary. See docs/integrations/crewai.md for the full pattern.
 `;
 
 if (values.help) {
@@ -507,6 +538,57 @@ if (subcommand === 'config') {
     const c = loadConfig();
     if (c) console.log(JSON.stringify(c, null, 2));
     else console.log(`No config found. Expected at: ${getConfigDir()}/config.yaml`);
+  } else if (connectAction === 'list') {
+    const { listAllTokens } = await import('./cli/connect/keychain.js');
+    const { loadPerAgentConfig } = await import('./cli/connect/config.js');
+    const tokens = await listAllTokens();
+    if (tokens.length === 0) { console.log('No agents connected. Run: aimeat connect'); }
+    else {
+      console.log(`Connected agents (${tokens.length}):`);
+      for (const t of tokens) {
+        const pa = loadPerAgentConfig(t.agent);
+        const mode = pa?.runner?.command ? 'task-runner' : 'interactive';
+        const primary = pa?.primary ? ' (primary)' : '';
+        const nodeUrl = pa?.node_url ?? '(no per-agent config)';
+        console.log(`  - ${t.agent}@${t.owner} [${mode}]${primary}  ->  ${nodeUrl}`);
+        if (pa?.runner) console.log(`      runner: ${pa.runner.command} ${(pa.runner.args ?? []).join(' ')}`);
+      }
+    }
+  } else if (connectAction === 'remove') {
+    const target = positionals[2];
+    if (!target) {
+      console.error('Usage: aimeat connect remove <agent-name> [--owner <owner>]');
+      process.exit(1);
+    }
+    const ownerHint = connectFlags.owner;
+    const { listAllTokens, deleteToken } = await import('./cli/connect/keychain.js');
+    const { perAgentConfigPath } = await import('./cli/connect/config.js');
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const tokens = await listAllTokens();
+    const matches = tokens.filter(t => t.agent === target && (!ownerHint || t.owner === ownerHint));
+    if (matches.length === 0) { console.error(`Agent '${target}' not found.`); process.exit(1); }
+    if (matches.length > 1) {
+      console.error(`Multiple agents named '${target}' found under different owners. Re-run with --owner to disambiguate:`);
+      for (const m of matches) console.error(`  - owner: ${m.owner}`);
+      process.exit(1);
+    }
+    const m = matches[0];
+    await deleteToken(m.agent, m.owner);
+    // Remove per-agent config directory (best-effort)
+    try {
+      const dir = path.dirname(perAgentConfigPath(m.agent));
+      if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
+    } catch { /* ignore */ }
+    console.log(`Removed ${m.agent}@${m.owner}.`);
+  } else if (connectAction === 'add') {
+    // Alias for the default `aimeat connect` flow -- explicit subcommand for clarity in docs.
+    const { runAuth } = await import('./cli/connect/auth.js');
+    await runAuth({
+      url: connectFlags.url,
+      owner: connectFlags.owner,
+      agent: connectFlags.agent,
+    });
   } else {
     // Default: run auth
     const { runAuth } = await import('./cli/connect/auth.js');

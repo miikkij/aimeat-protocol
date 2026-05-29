@@ -10,6 +10,8 @@
  *   registerFlagsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
  *   v1.0.0 — 2026-03-21 — Initial creation: 1 tool for content moderation reporting via MCP
+ *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -17,6 +19,7 @@ import { z } from 'zod';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { annotationsFor } from './annotations.js';
 
 export function registerFlagsTools(
     mcp: McpServer,
@@ -38,6 +41,7 @@ export function registerFlagsTools(
             reason: z.enum(['unreliable', 'inappropriate', 'illegal', 'spam', 'other']).describe('Reason for reporting'),
             description: z.string().optional().describe('Optional additional context'),
         },
+        annotationsFor('aimeat_flag_report'),
         async ({ target_type, target_id, reason, description }) => {
             // Check if already flagged by this agent
             const existing = await storage.getFlagByUser(target_type, target_id, agentGaii);

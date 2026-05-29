@@ -1,13 +1,17 @@
 /**
  * @file index.ts
  * @description Registry that wires all MCP tool modules to an McpServer instance.
- *   Each module registers its own tools; this file orchestrates the registration
- *   order and passes the shared AimeatClient and agent name.
- * @version-history v1.1.0 -- 2026-05-28 -- Register Hello Integration onboarding MCP tools.
- * @version-history v1.1.1 -- 2026-05-28 -- Register connector telemetry reporting MCP tool.
+ *   Each module receives the AgentRegistry; tool handlers call
+ *   `registry.resolve(agent_name?)` per request to pick which loaded agent's
+ *   client to use. Single-agent installs are unchanged in UX (agent_name is
+ *   optional and defaults to the only loaded agent).
+ * @version-history
+ *   v1.1.0 -- 2026-05-28 -- Register Hello Integration onboarding MCP tools
+ *   v1.1.1 -- 2026-05-28 -- Register connector telemetry reporting MCP tool
+ *   v2.0.0 -- 2026-05-29 -- Multi-agent: tool modules now take AgentRegistry
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { AimeatClient } from '../../api-client.js';
+import type { AgentRegistry } from '../../agent-registry.js';
 
 import { registerCoreTools } from './core.js';
 import { registerAgentTasksTools } from './agent-tasks.js';
@@ -31,26 +35,26 @@ import { registerFlagsTools } from './flags.js';
 import { registerHandbookTools } from './handbook.js';
 import { registerOnboardingTools } from './onboarding.js';
 
-export function registerAllTools(mcp: McpServer, client: AimeatClient, agentName: string): void {
-  registerCoreTools(mcp, client, agentName);
-  registerAgentTasksTools(mcp, client, agentName);
-  registerAgentMessagesTools(mcp, client, agentName);
-  registerAgentCapsTools(mcp, client, agentName);
-  registerAgentTelemetryTools(mcp, client, agentName);
-  registerBoardsTools(mcp, client);
-  registerCatalogueTools(mcp, client);
-  registerCapabilitiesTools(mcp, client);
-  registerExtensionsTools(mcp, client);
-  registerCortexTools(mcp, client);
-  registerAppsTools(mcp, client);
-  registerKnowledgeTools(mcp, client);
-  registerOrganismsTools(mcp, client);
-  registerConsentTools(mcp, client);
-  registerGroupsTools(mcp, client);
-  registerInstancesTools(mcp, client);
-  registerMemoryExtTools(mcp, client);
-  registerWalletExtTools(mcp, client);
-  registerFlagsTools(mcp, client);
-  registerHandbookTools(mcp, client);
-  registerOnboardingTools(mcp, client, agentName);
+export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void {
+  registerCoreTools(mcp, registry);
+  registerAgentTasksTools(mcp, registry);
+  registerAgentMessagesTools(mcp, registry);
+  registerAgentCapsTools(mcp, registry);
+  registerAgentTelemetryTools(mcp, registry);
+  registerBoardsTools(mcp, registry);
+  registerCatalogueTools(mcp, registry);
+  registerCapabilitiesTools(mcp, registry);
+  registerExtensionsTools(mcp, registry);
+  registerCortexTools(mcp, registry);
+  registerAppsTools(mcp, registry);
+  registerKnowledgeTools(mcp, registry);
+  registerOrganismsTools(mcp, registry);
+  registerConsentTools(mcp, registry);
+  registerGroupsTools(mcp, registry);
+  registerInstancesTools(mcp, registry);
+  registerMemoryExtTools(mcp, registry);
+  registerWalletExtTools(mcp, registry);
+  registerFlagsTools(mcp, registry);
+  registerHandbookTools(mcp, registry);
+  registerOnboardingTools(mcp, registry);
 }

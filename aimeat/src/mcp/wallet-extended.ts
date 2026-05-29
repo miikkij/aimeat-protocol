@@ -9,6 +9,8 @@
  *   registerWalletExtendedTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
  *   v1.0.0 — 2026-03-21 — Initial creation: aimeat_wallet_transactions tool
+ *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -16,6 +18,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
+import { annotationsFor } from './annotations.js';
 
 export function registerWalletExtendedTools(
     mcp: McpServer,
@@ -34,6 +37,7 @@ export function registerWalletExtendedTools(
         {
             limit: z.number().int().min(1).max(200).optional(),
         },
+        annotationsFor('aimeat_wallet_transactions'),
         async ({ limit }) => {
             const effectiveLimit = limit ?? 20;
 

@@ -11,6 +11,8 @@
  * @version-history
  *   v1.0.0 — 2026-03-21 — Initial creation: 2 tools + 1 resource for extension management via MCP
  *   v1.1.0 — 2026-05-02 — Add 5 lifecycle tools: install, activate, deactivate, delete, get
+ *   v1.2.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -24,6 +26,7 @@ import type { ExtensionCtx } from '../services/extension-runtime.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken } from '../services/upload-token.js';
+import { annotationsFor } from './annotations.js';
 
 export function registerExtensionsTools(
     mcp: McpServer,
@@ -89,6 +92,7 @@ export function registerExtensionsTools(
         'aimeat_extension_list',
         'List active extensions and their available actions',
         {},
+        annotationsFor('aimeat_extension_list'),
         async () => {
             const extensions = await storage.listExtensions();
             const active = extensions.filter(e => e.status === 'active');
@@ -124,6 +128,7 @@ export function registerExtensionsTools(
             input: z.record(z.string(), z.unknown()).optional(),
             instance_id: z.string().optional(),
         },
+        annotationsFor('aimeat_extension_invoke'),
         async ({ extension_name, action_id, input, instance_id }) => {
             const ext = await storage.getExtension(extension_name);
             if (!ext) {
@@ -341,6 +346,7 @@ INLINE MODE: Provide manifest (YAML string) and scripts (filename-to-code map) d
             manifest: z.string().optional().describe('Extension manifest in YAML format. Omit to get an upload URL for a ZIP bundle.'),
             scripts: z.record(z.string(), z.string()).optional().describe('Map of script filename to JavaScript source code. Omit for upload mode.'),
         },
+        annotationsFor('aimeat_extension_install'),
         async ({ manifest: manifestYaml, scripts }) => {
             // --- UPLOAD MODE: no manifest provided, return presigned upload URL ---
             if (!manifestYaml) {
@@ -513,6 +519,7 @@ INLINE MODE: Provide manifest (YAML string) and scripts (filename-to-code map) d
         {
             name: z.string().describe('Name of the extension to activate'),
         },
+        annotationsFor('aimeat_extension_activate'),
         async ({ name }) => {
             const ext = await storage.getExtension(name);
             if (!ext) {
@@ -551,6 +558,7 @@ INLINE MODE: Provide manifest (YAML string) and scripts (filename-to-code map) d
         {
             name: z.string().describe('Name of the extension to deactivate'),
         },
+        annotationsFor('aimeat_extension_deactivate'),
         async ({ name }) => {
             const ext = await storage.getExtension(name);
             if (!ext) {
@@ -581,6 +589,7 @@ INLINE MODE: Provide manifest (YAML string) and scripts (filename-to-code map) d
         {
             name: z.string().describe('Name of the extension to delete'),
         },
+        annotationsFor('aimeat_extension_delete'),
         async ({ name }) => {
             const ext = await storage.getExtension(name);
             if (!ext) {
@@ -616,6 +625,7 @@ INLINE MODE: Provide manifest (YAML string) and scripts (filename-to-code map) d
         {
             name: z.string().describe('Name of the extension to retrieve'),
         },
+        annotationsFor('aimeat_extension_get'),
         async ({ name }) => {
             const ext = await storage.getExtension(name);
             if (!ext) {

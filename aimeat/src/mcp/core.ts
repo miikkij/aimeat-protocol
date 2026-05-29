@@ -11,6 +11,8 @@
  * @version-history
  *   v1.0.0 — 2026-03-20 — Extracted from src/routes/mcp.ts (pure refactor, no logic changes)
  *   v1.1.0 -- 2026-05-28 -- Add memory tags and owner-scope listing support
+ *   v1.2.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -23,6 +25,7 @@ import { calculateWorkCost, holdEscrow, settlePayment } from '../services/morsel
 import { generateUploadToken } from '../services/upload-token.js';
 import type { ResourceChangeEvent } from './index.js';
 import { resourceEvents } from './index.js';
+import { annotationsFor } from './annotations.js';
 
 export function registerCoreTools(
     mcp: McpServer,
@@ -125,6 +128,7 @@ export function registerCoreTools(
         'aimeat_catalogue_search',
         'Search the action catalogue for available services',
         { search: z.string().optional(), category: z.string().optional() },
+        annotationsFor('aimeat_catalogue_search'),
         async ({ search, category }) => {
             const actions = await storage.listActions({ search, category });
             return {
@@ -149,6 +153,7 @@ export function registerCoreTools(
         'aimeat_agent_profile',
         'View an agent\'s public profile',
         { gaii: z.string() },
+        annotationsFor('aimeat_agent_profile'),
         async ({ gaii }) => {
             const agent = await storage.getAgent(gaii);
             if (!agent) return { content: [{ type: 'text' as const, text: 'Agent not found' }] };
@@ -173,6 +178,7 @@ export function registerCoreTools(
         'aimeat_memory_read',
         'Read a memory entry by key',
         { key: z.string() },
+        annotationsFor('aimeat_memory_read'),
         async ({ key }) => {
             const record = await storage.getMemory(agentGaii, key);
             if (!record) return { content: [{ type: 'text' as const, text: 'Memory not found' }] };
@@ -203,6 +209,7 @@ export function registerCoreTools(
             group_id: z.string().optional().describe('ID of sharing group for group visibility'),
             tags: z.array(z.string()).default([]).describe('Optional tags for filtering'),
         },
+        annotationsFor('aimeat_memory_write'),
         async ({ key, value, visibility, group_id, tags }) => {
             const existing = await storage.getMemory(agentGaii, key);
             const record = await storage.setMemory({
@@ -238,6 +245,7 @@ export function registerCoreTools(
             tags: z.array(z.string()).optional().describe('Optional tag filters'),
             owner_scope: z.boolean().optional().describe('When true, list same-owner GHII and agent memory'),
         },
+        annotationsFor('aimeat_memory_list'),
         async ({ prefix, visibility, tags, owner_scope }) => {
             let entries: Awaited<ReturnType<Storage['listMemory']>>;
             if (owner_scope) {
@@ -287,6 +295,7 @@ export function registerCoreTools(
             input: z.record(z.string(), z.any()),
             ttl_hours: z.number().optional(),
         },
+        annotationsFor('aimeat_action_execute'),
         async ({ action_id, provider_gaii, input, ttl_hours }) => {
             const ttl = ttl_hours ?? 24;
             const trackingCode = generateTrackingCode();
@@ -337,6 +346,7 @@ export function registerCoreTools(
         'aimeat_work_inbox',
         'Check the work inbox for pending items',
         {},
+        annotationsFor('aimeat_work_inbox'),
         async () => {
             const items = await storage.listWorkByProvider(agentGaii);
             const pending = items.filter(w => ['pending', 'accepted', 'in_progress'].includes(w.status));
@@ -361,6 +371,7 @@ export function registerCoreTools(
         'aimeat_work_accept',
         'Accept a pending work item',
         { tracking_code: z.string() },
+        annotationsFor('aimeat_work_accept'),
         async ({ tracking_code }) => {
             const work = await storage.getWork(tracking_code);
             if (!work) return { content: [{ type: 'text' as const, text: 'Work not found' }], isError: true };
@@ -376,6 +387,7 @@ export function registerCoreTools(
         'aimeat_work_deliver',
         'Deliver the result of a work item',
         { tracking_code: z.string(), output: z.record(z.string(), z.any()) },
+        annotationsFor('aimeat_work_deliver'),
         async ({ tracking_code, output }) => {
             const work = await storage.getWork(tracking_code);
             if (!work) return { content: [{ type: 'text' as const, text: 'Work not found' }], isError: true };
@@ -395,6 +407,7 @@ export function registerCoreTools(
         'aimeat_wallet_balance',
         'Check morsel wallet balance',
         {},
+        annotationsFor('aimeat_wallet_balance'),
         async () => {
             const agent = await storage.getAgent(agentGaii);
             if (!agent) return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };
@@ -420,6 +433,7 @@ export function registerCoreTools(
         'aimeat_board_read',
         'Read posts from a notification board',
         { board_id: z.string(), category: z.string().optional(), limit: z.number().optional() },
+        annotationsFor('aimeat_board_read'),
         async ({ board_id, category, limit }) => {
             const posts = await storage.listPosts(board_id, { category, limit: limit ?? 20 });
             return {
@@ -444,6 +458,7 @@ export function registerCoreTools(
         'aimeat_board_post',
         'Post a message to a notification board',
         { board_id: z.string(), title: z.string(), body: z.string(), category: z.string().optional() },
+        annotationsFor('aimeat_board_post'),
         async ({ board_id, title, body, category }) => {
             const { randomBytes } = await import('node:crypto');
             const postId = `post-${randomBytes(8).toString('hex')}`;
@@ -477,6 +492,7 @@ INLINE MODE (for tiny files < 1 KB): Include data_base64 with base64-encoded dat
             visibility: z.enum(['private', 'owner', 'group', 'public']).optional().describe('Access control (default: private)'),
             group_id: z.string().optional().describe('ID of sharing group for group visibility'),
         },
+        annotationsFor('aimeat_storage_upload'),
         async ({ key, data_base64, mime_type, visibility, group_id }) => {
             // --- UPLOAD MODE ---
             if (!data_base64) {
@@ -536,6 +552,7 @@ INLINE MODE (for tiny files < 1 KB): Include data_base64 with base64-encoded dat
         'aimeat_storage_download',
         'Download a file from binary storage (returns base64)',
         { key: z.string() },
+        annotationsFor('aimeat_storage_download'),
         async ({ key }) => {
             const file = await storage.getStorageFile(agentGaii, key);
             if (!file) return { content: [{ type: 'text' as const, text: 'File not found' }], isError: true };
@@ -569,6 +586,7 @@ INLINE MODE (for tiny files < 1 KB): Include data_base64 with base64-encoded dat
         'aimeat_admin_stats',
         'Get node statistics and health metrics (operator only)',
         {},
+        annotationsFor('aimeat_admin_stats'),
         async () => {
             if (!(await isOperator())) return { content: [{ type: 'text' as const, text: 'Operator role required' }], isError: true };
             const agents = await storage.listAgents();
@@ -606,6 +624,7 @@ INLINE MODE (for tiny files < 1 KB): Include data_base64 with base64-encoded dat
         'aimeat_admin_agents',
         'List all agents with details (operator only)',
         { limit: z.number().optional() },
+        annotationsFor('aimeat_admin_agents'),
         async ({ limit }) => {
             if (!(await isOperator())) return { content: [{ type: 'text' as const, text: 'Operator role required' }], isError: true };
             const agents = await storage.listAgents();
@@ -631,6 +650,7 @@ INLINE MODE (for tiny files < 1 KB): Include data_base64 with base64-encoded dat
         'aimeat_admin_config',
         'View current node configuration (operator only)',
         {},
+        annotationsFor('aimeat_admin_config'),
         async () => {
             if (!(await isOperator())) return { content: [{ type: 'text' as const, text: 'Operator role required' }], isError: true };
             return {
@@ -653,6 +673,7 @@ INLINE MODE (for tiny files < 1 KB): Include data_base64 with base64-encoded dat
         'aimeat_admin_mint',
         'Mint morsels for an agent (operator only, daily cap enforced)',
         { gaii: z.string(), amount: z.number().int().positive() },
+        annotationsFor('aimeat_admin_mint'),
         async ({ gaii, amount }) => {
             if (!(await isOperator())) return { content: [{ type: 'text' as const, text: 'Operator role required' }], isError: true };
             const agent = await storage.getAgent(gaii);

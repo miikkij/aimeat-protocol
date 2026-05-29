@@ -10,6 +10,8 @@
  *   registerChatInstancesTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
  *   v1.0.0 — 2026-03-21 — Initial creation: 3 tools + 1 resource for chat instance management via MCP
+ *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -17,6 +19,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGaiiLoose, buildChatInstanceId } from '../utils/gaii.js';
+import { annotationsFor } from './annotations.js';
 
 export function registerChatInstancesTools(
     mcp: McpServer,
@@ -83,6 +86,7 @@ export function registerChatInstancesTools(
         'aimeat_instance_list',
         "List agent owner's chat instances",
         {},
+        annotationsFor('aimeat_instance_list'),
         async () => {
             const instances = await storage.listChatInstances({ ownerName: ownerName() });
 
@@ -112,6 +116,7 @@ export function registerChatInstancesTools(
             name: z.string().describe('Application name for this instance'),
             model: z.string().optional().describe('AI model identifier (e.g. gpt-4o, claude-3-5-sonnet)'),
         },
+        annotationsFor('aimeat_instance_create'),
         async ({ name, model }) => {
             const owner = ownerName();
             const platform = model ? model.split('-')[0] ?? 'unknown' : 'unknown';
@@ -173,6 +178,7 @@ export function registerChatInstancesTools(
         {
             instance_id: z.string().describe('Chat instance ID'),
         },
+        annotationsFor('aimeat_instance_status'),
         async ({ instance_id }) => {
             const inst = await storage.getChatInstance(instance_id);
             if (!inst) {

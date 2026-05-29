@@ -9,12 +9,15 @@
  *   registerCatalogueTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
  *   v1.0.0 — 2026-03-21 — Initial creation: 3 tools for agent directory, public boards, and people directory
+ *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { annotationsFor } from './annotations.js';
 
 export function registerCatalogueTools(
     mcp: McpServer,
@@ -33,6 +36,7 @@ export function registerCatalogueTools(
             search: z.string().optional(),
             category: z.string().optional(),
         },
+        annotationsFor('aimeat_catalogue_agents'),
         async ({ search, category }) => {
             const agents = await storage.listAgents();
 
@@ -74,6 +78,7 @@ export function registerCatalogueTools(
         'aimeat_catalogue_boards',
         'Browse all publicly visible boards on this node',
         {},
+        annotationsFor('aimeat_catalogue_boards'),
         async () => {
             const boards = await storage.listBoards();
             const publicBoards = boards.filter(b => b.visibility === 'public');
@@ -100,6 +105,7 @@ export function registerCatalogueTools(
             city: z.string().optional(),
             interest: z.string().optional(),
         },
+        annotationsFor('aimeat_catalogue_directory'),
         async ({ city, interest }) => {
             const ghiis = await storage.listGHIIs();
 

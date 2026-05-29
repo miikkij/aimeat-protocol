@@ -2,14 +2,19 @@
  * @file boards.ts
  * @description MCP tool registrations for board management -- creating, listing,
  *   subscribing, reacting, replying, member updates, and deletion.
+ * @version-history
+ *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { AimeatClient } from '../../api-client.js';
+import type { AgentRegistry } from '../../agent-registry.js';
+import { annotationsFor } from '../../../../mcp/annotations.js';
 
-export function registerBoardsTools(mcp: McpServer, client: AimeatClient): void {
+export function registerBoardsTools(mcp: McpServer, registry: AgentRegistry): void {
+  const { client } = registry.resolve();
 
-  mcp.tool('aimeat_board_list', 'List visible boards', {}, async () => {
+  mcp.tool('aimeat_board_list', 'List visible boards', {}, annotationsFor('aimeat_board_list'), async () => {
     const resp = await client.get('/v1/boards');
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
@@ -18,7 +23,7 @@ export function registerBoardsTools(mcp: McpServer, client: AimeatClient): void 
     name: z.string().describe('Board name'),
     description: z.string().optional().describe('Board description'),
     visibility: z.string().optional().describe('Board visibility level'),
-  }, async ({ name, description, visibility }) => {
+  }, annotationsFor('aimeat_board_create'), async ({ name, description, visibility }) => {
     const body: Record<string, unknown> = { name };
     if (description) body.description = description;
     if (visibility) body.visibility = visibility;
@@ -28,7 +33,7 @@ export function registerBoardsTools(mcp: McpServer, client: AimeatClient): void 
 
   mcp.tool('aimeat_board_subscribe', 'Subscribe to a board', {
     board_id: z.string().describe('Board identifier'),
-  }, async ({ board_id }) => {
+  }, annotationsFor('aimeat_board_subscribe'), async ({ board_id }) => {
     const resp = await client.post(`/v1/boards/${encodeURIComponent(board_id)}/subscribe`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
@@ -37,7 +42,7 @@ export function registerBoardsTools(mcp: McpServer, client: AimeatClient): void 
     board_id: z.string().describe('Board identifier'),
     post_id: z.string().describe('Post identifier'),
     emoji: z.string().describe('Reaction emoji'),
-  }, async ({ board_id, post_id, emoji }) => {
+  }, annotationsFor('aimeat_board_react'), async ({ board_id, post_id, emoji }) => {
     const resp = await client.post(
       `/v1/boards/${encodeURIComponent(board_id)}/posts/${encodeURIComponent(post_id)}/react`,
       { emoji },
@@ -49,7 +54,7 @@ export function registerBoardsTools(mcp: McpServer, client: AimeatClient): void 
     board_id: z.string().describe('Board identifier'),
     post_id: z.string().describe('Post identifier'),
     body: z.string().describe('Reply body'),
-  }, async ({ board_id, post_id, body }) => {
+  }, annotationsFor('aimeat_board_reply'), async ({ board_id, post_id, body }) => {
     const resp = await client.post(
       `/v1/boards/${encodeURIComponent(board_id)}/posts/${encodeURIComponent(post_id)}/replies`,
       { body },
@@ -60,7 +65,7 @@ export function registerBoardsTools(mcp: McpServer, client: AimeatClient): void 
   mcp.tool('aimeat_board_members', 'Update board member list', {
     board_id: z.string().describe('Board identifier'),
     members: z.array(z.string()).describe('List of member identifiers'),
-  }, async ({ board_id, members }) => {
+  }, annotationsFor('aimeat_board_members'), async ({ board_id, members }) => {
     const resp = await client.patch(
       `/v1/boards/${encodeURIComponent(board_id)}/members`,
       { members },
@@ -70,7 +75,7 @@ export function registerBoardsTools(mcp: McpServer, client: AimeatClient): void 
 
   mcp.tool('aimeat_board_delete', 'Delete a board', {
     board_id: z.string().describe('Board identifier'),
-  }, async ({ board_id }) => {
+  }, annotationsFor('aimeat_board_delete'), async ({ board_id }) => {
     const resp = await client.delete(`/v1/boards/${encodeURIComponent(board_id)}`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });

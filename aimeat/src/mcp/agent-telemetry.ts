@@ -10,6 +10,8 @@
  *   registerAgentTelemetryTools(mcp, storage, config, getAgentGaii);
  * @version-history
  *   v1.0.0 -- 2026-05-28 -- Add public MCP telemetry reporting tool
+ *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -18,6 +20,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import { emitChange } from '../services/event-bus.js';
 import type { Storage, TelemetryEvent } from '../storage/interface.js';
+import { annotationsFor } from './annotations.js';
 
 export function registerAgentTelemetryTools(
     mcp: McpServer,
@@ -36,7 +39,7 @@ export function registerAgentTelemetryTools(
             .describe('Telemetry data such as tokens_in, tokens_out, ai_calls, duration_seconds, or tool name'),
         session_id: z.string().optional().describe('Optional runtime session identifier'),
         task_id: z.string().optional().describe('Optional related AIMEAT task id'),
-    }, async ({ type, data, session_id, task_id }) => {
+    }, annotationsFor('aimeat_agent_telemetry_report'), async ({ type, data, session_id, task_id }) => {
         const agent = await storage.getAgent(agentGaii);
         if (!agent) {
             return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };

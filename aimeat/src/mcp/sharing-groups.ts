@@ -8,6 +8,8 @@
  *   registerSharingGroupTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
+ *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -16,6 +18,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, SharingGroupMember } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
+import { annotationsFor } from './annotations.js';
 
 export function registerSharingGroupTools(
     mcp: McpServer,
@@ -40,6 +43,7 @@ export function registerSharingGroupTools(
         'aimeat_group_list',
         'List sharing groups you are a member of or own',
         {},
+        annotationsFor('aimeat_group_list'),
         async () => {
             const ownerGhii = getOwnerGhii();
 
@@ -84,6 +88,7 @@ export function registerSharingGroupTools(
         {
             group_id: z.string().describe('The sharing group ID'),
         },
+        annotationsFor('aimeat_group_get'),
         async ({ group_id }) => {
             const group = await storage.getSharingGroup(group_id);
             if (!group) return { content: [{ type: 'text' as const, text: 'Sharing group not found' }], isError: true };
@@ -138,6 +143,7 @@ export function registerSharingGroupTools(
                 }).optional().describe('Member permissions (defaults to read:true, write:false)'),
             })).optional().describe('Initial members to add'),
         },
+        annotationsFor('aimeat_group_create'),
         async ({ name, description, members }) => {
             const ownerGhii = getOwnerGhii();
 
@@ -205,6 +211,7 @@ export function registerSharingGroupTools(
                 write: z.boolean(),
             }).optional().describe('Member permissions (defaults to group default)'),
         },
+        annotationsFor('aimeat_group_add_member'),
         async ({ group_id, identifier, identifier_type, permissions }) => {
             const ownerGhii = getOwnerGhii();
 
@@ -266,6 +273,7 @@ export function registerSharingGroupTools(
             group_id: z.string().describe('The sharing group ID'),
             identifier: z.string().describe('GAII or GHII of the member to remove'),
         },
+        annotationsFor('aimeat_group_remove_member'),
         async ({ group_id, identifier }) => {
             const ownerGhii = getOwnerGhii();
 

@@ -10,12 +10,15 @@
  *   registerMemoryExtendedTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
  *   v1.0.0 — 2026-03-21 — Initial creation: aimeat_memory_search + aimeat_memory_read_public
+ *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { annotationsFor } from './annotations.js';
 
 export function registerMemoryExtendedTools(
     mcp: McpServer,
@@ -35,6 +38,7 @@ export function registerMemoryExtendedTools(
             query: z.string(),
             visibility: z.enum(['private', 'owner', 'group', 'public']).optional(),
         },
+        annotationsFor('aimeat_memory_search'),
         async ({ query, visibility }) => {
             const results = await storage.searchMemory(agentGaii, query, {
                 visibility,
@@ -64,6 +68,7 @@ export function registerMemoryExtendedTools(
             gaii: z.string(),
             key: z.string(),
         },
+        annotationsFor('aimeat_memory_read_public'),
         async ({ gaii, key }) => {
             const record = await storage.getMemory(gaii, key);
 

@@ -9,6 +9,8 @@
  *   registerCortexTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
  *   v1.0.0 - 2026-05-02 - Initial creation: 5 tools for cortex lifecycle management via MCP
+ *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -20,6 +22,7 @@ import { runCapabilityAggregation } from '../services/capability-aggregator.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken } from '../services/upload-token.js';
+import { annotationsFor } from './annotations.js';
 
 export function registerCortexTools(
     mcp: McpServer,
@@ -35,6 +38,7 @@ export function registerCortexTools(
         'aimeat_cortex_list',
         'List all installed cortex extensions with their status and metadata',
         {},
+        annotationsFor('aimeat_cortex_list'),
         async () => {
             const extensions = await storage.listCortexExtensions({});
             return {
@@ -67,6 +71,7 @@ INLINE MODE: Provide manifest (YAML string) and optional libs (filename-to-code 
             manifest: z.string().optional().describe('YAML manifest string. Omit to get an upload URL for a ZIP bundle.'),
             libs: z.record(z.string(), z.string()).optional().describe('Map of filename to JavaScript source code for lib files.'),
         },
+        annotationsFor('aimeat_cortex_install'),
         async ({ manifest, libs }) => {
             const agentGaii = getAgentGaii();
             const parsed = parseGAII(agentGaii);
@@ -197,6 +202,7 @@ INLINE MODE: Provide manifest (YAML string) and optional libs (filename-to-code 
         {
             name: z.string().describe('Name of the cortex extension to activate'),
         },
+        annotationsFor('aimeat_cortex_activate'),
         async ({ name }) => {
             const agentGaii = getAgentGaii();
             const ext = await storage.getCortexExtension(name);
@@ -253,6 +259,7 @@ INLINE MODE: Provide manifest (YAML string) and optional libs (filename-to-code 
         {
             name: z.string().describe('Name of the cortex extension to deactivate'),
         },
+        annotationsFor('aimeat_cortex_deactivate'),
         async ({ name }) => {
             const agentGaii = getAgentGaii();
             const ext = await storage.getCortexExtension(name);
@@ -301,6 +308,7 @@ INLINE MODE: Provide manifest (YAML string) and optional libs (filename-to-code 
         {
             name: z.string().describe('Name of the cortex extension to delete'),
         },
+        annotationsFor('aimeat_cortex_delete'),
         async ({ name }) => {
             const agentGaii = getAgentGaii();
             const ext = await storage.getCortexExtension(name);

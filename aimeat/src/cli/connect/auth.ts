@@ -20,10 +20,11 @@
  * @version-history v1.9.18 -- 2026-05-28 -- Add correct post-onboarding setup instruction for actual commands, config, and knowledge artifacts.
  * @version-history v1.9.19 -- 2026-05-28 -- Add shared owner-memory tag guidance after onboarding.
  * @version-history v1.9.20 -- 2026-05-28 -- Move Hello Integration instruction into shared onboarding-prompt.ts to remove duplication with skill-bundle.ts.
+ * @version-history v2.0.0 -- 2026-05-29 -- Write per-agent config alongside token + token table; mark first agent as primary so multi-agent serve has a sensible default.
  */
 import { AimeatClient } from './api-client.js';
-import { storeToken, getToken } from './keychain.js';
-import { saveConfig } from './config.js';
+import { storeToken, getToken, listAllTokens } from './keychain.js';
+import { saveConfig, savePerAgentConfig, loadPerAgentConfig } from './config.js';
 import { downloadSkillBundle, readSkillBundleGuide } from './skill-bundle.js';
 import { buildAgentOnboardingInstruction } from './onboarding-prompt.js';
 
@@ -288,10 +289,35 @@ export async function runAuth(args: AuthArgs): Promise<void> {
   const token = tokenData;
   s.stop('Approved!');
 
+  // Before storing the new token, check whether this is the first agent (so it
+  // gets marked as `primary: true` in its per-agent config -- multi-agent serve
+  // resolves to the primary agent when no agent_name is given).
+  const tokensBefore = await listAllTokens();
+  const sameAlreadyExists = tokensBefore.some(t => t.agent === agentName && t.owner === owner);
+  const isFirstAgent = tokensBefore.filter(t => !(t.agent === agentName && t.owner === owner)).length === 0;
+
   await storeToken(agentName, owner, token.access_token);
   success(`Token stored (aimeat:${agentName}@${owner})`);
 
-  saveConfig({ node_url: nodeUrl, agent: agentName, owner });
+  // Per-agent config (~/.aimeat/agents/{agent}/config.yaml). Preserve any
+  // existing runner/wake/poll_interval if the agent is being re-connected.
+  const existingPerAgent = loadPerAgentConfig(agentName);
+  savePerAgentConfig(agentName, {
+    agent: agentName,
+    owner,
+    node_url: nodeUrl,
+    primary: existingPerAgent?.primary ?? isFirstAgent,
+    poll_interval: existingPerAgent?.poll_interval,
+    wake: existingPerAgent?.wake,
+    runner: existingPerAgent?.runner,
+  });
+
+  // Legacy global config -- kept so older single-agent code paths
+  // (`loadConfig().agent`) keep working. The first-registered agent becomes the
+  // global's `agent`; later agents do not overwrite it.
+  if (isFirstAgent || sameAlreadyExists) {
+    saveConfig({ node_url: nodeUrl, agent: agentName, owner });
+  }
 
   client.setToken(token.access_token);
   await downloadAndPrintBundleGuide(client, agentName, success, info, warn);

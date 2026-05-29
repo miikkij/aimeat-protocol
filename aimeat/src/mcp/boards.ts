@@ -10,6 +10,8 @@
  *   registerBoardsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
  *   v1.0.0 — 2026-03-21 — Initial creation: 7 tools + 1 resource for board management via MCP
+ *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -18,6 +20,7 @@ import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII, isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
+import { annotationsFor } from './annotations.js';
 
 export function registerBoardsTools(
     mcp: McpServer,
@@ -94,6 +97,7 @@ export function registerBoardsTools(
         'aimeat_board_list',
         'List visible boards',
         {},
+        annotationsFor('aimeat_board_list'),
         async () => {
             const boards = await storage.listBoards();
             const visible = boards.filter(b => canSeeBoard(b));
@@ -124,6 +128,7 @@ export function registerBoardsTools(
             description: z.string().optional(),
             allowed_gaiis: z.array(z.string()).optional(),
         },
+        annotationsFor('aimeat_board_create'),
         async ({ name, visibility, description, allowed_gaiis }) => {
             // public/system require operator
             if (visibility === 'public') {
@@ -171,6 +176,7 @@ export function registerBoardsTools(
                 tags: z.array(z.string()).optional(),
             }).optional(),
         },
+        annotationsFor('aimeat_board_subscribe'),
         async ({ board_id, callback_url, filters }) => {
             const board = await storage.getBoard(board_id);
             if (!board) return { content: [{ type: 'text' as const, text: 'Board not found' }], isError: true };
@@ -210,6 +216,7 @@ export function registerBoardsTools(
             post_id: z.string(),
             emoji: z.string(),
         },
+        annotationsFor('aimeat_board_react'),
         async ({ board_id, post_id, emoji }) => {
             const ok = await storage.addReaction(board_id, post_id, emoji, agentGaii);
             if (!ok) return { content: [{ type: 'text' as const, text: 'Post not found' }], isError: true };
@@ -234,6 +241,7 @@ export function registerBoardsTools(
             post_id: z.string(),
             body: z.string(),
         },
+        annotationsFor('aimeat_board_reply'),
         async ({ board_id, post_id, body }) => {
             const parent = await storage.getPost(board_id, post_id);
             if (!parent) return { content: [{ type: 'text' as const, text: 'Post not found' }], isError: true };
@@ -277,6 +285,7 @@ export function registerBoardsTools(
             add: z.array(z.string()).optional(),
             remove: z.array(z.string()).optional(),
         },
+        annotationsFor('aimeat_board_members'),
         async ({ board_id, add, remove }) => {
             const board = await storage.getBoard(board_id);
             if (!board) return { content: [{ type: 'text' as const, text: 'Board not found' }], isError: true };
@@ -315,6 +324,7 @@ export function registerBoardsTools(
         {
             board_id: z.string(),
         },
+        annotationsFor('aimeat_board_delete'),
         async ({ board_id }) => {
             const board = await storage.getBoard(board_id);
             if (!board) return { content: [{ type: 'text' as const, text: 'Board not found' }], isError: true };

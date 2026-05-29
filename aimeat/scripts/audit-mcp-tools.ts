@@ -13,6 +13,7 @@
  *   v1.0.0 -- 2026-05-28 -- Initial MCP surface audit script
  *   v1.1.0 -- 2026-05-28 -- Include shared catalog CLI fallback coverage
  *   v1.2.0 -- 2026-05-28 -- Report catalog drift against MCP surfaces and CLI handlers
+ *   v1.3.0 -- 2026-05-29 -- Add TOOL_ANNOTATIONS coverage check
  */
 
 import { readdir, readFile } from 'node:fs/promises';
@@ -20,6 +21,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONNECT_CLI_TOOLS } from '../src/cli/connect/tool-call.js';
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../src/mcp/catalog/definitions.js';
+import { TOOL_ANNOTATIONS } from '../src/mcp/annotations.js';
 
 interface SurfaceConfig {
     id: 'server' | 'connector';
@@ -45,6 +47,11 @@ interface AuditReport {
         cliFallbackWithoutHandler: string[];
         serverMcpWithoutCatalog: string[];
         connectorMcpWithoutCatalog: string[];
+    };
+    annotations: {
+        all: string[];
+        registeredWithoutAnnotation: string[];
+        annotationWithoutRegistration: string[];
     };
     overlap: string[];
     serverOnly: string[];
@@ -124,6 +131,13 @@ function buildReport(serverTools: ToolReference[], connectorTools: ToolReference
         .map(definition => definition.name)
         .sort((first, second) => first.localeCompare(second));
 
+    const annotationNames = Object.keys(TOOL_ANNOTATIONS)
+        .sort((first, second) => first.localeCompare(second));
+    const annotationNameSet = new Set(annotationNames);
+    const registeredNames = [...new Set([...serverNames, ...connectorNames])]
+        .sort((first, second) => first.localeCompare(second));
+    const registeredNameSet = new Set(registeredNames);
+
     return {
         generatedAt: new Date().toISOString(),
         surfaces: { server: serverTools, connector: connectorTools },
@@ -135,6 +149,11 @@ function buildReport(serverTools: ToolReference[], connectorTools: ToolReference
             cliFallbackWithoutHandler: cliFallback.filter(name => !cliHandlerNames.has(name)),
             serverMcpWithoutCatalog: serverNames.filter(name => !catalogNameSet.has(name)),
             connectorMcpWithoutCatalog: connectorNames.filter(name => !catalogNameSet.has(name)),
+        },
+        annotations: {
+            all: annotationNames,
+            registeredWithoutAnnotation: registeredNames.filter(name => !annotationNameSet.has(name)),
+            annotationWithoutRegistration: annotationNames.filter(name => !registeredNameSet.has(name)),
         },
         overlap: serverNames.filter(name => connectorNameSet.has(name)),
         serverOnly: serverNames.filter(name => !connectorNameSet.has(name)),
@@ -184,6 +203,9 @@ function printMarkdownReport(report: AuditReport): void {
     console.log(`CLI fallback names missing CLI handlers: ${report.catalog.cliFallbackWithoutHandler.length}`);
     console.log(`Public MCP names missing from catalog: ${report.catalog.serverMcpWithoutCatalog.length}`);
     console.log(`Connector MCP names missing from catalog: ${report.catalog.connectorMcpWithoutCatalog.length}`);
+    console.log(`Annotation entries: ${report.annotations.all.length}`);
+    console.log(`Registered tools missing annotations: ${report.annotations.registeredWithoutAnnotation.length}`);
+    console.log(`Annotation entries with no registered tool: ${report.annotations.annotationWithoutRegistration.length}`);
 
     printNameList('Server-Only Tool Names', report.serverOnly);
     printNameList('Connector-Only Tool Names', report.connectorOnly);
@@ -192,6 +214,11 @@ function printMarkdownReport(report: AuditReport): void {
     printNameList('CLI Fallback Names Missing CLI Handlers', report.catalog.cliFallbackWithoutHandler);
     printNameList('Public MCP Names Missing From Catalog', report.catalog.serverMcpWithoutCatalog);
     printNameList('Connector MCP Names Missing From Catalog', report.catalog.connectorMcpWithoutCatalog);
+
+    console.log('\n## Annotation Coverage');
+    printNameList('Registered Tools Missing Annotations', report.annotations.registeredWithoutAnnotation);
+    printNameList('Annotation Entries With No Registered Tool', report.annotations.annotationWithoutRegistration);
+
     printNameList('Shared Tool Names', report.overlap);
 
     for (const surface of surfaces) {

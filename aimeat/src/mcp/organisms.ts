@@ -10,6 +10,8 @@
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
  *   v1.0.0 — 2026-03-21 — Initial creation: 5 tools + 1 resource for organism management via MCP
+ *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -18,6 +20,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
+import { annotationsFor } from './annotations.js';
 
 export function registerOrganismsTools(
     mcp: McpServer,
@@ -105,6 +108,7 @@ export function registerOrganismsTools(
         'aimeat_organism_list',
         'List organisms visible to the agent (public and organisms the owner is a member of)',
         {},
+        annotationsFor('aimeat_organism_list'),
         async () => {
             const ownerGhii = getOwnerGhii();
             // Get public organisms
@@ -146,6 +150,7 @@ export function registerOrganismsTools(
         {
             organism_id: z.string().describe('The organism ID'),
         },
+        annotationsFor('aimeat_organism_get'),
         async ({ organism_id }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
@@ -193,6 +198,7 @@ export function registerOrganismsTools(
             organism_id: z.string().describe('The organism ID to join'),
             message: z.string().optional().describe('Optional message for join requests (used when approval is required)'),
         },
+        annotationsFor('aimeat_organism_join'),
         async ({ organism_id, message }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
@@ -273,6 +279,7 @@ export function registerOrganismsTools(
         {
             organism_id: z.string().describe('The organism ID to leave'),
         },
+        annotationsFor('aimeat_organism_leave'),
         async ({ organism_id }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
@@ -319,6 +326,7 @@ export function registerOrganismsTools(
             role: z.string().optional().describe('Filter by role: creator, admin, member'),
             status: z.string().optional().describe('Filter by status: active, pending, banned (default: active)'),
         },
+        annotationsFor('aimeat_organism_members'),
         async ({ organism_id, role, status }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };

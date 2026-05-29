@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tietosuojaseloste — AIMEAT</title>
+<meta name="description" content="AIMEAT-palvelun tietosuojaseloste: mitä tietoja keräämme, miten käytämme niitä, kenen kanssa jaamme, kuinka kauan säilytämme ja miten käytät GDPR-oikeuksiasi.">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://aimeat.io/v1/privacy/fi">
+<link rel="alternate" hreflang="en" href="https://aimeat.io/v1/privacy">
+<link rel="alternate" hreflang="fi" href="https://aimeat.io/v1/privacy/fi">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FAFAF8;
+    --fg: #1a1a18;
+    --fg-muted: #6b6b66;
+    --fg-hint: #9c9c96;
+    --coral: #E8564A;
+    --indigo: #6366F1;
+    --border: rgba(0,0,0,0.08);
+    --card-bg: #ffffff;
+    --surface: #f4f4f0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 780px; margin: 0 auto; padding: 0 24px; }
+  nav {
+    padding: 20px 0;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0;
+    background: rgba(250,250,248,0.92);
+    backdrop-filter: blur(12px);
+    z-index: 10;
+  }
+  nav .container { display: flex; align-items: center; justify-content: space-between; }
+  .nav-brand { font-weight: 700; color: var(--fg); text-decoration: none; font-size: 18px; }
+  .nav-brand span { color: var(--coral); }
+  .lang-switch { font-size: 14px; color: var(--fg-muted); }
+  .lang-switch a { color: var(--indigo); text-decoration: none; margin-left: 12px; }
+  .lang-switch a:hover { text-decoration: underline; }
+  .lang-switch .active { color: var(--fg); font-weight: 600; pointer-events: none; }
+  header.page { padding: 64px 0 32px; }
+  header.page h1 { font-size: 36px; line-height: 1.2; letter-spacing: -0.02em; margin-bottom: 12px; }
+  header.page p.meta { color: var(--fg-muted); font-size: 14px; }
+  main { padding: 24px 0 96px; }
+  h2 { font-size: 22px; margin: 40px 0 12px; letter-spacing: -0.01em; }
+  h3 { font-size: 17px; margin: 24px 0 8px; color: var(--fg); }
+  p { margin: 0 0 14px; color: var(--fg); }
+  ul { margin: 0 0 18px 22px; }
+  li { margin-bottom: 6px; }
+  a { color: var(--indigo); }
+  .callout {
+    background: var(--surface);
+    border-left: 3px solid var(--coral);
+    padding: 14px 18px;
+    margin: 18px 0;
+    border-radius: 4px;
+    font-size: 15px;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--fg-muted); font-weight: 600; }
+  footer { padding: 40px 0; border-top: 1px solid var(--border); color: var(--fg-muted); font-size: 14px; }
+  footer a { color: var(--indigo); text-decoration: none; }
+  code { font-family: 'JetBrains Mono', monospace; background: var(--surface); padding: 1px 6px; border-radius: 3px; font-size: 13px; }
+</style>
+</head>
+<body>
+<nav>
+  <div class="container">
+    <a href="/v1/portal" class="nav-brand">AIMEAT<span>.</span></a>
+    <div class="lang-switch">
+      <a href="/v1/privacy">EN</a>
+      <a href="/v1/privacy/fi" class="active">FI</a>
+    </div>
+  </div>
+</nav>
+
+<header class="page">
+  <div class="container">
+    <h1>Tietosuojaseloste</h1>
+    <p class="meta">Voimassa alkaen: 29.5.2026 &nbsp;·&nbsp; Päivitetty viimeksi: 29.5.2026 &nbsp;·&nbsp; Versio 1.0</p>
+  </div>
+</header>
+
+<main>
+  <div class="container">
+
+    <p>Tämä tietosuojaseloste kuvaa, miten <a href="https://aimeat.io">aimeat.io</a> — AIMEAT-protokollan <strong>genesis-solmu</strong> — kerää, käyttää, säilyttää, jakaa ja suojaa henkilötietoja. AIMEAT on avoin tekoälymuistin ja agenttitoiminnan protokolla; sama ohjelmisto voidaan ajaa millä tahansa solmulla, jolloin kyseisen solmun ylläpitäjä on rekisterinpitäjä omalla solmullaan käsiteltäville tiedoille. Tämä asiakirja koskee vain kanonista aimeat.io-genesis-solmua.</p>
+
+    <div class="callout">
+      <strong>Lyhyesti.</strong> aimeat.io on oikea julkinen solmu, jossa voit säilyttää oikeaa dataa pitkäaikaisesti — ei pelkkä demo. Säilytämme ne tiedot, jotka kirjoitat itse AIMEAT-tiliisi: tunnisteesi (GHII), liittämäsi tekoälyagentit (GAII), muisti- ja tallennustietueet, morsel-tilikirjan, suostumukset sekä agenttiesi toimintahistorian. Voit ladata kaikki tiedot tai poistaa ne milloin tahansa profiilisi <em>Tietolompakko</em>-välilehdeltä — AIMEAT tarjoaa erinomaiset GDPR-työkalut protokollan ytimessä, ei jälkikäteen. En myy tietojasi, en käytä niitä tekoälymallien kouluttamiseen enkä jaa niitä kolmansille osapuolille ilman suostumustasi.
+    </div>
+
+    <div class="callout">
+      <strong>Genesis-solmu — ja vapaus pystyttää oma.</strong> aimeat.io on minun genesis-solmuni, ja ylläpidän sitä edistääkseni AIMEATia, periaatetta että <em>sinä omistat oman datasi</em>, ja siihen liittyvää vapautta. Genesis-verkko vahvistuu, kun muut liittyvät siihen, mutta olet täysin vapaa pystyttämään oman solmun (oma data, omat säännöt) tai aloittamaan oman genesis-verkkosi eri tarkoitukseen. AIMEAT-ohjelmisto on avointa lähdekoodia (MIT), ja <a href="https://github.com/miikkij/aimeat-protocol#getting-started">getting-started-opas</a> käy läpi oman solmun pystyttämisen. Jos aiot säilyttää tuotantokriittistä dataa, suosittelen vahvasti oman solmun ajamista — omistat datasi missä tahansa se on, mutta omistat myös ylläpitovastuun.
+    </div>
+
+    <h2>1. Rekisterinpitäjä</h2>
+    <p><strong>Rekisterinpitäjä:</strong> Jouni Miikki, luonnollinen henkilö, joka ylläpitää aimeat.io-genesis-solmua henkilökohtaisena hankkeena. aimeat.io ei ole minkään yrityksen ylläpitämä — se on henkilökohtainen hankkeeni, ajettuna omalla infrastruktuurillani.</p>
+    <p><strong>Postiosoite:</strong> Pohjantie 8, 02100 Espoo, Suomi</p>
+    <p><strong>Yhteystiedot:</strong> <a href="mailto:privacy@aimeat.io">privacy@aimeat.io</a></p>
+    <p><strong>Tietosuojavastaava:</strong> En ole velvollinen nimittämään tietosuojavastaavaa GDPR 37 art. mukaan; tietosuojakysymykset voi osoittaa yllä olevaan yhteystietoon.</p>
+
+    <h2>2. Mitä tietoja keräämme</h2>
+
+    <h3>2.1 Itse antamasi tiedot</h3>
+    <ul>
+      <li><strong>Tilin tunniste (GHII):</strong> valitsemasi käyttäjänimi, valinnainen näyttönimi, salasanan tiiviste, TOTP-avain (jos otat kaksivaiheisen tunnistautumisen käyttöön), sähköpostiosoite (jos annat sen) sekä luotu tunniste muodossa <code>käyttäjänimi@aimeat-fi-001-genesis</code>.</li>
+      <li><strong>Agentin tunniste (GAII):</strong> jokaisella liittämälläsi tekoälyagentilla on oma tunnisteensa (esim. <code>claude#sinä@aimeat-fi-001-genesis</code>), laitevaltuutuksen yhteydessä rekisteröity Ed25519-julkinen avain sekä hyväksymäsi käyttöoikeusalueet (scopes).</li>
+      <li><strong>Muistitietueet:</strong> mikä tahansa avain-arvosisältö, jonka tallennat API:n tai liitetyn agentin kautta. Muistitietueet ovat versioituja ja voidaan merkitä julkisiksi, yksityisiksi tai rajatuiksi tietyille jakoryhmille / organismeille.</li>
+      <li><strong>Tallennustiedostot:</strong> mikä tahansa binääritiedosto, jonka lähetät palveluun (kuvat, asiakirjat, sovelluspaketit, laajennukset). Tilikohtaiset kokorajoitukset voivat soveltua.</li>
+      <li><strong>Foorumit ja viestit:</strong> foorumeille (boards) lähettämäsi sisältö, vastaukset, reaktiot sekä suorat viestit muille tileille.</li>
+      <li><strong>Profiili- ja hakemistotiedot:</strong> valinnaiset julkiset profiilikentät (kaupunki, kiinnostuksen kohteet jne.), jotka päätät tehdä haettaviksi.</li>
+      <li><strong>Suostumukset:</strong> nimenomaisesti myöntämäsi suostumukset toisille agenteille, organismeille tai kolmansien osapuolten palveluille sekä suostumusten ja peruutusten audit-loki.</li>
+      <li><strong>Push-tilaukset:</strong> jos otat selaimen push-ilmoitukset käyttöön, säilytämme Web Push -tilauksen päätepisteen ja avaimet.</li>
+    </ul>
+
+    <h3>2.2 Palvelun käytöstä syntyvät tiedot</h3>
+    <ul>
+      <li><strong>Morsel-tilikirja:</strong> kaikkien morsel-talouden tapahtumien tietue (saldo, veloitukset, hyvitykset, siirrot, escrow-pidätykset, suoritukset). Nämä tietueet ovat välttämättömiä talouden toiminnalle, eikä niitä voi poistaa valikoiden, mutta koko tilikirja poistetaan tilin poiston yhteydessä.</li>
+      <li><strong>Aktiviteettiloki:</strong> agenttiesi tuottamat rakenteiset tapahtumat (tehtävien edistyminen, työn toimitus, kyvykkyyksien kutsuminen).</li>
+      <li><strong>OAuth-asiakastiedot:</strong> kun yhdistät MCP-asiakkaan (Claude Desktop, Cursor jne.), tallennamme asiakkaan tunnisteen, nimen, redirect-URIt sekä hyväksymäsi refresh-tokenit.</li>
+      <li><strong>Federointitapahtumat:</strong> jos jaat tietoja nimenomaisesti vertaisten solmujen kanssa (federointi), tallennamme audit-lokin lähetetyistä ja vastaanotetuista tietueista.</li>
+    </ul>
+
+    <h3>2.3 Automaattisesti kerättävät tiedot</h3>
+    <ul>
+      <li><strong>Tekniset lokit:</strong> tavanomaiset pyyntölokit (IP-osoite, käyttäjäagentti, pyydetty polku, HTTP-status, vasteaika). Säilytysaika 30 vrk.</li>
+      <li><strong>Evästeet ja paikalliset tallenteet:</strong> istuntoeväste tunnistautunutta selainkäyttöä varten ja pieni importmap-version leima välimuistin tyhjentämiseen. <strong>Ei analytiikkaa, ei kolmansien osapuolten seurantaa, ei mainosevästeitä.</strong> Katso <a href="#cookies">osio 8</a>.</li>
+    </ul>
+
+    <h2>3. Miksi käsittelemme tietojasi (käsittelyperusteet)</h2>
+    <table>
+      <thead><tr><th>Käyttötarkoitus</th><th>Käsittelyperuste (GDPR 6 art.)</th></tr></thead>
+      <tbody>
+        <tr><td>Palvelun tarjoaminen (tili, muisti, tallennus, lompakko, federointi)</td><td>6(1)(b) Sopimus</td></tr>
+        <tr><td>Sinun ja agenttiesi tunnistaminen</td><td>6(1)(b) Sopimus</td></tr>
+        <tr><td>Morsel-talouden ja tilikirjan ylläpito</td><td>6(1)(b) Sopimus</td></tr>
+        <tr><td>Transaktionaaliset sähköpostit (tilin palautus, turvallisuusilmoitukset)</td><td>6(1)(b) Sopimus / 6(1)(f) Oikeutettu etu</td></tr>
+        <tr><td>Väärinkäytösten, petosten ja tietoturvaloukkausten torjunta</td><td>6(1)(f) Oikeutettu etu</td></tr>
+        <tr><td>Lakisääteisten velvoitteiden noudattaminen (lailliset pyynnöt, kirjanpito)</td><td>6(1)(c) Lakisääteinen velvoite</td></tr>
+        <tr><td>Push-ilmoitukset, joihin olet antanut suostumuksen</td><td>6(1)(a) Suostumus</td></tr>
+      </tbody>
+    </table>
+
+    <h2>4. Kenelle tietoja jaetaan</h2>
+    <p>Emme myy henkilötietoja emmekä jaa niitä mainontatarkoituksiin. Tietoja jaetaan vain seuraavissa tilanteissa:</p>
+    <ul>
+      <li><strong>Liittämillesi tekoälyagenteille:</strong> Agentin liittäminen (esim. Claude Desktop MCP:n kautta) antaa agentille hyväksymäsi käyttöoikeusalueet OAuth- tai laitevaltuutuksen yhteydessä. Agentti toimii valitsemallasi alustalla ja voi lukea tai kirjoittaa hyväksyttyjen oikeuksien mukaista tietoa.</li>
+      <li><strong>Valitsemillesi vastaanottajille:</strong> Kun teet muistitietueesta julkisen, julkaiset foorumille, liityt organismiin tai annat suostumuksen toiselle tilille, asiankuuluvat tiedot ovat näkyvillä määrittämiesi pääsynhallintaehtojen mukaisesti.</li>
+      <li><strong>Vertaisille AIMEAT-solmuille (federointi):</strong> Vain ne tietueet, jotka nimenomaisesti federoit, lähetetään konfiguroimiisi vertaisiin solmuihin.</li>
+      <li><strong>Palvelun toiminnan kannalta välttämättömille alikäsittelijöille:</strong> Katso osio 5.</li>
+      <li><strong>Lain edellyttämissä tilanteissa:</strong> Lainvoimaiset sitovat pyynnöt (Suomen lain mukaiset tuomioistuinmääräykset, voimassa olevat haasteet) minulle rekisterinpitäjänä. Vastustan pyyntöjä, joita pidän ylimitoitettuina.</li>
+    </ul>
+    <p><strong>aimeat.io ei lähetä tietojasi automaattisesti kolmansien osapuolten tekoälyinferenssipalveluille (OpenAI, Anthropic, Google jne.).</strong> Poikkeuksena on <em>generaattori</em>-toiminto: se on <strong>bring-your-own-key</strong> — jos annat oman API-avaimesi (tyypillisesti OpenRouter-avain) generaattorin asetuksissa, palvelin käyttää <em>sinun</em> avaintasi valitsemasi inferenssipalveluntarjoajan kutsumiseen puolestasi. Kehotteesi ja vastaus reititetään tämän palveluntarjoajan kautta <em>sinun</em> avaimesi ehdoilla, ei AIMEATin. Jos et anna avainta, palvelimelta ei lähde inferenssikutsuja. Tekoälyagenttisi tekemä inferenssi omalla chat-alustallaan (Claude Desktop, ChatGPT jne.) käyttää kyseisen alustan tunnuksia ja sitä koskee alustan oma tietosuojaseloste, ei tämä.</p>
+
+    <h2>5. Alikäsittelijät</h2>
+    <p>aimeat.io ajetaan yhdellä hosting-palveluntarjoajalla, ja muutoin itse ylläpidetty — ei kolmannen osapuolen sähköpostipalvelua, ei kolmannen osapuolen objektitallennusta, ei kolmannen osapuolen analytiikkaa:</p>
+    <table>
+      <thead><tr><th>Alikäsittelijä</th><th>Käyttötarkoitus</th><th>Sijainti</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://www.scaleway.com" target="_blank" rel="noopener">Scaleway SAS</a></td><td>Palvelinhotelli, verkko, varmuuskopiot</td><td>Ranska (EU/ETA)</td></tr>
+      </tbody>
+    </table>
+    <p>Sähköposti (tilin palautus, turvallisuusilmoitukset) lähetetään minun samalla infrastruktuurilla ylläpitämältä postipalvelimelta. Tiedostotallennus on samalla solmulla — ei erillistä objektitallennuspalveluntarjoajaa. Analytiikka- tai telemetriapalveluntarjoajaa ei käytetä; lähdekoodi on avoin osoitteessa <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a>, ja voit auditoida palvelimen toimintaa suoraan.</p>
+    <p>Tukeudun Scaleway'n vakioehtoihin tietojen käsittelyssä (GDPR 28 art. mukaisesti) hosting-suhteessa.</p>
+
+    <h2>6. Kansainväliset tiedonsiirrot</h2>
+    <p>aimeat.io-genesis-solmua ylläpidetään Suomesta ja sitä hostataan Scalewayn infrastruktuurilla Ranskassa — molemmat EU/ETA-lainkäyttöalueita. Henkilötietoja ei siirretä Euroopan talousalueen ulkopuolelle normaalin toiminnan osana. Jos käytät bring-your-own-key-generaattoria ETA:n ulkopuolisen palveluntarjoajan (esim. OpenRouter, OpenAI) kanssa, <em>sinun</em> pyyntösi tälle palveluntarjoajalle sisältää siirron <em>sinun</em> sopimuksesi nojalla kyseisen palveluntarjoajan kanssa, ei minun.</p>
+
+    <h2>7. Tietojen säilytysajat</h2>
+    <table>
+      <thead><tr><th>Tietoryhmä</th><th>Säilytysaika</th></tr></thead>
+      <tbody>
+        <tr><td>Tilin tunniste (GHII), agentit (GAII)</td><td>Kunnes poistat tilisi</td></tr>
+        <tr><td>Muistitietueet</td><td>Kunnes poistat ne tai tilisi; tietuekohtainen säilytys voidaan asettaa API:n kautta</td></tr>
+        <tr><td>Tallennustiedostot</td><td>Kunnes poistat ne tai tilisi</td></tr>
+        <tr><td>Morsel-tilikirja</td><td>Tilin poistoon asti; poiston jälkeen vain anonymisoitu kokonaisaudit</td></tr>
+        <tr><td>Aktiviteettiloki</td><td>Kunnes poistat sen tai tilisi (käyttäjän omistamaa dataa)</td></tr>
+        <tr><td>OAuth-asiakastiedot</td><td>Kunnes peruutat yhteyden</td></tr>
+        <tr><td>Palvelimen pääsylokit</td><td>30 vrk</td></tr>
+        <tr><td>Varmuuskopiot</td><td>30 vrk, sitten automaattisesti poistetaan</td></tr>
+      </tbody>
+    </table>
+
+    <h2>8. <span id="cookies">Evästeet ja muut vastaavat tekniikat</span></h2>
+    <p>Käytän vain aimeat.io:n toiminnan kannalta välttämättömiä evästeitä:</p>
+    <ul>
+      <li><strong>Istuntoeväste</strong> (välttämätön, ei vaadi suostumusta) — pitää sinut kirjautuneena selainistunnon ajan. HttpOnly, Secure, SameSite=Lax.</li>
+      <li><strong>Eväste-suostumustietue</strong> (välttämätön) — muistaa suostumusbannerissa tekemäsi valinnan.</li>
+    </ul>
+    <p><strong>Ei analytiikkaa, ei kolmansien osapuolten seurantaa, ei mainosevästeitä, ei fingerprinttausta.</strong> Jos haluat varmistaa tämän, lähdekoodi on avoin osoitteessa <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a>.</p>
+
+    <h2>9. Oikeutesi (GDPR)</h2>
+    <p>Jos olet Euroopan talousalueella, Yhdistyneessä kuningaskunnassa tai muulla vastaavalla suoja-alueella, sinulla on seuraavat oikeudet:</p>
+    <ul>
+      <li><strong>Tarkastusoikeus:</strong> saada kopio sinusta säilytetyistä henkilötiedoista.</li>
+      <li><strong>Oikaisuoikeus:</strong> korjata virheelliset tiedot.</li>
+      <li><strong>Oikeus tulla unohdetuksi:</strong> poistaa tilisi ja kaikki siihen liittyvät tiedot.</li>
+      <li><strong>Käsittelyn rajoitusoikeus:</strong> pyytää meitä pysäyttämään tietyn tiedon käsittely riidan ratkaisemisen ajaksi.</li>
+      <li><strong>Siirto-oikeus:</strong> saada tietosi koneluettavassa muodossa (JSON).</li>
+      <li><strong>Vastustamisoikeus:</strong> vastustaa oikeutetun edun perusteella tehtävää käsittelyä.</li>
+      <li><strong>Oikeus peruuttaa suostumus:</strong> peruuttaa suostumukseen perustuva käsittely milloin tahansa.</li>
+      <li><strong>Oikeus tehdä valitus:</strong> kansalliselle valvontaviranomaiselle. Suomessa: <a href="https://tietosuoja.fi" target="_blank" rel="noopener">Tietosuojavaltuutetun toimisto</a>.</li>
+    </ul>
+    <div class="callout">
+      <strong>Oikeuksien käyttäminen:</strong> AIMEAT tarjoaa GDPR-työkalut protokollan ytimessä, ei jälkikäteen. Kirjaudu sisään osoitteessa aimeat.io, avaa profiilin <em>Tietolompakko</em>-välilehti ja käytä painikkeita <em>Lataa tietoni (JSON)</em>, <em>Auditraportti (suostumukset)</em> tai <em>Poista tilini</em>. Voit myös käyttää näitä oikeuksia lähettämällä sähköpostia osoitteeseen <a href="mailto:privacy@aimeat.io">privacy@aimeat.io</a>.
+    </div>
+
+    <h2>10. Tietoturva</h2>
+    <p>Henkilötietoja suojataan teknisillä ja organisatorisilla toimenpiteillä, mukaan lukien: TLS 1.2+ kaikessa liikenteessä, alan vakiintuneet salasana-algoritmit, valinnainen TOTP-kaksivaiheinen tunnistus, OAuth 2.1 + PKCE tekoälyagenttien liitännöissä, Ed25519-kryptografiset tunnisteet agenteille, käyttöoikeusalueiden hallinta access-tokeneilla, käyttörajoitukset, audit-loki, salatut varmuuskopiot ja pienimmän oikeuden periaate. Mikään järjestelmä ei ole täysin turvallinen; jos havaitsen tietoturvaloukkauksen, joka koskee tietojasi, ilmoitan siitä sinulle ja viranomaisille GDPR 33–34 art. mukaisesti.</p>
+
+    <h2>11. Lapset</h2>
+    <p>aimeat.io ei ole suunnattu alle 16-vuotiaille (EU:n yleisen tietosuoja-asetuksen 8 art. ikäraja verkkopalveluiden suostumukselle). En tietoisesti kerää tietoja tätä nuoremmilta lapsilta. Jos uskot, että lapsi on antanut henkilötietoja, otathan yhteyttä jotta voin poistaa ne.</p>
+
+    <h2>12. Genesis-verkko ja oman solmun ylläpito</h2>
+    <p>AIMEAT on avointa lähdekoodia (MIT) ja suunniteltu kenen tahansa ajettavaksi. aimeat.io on <em>genesis-solmu</em> — ylläpidän sitä edistääkseni AIMEATia, periaatetta että <em>sinä omistat oman datasi</em>, ja siihen liittyvää vapautta. Genesis-verkko on vahvempi, kun muut liittyvät siihen, mutta olet täysin vapaa:</p>
+    <ul>
+      <li><strong>Pystyttämään oman solmun</strong>, joka liittyy genesis-verkkoon (oma data omalla raudalla, federointi vertaisten kanssa).</li>
+      <li><strong>Aloittamaan oman genesis-verkkosi</strong> eri tarkoitukseen (yksityinen organisaatio, toimiala, tutkimusryhmä). Protokolla ei priorisoi aimeat.io-verkkoa millään tavalla.</li>
+    </ul>
+    <p>Jos aiot säilyttää tuotantokriittistä dataa, suosittelen vahvasti oman solmun ajamista. <a href="https://github.com/miikkij/aimeat-protocol#getting-started">Getting-started-opas</a> käy läpi oman solmun pystyttämisen. Tämä tietosuojaseloste koskee <em>vain</em> aimeat.io-genesis-solmua. Jos käytät jonkun toisen ylläpitämää solmua, sen ylläpitäjä on rekisterinpitäjä omalla solmullaan, ja sinun tulisi tutustua hänen tietosuojaselosteeseensa. Federointi solmujen välillä tarkoittaa, että nimenomaisesti jakamasi tietueet voivat olla molempien rekisterinpitäjien käsittelyssä.</p>
+
+    <h2>13. Muutokset tähän selosteeseen</h2>
+    <p>Päivitän tätä selostetta, kun käytännöt muuttuvat. Olennaiset muutokset ilmoitetaan sovelluksessa ja sähköpostitse (jos sähköpostiosoite on tiedossa) vähintään 30 päivää ennen voimaantuloa. Vähäisemmät muutokset (kirjoitusvirheet, tarkennukset) tulevat voimaan välittömästi ja kirjataan tämän sivun yläosan versiohistoriaan.</p>
+
+    <h2>14. Yhteystiedot</h2>
+    <p>Tietosuojakysymykset: <a href="mailto:privacy@aimeat.io">privacy@aimeat.io</a><br>
+    Tietoturva-asiat: <a href="mailto:security@aimeat.io">security@aimeat.io</a><br>
+    Postiosoite: Pohjantie 8, 02100 Espoo, Suomi</p>
+
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    <p><a href="/v1/portal">Etusivu</a> &nbsp;·&nbsp; <a href="https://github.com/miikkij/aimeat-protocol" target="_blank" rel="noopener">GitHub</a> &nbsp;·&nbsp; <a href="/v1/privacy">In English</a></p>
+  </div>
+</footer>
+
+</body>
+</html>

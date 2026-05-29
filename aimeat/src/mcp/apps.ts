@@ -10,6 +10,8 @@
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
  *   v1.0.0 — 2026-05-02 — Initial creation: 5 tools for app publish, list, get, delete, versions
+ *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -19,6 +21,7 @@ import type { Storage, AppManifest } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken } from '../services/upload-token.js';
+import { annotationsFor } from './annotations.js';
 
 export function registerAppsTools(
     mcp: McpServer,
@@ -45,6 +48,7 @@ INLINE MODE (for tiny files < 1 KB): Include content_base64 with the base64-enco
             icon: z.string().optional().describe('Emoji icon for the app'),
             version: z.string().optional().describe('Semver display version (e.g. "1.0.0"). Auto-generated if omitted.'),
         },
+        annotationsFor('aimeat_app_publish'),
         async ({ filename, content_base64, name, description, category, tags, icon, version }) => {
             const agentGaii = getAgentGaii();
             const parsed = parseGAII(agentGaii);
@@ -163,6 +167,7 @@ INLINE MODE (for tiny files < 1 KB): Include content_base64 with the base64-enco
             tag: z.string().optional().describe('Filter by tag'),
             own: z.boolean().optional().describe('If true, list only apps owned by the current agent'),
         },
+        annotationsFor('aimeat_app_list'),
         async ({ category, search, tag, own }) => {
             const agentGaii = getAgentGaii();
 
@@ -214,6 +219,7 @@ INLINE MODE (for tiny files < 1 KB): Include content_base64 with the base64-enco
             owner: z.string().describe('Owner name of the app'),
             filename: z.string().describe('App filename'),
         },
+        annotationsFor('aimeat_app_get'),
         async ({ owner, filename }) => {
             const app = await storage.getAppByOwnerName(owner, filename);
             if (!app) {
@@ -251,6 +257,7 @@ INLINE MODE (for tiny files < 1 KB): Include content_base64 with the base64-enco
             filename: z.string().describe('App filename to delete'),
             version: z.number().optional().describe('Specific version number to delete. Omit to delete all versions.'),
         },
+        annotationsFor('aimeat_app_delete'),
         async ({ filename, version }) => {
             const agentGaii = getAgentGaii();
             const ownerGaii = `${parseGAII(agentGaii)?.owner ?? agentGaii}@${config.nodeId}`;
@@ -295,6 +302,7 @@ INLINE MODE (for tiny files < 1 KB): Include content_base64 with the base64-enco
             owner: z.string().describe('Owner name of the app'),
             filename: z.string().describe('App filename'),
         },
+        annotationsFor('aimeat_app_versions'),
         async ({ owner, filename }) => {
             // First find the app to get the ownerGaii
             const app = await storage.getAppByOwnerName(owner, filename);

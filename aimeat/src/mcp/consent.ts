@@ -10,6 +10,8 @@
  *   registerConsentTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
  *   v1.0.0 — 2026-03-21 — Initial creation: 3 tools + 1 resource for consent management via MCP
+ *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -18,6 +20,7 @@ import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
+import { annotationsFor } from './annotations.js';
 
 export function registerConsentTools(
     mcp: McpServer,
@@ -95,6 +98,7 @@ export function registerConsentTools(
             purpose: z.string().describe('Human-readable purpose for this consent'),
             ttl_hours: z.number().optional().describe('Expiry in hours from now (omit for indefinite)'),
         },
+        annotationsFor('aimeat_consent_grant'),
         async ({ target_gaii, scope, data_pattern, purpose, ttl_hours }) => {
             const ghii = ownerGhii();
 
@@ -147,6 +151,7 @@ export function registerConsentTools(
         'aimeat_consent_list',
         'List own consent grants',
         {},
+        annotationsFor('aimeat_consent_list'),
         async () => {
             const ghii = ownerGhii();
             const consents = await storage.listConsents(ghii);
@@ -177,6 +182,7 @@ export function registerConsentTools(
         {
             consent_id: z.string().describe('ID of the consent to revoke'),
         },
+        annotationsFor('aimeat_consent_revoke'),
         async ({ consent_id }) => {
             const consent = await storage.getConsent(consent_id);
             if (!consent) {

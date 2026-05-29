@@ -10,12 +10,15 @@
  * @version-history
  *   v1.0.0 -- 2026-03-21 -- Initial creation: 1 tool for managed system prompt retrieval via MCP
  *   v1.1.0 -- 2026-05-27 -- Rename tool from aimeat_prompts_get to aimeat_handbook_get
+ *   v1.2.0 -- 2026-05-29 -- Add tool annotations (title + readOnlyHint) from shared
+ *     annotations.ts for Connectors Directory compliance.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { annotationsFor } from './annotations.js';
 
 export function registerPromptsTools(
     mcp: McpServer,
@@ -33,6 +36,7 @@ export function registerPromptsTools(
         {
             tier: z.string().describe('Prompt tier or ID (e.g. "tier1", "tier2", "tier-1", or a custom prompt ID)'),
         },
+        annotationsFor('aimeat_handbook_get'),
         async ({ tier }) => {
             // Normalize tier aliases used in routes (tier1 → tier-1, etc.)
             const normalized = tier

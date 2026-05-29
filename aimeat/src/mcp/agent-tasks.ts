@@ -10,6 +10,8 @@
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  *   v1.1.0 -- 2026-05-28 -- Remove legacy agent-side task start tool; owners start queued tasks
  *   v1.2.0 -- 2026-05-28 -- Add TODO proposal tool for public MCP parity with connector MCP
+ *   v1.3.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -17,6 +19,7 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo } from '../storage/interface.js';
+import { annotationsFor } from './annotations.js';
 
 export function registerAgentTaskTools(
     mcp: McpServer,
@@ -43,6 +46,7 @@ export function registerAgentTaskTools(
             page: z.number().optional().describe('Page number (default 1)'),
             per_page: z.number().optional().describe('Results per page (default 20, max 100)'),
         },
+        annotationsFor('aimeat_task_list'),
         async ({ status, page, per_page }) => {
             const pageNum = Math.max(1, page ?? 1);
             const perPage = Math.min(100, Math.max(1, per_page ?? 20));
@@ -83,6 +87,7 @@ export function registerAgentTaskTools(
         {
             task_id: z.string().describe('The task ID'),
         },
+        annotationsFor('aimeat_task_get'),
         async ({ task_id }) => {
             const task = await storage.getAgentTask(task_id);
             if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
@@ -140,6 +145,7 @@ export function registerAgentTaskTools(
                 estimate_minutes: z.number().optional().describe('Estimated work time in minutes'),
             })).describe('Proposed TODO plan'),
         },
+        annotationsFor('aimeat_task_propose_todos'),
         async ({ task_id, todos }) => {
             const task = await storage.getAgentTask(task_id);
             if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
@@ -216,6 +222,7 @@ export function registerAgentTaskTools(
             message: z.string().describe('Event message'),
             details: z.record(z.string(), z.unknown()).optional().describe('Optional event details (may include telemetry)'),
         },
+        annotationsFor('aimeat_task_event'),
         async ({ task_id, type, message, details }) => {
             const task = await storage.getAgentTask(task_id);
             if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
@@ -280,6 +287,7 @@ export function registerAgentTaskTools(
             todo_id: z.string().describe('The TODO item ID'),
             status: z.enum(['pending', 'active', 'done', 'failed', 'skipped']).describe('New TODO status'),
         },
+        annotationsFor('aimeat_task_todo'),
         async ({ task_id, todo_id, status }) => {
             const task = await storage.getAgentTask(task_id);
             if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
@@ -355,6 +363,7 @@ export function registerAgentTaskTools(
             task_id: z.string().describe('The task ID to complete'),
             message: z.string().optional().describe('Completion message'),
         },
+        annotationsFor('aimeat_task_complete'),
         async ({ task_id, message }) => {
             const task = await storage.getAgentTask(task_id);
             if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
@@ -409,6 +418,7 @@ export function registerAgentTaskTools(
             task_id: z.string().describe('The task ID to fail'),
             reason: z.string().describe('Reason for failure'),
         },
+        annotationsFor('aimeat_task_fail'),
         async ({ task_id, reason }) => {
             const task = await storage.getAgentTask(task_id);
             if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };

@@ -16,6 +16,8 @@
  *   v1.1.0 — 2026-03-04 — Static HTML URL routing, SPA shell serving
  *   v1.2.0 — 2026-03-14 — Prompt fallback to factory seeds when storage not yet seeded
  *   v1.2.1 — 2026-03-14 — Marketplace route renamed to app-store
+ *   v1.3.0 -- 2026-05-29 -- Add /v1/privacy (en) and /v1/privacy/fi (fi) routes serving
+ *     static privacy policy pages for Connectors Directory submission compliance.
  */
 import { Router } from 'express';
 import { readFileSync, existsSync } from 'node:fs';
@@ -410,6 +412,26 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(404).type('text/plain').send('Consent page not found');
     }
   });
+
+  // Privacy policy pages — standalone static HTML (not SPA).
+  // Required by the Anthropic Connectors Directory; missing/incomplete privacy
+  // policies cause immediate rejection of directory submissions.
+  const servePrivacyPage = (filename: string) => (_req: import('express').Request, res: import('express').Response) => {
+    const htmlPath = resolvePublicFile(filename);
+    if (htmlPath) {
+      let html = readFileSync(htmlPath, 'utf-8');
+      const nonce = res.locals.cspNonce as string || '';
+      if (nonce) {
+        html = html.replace(/<script(?=[ >])/g, `<script nonce="${nonce}"`);
+        html = html.replace(/<style(?=[ >])/g, `<style nonce="${nonce}"`);
+      }
+      res.type('text/html').send(html);
+    } else {
+      res.status(404).type('text/plain').send('Privacy policy page not found');
+    }
+  };
+  router.get('/v1/privacy', servePrivacyPage('privacy.html'));
+  router.get('/v1/privacy/fi', servePrivacyPage('privacy.fi.html'));
 
   // Encrypted chat example app — standalone HTML (not SPA)
   router.get('/v1/echat', (_req, res) => {

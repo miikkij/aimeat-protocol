@@ -2,26 +2,38 @@
  * @file agent-messages.ts
  * @description MCP tool registrations for agent-to-agent messaging. Routes are
  *   scoped to the connected agent via /v1/agents/{name}/messages.
- * @version-history v1.1.0 -- 2026-05-28 -- Align send payload with the actual agent message API.
+ * @version-history
+ *   v1.1.0 -- 2026-05-28 -- Align send payload with the actual agent message API
+ *   v2.0.0 -- 2026-05-29 -- Registry-driven, agent_name parameter
+ *   v2.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
+ *     from shared annotations.ts for Connectors Directory compliance.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import type { AimeatClient } from '../../api-client.js';
+import type { AgentRegistry } from '../../agent-registry.js';
+import { agentNameSchema, pickAgent } from './_registry.js';
+import { annotationsFor } from '../../../../mcp/annotations.js';
 
-export function registerAgentMessagesTools(mcp: McpServer, client: AimeatClient, agentName?: string): void {
-  const enc = encodeURIComponent(agentName!);
+export function registerAgentMessagesTools(mcp: McpServer, registry: AgentRegistry): void {
 
-  mcp.tool('aimeat_message_inbox', 'Get pending inbound messages', {}, async () => {
+  mcp.tool('aimeat_message_inbox', 'Get pending inbound messages', {
+    agent_name: agentNameSchema,
+  }, annotationsFor('aimeat_message_inbox'), async ({ agent_name }) => {
+    const { client, agent } = pickAgent(registry, agent_name);
+    const enc = encodeURIComponent(agent);
     const resp = await client.get(`/v1/agents/${enc}/messages/inbox`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
   mcp.tool('aimeat_message_send', 'Send an outbound message from the connected agent to the owner conversation', {
+    agent_name: agentNameSchema,
     content: z.string().optional().describe('Message content'),
     body: z.string().optional().describe('Message content alias for older callers'),
     linked_task_id: z.string().optional().describe('Optional linked task identifier'),
     metadata: z.record(z.string(), z.unknown()).optional().describe('Optional metadata key-value pairs'),
-  }, async ({ content, body, linked_task_id, metadata }) => {
+  }, annotationsFor('aimeat_message_send'), async ({ agent_name, content, body, linked_task_id, metadata }) => {
+    const { client, agent } = pickAgent(registry, agent_name);
+    const enc = encodeURIComponent(agent);
     const message = content ?? body;
     if (!message) {
       return { content: [{ type: 'text' as const, text: 'Message content is required. Provide content or body.' }] };
