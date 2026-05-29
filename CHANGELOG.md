@@ -2,6 +2,25 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## aimeat-crewai 0.1.2 - 2026-05-29
+
+### Fixed
+
+- **Optional MCP parameters leaked through as JSON `null`.** Persona instructions to "omit instead of null" were ignored not by the LLM but by the layer below it: `crewai-tools` / `mcpadapt` builds a Pydantic args model for each MCP tool, fills missing optional fields with `None`, and serialises to JSON where `None` becomes `null`. AIMEAT server-side zod `.optional()` then rejected those calls with "expected string, received null". 0.1.2 wraps each tool's `_run` to filter kwargs where the value is `None` before forwarding to the MCP transport, so the request payload omits the field entirely (which `.optional()` accepts). Fixes were observed in `aimeat_memory_write` (tags/ttl_hours/group_id), `aimeat_handbook_get` (module), and any other tool with optional params.
+- Internal helper `_strip_none_kwargs(tool)` applied to every tool returned by both `create_liaison_agent` and `liaison_tools`. Persona's earlier "omit instead of null" guidance stays in place as a redundancy.
+
+## [1.13.2] - 2026-05-29
+
+### Fixed (stalled task recovery)
+
+- **Tasks that were marked `stalled` by the stall detector had no recovery path: `aimeat_task_complete`, `aimeat_task_event`, `aimeat_task_todo`, and `aimeat_task_fail` all returned `INVALID_STATE` ("Only active tasks can be ...").** The stall detector was originally designed as a one-way signal -- once stalled, the task was effectively orphaned. In practice this hits during normal onboarding flow whenever an agent's subprocess briefly crashes, the operator kills it to fix something, or there's a network glitch: the onboarding test task gets stalled, the agent restarts, the agent has the correct deliverable -- and AIMEAT refuses to accept it. Now all four endpoints handle stalled tasks gracefully:
+  - `POST /v1/agents/:name/tasks/:id/event` -- if the task is stalled when an event arrives, the task is auto-resumed (`stalled` → `active`) and a `started` event is appended ("Task auto-resumed from stalled"). The original event is then appended normally. Rationale: an event from the agent IS evidence that the agent is back.
+  - `PATCH /v1/agents/:name/tasks/:id/todos/:todoId` -- same auto-resume semantics.
+  - `POST /v1/agents/:name/tasks/:id/complete` -- accepts `stalled` directly without requiring re-activation. A late deliverable is more useful than rejecting it.
+  - `POST /v1/agents/:name/tasks/:id/fail` -- accepts `stalled` so the agent can explicitly mark the task failed instead of leaving it lingering.
+  - `POST /v1/agents/:name/tasks/:id/start` (owner-only) -- `queued | paused | stalled` → `active`, so the owner has an explicit re-start path too.
+- The stall detector itself is unchanged: it still marks quiet active tasks as stalled. What changed is that stalled is now a recoverable state.
+
 ## [1.13.1] - 2026-05-29
 
 ### Fixed (multi-agent `aimeat connect serve` routing)

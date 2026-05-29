@@ -52,6 +52,42 @@ class AimeatLiaisonError(RuntimeError):
     """Raised when the liaison cannot establish or use an AIMEAT MCP connection."""
 
 
+def _strip_none_kwargs(tool: Any) -> Any:
+    """
+    Wrap a CrewAI tool so its `_run` filters out kwargs where the value is None
+    before passing them through to the underlying MCP call.
+
+    Why this exists: When the LLM correctly OMITS an optional parameter
+    (e.g. `tags`, `ttl_hours`, `module`), the crewai-tools / mcpadapt layer
+    still materialises the args as a Pydantic model with field defaults of
+    `None`. JSON serialisation then turns those into explicit `null` values
+    in the MCP request payload. The AIMEAT server uses zod `.optional()` which
+    matches `undefined` and absent fields -- NOT `null` -- so it rejects the
+    request with "expected string, received null". Persona instructions to
+    "omit instead of null" don't help: the LLM did omit, but Python re-added.
+
+    The fix is to intercept after the LLM's call reaches the Python tool but
+    before the request hits MCP transport, and drop any kwargs whose value is
+    None. The kwarg simply won't be in the payload, which is what the LLM
+    intended and what zod `.optional()` accepts. Real None values that the
+    caller MEANT to pass cannot be distinguished here from default-Nones, but
+    AIMEAT's MCP surface has no field where explicit null is meaningful
+    (every optional is "if present, validate; otherwise skip"), so this is
+    safe in practice.
+    """
+    # CrewAI tools expose `_run(self, **kwargs)` as the inner entry point that
+    # MCPServerAdapter overrides to forward to the MCP transport. We replace
+    # it with a closure that filters and delegates.
+    original_run = tool._run
+
+    def wrapped_run(*args: Any, **kwargs: Any) -> Any:
+        clean = {k: v for k, v in kwargs.items() if v is not None}
+        return original_run(*args, **clean)
+
+    tool._run = wrapped_run
+    return tool
+
+
 # Default agent persona. Overridable per call. The text is intentionally
 # operational rather than chatty -- the LLM reads this verbatim and uses it
 # to decide when to call which AIMEAT tool, so the more concrete the
@@ -260,6 +296,11 @@ def create_liaison_agent(
         else:
             tools = list(all_tools)
 
+        # Strip None-valued kwargs from each tool's _run so the LLM's correctly-
+        # omitted optionals don't leak through as JSON null and trip AIMEAT's
+        # zod .optional() validation. See _strip_none_kwargs docstring.
+        tools = [_strip_none_kwargs(t) for t in tools]
+
         agent_args: dict[str, Any] = {
             "role": role,
             "goal": goal,
@@ -303,4 +344,4 @@ def liaison_tools(mcp_server_params: Any) -> list[Any]:
         The list of tool objects discovered through the MCP adapter.
     """
     adapter = MCPServerAdapter(mcp_server_params)
-    return list(adapter.tools)
+    return [_strip_none_kwargs(t) for t in adapter.tools]

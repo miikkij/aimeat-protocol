@@ -333,7 +333,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     emitChange('agent-tasks');
   });
 
-  /* ── POST /v1/agents/:name/tasks/:id/start -- Start task (queued -> active) ── */
+  /* ── POST /v1/agents/:name/tasks/:id/start -- Start task (queued|paused|stalled -> active) ── */
   router.post('/v1/agents/:name/tasks/:id/start', requireAuth(), async (req, res) => {
     // Owner-only: agents must not self-start tasks (propose-before-start rule)
     const isOwner = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
@@ -355,9 +355,15 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
       return;
     }
 
-    if (task.status !== 'queued' && task.status !== 'paused') {
+    // Allow recovery from 'stalled': the stall detector marks tasks as stalled
+    // when they go quiet for too long, but a stalled task is not a failed task
+    // -- the agent may have crashed, been killed, or have lost its tokens. The
+    // owner can re-start a stalled task to give the agent another chance
+    // (typical scenario: onboarding test task stalls because the agent
+    // subprocess died mid-flow; the owner fixes the subprocess and re-starts).
+    if (task.status !== 'queued' && task.status !== 'paused' && task.status !== 'stalled') {
       res.status(409).json(error(config.nodeId, 'INVALID_STATE',
-        `Only queued or paused tasks can be started (current: ${task.status})`));
+        `Only queued, paused, or stalled tasks can be started (current: ${task.status})`));
       return;
     }
 
@@ -469,6 +475,25 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
       return;
     }
 
+    // Stalled tasks are reactivated automatically when an event arrives:
+    // the stall-detector marks tasks as stalled when no events come in for
+    // a while, but if the agent posts an event now, it's evidently back and
+    // the task should resume. This avoids needing a separate "restart"
+    // endpoint for the common case of an agent that briefly crashed or lost
+    // connectivity and then recovered.
+    if (task.status === 'stalled') {
+      const resumeNow = new Date().toISOString();
+      await storage.updateAgentTask(id, { status: 'active', lastEventAt: resumeNow, updatedAt: resumeNow });
+      await storage.appendTaskEvent({
+        id: randomUUID(),
+        taskId: id,
+        type: 'started',
+        message: 'Task auto-resumed from stalled (agent posted a new event)',
+        timestamp: resumeNow,
+      });
+      task.status = 'active';
+    }
+
     if (task.status !== 'active') {
       res.status(409).json(error(config.nodeId, 'INVALID_STATE',
         `Events can only be appended to active tasks (current: ${task.status})`));
@@ -530,9 +555,15 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
       return;
     }
 
-    if (task.status !== 'active') {
+    // Allow completing from 'stalled' as well: if the agent comes back with
+    // a deliverable after a stall, accept it -- a late deliverable is more
+    // useful than rejecting the agent's work because the stall detector flipped
+    // the state. Active -> done and stalled -> done are both valid completion
+    // paths; failed/done/draft/queued/paused are not (those need explicit
+    // owner-driven transitions, e.g. /start, before they can complete).
+    if (task.status !== 'active' && task.status !== 'stalled') {
       res.status(409).json(error(config.nodeId, 'INVALID_STATE',
-        `Only active tasks can be completed (current: ${task.status})`));
+        `Only active or stalled tasks can be completed (current: ${task.status})`));
       return;
     }
 
@@ -575,9 +606,12 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
       return;
     }
 
-    if (task.status !== 'active') {
+    // Stalled tasks can also be marked failed -- e.g. the agent realises it
+    // can't recover and explicitly reports failure rather than letting the
+    // task linger in stalled state forever.
+    if (task.status !== 'active' && task.status !== 'stalled') {
       res.status(409).json(error(config.nodeId, 'INVALID_STATE',
-        `Only active tasks can be failed (current: ${task.status})`));
+        `Only active or stalled tasks can be failed (current: ${task.status})`));
       return;
     }
 
@@ -619,6 +653,21 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     if (!canAccessTask(req, task)) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
       return;
+    }
+
+    // Stalled tasks accept todo updates too: same auto-resume semantics as
+    // events -- if the agent is updating todos, it's clearly back.
+    if (task.status === 'stalled') {
+      const resumeNow = new Date().toISOString();
+      await storage.updateAgentTask(id, { status: 'active', lastEventAt: resumeNow, updatedAt: resumeNow });
+      await storage.appendTaskEvent({
+        id: randomUUID(),
+        taskId: id,
+        type: 'started',
+        message: 'Task auto-resumed from stalled (agent updated a todo)',
+        timestamp: resumeNow,
+      });
+      task.status = 'active';
     }
 
     if (task.status !== 'active') {
