@@ -24,6 +24,9 @@ objects (for stdio) that the caller passes to `MCPServerAdapter` from
 """
 from __future__ import annotations
 
+import os
+import shutil
+import sys
 from typing import Any
 
 try:
@@ -32,6 +35,53 @@ except ImportError as exc:  # pragma: no cover
     raise ImportError(
         "The `mcp` package is required. Install it with: pip install mcp"
     ) from exc
+
+
+def _resolve_windows_command(command: str) -> tuple[str, list[str]]:
+    """
+    Windows-specific shim resolution for stdio MCP transport.
+
+    On Windows, `npm install -g <pkg>` installs a `.cmd` wrapper script (e.g.
+    `aimeat.cmd`) into the global node_modules/bin path. Python's stdio MCP
+    client calls `CreateProcess` to spawn the server, and `CreateProcess`
+    cannot directly execute a `.cmd` file -- it returns WinError 193
+    ("%1 is not a valid Win32 application"). The standard workaround is to
+    spawn it through `cmd.exe /c <name>` which DOES know how to handle
+    .cmd shims.
+
+    This function detects whether the caller's `command` is a bare name (no
+    path separators, no extension) AND we're on Windows AND a matching
+    `.cmd` or `.bat` shim exists on PATH. If so, returns the wrapped form:
+    `("cmd.exe", ["/c", command, ...])`. Otherwise returns the command
+    unchanged so users with a real executable (Linux/Mac, or a Windows .exe
+    on PATH) are unaffected.
+
+    Returns:
+        (resolved_command, args_prefix) -- args_prefix is empty list unless
+        we wrapped via cmd.exe, in which case it's ["/c", original_command].
+    """
+    if sys.platform != "win32":
+        return command, []
+    # If command is an absolute path or contains directory separators, trust
+    # the caller -- they know what they're doing.
+    if os.path.sep in command or (os.path.altsep and os.path.altsep in command):
+        return command, []
+    # If the command already ends in .exe (or .bat/.cmd that the user explicitly
+    # named), no rewriting needed.
+    lower = command.lower()
+    if lower.endswith((".exe", ".bat", ".cmd")):
+        return command, []
+    # Look for an .exe first -- that runs directly, no shell needed.
+    if shutil.which(command + ".exe"):
+        return command, []
+    # Then look for a shim. If found, wrap in cmd.exe /c.
+    if shutil.which(command + ".cmd") or shutil.which(command + ".bat") or shutil.which(command):
+        # Use cmd.exe /c to handle the shim. The original command name goes
+        # into args so PATH resolution picks the .cmd / .bat shim.
+        return "cmd.exe", ["/c", command]
+    # Couldn't find anything; let it fail downstream with a clearer error
+    # rather than silently rewriting.
+    return command, []
 
 
 def stdio_params(
@@ -71,9 +121,16 @@ def stdio_params(
     if extra_args:
         args.extend(extra_args)
 
+    # Windows: aimeat is typically installed as a `.cmd` shim by npm, which
+    # CreateProcess (used by the stdio MCP client) cannot launch directly --
+    # it returns WinError 193. Detect that case and wrap through cmd.exe /c.
+    # No-op on Linux/Mac or when the user passed an absolute path.
+    resolved_command, prefix_args = _resolve_windows_command(aimeat_command)
+    final_args = prefix_args + args
+
     return StdioServerParameters(
-        command=aimeat_command,
-        args=args,
+        command=resolved_command,
+        args=final_args,
         env=env,
     )
 

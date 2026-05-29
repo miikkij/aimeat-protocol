@@ -28,9 +28,17 @@ def main() -> None:
     # for the "demo-crew" agent identity. The connector reads the token from
     # ~/.aimeat/ automatically. For remote/cloud deployments, swap in
     # http_params(node_url=..., agent_token=...) instead.
-    mcp_params = stdio_params(agent_name=os.environ.get("AIMEAT_AGENT_NAME", "demo-crew"))
+    agent_name = os.environ.get("AIMEAT_AGENT_NAME", "demo-crew")
+    mcp_params = stdio_params(agent_name=agent_name)
 
-    with create_liaison_agent(mcp_server_params=mcp_params, verbose=True) as liaison:
+    # Passing agent_name explicitly here lets the liaison inject it into its
+    # persona, so the LLM always passes the right value to AIMEAT tools that
+    # need an `agent_name` parameter -- no guessing.
+    with create_liaison_agent(
+        mcp_server_params=mcp_params,
+        agent_name=agent_name,
+        verbose=True,
+    ) as liaison:
         researcher = Agent(
             role="Researcher",
             goal="Find three recent and credible facts about the topic.",

@@ -2,6 +2,21 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## aimeat-crewai 0.1.1 - 2026-05-29
+
+(Independent versioning for the Python package; see `python/aimeat-crewai/`.)
+
+### Fixed
+
+- **Windows `stdio_params` crashed with WinError 193.** `aimeat` on Windows is an npm-installed `.cmd` shim that `CreateProcess` (used by the stdio MCP client) cannot execute directly. `stdio_params()` now detects Windows + `.cmd`/`.bat` shims on PATH and auto-wraps the invocation via `cmd.exe /c <command>`. No-op on Linux/Mac. No-op when the user passed an absolute path to a real `.exe`. Internal helper: `_resolve_windows_command()`.
+- **Liaison persona did not know its own agent name** → the LLM guessed (`"assistant"`, `"crewai"`, the CrewAI role name) and wasted retries on AIMEAT tools that take an `agent_name` parameter. `create_liaison_agent()` now accepts an `agent_name=` keyword that gets injected verbatim into the persona's `backstory`. When omitted, the factory tries to extract it from the `--agent` flag in `stdio_params()` automatically. HTTP/SSE transport users must pass `agent_name` explicitly because there's no `--agent` flag to read.
+- **Persona did not tell the LLM how to handle optional MCP parameters.** Added explicit calling-conventions section: "for OPTIONAL parameters, OMIT them entirely instead of passing null. MCP schema validation rejects explicit null." Also covered: enum params, AUTH_REQUIRED handling, INVALID_STEP handling (so the liaison gracefully skips steps that don't exist in reduced task-runner onboarding flow).
+
+### Changed
+
+- **`DEFAULT_BACKSTORY` → `DEFAULT_BACKSTORY_TEMPLATE`.** The template contains a `{agent_name}` placeholder that the factory formats. The old `DEFAULT_BACKSTORY` constant is kept as a backwards-compat alias that resolves the placeholder to a generic string.
+- **Persona now mentions** the 3 calling conventions before the responsibilities list -- LLMs read top-of-prompt content more reliably than buried mid-text instructions.
+
 ## [1.13.0] - 2026-05-29
 
 ### Changed (task-runner Hello Integration)

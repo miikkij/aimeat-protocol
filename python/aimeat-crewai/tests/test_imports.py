@@ -76,3 +76,39 @@ def test_create_liaison_agent_requires_mcp_params() -> None:
     with pytest.raises(AimeatLiaisonError, match="mcp_server_params"):
         with create_liaison_agent(mcp_server_params=None):
             pass
+
+
+def test_extract_agent_name_from_stdio_params() -> None:
+    """Internal helper: stdio_params(agent_name=X) should be readable back."""
+    from aimeat_crewai import stdio_params
+    from aimeat_crewai.liaison import _extract_agent_name_from_params
+
+    p = stdio_params(agent_name="company-crew")
+    assert _extract_agent_name_from_params(p) == "company-crew"
+
+    p_no_agent = stdio_params()
+    assert _extract_agent_name_from_params(p_no_agent) is None
+
+
+def test_default_backstory_template_has_placeholder() -> None:
+    """Template must contain {agent_name} so the factory can inject the name."""
+    from aimeat_crewai.liaison import DEFAULT_BACKSTORY_TEMPLATE
+
+    assert "{agent_name}" in DEFAULT_BACKSTORY_TEMPLATE
+    # And the rendered legacy constant should NOT still contain the brace form
+    from aimeat_crewai.liaison import DEFAULT_BACKSTORY
+    assert "{agent_name}" not in DEFAULT_BACKSTORY
+
+
+def test_windows_stdio_no_op_on_unix() -> None:
+    """The Windows shim resolver must be a no-op on non-Windows hosts."""
+    import sys
+    from aimeat_crewai.mcp_client import _resolve_windows_command
+
+    if sys.platform == "win32":
+        # On Windows we can't usefully assert behaviour without a controlled PATH;
+        # the integration test (running aimeat for real) covers this.
+        return
+    cmd, prefix = _resolve_windows_command("aimeat")
+    assert cmd == "aimeat"
+    assert prefix == []

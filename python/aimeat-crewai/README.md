@@ -6,7 +6,10 @@
 from crewai import Agent, Crew, Task
 from aimeat_crewai import create_liaison_agent, stdio_params
 
-with create_liaison_agent(mcp_server_params=stdio_params(agent_name="company-crew")) as liaison:
+with create_liaison_agent(
+    mcp_server_params=stdio_params(agent_name="company-crew"),
+    agent_name="company-crew",  # injected into persona so LLM passes it to AIMEAT tools
+) as liaison:
     researcher = Agent(role="Researcher", ...)
     writer = Agent(role="Writer", ...)
 
@@ -136,6 +139,12 @@ my_agent_2 = Agent(role="...", tools=tools[:5])  # subset
 ```
 
 NOTE: `liaison_tools` leaves the MCP adapter open for the process's lifetime. Use `create_liaison_agent` if you can.
+
+## Notes for stable behaviour
+
+- **Always pass `agent_name`** to `create_liaison_agent`. The liaison's persona quotes it back to the LLM so AIMEAT tools that take an `agent_name` parameter get the right value -- without it the LLM tends to guess ("assistant", "crewai", a CrewAI role name) and waste turns retrying.
+- **On Windows**, `stdio_params` auto-wraps `aimeat` (an npm `.cmd` shim) through `cmd.exe /c` so the stdio MCP client can launch it. No action needed from you; Linux/Mac are unchanged.
+- **Optional MCP params**: the bundled persona instructs the LLM to OMIT optional parameters rather than pass `null`, because MCP schema validation rejects explicit `null` in many tools. If you write your own persona, keep this rule.
 
 ## Compatibility
 

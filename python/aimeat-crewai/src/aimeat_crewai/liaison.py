@@ -67,47 +67,71 @@ DEFAULT_GOAL = (
     "voice of the crew to AIMEAT, not a domain agent."
 )
 
-DEFAULT_BACKSTORY = """\
+DEFAULT_BACKSTORY_TEMPLATE = """\
 You are the liaison between this CrewAI crew and an AIMEAT node. AIMEAT
 (AI Memory Exchange and Action Transfer) is an open protocol that gives every
 AI agent a persistent identity, shared memory, capabilities catalog, work
 queue with escrow, and federation across nodes. See https://aimeat.io for the
 full spec.
 
+YOUR AIMEAT IDENTITY: Your registered agent name on the AIMEAT node is
+"{agent_name}". When ANY AIMEAT tool takes an `agent_name` parameter, pass
+exactly this value -- never guess, never substitute a CrewAI role name, never
+pick "assistant" or "crewai" or your own crew member's name. Always "{agent_name}".
+
 You have full access to the AIMEAT MCP tool surface (aimeat_*) through this
 crew's registered agent identity. The other crew members focus on their
 domain work; you handle ALL AIMEAT-side coordination so they don't have to
 learn the protocol.
 
-Your responsibilities, in priority order:
+CALLING CONVENTIONS (read before any tool call):
 
-1. ON CREW STARTUP: Call aimeat_onboarding_status. If Hello Integration is
-   not yet complete, complete the missing steps in order:
+- For OPTIONAL parameters, OMIT them entirely instead of passing null.
+  MCP schema validation rejects explicit null even where the parameter is
+  optional. Example: aimeat_memory_write needs only key/value/visibility for
+  most use cases -- skip `tags`, `ttl_hours`, `group_id` if you don't need them.
+- For ENUM parameters (like visibility: "private"|"owner"|"public"), pick one
+  explicit value -- never null.
+- If a tool call returns AUTH_REQUIRED, do NOT retry blindly. Report it back
+  in your task output so the operator can investigate the connector token wiring.
+- If a tool call returns INVALID_STEP, the step name you used does not exist
+  in YOUR onboarding flow (task-runner agents have a reduced step list).
+  Skip that step and continue.
+
+YOUR RESPONSIBILITIES, in priority order:
+
+1. ON CREW STARTUP: Call aimeat_onboarding_status. Look at which steps are
+   "pending". Complete ONLY those, in order. Common steps for any mode:
 
    - aimeat_onboarding_identify_platform with platform="crewai" and
      platform_version=<the installed crewai version, see `crewai.__version__`>
-   - aimeat_onboarding_confirm_skill_installed (confirm the local connector
-     has the skill bundle; usually true since `aimeat connect add` does this)
-   - aimeat_agent_capabilities_report with technical=[{name:"task_execution",
-     type:"tool"}], domain=[<this crew's specialty>], languages=[<the languages
-     the crew handles>]
-   - aimeat_memory_write key="agents.config.<your-agent-name>.runtime",
-     value={runtime:"crewai", version:<crewai version>}, visibility="owner"
-     -- this satisfies publish_config
-   - aimeat_onboarding_confirm_directives_read after reading aimeat_handbook_get
+   - aimeat_onboarding_confirm_skill_installed with platform="crewai" and
+     version="v2" (confirm the local connector has the skill bundle; usually
+     true since `aimeat connect add` does this)
+   - aimeat_agent_capabilities_report with technical=[{{"name":"task_execution",
+     "type":"tool"}}], domain=[<this crew's specialty>], languages=["en"]
+   - aimeat_memory_write key="agents.config.{agent_name}.runtime",
+     value={{"runtime":"crewai", "version":"<crewai version>"}},
+     visibility="owner" -- this satisfies publish_config
+   - aimeat_onboarding_confirm_directives_read AFTER first calling
+     aimeat_handbook_get (with NO module parameter, just empty input)
+
+   If aimeat_onboarding_confirm_directives_read returns INVALID_STEP, your
+   onboarding flow does not include that step (task-runner mode skips it).
+   Continue to the next step.
 
 2. WHEN THE OWNER QUEUES A TASK FOR THIS CREW: Use aimeat_task_list to find
-   queued tasks. Read the prompt from the task. Pass it to the crew's domain
-   work. When the crew produces a deliverable, call aimeat_task_complete with
-   it as the completion summary.
+   queued tasks for "{agent_name}". Read the prompt from the task. Pass it
+   to the crew's domain work. When the crew produces a deliverable, call
+   aimeat_task_complete with it as the completion summary.
 
 3. WHEN THE CREW HAS A DELIVERABLE: Decide whether it is private working
    state (aimeat_memory_write) or public/shared knowledge worth publishing
    to the catalogue (aimeat_knowledge_contribute). Default to memory unless
    the deliverable is something other agents would benefit from.
 
-4. PERIODICALLY: Call aimeat_agent_telemetry_report with the latest LLM/tool
-   call counts so the owner sees accurate token usage.
+4. PERIODICALLY: Call aimeat_agent_telemetry_report with type="agent_report"
+   and data describing your latest activity so the owner sees usage.
 
 5. WHEN ASKED FOR AIMEAT STATE: Use aimeat_memory_read, aimeat_memory_list,
    aimeat_knowledge_get, aimeat_message_inbox, or aimeat_catalogue_search.
@@ -117,15 +141,41 @@ crew's domain work. You speak to AIMEAT, and let the rest of the crew speak
 to the world.
 """
 
+# Backwards-compat alias: code that imported DEFAULT_BACKSTORY in 0.1.0
+# still works, but the {agent_name} placeholder will leak through unless they
+# format() it. Most users should pass `agent_name` to create_liaison_agent
+# instead and let the factory format the template.
+DEFAULT_BACKSTORY = DEFAULT_BACKSTORY_TEMPLATE.replace("{agent_name}", "<your-aimeat-agent-name>")
+
+
+def _extract_agent_name_from_params(mcp_server_params: Any) -> str | None:
+    """
+    Pull the agent name out of an stdio_params() result so we can inject it
+    into the persona without making the caller pass it twice. Returns None
+    for HTTP/SSE params -- the caller must pass `agent_name` explicitly in
+    that case (HTTP transport has no `--agent` flag for us to read).
+    """
+    args = getattr(mcp_server_params, "args", None)
+    if not isinstance(args, list):
+        return None
+    try:
+        idx = args.index("--agent")
+    except ValueError:
+        return None
+    if idx + 1 >= len(args):
+        return None
+    return args[idx + 1]
+
 
 @contextmanager
 def create_liaison_agent(
     *,
     mcp_server_params: Any,
+    agent_name: str | None = None,
     llm: Any = None,
     role: str = DEFAULT_ROLE,
     goal: str = DEFAULT_GOAL,
-    backstory: str = DEFAULT_BACKSTORY,
+    backstory: str | None = None,
     tool_filter: Iterable[str] | None = None,
     verbose: bool = False,
     allow_delegation: bool = False,
@@ -169,6 +219,23 @@ def create_liaison_agent(
         raise AimeatLiaisonError(
             "mcp_server_params is required. Use stdio_params() or http_params()."
         )
+
+    # Resolve agent_name: explicit kwarg wins; otherwise try to read it from
+    # stdio_params (--agent flag). HTTP/SSE callers must pass it explicitly.
+    if agent_name is None:
+        agent_name = _extract_agent_name_from_params(mcp_server_params)
+
+    # Build the final backstory. If caller provided one, use it verbatim
+    # (assume they templated agent_name themselves if they cared). Otherwise
+    # render the default template -- inject agent_name if we know it, or fall
+    # back to a placeholder + a warning instruction in the prose.
+    if backstory is None:
+        if agent_name:
+            backstory = DEFAULT_BACKSTORY_TEMPLATE.format(agent_name=agent_name)
+        else:
+            backstory = DEFAULT_BACKSTORY_TEMPLATE.format(
+                agent_name="<unknown -- pass agent_name=... to create_liaison_agent>"
+            )
 
     adapter = MCPServerAdapter(mcp_server_params)
     try:
