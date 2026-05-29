@@ -854,7 +854,7 @@ await test('37. Auto-check does not re-validate already-passed steps', async () 
     }
 });
 
-// ─── Task-runner mode: reduced 5-step Hello Integration ───
+// ─── Task-runner mode: reduced 7-step Hello Integration (smoke test built-in) ───
 const runnerName = 'onboard-runner';
 let runnerGaii = '';
 let runnerToken = '';
@@ -887,27 +887,27 @@ await test('39. Task-runner mode is persisted across reads', async () => {
     assert(runner.mode === 'task-runner', `expected mode=task-runner, got ${runner.mode}`);
 });
 
-await test('40. Task-runner onboarding has exactly 5 steps (reduced flow)', async () => {
+await test('40. Task-runner onboarding has exactly 7 steps (reduced flow with test-task pair)', async () => {
     const { status, body } = await json(`/v1/agents/${runnerName}/onboarding/start`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     const steps = body.data.onboarding.steps;
-    assert(steps.length === 5, `expected 5 steps, got ${steps.length} (${steps.map((s: any) => s.id).join(',')})`);
+    assert(steps.length === 7, `expected 7 steps, got ${steps.length} (${steps.map((s: any) => s.id).join(',')})`);
 
-    const expectedIds = ['authenticate', 'identify_platform', 'install_skill', 'report_capabilities', 'publish_config'];
+    const expectedIds = ['authenticate', 'identify_platform', 'install_skill', 'report_capabilities', 'accept_test_task', 'complete_test_task', 'publish_config'];
     for (const id of expectedIds) {
         assert(steps.find((s: any) => s.id === id), `missing expected step: ${id}`);
     }
-    // None of the omitted steps should appear
-    const omitted = ['accept_test_task', 'complete_test_task', 'send_test_message', 'configure_delivery', 'report_telemetry', 'publish_commands', 'declare_services', 'read_directives'];
+    // Truly interactive-only steps are still omitted (commands, messages, directives, delivery, telemetry, declare_services)
+    const omitted = ['send_test_message', 'configure_delivery', 'report_telemetry', 'publish_commands', 'declare_services', 'read_directives'];
     for (const id of omitted) {
         assert(!steps.find((s: any) => s.id === id), `task-runner should not have step: ${id}`);
     }
 });
 
-await test('41. Task-runner auto-completes onboarding when all 5 steps pass', async () => {
+await test('41. Task-runner non-test-task steps pass; test-task pair stays pending until subprocess runs', async () => {
     // identify_platform + install_skill require step confirmation (api_call validation)
     for (const [stepId, payload] of [
         ['identify_platform', { platform: 'crewai', platform_version: '0.1' }],
@@ -944,16 +944,26 @@ await test('41. Task-runner auto-completes onboarding when all 5 steps pass', as
     });
     assert(memStatus === 200 || memStatus === 201, `POST publish_config memory failed: ${memStatus}: ${JSON.stringify(memBody)}`);
 
-    // GET triggers auto-check -- all 5 should be passed and overall status completed
+    // GET triggers auto-check. The 5 non-test-task steps should be passed; the
+    // test-task pair stays pending because no subprocess is wired in this E2E.
+    // Onboarding overall must therefore remain in_progress, not completed --
+    // which is the whole point of keeping the test-task pair for task-runners.
     const { status, body } = await json(`/v1/agents/${runnerName}/onboarding`, {
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(status === 200, `GET onboarding status ${status}: ${JSON.stringify(body)}`);
     const ob = body.data.onboarding;
-    for (const step of ob.steps) {
-        assert(step.status === 'passed', `task-runner step ${step.id} should be passed, got ${step.status}`);
+    const passedIds = new Set<string>(ob.steps.filter((s: any) => s.status === 'passed').map((s: any) => s.id));
+    for (const id of ['authenticate', 'identify_platform', 'install_skill', 'report_capabilities', 'publish_config']) {
+        assert(passedIds.has(id), `expected ${id} to be passed; status was ${ob.steps.find((s: any) => s.id === id)?.status}`);
     }
-    assert(ob.status === 'completed', `expected completed, got ${ob.status}`);
+    const acceptStep = ob.steps.find((s: any) => s.id === 'accept_test_task');
+    const completeStep = ob.steps.find((s: any) => s.id === 'complete_test_task');
+    assert(acceptStep?.status === 'pending' || acceptStep?.status === 'passed',
+        `accept_test_task should be pending or passed, got ${acceptStep?.status}`);
+    assert(completeStep?.status === 'pending',
+        `complete_test_task should still be pending without a real subprocess, got ${completeStep?.status}`);
+    assert(ob.status === 'in_progress', `expected in_progress (test-task pair not finished), got ${ob.status}`);
 });
 
 // ─── Summary ───

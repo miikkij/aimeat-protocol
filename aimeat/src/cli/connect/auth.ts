@@ -351,7 +351,7 @@ export async function runAuth(args: AuthArgs): Promise<void> {
   await downloadAndPrintBundleGuide(client, agentName, success, info, warn);
 
   if (mode === 'task-runner') {
-    info(`Mode set to task-runner. Hello Integration will be the reduced 5-step flow.`);
+    info(`Mode set to task-runner. Hello Integration will be the reduced 7-step flow (the test-task pair is kept so onboarding doubles as a smoke test for your subprocess).`);
     info(`To make this agent actually run tasks, edit ~/.aimeat/agents/${agentName}/config.yaml`);
     info(`and add a "runner:" block (command/args/cwd/env). See: aimeat connect docs task-runner`);
   }

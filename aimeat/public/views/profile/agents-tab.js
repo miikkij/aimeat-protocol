@@ -126,7 +126,7 @@ You're acting on my behalf within scopes I approve at step 2. Decline anything t
 
 /* Paste for a task-runner agent (e.g. CrewAI crew). Different from
    buildMcpOnboardingPrompt because task-runners never run the full 13-step
-   Hello Integration -- the server gives them the 5-step reduced flow when
+   Hello Integration -- the server gives them the 7-step reduced flow when
    mode=task-runner is set. */
 function buildTaskRunnerPrompt(sess, agentName) {
   const url = getNodeUrl();
@@ -137,14 +137,16 @@ Required: aimeat@1.12.4 or later (npm). (1.12.0-1.12.3 silently dropped the --mo
 
 == Step 1 -- Connect with mode=task-runner ==
 The --mode flag sets the agent's mode at registration time, so the
-server gives you the reduced 5-step Hello Integration (instead of the
-default 13-step interactive flow). No separate owner-only call needed.
+server gives you the reduced 7-step Hello Integration (instead of the
+default 13-step interactive flow). The test-task pair (accept + complete)
+is kept on purpose: it doubles as the smoke test that proves your
+subprocess actually runs end-to-end. No separate owner-only call needed.
 
   npx aimeat connect add --agent ${name} --mode task-runner --url ${url} --owner ${sess.owner}
 
 Ask ${sess.owner} to approve in their browser at Profile -> Agents.
 Verify after approval: npx aimeat connect call aimeat_onboarding_status --agent ${name}
-You should see 5 steps, not 13.
+You should see 7 steps, not 13.
 
 == Step 2 -- Configure your subprocess ==
 Edit ~/.aimeat/agents/${name}/config.yaml and add a runner: block:
@@ -177,11 +179,29 @@ you may call aimeat_task_event with AIMEAT_TOKEN.)
   npx aimeat connect serve
 Confirm your agent appears as [task-runner]: npx aimeat connect list
 
-== Step 4 -- Smoke test ==
-From another shell or another connected agent:
-  npx aimeat connect call aimeat_task_propose_todos --agent <another-agent> --json '{"target_agent":"${name}","title":"Smoke test","prompt":"Reply with the word OK.","todos":[]}'
-Within seconds your subprocess should run. List your completed tasks:
-  npx aimeat connect call aimeat_task_list --agent ${name} --json '{"status":"done","per_page":5}'
+== Step 4 -- Smoke test is automatic ==
+You don't need to queue a test task manually. Onboarding includes an
+accept_test_task / complete_test_task pair: when ${sess.owner} approves
+the agent, the server queues a real task for ${name} immediately. Your
+running "aimeat connect serve" subprocess will pick it up within ~30s,
+execute it, and the deliverable (your stdout) becomes the task completion
+summary. Onboarding flips to "completed" only after that round-trip
+succeeds -- so the green checkmark IS the smoke test.
+
+Check onboarding status:
+  npx aimeat connect call aimeat_onboarding_status --agent ${name}
+
+Expected progression after approval:
+  authenticate, identify_platform, install_skill, report_capabilities,
+  publish_config -> passed (these you handle directly)
+  accept_test_task, complete_test_task -> passed (these your subprocess
+  handles via "aimeat connect serve")
+
+If complete_test_task stays pending for more than a minute after
+accept_test_task is passed, your subprocess is the suspect: check the
+serve logs, the runner.command path, env vars, exit code. Use:
+  npx aimeat connect call aimeat_task_list --agent ${name} --json '{"per_page":5}'
+to see the actual task state on the server.
 
 If a step breaks, report the exact step number and error output. Do not improvise around it.`;
 }

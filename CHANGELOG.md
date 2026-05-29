@@ -2,6 +2,12 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.12.5] - 2026-05-29
+
+### Fixed (documentation)
+
+- **Profile -> Agents -> "Connect a task-runner agent" paste prompt Step 4 (smoke test) recommended a CLI call that cannot work.** The paste told the agent to invoke `aimeat_task_propose_todos --json '{"target_agent":"...","title":"Smoke test","prompt":"..."}'` to queue a test task. This was wrong on two counts: (1) `aimeat_task_propose_todos` is for adding TODOs to an EXISTING task (it requires `task_id`), not for creating new ones; the schema rejects `target_agent`, `title`, and `prompt` outright. (2) Task creation goes through `POST /v1/agents/:name/tasks` which requires the `owner` role, so even a correct create-tool would 403 from an agent token. The CLI fallback has no task-creation tool at all. Updated paste Step 4 to direct the operator to create the smoke task from the browser (Profile -> Agents -> expand card -> Tasks tab -> "+ New task"), which uses the owner's session JWT and works. The verification side (listing the completed task via `aimeat_task_list`) is still done from the agent's CLI session and is correct.
+
 ## [1.12.4] - 2026-05-29
 
 ### Fixed

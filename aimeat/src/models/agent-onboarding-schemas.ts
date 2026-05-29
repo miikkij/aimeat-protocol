@@ -86,17 +86,23 @@ const STEP_DEFINITIONS: StepDefinition[] = [
 
 /**
  * Steps included when a task-runner agent is onboarded. Task-runners have no
- * interactive command surface, never send messages, never run test tasks, and
- * don't declare services -- they just execute a configured subprocess when a
- * task arrives. This reduced flow gates them on the bare minimum: authenticated,
- * platform identified, skill bundle installed, capabilities reported, and
- * runtime config published (so the owner can see what runner is configured).
+ * interactive command surface (no slash commands), never send chat messages,
+ * and don't declare interactive services -- those steps are skipped. But the
+ * test-task pair (accept + complete) is KEPT: a task-runner whose entire
+ * purpose is to execute queued tasks should not be marked "ready" until its
+ * subprocess has actually executed a real test task end-to-end. The onboarding
+ * test task IS the smoke test for task-runner agents -- it proves the runner
+ * block in config.yaml is wired correctly, the subprocess starts, and stdout
+ * round-trips back as the deliverable. publish_commands is still skipped
+ * because task-runners have no command surface.
  */
 const TASK_RUNNER_STEP_IDS: ReadonlyArray<OnboardingStepId> = [
   'authenticate',
   'identify_platform',
   'install_skill',
   'report_capabilities',
+  'accept_test_task',
+  'complete_test_task',
   'publish_config',
 ];
 
@@ -106,7 +112,7 @@ export type AgentMode = 'autonomous' | 'interactive' | 'task-runner' | 'coordina
  * Build the Hello Integration step list for a new onboarding record. The
  * `mode` parameter selects which subset of STEP_DEFINITIONS applies:
  *
- *   - 'task-runner'                       -> TASK_RUNNER_STEP_IDS (5 steps)
+ *   - 'task-runner'                       -> TASK_RUNNER_STEP_IDS (7 steps)
  *   - 'autonomous' / 'interactive' /
  *     'coordinator' / undefined (default) -> full 13-step list
  *
