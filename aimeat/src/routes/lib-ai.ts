@@ -60,7 +60,8 @@ const ai = {
     if (_availCache && (now - _availCache.t) < 60_000) return _availCache.v;
     try {
       const r = await authFetch('/v1/openrouter/settings');
-      const v = !!(r && r.ok && r.data && r.data.has_api_key);
+      // Endpoint returns camelCase \`hasApiKey\`. Tolerate snake_case for older nodes too.
+      const v = !!(r && r.ok && r.data && (r.data.hasApiKey || r.data.has_api_key));
       _availCache = { v, t: now };
       return v;
     } catch (e) { return false; }

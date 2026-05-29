@@ -115,7 +115,11 @@ export async function complete(
 
     // Check for error in response body (OpenRouter sometimes returns 200 with error)
     if (data.error) {
-      const err = new Error(`OpenRouter error: ${data.error.message || JSON.stringify(data.error)}`) as Error & { status: number };
+      // Log the full error so we can diagnose model-specific issues (Owl Alpha
+      // and friends sometimes reject params silently with 200 + error body).
+      logger.warn(`[openrouter] error body: ${JSON.stringify(data.error).slice(0, 500)}`);
+      const errMsg = data.error.message || JSON.stringify(data.error);
+      const err = new Error(`OpenRouter error: ${errMsg}`) as Error & { status: number };
       err.status = data.error.code || 502;
       throw err;
     }
