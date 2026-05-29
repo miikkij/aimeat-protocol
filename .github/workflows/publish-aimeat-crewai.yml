@@ -1,0 +1,106 @@
+name: Publish aimeat-crewai to PyPI
+
+# Triggers on tags like `aimeat-crewai-v0.1.0`, `aimeat-crewai-v0.2.0` etc.
+# That namespace lets the Node-side AIMEAT package version independently --
+# pushing `v1.13.1` (Node) does NOT trigger this workflow, and pushing
+# `aimeat-crewai-v0.1.0` does NOT trigger the Node release flow.
+#
+# Authentication uses PyPI Trusted Publisher (OIDC), so NO secrets or tokens
+# are stored anywhere -- GitHub's OIDC provider proves to PyPI that this
+# workflow has the right to publish. The pending publisher must be registered
+# on pypi.org first under the project name 'aimeat-crewai' with this exact
+# workflow filename and the environment 'pypi'.
+
+on:
+  push:
+    tags:
+      - "aimeat-crewai-v*.*.*"
+  workflow_dispatch: {}  # allow manual runs from the Actions tab for testing
+
+jobs:
+  build:
+    name: Build sdist + wheel
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: python/aimeat-crewai
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build backend
+        run: python -m pip install --upgrade pip build
+
+      - name: Verify version tag matches pyproject.toml
+        # Prevents accidentally publishing a tag that does not match the
+        # version declared in pyproject.toml. Skipped on workflow_dispatch
+        # because there is no tag in that flow.
+        if: github.event_name == 'push'
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#aimeat-crewai-v}"
+          PKG_VERSION="$(python -c 'import tomllib,pathlib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "Tag version ($TAG_VERSION) does not match pyproject.toml version ($PKG_VERSION)."
+            echo "Bump pyproject.toml first, commit, then tag."
+            exit 1
+          fi
+          echo "Version check OK: $TAG_VERSION"
+
+      - name: Build distributions
+        run: python -m build
+
+      - name: List built artifacts
+        run: ls -la dist/
+
+      - name: Upload artifacts for the publish job
+        uses: actions/upload-artifact@v4
+        with:
+          name: aimeat-crewai-dist
+          path: python/aimeat-crewai/dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+
+    # Required by PyPI Trusted Publisher OIDC flow. The 'pypi' environment
+    # name must match what was registered as the pending publisher on PyPI.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/aimeat-crewai
+
+    permissions:
+      # id-token: write is what lets GitHub mint an OIDC token that PyPI
+      # accepts as proof of identity. NO repository secret is involved.
+      id-token: write
+
+    # Don't auto-publish on workflow_dispatch; that path is for build-only
+    # smoke checks. Real releases come from pushed tags.
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Download built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: aimeat-crewai-dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # No `password`, no `username`, no `repository-url` overrides --
+          # default targets pypi.org, OIDC handles auth.
+          packages-dir: dist/
+          # `print-hash: true` shows the SHA256 of each uploaded artifact in
+          # the workflow log. Useful for verifying that what reached PyPI is
+          # the same as what GitHub built.
+          print-hash: true

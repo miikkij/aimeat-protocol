@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aimeat-crewai"
+version = "0.1.0"
+description = "AIMEAT Liaison Agent for CrewAI -- drop-in crew member that handles all communication with an AIMEAT node (Hello Integration handshake, capability reporting, memory writes, knowledge publishing, task lifecycle) so the rest of the crew can focus on domain work."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Jouni Miikki" },
+]
+keywords = ["aimeat", "crewai", "mcp", "ai-agents", "multi-agent", "agent-orchestration"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "crewai>=0.80.0",
+    "crewai-tools[mcp]>=0.25.0",
+    "mcp>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.4",
+]
+
+[project.urls]
+Homepage = "https://aimeat.io"
+Repository = "https://github.com/miikkij/aimeat-protocol"
+Documentation = "https://github.com/miikkij/aimeat-protocol/tree/main/python/aimeat-crewai"
+Issues = "https://github.com/miikkij/aimeat-protocol/issues"
+Changelog = "https://github.com/miikkij/aimeat-protocol/blob/main/CHANGELOG.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aimeat_crewai"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

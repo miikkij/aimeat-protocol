@@ -107,3 +107,15 @@ google*.html
 
 # Business strategy (private)
 docs/businessfinland/
+
+# Python (added 2026-05-29 with python/aimeat-crewai/ package)
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
