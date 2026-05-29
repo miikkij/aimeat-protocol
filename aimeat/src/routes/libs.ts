@@ -4,6 +4,10 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.10.0 - 2026-05-29 - Add aimeat-ai.js — AI completion using the user's
+ *   OpenRouter key (apps reach /v1/ai/complete; budget + per-app quotas
+ *   enforced server-side). Registered both as a route and in the /v1/libs
+ *   catalogue.
  * v1.9.8 - 2026-05-28 - Modal submit button now reads "Sign In / Register" to surface upsert behavior.
  * v1.9.7 - 2026-05-28 - Disable browser caching for generated helper libraries.
  * v1.9.6 - 2026-05-28 - Handle dev-mode auth reset responses in browser auth registration.
@@ -20,6 +24,7 @@ import { aimeatTunnelLib } from './lib-tunnel.js';
 import { aimeatAudioLib } from './lib-audio.js';
 import { aimeatSpeechLib } from './lib-speech.js';
 import { aimeatCapabilitiesLib } from './lib-capabilities.js';
+import { aimeatAiLib } from './lib-ai.js';
 
 function sendJavascriptLibrary(res: Response, source: string): void {
   res.set('Cache-Control', 'no-store');
@@ -83,6 +88,11 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   // GET /v1/libs/aimeat-capabilities.js — Capability discovery, invoke, management
   router.get('/v1/libs/aimeat-capabilities.js', (_req, res) => {
     sendJavascriptLibrary(res, aimeatCapabilitiesLib(config));
+  });
+
+  // GET /v1/libs/aimeat-ai.js — AI completion using the user's OpenRouter key
+  router.get('/v1/libs/aimeat-ai.js', (_req, res) => {
+    sendJavascriptLibrary(res, aimeatAiLib(config));
   });
 
   // GET /v1/libs/ — List available libraries
@@ -166,6 +176,14 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
           description: 'Speech: text-to-speech, speech-to-text, voice commands, pluggable providers (ElevenLabs, Whisper, etc.)',
           size_estimate: '~15KB',
           include: `<script src="${config.baseUrl}/v1/libs/aimeat-speech.js"></script>`,
+        },
+        {
+          name: 'aimeat-ai',
+          url: '/v1/libs/aimeat-ai.js',
+          description: 'AI completion using the user\'s configured OpenRouter key. Per-user daily budget and per-app quotas enforce safe spend.',
+          size_estimate: '~4KB',
+          include: `<script src="${config.baseUrl}/v1/libs/aimeat-ai.js"></script>`,
+          requires: 'aimeat-auth',
         },
       ],
     });

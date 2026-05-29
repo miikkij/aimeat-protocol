@@ -80,6 +80,7 @@ import { generatorAutopilotRouter } from '../routes/generator-autopilot.js';
 import { foundryRouter } from '../routes/foundry.js';
 import { calibratorRouter } from '../routes/calibrator.js';
 import { openrouterRouter } from '../routes/openrouter.js';
+import { aiRouter } from '../routes/ai.js';
 import { uploadRouter } from '../routes/upload.js';
 import { agentTasksRouter } from '../routes/agent-tasks.js';
 import { agentIntegrationRouter } from '../routes/agent-integration.js';
@@ -254,6 +255,7 @@ export async function mountRoutes(
     app.use(calibratorRouter(config, storage));  // Prompt calibration tool
   }
   app.use(openrouterRouter(config, storage));   // OpenRouter AI autopilot
+  app.use(aiRouter(config, storage));            // App-level AI completion (user's key, budget-gated)
   app.use(csmRouter(config, storage));       // Phase 0.2 — CSM management
   app.use(msmRouter(config, storage));        // MSM — Machine Service Manifest
   app.use(actionsRouter(config, storage));

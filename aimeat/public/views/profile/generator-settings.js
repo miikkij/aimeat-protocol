@@ -305,6 +305,9 @@ export function OpenRouterSettings({ onSettingsChange }) {
             </div>
           `}
 
+          <!-- Apps AI budget — apps reach this key via /v1/ai/complete -->
+          ${hasApiKey && html`<${AiAppsBudgetPanel} />`}
+
           <!-- Actions -->
           <div class="pf-gen-or-actions">
             <button class="btn-primary" onClick=${handleSave} disabled=${saving}>
@@ -322,6 +325,127 @@ export function OpenRouterSettings({ onSettingsChange }) {
           </div>
         </div>
       `}
+    </div>
+  `;
+}
+
+/**
+ * Budget + spend panel for app-level AI use (/v1/ai/complete). Shows today's
+ * total spend and per-app breakdown, lets the user set the daily USD cap.
+ *
+ * Numbers come from the server's tracked usage (token counts always exact,
+ * cost is OpenRouter-reported when available, rough estimate otherwise).
+ * Per-app quotas + allowlist editing is out of scope for v1 — set via API.
+ */
+function AiAppsBudgetPanel() {
+  const [usage, setUsage] = useState(null);
+  const [settings, setSettings] = useState(null);
+  const [editing, setEditing] = useState(false);
+  const [budgetInput, setBudgetInput] = useState('1');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState(null);
+
+  useEffect(() => { reload(); }, []);
+
+  async function reload() {
+    const [u, s] = await Promise.all([
+      apiGet('/v1/ai/usage').catch(() => null),
+      apiGet('/v1/ai/settings').catch(() => null),
+    ]);
+    if (u && u.ok !== false && u.data) setUsage(u.data);
+    if (s && s.ok !== false && s.data) {
+      setSettings(s.data);
+      setBudgetInput(String(s.data.daily_budget_usd ?? 1));
+    }
+  }
+
+  async function saveBudget() {
+    setSaving(true); setMessage(null);
+    const n = Number(budgetInput);
+    if (!Number.isFinite(n) || n < 0 || n > 1000) {
+      setMessage({ text: 'Budget must be a number between 0 and 1000.', error: true });
+      setSaving(false); return;
+    }
+    try {
+      const r = await apiPost('/v1/ai/settings', { daily_budget_usd: n });
+      if (r.ok === false) throw new Error(r.error?.message || 'Save failed');
+      setMessage({ text: 'Budget saved.' });
+      setEditing(false);
+      await reload();
+    } catch (e) {
+      setMessage({ text: e.message || 'Save failed', error: true });
+    }
+    setSaving(false);
+  }
+
+  if (!usage || !settings) return null;
+  const budget = usage.daily_budget_usd;
+  const spent = usage.spent_today_usd;
+  const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
+  const perAppEntries = Object.entries(usage.per_app || {});
+
+  return html`
+    <div class="pf-gen-or-field" style="border-top:2px solid var(--cl-ink,#e5e5e5);padding-top:14px;margin-top:14px;">
+      <label class="pf-gen-or-label">💸 AI apps daily budget</label>
+      <div style="font-size:12px;color:#666;margin-bottom:8px;">
+        Apps that call <code>AIMEAT.ai.complete()</code> use this key. When today's
+        spend hits the budget, further calls return <code>QUOTA_EXHAUSTED</code>.
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;background:#f5f5f5;border-radius:4px;height:20px;position:relative;overflow:hidden;">
+          <div style="position:absolute;top:0;left:0;bottom:0;width:${pct}%;background:${pct >= 90 ? '#ef4444' : pct >= 60 ? '#f59e0b' : '#22c55e'};transition:width .3s;"></div>
+          <div style="position:relative;text-align:center;font-size:11px;line-height:20px;font-weight:700;">
+            $${spent.toFixed(4)} / $${budget.toFixed(2)} (${pct}%)
+          </div>
+        </div>
+        ${editing ? html`
+          <input type="number" min="0" max="1000" step="0.10" value=${budgetInput}
+                 onInput=${e => setBudgetInput(e.target.value)}
+                 style="width:90px;padding:4px 6px;font-size:13px;" />
+          <button class="btn-primary btn-sm" onClick=${saveBudget} disabled=${saving}>
+            ${saving ? '...' : 'Save'}
+          </button>
+          <button class="btn-outline btn-sm" onClick=${() => setEditing(false)}>Cancel</button>
+        ` : html`
+          <button class="btn-outline btn-sm" onClick=${() => setEditing(true)}>Change</button>
+        `}
+      </div>
+
+      ${message && html`<div class="pf-gen-or-message ${message.error ? 'pf-gen-or-message-error' : 'pf-gen-or-message-success'}" style="margin-top:8px;">${message.text}</div>`}
+
+      ${perAppEntries.length > 0 && html`
+        <details style="margin-top:10px;">
+          <summary style="cursor:pointer;font-size:12px;color:#666;">
+            Per-app breakdown (${perAppEntries.length} app${perAppEntries.length === 1 ? '' : 's'})
+          </summary>
+          <table style="width:100%;margin-top:6px;font-size:12px;border-collapse:collapse;">
+            <thead>
+              <tr style="border-bottom:1px solid #e5e5e5;">
+                <th style="text-align:left;padding:4px;">App</th>
+                <th style="text-align:right;padding:4px;">Cost</th>
+                <th style="text-align:right;padding:4px;">Calls</th>
+                <th style="text-align:right;padding:4px;">Tokens</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${perAppEntries.map(([app, s]) => html`
+                <tr>
+                  <td style="padding:4px;">${app}</td>
+                  <td style="text-align:right;padding:4px;">$${(s.cost_usd || 0).toFixed(4)}</td>
+                  <td style="text-align:right;padding:4px;">${s.calls || 0}</td>
+                  <td style="text-align:right;padding:4px;">${s.tokens || 0}</td>
+                </tr>
+              `)}
+            </tbody>
+          </table>
+        </details>
+      `}
+
+      <div style="font-size:11px;color:#999;margin-top:8px;">
+        Cost is estimated when the provider doesn't report it (LM Studio, custom). Your
+        OpenRouter dashboard has the authoritative bill.
+      </div>
     </div>
   `;
 }

@@ -7,12 +7,32 @@
  * @version-history
  *   v1.0.0 — 2026-03-20 — Initial implementation
  *   v1.1.0 — 2026-03-21 — Made provider-agnostic with baseUrl parameter; apiKey optional
+ *   v1.2.0 — 2026-05-29 — `OpenRouterCompletionResult` now exposes optional
+ *     `usage` (prompt/completion/total tokens + cost_usd) so callers (the new
+ *     /v1/ai/complete app endpoint in particular) can enforce per-user/per-app
+ *     daily budgets. Backwards-compatible: old callers ignoring `usage` are
+ *     unaffected. Cost is OpenRouter-reported when present, undefined otherwise.
  */
 import { logger } from '../utils/logger.js';
 
 export interface OpenRouterCompletionResult {
   content: string;
   model: string;
+  /**
+   * Token + cost usage as reported by the provider. May be partial:
+   *  - OpenRouter returns prompt/completion tokens reliably, and `cost` when
+   *    the request asked for it.
+   *  - LM Studio / custom OpenAI-compatible providers usually report tokens
+   *    but no cost.
+   * Callers treating cost as load-bearing should fall back to a per-token
+   * estimate when `cost_usd` is undefined.
+   */
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+    cost_usd?: number;
+  };
 }
 
 export interface OpenRouterModel {
@@ -88,7 +108,7 @@ export async function complete(
       choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
       model?: string;
       error?: { message?: string; code?: number };
-      usage?: { prompt_tokens?: number; completion_tokens?: number };
+      usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number };
     };
 
     logger.info(`[openrouter] Response: status=${resp.status}, model=${data.model}, choices=${data.choices?.length || 0}, finish=${data.choices?.[0]?.finish_reason}, promptTokens=${data.usage?.prompt_tokens}, completionTokens=${data.usage?.completion_tokens}, hasError=${!!data.error}`);
@@ -104,7 +124,13 @@ export async function complete(
     if (!content) {
       console.warn(`[openrouter] EMPTY CONTENT: model=${model}, finish_reason=${data.choices?.[0]?.finish_reason}, raw=${JSON.stringify(data).slice(0, 500)}`);
     }
-    return { content, model: data.model ?? model };
+    const usage = data.usage ? {
+      prompt_tokens: data.usage.prompt_tokens,
+      completion_tokens: data.usage.completion_tokens,
+      total_tokens: data.usage.total_tokens,
+      cost_usd: typeof data.usage.cost === 'number' ? data.usage.cost : undefined,
+    } : undefined;
+    return { content, model: data.model ?? model, usage };
   } finally {
     clearTimeout(timeout);
   }
