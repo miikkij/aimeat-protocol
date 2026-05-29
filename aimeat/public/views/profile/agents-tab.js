@@ -133,7 +133,7 @@ function buildTaskRunnerPrompt(sess, agentName) {
   const name = agentName || '<your-crew-name>';
   return `You are being attached to an AIMEAT node as a TASK-RUNNER agent (mode: "task-runner"). Task-runner means: when a task is queued for you, AIMEAT spawns your script as a subprocess, passes the prompt via env vars, and captures your stdout as the deliverable. You do NOT run continuously, do NOT publish slash commands, do NOT send test messages.
 
-Required: aimeat@1.12.2 or later (npm).
+Required: aimeat@1.12.3 or later (npm). (1.12.2 has a bug in connect call --agent routing that breaks the verification command in Step 1.)
 
 == Step 1 -- Connect with mode=task-runner ==
 The --mode flag sets the agent's mode at registration time, so the
