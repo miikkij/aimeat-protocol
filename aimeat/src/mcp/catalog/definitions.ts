@@ -172,6 +172,13 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_agents_list',
+        description: "List the calling owner's agents on the node (name, mode, capabilities, tags, last_seen, etc.). Use this to discover which agents you can delegate to via aimeat_task_create.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {},
+    },
+    {
         name: 'aimeat_task_list',
         description: 'List tasks for the connected agent.',
         caller: 'agent',

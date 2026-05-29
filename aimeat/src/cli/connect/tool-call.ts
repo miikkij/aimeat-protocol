@@ -293,6 +293,12 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_agents_list',
+        description: "List the calling owner's agents on the node (name, mode, capabilities, tags, last_seen, ...). Use this to discover delegation targets for aimeat_task_create.",
+        input: {},
+        handler: ({ client }) => client.get('/v1/agents'),
+    },
+    {
         name: 'aimeat_task_list',
         description: 'List tasks for the connected agent.',
         input: { status: { type: 'string', description: 'Optional task status filter.' } },

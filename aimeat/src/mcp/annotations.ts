@@ -97,6 +97,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_organism_join: { title: 'Join Organism', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_organism_leave: { title: 'Leave Organism', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
 
+    // ── Agents (owner's view) ──
+    aimeat_agents_list: { title: 'List My Agents', readOnlyHint: true },
+
     // ── Tasks ──
     aimeat_task_list: { title: 'List Tasks', readOnlyHint: true },
     aimeat_task_get: { title: 'Get Task', readOnlyHint: true },

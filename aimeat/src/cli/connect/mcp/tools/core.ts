@@ -93,6 +93,20 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
 
   // ── Agent profile ──────────────────────────────────────────────────
 
+  mcp.tool(
+    'aimeat_agents_list',
+    "List the calling owner's agents on the node. Returns name, mode, capabilities, tags, last_seen, and other public-agent fields for every agent registered under the same owner as the calling agent (or the calling owner JWT). Use this to discover who you can delegate to via aimeat_task_create.",
+    {
+      agent_name: agentNameSchema,
+    },
+    annotationsFor('aimeat_agents_list'),
+    async ({ agent_name }) => {
+      const { client } = pickAgent(registry, agent_name);
+      const resp = await client.get('/v1/agents');
+      return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    },
+  );
+
   mcp.tool('aimeat_agent_profile', 'View an agent\'s public profile', {
     agent_name: agentNameSchema,
     gaii: z.string().describe('Agent GAII identifier'),
