@@ -53,8 +53,10 @@ const FALLBACK_COMPLETION_COST_PER_TOKEN = 0.000015;
 /** Defaults applied when the user hasn't set explicit values. */
 const DEFAULT_DAILY_BUDGET_USD = 1.0;
 const DEFAULT_APP_DAILY_USD = 0.10;
-/** Hard server-side cap on max_tokens regardless of what the caller asks. */
-const MAX_TOKENS_CEILING = 4000;
+// No hard server-side max_tokens ceiling: the user already controls cost via
+// the daily USD budget + per-app quota, and capping tokens silently truncated
+// long responses (e.g. translating a whole comic episode) which the model
+// would then return as malformed JSON.
 
 interface UsageRecord {
   /** ISO date key (YYYY-MM-DD). */
@@ -221,16 +223,14 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           || 'anthropic/claude-sonnet-4';
       }
 
-      // Server-side hard ceiling on max_tokens regardless of caller.
-      const cappedMaxTokens = max_tokens === undefined
-        ? undefined
-        : Math.min(Math.max(1, max_tokens | 0), MAX_TOKENS_CEILING);
+      // Pass max_tokens through unchanged when set. Most apps should leave it
+      // unset so the model picks its own ceiling (budget is the real guardrail).
       const options = {
         temperature: temperature ?? (typeof prefs.temperature === 'number' ? prefs.temperature : undefined),
         top_p: top_p ?? (typeof prefs.top_p === 'number' ? prefs.top_p : undefined),
-        max_tokens: cappedMaxTokens ?? (typeof prefs.max_tokens === 'number'
-          ? Math.min(prefs.max_tokens as number, MAX_TOKENS_CEILING)
-          : undefined),
+        max_tokens: typeof max_tokens === 'number' && max_tokens > 0
+          ? (max_tokens | 0)
+          : (typeof prefs.max_tokens === 'number' ? (prefs.max_tokens as number) : undefined),
       };
 
       try {
@@ -329,7 +329,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         defaults: {
           daily_budget_usd: DEFAULT_DAILY_BUDGET_USD,
           per_app_daily_usd: DEFAULT_APP_DAILY_USD,
-          max_tokens_ceiling: MAX_TOKENS_CEILING,
+          max_tokens_ceiling: null,
         },
       }));
     });
