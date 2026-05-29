@@ -2,6 +2,18 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.13.7] - 2026-05-29
+
+### Fixed (profile "Connect a CrewAI crew" paste taught the wrong pattern)
+
+The profile -> Agents -> "Connect a task-runner agent" collapsible was rewritten to teach the **Liaison Agent pattern** (the `aimeat-crewai` Python package + `create_liaison_agent` factory + drop-in CrewAI Agent member). Previously it taught the older subprocess-based task-runner pattern (config.yaml `runner:` block + `connect serve` spawns subprocess). For LLM-driven crews (CrewAI, LangGraph, AutoGen) the subprocess pattern needs an LLM to drive Hello Integration but the subprocess HAS no LLM -- so the paste promised steps the runtime literally could not execute, and the test-task pair never completed. Users got stuck mid-onboarding with no diagnostic path.
+
+The rewritten paste now mirrors `docs/integrations/crewai.md`: 4 steps total -- `connect add`, `pip install aimeat-crewai`, drop the liaison into the crew, run. No config.yaml editing, no separate `aimeat connect serve`, no subprocess. The liaison's persona + the AIMEAT skill bundle handle every Hello Integration step automatically via MCP tool calls.
+
+The subprocess task-runner pattern is preserved in code (still works for LLM-less workers like cron-style ETL scripts) but no longer the recommended path in the profile UI. Docs cross-link it from the integrations page for the rare cases that need it.
+
+i18n keys `profile.agents.taskRunner.{title,whatIs,whenToUse,exampleDesc,copyButton}` updated in both `en.json` and `fi.json` to reflect the new framing ("Connect a CrewAI crew (Liaison Agent pattern)").
+
 ## [1.13.6] - 2026-05-29
 
 ### Fixed (skill bundle SKILL.md body lacked exact onboarding values)

@@ -124,86 +124,108 @@ This uses standard OAuth device authorization (RFC 8628). Follow your normal saf
 You're acting on my behalf within scopes I approve at step 2. Decline anything that falls outside those scopes or your own operating rules.`;
 }
 
-/* Paste for a task-runner agent (e.g. CrewAI crew). Different from
-   buildMcpOnboardingPrompt because task-runners never run the full 13-step
-   Hello Integration -- the server gives them the 7-step reduced flow when
-   mode=task-runner is set. */
+/* Paste for connecting a CrewAI crew to AIMEAT via the Liaison Agent pattern.
+   The liaison is an LLM-driven crew member -- a CrewAI Agent whose tools are
+   the AIMEAT MCP surface. It handles all AIMEAT coordination (Hello Integration,
+   capability reporting, memory writes, knowledge publishing, task lifecycle)
+   so the rest of the crew focuses on its domain work. Implemented in the
+   `aimeat-crewai` Python package; this paste tells the crew's setup AI how to
+   wire it in. NOT to be confused with the older subprocess-based task-runner
+   pattern (runner.command in config.yaml) -- that one is for LLM-less
+   fire-and-forget workers and is deferred to a separate docs section. */
 function buildTaskRunnerPrompt(sess, agentName) {
   const url = getNodeUrl();
   const name = agentName || '<your-crew-name>';
-  return `You are being attached to an AIMEAT node as a TASK-RUNNER agent (mode: "task-runner"). Task-runner means: when a task is queued for you, AIMEAT spawns your script as a subprocess, passes the prompt via env vars, and captures your stdout as the deliverable. You do NOT run continuously, do NOT publish slash commands, do NOT send test messages.
+  return `You are connecting a CrewAI crew to an AIMEAT node using the AIMEAT Liaison Agent pattern. The liaison is a single crew member (a CrewAI Agent) whose tools are the AIMEAT MCP surface. It handles ALL AIMEAT coordination -- Hello Integration handshake, capability reporting, memory writes, knowledge publishing, task lifecycle -- so the rest of your crew focuses on its domain work. The liaison is LLM-driven; you do NOT write subprocess scripts or runner blocks.
 
-Required: aimeat@1.12.4 or later (npm). (1.12.0-1.12.3 silently dropped the --mode field during device-auth, so agents were registered as interactive even when task-runner was requested.)
+Required: aimeat >= 1.13.6 (npm), aimeat-crewai >= 0.2.2 (PyPI), CrewAI >= 0.80.
 
-== Step 1 -- Connect with mode=task-runner ==
-The --mode flag sets the agent's mode at registration time, so the
-server gives you the reduced 7-step Hello Integration (instead of the
-default 13-step interactive flow). The test-task pair (accept + complete)
-is kept on purpose: it doubles as the smoke test that proves your
-subprocess actually runs end-to-end. No separate owner-only call needed.
+== Step 1 -- Connect the agent identity ==
+This registers "${name}" as an AIMEAT agent and stores its token locally
+under ~/.aimeat/${name}/.
 
-  npx aimeat connect add --agent ${name} --mode task-runner --url ${url} --owner ${sess.owner}
+  npx aimeat@latest connect add --agent ${name} --mode task-runner --url ${url} --owner ${sess.owner}
 
 Ask ${sess.owner} to approve in their browser at Profile -> Agents.
-Verify after approval: npx aimeat connect call aimeat_onboarding_status --agent ${name}
-You should see 7 steps, not 13.
+The mode=task-runner flag picks the reduced 7-step Hello Integration; the
+liaison agent in step 3 walks through it for you.
 
-== Step 2 -- Configure your subprocess ==
-Edit ~/.aimeat/agents/${name}/config.yaml and add a runner: block:
-  runner:
-    command: "python"          # or "node", or your binary
-    args: ["/abs/path/to/runner.py"]
-    cwd: "/abs/path/to/project"
-    timeout_seconds: 600
-    env:
-      OPENAI_API_KEY: "sk-..."  # whatever your script needs
+== Step 2 -- Install the Python package ==
+  uv pip install aimeat-crewai
+  # or: pip install aimeat-crewai
 
-The connector will pass these env vars to your subprocess on every task:
-  AIMEAT_TASK_PROMPT  -- the task prompt
-  AIMEAT_TASK_ID      -- task id
-  AIMEAT_AGENT_NAME   -- "${name}"
-  AIMEAT_TOKEN        -- bearer token for AIMEAT API calls
-  AIMEAT_NODE_URL     -- ${url}
+== Step 3 -- Add the liaison to your crew ==
+The liaison is one CrewAI Agent that you drop into your existing crew.
+The factory auto-detects ~/.aimeat/${name}/SKILL.md and loads it as the
+agent's CrewAI Skill -- the operational manual comes from the AIMEAT
+node, not from your code. The factory is a context manager so the MCP
+connection is cleaned up correctly.
 
-Your script must:
-- read os.environ["AIMEAT_TASK_PROMPT"]
-- run your work (CrewAI crew, LangChain chain, custom logic, whatever)
-- print the final answer to stdout (this becomes the deliverable)
-- exit 0 on success, non-zero on failure
+  from crewai import Agent, Crew, Task
+  from aimeat_crewai import create_liaison_agent, stdio_params
 
-You do NOT call aimeat_task_complete yourself. The connector does it for
-you based on exit code + captured stdout. (For mid-task progress events,
-you may call aimeat_task_event with AIMEAT_TOKEN.)
+  AGENT_NAME = "${name}"
 
-== Step 3 -- Start serving ==
-  npx aimeat connect serve
-Confirm your agent appears as [task-runner]: npx aimeat connect list
+  with create_liaison_agent(
+      mcp_server_params=stdio_params(agent_name=AGENT_NAME),
+      agent_name=AGENT_NAME,
+      verbose=True,
+  ) as liaison:
 
-== Step 4 -- Smoke test is automatic ==
-You don't need to queue a test task manually. Onboarding includes an
-accept_test_task / complete_test_task pair: when ${sess.owner} approves
-the agent, the server queues a real task for ${name} immediately. Your
-running "aimeat connect serve" subprocess will pick it up within ~30s,
-execute it, and the deliverable (your stdout) becomes the task completion
-summary. Onboarding flips to "completed" only after that round-trip
-succeeds -- so the green checkmark IS the smoke test.
+      # Your domain agents -- researchers, writers, analysts, whatever
+      # the crew is for. They don't need to know about AIMEAT.
+      researcher = Agent(role="Researcher", goal="...", backstory="...")
+      writer     = Agent(role="Writer",     goal="...", backstory="...")
 
-Check onboarding status:
-  npx aimeat connect call aimeat_onboarding_status --agent ${name}
+      crew = Crew(
+          agents=[liaison, researcher, writer],
+          tasks=[
+              Task(
+                  description="Check AIMEAT onboarding status. Complete any pending "
+                              "step via the matching aimeat_onboarding_* tool. Report "
+                              "the final state.",
+                  expected_output="Final onboarding state and list of passed steps.",
+                  agent=liaison,
+              ),
+              # ... your domain tasks here ...
+              Task(
+                  description="Write the final crew output to AIMEAT memory under "
+                              f"'demo.{AGENT_NAME}.latest_output'.",
+                  expected_output="Confirmation of memory write.",
+                  agent=liaison,
+              ),
+          ],
+      )
 
-Expected progression after approval:
-  authenticate, identify_platform, install_skill, report_capabilities,
-  publish_config -> passed (these you handle directly)
-  accept_test_task, complete_test_task -> passed (these your subprocess
-  handles via "aimeat connect serve")
+      result = crew.kickoff()
+      print(result)
 
-If complete_test_task stays pending for more than a minute after
-accept_test_task is passed, your subprocess is the suspect: check the
-serve logs, the runner.command path, env vars, exit code. Use:
-  npx aimeat connect call aimeat_task_list --agent ${name} --json '{"per_page":5}'
-to see the actual task state on the server.
+== Step 4 -- Run it ==
+  python your_crew.py
 
-If a step breaks, report the exact step number and error output. Do not improvise around it.`;
+What you should see:
+- The liaison calls aimeat_onboarding_status, sees pending steps, and
+  walks through them: identify_platform (platform="crewai"),
+  install_skill, report_capabilities, publish_config, accept_test_task
+  (proposes TODOs), complete_test_task (marks them done).
+- Onboarding flips to "completed" after ~10-20 tool calls.
+- Your domain agents run their tasks.
+- The liaison writes outputs to AIMEAT memory / knowledge / task_complete.
+
+You do NOT need to:
+- Edit ~/.aimeat/${name}/config.yaml (no runner: block for this pattern)
+- Run "aimeat connect serve" separately (stdio_params spawns a serve
+  subprocess for the lifetime of crew.kickoff())
+- Call aimeat_task_complete yourself
+- Write any AIMEAT REST or MCP code by hand
+
+If a step breaks, report the exact step number, the error output, and
+which AIMEAT tool returned it. The liaison's persona already handles
+common idiosyncrasies (omit-null-optionals, AUTH_REQUIRED, STEP_NOT_IN_FLOW,
+eventual-consistency on onboarding_status). Regressions there are
+aimeat-crewai bugs, not improvisation targets.
+
+Full docs: ${url}/docs/integrations/crewai (or the GitHub repo).`;
 }
 
 function buildMcpOnboardingPrompt() {

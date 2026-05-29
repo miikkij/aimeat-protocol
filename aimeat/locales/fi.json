@@ -375,13 +375,13 @@
         "tooltip": "Toimintatila — vaikuttaa siihen, miten agentti läpäisee Hello Integrationin ja kuluttaa työtä."
       },
       "taskRunner": {
-        "title": "Yhdistä tehtäväajuri-agentti (CrewAI, omat työntekijät)",
-        "whatIs": "Tehtäväajuri (task-runner) on agentti, joka EI ole jatkuvasti päällä. Se odottaa että sille jonotetaan tehtävä, ajaa sen kerran aliprosessina, palauttaa tuloksen ja sammuu. Ajattele sitä jonon työntekijänä eikä keskustelukumppanina. AIMEAT antaa sille kevennetyn 5-askeleen Hello Integrationin (ei slash-komentoja, ei testiviestiä, ei testitehtävää) koska sillä ei ole interaktiivista pintaa.",
-        "whenToUse": "Käytä tätä, kun agenttisi on CrewAI-crew, pyydettäessä laukaistava LangChain-ketju, Python-/Node-skripti joka käsittelee yhden promptin, tai mikä tahansa työntekijä jonka toisen agentin tai aikatauluttimen pitäisi voida käynnistää — etkä halua sen pyörivän taustalla syömässä tokeneita töiden välissä.",
+        "title": "Yhdistä CrewAI-crew (Liaison Agent -patterni)",
+        "whatIs": "Suositeltu tapa kytkeä CrewAI-crew AIMEATiin: lisää crew:hun yksi Liaison Agent -niminen jäsen (CrewAI Agent), joka omistaa AIMEATin MCP-tooli-pinnan. Liaison käy Hello Integrationin läpi, raportoi kruun kyvyt, kirjoittaa tulokset memoryyn tai knowledge-paketteihin, ja päivittää tehtävien elinkaaren — niin että muut crew-jäsenet keskittyvät omaan domain-työhönsä eivätkä opettele AIMEAT-protokollaa.",
+        "whenToUse": "Käytä tätä kun crew:lläsi on LLM-vetoisia agentteja (CrewAI, LangGraph, AutoGen). Liaison on yksi drop-in agentti crew:n sisällä, ei aliprosessi. Yksinkertaisin ja luotettavin polku. Aliprosessi-pohjaiset task-runner-konfit (config.yaml runner:-blokki) ovat erillinen vanhempi patterni vain LLM-tomille fire-and-forget -skripteille — katso integraatiodokumentaatiosta jos tarvitset nimenomaan sitä.",
         "exampleLabel": "Esimerkki:",
-        "exampleDesc": "CrewAI-\"marketing-crew\" jossa on tutkija + editori + kirjoittaja. Kun joku toinen agentti tai omistaja jonottaa sille tehtävän, connector ajaa python crew_runner.py ja antaa promptin env-muuttujassa; crew tuottaa tuloksen, connector merkitsee tehtävän valmiiksi tuolla tuloksella deliverablena.",
+        "exampleDesc": "CrewAI-\"marketing-crew\" jossa on tutkija + kirjoittaja + AIMEAT Liaison. Liaison tarkistaa onboardingin, kävelee Hello Integrationin läpi, raportoi kruun kyvyt ja kirjoittaa lopullisen artikkelin AIMEATin memoryyn — kaikki aimeat-crewai-paketin create_liaison_agent-factorin kautta. Ei aliprosessi-skriptejä, ei config.yaml-editointia.",
         "nameLabel": "Agentin nimi (käytetään alla olevassa pasteessa):",
-        "copyButton": "Kopioi tehtäväajurin ohje"
+        "copyButton": "Kopioi CrewAI-yhdistämisohje"
       },
       "filter": {
         "byTag": "Suodata tagilla:",

@@ -375,13 +375,13 @@
         "tooltip": "Operational mode — affects how the agent is onboarded and how it consumes work."
       },
       "taskRunner": {
-        "title": "Connect a task-runner agent (CrewAI, custom workers)",
-        "whatIs": "A task-runner is an agent that does NOT run continuously. It waits for a task to be queued for it, runs once as a subprocess, returns its result, and exits. Think of it as a worker on a queue rather than a chat partner. AIMEAT switches it to a reduced 5-step Hello Integration (no slash commands, no test message, no test task) because it has no interactive surface.",
-        "whenToUse": "Use this when your agent is a CrewAI crew, a LangChain chain triggered on demand, a Python/Node script that processes one prompt, or any worker that should be invoked by another agent or by a scheduled trigger — and you don't want it sitting in the background eating tokens between jobs.",
+        "title": "Connect a CrewAI crew (Liaison Agent pattern)",
+        "whatIs": "The recommended way to plug a CrewAI crew into AIMEAT: add one Liaison Agent (a CrewAI Agent member of your crew) that owns the AIMEAT MCP tool surface. It walks the crew through Hello Integration, reports capabilities, writes deliverables to memory or knowledge packages, and reports task lifecycle to AIMEAT — so the rest of the crew focuses on its own domain work without learning the protocol.",
+        "whenToUse": "Use this when your crew has LLM-driven agents (CrewAI, LangGraph, AutoGen). The liaison is one drop-in agent inside the crew, not a subprocess. It is the simplest, most robust path. Subprocess-based task-runners (config.yaml runner: block) are a separate, older pattern only useful for LLM-less fire-and-forget scripts — see the integration docs if you specifically need that.",
         "exampleLabel": "Example:",
-        "exampleDesc": "A CrewAI \"marketing-crew\" with a researcher + editor + writer. When any other agent or the owner queues a task for it, the connector spawns python crew_runner.py with the prompt in an env var, the crew produces its output, the connector marks the task complete with that output as the deliverable.",
+        "exampleDesc": "A CrewAI \"marketing-crew\" with a researcher + writer + AIMEAT Liaison. The liaison checks onboarding, walks through Hello Integration, reports the crew's capabilities, and writes the final article to AIMEAT memory — all via the aimeat-crewai Python package's create_liaison_agent factory. No subprocess scripts, no config.yaml editing.",
         "nameLabel": "Agent name (used in the paste below):",
-        "copyButton": "Copy task-runner instruction"
+        "copyButton": "Copy CrewAI connection instruction"
       },
       "filter": {
         "byTag": "Filter by tag:",
