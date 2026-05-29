@@ -13,6 +13,8 @@
  *   v1.1.0 -- 2026-05-29 -- Add 301 redirects for /privacy.html, /privacy.fi.html,
  *     /connect.html, /connect.fi.html to their /v1/ canonical routes so the
  *     {{placeholder}}-tokenised raw templates are never served directly.
+ *   v1.2.0 -- 2026-05-29 -- Add /terms.html, /terms.fi.html to the redirect map
+ *     for the new Terms of Service template pages.
  */
 import express from 'express';
 import { existsSync, readFileSync } from 'node:fs';
@@ -64,6 +66,8 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
       '/wizard.html':       '/v1/setup/wizard',
       '/privacy.html':      '/v1/privacy',
       '/privacy.fi.html':   '/v1/privacy/fi',
+      '/terms.html':        '/v1/terms',
+      '/terms.fi.html':     '/v1/terms/fi',
       '/connect.html':      '/v1/connect',
       '/connect.fi.html':   '/v1/connect/fi',
     };

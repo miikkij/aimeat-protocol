@@ -23,6 +23,10 @@
  *   v1.5.0 -- 2026-05-29 -- Privacy pages now template-substitute AIMEAT_OPERATOR_*
  *     env vars and fail-loud (503) if required fields are missing. Lets self-hosters
  *     identify themselves as the GDPR controller without forking the HTML.
+ *   v1.6.0 -- 2026-05-29 -- Add /v1/terms (en) and /v1/terms/fi (fi) routes serving
+ *     the Terms of Service page. Same template substitution + fail-loud guard as
+ *     privacy pages (since the ToS identifies the operator as a party to the agreement,
+ *     missing operator config blocks it the same way).
  */
 import { Router } from 'express';
 import { readFileSync, existsSync } from 'node:fs';
@@ -505,10 +509,13 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
     const isPrivacyPage = filename.startsWith('privacy');
+    const isTermsPage = filename.startsWith('terms');
     const isConnectPage = filename.startsWith('connect');
     const locale: 'en' | 'fi' = filename.endsWith('.fi.html') ? 'fi' : 'en';
 
-    if (isPrivacyPage) {
+    // Privacy + ToS both name the operator as a party / data controller.
+    // Block both if operator config is incomplete.
+    if (isPrivacyPage || isTermsPage) {
       const missing = missingOperatorConfig(config.operator);
       if (missing.length > 0) {
         res.status(503).type('text/html').send(renderPrivacyNotConfiguredPage(missing, locale));
@@ -518,7 +525,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
 
     let html = readFileSync(htmlPath, 'utf-8');
 
-    if (isPrivacyPage || isConnectPage) {
+    if (isPrivacyPage || isTermsPage || isConnectPage) {
       const vars = templateVars(config, locale);
       html = html.replace(/\{\{(\w+)\}\}/g, (_match, key: string) => vars[key] ?? `{{${key}}}`);
     }
@@ -532,6 +539,8 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   };
   router.get('/v1/privacy', serveStaticPage('privacy.html'));
   router.get('/v1/privacy/fi', serveStaticPage('privacy.fi.html'));
+  router.get('/v1/terms', serveStaticPage('terms.html'));
+  router.get('/v1/terms/fi', serveStaticPage('terms.fi.html'));
 
   // Connect / MCP attach page — standalone static HTML. Public-facing docs
   // required by the Anthropic Connectors Directory (3+ example prompts +
