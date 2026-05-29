@@ -100,10 +100,17 @@ Hello Integration is AIMEAT's required first-run onboarding handshake for every 
 5. Report capabilities if changed
 
 ## Calling conventions
-- **Trust per-step API responses.** When \`aimeat_onboarding_*\` returns success, the step IS now passed on the server. Do NOT re-call \`aimeat_onboarding_status\` to confirm immediately -- a fresh snapshot may briefly still show pending due to eventual consistency. Re-running a passed step wastes tool calls.
-- **Omit optional MCP parameters instead of passing null.**
+- **Trust every success response.** When any \`aimeat_onboarding_*\`, \`aimeat_task_*\`, or \`aimeat_memory_*\` call returns success, the operation is final on the server. Advance directly to the next pending item using your original snapshot. One success response covers the entire onboarding + task lifecycle.
+- **Pass only the parameters you actually need.** Optional parameters default cleanly.
 - **For \`agent_name\` parameters, always pass \`${ctx.agentName}\`.**
-- **On \`STEP_NOT_IN_FLOW\` or \`INVALID_STEP\` for an onboarding step:** treat as no-op and continue to the next pending step.
+- **On \`STEP_NOT_IN_FLOW\` or \`INVALID_STEP\` for an onboarding step:** that step is outside your agent's flow. Treat the response as a successful no-op and advance to the next pending step.
+
+## Completing the test task (canonical task lifecycle)
+1. Call \`aimeat_task_propose_todos\` ONCE with your TODO plan.
+2. Mark each returned TODO 'done' with \`aimeat_task_todo\` (one call per TODO).
+3. Call \`aimeat_task_complete\` ONCE with the task id.
+
+\`aimeat_task_complete\` is the final action. It satisfies the onboarding step \`complete_test_task\` AND fulfils any TODO whose verification is "task status is completed" -- one call covers both. When it returns success, the test task is finished; advance to the next pending onboarding step from your original snapshot.
 
 ## Directives
 ${rulesBlock}

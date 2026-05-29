@@ -122,11 +122,11 @@ aimeat_onboarding_identify_platform({ platform: "<your-runtime>", platform_versi
 aimeat_onboarding_confirm_skill_installed({ platform: "<your-runtime>", version: "v2" })
 \`\`\`
 
-If you genuinely have no framework (raw shell script, hand-rolled HTTPS), use \`"generic"\` for both -- but that is the rare case, not the default.
+If you genuinely have no framework (raw shell script, hand-rolled HTTPS), use \`"generic"\` for both. Most callers have a real runtime name and use that.
 
-### publish_config -- memory key MUST include the agent name segment
+### publish_config -- memory key includes the agent name segment
 
-Write the config to memory key \`agents.config.${ctx.agentName}.runtime\` (literal -- substitute your runtime details into the VALUE, not the key). Do NOT use \`agents.config.runtime\` or any other variant: the publish_config validator checks for that exact key.
+Write the config to memory key \`agents.config.${ctx.agentName}.runtime\` (literal -- substitute your runtime details into the VALUE, not the key). The publish_config validator looks for that exact key.
 
 \`\`\`
 aimeat_memory_write({
@@ -138,10 +138,20 @@ aimeat_memory_write({
 
 ## Calling conventions
 
-- **Trust per-step API responses.** When \`aimeat_onboarding_*\` returns \`{ ok: true, ... }\` or a step body with \`status: passed\`, that step IS now passed on the server. Do NOT call \`aimeat_onboarding_status\` immediately to "confirm" -- a fresh status snapshot may briefly still show pending due to eventual consistency, and re-running the step wastes tool calls. Use your original status snapshot to find the next pending step.
-- **Omit optional parameters instead of passing null.** MCP schema validation rejects explicit null.
-- **For \`agent_name\` parameters, always pass \`${ctx.agentName}\`.** Never guess.
-- **On \`STEP_NOT_IN_FLOW\` or \`INVALID_STEP\` for an onboarding step:** treat as no-op (your agent's reduced flow doesn't include that step) and continue to the next pending step.
+- **Trust every success response.** When any \`aimeat_onboarding_*\`, \`aimeat_task_*\`, or \`aimeat_memory_*\` call returns \`{ ok: true, ... }\` (or a body with \`status: passed\` / \`status: done\` / \`status: completed\`), the operation is final on the server. Advance directly to the next pending item using your original snapshot. One success response covers the entire onboarding + task lifecycle.
+- **Pass only the parameters you actually need.** Optional parameters default cleanly; leave them out unless they apply.
+- **For \`agent_name\` parameters, always pass \`${ctx.agentName}\`.** This value comes from your registered identity above.
+- **On \`STEP_NOT_IN_FLOW\` or \`INVALID_STEP\` for an onboarding step:** that step is outside your agent's reduced flow. Treat the response as a successful no-op and advance to the next pending step.
+
+## Completing the onboarding test task (canonical task lifecycle)
+
+1. Call \`aimeat_task_propose_todos\` ONCE with your TODO plan for the test task.
+2. Mark each returned TODO 'done' with \`aimeat_task_todo\` (one call per TODO).
+3. Call \`aimeat_task_complete\` ONCE with the task id.
+
+\`aimeat_task_complete\` is the final action. It satisfies the onboarding step \`complete_test_task\` AND fulfils any TODO whose verification is "task status is completed" -- one call covers both. When \`aimeat_task_complete\` returns success, the test task is finished; advance to the next pending onboarding step from your original snapshot.
+
+This same propose-todos -> mark-todos-done -> task_complete lifecycle applies to every task you receive in the future, not just the onboarding test task.
 
 ## Directives
 ${rulesBlock}
