@@ -127,6 +127,10 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_agent_capabilities_report: { title: 'Report Agent Capabilities', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_agent_activity: { title: 'List Agent Activity', readOnlyHint: true },
 
+    // ── Owner-managed agent classification ──
+    aimeat_agent_tags_set: { title: 'Set Agent Tags', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_agent_mode_set: { title: 'Set Agent Mode', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+
     // ── Knowledge packages ──
     aimeat_knowledge_list: { title: 'List Knowledge Packages', readOnlyHint: true },
     aimeat_knowledge_get: { title: 'Read Knowledge Package', readOnlyHint: true },

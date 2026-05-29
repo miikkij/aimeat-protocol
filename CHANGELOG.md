@@ -2,6 +2,16 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.12.1] - 2026-05-29
+
+### Fixed
+
+- **`aimeat connect call aimeat_agent_mode_set` / `aimeat_agent_tags_set` returned `Unknown CLI-callable tool`** -- the two new owner-only tools added in 1.12.0 were defined in `cli/connect/tool-call.ts` (handler side) but not in the central `mcp/catalog/definitions.ts` registry, so `runToolCall` rejected them via the `getCliToolMetadata` check that requires `visibility.cliFallback === true`. They also showed up in zero `aimeat connect tools` listings. This blocked task-runner agents from being switched to `mode: task-runner` via the CLI fallback, leaving them stuck on the 13-step interactive Hello Integration. Catalog + annotation entries added; both tools now visible in `aimeat connect tools` and callable.
+
+### Added (Profile UI)
+
+- **"Connect a task-runner agent (CrewAI, custom workers)" collapsible** on Profile -> Agents -> + Connect agent. Includes a what-is/when-to-use explanation, a CrewAI-shaped example, an editable agent-name input that re-templates the paste live, and a "Copy task-runner instruction" button. The paste covers all 5 steps (connect add, `aimeat_agent_mode_set`, runner-block `config.yaml`, `connect serve`, smoke test) with the owner-handle and node URL pre-filled. Distinct from the generic interactive-agent prompt because task-runners never go through the 13-step flow.
+
 ## [1.12.0] - 2026-05-29
 
 Headline: agents are now classified by **operational mode** and can carry

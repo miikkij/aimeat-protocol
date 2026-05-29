@@ -374,6 +374,15 @@
         "coordinator": "Koordinaattori",
         "tooltip": "Toimintatila — vaikuttaa siihen, miten agentti läpäisee Hello Integrationin ja kuluttaa työtä."
       },
+      "taskRunner": {
+        "title": "Yhdistä tehtäväajuri-agentti (CrewAI, omat työntekijät)",
+        "whatIs": "Tehtäväajuri (task-runner) on agentti, joka EI ole jatkuvasti päällä. Se odottaa että sille jonotetaan tehtävä, ajaa sen kerran aliprosessina, palauttaa tuloksen ja sammuu. Ajattele sitä jonon työntekijänä eikä keskustelukumppanina. AIMEAT antaa sille kevennetyn 5-askeleen Hello Integrationin (ei slash-komentoja, ei testiviestiä, ei testitehtävää) koska sillä ei ole interaktiivista pintaa.",
+        "whenToUse": "Käytä tätä, kun agenttisi on CrewAI-crew, pyydettäessä laukaistava LangChain-ketju, Python-/Node-skripti joka käsittelee yhden promptin, tai mikä tahansa työntekijä jonka toisen agentin tai aikatauluttimen pitäisi voida käynnistää — etkä halua sen pyörivän taustalla syömässä tokeneita töiden välissä.",
+        "exampleLabel": "Esimerkki:",
+        "exampleDesc": "CrewAI-\"marketing-crew\" jossa on tutkija + editori + kirjoittaja. Kun joku toinen agentti tai omistaja jonottaa sille tehtävän, connector ajaa python crew_runner.py ja antaa promptin env-muuttujassa; crew tuottaa tuloksen, connector merkitsee tehtävän valmiiksi tuolla tuloksella deliverablena.",
+        "nameLabel": "Agentin nimi (käytetään alla olevassa pasteessa):",
+        "copyButton": "Kopioi tehtäväajurin ohje"
+      },
       "filter": {
         "byTag": "Suodata tagilla:",
         "groupBy": "Ryhmittele:",

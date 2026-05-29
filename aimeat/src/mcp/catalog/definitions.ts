@@ -133,6 +133,26 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_agent_tags_set',
+        description: "Owner-only. Replace the tag list on one of your agents. Convention: 'crew:<name>', 'source:<name>', 'role:<name>', 'project:<name>'. Max 20 tags.",
+        caller: 'owner',
+        visibility: agentEverywhere,
+        input: {
+            target_agent_name: { type: 'string', required: true, description: 'Agent whose tags to update (must be owned by the calling owner).' },
+            tags: { type: 'array', required: true, description: 'Replacement tag list. Empty array clears all tags.' },
+        },
+    },
+    {
+        name: 'aimeat_agent_mode_set',
+        description: "Owner-only. Set an agent's operational mode. Modes: 'autonomous', 'interactive', 'task-runner' (reduced 5-step Hello Integration), 'coordinator'.",
+        caller: 'owner',
+        visibility: agentEverywhere,
+        input: {
+            target_agent_name: { type: 'string', required: true, description: 'Agent whose mode to update (must be owned by the calling owner).' },
+            mode: { type: 'string', required: true, enum: ['autonomous', 'interactive', 'task-runner', 'coordinator'], description: 'New mode.' },
+        },
+    },
+    {
         name: 'aimeat_message_inbox',
         description: 'Get pending inbound messages.',
         caller: 'agent',

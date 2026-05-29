@@ -27,6 +27,7 @@
  *   v3.0.9 -- 2026-05-28 -- Explain connector benefits and shared tag memory in agent prompts
  *   v3.1.0 -- 2026-05-28 -- Explain connector and fallback connection options before commands
  *   v3.2.0 -- 2026-05-29 -- Tag filter bar + group-by toggle (none / tag / mode)
+ *   v3.3.0 -- 2026-05-29 -- Add "Connect a task-runner" collapsible with CrewAI-shaped paste prompt
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -123,6 +124,68 @@ This uses standard OAuth device authorization (RFC 8628). Follow your normal saf
 You're acting on my behalf within scopes I approve at step 2. Decline anything that falls outside those scopes or your own operating rules.`;
 }
 
+/* Paste for a task-runner agent (e.g. CrewAI crew). Different from
+   buildMcpOnboardingPrompt because task-runners never run the full 13-step
+   Hello Integration -- the server gives them the 5-step reduced flow when
+   mode=task-runner is set. */
+function buildTaskRunnerPrompt(sess, agentName) {
+  const url = getNodeUrl();
+  const name = agentName || '<your-crew-name>';
+  return `You are being attached to an AIMEAT node as a TASK-RUNNER agent (mode: "task-runner"). Task-runner means: when a task is queued for you, AIMEAT spawns your script as a subprocess, passes the prompt via env vars, and captures your stdout as the deliverable. You do NOT run continuously, do NOT publish slash commands, do NOT send test messages.
+
+Required: aimeat@1.12.0 or later (npm).
+
+== Step 1 -- Connect ==
+  npx aimeat connect add --agent ${name} --url ${url} --owner ${sess.owner}
+Ask ${sess.owner} to approve in their browser at Profile -> Agents.
+
+== Step 2 -- Switch server-side mode to task-runner ==
+This replaces the 13-step Hello Integration with the 5-step reduced flow
+(no commands, no test task, no messages). Run:
+  npx aimeat connect call aimeat_agent_mode_set --agent ${name} --json '{"target_agent_name":"${name}","mode":"task-runner"}'
+Verify with: npx aimeat connect call aimeat_onboarding_status --agent ${name}
+You should see 5 steps, not 13.
+
+== Step 3 -- Configure your subprocess ==
+Edit ~/.aimeat/agents/${name}/config.yaml and add a runner: block:
+  runner:
+    command: "python"          # or "node", or your binary
+    args: ["/abs/path/to/runner.py"]
+    cwd: "/abs/path/to/project"
+    timeout_seconds: 600
+    env:
+      OPENAI_API_KEY: "sk-..."  # whatever your script needs
+
+The connector will pass these env vars to your subprocess on every task:
+  AIMEAT_TASK_PROMPT  -- the task prompt
+  AIMEAT_TASK_ID      -- task id
+  AIMEAT_AGENT_NAME   -- "${name}"
+  AIMEAT_TOKEN        -- bearer token for AIMEAT API calls
+  AIMEAT_NODE_URL     -- ${url}
+
+Your script must:
+- read os.environ["AIMEAT_TASK_PROMPT"]
+- run your work (CrewAI crew, LangChain chain, custom logic, whatever)
+- print the final answer to stdout (this becomes the deliverable)
+- exit 0 on success, non-zero on failure
+
+You do NOT call aimeat_task_complete yourself. The connector does it for
+you based on exit code + captured stdout. (For mid-task progress events,
+you may call aimeat_task_event with AIMEAT_TOKEN.)
+
+== Step 4 -- Start serving ==
+  npx aimeat connect serve
+Confirm your agent appears as [task-runner]: npx aimeat connect list
+
+== Step 5 -- Smoke test ==
+From another shell or another connected agent:
+  npx aimeat connect call aimeat_task_propose_todos --agent <another-agent> --json '{"target_agent":"${name}","title":"Smoke test","prompt":"Reply with the word OK.","todos":[]}'
+Within seconds your subprocess should run. List your completed tasks:
+  npx aimeat connect call aimeat_task_list --agent ${name} --json '{"status":"done","per_page":5}'
+
+If a step breaks, report the exact step number and error output. Do not improvise around it.`;
+}
+
 function buildMcpOnboardingPrompt() {
   return `You are connected to AIMEAT through MCP in this runtime.
 
@@ -196,6 +259,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [approvePreset, setApprovePreset] = useState('standard');
   const [connectExpanded, setConnectExpanded] = useState(false);
   const [pasteExpanded, setPasteExpanded] = useState(false);
+  const [taskRunnerExpanded, setTaskRunnerExpanded] = useState(false);
+  const [taskRunnerName, setTaskRunnerName] = useState('');
   const [taskStatsMap, setTaskStatsMap] = useState({});
   const [tagFilter, setTagFilter] = useState(new Set());
   const [groupBy, setGroupBy] = useState('none'); // 'none' | 'tag' | 'mode'
@@ -465,6 +530,34 @@ export default function AgentsTab({ session, showToast, onStats }) {
                   markCopied('manual-agent-prompt');
                 });
               }}>${copiedAction === 'manual-agent-prompt' ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.copyPrompt')}</button>
+            </div>
+          `}
+        </div>
+
+        <div class="pf-agent-divider mt-1">
+          <button class="expand-btn" onClick=${() => setTaskRunnerExpanded(!taskRunnerExpanded)}>
+            <span>${t('profile.agents.taskRunner.title')}</span>
+            <span class="pf-chevron ${taskRunnerExpanded ? 'pf-chevron-open' : ''}">\u25BC</span>
+          </button>
+          ${taskRunnerExpanded && html`
+            <div class="mt-half">
+              <p class="text-caption mb-half">${t('profile.agents.taskRunner.whatIs')}</p>
+              <p class="text-caption mb-half">${t('profile.agents.taskRunner.whenToUse')}</p>
+              <p class="text-caption mb-half"><strong>${t('profile.agents.taskRunner.exampleLabel')}</strong> ${t('profile.agents.taskRunner.exampleDesc')}</p>
+              <div class="mb-half mt-1">
+                <label class="text-caption mb-half" for="pf-task-runner-name">${t('profile.agents.taskRunner.nameLabel')}</label>
+                <input id="pf-task-runner-name" type="text"
+                       class="pf-task-runner-input"
+                       placeholder="marketing-crew"
+                       value=${taskRunnerName}
+                       onInput=${(e) => setTaskRunnerName(e.target.value)} />
+              </div>
+              <div class="agent-prompt-box">${buildTaskRunnerPrompt(session, taskRunnerName)}</div>
+              <button class="copy-prompt-btn" onClick=${() => {
+                copyToClipboard(buildTaskRunnerPrompt(session, taskRunnerName)).then(() => {
+                  markCopied('task-runner-prompt');
+                });
+              }}>${copiedAction === 'task-runner-prompt' ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.taskRunner.copyButton')}</button>
             </div>
           `}
         </div>
