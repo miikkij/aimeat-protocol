@@ -17,6 +17,13 @@
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  *   v3.3.0 -- 2026-05-29 -- Add delete confirmation, "Request changes" modal for the revise-proposed-todos flow, outdated-todo history rendering, and revision_requested status.
  *   v3.3.1 -- 2026-05-30 -- Re-fetch the event log on every live-update tick while a task card is expanded. Without this, the parent refreshed the task object (todos + status) but the events list under it stayed frozen until the user closed and re-opened the card.
+ *   v4.0.0 -- 2026-05-30 -- Replace the split-panel TaskCreationBuilder with a
+ *     plain create form (TaskCreateForm). The builder simulated a live chat
+ *     ("Agent is analyzing your request...") that never happened -- the agent
+ *     is an async daemon that picks the task up later -- and reopening the tab
+ *     showed a completely different (queued-card) view, which was misleading.
+ *     The form now creates the task queued and the list updates immediately, so
+ *     the create state and the reopened state look the same.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -24,11 +31,90 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
-import { listTasks, deleteTask, startTask, listEvents, requestChanges } from '/js/services/agent-tasks.js';
+import { listTasks, deleteTask, startTask, listEvents, requestChanges, createTask } from '/js/services/agent-tasks.js';
 import { useConfirm, Modal } from '/components/Modal.js';
-import TaskCreationBuilder from './agents-task-builder.js';
 
 const TASK_FILTERS = ['all', 'active', 'queued', 'completed', 'failed'];
+
+// Character limits -- keep in sync with AgentTaskCreateSchema in
+// src/models/agent-task-schemas.ts (title max 256, description max 10000).
+// The agent crew reads task.description as its prompt, so that is the field
+// that needs room; title is just a short label for lists/cards.
+const TITLE_MAX = 256;
+const DESC_MAX = 10000;
+
+// Build a short task title from the (longer) description when the owner leaves
+// the title blank. Display-only; the full text lives in the description.
+function deriveTitle(text) {
+  const firstLine = text.split('\n').map(l => l.trim()).find(Boolean) || text.trim();
+  return firstLine.length > 120 ? firstLine.slice(0, 117) + '...' : firstLine;
+}
+
+// Plain create form: description (what the agent reads) + optional short title.
+// On submit the task is created 'queued' and the parent reloads the list, so
+// the new task appears as a normal queued card -- no fake "analyzing" state.
+function TaskCreateForm({ agentName, showToast, onCreated, onCancel }) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [creating, setCreating] = useState(false);
+
+  async function handleCreate() {
+    const desc = description.trim();
+    if (!desc) {
+      showToast(t('profile.agents.tasks.descRequired'), true);
+      return;
+    }
+    setCreating(true);
+    try {
+      await createTask(agentName, {
+        title: (title.trim() || deriveTitle(desc)).slice(0, TITLE_MAX),
+        description: desc,
+        status: 'queued',
+      });
+      showToast(t('profile.agents.tasks.taskCreated'));
+      onCreated();
+    } catch (err) {
+      showToast(err.message || t('profile.agents.tasks.createError'), true);
+    }
+    setCreating(false);
+  }
+
+  return html`
+    <div class="pf-agd-create-form">
+      <div class="pf-agd-form-field">
+        <label>${t('profile.agents.tasks.descLabel')}</label>
+        <textarea
+          placeholder=${t('profile.agents.tasks.builder.placeholder')}
+          value=${description}
+          maxlength=${DESC_MAX}
+          onInput=${e => setDescription(e.target.value)}
+          rows="6"
+        ></textarea>
+        <div class=${`agd-chat-charcount ${description.length >= DESC_MAX ? 'agd-chat-charcount-max' : ''}`}>
+          ${description.length} / ${DESC_MAX}
+        </div>
+      </div>
+      <div class="pf-agd-form-field">
+        <label>${t('profile.agents.tasks.titleLabel')}</label>
+        <input
+          type="text"
+          maxlength=${TITLE_MAX}
+          placeholder=${t('profile.agents.tasks.titlePlaceholder')}
+          value=${title}
+          onInput=${e => setTitle(e.target.value)}
+        />
+      </div>
+      <div class="pf-agd-form-actions">
+        <button class="btn-primary btn-sm" onClick=${handleCreate} disabled=${creating || !description.trim()}>
+          ${creating ? t('profile.agents.tasks.starting') : t('profile.agents.tasks.createTask')}
+        </button>
+        <button class="btn-outline btn-sm" onClick=${onCancel} disabled=${creating}>
+          ${t('profile.agents.tasks.cancel')}
+        </button>
+      </div>
+    </div>
+  `;
+}
 
 function statusLabel(status) {
   const key = `profile.agents.tasks.${status}`;
@@ -342,7 +428,7 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
   `;
 }
 
-export default function AgentTasksSubtab({ agentName, session, showToast }) {
+export default function AgentTasksSubtab({ agentName, showToast }) {
   const [tasks, setTasks] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [error, setError] = useState(null);
@@ -403,7 +489,7 @@ export default function AgentTasksSubtab({ agentName, session, showToast }) {
       </div>
 
       ${showCreate && html`
-        <${TaskCreationBuilder} agentName=${agentName} session=${session} showToast=${showToast} onClose=${handleCreated} />
+        <${TaskCreateForm} agentName=${agentName} showToast=${showToast} onCreated=${handleCreated} onCancel=${() => setShowCreate(false)} />
       `}
 
       ${error && html`<div class="pf-agd-empty">${error}</div>`}
