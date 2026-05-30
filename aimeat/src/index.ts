@@ -146,9 +146,12 @@ USAGE
   aimeat connect --url <node-url> --owner <owner> [--agent <name>]
       Authenticate an AI agent with OAuth device authorization.
 
-  aimeat connect serve
+  aimeat connect serve [--surface <appdev|agent|service|admin>]
       Start the local MCP server for the connected agent. Configure your AI
       runtime to launch this command so it can see AIMEAT tools.
+      --surface restricts the exposed tools to one purpose-scoped set (focuses
+      the agent, fewer tools = less confusion). Omit for the full toolset.
+      e.g. aimeat connect serve --surface agent
 
   aimeat connect status
       Show the connected agent, owner, node, and token status.

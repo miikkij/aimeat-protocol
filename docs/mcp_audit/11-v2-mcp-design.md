@@ -23,6 +23,8 @@ Surfaces (working route names):
 
 `/v1/mcp` stays frozen and full for existing consumers. v2 surfaces are opt-in.
 
+**Local connector:** the same surfaces are available over stdio via `aimeat connect serve --surface <appdev|agent|service|admin>` (default = full toolset). It filters registration with the same `surfaces.ts` allowlist, so a local runtime gets the identical focused set. (admin is server-only in practice — the connector lacks operator `admin_*` tools.)
+
 ---
 
 ## 2. Master placement (every tool → surface)
