@@ -55,7 +55,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
   // POST /v1/memory — write a memory entry (agent auth required)
   router.post('/v1/memory', requireAuth(), requireRole('agent'), requireScope('memory:write'), validateBody(MemoryWriteSchema, config.nodeId), async (req, res) => {
-    const { key, value, visibility, tags, ttl_hours, group_id } = req.body ?? {};
+    const { key, value, visibility, tags, ttl_hours, group_id, agent: agentParam } = req.body ?? {};
 
     // Phase 2.3 — Workspace access check for organism.* keys (key comes from body, not params)
     if (typeof key === 'string' && key.startsWith('organism.')) {
@@ -74,7 +74,26 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
     const now = new Date().toISOString();
     // Owner sessions use GHII identity (owner@nodeId) for memory storage
-    const gaii = resolve(req);
+    let gaii = resolve(req);
+
+    // Owner sessions may store an entry under one of their own agents' GAII by
+    // passing `agent` (the target GAII). Without this, an owner-created entry
+    // lands under the owner's GHII instead of the agent it belongs to. Mirrors
+    // the ownership validation in GET /v1/memory?agent=. Restricted to owner
+    // sessions so an agent cannot write into a sibling agent's namespace.
+    if (agentParam && agentParam !== gaii) {
+      const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+      if (!isOwnerSession) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only owner sessions may store memory under a specific agent'));
+        return;
+      }
+      const targetAgent = await storage.getAgent(agentParam);
+      if (!targetAgent || targetAgent.owner !== req.auth!.owner) {
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only write memory to your own agents'));
+        return;
+      }
+      gaii = agentParam;
+    }
 
     // Anonymous namespace enforcement: anonymous agents can only write to anonymous.* keys
     if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) {
@@ -1094,8 +1113,22 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     // Defense-in-depth: verify ownership before deletion
     // Operators can delete any key by passing ?owner=... query parameter
     const ownerOverride = req.query.owner as string | undefined;
-    const effectiveOwner = (ownerOverride && req.auth!.roles.includes('operator')) ? ownerOverride : gaii;
-    const existing = await storage.getMemory(effectiveOwner, key);
+    let effectiveOwner = (ownerOverride && req.auth!.roles.includes('operator')) ? ownerOverride : gaii;
+    let existing = await storage.getMemory(effectiveOwner, key);
+
+    // Owner sessions can delete any of their agents' memory entries. Mirrors
+    // the cross-agent lookup in PUT /v1/memory/:key — without this, an owner
+    // (whose GAII is the GHII) deleting a key stored under one of their agents
+    // would get a spurious 404. Only kicks in when no explicit operator
+    // ?owner= override was supplied.
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    if (!existing && isOwnerSession && !ownerOverride) {
+      const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
+      for (const agent of agents) {
+        const found = await storage.getMemory(agent.gaii, key);
+        if (found) { existing = found; effectiveOwner = agent.gaii; break; }
+      }
+    }
     if (!existing) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key not found: ${key}`));
       return;
@@ -1111,8 +1144,8 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       return;
     }
 
-    emitResourceUpdated(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
-    emitResourceListChanged(gaii);
+    emitResourceUpdated(effectiveOwner, `aimeat://memory/${encodeURIComponent(key)}`);
+    emitResourceListChanged(effectiveOwner);
 
     res.json(success(config.nodeId, {
       deleted: true,

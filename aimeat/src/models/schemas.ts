@@ -75,6 +75,9 @@ export const MemoryWriteSchema = z.object({
     group_id: z.string().optional(),
     tags: z.array(z.string().max(64)).max(20).optional(),
     ttl_hours: z.number().positive().max(8760).optional(), // max 1 year
+    // Owner-session only: target GAII to store this entry under one of the
+    // owner's own agents (instead of the owner's GHII). Ignored for agents.
+    agent: z.string().optional(),
 });
 
 export const MemoryUpdateSchema = z.object({

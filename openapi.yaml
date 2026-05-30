@@ -418,6 +418,13 @@ components:
           type: integer
           nullable: true
           description: Time-to-live in hours (null = permanent)
+        agent:
+          type: string
+          description: >
+            Owner-session only — target GAII to store this entry under one of
+            the owner's own agents instead of the owner's GHII. Ignored for
+            agent sessions. The agent must belong to the calling owner.
+          example: claude#alice@aimeat-fi-001-genesis
 
     MemoryEntry:
       type: object
@@ -4767,6 +4774,12 @@ paths:
     delete:
       operationId: deleteMemory
       summary: Delete memory
+      description: >
+        Delete a memory entry by key. Owner sessions may delete entries stored
+        under any of their own agents — if the key is not found under the
+        owner's GHII, the server looks it up across the owner's agents and
+        deletes the match. Operators may delete any owner's entry by passing
+        the `owner` query parameter.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -4776,9 +4789,19 @@ paths:
           required: true
           schema:
             type: string
+        - name: owner
+          in: query
+          required: false
+          schema:
+            type: string
+          description: >
+            Operator-only override — target identity (GHII/GAII) whose memory
+            entry should be deleted. Ignored for non-operator sessions.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /v1/memory/search:
     get:

@@ -17,6 +17,8 @@
  *   v2.2.0 -- 2026-05-24 -- Fix C6: remove GAII CSS, M2: compact connect content
  *   v2.3.0 -- 2026-05-24 -- Add F18 violation badge, C5 directives textarea styles
  *   v2.4.0 -- 2026-05-24 -- Add header-row flex layout for title + connect button alignment
+ *   v2.5.0 -- 2026-05-31 -- Add stored-memory-key inline editor (textarea), memory-detail wrapper, in-row edit/delete action rows, and danger-tinted ghost action styles for the Data Access tab
+ *   v2.6.0 -- 2026-05-31 -- Add stored-key create form layout (pf-agd-keyadd-form, vertical stack)
  */
 
 /* Header row: title left, connect button right */
@@ -1952,6 +1954,61 @@
   color: var(--warn, #F59E0B);
 }
 
+/* Inline edit/delete actions on a memory-area row */
+.pf .pf-agd-area-actions {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Stored memory key: expanded detail wrapper (value + action row) */
+.pf .pf-agd-memory-detail {
+  margin: 0.25rem 0 0.5rem 1.5rem;
+}
+.pf .pf-agd-memory-detail .pf-agd-memory-preview {
+  margin-left: 0;
+}
+
+/* Inline value editor textarea for a stored memory key */
+.pf .pf-agd-memory-edit {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 8rem;
+  max-height: 360px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 6px;
+  background: var(--bg-dim, #F9FAFB);
+  color: var(--text, #1A1A2E);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+.pf .pf-agd-memory-edit:focus {
+  outline: none;
+  border-color: var(--accent, #E8564A);
+}
+.pf .pf-agd-memory-edit:disabled {
+  opacity: 0.6;
+}
+
+/* Action button row beneath a stored memory key's value/editor */
+.pf .pf-agd-memory-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+/* Danger-tinted ghost button used for in-row delete actions */
+.pf .pf-agd-action-danger {
+  color: var(--danger, #EF4444);
+}
+.pf .pf-agd-action-danger:hover {
+  color: var(--danger, #EF4444);
+}
+
 /* Effective scope summary */
 .pf .pf-agd-scope-summary {
   background: var(--bg-dim, #F9FAFB);
@@ -2218,6 +2275,17 @@
   font-size: 0.82rem;
 }
 .pf .pf-agd-area-form input { flex: 1; min-width: 120px; }
+
+/* Data access: stored-key create form — stack inputs/value/actions vertically */
+.pf .pf-agd-keyadd-form {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.4rem;
+  padding: 0.5rem 0;
+}
+.pf .pf-agd-keyadd-form input,
+.pf .pf-agd-keyadd-form select { width: 100%; box-sizing: border-box; }
+.pf .pf-agd-keyadd-form .pf-agd-memory-edit { margin: 0; }
 
 /* Data access: package picker */
 .pf .pf-agd-package-picker {

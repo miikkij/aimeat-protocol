@@ -7,6 +7,8 @@
  * @version-history
  *   v1.0.0 — 2026-03-14 — Initial comprehensive memory E2E test suite
  *   v1.1.0 — 2026-05-28 — Expect missing memory reads to return 404 without auto-creating records
+ *   v1.2.0 — 2026-05-31 — Add owner-session cross-agent DELETE coverage (owner can delete a key stored under their agent; truly-missing key still 404s)
+ *   v1.3.0 — 2026-05-31 — Add owner-session POST agent-targeting coverage (owner can create a key under their agent's GAII via `agent`; foreign-agent target rejected)
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-memory-full.ts
@@ -436,6 +438,67 @@ await test('DELETE non-existent key returns 404', async () => {
 await test('GET after DELETE returns 404', async () => {
     const { status } = await json('/v1/memory/test.deleteme', { headers: auth1() });
     assert(status === 404, `expected 404 after delete, got ${status}`);
+});
+
+// Owner sessions can delete a key stored under one of their agents, even
+// though the owner's own GHII has no such key. Mirrors the PUT cross-agent
+// lookup. Regression guard for the DELETE 404 bug (owner-deletes-agent-key).
+const ownerAuth = () => ({ Authorization: `Bearer ${ownerToken}` });
+
+await test('Owner can DELETE a key stored under their agent', async () => {
+    // Agent 1 creates a private key.
+    const createRes = await json('/v1/memory', {
+        method: 'POST',
+        headers: auth1(),
+        body: JSON.stringify({ key: 'test.owner.delete', value: 'agent-owned', visibility: 'private' }),
+    });
+    assert(createRes.status === 201, `setup create status ${createRes.status}`);
+
+    // Owner session (GHII != agent GAII) deletes it.
+    const { status, body } = await json('/v1/memory/test.owner.delete', {
+        method: 'DELETE',
+        headers: ownerAuth(),
+    });
+    assert(status === 200, `expected 200 owner cross-agent delete, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.data?.deleted === true, 'deleted flag');
+
+    // Confirm it's actually gone from the agent's namespace.
+    const after = await json('/v1/memory/test.owner.delete', { headers: auth1() });
+    assert(after.status === 404, `expected 404 after owner delete, got ${after.status}`);
+});
+
+await test('Owner DELETE of a truly missing key still returns 404', async () => {
+    const { status } = await json('/v1/memory/test.owner.never.existed', {
+        method: 'DELETE',
+        headers: ownerAuth(),
+    });
+    assert(status === 404, `expected 404, got ${status}`);
+});
+
+// Owner sessions can create a memory entry UNDER an agent's GAII (not the
+// owner's GHII) by passing `agent`. Regression guard for owner-created agent
+// memory landing under the wrong identity.
+await test('Owner POST with agent= stores under the agent GAII', async () => {
+    const { status, body } = await json('/v1/memory', {
+        method: 'POST',
+        headers: ownerAuth(),
+        body: JSON.stringify({ key: 'test.owner.creates', value: { v: 1 }, visibility: 'owner', agent: agentGaii }),
+    });
+    assert(status === 201, `expected 201, got ${status}: ${JSON.stringify(body)}`);
+
+    // The agent itself must be able to read it — proves it's in the agent's namespace.
+    const read = await json('/v1/memory/test.owner.creates', { headers: auth1() });
+    assert(read.status === 200, `agent should read owner-created key, got ${read.status}`);
+    assert(read.body.data?.value?.v === 1, `value mismatch: ${JSON.stringify(read.body.data?.value)}`);
+});
+
+await test('Owner POST with agent= belonging to another owner is rejected', async () => {
+    const { status } = await json('/v1/memory', {
+        method: 'POST',
+        headers: ownerAuth(),
+        body: JSON.stringify({ key: 'test.owner.forbidden', value: 'x', agent: 'someoneelse#stranger@aimeat-local-001-dev' }),
+    });
+    assert(status === 403, `expected 403 for foreign agent target, got ${status}`);
 });
 
 // ═══════════════════════════════════════════════════════

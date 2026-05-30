@@ -21,11 +21,16 @@ export async function searchMemory(query, agentGaii) {
   return Array.isArray(list) ? list : [];
 }
 
-/** Create a new memory entry. */
-export async function createMemory(key, value, visibility, tags, groupId) {
+/**
+ * Create a new memory entry.
+ * @param {string} [agentGaii] Owner-session only — store the entry under one of
+ *   the owner's own agents (the agent's GAII) instead of the owner's GHII.
+ */
+export async function createMemory(key, value, visibility, tags, groupId, agentGaii) {
   const body = { key, value, visibility: visibility || 'private' };
   if (tags) body.tags = Array.isArray(tags) ? tags : tags.split(',').map(t => t.trim()).filter(Boolean);
   if (visibility === 'group' && groupId) body.group_id = groupId;
+  if (agentGaii) body.agent = agentGaii;
   return api('/v1/memory', {
     method: 'POST',
     body: JSON.stringify(body),

@@ -6,6 +6,8 @@
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  *   v1.1.0 -- 2026-05-24 -- Add area form (F12), link package (F13), doc count (F14), tags help (F15), scope footer (F16)
  *   v1.2.0 -- 2026-05-30 -- Live-update refresh also re-fetches the currently expanded memory entry's value (was: only the key list refreshed, the open entry stayed stale until the user closed + reopened it or switched tabs). Also stop showing the full-tab "Loading..." overlay on every live-update tick -- it now only shows on initial mount.
+ *   v1.3.0 -- 2026-05-31 -- Make Stored Memory Keys editable (inline textarea + Save) and deletable; make Memory Areas editable (key prefix / description / access) and deletable. Stored-key list now carries `version` for optimistic-lock PUTs. Delete confirmations use the shared useConfirm dialog.
+ *   v1.4.0 -- 2026-05-31 -- Add "+ Add key" button + create form to Stored Memory Keys. New entries are created under the AGENT's GAII (createMemory passes agent.gaii), not the owner's GHII, so they belong to the agent being viewed.
  */
 
 import { h } from 'preact';
@@ -14,10 +16,13 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { apiGet, apiPatch } from '/js/api.js';
 import { getDirectives, upsertDirectives } from '/js/services/agent-directives.js';
+import { updateMemoryFull, deleteMemory, createMemory } from '/js/services/memory.js';
+import { useConfirm } from '/components/Modal.js';
 
 const html = htm.bind(h);
 
 export default function TabDataAccess({ agent, agentName, session, showToast, allAgents }) {
+  const { confirm, ConfirmUI } = useConfirm();
   const [tags, setTags] = useState(agent.tags ?? []);
   const [memoryAreas, setMemoryAreas] = useState([]);
   const [resources, setResources] = useState([]);
@@ -27,17 +32,36 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
   const [newAreaKey, setNewAreaKey] = useState('');
   const [newAreaDesc, setNewAreaDesc] = useState('');
   const [newAreaPerm, setNewAreaPerm] = useState('read+write');
+  // Memory-area inline editing (by index into memoryAreas).
+  const [editingAreaIdx, setEditingAreaIdx] = useState(null);
+  const [editAreaKey, setEditAreaKey] = useState('');
+  const [editAreaDesc, setEditAreaDesc] = useState('');
+  const [editAreaPerm, setEditAreaPerm] = useState('read+write');
   const [addingPackage, setAddingPackage] = useState(false);
   const [newPkgName, setNewPkgName] = useState('');
   const [newPkgDesc, setNewPkgDesc] = useState('');
   const [memoryKeys, setMemoryKeys] = useState([]);
   const [expandedKey, setExpandedKey] = useState(null);
   const [expandedValue, setExpandedValue] = useState(null);
+  // Stored-key inline value editing.
+  const [editingKey, setEditingKey] = useState(null);
+  const [editValue, setEditValue] = useState('');
+  const [savingKey, setSavingKey] = useState(false);
+  // Stored-key creation form.
+  const [addingKey, setAddingKey] = useState(false);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [newKeyValue, setNewKeyValue] = useState('');
+  const [newKeyVis, setNewKeyVis] = useState('private');
+  const [creatingKey, setCreatingKey] = useState(false);
   const [loading, setLoading] = useState(true);
   // Track which key's value is currently being shown so the live-update
   // refresher can re-fetch it without going through the click handler.
   const expandedKeyRef = useRef(null);
   expandedKeyRef.current = expandedKey;
+  // Don't let a background live-update tick clobber the textarea while the
+  // user is mid-edit.
+  const editingKeyRef = useRef(null);
+  editingKeyRef.current = editingKey;
 
   async function fetchMemoryValue(key) {
     const gaii = agent?.gaii || agentName;
@@ -65,22 +89,26 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
       setResources(data.resources || []);
       const items = memResp?.data?.items || memResp?.data || [];
       const keys = (Array.isArray(items) ? items : [])
-        .map(item => ({ key: item.key, visibility: item.visibility, updatedAt: item.updatedAt }));
+        .map(item => ({ key: item.key, visibility: item.visibility, version: item.version, updatedAt: item.updated_at ?? item.updatedAt }));
       setMemoryKeys(keys);
 
       // If the user has a memory entry expanded, re-fetch its value too so
       // the rendered body stays in sync with the latest server state. Without
       // this, the key list refreshes but the open entry shows stale content
-      // until the user collapses + re-expands it.
+      // until the user collapses + re-expands it. Skip the re-fetch while the
+      // user is editing that entry so we don't overwrite their textarea.
       const currentKey = expandedKeyRef.current;
       if (currentKey) {
         const stillPresent = keys.some(k => k.key === currentKey);
         if (stillPresent) {
-          setExpandedValue(await fetchMemoryValue(currentKey));
+          if (editingKeyRef.current !== currentKey) {
+            setExpandedValue(await fetchMemoryValue(currentKey));
+          }
         } else {
           // Entry deleted server-side; collapse it.
           setExpandedKey(null);
           setExpandedValue(null);
+          setEditingKey(null);
         }
       }
     } catch {
@@ -149,6 +177,46 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
     }
   }
 
+  function startEditArea(idx, area) {
+    setEditingAreaIdx(idx);
+    setEditAreaKey(area.key_prefix || area.key || area || '');
+    setEditAreaDesc(area.description || '');
+    setEditAreaPerm(area.access === 'read' ? 'read' : 'read+write');
+  }
+
+  function cancelEditArea() {
+    setEditingAreaIdx(null);
+  }
+
+  async function handleSaveArea(idx) {
+    const key = editAreaKey.trim();
+    if (!key) return;
+    try {
+      const updated = memoryAreas.map((a, i) =>
+        i === idx ? { key_prefix: key, description: editAreaDesc.trim(), access: editAreaPerm } : a);
+      await upsertDirectives(agentName, { memory_areas: updated });
+      setMemoryAreas(updated);
+      setEditingAreaIdx(null);
+      showToast(t('profile.agents.detail.data_access.areaUpdated'));
+    } catch (err) {
+      showToast(err.message || t('profile.agents.detail.data_access.updateAreaError'), true);
+    }
+  }
+
+  function handleRemoveArea(idx) {
+    confirm(t('profile.agents.detail.data_access.confirmDeleteArea'), async () => {
+      try {
+        const updated = memoryAreas.filter((_, i) => i !== idx);
+        await upsertDirectives(agentName, { memory_areas: updated });
+        setMemoryAreas(updated);
+        if (editingAreaIdx === idx) setEditingAreaIdx(null);
+        showToast(t('profile.agents.detail.data_access.areaRemoved'));
+      } catch (err) {
+        showToast(err.message || t('profile.agents.detail.data_access.removeAreaError'), true);
+      }
+    }, { danger: true });
+  }
+
   async function handleLinkPackage() {
     const name = newPkgName.trim();
     if (!name) return;
@@ -169,11 +237,83 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
     if (expandedKey === mk.key) {
       setExpandedKey(null);
       setExpandedValue(null);
+      setEditingKey(null);
       return;
     }
+    setEditingKey(null);
     setExpandedKey(mk.key);
     setExpandedValue('...');
     setExpandedValue(await fetchMemoryValue(mk.key));
+  }
+
+  function startEditKey(mk) {
+    setExpandedKey(mk.key);
+    setEditingKey(mk.key);
+    // expandedValue holds the freshly-fetched value text; seed the editor from it.
+    setEditValue(typeof expandedValue === 'string' && expandedValue !== '...' ? expandedValue : '');
+  }
+
+  function cancelEditKey() {
+    setEditingKey(null);
+  }
+
+  async function handleSaveKey(mk) {
+    setSavingKey(true);
+    try {
+      // Preserve the original value type: if the editor text parses as JSON,
+      // store the parsed value (object/array/number/etc.); otherwise store the
+      // raw string.
+      let parsed;
+      try { parsed = JSON.parse(editValue); } catch { parsed = editValue; }
+      await updateMemoryFull(mk.key, { value: parsed, version: mk.version });
+      showToast(t('profile.agents.detail.data_access.valueSaved'));
+      setEditingKey(null);
+      await loadData({ showSpinner: false });
+    } catch (err) {
+      showToast(err.message || t('profile.agents.detail.data_access.saveValueError'), true);
+    } finally {
+      setSavingKey(false);
+    }
+  }
+
+  function handleDeleteKey(mk) {
+    confirm(t('profile.agents.detail.data_access.confirmDeleteKey', { key: mk.key }), async () => {
+      try {
+        await deleteMemory(mk.key);
+        showToast(t('profile.agents.detail.data_access.keyDeleted'));
+        if (expandedKey === mk.key) { setExpandedKey(null); setExpandedValue(null); }
+        setEditingKey(null);
+        await loadData({ showSpinner: false });
+      } catch (err) {
+        showToast(err.message || t('profile.agents.detail.data_access.deleteKeyError'), true);
+      }
+    }, { danger: true });
+  }
+
+  async function handleCreateKey() {
+    const key = newKeyName.trim();
+    if (!key || creatingKey) return;
+    setCreatingKey(true);
+    try {
+      // Preserve value type: store parsed JSON when the text parses, else the
+      // raw string.
+      let parsed;
+      try { parsed = JSON.parse(newKeyValue); } catch { parsed = newKeyValue; }
+      // Store under the AGENT's GAII (not the owner GHII) so the entry belongs
+      // to the agent being viewed.
+      const gaii = agent?.gaii || agentName;
+      await createMemory(key, parsed, newKeyVis, undefined, undefined, gaii);
+      showToast(t('profile.agents.detail.data_access.keyCreated'));
+      setAddingKey(false);
+      setNewKeyName('');
+      setNewKeyValue('');
+      setNewKeyVis('private');
+      await loadData({ showSpinner: false });
+    } catch (err) {
+      showToast(err.message || t('profile.agents.detail.data_access.createKeyError'), true);
+    } finally {
+      setCreatingKey(false);
+    }
   }
 
   function getSharedWith(tag) {
@@ -190,7 +330,7 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
   const hasResources = resources.length > 0;
   const hasKeys = memoryKeys.length > 0;
 
-  if (!hasTags && !hasAreas && !hasResources && !hasKeys && !addingTag && !addingArea && !addingPackage) {
+  if (!hasTags && !hasAreas && !hasResources && !hasKeys && !addingTag && !addingArea && !addingPackage && !addingKey) {
     return html`
       <div>
         <div class="pf-agd-empty">${t('profile.agents.detail.empty.data_access')}</div>
@@ -198,7 +338,9 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
           <button class="btn-outline btn-sm" onClick=${() => setAddingTag(true)}>+ ${t('profile.agents.detail.data_access.addTag')}</button>
           <button class="btn-outline btn-sm" onClick=${() => setAddingArea(true)}>+ ${t('profile.agents.detail.data_access.addArea')}</button>
           <button class="btn-outline btn-sm" onClick=${() => setAddingPackage(true)}>+ ${t('profile.agents.detail.data_access.linkPackage')}</button>
+          <button class="btn-outline btn-sm" onClick=${() => setAddingKey(true)}>+ ${t('profile.agents.detail.data_access.addKey')}</button>
         </div>
+        <${ConfirmUI} />
       </div>
     `;
   }
@@ -260,15 +402,34 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
             <button class="btn-outline btn-sm" onClick=${() => setAddingArea(false)}>${t('common.cancel')}</button>
           </div>
         `}
-        ${hasAreas ? memoryAreas.map(area => html`
-          <div key=${area.key_prefix || area.key || area} class="pf-agd-area-row">
-            <span class="pf-agd-area-key">${area.key_prefix || area.key || area}</span>
-            <span class="pf-agd-area-desc">${area.description || ''}</span>
-            <span class="pf-agd-area-perm ${area.access === 'read' ? 'pf-agd-area-perm--ro' : 'pf-agd-area-perm--rw'}">
-              ${area.access === 'read' ? t('profile.agents.detail.data_access.permReadOnly') : t('profile.agents.detail.data_access.permReadWrite')}
-            </span>
-          </div>
-        `) : !addingArea && html`
+        ${hasAreas ? memoryAreas.map((area, idx) => (
+          editingAreaIdx === idx ? html`
+            <div key=${'edit-' + idx} class="pf-agd-area-form">
+              <input type="text" value=${editAreaKey} onInput=${(e) => setEditAreaKey(e.target.value)}
+                     placeholder=${t('profile.agents.detail.data_access.areaKeyPlaceholder')} />
+              <input type="text" value=${editAreaDesc} onInput=${(e) => setEditAreaDesc(e.target.value)}
+                     placeholder=${t('profile.agents.detail.data_access.areaDescPlaceholder')} />
+              <select value=${editAreaPerm} onChange=${(e) => setEditAreaPerm(e.target.value)}>
+                <option value="read+write">${t('profile.agents.detail.data_access.permReadWrite')}</option>
+                <option value="read">${t('profile.agents.detail.data_access.permReadOnly')}</option>
+              </select>
+              <button class="btn-primary btn-sm" onClick=${() => handleSaveArea(idx)}>${t('common.save')}</button>
+              <button class="btn-outline btn-sm" onClick=${cancelEditArea}>${t('common.cancel')}</button>
+            </div>
+          ` : html`
+            <div key=${area.key_prefix || area.key || idx} class="pf-agd-area-row">
+              <span class="pf-agd-area-key">${area.key_prefix || area.key || area}</span>
+              <span class="pf-agd-area-desc">${area.description || ''}</span>
+              <span class="pf-agd-area-perm ${area.access === 'read' ? 'pf-agd-area-perm--ro' : 'pf-agd-area-perm--rw'}">
+                ${area.access === 'read' ? t('profile.agents.detail.data_access.permReadOnly') : t('profile.agents.detail.data_access.permReadWrite')}
+              </span>
+              <span class="pf-agd-area-actions">
+                <button class="btn-ghost btn-sm" onClick=${() => startEditArea(idx, area)}>${t('profile.agents.detail.data_access.edit')}</button>
+                <button class="btn-ghost btn-sm pf-agd-action-danger" onClick=${() => handleRemoveArea(idx)}>${t('common.delete')}</button>
+              </span>
+            </div>
+          `
+        )) : !addingArea && html`
           <div class="pf-agd-empty">${t('profile.agents.detail.data_access.noAreas')}</div>
         `}
       </div>
@@ -301,11 +462,35 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
       </div>
 
       <!-- STORED MEMORY KEYS -->
-      ${memoryKeys.length > 0 && html`
-        <div class="pf-agd-data-section">
+      <div class="pf-agd-data-section">
           <div class="pf-agd-section-header">
             <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.storedKeysTitle')}</span>
+            <button class="btn-outline btn-sm" onClick=${() => setAddingKey(!addingKey)}>+ ${t('profile.agents.detail.data_access.addKey')}</button>
           </div>
+          ${addingKey && html`
+            <div class="pf-agd-area-form pf-agd-keyadd-form">
+              <input type="text" value=${newKeyName} onInput=${(e) => setNewKeyName(e.target.value)}
+                     placeholder=${t('profile.agents.detail.data_access.keyNamePlaceholder')} />
+              <select value=${newKeyVis} onChange=${(e) => setNewKeyVis(e.target.value)}>
+                <option value="private">private</option>
+                <option value="owner">owner</option>
+                <option value="public">public</option>
+              </select>
+              <textarea class="pf-agd-memory-edit" value=${newKeyValue}
+                        onInput=${(e) => setNewKeyValue(e.target.value)}
+                        placeholder=${t('profile.agents.detail.data_access.keyValuePlaceholder')}
+                        disabled=${creatingKey}></textarea>
+              <div class="pf-agd-memory-actions">
+                <button class="btn-primary btn-sm" disabled=${creatingKey || !newKeyName.trim()} onClick=${handleCreateKey}>
+                  ${creatingKey ? t('profile.agents.detail.data_access.saving') : t('common.save')}
+                </button>
+                <button class="btn-outline btn-sm" disabled=${creatingKey} onClick=${() => setAddingKey(false)}>${t('common.cancel')}</button>
+              </div>
+            </div>
+          `}
+          ${memoryKeys.length === 0 && !addingKey && html`
+            <div class="pf-agd-empty">${t('profile.agents.detail.data_access.noKeys')}</div>
+          `}
           ${memoryKeys.map(mk => html`
             <div key=${mk.key}>
               <div class="pf-agd-area-row pf-agd-area-row--clickable" onClick=${() => toggleExpandKey(mk)}>
@@ -314,12 +499,29 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
                 <span class="pf-agd-area-perm pf-agd-area-perm--${mk.visibility === 'public' ? 'rw' : 'ro'}">${mk.visibility}</span>
               </div>
               ${expandedKey === mk.key && html`
-                <pre class="pf-agd-memory-preview">${expandedValue}</pre>
+                <div class="pf-agd-memory-detail">
+                  ${editingKey === mk.key ? html`
+                    <textarea class="pf-agd-memory-edit" value=${editValue}
+                              onInput=${(e) => setEditValue(e.target.value)}
+                              disabled=${savingKey}></textarea>
+                    <div class="pf-agd-memory-actions">
+                      <button class="btn-primary btn-sm" disabled=${savingKey} onClick=${() => handleSaveKey(mk)}>
+                        ${savingKey ? t('profile.agents.detail.data_access.saving') : t('common.save')}
+                      </button>
+                      <button class="btn-outline btn-sm" disabled=${savingKey} onClick=${cancelEditKey}>${t('common.cancel')}</button>
+                    </div>
+                  ` : html`
+                    <pre class="pf-agd-memory-preview">${expandedValue}</pre>
+                    <div class="pf-agd-memory-actions">
+                      <button class="btn-ghost btn-sm" onClick=${() => startEditKey(mk)}>${t('profile.agents.detail.data_access.edit')}</button>
+                      <button class="btn-ghost btn-sm pf-agd-action-danger" onClick=${() => handleDeleteKey(mk)}>${t('common.delete')}</button>
+                    </div>
+                  `}
+                </div>
               `}
             </div>
           `)}
-        </div>
-      `}
+      </div>
 
       <!-- EFFECTIVE SCOPE SUMMARY -->
       <div class="pf-agd-scope-summary">
@@ -328,6 +530,8 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
         }${hasResources ? `\n${t('profile.agents.detail.data_access.knowledgeTitle')}: ${resources.map(r => r.name || r.url || r).join(', ')}` : ''}
         <div class="pf-agd-scope-footer">${t('profile.agents.detail.data_access.scopeFooter')}</div>
       </div>
+
+      <${ConfirmUI} />
     </div>
   `;
 }
