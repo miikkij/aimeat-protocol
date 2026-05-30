@@ -12,6 +12,7 @@
  *   v1.0.0 — 2026-03-21 — Initial creation: 5 tools + 1 resource for organism management via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -21,6 +22,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 export function registerOrganismsTools(
     mcp: McpServer,
@@ -106,7 +108,7 @@ export function registerOrganismsTools(
     // ── Tool 1: aimeat_organism_list ──
     mcp.tool(
         'aimeat_organism_list',
-        'List organisms visible to the agent (public and organisms the owner is a member of)',
+        descriptionFor('aimeat_organism_list'),
         {},
         annotationsFor('aimeat_organism_list'),
         async () => {
@@ -146,7 +148,7 @@ export function registerOrganismsTools(
     // ── Tool 2: aimeat_organism_get ──
     mcp.tool(
         'aimeat_organism_get',
-        'Get details of a specific organism including its members',
+        descriptionFor('aimeat_organism_get'),
         {
             organism_id: z.string().describe('The organism ID'),
         },
@@ -193,7 +195,7 @@ export function registerOrganismsTools(
     // ── Tool 3: aimeat_organism_join ──
     mcp.tool(
         'aimeat_organism_join',
-        'Join an organism. Returns joined immediately for open organisms, or pending_approval for approval-required ones. Invite-only organisms cannot be joined this way.',
+        descriptionFor('aimeat_organism_join'),
         {
             organism_id: z.string().describe('The organism ID to join'),
             message: z.string().optional().describe('Optional message for join requests (used when approval is required)'),
@@ -275,7 +277,7 @@ export function registerOrganismsTools(
     // ── Tool 4: aimeat_organism_leave ──
     mcp.tool(
         'aimeat_organism_leave',
-        'Leave an organism. The creator cannot leave — they must delete the organism instead.',
+        descriptionFor('aimeat_organism_leave'),
         {
             organism_id: z.string().describe('The organism ID to leave'),
         },
@@ -320,7 +322,7 @@ export function registerOrganismsTools(
     // ── Tool 5: aimeat_organism_members ──
     mcp.tool(
         'aimeat_organism_members',
-        'List members of an organism',
+        descriptionFor('aimeat_organism_members'),
         {
             organism_id: z.string().describe('The organism ID'),
             role: z.string().optional().describe('Filter by role: creator, admin, member'),

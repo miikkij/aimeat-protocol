@@ -7,16 +7,18 @@
  *   v2.0.0 -- 2026-05-29 -- Registry-driven, agent_name parameter
  *   v2.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v2.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, pickAgent } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
+import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 
 export function registerAgentMessagesTools(mcp: McpServer, registry: AgentRegistry): void {
 
-  mcp.tool('aimeat_message_inbox', 'Get pending inbound messages', {
+  mcp.tool('aimeat_message_inbox', descriptionFor('aimeat_message_inbox'), {
     agent_name: agentNameSchema,
   }, annotationsFor('aimeat_message_inbox'), async ({ agent_name }) => {
     const { client, agent } = pickAgent(registry, agent_name);
@@ -25,7 +27,7 @@ export function registerAgentMessagesTools(mcp: McpServer, registry: AgentRegist
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_message_send', 'Send an outbound message from the connected agent to the owner conversation', {
+  mcp.tool('aimeat_message_send', descriptionFor('aimeat_message_send'), {
     agent_name: agentNameSchema,
     content: z.string().optional().describe('Message content'),
     body: z.string().optional().describe('Message content alias for older callers'),

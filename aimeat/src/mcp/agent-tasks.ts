@@ -12,6 +12,7 @@
  *   v1.2.0 -- 2026-05-28 -- Add TODO proposal tool for public MCP parity with connector MCP
  *   v1.3.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.4.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -20,6 +21,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 import { parseGAII, buildGAII } from '../utils/gaii.js';
 
 export function registerAgentTaskTools(
@@ -43,7 +45,7 @@ export function registerAgentTaskTools(
     // agents (e.g. demo-crew). The target agent must belong to the same owner.
     mcp.tool(
         'aimeat_task_create',
-        "Queue a task for one of your owner's agents (yourself or any same-owner agent). The owner sees it in their dashboard. Use this to ask another crew or worker to do something.",
+        descriptionFor('aimeat_task_create'),
         {
             target_agent: z.string().describe('Name of the agent the task is FOR. Must be owned by the same owner as the calling agent.'),
             title: z.string().describe('Short human-readable title for the task.'),
@@ -99,7 +101,7 @@ export function registerAgentTaskTools(
     // ── Tool 1: aimeat_task_list ──
     mcp.tool(
         'aimeat_task_list',
-        'List tasks assigned to you',
+        descriptionFor('aimeat_task_list'),
         {
             status: z.enum(['draft', 'queued', 'active', 'stalled', 'done', 'failed']).optional()
                 .describe('Filter by task status'),
@@ -143,7 +145,7 @@ export function registerAgentTaskTools(
     // ── Tool 2: aimeat_task_get ──
     mcp.tool(
         'aimeat_task_get',
-        'Get full details of a specific task including TODOs, scope, rules, and verification',
+        descriptionFor('aimeat_task_get'),
         {
             task_id: z.string().describe('The task ID'),
         },
@@ -195,7 +197,7 @@ export function registerAgentTaskTools(
     // ── Tool 3: aimeat_task_propose_todos ──
     mcp.tool(
         'aimeat_task_propose_todos',
-        'Propose TODOs for a queued task before owner approval or onboarding auto-start',
+        descriptionFor('aimeat_task_propose_todos'),
         {
             task_id: z.string().describe('The task ID'),
             todos: z.array(z.object({
@@ -282,7 +284,7 @@ export function registerAgentTaskTools(
     // ── Tool 4: aimeat_task_event ──
     mcp.tool(
         'aimeat_task_event',
-        'Append a progress event to an active task',
+        descriptionFor('aimeat_task_event'),
         {
             task_id: z.string().describe('The task ID'),
             type: z.enum([
@@ -352,7 +354,7 @@ export function registerAgentTaskTools(
     // ── Tool 5: aimeat_task_todo ──
     mcp.tool(
         'aimeat_task_todo',
-        'Update the status of a TODO item in a task',
+        descriptionFor('aimeat_task_todo'),
         {
             task_id: z.string().describe('The task ID'),
             todo_id: z.string().describe('The TODO item ID'),
@@ -429,7 +431,7 @@ export function registerAgentTaskTools(
     // ── Tool 7: aimeat_task_complete ──
     mcp.tool(
         'aimeat_task_complete',
-        'Complete an active task (transitions active -> done)',
+        descriptionFor('aimeat_task_complete'),
         {
             task_id: z.string().describe('The task ID to complete'),
             message: z.string().optional().describe('Completion message'),
@@ -484,7 +486,7 @@ export function registerAgentTaskTools(
     // ── Tool 8: aimeat_task_fail ──
     mcp.tool(
         'aimeat_task_fail',
-        'Fail an active task (transitions active -> failed)',
+        descriptionFor('aimeat_task_fail'),
         {
             task_id: z.string().describe('The task ID to fail'),
             reason: z.string().describe('Reason for failure'),

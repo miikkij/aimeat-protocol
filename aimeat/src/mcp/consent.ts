@@ -12,6 +12,7 @@
  *   v1.0.0 — 2026-03-21 — Initial creation: 3 tools + 1 resource for consent management via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -21,6 +22,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 export function registerConsentTools(
     mcp: McpServer,
@@ -90,7 +92,7 @@ export function registerConsentTools(
     // ── Tool 1: aimeat_consent_grant ──
     mcp.tool(
         'aimeat_consent_grant',
-        'Grant data access to another agent or recipient',
+        descriptionFor('aimeat_consent_grant'),
         {
             target_gaii: z.string().describe('Recipient GAII, "*", or prefixed identifier (organism.x, domain:x, node:x)'),
             scope: z.enum(['private', 'dmz', 'federation']).describe('Consent scope zone'),
@@ -149,7 +151,7 @@ export function registerConsentTools(
     // ── Tool 2: aimeat_consent_list ──
     mcp.tool(
         'aimeat_consent_list',
-        'List own consent grants',
+        descriptionFor('aimeat_consent_list'),
         {},
         annotationsFor('aimeat_consent_list'),
         async () => {
@@ -178,7 +180,7 @@ export function registerConsentTools(
     // ── Tool 3: aimeat_consent_revoke ──
     mcp.tool(
         'aimeat_consent_revoke',
-        'Revoke a consent grant',
+        descriptionFor('aimeat_consent_revoke'),
         {
             consent_id: z.string().describe('ID of the consent to revoke'),
         },

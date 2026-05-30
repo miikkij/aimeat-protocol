@@ -11,17 +11,19 @@
  *
  * @version-history
  *   v1.0.0 -- 2026-05-29 -- Initial creation: tags_set + mode_set
+ *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, pickAgent } from './_registry.js';
+import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 
 export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegistry): void {
 
   mcp.tool(
     'aimeat_agent_tags_set',
-    "Set (replace) the owner-managed tag list on one of your agents. Convention: 'crew:<name>', 'source:<name>', 'role:<name>', 'project:<name>' -- but any lowercase alphanumeric-plus-`._-` string is accepted. Max 20 tags.",
+    descriptionFor('aimeat_agent_tags_set'),
     {
       agent_name: agentNameSchema,
       target_agent_name: z.string().describe('Agent whose tags to update (must be owned by the calling owner).'),
@@ -36,7 +38,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
 
   mcp.tool(
     'aimeat_agent_mode_set',
-    "Set the operational mode on one of your agents. Modes: 'autonomous' (runs continuously, full Hello Integration), 'interactive' (user-facing, full Hello Integration), 'task-runner' (triggered/ephemeral, reduced 5-step Hello Integration -- no commands, messages, or test task), 'coordinator' (orchestrates others, full Hello Integration).",
+    descriptionFor('aimeat_agent_mode_set'),
     {
       agent_name: agentNameSchema,
       target_agent_name: z.string().describe('Agent whose mode to update (must be owned by the calling owner).'),

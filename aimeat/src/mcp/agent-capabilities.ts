@@ -12,6 +12,7 @@
  *   v1.0.0 -- 2026-05-20 -- Initial creation for Agent Dashboard Phase 2
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -19,6 +20,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTechnicalCapability } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 export function registerAgentCapabilityTools(
     mcp: McpServer,
@@ -33,7 +35,7 @@ export function registerAgentCapabilityTools(
     // ── Tool 1: aimeat_agent_capabilities_report ──
     mcp.tool(
         'aimeat_agent_capabilities_report',
-        'Report your technical and domain capabilities so the system knows what you can do',
+        descriptionFor('aimeat_agent_capabilities_report'),
         {
             technical: z.array(z.object({
                 name: z.string().describe('Capability name (e.g. "playwright", "git", "python")'),
@@ -90,7 +92,7 @@ export function registerAgentCapabilityTools(
     // ── Tool 2: aimeat_agent_activity ──
     mcp.tool(
         'aimeat_agent_activity',
-        'View your activity stats and history',
+        descriptionFor('aimeat_agent_activity'),
         {
             days: z.number().optional().describe('Number of days of history to retrieve (default 30)'),
             granularity: z.enum(['daily', 'hourly']).optional().describe('Granularity of history records (default daily)'),

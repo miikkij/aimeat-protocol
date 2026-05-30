@@ -14,26 +14,31 @@
  *     agent's client at module scope). Fixes AUTH_REQUIRED for multi-agent installs
  *     where the LLM passes agent_name="company-crew" but core tools silently routed
  *     through whoever the connector picked as primary at startup.
+ *   v1.4.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.5.0 -- 2026-05-30 -- MCP audit Phase 1 (F5): read tools (memory_read/list, catalogue_search,
+ *     work_inbox, board_read) accept response_format and shape REST payloads via shared shapeResponse().
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
+import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema } from '../../../../mcp/catalog/shape.js';
 import { agentNameSchema, pickAgent } from './_registry.js';
 
 export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void {
   // ── Memory ──────────────────────────────────────────────────────────
 
-  mcp.tool('aimeat_memory_read', 'Read a memory entry by key', {
+  mcp.tool('aimeat_memory_read', descriptionFor('aimeat_memory_read'), {
     agent_name: agentNameSchema,
     key: z.string().describe('Memory entry key'),
-  }, annotationsFor('aimeat_memory_read'), async ({ agent_name, key }) => {
+    response_format: responseFormatSchema,
+  }, annotationsFor('aimeat_memory_read'), async ({ agent_name, key, response_format }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.get(`/v1/memory/${encodeURIComponent(key)}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return jsonContent(shapeResponse('aimeat_memory_read', response_format, resp.data ?? resp));
   });
 
-  mcp.tool('aimeat_memory_write', 'Write a memory entry', {
+  mcp.tool('aimeat_memory_write', descriptionFor('aimeat_memory_write'), {
     agent_name: agentNameSchema,
     key: z.string().describe('Memory entry key'),
     value: z.unknown().describe('Value to store'),
@@ -50,14 +55,15 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_memory_list', 'List memory entries for this agent, or same-owner memory when owner_scope is true', {
+  mcp.tool('aimeat_memory_list', descriptionFor('aimeat_memory_list'), {
     agent_name: agentNameSchema,
     prefix: z.string().optional().describe('Key prefix filter'),
     visibility: z.string().optional().describe('Optional visibility filter'),
     tags: z.array(z.string()).optional().describe('Optional tag filters'),
     owner_scope: z.boolean().optional().describe('When true, list same-owner GHII and agent memory'),
     limit: z.number().optional().describe('Maximum entries to return'),
-  }, annotationsFor('aimeat_memory_list'), async ({ agent_name, prefix, visibility, tags, owner_scope, limit }) => {
+    response_format: responseFormatSchema,
+  }, annotationsFor('aimeat_memory_list'), async ({ agent_name, prefix, visibility, tags, owner_scope, limit, response_format }) => {
     const { client } = pickAgent(registry, agent_name);
     const params = new URLSearchParams();
     if (prefix) params.set('prefix', prefix);
@@ -67,10 +73,10 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     if (limit !== undefined) params.set('limit', String(limit));
     const qs = params.toString();
     const resp = await client.get(`/v1/memory${qs ? `?${qs}` : ''}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return jsonContent(shapeResponse('aimeat_memory_list', response_format, resp.data ?? resp));
   });
 
-  mcp.tool('aimeat_memory_search', 'Search memory entries by query', {
+  mcp.tool('aimeat_memory_search', descriptionFor('aimeat_memory_search'), {
     agent_name: agentNameSchema,
     query: z.string().describe('Search query'),
   }, annotationsFor('aimeat_memory_search'), async ({ agent_name, query }) => {
@@ -81,21 +87,22 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
 
   // ── Catalogue ───────────────────────────────────────────────────────
 
-  mcp.tool('aimeat_catalogue_search', 'Search the action catalogue', {
+  mcp.tool('aimeat_catalogue_search', descriptionFor('aimeat_catalogue_search'), {
     agent_name: agentNameSchema,
     query: z.string().optional().describe('Search query'),
-  }, annotationsFor('aimeat_catalogue_search'), async ({ agent_name, query }) => {
+    response_format: responseFormatSchema,
+  }, annotationsFor('aimeat_catalogue_search'), async ({ agent_name, query, response_format }) => {
     const { client } = pickAgent(registry, agent_name);
     const qs = query ? `?q=${encodeURIComponent(query)}` : '';
     const resp = await client.get(`/v1/catalogue${qs}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return jsonContent(shapeResponse('aimeat_catalogue_search', response_format, resp.data ?? resp));
   });
 
   // ── Agent profile ──────────────────────────────────────────────────
 
   mcp.tool(
     'aimeat_agents_list',
-    "List the calling owner's agents on the node. Returns name, mode, capabilities, tags, last_seen, and other public-agent fields for every agent registered under the same owner as the calling agent (or the calling owner JWT). Use this to discover who you can delegate to via aimeat_task_create.",
+    descriptionFor('aimeat_agents_list'),
     {
       agent_name: agentNameSchema,
     },
@@ -107,7 +114,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     },
   );
 
-  mcp.tool('aimeat_agent_profile', 'View an agent\'s public profile', {
+  mcp.tool('aimeat_agent_profile', descriptionFor('aimeat_agent_profile'), {
     agent_name: agentNameSchema,
     gaii: z.string().describe('Agent GAII identifier'),
   }, annotationsFor('aimeat_agent_profile'), async ({ agent_name, gaii }) => {
@@ -118,7 +125,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
 
   // ── Work ────────────────────────────────────────────────────────────
 
-  mcp.tool('aimeat_action_execute', 'Request execution of an action', {
+  mcp.tool('aimeat_action_execute', descriptionFor('aimeat_action_execute'), {
     agent_name: agentNameSchema,
     action_id: z.string().describe('Action identifier'),
     input: z.record(z.string(), z.unknown()).optional().describe('Input parameters for the action'),
@@ -130,15 +137,16 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_work_inbox', 'Check the work inbox for pending work items', {
+  mcp.tool('aimeat_work_inbox', descriptionFor('aimeat_work_inbox'), {
     agent_name: agentNameSchema,
-  }, annotationsFor('aimeat_work_inbox'), async ({ agent_name }) => {
+    response_format: responseFormatSchema,
+  }, annotationsFor('aimeat_work_inbox'), async ({ agent_name, response_format }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.get('/v1/work/inbox');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return jsonContent(shapeResponse('aimeat_work_inbox', response_format, resp.data ?? resp));
   });
 
-  mcp.tool('aimeat_work_accept', 'Accept a work item', {
+  mcp.tool('aimeat_work_accept', descriptionFor('aimeat_work_accept'), {
     agent_name: agentNameSchema,
     tracking_code: z.string().describe('Work item tracking code'),
   }, annotationsFor('aimeat_work_accept'), async ({ agent_name, tracking_code }) => {
@@ -147,7 +155,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_work_deliver', 'Deliver a work result', {
+  mcp.tool('aimeat_work_deliver', descriptionFor('aimeat_work_deliver'), {
     agent_name: agentNameSchema,
     tracking_code: z.string().describe('Work item tracking code'),
     result: z.unknown().describe('Delivery payload'),
@@ -159,7 +167,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
 
   // ── Wallet ──────────────────────────────────────────────────────────
 
-  mcp.tool('aimeat_wallet_balance', 'Check morsel wallet balance', {
+  mcp.tool('aimeat_wallet_balance', descriptionFor('aimeat_wallet_balance'), {
     agent_name: agentNameSchema,
   }, annotationsFor('aimeat_wallet_balance'), async ({ agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
@@ -169,16 +177,17 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
 
   // ── Boards (basic read/post) ────────────────────────────────────────
 
-  mcp.tool('aimeat_board_read', 'Read board posts', {
+  mcp.tool('aimeat_board_read', descriptionFor('aimeat_board_read'), {
     agent_name: agentNameSchema,
     board_id: z.string().describe('Board identifier'),
-  }, annotationsFor('aimeat_board_read'), async ({ agent_name, board_id }) => {
+    response_format: responseFormatSchema,
+  }, annotationsFor('aimeat_board_read'), async ({ agent_name, board_id, response_format }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.get(`/v1/boards/${encodeURIComponent(board_id)}/posts`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return jsonContent(shapeResponse('aimeat_board_read', response_format, resp.data ?? resp));
   });
 
-  mcp.tool('aimeat_board_post', 'Post to a board', {
+  mcp.tool('aimeat_board_post', descriptionFor('aimeat_board_post'), {
     agent_name: agentNameSchema,
     board_id: z.string().describe('Board identifier'),
     title: z.string().describe('Post title'),
@@ -191,7 +200,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
 
   // ── Storage ─────────────────────────────────────────────────────────
 
-  mcp.tool('aimeat_storage_upload', 'Upload a file to storage', {
+  mcp.tool('aimeat_storage_upload', descriptionFor('aimeat_storage_upload'), {
     agent_name: agentNameSchema,
     key: z.string().describe('Storage key'),
     content: z.string().describe('File content (base64-encoded)'),
@@ -204,7 +213,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_storage_download', 'Download a file from storage', {
+  mcp.tool('aimeat_storage_download', descriptionFor('aimeat_storage_download'), {
     agent_name: agentNameSchema,
     key: z.string().describe('Storage key'),
   }, annotationsFor('aimeat_storage_download'), async ({ agent_name, key }) => {
@@ -219,7 +228,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   // has operator scope. Documented here so the param isn't misread as
   // "operator masquerade".
 
-  mcp.tool('aimeat_admin_stats', 'Node statistics (operator only)', {
+  mcp.tool('aimeat_admin_stats', descriptionFor('aimeat_admin_stats'), {
     agent_name: agentNameSchema,
   }, annotationsFor('aimeat_admin_stats'), async ({ agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
@@ -227,7 +236,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_admin_agents', 'List all agents on the node (operator only)', {
+  mcp.tool('aimeat_admin_agents', descriptionFor('aimeat_admin_agents'), {
     agent_name: agentNameSchema,
   }, annotationsFor('aimeat_admin_agents'), async ({ agent_name }) => {
     const { client } = pickAgent(registry, agent_name);
@@ -235,7 +244,7 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_admin_config', 'View node configuration (operator only)', {
+  mcp.tool('aimeat_admin_config', descriptionFor('aimeat_admin_config'), {
     agent_name: agentNameSchema,
   }, annotationsFor('aimeat_admin_config'), async ({ agent_name }) => {
     const { client } = pickAgent(registry, agent_name);

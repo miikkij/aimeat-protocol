@@ -11,12 +11,14 @@
  *   v2.0.0 -- 2026-05-29 -- Registry-driven, agent_name parameter
  *   v2.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v2.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, pickAgent } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
+import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 
 function asText(value: unknown): { content: Array<{ type: 'text'; text: string }> } {
     return { content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] };
@@ -24,7 +26,7 @@ function asText(value: unknown): { content: Array<{ type: 'text'; text: string }
 
 export function registerOnboardingTools(mcp: McpServer, registry: AgentRegistry): void {
 
-    mcp.tool('aimeat_onboarding_status', 'View required Hello Integration first-run onboarding status and next-step hints', {
+    mcp.tool('aimeat_onboarding_status', descriptionFor('aimeat_onboarding_status'), {
         agent_name: agentNameSchema,
     }, annotationsFor('aimeat_onboarding_status'), async ({ agent_name }) => {
         const { client, agent } = pickAgent(registry, agent_name);
@@ -33,7 +35,7 @@ export function registerOnboardingTools(mcp: McpServer, registry: AgentRegistry)
         return asText(resp.data ?? resp);
     });
 
-    mcp.tool('aimeat_onboarding_identify_platform', 'Confirm the connected agent runtime/platform for Hello Integration', {
+    mcp.tool('aimeat_onboarding_identify_platform', descriptionFor('aimeat_onboarding_identify_platform'), {
         agent_name: agentNameSchema,
         platform: z.string().describe('Runtime/platform name, for example claude, openclaw, hermes, generic, or vscode'),
         platform_version: z.string().optional().describe('Runtime/platform version if known'),
@@ -46,7 +48,7 @@ export function registerOnboardingTools(mcp: McpServer, registry: AgentRegistry)
         return asText(resp.data ?? resp);
     });
 
-    mcp.tool('aimeat_onboarding_confirm_skill_installed', 'Confirm this skill bundle has been downloaded/extracted for Hello Integration', {
+    mcp.tool('aimeat_onboarding_confirm_skill_installed', descriptionFor('aimeat_onboarding_confirm_skill_installed'), {
         agent_name: agentNameSchema,
         platform: z.string().describe('Runtime/platform using the bundle, for example generic, claude, openclaw, or hermes'),
         version: z.string().describe('Bundle version if known; use local when no version is shown'),
@@ -57,7 +59,7 @@ export function registerOnboardingTools(mcp: McpServer, registry: AgentRegistry)
         return asText(resp.data ?? resp);
     });
 
-    mcp.tool('aimeat_onboarding_confirm_directives_read', 'Confirm the agent has read its AIMEAT handbook/directives', {
+    mcp.tool('aimeat_onboarding_confirm_directives_read', descriptionFor('aimeat_onboarding_confirm_directives_read'), {
         agent_name: agentNameSchema,
         confirmed: z.boolean().optional().describe('Set true after reading the handbook/directives'),
     }, annotationsFor('aimeat_onboarding_confirm_directives_read'), async ({ agent_name, confirmed }) => {
@@ -67,7 +69,7 @@ export function registerOnboardingTools(mcp: McpServer, registry: AgentRegistry)
         return asText(resp.data ?? resp);
     });
 
-    mcp.tool('aimeat_onboarding_declare_services', 'Optionally declare services/capabilities exposed by this agent', {
+    mcp.tool('aimeat_onboarding_declare_services', descriptionFor('aimeat_onboarding_declare_services'), {
         agent_name: agentNameSchema,
         services: z.array(z.object({
             name: z.string().describe('Service name'),

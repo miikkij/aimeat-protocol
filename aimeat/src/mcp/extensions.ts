@@ -13,6 +13,7 @@
  *   v1.1.0 — 2026-05-02 — Add 5 lifecycle tools: install, activate, deactivate, delete, get
  *   v1.2.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.3.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -27,6 +28,7 @@ import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 export function registerExtensionsTools(
     mcp: McpServer,
@@ -90,7 +92,7 @@ export function registerExtensionsTools(
     // ── Tool 1: aimeat_extension_list ──
     mcp.tool(
         'aimeat_extension_list',
-        'List active extensions and their available actions',
+        descriptionFor('aimeat_extension_list'),
         {},
         annotationsFor('aimeat_extension_list'),
         async () => {
@@ -121,7 +123,7 @@ export function registerExtensionsTools(
     // ── Tool 2: aimeat_extension_invoke ──
     mcp.tool(
         'aimeat_extension_invoke',
-        'Invoke an action on an active extension',
+        descriptionFor('aimeat_extension_invoke'),
         {
             extension_name: z.string().describe('Name of the extension to invoke'),
             action_id: z.string().describe('ID of the action to execute'),
@@ -339,9 +341,7 @@ export function registerExtensionsTools(
     // ── Tool 3: aimeat_extension_install ──
     mcp.tool(
         'aimeat_extension_install',
-        `Install a new extension. Two modes:
-UPLOAD MODE (recommended): Call with no arguments to get an upload URL. Create a ZIP containing manifest.yaml at root and scripts in scripts/ directory, then PUT it to the URL.
-INLINE MODE: Provide manifest (YAML string) and scripts (filename-to-code map) directly.`,
+        descriptionFor('aimeat_extension_install'),
         {
             manifest: z.string().optional().describe('Extension manifest in YAML format. Omit to get an upload URL for a ZIP bundle.'),
             scripts: z.record(z.string(), z.string()).optional().describe('Map of script filename to JavaScript source code. Omit for upload mode.'),
@@ -515,7 +515,7 @@ INLINE MODE: Provide manifest (YAML string) and scripts (filename-to-code map) d
     // ── Tool 4: aimeat_extension_activate ──
     mcp.tool(
         'aimeat_extension_activate',
-        'Activate an installed extension',
+        descriptionFor('aimeat_extension_activate'),
         {
             name: z.string().describe('Name of the extension to activate'),
         },
@@ -554,7 +554,7 @@ INLINE MODE: Provide manifest (YAML string) and scripts (filename-to-code map) d
     // ── Tool 5: aimeat_extension_deactivate ──
     mcp.tool(
         'aimeat_extension_deactivate',
-        'Deactivate an active extension',
+        descriptionFor('aimeat_extension_deactivate'),
         {
             name: z.string().describe('Name of the extension to deactivate'),
         },
@@ -585,7 +585,7 @@ INLINE MODE: Provide manifest (YAML string) and scripts (filename-to-code map) d
     // ── Tool 6: aimeat_extension_delete ──
     mcp.tool(
         'aimeat_extension_delete',
-        'Delete/uninstall an extension',
+        descriptionFor('aimeat_extension_delete'),
         {
             name: z.string().describe('Name of the extension to delete'),
         },
@@ -621,7 +621,7 @@ INLINE MODE: Provide manifest (YAML string) and scripts (filename-to-code map) d
     // ── Tool 7: aimeat_extension_get ──
     mcp.tool(
         'aimeat_extension_get',
-        'Get full extension details including action schemas',
+        descriptionFor('aimeat_extension_get'),
         {
             name: z.string().describe('Name of the extension to retrieve'),
         },

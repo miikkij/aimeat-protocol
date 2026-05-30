@@ -6,6 +6,7 @@
  *   v1.0.0 - 2026-05-02 - Initial: list, get, invoke
  *   v1.2.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.3.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -13,6 +14,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 export function registerCapabilitiesTools(
     mcp: McpServer,
@@ -25,7 +27,7 @@ export function registerCapabilitiesTools(
 
     mcp.tool(
         'aimeat_capabilities_list',
-        'List and search capabilities on this AIMEAT node. Returns id, name, summary, callable, authRequired, cost, tags for each.',
+        descriptionFor('aimeat_capabilities_list'),
         {
             search: z.string().optional().describe('Full-text search on name and summary'),
             tags: z.array(z.string()).optional().describe('Filter by tags'),
@@ -52,7 +54,7 @@ export function registerCapabilitiesTools(
 
     mcp.tool(
         'aimeat_capabilities_get',
-        'Get full detail of a capability including input/output schemas, examples, usage instructions, dependencies, and trust signals.',
+        descriptionFor('aimeat_capabilities_get'),
         {
             id: z.string().describe('Capability ID'),
         },
@@ -66,7 +68,7 @@ export function registerCapabilitiesTools(
 
     mcp.tool(
         'aimeat_capabilities_invoke',
-        'Invoke a callable capability. Extensions and manual webhooks return results immediately. Cortex capabilities are browser-only and will return an error with usage instructions.',
+        descriptionFor('aimeat_capabilities_invoke'),
         {
             id: z.string().describe('Capability ID to invoke'),
             input: z.record(z.string(), z.unknown()).optional().describe('Input data for the capability'),
@@ -103,7 +105,7 @@ export function registerCapabilitiesTools(
 
     mcp.tool(
         'aimeat_capabilities_create',
-        'Create a new manual capability on this AIMEAT node. Returns the created capability record.',
+        descriptionFor('aimeat_capabilities_create'),
         {
             id: z.string().optional().describe('Custom capability ID (auto-generated UUID if omitted)'),
             name: z.string().describe('Human-readable capability name'),
@@ -174,7 +176,7 @@ export function registerCapabilitiesTools(
 
     mcp.tool(
         'aimeat_capabilities_update',
-        'Update an existing capability that you own. Only provided fields are updated.',
+        descriptionFor('aimeat_capabilities_update'),
         {
             id: z.string().describe('Capability ID to update'),
             name: z.string().optional().describe('Updated capability name'),
@@ -211,7 +213,7 @@ export function registerCapabilitiesTools(
 
     mcp.tool(
         'aimeat_capabilities_delete',
-        'Delete a manual capability that you own. Only manual capabilities can be deleted; auto-aggregated capabilities are removed when their source is removed.',
+        descriptionFor('aimeat_capabilities_delete'),
         {
             id: z.string().describe('Capability ID to delete'),
         },
@@ -236,7 +238,7 @@ export function registerCapabilitiesTools(
 
     mcp.tool(
         'aimeat_capabilities_vouch',
-        'Vouch for a capability to increase its trust signal. You cannot vouch for your own capabilities.',
+        descriptionFor('aimeat_capabilities_vouch'),
         {
             id: z.string().describe('Capability ID to vouch for'),
             comment: z.string().optional().describe('Optional comment explaining why you vouch for this capability'),

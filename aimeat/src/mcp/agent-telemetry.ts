@@ -12,6 +12,7 @@
  *   v1.0.0 -- 2026-05-28 -- Add public MCP telemetry reporting tool
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { randomUUID } from 'node:crypto';
@@ -21,6 +22,7 @@ import type { AimeatConfig } from '../config.js';
 import { emitChange } from '../services/event-bus.js';
 import type { Storage, TelemetryEvent } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 export function registerAgentTelemetryTools(
     mcp: McpServer,
@@ -32,7 +34,7 @@ export function registerAgentTelemetryTools(
 ): void {
     const agentGaii = getAgentGaii();
 
-    mcp.tool('aimeat_agent_telemetry_report', 'Report agent telemetry to the node', {
+    mcp.tool('aimeat_agent_telemetry_report', descriptionFor('aimeat_agent_telemetry_report'), {
         type: z.enum(['llm_call', 'tool_call', 'agent_report']).default('agent_report')
             .describe('Telemetry event type'),
         data: z.record(z.string(), z.unknown()).optional()

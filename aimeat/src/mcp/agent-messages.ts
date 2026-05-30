@@ -9,6 +9,7 @@
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 3
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -17,6 +18,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 export function registerAgentMessageTools(
     mcp: McpServer,
@@ -31,7 +33,7 @@ export function registerAgentMessageTools(
     // ── Tool 1: aimeat_message_inbox ──
     mcp.tool(
         'aimeat_message_inbox',
-        'Get pending inbound messages for this agent',
+        descriptionFor('aimeat_message_inbox'),
         {},
         annotationsFor('aimeat_message_inbox'),
         async () => {
@@ -57,7 +59,7 @@ export function registerAgentMessageTools(
     // ── Tool 2: aimeat_message_send ──
     mcp.tool(
         'aimeat_message_send',
-        'Send a response message from this agent',
+        descriptionFor('aimeat_message_send'),
         {
             content: z.string().min(1).max(10000).describe('Message content (markdown supported)'),
             thread_id: z.string().uuid().optional().describe('Thread ID to reply in (omit to start new conversation)'),

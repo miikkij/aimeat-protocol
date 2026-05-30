@@ -12,6 +12,7 @@
  *   v1.0.0 — 2026-03-21 — Initial creation: 1 tool for content moderation reporting via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -20,6 +21,7 @@ import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 export function registerFlagsTools(
     mcp: McpServer,
@@ -34,7 +36,7 @@ export function registerFlagsTools(
     // ── Tool 1: aimeat_flag_report ──
     mcp.tool(
         'aimeat_flag_report',
-        'Report content for moderation review',
+        descriptionFor('aimeat_flag_report'),
         {
             target_type: z.enum(['memory', 'board_post', 'action', 'agent']).describe('Type of content being reported'),
             target_id: z.string().describe('ID of the content to flag'),

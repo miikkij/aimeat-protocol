@@ -12,6 +12,7 @@
  *   v1.0.0 — 2026-03-21 — Initial creation: 7 tools + 1 resource for board management via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -21,6 +22,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII, isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 export function registerBoardsTools(
     mcp: McpServer,
@@ -95,7 +97,7 @@ export function registerBoardsTools(
     // ── Tool 1: aimeat_board_list ──
     mcp.tool(
         'aimeat_board_list',
-        'List visible boards',
+        descriptionFor('aimeat_board_list'),
         {},
         annotationsFor('aimeat_board_list'),
         async () => {
@@ -121,7 +123,7 @@ export function registerBoardsTools(
     // ── Tool 2: aimeat_board_create ──
     mcp.tool(
         'aimeat_board_create',
-        'Create a new board',
+        descriptionFor('aimeat_board_create'),
         {
             name: z.string(),
             visibility: z.enum(['private', 'shared', 'public']),
@@ -167,7 +169,7 @@ export function registerBoardsTools(
     // ── Tool 3: aimeat_board_subscribe ──
     mcp.tool(
         'aimeat_board_subscribe',
-        'Subscribe to board notifications',
+        descriptionFor('aimeat_board_subscribe'),
         {
             board_id: z.string(),
             callback_url: z.string().optional(),
@@ -210,7 +212,7 @@ export function registerBoardsTools(
     // ── Tool 4: aimeat_board_react ──
     mcp.tool(
         'aimeat_board_react',
-        'React to a board post with an emoji',
+        descriptionFor('aimeat_board_react'),
         {
             board_id: z.string(),
             post_id: z.string(),
@@ -235,7 +237,7 @@ export function registerBoardsTools(
     // ── Tool 5: aimeat_board_reply ──
     mcp.tool(
         'aimeat_board_reply',
-        'Reply to a board post',
+        descriptionFor('aimeat_board_reply'),
         {
             board_id: z.string(),
             post_id: z.string(),
@@ -279,7 +281,7 @@ export function registerBoardsTools(
     // ── Tool 6: aimeat_board_members ──
     mcp.tool(
         'aimeat_board_members',
-        'Manage board members (add/remove allowed GAIIs)',
+        descriptionFor('aimeat_board_members'),
         {
             board_id: z.string(),
             add: z.array(z.string()).optional(),
@@ -320,7 +322,7 @@ export function registerBoardsTools(
     // ── Tool 7: aimeat_board_delete ──
     mcp.tool(
         'aimeat_board_delete',
-        'Delete a board',
+        descriptionFor('aimeat_board_delete'),
         {
             board_id: z.string(),
         },

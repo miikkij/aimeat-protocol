@@ -9,15 +9,17 @@
  *     is fetched on behalf of whichever agent the caller named (was: always
  *     primary). The /v1/agents/me/handbook endpoint resolves "me" from the
  *     bearer token, so the routed token must match the agent the caller meant.
+ *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
+import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { agentNameSchema, pickAgent } from './_registry.js';
 
 export function registerHandbookTools(mcp: McpServer, registry: AgentRegistry): void {
-  mcp.tool('aimeat_handbook_get', 'Get the agent operating handbook', {
+  mcp.tool('aimeat_handbook_get', descriptionFor('aimeat_handbook_get'), {
     agent_name: agentNameSchema,
     module: z.string().optional().describe('Specific handbook module to retrieve'),
   }, annotationsFor('aimeat_handbook_get'), async ({ agent_name, module }) => {

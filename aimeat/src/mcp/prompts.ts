@@ -12,6 +12,7 @@
  *   v1.1.0 -- 2026-05-27 -- Rename tool from aimeat_prompts_get to aimeat_handbook_get
  *   v1.2.0 -- 2026-05-29 -- Add tool annotations (title + readOnlyHint) from shared
  *     annotations.ts for Connectors Directory compliance.
+ *   v1.3.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -19,6 +20,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 export function registerPromptsTools(
     mcp: McpServer,
@@ -32,7 +34,7 @@ export function registerPromptsTools(
     // ── Tool 1: aimeat_handbook_get ──
     mcp.tool(
         'aimeat_handbook_get',
-        'Get the agent operating handbook or a managed prompt by tier or ID',
+        descriptionFor('aimeat_handbook_get'),
         {
             tier: z.string().describe('Prompt tier or ID (e.g. "tier1", "tier2", "tier-1", or a custom prompt ID)'),
         },

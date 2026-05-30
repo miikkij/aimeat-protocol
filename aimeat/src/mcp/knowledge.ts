@@ -12,6 +12,7 @@
  *   v1.0.0 — 2026-03-21 — Initial creation: 4 tools + 1 resource for knowledge management via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -20,6 +21,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 export function registerKnowledgeTools(
     mcp: McpServer,
@@ -111,7 +113,7 @@ export function registerKnowledgeTools(
     // ── Tool 1: aimeat_knowledge_list ──
     mcp.tool(
         'aimeat_knowledge_list',
-        'List knowledge packages accessible to you (your own + owner\'s packages)',
+        descriptionFor('aimeat_knowledge_list'),
         {},
         annotationsFor('aimeat_knowledge_list'),
         async () => {
@@ -143,7 +145,7 @@ export function registerKnowledgeTools(
     // ── Tool 2: aimeat_knowledge_get ──
     mcp.tool(
         'aimeat_knowledge_get',
-        'Read a knowledge package manifest and its entries',
+        descriptionFor('aimeat_knowledge_get'),
         {
             package_id: z.string().describe('The knowledge package ID'),
         },
@@ -187,7 +189,7 @@ export function registerKnowledgeTools(
     // ── Tool 3: aimeat_knowledge_contribute ──
     mcp.tool(
         'aimeat_knowledge_contribute',
-        'Add or update an entry in an existing knowledge package',
+        descriptionFor('aimeat_knowledge_contribute'),
         {
             package_id: z.string().describe('The knowledge package ID'),
             entry_key: z.string().describe('Entry key (short name, e.g. "summary" or "chapter-1")'),
@@ -266,7 +268,7 @@ export function registerKnowledgeTools(
     // ── Tool 4: aimeat_knowledge_links ──
     mcp.tool(
         'aimeat_knowledge_links',
-        'Get links for a knowledge package (related packages, references)',
+        descriptionFor('aimeat_knowledge_links'),
         {
             package_id: z.string().describe('The knowledge package ID'),
             direction: z.enum(['outgoing', 'incoming', 'both']).optional().describe('Link direction (default: both)'),

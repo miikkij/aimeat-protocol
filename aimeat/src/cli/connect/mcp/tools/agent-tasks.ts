@@ -11,16 +11,18 @@
  *   v2.0.0 -- 2026-05-29 -- Registry-driven, agent_name parameter, multi-agent support
  *   v2.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v2.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, pickAgent } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
+import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 
 export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry): void {
 
-  mcp.tool('aimeat_task_list', 'List tasks for the connected agent', {
+  mcp.tool('aimeat_task_list', descriptionFor('aimeat_task_list'), {
     agent_name: agentNameSchema,
     status: z.string().optional().describe('Filter by task status'),
   }, annotationsFor('aimeat_task_list'), async ({ agent_name, status }) => {
@@ -33,7 +35,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
 
   mcp.tool(
     'aimeat_task_create',
-    'Queue a task for one of your owner\'s agents (yourself, or any other agent owned by the same owner). Use this to ask another crew or worker to do something. The task lands in the target agent\'s queue and the owner sees it in their dashboard.',
+    descriptionFor('aimeat_task_create'),
     {
       agent_name: agentNameSchema,
       target_agent: z.string().describe('Name of the agent the task is FOR. Must be owned by the same owner as the calling agent. Example: "demo-crew".'),
@@ -58,7 +60,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     },
   );
 
-  mcp.tool('aimeat_task_get', 'Get task detail', {
+  mcp.tool('aimeat_task_get', descriptionFor('aimeat_task_get'), {
     agent_name: agentNameSchema,
     task_id: z.string().describe('Task identifier'),
   }, annotationsFor('aimeat_task_get'), async ({ agent_name, task_id }) => {
@@ -68,7 +70,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_task_propose_todos', 'Propose TODOs for a queued task, or re-propose after the owner requested changes. Trust the success response -- new todos are saved, any older todos are kept as outdated history.', {
+  mcp.tool('aimeat_task_propose_todos', descriptionFor('aimeat_task_propose_todos'), {
     agent_name: agentNameSchema,
     task_id: z.string().describe('Task identifier'),
     todos: z.array(z.object({
@@ -96,7 +98,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_task_request_changes', 'Owner-only: ask the agent to revise the proposed TODO plan. The agent keeps the old todos as outdated history and calls aimeat_task_propose_todos again with a revised plan.', {
+  mcp.tool('aimeat_task_request_changes', descriptionFor('aimeat_task_request_changes'), {
     agent_name: agentNameSchema,
     task_id: z.string().describe('Task identifier (must be a queued task that already has proposed todos)'),
     message: z.string().describe("Owner's free-text change request explaining how the plan should be revised"),
@@ -107,7 +109,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_task_event', 'Append a progress event to a task', {
+  mcp.tool('aimeat_task_event', descriptionFor('aimeat_task_event'), {
     agent_name: agentNameSchema,
     task_id: z.string().describe('Task identifier'),
     type: z.string().describe('Event type'),
@@ -119,7 +121,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_task_todo', 'Update a TODO item status within a task', {
+  mcp.tool('aimeat_task_todo', descriptionFor('aimeat_task_todo'), {
     agent_name: agentNameSchema,
     task_id: z.string().describe('Task identifier'),
     todo_id: z.string().describe('TODO item identifier'),
@@ -134,7 +136,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_task_complete', 'Complete a task', {
+  mcp.tool('aimeat_task_complete', descriptionFor('aimeat_task_complete'), {
     agent_name: agentNameSchema,
     task_id: z.string().describe('Task identifier'),
     message: z.string().optional().describe('Completion message'),
@@ -148,7 +150,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_task_fail', 'Fail a task with a reason', {
+  mcp.tool('aimeat_task_fail', descriptionFor('aimeat_task_fail'), {
     agent_name: agentNameSchema,
     task_id: z.string().describe('Task identifier'),
     reason: z.string().describe('Failure reason alias for message'),

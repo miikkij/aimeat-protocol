@@ -11,6 +11,7 @@
  *   v1.0.0 — 2026-03-21 — Initial creation: aimeat_wallet_transactions tool
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -19,6 +20,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 export function registerWalletExtendedTools(
     mcp: McpServer,
@@ -33,7 +35,7 @@ export function registerWalletExtendedTools(
     // ── Tool 1: aimeat_wallet_transactions ──
     mcp.tool(
         'aimeat_wallet_transactions',
-        'Retrieve your morsel transaction history. Transactions are keyed to the owner GHII balance.',
+        descriptionFor('aimeat_wallet_transactions'),
         {
             limit: z.number().int().min(1).max(200).optional(),
         },

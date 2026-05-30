@@ -5,21 +5,23 @@
  * @version-history
  *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
+import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 
 export function registerBoardsTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
 
-  mcp.tool('aimeat_board_list', 'List visible boards', {}, annotationsFor('aimeat_board_list'), async () => {
+  mcp.tool('aimeat_board_list', descriptionFor('aimeat_board_list'), {}, annotationsFor('aimeat_board_list'), async () => {
     const resp = await client.get('/v1/boards');
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_board_create', 'Create a new board', {
+  mcp.tool('aimeat_board_create', descriptionFor('aimeat_board_create'), {
     name: z.string().describe('Board name'),
     description: z.string().optional().describe('Board description'),
     visibility: z.string().optional().describe('Board visibility level'),
@@ -31,14 +33,14 @@ export function registerBoardsTools(mcp: McpServer, registry: AgentRegistry): vo
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_board_subscribe', 'Subscribe to a board', {
+  mcp.tool('aimeat_board_subscribe', descriptionFor('aimeat_board_subscribe'), {
     board_id: z.string().describe('Board identifier'),
   }, annotationsFor('aimeat_board_subscribe'), async ({ board_id }) => {
     const resp = await client.post(`/v1/boards/${encodeURIComponent(board_id)}/subscribe`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_board_react', 'React to a board post with an emoji', {
+  mcp.tool('aimeat_board_react', descriptionFor('aimeat_board_react'), {
     board_id: z.string().describe('Board identifier'),
     post_id: z.string().describe('Post identifier'),
     emoji: z.string().describe('Reaction emoji'),
@@ -50,7 +52,7 @@ export function registerBoardsTools(mcp: McpServer, registry: AgentRegistry): vo
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_board_reply', 'Reply to a board post', {
+  mcp.tool('aimeat_board_reply', descriptionFor('aimeat_board_reply'), {
     board_id: z.string().describe('Board identifier'),
     post_id: z.string().describe('Post identifier'),
     body: z.string().describe('Reply body'),
@@ -62,7 +64,7 @@ export function registerBoardsTools(mcp: McpServer, registry: AgentRegistry): vo
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_board_members', 'Update board member list', {
+  mcp.tool('aimeat_board_members', descriptionFor('aimeat_board_members'), {
     board_id: z.string().describe('Board identifier'),
     members: z.array(z.string()).describe('List of member identifiers'),
   }, annotationsFor('aimeat_board_members'), async ({ board_id, members }) => {
@@ -73,7 +75,7 @@ export function registerBoardsTools(mcp: McpServer, registry: AgentRegistry): vo
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_board_delete', 'Delete a board', {
+  mcp.tool('aimeat_board_delete', descriptionFor('aimeat_board_delete'), {
     board_id: z.string().describe('Board identifier'),
   }, annotationsFor('aimeat_board_delete'), async ({ board_id }) => {
     const resp = await client.delete(`/v1/boards/${encodeURIComponent(board_id)}`);

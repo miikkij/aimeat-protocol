@@ -10,6 +10,7 @@
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -19,6 +20,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, SharingGroupMember } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 export function registerSharingGroupTools(
     mcp: McpServer,
@@ -41,7 +43,7 @@ export function registerSharingGroupTools(
     // ── Tool 1: aimeat_group_list ──
     mcp.tool(
         'aimeat_group_list',
-        'List sharing groups you are a member of or own',
+        descriptionFor('aimeat_group_list'),
         {},
         annotationsFor('aimeat_group_list'),
         async () => {
@@ -84,7 +86,7 @@ export function registerSharingGroupTools(
     // ── Tool 2: aimeat_group_get ──
     mcp.tool(
         'aimeat_group_get',
-        'Get details of a specific sharing group including its members',
+        descriptionFor('aimeat_group_get'),
         {
             group_id: z.string().describe('The sharing group ID'),
         },
@@ -130,7 +132,7 @@ export function registerSharingGroupTools(
     // ── Tool 3: aimeat_group_create ──
     mcp.tool(
         'aimeat_group_create',
-        'Create a new sharing group. You become the owner.',
+        descriptionFor('aimeat_group_create'),
         {
             name: z.string().describe('Group name'),
             description: z.string().optional().describe('Group description'),
@@ -201,7 +203,7 @@ export function registerSharingGroupTools(
     // ── Tool 4: aimeat_group_add_member ──
     mcp.tool(
         'aimeat_group_add_member',
-        'Add a member to a sharing group. Only the group owner can add members.',
+        descriptionFor('aimeat_group_add_member'),
         {
             group_id: z.string().describe('The sharing group ID'),
             identifier: z.string().describe('GAII or GHII of the member to add'),
@@ -268,7 +270,7 @@ export function registerSharingGroupTools(
     // ── Tool 5: aimeat_group_remove_member ──
     mcp.tool(
         'aimeat_group_remove_member',
-        'Remove a member from a sharing group. Only the group owner can remove members.',
+        descriptionFor('aimeat_group_remove_member'),
         {
             group_id: z.string().describe('The sharing group ID'),
             identifier: z.string().describe('GAII or GHII of the member to remove'),

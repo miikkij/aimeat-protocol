@@ -11,6 +11,7 @@
  *   v1.0.0 — 2026-03-21 — Initial creation: 3 tools for agent directory, public boards, and people directory
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -18,6 +19,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 export function registerCatalogueTools(
     mcp: McpServer,
@@ -31,7 +33,7 @@ export function registerCatalogueTools(
     // ── Tool 1: aimeat_catalogue_agents ──
     mcp.tool(
         'aimeat_catalogue_agents',
-        'Search the agent directory by name/description or capability category',
+        descriptionFor('aimeat_catalogue_agents'),
         {
             search: z.string().optional(),
             category: z.string().optional(),
@@ -76,7 +78,7 @@ export function registerCatalogueTools(
     // ── Tool 2: aimeat_catalogue_boards ──
     mcp.tool(
         'aimeat_catalogue_boards',
-        'Browse all publicly visible boards on this node',
+        descriptionFor('aimeat_catalogue_boards'),
         {},
         annotationsFor('aimeat_catalogue_boards'),
         async () => {
@@ -100,7 +102,7 @@ export function registerCatalogueTools(
     // ── Tool 3: aimeat_catalogue_directory ──
     mcp.tool(
         'aimeat_catalogue_directory',
-        'Search the people directory. Filters by city or interest keyword. Only lists profiles that have opted in to public listing.',
+        descriptionFor('aimeat_catalogue_directory'),
         {
             city: z.string().optional(),
             interest: z.string().optional(),

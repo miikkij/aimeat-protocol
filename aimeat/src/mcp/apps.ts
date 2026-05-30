@@ -12,6 +12,7 @@
  *   v1.0.0 — 2026-05-02 — Initial creation: 5 tools for app publish, list, get, delete, versions
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -22,6 +23,7 @@ import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 export function registerAppsTools(
     mcp: McpServer,
@@ -35,9 +37,7 @@ export function registerAppsTools(
     // ── Tool 1: aimeat_app_publish ──
     mcp.tool(
         'aimeat_app_publish',
-        `Publish or update an HTML app. Two modes:
-UPLOAD MODE (recommended for files > 1 KB): Call with metadata only (omit content_base64). Returns an upload_url. PUT the raw HTML file to that URL. The PUT response contains the publish result as JSON.
-INLINE MODE (for tiny files < 1 KB): Include content_base64 with the base64-encoded HTML content. Result returned directly.`,
+        descriptionFor('aimeat_app_publish'),
         {
             filename: z.string().describe('App filename (e.g. "starwars.html"). Alphanumeric, dots, hyphens, underscores. Max 100 chars.'),
             content_base64: z.string().optional().describe('Base64-encoded HTML content. Omit to get an upload URL instead (recommended for files > 1KB).'),
@@ -160,7 +160,7 @@ INLINE MODE (for tiny files < 1 KB): Include content_base64 with the base64-enco
     // ── Tool 2: aimeat_app_list ──
     mcp.tool(
         'aimeat_app_list',
-        'List published apps with optional filtering by category, tag, search query, or ownership',
+        descriptionFor('aimeat_app_list'),
         {
             category: z.string().optional().describe('Filter by category'),
             search: z.string().optional().describe('Search query string'),
@@ -214,7 +214,7 @@ INLINE MODE (for tiny files < 1 KB): Include content_base64 with the base64-enco
     // ── Tool 3: aimeat_app_get ──
     mcp.tool(
         'aimeat_app_get',
-        'Get app details (manifest, metadata) without the content body',
+        descriptionFor('aimeat_app_get'),
         {
             owner: z.string().describe('Owner name of the app'),
             filename: z.string().describe('App filename'),
@@ -252,7 +252,7 @@ INLINE MODE (for tiny files < 1 KB): Include content_base64 with the base64-enco
     // ── Tool 4: aimeat_app_delete ──
     mcp.tool(
         'aimeat_app_delete',
-        'Delete an app you own. Optionally delete a specific version only.',
+        descriptionFor('aimeat_app_delete'),
         {
             filename: z.string().describe('App filename to delete'),
             version: z.number().optional().describe('Specific version number to delete. Omit to delete all versions.'),
@@ -297,7 +297,7 @@ INLINE MODE (for tiny files < 1 KB): Include content_base64 with the base64-enco
     // ── Tool 5: aimeat_app_versions ──
     mcp.tool(
         'aimeat_app_versions',
-        'List all versions of a specific app',
+        descriptionFor('aimeat_app_versions'),
         {
             owner: z.string().describe('Owner name of the app'),
             filename: z.string().describe('App filename'),

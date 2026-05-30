@@ -13,6 +13,9 @@
  *   v1.1.0 -- 2026-05-28 -- Add memory tags and owner-scope listing support
  *   v1.2.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.3.0 -- 2026-05-30 -- MCP audit Phase 1: descriptions read from canonical catalog via
+ *     descriptionFor(); read-heavy tools accept response_format ('concise'|'detailed') shaped by
+ *     shapeResponse(). Returns standardised via jsonContent().
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -26,6 +29,7 @@ import { generateUploadToken } from '../services/upload-token.js';
 import type { ResourceChangeEvent } from './index.js';
 import { resourceEvents } from './index.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema } from './catalog/shape.js';
 
 export function registerCoreTools(
     mcp: McpServer,
@@ -126,32 +130,28 @@ export function registerCoreTools(
     // ── Tool 1: aimeat_catalogue_search ──
     mcp.tool(
         'aimeat_catalogue_search',
-        'Search the action catalogue for available services',
-        { search: z.string().optional(), category: z.string().optional() },
+        descriptionFor('aimeat_catalogue_search'),
+        { search: z.string().optional(), category: z.string().optional(), response_format: responseFormatSchema },
         annotationsFor('aimeat_catalogue_search'),
-        async ({ search, category }) => {
+        async ({ search, category, response_format }) => {
             const actions = await storage.listActions({ search, category });
-            return {
-                content: [{
-                    type: 'text' as const,
-                    text: JSON.stringify(actions.map(a => ({
-                        action_id: a.id,
-                        provider_gaii: a.providerGaii,
-                        display_name: a.displayName,
-                        description: a.description,
-                        category: a.category,
-                        pricing: a.pricing,
-                        tags: a.tags,
-                    })), null, 2),
-                }],
-            };
+            const payload = actions.map(a => ({
+                action_id: a.id,
+                provider_gaii: a.providerGaii,
+                display_name: a.displayName,
+                description: a.description,
+                category: a.category,
+                pricing: a.pricing,
+                tags: a.tags,
+            }));
+            return jsonContent(shapeResponse('aimeat_catalogue_search', response_format, payload));
         },
     );
 
     // ── Tool 2: aimeat_agent_profile ──
     mcp.tool(
         'aimeat_agent_profile',
-        'View an agent\'s public profile',
+        descriptionFor('aimeat_agent_profile'),
         { gaii: z.string() },
         annotationsFor('aimeat_agent_profile'),
         async ({ gaii }) => {
@@ -179,7 +179,7 @@ export function registerCoreTools(
     // aimeat_task_create. Mirrors the REST endpoint GET /v1/agents.
     mcp.tool(
         'aimeat_agents_list',
-        "List the calling owner's agents on the node (name, mode, capabilities, tags, last_seen, etc.). Use this to discover which agents you can delegate to via aimeat_task_create.",
+        descriptionFor('aimeat_agents_list'),
         {},
         annotationsFor('aimeat_agents_list'),
         async () => {
@@ -218,32 +218,27 @@ export function registerCoreTools(
     // ── Tool 3: aimeat_memory_read ──
     mcp.tool(
         'aimeat_memory_read',
-        'Read a memory entry by key',
-        { key: z.string() },
+        descriptionFor('aimeat_memory_read'),
+        { key: z.string(), response_format: responseFormatSchema },
         annotationsFor('aimeat_memory_read'),
-        async ({ key }) => {
+        async ({ key, response_format }) => {
             const record = await storage.getMemory(agentGaii, key);
             if (!record) return { content: [{ type: 'text' as const, text: 'Memory not found' }] };
-            return {
-                content: [{
-                    type: 'text' as const,
-                    text: JSON.stringify({
-                        key: record.key,
-                        value: record.value,
-                        visibility: record.visibility,
-                        tags: record.tags,
-                        version: record.version,
-                        updated_at: record.updatedAt,
-                    }, null, 2),
-                }],
-            };
+            return jsonContent(shapeResponse('aimeat_memory_read', response_format, {
+                key: record.key,
+                value: record.value,
+                visibility: record.visibility,
+                tags: record.tags,
+                version: record.version,
+                updated_at: record.updatedAt,
+            }));
         },
     );
 
     // ── Tool 4: aimeat_memory_write ──
     mcp.tool(
         'aimeat_memory_write',
-        'Write a memory entry (creates or updates). Value can be any JSON: string, number, boolean, object, or array.',
+        descriptionFor('aimeat_memory_write'),
         {
             key: z.string().describe('Memory key (hierarchical, slash-separated)'),
             value: z.union([z.string(), z.number(), z.boolean(), z.record(z.string(), z.unknown()), z.array(z.unknown())]).describe('The value to store — any JSON type'),
@@ -280,15 +275,16 @@ export function registerCoreTools(
     // ── Tool 5: aimeat_memory_list ──
     mcp.tool(
         'aimeat_memory_list',
-        'List memory entries for the current agent, or same-owner memory when owner_scope is true',
+        descriptionFor('aimeat_memory_list'),
         {
             prefix: z.string().optional(),
             visibility: z.string().optional(),
             tags: z.array(z.string()).optional().describe('Optional tag filters'),
             owner_scope: z.boolean().optional().describe('When true, list same-owner GHII and agent memory'),
+            response_format: responseFormatSchema,
         },
         annotationsFor('aimeat_memory_list'),
-        async ({ prefix, visibility, tags, owner_scope }) => {
+        async ({ prefix, visibility, tags, owner_scope, response_format }) => {
             let entries: Awaited<ReturnType<Storage['listMemory']>>;
             if (owner_scope) {
                 const parsed = parseGAII(agentGaii);
@@ -311,26 +307,21 @@ export function registerCoreTools(
             } else {
                 entries = await storage.listMemory(agentGaii, { prefix, visibility, tags });
             }
-            return {
-                content: [{
-                    type: 'text' as const,
-                    text: JSON.stringify(entries.map(e => ({
-                        key: e.key,
-                        owner_gaii: e.ownerGaii,
-                        visibility: e.visibility,
-                        tags: e.tags,
-                        version: e.version,
-                        updated_at: e.updatedAt,
-                    })), null, 2),
-                }],
-            };
+            return jsonContent(shapeResponse('aimeat_memory_list', response_format, entries.map(e => ({
+                key: e.key,
+                owner_gaii: e.ownerGaii,
+                visibility: e.visibility,
+                tags: e.tags,
+                version: e.version,
+                updated_at: e.updatedAt,
+            }))));
         },
     );
 
     // ── Tool 6: aimeat_action_execute ──
     mcp.tool(
         'aimeat_action_execute',
-        'Request execution of an action (creates a work item)',
+        descriptionFor('aimeat_action_execute'),
         {
             action_id: z.string(),
             provider_gaii: z.string(),
@@ -386,32 +377,27 @@ export function registerCoreTools(
     // ── Tool 7: aimeat_work_inbox ──
     mcp.tool(
         'aimeat_work_inbox',
-        'Check the work inbox for pending items',
-        {},
+        descriptionFor('aimeat_work_inbox'),
+        { response_format: responseFormatSchema },
         annotationsFor('aimeat_work_inbox'),
-        async () => {
+        async ({ response_format }) => {
             const items = await storage.listWorkByProvider(agentGaii);
             const pending = items.filter(w => ['pending', 'accepted', 'in_progress'].includes(w.status));
-            return {
-                content: [{
-                    type: 'text' as const,
-                    text: JSON.stringify(pending.map(w => ({
-                        tracking_code: w.trackingCode,
-                        status: w.status,
-                        action_id: w.actionId,
-                        requester_gaii: w.requesterGaii,
-                        cost: w.cost,
-                        created_at: w.createdAt,
-                    })), null, 2),
-                }],
-            };
+            return jsonContent(shapeResponse('aimeat_work_inbox', response_format, pending.map(w => ({
+                tracking_code: w.trackingCode,
+                status: w.status,
+                action_id: w.actionId,
+                requester_gaii: w.requesterGaii,
+                cost: w.cost,
+                created_at: w.createdAt,
+            }))));
         },
     );
 
     // ── Tool 8: aimeat_work_accept ──
     mcp.tool(
         'aimeat_work_accept',
-        'Accept a pending work item',
+        descriptionFor('aimeat_work_accept'),
         { tracking_code: z.string() },
         annotationsFor('aimeat_work_accept'),
         async ({ tracking_code }) => {
@@ -427,7 +413,7 @@ export function registerCoreTools(
     // ── Tool 9: aimeat_work_deliver ──
     mcp.tool(
         'aimeat_work_deliver',
-        'Deliver the result of a work item',
+        descriptionFor('aimeat_work_deliver'),
         { tracking_code: z.string(), output: z.record(z.string(), z.any()) },
         annotationsFor('aimeat_work_deliver'),
         async ({ tracking_code, output }) => {
@@ -447,7 +433,7 @@ export function registerCoreTools(
     // ── Tool 10: aimeat_wallet_balance ──
     mcp.tool(
         'aimeat_wallet_balance',
-        'Check morsel wallet balance',
+        descriptionFor('aimeat_wallet_balance'),
         {},
         annotationsFor('aimeat_wallet_balance'),
         async () => {
@@ -473,32 +459,27 @@ export function registerCoreTools(
     // ── Tool 11: aimeat_board_read ──
     mcp.tool(
         'aimeat_board_read',
-        'Read posts from a notification board',
-        { board_id: z.string(), category: z.string().optional(), limit: z.number().optional() },
+        descriptionFor('aimeat_board_read'),
+        { board_id: z.string(), category: z.string().optional(), limit: z.number().optional(), response_format: responseFormatSchema },
         annotationsFor('aimeat_board_read'),
-        async ({ board_id, category, limit }) => {
+        async ({ board_id, category, limit, response_format }) => {
             const posts = await storage.listPosts(board_id, { category, limit: limit ?? 20 });
-            return {
-                content: [{
-                    type: 'text' as const,
-                    text: JSON.stringify(posts.map(p => ({
-                        id: p.id,
-                        author_gaii: p.authorGaii,
-                        title: p.title,
-                        body: p.body,
-                        category: p.category,
-                        reactions: p.reactions,
-                        created_at: p.createdAt,
-                    })), null, 2),
-                }],
-            };
+            return jsonContent(shapeResponse('aimeat_board_read', response_format, posts.map(p => ({
+                id: p.id,
+                author_gaii: p.authorGaii,
+                title: p.title,
+                body: p.body,
+                category: p.category,
+                reactions: p.reactions,
+                created_at: p.createdAt,
+            }))));
         },
     );
 
     // ── Tool 12: aimeat_board_post ──
     mcp.tool(
         'aimeat_board_post',
-        'Post a message to a notification board',
+        descriptionFor('aimeat_board_post'),
         { board_id: z.string(), title: z.string(), body: z.string(), category: z.string().optional() },
         annotationsFor('aimeat_board_post'),
         async ({ board_id, title, body, category }) => {
@@ -524,9 +505,7 @@ export function registerCoreTools(
     // ── Tool 13: aimeat_storage_upload ──
     mcp.tool(
         'aimeat_storage_upload',
-        `Upload a file to binary storage. Two modes:
-UPLOAD MODE (recommended for files > 1 KB): Call with key only (omit data_base64). Returns an upload_url. PUT the raw file to that URL. The PUT response contains the result as JSON.
-INLINE MODE (for tiny files < 1 KB): Include data_base64 with base64-encoded data. Result returned directly.`,
+        descriptionFor('aimeat_storage_upload'),
         {
             key: z.string().describe('Storage key (path-like identifier)'),
             data_base64: z.string().optional().describe('Base64-encoded file data. Omit to get an upload URL instead (recommended for files > 1KB).'),
@@ -592,7 +571,7 @@ INLINE MODE (for tiny files < 1 KB): Include data_base64 with base64-encoded dat
     // ── Tool 14: aimeat_storage_download ──
     mcp.tool(
         'aimeat_storage_download',
-        'Download a file from binary storage (returns base64)',
+        descriptionFor('aimeat_storage_download'),
         { key: z.string() },
         annotationsFor('aimeat_storage_download'),
         async ({ key }) => {
@@ -626,7 +605,7 @@ INLINE MODE (for tiny files < 1 KB): Include data_base64 with base64-encoded dat
     // ── Tool 15: aimeat_admin_stats ──
     mcp.tool(
         'aimeat_admin_stats',
-        'Get node statistics and health metrics (operator only)',
+        descriptionFor('aimeat_admin_stats'),
         {},
         annotationsFor('aimeat_admin_stats'),
         async () => {
@@ -664,7 +643,7 @@ INLINE MODE (for tiny files < 1 KB): Include data_base64 with base64-encoded dat
     // ── Tool 16: aimeat_admin_agents ──
     mcp.tool(
         'aimeat_admin_agents',
-        'List all agents with details (operator only)',
+        descriptionFor('aimeat_admin_agents'),
         { limit: z.number().optional() },
         annotationsFor('aimeat_admin_agents'),
         async ({ limit }) => {
@@ -690,7 +669,7 @@ INLINE MODE (for tiny files < 1 KB): Include data_base64 with base64-encoded dat
     // ── Tool 17: aimeat_admin_config ──
     mcp.tool(
         'aimeat_admin_config',
-        'View current node configuration (operator only)',
+        descriptionFor('aimeat_admin_config'),
         {},
         annotationsFor('aimeat_admin_config'),
         async () => {
@@ -713,7 +692,7 @@ INLINE MODE (for tiny files < 1 KB): Include data_base64 with base64-encoded dat
     // ── Tool 18: aimeat_admin_mint ──
     mcp.tool(
         'aimeat_admin_mint',
-        'Mint morsels for an agent (operator only, daily cap enforced)',
+        descriptionFor('aimeat_admin_mint'),
         { gaii: z.string(), amount: z.number().int().positive() },
         annotationsFor('aimeat_admin_mint'),
         async ({ gaii, amount }) => {

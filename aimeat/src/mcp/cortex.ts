@@ -11,6 +11,7 @@
  *   v1.0.0 - 2026-05-02 - Initial creation: 5 tools for cortex lifecycle management via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -23,6 +24,7 @@ import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 export function registerCortexTools(
     mcp: McpServer,
@@ -36,7 +38,7 @@ export function registerCortexTools(
     // ── Tool 1: aimeat_cortex_list ──
     mcp.tool(
         'aimeat_cortex_list',
-        'List all installed cortex extensions with their status and metadata',
+        descriptionFor('aimeat_cortex_list'),
         {},
         annotationsFor('aimeat_cortex_list'),
         async () => {
@@ -64,9 +66,7 @@ export function registerCortexTools(
     // ── Tool 2: aimeat_cortex_install ──
     mcp.tool(
         'aimeat_cortex_install',
-        `Install a cortex extension. Two modes:
-UPLOAD MODE (recommended): Call with no arguments to get an upload URL. Create a ZIP containing manifest.yaml at root and lib files in libs/ directory, then PUT it to the URL.
-INLINE MODE: Provide manifest (YAML string) and optional libs (filename-to-code map) directly.`,
+        descriptionFor('aimeat_cortex_install'),
         {
             manifest: z.string().optional().describe('YAML manifest string. Omit to get an upload URL for a ZIP bundle.'),
             libs: z.record(z.string(), z.string()).optional().describe('Map of filename to JavaScript source code for lib files.'),
@@ -198,7 +198,7 @@ INLINE MODE: Provide manifest (YAML string) and optional libs (filename-to-code 
     // ── Tool 3: aimeat_cortex_activate ──
     mcp.tool(
         'aimeat_cortex_activate',
-        'Activate an installed cortex extension, making it available for use',
+        descriptionFor('aimeat_cortex_activate'),
         {
             name: z.string().describe('Name of the cortex extension to activate'),
         },
@@ -255,7 +255,7 @@ INLINE MODE: Provide manifest (YAML string) and optional libs (filename-to-code 
     // ── Tool 4: aimeat_cortex_deactivate ──
     mcp.tool(
         'aimeat_cortex_deactivate',
-        'Deactivate a cortex extension without uninstalling it',
+        descriptionFor('aimeat_cortex_deactivate'),
         {
             name: z.string().describe('Name of the cortex extension to deactivate'),
         },
@@ -304,7 +304,7 @@ INLINE MODE: Provide manifest (YAML string) and optional libs (filename-to-code 
     // ── Tool 5: aimeat_cortex_delete ──
     mcp.tool(
         'aimeat_cortex_delete',
-        'Delete (uninstall) a cortex extension, deactivating it first if active',
+        descriptionFor('aimeat_cortex_delete'),
         {
             name: z.string().describe('Name of the cortex extension to delete'),
         },

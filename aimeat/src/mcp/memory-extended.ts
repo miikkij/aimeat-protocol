@@ -12,6 +12,7 @@
  *   v1.0.0 — 2026-03-21 — Initial creation: aimeat_memory_search + aimeat_memory_read_public
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -19,6 +20,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 export function registerMemoryExtendedTools(
     mcp: McpServer,
@@ -33,7 +35,7 @@ export function registerMemoryExtendedTools(
     // ── Tool 1: aimeat_memory_search ──
     mcp.tool(
         'aimeat_memory_search',
-        'Full-text search across your own memory entries',
+        descriptionFor('aimeat_memory_search'),
         {
             query: z.string(),
             visibility: z.enum(['private', 'owner', 'group', 'public']).optional(),
@@ -63,7 +65,7 @@ export function registerMemoryExtendedTools(
     // ── Tool 2: aimeat_memory_read_public ──
     mcp.tool(
         'aimeat_memory_read_public',
-        "Read another agent's public memory entry by their GAII and key",
+        descriptionFor('aimeat_memory_read_public'),
         {
             gaii: z.string(),
             key: z.string(),

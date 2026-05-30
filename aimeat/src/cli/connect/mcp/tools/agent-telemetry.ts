@@ -8,16 +8,18 @@
  *   v2.0.0 -- 2026-05-29 -- Registry-driven, agent_name parameter
  *   v2.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v2.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, pickAgent } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
+import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 
 export function registerAgentTelemetryTools(mcp: McpServer, registry: AgentRegistry): void {
 
-    mcp.tool('aimeat_agent_telemetry_report', 'Report agent telemetry to the node', {
+    mcp.tool('aimeat_agent_telemetry_report', descriptionFor('aimeat_agent_telemetry_report'), {
         agent_name: agentNameSchema,
         type: z.enum(['llm_call', 'tool_call', 'agent_report']).default('agent_report')
             .describe('Telemetry event type'),

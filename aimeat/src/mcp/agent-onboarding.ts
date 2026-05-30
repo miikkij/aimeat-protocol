@@ -14,6 +14,7 @@
  *   v1.0.0 -- 2026-05-28 -- Add public MCP Hello Integration lifecycle tools
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -26,6 +27,7 @@ import { calculateReadiness } from '../services/readiness-scorer.js';
 import type { AgentOnboardingRecord, Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 type ToolTextResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
 
@@ -211,14 +213,14 @@ export function registerAgentOnboardingTools(
 ): void {
     const agentGaii = getAgentGaii();
 
-    mcp.tool('aimeat_onboarding_status', 'View required Hello Integration first-run onboarding status and next-step hints', {}, annotationsFor('aimeat_onboarding_status'), async () => {
+    mcp.tool('aimeat_onboarding_status', descriptionFor('aimeat_onboarding_status'), {}, annotationsFor('aimeat_onboarding_status'), async () => {
         const status = await buildOnboardingStatus(agentGaii, storage);
         if (status.error) return asError(String(status.error));
         emitResourceUpdated(agentGaii, `aimeat://agents/${getAgentName(agentGaii)}/onboarding`);
         return asText(status);
     });
 
-    mcp.tool('aimeat_onboarding_identify_platform', 'Confirm the connected agent runtime/platform for Hello Integration', {
+    mcp.tool('aimeat_onboarding_identify_platform', descriptionFor('aimeat_onboarding_identify_platform'), {
         platform: z.string().describe('Runtime/platform name, for example claude, openclaw, hermes, generic, or vscode'),
         platform_version: z.string().optional().describe('Runtime/platform version if known'),
     }, annotationsFor('aimeat_onboarding_identify_platform'), async ({ platform, platform_version }) => {
@@ -226,7 +228,7 @@ export function registerAgentOnboardingTools(
         return result.error ? asError(String(result.error)) : asText(result);
     });
 
-    mcp.tool('aimeat_onboarding_confirm_skill_installed', 'Confirm this skill bundle has been downloaded/extracted for Hello Integration', {
+    mcp.tool('aimeat_onboarding_confirm_skill_installed', descriptionFor('aimeat_onboarding_confirm_skill_installed'), {
         platform: z.string().describe('Runtime/platform using the bundle, for example generic, claude, openclaw, or hermes'),
         version: z.string().describe('Bundle version if known; use local when no version is shown'),
     }, annotationsFor('aimeat_onboarding_confirm_skill_installed'), async ({ platform, version }) => {
@@ -234,14 +236,14 @@ export function registerAgentOnboardingTools(
         return result.error ? asError(String(result.error)) : asText(result);
     });
 
-    mcp.tool('aimeat_onboarding_confirm_directives_read', 'Confirm the agent has read its AIMEAT handbook/directives', {
+    mcp.tool('aimeat_onboarding_confirm_directives_read', descriptionFor('aimeat_onboarding_confirm_directives_read'), {
         confirmed: z.boolean().optional().describe('Set true after reading the handbook/directives'),
     }, annotationsFor('aimeat_onboarding_confirm_directives_read'), async ({ confirmed }) => {
         const result = await confirmOnboardingStep(agentGaii, 'read_directives', { confirmed: confirmed ?? true }, storage, emitResourceUpdated);
         return result.error ? asError(String(result.error)) : asText(result);
     });
 
-    mcp.tool('aimeat_onboarding_declare_services', 'Optionally declare services/capabilities exposed by this agent', {
+    mcp.tool('aimeat_onboarding_declare_services', descriptionFor('aimeat_onboarding_declare_services'), {
         services: z.array(z.object({
             name: z.string().describe('Service name'),
             description: z.string().optional().describe('Short service description'),

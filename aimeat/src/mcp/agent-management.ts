@@ -16,6 +16,7 @@
  * @version-history
  *   v1.0.0 -- 2026-05-29 -- Initial creation. Closes public/connector parity drift
  *     for mode_set + tags_set (connector-only since 1.12.1).
+ *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -25,6 +26,7 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII, buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 const VALID_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator'] as const;
 const TAG_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
@@ -46,7 +48,7 @@ export function registerAgentManagementTools(
     // lowercase alphanumeric-plus-`._-` string is accepted, max 20 tags.
     mcp.tool(
         'aimeat_agent_tags_set',
-        "Set (replace) the owner-managed tag list on one of your agents. Convention: 'crew:<name>', 'source:<name>', 'role:<name>', 'project:<name>' -- but any lowercase alphanumeric-plus-`._-` string is accepted. Max 20 tags.",
+        descriptionFor('aimeat_agent_tags_set'),
         {
             target_agent_name: z.string().describe('Agent whose tags to update (must be owned by the same owner as the calling agent).'),
             tags: z.array(z.string()).describe('Replacement tag list. Empty array clears all tags.'),
@@ -111,7 +113,7 @@ export function registerAgentManagementTools(
     // Hello Integration step set: task-runner gets a reduced 5-step flow.
     mcp.tool(
         'aimeat_agent_mode_set',
-        "Set the operational mode on one of your agents. Modes: 'autonomous' (runs continuously, full Hello Integration), 'interactive' (user-facing, full Hello Integration), 'task-runner' (triggered/ephemeral, reduced 5-step Hello Integration -- no commands, messages, or test task), 'coordinator' (orchestrates others, full Hello Integration).",
+        descriptionFor('aimeat_agent_mode_set'),
         {
             target_agent_name: z.string().describe('Agent whose mode to update (must be owned by the same owner as the calling agent).'),
             mode: z.enum(VALID_MODES).describe('New mode.'),

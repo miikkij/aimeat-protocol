@@ -12,6 +12,7 @@
  *   v1.0.0 — 2026-03-21 — Initial creation: 3 tools + 1 resource for chat instance management via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
+ *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -20,6 +21,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGaiiLoose, buildChatInstanceId } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
+import { descriptionFor } from './catalog/shape.js';
 
 export function registerChatInstancesTools(
     mcp: McpServer,
@@ -84,7 +86,7 @@ export function registerChatInstancesTools(
     // ── Tool 1: aimeat_instance_list ──
     mcp.tool(
         'aimeat_instance_list',
-        "List agent owner's chat instances",
+        descriptionFor('aimeat_instance_list'),
         {},
         annotationsFor('aimeat_instance_list'),
         async () => {
@@ -111,7 +113,7 @@ export function registerChatInstancesTools(
     // ── Tool 2: aimeat_instance_create ──
     mcp.tool(
         'aimeat_instance_create',
-        'Register a new chat instance',
+        descriptionFor('aimeat_instance_create'),
         {
             name: z.string().describe('Application name for this instance'),
             model: z.string().optional().describe('AI model identifier (e.g. gpt-4o, claude-3-5-sonnet)'),
@@ -174,7 +176,7 @@ export function registerChatInstancesTools(
     // ── Tool 3: aimeat_instance_status ──
     mcp.tool(
         'aimeat_instance_status',
-        'Get chat instance status and details',
+        descriptionFor('aimeat_instance_status'),
         {
             instance_id: z.string().describe('Chat instance ID'),
         },
