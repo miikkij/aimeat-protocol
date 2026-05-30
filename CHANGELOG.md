@@ -63,6 +63,33 @@ for existing consumers.
 - `aimeat_instance_*` tools are not exposed on the v2 surfaces (auto-created
   session metadata, not an agent capability). They remain on `/v1/mcp`.
 
+## aimeat-crewai 0.3.6 - 2026-05-31
+
+Fix inbox message dispatch — message-triggered crews never ran. A daemon started
+with `listen_for=(..., "messages")` polled fine and logged listening, but inbox
+messages were never dispatched to a crew (tasks were unaffected). Three bugs in
+`daemon.py`, all now fixed:
+
+### Fixed
+
+- **Wrong JSON key (the blocker).** `_poll_messages()` read `data.messages`,
+  which the node never returns. The `GET /v1/agents/<agent>/inbox` response
+  carries inbox items under `data.pending_messages` (and a unified `data.items`),
+  so the poll returned `[]` every cycle and no message crew ever ran. Now reads
+  `pending_messages` (fallback `items`).
+- **Truncated content.** Inbox items carry only a ~100-char `preview`, not the
+  full body, so even after the key fix the crew would have received a clipped
+  request (or `"(empty)"`). New `_fetch_message_content()` resolves the full
+  message body via `GET /v1/agents/<agent>/messages?thread_id=`.
+- **Infinite re-dispatch.** The message loop never marked messages handled, so a
+  still-pending message re-ran the crew on every poll cycle. New
+  `_mark_message_delivered()` (`PATCH /v1/agents/<agent>/messages/<id>` →
+  `status: delivered`) is called after a successful kickoff, plus a process-local
+  `done_ids` guard against re-dispatch within a daemon lifetime.
+
+Diagnosed from a field report against `aimeat-finland-001-genesis` (connector
+CLI v1.14.3). Drop-in replacement for 0.3.5; no API changes.
+
 ## [1.14.6] - 2026-05-30
 
 Agent detail view live-refresh fixes. Both fixes are in tabs that
