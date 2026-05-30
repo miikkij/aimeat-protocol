@@ -2,6 +2,67 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [Unreleased]
+
+MCP overhaul from the tool-design audit (`docs/mcp_audit/`): the `/v1/mcp` tool
+surface was reviewed against MCP/Anthropic best practices, made consistent and
+safer, and a new set of purpose-scoped surfaces (`/v2/mcp/<role>`) was added so
+agents load only the tools that fit their job. `/v1/mcp` is unchanged and frozen
+for existing consumers.
+
+### Added
+
+- **v2 purpose-scoped MCP surfaces** — `POST /v2/mcp/{appdev|agent|service|admin}`,
+  each exposing only the tools relevant to that role (a projection of the same
+  canonical catalog — no forked handlers). `agent` ~45 tools, `appdev` ~20,
+  `service` ~52, `admin` ~15, vs ~100 on the full surface. Fewer, focused tools
+  = less context and fewer wrong-tool mistakes. The same surfaces are available
+  locally via `aimeat connect serve --surface <role>`.
+- **Per-agent scope enforcement on MCP (F1)** — the tool surface is now filtered
+  by the agent's granted scopes (mirroring the REST `requireScope` gates), so an
+  agent no longer sees/uses tools it isn't scoped for. `AIMEAT_MCP_ENFORCE_SCOPES`
+  (default true) toggles a warn-only rollout. Owner-attached agents with a `*`
+  scope still get the full surface.
+- **`response_format` (`concise` | `detailed`)** on read-heavy tools — concise
+  returns only high-signal fields for fewer tokens.
+- **`structuredContent` + `outputSchema`** on core read tools (memory read/list,
+  wallet, work inbox, agents list, agent profile) — machine-readable output
+  alongside the text content.
+- **Binary download handle** — `aimeat_storage_download` returns a `resource_link`
+  + a presigned, TTL-limited `GET /v1/download/:token` URL instead of base64, so
+  binaries never flow through the model context. `inline:true` only for small text.
+- **Output-size backstop** — tool results are bounded (~25k tokens) to protect the
+  context window; `aimeat_memory_list` gained a `limit` + capped owner-scope.
+- **Per-role operating handbooks** — separate handbook per surface, fetchable via
+  `aimeat_handbook_get(surface:"<role>")` or `GET /v1/agents/me/handbook/surface/:role`.
+- **`aimeat_message_history`** tool (full thread context, oldest-first).
+- **Tool-surface tooling** — `pnpm audit:mcp-schemas` (server↔connector↔catalog
+  schema-parity audit with a `--strict` drift ratchet + v2 surface coverage) and
+  `pnpm eval:mcp-surface` (context-cost report).
+
+### Changed
+
+- **Canonical tool catalog** (`src/mcp/catalog/`) is now the single source for tool
+  descriptions on both MCP surfaces (was: inline strings duplicated per surface).
+  Descriptions rewritten to "new teammate" quality.
+- **Reconciled server↔connector input schemas** — 43 tools whose two surfaces
+  disagreed on parameter names now match the REST contract (e.g. `consent_grant`,
+  `group_get`, `catalogue_*`); fixed a connector `storage_upload` bug (sent
+  `content`, REST reads `data`). Remaining known divergences are tracked/baselined.
+- **MCP audit + CLI guidance** — `aimeat help` / `aimeat connect` and the bootstrap
+  `GET /` discovery doc now document the v2 surfaces.
+
+### Fixed
+
+- Stale agent handbook guidance: removed a phantom `aimeat_memory_delete` tool
+  reference, corrected the "18 built-in tools" wording, and added a missing
+  `aimeat_message_history` tool annotation that was breaking MCP registration.
+
+### Removed
+
+- `aimeat_instance_*` tools are not exposed on the v2 surfaces (auto-created
+  session metadata, not an agent capability). They remain on `/v1/mcp`.
+
 ## [1.14.6] - 2026-05-30
 
 Agent detail view live-refresh fixes. Both fixes are in tabs that
