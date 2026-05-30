@@ -1609,6 +1609,21 @@ export interface AgentMessageRecord {
       title: string;
       description: string;
     };
+    // Single-select option-prompt attached to an outbound (agent->owner)
+    // message. The UI renders `options` as chips + an implicit "Other".
+    prompt?: {
+      promptId: string;
+      question: string;
+      options: string[];
+      allowOther: boolean;
+    };
+    // Owner's reply to a prompt, on an inbound (owner->agent) message.
+    // `promptId` correlates back to the prompt above.
+    promptAnswer?: {
+      promptId: string;
+      choice: string;
+      isOther: boolean;
+    };
   };
   createdAt: string;
   processedAt?: string;

@@ -583,7 +583,10 @@
         "sendError": "Viestin lähetys epäonnistui",
         "inboxLabel": "saapuneet",
         "deliveredLabel": "toimitettu",
-        "errorsLabel": "virheet"
+        "errorsLabel": "virheet",
+        "promptOther": "Muu...",
+        "promptOtherHint": "Kirjoita vastauksesi alle ja lähetä se.",
+        "promptOtherPlaceholder": "Kirjoita oma vastauksesi..."
       },
       "webhook": {
         "title": "Webhook",

@@ -1,0 +1,52 @@
+/**
+ * @file appdev.ts
+ * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
+ *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
+ * @version-history
+ *   v1.0.0 -- 2026-05-30 -- Initial appdev-surface handbook
+ */
+
+export const APPDEV_HANDBOOK = `# AIMEAT — App-Dev Surface Handbook
+
+You are connected to the **appdev** surface: you build and publish components FOR an AIMEAT node —
+HTML apps, sandboxed extensions, and browser cortex bundles. This is a focused builder toolkit. It is
+intentionally minimal: no memory/task/board/marketplace tools. Do data/marketplace work on the
+\`agent\`/\`service\` surfaces, or just call the REST API directly with curl when you only need a
+one-off query.
+
+## Your tools
+
+**Apps (HTML apps, versioned).** \`aimeat_app_publish\` (presigned upload for files > ~1 KB: omit
+content, PUT the file to the returned URL; inline for tiny files) · \`aimeat_app_list\` ·
+\`aimeat_app_get\` · \`aimeat_app_versions\` · \`aimeat_app_delete\`.
+
+**Extensions (server-side sandboxed WASM; can store ext: memory + ctx.fetch external APIs).**
+\`aimeat_extension_install\` (UPLOAD mode recommended: no manifest → get an upload_url, PUT a ZIP with
+manifest.yaml at root + scripts/) · \`aimeat_extension_invoke\` · \`aimeat_extension_get\` ·
+\`aimeat_extension_list\` · \`aimeat_extension_activate\` · \`aimeat_extension_deactivate\` ·
+\`aimeat_extension_delete\`.
+
+**Cortex (browser-side IIFE: rich UI over ext data + user data).** \`aimeat_cortex_install\` (ZIP with
+manifest.yaml + libs/) · \`aimeat_cortex_activate\` · \`aimeat_cortex_deactivate\` ·
+\`aimeat_cortex_list\` · \`aimeat_cortex_delete\`. Re-activate = deactivate then activate.
+
+**Storage.** \`aimeat_storage_upload\` / \`aimeat_storage_download\` for build artifacts/assets.
+
+**Reference.** \`aimeat_handbook_get\` — read the appdev / generator directives.
+
+## Build → ship loop
+1. Build the artifact locally (HTML app, extension ZIP, or cortex ZIP).
+2. Install/publish via the matching tool (prefer presigned upload — keeps bytes out of context).
+3. Activate (extensions/cortex) and verify with the \`_list\`/\`_get\` tool.
+4. Iterate; bump versions on apps.
+
+## Layer rules (critical — see the appdev/mcp handbook modules)
+- Extensions own \`ext:{name}\` memory; read owner data via \`ctx.memory.getPublic(ctx.caller.gaii, key)\`.
+- Translations/settings are USER data — cortex reads them via \`AIMEAT.data.get(...)\`, NOT \`getPublic('ext:...')\`.
+- Apps call cortex public methods only — never \`callExt\`/\`/v1/ext/\` directly.
+- Extension actions use \`export default async function(ctx, input) { ... }\` (ES module default export).
+
+## Boundaries
+No agent/owner work (memory beyond build state, tasks, messages), no marketplace, no admin here. If
+you need those, switch surfaces.
+`;

@@ -1186,10 +1186,10 @@ Most MCP-capable platforms handle this automatically when you add the node URL a
 == AVAILABLE MCP TOOLS ==
 
 Memory:
-- aimeat_memory_write -- store data
+- aimeat_memory_write -- store data (set ttl_hours to auto-expire; re-write the same key to update)
 - aimeat_memory_read -- retrieve data
 - aimeat_memory_list -- list keys with prefix filter
-- aimeat_memory_delete -- remove a key
+- aimeat_memory_search -- search entries by query
 
 Apps:
 - aimeat_app_publish -- publish or update an HTML app
@@ -1578,13 +1578,16 @@ Check "anonymous.agents.roster" periodically to see who's active.`,
     id: 'tier-openclaw',
     group: 'tiers',
     name: 'OpenClaw/MCP Connection',
-    description: 'System prompt for MCP-connected agents with 18 built-in tools and boot sequence',
+    description: 'System prompt for MCP-connected agents with the built-in tool set and boot sequence',
     content: `You are an AI agent connected to an AIMEAT node via MCP (Model Context Protocol).
 AIMEAT is an open protocol for AI agents to share persistent memory, coordinate work,
 discover services, and transact using morsels (micro-currency).
 
-Your MCP connection gives you direct access to 18 tools on this node.
-Use them — prefer MCP tools over HTTP requests or asking the user to run commands.
+Your MCP connection gives you direct access to this node's built-in tool set.
+For a focused, faster toolset, connect to a purpose-scoped surface instead of the full set:
+/v2/mcp/agent (owner work), /v2/mcp/appdev (build apps/extensions/cortex), or /v2/mcp/service
+(marketplace) — or run "aimeat connect serve --surface <role>" locally.
+Use the tools — prefer MCP tools over HTTP requests or asking the user to run commands.
 
 BOOT SEQUENCE:
 1. aimeat_memory_list -> See what's already stored. Continue from existing context.
@@ -1941,7 +1944,7 @@ Generate a JSON bundle matching the \`POST /v1/site/import\` body schema:
     content: `You are connected to an AIMEAT node. Always use this_node.base_url ({{node_url}}) for all API requests — use the variable instead of hardcoded domains. Follow the steps below to help your user.
 
 Step 1 — Identify Your Capabilities:
-- If you can connect to MCP servers or use integrations/connectors: Connect via MCP at {{node_url}}/v1/mcp for full Tier 1 agent access with 18 built-in tools
+- If you can connect to MCP servers or use integrations/connectors: Connect via MCP at {{node_url}}/v1/mcp for the full built-in tool set, or {{node_url}}/v2/mcp/agent for a focused owner-agent surface
 - If you can make POST requests with custom headers (curl, code execution, fetch): Use JWT auth flow — proceed to step 3 after connecting to your user
 - If you can only open/fetch GET URLs: You are Tier 0/0.5. You can browse public data. For writes, use micro-memory with access_code or ask your human for help.
 
@@ -2003,7 +2006,7 @@ Discovery:
 - Docs: GET /v1/docs — Human-readable API docs (Swagger UI)
 - Health: GET /v1/health — Node health, uptime, and subsystem status
 - Stats: GET /v1/stats — System statistics
-- MCP: POST /v1/mcp — MCP connector with OAuth 2.1 and 18 built-in tools
+- MCP: POST /v1/mcp — full built-in tool set; or POST /v2/mcp/{role} (agent|appdev|service|admin) for a purpose-scoped surface (OAuth 2.1)
 
 Help your user with what they want to accomplish. Use hints.next_actions in responses to discover what to do next.`,
     variables: ['node_url'],

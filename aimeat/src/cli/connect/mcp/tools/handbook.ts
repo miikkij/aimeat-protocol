@@ -10,6 +10,7 @@
  *     primary). The /v1/agents/me/handbook endpoint resolves "me" from the
  *     bearer token, so the routed token must match the agent the caller meant.
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.3.0 -- 2026-05-30 -- Add `surface` param → fetches the v2 per-role surface handbook.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -22,11 +23,14 @@ export function registerHandbookTools(mcp: McpServer, registry: AgentRegistry): 
   mcp.tool('aimeat_handbook_get', descriptionFor('aimeat_handbook_get'), {
     agent_name: agentNameSchema,
     module: z.string().optional().describe('Specific handbook module to retrieve'),
-  }, annotationsFor('aimeat_handbook_get'), async ({ agent_name, module }) => {
+    surface: z.enum(['appdev', 'agent', 'service', 'admin']).optional().describe('Return the v2 purpose-scoped surface handbook for this role (use the surface you serve, e.g. "agent") instead of a module.'),
+  }, annotationsFor('aimeat_handbook_get'), async ({ agent_name, module, surface }) => {
     const { client } = pickAgent(registry, agent_name);
-    const path = module
-      ? `/v1/agents/me/handbook/${encodeURIComponent(module)}`
-      : '/v1/agents/me/handbook';
+    const path = surface
+      ? `/v1/agents/me/handbook/surface/${encodeURIComponent(surface)}`
+      : module
+        ? `/v1/agents/me/handbook/${encodeURIComponent(module)}`
+        : '/v1/agents/me/handbook';
     const resp = await client.get(path);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });

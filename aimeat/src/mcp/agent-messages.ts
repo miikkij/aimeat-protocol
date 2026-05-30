@@ -10,6 +10,8 @@
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.3.0 -- 2026-05-30 -- Add aimeat_message_history (full thread context, oldest-first) so agents can
+ *     read prior messages and correlate option-prompt answers (metadata.promptAnswer) to their questions.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -106,6 +108,46 @@ export function registerAgentMessageTools(
                         thread_id: record.threadId,
                         status: record.status,
                         created_at: record.createdAt,
+                    }, null, 2),
+                }],
+            };
+        },
+    );
+
+    // ── Tool 3: aimeat_message_history ──
+    mcp.tool(
+        'aimeat_message_history',
+        descriptionFor('aimeat_message_history'),
+        {
+            thread_id: z.string().optional().describe('Conversation thread to read (omit for recent messages across all threads)'),
+            page: z.number().int().positive().optional().describe('Page number (default 1)'),
+            per_page: z.number().int().positive().max(100).optional().describe('Messages per page (default 20, max 100)'),
+        },
+        annotationsFor('aimeat_message_history'),
+        async ({ thread_id, page, per_page }) => {
+            const result = await storage.listMessages(agentGaii, {
+                threadId: thread_id,
+                page: page ?? 1,
+                perPage: per_page ?? 20,
+            });
+            // Return oldest-first so the agent reads the conversation in order.
+            const ordered = [...result.messages].sort(
+                (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+            );
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                        messages: ordered.map(m => ({
+                            id: m.id,
+                            thread_id: m.threadId,
+                            direction: m.direction,
+                            from: m.senderGaii,
+                            content: m.content,
+                            metadata: m.metadata,
+                            created_at: m.createdAt,
+                        })),
+                        total: result.total,
                     }, null, 2),
                 }],
             };

@@ -583,7 +583,10 @@
         "sendError": "Failed to send message",
         "inboxLabel": "inbox",
         "deliveredLabel": "delivered",
-        "errorsLabel": "errors"
+        "errorsLabel": "errors",
+        "promptOther": "Other...",
+        "promptOtherHint": "Type your answer below and send it.",
+        "promptOtherPlaceholder": "Type your own answer..."
       },
       "webhook": {
         "title": "Webhook",

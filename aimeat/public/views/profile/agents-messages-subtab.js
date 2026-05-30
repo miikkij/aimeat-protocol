@@ -9,6 +9,10 @@
  *   - ProposedTask -- task proposal from agent with create/adjust buttons
  *   - ThreadList -- horizontal thread selector
  * @version-history
+ *   v1.3.0 -- 2026-05-30 -- Add OptionPrompt: render an agent's single-select option-prompt
+ *     (metadata.prompt) as clickable chips + an always-present "Other". Clicking sends the
+ *     choice back as a prompt_answer. A prompt locks (read-only, chosen chip highlighted) once
+ *     any newer message exists in the thread.
  *   v1.2.0 -- 2026-05-22 -- Fix: use camelCase field names from API (createdAt, metadata.tokensUsed)
  *   v1.1.0 -- 2026-05-22 -- Show timestamp on messages, sort oldest-first (chat-style)
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 3
@@ -57,10 +61,44 @@ function ProposedTask({ task, agentName, showToast }) {
   `;
 }
 
-function MessageBubble({ msg, agentName, showToast }) {
+// Single-select option-prompt the agent attached to an outbound message.
+// Chips are clickable while the prompt is the latest message in the thread;
+// once a newer message exists (`locked`), chips become read-only and the
+// chosen option (if any) stays highlighted. "Other" is always offered and
+// routes the owner to the free-text chat input.
+function OptionPrompt({ prompt, locked, answeredChoice, onAnswer, onOther }) {
+  return html`
+    <div class="agd-msg-prompt">
+      <div class="agd-msg-prompt-q">${prompt.question}</div>
+      <div class="agd-msg-prompt-options">
+        ${prompt.options.map(opt => {
+          const chosen = answeredChoice != null && opt === answeredChoice;
+          return html`
+            <button
+              key=${opt}
+              class="agd-msg-prompt-option ${chosen ? 'agd-msg-prompt-option--chosen' : ''}"
+              disabled=${locked}
+              onClick=${() => onAnswer(opt)}
+            >${opt}</button>
+          `;
+        })}
+        ${prompt.allowOther !== false && html`
+          <button
+            class="agd-msg-prompt-option agd-msg-prompt-option--other ${answeredChoice != null && !prompt.options.includes(answeredChoice) ? 'agd-msg-prompt-option--chosen' : ''}"
+            disabled=${locked}
+            onClick=${onOther}
+          >${t('profile.agents.messages.promptOther')}</button>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+function MessageBubble({ msg, agentName, showToast, locked, answeredChoice, onAnswer, onOther }) {
   const isInbound = msg.direction === 'inbound';
   const bubbleClass = isInbound ? 'agd-msg-inbound' : 'agd-msg-outbound';
   const proposedTask = msg.metadata?.proposedTask || null;
+  const prompt = msg.metadata?.prompt || null;
 
   return html`
     <div>
@@ -73,6 +111,15 @@ function MessageBubble({ msg, agentName, showToast }) {
       </div>
       ${proposedTask && html`
         <${ProposedTask} task=${proposedTask} agentName=${agentName} showToast=${showToast} />
+      `}
+      ${prompt && html`
+        <${OptionPrompt}
+          prompt=${prompt}
+          locked=${locked}
+          answeredChoice=${answeredChoice}
+          onAnswer=${(choice) => onAnswer(prompt, msg.threadId, choice)}
+          onOther=${() => onOther(prompt, msg.threadId)}
+        />
       `}
     </div>
   `;
@@ -108,7 +155,11 @@ export default function AgentMessagesSubtab({ agentName, session, showToast }) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState('');
+  // When the owner clicks "Other" on an option-prompt, we stage the prompt here
+  // so the next free-text send attaches a prompt_answer correlated to it.
+  const [pendingPrompt, setPendingPrompt] = useState(null); // { promptId, threadId } | null
   const historyRef = useRef(null);
+  const inputRef = useRef(null);
 
   async function loadMessages() {
     setLoading(true);
@@ -155,13 +206,43 @@ export default function AgentMessagesSubtab({ agentName, session, showToast }) {
     if (!draft.trim()) return;
     setSending(true);
     try {
-      await sendMessage(agentName, draft.trim(), activeThread);
+      // If the owner is answering an option-prompt via "Other", attach the
+      // correlated prompt_answer and reply in that prompt's thread.
+      if (pendingPrompt) {
+        await sendMessage(agentName, draft.trim(), pendingPrompt.threadId, undefined, {
+          prompt_answer: { prompt_id: pendingPrompt.promptId, choice: draft.trim(), is_other: true },
+        });
+        setPendingPrompt(null);
+      } else {
+        await sendMessage(agentName, draft.trim(), activeThread);
+      }
       setDraft('');
       await loadMessages();
     } catch (err) {
       showToast(err.message || t('profile.agents.messages.sendError'), true);
     }
     setSending(false);
+  }
+
+  // Owner clicked one of the agent's listed options -> reply immediately with
+  // the choice and a correlated prompt_answer (in the prompt's own thread).
+  async function answerOption(prompt, threadId, choice) {
+    setPendingPrompt(null);
+    try {
+      await sendMessage(agentName, choice, threadId, undefined, {
+        prompt_answer: { prompt_id: prompt.promptId, choice, is_other: false },
+      });
+      await loadMessages();
+    } catch (err) {
+      showToast(err.message || t('profile.agents.messages.sendError'), true);
+    }
+  }
+
+  // Owner clicked "Other" -> stage the prompt and focus the chat input so the
+  // next free-text send becomes the answer.
+  function chooseOther(prompt, threadId) {
+    setPendingPrompt({ promptId: prompt.promptId, threadId });
+    if (inputRef.current) inputRef.current.focus();
   }
 
   function handleKeyDown(e) {
@@ -179,6 +260,19 @@ export default function AgentMessagesSubtab({ agentName, session, showToast }) {
   const deliveredCount = messages.filter(m => m.status === 'delivered').length;
   const errorCount = messages.filter(m => m.status === 'error').length;
   const lastSeen = null; // TODO Phase 2+: derive from agent.last_seen
+
+  // Oldest-first (chat order).
+  const sorted = [...messages].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+  // Latest message id per thread -> an option-prompt is answerable only while it
+  // is the newest message in its thread (any later message locks it).
+  const lastIdByThread = {};
+  for (const m of sorted) lastIdByThread[m.threadId] = m.id;
+  // promptId -> the owner's chosen text (from a prompt_answer reply), for highlight.
+  const answeredByPromptId = {};
+  for (const m of sorted) {
+    const pa = m.metadata?.promptAnswer;
+    if (pa?.promptId) answeredByPromptId[pa.promptId] = pa.choice;
+  }
 
   return html`
     <div>
@@ -201,18 +295,37 @@ export default function AgentMessagesSubtab({ agentName, session, showToast }) {
 
       ${messages.length > 0 && html`
         <div class="agd-msg-history" ref=${historyRef}>
-          ${[...messages].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)).map(msg => html`
-            <${MessageBubble} key=${msg.id || msg.createdAt} msg=${msg} agentName=${agentName} showToast=${showToast} />
-          `)}
+          ${sorted.map(msg => {
+            const promptId = msg.metadata?.prompt?.promptId;
+            const locked = promptId ? lastIdByThread[msg.threadId] !== msg.id : false;
+            const answeredChoice = promptId ? (answeredByPromptId[promptId] ?? null) : null;
+            return html`
+              <${MessageBubble}
+                key=${msg.id || msg.createdAt}
+                msg=${msg}
+                agentName=${agentName}
+                showToast=${showToast}
+                locked=${locked}
+                answeredChoice=${answeredChoice}
+                onAnswer=${answerOption}
+                onOther=${chooseOther}
+              />
+            `;
+          })}
         </div>
+      `}
+
+      ${pendingPrompt && html`
+        <div class="agd-msg-pending-hint">${t('profile.agents.messages.promptOtherHint')}</div>
       `}
 
       <div class="agd-msg-input">
         <textarea
+          ref=${inputRef}
           value=${draft}
           onInput=${(e) => setDraft(e.target.value)}
           onKeyDown=${handleKeyDown}
-          placeholder=${t('profile.agents.messages.placeholder')}
+          placeholder=${pendingPrompt ? t('profile.agents.messages.promptOtherPlaceholder') : t('profile.agents.messages.placeholder')}
           rows="1"
         />
         <button class="btn-primary btn-sm" onClick=${handleSend} disabled=${sending || !draft.trim()}>

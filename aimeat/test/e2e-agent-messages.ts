@@ -1,5 +1,7 @@
 // E2E Tests for Agent Messages
 // Run: cd aimeat && pnpm exec tsx test/e2e-agent-messages.ts
+// v1.1.0 -- 2026-05-30 -- Add option-prompt tests (4b/4c): prompt metadata round-trip and
+//   prompt_answer correlation via thread history (the path aimeat_message_history reads).
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -185,6 +187,61 @@ await test('4. Message with proposed_task metadata', async () => {
     assert(body.data.message.metadata !== undefined, 'has metadata');
     assert(body.data.message.metadata.proposedTask !== undefined, 'has proposedTask in metadata');
     assert(body.data.message.metadata.proposedTask.title === 'Scrape website', 'proposedTask title matches');
+});
+
+const promptId = `p-${Date.now()}`;
+
+await test('4b. Option-prompt round-trips in outbound message metadata', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({
+            direction: 'outbound',
+            content: 'What kind of image do you want me to create?',
+            thread_id: firstThreadId,
+            metadata: {
+                prompt: {
+                    prompt_id: promptId,
+                    question: 'What kind of image?',
+                    options: ['color', 'black and white', 'photorealistic'],
+                    allow_other: true,
+                },
+            },
+        }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    const p = body.data.message.metadata?.prompt;
+    assert(p !== undefined, 'has prompt in metadata');
+    assert(p.promptId === promptId, `prompt_id round-trips: ${p.promptId}`);
+    assert(Array.isArray(p.options) && p.options.length === 3, 'options round-trip');
+    assert(p.allowOther === true, 'allow_other round-trips');
+});
+
+await test('4c. Owner prompt_answer round-trips and is correlatable via history', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            direction: 'inbound',
+            content: 'color',
+            thread_id: firstThreadId,
+            metadata: { prompt_answer: { prompt_id: promptId, choice: 'color', is_other: false } },
+        }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    const pa = body.data.message.metadata?.promptAnswer;
+    assert(pa !== undefined, 'has promptAnswer in metadata');
+    assert(pa.promptId === promptId, 'answer prompt_id matches the question');
+    assert(pa.choice === 'color', 'choice round-trips');
+    assert(pa.isOther === false, 'is_other round-trips');
+
+    // The answer must be findable in thread history (what aimeat_message_history reads).
+    const hist = await json(`/v1/agents/${agentName}/messages?thread_id=${firstThreadId}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const found = hist.body.data.messages.find((m: any) => m.metadata?.promptAnswer?.promptId === promptId);
+    assert(found !== undefined, 'answer is findable in thread history by prompt_id');
+    assert(found.metadata.promptAnswer.choice === 'color', 'history answer choice matches');
 });
 
 // ─── Phase 2: Update Status ───

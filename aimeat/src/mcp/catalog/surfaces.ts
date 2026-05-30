@@ -52,7 +52,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // server /v1/mcp), so it cannot appear on a server v2 surface — intentionally omitted here.
         'aimeat_task_create', 'aimeat_task_list', 'aimeat_task_get', 'aimeat_task_propose_todos',
         'aimeat_task_event', 'aimeat_task_todo', 'aimeat_task_complete', 'aimeat_task_fail',
-        'aimeat_message_inbox', 'aimeat_message_send',
+        'aimeat_message_inbox', 'aimeat_message_send', 'aimeat_message_history',
         'aimeat_knowledge_list', 'aimeat_knowledge_get', 'aimeat_knowledge_contribute', 'aimeat_knowledge_links',
         'aimeat_capabilities_list', 'aimeat_capabilities_get', 'aimeat_capabilities_invoke',
         'aimeat_organism_list', 'aimeat_organism_get', 'aimeat_organism_members', 'aimeat_organism_join', 'aimeat_organism_leave',

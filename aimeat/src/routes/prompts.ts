@@ -9,6 +9,7 @@
  *   v1.2.0 -- 2026-05-22 -- Add GET /v1/prompts/tier1/:module for modular prompt system
  *   v1.3.0 -- 2026-05-27 -- Add /v1/agents/me/handbook routes, 301 redirects from old tier1 paths
  *   v1.3.1 -- 2026-05-28 -- Add neutral handbook content aliases and stop advertising owner-only task start to agents
+ *   v1.4.0 -- 2026-05-30 -- Add GET /v1/agents/me/handbook/surface/:role serving the v2 per-role surface handbooks
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -17,6 +18,8 @@ import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
+import { handbookForRole } from '../services/handbooks/index.js';
+import { isV2Role, V2_ROLES } from '../mcp/catalog/surfaces.js';
 
 export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -38,6 +41,18 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   };
 
   // ── Handbook routes (replace /v1/prompts/tier1) ──
+
+  // GET /v1/agents/me/handbook/surface/:role -- v2 purpose-scoped surface handbook.
+  // Registered before /:module so "surface" is not mistaken for a module name.
+  router.get('/v1/agents/me/handbook/surface/:role', requireAuth(), async (req, res) => {
+    const role = req.params.role as string;
+    if (!isV2Role(role)) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Unknown surface: ${role}. Valid: ${V2_ROLES.join(', ')}`));
+      return;
+    }
+    const content = handbookForRole(role);
+    res.json(success(config.nodeId, { surface: role, content, system_prompt: content }));
+  });
 
   // GET /v1/agents/me/handbook/:module -- Feature module handbooks (auth required)
   router.get('/v1/agents/me/handbook/:module', requireAuth(), async (req, res) => {

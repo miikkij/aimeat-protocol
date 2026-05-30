@@ -10,6 +10,7 @@
  *   v2.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  *   v2.3.0 -- 2026-05-30 -- F10 drift reconciliation: message_send canonical on content (+thread_id);
  *     dropped the legacy body alias to match server MCP + REST AgentMessageCreateSchema.
+ *   v2.4.0 -- 2026-05-30 -- Add aimeat_message_history (full thread context via GET /messages?thread_id).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -46,6 +47,23 @@ export function registerAgentMessagesTools(mcp: McpServer, registry: AgentRegist
     if (linked_task_id) payload.linked_task_id = linked_task_id;
     if (metadata) payload.metadata = metadata;
     const resp = await client.post(`/v1/agents/${enc}/messages`, payload);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+  });
+
+  mcp.tool('aimeat_message_history', descriptionFor('aimeat_message_history'), {
+    agent_name: agentNameSchema,
+    thread_id: z.string().optional().describe('Conversation thread to read (omit for recent messages across all threads)'),
+    page: z.number().int().positive().optional().describe('Page number (default 1)'),
+    per_page: z.number().int().positive().max(100).optional().describe('Messages per page (default 20, max 100)'),
+  }, annotationsFor('aimeat_message_history'), async ({ agent_name, thread_id, page, per_page }) => {
+    const { client, agent } = pickAgent(registry, agent_name);
+    const enc = encodeURIComponent(agent);
+    const params = new URLSearchParams();
+    if (thread_id) params.set('thread_id', thread_id);
+    if (page) params.set('page', String(page));
+    if (per_page) params.set('per_page', String(per_page));
+    const qs = params.toString();
+    const resp = await client.get(`/v1/agents/${enc}/messages${qs ? '?' + qs : ''}`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 }

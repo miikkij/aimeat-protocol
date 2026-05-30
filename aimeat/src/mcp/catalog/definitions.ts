@@ -76,7 +76,10 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         description: 'Fetch a managed system prompt (the agent operating handbook), addressed by tier or prompt ID. Pass "tier1"/"tier2" (or "tier-1") for the standard onboarding/operating directives, or a custom prompt ID. Returns the prompt name, description, content, and any variables. Read this during onboarding to learn how to operate on the node; confirm you have read it with aimeat_onboarding_confirm_directives_read.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { module: { type: 'string', description: 'Optional handbook module name, such as tasks or messages.' } },
+        input: {
+            module: { type: 'string', description: 'Optional handbook module name, such as tasks or messages.' },
+            surface: { type: 'string', enum: ['appdev', 'agent', 'service', 'admin'], description: 'Optional v2 surface role — returns that surface\'s operating handbook.' },
+        },
     },
     {
         name: 'aimeat_onboarding_status',
@@ -181,14 +184,25 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_message_send',
-        description: 'Send a message from this agent to its owner\'s conversation (markdown supported). Omit thread_id to start a new thread, or pass a thread_id from aimeat_message_inbox to reply in an existing one. Optionally link a task or attach metadata (including a proposed_task for the owner to approve). This is the agent→human channel; it does not deliver to other agents.',
+        description: 'Send a message from this agent to its owner\'s conversation (markdown supported). Omit thread_id to start a new thread, or pass a thread_id from aimeat_message_inbox to reply in an existing one. Optionally link a task or attach metadata. Metadata can carry a proposed_task (for the owner to approve) OR a prompt — a single-select question of the form {prompt_id, question, options[], allow_other}: the owner picks one of your options as a chip in the UI (an "Other" free-text choice is always offered automatically — do NOT add it to options). Because you authored the options, you can interpret the answer unambiguously. Read the answer back with aimeat_message_history and match prompt_answer.prompt_id to your prompt_id. This is the agent→human channel; it does not deliver to other agents.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             content: { type: 'string', required: true, description: 'Message content (markdown supported).' },
             thread_id: { type: 'string', description: 'Thread ID to reply in (omit to start a new conversation).' },
             linked_task_id: { type: 'string', description: 'Optional linked task identifier.' },
-            metadata: { type: 'object', description: 'Optional metadata object.' },
+            metadata: { type: 'object', description: 'Optional metadata object. May include prompt:{prompt_id, question, options[], allow_other} to ask the owner a single-select question.' },
+        },
+    },
+    {
+        name: 'aimeat_message_history',
+        description: 'Read the full message history for a conversation — both your messages and the owner\'s, oldest-first — so you have complete context, not just the unread items aimeat_message_inbox returns. Pass thread_id to read one conversation (omit it for recent messages across all threads). Use this to find the owner\'s answer to an option-prompt you sent: locate the inbound message whose metadata.prompt_answer.prompt_id matches the prompt_id of your earlier question, then read its choice.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            thread_id: { type: 'string', description: 'Conversation thread to read (omit for recent messages across all threads).' },
+            page: { type: 'number', description: 'Page number (default 1).' },
+            per_page: { type: 'number', description: 'Messages per page (default 20, max 100).' },
         },
     },
     {

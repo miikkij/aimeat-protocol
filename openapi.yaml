@@ -2582,6 +2582,46 @@ components:
                 description:
                   type: string
                   maxLength: 5000
+            prompt:
+              type: object
+              description: Single-select option-prompt attached to an outbound (agent→owner) message. The UI renders options as chips plus an implicit "Other"; do not include "Other" in options.
+              required: [prompt_id, question, options]
+              properties:
+                prompt_id:
+                  type: string
+                  maxLength: 128
+                  description: Correlation id; echoed back in the answer's prompt_answer.prompt_id.
+                question:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+                options:
+                  type: array
+                  minItems: 2
+                  maxItems: 10
+                  items:
+                    type: string
+                    minLength: 1
+                    maxLength: 200
+                allow_other:
+                  type: boolean
+                  default: true
+            prompt_answer:
+              type: object
+              description: Owner's reply to an option-prompt, on an inbound (owner→agent) message. Correlated via prompt_id.
+              required: [prompt_id, choice]
+              properties:
+                prompt_id:
+                  type: string
+                  maxLength: 128
+                choice:
+                  type: string
+                  minLength: 1
+                  maxLength: 10000
+                  description: The chosen option text, or free text when the owner used "Other".
+                is_other:
+                  type: boolean
+                  default: false
 
     AgentMessageStatusUpdate:
       type: object
@@ -4516,6 +4556,28 @@ paths:
       responses:
         '200':
           description: Module handbook data
+
+  /v1/agents/me/handbook/surface/{role}:
+    get:
+      operationId: getAgentSurfaceHandbook
+      summary: v2 surface handbook
+      description: Returns the operating handbook for a v2 purpose-scoped MCP surface (appdev, agent, service, admin).
+      tags:
+        - Agent Integration
+      parameters:
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [appdev, agent, service, admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Surface handbook content
+        '404':
+          description: Unknown surface role
 
   # ── Memory ─────────────────────────────────────────────────
   /v1/memory:

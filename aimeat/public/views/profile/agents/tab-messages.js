@@ -3,6 +3,9 @@
  * @description Messages tab with command palette, "/" autocomplete, and chat area.
  *   Wraps the existing messages subtab and adds command discovery.
  * @version-history
+ *   v1.3.0 -- 2026-05-30 -- Render agent single-select option-prompts (metadata.prompt) as
+ *     clickable chips + an implicit "Other"; clicking sends a correlated prompt_answer. A
+ *     prompt locks (read-only, chosen chip highlighted) once a newer message exists.
  *   v1.2.0 -- 2026-05-24 -- Add command-reply visual pairing for slash commands
  *   v1.1.0 -- 2026-05-24 -- M7: visual distinction for command messages (slash prefix)
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
@@ -85,7 +88,11 @@ export default function TabMessages({ agent, agentName, session, showToast }) {
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState('');
   const [showAutocomplete, setShowAutocomplete] = useState(false);
+  // When the owner clicks "Other" on an option-prompt, stage it here so the next
+  // free-text send attaches a prompt_answer correlated to that prompt.
+  const [pendingPrompt, setPendingPrompt] = useState(null); // { promptId, threadId } | null
   const historyRef = useRef(null);
+  const inputRef = useRef(null);
 
   async function loadCommands() {
     try {
@@ -143,7 +150,15 @@ export default function TabMessages({ agent, agentName, session, showToast }) {
     if (!msg) return;
     setSending(true);
     try {
-      await sendMessage(agentName, msg, activeThread);
+      if (pendingPrompt) {
+        // Owner is answering an option-prompt via free-text "Other".
+        await sendMessage(agentName, msg, pendingPrompt.threadId, undefined, {
+          prompt_answer: { prompt_id: pendingPrompt.promptId, choice: msg, is_other: true },
+        });
+        setPendingPrompt(null);
+      } else {
+        await sendMessage(agentName, msg, activeThread);
+      }
       setDraft('');
       setShowAutocomplete(false);
       await loadMessages();
@@ -151,6 +166,26 @@ export default function TabMessages({ agent, agentName, session, showToast }) {
       showToast(err.message || t('profile.agents.detail.messages.sendError'), true);
     }
     setSending(false);
+  }
+
+  // Owner clicked one of the agent's listed options -> reply immediately with the
+  // choice and a correlated prompt_answer (in the prompt's own thread).
+  async function answerOption(prompt, threadId, choice) {
+    setPendingPrompt(null);
+    try {
+      await sendMessage(agentName, choice, threadId, undefined, {
+        prompt_answer: { prompt_id: prompt.promptId, choice, is_other: false },
+      });
+      await loadMessages();
+    } catch (err) {
+      showToast(err.message || t('profile.agents.detail.messages.sendError'), true);
+    }
+  }
+
+  // Owner clicked "Other" -> stage the prompt and focus the chat input.
+  function chooseOther(prompt, threadId) {
+    setPendingPrompt({ promptId: prompt.promptId, threadId });
+    if (inputRef.current) inputRef.current.focus();
   }
 
   function handleKeyDown(e) {
@@ -177,7 +212,12 @@ export default function TabMessages({ agent, agentName, session, showToast }) {
     setShowAutocomplete(false);
   }
 
-  function renderMessage(msg, isCommand, isReply) {
+  function renderMessage(msg, isCommand, isReply, promptCtx) {
+    const prompt = msg.metadata?.prompt || null;
+    // promptCtx = { locked, answeredChoice } derived once over the full thread.
+    const locked = promptCtx?.locked || false;
+    const answeredChoice = promptCtx?.answeredChoice ?? null;
+    const otherChosen = prompt && answeredChoice != null && !prompt.options.includes(answeredChoice);
     return html`
       <div key=${msg.id || msg.createdAt}>
         <div class="pf-agd-msg-bubble ${msg.direction === 'inbound' ? 'pf-agd-msg-inbound' : 'pf-agd-msg-outbound'} ${isCommand ? 'pf-agd-msg-command' : ''} ${isReply ? 'pf-agd-msg-reply' : ''}">
@@ -187,6 +227,28 @@ export default function TabMessages({ agent, agentName, session, showToast }) {
         <div class="pf-agd-msg-meta ${msg.direction === 'inbound' ? 'pf-agd-msg-meta-right' : ''}">
           ${msg.createdAt ? html`<span class="pf-agd-msg-time">${new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> ${timeAgo(msg.createdAt)}` : ''}
         </div>
+        ${prompt && html`
+          <div class="agd-msg-prompt">
+            <div class="agd-msg-prompt-q">${prompt.question}</div>
+            <div class="agd-msg-prompt-options">
+              ${prompt.options.map(opt => html`
+                <button
+                  key=${opt}
+                  class="agd-msg-prompt-option ${answeredChoice === opt ? 'agd-msg-prompt-option--chosen' : ''}"
+                  disabled=${locked || false}
+                  onClick=${() => answerOption(prompt, msg.threadId, opt)}
+                >${opt}</button>
+              `)}
+              ${prompt.allowOther !== false && html`
+                <button
+                  class="agd-msg-prompt-option agd-msg-prompt-option--other ${otherChosen ? 'agd-msg-prompt-option--chosen' : ''}"
+                  disabled=${locked || false}
+                  onClick=${() => chooseOther(prompt, msg.threadId)}
+                >${t('profile.agents.messages.promptOther')}</button>
+              `}
+            </div>
+          </div>
+        `}
       </div>
     `;
   }
@@ -223,24 +285,44 @@ export default function TabMessages({ agent, agentName, session, showToast }) {
         <div class="pf-agd-msg-history" ref=${historyRef}>
           ${(() => {
             const sorted = [...messages].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+            // An option-prompt is answerable only while it is the newest message
+            // in its thread (any later message locks it). Map each thread to its
+            // last message id, and each prompt_id to the owner's chosen text.
+            const lastIdByThread = {};
+            for (const m of sorted) lastIdByThread[m.threadId] = m.id;
+            const answeredByPromptId = {};
+            for (const m of sorted) {
+              const pa = m.metadata?.promptAnswer;
+              if (pa?.promptId) answeredByPromptId[pa.promptId] = pa.choice;
+            }
+            const promptCtxFor = (msg) => {
+              const pid = msg.metadata?.prompt?.promptId;
+              if (!pid) return null;
+              return {
+                locked: lastIdByThread[msg.threadId] !== msg.id,
+                answeredChoice: answeredByPromptId[pid] ?? null,
+              };
+            };
             const rendered = [];
             for (let i = 0; i < sorted.length; i++) {
               const msg = sorted[i];
               const isCommand = msg.content?.startsWith('/') && msg.direction === 'inbound';
               const nextMsg = sorted[i + 1];
-              const hasReply = isCommand && nextMsg && nextMsg.direction === 'outbound';
+              // Don't pair when the message carries an option-prompt -- the chips
+              // belong directly under it, not in a command/reply pair.
+              const hasReply = isCommand && nextMsg && nextMsg.direction === 'outbound' && !nextMsg.metadata?.prompt;
 
               if (hasReply) {
                 rendered.push(html`
                   <div class="pf-agd-msg-pair" key=${msg.id || msg.createdAt}>
-                    ${renderMessage(msg, true, false)}
+                    ${renderMessage(msg, true, false, null)}
                     <div class="pf-agd-msg-reply-indicator">↳</div>
-                    ${renderMessage(nextMsg, false, true)}
+                    ${renderMessage(nextMsg, false, true, null)}
                   </div>
                 `);
                 i++;
               } else {
-                rendered.push(renderMessage(msg, isCommand, false));
+                rendered.push(renderMessage(msg, isCommand, false, promptCtxFor(msg)));
               }
             }
             return rendered;
@@ -261,10 +343,11 @@ export default function TabMessages({ agent, agentName, session, showToast }) {
             </div>
           `}
           <textarea
+            ref=${inputRef}
             value=${draft}
             onInput=${handleInput}
             onKeyDown=${handleKeyDown}
-            placeholder=${t('profile.agents.detail.messages.placeholder')}
+            placeholder=${pendingPrompt ? t('profile.agents.messages.promptOtherPlaceholder') : t('profile.agents.detail.messages.placeholder')}
             rows="1"
           />
         </div>

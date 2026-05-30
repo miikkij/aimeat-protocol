@@ -105,6 +105,17 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
         tokensUsed: body.metadata.tokens_used,
         processingMs: body.metadata.processing_ms,
         proposedTask: body.metadata.proposed_task,
+        prompt: body.metadata.prompt ? {
+          promptId: body.metadata.prompt.prompt_id,
+          question: body.metadata.prompt.question,
+          options: body.metadata.prompt.options,
+          allowOther: body.metadata.prompt.allow_other,
+        } : undefined,
+        promptAnswer: body.metadata.prompt_answer ? {
+          promptId: body.metadata.prompt_answer.prompt_id,
+          choice: body.metadata.prompt_answer.choice,
+          isOther: body.metadata.prompt_answer.is_other,
+        } : undefined,
       } : undefined,
       createdAt: now,
     };
@@ -120,6 +131,7 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
           linked_task_id: record.linkedTaskId ?? null,
           preview: record.content.substring(0, 200),
           has_proposed_task: !!(record.metadata?.proposedTask),
+          has_prompt_answer: !!(record.metadata?.promptAnswer),
           created_at: record.createdAt,
         });
       }

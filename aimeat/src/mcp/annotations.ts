@@ -173,6 +173,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
 
     // ── Messages ──
     aimeat_message_inbox: { title: 'Read Message Inbox', readOnlyHint: true },
+    aimeat_message_history: { title: 'Read Message Thread History', readOnlyHint: true },
     aimeat_message_send: { title: 'Send Agent Message', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
 
     // ── Consent ──

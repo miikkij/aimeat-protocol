@@ -149,8 +149,61 @@ def _poll_tasks(token: str, node_url: str, agent_name: str, status: str = "queue
         return []
 
 
+def _fetch_message_content(
+    token: str, node_url: str, agent_name: str, thread_id: str, msg_id: str
+) -> str:
+    """Return the full body of a single message, or "" on error.
+
+    The /inbox endpoint only returns a ~100-char preview, so we fetch the full
+    message from the thread listing (GET /v1/agents/<agent>/messages?thread_id=)
+    and pick out the matching id. That endpoint returns complete records,
+    including the `content` field.
+    """
+    try:
+        url = f"{node_url.rstrip('/')}/v1/agents/{agent_name}/messages"
+        r = requests.get(
+            url,
+            headers={"Authorization": f"Bearer {token}"},
+            params={"thread_id": thread_id, "per_page": 100},
+            timeout=15,
+        )
+        if r.status_code != 200:
+            return ""
+        msgs = r.json().get("data", {}).get("messages", []) or []
+        for m in msgs:
+            if m.get("id") == msg_id:
+                return m.get("content", "") or ""
+        return ""
+    except Exception:
+        return ""
+
+
+def _mark_message_delivered(token: str, node_url: str, agent_name: str, msg_id: str) -> bool:
+    """Mark an inbox message delivered so it stops being re-dispatched.
+
+    listPendingMessages only returns status=='pending' inbound messages, so
+    PATCHing to 'delivered' after a successful kickoff removes it from the next
+    poll cycle. Returns True on success.
+    """
+    try:
+        url = f"{node_url.rstrip('/')}/v1/agents/{agent_name}/messages/{msg_id}"
+        r = requests.patch(
+            url,
+            headers={"Authorization": f"Bearer {token}"},
+            json={"status": "delivered"},
+            timeout=15,
+        )
+        return r.status_code == 200
+    except Exception:
+        return False
+
+
 def _poll_messages(token: str, node_url: str, agent_name: str) -> list[dict[str, Any]]:
-    """Return list of unread inbox messages for the agent, or [] on error."""
+    """Return list of pending inbox messages for the agent, or [] on error.
+
+    Each entry has its full `content` resolved (the /inbox endpoint only carries
+    a truncated preview, so we fetch the body per message).
+    """
     try:
         url = f"{node_url.rstrip('/')}/v1/agents/{agent_name}/inbox"
         r = requests.get(
@@ -160,8 +213,26 @@ def _poll_messages(token: str, node_url: str, agent_name: str) -> list[dict[str,
         )
         if r.status_code != 200:
             return []
-        body = r.json()
-        return body.get("data", {}).get("messages", []) or []
+        data = r.json().get("data", {})
+        # The node returns inbox items under `pending_messages` (and a unified
+        # `items`); there is no `messages` key. Fall back to `items` for safety.
+        stubs = data.get("pending_messages") or data.get("items") or []
+        out: list[dict[str, Any]] = []
+        for s in stubs:
+            msg_id = s.get("id")
+            thread_id = s.get("thread_id")
+            content = ""
+            if msg_id and thread_id:
+                content = _fetch_message_content(token, node_url, agent_name, thread_id, msg_id)
+            out.append({
+                "id": msg_id,
+                "thread_id": thread_id,
+                "from": s.get("from"),
+                # Fall back to the preview if the full fetch failed, so the crew
+                # still gets *something* rather than "(empty)".
+                "content": content or s.get("preview", ""),
+            })
+        return out
     except Exception:
         return []
 
@@ -488,6 +559,10 @@ def run_crew_daemon(
                         if stop["flag"]:
                             break
                         msg_id = msg.get("id")
+                        # Guard against re-dispatch within this process even if
+                        # the mark-delivered call below fails or races a poll.
+                        if not msg_id or msg_id in done_ids:
+                            continue
                         body = msg.get("content") or msg.get("body") or "(empty)"
                         print(f"[daemon:{agent_name}] dispatching message {msg_id}: {str(body)[:100]}")
                         synthetic_task = {
@@ -498,8 +573,10 @@ def run_crew_daemon(
                             "_original": msg,
                         }
                         crew = build_crew(synthetic_task, liaison)
+                        kickoff_ok = False
                         try:
                             crew.kickoff()
+                            kickoff_ok = True
                         except Exception as inner:
                             print(f"[daemon:{agent_name}] message {msg_id} crashed: {inner}")
                             if on_error:
@@ -507,6 +584,12 @@ def run_crew_daemon(
                                     on_error(inner)
                                 except Exception:
                                     pass
+                        # Mark delivered so the node stops returning it as pending;
+                        # only after a successful kickoff so a crash leaves it for
+                        # retry. Track locally regardless to avoid tight re-loops.
+                        if kickoff_ok:
+                            _mark_message_delivered(token, node_url, agent_name, msg_id)
+                            done_ids.add(msg_id)
                         dispatched_this_cycle = True
 
             except Exception as outer:

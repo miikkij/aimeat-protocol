@@ -753,6 +753,59 @@
   font-size: 0.8rem;
   color: var(--accent, #E8564A);
 }
+
+/* ── Option-prompt (agent asks the owner a single-select question) ── */
+.pf .agd-msg-prompt {
+  margin-top: 0.4rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 8px;
+  background: var(--card-bg-alt, #F3F4F6);
+}
+.pf .agd-msg-prompt-q {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+  color: var(--text, #1A1A2E);
+}
+.pf .agd-msg-prompt-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.pf .agd-msg-prompt-option {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 999px;
+  background: var(--card, #FFFFFF);
+  color: var(--text, #1A1A2E);
+  font-size: 0.8rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.pf .agd-msg-prompt-option:hover:not(:disabled) {
+  border-color: var(--accent, #E8564A);
+}
+.pf .agd-msg-prompt-option:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.pf .agd-msg-prompt-option--chosen {
+  border-color: var(--accent, #E8564A);
+  background: var(--accent, #E8564A);
+  color: #FFFFFF;
+  opacity: 1;
+  font-weight: 600;
+}
+.pf .agd-msg-prompt-option--other {
+  font-style: italic;
+}
+.pf .agd-msg-pending-hint {
+  font-size: 0.78rem;
+  color: var(--accent, #E8564A);
+  padding: 0.25rem 0.5rem;
+}
 .pf .agd-msg-threads ,
 .pf .pf-agd-msg-threads  {
   display: flex;

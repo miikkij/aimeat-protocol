@@ -13,6 +13,8 @@
  *   v1.2.0 -- 2026-05-29 -- Add tool annotations (title + readOnlyHint) from shared
  *     annotations.ts for Connectors Directory compliance.
  *   v1.3.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.4.0 -- 2026-05-30 -- aimeat_handbook_get gains optional `surface` param → returns the v2
+ *     per-role surface handbook (handbookForRole); tier now optional (defaults tier1).
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -21,6 +23,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { handbookForRole } from '../services/handbooks/index.js';
 
 export function registerPromptsTools(
     mcp: McpServer,
@@ -36,24 +39,30 @@ export function registerPromptsTools(
         'aimeat_handbook_get',
         descriptionFor('aimeat_handbook_get'),
         {
-            tier: z.string().describe('Prompt tier or ID (e.g. "tier1", "tier2", "tier-1", or a custom prompt ID)'),
+            tier: z.string().optional().describe('Prompt tier or ID (e.g. "tier1", "tier2", "tier-1", or a custom prompt ID). Defaults to tier1.'),
+            surface: z.enum(['appdev', 'agent', 'service', 'admin']).optional().describe('Return the v2 purpose-scoped surface handbook for this role (use the surface you connected to, e.g. "agent" on /v2/mcp/agent) instead of a tier prompt.'),
         },
         annotationsFor('aimeat_handbook_get'),
-        async ({ tier }) => {
+        async ({ tier, surface }) => {
+            // v2 surface handbook short-circuit
+            if (surface) {
+                return { content: [{ type: 'text' as const, text: handbookForRole(surface) }] };
+            }
+            const tierKey = tier ?? 'tier1';
             // Normalize tier aliases used in routes (tier1 → tier-1, etc.)
-            const normalized = tier
+            const normalized = tierKey
                 .replace(/^tier(\d)$/, 'tier-$1')
                 .replace(/^(\d)$/, 'tier-$1');
 
             const record = await storage.getSystemPrompt(normalized);
             if (!record || !record.active) {
                 // Try the original key as a fallback
-                const fallback = await storage.getSystemPrompt(tier);
+                const fallback = await storage.getSystemPrompt(tierKey);
                 if (!fallback || !fallback.active) {
                     return {
                         content: [{
                             type: 'text' as const,
-                            text: `Prompt not found or not active: ${tier}`,
+                            text: `Prompt not found or not active: ${tierKey}`,
                         }],
                         isError: true,
                     };

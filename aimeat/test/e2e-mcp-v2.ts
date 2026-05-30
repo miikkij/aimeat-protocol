@@ -104,6 +104,27 @@ await test('cross-surface isolation: agent has no marketplace/admin; appdev no m
     assert(!appdevTools.has('aimeat_memory_write'), 'appdev must not have memory_write');
 });
 
+await test("handbook_get surface:'agent' returns the agent surface handbook", async () => {
+    // Reuse the agent surface session path: register/authorize/token then call the tool.
+    const reg = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'v2-hb' }) });
+    const ts = new Date().toISOString();
+    const sig = await signMsg(agent.key, agent.gaii + NODE_ID + ts);
+    const auth = await json(`/v1/mcp/authorize?${new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii: agent.gaii, signature: sig, timestamp: ts })}`);
+    const tok = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: reg.body.client_id, client_secret: reg.body.client_secret }) });
+    const token = tok.body.access_token as string;
+    let sid = '';
+    const call = async (method: string, params: Record<string, unknown>, id: number) => {
+        const res = await fetch(`${BASE}/v2/mcp/agent`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${token}`, ...(sid ? { 'mcp-session-id': sid, 'mcp-protocol-version': '2025-03-26' } : {}) }, body: JSON.stringify({ jsonrpc: '2.0', id, method, params }) });
+        const s = res.headers.get('mcp-session-id'); if (s) sid = s;
+        const ct = res.headers.get('content-type') ?? '';
+        return ct.includes('text/event-stream') ? (parseSSE(await res.text()).find(m => m.id === id) ?? {}) : await res.json();
+    };
+    await call('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'v2-hb', version: '1.0.0' } }, 1);
+    const body = await call('tools/call', { name: 'aimeat_handbook_get', arguments: { surface: 'agent' } }, 2);
+    const text = body.result?.content?.[0]?.text ?? '';
+    assert(text.includes('Agent Surface Handbook'), `expected agent handbook, got: ${text.slice(0, 80)}`);
+});
+
 await test('unknown role → 400', async () => {
     const res = await json('/v2/mcp/nonsense', { method: 'POST', body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }) });
     assert(res.status === 400, `expected 400, got ${res.status}`);
