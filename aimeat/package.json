@@ -92,6 +92,7 @@
     "audit": "pnpm audit --audit-level=high",
     "audit:fix": "pnpm audit --fix",
     "audit:mcp-tools": "tsx scripts/audit-mcp-tools.ts",
+    "audit:mcp-schemas": "tsx scripts/audit-mcp-schemas.ts",
     "eval:mcp-surface": "tsx test/eval-mcp/surface-weight.ts",
     "prepublishOnly": "node -e \"require('fs').copyFileSync('../README.md','README.md')\" && pnpm build"
   },

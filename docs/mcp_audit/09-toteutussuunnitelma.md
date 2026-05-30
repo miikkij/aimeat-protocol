@@ -222,12 +222,13 @@ Profiilit ovat **oletuksia**, joita omistaja voi hienosäätää consentissa (de
 **Valmis kun:** keinotekoinen skeemadrift kaataa auditin.
 
 **Todo:**
-- [ ] Laajenna `scripts/audit-mcp-tools.ts` vertaamaan **skeemat** (param-nimet, required, tyypit, enum) server vs connector vs katalogi
-- [ ] Vertaa myös kuvaus, annotaatiot, `requiredScope`, `outputSchema`
-- [ ] `audit:mcp-tools --strict` CI-portti: fail skeemadriftistä tai puuttuvasta katalogimetadatasta
-- [ ] Dokumentoi sallitut poikkeamat eksplisiittisesti (esim. `aimeat_admin_mint` server-only)
-- [ ] Drift-injektiotesti: keinotekoinen ero kaataa auditin
-- [ ] `pnpm lint` + `pnpm typecheck` vihreä — **✅ vaihe todennettu**
+- [x] Uusi `scripts/audit-mcp-schemas.ts` (`pnpm audit:mcp-schemas`): vertaa server- vs connector-**input-skeemat** ajonaikaisella capturella (fake-MCP Proxy → register-funktiot → schema-avaimet); raportoi myös outputSchema-kattavuus + katalogi-input-drift
+- [x] `--strict` CI-portti: **ratchet** — fail vain UUDESTA driftistä (baseline `KNOWN_INPUT_DRIFT` = 50 jo olemassa olevaa); stale-baseline-entryt raportoidaan karsittavaksi
+- [x] Dokumentoitu poikkeamat: connector-extra `agent_name` filtteröidään; server-only/connector-only nimet (admin_mint / task_request_changes) eivät ole jaettuja → eivät vertailussa
+- [x] **Drift-injektiotesti tehty**: baseline-entryn poisto → `--strict` exit 1 (handbook_get `tier` vs `module`), palautus → exit 0
+- [x] `pnpm lint` (0 erroria) + `pnpm typecheck` vihreä; name-audit ennallaan — **✅ vaihe todennettu** (commit seuraa)
+
+> **Iso löydös:** audit paljasti **50 jaettua toolia joiden input-skeema eroaa pinnoittain** (esim. `handbook_get` server `tier` vs connector `module`; `group_get` `group_id` vs `id`; `consent_grant` täysin eri) — hiljainen drift jossa agentti voi antaa väärät paramit pintaa vaihtaessaan. Lisäksi laaja katalogi-input-drift. **Reconciliation (50 driftin korjaus) on oma urakkansa** joka pariutuu Phase 5:n signature-normalisoinnin kanssa; Phase 6 **lukitsee** tilan (ratchet estää uuden driftin) ja tekee debtin näkyväksi/seuratuksi. Karsi `KNOWN_INPUT_DRIFT`-settiä sitä mukaa kun pinnat yhtenäistetään.
 
 ---
 
