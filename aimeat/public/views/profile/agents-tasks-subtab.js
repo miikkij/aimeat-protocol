@@ -16,6 +16,7 @@
  *   v2.0.0 -- 2026-05-22 -- Add todo rendering, Start button, progress tracking
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  *   v3.3.0 -- 2026-05-29 -- Add delete confirmation, "Request changes" modal for the revise-proposed-todos flow, outdated-todo history rendering, and revision_requested status.
+ *   v3.3.1 -- 2026-05-30 -- Re-fetch the event log on every live-update tick while a task card is expanded. Without this, the parent refreshed the task object (todos + status) but the events list under it stayed frozen until the user closed and re-opened the card.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -92,19 +93,35 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
   const [showOutdated, setShowOutdated] = useState(false);
   const { confirm, ConfirmUI } = useConfirm();
 
+  async function fetchEvents({ silent = false } = {}) {
+    if (!silent) setLoadingEvents(true);
+    try {
+      const resp = await listEvents(agentName, task.id);
+      setEvents(resp?.data?.events || []);
+    } catch { setEvents([]); }
+    if (!silent) setLoadingEvents(false);
+  }
+
   async function handleExpand(e) {
     e.stopPropagation();
     if (expanded) { setExpanded(false); return; }
     setExpanded(true);
-    if (!events) {
-      setLoadingEvents(true);
-      try {
-        const resp = await listEvents(agentName, task.id);
-        setEvents(resp?.data?.events || []);
-      } catch { setEvents([]); }
-      setLoadingEvents(false);
-    }
+    if (!events) await fetchEvents();
   }
+
+  // While the task card is expanded, refresh its event log when the global
+  // live-update signal fires (server-side: agent appends an event, todo flips,
+  // status changes, etc.). The parent's loadTasks() refreshes the task itself
+  // -- including todos -- via re-render with new props, but events are
+  // fetched separately and would otherwise stay stale until the user closes
+  // and re-opens the card. Silent fetch so the in-place log doesn't flash a
+  // loading state on every tick.
+  useEffect(() => {
+    if (!expanded) return;
+    const handler = () => fetchEvents({ silent: true });
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, [expanded, task.id, agentName]);
 
   async function handleStart(e) {
     e.stopPropagation();

@@ -5,6 +5,7 @@
  * @version-history
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  *   v1.1.0 -- 2026-05-24 -- Add area form (F12), link package (F13), doc count (F14), tags help (F15), scope footer (F16)
+ *   v1.2.0 -- 2026-05-30 -- Live-update refresh also re-fetches the currently expanded memory entry's value (was: only the key list refreshed, the open entry stayed stale until the user closed + reopened it or switched tabs). Also stop showing the full-tab "Loading..." overlay on every live-update tick -- it now only shows on initial mount.
  */
 
 import { h } from 'preact';
@@ -33,9 +34,27 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
   const [expandedKey, setExpandedKey] = useState(null);
   const [expandedValue, setExpandedValue] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Track which key's value is currently being shown so the live-update
+  // refresher can re-fetch it without going through the click handler.
+  const expandedKeyRef = useRef(null);
+  expandedKeyRef.current = expandedKey;
 
-  async function loadData() {
-    setLoading(true);
+  async function fetchMemoryValue(key) {
+    const gaii = agent?.gaii || agentName;
+    try {
+      const resp = await apiGet(`/v1/memory/${encodeURIComponent(gaii)}/${encodeURIComponent(key)}`);
+      const val = resp?.data?.value;
+      return typeof val === 'string' ? val : JSON.stringify(val, null, 2);
+    } catch {
+      const resp2 = await apiGet(`/v1/memory?agent=${encodeURIComponent(gaii)}&prefix=${encodeURIComponent(key)}`);
+      const items = resp2?.data?.items || resp2?.data || [];
+      const found = Array.isArray(items) ? items.find(i => i.key === key) : null;
+      return found ? (typeof found.value === 'string' ? found.value : JSON.stringify(found.value, null, 2)) : 'Could not load value';
+    }
+  }
+
+  async function loadData({ showSpinner = true } = {}) {
+    if (showSpinner) setLoading(true);
     try {
       const [dirResp, memResp] = await Promise.all([
         getDirectives(agentName).catch(() => null),
@@ -48,13 +67,29 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
       const keys = (Array.isArray(items) ? items : [])
         .map(item => ({ key: item.key, visibility: item.visibility, updatedAt: item.updatedAt }));
       setMemoryKeys(keys);
+
+      // If the user has a memory entry expanded, re-fetch its value too so
+      // the rendered body stays in sync with the latest server state. Without
+      // this, the key list refreshes but the open entry shows stale content
+      // until the user collapses + re-expands it.
+      const currentKey = expandedKeyRef.current;
+      if (currentKey) {
+        const stillPresent = keys.some(k => k.key === currentKey);
+        if (stillPresent) {
+          setExpandedValue(await fetchMemoryValue(currentKey));
+        } else {
+          // Entry deleted server-side; collapse it.
+          setExpandedKey(null);
+          setExpandedValue(null);
+        }
+      }
     } catch {
       setMemoryAreas([]);
       setResources([]);
       setMemoryKeys([]);
     }
     setTags(agent.tags ?? []);
-    setLoading(false);
+    if (showSpinner) setLoading(false);
   }
 
   useEffect(() => { loadData(); }, [agentName]);
@@ -62,7 +97,11 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
   const loadRef = useRef(loadData);
   loadRef.current = loadData;
   useEffect(() => {
-    const handler = () => loadRef.current();
+    // Live-update tick: refresh in the background WITHOUT toggling the
+    // full-tab "Loading..." overlay. Showing the spinner on every tick
+    // (the SSE bus debounces to ~500ms but still fires often) made the
+    // whole panel flash blank every time anything changed server-side.
+    const handler = () => loadRef.current({ showSpinner: false });
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, []);
@@ -134,17 +173,7 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
     }
     setExpandedKey(mk.key);
     setExpandedValue('...');
-    try {
-      const gaii = agent?.gaii || agentName;
-      const resp = await apiGet(`/v1/memory/${encodeURIComponent(gaii)}/${encodeURIComponent(mk.key)}`);
-      const val = resp?.data?.value;
-      setExpandedValue(typeof val === 'string' ? val : JSON.stringify(val, null, 2));
-    } catch {
-      const resp2 = await apiGet(`/v1/memory?agent=${encodeURIComponent(agent?.gaii || agentName)}&prefix=${encodeURIComponent(mk.key)}`);
-      const items = resp2?.data?.items || resp2?.data || [];
-      const found = Array.isArray(items) ? items.find(i => i.key === mk.key) : null;
-      setExpandedValue(found ? (typeof found.value === 'string' ? found.value : JSON.stringify(found.value, null, 2)) : 'Could not load value');
-    }
+    setExpandedValue(await fetchMemoryValue(mk.key));
   }
 
   function getSharedWith(tag) {

@@ -2,6 +2,33 @@
 
 All notable changes to AIMEAT are documented in this file.
 
+## [1.14.6] - 2026-05-30
+
+Agent detail view live-refresh fixes. Both fixes are in tabs that
+already listened to the global `aimeat-live-update` SSE event but
+weren't refreshing the right state when the tick fired -- the user
+had to switch tabs and come back to see fresh data.
+
+### Fixed
+
+- **Data Access tab** (`tab-data-access.js`): the currently expanded
+  memory entry's value is now re-fetched on every live-update tick,
+  not just the list of keys. Before, the key list refreshed
+  correctly but the entry body the user had open stayed frozen until
+  they closed + re-opened it. If the entry was deleted server-side,
+  the panel now also auto-collapses it.
+- **Data Access tab** (`tab-data-access.js`): the full-tab
+  "Loading..." overlay no longer flashes on every live-update tick.
+  Only the initial mount shows the spinner; background refreshes are
+  silent. Previously, any unrelated server change made the whole
+  panel blank for ~500ms.
+- **Tasks tab** (`agents-tasks-subtab.js` `TaskItem`): the event log
+  of an expanded task now re-fetches on live-update ticks while the
+  card is open. Before, the task object refreshed via the parent's
+  `loadTasks()` (todos + status updated in-place), but the event
+  list underneath stayed stale because it was fetched separately on
+  expand and never re-run.
+
 ## [1.14.5] - 2026-05-29
 
 Task revision lifecycle for the proposed-todos -> owner-review loop, plus
