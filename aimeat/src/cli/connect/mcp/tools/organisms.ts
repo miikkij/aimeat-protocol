@@ -6,6 +6,8 @@
  *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.2.0 -- 2026-05-30 -- MCP drift reconciliation: id -> organism_id across get/join/leave/members;
+ *     add message (join) and role/status filters (members) to match server MCP + REST.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -22,30 +24,39 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
   });
 
   mcp.tool('aimeat_organism_get', descriptionFor('aimeat_organism_get'), {
-    id: z.string().describe('Organism identifier'),
-  }, annotationsFor('aimeat_organism_get'), async ({ id }) => {
-    const resp = await client.get(`/v1/organisms/${encodeURIComponent(id)}`);
+    organism_id: z.string().describe('ID of the organism to retrieve'),
+  }, annotationsFor('aimeat_organism_get'), async ({ organism_id }) => {
+    const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
   mcp.tool('aimeat_organism_join', descriptionFor('aimeat_organism_join'), {
-    id: z.string().describe('Organism identifier'),
-  }, annotationsFor('aimeat_organism_join'), async ({ id }) => {
-    const resp = await client.post(`/v1/organisms/${encodeURIComponent(id)}/join`);
+    organism_id: z.string().describe('ID of the organism to join'),
+    message: z.string().optional().describe('Optional message for join requests (used when approval is required)'),
+  }, annotationsFor('aimeat_organism_join'), async ({ organism_id, message }) => {
+    const body: Record<string, unknown> = {};
+    if (message != null) body.message = message;
+    const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/join`, body);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
   mcp.tool('aimeat_organism_leave', descriptionFor('aimeat_organism_leave'), {
-    id: z.string().describe('Organism identifier'),
-  }, annotationsFor('aimeat_organism_leave'), async ({ id }) => {
-    const resp = await client.post(`/v1/organisms/${encodeURIComponent(id)}/leave`);
+    organism_id: z.string().describe('ID of the organism to leave'),
+  }, annotationsFor('aimeat_organism_leave'), async ({ organism_id }) => {
+    const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/leave`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
   mcp.tool('aimeat_organism_members', descriptionFor('aimeat_organism_members'), {
-    id: z.string().describe('Organism identifier'),
-  }, annotationsFor('aimeat_organism_members'), async ({ id }) => {
-    const resp = await client.get(`/v1/organisms/${encodeURIComponent(id)}/members`);
+    organism_id: z.string().describe('The organism ID'),
+    role: z.string().optional().describe('Filter by role: creator, admin, member'),
+    status: z.string().optional().describe('Filter by status: active, pending, banned (default: active)'),
+  }, annotationsFor('aimeat_organism_members'), async ({ organism_id, role, status }) => {
+    const params = new URLSearchParams();
+    if (role) params.set('role', role);
+    if (status) params.set('status', status);
+    const qs = params.toString();
+    const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/members${qs ? `?${qs}` : ''}`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 }

@@ -612,9 +612,11 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            recipient: { type: 'string', required: true, description: 'Recipient GAII or GHII.' },
-            keys: { type: 'array', required: true, description: 'Memory keys to share.' },
-            purpose: { type: 'string', description: 'Purpose of the consent grant.' },
+            target_gaii: { type: 'string', required: true, description: 'Recipient GAII, "*", or prefixed identifier (organism.x, ghii:, domain:, node:).' },
+            scope: { type: 'string', required: true, description: 'Consent scope zone (private/dmz/federation).' },
+            data_pattern: { type: 'string', required: true, description: 'Glob pattern for data keys (e.g. "profile.*").' },
+            purpose: { type: 'string', required: true, description: 'Human-readable purpose for this consent.' },
+            ttl_hours: { type: 'number', description: 'Expiry in hours from now (omit for indefinite).' },
         },
     },
     {
@@ -629,7 +631,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         description: 'Revoke a consent grant by its id, setting status to revoked and stamping the time (the record is kept for audit, not deleted). Only the consent owner may revoke. Find the id with aimeat_consent_list.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { id: { type: 'string', required: true, description: 'Consent grant identifier.' } },
+        input: { consent_id: { type: 'string', required: true, description: 'ID of the consent to revoke.' } },
     },
     {
         name: 'aimeat_flag_report',

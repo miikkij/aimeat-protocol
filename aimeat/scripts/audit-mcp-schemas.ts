@@ -140,12 +140,11 @@ const KNOWN_INPUT_DRIFT = new Set<string>([
     'aimeat_board_subscribe', 'aimeat_capabilities_create', 'aimeat_capabilities_invoke',
     'aimeat_capabilities_list', 'aimeat_capabilities_update', 'aimeat_capabilities_vouch',
     'aimeat_catalogue_agents', 'aimeat_catalogue_directory', 'aimeat_catalogue_search',
-    'aimeat_consent_grant', 'aimeat_consent_revoke', 'aimeat_cortex_install', 'aimeat_extension_install',
+    'aimeat_cortex_install', 'aimeat_extension_install',
     'aimeat_extension_invoke', 'aimeat_flag_report', 'aimeat_group_add_member', 'aimeat_group_create',
     'aimeat_group_get', 'aimeat_group_remove_member', 'aimeat_handbook_get', 'aimeat_instance_create',
     'aimeat_instance_status', 'aimeat_knowledge_contribute', 'aimeat_knowledge_get',
     'aimeat_knowledge_links', 'aimeat_memory_search', 'aimeat_memory_write', 'aimeat_message_send',
-    'aimeat_organism_get', 'aimeat_organism_join', 'aimeat_organism_leave', 'aimeat_organism_members',
     'aimeat_storage_upload', 'aimeat_task_complete', 'aimeat_task_event', 'aimeat_task_fail',
     'aimeat_task_list', 'aimeat_work_deliver',
 ]);
