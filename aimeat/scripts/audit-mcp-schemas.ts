@@ -20,6 +20,7 @@ import type { AimeatConfig } from '../src/config.js';
 import type { Storage } from '../src/storage/interface.js';
 import type { AgentRegistry } from '../src/cli/connect/agent-registry.js';
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../src/mcp/catalog/definitions.js';
+import { MCP_SURFACES, V2_ROLES, validateSurfaces } from '../src/mcp/catalog/surfaces.js';
 
 // ── Server register functions (mirror src/mcp/index.ts) ──
 import { registerCoreTools } from '../src/mcp/core.js';
@@ -215,11 +216,30 @@ function main(): void {
     console.log(`\n## Catalog input metadata drift (informational) — ${catalogDrift.length}`);
     console.log(catalogDrift.length ? catalogDrift.join('\n') : '  None.');
 
-    if (strict && newDrift.length > 0) {
-        console.error(`\n✖ STRICT: ${newDrift.length} NEW server↔connector input-schema drift(s) beyond the baseline. Reconcile the two surfaces or (if intentional) update KNOWN_INPUT_DRIFT.`);
+    // ── v2 surface coverage (every surface tool must be REGISTERED on the server) ──
+    const serverNames = new Set(server.keys());
+    const { unknownTools, uncovered } = validateSurfaces();
+    const surfaceUnregistered: string[] = [];
+    console.log(`\n## v2 surface coverage`);
+    for (const role of V2_ROLES) {
+        const tools = MCP_SURFACES[role];
+        const missing = tools.filter(t => !serverNames.has(t));
+        for (const m of missing) surfaceUnregistered.push(`${role}:${m}`);
+        console.log(`  ${role.padEnd(8)} ${tools.length} tools${missing.length ? `  ✖ not server-registered: ${missing.join(', ')}` : '  ✓'}`);
+    }
+    if (unknownTools.length) console.log(`  ✖ unknown (not in catalog): ${unknownTools.join(', ')}`);
+    if (uncovered.length) console.log(`  ⚠ catalog tools in no surface & not excluded: ${uncovered.join(', ')}`);
+
+    const surfaceFail = surfaceUnregistered.length > 0 || unknownTools.length > 0 || uncovered.length > 0;
+
+    if (strict && (newDrift.length > 0 || surfaceFail)) {
+        if (newDrift.length) console.error(`\n✖ STRICT: ${newDrift.length} NEW server↔connector input-schema drift(s) beyond the baseline.`);
+        if (surfaceUnregistered.length) console.error(`✖ STRICT: surface tools not registered on the server: ${surfaceUnregistered.join(', ')}`);
+        if (unknownTools.length) console.error(`✖ STRICT: surface tools not in catalog: ${unknownTools.join(', ')}`);
+        if (uncovered.length) console.error(`✖ STRICT: catalog tools placed in no surface (and not excluded): ${uncovered.join(', ')}`);
         process.exit(1);
     }
-    console.log(`\n✓ Schema audit complete (${knownDrift.length} known drifts tracked, ${newDrift.length} new).`);
+    console.log(`\n✓ Schema audit complete (${knownDrift.length} known drifts tracked, ${newDrift.length} new; v2 surfaces ${surfaceFail ? 'HAVE ISSUES' : 'OK'}).`);
 }
 
 main();

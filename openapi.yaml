@@ -8310,6 +8310,56 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /v2/mcp/{role}:
+    parameters:
+      - name: role
+        in: path
+        required: true
+        description: Purpose-scoped MCP surface — exposes only the tools relevant to that role.
+        schema:
+          type: string
+          enum: [appdev, agent, service, admin]
+    post:
+      operationId: mcpExecuteV2
+      summary: Execute MCP tool call on a purpose-scoped surface
+      description: >
+        Same Streamable HTTP MCP transport and OAuth as /v1/mcp, but tools/list is restricted to the
+        named surface's allowlist (appdev = build apps/extensions/cortex; agent = owner's agent;
+        service = marketplace/provider; admin = operator/governance). Scope enforcement still applies
+        on top. Unknown role → 400.
+      tags: [MCP]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: MCP response (may be SSE stream)
+        '400':
+          description: Unknown surface role
+    get:
+      operationId: mcpResourcesV2
+      summary: MCP SSE stream / resource list for a surface
+      tags: [MCP]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: MCP resource list / SSE stream
+    delete:
+      operationId: mcpDeleteSessionV2
+      summary: Delete MCP session (surface)
+      tags: [MCP]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
   /v1/mcp/register:
     post:
       operationId: mcpRegisterClient
