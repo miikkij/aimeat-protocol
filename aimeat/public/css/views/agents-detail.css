@@ -914,12 +914,33 @@
   gap: 0.4rem;
   max-height: 350px;
 }
+/* Wrapper holding the chat input row plus a live character counter. The
+   border-top (separating input from chat history) lives on the wrapper so the
+   counter line sits inside the same bordered region as the input. */
+.pf .agd-builder-chat-input-wrap {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border, #E5E7EB);
+}
 .pf .agd-builder-chat-input ,
 .pf .pf-agd-builder-chat-input  {
   display: flex;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
   border-top: 1px solid var(--border, #E5E7EB);
+}
+.pf .agd-builder-chat-input-wrap .agd-builder-chat-input {
+  border-top: none;
+}
+.pf .agd-chat-charcount {
+  padding: 0 0.75rem 0.4rem;
+  text-align: right;
+  font-size: 0.72rem;
+  color: var(--text-dim, #6B7280);
+}
+.pf .agd-chat-charcount-max {
+  color: var(--danger, #EF4444);
+  font-weight: 600;
 }
 .pf .agd-builder-chat-input textarea ,
 .pf .pf-agd-builder-chat-input textarea  {

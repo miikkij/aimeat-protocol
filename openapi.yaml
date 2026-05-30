@@ -16043,8 +16043,11 @@ paths:
               properties:
                 title:
                   type: string
+                  maxLength: 256
                 description:
                   type: string
+                  maxLength: 10000
+                  description: Primary task instructions. The agent crew reads this field as its prompt.
                 status:
                   type: string
                   enum: [draft, queued]

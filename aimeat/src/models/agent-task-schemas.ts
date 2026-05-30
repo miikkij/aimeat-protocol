@@ -4,6 +4,7 @@
  * @version-history
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  *   v1.1.0 -- 2026-05-29 -- Add 'revision_requested' task status, 'outdated' todo status, and 'revision_requested' event type for the owner-requests-changes-to-proposed-todos flow.
+ *   v1.2.0 -- 2026-05-30 -- Raise task description max length 4096 -> 10000 chars (create + update). The agent crew reads task.description as its primary prompt, so this is the field that needs room.
  */
 import { z } from 'zod';
 
@@ -11,7 +12,7 @@ const TodoStatusSchema = z.enum(['pending', 'active', 'done', 'failed', 'skipped
 
 export const AgentTaskCreateSchema = z.object({
   title: z.string().min(1).max(256),
-  description: z.string().max(4096).optional().default(''),
+  description: z.string().max(10000).optional().default(''),
   scope: z.array(z.object({
     name: z.string(),
     value: z.string(),
@@ -45,7 +46,7 @@ export const AgentTaskCreateSchema = z.object({
 
 export const AgentTaskUpdateSchema = z.object({
   title: z.string().min(1).max(256).optional(),
-  description: z.string().max(4096).optional(),
+  description: z.string().max(10000).optional(),
   scope: z.array(z.object({
     name: z.string(),
     value: z.string(),

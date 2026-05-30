@@ -15,6 +15,11 @@
  *     tabs made the proposal panel look like it had three things to inspect
  *     when only one mattered. The verification fields stay in the schema for
  *     callers that want to set them via aimeat_task_create.
+ *   v1.2.0 -- 2026-05-30 -- The first chat message now becomes the task
+ *     DESCRIPTION (the field the agent crew reads as its prompt), with a short
+ *     title auto-derived from its first line. Previously the whole message was
+ *     forced into title, which is capped at 256 chars. Add a live character
+ *     counter (limit 10000) to the chat input.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -24,6 +29,20 @@ import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { createTask, getTask, startTask } from '/js/services/agent-tasks.js';
 import { sendMessage, listMessages } from '/js/services/agent-messages.js';
+
+// Max length for a chat message. Matches both AgentMessageCreateSchema.content
+// and AgentTaskCreateSchema.description (10000) in src/models/. The first
+// message in a thread becomes the task description, later ones are messages --
+// both share this ceiling.
+const MSG_MAX = 10000;
+
+// Build a short task title from the (longer) first message. The title is only
+// for display in lists/cards; the full text lives in the description, which is
+// what the agent actually reads. Title schema cap is 256 -- we stay well under.
+function deriveTitle(text) {
+  const firstLine = text.split('\n').map(l => l.trim()).find(Boolean) || text.trim();
+  return firstLine.length > 120 ? firstLine.slice(0, 117) + '...' : firstLine;
+}
 
 function ProposalPanel({ task, taskId }) {
   if (!taskId) {
@@ -179,17 +198,23 @@ function BuilderChat({ agentName, taskId, threadId, onTaskCreated, showToast }) 
           <div class="agd-builder-analyzing">${t('profile.agents.tasks.builder.analyzing')}</div>
         `}
       </div>
-      <div class="agd-builder-chat-input">
-        <textarea
-          value=${draft}
-          onInput=${(e) => setDraft(e.target.value)}
-          onKeyDown=${handleKeyDown}
-          placeholder=${placeholder}
-          rows="1"
-        />
-        <button class="btn-primary btn-sm" onClick=${handleSend} disabled=${sending || !draft.trim()}>
-          ${taskId ? t('profile.agents.messages.send') : t('profile.agents.tasks.builder.send')}
-        </button>
+      <div class="agd-builder-chat-input-wrap">
+        <div class="agd-builder-chat-input">
+          <textarea
+            value=${draft}
+            onInput=${(e) => setDraft(e.target.value)}
+            onKeyDown=${handleKeyDown}
+            placeholder=${placeholder}
+            maxlength=${MSG_MAX}
+            rows="1"
+          />
+          <button class="btn-primary btn-sm" onClick=${handleSend} disabled=${sending || !draft.trim()}>
+            ${taskId ? t('profile.agents.messages.send') : t('profile.agents.tasks.builder.send')}
+          </button>
+        </div>
+        <div class=${`agd-chat-charcount ${draft.length >= MSG_MAX ? 'agd-chat-charcount-max' : ''}`}>
+          ${draft.length} / ${MSG_MAX}
+        </div>
       </div>
     </div>
   `;
@@ -230,7 +255,13 @@ export default function TaskCreationBuilder({ agentName, session, showToast, onC
   async function handleFirstMessage(text) {
     const newThreadId = crypto.randomUUID();
     try {
-      const resp = await createTask(agentName, { title: text, status: 'queued' });
+      // The full message is the description (what the agent reads); title is a
+      // short label derived from it for display in task lists.
+      const resp = await createTask(agentName, {
+        title: deriveTitle(text),
+        description: text,
+        status: 'queued',
+      });
       const newTaskId = resp?.data?.task?.id;
       if (!newTaskId) throw new Error('No task ID returned');
       setTaskId(newTaskId);
