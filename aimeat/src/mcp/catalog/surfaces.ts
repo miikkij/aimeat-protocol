@@ -25,8 +25,15 @@ import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
 export type SurfaceRole = 'appdev' | 'agent' | 'service' | 'admin';
 export const V2_ROLES: readonly SurfaceRole[] = ['appdev', 'agent', 'service', 'admin'];
 
-/** Catalog tools intentionally NOT exposed on any v2 surface (auto-created session meta). */
-export const V2_EXCLUDED: readonly string[] = ['aimeat_instance_list', 'aimeat_instance_create', 'aimeat_instance_status'];
+/**
+ * Catalog tools intentionally NOT exposed on any v2 server surface:
+ *  - instance_* : auto-created session meta, not an agent capability
+ *  - task_request_changes : connector-only owner tool (never registered on the server /v1/mcp)
+ */
+export const V2_EXCLUDED: readonly string[] = [
+    'aimeat_instance_list', 'aimeat_instance_create', 'aimeat_instance_status',
+    'aimeat_task_request_changes',
+];
 
 /** role -> allowlist of tool names. Derived from docs/mcp_audit/11-v2-mcp-design.md §2/§3. */
 export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
@@ -41,7 +48,9 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
     agent: [
         'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_read_public',
         'aimeat_storage_upload', 'aimeat_storage_download',
-        'aimeat_task_create', 'aimeat_task_list', 'aimeat_task_get', 'aimeat_task_propose_todos', 'aimeat_task_request_changes',
+        // NOTE: aimeat_task_request_changes is connector-only (owner tool, not registered on the
+        // server /v1/mcp), so it cannot appear on a server v2 surface — intentionally omitted here.
+        'aimeat_task_create', 'aimeat_task_list', 'aimeat_task_get', 'aimeat_task_propose_todos',
         'aimeat_task_event', 'aimeat_task_todo', 'aimeat_task_complete', 'aimeat_task_fail',
         'aimeat_message_inbox', 'aimeat_message_send',
         'aimeat_knowledge_list', 'aimeat_knowledge_get', 'aimeat_knowledge_contribute', 'aimeat_knowledge_links',

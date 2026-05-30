@@ -19,6 +19,8 @@
  *   v1.7.0 — 2026-05-30 — MCP audit Phase 3 (F1): per-agent scope enforcement — createMcpServer
  *     filters the tool surface by the agent's defaultScopes (scopeAllowsTool), mirroring REST
  *     requireScope gates. Honours config.mcpEnforceScopes (false = warn-only logging).
+ *   v1.8.0 — 2026-05-30 — v2 S2: createMcpServer accepts a surface role; the gate hard-skips tools
+ *     outside that surface (toolsForSurface). role='all' (v1) applies no surface filter.
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -56,6 +58,7 @@ import { registerAgentOnboardingTools } from './agent-onboarding.js';
 import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerAgentManagementTools } from './agent-management.js';
 import { scopeAllowsTool } from './catalog/scopes.js';
+import { toolsForSurface, isV2Role, V2_ROLES, type SurfaceRole } from './catalog/surfaces.js';
 
 // ── Resource change event bus ──
 // Allows REST routes and MCP tools to emit resource change events
@@ -106,7 +109,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
     // OAuth 2.1 — only auth codes are in-memory (short-lived, single-use)
     const authCodes = new Map<string, AuthorizationCode>();
 
-    function createMcpServer(agentGaii: string, scopes: string[]): McpServer {
+    function createMcpServer(agentGaii: string, scopes: string[], role: SurfaceRole | 'all' = 'all'): McpServer {
         const mcp = new McpServer(
             { name: `AIMEAT Node ${config.nodeId}`, version: '1.2.0' },
             { capabilities: { tools: {}, resources: { subscribe: true, listChanged: true } } },
@@ -118,10 +121,14 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         // requireScope gates). Owner-attached agents with a '*' scope get everything. Warn-only
         // mode (config.mcpEnforceScopes=false) registers all tools but logs what WOULD be filtered.
         const enforce = config.mcpEnforceScopes;
+        const surfaceTools = role === 'all' ? null : toolsForSurface(role);
         const filteredTools: string[] = [];
         type ToolFn = (...args: unknown[]) => unknown;
         const patchable = mcp as unknown as { tool: ToolFn; registerTool: ToolFn };
         const gate = (name: string): boolean => {
+            // v2 surface filter: a tool not in this surface's purpose is simply not part of it
+            // (hard skip, silent — not a scope denial). role='all' (v1) applies no surface filter.
+            if (surfaceTools && !surfaceTools.has(name)) return false;
             if (scopeAllowsTool(scopes, name)) return true;
             filteredTools.push(name);
             return !enforce; // warn-only: still register (true); enforce: skip (false)
@@ -167,8 +174,8 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         return mcp;
     }
 
-    // POST /v1/mcp — MCP Streamable HTTP endpoint (handles JSON-RPC requests)
-    router.post('/v1/mcp', async (req: Request, res: Response) => {
+    // MCP Streamable HTTP POST handler — shared by /v1/mcp (role 'all') and /v2/mcp/:role.
+    const handleMcpPost = (serverRole: SurfaceRole | 'all') => async (req: Request, res: Response) => {
         // Origin validation (MCP spec: REQUIRED to prevent DNS rebinding)
         const origin = req.headers.origin;
         if (origin) {
@@ -348,7 +355,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             sessionIdGenerator: () => `mcp-${randomBytes(16).toString('hex')}`,
         });
 
-        const mcpServer = createMcpServer(authenticatedGaii, sessionScopes);
+        const mcpServer = createMcpServer(authenticatedGaii, sessionScopes, serverRole);
 
         transport.onclose = () => {
             if (transport.sessionId) {
@@ -368,10 +375,11 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                 sessionChatInstances.set(transport.sessionId, chatInstanceId);
             }
         }
-    });
+    };
 
-    // GET /v1/mcp — SSE endpoint for server-to-client notifications
-    router.get('/v1/mcp', async (req: Request, res: Response) => {
+    // GET handler (SSE server→client notifications) — role-agnostic; the session is already bound
+    // to its (role-scoped) server from the POST that created it.
+    const handleMcpGet = async (req: Request, res: Response) => {
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
         if (!sessionId || !transports.has(sessionId)) {
             res.status(400).json({ error: 'Missing or invalid mcp-session-id header' });
@@ -379,10 +387,10 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         }
         const transport = transports.get(sessionId)!;
         await transport.handleRequest(req as unknown as IncomingMessage, res as unknown as ServerResponse);
-    });
+    };
 
-    // DELETE /v1/mcp — Close MCP session
-    router.delete('/v1/mcp', async (req: Request, res: Response) => {
+    // DELETE handler — close session (role-agnostic)
+    const handleMcpDelete = async (req: Request, res: Response) => {
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
         if (!sessionId || !transports.has(sessionId)) {
             res.status(404).json({ error: 'Session not found' });
@@ -392,6 +400,34 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         await transport.close();
         transports.delete(sessionId);
         res.status(200).json({ closed: true });
+    };
+
+    // Validate the :role path param for v2 surfaces; replies 400 (JSON-RPC) on unknown role.
+    const v2Role = (req: Request, res: Response): SurfaceRole | null => {
+        const raw = req.params.role;
+        const role = (Array.isArray(raw) ? raw[0] : raw) as string;
+        if (!isV2Role(role)) {
+            res.status(400).json({ jsonrpc: '2.0', error: { code: -32602, message: `Unknown MCP surface role "${role}". Use one of: ${V2_ROLES.join(', ')}.` }, id: req.body?.id ?? null });
+            return null;
+        }
+        return role;
+    };
+
+    // ── v1/mcp — full surface (frozen, role 'all') ──
+    router.post('/v1/mcp', handleMcpPost('all'));
+    router.get('/v1/mcp', handleMcpGet);
+    router.delete('/v1/mcp', handleMcpDelete);
+
+    // ── v2/mcp/:role — purpose-scoped surfaces (appdev | agent | service | admin) ──
+    router.post('/v2/mcp/:role', async (req: Request, res: Response) => {
+        const role = v2Role(req, res);
+        if (role) await handleMcpPost(role)(req, res);
+    });
+    router.get('/v2/mcp/:role', async (req: Request, res: Response) => {
+        if (v2Role(req, res)) await handleMcpGet(req, res);
+    });
+    router.delete('/v2/mcp/:role', async (req: Request, res: Response) => {
+        if (v2Role(req, res)) await handleMcpDelete(req, res);
     });
 
     // ── OAuth 2.1 Endpoints ──
