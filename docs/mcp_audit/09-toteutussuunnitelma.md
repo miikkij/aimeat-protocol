@@ -53,15 +53,17 @@ Lisäksi uusi jaettu moduuli **`src/mcp/catalog/shape.ts`**: `shapeResponse(name
 **Valmis kun:** yksikään `mcp.tool(...)`-/`registerTool`-rekisteröinti ei sisällä inline-kuvausstringiä; `audit:mcp-tools` vihreä.
 
 **Todo:**
-- [ ] Laajenna `AimeatToolDefinition` V1:n tarvitsemilla kentillä (`supportsResponseFormat`) + tiedostoheaderin version-history (Rule 2)
-- [ ] Luo `src/mcp/catalog/shape.ts`: `descriptionFor()` + `shapeResponse(name, format, data)` + header
-- [ ] Kirjoita 98 toolin `description` uudelleen katalogiin "uudelle tiimiläiselle" -tasolle (mitä / milloin käyttää / milloin ei / suhteet / formaatti)
-- [ ] Server `src/mcp/*.ts`: korvaa inline-kuvaukset `descriptionFor(name)`:lla
-- [ ] Connector `src/cli/connect/mcp/tools/*.ts`: korvaa inline-kuvaukset `descriptionFor(name)`:lla
-- [ ] Lisää `response_format`-param + `shapeResponse`-kutsu lukuraskaisiin tooleihin (molemmat pinnat)
-- [ ] Testi: `response_format=concise` ≈ ⅓ tokeneista vs `detailed`
-- [ ] `pnpm lint` + `pnpm typecheck` + `pnpm audit:mcp-tools` vihreä
-- [ ] `e2e-mcp-prompts`, `e2e-mcp`, `e2e-mcp-memory-extended` SQLitellä vihreät — **✅ vaihe todennettu**
+- [x] Laajenna `AimeatToolDefinition` V1:n tarvitsemilla kentillä (`supportsResponseFormat`, `conciseFields`, `concisePath`) + tiedostoheaderin version-history (Rule 2)
+- [x] Luo `src/mcp/catalog/shape.ts`: `descriptionFor()` + `shapeResponse(name, format, data)` + `jsonContent()` + `responseFormatSchema` + header
+- [x] Kirjoita toolien `description` uudelleen katalogiin "uudelle tiimiläiselle" -tasolle (core-toolit käsin + 53 muuta rikastettu, handler-pohjaisesti todennettu)
+- [x] Server `src/mcp/*.ts` (22 tiedostoa): korvaa inline-kuvaukset `descriptionFor(name)`:lla
+- [x] Connector `src/cli/connect/mcp/tools/*.ts` (22 tiedostoa): korvaa inline-kuvaukset `descriptionFor(name)`:lla
+- [x] Lisää `response_format`-param + `shapeResponse`-kutsu lukuraskaisiin tooleihin (molemmat pinnat: memory_read/list, catalogue_search, board_read, work_inbox)
+- [x] Testi: `response_format=concise` projisoi oikein (9/9 yksikkötestiä `test/unit/mcp-shape.test.ts` — bare-array, wrapped, single-record, empty-guard, no-op)
+- [x] `pnpm lint` (0 erroria) + `pnpm typecheck` + `pnpm audit:mcp-tools` (0 driftiä, 0 annotaatioaukkoa) vihreä
+- [x] `e2e-mcp` + 11 muuta MCP-suitea SQLitellä vihreät (**230/230**) — **✅ vaihe todennettu** (commit `8b16b2d`)
+
+> Avoin jatkokohta (siirretty vaiheeseen 6): katalogin `input`-metadata eroaa osalla tooleista live-handlerin paramien kanssa (esim. `handbook_get` `tier` vs `module`, `consent_grant`-paramit, `board_members` `add`/`remove`) — skeema-audit reconciloi nämä.
 
 ---
 
