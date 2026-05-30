@@ -432,10 +432,13 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_storage_download',
-        description: 'Download a stored file by key. Storage holds binaries (images, video, large blobs); the content is returned base64-encoded, so only fetch what you actually need to inspect — for large media prefer handing the key onward rather than reading the bytes into context. (Phase 2 will return a download handle instead of inline base64.)',
+        description: 'Get a stored file by key. Storage holds binaries (images, video, large blobs), so by default this returns a HANDLE — a resource_link plus a presigned, TTL-limited download_url and metadata (mime_type, size) — NOT the bytes. Fetch the download_url out-of-band (or hand it to a human/tool); never read large binary into the conversation. Set inline=true only for small text files (<= 32 KB) to get the content directly.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { key: { type: 'string', required: true, description: 'Storage key to download.' } },
+        input: {
+            key: { type: 'string', required: true, description: 'Storage key to download.' },
+            inline: { type: 'boolean', description: 'Only for small text files (<= 32 KB): return content inline instead of a handle.' },
+        },
     },
     {
         name: 'aimeat_admin_stats',

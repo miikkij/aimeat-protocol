@@ -16,6 +16,10 @@
  *   v1.3.0 -- 2026-05-30 -- MCP audit Phase 1: descriptions read from canonical catalog via
  *     descriptionFor(); read-heavy tools accept response_format ('concise'|'detailed') shaped by
  *     shapeResponse(). Returns standardised via jsonContent().
+ *   v1.4.0 -- 2026-05-30 -- MCP audit Phase 2 (F3): aimeat_memory_list gains a limit param with a
+ *     default + hard cap, and owner_scope aggregation stops at the cap (was unbounded).
+ *   v1.5.0 -- 2026-05-30 -- MCP audit Phase 2 (F11): aimeat_storage_download returns a handle
+ *     (resource_link + presigned download_url) instead of base64; inline=true only for small text.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -26,10 +30,25 @@ import { parseGAII } from '../utils/gaii.js';
 import { generateTrackingCode } from '../utils/tracking-code.js';
 import { calculateWorkCost, holdEscrow, settlePayment } from '../services/morsel.js';
 import { generateUploadToken } from '../services/upload-token.js';
+import { generateDownloadToken } from '../services/download-token.js';
 import type { ResourceChangeEvent } from './index.js';
 import { resourceEvents } from './index.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema } from './catalog/shape.js';
+
+// F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
+// unbounded payload. jsonContent() is the universal char-budget backstop; these caps stop the
+// aggregation earlier and give the agent an actionable "narrow your query" signal.
+const MEMORY_LIST_DEFAULT_LIMIT = 200;
+const MEMORY_LIST_MAX_LIMIT = 1000;
+
+// F11: storage holds binaries (images, video, large blobs). aimeat_storage_download returns a
+// handle (resource_link + presigned download_url) instead of base64 so bytes never enter the
+// model context. Only small text files may be returned inline.
+const STORAGE_INLINE_MAX_BYTES = 32 * 1024;
+function isInlineableMime(mime: string): boolean {
+    return mime.startsWith('text/') || /(json|xml|csv|javascript|yaml|markdown)/i.test(mime);
+}
 
 export function registerCoreTools(
     mcp: McpServer,
@@ -281,11 +300,14 @@ export function registerCoreTools(
             visibility: z.string().optional(),
             tags: z.array(z.string()).optional().describe('Optional tag filters'),
             owner_scope: z.boolean().optional().describe('When true, list same-owner GHII and agent memory'),
+            limit: z.number().int().positive().max(MEMORY_LIST_MAX_LIMIT).optional().describe(`Max entries to return (default ${MEMORY_LIST_DEFAULT_LIMIT}, hard cap ${MEMORY_LIST_MAX_LIMIT})`),
             response_format: responseFormatSchema,
         },
         annotationsFor('aimeat_memory_list'),
-        async ({ prefix, visibility, tags, owner_scope, response_format }) => {
+        async ({ prefix, visibility, tags, owner_scope, limit, response_format }) => {
+            const cap = Math.min(limit ?? MEMORY_LIST_DEFAULT_LIMIT, MEMORY_LIST_MAX_LIMIT);
             let entries: Awaited<ReturnType<Storage['listMemory']>>;
+            let truncated = false;
             if (owner_scope) {
                 const parsed = parseGAII(agentGaii);
                 if (!parsed) {
@@ -298,23 +320,29 @@ export function registerCoreTools(
                 }
                 const ownerGhii = `${parsed.owner}@${config.nodeId}`;
                 const agents = await storage.getAgentsByOwner(parsed.owner);
-                entries = [
-                    ...await storage.listMemory(ownerGhii, { prefix, visibility, tags }),
-                ];
+                entries = [...await storage.listMemory(ownerGhii, { prefix, visibility, tags })];
+                // Stop accumulating once we exceed the cap — owner-scope can otherwise aggregate
+                // every agent's memory unbounded.
                 for (const agent of agents) {
+                    if (entries.length > cap) break;
                     entries.push(...await storage.listMemory(agent.gaii, { prefix, visibility, tags }));
                 }
             } else {
                 entries = await storage.listMemory(agentGaii, { prefix, visibility, tags });
             }
-            return jsonContent(shapeResponse('aimeat_memory_list', response_format, entries.map(e => ({
+            if (entries.length > cap) { entries = entries.slice(0, cap); truncated = true; }
+            const items = entries.map(e => ({
                 key: e.key,
                 owner_gaii: e.ownerGaii,
                 visibility: e.visibility,
                 tags: e.tags,
                 version: e.version,
                 updated_at: e.updatedAt,
-            }))));
+            }));
+            const payload = truncated
+                ? { items, truncated: true, shown: items.length, hint: `Showing first ${cap}. Narrow with prefix/tags or raise limit (max ${MEMORY_LIST_MAX_LIMIT}).` }
+                : items;
+            return jsonContent(shapeResponse('aimeat_memory_list', response_format, payload));
         },
     );
 
@@ -572,21 +600,48 @@ export function registerCoreTools(
     mcp.tool(
         'aimeat_storage_download',
         descriptionFor('aimeat_storage_download'),
-        { key: z.string() },
+        {
+            key: z.string(),
+            inline: z.boolean().optional().describe('Only for small text files (<= 32 KB): return content inline. Binaries always return a download handle, never base64 in context.'),
+        },
         annotationsFor('aimeat_storage_download'),
-        async ({ key }) => {
+        async ({ key, inline }) => {
             const file = await storage.getStorageFile(agentGaii, key);
             if (!file) return { content: [{ type: 'text' as const, text: 'File not found' }], isError: true };
+            const resourceUri = `aimeat://storage/${encodeURIComponent(key)}`;
+
+            // Inline only for small text files — keeps binaries (images/video/large blobs) out of context.
+            if (inline && file.size <= STORAGE_INLINE_MAX_BYTES && isInlineableMime(file.mimeType)) {
+                return jsonContent({
+                    key: file.key, mime_type: file.mimeType, size: file.size,
+                    mode: 'inline', content_text: file.data.toString('utf8'), resource_uri: resourceUri,
+                });
+            }
+
+            // Default: return a handle. resource_link lets MCP clients read bytes out-of-band via
+            // resources/read; download_url is a presigned, TTL-limited HTTP fetch for everything else.
+            const token = await generateDownloadToken({ sub: file.ownerGaii, key, mimeType: file.mimeType, size: file.size });
             return {
-                content: [{
-                    type: 'text' as const,
-                    text: JSON.stringify({
-                        key: file.key,
-                        mime_type: file.mimeType,
-                        size: file.size,
-                        data_base64: file.data.toString('base64'),
-                    }, null, 2),
-                }],
+                content: [
+                    {
+                        type: 'resource_link' as const,
+                        uri: resourceUri,
+                        name: file.key,
+                        mimeType: file.mimeType,
+                        description: `${file.size} bytes — fetch via download_url; do not read the bytes into context`,
+                    },
+                    {
+                        type: 'text' as const,
+                        text: JSON.stringify({
+                            key: file.key, mime_type: file.mimeType, size: file.size, mode: 'handle',
+                            download_url: `${config.baseUrl}/v1/download/${token}`,
+                            download_method: 'GET', expires_in_seconds: 3600, resource_uri: resourceUri,
+                            note: inline
+                                ? 'inline refused (file too large or not text) — returning a handle instead'
+                                : 'Binary content is not inlined. GET download_url to fetch the bytes out-of-band.',
+                        }, null, 2),
+                    },
+                ],
             };
         },
     );

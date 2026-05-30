@@ -21,6 +21,9 @@
  *   v1.1.0 -- 2026-05-30 -- shapeResponse handles both the server's bare-array/object payloads and the
  *     connector's REST-wrapped payloads (via catalog concisePath), with an empty-projection guard so a
  *     field-name mismatch safely degrades to a no-op instead of returning {}.
+ *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 2 (F3): truncateResult() + jsonContent() applies it as a
+ *     universal output-size backstop (~25k tokens, matching Claude Code's tool-output cap) so no tool
+ *     can blow the model context with an unbounded payload.
  */
 
 import { z } from 'zod';
@@ -104,7 +107,30 @@ export function shapeResponse(name: string, format: ResponseFormat | undefined, 
     return data;
 }
 
-/** Standard MCP text-content envelope around a JSON-serialisable payload. */
-export function jsonContent(data: unknown): { content: { type: 'text'; text: string }[] } {
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+/**
+ * Universal output-size backstop. Claude Code truncates tool results at ~25k tokens; an unbounded
+ * list (e.g. owner-scope memory, a full catalogue) can otherwise blow the context or get silently
+ * cut mid-JSON. Default ~100k chars ≈ 25k tokens. When exceeded, returns a VALID-JSON envelope
+ * carrying a preview plus an actionable hint, rather than truncating raw JSON into garbage.
+ */
+export const DEFAULT_MAX_RESULT_CHARS = 100_000;
+
+export function truncateResult(text: string, maxChars: number = DEFAULT_MAX_RESULT_CHARS): string {
+    if (text.length <= maxChars) return text;
+    return JSON.stringify({
+        _truncated: true,
+        reason: `Result exceeded ${maxChars} characters (~${Math.round(maxChars / 4)} tokens) and was truncated to protect the context window.`,
+        shown_chars: maxChars,
+        total_chars: text.length,
+        hint: 'Narrow the request: use a more specific prefix/filter, a smaller limit, or response_format="concise".',
+        preview: text.slice(0, maxChars),
+    }, null, 2);
+}
+
+/**
+ * Standard MCP text-content envelope around a JSON-serialisable payload. Applies truncateResult()
+ * so every tool that returns through here is automatically bounded.
+ */
+export function jsonContent(data: unknown, maxChars: number = DEFAULT_MAX_RESULT_CHARS): { content: { type: 'text'; text: string }[] } {
+    return { content: [{ type: 'text' as const, text: truncateResult(JSON.stringify(data, null, 2), maxChars) }] };
 }

@@ -216,10 +216,14 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   mcp.tool('aimeat_storage_download', descriptionFor('aimeat_storage_download'), {
     agent_name: agentNameSchema,
     key: z.string().describe('Storage key'),
-  }, annotationsFor('aimeat_storage_download'), async ({ agent_name, key }) => {
+    inline: z.boolean().optional().describe('Only for small text files (<= 32 KB): return content inline. Binaries always return a download handle, never base64 in context.'),
+  }, annotationsFor('aimeat_storage_download'), async ({ agent_name, key, inline }) => {
     const { client } = pickAgent(registry, agent_name);
-    const resp = await client.get(`/v1/storage/${encodeURIComponent(key)}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    // F11: never pull raw bytes through the model context — request a handle (presigned
+    // download_url + metadata), or inline only for small text files.
+    const mode = inline ? 'inline' : 'handle';
+    const resp = await client.get(`/v1/storage/${encodeURIComponent(key)}?mode=${mode}`);
+    return jsonContent(resp.data ?? resp);
   });
 
   // ── Admin ───────────────────────────────────────────────────────────

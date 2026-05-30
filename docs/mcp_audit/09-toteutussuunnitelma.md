@@ -88,16 +88,19 @@ Lisäksi uusi jaettu moduuli **`src/mcp/catalog/shape.ts`**: `shapeResponse(name
 **Valmis kun:** grep "truncat|maxToken" löytää jaetun katon; `storage_download` palauttaa aina `resource_link`+URL+metadata — binääritavut eivät virtaa tool-vastaukseen; `inline:true` toimii vain pienelle tekstille.
 
 **Todo:**
-- [ ] `listDefaults: { defaultLimit, maxLimit }` kaikille listatooleille katalogissa
-- [ ] Korjaa server `aimeat_memory_list` ottamaan `limit` (puuttuu nyt) → signature-pariteetti connectorin kanssa
-- [ ] `shape.ts`: `truncateResult(text, maxTokens=25000)` + `_truncated`-ohjekenttä; sovella jaetussa return-helperissä molemmilla pinnoilla
-- [ ] `aimeat_memory_list owner_scope:true`: aggregaattikatto + pudotettujen raportointi
-- [ ] `aimeat_storage_download`: poista base64-inline oletuspolusta; palauta aina `resource_link` (`aimeat://storage/{key}`) + presigned URL + metadata
-- [ ] `inline: true` -override vain pienelle tekstille (≤ 32 KB & tekstipohjainen mime), muuten estä → handle
-- [ ] Uusi reitti `GET /v1/download/:token` → `openapi.yaml` + `pnpm generate:types` (Rule 3)
-- [ ] Testit: `e2e-mcp-memory-extended`, storage-osa, download-token (happy + expired/oversize), **testi: iso binääri ei palaudu base64:nä**
-- [ ] `pnpm lint` + `pnpm typecheck` vihreä
-- [ ] Relevantit `e2e-mcp-*` SQLitellä vihreät — **✅ vaihe todennettu**
+- [x] `shape.ts`: `truncateResult(text, ~25k tokens)` + `_truncated`-ohjekenttä; `jsonContent()` soveltaa sen **universaalina** backstoppina molemmilla pinnoilla
+- [x] Korjaa server `aimeat_memory_list` ottamaan `limit` (default 200 / hard cap 1000) → signature-pariteetti connectorin kanssa
+- [x] `aimeat_memory_list owner_scope:true`: aggregaattikatto (lopettaa kun cap ylittyy) + `truncated`/`shown`/`hint`-raportointi
+- [x] `aimeat_storage_download`: poista base64-inline oletuspolusta; palauta aina `resource_link` (`aimeat://storage/{key}`) + presigned `download_url` + metadata
+- [x] `inline: true` -override vain pienelle tekstille (≤ 32 KB & tekstipohjainen mime), muuten handle
+- [x] Uusi `download-token.ts`-palvelu (TTL, ei single-use → Range toimii) + `GET /v1/download/:token` (presigned, no-auth) + storage `GET ?mode=handle|inline`
+- [x] **Rule 3:** `openapi.yaml` (/v1/download/{token} + storage mode-param) + `pnpm generate:types` (matkalla korjattu 2 ennestään rikkinäistä spec-kohtaa: `AimeatResponse`-dangling-ref, `getAgentInbox`-duplikaatti operationId)
+- [x] Testit: download-token-yksikkötesti (roundtrip/expired/wrong-typ/garbage), e2e: `storage_download` palauttaa handlen + presigned URL palauttaa tavut + **iso binääri ei palaudu base64:nä** + inline-teksti
+- [x] `pnpm lint` (0 erroria) + `pnpm typecheck` vihreä
+- [x] e2e: **232** MCP + 52 micro-memory + 58 upload/storage-visibility + **17** yksikkötestiä SQLitellä vihreät — **✅ vaihe todennettu**
+
+> Avoimet jatkokohdat: `listDefaults`-metadata + universaali truncation kaikkiin handlereihin → luontevasti Phase 4:n `registerTool`-migraation yhteyteen (siellä kosketaan kaikkia handlereita). `aimeat_storage_upload`-presigned-paritus connectorissa on jo olemassa.
+> **Sivulöydös (jo korjattu):** `generate:types` oli rikki `main`issa kahden ennestään olemassa olevan spec-virheen takia; korjattiin campsite-periaatteella tämän vaiheen yhteydessä.
 
 ---
 

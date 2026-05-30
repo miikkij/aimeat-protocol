@@ -5275,6 +5275,40 @@ paths:
         '413':
           description: File exceeds size limit encoded in token
 
+  /v1/download/{token}:
+    get:
+      operationId: downloadViaToken
+      summary: Download file via presigned token
+      description: |
+        Streams the bytes of one stored file. The token (from aimeat_storage_download or
+        GET /v1/storage/{key}?mode=handle) encodes the owner and key and has a TTL.
+        No Authorization header needed; supports Range headers. Not single-use — the handle
+        may be fetched multiple times within its TTL (e.g. Range requests, resumes).
+      tags: [Storage]
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Presigned download JWT token
+      responses:
+        '200':
+          description: File content (raw bytes)
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '206':
+          description: Partial content (Range request)
+        '401':
+          description: Invalid token
+        '404':
+          description: File not found
+        '410':
+          description: Token expired
+
   # ── Binary Storage ─────────────────────────────────────────
   /v1/storage:
     post:
@@ -5321,7 +5355,12 @@ paths:
     get:
       operationId: downloadFile
       summary: Download file
-      description: Supports Range headers for partial downloads.
+      description: >
+        Returns raw bytes by default (supports Range headers for partial downloads).
+        With `mode=handle`, returns a JSON handle (resource_uri + presigned, TTL-limited
+        download_url + metadata) instead of bytes — used by MCP clients so binary content
+        never enters the model context. With `mode=inline`, returns small (<= 32 KB) text
+        files inline as JSON; larger or non-text files are rejected with 413.
       tags: [Storage]
       security:
         - BearerAuth: []
@@ -5331,16 +5370,28 @@ paths:
           required: true
           schema:
             type: string
+        - name: mode
+          in: query
+          required: false
+          description: Omit for raw bytes. `handle` returns a presigned download_url; `inline` returns small text inline.
+          schema:
+            type: string
+            enum: [handle, inline]
       responses:
         '200':
-          description: File content
+          description: File content (raw bytes), or a JSON handle/inline payload when `mode` is set
           content:
             application/octet-stream:
               schema:
                 type: string
                 format: binary
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
         '206':
           description: Partial content (Range request)
+        '413':
+          description: Inline refused — file too large or not text (use mode=handle)
 
     head:
       operationId: fileMetadata
@@ -6325,7 +6376,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AimeatResponse'
+                $ref: '#/components/schemas/AimeatEnvelope'
         '403':
           description: Only board owner or operator can manage members
         '404':
@@ -16990,7 +17041,7 @@ paths:
 
   /v1/agents/{name}/messages/inbox:
     get:
-      operationId: getAgentInbox
+      operationId: getAgentMessagesInbox
       summary: Get pending inbound messages
       description: Returns messages with status 'pending' and direction 'inbound' (agent polling endpoint)
       tags: [Agent Messages]

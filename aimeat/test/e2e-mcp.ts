@@ -528,6 +528,56 @@ await test('24. aimeat_board_read', async () => {
     assert(Array.isArray(result), 'is array');
 });
 
+await test('24b. aimeat_storage_download returns a handle for binaries (F11: no base64 in context)', async () => {
+    const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4, 5]);
+    // Upload a binary file inline (small, but image mime → not inlineable on download)
+    const up = await mcpRpc('tools/call', {
+        name: 'aimeat_storage_upload',
+        arguments: { key: 'mcp-bin.png', data_base64: bytes.toString('base64'), mime_type: 'image/png' },
+    }, 17);
+    assert(up.status === 200, `upload status ${up.status}: ${JSON.stringify(up.body)}`);
+
+    const { status, body } = await mcpRpc('tools/call', {
+        name: 'aimeat_storage_download',
+        arguments: { key: 'mcp-bin.png' },
+    }, 18);
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const content = body.result.content;
+    const link = content.find((c: any) => c.type === 'resource_link');
+    assert(link !== undefined, 'has resource_link content block');
+    assert(link.uri === 'aimeat://storage/mcp-bin.png', `resource_link uri: ${link.uri}`);
+    const textBlock = content.find((c: any) => c.type === 'text');
+    const meta = JSON.parse(textBlock.text);
+    assert(meta.mode === 'handle', `mode: ${meta.mode}`);
+    assert(typeof meta.download_url === 'string' && meta.download_url.includes('/v1/download/'), `download_url: ${meta.download_url}`);
+    assert(meta.data_base64 === undefined, 'must NOT inline base64 for a binary');
+    assert(!textBlock.text.includes('iVBOR') && !textBlock.text.includes(bytes.toString('base64')), 'raw bytes must not appear in the result');
+
+    // The presigned download_url returns the actual bytes (no auth header)
+    const dl = await fetch(meta.download_url);
+    assert(dl.status === 200, `download status ${dl.status}`);
+    const got = Buffer.from(await dl.arrayBuffer());
+    assert(got.equals(bytes), 'downloaded bytes match the uploaded bytes');
+});
+
+await test('24c. aimeat_storage_download inline=true returns small text content', async () => {
+    const text = 'hello inline text';
+    const up = await mcpRpc('tools/call', {
+        name: 'aimeat_storage_upload',
+        arguments: { key: 'mcp-note.txt', data_base64: Buffer.from(text).toString('base64'), mime_type: 'text/plain' },
+    }, 19);
+    assert(up.status === 200, `upload status ${up.status}`);
+
+    const { status, body } = await mcpRpc('tools/call', {
+        name: 'aimeat_storage_download',
+        arguments: { key: 'mcp-note.txt', inline: true },
+    }, 23);
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const result = JSON.parse(body.result.content[0].text);
+    assert(result.mode === 'inline', `mode: ${result.mode}`);
+    assert(result.content_text === text, `content_text: ${result.content_text}`);
+});
+
 // ─── Phase 6: MCP Resource Read ───
 console.log('\nPhase 6 — MCP Resource Read');
 

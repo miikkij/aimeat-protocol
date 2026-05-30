@@ -1,3 +1,17 @@
+/**
+ * @file storage-files.ts
+ * @description Binary file storage REST API: upload (inline/presigned/chunked), list, download,
+ *   delete, and public/consent access. Files are addressed by key under an owner GAII.
+ * @structure
+ *   - storageFilesRouter() — Express router: POST/GET/HEAD/DELETE /v1/storage, chunked upload,
+ *     presigned GET /v1/download/:token, and public GET /v1/pub/:gaii/{*key}
+ * @usage
+ *   import { storageFilesRouter } from '../routes/storage-files.js';
+ *   app.use(storageFilesRouter(config, storage));
+ * @version-history
+ *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 2 (F11): presigned GET /v1/download/:token + storage
+ *     GET ?mode=handle|inline so binary bytes are fetched out-of-band, never base64'd into context.
+ */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -12,6 +26,14 @@ import { checkStorageQuota, chargeOverage } from '../services/quota.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { generateUploadToken } from '../services/upload-token.js';
+import { generateDownloadToken, verifyDownloadToken, DownloadTokenError } from '../services/download-token.js';
+
+/** F11: max bytes returned inline (base64) from handle/inline download mode — keeps big binaries out of the model context. */
+const INLINE_MAX_BYTES = 32 * 1024;
+/** F11: mime types small enough / textual enough to be safe to inline. */
+function isInlineableMime(mime: string): boolean {
+    return mime.startsWith('text/') || /(json|xml|csv|javascript|yaml|markdown|x-www-form-urlencoded)/i.test(mime);
+}
 
 /** Anonymous agents (shared#anonymous@...) may only use keys prefixed with "anonymous/" */
 function isAnonymousGaii(gaii: string): boolean {
@@ -34,6 +56,51 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
 
     // Max chunked file size (configurable, default 5 GB)
     const MAX_CHUNKED_FILE_SIZE = config.storageMaxChunkedFileSizeGb * 1024 * 1024 * 1024;
+
+    // GET /v1/download/:token — presigned download (F11). No agent auth: the token IS the
+    // capability and is scoped to one owner+key with a TTL. Lets binary bytes be fetched
+    // out-of-band (handed off, embedded, streamed) instead of base64'd into the model context.
+    router.get('/v1/download/:token', async (req, res) => {
+        let verified;
+        try {
+            verified = await verifyDownloadToken(req.params.token as string);
+        } catch (err) {
+            if (err instanceof DownloadTokenError) {
+                const status = err.code === 'TOKEN_EXPIRED' ? 410 : 401;
+                res.status(status).json(error(config.nodeId, err.code, err.message));
+                return;
+            }
+            res.status(401).json(error(config.nodeId, 'TOKEN_INVALID', 'Invalid download token'));
+            return;
+        }
+
+        const file = await storage.getStorageFile(verified.sub, verified.key);
+        if (!file) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'File not found'));
+            return;
+        }
+
+        const rangeHeader = req.headers.range;
+        if (rangeHeader) {
+            const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+            if (match) {
+                const start = parseInt(match[1], 10);
+                const end = match[2] ? parseInt(match[2], 10) : file.size - 1;
+                const chunk = file.data.subarray(start, end + 1);
+                res.status(206);
+                res.setHeader('Content-Range', `bytes ${start}-${end}/${file.size}`);
+                res.setHeader('Content-Length', chunk.length);
+                res.setHeader('Content-Type', file.mimeType);
+                res.end(chunk);
+                return;
+            }
+        }
+
+        res.setHeader('Content-Type', file.mimeType);
+        res.setHeader('Content-Length', file.size);
+        res.setHeader('Cache-Control', 'private, max-age=300');
+        res.end(file.data);
+    });
 
     // POST /v1/storage — upload file (agent auth)
     router.post('/v1/storage', requireAuth(), requireRole('agent'), async (req, res) => {
@@ -509,6 +576,33 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only access your own files'));
                 return;
             }
+        }
+
+        // F11: ?mode=handle | inline — return a JSON handle instead of raw bytes, so callers
+        // (e.g. the connector MCP) never pull binary into the model context. Default = raw bytes.
+        const mode = (Array.isArray(req.query.mode) ? req.query.mode[0] : req.query.mode) as string | undefined;
+        if (mode === 'handle' || mode === 'inline') {
+            const resourceUri = `aimeat://storage/${encodeURIComponent(key)}`;
+            if (mode === 'inline') {
+                if (file.size > INLINE_MAX_BYTES || !isInlineableMime(file.mimeType)) {
+                    res.status(413).json(error(config.nodeId, 'INLINE_NOT_ALLOWED',
+                        `Inline is only for small (<= ${INLINE_MAX_BYTES} bytes) text files. This file is ${file.size} bytes (${file.mimeType}). Use mode=handle and the download_url instead.`));
+                    return;
+                }
+                res.json(success(config.nodeId, {
+                    key: file.key, mime_type: file.mimeType, size: file.size, mode: 'inline',
+                    content_text: file.data.toString('utf8'), resource_uri: resourceUri,
+                }));
+                return;
+            }
+            const token = await generateDownloadToken({ sub: file.ownerGaii, key, mimeType: file.mimeType, size: file.size });
+            res.json(success(config.nodeId, {
+                key: file.key, mime_type: file.mimeType, size: file.size, visibility: file.visibility, mode: 'handle',
+                download_url: `${config.baseUrl}/v1/download/${token}`,
+                download_method: 'GET', expires_in_seconds: 3600, resource_uri: resourceUri,
+                note: 'Binary content is NOT inlined. GET download_url to fetch the bytes out-of-band.',
+            }, [{ description: 'Fetch the file bytes', method: 'GET', url: `/v1/download/${token}` }]));
+            return;
         }
 
         // Range header support

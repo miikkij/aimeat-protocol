@@ -8,7 +8,7 @@
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 1 (F5): cover concise projection + empty-projection guard
  */
 import { describe, it, expect } from 'vitest';
-import { shapeResponse, descriptionFor } from '../../src/mcp/catalog/shape.js';
+import { shapeResponse, descriptionFor, truncateResult, jsonContent } from '../../src/mcp/catalog/shape.js';
 
 describe('shapeResponse — response_format projection', () => {
   it('returns data unchanged for detailed / undefined format', () => {
@@ -59,6 +59,37 @@ describe('shapeResponse — response_format projection', () => {
   it('is a no-op for tools that declare no conciseFields', () => {
     const balance = { balance: 100, in_escrow: 5, available: 95 };
     expect(shapeResponse('aimeat_wallet_balance', 'concise', balance)).toEqual(balance);
+  });
+});
+
+describe('truncateResult — output-size backstop', () => {
+  it('returns text unchanged when under the limit', () => {
+    const text = '{"ok":true}';
+    expect(truncateResult(text, 1000)).toBe(text);
+  });
+
+  it('wraps over-limit text in a valid-JSON truncation envelope with a preview', () => {
+    const big = 'x'.repeat(500);
+    const out = truncateResult(big, 100);
+    const parsed = JSON.parse(out);
+    expect(parsed._truncated).toBe(true);
+    expect(parsed.total_chars).toBe(500);
+    expect(parsed.shown_chars).toBe(100);
+    expect(parsed.preview).toHaveLength(100);
+    expect(parsed.hint).toMatch(/narrow/i);
+  });
+
+  it('jsonContent applies the truncation backstop', () => {
+    const huge = { blob: 'y'.repeat(2000) };
+    const res = jsonContent(huge, 200);
+    expect(res.content[0].type).toBe('text');
+    const parsed = JSON.parse(res.content[0].text);
+    expect(parsed._truncated).toBe(true);
+  });
+
+  it('jsonContent passes small payloads through untouched', () => {
+    const res = jsonContent({ a: 1 });
+    expect(JSON.parse(res.content[0].text)).toEqual({ a: 1 });
   });
 });
 
