@@ -124,6 +124,54 @@
 .pf .pf-agd-status-failed  { background: rgba(239, 68, 68, 0.1); color: var(--danger, #ef4444); }
 .pf .agd-status-stalled ,
 .pf .pf-agd-status-stalled  { background: rgba(239, 68, 68, 0.1); color: var(--warn, #F59E0B); }
+.pf .pf-agd-status-revision_requested { background: rgba(217, 119, 6, 0.18); color: var(--warn, #F59E0B); }
+
+/* Task revision flow (since 1.14.5): outdated todos shown collapsed beneath
+   the active proposal so the owner can see what was replaced after a
+   /request-changes round-trip. */
+.pf .pf-agd-todo-history {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border, #E5E7EB);
+}
+.pf .pf-agd-todo-history-toggle {
+  background: none;
+  border: none;
+  color: var(--text-dim, #6B7280);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.25rem 0;
+  text-align: left;
+}
+.pf .pf-agd-todo-history-toggle:hover { color: var(--text); }
+.pf .pf-agd-todo-list-outdated {
+  opacity: 0.6;
+  margin-top: 0.25rem;
+}
+.pf .pf-agd-todo-outdated .pf-agd-todo-title {
+  text-decoration: line-through;
+  color: var(--text-dim, #6B7280);
+}
+
+/* Request-changes modal contents */
+.pf .pf-agd-modal-help {
+  color: var(--text-dim, #6B7280);
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+.pf .pf-agd-revision-textarea {
+  width: 100%;
+  min-height: 8rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 6px;
+  background: var(--card, #FFFFFF);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.95rem;
+  resize: vertical;
+  box-sizing: border-box;
+}
 
 /* Task creation form */
 .pf .agd-create-form ,

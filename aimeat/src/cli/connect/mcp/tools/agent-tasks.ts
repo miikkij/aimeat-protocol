@@ -68,7 +68,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_task_propose_todos', 'Propose TODOs for a queued task before owner approval or onboarding auto-start', {
+  mcp.tool('aimeat_task_propose_todos', 'Propose TODOs for a queued task, or re-propose after the owner requested changes. Trust the success response -- new todos are saved, any older todos are kept as outdated history.', {
     agent_name: agentNameSchema,
     task_id: z.string().describe('Task identifier'),
     todos: z.array(z.object({
@@ -80,20 +80,30 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
   }, annotationsFor('aimeat_task_propose_todos'), async ({ agent_name, task_id, todos }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
+    // Dedicated endpoint handles the queued/revision_requested state machine
+    // and merges new todos with the outdated history -- a raw PATCH would
+    // clobber the outdated entries the owner can see in the dashboard.
     const payload = {
-      todos: todos.map((todo, index) => ({
-        id: `todo-${index + 1}`,
-        order: index + 1,
+      todos: todos.map((todo) => ({
         title: todo.title,
         description: todo.description ?? '',
         environment: 'agent',
-        environment_reason: 'The connected agent can perform this onboarding verification step through AIMEAT MCP tools.',
         verification: todo.verification ?? '',
         estimate_minutes: todo.estimate_minutes,
-        status: 'pending',
       })),
     };
-    const resp = await client.patch(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}`, payload);
+    const resp = await client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}/propose-todos`, payload);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+  });
+
+  mcp.tool('aimeat_task_request_changes', 'Owner-only: ask the agent to revise the proposed TODO plan. The agent keeps the old todos as outdated history and calls aimeat_task_propose_todos again with a revised plan.', {
+    agent_name: agentNameSchema,
+    task_id: z.string().describe('Task identifier (must be a queued task that already has proposed todos)'),
+    message: z.string().describe("Owner's free-text change request explaining how the plan should be revised"),
+  }, annotationsFor('aimeat_task_request_changes'), async ({ agent_name, task_id, message }) => {
+    const { client, agent } = pickAgent(registry, agent_name);
+    const enc = encodeURIComponent(agent);
+    const resp = await client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}/request-changes`, { message });
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 

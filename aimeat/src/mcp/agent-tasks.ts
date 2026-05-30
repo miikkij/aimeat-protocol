@@ -214,25 +214,35 @@ export function registerAgentTaskTools(
                 return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
             }
 
-            if (!['queued', 'active'].includes(task.status)) {
-                return { content: [{ type: 'text' as const, text: `TODOs can only be proposed on queued or active tasks (current: ${task.status})` }], isError: true };
+            if (!['queued', 'revision_requested', 'active'].includes(task.status)) {
+                return { content: [{ type: 'text' as const, text: `TODOs can only be proposed on queued, revision_requested, or active tasks (current: ${task.status})` }], isError: true };
             }
 
             const now = new Date().toISOString();
-            const proposedTodos: AgentTaskTodo[] = todos.map((todo, index) => ({
-                id: `todo-${index + 1}`,
-                order: index + 1,
+            // Preserve outdated history (from prior revision cycles) and retire still-
+            // pending todos to outdated when the task is in revision_requested state.
+            // This mirrors POST /v1/agents/:name/tasks/:id/propose-todos exactly.
+            const preserved: AgentTaskTodo[] = (task.todos ?? []).flatMap(t => {
+                if (t.status === 'outdated') return [t];
+                if (task.status === 'revision_requested') return [{ ...t, status: 'outdated' as const }];
+                return [];
+            });
+            const baseOrder = preserved.length;
+            const newTodos: AgentTaskTodo[] = todos.map((todo, index) => ({
+                id: `todo-${baseOrder + index + 1}`,
+                order: baseOrder + index + 1,
                 title: todo.title,
                 description: todo.description ?? '',
                 environment: 'agent',
-                environmentReason: 'The connected agent can perform this onboarding verification step through AIMEAT MCP tools.',
+                environmentReason: 'The connected agent can perform this work through AIMEAT MCP tools.',
                 verification: todo.verification ?? '',
                 estimateMinutes: todo.estimate_minutes,
                 status: 'pending',
             }));
 
             const updated = await storage.updateAgentTask(task_id, {
-                todos: proposedTodos,
+                todos: [...preserved, ...newTodos],
+                status: task.status === 'revision_requested' ? 'queued' : task.status,
                 lastEventAt: now,
                 updatedAt: now,
             });
@@ -241,8 +251,8 @@ export function registerAgentTaskTools(
                 id: randomUUID(),
                 taskId: task_id,
                 type: 'progress',
-                message: 'TODO plan proposed',
-                details: { todo_count: proposedTodos.length },
+                message: task.status === 'revision_requested' ? 'Revised TODO plan proposed' : 'TODO plan proposed',
+                details: { todo_count: newTodos.length, outdated_count: preserved.length },
                 timestamp: now,
             });
 
@@ -255,8 +265,9 @@ export function registerAgentTaskTools(
                         updated: true,
                         task_id,
                         status: updated?.status ?? task.status,
-                        todo_count: proposedTodos.length,
-                        todos: proposedTodos.map(todo => ({
+                        todo_count: newTodos.length,
+                        outdated_count: preserved.length,
+                        todos: newTodos.map(todo => ({
                             id: todo.id,
                             order: todo.order,
                             title: todo.title,

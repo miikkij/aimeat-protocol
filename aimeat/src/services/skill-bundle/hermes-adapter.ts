@@ -107,10 +107,14 @@ Hello Integration is AIMEAT's required first-run onboarding handshake for every 
 
 ## Completing the test task (canonical task lifecycle)
 1. Call \`aimeat_task_propose_todos\` ONCE with your TODO plan.
-2. Mark each returned TODO 'done' with \`aimeat_task_todo\` (one call per TODO).
-3. Call \`aimeat_task_complete\` ONCE with the task id.
+2. Wait for the owner to approve (task goes to \`active\`). Task-runner mode tasks land in \`active\` immediately.
+3. Mark each TODO 'done' with \`aimeat_task_todo\` (one call per TODO).
+4. Call \`aimeat_task_complete\` ONCE with the task id.
 
-\`aimeat_task_complete\` is the final action. It satisfies the onboarding step \`complete_test_task\` AND fulfils any TODO whose verification is "task status is completed" -- one call covers both. When it returns success, the test task is finished; advance to the next pending onboarding step from your original snapshot.
+\`aimeat_task_complete\` is the final action. It satisfies the onboarding step \`complete_test_task\` AND fulfils any TODO whose verification is "task status is completed" -- one call covers both.
+
+## When a task comes back in 'revision_requested'
+The owner asked for a different plan. Read the change request from the linked inbox message (or the task's latest \`revision_requested\` event), then call \`aimeat_task_propose_todos\` again with the revised plan. The server keeps your prior proposal as \`outdated\` history and flips the task back to \`queued\` for owner review.
 
 ## Directives
 ${rulesBlock}

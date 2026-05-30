@@ -392,6 +392,110 @@ await test('15. Integration kit', async () => {
     assert(typeof body.data.kit.error_protocol === 'object', 'has error_protocol');
 });
 
+// ─── Phase 7: Revision lifecycle (since 1.14.5) ───
+console.log('\nPhase 7 -- Revision Lifecycle');
+
+let revisionTaskId = '';
+await test('16. Setup: owner creates a queued task with no todos', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            title: 'Revision flow task',
+            description: 'Owner will request changes mid-flow.',
+            status: 'queued',
+        }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    revisionTaskId = body.data.task.id;
+});
+
+await test('17. Agent proposes initial TODO plan via /propose-todos', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks/${revisionTaskId}/propose-todos`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({
+            todos: [
+                { title: 'Fetch source data', verification: 'has data' },
+                { title: 'Summarise findings', verification: 'has summary' },
+            ],
+        }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.task.status === 'queued', `status: ${body.data.task.status}`);
+    assert(body.data.task.todos.length === 2, `todo count: ${body.data.task.todos.length}`);
+    assert(body.data.task.todos.every((t: any) => t.status === 'pending'), 'all proposed pending');
+});
+
+await test('18. Owner requests changes -> status revision_requested + todos outdated', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks/${revisionTaskId}/request-changes`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ message: 'Add a verification step at the end and skip the summary.' }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.task.status === 'revision_requested', `status: ${body.data.task.status}`);
+    assert(body.data.task.todos.every((t: any) => t.status === 'outdated'), 'all todos outdated');
+    assert(body.data.message && body.data.message.linkedTaskId === revisionTaskId, 'linked message stored');
+});
+
+await test('19. Request changes rejected when task has no pending todos', async () => {
+    const { status } = await json(`/v1/agents/${agentName}/tasks/${revisionTaskId}/request-changes`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ message: 'Try again.' }),
+    });
+    assert(status === 409, `expected 409 (status is revision_requested), got ${status}`);
+});
+
+await test('20. Request changes is owner-only (agent gets 403)', async () => {
+    const { status } = await json(`/v1/agents/${agentName}/tasks/${revisionTaskId}/request-changes`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ message: 'Cannot self-request.' }),
+    });
+    assert(status === 403, `expected 403, got ${status}`);
+});
+
+await test('21. Agent re-proposes -> status back to queued, outdated kept, new pending appended', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks/${revisionTaskId}/propose-todos`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({
+            todos: [
+                { title: 'Fetch source data', verification: 'has data' },
+                { title: 'Run verification checks', verification: 'all checks pass' },
+            ],
+        }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.task.status === 'queued', `status: ${body.data.task.status}`);
+    const todos = body.data.task.todos;
+    const outdated = todos.filter((t: any) => t.status === 'outdated');
+    const pending = todos.filter((t: any) => t.status === 'pending');
+    assert(outdated.length === 2, `outdated count: ${outdated.length}`);
+    assert(pending.length === 2, `pending count: ${pending.length}`);
+});
+
+await test('22. Owner can /start the revised plan', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks/${revisionTaskId}/start`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.task.status === 'active', `status: ${body.data.task.status}`);
+});
+
+await test('23. Revision_requested event was logged with owner message', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks/${revisionTaskId}/events`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const revEvent = body.data.events.find((e: any) => e.type === 'revision_requested');
+    assert(revEvent, 'revision_requested event present');
+    assert(revEvent.message.includes('verification step'), `event message: ${revEvent.message}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 

@@ -5,6 +5,7 @@
  *   for the agent task queue system.
  * @version-history
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
+ *   v1.1.0 -- 2026-05-29 -- Add requestChanges() for the owner-asks-agent-to-revise-todos flow.
  */
 import { apiGet, apiPost, apiDelete } from '/js/api.js';
 
@@ -39,6 +40,10 @@ export async function failTask(agentName, taskId, reason) {
 
 export async function deleteTask(agentName, taskId) {
   return apiDelete(`/v1/agents/${encodeURIComponent(agentName)}/tasks/${encodeURIComponent(taskId)}`);
+}
+
+export async function requestChanges(agentName, taskId, message) {
+  return apiPost(`/v1/agents/${encodeURIComponent(agentName)}/tasks/${encodeURIComponent(taskId)}/request-changes`, { message });
 }
 
 export async function listEvents(agentName, taskId) {

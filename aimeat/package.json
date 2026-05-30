@@ -1,6 +1,6 @@
 {
   "name": "aimeat",
-  "version": "1.14.4",
+  "version": "1.14.5",
   "description": "AIME AT - AI Memory Exchange and Action Transfer - reference implementation",
   "type": "module",
   "main": "dist/src/index.js",

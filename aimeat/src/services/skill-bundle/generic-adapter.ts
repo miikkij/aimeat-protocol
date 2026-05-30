@@ -146,12 +146,26 @@ aimeat_memory_write({
 ## Completing the onboarding test task (canonical task lifecycle)
 
 1. Call \`aimeat_task_propose_todos\` ONCE with your TODO plan for the test task.
-2. Mark each returned TODO 'done' with \`aimeat_task_todo\` (one call per TODO).
-3. Call \`aimeat_task_complete\` ONCE with the task id.
+2. Wait for the owner to approve. The task transitions to \`active\` when approved (task-runner mode agents skip this gate -- their tasks land in \`active\` immediately).
+3. Mark each TODO 'done' with \`aimeat_task_todo\` (one call per TODO) as you finish the work.
+4. Call \`aimeat_task_complete\` ONCE with the task id.
 
 \`aimeat_task_complete\` is the final action. It satisfies the onboarding step \`complete_test_task\` AND fulfils any TODO whose verification is "task status is completed" -- one call covers both. When \`aimeat_task_complete\` returns success, the test task is finished; advance to the next pending onboarding step from your original snapshot.
 
-This same propose-todos -> mark-todos-done -> task_complete lifecycle applies to every task you receive in the future, not just the onboarding test task.
+## When the owner requests a revised TODO plan
+
+If a task you proposed comes back in status \`revision_requested\`, the owner saw your plan and asked for changes. The change request is delivered two ways: as an inbound message in \`aimeat_message_inbox\` with \`linked_task_id\` set to that task, and as a task event of type \`revision_requested\` visible via the task detail.
+
+To revise:
+
+1. Read the owner's change request (the message \`content\`, or the latest \`revision_requested\` event \`message\` on the task).
+2. Decide a new TODO plan that addresses the request.
+3. Call \`aimeat_task_propose_todos\` AGAIN with the revised TODOs. The server preserves your previous proposal as \`outdated\` history (visible to the owner for context) and appends your new TODOs as \`pending\`. The task flips back to \`queued\` for the owner to review.
+4. Wait for the owner to /start the task (or to request changes again).
+
+Trust the success response from the revised \`aimeat_task_propose_todos\` call -- the new plan is saved and the owner is notified.
+
+This same propose-todos -> (revise if asked) -> wait-for-active -> mark-todos-done -> task_complete lifecycle applies to every task you receive in the future, not just the onboarding test task.
 
 ## Directives
 ${rulesBlock}

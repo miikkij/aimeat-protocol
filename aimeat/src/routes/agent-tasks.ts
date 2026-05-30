@@ -32,7 +32,8 @@ import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { recordTaskStarted, recordTaskCompleted, recordTaskFailed } from '../services/activity-recorder.js';
-import { AgentTaskCreateSchema, AgentTaskUpdateSchema, AgentTaskEventSchema, AgentTaskTodoUpdateSchema } from '../models/agent-task-schemas.js';
+import { AgentTaskCreateSchema, AgentTaskUpdateSchema, AgentTaskEventSchema, AgentTaskTodoUpdateSchema, AgentTaskRequestChangesSchema } from '../models/agent-task-schemas.js';
+import type { AgentMessageRecord } from '../storage/interface.js';
 import { requireReadiness } from '../middleware/readiness-gate.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 
@@ -293,9 +294,9 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
         `Owner can only update draft or queued tasks (current: ${task.status})`));
       return;
     }
-    if (!isOwnerSession && !['queued', 'active'].includes(task.status)) {
+    if (!isOwnerSession && !['queued', 'revision_requested', 'active'].includes(task.status)) {
       res.status(409).json(error(config.nodeId, 'INVALID_STATE',
-        `Agent can only update queued or active tasks (current: ${task.status})`));
+        `Agent can only update queued, revision_requested, or active tasks (current: ${task.status})`));
       return;
     }
 
@@ -471,6 +472,238 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
 
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks');
+  });
+
+  /* ── POST /v1/agents/:name/tasks/:id/propose-todos -- Agent proposes (or re-proposes) a TODO plan ──
+   *
+   * The merge-aware companion to PATCH /tasks/:id. Use this endpoint instead
+   * of raw PATCH when the agent wants to propose todos -- the server handles
+   * the queued/revision_requested state machine and preserves the outdated
+   * history correctly.
+   *
+   *  queued (no todos)        -> set todos = body.todos (status pending), no state change
+   *  queued (has pending)     -> replace pending todos with new ones (outdated preserved)
+   *  revision_requested        -> mark all current non-outdated todos as 'outdated',
+   *                              APPEND new todos with status 'pending', flip task
+   *                              status back to 'queued' so the owner can /start
+   *                              (or /request-changes again).
+   *  active                    -> 409 (mid-execution re-proposal goes through PATCH)
+   *  anything else             -> 409
+   *
+   * Owner can also call this endpoint (useful for owner-driven planning), but
+   * the typical caller is the agent via aimeat_task_propose_todos MCP tool.
+   */
+  router.post('/v1/agents/:name/tasks/:id/propose-todos', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+
+    const task = await storage.getAgentTask(id);
+    if (!task) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Task not found'));
+      return;
+    }
+    if (!canAccessTask(req, task)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      return;
+    }
+    if (task.status !== 'queued' && task.status !== 'revision_requested') {
+      res.status(409).json(error(config.nodeId, 'INVALID_STATE',
+        `TODOs can only be proposed on queued or revision_requested tasks (current: ${task.status})`));
+      return;
+    }
+
+    const proposeBody = req.body as { todos?: Array<{
+      id?: string; order?: number; title: string; description?: string;
+      environment?: 'aimeat' | 'agent'; environment_reason?: string;
+      verification?: string; estimate_minutes?: number;
+    }>; };
+    const incoming = Array.isArray(proposeBody?.todos) ? proposeBody.todos : [];
+    if (incoming.length === 0) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'todos must be a non-empty array'));
+      return;
+    }
+
+    const now = new Date().toISOString();
+
+    // Preserve outdated todos from previous revision cycles. When the task is
+    // revision_requested, also retire the still-pending todos to outdated so
+    // the next owner view shows them as history rather than as the active plan.
+    const preserved: AgentTaskTodo[] = (task.todos ?? []).flatMap(t => {
+      if (t.status === 'outdated') return [t];
+      if (task.status === 'revision_requested') return [{ ...t, status: 'outdated' as const }];
+      return [];
+    });
+
+    // Number new todos AFTER the preserved ones so order is stable across history.
+    const baseOrder = preserved.length;
+    const newTodos: AgentTaskTodo[] = incoming.map((t, index) => ({
+      id: t.id ?? `todo-${baseOrder + index + 1}`,
+      order: t.order ?? baseOrder + index + 1,
+      title: t.title,
+      description: t.description ?? '',
+      environment: t.environment ?? 'agent',
+      environmentReason: t.environment_reason,
+      verification: t.verification ?? '',
+      estimateMinutes: t.estimate_minutes,
+      status: 'pending',
+    }));
+
+    const updated = await storage.updateAgentTask(id, {
+      todos: [...preserved, ...newTodos],
+      // Revision cycle: agent's new proposal moves the task back to 'queued' so
+      // the owner can review again. Plain queued stays queued.
+      status: task.status === 'revision_requested' ? 'queued' : task.status,
+      lastEventAt: now,
+      updatedAt: now,
+    });
+
+    await storage.appendTaskEvent({
+      id: randomUUID(),
+      taskId: id,
+      type: 'progress',
+      message: task.status === 'revision_requested'
+        ? 'Revised TODO plan proposed'
+        : 'TODO plan proposed',
+      details: {
+        todo_count: newTodos.length,
+        outdated_count: preserved.length,
+      },
+      timestamp: now,
+    });
+
+    if (webhookDispatcher) {
+      webhookDispatcher.dispatchWebhookEvent(task.agentGaii, 'task.updated', {
+        task_id: task.id,
+        title: task.title,
+        status: updated?.status ?? task.status,
+        changed_fields: ['todos', 'status'],
+        todo_count: (updated?.todos ?? []).length,
+        pending_todo_count: (updated?.todos ?? []).filter((t: AgentTaskTodo) => t.status === 'pending').length,
+        updated_at: now,
+      });
+    }
+    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${req.params.name as string}/tasks`); } catch { /* MCP not connected */ }
+
+    res.json(success(config.nodeId, { task: updated }));
+    emitChange('agent-tasks');
+  });
+
+  /* ── POST /v1/agents/:name/tasks/:id/request-changes -- Owner asks agent to revise the proposed TODOs ──
+   *
+   * Owner-only. Allowed only when the task is 'queued' AND has at least one
+   * pending todo (i.e. the agent has already proposed something to revise).
+   * The endpoint marks all non-outdated todos as 'outdated', flips the task
+   * status to 'revision_requested', appends a 'revision_requested' task event
+   * carrying the owner's free-text message, and pushes a linked inbound agent
+   * message so the agent's inbox surfaces the request. The agent then calls
+   * aimeat_task_propose_todos (or POST /propose-todos) with the revised plan;
+   * that endpoint flips the task back to 'queued' for owner review.
+   */
+  router.post('/v1/agents/:name/tasks/:id/request-changes', requireAuth(), async (req, res) => {
+    // Owner-session only -- agents inherit the owner role in their JWT (see
+    // /v1/auth/token), so requireRole('owner') alone would let an agent
+    // self-request-changes on its own proposed plan, which makes no sense.
+    // The same pattern as /start gates this: ['owner'] AND NOT ['agent'].
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    if (!isOwnerSession) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the owner can request changes on a task'));
+      return;
+    }
+
+    const id = req.params.id as string;
+    const agentName = req.params.name as string;
+
+    const task = await storage.getAgentTask(id);
+    if (!task) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Task not found'));
+      return;
+    }
+    if (!canAccessTask(req, task)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      return;
+    }
+
+    if (task.status !== 'queued') {
+      res.status(409).json(error(config.nodeId, 'INVALID_STATE',
+        `Changes can only be requested on queued tasks (current: ${task.status})`));
+      return;
+    }
+    const activeTodos = (task.todos ?? []).filter(t => t.status !== 'outdated');
+    if (activeTodos.length === 0) {
+      res.status(409).json(error(config.nodeId, 'INVALID_STATE',
+        'Cannot request changes on a task with no proposed todos yet -- wait for the agent to propose a plan first'));
+      return;
+    }
+
+    const parsed = AgentTaskRequestChangesSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')));
+      return;
+    }
+    const { message } = parsed.data;
+
+    const now = new Date().toISOString();
+    const retiredCount = activeTodos.length;
+    const newTodos = (task.todos ?? []).map(t => t.status === 'outdated' ? t : { ...t, status: 'outdated' as const });
+
+    const updated = await storage.updateAgentTask(id, {
+      status: 'revision_requested',
+      todos: newTodos,
+      lastEventAt: now,
+      updatedAt: now,
+    });
+
+    await storage.appendTaskEvent({
+      id: randomUUID(),
+      taskId: id,
+      type: 'revision_requested',
+      message,
+      details: { outdated_count: retiredCount },
+      timestamp: now,
+    });
+
+    // Push the change request to the agent's inbox as a linked message so the
+    // agent can pick it up without separately polling task events. Owner is
+    // the sender; direction='inbound' (user -> agent); status='pending' so
+    // the agent sees it in /messages/inbox until processed.
+    const messageRecord: AgentMessageRecord = {
+      id: randomUUID(),
+      agentGaii: task.agentGaii,
+      threadId: randomUUID(),
+      direction: 'inbound',
+      senderGaii: `${req.auth!.owner}@${config.nodeId}`,
+      content: message,
+      status: 'pending',
+      linkedTaskId: id,
+      createdAt: now,
+    };
+    await storage.createMessage(messageRecord);
+
+    if (webhookDispatcher) {
+      webhookDispatcher.dispatchWebhookEvent(task.agentGaii, 'task.updated', {
+        task_id: task.id,
+        title: task.title,
+        status: 'revision_requested',
+        changed_fields: ['status', 'todos'],
+        todo_count: newTodos.length,
+        pending_todo_count: 0,
+        updated_at: now,
+      });
+      webhookDispatcher.dispatchWebhookEvent(task.agentGaii, 'message.inbound', {
+        message_id: messageRecord.id,
+        thread_id: messageRecord.threadId,
+        linked_task_id: id,
+        preview: message.substring(0, 200),
+        has_proposed_task: false,
+        created_at: now,
+      });
+    }
+    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${agentName}/tasks`); } catch { /* MCP not connected */ }
+    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${agentName}/messages`); } catch { /* MCP not connected */ }
+
+    res.json(success(config.nodeId, { task: updated, message: messageRecord }));
+    emitChange('agent-tasks');
+    emitChange('agent-messages');
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/pause -- Pause task (active -> paused) ── */

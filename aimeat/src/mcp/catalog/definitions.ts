@@ -206,12 +206,22 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_task_propose_todos',
-        description: 'Propose TODOs for a queued task before owner approval or onboarding auto-start.',
+        description: 'Propose TODOs for a queued task, or re-propose after the owner has requested changes. The server preserves the prior proposal as outdated history.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             task_id: { type: 'string', required: true, description: 'Task identifier.' },
             todos: { type: 'array', required: true, description: 'Array of TODOs with title, optional description, verification, and estimate_minutes.' },
+        },
+    },
+    {
+        name: 'aimeat_task_request_changes',
+        description: "Owner-only: ask an agent to revise its proposed TODO plan for a queued task. Marks the existing todos as outdated, flips the task status to 'revision_requested', and pushes a linked message to the agent's inbox carrying the owner's free-text change request.",
+        caller: 'owner',
+        visibility: agentEverywhere,
+        input: {
+            task_id: { type: 'string', required: true, description: 'Task identifier (must be a queued task with existing proposed todos).' },
+            message: { type: 'string', required: true, description: "Owner's free-text change request." },
         },
     },
     {

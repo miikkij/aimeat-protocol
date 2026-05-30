@@ -332,12 +332,23 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_task_propose_todos',
-        description: 'Propose TODOs for a queued task before owner approval or onboarding auto-start.',
+        description: 'Propose TODOs for a queued task, or re-propose after the owner has requested changes. The server preserves prior proposals as outdated history.',
         input: {
             task_id: { type: 'string', required: true, description: 'Task identifier.' },
             todos: { type: 'array', required: true, description: 'Array of TODOs with title, optional description, verification, and estimate_minutes.' },
         },
-        handler: ({ client, agentPath }, input) => client.patch(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}`, taskTodoPayload(input)),
+        handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}/propose-todos`, taskTodoPayload(input)),
+    },
+    {
+        name: 'aimeat_task_request_changes',
+        description: "Owner-only: ask an agent to revise its proposed TODO plan. Marks the existing todos as outdated, flips the task status to 'revision_requested', and pushes a linked message carrying the owner's free-text change request.",
+        input: {
+            task_id: { type: 'string', required: true, description: 'Task identifier (must be a queued task with existing proposed todos).' },
+            message: { type: 'string', required: true, description: "Owner's free-text change request." },
+        },
+        handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}/request-changes`, {
+            message: requiredString(input, 'message'),
+        }),
     },
     {
         name: 'aimeat_task_event',

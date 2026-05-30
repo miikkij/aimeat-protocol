@@ -2359,7 +2359,15 @@ components:
     # === Agent Tasks ===
     TaskStatus:
       type: string
-      enum: [draft, queued, active, paused, done, failed, stalled]
+      description: |
+        Lifecycle status of an agent task.
+        - draft: created but not yet visible to the agent.
+        - queued: visible to the agent; agent proposes a todo plan; awaits owner /start (or task-runner mode auto-activation).
+        - revision_requested: the owner reviewed the proposed todos and used /request-changes to ask for a revised plan; agent will re-propose.
+        - active: the agent is executing the plan.
+        - paused, stalled: temporary holds.
+        - done, failed: terminal states.
+      enum: [draft, queued, revision_requested, active, paused, done, failed, stalled]
 
     AgentTask:
       type: object
@@ -16168,6 +16176,140 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/tasks/{id}/propose-todos:
+    post:
+      operationId: proposeAgentTaskTodos
+      summary: Propose (or re-propose) a TODO plan for a task
+      description: |
+        Merge-aware companion to PATCH /v1/agents/{name}/tasks/{id}. Use this
+        endpoint when an agent wants to propose todos -- the server handles
+        the queued/revision_requested state machine and preserves any previous
+        proposal as outdated history.
+
+        Behaviour by current task status:
+          - queued: new todos are stored as pending.
+          - revision_requested: existing pending todos are retired to
+            'outdated', new todos are appended as pending, and the task
+            transitions back to 'queued' for owner review.
+          - any other status: 409 INVALID_STATE.
+      tags: [Agent Tasks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [todos]
+              properties:
+                todos:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [title]
+                    properties:
+                      title: { type: string }
+                      description: { type: string }
+                      environment: { type: string, enum: [aimeat, agent] }
+                      environment_reason: { type: string }
+                      verification: { type: string }
+                      estimate_minutes: { type: integer }
+      responses:
+        '200':
+          description: TODO plan stored. Task moves back to 'queued' if it was 'revision_requested'.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentTask'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /v1/agents/{name}/tasks/{id}/request-changes:
+    post:
+      operationId: requestAgentTaskChanges
+      summary: Ask the agent to revise its proposed TODO plan
+      description: |
+        Owner-only. Marks all non-outdated todos as 'outdated', flips the task
+        status to 'revision_requested', appends a 'revision_requested' task
+        event carrying the owner's free-text message, and pushes a linked
+        inbound agent message so the agent's inbox surfaces the request.
+
+        Allowed only when the task is in 'queued' status AND has at least one
+        non-outdated todo (i.e. the agent has already proposed something to
+        revise). Returns 409 otherwise.
+      tags: [Agent Tasks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 4096
+                  description: Owner's free-text change request shown to the agent in its inbox.
+      responses:
+        '200':
+          description: Change request stored, task moved to revision_requested.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          task: { $ref: '#/components/schemas/AgentTask' }
+                          message: { type: object }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   /v1/agents/{name}/tasks/{id}/start:
     post:

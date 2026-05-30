@@ -7,6 +7,7 @@
  * @structure
  *   - AgentTasksSubtab (default export) -- main component with filter pills
  *   - TaskItem -- task row with expand/collapse, todo list, start button
+ *   - RequestChangesModal -- inline modal for owner to send a free-text change request
  * @version-history
  *   v3.2.0 -- 2026-05-24 -- Add interactive filter pills, scope/rules display, migrate to pf-agd- CSS prefix
  *   v3.1.0 -- 2026-05-24 -- Fix: use correct locale key for empty state
@@ -14,6 +15,7 @@
  *   v2.1.0 -- 2026-05-22 -- Fix: use camelCase field names from API; add task and todo timestamps
  *   v2.0.0 -- 2026-05-22 -- Add todo rendering, Start button, progress tracking
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
+ *   v3.3.0 -- 2026-05-29 -- Add delete confirmation, "Request changes" modal for the revise-proposed-todos flow, outdated-todo history rendering, and revision_requested status.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -21,7 +23,8 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
-import { listTasks, deleteTask, startTask, listEvents } from '/js/services/agent-tasks.js';
+import { listTasks, deleteTask, startTask, listEvents, requestChanges } from '/js/services/agent-tasks.js';
+import { useConfirm, Modal } from '/components/Modal.js';
 import TaskCreationBuilder from './agents-task-builder.js';
 
 const TASK_FILTERS = ['all', 'active', 'queued', 'completed', 'failed'];
@@ -37,13 +40,46 @@ function todoStatusIcon(status) {
   if (status === 'failed') return '❌';
   if (status === 'skipped') return '⏭';
   if (status === 'active') return '▶';
+  if (status === 'outdated') return '·';
   return '⬜';
 }
 
 function todoProgress(todos) {
   if (!todos || todos.length === 0) return null;
-  const done = todos.filter(td => td.status === 'done').length;
-  return `${done}/${todos.length}`;
+  const active = todos.filter(td => td.status !== 'outdated');
+  if (active.length === 0) return null;
+  const done = active.filter(td => td.status === 'done').length;
+  return `${done}/${active.length}`;
+}
+
+// Modal where the owner types the change request shown to the agent. Kept
+// inline here (rather than in /components) because the textarea-with-send
+// pattern is specific to this view; if a second caller needs it later, lift
+// it into a shared component.
+function RequestChangesModal({ open, onClose, onSubmit, submitting }) {
+  const [message, setMessage] = useState('');
+  useEffect(() => { if (open) setMessage(''); }, [open]);
+  function handleSend() {
+    const trimmed = message.trim();
+    if (!trimmed) return;
+    onSubmit(trimmed);
+  }
+  return html`<${Modal} open=${open} onClose=${onClose} title=${t('profile.agents.tasks.requestChangesTitle')}>
+    <p class="pf-agd-modal-help">${t('profile.agents.tasks.requestChangesHelp')}</p>
+    <textarea
+      class="pf-agd-revision-textarea"
+      placeholder=${t('profile.agents.tasks.requestChangesPlaceholder')}
+      value=${message}
+      onInput=${e => setMessage(e.target.value)}
+      rows=${6}
+    ></textarea>
+    <div class="modal-footer">
+      <button class="btn-ghost" onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}</button>
+      <button class="btn-primary" onClick=${handleSend} disabled=${submitting || !message.trim()}>
+        ${submitting ? t('profile.agents.tasks.requestChangesSending') : t('profile.agents.tasks.requestChangesSend')}
+      </button>
+    </div>
+  <//>`;
 }
 
 function TaskItem({ task, agentName, showToast, onRefresh }) {
@@ -51,6 +87,10 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
   const [events, setEvents] = useState(null);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [showRevisionModal, setShowRevisionModal] = useState(false);
+  const [sendingRevision, setSendingRevision] = useState(false);
+  const [showOutdated, setShowOutdated] = useState(false);
+  const { confirm, ConfirmUI } = useConfirm();
 
   async function handleExpand(e) {
     e.stopPropagation();
@@ -79,23 +119,52 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
     setStarting(false);
   }
 
-  async function handleDelete(e) {
+  function handleDelete(e) {
     e.stopPropagation();
-    try {
-      await deleteTask(agentName, task.id);
-      showToast(t('profile.agents.tasks.taskDeleted'));
-      onRefresh();
-    } catch (err) {
-      showToast(err.message || t('profile.agents.tasks.deleteError'), true);
-    }
+    confirm(
+      t('profile.agents.tasks.deleteConfirm') + ': ' + (task.title || task.id) + '?',
+      async () => {
+        try {
+          await deleteTask(agentName, task.id);
+          showToast(t('profile.agents.tasks.taskDeleted'));
+          onRefresh();
+        } catch (err) {
+          showToast(err.message || t('profile.agents.tasks.deleteError'), true);
+        }
+      },
+      { danger: true, confirmLabel: t('profile.agents.tasks.delete') },
+    );
   }
 
-  const todos = task.todos || [];
-  const hasTodos = todos.length > 0;
-  const progress = todoProgress(todos);
+  function handleOpenRevision(e) {
+    e.stopPropagation();
+    setShowRevisionModal(true);
+  }
+
+  async function handleSubmitRevision(message) {
+    setSendingRevision(true);
+    try {
+      await requestChanges(agentName, task.id, message);
+      showToast(t('profile.agents.tasks.requestChangesSent'));
+      setShowRevisionModal(false);
+      onRefresh();
+    } catch (err) {
+      showToast(err.message || t('profile.agents.tasks.requestChangesError'), true);
+    }
+    setSendingRevision(false);
+  }
+
+  const allTodos = task.todos || [];
+  const activeTodos = allTodos.filter(td => td.status !== 'outdated');
+  const outdatedTodos = allTodos.filter(td => td.status === 'outdated');
+  const todos = activeTodos; // keep existing variable name for downstream render
+  const hasTodos = activeTodos.length > 0;
+  const progress = todoProgress(allTodos);
   const isQueued = task.status === 'queued' || task.status === 'draft';
+  const isRevisionRequested = task.status === 'revision_requested';
   const isActive = task.status === 'active';
   const canStart = isQueued && hasTodos;
+  const canRequestChanges = task.status === 'queued' && hasTodos;
   const totalMinutes = todos.reduce((sum, td) => sum + (td.estimateMinutes || 0), 0);
   const aimeatSteps = todos.filter(td => td.environment === 'aimeat').length;
   const agentSteps = todos.filter(td => td.environment === 'agent').length;
@@ -185,6 +254,33 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
             </div>
           `}
 
+          ${isRevisionRequested && html`
+            <div class="pf-agd-todo-waiting">
+              ${t('profile.agents.tasks.revisionWaiting')}
+            </div>
+          `}
+
+          ${outdatedTodos.length > 0 && html`
+            <div class="pf-agd-todo-history">
+              <button class="pf-agd-todo-history-toggle" onClick=${(e) => { e.stopPropagation(); setShowOutdated(v => !v); }}>
+                ${showOutdated ? '▼' : '▶'} ${t('profile.agents.tasks.outdatedTodos')} (${outdatedTodos.length})
+              </button>
+              ${showOutdated && html`
+                <div class="pf-agd-todo-list pf-agd-todo-list-outdated">
+                  ${outdatedTodos.map((td, i) => html`
+                    <div class="pf-agd-todo-item pf-agd-todo-outdated" key=${td.id || 'old-' + i}>
+                      <span class="pf-agd-todo-icon">${todoStatusIcon('outdated')}</span>
+                      <div class="pf-agd-todo-content">
+                        <div class="pf-agd-todo-title">${td.title}</div>
+                        ${td.description && html`<div class="pf-agd-todo-desc">${td.description}</div>`}
+                      </div>
+                    </div>
+                  `)}
+                </div>
+              `}
+            </div>
+          `}
+
           ${loadingEvents && html`<div class="pf-agd-empty">${t('profile.loading')}</div>`}
           ${events && events.length > 0 && html`
             <div class="pf-agd-event-log">
@@ -207,10 +303,22 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
                 ${starting ? t('profile.agents.tasks.starting') : t('profile.agents.tasks.startThisTask')}
               </button>
             `}
-            ${(isQueued || task.status === 'draft') && html`
+            ${canRequestChanges && html`
+              <button class="btn-outline btn-sm" onClick=${handleOpenRevision}>
+                ${t('profile.agents.tasks.requestChanges')}
+              </button>
+            `}
+            ${(isQueued || task.status === 'draft' || isRevisionRequested) && html`
               <button class="btn-danger btn-sm" onClick=${handleDelete}>${t('profile.agents.tasks.delete')}</button>
             `}
           </div>
+          <${ConfirmUI} />
+          <${RequestChangesModal}
+            open=${showRevisionModal}
+            onClose=${() => setShowRevisionModal(false)}
+            onSubmit=${handleSubmitRevision}
+            submitting=${sendingRevision}
+          />
         </div>
       `}
     </div>
@@ -256,7 +364,10 @@ export default function AgentTasksSubtab({ agentName, session, showToast }) {
   const filtered = filter === 'all' ? tasks : tasks.filter(task => {
     switch (filter) {
       case 'active': return task.status === 'active';
-      case 'queued': return task.status === 'queued' || task.status === 'draft';
+      // 'revision_requested' lives under the queued filter -- the task is
+      // waiting for the agent to re-propose, which is conceptually the same
+      // "awaiting action before run" bucket the owner already monitors here.
+      case 'queued': return task.status === 'queued' || task.status === 'draft' || task.status === 'revision_requested';
       case 'completed': return task.status === 'done';
       case 'failed': return task.status === 'failed' || task.status === 'stalled';
       default: return true;

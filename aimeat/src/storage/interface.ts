@@ -1429,7 +1429,11 @@ export interface AgentTaskTodo {
   environmentReason?: string;
   verification: string;
   estimateMinutes?: number;
-  status: 'pending' | 'active' | 'done' | 'failed' | 'skipped';
+  // 'outdated' (since 1.14.5): the todo was part of a previous propose_todos
+  // proposal that the owner rejected via /request-changes. The todo is kept
+  // for history (so the agent and owner can see what was proposed before)
+  // but is not part of the current active plan.
+  status: 'pending' | 'active' | 'done' | 'failed' | 'skipped' | 'outdated';
   completedAt?: string;
 }
 
@@ -1451,7 +1455,12 @@ export interface AgentTaskRecord {
     memoryPrefixes?: string[];
   };
   todos: AgentTaskTodo[];
-  status: 'draft' | 'queued' | 'active' | 'paused' | 'stalled' | 'done' | 'failed';
+  // 'revision_requested' (since 1.14.5): the owner saw the agent's proposed
+  // todos and asked for a different plan via POST /tasks/:id/request-changes.
+  // The agent should read the latest 'revision_requested' event for the
+  // owner's message, then call aimeat_task_propose_todos again. Old todos are
+  // kept marked 'outdated' for context.
+  status: 'draft' | 'queued' | 'revision_requested' | 'active' | 'paused' | 'stalled' | 'done' | 'failed';
   parentTaskId?: string;
   workTrackingCode?: string;
   telemetry?: {
@@ -1469,9 +1478,14 @@ export interface AgentTaskRecord {
 export interface AgentTaskEventRecord {
   id: string;
   taskId: string;
+  // 'revision_requested' (since 1.14.5): logged when the owner sends a
+  // change-request message about a proposed todo list. The `message` field
+  // is the owner's free-text request; the `details` field stores the count
+  // of todos that were transitioned to 'outdated' by the request.
   type: 'started' | 'progress' | 'todo_completed' | 'todo_failed' |
         'memory_write' | 'extension_install' | 'app_publish' |
-        'verification' | 'completed' | 'failed' | 'message';
+        'verification' | 'completed' | 'failed' | 'message' |
+        'revision_requested';
   message: string;
   details?: Record<string, unknown>;
   timestamp: string;

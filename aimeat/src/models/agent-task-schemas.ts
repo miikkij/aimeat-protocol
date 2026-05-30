@@ -3,8 +3,11 @@
  * @description Zod validation schemas for agent task CRUD and lifecycle operations
  * @version-history
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
+ *   v1.1.0 -- 2026-05-29 -- Add 'revision_requested' task status, 'outdated' todo status, and 'revision_requested' event type for the owner-requests-changes-to-proposed-todos flow.
  */
 import { z } from 'zod';
+
+const TodoStatusSchema = z.enum(['pending', 'active', 'done', 'failed', 'skipped', 'outdated']);
 
 export const AgentTaskCreateSchema = z.object({
   title: z.string().min(1).max(256),
@@ -34,7 +37,7 @@ export const AgentTaskCreateSchema = z.object({
     environment_reason: z.string().optional(),
     verification: z.string().optional().default(''),
     estimate_minutes: z.number().optional(),
-    status: z.enum(['pending', 'active', 'done', 'failed', 'skipped']).optional().default('pending'),
+    status: TodoStatusSchema.optional().default('pending'),
   })).optional().default([]),
   status: z.enum(['draft', 'queued']).optional().default('draft'),
   parent_task_id: z.string().optional(),
@@ -68,7 +71,7 @@ export const AgentTaskUpdateSchema = z.object({
     environment_reason: z.string().optional(),
     verification: z.string().optional().default(''),
     estimate_minutes: z.number().optional(),
-    status: z.enum(['pending', 'active', 'done', 'failed', 'skipped']).optional().default('pending'),
+    status: TodoStatusSchema.optional().default('pending'),
     completed_at: z.string().optional(),
   })).optional(),
 });
@@ -76,12 +79,21 @@ export const AgentTaskUpdateSchema = z.object({
 export const AgentTaskEventSchema = z.object({
   type: z.enum(['started', 'progress', 'todo_completed', 'todo_failed',
     'memory_write', 'extension_install', 'app_publish',
-    'verification', 'completed', 'failed', 'message']),
+    'verification', 'completed', 'failed', 'message',
+    'revision_requested']),
   message: z.string().min(1).max(4096),
   details: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const AgentTaskTodoUpdateSchema = z.object({
-  status: z.enum(['pending', 'active', 'done', 'failed', 'skipped']),
+  status: TodoStatusSchema,
   completed_at: z.string().optional(),
+});
+
+// POST /v1/agents/:name/tasks/:id/request-changes -- owner sends a free-text
+// change request about a proposed todo list. The endpoint marks the existing
+// todos 'outdated', flips the task to 'revision_requested', appends a
+// matching task event, and pushes the message to the agent so it can revise.
+export const AgentTaskRequestChangesSchema = z.object({
+  message: z.string().min(1).max(4096),
 });
