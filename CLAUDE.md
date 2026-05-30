@@ -38,33 +38,24 @@ When any feature, bugfix, or structural change is completed:
 
 Full guide: `docs/coding-guidelines/testing-requirements.md`
 
-### Rule 1b: Playwright Tests Must Pass After Frontend Changes
+### Rule 1b: Frontend Changes Must Be Verified by Driving the Browser via Playwright MCP
 
-**Valid backends: SQLite and MongoDB ONLY.** Same reasoning as Rule 1 — memory backend is deprecated.
+**Do NOT write or run the `.spec.ts` Playwright suite (`pnpm test:playwright:*`).** That suite is unreliable and is not the verification path for frontend work. Instead, the agent drives a real browser through the **Playwright MCP server** (configured in `.mcp.json`) — open the page, log in, click through the actual feature, and observe that it works.
 
 When frontend work is **finished** (a view, component, or feature is done — not mid-development):
 
-1. **Run only the spec files your change touches**, on SQLite for speed:
-   ```bash
-   # Single spec file:
-   pnpm test:playwright:sqlite -- profile-agents
+1. **Verify against the running dev server** (`pnpm dev`, port 40050) by driving Chrome through the Playwright MCP tools:
+   - Navigate to the relevant page (e.g. `/v1/profile#agents`).
+   - Log in / reach the authenticated state the feature needs.
+   - Perform the real user interactions (click, type, submit) that exercise the change.
+   - Confirm the expected result actually happens — elements appear, data loads/persists, edits and deletes take effect — not just that the page didn't crash.
+   - Take a snapshot/screenshot as evidence when useful.
 
-   # Single test by name:
-   pnpm test:playwright:sqlite -- --grep "shows agent cards"
+2. **Trigger:** Any completed change to `public/views/`, `public/components/`, `public/js/`, `public/css/`, `public/locales/`, or `*.html` files.
 
-   # Headed mode (see the browser):
-   pnpm test:playwright:sqlite -- --headed
-   ```
+3. **New frontend features must be exercised end-to-end via the browser MCP** — confirm the feature renders, navigates, and behaves correctly through real interaction, not just that it loads without error.
 
-2. **End of a multi-step plan: full sweep on MongoDB** for realistic behavior:
-   ```bash
-   pnpm test:playwright:mongodb
-   ```
-
-3. **Target: 0 failures.** All browser tests in the suites you ran must pass.
-4. **Trigger:** Any completed change to `public/views/`, `public/components/`, `public/js/`, `public/css/`, `public/locales/`, or `*.html` files.
-5. **New frontend features must include Playwright tests** that confirm the feature renders, navigates, and behaves correctly — not just that it loads without error.
-6. **Maintain test quality:** Playwright tests must verify that things actually happen (elements appear, data loads, interactions work), not just that the page doesn't crash.
+4. **Report what you actually observed.** Evidence before assertions: describe the interactions performed and the observed outcome. If you could not drive the browser (MCP unavailable, server down, no credentials), say so explicitly rather than claiming it works.
 
 ### Rule 2: Source File Headers Required
 
