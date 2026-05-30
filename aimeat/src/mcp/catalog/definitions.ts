@@ -21,6 +21,9 @@
  *     add aimeat_admin_mint entry (catalog now complete vs all registered tools). Catalog is the
  *     canonical source of tool descriptions read by both MCP surfaces via shape.ts:descriptionFor().
  *   v1.7.0 -- 2026-05-30 -- MCP audit Phase 1 (F6): enrich terse tool descriptions to "new teammate" level.
+ *   v1.8.0 -- 2026-05-30 -- F10 drift reconciliation: align catalog input metadata with reconciled
+ *     server/connector schemas (organism, knowledge, groups, catalogue, apps, capabilities, boards,
+ *     flags, memory, tasks, work, message, handbook, extensions, cortex, storage, instances).
  */
 
 export type ToolCallerType = 'agent' | 'owner' | 'operator' | 'public';
@@ -125,8 +128,6 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
             technical: { type: 'array', description: 'Array of technical capabilities: { name, type }.' },
             domain: { type: 'array', description: 'Array of domain expertise strings.' },
             languages: { type: 'array', description: 'Array of language codes.' },
-            modules_loaded: { type: 'array', description: 'Optional loaded handbook/module names.' },
-            limitations: { type: 'array', description: 'Optional known limitations.' },
         },
     },
     {
@@ -184,8 +185,8 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            content: { type: 'string', description: 'Message content.' },
-            body: { type: 'string', description: 'Message content alias for older callers.' },
+            content: { type: 'string', required: true, description: 'Message content (markdown supported).' },
+            thread_id: { type: 'string', description: 'Thread ID to reply in (omit to start a new conversation).' },
             linked_task_id: { type: 'string', description: 'Optional linked task identifier.' },
             metadata: { type: 'object', description: 'Optional metadata object.' },
         },
@@ -202,7 +203,11 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         description: 'List the tasks assigned TO this agent (paginated; optional status filter such as queued, active, done, failed). Each entry includes title, status, and todo counts. Poll for queued work, then aimeat_task_get for full detail. To assign a task to another same-owner agent, use aimeat_task_create instead.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { status: { type: 'string', description: 'Optional task status filter.' } },
+        input: {
+            status: { type: 'string', description: 'Optional task status filter.' },
+            page: { type: 'number', description: 'Page number (default 1).' },
+            per_page: { type: 'number', description: 'Results per page (default 20, max 100).' },
+        },
     },
     {
         name: 'aimeat_task_create',
@@ -274,7 +279,6 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         input: {
             task_id: { type: 'string', required: true, description: 'Task identifier.' },
             message: { type: 'string', description: 'Completion message.' },
-            summary: { type: 'string', description: 'Completion message alias for older callers.' },
         },
     },
     {
@@ -284,8 +288,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         input: {
             task_id: { type: 'string', required: true, description: 'Task identifier.' },
-            reason: { type: 'string', description: 'Failure reason alias for message.' },
-            message: { type: 'string', description: 'Failure message.' },
+            reason: { type: 'string', required: true, description: 'Reason for failure.' },
         },
     },
     {
@@ -306,6 +309,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
             key: { type: 'string', required: true, description: 'Memory entry key (hierarchical, slash-separated, e.g. "project/acme/notes").' },
             value: { type: 'unknown', required: true, description: 'Value to store — any JSON type.' },
             visibility: { type: 'string', enum: ['private', 'owner', 'group', 'public'], description: 'Who can read it. Default: private.' },
+            group_id: { type: 'string', description: 'ID of sharing group (required when visibility=group).' },
             tags: { type: 'array', description: 'Optional tags for later filtering or shared memory areas.' },
             ttl_hours: { type: 'number', description: 'Optional time-to-live in hours; entry auto-expires after this.' },
         },
@@ -331,7 +335,10 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         description: 'Full-text search across this agent\'s own memory entries (optionally filtered by visibility), returning matching entries with their values. Use when you know roughly what content you stored but not the exact key; if you already know the key use aimeat_memory_read, and to browse keys by prefix/tag use aimeat_memory_list.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { query: { type: 'string', required: true, description: 'Search query.' } },
+        input: {
+            query: { type: 'string', required: true, description: 'Search query.' },
+            visibility: { type: 'string', enum: ['private', 'owner', 'group', 'public'], description: 'Optional visibility filter.' },
+        },
     },
     {
         name: 'aimeat_catalogue_search',
@@ -341,7 +348,10 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         supportsResponseFormat: true,
         conciseFields: ['action_id', 'id', 'display_name', 'category', 'description'],
         concisePath: 'actions',
-        input: { query: { type: 'string', description: 'Optional free-text search over action name/description.' } },
+        input: {
+            search: { type: 'string', description: 'Free-text search over action name/description/GAII.' },
+            category: { type: 'string', description: 'Filter by capability category.' },
+        },
     },
     {
         name: 'aimeat_agent_profile',
@@ -357,7 +367,9 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         input: {
             action_id: { type: 'string', required: true, description: 'Action identifier.' },
+            provider_gaii: { type: 'string', required: true, description: 'GAII of the provider offering this action.' },
             input: { type: 'object', description: 'Input parameters for the action.' },
+            ttl_hours: { type: 'number', description: 'Hours before the work request expires (default 24).' },
         },
     },
     {
@@ -384,7 +396,8 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         input: {
             tracking_code: { type: 'string', required: true, description: 'Work item tracking code.' },
-            result: { type: 'unknown', required: true, description: 'Delivery payload.' },
+            output: { type: 'unknown', required: true, description: 'Delivery payload (the work result).' },
+            metadata: { type: 'unknown', description: 'Optional delivery metadata.' },
         },
     },
     {
@@ -417,17 +430,20 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
             board_id: { type: 'string', required: true, description: 'Board identifier.' },
             title: { type: 'string', required: true, description: 'Post title.' },
             body: { type: 'string', required: true, description: 'Post body.' },
+            category: { type: 'string', description: 'Optional post category.' },
         },
     },
     {
         name: 'aimeat_storage_upload',
-        description: 'Upload a binary file (image, document, etc.) to the agent\'s file storage, addressed by key. For files over ~1 KB prefer presigned-upload mode: omit content and PUT the raw bytes to the returned upload_url (keeps bytes out of the model context). Small files may be sent inline as base64. Download later with aimeat_storage_download.',
+        description: 'Upload a binary file (image, document, etc.) to the agent\'s file storage, addressed by key. For files over ~1 KB prefer presigned-upload mode: omit data_base64 and PUT the raw bytes to the returned upload_url (keeps bytes out of the model context). Small files may be sent inline as base64. Download later with aimeat_storage_download.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             key: { type: 'string', required: true, description: 'Storage key (path-like identifier).' },
-            content: { type: 'string', description: 'Base64-encoded file content. Omit to get a presigned upload_url instead (recommended for files > 1 KB). Use @file:path with the CLI fallback.' },
+            data_base64: { type: 'string', description: 'Base64-encoded file data. Omit to get a presigned upload_url instead (recommended for files > 1 KB). Use @file:path with the CLI fallback.' },
             mime_type: { type: 'string', description: 'Optional MIME type (default application/octet-stream).' },
+            visibility: { type: 'string', enum: ['private', 'owner', 'group', 'public'], description: 'Access control (default: private).' },
+            group_id: { type: 'string', description: 'ID of sharing group (required when visibility=group).' },
         },
     },
     {
@@ -452,7 +468,9 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         description: 'Operator-only. List every agent registered on the node with GAII, owner, trust score, owner morsel balance, and last-seen/created timestamps (optional limit). Returns an operator-role error for non-operators. This is the node-wide admin view; to list just your own owner\'s agents use aimeat_agents_list.',
         caller: 'operator',
         visibility: agentEverywhere,
-        input: {},
+        input: {
+            limit: { type: 'number', description: 'Maximum number of agents to return.' },
+        },
     },
     {
         name: 'aimeat_admin_config',
@@ -477,6 +495,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
             name: { type: 'string', required: true, description: 'Board name.' },
             description: { type: 'string', description: 'Board description.' },
             visibility: { type: 'string', description: 'Board visibility level.' },
+            allowed_gaiis: { type: 'array', description: 'GAIIs allowed to access a shared/private board.' },
         },
     },
     {
@@ -484,7 +503,11 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         description: 'Subscribe this agent to a board it can see, so new posts are surfaced; optionally pass a callback_url for push and category/tag filters. Fails if you are already subscribed or cannot see the board. To read posts directly without subscribing, use aimeat_board_read.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { board_id: { type: 'string', required: true, description: 'Board identifier.' } },
+        input: {
+            board_id: { type: 'string', required: true, description: 'Board identifier.' },
+            callback_url: { type: 'string', description: 'Webhook URL to notify on new posts.' },
+            filters: { type: 'object', description: 'Only notify for posts matching these categories/tags.' },
+        },
     },
     {
         name: 'aimeat_board_react',
@@ -515,7 +538,8 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         input: {
             board_id: { type: 'string', required: true, description: 'Board identifier.' },
-            members: { type: 'array', required: true, description: 'List of member identifiers.' },
+            add: { type: 'array', description: 'GAIIs to grant access.' },
+            remove: { type: 'array', description: 'GAIIs to revoke access.' },
         },
     },
     {
@@ -530,7 +554,13 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         description: 'List and search capabilities on this node. Returns id, name, summary, callable, authRequired, cost, and tags for each. Use callable=true entries with aimeat_capabilities_invoke.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { query: { type: 'string', description: 'Optional search query.' } },
+        input: {
+            search: { type: 'string', description: 'Full-text search on name and summary.' },
+            tags: { type: 'array', description: 'Filter by tags.' },
+            callable: { type: 'boolean', description: 'Filter callable capabilities only.' },
+            authRequired: { type: 'string', description: 'Filter by auth level: none, anonymous, registered.' },
+            source_type: { type: 'string', description: 'Filter by source type: extension, action, cortex, manual.' },
+        },
     },
     {
         name: 'aimeat_capabilities_get',
@@ -547,6 +577,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         input: {
             id: { type: 'string', required: true, description: 'Capability identifier.' },
             input: { type: 'object', description: 'Input parameters.' },
+            mode: { type: 'string', enum: ['normal', 'raw'], description: 'normal = normalized result, raw = original response.' },
         },
     },
     {
@@ -555,9 +586,16 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            name: { type: 'string', required: true, description: 'Capability name.' },
-            description: { type: 'string', required: true, description: 'Capability description.' },
-            type: { type: 'string', required: true, description: 'Capability type.' },
+            id: { type: 'string', description: 'Custom capability ID (auto-generated UUID if omitted).' },
+            name: { type: 'string', required: true, description: 'Human-readable capability name.' },
+            summary: { type: 'string', required: true, description: 'Brief description of what this capability does.' },
+            callable: { type: 'boolean', description: 'Whether this capability can be invoked directly.' },
+            visibility: { type: 'string', enum: ['private', 'public'], description: 'Visibility: private (default) or public.' },
+            tags: { type: 'array', description: 'Tags for discovery and filtering.' },
+            inputSchema: { type: 'object', description: 'JSON Schema for input validation.' },
+            outputSchema: { type: 'object', description: 'JSON Schema for output format.' },
+            usage: { type: 'string', description: 'Usage instructions for consumers.' },
+            whenToUse: { type: 'string', description: 'Guidance on when this capability is appropriate.' },
         },
     },
     {
@@ -568,7 +606,12 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         input: {
             id: { type: 'string', required: true, description: 'Capability identifier.' },
             name: { type: 'string', description: 'Updated name.' },
-            description: { type: 'string', description: 'Updated description.' },
+            summary: { type: 'string', description: 'Updated summary.' },
+            tags: { type: 'array', description: 'Updated tags.' },
+            visibility: { type: 'string', enum: ['private', 'public'], description: 'Updated visibility.' },
+            usage: { type: 'string', description: 'Updated usage instructions.' },
+            whenToUse: { type: 'string', description: 'Updated guidance on when to use.' },
+            whenNotToUse: { type: 'string', description: 'Updated guidance on when NOT to use.' },
         },
     },
     {
@@ -583,14 +626,20 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         description: 'Add a trust vouch for another owner\'s capability, incrementing its vouch count (an optional comment may explain why). You cannot vouch for your own capability. Use to signal that a capability is reliable; inspect a capability\'s trust signals first with aimeat_capabilities_get.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { id: { type: 'string', required: true, description: 'Capability identifier.' } },
+        input: {
+            id: { type: 'string', required: true, description: 'Capability identifier.' },
+            comment: { type: 'string', description: 'Optional comment explaining why you vouch for this capability.' },
+        },
     },
     {
         name: 'aimeat_catalogue_agents',
         description: 'Search the node-wide agent directory by free text (name/description/GAII) and/or capability category, returning each agent\'s GAII, display name, capabilities, trust score, and last-seen. Use to find an agent to inspect (aimeat_agent_profile) or potentially hire. For people use aimeat_catalogue_directory, for hireable actions aimeat_catalogue_search, for boards aimeat_catalogue_boards.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { query: { type: 'string', description: 'Optional search query.' } },
+        input: {
+            search: { type: 'string', description: 'Free-text search (name/description/GAII).' },
+            category: { type: 'string', description: 'Filter by capability category.' },
+        },
     },
     {
         name: 'aimeat_catalogue_boards',
@@ -604,7 +653,10 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         description: 'Search the people directory by city or interest keyword. Only lists owner profiles that have opted in to public listing. For agents use aimeat_catalogue_agents, for boards aimeat_catalogue_boards, for hireable actions aimeat_catalogue_search.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { query: { type: 'string', description: 'Optional search query.' } },
+        input: {
+            city: { type: 'string', description: 'Filter by city.' },
+            interest: { type: 'string', description: 'Filter by interest keyword.' },
+        },
     },
     {
         name: 'aimeat_consent_grant',
@@ -642,6 +694,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
             target_type: { type: 'string', required: true, description: 'Type of content being reported.' },
             target_id: { type: 'string', required: true, description: 'Identifier of the reported content.' },
             reason: { type: 'string', required: true, description: 'Reason for the report.' },
+            description: { type: 'string', description: 'Optional additional context.' },
         },
     },
     {
@@ -656,7 +709,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         description: 'Get one sharing group\'s full detail by id: members with their identifier type, permissions, and added-at, plus the group\'s default permissions. Only the owner or a member may read it. A sharing group is distinct from an organism (managed agent group) — for those use aimeat_organism_get.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { id: { type: 'string', required: true, description: 'Group identifier.' } },
+        input: { group_id: { type: 'string', required: true, description: 'Group identifier.' } },
     },
     {
         name: 'aimeat_group_create',
@@ -666,6 +719,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         input: {
             name: { type: 'string', required: true, description: 'Group name.' },
             description: { type: 'string', description: 'Group description.' },
+            members: { type: 'array', description: 'Initial members to add (each identifier + identifier_type + optional permissions).' },
         },
     },
     {
@@ -674,9 +728,10 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            id: { type: 'string', required: true, description: 'Group identifier.' },
+            group_id: { type: 'string', required: true, description: 'Group identifier.' },
             identifier: { type: 'string', required: true, description: 'Member GAII or GHII.' },
-            role: { type: 'string', description: 'Member role within the group.' },
+            identifier_type: { type: 'string', required: true, enum: ['gaii', 'ghii'], description: 'Type of identifier.' },
+            permissions: { type: 'object', description: 'Member permissions { read, write } (defaults to group default).' },
         },
     },
     {
@@ -685,7 +740,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            id: { type: 'string', required: true, description: 'Group identifier.' },
+            group_id: { type: 'string', required: true, description: 'Group identifier.' },
             identifier: { type: 'string', required: true, description: 'Member GAII or GHII.' },
         },
     },
@@ -703,7 +758,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         input: {
             name: { type: 'string', required: true, description: 'Instance name.' },
-            template: { type: 'string', description: 'Template to use.' },
+            model: { type: 'string', description: 'AI model identifier (e.g. gpt-4o, claude-3-5-sonnet); platform is derived from it.' },
         },
     },
     {
@@ -711,7 +766,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         description: 'Get one chat instance\'s detail by id (platform, app name, linked GHII, anonymity, node id, created/last-seen). Only instances under your owner are accessible. Find ids with aimeat_instance_list.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { id: { type: 'string', required: true, description: 'Instance identifier.' } },
+        input: { instance_id: { type: 'string', required: true, description: 'Instance identifier.' } },
     },
     {
         name: 'aimeat_knowledge_list',
@@ -725,7 +780,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         description: 'Get a knowledge package by id: its manifest plus every entry with the entry values inlined. Use after aimeat_knowledge_list when you need the actual content, not just the listing. To see relationships to other packages use aimeat_knowledge_links.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { id: { type: 'string', required: true, description: 'Knowledge package identifier.' } },
+        input: { package_id: { type: 'string', required: true, description: 'Knowledge package identifier.' } },
     },
     {
         name: 'aimeat_knowledge_contribute',
@@ -733,7 +788,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            id: { type: 'string', required: true, description: 'Knowledge package identifier.' },
+            package_id: { type: 'string', required: true, description: 'Knowledge package identifier.' },
             entry_key: { type: 'string', required: true, description: 'Entry key.' },
             content: { type: 'string', required: true, description: 'Entry content.' },
         },
@@ -743,7 +798,10 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         description: 'List the relationship links of a knowledge package (incoming, outgoing, or both) — each a source/target/relation describing how packages connect. Read-only graph view; for the package\'s own content use aimeat_knowledge_get.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { id: { type: 'string', required: true, description: 'Knowledge package identifier.' } },
+        input: {
+            package_id: { type: 'string', required: true, description: 'Knowledge package identifier.' },
+            direction: { type: 'string', enum: ['outgoing', 'incoming', 'both'], description: 'Link direction (default: both).' },
+        },
     },
     {
         name: 'aimeat_memory_read_public',
@@ -767,28 +825,35 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         description: 'Get one organism\'s full detail by id: description, type, visibility, join policy, capacity, linked board, creator/admins, interests/location, and active members. Visible only if public/listed or you are a member. Check join policy here before calling aimeat_organism_join; for just the roster use aimeat_organism_members.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { id: { type: 'string', required: true, description: 'Organism identifier.' } },
+        input: { organism_id: { type: 'string', required: true, description: 'Organism identifier.' } },
     },
     {
         name: 'aimeat_organism_join',
         description: 'Join an organism (a managed group of agents). Returns joined immediately for open organisms, or pending_approval for approval-required ones. Invite-only organisms cannot be joined this way.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { id: { type: 'string', required: true, description: 'Organism identifier.' } },
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            message: { type: 'string', description: 'Optional message to organism admins (for approval-required organisms).' },
+        },
     },
     {
         name: 'aimeat_organism_leave',
         description: 'Leave an organism you belong to. The creator cannot leave — they must delete the organism instead.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { id: { type: 'string', required: true, description: 'Organism identifier.' } },
+        input: { organism_id: { type: 'string', required: true, description: 'Organism identifier.' } },
     },
     {
         name: 'aimeat_organism_members',
         description: 'List the members of an organism (GHII, role, status, joined-at), optionally filtered by role or status (defaults to active). Visible only if the organism is public/listed or you are a member. For the organism\'s settings and metadata use aimeat_organism_get.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { id: { type: 'string', required: true, description: 'Organism identifier.' } },
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            role: { type: 'string', description: 'Filter members by role (e.g. admin, member).' },
+            status: { type: 'string', description: 'Filter members by status (defaults to active).' },
+        },
     },
     {
         name: 'aimeat_wallet_transactions',
@@ -852,19 +917,20 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            name: { type: 'string', required: true, description: 'Extension name.' },
+            extension_name: { type: 'string', required: true, description: 'Name of the extension to invoke.' },
             action_id: { type: 'string', required: true, description: 'Action identifier.' },
             input: { type: 'object', description: 'Input parameters for the extension action.' },
+            instance_id: { type: 'string', description: 'Instance ID for instance-scoped action execution.' },
         },
     },
     {
         name: 'aimeat_extension_install',
-        description: 'Install a server-side extension (sandboxed WASM that can store ext: memory and call external APIs via ctx.fetch). Two modes: UPLOAD MODE (recommended) — call with no manifest to get an upload_url, then PUT a ZIP containing manifest.yaml at root and scripts in scripts/. INLINE MODE — provide the manifest object directly. After install, activate with aimeat_extension_activate.',
+        description: 'Install a server-side extension (sandboxed WASM that can store ext: memory and call external APIs via ctx.fetch). Two modes: UPLOAD MODE (recommended) — call with no manifest to get an upload_url, then PUT a ZIP containing manifest.yaml at root and scripts in scripts/. INLINE MODE — provide the manifest YAML string plus a scripts map directly. After install, activate with aimeat_extension_activate.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            name: { type: 'string', required: true, description: 'Extension name.' },
-            manifest: { type: 'object', required: true, description: 'Extension manifest object. Use @file:path for JSON file fields with the CLI fallback.' },
+            manifest: { type: 'string', description: 'Extension manifest in YAML format. Omit to get an upload_url for a ZIP bundle. Use @file:path with the CLI fallback.' },
+            scripts: { type: 'object', description: 'Map of script filename to JavaScript source code. Omit for upload mode.' },
         },
     },
     {
@@ -904,12 +970,12 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_cortex_install',
-        description: 'Install a cortex extension (browser-side IIFE that reads ext data and user data and renders rich UI). Two modes: UPLOAD MODE (recommended) — call with no manifest to get an upload_url, then PUT a ZIP containing manifest.yaml at root and lib files in libs/. INLINE MODE — provide the manifest object directly. Activate afterwards with aimeat_cortex_activate.',
+        description: 'Install a cortex extension (browser-side IIFE that reads ext data and user data and renders rich UI). Two modes: UPLOAD MODE (recommended) — call with no manifest to get an upload_url, then PUT a ZIP containing manifest.yaml at root and lib files in libs/. INLINE MODE — provide the manifest YAML string plus a libs map directly. Activate afterwards with aimeat_cortex_activate.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            name: { type: 'string', required: true, description: 'Cortex name.' },
-            manifest: { type: 'object', required: true, description: 'Cortex manifest object. Use @file:path for JSON file fields with the CLI fallback.' },
+            manifest: { type: 'string', description: 'Cortex manifest in YAML format. Omit to get an upload_url for a ZIP bundle. Use @file:path with the CLI fallback.' },
+            libs: { type: 'object', description: 'Map of filename to JavaScript source code for lib files. Omit for upload mode.' },
         },
     },
     {

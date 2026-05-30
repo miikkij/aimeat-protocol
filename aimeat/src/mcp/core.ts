@@ -23,6 +23,8 @@
  *   v1.6.0 -- 2026-05-30 -- MCP audit Phase 4 (F4): migrate core read tools (memory_read/list,
  *     wallet_balance, work_inbox, agents_list, agent_profile) to registerTool() with outputSchema +
  *     structuredContent (via structuredResult), keeping text content for back-compat.
+ *   v1.7.0 -- 2026-05-30 -- F10 drift reconciliation: aimeat_memory_write gains ttl_hours (was hardcoded
+ *     null) so both surfaces support group_id + ttl_hours.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -252,9 +254,10 @@ export function registerCoreTools(
             visibility: z.enum(['private', 'owner', 'group', 'public']).default('private').describe('private = only you, owner = all your agents, group = sharing group members, public = anyone'),
             group_id: z.string().optional().describe('ID of sharing group for group visibility'),
             tags: z.array(z.string()).default([]).describe('Optional tags for filtering'),
+            ttl_hours: z.number().optional().describe('Time-to-live in hours (entry expires after this; omit for no expiry)'),
         },
         annotationsFor('aimeat_memory_write'),
-        async ({ key, value, visibility, group_id, tags }) => {
+        async ({ key, value, visibility, group_id, tags, ttl_hours }) => {
             const existing = await storage.getMemory(agentGaii, key);
             const record = await storage.setMemory({
                 key,
@@ -263,7 +266,7 @@ export function registerCoreTools(
                 visibility,
                 groupId: visibility === 'group' ? group_id : undefined,
                 tags,
-                ttlHours: null,
+                ttlHours: ttl_hours ?? null,
                 version: existing ? existing.version + 1 : 1,
                 createdAt: existing?.createdAt ?? new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
@@ -426,7 +429,7 @@ export function registerCoreTools(
     mcp.tool(
         'aimeat_work_deliver',
         descriptionFor('aimeat_work_deliver'),
-        { tracking_code: z.string(), output: z.record(z.string(), z.any()) },
+        { tracking_code: z.string(), output: z.record(z.string(), z.any()), metadata: z.unknown().optional() },
         annotationsFor('aimeat_work_deliver'),
         async ({ tracking_code, output }) => {
             const work = await storage.getWork(tracking_code);

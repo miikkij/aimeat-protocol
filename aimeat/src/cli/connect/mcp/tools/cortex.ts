@@ -6,6 +6,8 @@
  *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.2.0 -- 2026-05-30 -- F10 drift reconciliation: cortex_install now takes manifest (YAML string) + libs
+ *     map to match REST (connector was sending name + manifest object the route rejects).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -22,10 +24,12 @@ export function registerCortexTools(mcp: McpServer, registry: AgentRegistry): vo
   });
 
   mcp.tool('aimeat_cortex_install', descriptionFor('aimeat_cortex_install'), {
-    name: z.string().describe('Cortex name'),
-    manifest: z.record(z.string(), z.unknown()).describe('Cortex manifest object'),
-  }, annotationsFor('aimeat_cortex_install'), async ({ name, manifest }) => {
-    const resp = await client.post('/v1/cortex', { name, manifest });
+    manifest: z.string().describe('Cortex manifest in YAML format'),
+    libs: z.record(z.string(), z.string()).optional().describe('Map of filename to JavaScript source code for lib files'),
+  }, annotationsFor('aimeat_cortex_install'), async ({ manifest, libs }) => {
+    const body: Record<string, unknown> = { manifest };
+    if (libs) body.libs = libs;
+    const resp = await client.post('/v1/cortex', body);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 

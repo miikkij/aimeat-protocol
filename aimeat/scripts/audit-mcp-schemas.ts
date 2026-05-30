@@ -134,19 +134,18 @@ const CONNECTOR_EXTRA = new Set(['agent_name']);
  * known debt. Prune names from this set as each tool's two surfaces are reconciled.
  */
 const KNOWN_INPUT_DRIFT = new Set<string>([
-    'aimeat_action_execute', 'aimeat_admin_agents', 'aimeat_agent_activity', 'aimeat_app_delete',
-    'aimeat_app_get', 'aimeat_app_list', 'aimeat_app_publish', 'aimeat_app_versions',
-    'aimeat_board_create', 'aimeat_board_members', 'aimeat_board_post', 'aimeat_board_read',
-    'aimeat_board_subscribe', 'aimeat_capabilities_create', 'aimeat_capabilities_invoke',
-    'aimeat_capabilities_list', 'aimeat_capabilities_update', 'aimeat_capabilities_vouch',
-    'aimeat_catalogue_agents', 'aimeat_catalogue_directory', 'aimeat_catalogue_search',
-    'aimeat_cortex_install', 'aimeat_extension_install',
-    'aimeat_extension_invoke', 'aimeat_flag_report', 'aimeat_group_add_member', 'aimeat_group_create',
-    'aimeat_group_get', 'aimeat_group_remove_member', 'aimeat_handbook_get', 'aimeat_instance_create',
-    'aimeat_instance_status', 'aimeat_knowledge_contribute', 'aimeat_knowledge_get',
-    'aimeat_knowledge_links', 'aimeat_memory_search', 'aimeat_memory_write', 'aimeat_message_send',
-    'aimeat_storage_upload', 'aimeat_task_complete', 'aimeat_task_event', 'aimeat_task_fail',
-    'aimeat_task_list', 'aimeat_work_deliver',
+    // intentional: server MCP app_* tools manage HTML apps via /v1/apps (owner/filename, content_base64),
+    // connector app_* tools manage component packages via /v1/packages (group_id, content). These are two
+    // different backends sharing the app_* name; unifying them is tool-consolidation (audit Phase 5), not
+    // input-schema reconciliation — switching the connector's target route would change behavior.
+    'aimeat_app_delete', 'aimeat_app_get', 'aimeat_app_list', 'aimeat_app_publish', 'aimeat_app_versions',
+    // intentional: server MCP handbook_get returns managed system prompts by `tier` (/v1/prompts/:tier),
+    // connector handbook_get returns the agent operating handbook by `module` (/v1/agents/me/handbook/:module).
+    // Two different resources sharing the tool name; unifying them is a semantic decision for consolidation.
+    'aimeat_handbook_get',
+    // intentional: server MCP instance_create targets chat-instances (model -> derived platform),
+    // connector instance_create targets package instances (template); two different concepts.
+    'aimeat_instance_create',
 ]);
 
 function diffKeys(serverKeys: string[], connectorKeys: string[]): { onlyServer: string[]; onlyConnector: string[] } {

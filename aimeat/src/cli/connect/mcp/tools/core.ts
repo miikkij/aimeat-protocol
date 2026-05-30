@@ -17,6 +17,9 @@
  *   v1.4.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  *   v1.5.0 -- 2026-05-30 -- MCP audit Phase 1 (F5): read tools (memory_read/list, catalogue_search,
  *     work_inbox, board_read) accept response_format and shape REST payloads via shared shapeResponse().
+ *   v1.6.0 -- 2026-05-30 -- F10 drift reconciliation: align connector core tool inputs with server MCP +
+ *     REST (catalogue_search search/category; memory_write group_id+ttl_hours; memory_search visibility;
+ *     board read/post/create/subscribe filters; work_deliver output; message_send content; storage_upload).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -43,12 +46,14 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     key: z.string().describe('Memory entry key'),
     value: z.unknown().describe('Value to store'),
     visibility: z.string().optional().describe('Visibility level (default: private)'),
+    group_id: z.string().optional().describe('ID of sharing group (required for group visibility)'),
     tags: z.array(z.string()).optional().describe('Optional tags for filtering/shared areas'),
     ttl_hours: z.number().optional().describe('Time-to-live in hours'),
-  }, annotationsFor('aimeat_memory_write'), async ({ agent_name, key, value, visibility, tags, ttl_hours }) => {
+  }, annotationsFor('aimeat_memory_write'), async ({ agent_name, key, value, visibility, group_id, tags, ttl_hours }) => {
     const { client } = pickAgent(registry, agent_name);
     const body: Record<string, unknown> = { key, value };
     if (visibility) body.visibility = visibility;
+    if (group_id) body.group_id = group_id;
     if (tags) body.tags = tags;
     if (ttl_hours !== undefined) body.ttl_hours = ttl_hours;
     const resp = await client.post('/v1/memory', body);
@@ -79,9 +84,12 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   mcp.tool('aimeat_memory_search', descriptionFor('aimeat_memory_search'), {
     agent_name: agentNameSchema,
     query: z.string().describe('Search query'),
-  }, annotationsFor('aimeat_memory_search'), async ({ agent_name, query }) => {
+    visibility: z.string().optional().describe('Optional visibility filter'),
+  }, annotationsFor('aimeat_memory_search'), async ({ agent_name, query, visibility }) => {
     const { client } = pickAgent(registry, agent_name);
-    const resp = await client.get(`/v1/memory/search?q=${encodeURIComponent(query)}`);
+    const params = new URLSearchParams({ q: query });
+    if (visibility) params.set('visibility', visibility);
+    const resp = await client.get(`/v1/memory/search?${params.toString()}`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
@@ -89,11 +97,15 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
 
   mcp.tool('aimeat_catalogue_search', descriptionFor('aimeat_catalogue_search'), {
     agent_name: agentNameSchema,
-    query: z.string().optional().describe('Search query'),
+    search: z.string().optional().describe('Free-text search (name/description/GAII)'),
+    category: z.string().optional().describe('Filter by capability category'),
     response_format: responseFormatSchema,
-  }, annotationsFor('aimeat_catalogue_search'), async ({ agent_name, query, response_format }) => {
+  }, annotationsFor('aimeat_catalogue_search'), async ({ agent_name, search, category, response_format }) => {
     const { client } = pickAgent(registry, agent_name);
-    const qs = query ? `?q=${encodeURIComponent(query)}` : '';
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (category) params.set('category', category);
+    const qs = params.toString() ? `?${params.toString()}` : '';
     const resp = await client.get(`/v1/catalogue${qs}`);
     return jsonContent(shapeResponse('aimeat_catalogue_search', response_format, resp.data ?? resp));
   });
@@ -128,11 +140,13 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   mcp.tool('aimeat_action_execute', descriptionFor('aimeat_action_execute'), {
     agent_name: agentNameSchema,
     action_id: z.string().describe('Action identifier'),
+    provider_gaii: z.string().describe('GAII of the provider offering this action (required to route + escrow)'),
     input: z.record(z.string(), z.unknown()).optional().describe('Input parameters for the action'),
-  }, annotationsFor('aimeat_action_execute'), async ({ agent_name, action_id, input }) => {
+    ttl_hours: z.number().optional().describe('Hours before the work request expires (default 24)'),
+  }, annotationsFor('aimeat_action_execute'), async ({ agent_name, action_id, provider_gaii, input, ttl_hours }) => {
     const { client } = pickAgent(registry, agent_name);
-    const body: Record<string, unknown> = { action_id };
-    if (input) body.input = input;
+    const body: Record<string, unknown> = { action_id, provider_gaii, input: input ?? {} };
+    if (ttl_hours !== undefined) body.ttl_hours = ttl_hours;
     const resp = await client.post('/v1/work/request', body);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
@@ -158,10 +172,13 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   mcp.tool('aimeat_work_deliver', descriptionFor('aimeat_work_deliver'), {
     agent_name: agentNameSchema,
     tracking_code: z.string().describe('Work item tracking code'),
-    result: z.unknown().describe('Delivery payload'),
-  }, annotationsFor('aimeat_work_deliver'), async ({ agent_name, tracking_code, result }) => {
+    output: z.unknown().describe('Delivery payload (the work result)'),
+    metadata: z.unknown().optional().describe('Optional delivery metadata'),
+  }, annotationsFor('aimeat_work_deliver'), async ({ agent_name, tracking_code, output, metadata }) => {
     const { client } = pickAgent(registry, agent_name);
-    const resp = await client.post(`/v1/work/${encodeURIComponent(tracking_code)}/deliver`, { result });
+    const body: Record<string, unknown> = { output };
+    if (metadata !== undefined) body.metadata = metadata;
+    const resp = await client.post(`/v1/work/${encodeURIComponent(tracking_code)}/deliver`, body);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
@@ -180,10 +197,16 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   mcp.tool('aimeat_board_read', descriptionFor('aimeat_board_read'), {
     agent_name: agentNameSchema,
     board_id: z.string().describe('Board identifier'),
+    category: z.string().optional().describe('Filter posts by category'),
+    limit: z.number().optional().describe('Maximum posts to return (default 20)'),
     response_format: responseFormatSchema,
-  }, annotationsFor('aimeat_board_read'), async ({ agent_name, board_id, response_format }) => {
+  }, annotationsFor('aimeat_board_read'), async ({ agent_name, board_id, category, limit, response_format }) => {
     const { client } = pickAgent(registry, agent_name);
-    const resp = await client.get(`/v1/boards/${encodeURIComponent(board_id)}/posts`);
+    const params = new URLSearchParams();
+    if (category) params.set('category', category);
+    if (limit !== undefined) params.set('limit', String(limit));
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const resp = await client.get(`/v1/boards/${encodeURIComponent(board_id)}/posts${qs}`);
     return jsonContent(shapeResponse('aimeat_board_read', response_format, resp.data ?? resp));
   });
 
@@ -192,9 +215,12 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     board_id: z.string().describe('Board identifier'),
     title: z.string().describe('Post title'),
     body: z.string().describe('Post body'),
-  }, annotationsFor('aimeat_board_post'), async ({ agent_name, board_id, title, body }) => {
+    category: z.string().optional().describe('Optional post category'),
+  }, annotationsFor('aimeat_board_post'), async ({ agent_name, board_id, title, body, category }) => {
     const { client } = pickAgent(registry, agent_name);
-    const resp = await client.post(`/v1/boards/${encodeURIComponent(board_id)}/posts`, { title, body });
+    const reqBody: Record<string, unknown> = { title, body };
+    if (category) reqBody.category = category;
+    const resp = await client.post(`/v1/boards/${encodeURIComponent(board_id)}/posts`, reqBody);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
@@ -203,12 +229,17 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   mcp.tool('aimeat_storage_upload', descriptionFor('aimeat_storage_upload'), {
     agent_name: agentNameSchema,
     key: z.string().describe('Storage key'),
-    content: z.string().describe('File content (base64-encoded)'),
+    data_base64: z.string().describe('Base64-encoded file data'),
     mime_type: z.string().optional().describe('MIME type of the file'),
-  }, annotationsFor('aimeat_storage_upload'), async ({ agent_name, key, content, mime_type }) => {
+    visibility: z.string().optional().describe('Access control (default: private)'),
+    group_id: z.string().optional().describe('ID of sharing group (required for group visibility)'),
+  }, annotationsFor('aimeat_storage_upload'), async ({ agent_name, key, data_base64, mime_type, visibility, group_id }) => {
     const { client } = pickAgent(registry, agent_name);
-    const body: Record<string, unknown> = { key, content };
+    // REST POST /v1/storage reads the base64 payload as `data`.
+    const body: Record<string, unknown> = { key, data: data_base64 };
     if (mime_type) body.mime_type = mime_type;
+    if (visibility) body.visibility = visibility;
+    if (group_id) body.group_id = group_id;
     const resp = await client.post('/v1/storage', body);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
@@ -242,10 +273,16 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
 
   mcp.tool('aimeat_admin_agents', descriptionFor('aimeat_admin_agents'), {
     agent_name: agentNameSchema,
-  }, annotationsFor('aimeat_admin_agents'), async ({ agent_name }) => {
+    limit: z.number().optional().describe('Maximum number of agents to return'),
+  }, annotationsFor('aimeat_admin_agents'), async ({ agent_name, limit }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.get('/v1/admin/agents');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    // REST returns all agents; apply the limit client-side to match the server MCP tool.
+    const data = (resp.data ?? resp) as { agents?: unknown[] };
+    if (limit !== undefined && Array.isArray(data.agents)) {
+      data.agents = data.agents.slice(0, limit);
+    }
+    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
   });
 
   mcp.tool('aimeat_admin_config', descriptionFor('aimeat_admin_config'), {

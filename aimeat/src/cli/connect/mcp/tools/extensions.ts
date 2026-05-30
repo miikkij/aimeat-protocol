@@ -6,6 +6,9 @@
  *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.2.0 -- 2026-05-30 -- F10 drift reconciliation: extension_invoke name->extension_name +instance_id
+ *     (instance-scoped route); extension_install now takes manifest (YAML string) + scripts map to match
+ *     REST ExtensionInstallSchema (connector was sending name + manifest object the route rejects).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -22,22 +25,26 @@ export function registerExtensionsTools(mcp: McpServer, registry: AgentRegistry)
   });
 
   mcp.tool('aimeat_extension_invoke', descriptionFor('aimeat_extension_invoke'), {
-    name: z.string().describe('Extension name'),
+    extension_name: z.string().describe('Name of the extension to invoke'),
     action_id: z.string().describe('Action identifier'),
     input: z.record(z.string(), z.unknown()).optional().describe('Input parameters'),
-  }, annotationsFor('aimeat_extension_invoke'), async ({ name, action_id, input }) => {
-    const resp = await client.post(
-      `/v1/ext/${encodeURIComponent(name)}/${encodeURIComponent(action_id)}`,
-      input ?? {},
-    );
+    instance_id: z.string().optional().describe('Instance ID for instance-scoped action execution'),
+  }, annotationsFor('aimeat_extension_invoke'), async ({ extension_name, action_id, input, instance_id }) => {
+    const enc = encodeURIComponent(extension_name);
+    const url = instance_id
+      ? `/v1/ext/${enc}/${encodeURIComponent(instance_id)}/${encodeURIComponent(action_id)}`
+      : `/v1/ext/${enc}/${encodeURIComponent(action_id)}`;
+    const resp = await client.post(url, input ?? {});
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
   mcp.tool('aimeat_extension_install', descriptionFor('aimeat_extension_install'), {
-    name: z.string().describe('Extension name'),
-    manifest: z.record(z.string(), z.unknown()).describe('Extension manifest object'),
-  }, annotationsFor('aimeat_extension_install'), async ({ name, manifest }) => {
-    const resp = await client.post('/v1/extensions', { name, manifest });
+    manifest: z.string().describe('Extension manifest in YAML format'),
+    scripts: z.record(z.string(), z.string()).optional().describe('Map of script filename to JavaScript source code'),
+  }, annotationsFor('aimeat_extension_install'), async ({ manifest, scripts }) => {
+    const body: Record<string, unknown> = { manifest };
+    if (scripts) body.scripts = scripts;
+    const resp = await client.post('/v1/extensions', body);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 

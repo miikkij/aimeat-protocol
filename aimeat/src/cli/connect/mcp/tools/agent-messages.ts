@@ -8,6 +8,8 @@
  *   v2.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v2.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v2.3.0 -- 2026-05-30 -- F10 drift reconciliation: message_send canonical on content (+thread_id);
+ *     dropped the legacy body alias to match server MCP + REST AgentMessageCreateSchema.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -29,18 +31,18 @@ export function registerAgentMessagesTools(mcp: McpServer, registry: AgentRegist
 
   mcp.tool('aimeat_message_send', descriptionFor('aimeat_message_send'), {
     agent_name: agentNameSchema,
-    content: z.string().optional().describe('Message content'),
-    body: z.string().optional().describe('Message content alias for older callers'),
+    content: z.string().describe('Message content (markdown supported)'),
+    thread_id: z.string().optional().describe('Thread ID to reply in (omit to start a new conversation)'),
     linked_task_id: z.string().optional().describe('Optional linked task identifier'),
     metadata: z.record(z.string(), z.unknown()).optional().describe('Optional metadata key-value pairs'),
-  }, annotationsFor('aimeat_message_send'), async ({ agent_name, content, body, linked_task_id, metadata }) => {
+  }, annotationsFor('aimeat_message_send'), async ({ agent_name, content, thread_id, linked_task_id, metadata }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
-    const message = content ?? body;
-    if (!message) {
-      return { content: [{ type: 'text' as const, text: 'Message content is required. Provide content or body.' }] };
+    if (!content) {
+      return { content: [{ type: 'text' as const, text: 'Message content is required.' }] };
     }
-    const payload: Record<string, unknown> = { content: message, direction: 'outbound' };
+    const payload: Record<string, unknown> = { content, direction: 'outbound' };
+    if (thread_id) payload.thread_id = thread_id;
     if (linked_task_id) payload.linked_task_id = linked_task_id;
     if (metadata) payload.metadata = metadata;
     const resp = await client.post(`/v1/agents/${enc}/messages`, payload);

@@ -6,6 +6,9 @@
  *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.2.0 -- 2026-05-30 -- F10 drift reconciliation: instance_status id->instance_id. instance_create
+ *     left as-is (model vs template) -- server MCP targets chat-instances, connector targets package
+ *     instances; the model/template divergence reflects two different instance concepts (baselined).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -32,9 +35,9 @@ export function registerInstancesTools(mcp: McpServer, registry: AgentRegistry):
   });
 
   mcp.tool('aimeat_instance_status', descriptionFor('aimeat_instance_status'), {
-    id: z.string().describe('Instance identifier'),
-  }, annotationsFor('aimeat_instance_status'), async ({ id }) => {
-    const resp = await client.get(`/v1/instances/${encodeURIComponent(id)}/status`);
+    instance_id: z.string().describe('Instance identifier'),
+  }, annotationsFor('aimeat_instance_status'), async ({ instance_id }) => {
+    const resp = await client.get(`/v1/instances/${encodeURIComponent(instance_id)}/status`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 }

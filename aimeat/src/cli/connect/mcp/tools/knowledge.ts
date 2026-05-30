@@ -6,6 +6,8 @@
  *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.2.0 -- 2026-05-30 -- F10 drift reconciliation: rename id->package_id (get/contribute/links),
+ *     add direction filter to links to match server/REST.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -22,25 +24,27 @@ export function registerKnowledgeTools(mcp: McpServer, registry: AgentRegistry):
   });
 
   mcp.tool('aimeat_knowledge_get', descriptionFor('aimeat_knowledge_get'), {
-    id: z.string().describe('Knowledge package identifier'),
-  }, annotationsFor('aimeat_knowledge_get'), async ({ id }) => {
-    const resp = await client.get(`/v1/knowledge/${encodeURIComponent(id)}`);
+    package_id: z.string().describe('Knowledge package identifier'),
+  }, annotationsFor('aimeat_knowledge_get'), async ({ package_id }) => {
+    const resp = await client.get(`/v1/knowledge/${encodeURIComponent(package_id)}`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
   mcp.tool('aimeat_knowledge_contribute', descriptionFor('aimeat_knowledge_contribute'), {
-    id: z.string().describe('Knowledge package identifier'),
+    package_id: z.string().describe('Knowledge package identifier'),
     entry_key: z.string().describe('Entry key'),
     content: z.string().describe('Entry content'),
-  }, annotationsFor('aimeat_knowledge_contribute'), async ({ id, entry_key, content }) => {
-    const resp = await client.post(`/v1/knowledge/${encodeURIComponent(id)}/contribute`, { entry_key, content });
+  }, annotationsFor('aimeat_knowledge_contribute'), async ({ package_id, entry_key, content }) => {
+    const resp = await client.post(`/v1/knowledge/${encodeURIComponent(package_id)}/contribute`, { entry_key, content });
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
   mcp.tool('aimeat_knowledge_links', descriptionFor('aimeat_knowledge_links'), {
-    id: z.string().describe('Knowledge package identifier'),
-  }, annotationsFor('aimeat_knowledge_links'), async ({ id }) => {
-    const resp = await client.get(`/v1/knowledge/${encodeURIComponent(id)}/links`);
+    package_id: z.string().describe('Knowledge package identifier'),
+    direction: z.enum(['outgoing', 'incoming', 'both']).optional().describe('Link direction (default: both)'),
+  }, annotationsFor('aimeat_knowledge_links'), async ({ package_id, direction }) => {
+    const query = direction ? `?direction=${encodeURIComponent(direction)}` : '';
+    const resp = await client.get(`/v1/knowledge/${encodeURIComponent(package_id)}/links${query}`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 }

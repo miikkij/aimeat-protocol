@@ -6,6 +6,8 @@
  *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.2.0 -- 2026-05-30 -- F10 drift reconciliation: add allowed_gaiis to create, callback_url+filters to
+ *     subscribe, replace members with add/remove on members (matches REST PATCH body + server MCP).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -25,18 +27,28 @@ export function registerBoardsTools(mcp: McpServer, registry: AgentRegistry): vo
     name: z.string().describe('Board name'),
     description: z.string().optional().describe('Board description'),
     visibility: z.string().optional().describe('Board visibility level'),
-  }, annotationsFor('aimeat_board_create'), async ({ name, description, visibility }) => {
+    allowed_gaiis: z.array(z.string()).optional().describe('GAIIs allowed to access a shared/private board'),
+  }, annotationsFor('aimeat_board_create'), async ({ name, description, visibility, allowed_gaiis }) => {
     const body: Record<string, unknown> = { name };
     if (description) body.description = description;
     if (visibility) body.visibility = visibility;
+    if (allowed_gaiis) body.allowed_gaiis = allowed_gaiis;
     const resp = await client.post('/v1/boards', body);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
   mcp.tool('aimeat_board_subscribe', descriptionFor('aimeat_board_subscribe'), {
     board_id: z.string().describe('Board identifier'),
-  }, annotationsFor('aimeat_board_subscribe'), async ({ board_id }) => {
-    const resp = await client.post(`/v1/boards/${encodeURIComponent(board_id)}/subscribe`);
+    callback_url: z.string().optional().describe('Webhook URL to notify on new posts'),
+    filters: z.object({
+      categories: z.array(z.string()).optional(),
+      tags: z.array(z.string()).optional(),
+    }).optional().describe('Only notify for posts matching these categories/tags'),
+  }, annotationsFor('aimeat_board_subscribe'), async ({ board_id, callback_url, filters }) => {
+    const body: Record<string, unknown> = {};
+    if (callback_url) body.callback_url = callback_url;
+    if (filters) body.filters = filters;
+    const resp = await client.post(`/v1/boards/${encodeURIComponent(board_id)}/subscribe`, body);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
@@ -66,11 +78,15 @@ export function registerBoardsTools(mcp: McpServer, registry: AgentRegistry): vo
 
   mcp.tool('aimeat_board_members', descriptionFor('aimeat_board_members'), {
     board_id: z.string().describe('Board identifier'),
-    members: z.array(z.string()).describe('List of member identifiers'),
-  }, annotationsFor('aimeat_board_members'), async ({ board_id, members }) => {
+    add: z.array(z.string()).optional().describe('GAIIs to grant access'),
+    remove: z.array(z.string()).optional().describe('GAIIs to revoke access'),
+  }, annotationsFor('aimeat_board_members'), async ({ board_id, add, remove }) => {
+    const body: Record<string, unknown> = {};
+    if (add) body.add = add;
+    if (remove) body.remove = remove;
     const resp = await client.patch(
       `/v1/boards/${encodeURIComponent(board_id)}/members`,
-      { members },
+      body,
     );
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });

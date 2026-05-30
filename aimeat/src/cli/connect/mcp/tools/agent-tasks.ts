@@ -12,6 +12,9 @@
  *   v2.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v2.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v2.3.0 -- 2026-05-30 -- F10 drift reconciliation: task_list +page/per_page; task_event +details;
+ *     task_complete canonical on message (dropped summary alias); task_fail canonical on reason (dropped
+ *     message alias) to match server MCP. REST /fail still receives the value as `message`.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -25,10 +28,16 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
   mcp.tool('aimeat_task_list', descriptionFor('aimeat_task_list'), {
     agent_name: agentNameSchema,
     status: z.string().optional().describe('Filter by task status'),
-  }, annotationsFor('aimeat_task_list'), async ({ agent_name, status }) => {
+    page: z.number().optional().describe('Page number (default 1)'),
+    per_page: z.number().optional().describe('Results per page (default 20, max 100)'),
+  }, annotationsFor('aimeat_task_list'), async ({ agent_name, status, page, per_page }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
-    const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (page !== undefined) params.set('page', String(page));
+    if (per_page !== undefined) params.set('per_page', String(per_page));
+    const qs = params.toString() ? `?${params.toString()}` : '';
     const resp = await client.get(`/v1/agents/${enc}/tasks${qs}`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
@@ -114,10 +123,13 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     task_id: z.string().describe('Task identifier'),
     type: z.string().describe('Event type'),
     message: z.string().describe('Event message'),
-  }, annotationsFor('aimeat_task_event'), async ({ agent_name, task_id, type, message }) => {
+    details: z.record(z.string(), z.unknown()).optional().describe('Optional event details (may include telemetry)'),
+  }, annotationsFor('aimeat_task_event'), async ({ agent_name, task_id, type, message, details }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
-    const resp = await client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}/event`, { type, message });
+    const body: Record<string, unknown> = { type, message };
+    if (details) body.details = details;
+    const resp = await client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}/event`, body);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
@@ -140,12 +152,11 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     agent_name: agentNameSchema,
     task_id: z.string().describe('Task identifier'),
     message: z.string().optional().describe('Completion message'),
-    summary: z.string().optional().describe('Completion message alias for older callers'),
-  }, annotationsFor('aimeat_task_complete'), async ({ agent_name, task_id, message, summary }) => {
+  }, annotationsFor('aimeat_task_complete'), async ({ agent_name, task_id, message }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
     const body: Record<string, unknown> = {};
-    if (message ?? summary) body.message = message ?? summary;
+    if (message) body.message = message;
     const resp = await client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}/complete`, body);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
@@ -153,12 +164,12 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
   mcp.tool('aimeat_task_fail', descriptionFor('aimeat_task_fail'), {
     agent_name: agentNameSchema,
     task_id: z.string().describe('Task identifier'),
-    reason: z.string().describe('Failure reason alias for message'),
-    message: z.string().optional().describe('Failure message'),
-  }, annotationsFor('aimeat_task_fail'), async ({ agent_name, task_id, reason, message }) => {
+    reason: z.string().describe('Reason for failure'),
+  }, annotationsFor('aimeat_task_fail'), async ({ agent_name, task_id, reason }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
-    const resp = await client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}/fail`, { message: message ?? reason });
+    // REST /fail reads `message`; server MCP exposes this as `reason`.
+    const resp = await client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}/fail`, { message: reason });
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 }
