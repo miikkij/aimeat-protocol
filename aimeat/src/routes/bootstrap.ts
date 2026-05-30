@@ -7,6 +7,8 @@
  * @version-history
  *   v1.0.0 - 2026-04-30 - Add for_ai_assistants and for_ai_agents sections to bootstrap response
  *   v1.0.1 -- 2026-05-28 -- Document same-owner shared tag memory pattern
+ *   v1.1.0 -- 2026-05-30 -- Advertise v2 purpose-scoped MCP surfaces (/v2/mcp/<role>) in mcp_connection;
+ *     drop stale "18 tools" wording
  */
 import { Router } from 'express';
 import { readFileSync } from 'node:fs';
@@ -338,8 +340,14 @@ export function bootstrapRouter(
               description: 'Connect via Model Context Protocol for direct integration from AI chat platforms',
               best_for: 'Claude, ChatGPT, Gemini, Cursor, and other MCP-compatible platforms',
               how: `Add ${base}/v1/mcp as an MCP server in your platform settings. OAuth 2.1 handles authentication automatically via browser consent flow.`,
-              tools_available: 18,
               discovery_endpoint: `GET ${base}/.well-known/oauth-authorization-server`,
+              surfaces: {
+                description: 'Optional purpose-scoped surfaces — connect to one of these instead of /v1/mcp to get a smaller, focused tool set (less context, fewer wrong-tool mistakes). Each has its own handbook at GET /v1/agents/me/handbook/surface/{role}.',
+                agent: `${base}/v2/mcp/agent — the owner's personal agent: memory, tasks, messages, knowledge, discovery, board reading (default choice for most agents)`,
+                appdev: `${base}/v2/mcp/appdev — build & publish apps, extensions, cortex`,
+                service: `${base}/v2/mcp/service — provide a service / marketplace: boards, work, wallet, capabilities, organisms`,
+                admin: `${base}/v2/mcp/admin — operator/owner governance: node admin, moderation, groups, consent`,
+              },
             },
             rest_api_without_mcp: {
               description: 'If MCP tools are not available in your environment, use these REST API equivalents. All require Authorization: Bearer <jwt> header.',
@@ -380,7 +388,7 @@ export function bootstrapRouter(
         step_1_identify_your_capabilities: {
           question: 'What can you do as an AI?',
           options: [
-            { if: 'You can connect to MCP servers or use integrations/connectors', then: `Connect via MCP at ${base}/v1/mcp for full Tier 1 agent access with 18 built-in tools` },
+            { if: 'You can connect to MCP servers or use integrations/connectors', then: `Connect via MCP at ${base}/v1/mcp for the full built-in tool set, or ${base}/v2/mcp/agent for a focused owner-agent surface (see endpoints.connection_methods.mcp_connection.surfaces)` },
             { if: 'You can make POST requests with custom headers (curl, code execution, fetch)', then: 'Use JWT auth flow — proceed to step_3_authenticate after connecting to your user' },
             { if: 'You can only open/fetch GET URLs', then: 'You are Tier 0/0.5. You can browse public data. For writes, use micro-memory with access_code or ask your human for help.' },
           ],
@@ -530,7 +538,7 @@ export function bootstrapRouter(
           stats: { method: 'GET', url: '/v1/stats', description: 'System statistics — agent count, action count, usage metrics', tier: 0 },
           federation: { method: 'GET', url: '/v1/federation/directory', description: 'Federated peer directory for multi-node networks', tier: 1 },
           wellknown: { method: 'GET', url: '/.well-known/aimeat', description: 'Node discovery endpoint (RFC 5785)', tier: 0 },
-          mcp: { method: 'POST', url: '/v1/mcp', description: 'MCP (Model Context Protocol) connector — OAuth 2.1 + 18 built-in tools', tier: 1 },
+          mcp: { method: 'POST', url: '/v1/mcp', description: 'MCP (Model Context Protocol) connector — OAuth 2.1, full built-in tool set; or /v2/mcp/{appdev|agent|service|admin} for a purpose-scoped surface', tier: 1 },
           apps: { method: 'GET', url: '/v1/apps', description: 'Browse downloadable apps directory', tier: 0 },
           libs: { method: 'GET', url: '/v1/libs', description: 'JavaScript helper libraries for app development', tier: 0 },
           site: { method: 'GET', url: '/v1/site', description: 'Site metadata, templates, and portal customization', tier: 0 },
