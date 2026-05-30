@@ -40,7 +40,7 @@ Surfaces (working route names):
 | cortex_* (5) | ✅ | | | | build |
 | task_* (9) | | ✅ | | | owner-facing work |
 | message_* (2) | | ✅ | | | owner conversation |
-| knowledge_* (4) | | ✅ | | | refined-knowledge contract (kept: enforces a shape) |
+| knowledge_* (4) | | ✅ | ✅ | | refined-knowledge contract (kept: enforces a shape) |
 | catalogue_agents | | ✅ | ✅ | | find peers |
 | catalogue_directory | | ✅ | | | find people (already memory-backed) |
 | catalogue_boards | | ✅ | ✅ | | find boards |
@@ -50,9 +50,9 @@ Surfaces (working route names):
 | work_* (3) | | | ✅ | | paid-work provider side |
 | action_execute | | | ✅ | | request paid work |
 | wallet_* (2) | | | ✅ | | money (useless without payments) |
-| capabilities consume (list/get/invoke) | | ⬜ | ✅ | | **open**: agent invoke? |
-| capabilities provide (create/update/delete/vouch) | | | ✅ | | provider |
-| organism_* (5) | | ⬜ | ✅ | | **open**: agent collaboration too? |
+| capabilities consume (list/get/invoke) | | ✅ | ✅ | | agent invokes; service provides too |
+| capabilities provide (create/update/delete/vouch) | | | ✅ | | provider only |
+| organism_* (5) | | ✅ | ✅ | | collaboration (both) |
 | agent self (profile/activity/capabilities_report/telemetry_report) | | ✅ | ✅ | | self-report/observe |
 | agents_list | | ✅ | ✅ | | discover own agents (delegation) |
 | agent_mode_set / agent_tags_set | | | | ✅ | owner manages agents |
@@ -72,11 +72,11 @@ Surfaces (working route names):
 `storage_upload` `storage_download` · `app_publish` `app_list` `app_get` `app_versions` `app_delete` · `extension_install` `extension_invoke` `extension_get` `extension_list` `extension_activate` `extension_deactivate` `extension_delete` · `cortex_install` `cortex_activate` `cortex_deactivate` `cortex_list` `cortex_delete` · `handbook_get`
 *(memory + onboarding_status optional — often just uses curl/API directly.)*
 
-### `mcpagent` — ~37 (default, owner's agent)
-memory: `memory_read` `memory_write` `memory_list` `memory_search` `memory_read_public` · storage: `storage_upload` `storage_download` · task: `task_create` `task_list` `task_get` `task_propose_todos` `task_request_changes` `task_event` `task_todo` `task_complete` `task_fail` · message: `message_inbox` `message_send` · knowledge: `knowledge_list` `knowledge_get` `knowledge_contribute` `knowledge_links` · discovery: `catalogue_agents` `catalogue_directory` `catalogue_boards` · `board_read` · agent self: `agent_profile` `agent_activity` `agent_capabilities_report` `agent_telemetry_report` `agents_list` · onboarding(5) · `handbook_get`
+### `mcpagent` — ~45 (default, owner's agent)
+memory: `memory_read` `memory_write` `memory_list` `memory_search` `memory_read_public` · storage: `storage_upload` `storage_download` · task: `task_create` `task_list` `task_get` `task_propose_todos` `task_request_changes` `task_event` `task_todo` `task_complete` `task_fail` · message: `message_inbox` `message_send` · knowledge: `knowledge_list` `knowledge_get` `knowledge_contribute` `knowledge_links` · capabilities (consume): `capabilities_list` `capabilities_get` `capabilities_invoke` · organism: `organism_list` `organism_get` `organism_members` `organism_join` `organism_leave` · discovery: `catalogue_agents` `catalogue_directory` `catalogue_boards` · `board_read` · agent self: `agent_profile` `agent_activity` `agent_capabilities_report` `agent_telemetry_report` `agents_list` · onboarding(5) · `handbook_get`
 
-### `mcpservice` — ~48 (marketplace / provider)
-discovery: `catalogue_search` `catalogue_agents` `catalogue_boards` · memory(5) · storage(2) · board full: `board_list` `board_read` `board_create` `board_post` `board_reply` `board_react` `board_subscribe` `board_members` `board_delete` · work: `work_inbox` `work_accept` `work_deliver` · `action_execute` · wallet: `wallet_balance` `wallet_transactions` · capabilities(7): `capabilities_list` `capabilities_get` `capabilities_invoke` `capabilities_create` `capabilities_update` `capabilities_delete` `capabilities_vouch` · organism(5): `organism_list` `organism_get` `organism_members` `organism_join` `organism_leave` · agent self(4) + `agents_list` · onboarding(5) · `handbook_get`
+### `mcpservice` — ~52 (marketplace / provider)
+discovery: `catalogue_search` `catalogue_agents` `catalogue_boards` · memory(5) · storage(2) · knowledge(4): `knowledge_list` `knowledge_get` `knowledge_contribute` `knowledge_links` · board full: `board_list` `board_read` `board_create` `board_post` `board_reply` `board_react` `board_subscribe` `board_members` `board_delete` · work: `work_inbox` `work_accept` `work_deliver` · `action_execute` · wallet: `wallet_balance` `wallet_transactions` · capabilities(7): `capabilities_list` `capabilities_get` `capabilities_invoke` `capabilities_create` `capabilities_update` `capabilities_delete` `capabilities_vouch` · organism(5): `organism_list` `organism_get` `organism_members` `organism_join` `organism_leave` · agent self(4) + `agents_list` · onboarding(5) · `handbook_get`
 
 ### `mcpadmin` — ~15 (operator / owner governance)
 `admin_stats` `admin_agents` `admin_config` `admin_mint` · `flag_report` · group(5): `group_list` `group_get` `group_create` `group_add_member` `group_remove_member` · consent(3): `consent_grant` `consent_list` `consent_revoke` · `agent_mode_set` `agent_tags_set`
@@ -96,26 +96,46 @@ discovery: `catalogue_search` `catalogue_agents` `catalogue_boards` · memory(5)
 
 ---
 
-## 5. Open decisions (confirm before building)
+## 5. Decisions (resolved 2026-05-30)
 
-1. **`capabilities` consume (`list`/`get`/`invoke`) on `mcpagent`?** Should the owner's agent be able to invoke node capabilities, or is that service-only? (Provide-side stays service.)
-2. **`organism_*` on `mcpagent`?** Joining a collective is collaboration — agent-level too, or service-only?
-3. **`mcpappdev`: include `memory` + `onboarding_status`?** Or truly minimal (build tools + handbook only)?
-4. **Within-surface consolidation** — apply now or leave as later gravy? (Recommend: leave; ship the projection first.)
-5. **Routing shape:** `/v2/mcp/<role>` (one router, role from path) vs separate mounts. (Recommend one router, role param.)
-6. **`knowledge` — keep** (decided: yes, it enforces a contract for refined shared knowledge).
+1. **`capabilities` consume on `mcpagent`** → **yes** (list/get/invoke). Provide-side (create/update/delete/vouch) → service only.
+2. **`organism_*` on `mcpagent`** → **yes** (collaboration is agent-level too; also on service).
+3. **`mcpappdev`** → **minimal**: build tools + `handbook_get` only. No memory/onboarding (uses OAuth + curl/API directly).
+4. **Within-surface consolidation** → **later gravy**, not now. Ship the projection first.
+5. **Routing** → **one router, role from path** (`/v2/mcp/:role`).
+6. **`knowledge`** → keep on agent + service (enforces a contract for refined shared knowledge).
+7. **`instance_*`** → removed from v2 entirely.
 
 ---
 
-## 6. Implementation outline (when approved — NOT started)
-
-Direct on `main`, no feature branches.
-
-- **S1.** Per-surface tool-set definition in the catalog (`surfaces.ts`: role → tool-name allowlist), driven by the master table §2.
-- **S2.** `createMcpServer(role, gaii, scopes)` filters registration by the role allowlist **and** scopes (extend the existing Phase-3 monkeypatch gate).
-- **S3.** Mount `/v2/mcp/:role` (reuse v1 OAuth/transport). Remove `instance_*` from v2.
-- **S4.** Extend `audit:mcp-schemas` with a per-surface lane; new `test/e2e-mcp-v2.ts` (per-role tools/list contains only its set + scope-filter still applies).
-- **S5.** OpenAPI for `/v2/mcp/*`; full sweep (Rule 1).
-- **Optional later:** within-surface consolidation + structuredContent-everywhere per surface.
+## 6. Implementation (on `main`, no feature branches)
 
 Each step: typecheck + lint + relevant e2e green; file headers (Rule 2).
+
+### S1 — Surface registry
+- [ ] `src/mcp/catalog/surfaces.ts`: `MCP_SURFACES` = role → tool-name allowlist (from §2 master table); `toolsForSurface(role)` + `SurfaceRole` type
+- [ ] Validate at module load that every listed tool exists in the catalog and every catalog tool is in ≥1 surface or explicitly excluded (e.g. `instance_*`)
+- [ ] Unit test: each role's allowlist matches §2; no unknown/duplicate names
+
+### S2 — Role-filtered registration
+- [ ] Generalise `createMcpServer(agentGaii, scopes)` → also accept `role`; the registration gate (Phase-3 monkeypatch) skips tools not in `toolsForSurface(role)` **and** not allowed by scope
+- [ ] v1 path passes role `'all'` (no surface filter) → unchanged behaviour
+- [ ] `instance_*` excluded from every v2 role
+
+### S3 — Mount `/v2/mcp/:role`
+- [ ] Route `/v2/mcp/:role` (role ∈ appdev|agent|service|admin) reusing v1 OAuth/transport/session machinery
+- [ ] Reject unknown roles (400); `.well-known` advertises v2
+- [ ] Manual smoke: each role's `tools/list` returns only its set
+
+### S4 — Audit + tests
+- [ ] Extend `audit:mcp-schemas` (or a new `audit:mcp-surfaces`) with a per-surface lane: every surface tool ∈ catalog, surfaces don't drift, `instance_*` absent
+- [ ] `test/e2e-mcp-v2.ts`: per-role `tools/list` = expected set; scope-filter still applies on top; a tool from another role is absent
+- [ ] Register suite in `run-e2e-ci.ts`
+
+### S5 — Spec + sweep
+- [ ] OpenAPI: document `/v2/mcp/:role`; `pnpm generate:types` clean
+- [ ] Full `pnpm test:e2e:sqlite` (+ `:mongodb` at the end) green (Rule 1)
+
+### Optional later (gravy, not required)
+- [ ] Within-surface consolidation per the audit (task/board/etc.)
+- [ ] structuredContent + outputSchema on all v2 reads
