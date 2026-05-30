@@ -324,6 +324,7 @@
         "domainAgent": "Agentti",
         "domainCatalogue": "Hakemisto",
         "domainGenerator": "Generaattori",
+        "domainTask": "Tehtävät",
         "permExecute": "Suoritus",
         "permRead": "Luku",
         "permWrite": "Kirjoitus",

@@ -136,7 +136,7 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
     const key = newAreaKey.trim();
     if (!key) return;
     try {
-      const updated = [...memoryAreas, { key, description: newAreaDesc.trim(), access: newAreaPerm }];
+      const updated = [...memoryAreas, { key_prefix: key, description: newAreaDesc.trim(), access: newAreaPerm }];
       await upsertDirectives(agentName, { memory_areas: updated });
       setMemoryAreas(updated);
       setNewAreaKey('');
@@ -261,8 +261,8 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
           </div>
         `}
         ${hasAreas ? memoryAreas.map(area => html`
-          <div key=${area.key || area} class="pf-agd-area-row">
-            <span class="pf-agd-area-key">${area.key || area}</span>
+          <div key=${area.key_prefix || area.key || area} class="pf-agd-area-row">
+            <span class="pf-agd-area-key">${area.key_prefix || area.key || area}</span>
             <span class="pf-agd-area-desc">${area.description || ''}</span>
             <span class="pf-agd-area-perm ${area.access === 'read' ? 'pf-agd-area-perm--ro' : 'pf-agd-area-perm--rw'}">
               ${area.access === 'read' ? t('profile.agents.detail.data_access.permReadOnly') : t('profile.agents.detail.data_access.permReadWrite')}
@@ -324,7 +324,7 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
       <!-- EFFECTIVE SCOPE SUMMARY -->
       <div class="pf-agd-scope-summary">
         ${t('profile.agents.detail.data_access.effectiveScope')}:\n${
-          [...memoryAreas.map(a => a.key || a), ...tags.map(tag => `agents.tag.${tag}.*`), 'agents.shared.index'].join(', ')
+          [...memoryAreas.map(a => a.key_prefix || a.key || a), ...tags.map(tag => `agents.tag.${tag}.*`), 'agents.shared.index'].join(', ')
         }${hasResources ? `\n${t('profile.agents.detail.data_access.knowledgeTitle')}: ${resources.map(r => r.name || r.url || r).join(', ')}` : ''}
         <div class="pf-agd-scope-footer">${t('profile.agents.detail.data_access.scopeFooter')}</div>
       </div>

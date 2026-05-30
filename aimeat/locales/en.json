@@ -324,6 +324,7 @@
         "domainAgent": "Agent",
         "domainCatalogue": "Catalogue",
         "domainGenerator": "Generator",
+        "domainTask": "Tasks",
         "permExecute": "Execute",
         "permRead": "Read",
         "permWrite": "Write",
