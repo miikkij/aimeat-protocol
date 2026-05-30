@@ -1629,6 +1629,73 @@
   min-height: 150px;
 }
 
+/* ── README tab (rendered from agents.<name>.readme markdown) ── */
+.pf .pf-agd-readme {
+  /* Comfortable reading width that still fits ~80-col ASCII art in code fences. */
+  max-width: 760px;
+  max-height: 60vh;
+  overflow: auto;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text, #1A1A2E);
+}
+.pf .pf-agd-readme .md-body > :first-child { margin-top: 0; }
+.pf .pf-agd-readme h1,
+.pf .pf-agd-readme h2,
+.pf .pf-agd-readme h3,
+.pf .pf-agd-readme h4 {
+  margin: 1rem 0 0.5rem;
+  line-height: 1.3;
+}
+.pf .pf-agd-readme h1 { font-size: 1.4rem; }
+.pf .pf-agd-readme h2 { font-size: 1.2rem; }
+.pf .pf-agd-readme h3 { font-size: 1.05rem; }
+.pf .pf-agd-readme p { margin: 0.5rem 0; }
+.pf .pf-agd-readme ul,
+.pf .pf-agd-readme ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.pf .pf-agd-readme li { margin: 0.2rem 0; }
+.pf .pf-agd-readme a { color: var(--accent, #E8564A); }
+.pf .pf-agd-readme blockquote {
+  margin: 0.5rem 0;
+  padding: 0.25rem 0.75rem;
+  border-left: 3px solid var(--border, #E5E7EB);
+  color: var(--text-dim, #6B7280);
+}
+.pf .pf-agd-readme table {
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  font-size: 0.85rem;
+}
+.pf .pf-agd-readme th,
+.pf .pf-agd-readme td {
+  border: 1px solid var(--border, #E5E7EB);
+  padding: 0.3rem 0.6rem;
+  text-align: left;
+}
+.pf .pf-agd-readme th { background: var(--card-bg-alt, #F3F4F6); }
+/* Inline code spans. */
+.pf .pf-agd-readme .md-code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+/* Fenced code blocks: monospace + EXACT whitespace so ASCII-art logos
+   (FIGLET output) keep alignment. Horizontal scroll instead of wrap. */
+.pf .pf-agd-readme .md-pre {
+  margin: 0.6rem 0;
+  padding: 0.75rem;
+  background: var(--card-bg-alt, #F3F4F6);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+.pf .pf-agd-readme .md-pre .md-code {
+  display: block;
+  white-space: pre;
+  tab-size: 4;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--text, #1A1A2E);
+}
+
 /* ── Integration tab: Onboarding checklist ── */
 
 .pf .pf-agd-checklist {

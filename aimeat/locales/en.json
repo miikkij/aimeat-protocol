@@ -632,6 +632,7 @@
       },
       "detail": {
         "tabs": {
+          "readme": "README",
           "integration": "Integration",
           "tasks": "Tasks",
           "messages": "Messages",
@@ -837,6 +838,7 @@
           "rules": "Rules"
         },
         "empty": {
+          "readme": "No README published",
           "tasks": "No tasks yet. Create a task to give this agent work.",
           "messages": "No messages yet. Send a message or use a command.",
           "data_access": "No data access configured. Use the buttons below to add tags, memory areas, or knowledge packages.",

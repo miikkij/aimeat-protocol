@@ -632,6 +632,7 @@
       },
       "detail": {
         "tabs": {
+          "readme": "README",
           "integration": "Integraatio",
           "tasks": "Tehtävät",
           "messages": "Viestit",
@@ -837,6 +838,7 @@
           "rules": "Säännöt"
         },
         "empty": {
+          "readme": "Ei README:tä julkaistu",
           "tasks": "Ei tehtäviä. Luo tehtävä antaaksesi agentille työtä.",
           "messages": "Ei viestejä. Lähetä viesti tai käytä komentoa.",
           "data_access": "Ei datayhteyksien asetuksia. Lisää tunnisteita, muistialueita tai tietopaketteja alla olevilla painikkeilla.",
