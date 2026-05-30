@@ -196,15 +196,15 @@ Profiilit ovat **oletuksia**, joita omistaja voi hienosäätää consentissa (de
 **Valmis kun:** tool-määrä laskenut merkittävästi, eval ei regressoi, aliakset deprekoitu hallitusti.
 
 **Todo:**
-- [ ] Eval-harness `test/eval-mcp/`: ~10 realistista tehtävää + agentic loop
-- [ ] Mittaa **baseline**: tool-kutsut / tokenit / virheet ennen konsolidointia
-- [ ] Konsolidoi `aimeat_catalogue_search/agents/boards/directory` → `aimeat_catalogue_search(kind=)`
-- [ ] Konsolidoi capabilities-CRUD (`create/update/delete/vouch`); pidä `get/list/invoke` erillään
-- [ ] Ratkaise `aimeat_group_*` vs `aimeat_sharing_group_*` -nimeäminen
-- [ ] Aliakset + deprekaatiovaroitus migraation ajaksi (`consolidatedInto`)
-- [ ] Aja eval uudelleen → vertaa baseline (kutsut/tokenit alas, virheet **ei** ylös)
-- [ ] `pnpm audit:mcp-tools` ennen/jälkeen dokumentoitu
-- [ ] `e2e-mcp-*` (konsolidoidut toolit + aliakset) vihreät — **✅ vaihe todennettu**
+- [x] Eval-harness `test/eval-mcp/`: 10 realistista tehtävää (`tasks.ts`, dataa) + `README.md` (live-LLM-metodologia, kehittäjän ajettava)
+- [x] **Mittausinstrumentti** `surface-weight.ts` (`pnpm eval:mcp-surface`): tool-pinnan **kontekstitokenikustannus** per tool/domain — deterministinen before/after-mittari ilman live-LLM:ää
+- [x] **Baseline mitattu: 99 toolia, ~11 720 tokenia.** Raskaimmat domainit: task (9, ~1212), board (9, ~1058), agent (6, ~948), extension (7, ~776), capabilities (7, ~743)
+- [ ] **(kehittäjä-gated)** Aja live-eval (`ANTHROPIC_API_KEY`) → baseline tool-kutsut/tokenit/virheet
+- [ ] **(kehittäjä-gated)** Konsolidoi `catalogue_search/agents/boards/directory` → `catalogue_search(kind=)` — vain jos eval vahvistaa ettei discovery heikkene (eri endpointit/paramit)
+- [ ] **(kehittäjä-gated)** Konsolidoi capabilities-CRUD; **tuotepäätös** `group_` vs `sharing_group_`
+- [ ] **(kehittäjä-gated)** Aliakset + deprekaatio (`consolidatedInto`); aja molemmat mittarit uudelleen; e2e vihreä — **vaihe todennettu kun merget tehty**
+
+> **Tila:** Vaiheen 5 **mittausinstrumentti + tehtäväsetti + kandidaattianalyysi** valmiina ja committattu. Itse **merget on tietoisesti jätetty kehittäjän ajettavaksi**, koska suunnitelman oma hyväksyntäportti on **live-LLM-eval** (vaatii API-kulua + on epädeterministinen, ei ajettavissa tässä ympäristössä) ja `group_*`-nimeäminen on **tuotepäätös**. Sokkona mergeäminen rikkoisi auditin oman periaatteen ("mittaa, älä arvaa", doc 07) ja olisi kuluttajia rikkova. Instrumentti antaa nyt kovan luvun jolla merget perustellaan/hylätään.
 
 ---
 
