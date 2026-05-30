@@ -16,6 +16,9 @@
  *   v1.4.0 — 2026-03-21 — Added registerCatalogueTools (3), registerMemoryExtendedTools (2), registerWalletExtendedTools (1)
  *   v1.5.0 — 2026-03-21 — Added registerConsentTools (3), registerChatInstancesTools (3), registerFlagsTools (1), registerPromptsTools (1)
  *   v1.6.0 — 2026-05-28 — Added public MCP Hello Integration onboarding and telemetry tools
+ *   v1.7.0 — 2026-05-30 — MCP audit Phase 3 (F1): per-agent scope enforcement — createMcpServer
+ *     filters the tool surface by the agent's defaultScopes (scopeAllowsTool), mirroring REST
+ *     requireScope gates. Honours config.mcpEnforceScopes (false = warn-only logging).
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -52,6 +55,7 @@ import { registerAgentMessageTools } from './agent-messages.js';
 import { registerAgentOnboardingTools } from './agent-onboarding.js';
 import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerAgentManagementTools } from './agent-management.js';
+import { scopeAllowsTool } from './catalog/scopes.js';
 
 // ── Resource change event bus ──
 // Allows REST routes and MCP tools to emit resource change events
@@ -102,11 +106,30 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
     // OAuth 2.1 — only auth codes are in-memory (short-lived, single-use)
     const authCodes = new Map<string, AuthorizationCode>();
 
-    function createMcpServer(agentGaii: string): McpServer {
+    function createMcpServer(agentGaii: string, scopes: string[]): McpServer {
         const mcp = new McpServer(
             { name: `AIMEAT Node ${config.nodeId}`, version: '1.2.0' },
             { capabilities: { tools: {}, resources: { subscribe: true, listChanged: true } } },
         );
+
+        // F1: enforce per-agent scopes on the tool surface. We monkeypatch mcp.tool for the
+        // duration of registration so each registerXxxTools() call only registers tools this
+        // agent's scopes allow (mirrors REST requireScope gates). Owner-attached agents with a '*'
+        // scope get everything. Warn-only mode (config.mcpEnforceScopes=false) registers all tools
+        // but logs what WOULD be filtered, so impact can be measured before enforcing.
+        const enforce = config.mcpEnforceScopes;
+        const filteredTools: string[] = [];
+        type ToolFn = (...args: unknown[]) => unknown;
+        const patchable = mcp as unknown as { tool: ToolFn };
+        const originalTool = patchable.tool.bind(mcp) as ToolFn;
+        patchable.tool = (...args: unknown[]) => {
+            const name = args[0] as string;
+            if (!scopeAllowsTool(scopes, name)) {
+                filteredTools.push(name);
+                if (enforce) return undefined;
+            }
+            return originalTool(...args);
+        };
 
         registerCoreTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerBoardsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
@@ -130,6 +153,15 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         registerAgentTelemetryTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentOnboardingTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentManagementTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+
+        // Restore the original method and report what scope enforcement did this session.
+        patchable.tool = originalTool;
+        if (filteredTools.length > 0) {
+            logger.info(
+                `[mcp-scope] ${enforce ? 'filtered' : 'would filter (warn-only)'} ${filteredTools.length} tool(s) for ${agentGaii}`,
+                { scopes, filtered: [...new Set(filteredTools)] },
+            );
+        }
 
         return mcp;
     }
@@ -228,6 +260,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
 
         // Validate agent exists and has a real owner
         let chatInstanceId: string | undefined;
+        let sessionScopes: string[]; // assigned from agent.defaultScopes in the validation block below
 
         {
             const agent = await storage.getAgent(authenticatedGaii);
@@ -260,6 +293,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
                 return;
             }
             sessionOwner = agent.owner;
+            sessionScopes = agent.defaultScopes ?? [];
 
             // Upsert ChatInstanceRecord for session tracking
             // Prefer mcp_client from JWT (set during OAuth consent) over User-Agent sniffing
@@ -313,7 +347,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             sessionIdGenerator: () => `mcp-${randomBytes(16).toString('hex')}`,
         });
 
-        const mcpServer = createMcpServer(authenticatedGaii);
+        const mcpServer = createMcpServer(authenticatedGaii, sessionScopes);
 
         transport.onclose = () => {
             if (transport.sessionId) {

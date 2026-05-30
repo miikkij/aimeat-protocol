@@ -136,15 +136,16 @@ Profiilit ovat **oletuksia**, joita omistaja voi hienosäätää consentissa (de
 **Valmis kun:** `task-runner`-agentti ei saa esim. `aimeat_app_publish`-toolia listalle; `appdev` saa; owner näkee kaikki; warn-only-flag toimii.
 
 **Todo:**
-- [ ] `requiredScope` jokaiselle toolille katalogissa (peilaa `auth/middleware.ts` scope-kartta)
-- [ ] `catalog/scope-profiles.ts`: roolipohjaiset bundlet (task-runner / appdev / organism-knowledge / coordinator / interactive) + `scopesForProfile()`
-- [ ] Thread agentin scopet `createMcpServer(agentGaii)`:hin (nyt vain gaii); rekisteröi vain sallitut toolit
-- [ ] Owner/operator-bypass kuten `middleware.ts` → owner-attached (Claude Desktop) säilyy leveänä
-- [ ] Connector: scopet keychainiin/configiin (`cli/connect/config.ts`) + jaettu `allowedTools(scopes)`-suodatus
-- [ ] Warn-only-tila (`AIMEAT_MCP_ENFORCE_SCOPES`): mittaa olemassa olevien agenttien menetys ennen pakotusta
-- [ ] Uusi `e2e-mcp-scopes.ts`: profiilikohtainen näkyvyys + owner näkee kaikki + warn-only ei suodata
-- [ ] `e2e-mcp` regressio vihreä
-- [ ] `pnpm lint` + `pnpm typecheck` vihreä — **✅ vaihe todennettu**
+- [x] Tool→scope-kartta `catalog/scopes.ts`:ssä (`TOOL_SCOPES`) — peilaa `auth/middleware.ts`-gateja **täsmälleen**: gataan vain ne toolit joiden REST-reitti käyttää `requireScope` (memory/social/wallet/work/consent). Muut jätetään gataamatta → MCP pysyy REST-yhdenmukaisena.
+- [x] `catalog/scopes.ts`: `scopeAllowsTool()` (wildcard: `*` / `domain:*` / exact, kuten middleware) + roolipohjaiset profiilit `MCP_SCOPE_PROFILES` + `scopesForProfile()` (task-runner / coordinator / appdev / organism-knowledge / interactive / autonomous)
+- [x] Thread agentin scopet (`agent.defaultScopes`) `createMcpServer(gaii, scopes)`:iin; `mcp.tool` patchataan rekisteröinnin ajaksi → vain sallitut toolit rekisteröidään
+- [x] '*' scope → koko pinta (owner-attached / Claude Desktop säilyy leveänä); admin-toolit pysyvät runtime-operator-gatattuina
+- [x] Warn-only-tila `AIMEAT_MCP_ENFORCE_SCOPES=false` (oletus true): rekisteröi kaikki mutta logittaa suodatettavat; lisätty `.env.example`:en
+- [x] Uusi `e2e-mcp-scopes.ts`: kapea agentti (`memory:read`) ei näe/ei voi kutsua memory_write/wallet/board_post/work/consent; laaja (`*`) näkee kaikki; suodatettu write ei persistoi (4/4)
+- [x] `e2e-mcp` + 11 muuta MCP-suitea regressio vihreä (**219/219**); 9 uutta `scopes`-yksikkötestiä
+- [x] `pnpm lint` (0 erroria) + `pnpm typecheck` vihreä — **✅ vaihe todennettu** (commit seuraa)
+
+> Päätökset/poikkeamat suunnitelmaan: (1) Todellinen scope-sanasto on suppeampi kuin alkup. profiilit olettivat (task:*/app:* eivät ole olemassa) → gataan vain oikeasti REST-gatatut domainit; profiilit mappaavat olemassa oleviin scopeihin ja laajenevat kun uusia lisätään. (2) MCP-token on aina agent-rooli (ei owner-session), joten "owner-bypass" = '*'-scope. (3) **Connector-suodatus jätettiin pois**: connector kutsuu REST:iä joka **jo** enforaa scopet (403), joten tietoturva on katettu; rekisteröi-aikainen suodatus on vain UX-parannus → siirretty myöhempään (connector ei vielä tallenna scopeja keychainiin).
 
 ---
 

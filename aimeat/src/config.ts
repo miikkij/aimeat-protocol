@@ -340,6 +340,8 @@ export interface AimeatConfig {
   // Scoped Agent Capabilities (REQ-006)
   defaultAgentScopes: string[];
   maxAgentScopes: string[];
+  /** F1: enforce per-agent scopes on the /v1/mcp tool surface (default true; false = warn-only). */
+  mcpEnforceScopes: boolean;
 
   // Prometheus Metrics
   metricsEnabled: boolean;
@@ -693,6 +695,11 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // Scoped Agent Capabilities (REQ-006)
     defaultAgentScopes: (process.env.AIMEAT_DEFAULT_AGENT_SCOPES ?? 'memory:read,memory:write,memory:delete,catalogue:read').split(',').map(s => s.trim()),
     maxAgentScopes: (process.env.AIMEAT_MAX_AGENT_SCOPES ?? '*').split(',').map(s => s.trim()),
+    // MCP audit Phase 3 (F1): enforce per-agent scopes on the public /v1/mcp tool surface
+    // (mirrors the REST requireScope gates). Default true — closes the least-privilege hole.
+    // Set false for a warn-only rollout: tools are still registered, but would-be-filtered
+    // tools are logged so you can measure impact before enforcing.
+    mcpEnforceScopes: process.env.AIMEAT_MCP_ENFORCE_SCOPES !== 'false',
 
     // Node Extensions (Sandboxed)
     extensionsEnabled: process.env.AIMEAT_EXTENSIONS_ENABLED !== 'false',

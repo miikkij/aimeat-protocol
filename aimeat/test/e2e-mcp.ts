@@ -144,6 +144,7 @@ await test('Register agent', async () => {
             owner: ownerName,
             capabilities: ['memory', 'actions'],
             model: 'gpt-4o',
+            scopes: ['*'], // full-surface integration agent; scope FILTERING is covered by e2e-mcp-scopes.ts
         }),
     });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
