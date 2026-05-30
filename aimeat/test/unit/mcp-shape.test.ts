@@ -8,7 +8,7 @@
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 1 (F5): cover concise projection + empty-projection guard
  */
 import { describe, it, expect } from 'vitest';
-import { shapeResponse, descriptionFor, truncateResult, jsonContent } from '../../src/mcp/catalog/shape.js';
+import { shapeResponse, descriptionFor, truncateResult, jsonContent, structuredResult } from '../../src/mcp/catalog/shape.js';
 
 describe('shapeResponse — response_format projection', () => {
   it('returns data unchanged for detailed / undefined format', () => {
@@ -91,6 +91,28 @@ describe('truncateResult — output-size backstop', () => {
     const res = jsonContent({ a: 1 });
     expect(JSON.parse(res.content[0].text)).toEqual({ a: 1 });
   });
+});
+
+describe('structuredResult — text + structuredContent (F4)', () => {
+    it('wraps a bare array as { items, count } for structuredContent, keeps array in text', () => {
+        const arr = [{ key: 'a' }, { key: 'b' }];
+        const res = structuredResult('aimeat_work_inbox', undefined, arr);
+        expect(res.structuredContent).toEqual({ items: arr, count: 2 });
+        expect(JSON.parse(res.content[0].text)).toEqual(arr); // text stays a bare array (back-compat)
+    });
+
+    it('passes an object through as structuredContent', () => {
+        const obj = { balance: 100, in_escrow: 5, available: 95 };
+        const res = structuredResult('aimeat_wallet_balance', undefined, obj);
+        expect(res.structuredContent).toEqual(obj);
+        expect(JSON.parse(res.content[0].text)).toEqual(obj);
+    });
+
+    it('applies concise projection before structuring', () => {
+        const record = { key: 'k', value: 'v', visibility: 'private', version: 9, updated_at: 'x' };
+        const res = structuredResult('aimeat_memory_read', 'concise', record);
+        expect(res.structuredContent).toEqual({ key: 'k', value: 'v' });
+    });
 });
 
 describe('descriptionFor — canonical catalog descriptions', () => {

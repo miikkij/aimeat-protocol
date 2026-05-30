@@ -166,14 +166,14 @@ Profiilit ovat **oletuksia**, joita omistaja voi hienosäätää consentissa (de
 **Valmis kun:** lukutoolit palauttavat structuredContentin; Inspector ei raportoi schema-virheitä.
 
 **Todo:**
-- [ ] `catalog/output-schemas.ts`: jaetut zod-skeemat (`memoryEntry`, `memoryList`, `taskDetail`, `taskList`, `walletBalance`, `catalogueResult`, `agentList`, ...)
-- [ ] `definitions.ts.outputSchema` viittaa skeemoihin avaimella
-- [ ] Migroi rekisteröinnit `mcp.tool()` → `mcp.registerTool()` molemmilla pinnoilla, tiedosto kerrallaan (typecheck+lint joka tiedoston jälkeen)
-- [ ] Handlerit palauttavat `{ structuredContent, content }` `shape.ts`:n kautta (storage + `resp.data`)
-- [ ] Aloita korkean arvon lukutooleista, laajenna kattavuutta
-- [ ] **MCP Inspector**: discovery/schema-validointi ilman virheitä
-- [ ] Testi: `structuredContent` läsnä + validi outputSchemaa vasten
-- [ ] `pnpm lint` + `pnpm typecheck` + `e2e-mcp-*` regressio vihreä — **✅ vaihe todennettu**
+- [x] `catalog/output-schemas.ts`: jaetut zod-skeemat (`walletBalanceOutput`, `memoryEntryOutput`, `memoryListOutput`, `genericListOutput`, `agentsListOutput`, `agentProfileOutput`) — kentät optional → sama skeema validoi sekä detailed että concise
+- [x] `shape.ts:structuredResult()` palauttaa `{ content (teksti, back-compat), structuredContent }`; bare array → `{ items, count }`, objektit läpi; concise-projektio ensin
+- [x] **Scope-filtteri (Phase 3) laajennettu kattamaan myös `registerTool`** — muuten migroidut toolit ohittaisivat enforce-suodatuksen (kriittinen yhteisvaikutus)
+- [x] Migroitu core.ts:n korkean arvon lukutoolit `registerTool()`:iin: `memory_read`, `memory_list`, `wallet_balance`, `work_inbox`, `agents_list`, `agent_profile`
+- [x] Testit: e2e assertoi `structuredContent` läsnä (wallet_balance.balance, memory_list.items); 3 uutta `structuredResult`-yksikkötestiä (29 yksikkötestiä yht.)
+- [x] `pnpm lint` (0 erroria) + `pnpm typecheck` + `e2e-mcp` (39) + scopes (4) + 219 MCP-sweep vihreä — **✅ vaihe todennettu** (commit seuraa)
+
+> Rajaus/päätökset: (1) **Inkrementaalinen migraatio** — `registerTool`+outputSchema vain korkean arvon, **rajatuille** lukutooleille (ei kaikkia 98:aa; `mcp.tool()` on vain deprekoitu, toimii yhä). Rajatut listat (memory_list cap 200, work_inbox, agents_list) välttävät truncation+structuredContent-konfliktin. (2) **Connector-puoli ja isot/unbounded listat (catalogue_search) siirretty** — connector tuottaa REST-`resp.data`:sta (F10-muotoero) ja vaatii oman normalisoinnin; tehdään Phase 5/6:n signature-yhtenäistyksen jälkeen. (3) outputSchema-kentät optional → coexist response_format=concise:n kanssa. (4) MCP Inspector -ajo jää release-vaiheen manuaalivalidointiin.
 
 ---
 

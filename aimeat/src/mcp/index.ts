@@ -112,24 +112,24 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             { capabilities: { tools: {}, resources: { subscribe: true, listChanged: true } } },
         );
 
-        // F1: enforce per-agent scopes on the tool surface. We monkeypatch mcp.tool for the
-        // duration of registration so each registerXxxTools() call only registers tools this
-        // agent's scopes allow (mirrors REST requireScope gates). Owner-attached agents with a '*'
-        // scope get everything. Warn-only mode (config.mcpEnforceScopes=false) registers all tools
-        // but logs what WOULD be filtered, so impact can be measured before enforcing.
+        // F1: enforce per-agent scopes on the tool surface. We monkeypatch BOTH mcp.tool and
+        // mcp.registerTool (tools may use either) for the duration of registration so each
+        // registerXxxTools() call only registers tools this agent's scopes allow (mirrors REST
+        // requireScope gates). Owner-attached agents with a '*' scope get everything. Warn-only
+        // mode (config.mcpEnforceScopes=false) registers all tools but logs what WOULD be filtered.
         const enforce = config.mcpEnforceScopes;
         const filteredTools: string[] = [];
         type ToolFn = (...args: unknown[]) => unknown;
-        const patchable = mcp as unknown as { tool: ToolFn };
-        const originalTool = patchable.tool.bind(mcp) as ToolFn;
-        patchable.tool = (...args: unknown[]) => {
-            const name = args[0] as string;
-            if (!scopeAllowsTool(scopes, name)) {
-                filteredTools.push(name);
-                if (enforce) return undefined;
-            }
-            return originalTool(...args);
+        const patchable = mcp as unknown as { tool: ToolFn; registerTool: ToolFn };
+        const gate = (name: string): boolean => {
+            if (scopeAllowsTool(scopes, name)) return true;
+            filteredTools.push(name);
+            return !enforce; // warn-only: still register (true); enforce: skip (false)
         };
+        const originalTool = patchable.tool.bind(mcp) as ToolFn;
+        const originalRegisterTool = patchable.registerTool.bind(mcp) as ToolFn;
+        patchable.tool = (...args: unknown[]) => gate(args[0] as string) ? originalTool(...args) : undefined;
+        patchable.registerTool = (...args: unknown[]) => gate(args[0] as string) ? originalRegisterTool(...args) : undefined;
 
         registerCoreTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerBoardsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
@@ -154,8 +154,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         registerAgentOnboardingTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentManagementTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
 
-        // Restore the original method and report what scope enforcement did this session.
+        // Restore the original methods and report what scope enforcement did this session.
         patchable.tool = originalTool;
+        patchable.registerTool = originalRegisterTool;
         if (filteredTools.length > 0) {
             logger.info(
                 `[mcp-scope] ${enforce ? 'filtered' : 'would filter (warn-only)'} ${filteredTools.length} tool(s) for ${agentGaii}`,

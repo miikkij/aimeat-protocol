@@ -20,6 +20,9 @@
  *     default + hard cap, and owner_scope aggregation stops at the cap (was unbounded).
  *   v1.5.0 -- 2026-05-30 -- MCP audit Phase 2 (F11): aimeat_storage_download returns a handle
  *     (resource_link + presigned download_url) instead of base64; inline=true only for small text.
+ *   v1.6.0 -- 2026-05-30 -- MCP audit Phase 4 (F4): migrate core read tools (memory_read/list,
+ *     wallet_balance, work_inbox, agents_list, agent_profile) to registerTool() with outputSchema +
+ *     structuredContent (via structuredResult), keeping text content for back-compat.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -34,7 +37,8 @@ import { generateDownloadToken } from '../services/download-token.js';
 import type { ResourceChangeEvent } from './index.js';
 import { resourceEvents } from './index.js';
 import { annotationsFor } from './annotations.js';
-import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema } from './catalog/shape.js';
+import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema, structuredResult } from './catalog/shape.js';
+import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, genericListOutput, agentsListOutput, agentProfileOutput } from './catalog/output-schemas.js';
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
 // unbounded payload. jsonContent() is the universal char-budget backstop; these caps stop the
@@ -168,27 +172,20 @@ export function registerCoreTools(
     );
 
     // ── Tool 2: aimeat_agent_profile ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_agent_profile',
-        descriptionFor('aimeat_agent_profile'),
-        { gaii: z.string() },
-        annotationsFor('aimeat_agent_profile'),
+        { description: descriptionFor('aimeat_agent_profile'), inputSchema: { gaii: z.string() }, outputSchema: agentProfileOutput, annotations: annotationsFor('aimeat_agent_profile') },
         async ({ gaii }) => {
             const agent = await storage.getAgent(gaii);
-            if (!agent) return { content: [{ type: 'text' as const, text: 'Agent not found' }] };
-            return {
-                content: [{
-                    type: 'text' as const,
-                    text: JSON.stringify({
-                        gaii: agent.gaii,
-                        display_name: agent.displayName,
-                        description: agent.description,
-                        capabilities: agent.capabilities,
-                        trust_score: agent.trustScore,
-                        created_at: agent.createdAt,
-                    }, null, 2),
-                }],
-            };
+            if (!agent) return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };
+            return structuredResult('aimeat_agent_profile', undefined, {
+                gaii: agent.gaii,
+                display_name: agent.displayName,
+                description: agent.description,
+                capabilities: agent.capabilities,
+                trust_score: agent.trustScore,
+                created_at: agent.createdAt,
+            });
         },
     );
 
@@ -196,61 +193,52 @@ export function registerCoreTools(
     // Lists the calling owner's agents. Used by Claude Desktop and other
     // owner-scoped MCP clients to discover who they can delegate to via
     // aimeat_task_create. Mirrors the REST endpoint GET /v1/agents.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_agents_list',
-        descriptionFor('aimeat_agents_list'),
-        {},
-        annotationsFor('aimeat_agents_list'),
+        { description: descriptionFor('aimeat_agents_list'), inputSchema: {}, outputSchema: agentsListOutput, annotations: annotationsFor('aimeat_agents_list') },
         async () => {
             const parsed = parseGAII(agentGaii);
             if (!parsed) {
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
             }
             const agents = await storage.getAgentsByOwner(parsed.owner);
-            return {
-                content: [{
-                    type: 'text' as const,
-                    text: JSON.stringify({
-                        agents: agents.map(a => ({
-                            gaii: a.gaii,
-                            name: a.name,
-                            owner: a.owner,
-                            display_name: a.displayName,
-                            description: a.description,
-                            capabilities: a.capabilities,
-                            technical_capabilities: a.technicalCapabilities,
-                            domain_capabilities: a.domainCapabilities,
-                            languages: a.languages ?? [],
-                            trust_score: a.trustScore,
-                            created_at: a.createdAt,
-                            last_seen: a.lastSeen,
-                            federate: a.federate ?? false,
-                            tags: a.tags ?? [],
-                            mode: a.mode ?? 'interactive',
-                        })),
-                    }, null, 2),
-                }],
-            };
+            return structuredResult('aimeat_agents_list', undefined, {
+                agents: agents.map(a => ({
+                    gaii: a.gaii,
+                    name: a.name,
+                    owner: a.owner,
+                    display_name: a.displayName,
+                    description: a.description,
+                    capabilities: a.capabilities,
+                    technical_capabilities: a.technicalCapabilities,
+                    domain_capabilities: a.domainCapabilities,
+                    languages: a.languages ?? [],
+                    trust_score: a.trustScore,
+                    created_at: a.createdAt,
+                    last_seen: a.lastSeen,
+                    federate: a.federate ?? false,
+                    tags: a.tags ?? [],
+                    mode: a.mode ?? 'interactive',
+                })),
+            });
         },
     );
 
     // ── Tool 3: aimeat_memory_read ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_memory_read',
-        descriptionFor('aimeat_memory_read'),
-        { key: z.string(), response_format: responseFormatSchema },
-        annotationsFor('aimeat_memory_read'),
+        { description: descriptionFor('aimeat_memory_read'), inputSchema: { key: z.string(), response_format: responseFormatSchema }, outputSchema: memoryEntryOutput, annotations: annotationsFor('aimeat_memory_read') },
         async ({ key, response_format }) => {
             const record = await storage.getMemory(agentGaii, key);
-            if (!record) return { content: [{ type: 'text' as const, text: 'Memory not found' }] };
-            return jsonContent(shapeResponse('aimeat_memory_read', response_format, {
+            if (!record) return { content: [{ type: 'text' as const, text: 'Memory not found' }], isError: true };
+            return structuredResult('aimeat_memory_read', response_format, {
                 key: record.key,
                 value: record.value,
                 visibility: record.visibility,
                 tags: record.tags,
                 version: record.version,
                 updated_at: record.updatedAt,
-            }));
+            });
         },
     );
 
@@ -292,18 +280,16 @@ export function registerCoreTools(
     );
 
     // ── Tool 5: aimeat_memory_list ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_memory_list',
-        descriptionFor('aimeat_memory_list'),
-        {
+        { description: descriptionFor('aimeat_memory_list'), outputSchema: memoryListOutput, annotations: annotationsFor('aimeat_memory_list'), inputSchema: {
             prefix: z.string().optional(),
             visibility: z.string().optional(),
             tags: z.array(z.string()).optional().describe('Optional tag filters'),
             owner_scope: z.boolean().optional().describe('When true, list same-owner GHII and agent memory'),
             limit: z.number().int().positive().max(MEMORY_LIST_MAX_LIMIT).optional().describe(`Max entries to return (default ${MEMORY_LIST_DEFAULT_LIMIT}, hard cap ${MEMORY_LIST_MAX_LIMIT})`),
             response_format: responseFormatSchema,
-        },
-        annotationsFor('aimeat_memory_list'),
+        } },
         async ({ prefix, visibility, tags, owner_scope, limit, response_format }) => {
             const cap = Math.min(limit ?? MEMORY_LIST_DEFAULT_LIMIT, MEMORY_LIST_MAX_LIMIT);
             let entries: Awaited<ReturnType<Storage['listMemory']>>;
@@ -342,7 +328,7 @@ export function registerCoreTools(
             const payload = truncated
                 ? { items, truncated: true, shown: items.length, hint: `Showing first ${cap}. Narrow with prefix/tags or raise limit (max ${MEMORY_LIST_MAX_LIMIT}).` }
                 : items;
-            return jsonContent(shapeResponse('aimeat_memory_list', response_format, payload));
+            return structuredResult('aimeat_memory_list', response_format, payload);
         },
     );
 
@@ -403,22 +389,20 @@ export function registerCoreTools(
     );
 
     // ── Tool 7: aimeat_work_inbox ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_work_inbox',
-        descriptionFor('aimeat_work_inbox'),
-        { response_format: responseFormatSchema },
-        annotationsFor('aimeat_work_inbox'),
+        { description: descriptionFor('aimeat_work_inbox'), inputSchema: { response_format: responseFormatSchema }, outputSchema: genericListOutput, annotations: annotationsFor('aimeat_work_inbox') },
         async ({ response_format }) => {
             const items = await storage.listWorkByProvider(agentGaii);
             const pending = items.filter(w => ['pending', 'accepted', 'in_progress'].includes(w.status));
-            return jsonContent(shapeResponse('aimeat_work_inbox', response_format, pending.map(w => ({
+            return structuredResult('aimeat_work_inbox', response_format, pending.map(w => ({
                 tracking_code: w.trackingCode,
                 status: w.status,
                 action_id: w.actionId,
                 requester_gaii: w.requesterGaii,
                 cost: w.cost,
                 created_at: w.createdAt,
-            }))));
+            })));
         },
     );
 
@@ -459,11 +443,9 @@ export function registerCoreTools(
     );
 
     // ── Tool 10: aimeat_wallet_balance ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_wallet_balance',
-        descriptionFor('aimeat_wallet_balance'),
-        {},
-        annotationsFor('aimeat_wallet_balance'),
+        { description: descriptionFor('aimeat_wallet_balance'), inputSchema: {}, outputSchema: walletBalanceOutput, annotations: annotationsFor('aimeat_wallet_balance') },
         async () => {
             const agent = await storage.getAgent(agentGaii);
             if (!agent) return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };
@@ -471,16 +453,11 @@ export function registerCoreTools(
             const balance = ghii?.morselBalance ?? 0;
             const { calculateEscrow } = await import('../services/morsel.js');
             const inEscrow = await calculateEscrow(storage, agentGaii);
-            return {
-                content: [{
-                    type: 'text' as const,
-                    text: JSON.stringify({
-                        balance,
-                        in_escrow: inEscrow,
-                        available: balance - inEscrow,
-                    }, null, 2),
-                }],
-            };
+            return structuredResult('aimeat_wallet_balance', undefined, {
+                balance,
+                in_escrow: inEscrow,
+                available: balance - inEscrow,
+            });
         },
     );
 

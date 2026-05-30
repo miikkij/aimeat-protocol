@@ -24,6 +24,8 @@
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 2 (F3): truncateResult() + jsonContent() applies it as a
  *     universal output-size backstop (~25k tokens, matching Claude Code's tool-output cap) so no tool
  *     can blow the model context with an unbounded payload.
+ *   v1.3.0 -- 2026-05-30 -- MCP audit Phase 4 (F4): structuredResult() returns both human-readable
+ *     text content and machine-readable structuredContent (for registerTool outputSchema tools).
  */
 
 import { z } from 'zod';
@@ -133,4 +135,30 @@ export function truncateResult(text: string, maxChars: number = DEFAULT_MAX_RESU
  */
 export function jsonContent(data: unknown, maxChars: number = DEFAULT_MAX_RESULT_CHARS): { content: { type: 'text'; text: string }[] } {
     return { content: [{ type: 'text' as const, text: truncateResult(JSON.stringify(data, null, 2), maxChars) }] };
+}
+
+/**
+ * F4: result for a tool registered with an outputSchema. Returns BOTH human-readable text content
+ * (back-compat for text-parsing clients) AND machine-readable structuredContent (validated by the
+ * SDK against the tool's outputSchema). Applies response_format shaping first, then normalises the
+ * shaped payload to an object: a bare array becomes { items, count }; objects pass through. The
+ * outputSchema must therefore cover the resulting keys (extra keys are stripped by the SDK).
+ */
+export function structuredResult(
+    name: string,
+    format: ResponseFormat | undefined,
+    data: unknown,
+    maxChars: number = DEFAULT_MAX_RESULT_CHARS,
+): { content: { type: 'text'; text: string }[]; structuredContent: Record<string, unknown> } {
+    const shaped = shapeResponse(name, format, data);
+    const text = truncateResult(JSON.stringify(shaped, null, 2), maxChars);
+    let structuredContent: Record<string, unknown>;
+    if (Array.isArray(shaped)) {
+        structuredContent = { items: shaped, count: shaped.length };
+    } else if (shaped && typeof shaped === 'object') {
+        structuredContent = shaped as Record<string, unknown>;
+    } else {
+        structuredContent = { value: shaped };
+    }
+    return { content: [{ type: 'text' as const, text }], structuredContent };
 }

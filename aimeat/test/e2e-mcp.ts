@@ -477,6 +477,8 @@ await test('20. aimeat_memory_list', async () => {
     assert(Array.isArray(entries), 'is array');
     const found = entries.find((e: any) => e.key === 'mcp-test-key');
     assert(found !== undefined, 'contains mcp-test-key');
+    // F4: registerTool outputSchema → structuredContent present alongside text
+    assert(Array.isArray(body.result.structuredContent?.items), 'has structuredContent.items array');
 });
 
 await test('21. aimeat_catalogue_search', async () => {
@@ -499,6 +501,8 @@ await test('22. aimeat_wallet_balance', async () => {
     assert(typeof result.balance === 'number', `balance: ${result.balance}`);
     assert(typeof result.in_escrow === 'number', `in_escrow: ${result.in_escrow}`);
     assert(typeof result.available === 'number', `available: ${result.available}`);
+    // F4: machine-readable structuredContent mirrors the text payload
+    assert(typeof body.result.structuredContent?.balance === 'number', 'has structuredContent.balance');
 });
 
 await test('23. aimeat_agent_profile', async () => {
