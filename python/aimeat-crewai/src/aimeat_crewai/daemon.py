@@ -13,6 +13,15 @@ This is the second half of the AIMEAT-CrewAI integration story:
     `aimeat_task_create` MCP tool (AIMEAT >= 1.14.0), and the daemon picks
     them up automatically.
 
+Changelog:
+  0.3.6 -- Fix inbox message dispatch. _poll_messages() read the non-existent
+    data.messages key (the node returns data.pending_messages / data.items), so
+    message-triggered crews never ran. Also: inbox items carry only a ~100-char
+    preview, so we now fetch full content per message via
+    GET /v1/agents/<agent>/messages?thread_id=, and PATCH the message to
+    status=delivered after a successful kickoff so it is not re-dispatched every
+    poll cycle (plus a process-local done_ids guard).
+
 Usage:
 
     from aimeat_crewai import run_crew_daemon, stdio_params

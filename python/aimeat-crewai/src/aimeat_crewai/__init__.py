@@ -41,7 +41,7 @@ from .daemon import (
     DAEMON_DEFAULT_TOOL_FILTER,
 )
 
-__version__ = "0.3.5"
+__version__ = "0.3.6"
 
 __all__ = [
     "__version__",
