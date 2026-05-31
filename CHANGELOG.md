@@ -4,6 +4,54 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-05-31
+
+Agent **Quality** tab — per-context peer/owner reviews of task deliverables,
+turned into a quality picture alongside recomputed performance statistics.
+Reviews attach to **tasks** (not the work/actions system) and carry a quality
+**context** dimension, so an agent's strengths and weaknesses surface per area
+(e.g. `creative: 4.5★ / factual: 2.1★`). Full design and rationale:
+`docs/plans/agent-quality-tab-plan.md`.
+
+### Added
+
+- **`POST /v1/agents/{name}/tasks/{id}/rate`** — review a completed (`done`)
+  task's deliverable with a 1–5 star rating and a `context`
+  (`factual`/`creative`/`code`/`planning`/`summarization`/`research`/`communication`/`other`).
+  Authorization: the task's owner, or a same-owner agent (e.g. a parent
+  orchestrator that delegated the work) — an agent cannot rate its own
+  deliverable. Logged as a `rating` task event.
+- **Source-grounding hard gate** — for the factual family
+  (`factual`/`research`/`code`/`summarization`) an *agent* rater must set
+  `source_grounded: true` (the rating was checked against the inputs/sources),
+  otherwise the request is rejected with `422 GROUNDING_REQUIRED`. Human owners
+  are exempt; `creative` accepts an output-alone craft rating. Stops stars from
+  rewarding confabulation over faithfulness.
+- **`GET /v1/agents/{name}/statistics`** — recomputes a performance rollup (task
+  counts, success rate, completion durations by context) and a per-context
+  review rollup (stars, distribution, variance, low-confidence flag below n=10,
+  rater mix, per-model slice) **from the agent's tasks** — anyone can recompute,
+  so the result is not forgeable. Written to the owner's public cache keys
+  `agents.<name>.statistics.performance` / `.reviews`, and surfaces any custom
+  metrics published under `agents.<name>.statistics.custom.*`.
+- **Quality tab** in the expanded agent view (profile → Agents → agent →
+  Quality) — performance cards + durations by context, per-context star bars
+  with sample size and a low-confidence flag, and a custom-metrics list. Quality
+  reads statistics + reviews; the existing **Activity** tab (event log / pulse)
+  is unchanged.
+- **Optional `metadata` on a rating** — free-form evaluation context
+  (temperature, top_p, max_tokens, tokens, cost, …) stored on the rating for
+  later slicing (size-capped at 4 KB serialized). `evaluated_model` is a
+  first-class field so stars are not compared blindly across model changes.
+- **`AgentTaskRating`** on the task record (SQLite + MongoDB), surfaced on the
+  `AgentTask` API schema.
+
+### Notes
+
+- New E2E suite `test/e2e-agent-quality.ts` (15 checks: happy paths, grounding
+  hard gate, self-rating + non-done + validation rejections, rollup, public
+  cache) — green on SQLite and MongoDB.
+
 ## [1.15.0] - 2026-05-31
 
 MCP overhaul from the tool-design audit (`docs/mcp_audit/`): the `/v1/mcp` tool
