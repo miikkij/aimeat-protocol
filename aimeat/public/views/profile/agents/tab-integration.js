@@ -4,6 +4,10 @@
  *   during onboarding or production status (connection, platform, readiness,
  *   identity, delivery log) after completion.
  * @version-history
+ *   v1.5.0 -- 2026-05-31 -- Live-update refresh no longer toggles the full-tab loading
+ *     placeholder (added a showSpinner option). During Hello Integration the agent
+ *     posts steps/telemetry rapidly, so the frequent SSE ticks were re-rendering the
+ *     "Loading..." state on every tick -- the tab flashed like a full reload.
  *   v1.4.0 -- 2026-05-28 -- Treat webhook with empty url as polling: status dot, label, and
  *                            the webhook section all key off (webhook && webhook.url), not just
  *                            the webhook object existing. A record with url="" is still polling.
@@ -48,8 +52,8 @@ export default function TabIntegration({ agent, onboarding, session, showToast, 
   const [updatingBundle, setUpdatingBundle] = useState(false);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
 
-  async function loadData() {
-    setLoading(true);
+  async function loadData({ showSpinner = true } = {}) {
+    if (showSpinner) setLoading(true);
     try {
       const [whResp, sbResp, dlResp, obResp] = await Promise.all([
         getWebhookConfig(agentName).catch(() => null),
@@ -62,7 +66,7 @@ export default function TabIntegration({ agent, onboarding, session, showToast, 
       setDeliveries(dlResp?.data?.deliveries || []);
       setPostChecklist(obResp?.data?.post_onboarding_checklist || null);
     } catch { /* silent */ }
-    setLoading(false);
+    if (showSpinner) setLoading(false);
   }
 
   useEffect(() => { loadData(); }, [agentName]);
@@ -70,7 +74,11 @@ export default function TabIntegration({ agent, onboarding, session, showToast, 
   const loadRef = useRef(loadData);
   loadRef.current = loadData;
   useEffect(() => {
-    const handler = () => loadRef.current();
+    // Background refresh on every live-update WITHOUT toggling the full-tab
+    // "Loading..." placeholder. During Hello Integration the agent posts steps
+    // + telemetry rapidly, so this fires often; showing the spinner each time
+    // made the whole tab flash like a reload. Initial mount still shows it.
+    const handler = () => loadRef.current({ showSpinner: false });
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, []);
