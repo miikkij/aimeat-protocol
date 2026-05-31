@@ -7,6 +7,9 @@
  *   v1.1.0 -- 2026-05-31 -- Add an editor for array-of-strings config fields
  *     (e.g. agent.system_principles): one item per line in a textarea, split
  *     back to an array on save. Previously object/array fields were read-only.
+ *   v1.2.0 -- 2026-05-31 -- Fix: inputs were bound to the saved value, not the
+ *     pending edit, so toggling a checkbox / typing snapped straight back on
+ *     re-render (looked un-editable). All inputs now reflect pending[path].
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
@@ -148,13 +151,13 @@ export default function ConfigTab({ data, reload }) {
                     ? html`${e.value ? html`<${Badge} type="healthy" /> ${t('dashboard.yesLabel')}` : html`<${Badge} type="critical" /> ${t('dashboard.noLabel')}`}`
                     : html`<code>${escHtml(String(e.value))}</code> <span class="adm-text-dim adm-text-xs">${t('dashboard.readOnly')}</span>`)
                   : e.type === 'boolean'
-                    ? html`<label style="cursor:pointer"><input type="checkbox" checked=${e.value} onChange=${ev => onChange(p, ev.target.checked)} disabled=${!editable} /> ${e.value ? t('dashboard.enabled') : t('dashboard.disabled')}</label>`
+                    ? html`<label style="cursor:pointer"><input type="checkbox" checked=${p in pending ? pending[p] : e.value} onChange=${ev => onChange(p, ev.target.checked)} disabled=${!editable} /> ${(p in pending ? pending[p] : e.value) ? t('dashboard.enabled') : t('dashboard.disabled')}</label>`
                     : e.type === 'integer'
-                      ? html`<input type="number" value=${e.value} style="width:120px" onChange=${ev => onChange(p, parseInt(ev.target.value))} disabled=${!editable} />${e.range ? html` <span class="adm-text-dim adm-text-xs">${escHtml(e.range)}</span>` : null}`
+                      ? html`<input type="number" value=${p in pending ? pending[p] : e.value} style="width:120px" onInput=${ev => onChange(p, parseInt(ev.target.value))} disabled=${!editable} />${e.range ? html` <span class="adm-text-dim adm-text-xs">${escHtml(e.range)}</span>` : null}`
                       : e.type === 'float'
-                        ? html`<input type="number" step="0.01" value=${e.value} style="width:120px" onChange=${ev => onChange(p, parseFloat(ev.target.value))} disabled=${!editable} />${e.range ? html` <span class="adm-text-dim adm-text-xs">${escHtml(e.range)}</span>` : null}`
+                        ? html`<input type="number" step="0.01" value=${p in pending ? pending[p] : e.value} style="width:120px" onInput=${ev => onChange(p, parseFloat(ev.target.value))} disabled=${!editable} />${e.range ? html` <span class="adm-text-dim adm-text-xs">${escHtml(e.range)}</span>` : null}`
                         : e.type === 'string'
-                          ? html`<input type="text" value=${e.value || ''} style="width:250px" onChange=${ev => onChange(p, ev.target.value)} disabled=${!editable} />`
+                          ? html`<input type="text" value=${p in pending ? pending[p] : (e.value || '')} style="width:250px" onInput=${ev => onChange(p, ev.target.value)} disabled=${!editable} />`
                           : e.type === 'object'
                             ? (Array.isArray(e.value)
                                 ? html`<textarea class="adm-config-array-edit" rows="4" disabled=${!editable}
