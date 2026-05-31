@@ -8,6 +8,7 @@
  *   v1.2.0 -- 2026-05-30 -- Live-update refresh also re-fetches the currently expanded memory entry's value (was: only the key list refreshed, the open entry stayed stale until the user closed + reopened it or switched tabs). Also stop showing the full-tab "Loading..." overlay on every live-update tick -- it now only shows on initial mount.
  *   v1.3.0 -- 2026-05-31 -- Make Stored Memory Keys editable (inline textarea + Save) and deletable; make Memory Areas editable (key prefix / description / access) and deletable. Stored-key list now carries `version` for optimistic-lock PUTs. Delete confirmations use the shared useConfirm dialog.
  *   v1.4.0 -- 2026-05-31 -- Add "+ Add key" button + create form to Stored Memory Keys. New entries are created under the AGENT's GAII (createMemory passes agent.gaii), not the owner's GHII, so they belong to the agent being viewed.
+ *   v1.5.0 -- 2026-05-31 -- Stored Memory Keys: show per-key created + last-updated timestamps (relative, full date on hover) and add a sort control (by updated or created, newest/oldest toggle). List now carries createdAt.
  */
 
 import { h } from 'preact';
@@ -15,6 +16,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { apiGet, apiPatch } from '/js/api.js';
+import { timeAgo } from '/js/utils.js';
 import { getDirectives, upsertDirectives } from '/js/services/agent-directives.js';
 import { updateMemoryFull, deleteMemory, createMemory } from '/js/services/memory.js';
 import { useConfirm } from '/components/Modal.js';
@@ -41,6 +43,9 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
   const [newPkgName, setNewPkgName] = useState('');
   const [newPkgDesc, setNewPkgDesc] = useState('');
   const [memoryKeys, setMemoryKeys] = useState([]);
+  // Stored-key sorting: field (updated|created) + direction (desc=newest first).
+  const [keySortField, setKeySortField] = useState('updated');
+  const [keySortDir, setKeySortDir] = useState('desc');
   const [expandedKey, setExpandedKey] = useState(null);
   const [expandedValue, setExpandedValue] = useState(null);
   // Stored-key inline value editing.
@@ -89,7 +94,7 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
       setResources(data.resources || []);
       const items = memResp?.data?.items || memResp?.data || [];
       const keys = (Array.isArray(items) ? items : [])
-        .map(item => ({ key: item.key, visibility: item.visibility, version: item.version, updatedAt: item.updated_at ?? item.updatedAt }));
+        .map(item => ({ key: item.key, visibility: item.visibility, version: item.version, createdAt: item.created_at ?? item.createdAt, updatedAt: item.updated_at ?? item.updatedAt }));
       setMemoryKeys(keys);
 
       // If the user has a memory entry expanded, re-fetch its value too so
@@ -330,6 +335,15 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
   const hasResources = resources.length > 0;
   const hasKeys = memoryKeys.length > 0;
 
+  // Sort the stored-key list by created/updated, newest- or oldest-first.
+  // Sorting is purely a display concern; loadData order is not relied on.
+  const sortedKeys = [...memoryKeys].sort((a, b) => {
+    const field = keySortField === 'created' ? 'createdAt' : 'updatedAt';
+    const ta = a[field] ? new Date(a[field]).getTime() : 0;
+    const tb = b[field] ? new Date(b[field]).getTime() : 0;
+    return keySortDir === 'asc' ? ta - tb : tb - ta;
+  });
+
   if (!hasTags && !hasAreas && !hasResources && !hasKeys && !addingTag && !addingArea && !addingPackage && !addingKey) {
     return html`
       <div>
@@ -465,7 +479,20 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
       <div class="pf-agd-data-section">
           <div class="pf-agd-section-header">
             <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.storedKeysTitle')}</span>
-            <button class="btn-outline btn-sm" onClick=${() => setAddingKey(!addingKey)}>+ ${t('profile.agents.detail.data_access.addKey')}</button>
+            <div class="pf-agd-keys-controls">
+              ${hasKeys && html`
+                <label class="pf-agd-sort-label">${t('profile.agents.detail.data_access.sortBy')}</label>
+                <select class="pf-agd-sort-select" value=${keySortField} onChange=${(e) => setKeySortField(e.target.value)}>
+                  <option value="updated">${t('profile.agents.detail.data_access.sortUpdated')}</option>
+                  <option value="created">${t('profile.agents.detail.data_access.sortCreated')}</option>
+                </select>
+                <button class="pf-agd-sort-dir" title=${keySortDir === 'desc' ? t('profile.agents.detail.data_access.sortNewestFirst') : t('profile.agents.detail.data_access.sortOldestFirst')}
+                        onClick=${() => setKeySortDir(keySortDir === 'desc' ? 'asc' : 'desc')}>
+                  ${keySortDir === 'desc' ? '↓' : '↑'}
+                </button>
+              `}
+              <button class="btn-outline btn-sm" onClick=${() => setAddingKey(!addingKey)}>+ ${t('profile.agents.detail.data_access.addKey')}</button>
+            </div>
           </div>
           ${addingKey && html`
             <div class="pf-agd-area-form pf-agd-keyadd-form">
@@ -491,11 +518,15 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
           ${memoryKeys.length === 0 && !addingKey && html`
             <div class="pf-agd-empty">${t('profile.agents.detail.data_access.noKeys')}</div>
           `}
-          ${memoryKeys.map(mk => html`
+          ${sortedKeys.map(mk => html`
             <div key=${mk.key}>
               <div class="pf-agd-area-row pf-agd-area-row--clickable" onClick=${() => toggleExpandKey(mk)}>
                 <span class="pf-agd-expand-icon">${expandedKey === mk.key ? '▼' : '▶'}</span>
                 <span class="pf-agd-area-key">${mk.key}</span>
+                <span class="pf-agd-key-meta">
+                  ${mk.createdAt ? html`<span title=${new Date(mk.createdAt).toLocaleString()}>${t('profile.agents.detail.data_access.created')}: ${timeAgo(mk.createdAt)}</span>` : ''}
+                  ${mk.updatedAt ? html`<span title=${new Date(mk.updatedAt).toLocaleString()}>${t('profile.agents.detail.data_access.updated')}: ${timeAgo(mk.updatedAt)}</span>` : ''}
+                </span>
                 <span class="pf-agd-area-perm pf-agd-area-perm--${mk.visibility === 'public' ? 'rw' : 'ro'}">${mk.visibility}</span>
               </div>
               ${expandedKey === mk.key && html`

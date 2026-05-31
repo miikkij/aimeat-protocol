@@ -798,7 +798,14 @@
           "keyValuePlaceholder": "Arvo — pelkkä teksti tai JSON",
           "noKeys": "Ei tallennettuja muistiavaimia vielä",
           "keyCreated": "Muistiavain luotu",
-          "createKeyError": "Muistiavaimen luonti epäonnistui"
+          "createKeyError": "Muistiavaimen luonti epäonnistui",
+          "created": "Luotu",
+          "updated": "Päivitetty",
+          "sortBy": "Järjestä",
+          "sortUpdated": "Viimeksi päivitetty",
+          "sortCreated": "Luotu",
+          "sortNewestFirst": "Uusin ensin",
+          "sortOldestFirst": "Vanhin ensin"
         },
         "agent_config": {
           "copy": "Kopioi",

@@ -19,6 +19,7 @@
  *   v2.4.0 -- 2026-05-24 -- Add header-row flex layout for title + connect button alignment
  *   v2.5.0 -- 2026-05-31 -- Add stored-memory-key inline editor (textarea), memory-detail wrapper, in-row edit/delete action rows, and danger-tinted ghost action styles for the Data Access tab
  *   v2.6.0 -- 2026-05-31 -- Add stored-key create form layout (pf-agd-keyadd-form, vertical stack)
+ *   v2.7.0 -- 2026-05-31 -- Add stored-key sort controls (pf-agd-keys-controls/sort-*) and per-key created/updated meta (pf-agd-key-meta)
  */
 
 /* Header row: title left, connect button right */
@@ -2286,6 +2287,50 @@
 .pf .pf-agd-keyadd-form input,
 .pf .pf-agd-keyadd-form select { width: 100%; box-sizing: border-box; }
 .pf .pf-agd-keyadd-form .pf-agd-memory-edit { margin: 0; }
+
+/* Data access: stored-key sort controls (in the section header) */
+.pf .pf-agd-keys-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.pf .pf-agd-sort-label {
+  font-size: 0.72rem;
+  color: var(--text-dim, #6B7280);
+}
+.pf .pf-agd-sort-select {
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 4px;
+  background: var(--card-bg, #FFFFFF);
+  color: var(--text, #1A1A2E);
+  font-size: 0.78rem;
+}
+.pf .pf-agd-sort-dir {
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 4px;
+  background: var(--card-bg, #FFFFFF);
+  color: var(--text-dim, #6B7280);
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0.2rem 0.45rem;
+}
+.pf .pf-agd-sort-dir:hover {
+  border-color: var(--accent, #E8564A);
+  color: var(--accent, #E8564A);
+}
+
+/* Data access: per-key created/updated meta in the stored-key row */
+.pf .pf-agd-key-meta {
+  margin-left: auto;
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.7rem;
+  color: var(--text-muted, #9CA3AF);
+  white-space: nowrap;
+}
 
 /* Data access: package picker */
 .pf .pf-agd-package-picker {
