@@ -238,6 +238,10 @@
       if (pathname === '/v1/portal' && search.includes('view=dev')) {
         return () => import('/views/portal-dev.js' + B);
       }
+      // Single-agent pop-out window: /v1/profile?solo=<agentName>
+      if (pathname === '/v1/profile' && /[?&]solo=/.test(search)) {
+        return () => import('/views/agent-solo.js' + B);
+      }
       // Portfolio public view: /v1/portfolio/<username>
       if (pathname.startsWith('/v1/portfolio/') && pathname !== '/v1/portfolio/') {
         return () => import('/views/portfolio.js' + B);

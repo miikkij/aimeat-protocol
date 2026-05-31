@@ -11,6 +11,10 @@
  *   v1.5.0 -- 2026-05-31 -- Add README tab, rendered from the agents.<name>.readme
  *     owner-namespaced memory entry. Shown first + selected by default when a
  *     non-empty README exists; hidden otherwise.
+ *   v1.6.0 -- 2026-05-31 -- Add `onPopOut` prop (pop-out ⤢ button on collapsed
+ *     bar + expanded footer that opens the agent in its own window) and
+ *     `soloMode` prop (used by the standalone /v1/profile?solo= view: forces
+ *     expanded, disables collapse, hides the pop-out button).
  */
 
 import { h } from 'preact';
@@ -68,7 +72,7 @@ async function fetchReadme(agent) {
   }
 }
 
-export default function AgentCard({ agent, onboarding, expanded, onToggle, session, showToast, allAgents, onScopesClick, onDeleteClick, onFederateToggle }) {
+export default function AgentCard({ agent, onboarding, expanded, onToggle, session, showToast, allAgents, onScopesClick, onDeleteClick, onFederateToggle, onPopOut, soloMode = false }) {
   const state = detectAgentState(agent, onboarding);
   const [activeTab, setActiveTab] = useState(null);
   // README markdown: undefined = not loaded, '' = none published, string = show tab.
@@ -99,9 +103,12 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
   }, [expanded, readme]);
 
   const handleCollapse = useCallback(() => {
+    // In solo mode the card is the whole window — clicking the header must not
+    // collapse it (there is nothing to collapse back into).
+    if (soloMode) return;
     onToggle(agent.name);
     if (expanded) { setActiveTab(null); userPickedTab.current = false; }
-  }, [expanded, agent.name, onToggle]);
+  }, [expanded, agent.name, onToggle, soloMode]);
 
   if (!expanded) {
     return html`
@@ -121,6 +128,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
             ${renderDeliveryIndicator(agent)}
             ${renderCollapsedStats(state, agent, onboarding)}
           </span>
+          ${renderPopOut(onPopOut, agent)}
         </div>
       </div>
     `;
@@ -189,6 +197,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
         <!-- Card Footer: Scopes + Delete -->
         <div class="pf-agd-card-footer">
           <div class="pf-agd-card-actions">
+            ${renderPopOut(onPopOut, agent)}
             ${onScopesClick && html`
               <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); onScopesClick(agent); }}>
                 ${t('profile.agents.scopeUi.manage')}
@@ -209,6 +218,15 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
       </div>
     </div>
   `;
+}
+
+// Pop-out button: opens this agent in its own window (one window per agent,
+// so re-clicking focuses the existing one). Only rendered when the parent
+// supplies onPopOut — the standalone solo view omits it.
+function renderPopOut(onPopOut, agent) {
+  if (!onPopOut) return null;
+  return html`<button class="pf-agd-popout-btn" title=${t('profile.agents.detail.popOut')}
+    onClick=${(e) => { e.stopPropagation(); onPopOut(agent); }}>⤢</button>`;
 }
 
 function renderDeliveryIndicator(agent) {

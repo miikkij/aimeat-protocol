@@ -20,6 +20,7 @@
  *   v2.5.0 -- 2026-05-31 -- Add stored-memory-key inline editor (textarea), memory-detail wrapper, in-row edit/delete action rows, and danger-tinted ghost action styles for the Data Access tab
  *   v2.6.0 -- 2026-05-31 -- Add stored-key create form layout (pf-agd-keyadd-form, vertical stack)
  *   v2.7.0 -- 2026-05-31 -- Add stored-key sort controls (pf-agd-keys-controls/sort-*) and per-key created/updated meta (pf-agd-key-meta)
+ *   v2.8.0 -- 2026-05-31 -- Add pop-out button (pf-agd-popout-btn), drag-to-reorder rows (pf-agd-dnd-*), and solo pop-out window layout (pf-agd-solo*)
  */
 
 /* Header row: title left, connect button right */
@@ -1313,6 +1314,67 @@
   white-space: nowrap;
   text-align: right;
 }
+
+/* Pop-out button (open agent in its own window) */
+.pf .pf-agd-popout-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-dim, #6B7280);
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.pf .pf-agd-collapsed .pf-agd-popout-btn { margin-left: 0.4rem; }
+.pf .pf-agd-popout-btn:hover {
+  color: var(--accent, #E8564A);
+  background: var(--bg-dim, #F9FAFB);
+}
+
+/* ── Drag-to-reorder rows (ungrouped, unfiltered agent list) ── */
+.pf .pf-agd-dnd-row {
+  position: relative;
+  padding-left: 1.1rem; /* gutter for the grip handle */
+}
+.pf .pf-agd-dnd-grip {
+  position: absolute;
+  left: 0.1rem;
+  top: 0.8rem;
+  z-index: 2;
+  cursor: grab;
+  color: var(--text-muted, #9CA3AF);
+  font-size: 0.85rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s;
+  user-select: none;
+}
+.pf .pf-agd-dnd-row:hover .pf-agd-dnd-grip { opacity: 0.7; }
+.pf .pf-agd-dnd-grip:active { cursor: grabbing; }
+.pf .pf-agd-dnd-dragging { opacity: 0.45; }
+
+/* ── Solo (pop-out) window layout ── */
+.pf-agd-solo {
+  padding: 0.5rem;
+  max-width: 640px;
+  margin: 0 auto;
+}
+.pf .pf-agd-solo-toast {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text, #1A1A2E);
+  color: #FFFFFF;
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  z-index: 1000;
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,0.18));
+}
+.pf .pf-agd-solo-toast--err { background: var(--danger, #EF4444); }
 
 /* ── Badges (platform, readiness, federation) ── */
 

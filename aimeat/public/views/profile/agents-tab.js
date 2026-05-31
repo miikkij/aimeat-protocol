@@ -28,6 +28,7 @@
  *   v3.1.0 -- 2026-05-28 -- Explain connector and fallback connection options before commands
  *   v3.2.0 -- 2026-05-29 -- Tag filter bar + group-by toggle (none / tag / mode)
  *   v3.3.0 -- 2026-05-29 -- Add "Connect a task-runner" collapsible with CrewAI-shaped paste prompt
+ *   v3.4.0 -- 2026-05-31 -- Drag-to-reorder agent bars (per-browser localStorage order, ungrouped/unfiltered list only) + pop-out button opening an agent in its own window (/v1/profile?solo=)
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -344,6 +345,37 @@ const PLATFORMS = {
 const PLATFORM_KEYS = ['windows','mac','linux','wsl2','android','aws'];
 const PLATFORM_LABELS = { windows:'profile.platforms.windows', mac:'profile.platforms.mac', linux:'profile.platforms.linux', wsl2:'profile.platforms.wsl2', android:'profile.platforms.android', aws:'profile.platforms.aws' };
 
+// ── Per-browser agent ordering (localStorage) ──
+// The agent bar order is not stored server-side; it is a per-browser
+// preference keyed by owner. Stored as a plain array of agent names.
+const ORDER_KEY_PREFIX = 'aimeat-agent-order:';
+function loadAgentOrder(owner) {
+  if (!owner) return [];
+  try { return JSON.parse(localStorage.getItem(ORDER_KEY_PREFIX + owner) || '[]') || []; }
+  catch { return []; }
+}
+function saveAgentOrder(owner, names) {
+  if (!owner) return;
+  try { localStorage.setItem(ORDER_KEY_PREFIX + owner, JSON.stringify(names)); }
+  catch { /* ignore quota/availability errors */ }
+}
+// Effective ordering: agents named in the saved order first (in that order),
+// then any agents not yet ordered (e.g. newly connected) in their API order.
+function effectiveOrderedNames(agents, order) {
+  const existing = new Set(agents.map(a => a.name));
+  const head = order.filter(n => existing.has(n));
+  const headSet = new Set(head);
+  const tail = agents.map(a => a.name).filter(n => !headSet.has(n));
+  return [...head, ...tail];
+}
+
+// Open one agent in its own window. One window per agent name so re-clicking
+// focuses the existing window instead of spawning duplicates.
+function popOutAgent(agent) {
+  const url = '/v1/profile?solo=' + encodeURIComponent(agent.name);
+  window.open(url, 'aimeat-agent-' + agent.name, 'width=560,height=920');
+}
+
 export default function AgentsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
   const [agents, setAgents] = useState(null);
@@ -363,6 +395,38 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [taskStatsMap, setTaskStatsMap] = useState({});
   const [tagFilter, setTagFilter] = useState(new Set());
   const [groupBy, setGroupBy] = useState('none'); // 'none' | 'tag' | 'mode'
+  // Per-browser drag-to-reorder of the agent bars (localStorage-backed).
+  const [agentOrder, setAgentOrder] = useState(() => loadAgentOrder(session?.owner));
+  const [draggingName, setDraggingName] = useState(null);
+  const draggedName = useRef(null);
+
+  function reorderAgents(fromName, toName) {
+    if (!fromName || !toName || fromName === toName || !session || !agents) return;
+    const names = effectiveOrderedNames(agents, agentOrder);
+    const arr = names.filter(n => n !== fromName);
+    const insertAt = arr.indexOf(toName);
+    if (insertAt < 0) return;
+    arr.splice(insertAt, 0, fromName); // drop BEFORE the target row
+    saveAgentOrder(session.owner, arr);
+    setAgentOrder(arr);
+  }
+
+  // Reordering only makes sense in the flat, unfiltered list.
+  const dnd = {
+    reorderable: groupBy === 'none' && tagFilter.size === 0,
+    draggingName,
+    onDragStart: (name, e) => {
+      draggedName.current = name;
+      setDraggingName(name);
+      if (e?.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', name); } catch { /* ignore */ }
+      }
+    },
+    onDragOver: (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; },
+    onDrop: (targetName) => { reorderAgents(draggedName.current, targetName); draggedName.current = null; setDraggingName(null); },
+    onDragEnd: () => { draggedName.current = null; setDraggingName(null); },
+  };
 
   const markCopied = (action) => {
     setCopiedAction(action);
@@ -691,6 +755,9 @@ export default function AgentsTab({ session, showToast, onStats }) {
           setScopesModal,
           handleDeleteAgent,
           toggleFederate,
+          onPopOut: popOutAgent,
+          dnd,
+          agentOrder,
         })}
       `
     }
@@ -756,7 +823,7 @@ function renderFilterBar(agents, tagFilter, setTagFilter, groupBy, setGroupBy) {
   `;
 }
 
-function renderAgentGroups({ agents, tagFilter, groupBy, onboardings, taskStatsMap, expandedAgent, toggleAgent, session, showToast, setScopesModal, handleDeleteAgent, toggleFederate }) {
+function renderAgentGroups({ agents, tagFilter, groupBy, onboardings, taskStatsMap, expandedAgent, toggleAgent, session, showToast, setScopesModal, handleDeleteAgent, toggleFederate, onPopOut, dnd, agentOrder }) {
   // Tag filter: agent must have ALL selected tags (intersection)
   const filtered = tagFilter.size === 0
     ? agents
@@ -770,25 +837,45 @@ function renderAgentGroups({ agents, tagFilter, groupBy, onboardings, taskStatsM
     return html`<div class="empty">${t('profile.agents.filter.noMatches')}</div>`;
   }
 
+  const card = (a) => html`
+    <${AgentCard}
+      agent=${{ ...a, taskStats: taskStatsMap[a.name] || null }}
+      onboarding=${onboardings[a.name]}
+      expanded=${expandedAgent === a.name}
+      onToggle=${toggleAgent}
+      session=${session}
+      showToast=${showToast}
+      allAgents=${agents}
+      onScopesClick=${(agent) => setScopesModal(agent)}
+      onDeleteClick=${handleDeleteAgent}
+      onFederateToggle=${toggleFederate}
+      onPopOut=${onPopOut}
+    />
+  `;
+
   const renderCard = (a) => html`
-    <div data-agent-name=${a.name} key=${a.name}>
-      <${AgentCard}
-        agent=${{ ...a, taskStats: taskStatsMap[a.name] || null }}
-        onboarding=${onboardings[a.name]}
-        expanded=${expandedAgent === a.name}
-        onToggle=${toggleAgent}
-        session=${session}
-        showToast=${showToast}
-        allAgents=${agents}
-        onScopesClick=${(agent) => setScopesModal(agent)}
-        onDeleteClick=${handleDeleteAgent}
-        onFederateToggle=${toggleFederate}
-      />
-    </div>
+    <div data-agent-name=${a.name} key=${a.name}>${card(a)}</div>
   `;
 
   if (groupBy === 'none') {
-    return filtered.map(renderCard);
+    // Apply the per-browser saved order, then (when reorderable) wrap each row
+    // in a draggable container with a grip handle.
+    const orderedNames = effectiveOrderedNames(agents, agentOrder || []);
+    const idx = new Map(orderedNames.map((n, i) => [n, i]));
+    const ordered = [...filtered].sort((a, b) => (idx.get(a.name) ?? 1e9) - (idx.get(b.name) ?? 1e9));
+    if (!dnd?.reorderable) return ordered.map(renderCard);
+    return ordered.map(a => html`
+      <div data-agent-name=${a.name} key=${a.name}
+           class="pf-agd-dnd-row ${dnd.draggingName === a.name ? 'pf-agd-dnd-dragging' : ''}"
+           draggable=${expandedAgent !== a.name}
+           onDragStart=${(e) => dnd.onDragStart(a.name, e)}
+           onDragOver=${dnd.onDragOver}
+           onDrop=${(e) => { e.preventDefault(); dnd.onDrop(a.name); }}
+           onDragEnd=${dnd.onDragEnd}>
+        <span class="pf-agd-dnd-grip" title=${t('profile.agents.reorderHint')}>⠿</span>
+        ${card(a)}
+      </div>
+    `);
   }
 
   if (groupBy === 'mode') {

@@ -394,6 +394,11 @@
         "untagged": "Untagged",
         "noMatches": "No agents match the current filter."
       },
+      "reorderHint": "Drag to reorder",
+      "solo": {
+        "notFound": "Agent not found.",
+        "loginRequired": "Please log in to view this agent."
+      },
       "approval": {
         "credentials_ready_title": "Agent approved",
         "credentials_ready_desc": "Copy the credentials below and paste them to your agent.",
@@ -655,6 +660,7 @@
         },
         "sharedTags": "Shared tags",
         "lastSeen": "Last seen",
+        "popOut": "Open in its own window",
         "deliveryMcp": "MCP notifications",
         "deliveryWebhook": "Webhook",
         "deliveryPolling": "Polling",

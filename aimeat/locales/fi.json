@@ -394,6 +394,11 @@
         "untagged": "Ei tageja",
         "noMatches": "Yksikään agentti ei vastaa nykyistä suodatinta."
       },
+      "reorderHint": "Raahaa järjestääksesi",
+      "solo": {
+        "notFound": "Agenttia ei löytynyt.",
+        "loginRequired": "Kirjaudu sisään nähdäksesi tämän agentin."
+      },
       "approval": {
         "credentials_ready_title": "Agentti hyväksytty",
         "credentials_ready_desc": "Kopioi alla olevat tunnistetiedot ja liitä ne agentillesi.",
@@ -655,6 +660,7 @@
         },
         "sharedTags": "Jaetut tunnisteet",
         "lastSeen": "Viimeksi nähty",
+        "popOut": "Avaa omaan ikkunaan",
         "deliveryMcp": "MCP-ilmoitukset",
         "deliveryWebhook": "Webhook",
         "deliveryPolling": "Pollaus",
