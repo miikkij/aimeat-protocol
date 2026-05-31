@@ -4,6 +4,8 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-05-31
+
 MCP overhaul from the tool-design audit (`docs/mcp_audit/`): the `/v1/mcp` tool
 surface was reviewed against MCP/Anthropic best practices, made consistent and
 safer, and a new set of purpose-scoped surfaces (`/v2/mcp/<role>`) was added so
@@ -39,6 +41,25 @@ for existing consumers.
 - **Tool-surface tooling** — `pnpm audit:mcp-schemas` (server↔connector↔catalog
   schema-parity audit with a `--strict` drift ratchet + v2 surface coverage) and
   `pnpm eval:mcp-surface` (context-cost report).
+- **Editable Stored Memory Keys** in the agent Data Access tab — inline value
+  editor, delete, and **+ Add key**. New entries are created under the **agent's
+  GAII** (not the owner's GHII) via a new `agent` parameter on `POST /v1/memory`,
+  so they belong to the agent being viewed. Rows now show per-key created /
+  last-updated timestamps and a sort control (updated/created, newest/oldest).
+- **Editable agent Memory Areas** (key prefix / description / read vs read+write)
+  with delete, in the Data Access tab.
+- **Drag-to-reorder agent bars** in the profile Agents tab — per-browser order
+  saved to `localStorage` (ungrouped, unfiltered list).
+- **Pop-out agent window** — a ⤢ button opens a single agent in its own window
+  (`/v1/profile?solo=<name>`) so several agents can sit side by side; each window
+  keeps its own SSE connection.
+- **Editable array config in the admin dashboard** — array-of-strings fields such
+  as **`agent.system_principles`** (the system-wide directive principles) are now
+  edited one-item-per-line in the Config tab and persisted via `PUT /v1/admin/config`.
+- **Task deliverable link** — agents may pass `deliverable_key` on
+  `POST .../tasks/{id}/complete`; it is stored on the task (`deliverableKey`, both
+  backends) and the owner's Tasks tab links to that agent-memory entry, showing
+  the value on demand or "no longer exists" if it was deleted.
 
 ### Changed
 
@@ -51,8 +72,28 @@ for existing consumers.
   `content`, REST reads `data`). Remaining known divergences are tracked/baselined.
 - **MCP audit + CLI guidance** — `aimeat help` / `aimeat connect` and the bootstrap
   `GET /` discovery doc now document the v2 surfaces.
+- **`DELETE /v1/memory/:key` mirrors the PUT owner-session cross-agent lookup** —
+  an owner can now delete a key stored under one of their agents (previously 404).
+- **`PUT /v1/agents/:name/directives` now merges** instead of full-replacing —
+  fields omitted from the request body are preserved, so the Directives and Data
+  Access tabs no longer wipe each other's sections.
+- **Collapsed agent bar is now two rows** (identity/badges on top, a faint-divider
+  second line for delivery/status/last-seen) so the status text stops overflowing.
 
 ### Fixed
+
+- **SSE live updates were globally broken.** The global `compression()` middleware
+  buffered the `GET /v1/events` stream, so change events never reached the browser —
+  the UI only appeared to refresh via polling (the Memory tab, agent task event log,
+  and 13 other tabs all stayed stale until reload). `text/event-stream` is now
+  excluded from compression and the stream is flushed per event; live updates work
+  again everywhere.
+- **Behavioral directives silently vanished on save.** The Directives tab sent a
+  `content` field the API/storage doesn't have (so it was stripped); behavioral
+  directives are now stored as the agent-level `rules` and reconstructed on load.
+- **Admin Config fields looked un-editable.** Inputs were bound to the saved value
+  instead of the pending edit, so toggling a checkbox / typing snapped straight
+  back on re-render. All inputs now reflect `pending[path]`.
 
 - Stale agent handbook guidance: removed a phantom `aimeat_memory_delete` tool
   reference, corrected the "18 built-in tools" wording, and added a missing
