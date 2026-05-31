@@ -14,6 +14,14 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.3.7 -- Cooperative cancellation. Before each (blocking) EXECUTE kickoff the
+    daemon re-checks whether the subtask is still wanted: it skips + fails the
+    task if its status is no longer active/stalled (owner paused/deleted it) OR
+    if its id appears in any `agents.cancel.*` memory marker visible to the
+    owner (owner_scope) -- markers a coordinator or the owner writes to cancel
+    work it delegated. Stops abandoned/speculative subtasks from ever starting
+    (circuit breaker for the "coordinator over-delegated to one crew" case).
+    Running kickoffs are not interrupted (cooperative, not preemptive).
   0.3.6 -- Fix inbox message dispatch. _poll_messages() read the non-existent
     data.messages key (the node returns data.pending_messages / data.items), so
     message-triggered crews never ran. Also: inbox items carry only a ~100-char
@@ -156,6 +164,65 @@ def _poll_tasks(token: str, node_url: str, agent_name: str, status: str = "queue
         return body.get("data", {}).get("tasks", []) or []
     except Exception:
         return []
+
+
+def _is_cancelled(token: str, node_url: str, agent_name: str, task_id: str) -> bool:
+    """Cooperative cancellation check, run just before a (blocking) kickoff.
+
+    A subtask counts as cancelled when EITHER:
+      * its status is no longer active/stalled (e.g. the owner paused/deleted it
+        from the UI, or it was already failed/completed), OR
+      * its id appears in any `agents.cancel.*` memory marker visible to this
+        owner. A coordinator (agent) or the owner writes a memory entry with key
+        prefix `agents.cancel.` whose value is a list of cancelled task ids;
+        we read them across the whole owner namespace (owner_scope=true) so a
+        marker written by ANY same-owner agent, or by the owner, is honoured.
+        This is what lets one agent cancel work it delegated to another.
+
+    On a transient read error we return False (don't drop a task on a hiccup).
+    """
+    base = node_url.rstrip("/")
+    hdr = {"Authorization": f"Bearer {token}"}
+    # 1) status re-check (catches owner-side pause/delete)
+    try:
+        r = requests.get(f"{base}/v1/agents/{agent_name}/tasks/{task_id}", headers=hdr, timeout=15)
+        if r.status_code == 200:
+            status = (r.json().get("data", {}).get("task", {}) or {}).get("status")
+            if status not in ("active", "stalled"):
+                return True
+    except Exception:
+        pass
+    # 2) cancel markers (owner-scope), covers coordinator-written cancellations
+    try:
+        r = requests.get(
+            f"{base}/v1/memory",
+            headers=hdr,
+            params={"owner_scope": "true", "prefix": "agents.cancel.", "per_page": "100"},
+            timeout=15,
+        )
+        if r.status_code == 200:
+            for item in r.json().get("data", {}).get("items", []) or []:
+                val = item.get("value")
+                if isinstance(val, list) and task_id in (str(x) for x in val):
+                    return True
+                if isinstance(val, dict) and task_id in (str(k) for k in val.keys()):
+                    return True
+    except Exception:
+        pass
+    return False
+
+
+def _fail_cancelled(token: str, node_url: str, agent_name: str, task_id: str) -> None:
+    """Mark a not-yet-started, cancelled subtask failed so it leaves the queue."""
+    try:
+        requests.post(
+            f"{node_url.rstrip('/')}/v1/agents/{agent_name}/tasks/{task_id}/fail",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"message": "Cancelled before start (cancel marker or status change)"},
+            timeout=10,
+        )
+    except Exception:
+        pass
 
 
 def _fetch_message_content(
@@ -556,6 +623,20 @@ def run_crew_daemon(
                                 break
                             task_id = task.get("id")
                             if not task_id or task_id in done_ids:
+                                continue
+                            # Cooperative cancellation: re-check right before the
+                            # blocking kickoff. The daemon dispatches from a list
+                            # fetched at cycle start, so a subtask cancelled
+                            # mid-cycle (e.g. a coordinator timed out and gave up
+                            # on speculative branches, or the owner paused it) is
+                            # still in that list. This guard stops abandoned work
+                            # from ever starting -- circuit breaker for the
+                            # "coordinator over-delegated to one crew" case.
+                            if _is_cancelled(token, node_url, agent_name, task_id):
+                                print(f"[daemon:{agent_name}] EXECUTE task {task_id} cancelled before start -- skipping")
+                                _fail_cancelled(token, node_url, agent_name, task_id)
+                                done_ids.add(task_id)
+                                dispatched_this_cycle = True
                                 continue
                             ok = _dispatch("EXECUTE", task, build_crew)
                             if ok:

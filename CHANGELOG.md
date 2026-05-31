@@ -104,7 +104,31 @@ for existing consumers.
 - `aimeat_instance_*` tools are not exposed on the v2 surfaces (auto-created
   session metadata, not an agent capability). They remain on `/v1/mcp`.
 
-## aimeat-crewai 0.3.6 - 2026-05-31
+## aimeat-crewai 0.3.7 - 2026-05-31
+
+Cooperative subtask cancellation for the daemon (benefits every crew using
+`run_crew_daemon`, no per-crew code). Before each blocking EXECUTE
+`crew.kickoff()`, the daemon re-checks whether the subtask is still wanted and
+**skips + fails** it if not — stopping abandoned/speculative subtasks from ever
+starting (circuit breaker for the "coordinator over-delegated to one crew, then
+gave up at the collect timeout" case).
+
+### Added
+
+- **Cancel marker convention.** A subtask is treated as cancelled if its id is
+  listed in any memory entry with key prefix `agents.cancel.` (value = array of
+  task ids, `visibility: owner`), read across the owner namespace
+  (`owner_scope=true`). A coordinator agent can write `agents.cancel.run.<run>`
+  for a batch; the owner UI writes `agents.cancel.task.<id>`. This is what lets
+  one agent cancel work it delegated to another (the marker is visible to all
+  the owner's agents).
+- **Pre-kickoff guard** in the EXECUTE loop: `_is_cancelled()` checks (1) the
+  task status is still `active`/`stalled` (catches an owner-side pause/delete)
+  and (2) the cancel markers; on a hit it `POST .../fail`s the task and skips.
+  Running kickoffs are not interrupted — cancellation is cooperative, applying
+  to not-yet-started subtasks.
+
+
 
 Fix inbox message dispatch — message-triggered crews never ran. A daemon started
 with `listen_for=(..., "messages")` polled fine and logged listening, but inbox

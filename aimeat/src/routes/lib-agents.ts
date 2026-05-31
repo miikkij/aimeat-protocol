@@ -10,6 +10,10 @@
  * @version-history
  *   v1.0.0 -- 2026-05-31 -- Initial: list/get, createTask/run, getTask/tasks/events,
  *     watch (SSE + poll fallback), deliverable, memory, pendingPrompts/answerPrompt.
+ *   v1.1.0 -- 2026-05-31 -- Cooperative cancellation: cancelTask/cancelRun write
+ *     `agents.cancel.*` memory markers (owner_scope-visible) that worker daemons
+ *     honour before kickoff; cancelTask also natively pauses/deletes for
+ *     immediate effect. cancelledTaskIds() reads the union.
  */
 import type { AimeatConfig } from '../config.js';
 
@@ -61,6 +65,8 @@ function unwrap(r, action) {
 
 // 30s cache for list() so apps can call it on every render cheaply.
 var _agentsCache = null;
+// 10s cache for the cancelled-task-id set.
+var _cancelSetCache = null;
 
 var agents = {
   /** List the owner's agents. opts.activeOnly filters to ones seen recently.
@@ -231,8 +237,65 @@ var agents = {
     });
   },
 
+  /** Cooperative-cancel a task. Writes a cancel marker the worker daemon
+   *  honours before its next kickoff (so abandoned/speculative subtasks never
+   *  start), AND, for immediate effect, natively pauses an active task or
+   *  deletes a queued one (owner-only ops; best-effort). Returns
+   *  { marked:true, native:'paused'|'deleted'|null }. */
+  async cancelTask(name, taskId, opts) {
+    await authFetch('/v1/memory', { method: 'POST', body: JSON.stringify({
+      key: 'agents.cancel.task.' + taskId,
+      value: [taskId],
+      visibility: 'owner',
+    }) });
+    var native = null;
+    try {
+      var t = await agents.getTask(name, taskId);
+      var st = t && t.status;
+      if (st === 'active') {
+        var r = await authFetch('/v1/agents/' + enc(name) + '/tasks/' + enc(taskId) + '/pause', { method: 'POST' });
+        if (r && r.ok) native = 'paused';
+      } else if (st === 'queued' || st === 'draft') {
+        var r2 = await authFetch('/v1/agents/' + enc(name) + '/tasks/' + enc(taskId), { method: 'DELETE' });
+        if (r2 && r2.ok) native = 'deleted';
+      }
+    } catch (e) { /* native stop is best-effort; the marker still applies */ }
+    if (opts && opts.invalidate !== false) _cancelSetCache = null;
+    return { marked: true, native: native };
+  },
+
+  /** Cancel a whole run/batch: write one marker listing many task ids
+   *  (key agents.cancel.run.<run>). Workers union all agents.cancel.* markers. */
+  async cancelRun(run, taskIds) {
+    if (!run || !Array.isArray(taskIds)) throw new Error('cancelRun requires (run, taskIds[])');
+    await authFetch('/v1/memory', { method: 'POST', body: JSON.stringify({
+      key: 'agents.cancel.run.' + run,
+      value: taskIds.map(String),
+      visibility: 'owner',
+    }) });
+    _cancelSetCache = null;
+    return { marked: true, count: taskIds.length };
+  },
+
+  /** The set (array) of task ids cancelled via any agents.cancel.* marker
+   *  visible to the owner. 10s cache. */
+  async cancelledTaskIds(opts) {
+    var now = Date.now();
+    if (!(opts && opts.fresh) && _cancelSetCache && (now - _cancelSetCache.t) < 10000) return _cancelSetCache.v;
+    var data = unwrap(await authFetch('/v1/memory?owner_scope=true&prefix=' + enc('agents.cancel.') + '&per_page=100'), 'read cancel markers');
+    var set = {};
+    (data.items || []).forEach(function (it) {
+      var v = it.value;
+      if (Array.isArray(v)) v.forEach(function (x) { set[String(x)] = true; });
+      else if (v && typeof v === 'object') Object.keys(v).forEach(function (k) { set[k] = true; });
+    });
+    var v = Object.keys(set);
+    _cancelSetCache = { v: v, t: now };
+    return v;
+  },
+
   /** Clear the cached agent list (call after creating/deleting an agent). */
-  invalidateCache() { _agentsCache = null; },
+  invalidateCache() { _agentsCache = null; _cancelSetCache = null; },
 };
 
 if (!global.AIMEAT) global.AIMEAT = {};

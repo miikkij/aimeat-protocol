@@ -17,6 +17,9 @@
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  *   v3.3.0 -- 2026-05-29 -- Add delete confirmation, "Request changes" modal for the revise-proposed-todos flow, outdated-todo history rendering, and revision_requested status.
  *   v3.3.1 -- 2026-05-30 -- Re-fetch the event log on every live-update tick while a task card is expanded. Without this, the parent refreshed the task object (todos + status) but the events list under it stayed frozen until the user closed and re-opened the card.
+ *   v4.2.0 -- 2026-05-31 -- Add owner "Cancel" on active/stalled tasks: writes an
+ *     agents.cancel.task.<id> marker (worker daemons self-skip before kickoff) +
+ *     natively pauses the active task for immediate effect.
  *   v4.1.0 -- 2026-05-31 -- Show a completed task's deliverable: link to the
  *     agent-memory key it was published to (task.deliverableKey), fetch + preview
  *     the value on demand, and show "no longer exists" if the entry is gone.
@@ -34,7 +37,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
-import { apiGet } from '/js/api.js';
+import { apiGet, apiPost } from '/js/api.js';
 import { listTasks, deleteTask, startTask, listEvents, requestChanges, createTask } from '/js/services/agent-tasks.js';
 import { useConfirm, Modal } from '/components/Modal.js';
 
@@ -265,6 +268,32 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
     );
   }
 
+  // Cooperative cancel for a running/queued subtask: write an
+  // `agents.cancel.task.<id>` marker (owner_scope-visible, so the worker daemon
+  // self-skips before its next kickoff) AND, for immediate effect, natively
+  // pause an active task. Covers the "coordinator over-delegated; stop the work
+  // nobody is waiting for" case.
+  function handleCancel(e) {
+    e.stopPropagation();
+    confirm(
+      t('profile.agents.tasks.cancelConfirm') + ': ' + (task.title || task.id) + '?',
+      async () => {
+        try {
+          await apiPost('/v1/memory', { key: 'agents.cancel.task.' + task.id, value: [task.id], visibility: 'owner' });
+          // Immediate native stop (owner-only): pause active tasks.
+          if (task.status === 'active') {
+            try { await apiPost(`/v1/agents/${encodeURIComponent(agentName)}/tasks/${encodeURIComponent(task.id)}/pause`, {}); } catch { /* marker still applies */ }
+          }
+          showToast(t('profile.agents.tasks.cancelled'));
+          onRefresh();
+        } catch (err) {
+          showToast(err.message || t('profile.agents.tasks.cancelError'), true);
+        }
+      },
+      { danger: true },
+    );
+  }
+
   function handleOpenRevision(e) {
     e.stopPropagation();
     setShowRevisionModal(true);
@@ -453,6 +482,9 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
               <button class="btn-outline btn-sm" onClick=${handleOpenRevision}>
                 ${t('profile.agents.tasks.requestChanges')}
               </button>
+            `}
+            ${(isActive || task.status === 'stalled') && html`
+              <button class="btn-danger btn-sm" onClick=${handleCancel}>${t('profile.agents.tasks.cancel')}</button>
             `}
             ${(isQueued || task.status === 'draft' || isRevisionRequested) && html`
               <button class="btn-danger btn-sm" onClick=${handleDelete}>${t('profile.agents.tasks.delete')}</button>
