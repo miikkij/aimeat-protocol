@@ -50,8 +50,19 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
     app.set('trust proxy', 'loopback');
   }
 
-  // Compress all responses (gzip/deflate based on Accept-Encoding)
-  app.use(compression());
+  // Compress all responses (gzip/deflate based on Accept-Encoding).
+  // EXCEPTION: never compress Server-Sent Event streams. The compression
+  // middleware buffers the response body, so the per-event `data:` chunks the
+  // SSE route writes would be held in the buffer and never flushed to the
+  // client — the connection opens but no events ever arrive, silently killing
+  // all live updates (memory tab, agent task event logs, etc.). Skipping
+  // text/event-stream lets those writes pass straight through.
+  app.use(compression({
+    filter: (req, res) => {
+      if (res.getHeader('Content-Type') === 'text/event-stream') return false;
+      return compression.filter(req, res);
+    },
+  }));
 
   // Global body parsing middleware (skip for presigned upload — it reads raw body)
   app.use((req, res, next) => {

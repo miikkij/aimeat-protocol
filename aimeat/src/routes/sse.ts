@@ -1,3 +1,16 @@
+/**
+ * @file sse.ts
+ * @description Server-Sent Events transport for live UI updates. Exposes
+ *   POST /v1/events/ticket (exchange JWT for a single-use connection ticket)
+ *   and GET /v1/events?ticket=... (the event stream). Forwards every
+ *   event-bus change to connected clients as an unnamed `data:` SSE message.
+ * @structure sseRouter(config, storage) -> Router
+ * @usage app.use(sseRouter(config, storage)); client: EventSource('/v1/events?ticket=...')
+ * @version-history
+ *   v1.1.0 -- 2026-05-31 -- Flush after each write; SSE is now excluded from the
+ *     global compression middleware (which buffered the stream and silently
+ *     dropped all live updates).
+ */
 import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
@@ -62,14 +75,22 @@ export function sseRouter(config: AimeatConfig, _storage: Storage): Router {
     });
     res.flushHeaders();
 
+    // res.flush() is added by the compression middleware; SSE is excluded from
+    // compression (see server.ts), but we still flush defensively so no proxy
+    // or residual buffer can hold an event back. Optional-chained for the case
+    // where flush is not present.
+    const flush = () => { (res as unknown as { flush?: () => void }).flush?.(); };
+
     // Keepalive comment every 30s
     const keepalive = setInterval(() => {
       res.write(':keepalive\n\n');
+      flush();
     }, 30_000);
 
     // Forward change events to this client
     const handler = (evt: ChangeEvent) => {
       res.write(`data: ${JSON.stringify(evt)}\n\n`);
+      flush();
     };
     onChangeEvent(handler);
 
