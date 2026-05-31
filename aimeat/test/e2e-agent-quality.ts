@@ -267,6 +267,26 @@ await test('10. Statistics written to public cache key (agents.<name>.statistics
     assert(value && typeof value === 'object', 'cache value present');
 });
 
+await test('11. Custom metric under agents.<name>.statistics.custom.* surfaces in /statistics', async () => {
+    // Agent-authored metric lives in the AGENT's GAII namespace. Write it as the
+    // owner via the `agent` param (same path the Data Access tab uses).
+    const key = `agents.${agentName}.statistics.custom.internal_score`;
+    const w = await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key, value: { rounds: 7, avg: 0.82 }, visibility: 'public', agent: agentGaii }),
+    });
+    assert(w.status === 200 || w.status === 201, `write status ${w.status}: ${JSON.stringify(w.body)}`);
+
+    const { status, body } = await json(`/v1/agents/${agentName}/statistics`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const custom = body.data.custom || [];
+    const entry = custom.find((c: any) => c.key === 'internal_score');
+    assert(entry, `custom entry present: ${JSON.stringify(custom)}`);
+    assert(entry.value?.rounds === 7, `custom value round-trip: ${JSON.stringify(entry.value)}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 

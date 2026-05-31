@@ -9,6 +9,7 @@
  *   - GET /v1/agents/:name/activity      -- stats + history + scheduled jobs
  *   - GET /v1/agents/:name/statistics    -- Quality tab: recomputed performance + per-context review rollups
  * @version-history
+ *   v1.1.1 -- 2026-05-31 -- /statistics: read custom metrics from the agent's GAII namespace (agent-authored) instead of the owner GHII
  *   v1.1.0 -- 2026-05-31 -- Add GET /statistics (Quality tab): recompute performance + per-context review rollups from tasks; writes public cache keys
  *   v1.0.0 -- 2026-05-20 -- Initial creation for Agent Dashboard Phase 2
  */
@@ -205,12 +206,14 @@ export function agentActivityRouter(config: AimeatConfig, storage: Storage): Rou
 
     const stats = await recomputeAndCacheStatistics(storage, agentGaii, config.nodeId);
 
-    // Surface any custom metrics the agent published under its statistics.custom.* prefix.
-    const ownerGhii = `${agent.owner}@${config.nodeId}`;
+    // Surface any custom metrics the agent published under its statistics.custom.*
+    // prefix. These are agent-authored, so they live in the AGENT's GAII
+    // namespace (an agent's own memory writes land under its GAII), not the
+    // owner's GHII — read from agentGaii.
     const customPrefix = `agents.${agent.name}.statistics.custom.`;
     let custom: Array<{ key: string; value: unknown; updated_at: string }> = [];
     try {
-      const records = await storage.listMemory(ownerGhii, { prefix: customPrefix });
+      const records = await storage.listMemory(agentGaii, { prefix: customPrefix });
       custom = records.map(r => ({ key: r.key.slice(customPrefix.length), value: r.value, updated_at: r.updatedAt }));
     } catch { /* custom metrics are optional */ }
 
