@@ -252,6 +252,42 @@ await test('6. Update agent directives', async () => {
     assert(agentRules[0].id === 'agent-rule-3', `agent rule id: ${agentRules[0].id}`);
 });
 
+await test('6b. Partial update MERGES -- omitted fields are preserved', async () => {
+    // After test 6: purpose='Updated research assistant', rules=[agent-rule-3], memory_areas=[].
+    // Send ONLY memory_areas (as the Data Access tab does). purpose + rules must survive.
+    const { status } = await json(`/v1/agents/${agentName}/directives`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            memory_areas: [{ key_prefix: 'merged.', description: 'partial update area' }],
+        }),
+    });
+    assert(status === 200, `status ${status}`);
+
+    const { body } = await json(`/v1/agents/${agentName}/directives`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    // Agent-level fields set earlier must NOT have been wiped by the partial PUT.
+    assert(body.data.purpose === 'Updated research assistant', `purpose clobbered: ${body.data.purpose}`);
+    const agentRules = body.data.rules.filter((r: any) => r.source === 'agent');
+    assert(agentRules.length === 1 && agentRules[0].id === 'agent-rule-3', `agent rule clobbered: ${JSON.stringify(agentRules)}`);
+    // And the memory area we sent is now present.
+    assert(body.data.memory_areas.some((m: any) => m.key_prefix === 'merged.'), `memory area not saved: ${JSON.stringify(body.data.memory_areas)}`);
+
+    // Now send ONLY rules (as the Directives tab does); the memory area must survive.
+    await json(`/v1/agents/${agentName}/directives`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ rules: [{ id: 'behavioral', description: '## Rules\n1. Be careful' }] }),
+    });
+    const { body: after } = await json(`/v1/agents/${agentName}/directives`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(after.data.memory_areas.some((m: any) => m.key_prefix === 'merged.'), `memory area wiped by rules update: ${JSON.stringify(after.data.memory_areas)}`);
+    const aRules = after.data.rules.filter((r: any) => r.source === 'agent');
+    assert(aRules.length === 1 && aRules[0].id === 'behavioral', `behavioral rule not saved: ${JSON.stringify(aRules)}`);
+});
+
 // ─── Phase 3: Delete ───
 console.log('\nPhase 3 -- Delete');
 

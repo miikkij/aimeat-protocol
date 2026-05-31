@@ -373,7 +373,9 @@ function effectiveOrderedNames(agents, order) {
 // focuses the existing window instead of spawning duplicates.
 function popOutAgent(agent) {
   const url = '/v1/profile?solo=' + encodeURIComponent(agent.name);
-  window.open(url, 'aimeat-agent-' + agent.name, 'width=560,height=920');
+  // ~900px so the agent card gets the same usable width as in the list view
+  // (≈762px) and the full tab bar fits without horizontal scrolling.
+  window.open(url, 'aimeat-agent-' + agent.name, 'width=900,height=950');
 }
 
 export default function AgentsTab({ session, showToast, onStats }) {
@@ -872,7 +874,7 @@ function renderAgentGroups({ agents, tagFilter, groupBy, onboardings, taskStatsM
            onDragOver=${dnd.onDragOver}
            onDrop=${(e) => { e.preventDefault(); dnd.onDrop(a.name); }}
            onDragEnd=${dnd.onDragEnd}>
-        <span class="pf-agd-dnd-grip" title=${t('profile.agents.reorderHint')}>⠿</span>
+        ${expandedAgent !== a.name ? html`<span class="pf-agd-dnd-grip" title=${t('profile.agents.reorderHint')}>⠿</span>` : ''}
         ${card(a)}
       </div>
     `);

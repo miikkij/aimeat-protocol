@@ -21,6 +21,9 @@
  *   v2.6.0 -- 2026-05-31 -- Add stored-key create form layout (pf-agd-keyadd-form, vertical stack)
  *   v2.7.0 -- 2026-05-31 -- Add stored-key sort controls (pf-agd-keys-controls/sort-*) and per-key created/updated meta (pf-agd-key-meta)
  *   v2.8.0 -- 2026-05-31 -- Add pop-out button (pf-agd-popout-btn), drag-to-reorder rows (pf-agd-dnd-*), and solo pop-out window layout (pf-agd-solo*)
+ *   v2.9.0 -- 2026-05-31 -- Collapsed bar two-row layout (pf-agd-collapsed-main + pf-agd-collapsed-meta divider) to stop status overflow; move drag grip into the left margin so the card border stays flush
+ *   v2.10.0 -- 2026-05-31 -- Extend the drag-row drop target left over the grip gutter (padding-left + negative margin-left) so dropping on/near the handle registers; card border stays aligned
+ *   v2.11.0 -- 2026-05-31 -- Widen the solo pop-out window (and pf-agd-solo max-width) so the agent card matches the list-view width and the full tab bar fits
  */
 
 /* Header row: title left, connect button right */
@@ -1264,8 +1267,9 @@
 }
 .pf .pf-agd-collapsed {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
   padding: 0.625rem 0.875rem;
   background: var(--card-bg, #FFFFFF);
   border: 1px solid var(--border, #E5E7EB);
@@ -1278,6 +1282,21 @@
 }
 .pf .pf-agd-collapsed--problem {
   border-color: var(--danger, #ef4444);
+}
+/* Top row: expand arrow + icon + name + badges + pop-out */
+.pf .pf-agd-collapsed-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+/* Second row: delivery + status + last seen, smaller, faint divider above */
+.pf .pf-agd-collapsed-meta {
+  margin-top: 0.4rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--border-subtle, #F3F4F6);
+  font-size: 0.7rem;
+  color: var(--text-muted, #9CA3AF);
+  line-height: 1.4;
 }
 .pf .pf-agd-expand-icon {
   font-size: 0.7rem;
@@ -1327,21 +1346,28 @@
   border-radius: 4px;
   flex-shrink: 0;
 }
-.pf .pf-agd-collapsed .pf-agd-popout-btn { margin-left: 0.4rem; }
+.pf .pf-agd-collapsed-main .pf-agd-popout-btn { margin-left: auto; }
 .pf .pf-agd-popout-btn:hover {
   color: var(--accent, #E8564A);
   background: var(--bg-dim, #F9FAFB);
 }
 
 /* ── Drag-to-reorder rows (ungrouped, unfiltered agent list) ── */
+/* The row's box (= the drop target) is extended LEFT to cover the grip handle
+   via padding-left, while a matching negative margin-left pulls the box back so
+   the card border stays flush with the rest of the list. Net effect: the card
+   stays aligned with the dividers above, the grip sits in the left gutter, and
+   dropping anywhere over that gutter still drops onto the row (people grab the
+   handle and drop near it). */
 .pf .pf-agd-dnd-row {
   position: relative;
-  padding-left: 1.1rem; /* gutter for the grip handle */
+  padding-left: 1.5rem;
+  margin-left: -1.5rem;
 }
 .pf .pf-agd-dnd-grip {
   position: absolute;
-  left: 0.1rem;
-  top: 0.8rem;
+  left: 0.2rem;
+  top: 1.1rem;
   z-index: 2;
   cursor: grab;
   color: var(--text-muted, #9CA3AF);
@@ -1357,8 +1383,8 @@
 
 /* ── Solo (pop-out) window layout ── */
 .pf-agd-solo {
-  padding: 0.5rem;
-  max-width: 640px;
+  padding: 0.5rem 1rem;
+  max-width: 860px; /* card gets ≈828px — same usable width as the list view */
   margin: 0 auto;
 }
 .pf .pf-agd-solo-toast {

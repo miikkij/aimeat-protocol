@@ -15,6 +15,9 @@
  *     bar + expanded footer that opens the agent in its own window) and
  *     `soloMode` prop (used by the standalone /v1/profile?solo= view: forces
  *     expanded, disables collapse, hides the pop-out button).
+ *   v1.7.0 -- 2026-05-31 -- Collapsed bar split into two rows (identity+badges on
+ *     top, delivery/status/last-seen on a faint-divider-separated second line)
+ *     so the status text stops overflowing the card.
  */
 
 import { h } from 'preact';
@@ -115,20 +118,24 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
       <div class="pf-agd-card">
         <div class="pf-agd-collapsed ${state === 'problem' ? 'pf-agd-collapsed--problem' : ''}"
              onClick=${() => onToggle(agent.name)}>
-          <span class="pf-agd-expand-icon">▶</span>
-          <span class="pf-agd-collapsed-icon">🤖</span>
-          <span class="pf-agd-collapsed-name">${agent.display_name || agent.name}</span>
-          <div class="pf-agd-collapsed-badges">
-            ${renderModeBadge(agent)}
-            ${renderPlatformBadge(onboarding)}
-            ${renderReadinessBadge(state, onboarding)}
-            ${agent.federate && html`<span class="pf-agd-badge pf-agd-badge--federation">${t('profile.federated')}</span>`}
+          <div class="pf-agd-collapsed-main">
+            <span class="pf-agd-expand-icon">▶</span>
+            <span class="pf-agd-collapsed-icon">🤖</span>
+            <span class="pf-agd-collapsed-name">${agent.display_name || agent.name}</span>
+            <div class="pf-agd-collapsed-badges">
+              ${renderModeBadge(agent)}
+              ${renderPlatformBadge(onboarding)}
+              ${renderReadinessBadge(state, onboarding)}
+              ${agent.federate && html`<span class="pf-agd-badge pf-agd-badge--federation">${t('profile.federated')}</span>`}
+            </div>
+            ${renderPopOut(onPopOut, agent)}
           </div>
-          <span class="pf-agd-collapsed-stats">
+          <!-- Second line: faint-divider-separated meta (delivery + status + last seen)
+               so the long status text gets its own row instead of overflowing. -->
+          <div class="pf-agd-collapsed-meta">
             ${renderDeliveryIndicator(agent)}
             ${renderCollapsedStats(state, agent, onboarding)}
-          </span>
-          ${renderPopOut(onPopOut, agent)}
+          </div>
         </div>
       </div>
     `;

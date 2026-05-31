@@ -5,6 +5,10 @@
  *   Memory areas, knowledge packages, and config files live in their own tabs.
  * @version-history
  *   v2.0.0 -- 2026-05-24 -- C5: rewrite as full structured text editor; M6: no SSE listener (owner-initiated only)
+ *   v2.1.0 -- 2026-05-31 -- Fix: behavioral directives were sent as `content` (a
+ *     field the API/storage doesn't have) so they silently vanished on save.
+ *     Now stored as the agent-level `rules` and reconstructed from agent-source
+ *     rules on load; relies on the PUT merge so memory_areas/resources survive.
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  */
 
@@ -17,14 +21,19 @@ import { getDirectives, upsertDirectives } from '/js/services/agent-directives.j
 const html = htm.bind(h);
 
 /**
- * Convert legacy rules array to plain text for display/editing.
+ * Extract the AGENT-level behavioral directives text from the merged rules
+ * array returned by GET. The merged list also contains system/owner rules
+ * (each tagged with `source`); the editor only owns the `agent` ones, which we
+ * store as a single freeform blob. Falls back to any untagged rule so older
+ * records still render.
  */
-function rulesToText(rules) {
-  if (!rules || rules.length === 0) return '';
-  return rules.map(r => {
-    if (typeof r === 'string') return r;
-    return r.text || r.rule || '';
-  }).filter(Boolean).join('\n');
+function agentDirectivesToText(rules) {
+  if (!Array.isArray(rules) || rules.length === 0) return '';
+  return rules
+    .filter(r => r && (r.source === 'agent' || r.source === undefined))
+    .map(r => (typeof r === 'string' ? r : (r.description || r.text || r.rule || '')))
+    .filter(Boolean)
+    .join('\n');
 }
 
 export default function TabDirectives({ agentName, session, showToast }) {
@@ -43,12 +52,9 @@ export default function TabDirectives({ agentName, session, showToast }) {
       const resp = await getDirectives(agentName);
       const data = resp?.data || {};
       setPurpose(data.purpose || data.agent_purpose || '');
-      // Support both new content format and legacy rules array
-      if (data.content) {
-        setContent(data.content);
-      } else {
-        setContent(rulesToText(data.rules));
-      }
+      // Behavioral directives are stored as the agent-level rules; reconstruct
+      // the freeform text from them (data.content kept as a defensive fallback).
+      setContent(data.content || agentDirectivesToText(data.rules));
       setError(null);
     } catch (err) {
       if (err.status === 404) {
@@ -79,9 +85,13 @@ export default function TabDirectives({ agentName, session, showToast }) {
   async function handleSave() {
     setSaving(true);
     try {
+      // Store the freeform behavioral directives as the agent-level rules (the
+      // server merges, so this does NOT touch memory_areas/resources set in
+      // other tabs). The agent receives `rules` as its behavioral constraints.
+      const trimmed = editContent.trim();
       const payload = {
-        content: editContent.trim() || undefined,
-        purpose: editPurpose.trim() || undefined,
+        purpose: editPurpose.trim(),
+        rules: trimmed ? [{ id: 'behavioral', description: trimmed }] : [],
       };
       await upsertDirectives(agentName, payload);
       showToast(t('profile.agents.directives.saved'));

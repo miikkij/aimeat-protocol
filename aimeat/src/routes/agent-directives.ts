@@ -10,6 +10,11 @@
  * @version-history
  *   v1.1.0 -- 2026-05-23 -- Add webhook dispatch for directive.updated events
  *   v1.2.0 -- 2026-05-28 -- Include owner-managed shared memory tags in directive reads
+ *   v1.3.0 -- 2026-05-31 -- PUT now MERGES instead of full-replace: fields omitted
+ *     from the request body are preserved from the existing record (detected via
+ *     raw body keys, since the Zod schema defaults would otherwise blank them).
+ *     Fixes tabs clobbering each other's directives sections (e.g. saving
+ *     behavioral rules wiping memory_areas and vice-versa).
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  */
 
@@ -122,27 +127,41 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
     const body = parsed.data;
     const now = new Date().toISOString();
 
+    // PARTIAL UPDATE / MERGE: the directives record is edited from several tabs
+    // (Directives sends purpose+rules, Data Access sends memory_areas, etc.).
+    // The Zod schema fills omitted fields with defaults ([]/''), so a naive
+    // full replace would wipe whatever the other tab set. Detect which fields
+    // the caller actually sent via the RAW body keys and preserve the rest.
+    const raw = (req.body ?? {}) as Record<string, unknown>;
+    const existing = await storage.getAgentDirectives(agentGaii);
+
     // Convert snake_case to camelCase for storage
     const directivesData: Parameters<typeof storage.upsertAgentDirectives>[0] = {
       agentGaii,
-      purpose: body.purpose,
-      rules: body.rules,
-      memoryAreas: body.memory_areas.map(ma => ({
-        keyPrefix: ma.key_prefix,
-        description: ma.description,
-        schema: ma.schema,
-        csmId: ma.csm_id,
-      })),
-      resources: body.resources,
+      purpose: ('purpose' in raw) ? body.purpose : (existing?.purpose ?? ''),
+      rules: ('rules' in raw) ? body.rules : (existing?.rules ?? []),
+      memoryAreas: ('memory_areas' in raw)
+        ? body.memory_areas.map(ma => ({
+            keyPrefix: ma.key_prefix,
+            description: ma.description,
+            schema: ma.schema,
+            csmId: ma.csm_id,
+          }))
+        : (existing?.memoryAreas ?? []),
+      resources: ('resources' in raw) ? body.resources : (existing?.resources ?? []),
       updatedAt: now,
     };
-    if (body.budget_limits) {
-      directivesData.budgetLimits = {
-        maxTokensPerTask: body.budget_limits.max_tokens_per_task,
-        maxTokensPerDay: body.budget_limits.max_tokens_per_day,
-        maxTasksPerDay: body.budget_limits.max_tasks_per_day,
-        alertThreshold: body.budget_limits.alert_threshold,
-      };
+    if ('budget_limits' in raw) {
+      if (body.budget_limits) {
+        directivesData.budgetLimits = {
+          maxTokensPerTask: body.budget_limits.max_tokens_per_task,
+          maxTokensPerDay: body.budget_limits.max_tokens_per_day,
+          maxTasksPerDay: body.budget_limits.max_tasks_per_day,
+          alertThreshold: body.budget_limits.alert_threshold,
+        };
+      }
+    } else if (existing?.budgetLimits) {
+      directivesData.budgetLimits = existing.budgetLimits;
     }
     const record = await storage.upsertAgentDirectives(directivesData);
 
