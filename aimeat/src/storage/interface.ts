@@ -1473,6 +1473,10 @@ export interface AgentTaskRating {
   sourceGrounded: boolean;  // was the rating checked against inputs/sources?
   unsupported?: number;     // optional: # unsupported claims (from factcheck)
   evaluatedModel?: string;  // model that PRODUCED the deliverable (baseline stamp)
+  // Optional free-form evaluation context for later slicing (e.g. temperature,
+  // top_p, max_tokens, tokensIn/Out, cost). Stored as-is, not aggregated yet —
+  // the schema stays fixed while this side-channel grows. Capped on write.
+  metadata?: Record<string, unknown>;
   ratedAt: string;
 }
 

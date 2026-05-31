@@ -17,6 +17,7 @@
  *   - PATCH  /v1/agents/:name/tasks/:id/todos/:todoId -- Update individual todo status
  *   - GET    /v1/agents/:name/tasks/:id/events -- List events
  * @version-history
+ *   v1.4.1 -- 2026-05-31 -- /rate: add optional free-form `metadata` (temperature/tokens/cost) stored on the rating for later slicing (size-capped)
  *   v1.4.0 -- 2026-05-31 -- Add POST /tasks/:id/rate (Quality tab): per-context star rating with source-grounding hard gate; refreshes the public statistics cache
  *   v1.3.0 -- 2026-05-23 -- Add webhook dispatch for task.queued, task.approved, task.updated events
  *   v1.2.0 -- 2026-05-22 -- Add individual todo update endpoint (PATCH /todos/:todoId)
@@ -1003,7 +1004,13 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
         parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')));
       return;
     }
-    const { stars, context, comment, source_grounded, unsupported, evaluated_model } = parsed.data;
+    const { stars, context, comment, source_grounded, unsupported, evaluated_model, metadata } = parsed.data;
+
+    // Cap the free-form metadata so it can't be used to bloat the rating blob.
+    if (metadata && JSON.stringify(metadata).length > 4096) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'metadata too large (max 4096 bytes serialized)'));
+      return;
+    }
 
     // Source-grounding hard gate (factual family + agent rater must be grounded).
     if (RATING_CONTEXTS_REQUIRING_GROUNDING.has(context) && !isOwnerSession && !source_grounded) {
@@ -1027,6 +1034,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
       sourceGrounded: source_grounded,
       ...(typeof unsupported === 'number' ? { unsupported } : {}),
       ...(evaluated_model ? { evaluatedModel: evaluated_model } : {}),
+      ...(metadata ? { metadata } : {}),
       ratedAt: now,
     };
 

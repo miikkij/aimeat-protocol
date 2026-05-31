@@ -2450,6 +2450,10 @@ components:
         evaluatedModel:
           type: string
           description: Model that produced the deliverable (baseline stamp).
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Free-form evaluation context (temperature, tokens, cost, ...) stored for later slicing.
         ratedAt:
           type: string
           format: date-time
@@ -16832,6 +16836,13 @@ paths:
                   type: string
                   maxLength: 128
                   description: Model that produced the deliverable (baseline stamp; ratings are not compared blindly across model changes).
+                metadata:
+                  type: object
+                  additionalProperties: true
+                  description: >
+                    Free-form evaluation context (e.g. temperature, top_p,
+                    max_tokens, tokens_in/out, cost) stored on the rating for
+                    later slicing. Max 4096 bytes serialized.
       responses:
         '200':
           description: Task rated

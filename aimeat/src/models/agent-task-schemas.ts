@@ -104,6 +104,9 @@ export const AgentTaskRateSchema = z.object({
   source_grounded: z.boolean().optional().default(false),
   unsupported: z.number().int().min(0).optional(),
   evaluated_model: z.string().max(128).optional(),
+  // Free-form eval context (temperature, top_p, max_tokens, tokens, cost, ...).
+  // Stored on the rating for later slicing; size-capped in the route handler.
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const AgentTaskTodoUpdateSchema = z.object({

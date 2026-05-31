@@ -178,12 +178,23 @@ await test('3. Same-owner agent rates factual WITHOUT source_grounded -> 422 GRO
 await test('4. Same-owner agent rates factual WITH source_grounded -> 200, raterType source-grounded-agent', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/tasks/${secondDoneTaskId}/rate`, {
         method: 'POST', headers: { Authorization: `Bearer ${parentToken}` },
-        body: JSON.stringify({ stars: 1, context: 'factual', source_grounded: true, unsupported: 15, evaluated_model: 'claude-opus-4-8' }),
+        body: JSON.stringify({ stars: 1, context: 'factual', source_grounded: true, unsupported: 15, evaluated_model: 'claude-opus-4-8', metadata: { temperature: 0.15, tokens_in: 1200, tokens_out: 800, cost: 0.004 } }),
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.task.rating?.raterType === 'source-grounded-agent', `raterType: ${body.data.task.rating?.raterType}`);
     assert(body.data.task.rating?.unsupported === 15, `unsupported: ${body.data.task.rating?.unsupported}`);
     assert(body.data.task.rating?.evaluatedModel === 'claude-opus-4-8', 'model stamped');
+    assert(body.data.task.rating?.metadata?.temperature === 0.15, `metadata.temperature: ${body.data.task.rating?.metadata?.temperature}`);
+    assert(body.data.task.rating?.metadata?.tokens_in === 1200, 'metadata tokens round-trip');
+});
+
+await test('4b. Oversized metadata is rejected -> 400', async () => {
+    const big = { blob: 'x'.repeat(5000) };
+    const { status } = await json(`/v1/agents/${agentName}/tasks/${secondDoneTaskId}/rate`, {
+        method: 'POST', headers: { Authorization: `Bearer ${parentToken}` },
+        body: JSON.stringify({ stars: 3, context: 'factual', source_grounded: true, metadata: big }),
+    });
+    assert(status === 400, `expected 400, got ${status}`);
 });
 
 await test('5. Agent rates a creative task output-alone -> 200 (creative is exempt)', async () => {
