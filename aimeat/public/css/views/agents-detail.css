@@ -25,6 +25,7 @@
  *   v2.10.0 -- 2026-05-31 -- Extend the drag-row drop target left over the grip gutter (padding-left + negative margin-left) so dropping on/near the handle registers; card border stays aligned
  *   v2.11.0 -- 2026-05-31 -- Add Quality tab styles (per-context review rows, duration chips, custom-metric rows)
  *   v2.12.0 -- 2026-05-31 -- Add deliverable rating control styles (star picker, current-rating row, rate modal fields)
+ *   v2.13.0 -- 2026-05-31 -- Add Quality-tab "Rate deliverables" pending-list row styles
  *   v2.11.0 -- 2026-05-31 -- Widen the solo pop-out window (and pf-agd-solo max-width) so the agent card matches the list-view width and the full tab bar fits
  *   v2.12.0 -- 2026-05-31 -- Add completed-task deliverable styles (pf-agd-deliverable*) linking a task to its agent-memory output key
  *   v2.13.0 -- 2026-05-31 -- Add per-task blur-title toggle styles (pf-agd-blur-toggle, pf-agd-task-title--blurred) for hiding sensitive titles in screen recordings
@@ -2865,4 +2866,43 @@
   font-size: 0.85rem;
   color: var(--text, #1A1A2E);
   cursor: pointer;
+}
+
+/* Quality tab "Rate deliverables" pending list */
+.pf .pf-agd-quality-pending {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.pf .pf-agd-quality-pending-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 8px;
+  background: var(--card-bg, #FFFFFF);
+}
+.pf .pf-agd-quality-pending-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  color: var(--text, #1A1A2E);
+}
+.pf .pf-agd-quality-pending-rated {
+  font-size: 0.8rem;
+  color: var(--accent, #E8564A);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+.pf .pf-agd-quality-pending-unrated {
+  font-size: 0.72rem;
+  color: var(--text-muted, #9CA3AF);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 6px;
+  padding: 0.05rem 0.4rem;
+  white-space: nowrap;
 }

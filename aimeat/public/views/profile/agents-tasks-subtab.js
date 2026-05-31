@@ -9,6 +9,8 @@
  *   - TaskItem -- task row with expand/collapse, todo list, start button
  *   - RequestChangesModal -- inline modal for owner to send a free-text change request
  * @version-history
+ *   v4.5.0 -- 2026-05-31 -- Extract RateModal to shared ./agents/rate-modal.js
+ *     so the Quality tab can reuse it; no behaviour change here.
  *   v4.4.0 -- 2026-05-31 -- Add owner "Rate deliverable" control on done tasks
  *     (RateModal: stars + context + source-grounded + comment) wired to
  *     POST /tasks/:id/rate; shows the current rating with a re-rate affordance.
@@ -46,13 +48,9 @@ import { timeAgo } from '/js/utils.js';
 import { apiGet, apiPost } from '/js/api.js';
 import { listTasks, deleteTask, startTask, listEvents, requestChanges, createTask, rateTask } from '/js/services/agent-tasks.js';
 import { useConfirm, Modal } from '/components/Modal.js';
+import RateModal from './agents/rate-modal.js';
 
 const TASK_FILTERS = ['all', 'active', 'queued', 'completed', 'failed'];
-
-// Quality contexts an owner can pick when rating a deliverable. Mirrors the
-// RatingContext enum in src/storage/interface.ts; labels come from the shared
-// profile.agents.detail.quality.contexts.* i18n block.
-const RATE_CONTEXTS = ['factual', 'creative', 'code', 'planning', 'summarization', 'research', 'communication', 'other'];
 
 // Per-browser "blur the title" preference. Used when screen-recording the tab
 // so sensitive task titles can be hidden without affecting other viewers or
@@ -205,67 +203,6 @@ function RequestChangesModal({ open, onClose, onSubmit, submitting }) {
       <button class="btn-ghost" onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}</button>
       <button class="btn-primary" onClick=${handleSend} disabled=${submitting || !message.trim()}>
         ${submitting ? t('profile.agents.tasks.requestChangesSending') : t('profile.agents.tasks.requestChangesSend')}
-      </button>
-    </div>
-  <//>`;
-}
-
-// Modal where the owner rates a completed task's deliverable: 1–5 stars, the
-// quality context, an optional "checked against sources" flag, and a comment.
-// Submits to POST /tasks/:id/rate. Pre-fills from the existing rating so the
-// same modal does re-rate.
-function RateModal({ open, onClose, onSubmit, submitting, existing }) {
-  const [stars, setStars] = useState(existing?.stars || 0);
-  const [context, setContext] = useState(existing?.context || 'creative');
-  const [grounded, setGrounded] = useState(existing?.sourceGrounded || false);
-  const [comment, setComment] = useState(existing?.comment || '');
-  useEffect(() => {
-    if (open) {
-      setStars(existing?.stars || 0);
-      setContext(existing?.context || 'creative');
-      setGrounded(existing?.sourceGrounded || false);
-      setComment(existing?.comment || '');
-    }
-  }, [open]);
-  function handleSend() {
-    if (!stars) return;
-    const body = { stars, context, source_grounded: grounded };
-    const c = comment.trim();
-    if (c) body.comment = c;
-    onSubmit(body);
-  }
-  return html`<${Modal} open=${open} onClose=${onClose} title=${t('profile.agents.tasks.rate.title')}>
-    <p class="pf-agd-modal-help">${t('profile.agents.tasks.rate.help')}</p>
-    <div class="pf-agd-rate-stars" role="radiogroup">
-      ${[1, 2, 3, 4, 5].map(n => html`
-        <button key=${n}
-                class=${`pf-agd-rate-star ${n <= stars ? 'pf-agd-rate-star--on' : ''}`}
-                onClick=${() => setStars(n)}
-                aria-label=${String(n)}
-                aria-pressed=${n <= stars}>★</button>
-      `)}
-    </div>
-    <label class="pf-agd-rate-field">
-      <span>${t('profile.agents.tasks.rate.context')}</span>
-      <select value=${context} onChange=${e => setContext(e.target.value)}>
-        ${RATE_CONTEXTS.map(c => html`<option key=${c} value=${c}>${t(`profile.agents.detail.quality.contexts.${c}`)}</option>`)}
-      </select>
-    </label>
-    <label class="pf-agd-rate-check">
-      <input type="checkbox" checked=${grounded} onChange=${e => setGrounded(e.target.checked)} />
-      <span>${t('profile.agents.tasks.rate.grounded')}</span>
-    </label>
-    <textarea
-      class="pf-agd-revision-textarea"
-      placeholder=${t('profile.agents.tasks.rate.commentPlaceholder')}
-      value=${comment}
-      onInput=${e => setComment(e.target.value)}
-      rows=${3}
-    ></textarea>
-    <div class="modal-footer">
-      <button class="btn-ghost" onClick=${onClose} disabled=${submitting}>${t('common.cancel') || 'Cancel'}</button>
-      <button class="btn-primary" onClick=${handleSend} disabled=${submitting || !stars}>
-        ${submitting ? t('profile.agents.tasks.rate.submitting') : t('profile.agents.tasks.rate.submit')}
       </button>
     </div>
   <//>`;

@@ -10,6 +10,9 @@
  * @structure default export TabQuality({ agentName })
  * @usage rendered by agent-card.js renderTabContent() for the 'quality' tab
  * @version-history
+ *   v1.1.0 -- 2026-05-31 -- Add "Rate deliverables" list: completed tasks the owner
+ *     can rate inline via the shared RateModal (unrated first); refreshes the
+ *     rollups on submit.
  *   v1.0.0 -- 2026-05-31 -- Initial Quality tab (per-context reviews + performance + custom)
  */
 
@@ -17,7 +20,8 @@ import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { getAgentStatistics } from '/js/services/agent-tasks.js';
+import { getAgentStatistics, listTasks, rateTask } from '/js/services/agent-tasks.js';
+import RateModal from './rate-modal.js';
 
 const html = htm.bind(h);
 
@@ -38,17 +42,38 @@ function fmtSeconds(secs) {
   return `${Number(secs || 0).toLocaleString()}${t('profile.agents.detail.quality.seconds')}`;
 }
 
-export default function TabQuality({ agentName }) {
+export default function TabQuality({ agentName, showToast }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [doneTasks, setDoneTasks] = useState([]);
+  const [rateTarget, setRateTarget] = useState(null); // task being rated, or null
+  const [sendingRate, setSendingRate] = useState(false);
 
   async function loadData() {
     setLoading(true);
     try {
-      const resp = await getAgentStatistics(agentName);
-      setData(resp?.data || null);
+      const [statsResp, tasksResp] = await Promise.all([
+        getAgentStatistics(agentName),
+        listTasks(agentName, { status: 'done', per_page: 100 }).catch(() => null),
+      ]);
+      setData(statsResp?.data || null);
+      setDoneTasks(tasksResp?.data?.tasks || []);
     } catch { setData(null); }
     setLoading(false);
+  }
+
+  async function handleSubmitRate(body) {
+    if (!rateTarget) return;
+    setSendingRate(true);
+    try {
+      await rateTask(agentName, rateTarget.id, body);
+      showToast?.(t('profile.agents.tasks.rate.success'));
+      setRateTarget(null);
+      await loadData();
+    } catch (err) {
+      showToast?.(err.message || t('profile.agents.tasks.rate.error'), true);
+    }
+    setSendingRate(false);
   }
 
   useEffect(() => { loadData(); }, [agentName]);
@@ -139,6 +164,27 @@ export default function TabQuality({ agentName }) {
           </div>
         `}
 
+      <!-- Rate deliverables (completed tasks the owner can rate) -->
+      <div class="pf-agd-section-title">${t('profile.agents.detail.quality.pendingTitle')}</div>
+      <div class="pf-agd-quality-desc">${t('profile.agents.detail.quality.pendingDesc')}</div>
+      ${doneTasks.length === 0
+        ? html`<div class="pf-agd-empty">${t('profile.agents.detail.quality.allRated')}</div>`
+        : html`
+          <div class="pf-agd-quality-pending">
+            ${[...doneTasks].sort((a, b) => (a.rating ? 1 : 0) - (b.rating ? 1 : 0)).map(task => html`
+              <div key=${task.id} class="pf-agd-quality-pending-row">
+                <span class="pf-agd-quality-pending-title">${task.title || task.id}</span>
+                ${task.rating
+                  ? html`<span class="pf-agd-quality-pending-rated">${starGlyphs(task.rating.stars)} ${ctxLabel(task.rating.context)}</span>`
+                  : html`<span class="pf-agd-quality-pending-unrated">${t('profile.agents.detail.quality.unrated')}</span>`}
+                <button class="btn-outline btn-sm" onClick=${() => setRateTarget(task)}>
+                  ${task.rating ? t('profile.agents.tasks.rate.rerate') : t('profile.agents.tasks.rate.button')}
+                </button>
+              </div>
+            `)}
+          </div>
+        `}
+
       <!-- Custom metrics -->
       <div class="pf-agd-section-title">${t('profile.agents.detail.quality.customTitle')}</div>
       <div class="pf-agd-quality-desc">${t('profile.agents.detail.quality.customDesc')}</div>
@@ -154,6 +200,14 @@ export default function TabQuality({ agentName }) {
             `)}
           </div>
         `}
+
+      <${RateModal}
+        open=${!!rateTarget}
+        onClose=${() => setRateTarget(null)}
+        onSubmit=${handleSubmitRate}
+        submitting=${sendingRate}
+        existing=${rateTarget?.rating}
+      />
     </div>
   `;
 }
