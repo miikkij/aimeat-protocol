@@ -86,6 +86,26 @@ export const AgentTaskEventSchema = z.object({
   details: z.record(z.string(), z.unknown()).optional(),
 });
 
+// POST /v1/agents/:name/tasks/:id/rate -- peer/owner review of a completed
+// task's deliverable. The `context` enum is the quality "dimension"
+// (factual/creative/...). For the factual family
+// (factual/research/code/summarization) an agent rating must set
+// source_grounded=true; the endpoint hard-gates ungrounded agent ratings there
+// so stars measure faithfulness, not showiness. Human-owner ratings are exempt.
+export const RatingContextSchema = z.enum([
+  'factual', 'creative', 'code', 'planning',
+  'summarization', 'research', 'communication', 'other',
+]);
+
+export const AgentTaskRateSchema = z.object({
+  stars: z.number().int().min(1).max(5),
+  context: RatingContextSchema,
+  comment: z.string().max(2048).optional(),
+  source_grounded: z.boolean().optional().default(false),
+  unsupported: z.number().int().min(0).optional(),
+  evaluated_model: z.string().max(128).optional(),
+});
+
 export const AgentTaskTodoUpdateSchema = z.object({
   status: TodoStatusSchema,
   completed_at: z.string().optional(),

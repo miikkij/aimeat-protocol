@@ -6,6 +6,7 @@
  * @version-history
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  *   v1.1.0 -- 2026-05-29 -- Add requestChanges() for the owner-asks-agent-to-revise-todos flow.
+ *   v1.2.0 -- 2026-05-31 -- Add rateTask() and getAgentStatistics() for the Quality tab.
  */
 import { apiGet, apiPost, apiDelete } from '/js/api.js';
 
@@ -48,4 +49,14 @@ export async function requestChanges(agentName, taskId, message) {
 
 export async function listEvents(agentName, taskId) {
   return apiGet(`/v1/agents/${encodeURIComponent(agentName)}/tasks/${encodeURIComponent(taskId)}/events`);
+}
+
+/** Review a completed task's deliverable. body: { stars, context, comment?, source_grounded?, unsupported?, evaluated_model? } */
+export async function rateTask(agentName, taskId, body) {
+  return apiPost(`/v1/agents/${encodeURIComponent(agentName)}/tasks/${encodeURIComponent(taskId)}/rate`, body);
+}
+
+/** Quality tab: recomputed performance + per-context review rollups + custom metrics. */
+export async function getAgentStatistics(agentName) {
+  return apiGet(`/v1/agents/${encodeURIComponent(agentName)}/statistics`);
 }

@@ -1262,6 +1262,7 @@ model AgentTask {
   updatedAt        DateTime  @updatedAt
   completedAt      DateTime?
   deliverableKey   String?
+  rating           Json?
 
   @@index([agentGaii, status])
   @@index([ownerGaii])

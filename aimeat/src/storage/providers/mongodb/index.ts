@@ -5458,6 +5458,7 @@ export class MongoStorage implements Storage {
             updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
             completedAt: row.completedAt ? (row.completedAt instanceof Date ? row.completedAt.toISOString() : row.completedAt) : undefined,
             deliverableKey: row.deliverableKey ?? undefined,
+            rating: row.rating as AgentTaskRecord['rating'] ?? undefined,
         };
     }
 
@@ -5494,6 +5495,7 @@ export class MongoStorage implements Storage {
                 createdAt: new Date(record.createdAt),
                 completedAt: record.completedAt ? new Date(record.completedAt) : null,
                 deliverableKey: record.deliverableKey ?? null,
+                rating: record.rating as any ?? null,
             },
         });
         return record;
@@ -5576,6 +5578,7 @@ export class MongoStorage implements Storage {
                     lastEventAt: merged.lastEventAt ? new Date(merged.lastEventAt) : null,
                     completedAt: merged.completedAt ? new Date(merged.completedAt) : null,
                     deliverableKey: merged.deliverableKey ?? null,
+                    rating: merged.rating as any ?? null,
                 },
             });
             return this.toTaskRecord(row);

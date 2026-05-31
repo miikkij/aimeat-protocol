@@ -473,6 +473,8 @@
         "requestChangesError": "Failed to send change request",
         "revisionWaiting": "Waiting for the agent to propose a revised plan.",
         "outdatedTodos": "Previously proposed (outdated)",
+        "blurTitle": "Hide title (blur for screen recording)",
+        "unblurTitle": "Show title",
         "builder": {
           "title": "New Task",
           "placeholder": "What should the agent do? Describe in plain language or technical detail.",
@@ -653,7 +655,39 @@
           "directives": "Directives",
           "agent_config": "Agent Config",
           "activity": "Activity",
-          "services": "Services"
+          "services": "Services",
+          "quality": "Quality"
+        },
+        "quality": {
+          "performanceTitle": "Performance",
+          "performanceDesc": "How much this agent has done and how fast — computed from its tasks.",
+          "reviewsTitle": "Reviews by context",
+          "reviewsDesc": "Per-context star ratings of the agent's deliverables. Factual contexts are source-grounded.",
+          "customTitle": "Custom metrics",
+          "customDesc": "Metrics the agent publishes about itself.",
+          "tasksTotal": "Tasks",
+          "tasksCompleted": "Completed",
+          "tasksFailed": "Failed",
+          "successRate": "Success rate",
+          "avgTime": "Avg make-time",
+          "events": "Events",
+          "overall": "Overall",
+          "ratings": "{count} ratings",
+          "lowConfidence": "Low confidence (small sample)",
+          "noReviews": "No reviews yet. Rate a completed task to start building quality stats.",
+          "noCustom": "No custom metrics published.",
+          "grounded": "{count} source-grounded",
+          "seconds": "s",
+          "contexts": {
+            "factual": "Factual",
+            "creative": "Creative",
+            "code": "Code",
+            "planning": "Planning",
+            "summarization": "Summarization",
+            "research": "Research",
+            "communication": "Communication",
+            "other": "Other"
+          }
         },
         "state": {
           "new": "New",

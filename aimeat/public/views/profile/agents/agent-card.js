@@ -1,8 +1,9 @@
 /**
  * @file agent-card.js
  * @description Agent card component with collapsed/expanded states,
- *   Two-Zone Header (identity + state-dependent status), and 8-tab bar.
+ *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v1.8.0 -- 2026-05-31 -- Add Quality tab (per-context reviews + performance + custom stats)
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  *   v1.1.0 -- 2026-05-24 -- Fix C6: remove GAII from Zone 1, M1: add Next prefix, C1: production stats, C2: problem action buttons
  *   v1.3.0 -- 2026-05-24 -- Audit fix: use proper down arrow glyph for collapse icon
@@ -36,6 +37,7 @@ import TabDataAccess from './tab-data-access.js';
 import TabDirectives from './tab-directives.js';
 import TabAgentConfig from './tab-agent-config.js';
 import TabActivity from './tab-activity.js';
+import TabQuality from './tab-quality.js';
 import TabServices from './tab-services.js';
 
 const html = htm.bind(h);
@@ -50,6 +52,7 @@ const TABS = [
   { id: 'directives', key: 'profile.agents.detail.tabs.directives' },
   { id: 'agent-config', key: 'profile.agents.detail.tabs.agent_config' },
   { id: 'activity', key: 'profile.agents.detail.tabs.activity' },
+  { id: 'quality', key: 'profile.agents.detail.tabs.quality' },
   { id: 'services', key: 'profile.agents.detail.tabs.services' },
 ];
 
@@ -488,6 +491,7 @@ function renderTabContent(activeTab, agent, onboarding, session, showToast, allA
     case 'directives': return html`<${TabDirectives} ...${props} />`;
     case 'agent-config': return html`<${TabAgentConfig} ...${props} />`;
     case 'activity': return html`<${TabActivity} ...${props} />`;
+    case 'quality': return html`<${TabQuality} ...${props} />`;
     case 'services': return html`<${TabServices} ...${props} />`;
     default: return null;
   }

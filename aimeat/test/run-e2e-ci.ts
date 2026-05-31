@@ -63,6 +63,7 @@ const ALL_SUITES = [
     'test/ai.ts',
     'test/e2e-sharing-groups.ts',
     'test/e2e-agent-tasks.ts',
+    'test/e2e-agent-quality.ts',
     'test/e2e-agent-directives.ts',
     'test/e2e-agent-messages.ts',
     'test/e2e-agent-services.ts',

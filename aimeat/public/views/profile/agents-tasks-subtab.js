@@ -9,6 +9,9 @@
  *   - TaskItem -- task row with expand/collapse, todo list, start button
  *   - RequestChangesModal -- inline modal for owner to send a free-text change request
  * @version-history
+ *   v4.3.0 -- 2026-05-31 -- Add per-task "blur title" toggle in the collapsed
+ *     task row (eye icon). Hides a task title behind a CSS blur for screen
+ *     recordings; preference persists per task ID in localStorage (browser-only).
  *   v3.2.0 -- 2026-05-24 -- Add interactive filter pills, scope/rules display, migrate to pf-agd- CSS prefix
  *   v3.1.0 -- 2026-05-24 -- Fix: use correct locale key for empty state
  *   v3.0.0 -- 2026-05-22 -- Replace TaskCreateForm with TaskCreationBuilder (design spec split-panel)
@@ -42,6 +45,29 @@ import { listTasks, deleteTask, startTask, listEvents, requestChanges, createTas
 import { useConfirm, Modal } from '/components/Modal.js';
 
 const TASK_FILTERS = ['all', 'active', 'queued', 'completed', 'failed'];
+
+// Per-browser "blur the title" preference. Used when screen-recording the tab
+// so sensitive task titles can be hidden without affecting other viewers or
+// the server. Stored as an array of task IDs in localStorage; survives reloads
+// but never leaves this browser.
+const BLUR_STORAGE_KEY = 'aimeat.blurredTaskTitles';
+
+function readBlurredSet() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(BLUR_STORAGE_KEY));
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch { return new Set(); }
+}
+
+function isTaskBlurred(taskId) {
+  return readBlurredSet().has(taskId);
+}
+
+function setTaskBlurred(taskId, blurred) {
+  const set = readBlurredSet();
+  if (blurred) set.add(taskId); else set.delete(taskId);
+  try { localStorage.setItem(BLUR_STORAGE_KEY, JSON.stringify([...set])); } catch { /* storage full/blocked -- preference just won't persist */ }
+}
 
 // Character limits -- keep in sync with AgentTaskCreateSchema in
 // src/models/agent-task-schemas.ts (title max 256, description max 10000).
@@ -186,7 +212,17 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
   const [showOutdated, setShowOutdated] = useState(false);
   // Deliverable preview: null = not requested, {loading}|{notFound}|{value}.
   const [deliverable, setDeliverable] = useState(null);
+  // Local-only "hide the title" toggle (for screen recordings). Persisted per
+  // task ID in localStorage; see helpers at top of file.
+  const [blurred, setBlurred] = useState(() => isTaskBlurred(task.id));
   const { confirm, ConfirmUI } = useConfirm();
+
+  function handleToggleBlur(e) {
+    e.stopPropagation();
+    const next = !blurred;
+    setBlurred(next);
+    setTaskBlurred(task.id, next);
+  }
 
   // Fetch the task's published deliverable from the agent's memory namespace.
   // Uses the owner list endpoint (?agent=<gaii>&prefix=<key>) which returns the
@@ -338,7 +374,13 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
     <div>
       <div class="pf-agd-task-item" onClick=${handleExpand}>
         <div class="pf-agd-task-title-row">
-          <span class="pf-agd-task-title">${task.title || task.id}</span>
+          <button
+            class=${`pf-agd-blur-toggle ${blurred ? 'pf-agd-blur-toggle--on' : ''}`}
+            onClick=${handleToggleBlur}
+            title=${blurred ? t('profile.agents.tasks.unblurTitle') : t('profile.agents.tasks.blurTitle')}
+            aria-pressed=${blurred}
+          >${blurred ? '🙈' : '👁'}</button>
+          <span class=${`pf-agd-task-title ${blurred ? 'pf-agd-task-title--blurred' : ''}`}>${task.title || task.id}</span>
           ${progress && html`<span class="pf-agd-todo-progress">${progress}</span>`}
         </div>
         <div class="pf-agd-task-meta">

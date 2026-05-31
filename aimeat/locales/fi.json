@@ -473,6 +473,8 @@
         "requestChangesError": "Muutospyynnön lähetys epäonnistui",
         "revisionWaiting": "Odotetaan agentin korjattua ehdotusta.",
         "outdatedTodos": "Aiemmin ehdotetut (vanhentuneet)",
+        "blurTitle": "Piilota otsikko (sumenna ruutunauhoitusta varten)",
+        "unblurTitle": "Näytä otsikko",
         "builder": {
           "title": "Uusi tehtävä",
           "placeholder": "Mitä agentin pitäisi tehdä? Kuvaile selkokielellä tai teknisesti.",
@@ -653,7 +655,39 @@
           "directives": "Ohjeistukset",
           "agent_config": "Agenttiasetukset",
           "activity": "Toiminta",
-          "services": "Palvelut"
+          "services": "Palvelut",
+          "quality": "Laatu"
+        },
+        "quality": {
+          "performanceTitle": "Suorituskyky",
+          "performanceDesc": "Kuinka paljon agentti on tehnyt ja kuinka nopeasti — laskettu sen tehtävistä.",
+          "reviewsTitle": "Arviot konteksteittain",
+          "reviewsDesc": "Agentin tuotosten tähtiarviot konteksteittain. Faktakontekstit ovat lähteisiin perustuvia.",
+          "customTitle": "Omat mittarit",
+          "customDesc": "Mittarit, joita agentti julkaisee itsestään.",
+          "tasksTotal": "Tehtäviä",
+          "tasksCompleted": "Valmiit",
+          "tasksFailed": "Epäonnistuneet",
+          "successRate": "Onnistumisaste",
+          "avgTime": "Keskim. tekoaika",
+          "events": "Tapahtumia",
+          "overall": "Kokonaisuus",
+          "ratings": "{count} arviota",
+          "lowConfidence": "Matala luottamus (pieni otos)",
+          "noReviews": "Ei vielä arvioita. Arvioi valmis tehtävä aloittaaksesi laatutilastojen kerryttämisen.",
+          "noCustom": "Ei julkaistuja omia mittareita.",
+          "grounded": "{count} lähteistettyä",
+          "seconds": "s",
+          "contexts": {
+            "factual": "Faktatieto",
+            "creative": "Luova",
+            "code": "Koodi",
+            "planning": "Suunnittelu",
+            "summarization": "Tiivistäminen",
+            "research": "Tutkimus",
+            "communication": "Viestintä",
+            "other": "Muu"
+          }
         },
         "state": {
           "new": "Uusi",

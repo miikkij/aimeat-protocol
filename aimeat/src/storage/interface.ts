@@ -1437,6 +1437,45 @@ export interface AgentTaskTodo {
   completedAt?: string;
 }
 
+/**
+ * Context dimension a task rating is scored against. Fixed-but-extensible enum
+ * (vs free-text) so ratings stay comparable across agents — no ad-hoc
+ * fragmentation. Maps onto the crew "dimension" concept. The factual family
+ * (factual/research/code/summarization) must be source-grounded — see
+ * RATING_CONTEXTS_REQUIRING_GROUNDING and the rate endpoint.
+ */
+export type RatingContext =
+  | 'factual' | 'creative' | 'code' | 'planning'
+  | 'summarization' | 'research' | 'communication' | 'other';
+
+/** Contexts whose ratings must be checked against sources/inputs, not output-alone. */
+export const RATING_CONTEXTS_REQUIRING_GROUNDING: ReadonlySet<RatingContext> =
+  new Set<RatingContext>(['factual', 'research', 'code', 'summarization']);
+
+/**
+ * Who produced a rating. Used to weight human judgement higher and to mark
+ * ungrounded agent ratings as uncertain in the rollup. A source-grounded-agent
+ * checked the deliverable against its inputs/spec (e.g. crew verify=factcheck).
+ */
+export type RaterType = 'human-owner' | 'agent' | 'source-grounded-agent';
+
+/**
+ * Peer/owner review attached to a completed task. Tamper integrity comes from
+ * the recompute endpoint (anyone can recompute rollups from the tasks), not from
+ * where this is stored.
+ */
+export interface AgentTaskRating {
+  stars: number;            // 1–5
+  context: RatingContext;
+  comment?: string;
+  ratedBy: string;          // GHII (owner) or GAII (agent) of the rater
+  raterType: RaterType;
+  sourceGrounded: boolean;  // was the rating checked against inputs/sources?
+  unsupported?: number;     // optional: # unsupported claims (from factcheck)
+  evaluatedModel?: string;  // model that PRODUCED the deliverable (baseline stamp)
+  ratedAt: string;
+}
+
 export interface AgentTaskRecord {
   id: string;
   agentGaii: string;
@@ -1477,6 +1516,9 @@ export interface AgentTaskRecord {
   // published (set by the agent on /complete). The owner UI links to it; if the
   // entry no longer exists, the UI shows that it's gone.
   deliverableKey?: string;
+  // Peer/owner review of this task's deliverable (set via POST /tasks/:id/rate).
+  // Feeds the per-context quality rollup computed by GET /agents/:name/statistics.
+  rating?: AgentTaskRating;
 }
 
 export interface AgentTaskEventRecord {
@@ -1486,10 +1528,13 @@ export interface AgentTaskEventRecord {
   // change-request message about a proposed todo list. The `message` field
   // is the owner's free-text request; the `details` field stores the count
   // of todos that were transitioned to 'outdated' by the request.
+  // 'rating' (Quality tab): logged when a task's deliverable is reviewed via
+  // POST /tasks/:id/rate. `details` carries { stars, context, raterType,
+  // sourceGrounded }.
   type: 'started' | 'progress' | 'todo_completed' | 'todo_failed' |
         'memory_write' | 'extension_install' | 'app_publish' |
         'verification' | 'completed' | 'failed' | 'message' |
-        'revision_requested';
+        'revision_requested' | 'rating';
   message: string;
   details?: Record<string, unknown>;
   timestamp: string;

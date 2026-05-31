@@ -7,7 +7,9 @@
  * @structure
  *   - GET /v1/agents/:name/activity/log  -- event log drill-down (paginated)
  *   - GET /v1/agents/:name/activity      -- stats + history + scheduled jobs
+ *   - GET /v1/agents/:name/statistics    -- Quality tab: recomputed performance + per-context review rollups
  * @version-history
+ *   v1.1.0 -- 2026-05-31 -- Add GET /statistics (Quality tab): recompute performance + per-context review rollups from tasks; writes public cache keys
  *   v1.0.0 -- 2026-05-20 -- Initial creation for Agent Dashboard Phase 2
  */
 
@@ -17,6 +19,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
+import { recomputeAndCacheStatistics } from '../services/agent-statistics.js';
 
 export function agentActivityRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -174,6 +177,49 @@ export function agentActivityRouter(config: AimeatConfig, storage: Storage): Rou
       scheduled_jobs: scheduledJobs,
     }, [
       { description: 'Event log', method: 'GET', url: `/v1/agents/${agentName}/activity/log` },
+    ]));
+  });
+
+  /* ── GET /v1/agents/:name/statistics -- Quality tab rollups (recomputed from tasks) ──
+   *
+   * Recomputes the performance + per-context review rollups from the agent's
+   * tasks (source of truth → not forgeable) and writes them to the agent
+   * owner's public statistics cache keys so other agents/owners can read them
+   * without recomputing. Owners can view any of their agents; an agent can view
+   * itself.
+   */
+  router.get('/v1/agents/:name/statistics', requireAuth(), async (req, res) => {
+    const agentName = req.params.name as string;
+    const agentGaii = resolveAgentGaii(req, agentName);
+
+    if (!canAccess(req, agentGaii)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      return;
+    }
+
+    const agent = await storage.getAgent(agentGaii);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
+      return;
+    }
+
+    const stats = await recomputeAndCacheStatistics(storage, agentGaii, config.nodeId);
+
+    // Surface any custom metrics the agent published under its statistics.custom.* prefix.
+    const ownerGhii = `${agent.owner}@${config.nodeId}`;
+    const customPrefix = `agents.${agent.name}.statistics.custom.`;
+    let custom: Array<{ key: string; value: unknown; updated_at: string }> = [];
+    try {
+      const records = await storage.listMemory(ownerGhii, { prefix: customPrefix });
+      custom = records.map(r => ({ key: r.key.slice(customPrefix.length), value: r.value, updated_at: r.updatedAt }));
+    } catch { /* custom metrics are optional */ }
+
+    res.json(success(config.nodeId, {
+      performance: stats.performance,
+      reviews: stats.reviews,
+      custom,
+    }, [
+      { description: 'Activity stats', method: 'GET', url: `/v1/agents/${agentName}/activity` },
     ]));
   });
 

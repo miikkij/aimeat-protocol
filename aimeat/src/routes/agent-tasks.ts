@@ -13,9 +13,11 @@
  *   - POST   /v1/agents/:name/tasks/:id/event -- Append event
  *   - POST   /v1/agents/:name/tasks/:id/complete -- Complete task (active->done)
  *   - POST   /v1/agents/:name/tasks/:id/fail  -- Fail task (active->failed)
+ *   - POST   /v1/agents/:name/tasks/:id/rate  -- Review a done task's deliverable (Quality tab)
  *   - PATCH  /v1/agents/:name/tasks/:id/todos/:todoId -- Update individual todo status
  *   - GET    /v1/agents/:name/tasks/:id/events -- List events
  * @version-history
+ *   v1.4.0 -- 2026-05-31 -- Add POST /tasks/:id/rate (Quality tab): per-context star rating with source-grounding hard gate; refreshes the public statistics cache
  *   v1.3.0 -- 2026-05-23 -- Add webhook dispatch for task.queued, task.approved, task.updated events
  *   v1.2.0 -- 2026-05-22 -- Add individual todo update endpoint (PATCH /todos/:todoId)
  *   v1.1.0 -- 2026-05-22 -- Fix: accumulate telemetry across events instead of overwriting; allow agent PATCH on queued tasks
@@ -25,14 +27,16 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentTaskRecord, AgentTaskTodo, AgentTaskScope } from '../storage/interface.js';
+import type { Storage, AgentTaskRecord, AgentTaskTodo, AgentTaskScope, AgentTaskRating, RaterType } from '../storage/interface.js';
+import { RATING_CONTEXTS_REQUIRING_GROUNDING } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope, agentNotFoundResponse } from '../auth/middleware.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { recordTaskStarted, recordTaskCompleted, recordTaskFailed } from '../services/activity-recorder.js';
-import { AgentTaskCreateSchema, AgentTaskUpdateSchema, AgentTaskEventSchema, AgentTaskTodoUpdateSchema, AgentTaskRequestChangesSchema } from '../models/agent-task-schemas.js';
+import { recomputeAndCacheStatistics } from '../services/agent-statistics.js';
+import { AgentTaskCreateSchema, AgentTaskUpdateSchema, AgentTaskEventSchema, AgentTaskTodoUpdateSchema, AgentTaskRequestChangesSchema, AgentTaskRateSchema } from '../models/agent-task-schemas.js';
 import type { AgentMessageRecord } from '../storage/interface.js';
 import { requireReadiness } from '../middleware/readiness-gate.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
@@ -945,6 +949,101 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     });
 
     await recordTaskFailed(storage, task.agentGaii);
+
+    res.json(success(config.nodeId, { task: updated }));
+    emitChange('agent-tasks');
+  });
+
+  /* ── POST /v1/agents/:name/tasks/:id/rate -- Review a completed task's deliverable ──
+   *
+   * The Quality tab's core write. Attaches a per-context star rating (1–5) to a
+   * DONE task. Authorization: the task's owner (human) OR a SAME-OWNER agent
+   * (e.g. the parent orchestrator that delegated the work). An agent may not
+   * rate its OWN deliverable (no self-rating).
+   *
+   * Source-grounding hard gate: for the factual family
+   * (factual/research/code/summarization) an AGENT rater must set
+   * source_grounded=true — otherwise the stars measure showiness, not
+   * faithfulness (POC-proven). Human owners are exempt; `creative` accepts an
+   * output-alone craft rating.
+   */
+  router.post('/v1/agents/:name/tasks/:id/rate', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+
+    const task = await storage.getAgentTask(id);
+    if (!task) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Task not found'));
+      return;
+    }
+
+    // Authorize: caller must share the task's owner.
+    const callerRoles = req.auth!.roles as string[];
+    const isOwnerSession = callerRoles.includes('owner') && !callerRoles.includes('agent');
+    const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
+    if (task.ownerGaii !== ownerGhii) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      return;
+    }
+    // No self-rating: an agent cannot rate the deliverable it produced.
+    if (!isOwnerSession && req.auth!.sub === task.agentGaii) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN',
+        'An agent cannot rate its own deliverable'));
+      return;
+    }
+
+    if (task.status !== 'done') {
+      res.status(409).json(error(config.nodeId, 'INVALID_STATE',
+        `Only completed (done) tasks can be rated (current: ${task.status})`));
+      return;
+    }
+
+    const parsed = AgentTaskRateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')));
+      return;
+    }
+    const { stars, context, comment, source_grounded, unsupported, evaluated_model } = parsed.data;
+
+    // Source-grounding hard gate (factual family + agent rater must be grounded).
+    if (RATING_CONTEXTS_REQUIRING_GROUNDING.has(context) && !isOwnerSession && !source_grounded) {
+      res.status(422).json(error(config.nodeId, 'GROUNDING_REQUIRED',
+        `Ratings in context '${context}' must be source-grounded (checked against inputs/sources). ` +
+        `Set source_grounded=true, or have a human owner rate it.`));
+      return;
+    }
+
+    const raterType: RaterType = isOwnerSession
+      ? 'human-owner'
+      : (source_grounded ? 'source-grounded-agent' : 'agent');
+
+    const now = new Date().toISOString();
+    const rating: AgentTaskRating = {
+      stars,
+      context,
+      ...(comment ? { comment } : {}),
+      ratedBy: resolve(req),
+      raterType,
+      sourceGrounded: source_grounded,
+      ...(typeof unsupported === 'number' ? { unsupported } : {}),
+      ...(evaluated_model ? { evaluatedModel: evaluated_model } : {}),
+      ratedAt: now,
+    };
+
+    const updated = await storage.updateAgentTask(id, { rating, updatedAt: now });
+
+    await storage.appendTaskEvent({
+      id: randomUUID(),
+      taskId: id,
+      type: 'rating',
+      message: `Rated ${stars}★ (${context})`,
+      details: { stars, context, raterType, sourceGrounded: source_grounded },
+      timestamp: now,
+    });
+
+    // Refresh the public statistics cache. Best-effort: a failure here must not
+    // fail the rating write — the rollup is recomputable on demand anyway.
+    recomputeAndCacheStatistics(storage, task.agentGaii, config.nodeId).catch(() => {});
 
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks');

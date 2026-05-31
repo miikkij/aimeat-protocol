@@ -1197,7 +1197,8 @@ export function initializeSchema(db: Database.Database): void {
       createdAt       TEXT NOT NULL,
       updatedAt       TEXT NOT NULL,
       completedAt     TEXT,
-      deliverableKey  TEXT
+      deliverableKey  TEXT,
+      rating          TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_agent_tasks_agent ON agent_tasks(agentGaii, status);
     CREATE INDEX IF NOT EXISTS idx_agent_tasks_owner ON agent_tasks(ownerGaii);
@@ -1347,6 +1348,8 @@ export function initializeSchema(db: Database.Database): void {
 
   // Task deliverable memory key — link a completed task to its output entry
   safeAddColumn('agent_tasks', 'deliverableKey', 'TEXT');
+  // Quality tab — per-context task rating (JSON: AgentTaskRating)
+  safeAddColumn('agent_tasks', 'rating', 'TEXT');
 
   // Package instance status rename: 'active' -> 'installed'
   db.exec("UPDATE package_instances SET status = 'installed' WHERE status = 'active'");

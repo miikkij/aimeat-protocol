@@ -2415,6 +2415,44 @@ components:
         deliverableKey:
           type: string
           description: Memory key (agent namespace) where the task's deliverable was published, if any.
+        rating:
+          $ref: '#/components/schemas/AgentTaskRating'
+
+    AgentTaskRating:
+      type: object
+      description: >
+        Peer/owner review of a completed task's deliverable (Quality tab). Feeds
+        the per-context quality rollup from GET /v1/agents/{name}/statistics.
+      required: [stars, context, ratedBy, raterType, sourceGrounded, ratedAt]
+      properties:
+        stars:
+          type: integer
+          minimum: 1
+          maximum: 5
+        context:
+          type: string
+          enum: [factual, creative, code, planning, summarization, research, communication, other]
+        comment:
+          type: string
+        ratedBy:
+          type: string
+          description: GHII (owner) or GAII (agent) of the rater.
+        raterType:
+          type: string
+          enum: [human-owner, agent, source-grounded-agent]
+        sourceGrounded:
+          type: boolean
+          description: Whether the rating was checked against the deliverable's inputs/sources.
+        unsupported:
+          type: integer
+          minimum: 0
+          description: Optional count of unsupported/fabricated claims.
+        evaluatedModel:
+          type: string
+          description: Model that produced the deliverable (baseline stamp).
+        ratedAt:
+          type: string
+          format: date-time
 
     TaskEvent:
       type: object
@@ -16730,6 +16768,97 @@ paths:
         '409':
           $ref: '#/components/responses/Conflict'
 
+  /v1/agents/{name}/tasks/{id}/rate:
+    post:
+      operationId: rateAgentTask
+      summary: Review a completed task's deliverable (Quality tab)
+      description: >
+        Attach a per-context star rating (1–5) to a **done** task. The `context`
+        is the quality dimension (factual/creative/code/…). Authorization: the
+        task's owner (human) or a same-owner agent (e.g. the parent orchestrator
+        that delegated the work); an agent may not rate its own deliverable.
+
+
+        **Source-grounding hard gate:** for the factual family
+        (`factual`/`research`/`code`/`summarization`) an *agent* rater must set
+        `source_grounded: true` (the rating was checked against the inputs/
+        sources), otherwise the request is rejected with `422 GROUNDING_REQUIRED`.
+        Human owners are exempt; `creative` accepts an output-alone craft rating.
+        The rating refreshes the agent's public statistics cache.
+      tags: [Agent Tasks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stars, context]
+              properties:
+                stars:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  description: Star rating, 1 (poor) to 5 (excellent).
+                context:
+                  type: string
+                  enum: [factual, creative, code, planning, summarization, research, communication, other]
+                  description: Quality dimension this rating scores.
+                comment:
+                  type: string
+                  maxLength: 2048
+                source_grounded:
+                  type: boolean
+                  default: false
+                  description: >
+                    Whether the rating was checked against the deliverable's
+                    inputs/sources. Required true for the factual family when the
+                    rater is an agent.
+                unsupported:
+                  type: integer
+                  minimum: 0
+                  description: Optional count of unsupported/fabricated claims (e.g. from a factcheck pass).
+                evaluated_model:
+                  type: string
+                  maxLength: 128
+                  description: Model that produced the deliverable (baseline stamp; ratings are not compared blindly across model changes).
+      responses:
+        '200':
+          description: Task rated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentTask'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          description: Source-grounding required for this context (GROUNDING_REQUIRED).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
   /v1/agents/{name}/tasks/{id}/todos/{todoId}:
     patch:
       operationId: updateTaskTodo
@@ -17448,6 +17577,39 @@ paths:
           description: Paginated event log
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/agents/{name}/statistics:
+    get:
+      operationId: getAgentStatistics
+      summary: Get agent quality statistics (Quality tab)
+      description: >
+        Recompute the agent's performance rollup (task counts, success rate,
+        completion durations by context) and per-context peer-review rollup
+        (stars, distribution, variance, low-confidence flag, rater mix, per-model
+        slice) **from the agent's tasks** — the source of truth, so the result is
+        not forgeable. The recomputed rollups are also written to the owner's
+        public statistics cache keys (`agents.<name>.statistics.performance` /
+        `.reviews`). Also returns any custom metrics the agent published under
+        `agents.<name>.statistics.custom.*`. Owners can view any of their agents;
+        an agent can view itself.
+      tags: [Agents]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Recomputed performance + review rollups and custom metrics
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
