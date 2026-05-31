@@ -4,6 +4,9 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.11.0 - 2026-05-31 - Add aimeat-agents.js — apps commission & observe the
+ *   owner's agents (list, createTask/run, watch via SSE, deliverables,
+ *   option-prompt answer loop). Registered as a route + in the /v1/libs catalogue.
  * v1.10.0 - 2026-05-29 - Add aimeat-ai.js — AI completion using the user's
  *   OpenRouter key (apps reach /v1/ai/complete; budget + per-app quotas
  *   enforced server-side). Registered both as a route and in the /v1/libs
@@ -25,6 +28,7 @@ import { aimeatAudioLib } from './lib-audio.js';
 import { aimeatSpeechLib } from './lib-speech.js';
 import { aimeatCapabilitiesLib } from './lib-capabilities.js';
 import { aimeatAiLib } from './lib-ai.js';
+import { aimeatAgentsLib } from './lib-agents.js';
 
 function sendJavascriptLibrary(res: Response, source: string): void {
   res.set('Cache-Control', 'no-store');
@@ -93,6 +97,11 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   // GET /v1/libs/aimeat-ai.js — AI completion using the user's OpenRouter key
   router.get('/v1/libs/aimeat-ai.js', (_req, res) => {
     sendJavascriptLibrary(res, aimeatAiLib(config));
+  });
+
+  // GET /v1/libs/aimeat-agents.js — commission & observe the owner's agents
+  router.get('/v1/libs/aimeat-agents.js', (_req, res) => {
+    sendJavascriptLibrary(res, aimeatAgentsLib(config));
   });
 
   // GET /v1/libs/ — List available libraries
@@ -183,6 +192,14 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
           description: 'AI completion using the user\'s configured OpenRouter key. Per-user daily budget and per-app quotas enforce safe spend.',
           size_estimate: '~4KB',
           include: `<script src="${config.baseUrl}/v1/libs/aimeat-ai.js"></script>`,
+          requires: 'aimeat-auth',
+        },
+        {
+          name: 'aimeat-agents',
+          url: '/v1/libs/aimeat-agents.js',
+          description: 'Agents: list, commission tasks (createTask/run), watch progress live (SSE), read deliverables, and the ask-the-user option-prompt loop.',
+          size_estimate: '~7KB',
+          include: `<script src="${config.baseUrl}/v1/libs/aimeat-agents.js"></script>`,
           requires: 'aimeat-auth',
         },
       ],

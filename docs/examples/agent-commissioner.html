@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Commissioner — AIMEAT demo</title>
+<style>
+  :root { --bg:#0f1020; --card:#1a1c33; --line:#2a2d4a; --txt:#e8e8f0; --dim:#9aa0c0; --accent:#E8564A; --ok:#10b981; --warn:#F59E0B; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--txt); }
+  header { padding:1rem 1.25rem; border-bottom:1px solid var(--line); }
+  header h1 { margin:0; font-size:1.1rem; }
+  header p { margin:.25rem 0 0; color:var(--dim); font-size:.85rem; }
+  main, #auth { max-width:760px; margin:0 auto; padding:1.25rem; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:1rem; margin-bottom:1rem; }
+  label { display:block; font-size:.8rem; color:var(--dim); margin-bottom:.35rem; }
+  select, textarea, input { width:100%; padding:.55rem .65rem; border:1px solid var(--line); border-radius:6px; background:#12142a; color:var(--txt); font:inherit; }
+  textarea { min-height:5rem; resize:vertical; }
+  button { padding:.5rem .9rem; border:none; border-radius:6px; background:var(--accent); color:#fff; font:inherit; cursor:pointer; }
+  button.ghost { background:transparent; border:1px solid var(--line); color:var(--txt); }
+  button:disabled { opacity:.5; cursor:default; }
+  .row { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+  .muted { color:var(--dim); font-size:.85rem; }
+  .status { font-weight:600; }
+  ol#events { margin:.5rem 0 0; padding-left:1.1rem; font-size:.85rem; }
+  ol#events li { margin:.2rem 0; }
+  .ev-type { color:var(--accent); font-weight:600; }
+  pre { background:#0c0d1c; border:1px solid var(--line); border-radius:6px; padding:.6rem; overflow:auto; font-size:.8rem; white-space:pre-wrap; word-break:break-word; }
+  .prompt { border:1px solid var(--warn); border-radius:8px; padding:.6rem; margin:.5rem 0; }
+  .prompt .q { font-weight:600; margin-bottom:.4rem; }
+  .chip { background:#12142a; border:1px solid var(--line); border-radius:999px; padding:.3rem .7rem; cursor:pointer; }
+  .chip:hover { border-color:var(--accent); }
+  .gone { color:var(--warn); font-style:italic; }
+  .err { color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🤖 Agent Commissioner</h1>
+  <p>A tiny AIMEAT app — commission a task to one of your agents and watch it live. Built on <code>aimeat-agents.js</code>.</p>
+</header>
+
+<div id="auth" class="card" hidden>
+  <label>Username</label>
+  <input id="u" autocomplete="username" />
+  <label style="margin-top:.5rem">Password</label>
+  <input id="p" type="password" autocomplete="current-password" />
+  <div class="row" style="margin-top:.6rem">
+    <button id="loginBtn">Sign in</button>
+    <span id="authMsg" class="muted"></span>
+  </div>
+</div>
+
+<main hidden>
+  <div class="card">
+    <label>Agent</label>
+    <select id="agent"></select>
+    <label style="margin-top:.6rem">What should it do?</label>
+    <textarea id="desc" placeholder="e.g. Write a one-paragraph summary of why board-game cafés became popular."></textarea>
+    <div class="row" style="margin-top:.6rem">
+      <button id="commission">Commission task</button>
+      <span id="status" class="status muted"></span>
+    </div>
+  </div>
+
+  <div class="card" id="liveCard" hidden>
+    <div class="row" style="justify-content:space-between">
+      <strong id="taskTitle"></strong>
+      <span id="taskStatus" class="muted"></span>
+    </div>
+    <div id="prompts"></div>
+    <ol id="events"></ol>
+    <div id="deliverable"></div>
+  </div>
+</main>
+
+<script src="/v1/libs/aimeat-auth.js"></script>
+<script src="/v1/libs/aimeat-agents.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s) { return document.querySelector(s); };
+  var authCard = $('#auth'), main = $('main');
+
+  function showApp() {
+    authCard.hidden = true; main.hidden = false;
+    loadAgents();
+  }
+
+  async function loadAgents() {
+    try {
+      var list = await AIMEAT.agents.list();
+      var sel = $('#agent');
+      sel.innerHTML = '';
+      list.forEach(function (a) {
+        var o = document.createElement('option');
+        o.value = a.name;
+        o.textContent = a.name + (a.mode ? ' (' + a.mode + ')' : '');
+        sel.appendChild(o);
+      });
+      if (!list.length) $('#status').textContent = 'No agents yet — connect one in your profile first.';
+    } catch (e) { $('#status').innerHTML = '<span class="err">' + e.message + '</span>'; }
+  }
+
+  // ---- Auth ----
+  if (AIMEAT.auth.getSession()) {
+    showApp();
+  } else {
+    authCard.hidden = false;
+    $('#loginBtn').addEventListener('click', async function () {
+      $('#authMsg').textContent = 'Signing in...';
+      try {
+        await AIMEAT.auth.loginWithPassword($('#u').value.trim(), $('#p').value);
+        showApp();
+      } catch (e) { $('#authMsg').innerHTML = '<span class="err">' + (e.message || 'Login failed') + '</span>'; }
+    });
+  }
+  AIMEAT.auth.on('login', function () { showApp(); });
+
+  // ---- Commission + watch ----
+  var stopWatch = null;
+
+  $('#commission').addEventListener('click', async function () {
+    var name = $('#agent').value;
+    var desc = $('#desc').value.trim();
+    if (!name || !desc) { $('#status').textContent = 'Pick an agent and describe the task.'; return; }
+    $('#commission').disabled = true;
+    $('#status').textContent = 'Commissioning...';
+    if (stopWatch) { stopWatch(); stopWatch = null; }
+    $('#events').innerHTML = ''; $('#prompts').innerHTML = ''; $('#deliverable').innerHTML = '';
+    try {
+      var task = await AIMEAT.agents.createTask(name, { description: desc });
+      $('#status').textContent = 'Commissioned. Watching live…';
+      $('#liveCard').hidden = false;
+      $('#taskTitle').textContent = task.title;
+      stopWatch = AIMEAT.agents.watch(name, task.id, function (t, events) {
+        render(name, t, events);
+      });
+    } catch (e) {
+      $('#status').innerHTML = '<span class="err">' + (e.message || 'Failed') + '</span>';
+    }
+    $('#commission').disabled = false;
+  });
+
+  function render(name, task, events) {
+    $('#taskStatus').textContent = task.status;
+    var ol = $('#events');
+    ol.innerHTML = events.map(function (ev) {
+      return '<li><span class="ev-type">' + esc(ev.type) + '</span> ' + esc(ev.message || '') + '</li>';
+    }).join('');
+
+    // pending option-prompts → clickable chips
+    AIMEAT.agents.pendingPrompts(name).then(function (prompts) {
+      var box = $('#prompts');
+      box.innerHTML = '';
+      prompts.forEach(function (p) {
+        var div = document.createElement('div');
+        div.className = 'prompt';
+        div.innerHTML = '<div class="q">❓ ' + esc(p.question) + '</div>';
+        var row = document.createElement('div'); row.className = 'row';
+        p.options.forEach(function (opt) {
+          var b = document.createElement('button'); b.className = 'chip'; b.textContent = opt;
+          b.addEventListener('click', function () {
+            box.innerHTML = '<span class="muted">Answer sent: ' + esc(opt) + '</span>';
+            AIMEAT.agents.answerPrompt(name, { prompt_id: p.prompt_id, choice: opt });
+          });
+          row.appendChild(b);
+        });
+        div.appendChild(row); box.appendChild(div);
+      });
+    });
+
+    // deliverable when done
+    if (task.status === 'done') {
+      if (stopWatch) { stopWatch(); stopWatch = null; }
+      $('#status').textContent = 'Done.';
+      AIMEAT.agents.deliverable(name, task.id).then(function (d) {
+        var box = $('#deliverable');
+        if (!d) { box.innerHTML = '<p class="muted">No deliverable key was recorded for this task.</p>'; return; }
+        if (d.gone) { box.innerHTML = '<p class="gone">⚠️ The deliverable (' + esc(d.key) + ') no longer exists.</p>'; return; }
+        var val = typeof d.value === 'string' ? d.value : JSON.stringify(d.value, null, 2);
+        box.innerHTML = '<p class="muted">Deliverable — <code>' + esc(d.key) + '</code></p><pre>' + esc(val) + '</pre>';
+      });
+    } else if (task.status === 'failed' || task.status === 'stalled') {
+      if (stopWatch) { stopWatch(); stopWatch = null; }
+      $('#status').innerHTML = '<span class="err">Task ' + esc(task.status) + '.</span>';
+    }
+  }
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+})();
+</script>
+</body>
+</html>
