@@ -3151,6 +3151,7 @@
     "cfgReadOnlyHelpDetail": "Config persistence requires a database (MongoDB or SQLite). In-memory nodes lose all changes on restart. Configure this node via .env file, aimeat.ini, aimeat.json, or CLI arguments (aimeat start --db sqlite).",
     "cfgHelpTitle": "Help",
     "cfgReset": "Reset",
+    "cfgOnePerLine": "One entry per line",
     "cfgResetDone": "Reset {path} — DB override removed.",
     "cfgSource": "Source",
     "consul": "Consul",

@@ -1,3 +1,13 @@
+/**
+ * @file config-tab.js
+ * @description Admin dashboard Config tab — renders the mutable node config
+ *   schema (GET /v1/admin/config) with per-type editors and persists changes
+ *   via PUT /v1/admin/config.
+ * @version-history
+ *   v1.1.0 -- 2026-05-31 -- Add an editor for array-of-strings config fields
+ *     (e.g. agent.system_principles): one item per line in a textarea, split
+ *     back to an array on save. Previously object/array fields were read-only.
+ */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
@@ -51,7 +61,16 @@ export default function ConfigTab({ data, reload }) {
   }
 
   async function save() {
-    const changes = Object.entries(pending).map(([path, value]) => ({ path, value }));
+    const changes = Object.entries(pending).map(([path, value]) => {
+      const entry = schema[path];
+      // Array-of-strings fields (e.g. agent.system_principles) are edited as
+      // one item per line; split the raw text back into an array on save so it
+      // matches what the API validator expects.
+      if (entry && entry.type === 'object' && Array.isArray(entry.value) && typeof value === 'string') {
+        return { path, value: value.split('\n').map(l => l.trim()).filter(Boolean) };
+      }
+      return { path, value };
+    });
     if (!changes.length) return;
     try {
       const r = await saveConfig(changes);
@@ -137,7 +156,13 @@ export default function ConfigTab({ data, reload }) {
                         : e.type === 'string'
                           ? html`<input type="text" value=${e.value || ''} style="width:250px" onChange=${ev => onChange(p, ev.target.value)} disabled=${!editable} />`
                           : e.type === 'object'
-                            ? html`<code style="font-size:.75rem">${escHtml(JSON.stringify(e.value)).substring(0, 100)}...</code>`
+                            ? (Array.isArray(e.value)
+                                ? html`<textarea class="adm-config-array-edit" rows="4" disabled=${!editable}
+                                          value=${pending[p] !== undefined ? pending[p] : e.value.join('\n')}
+                                          onInput=${ev => onChange(p, ev.target.value)}
+                                          placeholder=${t('dashboard.cfgOnePerLine')}></textarea>
+                                       <div class="adm-text-dim adm-text-xs">${t('dashboard.cfgOnePerLine')}</div>`
+                                : html`<code style="font-size:.75rem">${escHtml(JSON.stringify(e.value)).substring(0, 100)}...</code>`)
                             : html`<code>${escHtml(String(e.value))}</code>`
                 }
                 ${e.canReset && editable && html` <button class="adm-btn-sm" onClick=${() => resetConfig(p)}>${t('dashboard.cfgReset')}</button>`}

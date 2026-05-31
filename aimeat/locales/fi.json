@@ -3151,6 +3151,7 @@
     "cfgReadOnlyHelpDetail": "Asetusten tallennus vaatii tietokannan (MongoDB tai SQLite). Muistinsisäiset solmut menettävät kaikki muutokset uudelleenkäynnistyksessä. Määritä tämä solmu .env-tiedoston, aimeat.ini:n, aimeat.json:n tai CLI-argumenttien kautta.",
     "cfgHelpTitle": "Ohje",
     "cfgReset": "Palauta",
+    "cfgOnePerLine": "Yksi kohta per rivi",
     "cfgResetDone": "Palautettu {path} — tietokantaohitus poistettu.",
     "cfgSource": "Lähde",
     "consul": "Consul",
