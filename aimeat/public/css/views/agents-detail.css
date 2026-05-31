@@ -24,6 +24,7 @@
  *   v2.9.0 -- 2026-05-31 -- Collapsed bar two-row layout (pf-agd-collapsed-main + pf-agd-collapsed-meta divider) to stop status overflow; move drag grip into the left margin so the card border stays flush
  *   v2.10.0 -- 2026-05-31 -- Extend the drag-row drop target left over the grip gutter (padding-left + negative margin-left) so dropping on/near the handle registers; card border stays aligned
  *   v2.11.0 -- 2026-05-31 -- Add Quality tab styles (per-context review rows, duration chips, custom-metric rows)
+ *   v2.12.0 -- 2026-05-31 -- Add deliverable rating control styles (star picker, current-rating row, rate modal fields)
  *   v2.11.0 -- 2026-05-31 -- Widen the solo pop-out window (and pf-agd-solo max-width) so the agent card matches the list-view width and the full tab bar fits
  *   v2.12.0 -- 2026-05-31 -- Add completed-task deliverable styles (pf-agd-deliverable*) linking a task to its agent-memory output key
  *   v2.13.0 -- 2026-05-31 -- Add per-task blur-title toggle styles (pf-agd-blur-toggle, pf-agd-task-title--blurred) for hiding sensitive titles in screen recordings
@@ -2789,4 +2790,79 @@
   color: var(--text, #1A1A2E);
   text-align: right;
   word-break: break-word;
+}
+
+/* ── Deliverable rating (Tasks tab) ── */
+
+/* Current rating + rate/re-rate button row under a done task's deliverable */
+.pf .pf-agd-rate-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+.pf .pf-agd-rate-current {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+.pf .pf-agd-rate-current-stars {
+  color: var(--accent, #E8564A);
+  letter-spacing: 1px;
+}
+.pf .pf-agd-rate-current-ctx {
+  color: var(--text-dim, #6B7280);
+  font-weight: 600;
+}
+.pf .pf-agd-rate-current-comment {
+  color: var(--text-muted, #9CA3AF);
+  font-style: italic;
+}
+
+/* Star picker inside the rate modal */
+.pf .pf-agd-rate-stars {
+  display: flex;
+  gap: 0.15rem;
+  margin: 0.5rem 0 0.75rem;
+}
+.pf .pf-agd-rate-star {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--border, #E5E7EB);
+  padding: 0;
+  transition: color 0.12s;
+}
+.pf .pf-agd-rate-star:hover {
+  color: var(--accent, #E8564A);
+}
+.pf .pf-agd-rate-star--on {
+  color: var(--accent, #E8564A);
+}
+
+/* Context select + grounded checkbox rows in the rate modal */
+.pf .pf-agd-rate-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--text-dim, #6B7280);
+}
+.pf .pf-agd-rate-field select {
+  flex: 1;
+}
+.pf .pf-agd-rate-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--text, #1A1A2E);
+  cursor: pointer;
 }
