@@ -304,15 +304,24 @@ await test('9d. Individual todo update rejects nonexistent todoId', async () => 
     assert(status === 404, `expected 404, got ${status}`);
 });
 
-await test('10. Complete task (active -> done)', async () => {
+await test('10. Complete task (active -> done) with deliverable_key', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/tasks/${queuedTaskId}/complete`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${agentToken}` },
-        body: JSON.stringify({ message: 'All steps finished successfully' }),
+        body: JSON.stringify({ message: 'All steps finished successfully', deliverable_key: 'agents.dirbot.report' }),
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.task.status === 'done', `status: ${body.data.task.status}`);
     assert(typeof body.data.task.completedAt === 'string', 'has completedAt');
+    assert(body.data.task.deliverableKey === 'agents.dirbot.report', `deliverableKey: ${body.data.task.deliverableKey}`);
+});
+
+await test('10b. deliverableKey persists on subsequent reads', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks/${queuedTaskId}`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(status === 200, `status ${status}`);
+    assert(body.data.task.deliverableKey === 'agents.dirbot.report', `deliverableKey after read: ${body.data.task.deliverableKey}`);
 });
 
 // ─── Phase 4: Fail scenario ───

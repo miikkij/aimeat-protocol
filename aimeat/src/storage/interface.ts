@@ -1473,6 +1473,10 @@ export interface AgentTaskRecord {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+  // Memory key under the agent's namespace where the task's deliverable was
+  // published (set by the agent on /complete). The owner UI links to it; if the
+  // entry no longer exists, the UI shows that it's gone.
+  deliverableKey?: string;
 }
 
 export interface AgentTaskEventRecord {

@@ -1196,7 +1196,8 @@ export function initializeSchema(db: Database.Database): void {
       lastEventAt     TEXT,
       createdAt       TEXT NOT NULL,
       updatedAt       TEXT NOT NULL,
-      completedAt     TEXT
+      completedAt     TEXT,
+      deliverableKey  TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_agent_tasks_agent ON agent_tasks(agentGaii, status);
     CREATE INDEX IF NOT EXISTS idx_agent_tasks_owner ON agent_tasks(ownerGaii);
@@ -1343,6 +1344,9 @@ export function initializeSchema(db: Database.Database): void {
 
   // Single-balance migration — per-agent daily spend limit
   safeAddColumn('agents', 'dailySpendLimit', 'REAL DEFAULT NULL');
+
+  // Task deliverable memory key — link a completed task to its output entry
+  safeAddColumn('agent_tasks', 'deliverableKey', 'TEXT');
 
   // Package instance status rename: 'active' -> 'installed'
   db.exec("UPDATE package_instances SET status = 'installed' WHERE status = 'active'");

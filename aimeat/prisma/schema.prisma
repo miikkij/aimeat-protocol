@@ -1261,6 +1261,7 @@ model AgentTask {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   completedAt      DateTime?
+  deliverableKey   String?
 
   @@index([agentGaii, status])
   @@index([ownerGaii])

@@ -24,6 +24,7 @@
  *   v2.9.0 -- 2026-05-31 -- Collapsed bar two-row layout (pf-agd-collapsed-main + pf-agd-collapsed-meta divider) to stop status overflow; move drag grip into the left margin so the card border stays flush
  *   v2.10.0 -- 2026-05-31 -- Extend the drag-row drop target left over the grip gutter (padding-left + negative margin-left) so dropping on/near the handle registers; card border stays aligned
  *   v2.11.0 -- 2026-05-31 -- Widen the solo pop-out window (and pf-agd-solo max-width) so the agent card matches the list-view width and the full tab bar fits
+ *   v2.12.0 -- 2026-05-31 -- Add completed-task deliverable styles (pf-agd-deliverable*) linking a task to its agent-memory output key
  */
 
 /* Header row: title left, connect button right */
@@ -2088,6 +2089,34 @@
   display: flex;
   gap: 0.5rem;
   margin-top: 0.4rem;
+}
+
+/* Completed-task deliverable link (task → agent-memory key) */
+.pf .pf-agd-deliverable {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.4rem 0;
+}
+.pf .pf-agd-deliverable-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-dim, #6B7280);
+}
+.pf .pf-agd-deliverable-key {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  background: var(--code-bg, #F3F4F6);
+  padding: 1px 6px;
+  border-radius: 3px;
+  word-break: break-all;
+}
+.pf .pf-agd-deliverable-gone {
+  font-size: 0.78rem;
+  color: var(--warn, #F59E0B);
+  font-style: italic;
+  margin: 0.25rem 0 0.5rem;
 }
 
 /* Danger-tinted ghost button used for in-row delete actions */

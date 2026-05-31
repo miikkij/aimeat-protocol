@@ -2412,6 +2412,9 @@ components:
         updatedAt:
           type: string
           format: date-time
+        deliverableKey:
+          type: string
+          description: Memory key (agent namespace) where the task's deliverable was published, if any.
 
     TaskEvent:
       type: object
@@ -16630,7 +16633,11 @@ paths:
     post:
       operationId: completeAgentTask
       summary: Complete a task
-      description: Mark an active task as done with an optional completion message.
+      description: >
+        Mark an active task as done with an optional completion message. The
+        agent may also pass `deliverable_key` — the memory key (under its own
+        namespace) where it published the task's output — which is stored on the
+        task so the owner UI can link straight to the deliverable.
       tags: [Agent Tasks]
       security:
         - BearerAuth: []
@@ -16652,6 +16659,13 @@ paths:
                 message:
                   type: string
                   description: Completion summary
+                deliverable_key:
+                  type: string
+                  maxLength: 256
+                  description: >
+                    Memory key (in the agent's namespace) holding the task's
+                    published deliverable. Stored on the task; the owner UI
+                    links to it and shows if the entry was later deleted.
       responses:
         '200':
           description: Task completed

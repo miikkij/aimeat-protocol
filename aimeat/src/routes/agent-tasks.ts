@@ -873,12 +873,19 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
 
     const now = new Date().toISOString();
     const message = typeof req.body?.message === 'string' ? req.body.message : 'Task completed';
+    // Optional: the memory key (under the agent's namespace) where the agent
+    // published the deliverable. Lets the owner UI link straight to the output.
+    const rawDeliverable = req.body?.deliverable_key;
+    const deliverableKey = (typeof rawDeliverable === 'string' && rawDeliverable.trim())
+      ? rawDeliverable.trim().slice(0, 256)
+      : undefined;
 
     const updated = await storage.updateAgentTask(id, {
       status: 'done',
       completedAt: now,
       lastEventAt: now,
       updatedAt: now,
+      ...(deliverableKey ? { deliverableKey } : {}),
     });
 
     await storage.appendTaskEvent({

@@ -17,6 +17,9 @@
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  *   v3.3.0 -- 2026-05-29 -- Add delete confirmation, "Request changes" modal for the revise-proposed-todos flow, outdated-todo history rendering, and revision_requested status.
  *   v3.3.1 -- 2026-05-30 -- Re-fetch the event log on every live-update tick while a task card is expanded. Without this, the parent refreshed the task object (todos + status) but the events list under it stayed frozen until the user closed and re-opened the card.
+ *   v4.1.0 -- 2026-05-31 -- Show a completed task's deliverable: link to the
+ *     agent-memory key it was published to (task.deliverableKey), fetch + preview
+ *     the value on demand, and show "no longer exists" if the entry is gone.
  *   v4.0.0 -- 2026-05-30 -- Replace the split-panel TaskCreationBuilder with a
  *     plain create form (TaskCreateForm). The builder simulated a live chat
  *     ("Agent is analyzing your request...") that never happened -- the agent
@@ -31,6 +34,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
+import { apiGet } from '/js/api.js';
 import { listTasks, deleteTask, startTask, listEvents, requestChanges, createTask } from '/js/services/agent-tasks.js';
 import { useConfirm, Modal } from '/components/Modal.js';
 
@@ -177,7 +181,29 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
   const [showRevisionModal, setShowRevisionModal] = useState(false);
   const [sendingRevision, setSendingRevision] = useState(false);
   const [showOutdated, setShowOutdated] = useState(false);
+  // Deliverable preview: null = not requested, {loading}|{notFound}|{value}.
+  const [deliverable, setDeliverable] = useState(null);
   const { confirm, ConfirmUI } = useConfirm();
+
+  // Fetch the task's published deliverable from the agent's memory namespace.
+  // Uses the owner list endpoint (?agent=<gaii>&prefix=<key>) which returns the
+  // value inline; if the exact key is gone, show that it no longer exists.
+  async function fetchDeliverable() {
+    const gaii = task.agentGaii;
+    const key = task.deliverableKey;
+    if (!gaii || !key) { setDeliverable({ notFound: true }); return; }
+    setDeliverable({ loading: true });
+    try {
+      const resp = await apiGet(`/v1/memory?agent=${encodeURIComponent(gaii)}&prefix=${encodeURIComponent(key)}&per_page=20`);
+      const items = resp?.data?.items || resp?.data || [];
+      const found = Array.isArray(items) ? items.find(i => i.key === key) : null;
+      if (!found) { setDeliverable({ notFound: true }); return; }
+      const v = found.value;
+      setDeliverable({ value: typeof v === 'string' ? v : JSON.stringify(v, null, 2) });
+    } catch {
+      setDeliverable({ notFound: true });
+    }
+  }
 
   async function fetchEvents({ silent = false } = {}) {
     if (!silent) setLoadingEvents(true);
@@ -294,6 +320,23 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
       ${expanded && html`
         <div class="pf-agd-task-expanded">
           ${task.description && html`<div class="pf-agd-task-desc">${task.description}</div>`}
+
+          ${task.deliverableKey && html`
+            <div class="pf-agd-deliverable">
+              <span class="pf-agd-deliverable-label">${t('profile.agents.tasks.deliverable')}:</span>
+              <code class="pf-agd-deliverable-key">${task.deliverableKey}</code>
+              <button class="btn-ghost btn-sm" onClick=${(e) => { e.stopPropagation(); fetchDeliverable(); }}>
+                ${t('profile.agents.tasks.viewDeliverable')}
+              </button>
+            </div>
+            ${deliverable && html`
+              ${deliverable.loading
+                ? html`<div class="pf-agd-empty">${t('profile.loading')}</div>`
+                : deliverable.notFound
+                  ? html`<div class="pf-agd-deliverable-gone">${t('profile.agents.tasks.deliverableGone')}</div>`
+                  : html`<pre class="pf-agd-memory-preview">${deliverable.value}</pre>`}
+            `}
+          `}
 
           ${task.scope && html`
             <div class="pf-agd-info-row">
