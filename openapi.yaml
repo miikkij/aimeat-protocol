@@ -2417,6 +2417,11 @@ components:
           description: Memory key (agent namespace) where the task's deliverable was published, if any.
         rating:
           $ref: '#/components/schemas/AgentTaskRating'
+        triage:
+          type: string
+          nullable: true
+          enum: [kept, archived]
+          description: Tasks-tab triage bucket override (null = default Recent/auto-archive).
 
     AgentTaskRating:
       type: object
@@ -16319,7 +16324,13 @@ paths:
     get:
       operationId: listAgentTasks
       summary: List tasks for an agent
-      description: List all tasks for the specified agent, optionally filtered by status.
+      description: >
+        List tasks for the agent. The Tasks tab splits them into triage buckets:
+        `recent` (non-terminal + recently finished), `keep` (manually pinned),
+        `archive` (manually archived + auto-archived old terminal tasks). Pass
+        `bucket` to scope to one; omit it to get all. `q` searches title +
+        description; `updated_after`/`updated_before` filter by time. The response
+        always includes `counts` (per-bucket totals) for the tab badges.
       tags: [Agent Tasks]
       security:
         - BearerAuth: []
@@ -16333,11 +16344,25 @@ paths:
           in: query
           schema:
             $ref: '#/components/schemas/TaskStatus'
+        - name: bucket
+          in: query
+          schema: { type: string, enum: [recent, keep, archive] }
+          description: Triage bucket to return (omit for all).
+        - name: q
+          in: query
+          schema: { type: string }
+          description: Case-insensitive substring search over title + description.
+        - name: updated_after
+          in: query
+          schema: { type: string, format: date-time }
+        - name: updated_before
+          in: query
+          schema: { type: string, format: date-time }
         - $ref: '#/components/parameters/Pagination'
         - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
-          description: List of tasks
+          description: List of tasks (filtered) with per-bucket counts
           content:
             application/json:
               schema:
@@ -16354,6 +16379,12 @@ paths:
                               $ref: '#/components/schemas/AgentTask'
                           total:
                             type: integer
+                          counts:
+                            type: object
+                            properties:
+                              recent: { type: integer }
+                              keep: { type: integer }
+                              archive: { type: integer }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -16928,6 +16959,59 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/agents/{name}/tasks/{id}/triage:
+    patch:
+      operationId: triageAgentTask
+      summary: Move a task between Tasks-tab buckets
+      description: >
+        Owner moves a task between the triage buckets. `kept` pins it to the Keep
+        tab (never auto-archived); `archived` moves it to Archive; `null` restores
+        it to the default (Recent / auto-archive by age). Owner-only.
+      tags: [Agent Tasks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [triage]
+              properties:
+                triage:
+                  type: string
+                  nullable: true
+                  enum: [kept, archived, null]
+      responses:
+        '200':
+          description: Task triaged
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentTask'
+        '400':
+          description: Invalid triage value.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /v1/agents/{name}/tasks/{id}/todos/{todoId}:
     patch:

@@ -399,6 +399,11 @@ export interface AimeatConfig {
 
   // Agent Tasks (Phase 1)
   taskStallThresholdMinutes: number;
+  // Tasks-tab triage: when on, un-triaged terminal (done/failed) tasks fall to
+  // the Archive bucket once older than taskArchiveAfterHours. Off = they stay in
+  // Recent until the owner archives them manually.
+  taskAutoArchive: boolean;
+  taskArchiveAfterHours: number;
 
   // Agent Directives (Phase 1)
   agentSystemPrinciples: string[];
@@ -755,6 +760,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
 
     // Agent Tasks (Phase 1)
     taskStallThresholdMinutes: parseInt(process.env.AIMEAT_TASK_STALL_THRESHOLD_MINUTES ?? '30', 10),
+    taskAutoArchive: process.env.AIMEAT_TASK_AUTO_ARCHIVE !== 'false',
+    taskArchiveAfterHours: parseInt(process.env.AIMEAT_TASK_ARCHIVE_AFTER_HOURS ?? '24', 10),
 
     // Agent Directives (Phase 1)
     agentSystemPrinciples: JSON.parse(process.env.AIMEAT_AGENT_SYSTEM_PRINCIPLES || '["AIMEAT-first: prefer native systems", "Log all significant actions"]'),

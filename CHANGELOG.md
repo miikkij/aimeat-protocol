@@ -4,6 +4,33 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-06-01
+
+Agent **Tasks** tab triage — long task lists are split into three buckets so the
+working set stays small without pagination, plus on-demand search and a per-task
+view of the memory entries a task produced. Full design:
+`docs/plans/agent-tasks-triage-plan.md`.
+
+### Added
+
+- **Triage buckets** — the Tasks tab now has **Recent** (non-terminal + recently
+  finished), **Keep** (manually pinned), and **Archive** (manually archived +
+  auto-archived old terminal tasks), each with a live count. Per-task **Keep /
+  Archive / Restore** actions. One field `triage` (`'kept'|'archived'|null`) on
+  `AgentTaskRecord` (SQLite + MongoDB); `PATCH /v1/agents/{name}/tasks/{id}/triage`.
+- **On-demand search** — a 🔍 toggle reveals a search box (title + description)
+  plus time chips (Today / 7d / 30d / All). `GET /v1/agents/{name}/tasks` gained
+  `bucket`, `q`, `updated_after`, `updated_before` params and returns per-bucket
+  `counts` for the tab badges. No pagination — buckets + search handle length.
+- **Auto-archive node config** (admin Config tab) — `tasks.auto_archive`
+  (default on) and `tasks.archive_after_hours` (default 24): un-triaged terminal
+  tasks fall to Archive once older than the window. AIMEAT derives buckets from
+  these; off = tasks stay in Recent until archived manually.
+- **Per-task memory entries** — the expanded task lists the memory entries that
+  belong to it: entries tagged `task:<id>` plus the live-status key prefix
+  (`agents.<name>.tasks.<id>.`), deduped by key. (A tagging-aware runner
+  populates the `task:<id>` entries; until then the live key shows.)
+
 ## [1.16.2] - 2026-06-01
 
 Follow-on to the Quality tab (1.16.0): an owner-facing way to rate from the UI,

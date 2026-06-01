@@ -426,6 +426,37 @@
           "saved": "Concurrency updated",
           "error": "Failed to update concurrency"
         },
+        "bucket": {
+          "recent": "Recent",
+          "keep": "Keep",
+          "archive": "Archive",
+          "empty": {
+            "recent": "No recent tasks.",
+            "keep": "Nothing kept. Use ★ Keep on a task to pin it here.",
+            "archive": "Archive is empty."
+          }
+        },
+        "search": {
+          "toggle": "Search",
+          "placeholder": "Search tasks…",
+          "noResults": "No tasks match your search.",
+          "time": { "all": "All", "today": "Today", "7d": "7d", "30d": "30d" }
+        },
+        "triage": {
+          "keep": "Keep",
+          "archive": "Archive",
+          "restore": "Restore",
+          "keepHint": "Pin to the Keep tab (won't auto-archive)",
+          "archiveHint": "Move to the Archive tab",
+          "kept": "Moved to Keep",
+          "archived": "Archived",
+          "restored": "Restored to Recent",
+          "error": "Failed to update task"
+        },
+        "memory": {
+          "show": "Memory entries",
+          "none": "No memory entries linked to this task yet."
+        },
         "createTask": "Create Task",
         "cancel": "Cancel",
         "titleLabel": "Title (optional)",

@@ -547,6 +547,70 @@ await test('27. Invalid max_concurrent_tasks rejected (0 and 99)', async () => {
     assert(hi.status === 400, `expected 400 for 99, got ${hi.status}`);
 });
 
+// ─── Phase 9: Triage buckets & search ───
+console.log('\nPhase 9 -- Triage buckets & search');
+
+await test('28. Done task sits in Recent bucket; list returns bucket counts', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks?bucket=recent`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.counts && typeof body.data.counts.recent === 'number', 'has counts');
+    assert(body.data.tasks.some((t: any) => t.id === queuedTaskId), 'completed task is in Recent');
+});
+
+await test('29. Keep moves the task to the Keep bucket', async () => {
+    const r = await json(`/v1/agents/${agentName}/tasks/${queuedTaskId}/triage`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ triage: 'kept' }),
+    });
+    assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body)}`);
+    assert(r.body.data.task.triage === 'kept', `triage: ${r.body.data.task.triage}`);
+    const keep = await json(`/v1/agents/${agentName}/tasks?bucket=keep`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(keep.body.data.tasks.some((t: any) => t.id === queuedTaskId), 'in Keep bucket');
+    assert(keep.body.data.counts.keep >= 1, `counts.keep: ${keep.body.data.counts.keep}`);
+    const recent = await json(`/v1/agents/${agentName}/tasks?bucket=recent`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(!recent.body.data.tasks.some((t: any) => t.id === queuedTaskId), 'no longer in Recent');
+});
+
+await test('30. Archive moves the task to the Archive bucket', async () => {
+    const r = await json(`/v1/agents/${agentName}/tasks/${queuedTaskId}/triage`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ triage: 'archived' }),
+    });
+    assert(r.status === 200, `status ${r.status}`);
+    const arch = await json(`/v1/agents/${agentName}/tasks?bucket=archive`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(arch.body.data.tasks.some((t: any) => t.id === queuedTaskId), 'in Archive bucket');
+});
+
+await test('31. Restore (null) returns the task to Recent', async () => {
+    const r = await json(`/v1/agents/${agentName}/tasks/${queuedTaskId}/triage`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ triage: null }),
+    });
+    assert(r.status === 200, `status ${r.status}`);
+    assert(!r.body.data.task.triage, `triage cleared: ${r.body.data.task.triage}`);
+    const recent = await json(`/v1/agents/${agentName}/tasks?bucket=recent`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(recent.body.data.tasks.some((t: any) => t.id === queuedTaskId), 'back in Recent');
+});
+
+await test('32. Search q filters by title/description', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks?q=Queued`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}`);
+    assert(body.data.tasks.length > 0, 'q returned results');
+    assert(body.data.tasks.every((t: any) => `${t.title} ${t.description}`.toLowerCase().includes('queued')), 'all results match q');
+});
+
+await test('33. Triage rejects an invalid value (400)', async () => {
+    const { status } = await json(`/v1/agents/${agentName}/tasks/${queuedTaskId}/triage`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ triage: 'bogus' }),
+    });
+    assert(status === 400, `expected 400, got ${status}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 

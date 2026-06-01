@@ -426,6 +426,37 @@
           "saved": "Rinnakkaisuus päivitetty",
           "error": "Rinnakkaisuuden päivitys epäonnistui"
         },
+        "bucket": {
+          "recent": "Viimeaikaiset",
+          "keep": "Tarpeelliset",
+          "archive": "Arkisto",
+          "empty": {
+            "recent": "Ei viimeaikaisia tehtäviä.",
+            "keep": "Ei talteen nostettuja. Käytä ★ Talteen kiinnittääksesi tehtävän tänne.",
+            "archive": "Arkisto on tyhjä."
+          }
+        },
+        "search": {
+          "toggle": "Haku",
+          "placeholder": "Hae tehtäviä…",
+          "noResults": "Mikään tehtävä ei vastaa hakua.",
+          "time": { "all": "Kaikki", "today": "Tänään", "7d": "7pv", "30d": "30pv" }
+        },
+        "triage": {
+          "keep": "Talteen",
+          "archive": "Arkistoi",
+          "restore": "Palauta",
+          "keepHint": "Kiinnitä Tarpeelliset-välilehdelle (ei auto-arkistoidu)",
+          "archiveHint": "Siirrä Arkisto-välilehdelle",
+          "kept": "Siirretty Tarpeellisiin",
+          "archived": "Arkistoitu",
+          "restored": "Palautettu Viimeaikaisiin",
+          "error": "Tehtävän päivitys epäonnistui"
+        },
+        "memory": {
+          "show": "Muistimerkinnät",
+          "none": "Tähän tehtävään ei ole vielä linkitetty muistimerkintöjä."
+        },
         "createTask": "Luo tehtävä",
         "cancel": "Peruuta",
         "titleLabel": "Otsikko (valinnainen)",

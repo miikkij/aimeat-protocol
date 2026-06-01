@@ -343,6 +343,10 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'agentMaxTokensPerTask', dotPath: 'agent.max_tokens_per_task', envVar: 'AIMEAT_AGENT_MAX_TOKENS_PER_TASK', type: 'number', validate: (v: unknown) => typeof v === 'number' && (v as number) >= 1000 && (v as number) <= 10000000, immutable: false, description: 'Maximum token budget per agent task', range: '1000-10000000' },
   { key: 'agentMandatoryLogging', dotPath: 'agent.mandatory_logging', envVar: 'AIMEAT_AGENT_MANDATORY_LOGGING', type: 'boolean', validate: (v: unknown) => typeof v === 'boolean', immutable: false, description: 'Require agents to log all significant actions' },
   { key: 'agentAimeatFirstEnabled', dotPath: 'agent.aimeat_first', envVar: 'AIMEAT_AGENT_AIMEAT_FIRST', type: 'boolean', validate: (v: unknown) => typeof v === 'boolean', immutable: false, description: 'Enable AIMEAT-first principle in agent directives' },
+
+  // ── Agent Tasks triage (Phase 1, mutable) ──
+  { key: 'taskAutoArchive', dotPath: 'tasks.auto_archive', envVar: 'AIMEAT_TASK_AUTO_ARCHIVE', type: 'boolean', validate: (v: unknown) => typeof v === 'boolean', immutable: false, description: 'Auto-archive completed tasks older than the archive window (Tasks tab)' },
+  { key: 'taskArchiveAfterHours', dotPath: 'tasks.archive_after_hours', envVar: 'AIMEAT_TASK_ARCHIVE_AFTER_HOURS', type: 'number', validate: (v: unknown) => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 8760, immutable: false, description: 'Hours a completed task stays in Recent before auto-archiving', range: '1-8760' },
 ];
 
 // ── Derived Lookup Maps ──

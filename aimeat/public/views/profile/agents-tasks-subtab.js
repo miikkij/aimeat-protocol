@@ -9,6 +9,11 @@
  *   - TaskItem -- task row with expand/collapse, todo list, start button
  *   - RequestChangesModal -- inline modal for owner to send a free-text change request
  * @version-history
+ *   v4.8.0 -- 2026-06-01 -- Show a task's memory entries in the expanded view:
+ *     entries tagged task:<id> + the live-status key prefix, deduped by key.
+ *   v4.7.0 -- 2026-06-01 -- Triage: replace status pills with Recent/Keep/Archive
+ *     buckets (server-derived, with counts), on-demand search (🔍 toggle) + time
+ *     chips, and per-task Keep/Archive/Restore actions. Fetches by bucket/q/time.
  *   v4.6.0 -- 2026-06-01 -- Add "max concurrent tasks" runner config (number input,
  *     default 1) that PATCHes /v1/agents/:name/max-concurrent-tasks. Consumed by
  *     the agent's runner (e.g. a CrewAI daemon) via the integration kit.
@@ -49,12 +54,23 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { apiGet, apiPost } from '/js/api.js';
-import { listTasks, deleteTask, startTask, listEvents, requestChanges, createTask, rateTask } from '/js/services/agent-tasks.js';
+import { listTasks, deleteTask, startTask, listEvents, requestChanges, createTask, rateTask, setTaskTriage } from '/js/services/agent-tasks.js';
 import { setMaxConcurrentTasks } from '/js/services/agents.js';
 import { useConfirm, Modal } from '/components/Modal.js';
 import RateModal from './agents/rate-modal.js';
 
-const TASK_FILTERS = ['all', 'active', 'queued', 'completed', 'failed'];
+// Tasks-tab triage buckets (server-derived) + on-demand search time chips.
+const BUCKETS = ['recent', 'keep', 'archive'];
+const TIME_CHIPS = ['all', 'today', '7d', '30d'];
+
+/** Map a time chip to an `updated_after` ISO bound (undefined = no bound). */
+function timeChipToAfter(chip) {
+  const now = new Date();
+  if (chip === 'today') { const d = new Date(now); d.setHours(0, 0, 0, 0); return d.toISOString(); }
+  if (chip === '7d') return new Date(now.getTime() - 7 * 86400000).toISOString();
+  if (chip === '30d') return new Date(now.getTime() - 30 * 86400000).toISOString();
+  return undefined;
+}
 
 // Per-browser "blur the title" preference. Used when screen-recording the tab
 // so sensitive task titles can be hidden without affecting other viewers or
@@ -224,6 +240,8 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
   const [showOutdated, setShowOutdated] = useState(false);
   // Deliverable preview: null = not requested, {loading}|{notFound}|{value}.
   const [deliverable, setDeliverable] = useState(null);
+  // This task's memory entries: null = not requested, {loading}|{items}.
+  const [taskMemory, setTaskMemory] = useState(null);
   // Local-only "hide the title" toggle (for screen recordings). Persisted per
   // task ID in localStorage; see helpers at top of file.
   const [blurred, setBlurred] = useState(() => isTaskBlurred(task.id));
@@ -253,6 +271,35 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
       setDeliverable({ value: typeof v === 'string' ? v : JSON.stringify(v, null, 2) });
     } catch {
       setDeliverable({ notFound: true });
+    }
+  }
+
+  // Fetch the memory entries that belong to this task: entries tagged
+  // `task:<id>` (written by a tagging-aware runner) plus anything under the
+  // live-status key prefix `agents.<name>.tasks.<id>.` (full task id). Deduped
+  // by key. Until runners tag their writes, this surfaces at least the live key.
+  async function fetchTaskMemory() {
+    const gaii = task.agentGaii;
+    if (!gaii) { setTaskMemory({ items: [] }); return; }
+    setTaskMemory({ loading: true });
+    try {
+      const tag = `task:${task.id}`;
+      const livePrefix = `agents.${agentName}.tasks.${task.id}.`;
+      const [byTag, byLive] = await Promise.all([
+        apiGet(`/v1/memory?agent=${encodeURIComponent(gaii)}&tags=${encodeURIComponent(tag)}&per_page=50`).catch(() => null),
+        apiGet(`/v1/memory?agent=${encodeURIComponent(gaii)}&prefix=${encodeURIComponent(livePrefix)}&per_page=20`).catch(() => null),
+      ]);
+      const items = [];
+      const seen = new Set();
+      for (const resp of [byTag, byLive]) {
+        const list = resp?.data?.items || resp?.data || [];
+        for (const it of (Array.isArray(list) ? list : [])) {
+          if (it.key && !seen.has(it.key)) { seen.add(it.key); items.push(it); }
+        }
+      }
+      setTaskMemory({ items });
+    } catch {
+      setTaskMemory({ items: [] });
     }
   }
 
@@ -352,6 +399,19 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
     setShowRateModal(true);
   }
 
+  async function handleTriage(e, triage) {
+    e.stopPropagation();
+    try {
+      await setTaskTriage(agentName, task.id, triage);
+      showToast(t(triage === 'kept' ? 'profile.agents.tasks.triage.kept'
+        : triage === 'archived' ? 'profile.agents.tasks.triage.archived'
+        : 'profile.agents.tasks.triage.restored'));
+      onRefresh();
+    } catch (err) {
+      showToast(err.message || t('profile.agents.tasks.triage.error'), true);
+    }
+  }
+
   async function handleSubmitRate(body) {
     setSendingRate(true);
     try {
@@ -440,6 +500,26 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
                   : html`<pre class="pf-agd-memory-preview">${deliverable.value}</pre>`}
             `}
           `}
+
+          <div class="pf-agd-task-memory">
+            <button class="btn-ghost btn-sm" onClick=${(e) => { e.stopPropagation(); fetchTaskMemory(); }}>
+              ${t('profile.agents.tasks.memory.show')}
+            </button>
+            ${taskMemory && (taskMemory.loading
+              ? html`<div class="pf-agd-empty">${t('profile.loading')}</div>`
+              : taskMemory.items.length === 0
+                ? html`<div class="pf-agd-empty">${t('profile.agents.tasks.memory.none')}</div>`
+                : html`
+                  <div class="pf-agd-task-memory-list">
+                    ${taskMemory.items.map(it => html`
+                      <div class="pf-agd-task-memory-row" key=${it.key}>
+                        <code class="pf-agd-task-memory-key">${it.key}</code>
+                        <span class="pf-agd-task-memory-val">${typeof it.value === 'object' ? JSON.stringify(it.value).slice(0, 120) : String(it.value ?? '').slice(0, 120)}</span>
+                      </div>
+                    `)}
+                  </div>
+                `)}
+          </div>
 
           ${isDone && html`
             <div class="pf-agd-rate-row">
@@ -578,6 +658,16 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
             ${(isQueued || task.status === 'draft' || isRevisionRequested) && html`
               <button class="btn-danger btn-sm" onClick=${handleDelete}>${t('profile.agents.tasks.delete')}</button>
             `}
+            <span class="pf-agd-task-actions-spacer"></span>
+            ${task.triage !== 'kept' && html`
+              <button class="btn-ghost btn-sm" onClick=${(e) => handleTriage(e, 'kept')} title=${t('profile.agents.tasks.triage.keepHint')}>★ ${t('profile.agents.tasks.triage.keep')}</button>
+            `}
+            ${task.triage !== 'archived' && html`
+              <button class="btn-ghost btn-sm" onClick=${(e) => handleTriage(e, 'archived')} title=${t('profile.agents.tasks.triage.archiveHint')}>${t('profile.agents.tasks.triage.archive')}</button>
+            `}
+            ${task.triage && html`
+              <button class="btn-ghost btn-sm" onClick=${(e) => handleTriage(e, null)}>${t('profile.agents.tasks.triage.restore')}</button>
+            `}
           </div>
           <${ConfirmUI} />
           <${RequestChangesModal}
@@ -601,9 +691,13 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
 
 export default function AgentTasksSubtab({ agent, agentName, showToast }) {
   const [tasks, setTasks] = useState(null);
+  const [counts, setCounts] = useState({ recent: 0, keep: 0, archive: 0 });
+  const [bucket, setBucket] = useState('recent');
   const [showCreate, setShowCreate] = useState(false);
   const [error, setError] = useState(null);
-  const [filter, setFilter] = useState('all');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const [timeChip, setTimeChip] = useState('all');
   // Runner concurrency config (default 1 = serial). Saved to the agent via PATCH.
   const [maxConcurrent, setMaxConcurrent] = useState(agent?.max_concurrent_tasks ?? 1);
   const [savingConcurrency, setSavingConcurrency] = useState(false);
@@ -625,8 +719,14 @@ export default function AgentTasksSubtab({ agent, agentName, showToast }) {
 
   async function loadTasks() {
     try {
-      const resp = await listTasks(agentName);
+      const resp = await listTasks(agentName, {
+        bucket,
+        q: q.trim() || undefined,
+        updated_after: timeChipToAfter(timeChip),
+        per_page: 100,
+      });
       setTasks(resp?.data?.tasks || []);
+      setCounts(resp?.data?.counts || { recent: 0, keep: 0, archive: 0 });
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -634,7 +734,11 @@ export default function AgentTasksSubtab({ agent, agentName, showToast }) {
     }
   }
 
-  useEffect(() => { loadTasks(); }, [agentName]);
+  // Refetch on agent/bucket/time change immediately; debounce text search.
+  useEffect(() => {
+    const id = setTimeout(() => loadTasks(), q ? 300 : 0);
+    return () => clearTimeout(id);
+  }, [agentName, bucket, timeChip, q]);
 
   const loadRef = useRef(loadTasks);
   loadRef.current = loadTasks;
@@ -653,24 +757,13 @@ export default function AgentTasksSubtab({ agent, agentName, showToast }) {
     return html`<div class="pf-agd-empty">${t('profile.loading')}</div>`;
   }
 
-  const filtered = filter === 'all' ? tasks : tasks.filter(task => {
-    switch (filter) {
-      case 'active': return task.status === 'active';
-      // 'revision_requested' lives under the queued filter -- the task is
-      // waiting for the agent to re-propose, which is conceptually the same
-      // "awaiting action before run" bucket the owner already monitors here.
-      case 'queued': return task.status === 'queued' || task.status === 'draft' || task.status === 'revision_requested';
-      case 'completed': return task.status === 'done';
-      case 'failed': return task.status === 'failed' || task.status === 'stalled';
-      default: return true;
-    }
-  });
+  const totalTasks = counts.recent + counts.keep + counts.archive;
 
   return html`
     <div>
       <div class="pf-agd-section-header">
         <span class="pf-agd-section-title">
-          ${t('profile.agents.tasks.title')}${tasks.length > 0 ? ` (${tasks.length})` : ''}
+          ${t('profile.agents.tasks.title')}${totalTasks > 0 ? ` (${totalTasks})` : ''}
         </span>
         <button class="btn-outline btn-sm" onClick=${() => setShowCreate(!showCreate)}>
           ${showCreate ? '-' : '+'} ${t('profile.agents.tasks.newTask')}
@@ -700,20 +793,42 @@ export default function AgentTasksSubtab({ agent, agentName, showToast }) {
 
       ${error && html`<div class="pf-agd-empty">${error}</div>`}
 
-      <div class="pf-agd-filter-bar">
-        ${TASK_FILTERS.map(f => html`
-          <button key=${f}
-                  class="pf-agd-filter-pill ${filter === f ? 'pf-agd-filter-pill--active' : ''}"
-                  onClick=${() => setFilter(f)}>
-            ${t(`profile.agents.detail.tasks.filter.${f}`)}
+      <div class="pf-agd-bucket-bar">
+        ${BUCKETS.map(b => html`
+          <button key=${b}
+                  class="pf-agd-bucket ${bucket === b ? 'pf-agd-bucket--active' : ''}"
+                  onClick=${() => setBucket(b)}>
+            ${t(`profile.agents.tasks.bucket.${b}`)} <span class="pf-agd-bucket-count">${counts[b] ?? 0}</span>
           </button>
         `)}
+        <span class="pf-agd-bucket-spacer"></span>
+        <button class="pf-agd-search-toggle ${searchOpen ? 'pf-agd-search-toggle--on' : ''}"
+                onClick=${() => setSearchOpen(o => !o)}
+                title=${t('profile.agents.tasks.search.toggle')}
+                aria-pressed=${searchOpen}>🔍</button>
       </div>
 
-      ${filtered.length > 0 ? filtered.map(task => html`
+      ${searchOpen && html`
+        <div class="pf-agd-search-bar">
+          <input class="pf-agd-search-input" type="search"
+                 placeholder=${t('profile.agents.tasks.search.placeholder')}
+                 value=${q} onInput=${e => setQ(e.target.value)} />
+          <div class="pf-agd-time-chips">
+            ${TIME_CHIPS.map(c => html`
+              <button key=${c}
+                      class="pf-agd-time-chip ${timeChip === c ? 'pf-agd-time-chip--on' : ''}"
+                      onClick=${() => setTimeChip(c)}>
+                ${t(`profile.agents.tasks.search.time.${c}`)}
+              </button>
+            `)}
+          </div>
+        </div>
+      `}
+
+      ${tasks.length > 0 ? tasks.map(task => html`
         <${TaskItem} key=${task.id} task=${task} agentName=${agentName} showToast=${showToast} onRefresh=${loadTasks} />
       `) : html`
-        <div class="pf-agd-empty">${t('profile.agents.detail.empty.tasks')}</div>
+        <div class="pf-agd-empty">${q ? t('profile.agents.tasks.search.noResults') : t(`profile.agents.tasks.bucket.empty.${bucket}`)}</div>
       `}
     </div>
   `;

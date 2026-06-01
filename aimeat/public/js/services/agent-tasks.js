@@ -7,16 +7,29 @@
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  *   v1.1.0 -- 2026-05-29 -- Add requestChanges() for the owner-asks-agent-to-revise-todos flow.
  *   v1.2.0 -- 2026-05-31 -- Add rateTask() and getAgentStatistics() for the Quality tab.
+ *   v1.3.0 -- 2026-06-01 -- listTasks() gains bucket/q/updated_after/before params; add setTaskTriage() for the Recent/Keep/Archive buckets.
  */
-import { apiGet, apiPost, apiDelete } from '/js/api.js';
+import { apiGet, apiPost, apiDelete, api } from '/js/api.js';
 
 export async function listTasks(agentName, opts = {}) {
   const params = new URLSearchParams();
   if (opts.status) params.set('status', opts.status);
+  if (opts.bucket) params.set('bucket', opts.bucket);               // recent | keep | archive
+  if (opts.q) params.set('q', opts.q);                              // title/description search
+  if (opts.updated_after) params.set('updated_after', opts.updated_after);
+  if (opts.updated_before) params.set('updated_before', opts.updated_before);
   if (opts.page) params.set('page', String(opts.page));
   if (opts.per_page) params.set('per_page', String(opts.per_page));
   const qs = params.toString();
   return apiGet(`/v1/agents/${encodeURIComponent(agentName)}/tasks${qs ? '?' + qs : ''}`);
+}
+
+/** Move a task between Tasks-tab buckets. triage: 'kept' | 'archived' | null (restore). */
+export async function setTaskTriage(agentName, taskId, triage) {
+  return api(`/v1/agents/${encodeURIComponent(agentName)}/tasks/${encodeURIComponent(taskId)}/triage`, {
+    method: 'PATCH',
+    body: JSON.stringify({ triage }),
+  });
 }
 
 export async function getTask(agentName, taskId) {

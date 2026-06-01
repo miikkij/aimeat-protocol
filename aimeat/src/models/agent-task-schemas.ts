@@ -109,6 +109,13 @@ export const AgentTaskRateSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
+// PATCH /v1/agents/:name/tasks/:id/triage -- owner moves a task between the
+// Tasks-tab buckets. 'kept' -> Keep, 'archived' -> Archive, null -> back to the
+// default (Recent / auto-archive).
+export const AgentTaskTriageSchema = z.object({
+  triage: z.enum(['kept', 'archived']).nullable(),
+});
+
 export const AgentTaskTodoUpdateSchema = z.object({
   status: TodoStatusSchema,
   completed_at: z.string().optional(),

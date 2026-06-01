@@ -14,9 +14,11 @@
  *   - POST   /v1/agents/:name/tasks/:id/complete -- Complete task (active->done)
  *   - POST   /v1/agents/:name/tasks/:id/fail  -- Fail task (active->failed)
  *   - POST   /v1/agents/:name/tasks/:id/rate  -- Review a done task's deliverable (Quality tab)
+ *   - PATCH  /v1/agents/:name/tasks/:id/triage -- Move a task between Tasks-tab buckets (Recent/Keep/Archive)
  *   - PATCH  /v1/agents/:name/tasks/:id/todos/:todoId -- Update individual todo status
  *   - GET    /v1/agents/:name/tasks/:id/events -- List events
  * @version-history
+ *   v1.5.0 -- 2026-06-01 -- Tasks-tab triage: PATCH /tasks/:id/triage (Keep/Archive/Restore) + GET /tasks gains bucket/q/updated_before/after params and per-bucket counts
  *   v1.4.1 -- 2026-05-31 -- /rate: add optional free-form `metadata` (temperature/tokens/cost) stored on the rating for later slicing (size-capped)
  *   v1.4.0 -- 2026-05-31 -- Add POST /tasks/:id/rate (Quality tab): per-context star rating with source-grounding hard gate; refreshes the public statistics cache
  *   v1.3.0 -- 2026-05-23 -- Add webhook dispatch for task.queued, task.approved, task.updated events
@@ -37,12 +39,32 @@ import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { recordTaskStarted, recordTaskCompleted, recordTaskFailed } from '../services/activity-recorder.js';
 import { recomputeAndCacheStatistics } from '../services/agent-statistics.js';
-import { AgentTaskCreateSchema, AgentTaskUpdateSchema, AgentTaskEventSchema, AgentTaskTodoUpdateSchema, AgentTaskRequestChangesSchema, AgentTaskRateSchema } from '../models/agent-task-schemas.js';
+import { AgentTaskCreateSchema, AgentTaskUpdateSchema, AgentTaskEventSchema, AgentTaskTodoUpdateSchema, AgentTaskRequestChangesSchema, AgentTaskRateSchema, AgentTaskTriageSchema } from '../models/agent-task-schemas.js';
 import type { AgentMessageRecord } from '../storage/interface.js';
 import { requireReadiness } from '../middleware/readiness-gate.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
+
+const TASK_TERMINAL_STATUSES = new Set(['done', 'failed']);
+type TaskBucket = 'recent' | 'keep' | 'archive';
+
+/**
+ * Which Tasks-tab bucket a task falls in. See
+ * docs/plans/agent-tasks-triage-plan.md §2:
+ *   kept -> Keep · archived -> Archive · non-terminal -> Recent ·
+ *   terminal+old+autoArchive -> Archive · otherwise -> Recent.
+ */
+function deriveTaskBucket(
+  task: AgentTaskRecord, nowMs: number, autoArchive: boolean, windowHours: number,
+): TaskBucket {
+  if (task.triage === 'kept') return 'keep';
+  if (task.triage === 'archived') return 'archive';
+  if (!TASK_TERMINAL_STATUSES.has(task.status)) return 'recent';
+  if (!autoArchive) return 'recent';
+  const ageHours = (nowMs - new Date(task.updatedAt).getTime()) / 3_600_000;
+  return ageHours > windowHours ? 'archive' : 'recent';
+}
 
 export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhookDispatcher?: WebhookDispatcher): Router {
   const router = Router();
@@ -226,36 +248,74 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     emitChange('agent-tasks');
   });
 
-  /* ── GET /v1/agents/:name/tasks -- List tasks for an agent ── */
+  /* ── GET /v1/agents/:name/tasks -- List tasks for an agent ──
+   *
+   * Query params:
+   *   status                 -- filter by task status (sub-filter within a bucket)
+   *   bucket                 -- recent | keep | archive (Tasks-tab triage bucket)
+   *   q                      -- case-insensitive substring over title + description
+   *   updated_after/_before  -- ISO timestamps (the time filter)
+   *   page / per_page        -- paginate the filtered result
+   *
+   * Returns { tasks, total, counts: { recent, keep, archive }, page, per_page }.
+   * Bucket/search/time are applied in the handler; per-agent task counts are
+   * bounded so fetching the agent's tasks and filtering here stays cheap. Callers
+   * that pass no bucket get every task (backward-compatible). `counts` are the
+   * bucket totals (NOT narrowed by status/q) for the tab badges.
+   */
   router.get('/v1/agents/:name/tasks', requireAuth(), async (req, res) => {
     const agentName = req.params.name as string;
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
 
     const status = req.query.status as string | undefined;
+    const bucket = req.query.bucket as string | undefined;
+    const q = (req.query.q as string | undefined)?.trim().toLowerCase();
+    const updatedAfter = req.query.updated_after as string | undefined;
+    const updatedBefore = req.query.updated_before as string | undefined;
     const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
     const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string || '20', 10)));
 
-    if (isOwnerSession) {
-      const ownerGaii = resolve(req);
-      const agentGaii = resolveAgentGaii(req, agentName);
-      const result = await storage.listAgentTasksByOwner(ownerGaii, {
-        status,
-        agentGaii,
-        page,
-        perPage,
-      });
-      res.json(success(config.nodeId, { tasks: result.tasks, total: result.total, page, per_page: perPage }));
-    } else {
-      // Agent session -- must be the named agent
-      const agentGaii = req.auth!.sub;
-      const expectedGaii = resolveAgentGaii(req, agentName);
-      if (agentGaii !== expectedGaii) {
-        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Agents can only access their own tasks'));
-        return;
-      }
-      const result = await storage.listAgentTasks(agentGaii, { status, page, perPage });
-      res.json(success(config.nodeId, { tasks: result.tasks, total: result.total, page, per_page: perPage }));
+    // Authorize + resolve the target agent.
+    const agentGaii = isOwnerSession ? resolveAgentGaii(req, agentName) : req.auth!.sub;
+    if (!isOwnerSession && agentGaii !== resolveAgentGaii(req, agentName)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Agents can only access their own tasks'));
+      return;
     }
+
+    // Fetch all of the agent's tasks (no status filter -- we need every task for
+    // the bucket counts), paging through the storage layer.
+    const all: AgentTaskRecord[] = [];
+    for (let p = 1; ; p++) {
+      const r = isOwnerSession
+        ? await storage.listAgentTasksByOwner(resolve(req), { agentGaii, page: p, perPage: 200 })
+        : await storage.listAgentTasks(agentGaii, { page: p, perPage: 200 });
+      all.push(...r.tasks);
+      if (all.length >= r.total || r.tasks.length === 0) break;
+    }
+
+    const now = Date.now();
+    const autoArchive = config.taskAutoArchive;
+    const windowHours = config.taskArchiveAfterHours;
+    const counts = { recent: 0, keep: 0, archive: 0 };
+    for (const t of all) counts[deriveTaskBucket(t, now, autoArchive, windowHours)]++;
+
+    let filtered = all;
+    if (bucket === 'recent' || bucket === 'keep' || bucket === 'archive') {
+      filtered = filtered.filter(t => deriveTaskBucket(t, now, autoArchive, windowHours) === bucket);
+    }
+    if (status) filtered = filtered.filter(t => t.status === status);
+    if (q) filtered = filtered.filter(t =>
+      (t.title || '').toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q));
+    if (updatedAfter) filtered = filtered.filter(t => t.updatedAt >= updatedAfter);
+    if (updatedBefore) filtered = filtered.filter(t => t.updatedAt <= updatedBefore);
+
+    filtered.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0));
+
+    const total = filtered.length;
+    const startIdx = (page - 1) * perPage;
+    const paged = filtered.slice(startIdx, startIdx + perPage);
+
+    res.json(success(config.nodeId, { tasks: paged, total, counts, page, per_page: perPage }));
   });
 
   /* ── GET /v1/agents/:name/tasks/:id -- Get task detail ── */
@@ -1052,6 +1112,50 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     // Refresh the public statistics cache. Best-effort: a failure here must not
     // fail the rating write — the rollup is recomputable on demand anyway.
     recomputeAndCacheStatistics(storage, task.agentGaii, config.nodeId).catch(() => {});
+
+    res.json(success(config.nodeId, { task: updated }));
+    emitChange('agent-tasks');
+  });
+
+  /* ── PATCH /v1/agents/:name/tasks/:id/triage -- Move a task between Tasks-tab buckets ──
+   *
+   * Owner-only. body { triage: 'kept' | 'archived' | null }. 'kept' -> Keep tab
+   * (never auto-archived), 'archived' -> Archive tab, null -> back to default
+   * (Recent / auto-archive). Bumps updatedAt so a restored (null) task gets a
+   * fresh Recent window instead of immediately re-archiving by age.
+   */
+  router.patch('/v1/agents/:name/tasks/:id/triage', requireAuth(), requireRole('owner'), async (req, res) => {
+    const id = req.params.id as string;
+
+    const task = await storage.getAgentTask(id);
+    if (!task) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Task not found'));
+      return;
+    }
+    const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
+    if (task.ownerGaii !== ownerGhii) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      return;
+    }
+
+    const parsed = AgentTaskTriageSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')));
+      return;
+    }
+    const { triage } = parsed.data;
+    const now = new Date().toISOString();
+
+    const updated = await storage.updateAgentTask(id, { triage: triage ?? undefined, updatedAt: now });
+    await storage.appendTaskEvent({
+      id: randomUUID(),
+      taskId: id,
+      type: 'message',
+      message: `Triage: ${triage ?? 'recent'}`,
+      details: { triage },
+      timestamp: now,
+    });
 
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks');

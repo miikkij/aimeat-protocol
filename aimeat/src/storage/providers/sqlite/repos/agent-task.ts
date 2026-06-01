@@ -33,6 +33,7 @@ function deserializeTask(row: Record<string, unknown>): AgentTaskRecord {
   if (row.completedAt) record.completedAt = row.completedAt as string;
   if (row.deliverableKey) record.deliverableKey = row.deliverableKey as string;
   if (row.rating) record.rating = JSON.parse(row.rating as string);
+  if (row.triage) record.triage = row.triage as AgentTaskRecord['triage'];
   return record;
 }
 
@@ -55,8 +56,8 @@ export function createAgentTask(db: Database.Database, record: AgentTaskRecord):
     `INSERT INTO agent_tasks
      (id, agentGaii, ownerGaii, title, description, scope, rules, verification,
       resources, todos, status, parentTaskId, workTrackingCode, telemetry,
-      lastEventAt, createdAt, updatedAt, completedAt, deliverableKey, rating)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      lastEventAt, createdAt, updatedAt, completedAt, deliverableKey, rating, triage)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     record.id,
     record.agentGaii,
@@ -78,6 +79,7 @@ export function createAgentTask(db: Database.Database, record: AgentTaskRecord):
     record.completedAt ?? null,
     record.deliverableKey ?? null,
     record.rating ? JSON.stringify(record.rating) : null,
+    record.triage ?? null,
   );
   return record;
 }
@@ -165,7 +167,7 @@ export function updateAgentTask(
        title = ?, description = ?, scope = ?, rules = ?, verification = ?,
        resources = ?, todos = ?, status = ?, parentTaskId = ?,
        workTrackingCode = ?, telemetry = ?, lastEventAt = ?,
-       updatedAt = ?, completedAt = ?, deliverableKey = ?, rating = ?
+       updatedAt = ?, completedAt = ?, deliverableKey = ?, rating = ?, triage = ?
      WHERE id = ?`
   ).run(
     merged.title,
@@ -184,6 +186,7 @@ export function updateAgentTask(
     merged.completedAt ?? null,
     merged.deliverableKey ?? null,
     merged.rating ? JSON.stringify(merged.rating) : null,
+    merged.triage ?? null,
     id,
   );
 

@@ -1531,6 +1531,11 @@ export interface AgentTaskRecord {
   // Peer/owner review of this task's deliverable (set via POST /tasks/:id/rate).
   // Feeds the per-context quality rollup computed by GET /agents/:name/statistics.
   rating?: AgentTaskRating;
+  // Triage bucket for the Tasks tab (set via PATCH /tasks/:id/triage):
+  //   'kept'     -> owner promoted it to the Keep tab; never auto-archived
+  //   'archived' -> owner archived it (or it auto-fell when older than the window)
+  //   undefined  -> default: shown in Recent, auto-archives by age if enabled
+  triage?: 'kept' | 'archived';
 }
 
 export interface AgentTaskEventRecord {
