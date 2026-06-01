@@ -27,9 +27,35 @@ view of the memory entries a task produced. Full design:
   tasks fall to Archive once older than the window. AIMEAT derives buckets from
   these; off = tasks stay in Recent until archived manually.
 - **Per-task memory entries** — the expanded task lists the memory entries that
-  belong to it: entries tagged `task:<id>` plus the live-status key prefix
-  (`agents.<name>.tasks.<id>.`), deduped by key. (A tagging-aware runner
-  populates the `task:<id>` entries; until then the live key shows.)
+  belong to it: entries tagged `task:<id>`, the task's `deliverableKey`, and the
+  live-status key prefix (`agents.<name>.tasks.<id>.`), deduped by key. Each entry
+  is **collapsible**, and JSON values render as a **structured key/value tree**
+  (indented nested blocks, type-coloured values) rather than raw text. (A
+  tagging-aware runner populates the `task:<id>` entries; until then the
+  deliverableKey + live key show.)
+
+### Changed
+
+- **Blur-title eye is hover-only** in the Tasks list — the per-task "hide title"
+  toggle now appears on row hover/focus instead of always being visible,
+  de-cluttering long lists; rows whose title is already hidden keep their eye.
+
+### Fixed
+
+- **No more empty flash on live updates** — tabs that refetch on the live-update
+  signal no longer blank-then-repaint; they swap fresh data in place (first mount
+  still shows the loading state, via a `showSpinner` option on the loaders).
+  Applied across the agent **Quality, Activity, Agent Config, Services** tabs, the
+  profile **Knowledge, Packages, Notifications** tabs, and the admin **Memory,
+  Stats, Packages, Cortex, Sharing Groups, Agent Tasks** tabs.
+
+### Companion
+
+- **`aimeat-crewai` 0.3.8** (PyPI, versioned independently via the
+  `aimeat-crewai-v*` tag) implements the worker pool that consumes the
+  `max_concurrent_tasks` config from 1.16.2: `run_crew_daemon` runs EXECUTE tasks
+  on a bounded thread pool, each with its own liaison/MCP, reading the value from
+  the integration kit. Default 1 = serial (unchanged).
 
 ## [1.16.2] - 2026-06-01
 
@@ -110,6 +136,26 @@ Reviews attach to **tasks** (not the work/actions system) and carry a quality
 - New E2E suite `test/e2e-agent-quality.ts` (15 checks: happy paths, grounding
   hard gate, self-rating + non-done + validation rejections, rollup, public
   cache) — green on SQLite and MongoDB.
+
+## [1.15.1] - 2026-05-31
+
+### Added
+
+- **Cooperative task cancellation** — owners can **Cancel** an active/stalled
+  task from the Tasks tab. It writes an owner-scoped `agents.cancel.task.<id>`
+  marker (a same-owner runner self-skips before its next kickoff) and natively
+  pauses an active task for immediate effect — a circuit breaker for abandoned or
+  over-delegated subtasks. (The `aimeat-crewai` daemon honours the marker as of
+  its 0.3.7 release.)
+- **`aimeat-agents.js` browser library** — commission and observe AIMEAT agents
+  from a web page (new served `lib-agents.js` helper + demo HTML).
+
+### Fixed
+
+- **Integration tab no longer flashes** on live updates — a `showSpinner` option
+  on its loader stops the tab from re-rendering its loading state every time
+  server-side data changes (first mount still shows it). (Extended to the rest of
+  the tabs in 1.17.0.)
 
 ## [1.15.0] - 2026-05-31
 
