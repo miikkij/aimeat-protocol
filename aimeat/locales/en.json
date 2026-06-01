@@ -420,6 +420,12 @@
         "title": "Task Queue",
         "empty": "No tasks yet",
         "newTask": "New Task",
+        "concurrency": {
+          "label": "Max concurrent tasks",
+          "hint": "1 = serial. Higher needs a concurrency-capable runner (e.g. a CrewAI daemon).",
+          "saved": "Concurrency updated",
+          "error": "Failed to update concurrency"
+        },
         "createTask": "Create Task",
         "cancel": "Cancel",
         "titleLabel": "Title (optional)",

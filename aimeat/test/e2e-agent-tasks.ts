@@ -505,6 +505,48 @@ await test('23. Revision_requested event was logged with owner message', async (
     assert(revEvent.message.includes('verification step'), `event message: ${revEvent.message}`);
 });
 
+// ─── Phase 8: Runner concurrency config ───
+console.log('\nPhase 8 -- Concurrency config');
+
+await test('24. max_concurrent_tasks defaults to 1', async () => {
+    const { status, body } = await json('/v1/agents', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(status === 200, `status ${status}`);
+    const a = body.data.agents.find((x: any) => x.name === agentName);
+    assert(a, 'agent present in list');
+    assert(a.max_concurrent_tasks === 1, `default should be 1, got ${a.max_concurrent_tasks}`);
+});
+
+await test('25. PATCH max-concurrent-tasks to 3', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/max-concurrent-tasks`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ max_concurrent_tasks: 3 }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.max_concurrent_tasks === 3, `value: ${body.data.max_concurrent_tasks}`);
+});
+
+await test('26. Integration kit exposes max_concurrent_tasks', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/integration-kit`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(status === 200, `status ${status}`);
+    assert(body.data.kit.watchdog_spec.max_concurrent_tasks === 3,
+        `kit value: ${body.data.kit.watchdog_spec.max_concurrent_tasks}`);
+});
+
+await test('27. Invalid max_concurrent_tasks rejected (0 and 99)', async () => {
+    const lo = await json(`/v1/agents/${agentName}/max-concurrent-tasks`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ max_concurrent_tasks: 0 }),
+    });
+    assert(lo.status === 400, `expected 400 for 0, got ${lo.status}`);
+    const hi = await json(`/v1/agents/${agentName}/max-concurrent-tasks`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ max_concurrent_tasks: 99 }),
+    });
+    assert(hi.status === 400, `expected 400 for 99, got ${hi.status}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 

@@ -26,6 +26,7 @@
  *   v2.11.0 -- 2026-05-31 -- Add Quality tab styles (per-context review rows, duration chips, custom-metric rows)
  *   v2.12.0 -- 2026-05-31 -- Add deliverable rating control styles (star picker, current-rating row, rate modal fields)
  *   v2.13.0 -- 2026-05-31 -- Add Quality-tab "Rate deliverables" pending-list row styles
+ *   v2.14.0 -- 2026-06-01 -- Add Tasks-tab max-concurrent-tasks config row styles
  *   v2.11.0 -- 2026-05-31 -- Widen the solo pop-out window (and pf-agd-solo max-width) so the agent card matches the list-view width and the full tab bar fits
  *   v2.12.0 -- 2026-05-31 -- Add completed-task deliverable styles (pf-agd-deliverable*) linking a task to its agent-memory output key
  *   v2.13.0 -- 2026-05-31 -- Add per-task blur-title toggle styles (pf-agd-blur-toggle, pf-agd-task-title--blurred) for hiding sensitive titles in screen recordings
@@ -2905,4 +2906,31 @@
   border-radius: 6px;
   padding: 0.05rem 0.4rem;
   white-space: nowrap;
+}
+
+/* Tasks tab — max concurrent tasks runner config */
+.pf .pf-agd-concurrency {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.25rem 0 0.75rem;
+  font-size: 0.85rem;
+}
+.pf .pf-agd-concurrency-label {
+  color: var(--text-dim, #6B7280);
+  font-weight: 600;
+}
+.pf .pf-agd-concurrency-input {
+  width: 4rem;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 6px;
+  background: var(--card-bg, #FFFFFF);
+  color: var(--text, #1A1A2E);
+  font-size: 0.85rem;
+}
+.pf .pf-agd-concurrency-hint {
+  color: var(--text-muted, #9CA3AF);
+  font-size: 0.75rem;
 }

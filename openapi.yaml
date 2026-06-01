@@ -4357,6 +4357,65 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/agents/{name}/max-concurrent-tasks:
+    patch:
+      operationId: updateAgentMaxConcurrentTasks
+      summary: Set how many tasks the agent's runner may process concurrently
+      description: >
+        Owner sets `max_concurrent_tasks` (1–20, default 1) for an agent. 1 =
+        serial (safe for any engine); higher values require a runner that can
+        process tasks in parallel (e.g. a CrewAI daemon with a per-task
+        liaison/worker pool). AIMEAT only stores and exposes the number — it does
+        not enforce concurrency server-side. The runner reads it from the
+        integration kit's `watchdog_spec.max_concurrent_tasks`.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Agent name (not full GAII)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [max_concurrent_tasks]
+              properties:
+                max_concurrent_tasks:
+                  type: integer
+                  minimum: 1
+                  maximum: 20
+                  default: 1
+      responses:
+        '200':
+          description: Concurrency updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          gaii: { type: string }
+                          name: { type: string }
+                          max_concurrent_tasks: { type: integer }
+        '400':
+          description: Invalid value (must be an integer 1–20).
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /v1/agents/{name}/scopes:
     patch:
       operationId: updateAgentScopes

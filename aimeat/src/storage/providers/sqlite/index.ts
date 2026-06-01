@@ -263,8 +263,8 @@ export class SqliteStorage implements Storage {
     try {
       this.db.prepare(
         `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic, allowedOrigins, defaultScopes, federate,
-         webhookUrl, webhookSecret, webhookEnabled, webhookLastSuccess, webhookLastFailure, webhookFailCount, platform, platformVersion, platformDetectedBy, tags, mode)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         webhookUrl, webhookSecret, webhookEnabled, webhookLastSuccess, webhookLastFailure, webhookFailCount, platform, platformVersion, platformDetectedBy, tags, mode, maxConcurrentTasks)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         agent.gaii, agent.name, agent.owner,
         agent.displayName ?? null, agent.description ?? null,
@@ -280,6 +280,7 @@ export class SqliteStorage implements Storage {
         agent.platform ?? null, agent.platformVersion ?? null, agent.platformDetectedBy ?? null,
         agent.tags ? JSON.stringify(agent.tags) : null,
         agent.mode ?? 'interactive',
+        agent.maxConcurrentTasks ?? 1,
       );
       return agent;
     } catch (err: unknown) {
@@ -314,7 +315,7 @@ export class SqliteStorage implements Storage {
        technicalCapabilities = ?, domainCapabilities = ?, activityStats = ?,
        modulesLoaded = ?, agentLimitations = ?, languages = ?,
        webhookUrl = ?, webhookSecret = ?, webhookEnabled = ?, webhookLastSuccess = ?, webhookLastFailure = ?, webhookFailCount = ?,
-       platform = ?, platformVersion = ?, platformDetectedBy = ?, tags = ?, mode = ?
+       platform = ?, platformVersion = ?, platformDetectedBy = ?, tags = ?, mode = ?, maxConcurrentTasks = ?
        WHERE gaii = ?`
     ).run(
       updated.name, updated.owner,
@@ -337,6 +338,7 @@ export class SqliteStorage implements Storage {
       updated.platform ?? null, updated.platformVersion ?? null, updated.platformDetectedBy ?? null,
       updated.tags ? JSON.stringify(updated.tags) : null,
       updated.mode ?? 'interactive',
+      updated.maxConcurrentTasks ?? 1,
       gaii,
     );
     return updated;
@@ -467,6 +469,7 @@ export class SqliteStorage implements Storage {
     if (row.platformDetectedBy) record.platformDetectedBy = row.platformDetectedBy as 'auto' | 'self_report' | 'message_reply';
     if (row.tags) record.tags = JSON.parse(row.tags as string);
     if (row.mode) record.mode = row.mode as 'autonomous' | 'interactive' | 'task-runner' | 'coordinator';
+    if (row.maxConcurrentTasks != null) record.maxConcurrentTasks = row.maxConcurrentTasks as number;
     return record;
   }
 

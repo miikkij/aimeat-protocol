@@ -4,6 +4,38 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.16.2] - 2026-06-01
+
+Follow-on to the Quality tab (1.16.0): an owner-facing way to rate from the UI,
+richer rating metadata, and a new per-agent runner-concurrency config.
+
+### Added
+
+- **`max_concurrent_tasks` per-agent runner config** — `PATCH
+  /v1/agents/{name}/max-concurrent-tasks` (1–20, default 1) and an editable
+  number field at the top of the agent **Tasks** tab. Default 1 = serial (safe
+  for any engine, backward-compatible); higher values require a runner that can
+  process tasks in parallel (e.g. a CrewAI daemon with a per-task liaison/worker
+  pool). AIMEAT only stores and exposes the number — it does **not** enforce
+  concurrency server-side. The runner reads it from the integration kit's
+  `watchdog_spec.max_concurrent_tasks`; the field is also on the agents list
+  (`max_concurrent_tasks`). Persisted on `AgentRecord` (SQLite + MongoDB).
+- **Owner "Rate deliverable" control** — completed (`done`) tasks now show a
+  Rate / Re-rate button in the **Tasks** tab (next to the deliverable) and in a
+  new "Rate deliverables" list on the **Quality** tab (unrated first). Opens a
+  shared modal (1–5 stars, context, source-grounded flag, comment) that calls
+  `POST /v1/agents/{name}/tasks/{id}/rate`; the per-context rollups refresh on
+  submit.
+- **Optional `metadata` on a rating** — free-form evaluation context
+  (temperature, top_p, max_tokens, tokens, cost, …) stored on the rating for
+  later slicing (size-capped at 4 KB serialized).
+
+### Fixed
+
+- **Quality tab custom metrics** are now read from the agent's GAII namespace
+  (where an agent's own memory writes land) instead of the owner GHII, so
+  agent-published `agents.<name>.statistics.custom.*` entries actually surface.
+
 ## [1.16.0] - 2026-05-31
 
 Agent **Quality** tab — per-context peer/owner reviews of task deliverables,

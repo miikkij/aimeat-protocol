@@ -9,6 +9,9 @@
  *   - TaskItem -- task row with expand/collapse, todo list, start button
  *   - RequestChangesModal -- inline modal for owner to send a free-text change request
  * @version-history
+ *   v4.6.0 -- 2026-06-01 -- Add "max concurrent tasks" runner config (number input,
+ *     default 1) that PATCHes /v1/agents/:name/max-concurrent-tasks. Consumed by
+ *     the agent's runner (e.g. a CrewAI daemon) via the integration kit.
  *   v4.5.0 -- 2026-05-31 -- Extract RateModal to shared ./agents/rate-modal.js
  *     so the Quality tab can reuse it; no behaviour change here.
  *   v4.4.0 -- 2026-05-31 -- Add owner "Rate deliverable" control on done tasks
@@ -47,6 +50,7 @@ import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { apiGet, apiPost } from '/js/api.js';
 import { listTasks, deleteTask, startTask, listEvents, requestChanges, createTask, rateTask } from '/js/services/agent-tasks.js';
+import { setMaxConcurrentTasks } from '/js/services/agents.js';
 import { useConfirm, Modal } from '/components/Modal.js';
 import RateModal from './agents/rate-modal.js';
 
@@ -595,11 +599,29 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
   `;
 }
 
-export default function AgentTasksSubtab({ agentName, showToast }) {
+export default function AgentTasksSubtab({ agent, agentName, showToast }) {
   const [tasks, setTasks] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all');
+  // Runner concurrency config (default 1 = serial). Saved to the agent via PATCH.
+  const [maxConcurrent, setMaxConcurrent] = useState(agent?.max_concurrent_tasks ?? 1);
+  const [savingConcurrency, setSavingConcurrency] = useState(false);
+
+  async function handleSaveConcurrency(next) {
+    const n = Math.max(1, Math.min(20, parseInt(next, 10) || 1));
+    setMaxConcurrent(n);
+    if (n === (agent?.max_concurrent_tasks ?? 1)) return;
+    setSavingConcurrency(true);
+    try {
+      await setMaxConcurrentTasks(agentName, n);
+      if (agent) agent.max_concurrent_tasks = n;
+      showToast?.(t('profile.agents.tasks.concurrency.saved'));
+    } catch (err) {
+      showToast?.(err.message || t('profile.agents.tasks.concurrency.error'), true);
+    }
+    setSavingConcurrency(false);
+  }
 
   async function loadTasks() {
     try {
@@ -653,6 +675,23 @@ export default function AgentTasksSubtab({ agentName, showToast }) {
         <button class="btn-outline btn-sm" onClick=${() => setShowCreate(!showCreate)}>
           ${showCreate ? '-' : '+'} ${t('profile.agents.tasks.newTask')}
         </button>
+      </div>
+
+      <div class="pf-agd-concurrency">
+        <label class="pf-agd-concurrency-label" for="pf-agd-mct-${agentName}">
+          ${t('profile.agents.tasks.concurrency.label')}
+        </label>
+        <input
+          id="pf-agd-mct-${agentName}"
+          class="pf-agd-concurrency-input"
+          type="number"
+          min="1"
+          max="20"
+          value=${maxConcurrent}
+          disabled=${savingConcurrency}
+          onChange=${e => handleSaveConcurrency(e.target.value)}
+        />
+        <span class="pf-agd-concurrency-hint">${t('profile.agents.tasks.concurrency.hint')}</span>
       </div>
 
       ${showCreate && html`

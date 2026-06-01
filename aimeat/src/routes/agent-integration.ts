@@ -250,6 +250,10 @@ export function agentIntegrationRouter(config: AimeatConfig, storage: Storage): 
       node_id: config.nodeId,
       watchdog_spec: {
         poll_interval_seconds: 60,
+        // How many tasks the runner may process concurrently. 1 = serial
+        // (safe for any engine); >1 requires an engine with a per-task
+        // liaison/worker pool (e.g. a CrewAI daemon). Owner-configurable.
+        max_concurrent_tasks: agent.maxConcurrentTasks ?? 1,
         inbox_endpoint: `/v1/agents/${agentName}/inbox`,
         task_event_endpoint: `/v1/agents/${agentName}/tasks/{id}/event`,
         task_todo_endpoint: `/v1/agents/${agentName}/tasks/{id}/todos/{todoId}`,

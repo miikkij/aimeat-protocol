@@ -49,6 +49,7 @@ model Agent {
   platform          String?
   platformVersion   String?
   mode              String?
+  maxConcurrentTasks Int     @default(1)
   platformDetectedBy String?
   tags              String[]
   createdAt     DateTime @default(now())

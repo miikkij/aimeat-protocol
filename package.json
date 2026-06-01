@@ -1,6 +1,6 @@
 {
   "name": "aimeat-protocol",
-  "version": "1.16.1",
+  "version": "1.16.2",
   "private": true,
   "description": "AIME AT — AI Memory Exchange and Action Transfer — love what you build, share what you know",
   "type": "module",

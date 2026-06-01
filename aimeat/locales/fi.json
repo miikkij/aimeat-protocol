@@ -420,6 +420,12 @@
         "title": "Tehtäväjono",
         "empty": "Ei tehtäviä vielä",
         "newTask": "Uusi tehtävä",
+        "concurrency": {
+          "label": "Tehtäviä rinnakkain enintään",
+          "hint": "1 = sarjallinen. Suurempi vaatii rinnakkaisuutta tukevan ajurin (esim. CrewAI-daemon).",
+          "saved": "Rinnakkaisuus päivitetty",
+          "error": "Rinnakkaisuuden päivitys epäonnistui"
+        },
         "createTask": "Luo tehtävä",
         "cancel": "Peruuta",
         "titleLabel": "Otsikko (valinnainen)",

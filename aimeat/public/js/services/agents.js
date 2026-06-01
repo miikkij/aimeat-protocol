@@ -30,6 +30,14 @@ export async function updateAgentScopes(name, scopes) {
   });
 }
 
+/** Set how many tasks the agent's runner may process concurrently (1–20). */
+export async function setMaxConcurrentTasks(name, max) {
+  return api(`/v1/agents/${encodeURIComponent(name)}/max-concurrent-tasks`, {
+    method: 'PATCH',
+    body: JSON.stringify({ max_concurrent_tasks: max }),
+  });
+}
+
 /** Get agent CORS origins. */
 export async function getAgentCors(name) {
   const data = await apiGet(`/v1/agents/${encodeURIComponent(name)}/cors`);

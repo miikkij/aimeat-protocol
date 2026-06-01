@@ -858,6 +858,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         federate: a.federate ?? false,
         tags: a.tags ?? [],
         mode: a.mode ?? 'interactive',
+        max_concurrent_tasks: a.maxConcurrentTasks ?? 1,
       })),
     }, [
       { description: 'Register a new agent', method: 'POST', url: '/v1/agents' },
@@ -951,6 +952,45 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       gaii: updated.gaii,
       name: updated.name,
       mode: updated.mode ?? 'interactive',
+    }));
+    emitChange('agents');
+  });
+
+  // PATCH /v1/agents/:name/max-concurrent-tasks — owner sets how many tasks the
+  // agent's runner may process concurrently. Default 1 = serial. AIMEAT only
+  // stores/exposes the number (read from the integration kit's watchdog_spec);
+  // the runner enforces it. >1 needs a concurrency-capable engine.
+  router.patch('/v1/agents/:name/max-concurrent-tasks', requireAuth(), requireRole('owner'), async (req, res) => {
+    const identifier = decodeURIComponent(req.params.name as string);
+    const gaii = identifier.includes('#') ? identifier : buildGAII(identifier, req.auth!.owner, config.nodeId);
+    const agent = await storage.getAgent(gaii);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${identifier}`));
+      return;
+    }
+    if (agent.owner !== req.auth!.owner) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only update your own agents'));
+      return;
+    }
+
+    const raw = req.body?.max_concurrent_tasks;
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value < 1 || value > 20) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        'max_concurrent_tasks must be an integer between 1 and 20'));
+      return;
+    }
+
+    const updated = await storage.updateAgent(gaii, { maxConcurrentTasks: value });
+    if (!updated) {
+      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${identifier}`));
+      return;
+    }
+
+    res.json(success(config.nodeId, {
+      gaii: updated.gaii,
+      name: updated.name,
+      max_concurrent_tasks: updated.maxConcurrentTasks ?? 1,
     }));
     emitChange('agents');
   });

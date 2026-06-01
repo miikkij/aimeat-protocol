@@ -58,6 +58,14 @@ export interface AgentRecord {
    * - `coordinator`: orchestrates other agents, treated like `interactive` for onboarding
    */
   mode?: 'autonomous' | 'interactive' | 'task-runner' | 'coordinator';
+  /**
+   * How many tasks the agent's runner may process concurrently. Default 1 =
+   * serial (the current behaviour, safe for any engine). >1 requires an engine
+   * that can run a per-task liaison/worker pool (e.g. a CrewAI daemon); the
+   * runner reads this value and scales its worker pool. AIMEAT only stores and
+   * exposes the number — it does not enforce concurrency server-side.
+   */
+  maxConcurrentTasks?: number;
 }
 
 export interface MemoryRecord {

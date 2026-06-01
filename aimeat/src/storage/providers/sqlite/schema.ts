@@ -28,6 +28,7 @@ export function initializeSchema(db: Database.Database): void {
       trustScore     REAL NOT NULL DEFAULT 50,
       morselBalance  REAL NOT NULL DEFAULT 0,
       dailySpendLimit REAL DEFAULT NULL,
+      maxConcurrentTasks INTEGER NOT NULL DEFAULT 1,
       createdAt      TEXT NOT NULL,
       lastSeen       TEXT NOT NULL,
       semantic       TEXT,
@@ -1404,6 +1405,11 @@ export function initializeSchema(db: Database.Database): void {
   // Default 'interactive' = backward-compatible: all existing agents went through
   // the full 13-step Hello Integration which matches interactive semantics.
   safeAddColumn('agents', 'mode', "TEXT DEFAULT 'interactive'");
+
+  // Max concurrent tasks the agent's runner may process. Default 1 = serial
+  // (backward-compatible). >1 requires a concurrency-capable engine (read by the
+  // runner; not enforced server-side).
+  safeAddColumn('agents', 'maxConcurrentTasks', 'INTEGER NOT NULL DEFAULT 1');
 
   // device_auth.mode -- mode the CLI passed to /v1/agents/device-authorize.
   // verify-route reads this when the owner approves, and propagates it to
