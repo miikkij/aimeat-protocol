@@ -33,6 +33,7 @@
  *   v2.18.0 -- 2026-06-01 -- Per-task memory entries are collapsible with pretty-printed JSON bodies
  *   v2.19.0 -- 2026-06-01 -- Structured JSON view for memory values (key/value rows, indented nested blocks, type colours)
  *   v2.20.0 -- 2026-06-01 -- Tab bar wraps (flex-wrap) instead of horizontal scroll so all 10 tabs stay visible on two rows
+ *   v2.21.0 -- 2026-06-02 -- Unseen-change badges: collapsed-card mini-badge (pf-agd-change-badge) + per-tab number badges (pf-agd-tab-badge)
  *   v2.11.0 -- 2026-05-31 -- Widen the solo pop-out window (and pf-agd-solo max-width) so the agent card matches the list-view width and the full tab bar fits
  *   v2.12.0 -- 2026-05-31 -- Add completed-task deliverable styles (pf-agd-deliverable*) linking a task to its agent-memory output key
  *   v2.13.0 -- 2026-05-31 -- Add per-task blur-title toggle styles (pf-agd-blur-toggle, pf-agd-task-title--blurred) for hiding sensitive titles in screen recordings
@@ -1735,6 +1736,47 @@
 .pf .pf-agd-tab-content {
   padding: 1rem;
   min-height: 150px;
+}
+
+/* ── Unseen-change badges ──
+   Collapsed-card mini-badge (total new across Tasks/Messages/Memory) + per-tab
+   number badges. Both use the accent colour so "something changed" reads at a
+   glance. Counts come from the localStorage last-seen baseline (agents-tab.js). */
+.pf .pf-agd-change-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 6px;
+  border-radius: 9px;
+  background: var(--accent, #E8564A);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.pf .pf-agd-tab {
+  /* allow the inline count badge to sit beside the label */
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.pf .pf-agd-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent, #E8564A);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 /* ── README tab (rendered from agents.<name>.readme markdown) ── */

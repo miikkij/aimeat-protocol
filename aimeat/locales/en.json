@@ -710,6 +710,9 @@
           "services": "Services",
           "quality": "Quality"
         },
+        "changes": {
+          "title": "New since you last looked"
+        },
         "quality": {
           "performanceTitle": "Performance",
           "performanceDesc": "How much this agent has done and how fast — computed from its tasks.",

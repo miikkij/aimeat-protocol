@@ -3,6 +3,11 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v1.11.0 -- 2026-06-02 -- Unseen-change badges: collapsed-card mini-badge
+ *     (total new across Tasks/Messages/Memory) + per-tab number badges on the
+ *     Tasks/Messages/Memory tab buttons; opening a tracked tab clears its badge
+ *     (via onTabSeen). Counts come from the `changes` prop (localStorage
+ *     last-seen baseline computed in agents-tab.js).
  *   v1.10.0 -- 2026-06-01 -- Reorder TABS to owner-requested order: Integration,
  *     Tasks, Messages, Data Access, Quality, Activity, then Directives /
  *     Agent Config / Services (README stays prepended/first).
@@ -91,7 +96,17 @@ async function fetchReadme(agent) {
   }
 }
 
-export default function AgentCard({ agent, onboarding, expanded, onToggle, session, showToast, allAgents, onScopesClick, onDeleteClick, onFederateToggle, onPopOut, soloMode = false }) {
+// Maps a tab id to its change-count key in the `changes` prop. Only these three
+// tabs carry unseen-change badges (Tasks, Messages, Memory/data-access).
+const TAB_CHANGE_KEY = { tasks: 'tasks', messages: 'messages', 'data-access': 'memory' };
+
+// Total unseen changes across the three tracked tabs (collapsed mini-badge).
+function totalChanges(changes) {
+  if (!changes) return 0;
+  return (changes.tasks || 0) + (changes.messages || 0) + (changes.memory || 0);
+}
+
+export default function AgentCard({ agent, onboarding, expanded, onToggle, session, showToast, allAgents, changes, onTabSeen, onScopesClick, onDeleteClick, onFederateToggle, onPopOut, soloMode = false }) {
   const state = detectAgentState(agent, onboarding);
   const [activeTab, setActiveTab] = useState(null);
   // README markdown: undefined = not loaded, '' = none published, string = show tab.
@@ -138,6 +153,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
             <span class="pf-agd-expand-icon">▶</span>
             <span class="pf-agd-collapsed-icon">🤖</span>
             <span class="pf-agd-collapsed-name">${agent.display_name || agent.name}</span>
+            ${renderChangeBadge(changes)}
             <div class="pf-agd-collapsed-badges">
               ${renderModeBadge(agent)}
               ${renderPlatformBadge(onboarding)}
@@ -202,11 +218,20 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
         <div class="pf-agd-tabs">
           ${tabs.map(tab => {
             const label = t(tab.key);
+            const changeKey = TAB_CHANGE_KEY[tab.id];
+            const count = changeKey ? (changes?.[changeKey] || 0) : 0;
             return html`
               <button key=${tab.id}
                       class="pf-agd-tab ${activeTab === tab.id ? 'pf-agd-tab--active' : ''}"
-                      onClick=${(e) => { e.stopPropagation(); userPickedTab.current = true; setActiveTab(tab.id); }}>
+                      onClick=${(e) => {
+                        e.stopPropagation();
+                        userPickedTab.current = true;
+                        setActiveTab(tab.id);
+                        // Opening a tracked tab clears its unseen badge.
+                        if (changeKey && onTabSeen) onTabSeen(agent.name, changeKey);
+                      }}>
                 ${label !== tab.key ? label : tab.id.charAt(0).toUpperCase() + tab.id.slice(1)}
+                ${count > 0 ? html`<span class="pf-agd-tab-badge">${count > 99 ? '99+' : count}</span>` : ''}
               </button>
             `;
           })}
@@ -250,6 +275,21 @@ function renderPopOut(onPopOut, agent) {
   if (!onPopOut) return null;
   return html`<button class="pf-agd-popout-btn" title=${t('profile.agents.detail.popOut')}
     onClick=${(e) => { e.stopPropagation(); onPopOut(agent); }}>⤢</button>`;
+}
+
+// Collapsed-card mini-badge: total unseen changes across Tasks/Messages/Memory,
+// so the owner can spot at a glance which agent has something new. Hidden when
+// nothing changed; naturally absent from the expanded view (which does not
+// render the collapsed bar). The title spells out the per-tab breakdown.
+function renderChangeBadge(changes) {
+  const total = totalChanges(changes);
+  if (total <= 0) return null;
+  const parts = [];
+  if (changes.tasks) parts.push(`${t('profile.agents.detail.tabs.tasks')}: ${changes.tasks}`);
+  if (changes.messages) parts.push(`${t('profile.agents.detail.tabs.messages')}: ${changes.messages}`);
+  if (changes.memory) parts.push(`${t('profile.agents.detail.tabs.data_access')}: ${changes.memory}`);
+  const title = `${t('profile.agents.detail.changes.title')} — ${parts.join(', ')}`;
+  return html`<span class="pf-agd-change-badge" title=${title}>${total > 99 ? '99+' : total}</span>`;
 }
 
 function renderDeliveryIndicator(agent) {

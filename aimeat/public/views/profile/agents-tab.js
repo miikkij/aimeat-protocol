@@ -45,6 +45,7 @@ import SharedBoard from './agents/shared-board.js';
 import AgentCard from './agents/agent-card.js';
 import { getOnboarding } from '/js/services/agent-integration.js';
 import { listTasks } from '/js/services/agent-tasks.js';
+import { listMessages } from '/js/services/agent-messages.js';
 
 // === Scope Management Constants ===
 const SCOPE_DOMAINS = [
@@ -359,6 +360,47 @@ function saveAgentOrder(owner, names) {
   try { localStorage.setItem(ORDER_KEY_PREFIX + owner, JSON.stringify(names)); }
   catch { /* ignore quota/availability errors */ }
 }
+
+// ── Per-browser "last seen per tab" state (localStorage) ──
+// Drives the per-agent change badges: how many tasks / messages / memory
+// entries have updated since the owner last opened that tab. Per-browser, keyed
+// by owner — same rationale as the agent ordering above (no server round-trip;
+// "what's new since I looked HERE" is inherently a per-device affordance).
+// Shape: { [agentName]: { tasks: iso, messages: iso, memory: iso } }
+// The three keys map to the Tasks, Messages and Memory (data-access) tabs.
+const SEEN_KEY_PREFIX = 'aimeat-agent-seen:';
+function loadSeen(owner) {
+  if (!owner) return {};
+  try { return JSON.parse(localStorage.getItem(SEEN_KEY_PREFIX + owner) || '{}') || {}; }
+  catch { return {}; }
+}
+function saveSeen(owner, data) {
+  if (!owner) return;
+  try { localStorage.setItem(SEEN_KEY_PREFIX + owner, JSON.stringify(data)); }
+  catch { /* ignore quota/availability errors */ }
+}
+// Stamp the given agent+tab as seen-now and persist. Read-modify-write against
+// the freshest localStorage so a concurrent loadData() seed doesn't clobber it.
+function markTabSeen(owner, agentName, tab) {
+  if (!owner || !agentName || !tab) return;
+  const seen = loadSeen(owner);
+  (seen[agentName] ||= {})[tab] = new Date().toISOString();
+  saveSeen(owner, seen);
+}
+// Count items whose newest available timestamp (first present of `fields`) is
+// strictly newer than `since`. `since` falsy → 0 (the caller seeds a baseline
+// on first observation, so an agent's whole history is never dumped as "new").
+function countNewer(items, since, fields) {
+  if (!Array.isArray(items) || !since) return 0;
+  const sinceMs = new Date(since).getTime();
+  let n = 0;
+  for (const it of items) {
+    let ts = null;
+    for (const f of fields) { if (it && it[f]) { ts = it[f]; break; } }
+    if (ts && new Date(ts).getTime() > sinceMs) n++;
+  }
+  return n;
+}
 // Effective ordering: agents named in the saved order first (in that order),
 // then any agents not yet ordered (e.g. newly connected) in their API order.
 function effectiveOrderedNames(agents, order) {
@@ -395,6 +437,10 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [taskRunnerExpanded, setTaskRunnerExpanded] = useState(false);
   const [taskRunnerName, setTaskRunnerName] = useState('');
   const [taskStatsMap, setTaskStatsMap] = useState({});
+  // Per-agent unseen-change counts { name: { tasks, messages, memory } } driving
+  // the collapsed mini-badge + per-tab number badges. Computed in loadData()
+  // from the localStorage "last seen per tab" baseline (see loadSeen/countNewer).
+  const [changesMap, setChangesMap] = useState({});
   const [tagFilter, setTagFilter] = useState(new Set());
   const [groupBy, setGroupBy] = useState('none'); // 'none' | 'tag' | 'mode'
   // Per-browser drag-to-reorder of the agent bars (localStorage-backed).
@@ -435,6 +481,19 @@ export default function AgentsTab({ session, showToast, onStats }) {
     setTimeout(() => setCopiedAction(current => current === action ? null : current), 2000);
   };
 
+  // Owner opened a tab on an agent → stamp it seen and clear that badge now.
+  // The next loadData() recomputes from the same baseline, keeping it at 0
+  // until a new change actually arrives.
+  const handleTabSeen = (agentName, tab) => {
+    if (!session) return;
+    markTabSeen(session.owner, agentName, tab);
+    setChangesMap(prev => {
+      const cur = prev[agentName];
+      if (!cur || !cur[tab]) return prev;
+      return { ...prev, [agentName]: { ...cur, [tab]: 0 } };
+    });
+  };
+
   useEffect(() => {
     if (session) loadData();
   }, [session]);
@@ -468,19 +527,56 @@ export default function AgentsTab({ session, showToast, onStats }) {
       }));
       setOnboardings(obMap);
       const tsMap = {};
+      const seen = loadSeen(session.owner);
+      let seenSeeded = false;
+      const chMap = {};
       await Promise.all(list.map(async (a) => {
         try {
-          const [doneResp, activeResp] = await Promise.all([
+          const [doneResp, activeResp, msgResp, memResp] = await Promise.all([
             listTasks(a.name, { status: 'done', per_page: 100 }),
             listTasks(a.name, { status: 'active', per_page: 100 }),
+            listMessages(a.name, { perPage: 100 }).catch(() => null),
+            apiGet(`/v1/memory?prefix=&per_page=100&agent=${encodeURIComponent(a.gaii || a.name)}`).catch(() => null),
           ]);
           const today = new Date().toISOString().slice(0, 10);
-          const doneToday = (doneResp?.data?.tasks || []).filter(tk => tk.completedAt?.startsWith(today)).length;
-          const activeCount = (activeResp?.data?.tasks || []).length;
-          tsMap[a.name] = { done: doneToday, active: activeCount };
-        } catch { tsMap[a.name] = null; }
+          const doneTasks = doneResp?.data?.tasks || [];
+          const activeTasks = activeResp?.data?.tasks || [];
+          const doneToday = doneTasks.filter(tk => tk.completedAt?.startsWith(today)).length;
+          tsMap[a.name] = { done: doneToday, active: activeTasks.length };
+
+          // Per-tab unseen-change counts. First observation of a tab seeds its
+          // baseline to "now" (count 0) so an agent's whole history is never
+          // dumped as new; only changes after that point raise the badge.
+          const agentSeen = seen[a.name] || (seen[a.name] = {});
+          const nowIso = new Date().toISOString();
+          const ch = {};
+          for (const [tab, items, fields] of [
+            ['tasks', [...doneTasks, ...activeTasks], ['updatedAt', 'completedAt', 'createdAt']],
+            // Only count agent→owner messages as unread; the owner's own
+            // inbound messages are not "new" to them.
+            ['messages', (msgResp?.data?.messages || []).filter(m => m.direction !== 'inbound'), ['createdAt', 'created_at']],
+            ['memory', (memResp?.data?.items || memResp?.data || []), ['updated_at', 'updatedAt', 'created_at', 'createdAt']],
+          ]) {
+            if (agentSeen[tab] === undefined) { agentSeen[tab] = nowIso; seenSeeded = true; ch[tab] = 0; }
+            else ch[tab] = countNewer(items, agentSeen[tab], fields);
+          }
+          chMap[a.name] = ch;
+        } catch { tsMap[a.name] = null; chMap[a.name] = null; }
       }));
       setTaskStatsMap(tsMap);
+      // Persist any freshly-seeded baselines. Merge against the latest storage
+      // so a tab the user opened mid-fetch (markTabSeen) is not overwritten.
+      if (seenSeeded) {
+        const fresh = loadSeen(session.owner);
+        for (const name of Object.keys(seen)) {
+          const merged = fresh[name] || (fresh[name] = {});
+          for (const tab of Object.keys(seen[name])) {
+            if (merged[tab] === undefined) merged[tab] = seen[name][tab];
+          }
+        }
+        saveSeen(session.owner, fresh);
+      }
+      setChangesMap(chMap);
     } catch { setAgents([]); }
   }
 
@@ -750,6 +846,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
           groupBy,
           onboardings,
           taskStatsMap,
+          changesMap,
+          onTabSeen: handleTabSeen,
           expandedAgent,
           toggleAgent,
           session,
@@ -825,7 +923,7 @@ function renderFilterBar(agents, tagFilter, setTagFilter, groupBy, setGroupBy) {
   `;
 }
 
-function renderAgentGroups({ agents, tagFilter, groupBy, onboardings, taskStatsMap, expandedAgent, toggleAgent, session, showToast, setScopesModal, handleDeleteAgent, toggleFederate, onPopOut, dnd, agentOrder }) {
+function renderAgentGroups({ agents, tagFilter, groupBy, onboardings, taskStatsMap, changesMap, onTabSeen, expandedAgent, toggleAgent, session, showToast, setScopesModal, handleDeleteAgent, toggleFederate, onPopOut, dnd, agentOrder }) {
   // Tag filter: agent must have ALL selected tags (intersection)
   const filtered = tagFilter.size === 0
     ? agents
@@ -848,6 +946,8 @@ function renderAgentGroups({ agents, tagFilter, groupBy, onboardings, taskStatsM
       session=${session}
       showToast=${showToast}
       allAgents=${agents}
+      changes=${changesMap?.[a.name] || null}
+      onTabSeen=${onTabSeen}
       onScopesClick=${(agent) => setScopesModal(agent)}
       onDeleteClick=${handleDeleteAgent}
       onFederateToggle=${toggleFederate}

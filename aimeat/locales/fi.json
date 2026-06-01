@@ -710,6 +710,9 @@
           "services": "Palvelut",
           "quality": "Laatu"
         },
+        "changes": {
+          "title": "Uutta sitten kun viimeksi katsoit"
+        },
         "quality": {
           "performanceTitle": "Suorituskyky",
           "performanceDesc": "Kuinka paljon agentti on tehnyt ja kuinka nopeasti — laskettu sen tehtävistä.",
