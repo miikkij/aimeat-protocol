@@ -32,6 +32,7 @@
  *   v2.17.0 -- 2026-06-01 -- Add per-task memory entries list styles (expanded task)
  *   v2.18.0 -- 2026-06-01 -- Per-task memory entries are collapsible with pretty-printed JSON bodies
  *   v2.19.0 -- 2026-06-01 -- Structured JSON view for memory values (key/value rows, indented nested blocks, type colours)
+ *   v2.20.0 -- 2026-06-01 -- Tab bar wraps (flex-wrap) instead of horizontal scroll so all 10 tabs stay visible on two rows
  *   v2.11.0 -- 2026-05-31 -- Widen the solo pop-out window (and pf-agd-solo max-width) so the agent card matches the list-view width and the full tab bar fits
  *   v2.12.0 -- 2026-05-31 -- Add completed-task deliverable styles (pf-agd-deliverable*) linking a task to its agent-memory output key
  *   v2.13.0 -- 2026-05-31 -- Add per-task blur-title toggle styles (pf-agd-blur-toggle, pf-agd-task-title--blurred) for hiding sensitive titles in screen recordings
@@ -1704,9 +1705,14 @@
 
 .pf .pf-agd-tabs {
   display: flex;
+  /* Wrap to a second row instead of scrolling horizontally: with 10 tabs the
+     bar no longer fits one line on the card width. TABS (agent-card.js) is
+     ordered by owner usage frequency so the most-used tabs land on the top row
+     and the rarely-touched setup tabs fall to the second. */
+  flex-wrap: wrap;
   gap: 0;
+  row-gap: 2px;
   border-bottom: 1px solid var(--border, #E5E7EB);
-  overflow-x: auto;
 }
 .pf .pf-agd-tab {
   padding: 0.5rem 0.875rem;

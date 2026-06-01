@@ -3,6 +3,9 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v1.9.0 -- 2026-06-01 -- Reorder TABS by owner usage frequency (Integration,
+ *     Tasks, Data Access, Quality, Activity, ... setup tabs last) so the
+ *     now-wrapping tab bar keeps the most-used tabs on the top row.
  *   v1.8.0 -- 2026-05-31 -- Add Quality tab (per-context reviews + performance + custom stats)
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  *   v1.1.0 -- 2026-05-24 -- Fix C6: remove GAII from Zone 1, M1: add Next prefix, C1: production stats, C2: problem action buttons
@@ -44,15 +47,22 @@ const html = htm.bind(h);
 
 // README is opt-in and prepended only when the agent has published one, so it
 // is NOT in this base list. See readmeTab below.
+//
+// Order is by owner usage frequency, not feature grouping: the tab bar wraps to
+// a second row (flex-wrap, see .pf-agd-tabs CSS) instead of scrolling, so the
+// most-used tabs are placed first and naturally land on the top row, while the
+// rarely-touched setup tabs (directives / agent-config / services) fall to the
+// second row. Integration sits right after README because it doubles as the
+// post-setup "overview" the owner returns to.
 const TABS = [
   { id: 'integration', key: 'profile.agents.detail.tabs.integration' },
   { id: 'tasks', key: 'profile.agents.detail.tabs.tasks' },
-  { id: 'messages', key: 'profile.agents.detail.tabs.messages' },
   { id: 'data-access', key: 'profile.agents.detail.tabs.data_access' },
+  { id: 'quality', key: 'profile.agents.detail.tabs.quality' },
+  { id: 'activity', key: 'profile.agents.detail.tabs.activity' },
+  { id: 'messages', key: 'profile.agents.detail.tabs.messages' },
   { id: 'directives', key: 'profile.agents.detail.tabs.directives' },
   { id: 'agent-config', key: 'profile.agents.detail.tabs.agent_config' },
-  { id: 'activity', key: 'profile.agents.detail.tabs.activity' },
-  { id: 'quality', key: 'profile.agents.detail.tabs.quality' },
   { id: 'services', key: 'profile.agents.detail.tabs.services' },
 ];
 
