@@ -34,6 +34,7 @@
  *   v2.19.0 -- 2026-06-01 -- Structured JSON view for memory values (key/value rows, indented nested blocks, type colours)
  *   v2.20.0 -- 2026-06-01 -- Tab bar wraps (flex-wrap) instead of horizontal scroll so all 10 tabs stay visible on two rows
  *   v2.21.0 -- 2026-06-02 -- Unseen-change badges: collapsed-card mini-badge (pf-agd-change-badge) + per-tab number badges (pf-agd-tab-badge)
+ *   v2.22.0 -- 2026-06-02 -- Add divider line above the tab bar (border-top + spacing) so tabs don't blend with the status row above
  *   v2.11.0 -- 2026-05-31 -- Widen the solo pop-out window (and pf-agd-solo max-width) so the agent card matches the list-view width and the full tab bar fits
  *   v2.12.0 -- 2026-05-31 -- Add completed-task deliverable styles (pf-agd-deliverable*) linking a task to its agent-memory output key
  *   v2.13.0 -- 2026-05-31 -- Add per-task blur-title toggle styles (pf-agd-blur-toggle, pf-agd-task-title--blurred) for hiding sensitive titles in screen recordings
@@ -1713,6 +1714,11 @@
   flex-wrap: wrap;
   gap: 0;
   row-gap: 2px;
+  /* Divider above the bar too, so the tabs read as their own block and don't
+     blend into the status row (Polling | Last seen | Today: N done) above. */
+  border-top: 1px solid var(--border, #E5E7EB);
+  margin-top: 0.5rem;
+  padding-top: 0.25rem;
   border-bottom: 1px solid var(--border, #E5E7EB);
 }
 .pf .pf-agd-tab {
