@@ -33,8 +33,8 @@ export default function MemoryTab({ data, reload, session }) {
 
   const toast = useToast();
 
-  const loadMemory = useCallback(async (off = 0) => {
-    setLoading(true);
+  const loadMemory = useCallback(async (off = 0, { showSpinner = true } = {}) => {
+    if (showSpinner) setLoading(true);
     try {
       const params = { limit: PAGE_SIZE, offset: off };
       if (ownerFilter.trim()) params.owner = ownerFilter.trim();
@@ -56,7 +56,7 @@ export default function MemoryTab({ data, reload, session }) {
 
   // Listen for live updates
   useEffect(() => {
-    const handler = () => { loadMemory(offset); };
+    const handler = () => { loadMemory(offset, { showSpinner: false }); }; // silent: no flash
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [loadMemory, offset]);

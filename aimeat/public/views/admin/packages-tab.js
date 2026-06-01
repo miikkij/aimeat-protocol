@@ -305,8 +305,8 @@ export default function PackagesAdminTab({ data, reload, session }) {
   const [seedMsg, setSeedMsg] = useState('');
   const [subtab, setSubtab] = useState('packages');
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async ({ showSpinner = true } = {}) => {
+    if (showSpinner) setLoading(true);
     try {
       const [pkgRes, instRes, tplRes, pendRes] = await Promise.all([
         pkgService.listPackages({ limit: 50 }),
@@ -329,7 +329,7 @@ export default function PackagesAdminTab({ data, reload, session }) {
 
   // Live updates
   useEffect(() => {
-    const handler = () => { loadData(); };
+    const handler = () => { loadData({ showSpinner: false }); }; // silent: no flash
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [loadData]);

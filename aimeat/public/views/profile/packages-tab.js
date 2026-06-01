@@ -41,8 +41,8 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async ({ showSpinner = true } = {}) => {
+    if (showSpinner) setLoading(true);
     try {
       const [instRes, pkgRes, tplRes] = await Promise.all([
         pkgService.listInstances({ status: 'installed' }),
@@ -65,7 +65,7 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
 
   // Live updates
   useEffect(() => {
-    const handler = () => { loadData(); };
+    const handler = () => { loadData({ showSpinner: false }); }; // silent: don't flash blank
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [loadData]);

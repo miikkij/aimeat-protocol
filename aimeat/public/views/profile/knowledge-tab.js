@@ -63,9 +63,9 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
   const nodeUrl = window.location.origin;
   const nodeId = session?.nodeId || '';
 
-  const loadPackages = useCallback(async () => {
+  const loadPackages = useCallback(async ({ showSpinner = true } = {}) => {
     try {
-      setLoading(true);
+      if (showSpinner) setLoading(true);
       const list = await knowledgeService.listMyPackages();
       const hydrated = await Promise.all(list.map(async (pkg) => {
         if (pkg.value) return pkg;
@@ -76,7 +76,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
       }));
       setPackages(hydrated);
       onStats?.({ knowledge: hydrated.length });
-    } catch { setPackages([]); }
+    } catch { if (showSpinner) setPackages([]); } // keep old list on a transient live-update refetch
     finally { setLoading(false); }
   }, [onStats]);
 
@@ -133,7 +133,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
   const loadRef = useRef(loadPackages);
   loadRef.current = loadPackages;
   useEffect(() => {
-    const handler = () => { loadRef.current(); loadFedConsents(); };
+    const handler = () => { loadRef.current({ showSpinner: false }); loadFedConsents(); }; // silent
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, []);

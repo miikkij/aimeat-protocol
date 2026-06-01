@@ -25,8 +25,8 @@ export default function AgentTasksTab({ data, reload, session }) {
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
 
-  const loadTasks = useCallback(async (p = 1) => {
-    setLoading(true);
+  const loadTasks = useCallback(async (p = 1, { showSpinner = true } = {}) => {
+    if (showSpinner) setLoading(true);
     try {
       const params = new URLSearchParams();
       params.set('page', String(p));
@@ -48,7 +48,7 @@ export default function AgentTasksTab({ data, reload, session }) {
 
   // Listen for live updates
   useEffect(() => {
-    const handler = () => { loadTasks(page); };
+    const handler = () => { loadTasks(page, { showSpinner: false }); }; // silent: no flash
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [loadTasks, page]);

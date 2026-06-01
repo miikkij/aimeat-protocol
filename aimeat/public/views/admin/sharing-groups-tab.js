@@ -19,8 +19,8 @@ export default function SharingGroupsTab({ data, reload, session }) {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const loadGroups = useCallback(async () => {
-    setLoading(true);
+  const loadGroups = useCallback(async ({ showSpinner = true } = {}) => {
+    if (showSpinner) setLoading(true);
     try {
       const r = await apiGet('/v1/admin/sharing-groups');
       if (r.data) {
@@ -37,7 +37,7 @@ export default function SharingGroupsTab({ data, reload, session }) {
 
   // Listen for live updates
   useEffect(() => {
-    const handler = () => { loadGroups(); };
+    const handler = () => { loadGroups({ showSpinner: false }); }; // silent: no flash
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [loadGroups]);

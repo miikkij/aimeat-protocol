@@ -27,13 +27,13 @@ export default function NotificationsTab({ session, showToast }) {
 
   // Re-check email verification when other tabs update data (e.g. email confirmed)
   useEffect(() => {
-    const handler = () => { if (session) checkSubscription(); };
+    const handler = () => { if (session) checkSubscription({ showSpinner: false }); }; // silent
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [session]);
 
-  async function checkSubscription() {
-    setLoading(true);
+  async function checkSubscription({ showSpinner = true } = {}) {
+    if (showSpinner) setLoading(true);
     try {
       // Get VAPID key
       const vapidRes = await apiGet('/v1/push/vapid-key');

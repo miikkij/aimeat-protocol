@@ -137,8 +137,8 @@ export default function StatsTab({ data }) {
   const [loading, setLoading] = useState(false);
   const chartRefs = useRef({});
 
-  const fetchStats = useCallback(async (p, cf, ct) => {
-    setLoading(true);
+  const fetchStats = useCallback(async (p, cf, ct, { showSpinner = true } = {}) => {
+    if (showSpinner) setLoading(true);
     try {
       const range = p === 'custom'
         ? (cf && ct ? { from: cf, to: ct } : null)
@@ -155,7 +155,7 @@ export default function StatsTab({ data }) {
 
   // Listen for live updates
   useEffect(() => {
-    const handler = () => { fetchStats(period, customFrom, customTo); };
+    const handler = () => { fetchStats(period, customFrom, customTo, { showSpinner: false }); }; // silent: no flash
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [period, customFrom, customTo]);

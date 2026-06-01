@@ -25,18 +25,18 @@ export default function CortexTab({ data, reload, session }) {
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async ({ showSpinner = true } = {}) => {
+    if (showSpinner) setLoading(true);
     try {
       const resp = await cortexService.listExtensions();
       setExtensions(resp?.extensions || []);
-    } catch { setExtensions([]); }
+    } catch { if (showSpinner) setExtensions([]); }
     setLoading(false);
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
   useEffect(() => {
-    const handler = () => { loadData(); };
+    const handler = () => { loadData({ showSpinner: false }); }; // silent: no flash
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [loadData]);
