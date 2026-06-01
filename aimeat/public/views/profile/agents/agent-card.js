@@ -3,6 +3,9 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v1.12.0 -- 2026-06-02 -- Active tracked tab never shows its own badge and is
+ *     kept marked-seen as new items arrive (so a message landing while you're on
+ *     the Messages tab doesn't raise a (1) you're already looking at).
  *   v1.11.0 -- 2026-06-02 -- Unseen-change badges: collapsed-card mini-badge
  *     (total new across Tasks/Messages/Memory) + per-tab number badges on the
  *     Tasks/Messages/Memory tab buttons; opening a tracked tab clears its badge
@@ -136,6 +139,16 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
     setActiveTab(hasReadme ? 'readme' : getDefaultTab(state));
   }, [expanded, readme]);
 
+  // While the owner is actively viewing a tracked tab (Tasks/Messages/Memory),
+  // keep it marked-seen as new items arrive. Without this, a message landing
+  // while you're on the Messages tab would raise its (1) badge even though you
+  // are looking right at it. Non-active tabs still accumulate their badge.
+  useEffect(() => {
+    if (!expanded) return;
+    const key = TAB_CHANGE_KEY[activeTab];
+    if (key && onTabSeen && changes?.[key]) onTabSeen(agent.name, key);
+  }, [expanded, activeTab, changes, agent.name]);
+
   const handleCollapse = useCallback(() => {
     // In solo mode the card is the whole window — clicking the header must not
     // collapse it (there is nothing to collapse back into).
@@ -219,7 +232,9 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
           ${tabs.map(tab => {
             const label = t(tab.key);
             const changeKey = TAB_CHANGE_KEY[tab.id];
-            const count = changeKey ? (changes?.[changeKey] || 0) : 0;
+            // The tab you're currently viewing never shows a badge — you're
+            // looking at it (and the effect above keeps it marked-seen).
+            const count = (changeKey && activeTab !== tab.id) ? (changes?.[changeKey] || 0) : 0;
             return html`
               <button key=${tab.id}
                       class="pf-agd-tab ${activeTab === tab.id ? 'pf-agd-tab--active' : ''}"

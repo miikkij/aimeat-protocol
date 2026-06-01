@@ -9,6 +9,9 @@
  *   - TaskItem -- task row with expand/collapse, todo list, start button
  *   - RequestChangesModal -- inline modal for owner to send a free-text change request
  * @version-history
+ *   v4.8.3 -- 2026-06-02 -- Render non-JSON memory values (e.g. an agent's
+ *     latest_output) as Markdown via the shared safe Markdown component, instead
+ *     of raw monospace text.
  *   v4.8.2 -- 2026-06-01 -- Render JSON memory values as a structured key/value
  *     tree (indented nested blocks, type-coloured values) instead of raw JSON text.
  *   v4.8.1 -- 2026-06-01 -- Per-task memory entries are now collapsible; values
@@ -62,6 +65,7 @@ import { apiGet, apiPost } from '/js/api.js';
 import { listTasks, deleteTask, startTask, listEvents, requestChanges, createTask, rateTask, setTaskTriage } from '/js/services/agent-tasks.js';
 import { setMaxConcurrentTasks } from '/js/services/agents.js';
 import { useConfirm, Modal } from '/components/Modal.js';
+import { Markdown } from '/components/Markdown.js';
 import RateModal from './agents/rate-modal.js';
 
 // Tasks-tab triage buckets (server-derived) + on-demand search time chips.
@@ -291,7 +295,10 @@ function TaskMemoryEntry({ entry }) {
         <div class="pf-agd-task-memory-body">
           ${isJson
             ? html`<${JsonNode} value=${json} />`
-            : html`<pre class="pf-agd-task-memory-raw">${raw}</pre>`}
+            // Non-JSON values (e.g. an agent's latest_output) are usually
+            // markdown — render them formatted via the shared safe Markdown
+            // component instead of raw text.
+            : html`<div class="pf-agd-task-memory-md"><${Markdown} text=${raw} /></div>`}
         </div>
       `}
     </div>
