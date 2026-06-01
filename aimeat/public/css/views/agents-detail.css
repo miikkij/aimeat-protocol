@@ -35,6 +35,7 @@
  *   v2.20.0 -- 2026-06-01 -- Tab bar wraps (flex-wrap) instead of horizontal scroll so all 10 tabs stay visible on two rows
  *   v2.21.0 -- 2026-06-02 -- Unseen-change badges: collapsed-card mini-badge (pf-agd-change-badge) + per-tab number badges (pf-agd-tab-badge)
  *   v2.22.0 -- 2026-06-02 -- Add divider line above the tab bar (border-top + spacing) so tabs don't blend with the status row above
+ *   v2.23.0 -- 2026-06-02 -- Compact .md-body styles for agent message bubbles (Markdown-rendered outbound replies)
  *   v2.11.0 -- 2026-05-31 -- Widen the solo pop-out window (and pf-agd-solo max-width) so the agent card matches the list-view width and the full tab bar fits
  *   v2.12.0 -- 2026-05-31 -- Add completed-task deliverable styles (pf-agd-deliverable*) linking a task to its agent-memory output key
  *   v2.13.0 -- 2026-05-31 -- Add per-task blur-title toggle styles (pf-agd-blur-toggle, pf-agd-task-title--blurred) for hiding sensitive titles in screen recordings
@@ -1851,6 +1852,75 @@
   line-height: 1.35;
   color: var(--text, #1A1A2E);
 }
+
+/* ── Markdown inside agent (outbound) message bubbles ──
+   Agent replies render through the shared Markdown component. The README
+   .md-body rules are scoped to .pf-agd-readme only, so message bubbles need
+   their own compact variant: no outer margins (the bubble padding handles
+   spacing), modest headings, bordered code chips (the bubble surface is grey,
+   so a plain grey code background would blend). */
+.pf .pf-agd-msg-bubble .md-body > :first-child { margin-top: 0; }
+.pf .pf-agd-msg-bubble .md-body > :last-child { margin-bottom: 0; }
+.pf .pf-agd-msg-bubble .md-body p { margin: 0.35rem 0; }
+.pf .pf-agd-msg-bubble .md-body h1,
+.pf .pf-agd-msg-bubble .md-body h2,
+.pf .pf-agd-msg-bubble .md-body h3,
+.pf .pf-agd-msg-bubble .md-body h4 {
+  margin: 0.5rem 0 0.25rem;
+  line-height: 1.3;
+  font-size: 0.95rem;
+}
+.pf .pf-agd-msg-bubble .md-body h1 { font-size: 1.05rem; }
+.pf .pf-agd-msg-bubble .md-body h2 { font-size: 1rem; }
+.pf .pf-agd-msg-bubble .md-body ul,
+.pf .pf-agd-msg-bubble .md-body ol { margin: 0.35rem 0; padding-left: 1.4rem; }
+.pf .pf-agd-msg-bubble .md-body li { margin: 0.15rem 0; }
+.pf .pf-agd-msg-bubble .md-body a { color: var(--accent, #E8564A); }
+.pf .pf-agd-msg-bubble .md-body blockquote {
+  margin: 0.4rem 0;
+  padding: 0.2rem 0.6rem;
+  border-left: 3px solid var(--border, #E5E7EB);
+  color: var(--text-dim, #6B7280);
+}
+.pf .pf-agd-msg-bubble .md-body .md-code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  background: var(--card, #FFFFFF);
+  border: 1px solid var(--border, #E5E7EB);
+  padding: 0.02rem 0.3rem;
+  border-radius: 4px;
+}
+.pf .pf-agd-msg-bubble .md-body .md-pre {
+  margin: 0.45rem 0;
+  padding: 0.6rem;
+  background: var(--card, #FFFFFF);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+.pf .pf-agd-msg-bubble .md-body .md-pre .md-code {
+  display: block;
+  white-space: pre;
+  background: none;
+  border: none;
+  padding: 0;
+  tab-size: 4;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--text, #1A1A2E);
+}
+.pf .pf-agd-msg-bubble .md-body table {
+  border-collapse: collapse;
+  margin: 0.4rem 0;
+  font-size: 0.8rem;
+}
+.pf .pf-agd-msg-bubble .md-body th,
+.pf .pf-agd-msg-bubble .md-body td {
+  border: 1px solid var(--border, #E5E7EB);
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+}
+.pf .pf-agd-msg-bubble .md-body th { background: var(--card-bg-alt, #F3F4F6); }
 
 /* ── Integration tab: Onboarding checklist ── */
 

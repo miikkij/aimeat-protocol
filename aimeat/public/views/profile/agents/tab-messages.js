@@ -3,6 +3,9 @@
  * @description Messages tab with command palette, "/" autocomplete, and chat area.
  *   Wraps the existing messages subtab and adds command discovery.
  * @version-history
+ *   v1.4.0 -- 2026-06-02 -- Render agent (outbound) message bodies as Markdown via the
+ *     shared safe vnode Markdown component, so LLM replies (bold, lists, code,
+ *     tables) display formatted. Owner inbound messages stay literal text.
  *   v1.3.0 -- 2026-05-30 -- Render agent single-select option-prompts (metadata.prompt) as
  *     clickable chips + an implicit "Other"; clicking sends a correlated prompt_answer. A
  *     prompt locks (read-only, chosen chip highlighted) once a newer message exists.
@@ -18,6 +21,7 @@ import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { sendMessage, listMessages, listThreads } from '/js/services/agent-messages.js';
 import { getAgentCommands } from '/js/services/agent-integration.js';
+import { Markdown } from '/components/Markdown.js';
 
 const html = htm.bind(h);
 
@@ -222,7 +226,12 @@ export default function TabMessages({ agent, agentName, session, showToast }) {
       <div key=${msg.id || msg.createdAt}>
         <div class="pf-agd-msg-bubble ${msg.direction === 'inbound' ? 'pf-agd-msg-inbound' : 'pf-agd-msg-outbound'} ${isCommand ? 'pf-agd-msg-command' : ''} ${isReply ? 'pf-agd-msg-reply' : ''}">
           ${isCommand && html`<span class="pf-agd-command-badge">${t('profile.agents.detail.messages.command')}</span>`}
-          ${msg.content}
+          ${msg.direction === 'outbound'
+            // Agent replies are markdown (LLM output). Render them safely via the
+            // shared vnode Markdown component. Owner-typed inbound messages stay
+            // literal — the input is a plain text field, not markdown.
+            ? html`<${Markdown} text=${msg.content || ''} />`
+            : msg.content}
         </div>
         <div class="pf-agd-msg-meta ${msg.direction === 'inbound' ? 'pf-agd-msg-meta-right' : ''}">
           ${msg.createdAt ? html`<span class="pf-agd-msg-time">${new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> ${timeAgo(msg.createdAt)}` : ''}
