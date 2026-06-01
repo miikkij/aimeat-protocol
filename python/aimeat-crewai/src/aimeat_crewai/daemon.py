@@ -14,6 +14,17 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.3.8 -- `max_concurrent_tasks` (#16). run_crew_daemon gained a
+    `max_concurrent_tasks` arg: `None` (default) reads the owner-configured value
+    from the AIMEAT integration kit (`watchdog_spec.max_concurrent_tasks`, set in
+    the profile Tasks tab; needs AIMEAT >= 1.16.2); an int overrides it. 1 =
+    serial (unchanged behaviour, one shared liaison). >1 runs EXECUTE tasks on a
+    bounded thread pool where EACH task gets its OWN liaison + MCP connection (a
+    shared stdio MCP can't be driven by parallel kickoffs). PROPOSE and inbox
+    messages stay serial on the shared liaison. In-flight tracking prevents
+    double-dispatch; cooperative cancellation is re-checked per worker just
+    before kickoff; crashes still fail the task. Drains the pool (waits for
+    running kickoffs) on shutdown.
   0.3.7 -- Cooperative cancellation. Before each (blocking) EXECUTE kickoff the
     daemon re-checks whether the subtask is still wanted: it skips + fails the
     task if its status is no longer active/stalled (owner paused/deleted it) OR
@@ -68,6 +79,7 @@ from __future__ import annotations
 import os
 import signal
 import time
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
@@ -164,6 +176,35 @@ def _poll_tasks(token: str, node_url: str, agent_name: str, status: str = "queue
         return body.get("data", {}).get("tasks", []) or []
     except Exception:
         return []
+
+
+def _fetch_max_concurrent(token: str, node_url: str, agent_name: str) -> int:
+    """Read the owner-configured concurrency from the AIMEAT integration kit.
+
+    AIMEAT (>= 1.16.2) exposes the per-agent runner config at
+    `GET /v1/agents/<agent>/integration-kit` under
+    `data.kit.watchdog_spec.max_concurrent_tasks`. The owner edits it in the
+    profile Tasks tab. Default 1 (serial) on any error or if the node is older.
+    """
+    try:
+        r = requests.get(
+            f"{node_url.rstrip('/')}/v1/agents/{agent_name}/integration-kit",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=15,
+        )
+        if r.status_code == 200:
+            v = (
+                r.json()
+                .get("data", {})
+                .get("kit", {})
+                .get("watchdog_spec", {})
+                .get("max_concurrent_tasks")
+            )
+            if isinstance(v, int) and v >= 1:
+                return v
+    except Exception:
+        pass
+    return 1
 
 
 def _is_cancelled(token: str, node_url: str, agent_name: str, task_id: str) -> bool:
@@ -429,6 +470,7 @@ def run_crew_daemon(
     llm: Any = None,
     tool_filter: Any = _USE_DAEMON_DEFAULT_FILTER,
     poll_interval_seconds: int = 30,
+    max_concurrent_tasks: int | None = None,
     listen_for: Iterable[str] = ("tasks",),
     on_idle: Callable[[], None] | None = None,
     on_error: Callable[[Exception], None] | None = None,
@@ -486,6 +528,17 @@ def run_crew_daemon(
         poll_interval_seconds: How often to check AIMEAT for new work
             when idle. Default 30s; raise for low-priority crews, lower
             for snappy interactive feel (but mind rate limits).
+        max_concurrent_tasks: How many EXECUTE-phase tasks the daemon runs in
+            parallel. `None` (default) reads the owner-configured value from the
+            AIMEAT integration kit (`watchdog_spec.max_concurrent_tasks`, set in
+            the profile Tasks tab; default 1). Pass an int to override locally.
+            1 = serial (the original behaviour, one shared liaison). >1 runs a
+            bounded thread pool where EACH concurrent task gets its OWN liaison
+            and MCP connection (a shared stdio MCP cannot be used by parallel
+            kickoffs). PROPOSE-phase and inbox messages stay serial on the shared
+            liaison. The value is read once at startup -- restart to apply a
+            change. Mind LLM rate limits: N parallel crews fan out further
+            internally, so start conservative (3-5).
         listen_for: Iterable of "tasks" and/or "messages". Default
             ("tasks",). When "messages" is included, inbox messages also
             become triggers: they're wrapped into a synthetic task dict
@@ -538,6 +591,17 @@ def run_crew_daemon(
     else:
         print(f"[daemon:{agent_name}] loading liaison with NO tool_filter (every available MCP tool)")
 
+    # Resolve concurrency: explicit override, else the owner-configured value
+    # from the integration kit (default 1 = serial). Read once at startup.
+    if max_concurrent_tasks is None:
+        effective_max = _fetch_max_concurrent(token, node_url, agent_name)
+    else:
+        effective_max = max(1, int(max_concurrent_tasks))
+    if effective_max > 1:
+        print(f"[daemon:{agent_name}] EXECUTE concurrency: up to {effective_max} tasks in parallel (per-task liaison)")
+    else:
+        print(f"[daemon:{agent_name}] EXECUTE concurrency: serial (1)")
+
     # Resolve PROPOSE crew builder: caller's override or the package default.
     propose_builder: BuildCrewCallback = build_propose_crew or _default_propose_crew
 
@@ -550,6 +614,12 @@ def run_crew_daemon(
     # cover the small remaining churn surface.
     proposed_ids: set[str] = set()
     done_ids: set[str] = set()
+
+    # Concurrent-EXECUTE state (only used when effective_max > 1). Mutated by the
+    # MAIN thread only: workers just run and return, the main thread reaps their
+    # futures and updates done_ids, so no lock is needed.
+    in_flight: set[str] = set()        # EXECUTE task ids currently in the pool
+    futures: dict[Future, str] = {}    # Future -> task_id
 
     def _dispatch(phase_label: str, task: dict[str, Any], builder: BuildCrewCallback) -> bool:
         """Run one crew against one task. Returns True on success, False on error."""
@@ -582,6 +652,77 @@ def run_crew_daemon(
                 except Exception:
                     pass
             return False
+
+    def _execute_worker(task: dict[str, Any]) -> tuple[str, str]:
+        """Run one EXECUTE task in its OWN liaison (for the concurrent path).
+
+        Each worker spawns a fresh liaison + MCP connection (its own connector
+        subprocess) because a shared stdio MCP can't be driven by parallel
+        kickoffs. Cooperative cancellation is re-checked just before kickoff.
+        On crash the task is marked failed server-side. Returns (task_id, status)
+        where status is "ok" | "cancelled" | "error".
+        """
+        task_id = task.get("id", "(unknown id)")
+        title = task.get("title", "(no title)")
+        print(f"[daemon:{agent_name}] EXECUTE(worker) task {task_id}: {title}")
+        try:
+            with create_liaison_agent(
+                mcp_server_params=stdio_params(agent_name=agent_name),
+                agent_name=agent_name,
+                tool_filter=resolved_tool_filter,
+                llm=llm,
+            ) as worker_liaison:
+                if _is_cancelled(token, node_url, agent_name, task_id):
+                    print(f"[daemon:{agent_name}] EXECUTE task {task_id} cancelled before start -- skipping")
+                    _fail_cancelled(token, node_url, agent_name, task_id)
+                    return (task_id, "cancelled")
+                crew = build_crew(task, worker_liaison)
+                result = crew.kickoff()
+                print(f"[daemon:{agent_name}] EXECUTE task {task_id} done; first 200 chars: {str(result)[:200]}")
+                return (task_id, "ok")
+        except Exception as inner:
+            print(f"[daemon:{agent_name}] EXECUTE task {task_id} crashed: {inner}")
+            if on_error:
+                try:
+                    on_error(inner)
+                except Exception:
+                    pass
+            try:
+                requests.post(
+                    f"{node_url.rstrip('/')}/v1/agents/{agent_name}/tasks/{task_id}/fail",
+                    headers={"Authorization": f"Bearer {token}"},
+                    json={"message": f"Crew crashed: {inner}"},
+                    timeout=10,
+                )
+            except Exception:
+                pass
+            return (task_id, "error")
+
+    def _reap_finished() -> None:
+        """Main-thread reap of completed EXECUTE workers (concurrent path)."""
+        for f in [f for f in list(futures) if f.done()]:
+            tid = futures.pop(f)
+            in_flight.discard(tid)
+            try:
+                _, status = f.result()
+            except Exception:
+                status = "error"
+            # ok/cancelled leave the active queue for good -> guard against
+            # re-dispatch. "error" already POSTed /fail (so the task is no longer
+            # active); mirror the serial path and DON'T add it, so a transient
+            # /fail failure still lets the next cycle retry.
+            if status in ("ok", "cancelled"):
+                done_ids.add(tid)
+
+    # The shared liaison's MCP connection stays open for the daemon's lifetime;
+    # it serves PROPOSE, inbox messages, and (serial mode) EXECUTE. When
+    # effective_max > 1, EXECUTE tasks run on a bounded thread pool instead, each
+    # on its own liaison (see _execute_worker). The pool spawns no threads until
+    # the first submit, so leaving it unused in serial mode costs nothing.
+    executor: ThreadPoolExecutor | None = (
+        ThreadPoolExecutor(max_workers=effective_max, thread_name_prefix=f"{agent_name}-exec")
+        if effective_max > 1 else None
+    )
 
     # The liaison's MCP connection stays open for the whole daemon's lifetime.
     # Each crew.kickoff() reuses the same liaison instance.
@@ -617,31 +758,63 @@ def run_crew_daemon(
                     # re-starting in the dashboard, which keeps them as 'active'
                     # again, but we also pick them up here so a daemon restart
                     # mid-task doesn't lose the task).
-                    for task_status in ("active", "stalled"):
-                        for task in _poll_tasks(token, node_url, agent_name, status=task_status):
-                            if stop["flag"]:
-                                break
-                            task_id = task.get("id")
-                            if not task_id or task_id in done_ids:
-                                continue
-                            # Cooperative cancellation: re-check right before the
-                            # blocking kickoff. The daemon dispatches from a list
-                            # fetched at cycle start, so a subtask cancelled
-                            # mid-cycle (e.g. a coordinator timed out and gave up
-                            # on speculative branches, or the owner paused it) is
-                            # still in that list. This guard stops abandoned work
-                            # from ever starting -- circuit breaker for the
-                            # "coordinator over-delegated to one crew" case.
-                            if _is_cancelled(token, node_url, agent_name, task_id):
-                                print(f"[daemon:{agent_name}] EXECUTE task {task_id} cancelled before start -- skipping")
-                                _fail_cancelled(token, node_url, agent_name, task_id)
-                                done_ids.add(task_id)
+                    #
+                    # Serial (effective_max == 1) keeps the original shared-liaison,
+                    # blocking-kickoff path. Concurrent (>1) reaps finished workers,
+                    # then submits up to the free pool slots -- each task on its own
+                    # per-task liaison/MCP (a shared stdio MCP can't be driven by
+                    # parallel kickoffs).
+                    if effective_max <= 1:
+                        for task_status in ("active", "stalled"):
+                            for task in _poll_tasks(token, node_url, agent_name, status=task_status):
+                                if stop["flag"]:
+                                    break
+                                task_id = task.get("id")
+                                if not task_id or task_id in done_ids:
+                                    continue
+                                # Cooperative cancellation: re-check right before the
+                                # blocking kickoff. The daemon dispatches from a list
+                                # fetched at cycle start, so a subtask cancelled
+                                # mid-cycle (e.g. a coordinator timed out and gave up
+                                # on speculative branches, or the owner paused it) is
+                                # still in that list. This guard stops abandoned work
+                                # from ever starting -- circuit breaker for the
+                                # "coordinator over-delegated to one crew" case.
+                                if _is_cancelled(token, node_url, agent_name, task_id):
+                                    print(f"[daemon:{agent_name}] EXECUTE task {task_id} cancelled before start -- skipping")
+                                    _fail_cancelled(token, node_url, agent_name, task_id)
+                                    done_ids.add(task_id)
+                                    dispatched_this_cycle = True
+                                    continue
+                                ok = _dispatch("EXECUTE", task, build_crew)
+                                if ok:
+                                    done_ids.add(task_id)
                                 dispatched_this_cycle = True
-                                continue
-                            ok = _dispatch("EXECUTE", task, build_crew)
-                            if ok:
-                                done_ids.add(task_id)
-                            dispatched_this_cycle = True
+                    else:
+                        _reap_finished()
+                        for task_status in ("active", "stalled"):
+                            if len(in_flight) >= effective_max:
+                                break
+                            for task in _poll_tasks(token, node_url, agent_name, status=task_status):
+                                if stop["flag"] or len(in_flight) >= effective_max:
+                                    break
+                                task_id = task.get("id")
+                                if not task_id or task_id in done_ids or task_id in in_flight:
+                                    continue
+                                # Pre-submit cancellation check -- cheap, and avoids
+                                # spawning a per-task liaison subprocess for work
+                                # that's already been cancelled. The worker re-checks
+                                # again just before its kickoff (authoritative).
+                                if _is_cancelled(token, node_url, agent_name, task_id):
+                                    print(f"[daemon:{agent_name}] EXECUTE task {task_id} cancelled before start -- skipping")
+                                    _fail_cancelled(token, node_url, agent_name, task_id)
+                                    done_ids.add(task_id)
+                                    dispatched_this_cycle = True
+                                    continue
+                                fut = executor.submit(_execute_worker, task)
+                                futures[fut] = task_id
+                                in_flight.add(task_id)
+                                dispatched_this_cycle = True
 
                 if "messages" in listen_set:
                     messages = _poll_messages(token, node_url, agent_name)
@@ -702,10 +875,22 @@ def run_crew_daemon(
                 print(f"[daemon:{agent_name}] one_shot=True, exiting after one cycle")
                 break
 
-            # Sleep in small increments so signal handlers can interrupt.
+            # Sleep in small increments so signal handlers can interrupt. While
+            # concurrent EXECUTE work is in flight, poll back sooner (<=5s) so
+            # freed pool slots get refilled without waiting a full poll interval.
+            cycle_sleep = min(poll_interval_seconds, 5) if in_flight else poll_interval_seconds
             slept = 0
-            while slept < poll_interval_seconds and not stop["flag"]:
-                time.sleep(min(1, poll_interval_seconds - slept))
+            while slept < cycle_sleep and not stop["flag"]:
+                time.sleep(min(1, cycle_sleep - slept))
                 slept += 1
 
         print(f"[daemon:{agent_name}] poll loop ended, releasing liaison")
+
+    # Drain the EXECUTE pool: let running kickoffs finish (cooperative, not
+    # preemptive -- matches the cancellation policy), then reap their results.
+    # Each worker owns its liaison, so it closes independently of the shared one.
+    if executor is not None:
+        if in_flight:
+            print(f"[daemon:{agent_name}] waiting for {len(in_flight)} in-flight task(s) to finish...")
+        executor.shutdown(wait=True)
+        _reap_finished()
