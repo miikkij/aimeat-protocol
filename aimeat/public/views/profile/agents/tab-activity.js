@@ -53,8 +53,8 @@ export default function TabActivity({ agent, agentName, session, showToast }) {
   const [logPage, setLogPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
 
-  async function loadData() {
-    setLoading(true);
+  async function loadData({ showSpinner = true } = {}) {
+    if (showSpinner) setLoading(true);
     try {
       const [actResp, logResp, dirResp, whResp, telResp] = await Promise.all([
         getActivity(agentName, 30).catch(() => null),
@@ -113,7 +113,9 @@ export default function TabActivity({ agent, agentName, session, showToast }) {
   const loadRef = useRef(loadData);
   loadRef.current = loadData;
   useEffect(() => {
-    const handler = () => loadRef.current();
+    // Live-update refetch must NOT show the spinner -- it fires often and would
+    // flash the whole tab blank. First mount still shows the spinner.
+    const handler = () => loadRef.current({ showSpinner: false });
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, []);

@@ -25,8 +25,8 @@ export default function TabAgentConfig({ agent, agentName, session, showToast })
   const [editContent, setEditContent] = useState('');
   const fileInputRef = useRef(null);
 
-  async function loadFiles() {
-    setLoading(true);
+  async function loadFiles({ showSpinner = true } = {}) {
+    if (showSpinner) setLoading(true);
     try {
       const gaii = agent?.gaii || agentName;
       const resp = await apiGet(`/v1/memory?prefix=agents.config.&agent=${encodeURIComponent(gaii)}`);
@@ -46,7 +46,7 @@ export default function TabAgentConfig({ agent, agentName, session, showToast })
         setPreview(configFiles[0].content);
       }
     } catch {
-      setFiles([]);
+      if (showSpinner) setFiles([]); // keep old files on a transient live-update refetch
     }
     setLoading(false);
   }
@@ -56,7 +56,8 @@ export default function TabAgentConfig({ agent, agentName, session, showToast })
   const loadRef = useRef(loadFiles);
   loadRef.current = loadFiles;
   useEffect(() => {
-    const handler = () => loadRef.current();
+    // Silent on live-update so the tab doesn't flash blank; first mount shows the spinner.
+    const handler = () => loadRef.current({ showSpinner: false });
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, []);

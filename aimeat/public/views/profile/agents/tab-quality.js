@@ -10,6 +10,9 @@
  * @structure default export TabQuality({ agentName })
  * @usage rendered by agent-card.js renderTabContent() for the 'quality' tab
  * @version-history
+ *   v1.2.0 -- 2026-06-01 -- Stop the empty flash on refresh: only show the loading
+ *     state on first load; live-update refetches swap data in place (and keep the
+ *     last good data on a transient error) instead of blanking the tab.
  *   v1.1.0 -- 2026-05-31 -- Add "Rate deliverables" list: completed tasks the owner
  *     can rate inline via the shared RateModal (unrated first); refreshes the
  *     rollups on submit.
@@ -50,15 +53,18 @@ export default function TabQuality({ agentName, showToast }) {
   const [sendingRate, setSendingRate] = useState(false);
 
   async function loadData() {
-    setLoading(true);
+    // NB: do NOT blank `data`/`loading` here. The initial render shows the
+    // loading state (loading starts true); every later call -- including
+    // live-update refetches -- swaps in fresh data in place without flashing an
+    // empty tab. A transient error keeps the last good data rather than clearing.
     try {
       const [statsResp, tasksResp] = await Promise.all([
         getAgentStatistics(agentName),
         listTasks(agentName, { status: 'done', per_page: 100 }).catch(() => null),
       ]);
-      setData(statsResp?.data || null);
+      if (statsResp?.data) setData(statsResp.data);
       setDoneTasks(tasksResp?.data?.tasks || []);
-    } catch { setData(null); }
+    } catch { /* keep showing the last good data on a transient error */ }
     setLoading(false);
   }
 

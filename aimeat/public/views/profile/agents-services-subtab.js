@@ -55,13 +55,13 @@ export default function AgentServicesSubtab({ agentName, session, showToast }) {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  async function loadServices() {
-    setLoading(true);
+  async function loadServices({ showSpinner = true } = {}) {
+    if (showSpinner) setLoading(true);
     try {
       const res = await getAgentServices(agentName);
       setServices(res.actions || []);
     } catch (err) {
-      showToast(err.message || t('profile.agents.services.loadError'), true);
+      if (showSpinner) showToast(err.message || t('profile.agents.services.loadError'), true);
     }
     setLoading(false);
   }
@@ -88,7 +88,8 @@ export default function AgentServicesSubtab({ agentName, session, showToast }) {
   useEffect(() => { loadServices(); }, [agentName]);
 
   useEffect(() => {
-    const handler = () => { loadServices(); };
+    // Silent refetch on live-update so the tab doesn't flash blank.
+    const handler = () => { loadServices({ showSpinner: false }); };
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [agentName]);
