@@ -30,6 +30,8 @@
  *   v2.15.0 -- 2026-06-01 -- Blur-title eye is now hover-only (revealed on task-row hover/focus) to de-clutter the list; blurred rows keep their eye visible
  *   v2.16.0 -- 2026-06-01 -- Add Tasks-tab triage UI styles (bucket segments + counts, search bar, time chips, per-task triage buttons)
  *   v2.17.0 -- 2026-06-01 -- Add per-task memory entries list styles (expanded task)
+ *   v2.18.0 -- 2026-06-01 -- Per-task memory entries are collapsible with pretty-printed JSON bodies
+ *   v2.19.0 -- 2026-06-01 -- Structured JSON view for memory values (key/value rows, indented nested blocks, type colours)
  *   v2.11.0 -- 2026-05-31 -- Widen the solo pop-out window (and pf-agd-solo max-width) so the agent card matches the list-view width and the full tab bar fits
  *   v2.12.0 -- 2026-05-31 -- Add completed-task deliverable styles (pf-agd-deliverable*) linking a task to its agent-memory output key
  *   v2.13.0 -- 2026-05-31 -- Add per-task blur-title toggle styles (pf-agd-blur-toggle, pf-agd-task-title--blurred) for hiding sensitive titles in screen recordings
@@ -3026,30 +3028,99 @@
 /* Triage buttons pushed to the right of the task action row */
 .pf .pf-agd-task-actions-spacer { flex: 1; }
 
-/* Per-task memory entries (expanded task) */
+/* Per-task memory entries (expanded task) -- collapsible per entry */
 .pf .pf-agd-task-memory { margin: 0.5rem 0; }
 .pf .pf-agd-task-memory-list {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.3rem;
   margin-top: 0.4rem;
 }
-.pf .pf-agd-task-memory-row {
+.pf .pf-agd-task-memory-entry {
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 8px;
+  background: var(--card-bg, #FFFFFF);
+  overflow: hidden;
+}
+.pf .pf-agd-task-memory-head {
   display: flex;
-  gap: 0.5rem;
-  align-items: baseline;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  padding: 0.4rem 0.55rem;
   font-size: 0.78rem;
-  padding: 0.2rem 0;
-  border-bottom: 1px solid var(--border, #E5E7EB);
+}
+.pf .pf-agd-task-memory-head:hover { background: var(--bg-dim, #F3F4F6); }
+.pf .pf-agd-task-memory-caret {
+  color: var(--text-muted, #9CA3AF);
+  font-size: 0.65rem;
+  flex-shrink: 0;
 }
 .pf .pf-agd-task-memory-key {
   color: var(--text-dim, #6B7280);
   font-family: var(--font-mono, monospace);
-  white-space: nowrap;
-}
-.pf .pf-agd-task-memory-val {
-  color: var(--text-muted, #9CA3AF);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
+.pf .pf-agd-task-memory-badge {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--accent, #E8564A);
+  border: 1px solid var(--accent, #E8564A);
+  border-radius: 4px;
+  padding: 0.02rem 0.3rem;
+}
+.pf .pf-agd-task-memory-body {
+  padding: 0.5rem 0.6rem;
+  border-top: 1px solid var(--border, #E5E7EB);
+  background: var(--bg-dim, #F3F4F6);
+  color: var(--text, #1A1A2E);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  max-height: 340px;
+  overflow: auto;
+}
+/* Raw (non-JSON) memory value: keep formatting, wrap long lines. */
+.pf .pf-agd-task-memory-raw {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono, monospace);
+}
+
+/* Structured JSON view: key/value rows, nested blocks indented with a guide line. */
+.pf .pf-agd-json-block { display: flex; flex-direction: column; gap: 0.05rem; }
+.pf .pf-agd-json-row {
+  display: flex;
+  gap: 0.45rem;
+  align-items: baseline;
+  padding: 0.05rem 0;
+}
+.pf .pf-agd-json-row--nested { display: block; }
+.pf .pf-agd-json-row--nested > .pf-agd-json-block {
+  margin: 0.1rem 0 0.2rem 0.3rem;
+  padding-left: 0.65rem;
+  border-left: 1px solid var(--border, #E5E7EB);
+}
+.pf .pf-agd-json-key {
+  font-weight: 600;
+  color: var(--text-dim, #6B7280);
+  font-family: var(--font-mono, monospace);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.pf .pf-agd-json-key::after { content: ':'; color: var(--text-muted, #9CA3AF); font-weight: 400; }
+.pf .pf-agd-json-str { color: var(--text, #1A1A2E); word-break: break-word; }
+.pf .pf-agd-json-num { color: var(--info, #3B82F6); font-family: var(--font-mono, monospace); }
+.pf .pf-agd-json-bool { color: var(--accent, #E8564A); font-family: var(--font-mono, monospace); }
+.pf .pf-agd-json-null,
+.pf .pf-agd-json-empty { color: var(--text-muted, #9CA3AF); font-style: italic; }

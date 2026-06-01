@@ -9,6 +9,11 @@
  *   - TaskItem -- task row with expand/collapse, todo list, start button
  *   - RequestChangesModal -- inline modal for owner to send a free-text change request
  * @version-history
+ *   v4.8.2 -- 2026-06-01 -- Render JSON memory values as a structured key/value
+ *     tree (indented nested blocks, type-coloured values) instead of raw JSON text.
+ *   v4.8.1 -- 2026-06-01 -- Per-task memory entries are now collapsible; values
+ *     render as pretty-printed JSON when valid (raw otherwise). Add deliverableKey
+ *     as a third lookup source alongside the task:<id> tag and live-key prefix.
  *   v4.8.0 -- 2026-06-01 -- Show a task's memory entries in the expanded view:
  *     entries tagged task:<id> + the live-status key prefix, deduped by key.
  *   v4.7.0 -- 2026-06-01 -- Triage: replace status pills with Recent/Keep/Archive
@@ -226,6 +231,71 @@ function RequestChangesModal({ open, onClose, onSubmit, submitting }) {
       </button>
     </div>
   <//>`;
+}
+
+// Parse a memory value into structured JSON when possible. Returns { json } for
+// objects (or strings that parse as JSON), or { raw } for plain text/markdown.
+function parseMemoryValue(value) {
+  if (value === null || value === undefined) return { raw: '' };
+  if (typeof value === 'object') return { json: value };
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed && (trimmed[0] === '{' || trimmed[0] === '[')) {
+      try { return { json: JSON.parse(trimmed) }; }
+      catch { /* not JSON after all -- show raw */ }
+    }
+    return { raw: value };
+  }
+  return { raw: String(value) };
+}
+
+// Recursive structured JSON renderer: objects/arrays become indented key/value
+// rows, primitives get type-coloured values. Far easier to scan than raw JSON.
+function JsonNode({ value }) {
+  if (value === null) return html`<span class="pf-agd-json-null">null</span>`;
+  const t = typeof value;
+  if (t === 'string') return html`<span class="pf-agd-json-str">${value}</span>`;
+  if (t === 'number') return html`<span class="pf-agd-json-num">${value}</span>`;
+  if (t === 'boolean') return html`<span class="pf-agd-json-bool">${value ? 'true' : 'false'}</span>`;
+  const entries = Array.isArray(value) ? value.map((v, i) => [String(i), v]) : Object.entries(value || {});
+  if (entries.length === 0) return html`<span class="pf-agd-json-empty">${Array.isArray(value) ? '[ ]' : '{ }'}</span>`;
+  return html`
+    <div class="pf-agd-json-block">
+      ${entries.map(([k, v]) => {
+        const nested = v !== null && typeof v === 'object';
+        return html`
+          <div class=${`pf-agd-json-row ${nested ? 'pf-agd-json-row--nested' : ''}`} key=${k}>
+            <span class="pf-agd-json-key">${k}</span>
+            <${JsonNode} value=${v} />
+          </div>
+        `;
+      })}
+    </div>
+  `;
+}
+
+// One collapsible memory entry. Header (key + JSON badge) toggles the body, which
+// renders a structured JSON view when the value is JSON, raw text otherwise.
+function TaskMemoryEntry({ entry }) {
+  const [open, setOpen] = useState(false);
+  const { json, raw } = parseMemoryValue(entry.value);
+  const isJson = json !== undefined;
+  return html`
+    <div class="pf-agd-task-memory-entry">
+      <button class="pf-agd-task-memory-head" onClick=${(e) => { e.stopPropagation(); setOpen(o => !o); }} aria-expanded=${open}>
+        <span class="pf-agd-task-memory-caret">${open ? '▼' : '▶'}</span>
+        <code class="pf-agd-task-memory-key">${entry.key}</code>
+        ${isJson && html`<span class="pf-agd-task-memory-badge">JSON</span>`}
+      </button>
+      ${open && html`
+        <div class="pf-agd-task-memory-body">
+          ${isJson
+            ? html`<${JsonNode} value=${json} />`
+            : html`<pre class="pf-agd-task-memory-raw">${raw}</pre>`}
+        </div>
+      `}
+    </div>
+  `;
 }
 
 function TaskItem({ task, agentName, showToast, onRefresh }) {
@@ -519,12 +589,7 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
                 ? html`<div class="pf-agd-empty">${t('profile.agents.tasks.memory.none')}</div>`
                 : html`
                   <div class="pf-agd-task-memory-list">
-                    ${taskMemory.items.map(it => html`
-                      <div class="pf-agd-task-memory-row" key=${it.key}>
-                        <code class="pf-agd-task-memory-key">${it.key}</code>
-                        <span class="pf-agd-task-memory-val">${typeof it.value === 'object' ? JSON.stringify(it.value).slice(0, 120) : String(it.value ?? '').slice(0, 120)}</span>
-                      </div>
-                    `)}
+                    ${taskMemory.items.map(it => html`<${TaskMemoryEntry} key=${it.key} entry=${it} />`)}
                   </div>
                 `)}
           </div>
