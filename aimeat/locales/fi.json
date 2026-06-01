@@ -703,7 +703,7 @@
           "integration": "Integraatio",
           "tasks": "Tehtävät",
           "messages": "Viestit",
-          "data_access": "Datayhteydet",
+          "data_access": "Muisti",
           "directives": "Ohjeistukset",
           "agent_config": "Agenttiasetukset",
           "activity": "Toiminta",
@@ -970,7 +970,7 @@
           "readme": "Ei README:tä julkaistu",
           "tasks": "Ei tehtäviä. Luo tehtävä antaaksesi agentille työtä.",
           "messages": "Ei viestejä. Lähetä viesti tai käytä komentoa.",
-          "data_access": "Ei datayhteyksien asetuksia. Lisää tunnisteita, muistialueita tai tietopaketteja alla olevilla painikkeilla.",
+          "data_access": "Ei muistia määritetty. Lisää tunnisteita, muistialueita tai tietopaketteja alla olevilla painikkeilla.",
           "agent_config": "Ei asetustiedostoja. Agentti lähettää asetustiedostot taitopaketin asennuksen jälkeen.",
           "activity": "Ei tallennettua toimintaa. Tapahtumat ilmestyvät tähän kun agentti aloittaa työskentelyn.",
           "services": "Ei ilmoitettuja palveluja. Agentti voi ilmoittaa palvelut Hello-integraation vaiheessa 11."

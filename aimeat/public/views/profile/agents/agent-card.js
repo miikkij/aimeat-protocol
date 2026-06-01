@@ -3,6 +3,9 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v1.10.0 -- 2026-06-01 -- Reorder TABS to owner-requested order: Integration,
+ *     Tasks, Messages, Data Access, Quality, Activity, then Directives /
+ *     Agent Config / Services (README stays prepended/first).
  *   v1.9.0 -- 2026-06-01 -- Reorder TABS by owner usage frequency (Integration,
  *     Tasks, Data Access, Quality, Activity, ... setup tabs last) so the
  *     now-wrapping tab bar keeps the most-used tabs on the top row.
@@ -48,19 +51,19 @@ const html = htm.bind(h);
 // README is opt-in and prepended only when the agent has published one, so it
 // is NOT in this base list. See readmeTab below.
 //
-// Order is by owner usage frequency, not feature grouping: the tab bar wraps to
-// a second row (flex-wrap, see .pf-agd-tabs CSS) instead of scrolling, so the
-// most-used tabs are placed first and naturally land on the top row, while the
-// rarely-touched setup tabs (directives / agent-config / services) fall to the
-// second row. Integration sits right after README because it doubles as the
-// post-setup "overview" the owner returns to.
+// Explicit owner-requested order (not auto-grouping). The tab bar wraps to a
+// second row (flex-wrap, see .pf-agd-tabs CSS) instead of scrolling, so the
+// first-listed tabs naturally land on the top row. README is prepended
+// separately when present, so the effective order is:
+//   README · Integration · Tasks · Messages · Data Access · Quality · Activity
+//   · Directives · Agent Config · Services
 const TABS = [
   { id: 'integration', key: 'profile.agents.detail.tabs.integration' },
   { id: 'tasks', key: 'profile.agents.detail.tabs.tasks' },
+  { id: 'messages', key: 'profile.agents.detail.tabs.messages' },
   { id: 'data-access', key: 'profile.agents.detail.tabs.data_access' },
   { id: 'quality', key: 'profile.agents.detail.tabs.quality' },
   { id: 'activity', key: 'profile.agents.detail.tabs.activity' },
-  { id: 'messages', key: 'profile.agents.detail.tabs.messages' },
   { id: 'directives', key: 'profile.agents.detail.tabs.directives' },
   { id: 'agent-config', key: 'profile.agents.detail.tabs.agent_config' },
   { id: 'services', key: 'profile.agents.detail.tabs.services' },
