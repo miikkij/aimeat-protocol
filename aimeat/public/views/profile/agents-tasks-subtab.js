@@ -274,10 +274,14 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
     }
   }
 
-  // Fetch the memory entries that belong to this task: entries tagged
-  // `task:<id>` (written by a tagging-aware runner) plus anything under the
-  // live-status key prefix `agents.<name>.tasks.<id>.` (full task id). Deduped
-  // by key. Until runners tag their writes, this surfaces at least the live key.
+  // Fetch the memory entries that belong to this task. The canonical handle is
+  // the `task:<full-id>` tag (the runner tags every write: deliverable, live,
+  // delegated deliverable + evalctx) -- the deliverable key embeds a SHORT id so
+  // it can't be matched by key substring, which is exactly why the tag exists.
+  // Two extra fallbacks make it robust for tasks written before the tag landed:
+  // the live-status key prefix (full id) and the task's own recorded
+  // deliverableKey. Rolling/public stats (statistics.custom.*) are NOT per-task
+  // tagged, so they never appear here. Deduped by key.
   async function fetchTaskMemory() {
     const gaii = task.agentGaii;
     if (!gaii) { setTaskMemory({ items: [] }); return; }
@@ -285,13 +289,17 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
     try {
       const tag = `task:${task.id}`;
       const livePrefix = `agents.${agentName}.tasks.${task.id}.`;
-      const [byTag, byLive] = await Promise.all([
+      const fetches = [
         apiGet(`/v1/memory?agent=${encodeURIComponent(gaii)}&tags=${encodeURIComponent(tag)}&per_page=50`).catch(() => null),
         apiGet(`/v1/memory?agent=${encodeURIComponent(gaii)}&prefix=${encodeURIComponent(livePrefix)}&per_page=20`).catch(() => null),
-      ]);
+      ];
+      if (task.deliverableKey) {
+        fetches.push(apiGet(`/v1/memory?agent=${encodeURIComponent(gaii)}&prefix=${encodeURIComponent(task.deliverableKey)}&per_page=5`).catch(() => null));
+      }
+      const results = await Promise.all(fetches);
       const items = [];
       const seen = new Set();
-      for (const resp of [byTag, byLive]) {
+      for (const resp of results) {
         const list = resp?.data?.items || resp?.data || [];
         for (const it of (Array.isArray(list) ? list : [])) {
           if (it.key && !seen.has(it.key)) { seen.add(it.key); items.push(it); }
