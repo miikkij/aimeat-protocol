@@ -170,8 +170,8 @@ function HomeView({ extAction, instanceConfig, onNav, tl }) {
     `}
 
     <div style="text-align:center; margin-top:32px;">
-      <a class="mk-btn mk-btn-primary" style="margin-right:8px;" onClick=${() => onNav('browse')}>${t('mkt.home.browseBtn')}</a>
-      <a class="mk-btn mk-btn-secondary" onClick=${() => onNav('sell')}>${t('mkt.home.sellBtn')}</a>
+      <a class="btn-primary" style="margin-right:8px;" onClick=${() => onNav('browse')}>${t('mkt.home.browseBtn')}</a>
+      <a class="btn-outline" onClick=${() => onNav('sell')}>${t('mkt.home.sellBtn')}</a>
     </div>
   `;
 }
@@ -241,8 +241,8 @@ function BrowseView({ extAction, instanceConfig, onNav, params, tl }) {
           </div></div>
       </div>
       <div style="margin-top:12px;">
-        <button class="mk-btn mk-btn-primary mk-btn-sm" onClick=${() => doSearch(1)}>${t('mkt.search.btn')}</button>
-        <button class="mk-btn mk-btn-secondary mk-btn-sm" style="margin-left:8px;" onClick=${clearSearch}>${t('mkt.search.clearBtn')}</button>
+        <button class="btn-primary btn-sm" onClick=${() => doSearch(1)}>${t('mkt.search.btn')}</button>
+        <button class="btn-outline btn-sm" style="margin-left:8px;" onClick=${clearSearch}>${t('mkt.search.clearBtn')}</button>
       </div>
     </div>
 
@@ -295,7 +295,7 @@ function ListingDetailView({ extAction, onNav, params, tl }) {
 
   if (err) return html`
     <div class="mk-empty-state"><div class="mk-empty-icon">\u2753</div><div class="mk-empty-text">${t('mkt.detail.notFound')}</div></div>
-    <div style="text-align:center;"><a class="mk-btn mk-btn-secondary" onClick=${() => onNav('home')}>${t('mkt.detail.backBtn')}</a></div>
+    <div style="text-align:center;"><a class="btn-outline" onClick=${() => onNav('home')}>${t('mkt.detail.backBtn')}</a></div>
   `;
   if (!listing) return html`<div class="mk-alert mk-alert-info">...</div>`;
 
@@ -340,7 +340,7 @@ function ListingDetailView({ extAction, onNav, params, tl }) {
         </div>
         ${isLoggedIn() ? html`
           <div style="margin-top:16px; text-align:center;">
-            <button class="mk-btn mk-btn-primary" onClick=${doPurchase}>${t('mkt.detail.purchaseBtn')}</button>
+            <button class="btn-primary" onClick=${doPurchase}>${t('mkt.detail.purchaseBtn')}</button>
           </div>
         ` : html`
           <div style="margin-top:16px; text-align:center;">
@@ -365,7 +365,7 @@ function CreateListingView({ extAction, instanceConfig, onNav, tl }) {
 
   if (!isLoggedIn()) return html`
     <div class="mk-empty-state"><div class="mk-empty-icon">\uD83D\uDD12</div><div class="mk-empty-text">${t('mkt.sell.authRequired')}</div></div>
-    <div style="text-align:center; margin-top:16px;"><a href="/v1/portal/human" class="mk-btn mk-btn-primary">${t('mkt.sell.authBtn')}</a></div>
+    <div style="text-align:center; margin-top:16px;"><a href="/v1/portal/human" class="btn-primary">${t('mkt.sell.authBtn')}</a></div>
   `;
 
   const submit = () => {
@@ -442,7 +442,7 @@ function CreateListingView({ extAction, instanceConfig, onNav, tl }) {
       ${msg ? html`<div class="mk-alert mk-alert-success">${msg}</div>` : null}
       ${err ? html`<div class="mk-alert mk-alert-error">${err}</div>` : null}
       <div style="margin-top:16px;">
-        <button class="mk-btn mk-btn-primary" onClick=${submit} disabled=${sending}>${t('mkt.sell.submitBtn')} (2 morsels)</button>
+        <button class="btn-primary" onClick=${submit} disabled=${sending}>${t('mkt.sell.submitBtn')} (2 morsels)</button>
       </div>
     </div>
   `;
@@ -479,7 +479,7 @@ function MyListingsView({ extAction, onNav, tl }) {
   return html`
     <h1 class="mk-page-title">${t('mkt.myListings.title')}</h1>
     <p class="mk-page-subtitle">${t('mkt.myListings.subtitle')}</p>
-    <div style="margin-bottom:16px;"><a class="mk-btn mk-btn-primary" onClick=${() => onNav('sell')}>${t('mkt.myListings.newBtn')}</a></div>
+    <div style="margin-bottom:16px;"><a class="btn-primary" onClick=${() => onNav('sell')}>${t('mkt.myListings.newBtn')}</a></div>
     ${actionMsg ? html`<div class="mk-alert mk-alert-info">${actionMsg}</div>` : null}
     ${listings.length > 0 ? listings.map(l => {
       const cl = catLabel(l.category, tl);
@@ -499,7 +499,7 @@ function MyListingsView({ extAction, onNav, tl }) {
           </a>
           ${l.status === 'active' ? html`
             <div style="margin-top:8px; display:flex; gap:8px;">
-              <button class="mk-btn mk-btn-secondary mk-btn-sm" onClick=${() => doAction('delist', { listingId: l.id }, 'Delisted')}>${t('mkt.myListings.delistBtn')}</button>
+              <button class="btn-outline btn-sm" onClick=${() => doAction('delist', { listingId: l.id }, 'Delisted')}>${t('mkt.myListings.delistBtn')}</button>
             </div>
           ` : null}
         </div>
@@ -570,7 +570,7 @@ function MyPurchasesView({ extAction, onNav, tl }) {
       </div>
       <div class="mk-form-group"><label class="mk-form-label">Comment</label>
         <input type="text" class="mk-form-input" value=${rateComment} onInput=${e => setRateComment(e.target.value)} /></div>
-      <button class="mk-btn mk-btn-primary mk-btn-sm" onClick=${doRate}>${t('mkt.detail.purchaseBtn')}</button>
+      <button class="btn-primary btn-sm" onClick=${doRate}>${t('mkt.detail.purchaseBtn')}</button>
     </div>
   `;
 }

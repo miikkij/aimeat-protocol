@@ -10,6 +10,7 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.3.0 — 2026-06-02 — Component unification (#4): make canonical .btn-* anchor-safe (text-decoration:none) so views can drop their per-view <a>-button clones (mk-btn/hb-btn/...) and use the canonical classes.
      v1.2.0 — 2026-06-02 — Tokenize shell component literals (semantic tints, scrollbar, overlay scrim, morsel pill, lang-btn active, input focus) so the whole shell flips for dark mode.
      v1.1.0 — 2026-06-02 — Add dark theme override + drift-alias layer + .theme-toggle-btn.
      v1.0.0 — prior — Light theme tokens, base styles, shared components.
@@ -469,6 +470,12 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* ── Buttons ── */
+/* Button classes are anchor-safe: applied to <a> they render as buttons,
+   not underlined links (lets views use canonical .btn-* on link-buttons). */
+.btn-primary, .btn-outline, .btn-ghost, .btn-danger, .btn-danger-solid,
+.btn-success, .btn-info {
+  text-decoration: none;
+}
 .btn-primary {
   padding: 8px 20px;
   background: linear-gradient(135deg, #E8564A 0%, #FF6B6B 100%);

@@ -4,6 +4,8 @@
  *   browse/search forms, status badges, instance selector, and pagination.
  * @version-history
  *   v1.1.0 — 2026-06-02 — Phase 5: tokenize for dark mode (bare color literals → theme tokens)
+ *   v1.2.0 — 2026-06-02 — Component unification (#4 buttons): remove .mk-btn* family;
+ *     marketplace buttons use canonical theme.css .btn-primary / .btn-outline / .btn-sm.
  */
 
 /* marketplace view — scoped under .mk- */
@@ -80,16 +82,8 @@
 .mk-alert-error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; }
 .mk-alert-info { background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-dim); }
 
-.mk-btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  padding: 10px 24px; border: none; border-radius: 10px;
-  font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s; text-decoration: none;
-}
-.mk-btn-primary { background: linear-gradient(135deg, var(--accent), #E8564A); color: #fff; }
-.mk-btn-primary:hover { opacity: 0.9; box-shadow: 0 2px 8px rgba(232,86,74,0.2); }
-.mk-btn-secondary { background: var(--bg-surface); border: 1px solid var(--border); color: var(--text); }
-.mk-btn-secondary:hover { background: var(--border); border-color: var(--accent); color: var(--accent); }
-.mk-btn-sm { padding: 6px 14px; font-size: 0.8rem; }
+/* .mk-btn* removed — marketplace uses canonical theme.css .btn-primary / .btn-outline /
+   .btn-sm (anchor-safe). Unified 2026-06-02 (#4 buttons). */
 
 .mk-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .mk-form-group { margin-bottom: 16px; }
