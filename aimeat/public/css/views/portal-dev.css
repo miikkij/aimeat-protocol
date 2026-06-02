@@ -56,8 +56,8 @@
 
 /* Mode notice */
 .dv-mode-notice { border-radius: 12px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; font-size: .9rem; display: flex; align-items: flex-start; gap: .75rem; }
-.dv-mode-notice-anon { background: rgba(124,58,237,.06); border: 1px solid rgba(124,58,237,.15); }
-.dv-mode-notice-user { background: rgba(34,197,94,.06); border: 1px solid rgba(34,197,94,.15); }
+.dv-mode-notice-anon { background: var(--purple-bg); border: 1px solid var(--purple-border); }
+.dv-mode-notice-user { background: var(--success-bg); border: 1px solid var(--success-border); }
 .dv-notice-icon { font-size: 1.3rem; flex-shrink: 0; }
 
 /* Steps */
