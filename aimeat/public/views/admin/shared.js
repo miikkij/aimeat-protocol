@@ -15,6 +15,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { escHtml } from '/js/utils.js';
 import { t } from '/js/i18n.js';
+import { EmptyState } from '/components/EmptyState.js';
 
 // Display formatters now live in the shared /js/format.js. Import them into local
 // scope (StatCard etc. call num() directly) AND re-export so the existing admin
@@ -71,9 +72,9 @@ export function Spinner({ text }) {
   return html`<div class="empty"><div class="spinner"></div> ${text || t('common.loading')}</div>`;
 }
 
-/** Empty state */
+/** Empty state — delegates to the canonical /components/EmptyState.js. */
 export function Empty({ text }) {
-  return html`<div class="empty">${text}</div>`;
+  return html`<${EmptyState} text=${text} />`;
 }
 
 /** Error box */

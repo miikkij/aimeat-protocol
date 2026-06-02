@@ -778,6 +778,8 @@ select.input-field { cursor: pointer; }
   color: var(--text-muted);
   font-style: italic;
 }
+/* Optional icon for the canonical EmptyState component (#9). */
+.empty-icon { display: block; font-size: 2.5rem; opacity: 0.4; margin-bottom: 0.5rem; font-style: normal; }
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; }
