@@ -249,8 +249,14 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
     // POST /v1/apps — Publish/update an app (requires auth)
     router.post('/v1/apps', requireAuth(), async (req, res) => {
-        const gaii = resolveIdentity(req.auth!, config.nodeId);
+        // Apps are OWNER-scoped resources. Whether the owner or one of their
+        // agents publishes, the canonical record lives under the owner's GHII
+        // so `/v1/apps/<owner>/<filename>` resolves to a single row and the
+        // version counter is shared (not two parallel buckets that shadow
+        // each other). The caller's GAII is preserved in audit logs only.
+        const callerGaii = resolveIdentity(req.auth!, config.nodeId);
         const owner = req.auth!.owner;
+        const ownerGhii = `${owner}@${config.nodeId}`;
         const {
             filename, content, mime_type, access_code,
             screenshot, screenshot_mime_type,
@@ -270,10 +276,9 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
         // --- PRESIGNED MODE: return upload URL instead of requiring content ---
         if (req.body.mode === 'presigned') {
-            const ownerGaii = `${owner}@${config.nodeId}`;
             const MAX_APP_SIZE = config.appMaxSizeMb * 1024 * 1024;
             const token = await generateUploadToken({
-                sub: ownerGaii,
+                sub: ownerGhii,
                 utype: 'app',
                 meta: { filename, name: req.body.name ?? filename, description, category, tags, icon, version: semver },
                 maxBytes: MAX_APP_SIZE,
@@ -310,10 +315,12 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             return;
         }
 
-        // Per-agent app count quota (only check for new apps, not updates)
-        const existingVersion = await storage.getLatestVersionNumber(gaii, filename);
+        // Per-owner app count quota (only check for new apps, not updates).
+        // Keyed by owner GHII so agents publishing on the owner's behalf share
+        // the same counter — same resource, one quota.
+        const existingVersion = await storage.getLatestVersionNumber(ownerGhii, filename);
         if (existingVersion === 0 && config.maxAppsPerAgent > 0) {
-            const { total } = await storage.listApps({ ownerGaii: gaii, limit: 1 });
+            const { total } = await storage.listApps({ ownerGaii: ownerGhii, limit: 1 });
             if (total >= config.maxAppsPerAgent) {
                 res.status(429).json(error(config.nodeId, 'QUOTA_EXCEEDED', `You have reached the maximum of ${config.maxAppsPerAgent} published apps`));
                 return;
@@ -347,7 +354,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         if (license_type === 'single' || license_type === 'lifetime') manifest.licenseType = license_type;
 
         await storage.createApp({
-            ownerGaii: gaii,
+            ownerGaii: ownerGhii,   // canonical owner key (NOT caller GAII)
             ownerName: owner,
             filename,
             versionNumber: newVersion,
@@ -375,7 +382,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             const screenshotMime = typeof screenshot_mime_type === 'string' ? screenshot_mime_type : 'image/png';
             await storage.createStorageFile({
                 key: `apps/screenshots/${filename}`,
-                ownerGaii: gaii,
+                ownerGaii: ownerGhii,   // match app row's ownerGaii so reads find it
                 visibility: 'public',
                 mimeType: screenshotMime,
                 size: screenshotData.length,
@@ -403,7 +410,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
                 await storage.createPost({
                     id: `post-${Date.now()}-${randomBytes(4).toString('hex')}`,
                     boardId: config.appAnnouncementBoardId,
-                    authorGaii: gaii,
+                    authorGaii: callerGaii,   // who actually clicked publish (audit/byline)
                     title: `${isUpdate ? '🔄' : '🚀'} ${manifest.name || filename} v${newVersion}`,
                     body: `${manifest.description || 'A new app has been published.'}\n\nDownload: ${downloadUrl}`,
                     tags,
@@ -435,11 +442,23 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
     // PATCH /v1/apps/:filename — Update access code on an app you own (requires auth)
     router.patch('/v1/apps/:filename', requireAuth(), async (req, res) => {
-        const gaii = resolveIdentity(req.auth!, config.nodeId);
+        const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+        const owner = req.auth!.owner;
+        const ownerGhii = `${owner}@${config.nodeId}`;
         const filename = req.params.filename as string;
 
-        let app = await storage.getApp(gaii, filename);
-        if (!app) app = await storage.getApp(req.auth!.owner, filename);
+        // Same lookup order as DELETE: canonical owner-GHII bucket first,
+        // then agent-GAII shadow bucket (pre-fix rows), then bare owner.
+        let app = await storage.getApp(ownerGhii, filename);
+        let effectiveGaii = ownerGhii;
+        if (!app) {
+            app = await storage.getApp(callerGaii, filename);
+            if (app) effectiveGaii = callerGaii;
+        }
+        if (!app) {
+            app = await storage.getApp(owner, filename);
+            if (app) effectiveGaii = owner;
+        }
         if (!app) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found in your uploads`));
             return;
@@ -452,9 +471,8 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             return;
         }
 
-        await storage.updateAppAccessCode(gaii, filename, newCode);
+        await storage.updateAppAccessCode(effectiveGaii, filename, newCode);
 
-        const owner = req.auth!.owner;
         res.json(success(config.nodeId, {
             filename,
             protected: !!newCode,
@@ -467,20 +485,33 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     });
 
     // DELETE /v1/apps/:filename — Remove an app you own (supports ?version=N)
+    // Apps are owner-scoped: an agent acting on behalf of its owner can delete
+    // the owner's apps. We resolve to the owner's GHII first, then fall through
+    // to historical buckets (callerGaii, bareOwner) for rows created before the
+    // POST handler started always-keying-by-owner-GHII.
     router.delete('/v1/apps/:filename', requireAuth(), async (req, res) => {
-        const gaii = resolveIdentity(req.auth!, config.nodeId);
+        const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+        const owner = req.auth!.owner;
+        const ownerGhii = `${owner}@${config.nodeId}`;
         const filename = req.params.filename as string;
         const versionParam = req.query.version as string | undefined;
         const version = versionParam ? parseInt(versionParam, 10) : undefined;
 
-        // Try full GHII first, fall back to bare owner name (backward compat for
-        // apps created before the ownerGaii fix in the package install flow)
-        let app = await storage.getApp(gaii, filename, version);
-        let effectiveGaii = gaii;
+        // Lookup order:
+        //   1. owner GHII  — the canonical place since the keying fix
+        //   2. caller GAII — agent-bucket shadow rows from before the fix
+        //   3. bare owner  — even older rows (pre-GHII formatting)
+        // Returning the first hit is correct: any of those buckets belongs to
+        // this user, so they are allowed to delete it.
+        let app = await storage.getApp(ownerGhii, filename, version);
+        let effectiveGaii = ownerGhii;
         if (!app) {
-            const bareOwner = req.auth!.owner;
-            app = await storage.getApp(bareOwner, filename, version);
-            if (app) effectiveGaii = bareOwner;
+            app = await storage.getApp(callerGaii, filename, version);
+            if (app) effectiveGaii = callerGaii;
+        }
+        if (!app) {
+            app = await storage.getApp(owner, filename, version);
+            if (app) effectiveGaii = owner;
         }
         if (!app) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found in your uploads${version ? ` (version ${version})` : ''}`));
@@ -490,11 +521,10 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         await storage.deleteApp(effectiveGaii, filename, version);
 
         if (!version) {
-            // Full delete — also remove screenshot
+            // Full delete — also remove screenshot stored under the same bucket
             await storage.deleteStorageFile(effectiveGaii, `apps/screenshots/${filename}`);
         }
 
-        const owner = req.auth!.owner;
         await storage.addSiteChangeLog({
             id: `site-${Date.now()}-${randomBytes(4).toString('hex')}`,
             action: 'app_delete',
