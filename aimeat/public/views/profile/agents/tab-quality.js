@@ -110,26 +110,26 @@ export default function TabQuality({ agentName, showToast }) {
       <!-- Performance -->
       <div class="pf-agd-section-title">${t('profile.agents.detail.quality.performanceTitle')}</div>
       <div class="pf-agd-quality-desc">${t('profile.agents.detail.quality.performanceDesc')}</div>
-      <div class="pf-agd-stats-grid">
-        <div class="pf-agd-stat-card">
-          <div class="pf-agd-stat-value">${perf.tasks?.total ?? 0}</div>
-          <div class="pf-agd-stat-label">${t('profile.agents.detail.quality.tasksTotal')}</div>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-card-value">${perf.tasks?.total ?? 0}</div>
+          <div class="stat-card-label">${t('profile.agents.detail.quality.tasksTotal')}</div>
         </div>
-        <div class="pf-agd-stat-card">
-          <div class="pf-agd-stat-value">${perf.tasks?.completed ?? 0}</div>
-          <div class="pf-agd-stat-label">${t('profile.agents.detail.quality.tasksCompleted')}</div>
+        <div class="stat-card">
+          <div class="stat-card-value">${perf.tasks?.completed ?? 0}</div>
+          <div class="stat-card-label">${t('profile.agents.detail.quality.tasksCompleted')}</div>
         </div>
-        <div class="pf-agd-stat-card">
-          <div class="pf-agd-stat-value">${perf.tasks?.successRate != null ? `${Math.round(perf.tasks.successRate * 100)}%` : '-'}</div>
-          <div class="pf-agd-stat-label">${t('profile.agents.detail.quality.successRate')}</div>
+        <div class="stat-card">
+          <div class="stat-card-value">${perf.tasks?.successRate != null ? `${Math.round(perf.tasks.successRate * 100)}%` : '-'}</div>
+          <div class="stat-card-label">${t('profile.agents.detail.quality.successRate')}</div>
         </div>
-        <div class="pf-agd-stat-card">
-          <div class="pf-agd-stat-value">${fmtSeconds(perf.duration?.avgCompletionSeconds)}</div>
-          <div class="pf-agd-stat-label">${t('profile.agents.detail.quality.avgTime')}</div>
+        <div class="stat-card">
+          <div class="stat-card-value">${fmtSeconds(perf.duration?.avgCompletionSeconds)}</div>
+          <div class="stat-card-label">${t('profile.agents.detail.quality.avgTime')}</div>
         </div>
-        <div class="pf-agd-stat-card">
-          <div class="pf-agd-stat-value">${perf.events?.total ?? 0}</div>
-          <div class="pf-agd-stat-label">${t('profile.agents.detail.quality.events')}</div>
+        <div class="stat-card">
+          <div class="stat-card-value">${perf.events?.total ?? 0}</div>
+          <div class="stat-card-label">${t('profile.agents.detail.quality.events')}</div>
         </div>
       </div>
       ${durKeys.length > 0 && html`

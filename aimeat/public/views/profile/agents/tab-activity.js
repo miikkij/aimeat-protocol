@@ -141,18 +141,18 @@ export default function TabActivity({ agent, agentName, session, showToast }) {
     <div>
       <!-- Stats summary -->
       ${stats && html`
-        <div class="pf-agd-stats-grid">
-          <div class="pf-agd-stat-card">
-            <div class="pf-agd-stat-value">${stats.tasksCompleted ?? 0}</div>
-            <div class="pf-agd-stat-label">${t('profile.agents.activity.tasksCompleted')}</div>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-card-value">${stats.tasksCompleted ?? 0}</div>
+            <div class="stat-card-label">${t('profile.agents.activity.tasksCompleted')}</div>
           </div>
-          <div class="pf-agd-stat-card">
-            <div class="pf-agd-stat-value">${stats.tokensUsed30d ?? 0}</div>
-            <div class="pf-agd-stat-label">${t('profile.agents.activity.tokensUsed')}</div>
+          <div class="stat-card">
+            <div class="stat-card-value">${stats.tokensUsed30d ?? 0}</div>
+            <div class="stat-card-label">${t('profile.agents.activity.tokensUsed')}</div>
           </div>
-          <div class="pf-agd-stat-card">
-            <div class="pf-agd-stat-value">${stats.successRate != null ? `${Math.round(stats.successRate)}%` : '-'}</div>
-            <div class="pf-agd-stat-label">${t('profile.agents.activity.successRate')}</div>
+          <div class="stat-card">
+            <div class="stat-card-value">${stats.successRate != null ? `${Math.round(stats.successRate)}%` : '-'}</div>
+            <div class="stat-card-label">${t('profile.agents.activity.successRate')}</div>
           </div>
         </div>
       `}

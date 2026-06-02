@@ -4,6 +4,8 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.7.0 -- 2026-06-02 -- Component unification (#6 stat cards): remove .agd-stat*/
+ *     .pf-agd-stat*; agent activity/quality stats use canonical .stat-card family.
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  *   v1.1.0 -- 2026-05-22 -- Add capability badge styles for Capabilities sub-tab
  *   v1.2.0 -- 2026-05-22 -- Add Activity sub-tab styles (stats cards, chart, jobs, event log)
@@ -580,15 +582,9 @@
 
 /* ── Activity sub-tab ── */
 
-/* Activity stats cards */
-.pf .agd-stats-grid ,
-.pf .pf-agd-stats-grid  { display: flex; gap: 8px; margin-bottom: 16px; }
-.pf .agd-stat-card ,
-.pf .pf-agd-stat-card  { flex: 1; background: var(--card-bg, #FFFFFF); border: 1px solid var(--border, #E5E7EB); border-radius: 8px; padding: 12px; text-align: center; }
-.pf .agd-stat-value ,
-.pf .pf-agd-stat-value  { font-size: 1.5rem; font-weight: 600; color: var(--text, #1A1A2E); }
-.pf .agd-stat-label ,
-.pf .pf-agd-stat-label  { font-size: 0.75rem; color: var(--text-muted, #9CA3AF); }
+/* Activity stats cards — .agd-stat*/.pf-agd-stat* removed; agent activity/quality
+   stats use canonical .stat-grid / .stat-card / .stat-card-value / .stat-card-label.
+   Unified 2026-06-02 (#6). */
 
 /* Activity chart area */
 .pf .agd-chart-container ,

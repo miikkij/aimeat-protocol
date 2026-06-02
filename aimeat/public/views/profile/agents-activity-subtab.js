@@ -35,11 +35,11 @@ function StatsCards({ stats }) {
   ];
 
   return html`
-    <div class="agd-stats-grid">
+    <div class="stat-grid">
       ${cards.map(c => html`
-        <div class="agd-stat-card" key=${c.key}>
-          <div class="agd-stat-value">${c.value}</div>
-          <div class="agd-stat-label">${t(`profile.agents.activity.${c.key}`)}</div>
+        <div class="stat-card" key=${c.key}>
+          <div class="stat-card-value">${c.value}</div>
+          <div class="stat-card-label">${t(`profile.agents.activity.${c.key}`)}</div>
         </div>
       `)}
     </div>
