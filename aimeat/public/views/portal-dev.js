@@ -219,7 +219,7 @@ function McpPanel({ locale, isLoggedIn, session }) {
               <div style="margin-bottom:.75rem">
                 <div style="font-size:.8rem;color:var(--muted);margin-bottom:.25rem">${dt('panel.mcpCodeRunThis', locale)}</div>
                 <div style="display:flex;align-items:center;gap:.5rem">
-                  <code style="font-size:.78rem;background:rgba(255,255,255,.06);padding:.4rem .6rem;border-radius:.25rem;user-select:all;flex:1;word-break:break-all">claude mcp add aimeat --transport http ${mcpUrl}</code>
+                  <code style="font-size:.78rem;background:var(--code-bg);padding:.4rem .6rem;border-radius:.25rem;user-select:all;flex:1;word-break:break-all">claude mcp add aimeat --transport http ${mcpUrl}</code>
                   <button type="button" onClick=${copyCommand}
                     style="padding:.3rem .6rem;background:var(--love1,#E8564A);color:#fff;border:none;border-radius:.25rem;cursor:pointer;font-size:.75rem;white-space:nowrap">
                     ${copied ? dt('panel.mcpCopied', locale) : dt('panel.mcpCopyCommand', locale)}
@@ -245,7 +245,7 @@ function McpPanel({ locale, isLoggedIn, session }) {
                   </li>
                   <li>${dt('panel.mcpDesktopStep2', locale)}
                     <div style="display:flex;align-items:center;gap:.5rem;margin:.4rem 0">
-                      <code style="font-size:.78rem;background:rgba(255,255,255,.06);padding:.25rem .5rem;border-radius:.25rem;user-select:all">${mcpUrl}</code>
+                      <code style="font-size:.78rem;background:var(--code-bg);padding:.25rem .5rem;border-radius:.25rem;user-select:all">${mcpUrl}</code>
                       <button type="button" onClick=${copyUrl}
                         style="padding:.2rem .5rem;background:rgba(130,100,255,.15);color:var(--accent,#a78bfa);border:1px solid rgba(130,100,255,.3);border-radius:.25rem;cursor:pointer;font-size:.75rem;white-space:nowrap">
                         ${copied ? dt('panel.mcpCopied', locale) : dt('panel.mcpCopyUrl', locale)}
@@ -277,7 +277,7 @@ function McpPanel({ locale, isLoggedIn, session }) {
                   </li>
                   <li>${dt('panel.mcpChatStep3', locale)}
                     <div style="display:flex;align-items:center;gap:.5rem;margin:.4rem 0">
-                      <code style="font-size:.8rem;background:rgba(255,255,255,.06);padding:.25rem .5rem;border-radius:.25rem;user-select:all">${mcpUrl}</code>
+                      <code style="font-size:.8rem;background:var(--code-bg);padding:.25rem .5rem;border-radius:.25rem;user-select:all">${mcpUrl}</code>
                       <button type="button" onClick=${copyUrl}
                         style="padding:.2rem .5rem;background:rgba(130,100,255,.15);color:var(--accent,#a78bfa);border:1px solid rgba(130,100,255,.3);border-radius:.25rem;cursor:pointer;font-size:.75rem;white-space:nowrap">
                         ${copied ? dt('panel.mcpCopied', locale) : dt('panel.mcpCopyUrl', locale)}
@@ -741,7 +741,7 @@ export default function PortalDevView({ navigate, locale }) {
       }
 
       <!-- Quick Start -->
-      <div class="dv-panel" style="border-color:var(--love1,#E8564A);background:linear-gradient(135deg,rgba(250,250,248,.95),rgba(245,240,238,.9))">
+      <div class="dv-panel" style="border-color:var(--love1,#E8564A);background:var(--bg-card)">
         <h3 style="margin-bottom:.5rem">\ud83d\ude80 ${dt('quickStart.title', locale)}</h3>
         <p style="margin-bottom:.5rem">${dt('quickStart.desc', locale)}</p>
         <div class="dv-prompt-output" style="margin-bottom:0">
