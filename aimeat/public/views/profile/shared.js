@@ -48,14 +48,9 @@ export function VisibilityPill({ visibility, onClick }) {
   </button>`;
 }
 
-/** Shared toggle switch (notifications-tab, email-tab). */
-export function ToggleSwitch({ checked, onChange, label }) {
-  return html`<label class="pf-toggle">
-    <input type="checkbox" checked=${checked} onChange=${onChange} class="pf-toggle-input" />
-    <span class="pf-toggle-slider"></span>
-    ${label && html`<span class="pf-toggle-label">${label}</span>`}
-  </label>`;
-}
+/** Shared toggle switch — relocated to the canonical /components/ToggleSwitch.js (#14);
+ *  re-exported here so notifications-tab/email-tab imports are unchanged. */
+export { ToggleSwitch } from '/components/ToggleSwitch.js';
 
 /** Glass-style card container (email-tab, notifications-tab). */
 export function GlassCard({ children }) {

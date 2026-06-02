@@ -856,21 +856,7 @@
 .pf .vis-private   { background: var(--purple-bg); color: var(--purple-fg); }
 .pf .vis-protected { background: var(--info-bg); color: var(--info-fg); }
 
-/* ── Toggle Switch (shared: notifications-tab, email-tab) ── */
-.pf-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-.pf-toggle-input { position: absolute; opacity: 0; width: 0; height: 0; }
-.pf-toggle-slider {
-  position: relative; display: inline-block; width: 44px; height: 24px;
-  background: #D1D5DB; border-radius: 12px; transition: background 0.2s;
-}
-.pf-toggle-slider::after {
-  content: ''; position: absolute; top: 2px; left: 2px;
-  width: 20px; height: 20px; border-radius: 50%; background: #fff;
-  transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-}
-.pf-toggle-input:checked + .pf-toggle-slider { background: var(--success, #22c55e); }
-.pf-toggle-input:checked + .pf-toggle-slider::after { transform: translateX(20px); }
-.pf-toggle-label { font-size: .85rem; color: var(--text, #1A1A2E); }
+/* Toggle Switch moved to theme.css .toggle* (canonical /components/ToggleSwitch.js, #14). */
 
 /* ── Glass Card (shared: email-tab, notifications-tab) ── */
 .pf-glass-card {

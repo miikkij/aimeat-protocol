@@ -13,6 +13,7 @@ export { Alert } from './Alert.js';
 export { useToast } from './Toast.js';
 export { Spinner } from './Spinner.js';
 export { EmptyState } from './EmptyState.js';
+export { ToggleSwitch } from './ToggleSwitch.js';
 export { Modal, ConfirmDialog, useConfirm } from './Modal.js';
 export { CopyButton } from './CopyButton.js';
 export { FormField } from './FormField.js';
