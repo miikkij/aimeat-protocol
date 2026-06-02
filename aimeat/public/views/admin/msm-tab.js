@@ -8,6 +8,9 @@
  * @version-history
  *   v1.1.0 — 2026-06-02 — Component unification (#3): delete-confirm overlay uses
  *     canonical .modal-overlay (theme.css) instead of removed .adm-modal-overlay.
+ *   v1.2.0 — 2026-06-02 — Component unification (#2): delete-confirm modal uses the
+ *     canonical <Modal> component (header ✕ + Escape/backdrop close); the typed-name
+ *     guard stays in the body, with the danger cue moved to the message text.
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
@@ -17,6 +20,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { dt, Badge, Empty, ExpandableHelp, useToast, Toast } from './shared.js';
 import { getMsmDetail, createMsm, updateMsm, deleteMsm, getMsmTemplates, getMsmTemplate } from '/js/services/admin.js';
+import { Modal } from '/components/Modal.js';
 
 export default function MsmTab({ data, reload }) {
   const integrations = data.msm?.integrations || [];
@@ -138,12 +142,10 @@ export default function MsmTab({ data, reload }) {
   // ── Delete confirmation modal ──
   function renderDeleteModal() {
     if (!deleteTarget) return null;
+    const closeDelete = () => { setDeleteTarget(null); setDeleteInput(''); };
     return html`
-      <div class="modal-overlay"
-           onClick=${e => { if (e.target === e.currentTarget) { setDeleteTarget(null); setDeleteInput(''); } }}>
-        <div class="adm-card" style="max-width:460px;width:90%;margin:0">
-          <h4 class="adm-mb-sm adm-text-error" style="margin:0">${t('dashboard.msmDeleteTitle')}</h4>
-          <p class="adm-text-base adm-mb-md" style="margin:0">
+      <${Modal} open=${true} onClose=${closeDelete} title=${t('dashboard.msmDeleteTitle')}>
+          <p class="adm-text-base adm-mb-md adm-text-error" style="margin:0 0 1rem">
             ${t('dashboard.msmDeleteConfirm').replace('{name}', deleteTarget)}
           </p>
           <input
@@ -154,7 +156,7 @@ export default function MsmTab({ data, reload }) {
             onInput=${e => setDeleteInput(e.target.value)}
           />
           <div class="adm-flex" style="justify-content:flex-end">
-            <button class="adm-btn-sm" onClick=${() => { setDeleteTarget(null); setDeleteInput(''); }}>
+            <button class="adm-btn-sm" onClick=${closeDelete}>
               ${t('dashboard.cancel')}
             </button>
             <button
@@ -166,8 +168,7 @@ export default function MsmTab({ data, reload }) {
               ${loading ? '...' : t('dashboard.delete')}
             </button>
           </div>
-        </div>
-      </div>
+      <//>
     `;
   }
 
