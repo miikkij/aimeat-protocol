@@ -13,6 +13,9 @@
  *     add onCopied hook (for sites that also toast), copiedLabel, title, type="button",
  *     and a `copied` class in the confirmed state (so bespoke classes like
  *     .dv-copy-btn.copied / .copy-btn.copied can style it) — for the #1 sweep.
+ *   v1.1.1 — 2026-06-02 — Compute the class as a single string (htm silently drops the
+ *     2nd `${}` hole when two interpolations share one quoted attribute, so the `copied`
+ *     class never applied — browser-verified the regression and the fix).
  */
 import { h } from 'preact';
 import { useState, useCallback } from 'preact/hooks';
@@ -38,8 +41,12 @@ export function CopyButton({ text, label, copiedLabel, className = '', title, on
     setTimeout(() => setCopied(false), 2000);
   }, [text, onCopied]);
 
+  // Single computed class string — htm drops the second `${}` hole when two
+  // interpolations share one quoted attribute, so concatenate here instead.
+  const cls = `${className || 'btn-ghost'}${copied ? ' copied' : ''}`;
+
   return html`
-    <button class="${className || 'btn-ghost'} ${copied ? 'copied' : ''}" type="button" title=${title} onClick=${handleCopy}>
+    <button class=${cls} type="button" title=${title} onClick=${handleCopy}>
       ${copied ? (copiedLabel || t('common.copied')) : (label || t('common.copy'))}
     </button>`;
 }

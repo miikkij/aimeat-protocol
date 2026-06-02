@@ -4,6 +4,11 @@
  *   during onboarding or production status (connection, platform, readiness,
  *   identity, delivery log) after completion.
  * @version-history
+ *   v1.6.0 -- 2026-06-02 -- Component unification (#1): the 3 copy buttons (agent prompt,
+ *     install command, curl) now use the canonical <CopyButton> with precomputed text
+ *     payloads -- dropped 3 copied-state useState hooks, 3 hand-rolled handlers, the
+ *     copied-flag params threaded through both render functions, and the local
+ *     copyToClipboard import.
  *   v1.5.0 -- 2026-05-31 -- Live-update refresh no longer toggles the full-tab loading
  *     placeholder (added a showSpinner option). During Hello Integration the agent
  *     posts steps/telemetry rapidly, so the frequent SSE ticks were re-rendering the
@@ -22,7 +27,8 @@ import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { timeAgo, copyToClipboard } from '/js/utils.js';
+import { timeAgo } from '/js/utils.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { detectAgentState } from './state-detector.js';
 import {
   getOnboarding, startOnboarding,
@@ -42,15 +48,12 @@ export default function TabIntegration({ agent, onboarding, session, showToast, 
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
   const [rerunning, setRerunning] = useState(false);
-  const [copiedCmd, setCopiedCmd] = useState(false);
-  const [copiedInstall, setCopiedInstall] = useState(false);
   const [showAllDeliveries, setShowAllDeliveries] = useState(false);
   const [allDeliveries, setAllDeliveries] = useState(null);
   const [editingWebhook, setEditingWebhook] = useState(false);
   const [webhookDraft, setWebhookDraft] = useState('');
   const [savingWebhook, setSavingWebhook] = useState(false);
   const [updatingBundle, setUpdatingBundle] = useState(false);
-  const [copiedPrompt, setCopiedPrompt] = useState(false);
 
   async function loadData({ showSpinner = true } = {}) {
     if (showSpinner) setLoading(true);
@@ -113,44 +116,23 @@ export default function TabIntegration({ agent, onboarding, session, showToast, 
     setRerunning(false);
   }
 
-  function handleCopyInstall(e) {
-    e.stopPropagation();
-    const url = getSkillBundleUrl(agentName);
-    copyToClipboard(`curl -o skill-bundle.zip ${location.origin}${url}`).then(() => {
-      setCopiedCmd(true);
-      setTimeout(() => setCopiedCmd(false), 2000);
-    });
-  }
+  // Copy-button payloads (the canonical <CopyButton> owns the copy + copied-state).
+  const skillBundleUrl = `${location.origin}${getSkillBundleUrl(agentName)}`;
+  const curlText = `curl -o skill-bundle.zip ${skillBundleUrl}`;
+  const installPlatform = onboarding?.platformName || onboarding?.detectedPlatform || '';
+  const installCmdText = (installPlatform.toLowerCase().includes('hermes') || installPlatform.toLowerCase().includes('openclaw'))
+    ? `hermes skills install ${skillBundleUrl}`
+    : `curl -o skill-bundle.zip ${skillBundleUrl} && unzip skill-bundle.zip`;
+  const agentPromptText = `Download and install your skill bundle from AIMEAT.
 
-  function handleCopyInstallCommand(e) {
-    e.stopPropagation();
-    const platform = onboarding?.platformName || onboarding?.detectedPlatform || '';
-    const url = `${location.origin}${getSkillBundleUrl(agentName)}`;
-    let cmd;
-    if (platform.toLowerCase().includes('hermes') || platform.toLowerCase().includes('openclaw')) {
-      cmd = `hermes skills install ${url}`;
-    } else {
-      cmd = `curl -o skill-bundle.zip ${url} && unzip skill-bundle.zip`;
-    }
-    copyToClipboard(cmd).then(() => {
-      setCopiedInstall(true);
-      setTimeout(() => setCopiedInstall(false), 2000);
-    });
-  }
-
-  function handleCopyAgentPrompt(e) {
-    e.stopPropagation();
-    const url = `${location.origin}${getSkillBundleUrl(agentName)}`;
-    const prompt = `Download and install your skill bundle from AIMEAT.
-
-Your skill bundle URL: ${url}
+Your skill bundle URL: ${skillBundleUrl}
 
 Steps:
 1. Authenticate with your agent token: POST ${location.origin}/v1/auth/token
    Sign the challenge with your private key to get a JWT.
 
 2. Download the skill bundle ZIP:
-   GET ${url}
+   GET ${skillBundleUrl}
    Header: Authorization: Bearer <your-jwt>
    Save the response as a ZIP file.
 
@@ -162,12 +144,7 @@ Steps:
 4. Read SKILL.md first -- it has your personalized directives, rules, and all the API endpoints you need.
 
 If you already have a JWT token, you can do this in one step:
-curl -H "Authorization: Bearer <jwt>" -o skill-bundle.zip "${url}" && unzip skill-bundle.zip && cat */SKILL.md`;
-    copyToClipboard(prompt).then(() => {
-      setCopiedPrompt(true);
-      setTimeout(() => setCopiedPrompt(false), 3000);
-    });
-  }
+curl -H "Authorization: Bearer <jwt>" -o skill-bundle.zip "${skillBundleUrl}" && unzip skill-bundle.zip && cat */SKILL.md`;
 
   function handleEditWebhook(e) {
     e.stopPropagation();
@@ -212,7 +189,7 @@ curl -H "Authorization: Bearer <jwt>" -o skill-bundle.zip "${url}" && unzip skil
   const isOnboarding = state === 'new' || state === 'onboarding';
 
   if (isOnboarding) {
-    return renderOnboardingView(onboarding, agentName, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleCopyInstallCommand, copiedInstall, handleCopyAgentPrompt, copiedPrompt);
+    return renderOnboardingView(onboarding, agentName, handleRerun, rerunning, curlText, installCmdText, agentPromptText);
   }
 
   async function handleShowAll() {
@@ -226,10 +203,10 @@ curl -H "Authorization: Bearer <jwt>" -o skill-bundle.zip "${url}" && unzip skil
 
   const displayDeliveries = showAllDeliveries && allDeliveries ? allDeliveries : deliveries;
 
-  return renderProductionView(agent, onboarding, webhook, bundleVersion, displayDeliveries, handleTestWebhook, testing, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleShowAll, showAllDeliveries, editingWebhook, webhookDraft, setWebhookDraft, handleEditWebhook, handleSaveWebhook, handleCancelWebhook, savingWebhook, handleUpdateBundle, updatingBundle, handleCopyInstallCommand, copiedInstall, handleCopyAgentPrompt, copiedPrompt, postChecklist);
+  return renderProductionView(agent, onboarding, webhook, bundleVersion, displayDeliveries, handleTestWebhook, testing, handleRerun, rerunning, curlText, handleShowAll, showAllDeliveries, editingWebhook, webhookDraft, setWebhookDraft, handleEditWebhook, handleSaveWebhook, handleCancelWebhook, savingWebhook, handleUpdateBundle, updatingBundle, agentPromptText, postChecklist);
 }
 
-function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleCopyInstallCommand, copiedInstall, handleCopyAgentPrompt, copiedPrompt) {
+function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, curlText, installCmdText, agentPromptText) {
   const steps = onboarding?.steps || [];
   const passed = steps.filter(s => s.status === 'passed').length;
   const total = steps.length || 11;
@@ -269,15 +246,15 @@ function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, han
       <div class="pf-agd-section">
         <div class="pf-agd-section-label">${t('profile.agents.skillBundle.title')}</div>
         <div class="pf-agd-form-actions">
-          <button class="btn-primary btn-sm" onClick=${handleCopyAgentPrompt}>
-            ${copiedPrompt ? '✓ ' + t('profile.agents.detail.integration.promptCopied') : t('profile.agents.detail.integration.copyAgentPrompt')}
-          </button>
-          <button class="btn-outline btn-sm" onClick=${handleCopyInstallCommand}>
-            ${copiedInstall ? '✓ ' + t('profile.agents.detail.integration.installCommandCopied') : t('profile.agents.detail.integration.copyInstallCommand')}
-          </button>
-          <button class="btn-outline btn-sm" onClick=${handleCopyInstall}>
-            ${copiedCmd ? '✓ ' + t('profile.agents.copied') : t('profile.agents.skillBundle.copyCurl')}
-          </button>
+          <${CopyButton} text=${agentPromptText} className="btn-primary btn-sm"
+            label=${t('profile.agents.detail.integration.copyAgentPrompt')}
+            copiedLabel=${'✓ ' + t('profile.agents.detail.integration.promptCopied')} />
+          <${CopyButton} text=${installCmdText} className="btn-outline btn-sm"
+            label=${t('profile.agents.detail.integration.copyInstallCommand')}
+            copiedLabel=${'✓ ' + t('profile.agents.detail.integration.installCommandCopied')} />
+          <${CopyButton} text=${curlText} className="btn-outline btn-sm"
+            label=${t('profile.agents.skillBundle.copyCurl')}
+            copiedLabel=${'✓ ' + t('profile.agents.copied')} />
           <a class="btn-outline btn-sm" href=${getSkillBundleUrl(agentName)} download>
             ${t('profile.agents.skillBundle.downloadZip')}
           </a>
@@ -293,7 +270,7 @@ function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, han
   `;
 }
 
-function renderProductionView(agent, onboarding, webhook, bundleVersion, displayDeliveries, handleTestWebhook, testing, handleRerun, rerunning, handleCopyInstall, copiedCmd, handleShowAll, showAllDeliveries, editingWebhook, webhookDraft, setWebhookDraft, handleEditWebhook, handleSaveWebhook, handleCancelWebhook, savingWebhook, handleUpdateBundle, updatingBundle, handleCopyInstallCommand, copiedInstall, handleCopyAgentPrompt, copiedPrompt, postChecklist) {
+function renderProductionView(agent, onboarding, webhook, bundleVersion, displayDeliveries, handleTestWebhook, testing, handleRerun, rerunning, curlText, handleShowAll, showAllDeliveries, editingWebhook, webhookDraft, setWebhookDraft, handleEditWebhook, handleSaveWebhook, handleCancelWebhook, savingWebhook, handleUpdateBundle, updatingBundle, agentPromptText, postChecklist) {
   const steps = onboarding?.steps || [];
   const agentName = agent.name;
 
@@ -397,12 +374,12 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
           </div>
         ` : ''}
         <div class="pf-agd-form-actions">
-          <button class="btn-primary btn-sm" onClick=${handleCopyAgentPrompt}>
-            ${copiedPrompt ? '✓ ' + t('profile.agents.detail.integration.promptCopied') : t('profile.agents.detail.integration.copyAgentPrompt')}
-          </button>
-          <button class="btn-outline btn-sm" onClick=${handleCopyInstall}>
-            ${copiedCmd ? '✓ ' + t('profile.agents.copied') : t('profile.agents.skillBundle.reinstall')}
-          </button>
+          <${CopyButton} text=${agentPromptText} className="btn-primary btn-sm"
+            label=${t('profile.agents.detail.integration.copyAgentPrompt')}
+            copiedLabel=${'✓ ' + t('profile.agents.detail.integration.promptCopied')} />
+          <${CopyButton} text=${curlText} className="btn-outline btn-sm"
+            label=${t('profile.agents.skillBundle.reinstall')}
+            copiedLabel=${'✓ ' + t('profile.agents.copied')} />
           <button class="btn-outline btn-sm" onClick=${handleUpdateBundle} disabled=${updatingBundle}>
             ${updatingBundle ? '...' : t('profile.agents.detail.integration.update')}
           </button>

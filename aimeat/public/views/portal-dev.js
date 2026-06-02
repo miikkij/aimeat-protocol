@@ -7,7 +7,7 @@ import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t as globalT } from '/js/i18n.js';
-import { sanitizeHtml } from '/js/utils.js';
+import { sanitizeHtml, copyToClipboard } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 
@@ -144,14 +144,14 @@ function McpPanel({ locale, isLoggedIn, session }) {
 
   const mcpUrl = `${NODE_URL}/v1/mcp`;
 
-  const copyUrl = useCallback(() => {
-    navigator.clipboard.writeText(mcpUrl);
+  const copyUrl = useCallback(async () => {
+    await copyToClipboard(mcpUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }, [mcpUrl]);
 
-  const copyCommand = useCallback(() => {
-    navigator.clipboard.writeText(`claude mcp add aimeat --transport http ${mcpUrl}`);
+  const copyCommand = useCallback(async () => {
+    await copyToClipboard(`claude mcp add aimeat --transport http ${mcpUrl}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }, [mcpUrl]);
