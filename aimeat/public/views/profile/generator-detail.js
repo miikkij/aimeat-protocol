@@ -676,7 +676,11 @@ export function ComponentDetail({ component, project, components, projectId, int
                 else if (component.subtype === 'data') sv = validateDataApiSpec(parsed);
                 else if (component.subtype === 'component') sv = validateComponentSpec(parsed);
                 else if (component.subtype === 'app-domain') sv = validateAppDomainSpec(parsed);
-                else sv = validateDataApiSpec(parsed); // fallback
+                // FAIL LOUD: a cortex must declare its subtype. A silent fallback to a default
+                // validator (previously validateDataApiSpec) masked the real bug — a missing subtype —
+                // as a confusing "Missing wrapsExtension" error on a component cortex. Name the real cause.
+                else if (component.type === 'cortex') sv = { valid: false, errors: ['Cortex component "' + component.id + '" has no subtype (expected data | component | app-domain) — this is an upstream blueprint/init bug; fix the subtype, do not guess a validator'] };
+                else sv = { valid: false, errors: ['Cannot select a spec validator for component "' + component.id + '" (type=' + component.type + ', subtype=' + component.subtype + ')'] };
                 // Also check blueprint action IDs
                 const bp = project?.blueprint;
                 if (bp && component.type === 'extension') {

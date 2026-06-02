@@ -54,7 +54,7 @@ import type { TestReport, TestResult } from '../services/generator-testing.js';
 import { join } from 'node:path';
 import { readFile } from 'node:fs/promises';
 // DB-backed prompt builder — reads templates from SystemPromptRecord
-import { buildPrompt } from '../services/generator-prompts/index.js';
+import { buildPrompt, validateExtensionSpec, validateDataApiSpec, validateComponentSpec, validateAppDomainSpec, validateAppSpec } from '../services/generator-prompts/index.js';
 import type { PromptRuntimeData, Blueprint, InterviewSpec, ComponentState } from '../services/generator-prompts/types.js';
 import { GeneratorDebugWriter } from '../services/generator-debug.js';
 
@@ -1017,6 +1017,44 @@ window.__renderSnapshot = null; // Set by test code to capture rendered state
       const projectRec = await storage.getMemory(gaii, `generator.${projectId}.project`);
       if (!projectRec) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found'));
+        return;
+      }
+
+      // VALIDATE the spec BEFORE storing it. The browser blocks invalid specs client-side
+      // (generator-detail.js runs the .js validators and only reveals "Save Spec" when valid); the
+      // agent path has no such gate, so we run the SAME validators here — generator-prompts/
+      // spec-validate.ts is a byte-for-byte port of public/js/services/generator-spec-validate.js —
+      // and dispatch the SAME way the spec-PROMPT route picks the prompt, so the validator matches
+      // the prompt that produced this spec. validate spec -> store spec.
+      const specBlueprint = (projectRec.value as { blueprint?: { components?: Array<Record<string, unknown>> } })?.blueprint;
+      const specBpComponent = specBlueprint?.components?.find((c) => c['id'] === componentId);
+      if (!specBpComponent) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Component "${componentId}" not in blueprint (import the blueprint first)`));
+        return;
+      }
+      const specType = specBpComponent['type'] as string;
+      const specSubtype = (specBpComponent['subtype'] as string) || '';
+      let specCheck: { valid: boolean; errors: string[] };
+      if (specType === 'extension') specCheck = validateExtensionSpec(spec);
+      else if (specType === 'app') specCheck = validateAppSpec(spec);
+      else if (specType === 'cortex') {
+        if (specSubtype === 'data') specCheck = validateDataApiSpec(spec);
+        else if (specSubtype === 'component') specCheck = validateComponentSpec(spec);
+        else if (specSubtype === 'app-domain') specCheck = validateAppDomainSpec(spec);
+        else {
+          // FAIL LOUD: a cortex MUST declare its subtype. Match the spec-PROMPT route (it builds a
+          // gen-component-spec prompt for an unknown cortex subtype) so the validator agrees with the
+          // prompt, but log it — a missing subtype is an upstream blueprint bug, not a normal path.
+          specCheck = validateComponentSpec(spec);
+          logger.warn(`⚠️ SUBTYPE MISSING on cortex "${componentId}" at spec store — validated as component spec to match the prompt route. Fix the blueprint subtype.`);
+        }
+      } else {
+        res.status(400).json(error(config.nodeId, 'NO_SPEC', `Component type "${specType}" does not use specs`));
+        return;
+      }
+      if (!specCheck.valid) {
+        // Return errors for the agent to correct — do NOT store an invalid spec.
+        res.status(422).json(error(config.nodeId, 'SPEC_VALIDATION_FAILED', specCheck.errors.join('; ')));
         return;
       }
 

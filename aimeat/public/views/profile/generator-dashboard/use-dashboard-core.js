@@ -78,7 +78,10 @@ export function useDashboardCore(projectId, onBack, showToast) {
         // Blueprint exists but no component records yet — initialize them
         const initialized = [];
         for (const c of p.blueprint.components) {
-          const comp = { id: c.id, type: c.type, label: c.label, status: 'not_started', prompt: null, result: null, validationErrors: [], registeredAs: null, history: [], _version: 0 };
+          // Preserve subtype (data|component|app-domain) on cortex records — the spec/code prompt
+          // selectors and the spec validators dispatch on it. Dropping it here was the single hop
+          // where subtype was lost end-to-end, forcing every downstream picker onto a wrong guess.
+          const comp = { id: c.id, type: c.type, label: c.label, ...(c.subtype ? { subtype: c.subtype } : {}), status: 'not_started', prompt: null, result: null, validationErrors: [], registeredAs: null, history: [], _version: 0 };
           await saveComponent(projectId, comp);
           initialized.push(comp);
         }
