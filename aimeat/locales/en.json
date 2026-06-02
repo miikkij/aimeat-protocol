@@ -14,7 +14,9 @@
     "name": "Name",
     "add": "Add",
     "yes": "Yes",
-    "no": "No"
+    "no": "No",
+    "copy": "Copy",
+    "copied": "✓ Copied"
   },
   "nav": {
     "try": "Try it",

@@ -14,7 +14,9 @@
     "name": "Nimi",
     "add": "Lisää",
     "yes": "Kyllä",
-    "no": "Ei"
+    "no": "Ei",
+    "copy": "Kopioi",
+    "copied": "✓ Kopioitu"
   },
   "nav": {
     "try": "Kokeile",
