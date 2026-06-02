@@ -160,15 +160,15 @@ function SearchView({ goTo, initData }) {
       <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
         <div class="hb-form-group" style="flex:1;min-width:200px;margin-bottom:0;">
           <label class="hb-form-label">${t('hobbies.search.interest')}</label>
-          <input class="hb-form-input" value=${interest} onInput=${e => setInterest(e.target.value)} onKeyDown=${onKey} placeholder=${t('hobbies.search.interestPlaceholder')} />
+          <input class="input-field" value=${interest} onInput=${e => setInterest(e.target.value)} onKeyDown=${onKey} placeholder=${t('hobbies.search.interestPlaceholder')} />
         </div>
         <div class="hb-form-group" style="flex:1;min-width:150px;margin-bottom:0;">
           <label class="hb-form-label">${t('hobbies.search.city')}</label>
-          <input class="hb-form-input" value=${city} onInput=${e => setCity(e.target.value)} onKeyDown=${onKey} placeholder=${t('hobbies.search.cityPlaceholder')} />
+          <input class="input-field" value=${city} onInput=${e => setCity(e.target.value)} onKeyDown=${onKey} placeholder=${t('hobbies.search.cityPlaceholder')} />
         </div>
         <div class="hb-form-group" style="flex:0;min-width:150px;margin-bottom:0;">
           <label class="hb-form-label">${t('hobbies.search.area')}</label>
-          <input class="hb-form-input" value=${area} onInput=${e => setArea(e.target.value)} onKeyDown=${onKey} placeholder=${t('hobbies.search.areaPlaceholder')} />
+          <input class="input-field" value=${area} onInput=${e => setArea(e.target.value)} onKeyDown=${onKey} placeholder=${t('hobbies.search.areaPlaceholder')} />
         </div>
         <button class="btn-primary btn-sm" onClick=${() => doSearch(1)}>${t('hobbies.search.btn')}</button>
       </div>
@@ -371,27 +371,27 @@ function JoinView({ goTo }) {
     <form ref=${formRef} class="hb-card" onSubmit=${onSubmit}>
       <div class="hb-form-group">
         <label class="hb-form-label">${t('hobbies.join.interests')}</label>
-        <input class="hb-form-input" id="hb-join-interests" required placeholder=${t('hobbies.join.interestsPlaceholder')} />
+        <input class="input-field" id="hb-join-interests" required placeholder=${t('hobbies.join.interestsPlaceholder')} />
         <div class="hb-form-hint">${t('hobbies.join.interestsHint')}</div>
       </div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;">
         <div class="hb-form-group" style="flex:1;min-width:150px;">
           <label class="hb-form-label">${t('hobbies.join.city')}</label>
-          <input class="hb-form-input" id="hb-join-city" required placeholder=${t('hobbies.join.cityPlaceholder')} />
+          <input class="input-field" id="hb-join-city" required placeholder=${t('hobbies.join.cityPlaceholder')} />
         </div>
         <div class="hb-form-group" style="flex:0 0 100px;">
           <label class="hb-form-label">${t('hobbies.join.country')}</label>
-          <input class="hb-form-input" id="hb-join-country" value="FI" placeholder="FI" />
+          <input class="input-field" id="hb-join-country" value="FI" placeholder="FI" />
         </div>
       </div>
       <div class="hb-form-group">
         <label class="hb-form-label">${t('hobbies.join.bio')}</label>
-        <textarea class="hb-form-textarea" id="hb-join-bio" maxlength="500" placeholder=${t('hobbies.join.bioPlaceholder')}></textarea>
+        <textarea class="input-field" id="hb-join-bio" maxlength="500" placeholder=${t('hobbies.join.bioPlaceholder')}></textarea>
         <div class="hb-form-hint">${t('hobbies.join.bioHint')}</div>
       </div>
       <div class="hb-form-group">
         <label class="hb-form-label">${t('hobbies.join.availability')}</label>
-        <select class="hb-form-select" id="hb-join-availability">
+        <select class="input-field" id="hb-join-availability">
           <option value="">${t('hobbies.join.availNone')}</option>
           <option value="anytime">${t('hobbies.join.availAnytime')}</option>
           <option value="mornings">${t('hobbies.join.availMornings')}</option>
@@ -402,7 +402,7 @@ function JoinView({ goTo }) {
       </div>
       <div class="hb-form-group">
         <label class="hb-form-label">${t('hobbies.join.seeking')}</label>
-        <input class="hb-form-input" id="hb-join-seeking" placeholder=${t('hobbies.join.seekingPlaceholder')} />
+        <input class="input-field" id="hb-join-seeking" placeholder=${t('hobbies.join.seekingPlaceholder')} />
         <div class="hb-form-hint">${t('hobbies.join.seekingHint')}</div>
       </div>
       <div style="margin-top:8px;margin-bottom:8px;">
@@ -546,15 +546,15 @@ function MeView({ goTo }) {
 
     <h2 style="font-size:1rem;color:var(--text-bright);margin:24px 0 12px;">${t('hobbies.me.editTitle')}</h2>
     <form ref=${editFormRef} class="hb-card" onSubmit=${onSave}>
-      <div class="hb-form-group"><label class="hb-form-label">${t('hobbies.profile.interests')}</label><input class="hb-form-input" id="hb-edit-interests" value=${(myEntry.interests || []).join(', ')} /><div class="hb-form-hint">${t('hobbies.join.interestsHint')}</div></div>
+      <div class="hb-form-group"><label class="hb-form-label">${t('hobbies.profile.interests')}</label><input class="input-field" id="hb-edit-interests" value=${(myEntry.interests || []).join(', ')} /><div class="hb-form-hint">${t('hobbies.join.interestsHint')}</div></div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;">
-        <div class="hb-form-group" style="flex:1;min-width:150px;"><label class="hb-form-label">${t('hobbies.search.city')}</label><input class="hb-form-input" id="hb-edit-city" value=${myEntry.city || ''} /></div>
-        <div class="hb-form-group" style="flex:0 0 100px;"><label class="hb-form-label">${t('hobbies.join.country')}</label><input class="hb-form-input" id="hb-edit-country" value=${myEntry.country || 'FI'} /></div>
+        <div class="hb-form-group" style="flex:1;min-width:150px;"><label class="hb-form-label">${t('hobbies.search.city')}</label><input class="input-field" id="hb-edit-city" value=${myEntry.city || ''} /></div>
+        <div class="hb-form-group" style="flex:0 0 100px;"><label class="hb-form-label">${t('hobbies.join.country')}</label><input class="input-field" id="hb-edit-country" value=${myEntry.country || 'FI'} /></div>
       </div>
-      <div class="hb-form-group"><label class="hb-form-label">${t('hobbies.join.bio')}</label><textarea class="hb-form-textarea" id="hb-edit-bio" maxlength="500">${myEntry.bio || ''}</textarea></div>
+      <div class="hb-form-group"><label class="hb-form-label">${t('hobbies.join.bio')}</label><textarea class="input-field" id="hb-edit-bio" maxlength="500">${myEntry.bio || ''}</textarea></div>
       <div class="hb-form-group">
         <label class="hb-form-label">${t('hobbies.join.availability')}</label>
-        <select class="hb-form-select" id="hb-edit-availability">
+        <select class="input-field" id="hb-edit-availability">
           <option value="" selected=${!availability}>${t('hobbies.join.availNone')}</option>
           <option value="anytime" selected=${availability === 'anytime'}>${t('hobbies.join.availAnytime')}</option>
           <option value="mornings" selected=${availability === 'mornings'}>${t('hobbies.join.availMornings')}</option>
@@ -563,7 +563,7 @@ function MeView({ goTo }) {
           <option value="evenings-weekends" selected=${availability === 'evenings-weekends'}>${t('hobbies.join.availEveningsWeekends')}</option>
         </select>
       </div>
-      <div class="hb-form-group"><label class="hb-form-label">${t('hobbies.join.seeking')}</label><input class="hb-form-input" id="hb-edit-seeking" value=${(seeking || []).join(', ')} /></div>
+      <div class="hb-form-group"><label class="hb-form-label">${t('hobbies.join.seeking')}</label><input class="input-field" id="hb-edit-seeking" value=${(seeking || []).join(', ')} /></div>
       <div style="margin-top:8px;margin-bottom:16px;">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.85rem;color:var(--text-dim);">
           <input type="checkbox" id="hb-edit-notifications" checked=${notifyEnabled} />

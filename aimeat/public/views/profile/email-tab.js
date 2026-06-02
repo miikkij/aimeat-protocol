@@ -130,7 +130,7 @@ export default function EmailTab({ session, showToast }) {
           <p class="email-sent-text">${t('profile.email.codeSent')}</p>
           <div class="email-form-group">
             <label class="email-form-label">${t('profile.email.enterCode')}</label>
-            <input class="pf-input input-verification-code" type="text" maxlength="6" placeholder="123456"
+            <input class="input-field input-verification-code" type="text" maxlength="6" placeholder="123456"
               value=${code} onInput=${e => setCode(e.target.value)} />
           </div>
           <button class="btn-primary" onClick=${handleVerifyCode} disabled=${verifying}>
@@ -147,7 +147,7 @@ export default function EmailTab({ session, showToast }) {
           ` : null}
           <div class="email-form-group">
             <label class="email-form-label">${t('profile.email.enterEmail')}</label>
-            <input class="pf-input" type="email" placeholder="you@example.com"
+            <input class="input-field" type="email" placeholder="you@example.com"
               value=${email} onInput=${e => setEmail(e.target.value)} />
           </div>
           <button class="btn-primary" onClick=${handleSendCode} disabled=${sending}>

@@ -6,6 +6,8 @@
  *   v1.1.0 — 2026-06-02 — Phase 5: tokenize for dark mode (bare color literals → theme tokens)
  *   v1.2.0 — 2026-06-02 — Component unification (#4 buttons): remove .mk-btn* family;
  *     marketplace buttons use canonical theme.css .btn-primary / .btn-outline / .btn-sm.
+ *   v1.3.0 — 2026-06-02 — Component unification (#5 inputs): remove .mk-form-input/
+ *     -textarea/-select; fields use canonical .input-field (kept mk-form-group/-label/-grid).
  */
 
 /* marketplace view — scoped under .mk- */
@@ -88,15 +90,8 @@
 .mk-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .mk-form-group { margin-bottom: 16px; }
 .mk-form-label { display: block; font-size: 0.85rem; color: var(--text-dim); margin-bottom: 6px; font-weight: 500; }
-.mk-form-input, .mk-form-textarea, .mk-form-select {
-  width: 100%; padding: 10px 14px;
-  background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: 10px; color: var(--text); font-size: 0.9rem;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; transition: border-color 0.2s;
-}
-.mk-form-input:focus, .mk-form-textarea:focus, .mk-form-select:focus { outline: none; border-color: var(--accent); }
-.mk-form-textarea { min-height: 80px; resize: vertical; }
-.mk-form-select { appearance: auto; }
+/* .mk-form-input/-textarea/-select removed — marketplace form fields use canonical
+   theme.css .input-field (tokenized, focus ring, var(--font)). Unified 2026-06-02 (#5). */
 
 .mk-pagination { display: flex; gap: 8px; justify-content: center; margin-top: 24px; }
 .mk-pagination a {

@@ -10,6 +10,7 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.4.0 — 2026-06-02 — Component unification (#5 inputs): add canonical textarea.input-field (resize/min-height) + select.input-field (cursor) so .input-field works on all field types and views can drop per-view form-input/textarea/select clones (mk-form/hb-form/...).
      v1.3.0 — 2026-06-02 — Component unification (#4): make canonical .btn-* anchor-safe (text-decoration:none) so views can drop their per-view <a>-button clones (mk-btn/hb-btn/...) and use the canonical classes.
      v1.2.0 — 2026-06-02 — Tokenize shell component literals (semantic tints, scrollbar, overlay scrim, morsel pill, lang-btn active, input focus) so the whole shell flips for dark mode.
      v1.1.0 — 2026-06-02 — Add dark theme override + drift-alias layer + .theme-toggle-btn.
@@ -721,6 +722,11 @@ a { color: inherit; text-decoration: none; }
   box-shadow: 0 0 0 3px var(--accent-subtle);
   background: var(--bg-input-focus);
 }
+
+/* Textarea + select behavior so .input-field works on all field types (lets views
+   drop per-view form-input/textarea/select clones). */
+textarea.input-field { resize: vertical; min-height: 80px; }
+select.input-field { cursor: pointer; }
 
 .prompt-box {
   width: 100%;

@@ -229,15 +229,15 @@ function BrowseView({ extAction, instanceConfig, onNav, params, tl }) {
     <div class="mk-card" style="margin-bottom:24px;">
       <div class="mk-form-grid">
         <div class="mk-form-group"><label class="mk-form-label">${t('mkt.search.keyword')}</label>
-          <input type="text" class="mk-form-input" placeholder=${t('mkt.search.keywordPlaceholder')} value=${q} onInput=${e => setQ(e.target.value)} /></div>
+          <input type="text" class="input-field" placeholder=${t('mkt.search.keywordPlaceholder')} value=${q} onInput=${e => setQ(e.target.value)} /></div>
         <div class="mk-form-group"><label class="mk-form-label">${t('mkt.search.category')}</label>
-          <select class="mk-form-select" value=${category} onChange=${e => setCategory(e.target.value)}>
+          <select class="input-field" value=${category} onChange=${e => setCategory(e.target.value)}>
             ${catOptions.map(o => html`<option value=${o.key}>${o.label}</option>`)}
           </select></div>
         <div class="mk-form-group"><label class="mk-form-label">${t('mkt.search.price')}</label>
           <div style="display:flex; gap:8px;">
-            <input type="number" class="mk-form-input" placeholder=${t('mkt.search.minPlaceholder')} value=${minPrice} onInput=${e => setMinPrice(e.target.value)} min="0" />
-            <input type="number" class="mk-form-input" placeholder=${t('mkt.search.maxPlaceholder')} value=${maxPrice} onInput=${e => setMaxPrice(e.target.value)} min="0" />
+            <input type="number" class="input-field" placeholder=${t('mkt.search.minPlaceholder')} value=${minPrice} onInput=${e => setMinPrice(e.target.value)} min="0" />
+            <input type="number" class="input-field" placeholder=${t('mkt.search.maxPlaceholder')} value=${maxPrice} onInput=${e => setMaxPrice(e.target.value)} min="0" />
           </div></div>
       </div>
       <div style="margin-top:12px;">
@@ -403,27 +403,27 @@ function CreateListingView({ extAction, instanceConfig, onNav, tl }) {
     <div class="mk-card">
       <p style="font-size:0.9rem; color:var(--text-dim); margin-bottom:16px;">${t('mkt.sell.formNote')}</p>
       <div class="mk-form-group"><label class="mk-form-label">${t('mkt.sell.titleLabel')}</label>
-        <input type="text" id="mk-sell-title" class="mk-form-input" placeholder=${t('mkt.sell.titlePlaceholder')} minlength="3" maxlength="200" /></div>
+        <input type="text" id="mk-sell-title" class="input-field" placeholder=${t('mkt.sell.titlePlaceholder')} minlength="3" maxlength="200" /></div>
       <div class="mk-form-group"><label class="mk-form-label">${t('mkt.sell.descLabel')}</label>
-        <textarea id="mk-sell-desc" class="mk-form-textarea" placeholder=${t('mkt.sell.descPlaceholder')} rows="4" minlength="10" maxlength="5000"></textarea></div>
+        <textarea id="mk-sell-desc" class="input-field" placeholder=${t('mkt.sell.descPlaceholder')} rows="4" minlength="10" maxlength="5000"></textarea></div>
       <div class="mk-form-grid">
         <div class="mk-form-group"><label class="mk-form-label">${t('mkt.sell.categoryLabel')}</label>
-          <select id="mk-sell-category" class="mk-form-select">
+          <select id="mk-sell-category" class="input-field">
             ${catOptions.map(o => html`<option value=${o.key}>${o.label}</option>`)}
           </select></div>
         <div class="mk-form-group"><label class="mk-form-label">${t('mkt.sell.priceLabel')}</label>
-          <input type="number" id="mk-sell-price" class="mk-form-input" placeholder="10" min="1" /></div>
+          <input type="number" id="mk-sell-price" class="input-field" placeholder="10" min="1" /></div>
       </div>
       <div class="mk-form-grid">
         <div class="mk-form-group"><label class="mk-form-label">${t('mkt.sell.conditionLabel')}</label>
-          <select id="mk-sell-condition" class="mk-form-select">
+          <select id="mk-sell-condition" class="input-field">
             <option value="">${t('mkt.sell.conditionNone')}</option>
             <option value="new">${t('mkt.sell.conditionNew')}</option>
             <option value="used">${t('mkt.sell.conditionUsed')}</option>
             <option value="digital">${t('mkt.sell.conditionDigital')}</option>
           </select></div>
         <div class="mk-form-group"><label class="mk-form-label">${t('mkt.sell.availLabel')}</label>
-          <select id="mk-sell-avail" class="mk-form-select">
+          <select id="mk-sell-avail" class="input-field">
             <option value="">${t('mkt.sell.availNone')}</option>
             <option value="immediate">${t('mkt.sell.availImmediate')}</option>
             <option value="on_request">${t('mkt.sell.availOnRequest')}</option>
@@ -432,12 +432,12 @@ function CreateListingView({ extAction, instanceConfig, onNav, tl }) {
       </div>
       <div class="mk-form-grid">
         <div class="mk-form-group"><label class="mk-form-label">${t('mkt.sell.cityLabel')}</label>
-          <input type="text" id="mk-sell-city" class="mk-form-input" placeholder=${t('mkt.sell.cityPlaceholder')} /></div>
+          <input type="text" id="mk-sell-city" class="input-field" placeholder=${t('mkt.sell.cityPlaceholder')} /></div>
         <div class="mk-form-group"><label class="mk-form-label">${t('mkt.sell.areaLabel')}</label>
-          <input type="text" id="mk-sell-area" class="mk-form-input" placeholder=${t('mkt.sell.areaPlaceholder')} /></div>
+          <input type="text" id="mk-sell-area" class="input-field" placeholder=${t('mkt.sell.areaPlaceholder')} /></div>
       </div>
       <div class="mk-form-group"><label class="mk-form-label">${t('mkt.sell.tagsLabel')}</label>
-        <input type="text" id="mk-sell-tags" class="mk-form-input" placeholder=${t('mkt.sell.tagsPlaceholder')} /></div>
+        <input type="text" id="mk-sell-tags" class="input-field" placeholder=${t('mkt.sell.tagsPlaceholder')} /></div>
 
       ${msg ? html`<div class="mk-alert mk-alert-success">${msg}</div>` : null}
       ${err ? html`<div class="mk-alert mk-alert-error">${err}</div>` : null}
@@ -564,12 +564,12 @@ function MyPurchasesView({ extAction, onNav, tl }) {
       <h3 class="mk-section-heading">${t('mkt.myPurchases.rateHint')}</h3>
       <div class="mk-form-grid">
         <div class="mk-form-group"><label class="mk-form-label">Listing ID</label>
-          <input type="text" class="mk-form-input" value=${rateId} onInput=${e => setRateId(e.target.value)} placeholder="listing-id" /></div>
+          <input type="text" class="input-field" value=${rateId} onInput=${e => setRateId(e.target.value)} placeholder="listing-id" /></div>
         <div class="mk-form-group"><label class="mk-form-label">Score (1-5)</label>
-          <input type="number" class="mk-form-input" value=${rateScore} onInput=${e => setRateScore(parseInt(e.target.value, 10))} min="1" max="5" /></div>
+          <input type="number" class="input-field" value=${rateScore} onInput=${e => setRateScore(parseInt(e.target.value, 10))} min="1" max="5" /></div>
       </div>
       <div class="mk-form-group"><label class="mk-form-label">Comment</label>
-        <input type="text" class="mk-form-input" value=${rateComment} onInput=${e => setRateComment(e.target.value)} /></div>
+        <input type="text" class="input-field" value=${rateComment} onInput=${e => setRateComment(e.target.value)} /></div>
       <button class="btn-primary btn-sm" onClick=${doRate}>${t('mkt.detail.purchaseBtn')}</button>
     </div>
   `;

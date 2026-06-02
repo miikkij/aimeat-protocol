@@ -5,6 +5,8 @@
  *   v1.1.0 — 2026-06-02 — Phase 5: tokenize for dark mode (replaced bare light-only color literals with theme tokens)
  *   v1.2.0 — 2026-06-02 — Component unification (#4 buttons): remove .hb-btn* family;
  *     hobbies buttons use canonical theme.css .btn-primary / .btn-outline / .btn-danger / .btn-sm.
+ *   v1.3.0 — 2026-06-02 — Component unification (#5 inputs): remove .hb-form-input/
+ *     -textarea/-select; fields use canonical .input-field (kept hb-form-group/-label/-hint).
  */
 /* hobbies view — scoped under .hb */
 .hb-wrap { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 24px 16px 80px; }
@@ -33,10 +35,8 @@
      .btn-danger (tokenized) / .btn-sm (anchor-safe). Unified 2026-06-02 (#4 buttons). */
   .hb-form-group { margin-bottom: 16px; }
   .hb-form-label { display: block; font-size: .85rem; color: var(--text-dim); margin-bottom: 6px; font-weight: 500; }
-  .hb-form-input, .hb-form-textarea, .hb-form-select { width: 100%; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: .9rem; font-family: var(--font); transition: border-color .2s; }
-  .hb-form-input:focus, .hb-form-textarea:focus, .hb-form-select:focus { outline: none; border-color: var(--accent); }
-  .hb-form-textarea { min-height: 80px; resize: vertical; }
-  .hb-form-select { appearance: auto; }
+  /* .hb-form-input/-textarea/-select removed — hobbies form fields use canonical
+     theme.css .input-field (focus ring added). Unified 2026-06-02 (#5). */
   .hb-form-hint { font-size: .78rem; color: var(--text-muted); margin-top: 4px; }
   .hb-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 32px; }
   .hb-stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; text-align: center; }
