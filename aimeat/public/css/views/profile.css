@@ -35,6 +35,19 @@
  *     var(--accent,#E8564A) → bare tokens (a dark-mode bug: frozen light hex). The
  *     toggles themselves are left in place (expanded markup wired into view state);
  *     canonical /components/Collapsible.js added for new collapsible sections.
+ *   v1.9.0 — 2026-06-02 — Component unification (#25 pill base): tokenize the
+ *     .pf .vis-pill radius (raw 9999px → var(--radius-full)) so it tracks the new
+ *     canonical .pill shape primitive in theme.css. Shape kept declared on
+ *     .pf .vis-pill (not delegated to bare .pill) to avoid the (0,2,0)-beats-(0,1,0)
+ *     specificity trap; its colors were already token-based (success/info/purple
+ *     -bg/-fg) and unchanged.
+ *   v1.10.0 — 2026-06-02 — Component unification (#26 recipient badge): tokenize the
+ *     .badge-label / .badge-{wildcard,ghii,organism,domain,node,gaii} colors onto
+ *     the new theme-invariant --badge-*-bg / --badge-fg tokens (theme.css). Removes
+ *     hardcoded #8b5cf6/#f97316/#6b7280/#3b82f6 and the dead light-only fallbacks
+ *     var(--success,#22c55e)/var(--danger,#ef4444). Appearance unchanged (values
+ *     resolve identically; swatches deliberately do not flip in dark). Shared shape
+ *     was already factored onto .badge-label — kept as-is.
  */
 .pf-hero{background:var(--pf-hero-gradient);border-bottom:1px solid var(--border,#E5E7EB)}
 .pf-hero-inner{max-width:1000px;margin:0 auto;padding:2rem 1.5rem 0}
@@ -838,26 +851,35 @@
 .input-field.input-sm { padding: .4rem .6rem; font-size: .85rem; }
 
 /* ── Recipient/Type Badge Labels ── */
+/* Shared shape lives on .badge-label; each .badge-* only sets its swatch.
+   All colors come from the theme-invariant --badge-* tokens (theme.css) so no
+   hardcoded hex / dead light-only fallback remains; appearance is unchanged
+   (these saturated swatches deliberately do not flip in dark mode). */
 .pf .badge-label {
   display: inline-block;
   font-size: .7rem;
   padding: 2px 6px;
   border-radius: 4px;
-  color: #fff;
+  color: var(--badge-fg);
   font-weight: 600;
   letter-spacing: .02em;
 }
-.pf .badge-wildcard    { background: var(--danger, #ef4444); }
-.pf .badge-ghii        { background: #8b5cf6; }
-.pf .badge-organism    { background: var(--success, #22c55e); }
-.pf .badge-domain      { background: #f97316; }
-.pf .badge-node        { background: #6b7280; }
-.pf .badge-gaii        { background: #3b82f6; }
+.pf .badge-wildcard    { background: var(--badge-wildcard-bg); }
+.pf .badge-ghii        { background: var(--badge-ghii-bg); }
+.pf .badge-organism    { background: var(--badge-organism-bg); }
+.pf .badge-domain      { background: var(--badge-domain-bg); }
+.pf .badge-node        { background: var(--badge-node-bg); }
+.pf .badge-gaii        { background: var(--badge-gaii-bg); }
 
 /* ── Visibility Pill (shared: memory-tab, knowledge-tab) ── */
+/* Shape mirrors the canonical .pill base in theme.css; kept declared here (not
+   delegated) because the scoped `.pf .vis-pill` (0,2,0) would beat a bare `.pill`
+   (0,1,0) anyway — the specificity trap. Radius now uses the same --radius-full
+   token as .pill (9999px) so the two stay in lockstep. Colors below are already
+   token-based and flip in dark mode. */
 .pf .vis-pill {
   border: none; cursor: pointer; padding: 2px 8px;
-  border-radius: 9999px; font-size: .7rem; font-weight: 600;
+  border-radius: var(--radius-full); font-size: .7rem; font-weight: 600;
   transition: opacity 0.15s;
 }
 .pf .vis-pill:hover { opacity: 0.8; }

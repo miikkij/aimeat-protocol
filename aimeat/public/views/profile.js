@@ -1,3 +1,19 @@
+/**
+ * @file profile.js
+ * @description Profile SPA shell — the authenticated user dashboard. Owns the
+ *   tab registry (tier-gated), the active-tab/visited-tab state, live-update
+ *   wiring, stats aggregation, and a local showToast() passed down to every tab
+ *   as a prop (one of the codebase's toast pathways; see note at its definition).
+ * @structure TABS registry, default Profile() component (state, showToast,
+ *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
+ * @usage Lazy-loaded route component for /v1/profile.
+ * @version-history
+ *   v1.1.0 — 2026-06-02 — Component unification (#10 toast): tokenized the
+ *     shared .toast colors in theme.css (--toast-*) and documented this shell's
+ *     showToast as a distinct, intentionally-not-migrated toast pathway. Added
+ *     this header (campsite rule — file previously had none).
+ *   v1.0.0 — prior — Profile SPA shell.
+ */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
 import htm from 'htm';
@@ -99,6 +115,12 @@ export default function Profile({ navigate, locale }) {
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
 
+  // NOTE: this is a THIRD toast pathway alongside /components/Toast.js's
+  // useToast() and the admin shell's useToast tuple. It renders a distinct
+  // <.pf.toast-container> wrapper + <.toast.error> markup (vs Toast.js's bare
+  // <.toast.toast-error/.toast-success>), so it is a convergence candidate but
+  // is NOT migrated here — adopting Toast.js would change DOM/behavior. The
+  // .toast colors are now tokenized in theme.css (--toast-*).
   const showToast = useCallback((msg, isError) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ msg, isError });
