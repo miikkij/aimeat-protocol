@@ -5,6 +5,8 @@
  *   surfaces map to global theme.css tokens so they flip with dark/light mode.
  * @version-history
  *   v1.1.0 — 2026-06-02 — Tokenize all surfaces/text/borders/badges for dark mode (Phase 2).
+ *   v1.2.0 — 2026-06-02 — Component unification (#3): remove .adm-modal-overlay
+ *     duplicate; msm-tab now uses canonical theme.css .modal-overlay.
  */
 
 /* Admin-scoped variables: indigo accent identity + surfaces mapped to global
@@ -501,14 +503,8 @@
 .adm-mt-md { margin-top: 12px; }
 .adm-mt-lg { margin-top: 16px; }
 
-/* ── Modal ── */
-.adm-modal-overlay {
-  position: fixed; inset: 0;
-  background: var(--overlay-scrim);
-  backdrop-filter: blur(8px);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 1000;
-}
+/* ── Modal ── canonical overlay/box live in theme.css (.modal-overlay / .modal).
+   msm-tab uses .modal-overlay directly; no admin-specific override needed. */
 
 /* ── Memory Tab ── */
 .adm-mem-stats {

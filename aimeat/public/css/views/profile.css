@@ -7,6 +7,8 @@
  *   v1.1.0 — 2026-06-02 — Phase 3a: tokenize hero/cta/callout gradients, card/tab/
  *     stat/input surfaces, feedback banners, and undefined-var drift (via theme.css
  *     alias layer) for dark mode. pf-gen-* badge contrast deferred to 3b.
+ *   v1.2.0 — 2026-06-02 — Component unification (#3): remove .pf .modal* override
+ *     (drift) so profile modals use canonical theme.css .modal styling.
  */
 .pf-hero{background:var(--pf-hero-gradient);border-bottom:1px solid var(--border,#E5E7EB)}
 .pf-hero-inner{max-width:1000px;margin:0 auto;padding:2rem 1.5rem 0}
@@ -268,9 +270,11 @@
 .pf .brd-member-remove:hover{color:var(--danger,#ef4444)}
 .pf .brd-member-add{display:flex;gap:.5rem;align-items:center}
 .pf .brd-member-add .input-field{flex:1}
-.pf .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(4px)}
-.pf .modal{background:var(--bg,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:var(--radius,12px);padding:2rem;max-width:500px;width:90%;max-height:80vh;overflow-y:auto}
-.pf .modal h3{color:var(--accent,#E8564A);margin-bottom:1rem}
+/* Modal overlay/box/title are canonical in theme.css (.modal-overlay / .modal /
+   .modal-header). The former .pf .modal* overrides were drift (hardcoded rgba
+   scrim, blur(4px), 1px border, --bg/--radius, accent-red title) — removed so
+   profile modals match the rest of the app. Width modifiers (.pf .scope-modal,
+   .pf .ext-modal-narrow) still layer on top of the canonical .modal base. */
 .pf .star-rating{display:flex;gap:.25rem}
 .pf .star{font-size:1.5rem;cursor:pointer;color:var(--text-dim,#6B7280);transition:color .15s}
 .pf .star:hover,.pf .star.active{color:var(--warn,#f59e0b)}

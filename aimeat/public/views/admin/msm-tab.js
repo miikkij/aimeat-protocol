@@ -1,3 +1,14 @@
+/**
+ * @file msm-tab.js
+ * @description Admin dashboard MSM (Marketplace Service Manifest) tab — list,
+ *   detail, create, edit and typed-name delete of registered service manifests.
+ * @structure default export MsmTab({ data, reload }); internal renderDeleteModal,
+ *   list/detail/create/edit views.
+ * @usage Mounted by the admin dashboard tab router.
+ * @version-history
+ *   v1.1.0 — 2026-06-02 — Component unification (#3): delete-confirm overlay uses
+ *     canonical .modal-overlay (theme.css) instead of removed .adm-modal-overlay.
+ */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
@@ -128,7 +139,7 @@ export default function MsmTab({ data, reload }) {
   function renderDeleteModal() {
     if (!deleteTarget) return null;
     return html`
-      <div class="adm-modal-overlay"
+      <div class="modal-overlay"
            onClick=${e => { if (e.target === e.currentTarget) { setDeleteTarget(null); setDeleteInput(''); } }}>
         <div class="adm-card" style="max-width:460px;width:90%;margin:0">
           <h4 class="adm-mb-sm adm-text-error" style="margin:0">${t('dashboard.msmDeleteTitle')}</h4>
