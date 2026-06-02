@@ -476,7 +476,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
 
 // ── Activation Logic ──
 
-async function activateExtension(
+export async function activateExtension(
   ext: CortexExtensionRecord,
   config: AimeatConfig,
   storage: Storage,

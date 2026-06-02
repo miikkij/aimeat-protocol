@@ -46,7 +46,7 @@ import { success, error } from '../middleware/envelope.js';
 import { logger } from '../utils/logger.js';
 import { validateInterviewSpec, validateSpecQuality, validateBlueprint, validateComponent } from '../services/generator-validate.js';
 import type { ComponentType } from '../services/generator-validate.js';
-import { registerCsm, registerMsm, registerExtension, registerApp } from '../services/generator-registration.js';
+import { registerCsm, registerMsm, registerExtension, registerApp, registerCortex } from '../services/generator-registration.js';
 import { emitChange } from '../services/event-bus.js';
 // encryption removed from generator settings — values stored as plain text in owner-scoped memory
 import { topologicalSort, executeHttpTest, executePlaywrightTest, isPlaywrightAvailable, ensureScreenshotDir, cleanupScreenshots, screenshotDir } from '../services/generator-testing.js';
@@ -1165,37 +1165,11 @@ window.__renderSnapshot = null; // Set by test code to capture rendered state
           case 'msm': await registerMsm(component.content, ownerName, storage); break;
           case 'extension': await registerExtension(component.content, ownerName, regGhii, storage, config.maxExtensionsPerOwner); break;
           case 'app': await registerApp(component.content, ownerName, regGhii, storage); break;
-          case 'cortex': {
-            // Register cortex: POST manifest+libs, then deactivate+activate
-            const cortexContent = component.content;
-            const manifestMatch = cortexContent.match(/```yaml\n([\s\S]*?)```/);
-            const jsMatch = cortexContent.match(/```javascript\n([\s\S]*?)```/);
-            if (manifestMatch) {
-              const manifest = manifestMatch[1].trim();
-              const nameMatch = manifest.match(/name:\s*"?([^\s"]+)"?/);
-              const cortexName = nameMatch?.[1] || '';
-              const libs: Record<string, string> = {};
-              if (jsMatch && cortexName) {
-                libs[`${cortexName}.js`] = jsMatch[1].trim();
-              }
-              const jwt = (req.headers.authorization ?? '').replace('Bearer ', '');
-              const baseUrl = `http://localhost:${config.port}`;
-              const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt}` };
-              // Register (or re-register: deactivate → delete → register)
-              const regResp = await fetch(`${baseUrl}/v1/cortex`, { method: 'POST', headers, body: JSON.stringify({ manifest, ...( Object.keys(libs).length > 0 ? { libs } : {}) }) });
-              if (!regResp.ok && cortexName) {
-                await fetch(`${baseUrl}/v1/cortex/${encodeURIComponent(cortexName)}/deactivate`, { method: 'POST', headers }).catch(() => {});
-                await fetch(`${baseUrl}/v1/cortex/${encodeURIComponent(cortexName)}`, { method: 'DELETE', headers }).catch(() => {});
-                await fetch(`${baseUrl}/v1/cortex`, { method: 'POST', headers, body: JSON.stringify({ manifest, ...(Object.keys(libs).length > 0 ? { libs } : {}) }) });
-              }
-              // Activate
-              if (cortexName) {
-                await fetch(`${baseUrl}/v1/cortex/${encodeURIComponent(cortexName)}/deactivate`, { method: 'POST', headers }).catch(() => {});
-                await fetch(`${baseUrl}/v1/cortex/${encodeURIComponent(cortexName)}/activate`, { method: 'POST', headers });
-              }
-            }
+          case 'cortex':
+            // Install + activate via the service layer (the public /v1/cortex routes are owner-only;
+            // the agent JWT would 403 and the install would silently fail). See registerCortex.
+            await registerCortex(component.content, ownerName, regGhii, storage, config);
             break;
-          }
           case 'memory':
           case 'translation': {
             // Write data to actual memory keys so AIMEAT.data.get() can read them.

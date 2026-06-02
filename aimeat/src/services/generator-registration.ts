@@ -19,6 +19,51 @@ import { parse as parseYaml } from 'yaml';
 import type { Storage, AppManifest, ExtensionRecord } from '../storage/interface.js';
 import { parseCsm, validateCsm, csmToJsonSchema } from './csm-parser.js';
 import { parseMsm, validateMsm } from './msm-parser.js';
+import { parseCortexManifest } from './cortex-manifest.js';
+import { activateExtension as activateCortexExtension } from '../routes/cortex.js';
+import type { AimeatConfig } from '../config.js';
+
+/**
+ * Register a cortex package on behalf of ownerName: parse manifest+lib, store, and ACTIVATE
+ * (so the lib is served). Mirrors the UI's registerComponent cortex path (POST /v1/cortex + activate)
+ * but via the service layer — the public /v1/cortex routes are owner-only, so the agent path
+ * cannot use them. `content` is the component text (```yaml manifest + ```javascript lib).
+ */
+export async function registerCortex(
+  content: string,
+  ownerName: string,
+  ownerGhii: string,
+  storage: Storage,
+  config: AimeatConfig,
+): Promise<void> {
+  const manifestMatch = content.match(/```yaml\n([\s\S]*?)```/);
+  const jsMatch = content.match(/```javascript\n([\s\S]*?)```/);
+  if (!manifestMatch) throw new Error('Cortex content has no ```yaml manifest block');
+  const manifest = manifestMatch[1].trim();
+  const nameMatch = manifest.match(/name:\s*"?([^\s"]+)"?/);
+  const cortexName = nameMatch?.[1] || '';
+  const libs: Record<string, string> = {};
+  if (jsMatch && cortexName) libs[`${cortexName}.js`] = jsMatch[1].trim();
+  const parseRes = parseCortexManifest(manifest, ownerName, libs);
+  if (!parseRes.ok || !parseRes.extension) {
+    throw new Error('Cortex manifest invalid: ' + (parseRes.errors ?? []).join('; '));
+  }
+  const ext = parseRes.extension;
+  for (const [fn, code] of Object.entries(libs)) await storage.setCortexLibFile(ext.name, fn, code);
+  const existing = await storage.getCortexExtension(ext.name);
+  if (existing) await storage.deleteCortexExtension(ext.name);  // generator always overwrites
+  await storage.createCortexExtension(ext);
+  // Activate so the lib is served + components materialise (service call, not the owner-only route).
+  const stored = await storage.getCortexExtension(ext.name);
+  if (stored) {
+    const artifacts = await activateCortexExtension(stored, config, storage, ownerGhii);
+    await storage.updateCortexExtension(ext.name, {
+      status: 'active',
+      activatedAt: new Date().toISOString(),
+      activationArtifacts: artifacts,
+    });
+  }
+}
 
 /**
  * Register a CSM service definition on behalf of ownerName.
