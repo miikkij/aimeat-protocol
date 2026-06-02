@@ -11,6 +11,10 @@
  *   v1.0.0 — 2026-03-10 — Initial Modal component
  *   v1.1.0 — 2026-03-14 — Add ConfirmDialog with danger variant
  *   v1.2.0 — 2026-03-16 — Add useConfirm hook for easy confirm() replacement
+ *   v1.3.0 — 2026-06-02 — Fix: memoise useConfirm's ConfirmUI (useCallback) so it
+ *     keeps a stable component identity. Previously it was redefined every render,
+ *     so any re-render of the host (e.g. the agents list polling) unmounted +
+ *     remounted the open dialog, causing it to strobe/flicker.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -103,7 +107,16 @@ export function useConfirm() {
 
   const close = useCallback(() => setState(null), []);
 
-  function ConfirmUI() {
+  // ConfirmUI MUST keep a stable identity across unrelated re-renders of the
+  // host component (e.g. the agents list polls every ~5-10s and refreshes on
+  // SSE live-updates while a delete confirm is open). When ConfirmUI was a plain
+  // function redefined on every render, Preact saw a new component *type* each
+  // time and unmounted+remounted the whole dialog — re-initialising its
+  // backdrop-filter overlay and making it strobe (appear/disappear rapidly
+  // during a burst of re-renders). Memoising on [state, close] means the
+  // reference only changes when the dialog actually opens/closes, so polling no
+  // longer remounts it.
+  const ConfirmUI = useCallback(() => {
     if (!state) return null;
     return html`<${ConfirmDialog}
       open=${true}
@@ -115,7 +128,7 @@ export function useConfirm() {
       cancelLabel=${state.cancelLabel}
       danger=${state.danger}
     />`;
-  }
+  }, [state, close]);
 
   return { confirm, ConfirmUI };
 }
