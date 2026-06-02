@@ -104,7 +104,7 @@ export default function KnowledgeAdminTab({ data, reload }) {
     ...f, entries: f.entries.map((e, idx) => idx === i ? { ...e, [field]: val } : e),
   }));
 
-  if (loading) return html`<${Spinner} text="Loading..." />`;
+  if (loading) return html`<${Spinner} text=${t('common.loading')} />`;
 
   return html`
     <div class="adm-section">

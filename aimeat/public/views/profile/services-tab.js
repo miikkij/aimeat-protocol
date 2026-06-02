@@ -87,7 +87,7 @@ function ServiceDetail({ svc }) {
     return () => { cancelled = true; };
   }, [svcId]);
 
-  if (loading) return html`<div class="svc-detail" onClick=${e => e.stopPropagation()}><${Spinner} text="Loading details..." /></div>`;
+  if (loading) return html`<div class="svc-detail" onClick=${e => e.stopPropagation()}><${Spinner} text=${t('common.loading')} /></div>`;
   if (error_) return html`<div class="svc-detail" onClick=${e => e.stopPropagation()}><div class="svc-detail-error">${error_}</div></div>`;
 
   // Merge local svc data with fetched detail (detail may have more fields)

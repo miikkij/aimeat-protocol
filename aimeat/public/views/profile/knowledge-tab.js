@@ -481,7 +481,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
           <strong>${escHtml(label)}</strong>
           ${entry.key && entry.key !== label ? html`<span class="kpkg-detail-key">${escHtml(entry.key)}</span>` : null}
         </div>
-        ${loadingEntries === pkg.key && !rawData ? html`<p class="kpkg-detail-loading">Loading...</p>` : null}
+        ${loadingEntries === pkg.key && !rawData ? html`<p class="kpkg-detail-loading">${t('common.loading')}</p>` : null}
         ${val && html`<pre class="kpkg-detail-value">${val}</pre>`}
         ${renderEntryRefs(entry.references)}
         ${renderRelatedEntries(entry.related_entries, allEntries)}
@@ -616,7 +616,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
       <!-- MY KNOWLEDGE -->
       <div class="kpkg-section">
         <h3>${t('knowledge.myKnowledge.title')}</h3>
-        ${loading && html`<${Spinner} text="Loading..." />`}
+        ${loading && html`<${Spinner} text=${t('common.loading')} />`}
         ${!loading && packages.length === 0 && html`
           <p class="kpkg-empty">${t('knowledge.myKnowledge.empty')}</p>
         `}
@@ -742,7 +742,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
       <!-- KNOWLEDGE ORGANISMS -->
       <div class="kpkg-section">
         <h3>${t('knowledge.organisms.title')}</h3>
-        ${organismLoading && html`<${Spinner} text="Loading..." />`}
+        ${organismLoading && html`<${Spinner} text=${t('common.loading')} />`}
         ${!organismLoading && organismPackages.length === 0 && html`
           <p class="kpkg-empty">${t('knowledge.organisms.empty')}</p>
         `}
@@ -762,7 +762,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
       <!-- DISCOVER -->
       <div class="kpkg-section">
         <h3>${t('knowledge.discover.title')}</h3>
-        ${discoverLoading && html`<${Spinner} text="Loading..." />`}
+        ${discoverLoading && html`<${Spinner} text=${t('common.loading')} />`}
         ${!discoverLoading && discovered.filter(p => p.sharing?.allow_clone !== false).length === 0 && html`
           <p class="kpkg-empty">${t('knowledge.discover.empty')}</p>
         `}
