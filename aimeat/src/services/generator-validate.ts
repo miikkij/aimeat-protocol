@@ -853,20 +853,53 @@ export function validateBlueprint(result: string): BlueprintValidationResult {
       const componentIds = new Set(
         ((parsed.components || []) as CleanComponent[]).map(c => c.id).filter(Boolean),
       );
-      for (const [key, schema] of Object.entries(parsed.dataModel as Record<string, Record<string, unknown>>)) {
-        if (!schema.type) warnings.push(`dataModel "${key}" missing "type"`);
-        if (!schema.source) warnings.push(`dataModel "${key}" missing "source"`);
-        if (!schema.producedBy) {
-          errors.push(`dataModel "${key}" missing "producedBy"`);
-        } else if (!componentIds.has(schema.producedBy as string)) {
-          errors.push(`dataModel "${key}" producedBy "${schema.producedBy}" does not match any component`);
+      const dm = parsed.dataModel as Record<string, unknown>;
+      // New structures/$ref format: structures + memoryKeys + actions. Old flat format falls to else.
+      if (dm.structures && typeof dm.structures === 'object') {
+        const structures = dm.structures as Record<string, unknown>;
+        for (const [name, struct] of Object.entries(structures as Record<string, Record<string, unknown>>)) {
+          if (!struct.type) warnings.push(`structure "${name}" missing "type"`);
         }
-        if (!Array.isArray(schema.consumedBy) || (schema.consumedBy as unknown[]).length === 0) {
-          warnings.push(`dataModel "${key}" has no consumers`);
-        } else {
-          for (const cid of schema.consumedBy as string[]) {
-            if (!componentIds.has(cid)) {
-              errors.push(`dataModel "${key}" consumedBy "${cid}" does not match any component`);
+        if (dm.memoryKeys && typeof dm.memoryKeys === 'object') {
+          for (const [key, schema] of Object.entries(dm.memoryKeys as Record<string, Record<string, unknown>>)) {
+            if (schema.$ref && !structures[schema.$ref as string]) {
+              errors.push(`memoryKey "${key}" references unknown structure "${schema.$ref}"`);
+            }
+            const items = schema.items as Record<string, unknown> | undefined;
+            if (items?.$ref && !structures[items.$ref as string]) {
+              errors.push(`memoryKey "${key}" items references unknown structure "${items.$ref}"`);
+            }
+            if (schema.producedBy && !componentIds.has(schema.producedBy as string)) {
+              errors.push(`memoryKey "${key}" producedBy "${schema.producedBy}" does not match any component`);
+            }
+          }
+        }
+        if (dm.actions && typeof dm.actions === 'object') {
+          for (const [name, action] of Object.entries(dm.actions as Record<string, Record<string, unknown>>)) {
+            const output = action.output as Record<string, unknown> | undefined;
+            if (output?.$ref && !structures[output.$ref as string]) {
+              errors.push(`action "${name}" output references unknown structure "${output.$ref}"`);
+            }
+          }
+        }
+      } else {
+        // Old flat format — backward compatible (skip the structured containers if mixed in)
+        for (const [key, schema] of Object.entries(dm as Record<string, Record<string, unknown>>)) {
+          if (key === 'structures' || key === 'memoryKeys' || key === 'actions') continue;
+          if (!schema.type) warnings.push(`dataModel "${key}" missing "type"`);
+          if (!schema.source) warnings.push(`dataModel "${key}" missing "source"`);
+          if (!schema.producedBy) {
+            errors.push(`dataModel "${key}" missing "producedBy"`);
+          } else if (!componentIds.has(schema.producedBy as string)) {
+            errors.push(`dataModel "${key}" producedBy "${schema.producedBy}" does not match any component`);
+          }
+          if (!Array.isArray(schema.consumedBy) || (schema.consumedBy as unknown[]).length === 0) {
+            warnings.push(`dataModel "${key}" has no consumers`);
+          } else {
+            for (const cid of schema.consumedBy as string[]) {
+              if (!componentIds.has(cid)) {
+                errors.push(`dataModel "${key}" consumedBy "${cid}" does not match any component`);
+              }
             }
           }
         }
