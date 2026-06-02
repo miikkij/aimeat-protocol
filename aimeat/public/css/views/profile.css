@@ -9,6 +9,9 @@
  *     alias layer) for dark mode. pf-gen-* badge contrast deferred to 3b.
  *   v1.2.0 — 2026-06-02 — Component unification (#3): remove .pf .modal* override
  *     (drift) so profile modals use canonical theme.css .modal styling.
+ *   v1.3.0 — 2026-06-02 — Component unification (#4 buttons): remove .pf .btn-primary
+ *     override (profile buttons now use canonical theme.css .btn-primary) and delete
+ *     dead .kpkg-btn* family (0 call sites).
  */
 .pf-hero{background:var(--pf-hero-gradient);border-bottom:1px solid var(--border,#E5E7EB)}
 .pf-hero-inner{max-width:1000px;margin:0 auto;padding:2rem 1.5rem 0}
@@ -216,9 +219,8 @@
 .pf .file-dropzone-empty{display:flex;flex-direction:column;align-items:center;gap:.4rem;color:var(--text-dim,#6B7280);font-size:.9rem}
 .pf .file-upload-list{display:flex;flex-direction:column;gap:.5rem;margin:.75rem 0}
 .pf .file-upload-item{display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;background:var(--bg-surface);border:1px solid var(--border,rgba(232,86,74,.15));border-radius:8px}
-.pf .btn-primary{background:linear-gradient(135deg,var(--accent,#E8564A),var(--accent-dark,#D4493F));color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .2s}
-.pf .btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(232,86,74,.3)}
-/* Button overrides removed — use theme.css btn-primary/btn-outline/btn-ghost/btn-danger-solid classes.
+/* Button overrides removed — profile uses canonical theme.css btn-primary / btn-outline /
+   btn-ghost / btn-danger-solid classes directly (incl. btn-primary, unified 2026-06-02).
    See docs/frontend-development-guide.md "Banned Patterns" for the rationale. */
 .pf .card-expanded{border-color:var(--accent,#E8564A)}
 .pf .card-clickable{cursor:pointer;user-select:none}
@@ -429,12 +431,8 @@
 .kpkg-action-bar{background:var(--bg-card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:12px;padding:1.25rem}
 .kpkg-action-buttons{display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:.75rem}
 .kpkg-action-desc{color:var(--muted,#888);font-size:.85rem;margin:0}
-.kpkg-btn{padding:.5rem 1rem;border-radius:8px;border:1px solid var(--border,#E5E7EB);cursor:pointer;font-size:.85rem;font-weight:500;transition:all .15s ease}
-.kpkg-btn-primary{background:var(--accent,#6366F1);color:#fff;border-color:var(--accent,#6366F1)}
-.kpkg-btn-primary:hover{opacity:.9}
-.kpkg-btn-primary:disabled{opacity:.5;cursor:not-allowed}
-.kpkg-btn-secondary{background:transparent;color:var(--text,#e0e0e0)}
-.kpkg-btn-secondary:hover{background:var(--surface-hover,#252540)}
+/* .kpkg-btn* removed — dead CSS (0 call sites); knowledge tab uses canonical
+   btn-outline / btn-danger-solid. Unified 2026-06-02. */
 .kpkg-import-box{background:var(--bg-card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:12px;padding:1.25rem}
 .kpkg-import-box h3{margin:0 0 .75rem}
 .kpkg-import-textarea{width:100%;min-height:80px;background:var(--bg,#F9FAFB);color:var(--text,#e0e0e0);border:1px solid var(--border,#E5E7EB);border-radius:8px;padding:.75rem;font-family:monospace;font-size:.8rem;resize:vertical;box-sizing:border-box}
@@ -481,10 +479,7 @@
 .kpkg-tag{display:inline-block;padding:.1rem .4rem;background:var(--bg-surface);border-radius:3px;font-size:.7rem;color:var(--muted,#888)}
 .kpkg-card-stats{font-size:.8rem;color:var(--muted,#888)}
 .kpkg-card-actions{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem}
-.kpkg-btn-sm{padding:.25rem .6rem;font-size:.75rem}
-.kpkg-btn-danger{background:rgba(231,76,60,.15);color:#e74c3c;border-color:rgba(231,76,60,.4)}
-.kpkg-btn-danger:hover{background:rgba(231,76,60,.3)}
-.kpkg-btn-danger:disabled{opacity:.5;cursor:not-allowed}
+/* .kpkg-btn-sm / .kpkg-btn-danger removed — dead CSS (0 call sites). Unified 2026-06-02. */
 .kpkg-detail{margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border,#E5E7EB)}
 .kpkg-detail-synthesis{color:var(--muted,#888);font-size:.85rem;font-style:italic;margin:0 0 .75rem}
 .kpkg-detail-entries h4{margin:0 0 .5rem;font-size:.85rem;color:var(--accent,#E8564A)}
