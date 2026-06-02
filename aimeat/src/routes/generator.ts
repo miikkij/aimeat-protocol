@@ -44,7 +44,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { logger } from '../utils/logger.js';
-import { validateInterviewSpec, validateBlueprint, validateComponent } from '../services/generator-validate.js';
+import { validateInterviewSpec, validateSpecQuality, validateBlueprint, validateComponent } from '../services/generator-validate.js';
 import type { ComponentType } from '../services/generator-validate.js';
 import { registerCsm, registerMsm, registerExtension, registerApp } from '../services/generator-registration.js';
 import { emitChange } from '../services/event-bus.js';
@@ -251,6 +251,14 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
         return;
       }
 
+      // Spec-quality gate (parity with the UI): block on hard errors (e.g. an unverified data
+      // source with no fallback); warnings are advisory and returned to the caller.
+      const quality = validateSpecQuality(interviewSpec);
+      if (!quality.valid) {
+        res.status(422).json(error(config.nodeId, 'SPEC_QUALITY_FAILED', quality.errors.join('; '), undefined, { errors: quality.errors, warnings: quality.warnings }));
+        return;
+      }
+
       const now = new Date().toISOString();
       await storage.setMemory({
         key: `generator.${projectId}.interview-spec`,
@@ -264,7 +272,7 @@ export function generatorRouter(config: AimeatConfig, storage: Storage): Router 
         updatedAt: now,
       });
 
-      res.json(success(config.nodeId, { saved: true }));
+      res.json(success(config.nodeId, { saved: true, warnings: quality.warnings }));
       emitChange('memory');
     }
   );
@@ -987,6 +995,51 @@ window.__renderSnapshot = null; // Set by test code to capture rendered state
   );
 
   // POST /v1/generator/:projectId/components/:componentId/submit — validate + store component content
+  // POST /v1/generator/:projectId/components/:componentId/spec — store a component's formal spec
+  // (the spec-first step for extension/cortex/app). The code prompt reads it back as
+  // selfSpec / extensionSpec / dataApiSpec. Mirrors the browser saveSpec() but server-side under
+  // the owner GHII, so the agent/API path can do spec-first exactly like the UI.
+  router.post('/v1/generator/:projectId/components/:componentId/spec',
+    requireAuth(),
+    requireRole('agent'),
+    requireScope('generator:write'),
+    async (req, res) => {
+      const gaii = ownerGhii(req);
+      const projectId = req.params['projectId'] as string;
+      const componentId = req.params['componentId'] as string;
+      const { spec } = req.body ?? {};
+
+      if (!spec || typeof spec !== 'object') {
+        res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'spec object is required'));
+        return;
+      }
+
+      const projectRec = await storage.getMemory(gaii, `generator.${projectId}.project`);
+      if (!projectRec) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found'));
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const key = `generator.${projectId}.spec.${componentId}`;
+      const existing = await storage.getMemory(gaii, key);
+      await storage.setMemory({
+        key,
+        ownerGaii: gaii,
+        value: spec,
+        visibility: 'owner',
+        version: existing ? existing.version + 1 : 1,
+        tags: ['generator', 'spec'],
+        ttlHours: null,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      });
+
+      res.json(success(config.nodeId, { stored: true, componentId }));
+      emitChange('memory');
+    }
+  );
+
   router.post('/v1/generator/:projectId/components/:componentId/submit',
     requireAuth(),
     requireRole('agent'),

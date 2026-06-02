@@ -125,6 +125,9 @@ function preCleanYaml(text: string): string {
   s = s.replace(/\\\{/g, '{').replace(/\\\}/g, '}');
   // Remove zero-width unicode
   s = s.replace(/\u200B|\u200C|\u200D|\uFEFF/g, '');
+  // Fix common AI mistake: action list items missing "id:" key
+  // e.g. "  - refreshQuotes\n    description:" -> "  - id: refreshQuotes\n    description:"
+  s = s.replace(/^(\s+- )([a-zA-Z][\w-]*)\n(\s+description:)/gm, '$1id: $2\n$3');
   return s;
 }
 
@@ -218,6 +221,25 @@ export function validateAntiPatterns(type: string, code: string): AntiPatternRes
     // setTimeout/setInterval — not available
     if (/\b(setTimeout|setInterval|setImmediate)\s*\(/m.test(code)) {
       errors.push('CRASH: setTimeout/setInterval/setImmediate are not available in the sandbox.');
+    }
+    // Web APIs — not available in bare V8 isolate (not Node.js, not browser)
+    if (/\bnew\s+URLSearchParams\b/m.test(code)) {
+      errors.push('CRASH: URLSearchParams is not available in the V8 sandbox. Use string concatenation with encodeURIComponent() instead.');
+    }
+    if (/\bnew\s+URL\s*\(/m.test(code)) {
+      errors.push('CRASH: URL constructor is not available in the V8 sandbox. Use string concatenation instead.');
+    }
+    if (/\bnew\s+(TextEncoder|TextDecoder)\s*\(/m.test(code)) {
+      errors.push('CRASH: TextEncoder/TextDecoder are not available in the V8 sandbox.');
+    }
+    if (/\bnew\s+(Headers|Request|Response|FormData|Blob|AbortController)\s*\(/m.test(code)) {
+      errors.push('CRASH: Web API constructors (Headers, Request, Response, FormData, Blob, AbortController) are not available in the V8 sandbox.');
+    }
+    if (/\b(atob|btoa)\s*\(/m.test(code)) {
+      errors.push('CRASH: atob/btoa are not available in the V8 sandbox.');
+    }
+    if (/\bstructuredClone\s*\(/m.test(code)) {
+      errors.push('CRASH: structuredClone is not available in the V8 sandbox. Use JSON.parse(JSON.stringify(obj)) instead.');
     }
   }
 
@@ -320,7 +342,7 @@ function validateMsm(result: string): ValidationResult {
   return { valid: errors.length === 0, errors, extracted: cleaned };
 }
 
-function validateExtension(result: string): ValidationResult {
+function validateExtension(result: string, blueprint: Record<string, unknown> | null = null): ValidationResult {
   const errors: string[] = [];
 
   // ── Extract YAML manifest — supports three formats ──
@@ -340,18 +362,20 @@ function validateExtension(result: string): ValidationResult {
     }
   }
 
-  // Format 2: fenced ```yaml block
+  // Format 2/3: fenced ```yaml block or raw text — cut at the earliest JS marker
   if (!raw) {
-    const fenced = extractCodeBlock(result, 'yaml');
-    if (fenced !== result.trim()) {
-      raw = fenced;
+    raw = extractCodeBlock(result, 'yaml');
+    const jsMarkers = [
+      /^\/\/\s*actions\//m,
+      /^#\s*actions\//m,
+      /^export\s+default\s+/m,
+    ];
+    let jsStart = -1;
+    for (const rx of jsMarkers) {
+      const idx = raw.search(rx);
+      if (idx > 0 && (jsStart === -1 || idx < jsStart)) jsStart = idx;
     }
-  }
-
-  // Format 3: no fences — cut at first // actions/ comment in raw text
-  if (!raw) {
-    const jsStart = result.search(/^\/\/\s*actions\//m);
-    raw = jsStart > 0 ? result.slice(0, jsStart).trim() : result.trim();
+    if (jsStart > 0) raw = raw.slice(0, jsStart).trim();
   }
 
   const { parsed, errors: parseErrors } = tryParseYaml(raw);
@@ -383,6 +407,26 @@ function validateExtension(result: string): ValidationResult {
     }
   }
 
+  // Blueprint action ID cross-check — WARNING only, not an error. The spec is the
+  // authority; the blueprint has abstract action names that may not match the API.
+  const parsedActions = (parsed as Record<string, unknown> | null)?.actions;
+  if (blueprint?.testScenarios && Array.isArray(parsedActions)) {
+    const components = blueprint.components as Array<Record<string, unknown>> | undefined;
+    const bpComp = components?.find((c) => c.type === 'extension');
+    if (bpComp) {
+      const testScenarios = blueprint.testScenarios as Array<Record<string, unknown>>;
+      const testActions = testScenarios
+        .filter((ts) => ts.component === bpComp.id)
+        .flatMap((ts) => ((ts.scenarios as Array<Record<string, unknown>>) || []).map((s) => s.action));
+      const actualIds = new Set((parsedActions as Array<Record<string, unknown>>).map((a) => a.id));
+      for (const expected of testActions) {
+        if (!actualIds.has(expected)) {
+          console.warn(`[validator] Blueprint expects "${expected}" but extension has: ${[...actualIds].join(', ')}`);
+        }
+      }
+    }
+  }
+
   // Check for action scripts — look for fenced JS blocks OR unfenced // actions/file.js comments
   const fencedJs = result.match(/```javascript[\s\S]*?```/gi) || [];
   const unfencedJs = result.match(/^\/\/\s*actions\/[\w-]+\.js\s*$/gm) || [];
@@ -390,6 +434,8 @@ function validateExtension(result: string): ValidationResult {
   const actionCount = Array.isArray(parsed?.actions) ? (parsed.actions as unknown[]).length : 0;
   if (actionCount > 0 && jsBlockCount === 0) {
     errors.push(`Extension defines ${actionCount} action(s) but no JavaScript code blocks found`);
+  } else if (actionCount > 0 && jsBlockCount > 0 && jsBlockCount < actionCount) {
+    errors.push(`Extension defines ${actionCount} action(s) but only ${jsBlockCount} JavaScript code blocks found — each action needs its own script`);
   }
 
   // Anti-pattern scan
@@ -439,7 +485,6 @@ function validateMemorySchema(result: string): ValidationResult {
 
 function validateTranslation(result: string): ValidationResult {
   const errors: string[] = [];
-  const warnings: string[] = [];
   const json = sanitizeJson(extractCodeBlock(result, 'json'));
   try {
     const parsed = JSON.parse(json) as Record<string, unknown>;
@@ -457,11 +502,11 @@ function validateTranslation(result: string): ValidationResult {
         errors.push(`Locale "${locale}" is empty — no translation keys found`);
       }
     }
-    // Anti-pattern scan (warnings only, don't block validation)
-    const ap = validateAntiPatterns('translation', json);
-    warnings.push(...ap.warnings);
+    // Anti-pattern scan — translation anti-patterns are warnings only, and the
+    // authoritative (UI) validator does NOT surface them; discard to keep parity.
+    void validateAntiPatterns('translation', json);
 
-    return { valid: errors.length === 0, errors, warnings, extracted: json };
+    return { valid: errors.length === 0, errors, extracted: json };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     errors.push(`Invalid JSON: ${msg}`);
@@ -575,10 +620,16 @@ function validateCortex(result: string, blueprint?: Record<string, unknown> | nu
     if (exportsMatch) {
       const exportedMethods = exportsMatch[1].split(',').map(m => m.trim().split(':')[0].trim()).filter(Boolean);
 
-      // Cross-check with blueprint produces API methods if available
-      if (blueprint?.components) {
-        interface BlueprintComponent { type: string; produces?: string[] }
-        const cortexComp = (blueprint.components as BlueprintComponent[]).find(c => c.type === 'cortex');
+      // Cross-check with blueprint produces API methods if available.
+      // Match the SPECIFIC cortex component by metadata.name (a blueprint may have several cortexes).
+      if (blueprint?.components && metadata?.name) {
+        const metaName = metadata.name as string;
+        interface BlueprintComponent { id?: string; type?: string; label?: string; produces?: string[] }
+        const cortexComps = (blueprint.components as BlueprintComponent[]).filter(c => c.type === 'cortex');
+        const cortexComp = cortexComps.find(c =>
+          c.id === metaName || c.label?.toLowerCase().includes(metaName.replace(/-/g, ' ')) ||
+          metaName.includes(c.id?.replace('cortex-', '') as string)
+        ) || (cortexComps.length === 1 ? cortexComps[0] : null);
         if (cortexComp?.produces) {
           const requiredMethods = cortexComp.produces
             .filter(prod => prod.startsWith('api:'))
@@ -618,7 +669,7 @@ export function validateComponent(
   switch (type) {
     case 'csm': return validateCsm(content);
     case 'msm': return validateMsm(content);
-    case 'extension': return validateExtension(content);
+    case 'extension': return validateExtension(content, blueprint);
     case 'app': return validateApp(content);
     case 'memory': return validateMemorySchema(content);
     case 'translation': return validateTranslation(content);
@@ -709,6 +760,63 @@ export function validateInterviewSpec(result: string): InterviewSpecValidationRe
   }
 }
 
+/* ── Spec Quality Gate ───────────────────────────────── */
+
+export interface SpecQualityResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+/**
+ * Check interview spec quality before proceeding to blueprint — no AI, just automated
+ * checks on the spec data. Mirrors the UI's validateSpecQuality (public/js/services/generator-validate.js).
+ */
+export function validateSpecQuality(spec: unknown): SpecQualityResult {
+  const warnings: string[] = [];
+  const errors: string[] = [];
+
+  if (!spec) {
+    errors.push('No specification provided');
+    return { valid: false, errors, warnings };
+  }
+
+  const s = spec as Record<string, unknown>;
+
+  if (!Array.isArray(s.useCases) || (s.useCases as unknown[]).length < 2) {
+    warnings.push('Less than 2 use cases defined — consider adding more to get a useful application');
+  }
+
+  if (Array.isArray(s.dataSources)) {
+    for (const ds of s.dataSources as Array<Record<string, unknown>>) {
+      const dsName = (ds.name || ds.id) as string;
+      if (!ds.url && ds.type !== 'user-input') {
+        warnings.push(`Data source "${dsName}" has no URL`);
+      }
+      if (!ds.sampleEntry && ds.type !== 'user-input' && ds.fallback !== 'defer') {
+        warnings.push(`Data source "${dsName}" has no sampleEntry — structures will be guessed, not verified`);
+      }
+      if (ds.verified === false && !ds.fallback) {
+        errors.push(`Data source "${dsName}" is unverified and has no fallback strategy`);
+      }
+    }
+  }
+
+  if (!Array.isArray(s.views) || (s.views as unknown[]).length === 0) {
+    warnings.push('No views defined — the blueprint will guess the UI layout');
+  }
+
+  if (!s.locale) {
+    warnings.push('No locale set — defaulting to English');
+  }
+
+  if (!s.style) {
+    warnings.push('No style preferences — the app will use default layout');
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
+}
+
 /* ── Blueprint Validator ─────────────────────────────── */
 
 interface BlueprintComponent {
@@ -725,6 +833,7 @@ interface BlueprintComponent {
 interface CleanComponent {
   id: string | undefined;
   type: string | undefined;
+  subtype?: string;
   label: string | undefined;
   produces?: string[];
   consumes?: string[];
@@ -751,7 +860,7 @@ export function validateBlueprint(result: string): BlueprintValidationResult {
     if (!Array.isArray(parsed.components)) {
       errors.push('Missing "components" array');
     } else {
-      const allowedComponentKeys = new Set(['id', 'type', 'label', 'produces', 'consumes', 'schedules', 'uses', 'role']);
+      const allowedComponentKeys = new Set(['id', 'type', 'subtype', 'label', 'produces', 'consumes', 'schedules', 'uses', 'role']);
       parsed.components = (parsed.components as BlueprintComponent[]).map((c): CleanComponent => {
         if (!c.id) errors.push(`Component missing "id" field`);
         if (!c.type) errors.push(`Component "${c.id || '?'}" missing "type" field`);
@@ -781,6 +890,7 @@ export function validateBlueprint(result: string): BlueprintValidationResult {
         }
 
         const clean: CleanComponent = { id: c.id, type: c.type, label: c.label };
+        if (typeof c.subtype === 'string' && c.type === 'cortex') clean.subtype = c.subtype;
         if (typeof c.role === 'string') clean.role = c.role;
         if (Array.isArray(c.produces)) clean.produces = c.produces as string[];
         if (Array.isArray(c.consumes)) clean.consumes = c.consumes as string[];
