@@ -10,6 +10,7 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.2.0 — 2026-06-02 — Tokenize shell component literals (semantic tints, scrollbar, overlay scrim, morsel pill, lang-btn active, input focus) so the whole shell flips for dark mode.
      v1.1.0 — 2026-06-02 — Add dark theme override + drift-alias layer + .theme-toggle-btn.
      v1.0.0 — prior — Light theme tokens, base styles, shared components.
    ═══════════════════════════════════════════════════════ */
@@ -99,6 +100,19 @@
   /* Code */
   --code-bg: #F3F4F6;
 
+  /* Semantic tints (chip/banner backgrounds + readable text/border on them).
+     The accent semantic colors (--success/--warn/--danger/--info) keep their
+     meaning across themes; only these tint surfaces flip. */
+  --success-bg: #D1FAE5; --success-fg: #047857; --success-border: #A7F3D0;
+  --warn-bg: #FEF3C7;    --warn-fg: #B45309;    --warn-border: #FDE68A;
+  --danger-bg: #FEE2E2;  --danger-fg: #DC2626;  --danger-border: #FECACA;
+  --info-bg: #EFF6FF;    --info-fg: #1D4ED8;    --info-border: #BFDBFE;
+
+  /* Shell surfaces */
+  --scrollbar-thumb: #D1D5DB;
+  --overlay-scrim: rgba(26, 26, 46, 0.4);
+  --morsel-bg: linear-gradient(135deg, #FFF1F0, #FFE0DE);
+
   /* ── Drift-alias layer ──
      Variables referenced across view CSS but never defined (rendered with no
      fallback = broken). Defined here as aliases of the canonical tokens above,
@@ -113,6 +127,7 @@
   --warning: var(--warn);
   --primary: var(--accent);
   --accent-faint: var(--accent-subtle);
+  --on-inverted: var(--bg); /* readable text on a var(--text) background — inverts opposite to --text */
   --mono: var(--font-mono);
   --sp-1: 4px;
   --sp-2: 8px;
@@ -170,6 +185,17 @@
 
   /* Code */
   --code-bg: #0E0F13;
+
+  /* Semantic tints (translucent so they read as native dark surfaces) */
+  --success-bg: rgba(16, 185, 129, 0.16); --success-fg: #6EE7B7; --success-border: rgba(16, 185, 129, 0.32);
+  --warn-bg: rgba(245, 158, 11, 0.16);    --warn-fg: #FCD34D;    --warn-border: rgba(245, 158, 11, 0.32);
+  --danger-bg: rgba(239, 68, 68, 0.16);   --danger-fg: #FCA5A5;  --danger-border: rgba(239, 68, 68, 0.34);
+  --info-bg: rgba(59, 130, 246, 0.16);    --info-fg: #93C5FD;    --info-border: rgba(59, 130, 246, 0.32);
+
+  /* Shell surfaces */
+  --scrollbar-thumb: #3A3D47;
+  --overlay-scrim: rgba(0, 0, 0, 0.6);
+  --morsel-bg: rgba(255, 111, 98, 0.16);
 }
 
 /* ── Base ── */
@@ -303,8 +329,8 @@ a { color: inherit; text-decoration: none; }
   gap: 2px;
   padding: 3px 10px;
   border-radius: var(--radius-full);
-  border: 1px solid rgba(232, 86, 74, 0.15);
-  background: linear-gradient(135deg, #FFF1F0, #FFE0DE);
+  border: 1px solid var(--accent-glow);
+  background: var(--morsel-bg);
   color: var(--accent);
   font-size: 0.75rem;
   font-weight: 700;
@@ -359,13 +385,13 @@ a { color: inherit; text-decoration: none; }
 
 .topnav-right a.active {
   color: var(--accent);
-  background: rgba(232, 86, 74, 0.06);
+  background: var(--accent-subtle);
 }
 
 .topnav-right .profile-link {
   display: none;
   color: var(--accent);
-  background: rgba(232, 86, 74, 0.06);
+  background: var(--accent-subtle);
 }
 
 .topnav-right .profile-link.visible { display: inline-flex; }
@@ -392,7 +418,7 @@ a { color: inherit; text-decoration: none; }
 
 .lang-btn.active {
   background: var(--text);
-  color: #FFFFFF;
+  color: var(--on-inverted);
   box-shadow: none;
 }
 
@@ -525,9 +551,9 @@ a { color: inherit; text-decoration: none; }
 }
 
 .btn-danger {
-  background: #FEE2E2;
-  color: var(--danger);
-  border: 1px solid #FECACA;
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+  border: 1px solid var(--danger-border);
 }
 
 .btn-ghost {
@@ -625,10 +651,10 @@ a { color: inherit; text-decoration: none; }
   letter-spacing: 0.3px;
 }
 
-.badge-success { background: #D1FAE5; color: #047857; }
-.badge-warn { background: #FEF3C7; color: #B45309; }
-.badge-danger { background: #FEE2E2; color: #DC2626; }
-.badge-info { background: #EFF6FF; color: #1D4ED8; }
+.badge-success { background: var(--success-bg); color: var(--success-fg); }
+.badge-warn { background: var(--warn-bg); color: var(--warn-fg); }
+.badge-danger { background: var(--danger-bg); color: var(--danger-fg); }
+.badge-info { background: var(--info-bg); color: var(--info-fg); }
 
 /* ── Live dot ── */
 .live-dot {
@@ -668,8 +694,8 @@ a { color: inherit; text-decoration: none; }
 
 .input-field:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(232, 86, 74, 0.1);
-  background: #FFFFFF;
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+  background: var(--bg-input-focus);
 }
 
 .prompt-box {
@@ -691,7 +717,7 @@ a { color: inherit; text-decoration: none; }
 
 .prompt-box:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(232, 86, 74, 0.1);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
 }
 
 /* ── Spinner ── */
@@ -717,7 +743,7 @@ a { color: inherit; text-decoration: none; }
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
 
 /* ── Footer ── */
 .footer {
@@ -762,10 +788,10 @@ a { color: inherit; text-decoration: none; }
 .alert-msg { flex: 1; }
 .alert-close { background: none; border: none; color: inherit; cursor: pointer; font-size: 1rem; padding: 0 0.25rem; opacity: 0.7; }
 .alert-close:hover { opacity: 1; }
-.alert-success { background: #D1FAE5; color: #047857; border: 1px solid #A7F3D0; }
-.alert-error { background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; }
-.alert-warn { background: #FEF3C7; color: #B45309; border: 1px solid #FDE68A; }
-.alert-info { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
+.alert-success { background: var(--success-bg); color: var(--success-fg); border: 1px solid var(--success-border); }
+.alert-error { background: var(--danger-bg); color: var(--danger-fg); border: 1px solid var(--danger-border); }
+.alert-warn { background: var(--warn-bg); color: var(--warn-fg); border: 1px solid var(--warn-border); }
+.alert-info { background: var(--info-bg); color: var(--info-fg); border: 1px solid var(--info-border); }
 
 /* ── Toast ── */
 .toast {
@@ -785,7 +811,7 @@ a { color: inherit; text-decoration: none; }
 /* ── Modal ── */
 .modal-overlay {
   position: fixed; inset: 0; z-index: 1000;
-  background: rgba(26, 26, 46, 0.4); backdrop-filter: blur(8px);
+  background: var(--overlay-scrim); backdrop-filter: blur(8px);
   display: flex; align-items: center; justify-content: center;
   padding: 24px;
   animation: fadeIn 0.2s ease;
