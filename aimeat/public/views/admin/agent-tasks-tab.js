@@ -11,7 +11,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { num, dt, Empty, Badge } from './shared.js';
+import { dt, Empty, Badge, StatsGrid } from './shared.js';
 import { apiGet } from '/js/api.js';
 
 const PAGE_SIZE = 20;
@@ -87,12 +87,7 @@ export default function AgentTasksTab({ data, reload, session }) {
       </div>
 
       <!-- Stats summary -->
-      <div class="adm-mem-stats">
-        <div class="adm-mem-stat">
-          <span class="adm-mem-stat-value">${num(total)}</span>
-          <span class="adm-mem-stat-label">${t('dashboard.agentTasksTotal')}</span>
-        </div>
-      </div>
+      <${StatsGrid} items=${[{ label: t('dashboard.agentTasksTotal'), value: total }]} />
 
       <!-- Table -->
       ${tasks.length === 0 && !loading && html`<${Empty} text=${t('dashboard.agentTasksEmpty')} />`}

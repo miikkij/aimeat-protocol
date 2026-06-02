@@ -13,6 +13,7 @@
  * @version-history
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 6)
  *   v1.1.0 — 2026-03-20 — add template moderation queue subtab
+ *   v1.2.0 — 2026-06-02 — Admin design unification: main btn-* classes → adm-btn* (btn-success→adm-btn, btn-danger→adm-btn-action adm-btn-danger), error divs → <ErrorBox>.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -20,7 +21,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { StatsGrid, Empty, Spinner, Badge, ExpandableHelp, dt } from './shared.js';
+import { StatsGrid, Empty, Spinner, Badge, ExpandableHelp, ErrorBox, dt } from './shared.js';
 import * as pkgService from '/js/services/packages.js';
 import {
   seedExamples,
@@ -114,7 +115,7 @@ function ReviewPanel({ item, onDone }) {
         <//>
       ` : null}
 
-      ${error ? html`<div class="error-box">${escHtml(error)}</div>` : null}
+      ${error ? html`<${ErrorBox} message=${error} />` : null}
 
       <div class="adm-mod-actions">
         <div class="adm-mod-action-group">
@@ -126,7 +127,7 @@ function ReviewPanel({ item, onDone }) {
             onInput=${e => setComment(e.target.value)}
             placeholder=${t('dashboard.modCommentPlaceholder') || 'Optional approval comment...'}
           />
-          <button class="btn-success" onClick=${handleApprove} disabled=${acting}>
+          <button class="adm-btn" onClick=${handleApprove} disabled=${acting}>
             ${t('dashboard.modApprove') || 'Approve'}
           </button>
         </div>
@@ -139,7 +140,7 @@ function ReviewPanel({ item, onDone }) {
             onInput=${e => setReason(e.target.value)}
             placeholder=${t('dashboard.modReasonPlaceholder') || 'Reason for rejection...'}
           />
-          <button class="btn-danger" onClick=${handleReject} disabled=${acting}>
+          <button class="adm-btn-action adm-btn-danger" onClick=${handleReject} disabled=${acting}>
             ${t('dashboard.modReject') || 'Reject'}
           </button>
         </div>
@@ -241,7 +242,7 @@ function PublishedTemplates({ templates, onReload }) {
             <tr key=${tpl.id + '-suspend'}>
               <td colspan="4">
                 <div class="adm-sub-panel adm-mod-suspend-panel">
-                  ${error ? html`<div class="error-box">${escHtml(error)}</div>` : null}
+                  ${error ? html`<${ErrorBox} message=${error} />` : null}
                   <label class="adm-mod-action-label">${t('dashboard.modSuspendReason') || 'Suspension reason (required)'}</label>
                   <div class="adm-mod-suspend-row">
                     <input
@@ -251,7 +252,7 @@ function PublishedTemplates({ templates, onReload }) {
                       onInput=${e => setSuspendReason(e.target.value)}
                       placeholder=${t('dashboard.modSuspendReasonPlaceholder') || 'Reason for suspension...'}
                     />
-                    <button class="btn-danger" onClick=${() => handleSuspend(tpl.id)} disabled=${acting}>
+                    <button class="adm-btn-action adm-btn-danger" onClick=${() => handleSuspend(tpl.id)} disabled=${acting}>
                       ${t('dashboard.modConfirmSuspend') || 'Confirm Suspend'}
                     </button>
                   </div>

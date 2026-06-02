@@ -7,6 +7,9 @@
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Governance Phase C
  *   v1.1.0 -- 2026-05-24 -- Fix M8 M9 F19 F20 F21 audit findings
  *   v1.2.0 -- 2026-05-24 -- Move readiness into onboarding, add bundle templates, add notify button
+ *   v1.3.0 -- 2026-06-02 -- Admin design unification: main btn-* classes → adm-btn /
+ *     adm-btn-action; the bespoke adm-agi-stat-card stat rows → canonical <StatsGrid>
+ *     (tones success→green, accent→indigo). adm-agi-mono-sm retained (table cells).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -14,7 +17,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { useViewCSS } from '/components/useViewCSS.js';
-import { num, dt, Empty } from './shared.js';
+import { num, dt, Empty, StatsGrid } from './shared.js';
 import * as api from '/js/services/admin-agent-integration.js';
 
 
@@ -113,7 +116,7 @@ function renderPlatformRegistry(platforms, totalAgents, session, loadData) {
       }
       ${showForm
         ? html`<${AddPlatformForm} session=${session} onDone=${() => { setShowForm(false); loadData(); }} onCancel=${() => setShowForm(false)} />`
-        : html`<button class="btn-outline adm-agi-add-btn" onClick=${() => setShowForm(true)}>
+        : html`<button class="adm-btn-action adm-agi-add-btn" onClick=${() => setShowForm(true)}>
             ${t('admin.agentIntegration.addPlatform')}
           </button>`
       }
@@ -163,10 +166,10 @@ function AddPlatformForm({ session, onDone, onCancel }) {
         <input class="adm-agi-add-form-input" value=${pattern} onInput=${e => setPattern(e.target.value)} placeholder=${t('admin.agentIntegration.placeholders.regex')} />
       </div>
       <div class="adm-agi-add-form-actions">
-        <button class="btn-primary" onClick=${handleSubmit} disabled=${submitting || !name.trim() || !id.trim()}>
+        <button class="adm-btn" onClick=${handleSubmit} disabled=${submitting || !name.trim() || !id.trim()}>
           ${submitting ? t('common.loading') : t('common.add')}
         </button>
-        <button class="btn-ghost" onClick=${onCancel}>${t('common.cancel')}</button>
+        <button class="adm-btn-action" onClick=${onCancel}>${t('common.cancel')}</button>
       </div>
     </div>
   `;
@@ -183,20 +186,11 @@ function renderOnboardingOverview(onboarding, readiness, session, loadData) {
   return html`
     <div class="adm-agi-section">
       <div class="adm-agi-section-title">${t('admin.agentIntegration.onboardingOverview')}</div>
-      <div class="adm-agi-stats">
-        <div class="adm-agi-stat-card">
-          <div class="adm-agi-stat-value adm-agi-stat-value--success">${num(onboarding.completed)}</div>
-          <div class="adm-agi-stat-label">${t('admin.agentIntegration.completed')}</div>
-        </div>
-        <div class="adm-agi-stat-card">
-          <div class="adm-agi-stat-value adm-agi-stat-value--accent">${num(onboarding.in_progress)}</div>
-          <div class="adm-agi-stat-label">${t('admin.agentIntegration.inProgress')}</div>
-        </div>
-        <div class="adm-agi-stat-card">
-          <div class="adm-agi-stat-value">${num(notStarted)}</div>
-          <div class="adm-agi-stat-label">${t('admin.agentIntegration.notStarted')}</div>
-        </div>
-      </div>
+      <${StatsGrid} items=${[
+        { label: t('admin.agentIntegration.completed'), value: onboarding.completed, tone: 'green' },
+        { label: t('admin.agentIntegration.inProgress'), value: onboarding.in_progress, tone: 'indigo' },
+        { label: t('admin.agentIntegration.notStarted'), value: notStarted },
+      ]} />
       ${stuck.length > 0 ? html`
         <div class="adm-agi-stuck-title">${t('admin.agentIntegration.stuckAgents')}</div>
         <div class="adm-agi-stuck">
@@ -246,10 +240,10 @@ function StuckAgentRow({ agent, session, onAction }) {
         <div class="adm-agi-stuck-suggestion">${suggestion}</div>
       </div>
       <div class="adm-agi-stuck-actions">
-        <button class="btn-outline adm-agi-stuck-btn" onClick=${handleRemind} disabled=${acting}>
+        <button class="adm-btn-action adm-agi-stuck-btn" onClick=${handleRemind} disabled=${acting}>
           ${t('admin.agentIntegration.sendReminder')}
         </button>
-        <button class="btn-ghost adm-agi-stuck-btn" onClick=${handleSkip} disabled=${acting}>
+        <button class="adm-btn-action adm-agi-stuck-btn" onClick=${handleSkip} disabled=${acting}>
           ${t('admin.agentIntegration.skipStep')}
         </button>
       </div>
@@ -337,7 +331,7 @@ function renderSkillBundles(bundles, onRegenerate, regenerating, session) {
                     : html`<span class="adm-agi-zero">0</span>`
                   }</td>
                   <td>${info.outdated > 0 ? html`
-                    <button class="btn-outline adm-agi-notify-btn" onClick=${() => handleNotify(platform)}>
+                    <button class="adm-btn-action adm-agi-notify-btn" onClick=${() => handleNotify(platform)}>
                       ${t('admin.agentIntegration.notifyOutdated')}
                     </button>
                   ` : ''}</td>
@@ -347,7 +341,7 @@ function renderSkillBundles(bundles, onRegenerate, regenerating, session) {
           </table>
         `
       }
-      <button class="btn-outline adm-agi-regen-btn" onClick=${onRegenerate} disabled=${regenerating}>
+      <button class="adm-btn-action adm-agi-regen-btn" onClick=${onRegenerate} disabled=${regenerating}>
         ${regenerating ? t('common.loading') : t('admin.agentIntegration.regenerateAll')}
       </button>
     </div>
@@ -363,25 +357,16 @@ function renderBundleTemplates() {
   return html`
     <div class="adm-agi-section">
       <div class="adm-agi-section-title">${t('admin.agentIntegration.bundleTemplates')}</div>
-      <div class="adm-agi-stats">
-        <div class="adm-agi-stat-card">
-          <div class="adm-agi-stat-value">0</div>
-          <div class="adm-agi-stat-label">${t('admin.agentIntegration.customReferences')}</div>
-        </div>
-        <div class="adm-agi-stat-card">
-          <div class="adm-agi-stat-value">0</div>
-          <div class="adm-agi-stat-label">${t('admin.agentIntegration.customScripts')}</div>
-        </div>
-        <div class="adm-agi-stat-card">
-          <div class="adm-agi-stat-value adm-agi-mono-sm">--</div>
-          <div class="adm-agi-stat-label">${t('admin.agentIntegration.lastGenerated')}</div>
-        </div>
-      </div>
+      <${StatsGrid} items=${[
+        { label: t('admin.agentIntegration.customReferences'), value: 0 },
+        { label: t('admin.agentIntegration.customScripts'), value: 0 },
+        { label: t('admin.agentIntegration.lastGenerated'), value: '--' },
+      ]} />
       <div class="adm-agi-btn-row">
-        <button class="btn-outline" onClick=${handleComingSoon}>
+        <button class="adm-btn-action" onClick=${handleComingSoon}>
           ${t('admin.agentIntegration.customizeBundle')}
         </button>
-        <button class="btn-outline" onClick=${handleComingSoon}>
+        <button class="adm-btn-action" onClick=${handleComingSoon}>
           ${t('admin.agentIntegration.previewBundle')}
         </button>
       </div>

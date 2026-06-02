@@ -1,3 +1,14 @@
+/**
+ * @file push-tab.js
+ * @description Admin dashboard Push Notifications tab — subscription stats, browser
+ *   subscribe/test/unsubscribe, per-locale web-push/email template editing, reset,
+ *   notification-trigger reference, and the subscriptions table.
+ * @structure default export PushTab({ data, reload }); template editor + subscriptions list.
+ * @usage Mounted by the admin dashboard tab router.
+ * @version-history
+ *   v1.1.0 — 2026-06-02 — Admin design unification: reset button inline danger style →
+ *     adm-btn-danger, template body textarea → adm-textarea (dynamic min-height kept).
+ */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
@@ -224,8 +235,8 @@ export default function PushTab({ data, reload }) {
 
                     <label class="adm-text-dim" style="font-size:.75rem">${t('dashboard.pushFieldBody')}</label>
                     <textarea
-                      class="adm-input"
-                      style="font-size:.85rem;font-family:monospace;min-height:${isWebPush ? '40px' : '100px'};resize:vertical"
+                      class="adm-textarea"
+                      style="min-height:${isWebPush ? '40px' : '100px'}"
                       onInput=${(e) => updateField(tpl.id, 'body', e.target.value)}
                     >${tpl.fields.body || ''}</textarea>
                   </div>
@@ -244,8 +255,8 @@ export default function PushTab({ data, reload }) {
 
       <!-- Reset button -->
       <div style="display:flex;justify-content:flex-end;margin-top:4px">
-        <button class="adm-btn-action adm-text-sm" onClick=${handleReset} disabled=${resetStatus === 'resetting'}
-          style="color:#ef4444;border-color:rgba(239,68,68,0.3)">${resetStatus === 'resetting' ? t('dashboard.pushResetting') : t('dashboard.pushResetBtn')}</button>
+        <button class="adm-btn-action adm-text-sm adm-btn-danger" onClick=${handleReset} disabled=${resetStatus === 'resetting'}
+          >${resetStatus === 'resetting' ? t('dashboard.pushResetting') : t('dashboard.pushResetBtn')}</button>
       </div>
     </div>
 

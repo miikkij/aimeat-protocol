@@ -11,6 +11,9 @@
  *   v1.2.0 — 2026-06-02 — Component unification (#2): delete-confirm modal uses the
  *     canonical <Modal> component (header ✕ + Escape/backdrop close); the typed-name
  *     guard stays in the body, with the danger cue moved to the message text.
+ *   v1.3.0 — 2026-06-02 — Admin design unification: inline danger styles → adm-btn-danger
+ *     (detail + list delete buttons) / adm-btn-danger-solid (modal delete), raw textarea →
+ *     adm-textarea adm-input-full, error divs → <ErrorBox> (edit + create views).
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
@@ -18,7 +21,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Badge, Empty, ExpandableHelp, useToast, Toast } from './shared.js';
+import { dt, Badge, Empty, ExpandableHelp, ErrorBox, useToast, Toast } from './shared.js';
 import { getMsmDetail, createMsm, updateMsm, deleteMsm, getMsmTemplates, getMsmTemplate } from '/js/services/admin.js';
 import { Modal } from '/components/Modal.js';
 
@@ -160,8 +163,7 @@ export default function MsmTab({ data, reload }) {
               ${t('dashboard.cancel')}
             </button>
             <button
-              class="adm-btn"
-              style="background:#ef4444;border-color:#ef4444"
+              class="adm-btn adm-btn-danger-solid"
               disabled=${deleteInput !== deleteTarget || loading}
               onClick=${doDelete}
             >
@@ -204,7 +206,7 @@ export default function MsmTab({ data, reload }) {
             ${t('dashboard.msmEditFederate')}
           </label>
 
-          ${err && html`<div class="error-box adm-mb-sm">${err}</div>`}
+          ${err && html`<div class="adm-mb-sm"><${ErrorBox} message=${err} /></div>`}
 
           <div class="adm-flex">
             <button class="adm-btn" onClick=${doEdit} disabled=${loading}>
@@ -231,7 +233,7 @@ export default function MsmTab({ data, reload }) {
             <h4 style="margin:0">${escHtml(detail.name)}</h4>
             <div class="adm-flex">
               <button class="adm-btn-sm" onClick=${openEdit}>${t('dashboard.edit')}</button>
-              <button class="adm-btn-sm adm-text-error" style="border-color:#ef4444" onClick=${() => openDelete(detail.name)}>
+              <button class="adm-btn-sm adm-btn-danger" onClick=${() => openDelete(detail.name)}>
                 ${t('dashboard.delete')}
               </button>
             </div>
@@ -276,8 +278,7 @@ export default function MsmTab({ data, reload }) {
           <label class="adm-text-base adm-text-dim adm-mb-xs" style="display:block">${t('dashboard.msmDefinition')}</label>
           <textarea
             rows="20"
-            class="adm-input adm-input-full adm-text-sm"
-            style="font-family:monospace;resize:vertical"
+            class="adm-textarea adm-input-full"
             placeholder=${t('dashboard.msmYamlPlaceholder')}
             value=${yaml}
             onInput=${e => setYaml(e.target.value)}
@@ -288,7 +289,7 @@ export default function MsmTab({ data, reload }) {
             ${t('dashboard.msmEditFederate')}
           </label>
 
-          ${err && html`<div class="error-box adm-mt-sm">${err}</div>`}
+          ${err && html`<div class="adm-mt-sm"><${ErrorBox} message=${err} /></div>`}
 
           <div class="adm-flex adm-mt-md">
             <button class="adm-btn" onClick=${doCreate} disabled=${loading || !yaml.trim()}>
@@ -340,7 +341,7 @@ export default function MsmTab({ data, reload }) {
                   <td style="white-space:nowrap">
                     <button class="adm-btn-sm" onClick=${() => showDetail(m.name)}>${t('dashboard.edit')}</button>
                     ${' '}
-                    <button class="adm-btn-sm adm-text-error" style="border-color:#ef4444" onClick=${() => openDelete(m.name)}>
+                    <button class="adm-btn-sm adm-btn-danger" onClick=${() => openDelete(m.name)}>
                       ${t('dashboard.delete')}
                     </button>
                   </td>

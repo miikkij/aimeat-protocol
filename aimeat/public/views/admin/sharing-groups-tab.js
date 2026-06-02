@@ -11,7 +11,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { num, dt, Empty } from './shared.js';
+import { num, dt, Empty, StatsGrid } from './shared.js';
 import { apiGet } from '/js/api.js';
 
 export default function SharingGroupsTab({ data, reload, session }) {
@@ -45,12 +45,7 @@ export default function SharingGroupsTab({ data, reload, session }) {
   return html`
     <div>
       <!-- Stats summary -->
-      <div class="adm-mem-stats">
-        <div class="adm-mem-stat">
-          <span class="adm-mem-stat-value">${num(total)}</span>
-          <span class="adm-mem-stat-label">${t('dashboard.sharingGroupsTotal')}</span>
-        </div>
-      </div>
+      <${StatsGrid} items=${[{ label: t('dashboard.sharingGroupsTotal'), value: total }]} />
 
       <!-- Table -->
       ${groups.length === 0 && !loading && html`<${Empty} text=${t('dashboard.sharingGroupsEmpty')} />`}

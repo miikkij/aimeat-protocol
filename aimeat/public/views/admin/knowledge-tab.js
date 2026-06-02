@@ -1,3 +1,14 @@
+/**
+ * @file knowledge-tab.js
+ * @description Admin dashboard Knowledge tab — operator view to create system
+ *   knowledge packages, review/moderate packages, and manage flags.
+ * @structure KnowledgeAdminTab (default)
+ * @usage Mounted by the admin dashboard tab router.
+ * @version-history
+ *   v1.1.0 — 2026-06-02 — Admin design unification: entry-content textarea
+ *     adm-input → adm-textarea (drop redundant resize/font-family inline style);
+ *     delete-package button inline color → adm-btn-danger (campsite fix).
+ */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
@@ -172,11 +183,10 @@ export default function KnowledgeAdminTab({ data, reload }) {
                         </button>
                       `}
                     </div>
-                    <textarea class="adm-input adm-input-full" value=${entry.content}
+                    <textarea class="adm-textarea adm-input-full" value=${entry.content}
                       onInput=${e => updateEntry(i, 'content', e.target.value)}
                       placeholder=${t('knowledge.operator.createForm.entryContent')}
-                      rows="3"
-                      style="resize:vertical;font-family:inherit" />
+                      rows="3" />
                   </div>
                 `)}
                 <button class="adm-btn-sm adm-mt-sm" onClick=${addEntry}>
@@ -244,7 +254,7 @@ export default function KnowledgeAdminTab({ data, reload }) {
               <button class="adm-btn-sm" onClick=${() => setReviewingId(reviewingId === pkg.package_id ? null : pkg.package_id)}>
                 ${t('knowledge.operator.review')}
               </button>
-              <button class="adm-btn-sm" style="color:#e74c3c" onClick=${() => deletePackage(pkg.package_id)}>
+              <button class="adm-btn-sm adm-btn-danger" onClick=${() => deletePackage(pkg.package_id)}>
                 ${t('knowledge.operator.deletePackage')}
               </button>
             </div>

@@ -1,3 +1,13 @@
+/**
+ * @file portal-tab.js
+ * @description Admin dashboard Portal tab — landing-page template editor,
+ *   site memory keys, KV pairs, AI prompt, and changelog (with LB-mode banner).
+ * @structure PortalTab (default)
+ * @usage Mounted by the admin dashboard tab router.
+ * @version-history
+ *   v1.1.0 — 2026-06-02 — Admin design unification: raw template textarea →
+ *     adm-textarea adm-input-full (drop inline mono/border/background styles).
+ */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
@@ -132,8 +142,8 @@ export default function PortalTab({ data, reload }) {
           </tbody>
         </table>
       </${ExpandableHelp}>
-      <textarea rows="20" value=${template} onInput=${e => setTemplate(e.target.value)}
-        style="width:100%;font-family:monospace;font-size:13px;padding:12px;border:1px solid var(--glass-border);border-radius:8px;background:var(--glass-bg);color:var(--text-bright);resize:vertical"></textarea>
+      <textarea class="adm-textarea adm-input-full" rows="20" value=${template} onInput=${e => setTemplate(e.target.value)}
+        style="font-size:13px"></textarea>
       <div class="adm-flex adm-mt-sm">
         <button class="adm-btn-action" onClick=${saveTemplate}>\u{1F4BE} ${t('dashboard.portalSaveTemplate')}</button>
         <button class="adm-btn-action" onClick=${downloadTemplate}>\u{1F4E5} ${t('dashboard.portalDownload')}</button>

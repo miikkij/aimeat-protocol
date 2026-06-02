@@ -1,3 +1,13 @@
+/**
+ * @file email-tab.js
+ * @description Admin dashboard Email tab — SMTP config view, test-send, group
+ *   broadcast, and per-locale email template editor with AI-prompt generation.
+ * @structure EmailTab (default), TemplateEditor, buildAiPrompt
+ * @usage Mounted by the admin dashboard tab router.
+ * @version-history
+ *   v1.1.0 — 2026-06-02 — Admin design unification: raw textareas → adm-textarea
+ *     adm-input-full; inline button color styles → adm-btn-success/adm-btn-danger.
+ */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
@@ -151,17 +161,19 @@ function TemplateEditor({ tpl, locale, onSave, onReset }) {
       `}
       ${view === 'html' && html`
         <textarea
+          class="adm-textarea adm-input-full"
           value=${editHtml}
           onInput=${e => setEditHtml(e.target.value)}
-          style="width:100%;height:420px;font-family:monospace;font-size:12px;padding:10px;border:1px solid var(--glass-border);border-top:none;border-radius:0 0 6px 6px;background:rgba(0,0,0,0.2);color:var(--text-bright);resize:vertical;line-height:1.5;tab-size:2"
+          style="height:420px;font-size:12px;border-top:none;border-radius:0 0 6px 6px"
           spellcheck="false"
         />
       `}
       ${view === 'text' && html`
         <textarea
+          class="adm-textarea adm-input-full"
           value=${editText}
           onInput=${e => setEditText(e.target.value)}
-          style="width:100%;height:300px;font-family:monospace;font-size:13px;padding:10px;border:1px solid var(--glass-border);border-top:none;border-radius:0 0 6px 6px;background:rgba(0,0,0,0.2);color:var(--text-bright);resize:vertical;line-height:1.5"
+          style="height:300px;font-size:13px;border-top:none;border-radius:0 0 6px 6px"
           spellcheck="false"
         />
       `}
@@ -174,8 +186,7 @@ function TemplateEditor({ tpl, locale, onSave, onReset }) {
           label=${t('dashboard.emailTplAiPrompt')} copiedLabel=${t('dashboard.emailTplAiPrompt')}
           onCopied=${() => setMsg({ ok: true, text: t('dashboard.emailTplAiPromptCopied') })} />
         ${tpl.isCustom && html`
-          <button class="adm-btn-action adm-text-sm" onClick=${doReset} disabled=${saving}
-            style="color:#ef4444;border-color:rgba(239,68,68,0.3)">${t('dashboard.emailTplReset')}</button>
+          <button class="adm-btn-action adm-btn-danger adm-text-sm" onClick=${doReset} disabled=${saving}>${t('dashboard.emailTplReset')}</button>
         `}
         ${msg && html`<span class="adm-text-sm" style="color:${msg.ok ? '#22c55e' : '#ef4444'}">${msg.text}</span>`}
       </div>
@@ -370,11 +381,10 @@ export default function EmailTab({ data, reload, locale }) {
       <input type="text" class="adm-input adm-input-full adm-mb-sm" value=${grpSubject}
         onInput=${e => setGrpSubject(e.target.value)}
         placeholder=${t('dashboard.emailGroupSubject')} />
-      <textarea class="adm-input adm-input-full" value=${grpBody}
+      <textarea class="adm-textarea adm-input-full" value=${grpBody}
         onInput=${e => setGrpBody(e.target.value)}
         placeholder=${t('dashboard.emailGroupBody')}
-        rows="4"
-        style="resize:vertical;font-family:inherit" />
+        rows="4" />
       <div class="adm-mt-sm">
         <button class="adm-btn" onClick=${doGroupSend} disabled=${grpSending || !grpSubject || !grpBody}>
           ${grpSending ? '...' : t('dashboard.emailGroupSend')}
@@ -399,12 +409,12 @@ export default function EmailTab({ data, reload, locale }) {
       <!-- Seed / Reset All buttons -->
       <div class="adm-flex-center" style="flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;border-radius:6px;background:rgba(255,255,255,0.02);border:1px solid var(--glass-border)">
         ${!seeded && html`
-          <button class="adm-btn-action adm-text-sm" style="background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.3);color:#22c55e"
+          <button class="adm-btn-action adm-btn-success adm-text-sm"
             onClick=${doSeedDefaults}>${t('dashboard.emailTplSeedDefaults')}</button>
           <span style="font-size:.78rem" class="adm-text-dim">${t('dashboard.emailTplSeedExplain')}</span>
         `}
         ${seeded && html`
-          <button class="adm-btn-action adm-text-sm" style="color:#ef4444;border-color:rgba(239,68,68,0.3)"
+          <button class="adm-btn-action adm-btn-danger adm-text-sm"
             onClick=${doResetAll}>${t('dashboard.emailTplResetAll')}</button>
           <button class="adm-btn-action adm-text-sm"
             onClick=${doSeedDefaults}>${t('dashboard.emailTplReseed')}</button>

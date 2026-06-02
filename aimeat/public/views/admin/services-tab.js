@@ -1,7 +1,11 @@
 /**
- * Admin Dashboard — Services Tab
- * Manage installed service extensions and their instances.
- * Install bundled extensions with one-click.
+ * @file services-tab.js
+ * @description Admin Dashboard — Services Tab. Manage installed service
+ *   extensions and their instances, install bundled extensions one-click,
+ *   edit action scripts and instance translations.
+ * @version-history
+ *   v1.1.0 — 2026-06-02 — Admin design unification: raw script/JSON textareas
+ *     → adm-textarea adm-input-full (drop inline mono/resize/border styles).
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -233,8 +237,8 @@ function TranslationEditor({ extName, inst, onSave }) {
       </div>
 
       ${jsonMode ? html`
-        <textarea value=${jsonText} onInput=${e => setJsonText(e.target.value)}
-          style="width:100%;height:200px;font-family:monospace;font-size:12px;padding:8px;border:1px solid var(--glass-border);border-radius:4px;background:rgba(0,0,0,0.2);color:var(--text-bright);resize:vertical"
+        <textarea class="adm-textarea adm-input-full" value=${jsonText} onInput=${e => setJsonText(e.target.value)}
+          style="height:200px;font-size:12px"
           spellcheck="false" />
       ` : html`
         <div class="adm-flex-col" style="gap:4px;max-height:300px;overflow-y:auto">
@@ -315,8 +319,8 @@ function ActionScriptEditor({ extName, actions, onUpdated }) {
           <div class="adm-flex-between adm-mb-xs">
             <code style="font-size:.8rem;color:var(--text-dim)">${extName}/${selectedAction}</code>
           </div>
-          <textarea value=${script} onInput=${e => setScript(e.target.value)}
-            style="width:100%;height:320px;font-family:'Fira Code',monospace;font-size:12px;line-height:1.5;padding:10px;border:1px solid var(--glass-border);border-radius:4px;background:rgba(0,0,0,0.3);color:var(--text-bright);resize:vertical;tab-size:2"
+          <textarea class="adm-textarea adm-input-full" value=${script} onInput=${e => setScript(e.target.value)}
+            style="height:320px;font-size:12px"
             spellcheck="false"
             onKeyDown=${e => {
               if (e.key === 'Tab') {
@@ -778,8 +782,8 @@ function AvailableExtCard({ ext, isInstalled, isInstalling, onInstall, onReinsta
           ${selectedAction && !loading && html`
             <div>
               <code class="adm-text-sm adm-text-dim">${ext.name}/actions/${selectedAction}.js</code>
-              <textarea value=${script} onInput=${e => setScript(e.target.value)}
-                style="width:100%;height:320px;font-family:'Fira Code',monospace;font-size:12px;line-height:1.5;padding:10px;border:1px solid var(--glass-border);border-radius:4px;background:rgba(0,0,0,0.3);color:var(--text-bright);resize:vertical;tab-size:2;margin-top:4px"
+              <textarea class="adm-textarea adm-input-full" value=${script} onInput=${e => setScript(e.target.value)}
+                style="height:320px;font-size:12px;margin-top:4px"
                 spellcheck="false"
                 onKeyDown=${e => {
                   if (e.key === 'Tab') {

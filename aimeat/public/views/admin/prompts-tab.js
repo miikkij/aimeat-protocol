@@ -188,7 +188,7 @@ export default function PromptsTab({ data, reload }) {
           <button class="adm-btn-action" onClick=${handleSave} disabled=${saving}>
             ${saving ? '...' : t('dashboard.promptsSave')}
           </button>
-          <button class="adm-btn-action" style="background:#dc262633;color:#ef4444" onClick=${handleReset} disabled=${saving}>
+          <button class="adm-btn-action adm-btn-danger" onClick=${handleReset} disabled=${saving}>
             ${t('dashboard.promptsReset')}
           </button>
         </div>
@@ -225,7 +225,7 @@ export default function PromptsTab({ data, reload }) {
     </${ExpandableHelp}>
 
     <div style="margin:12px 0">
-      <button class="adm-btn-action" style="background:#dc262633;color:#ef4444" onClick=${handleResetAll} disabled=${saving}>
+      <button class="adm-btn-action adm-btn-danger" onClick=${handleResetAll} disabled=${saving}>
         ${t('dashboard.promptsResetAll')}
       </button>
     </div>
@@ -238,7 +238,7 @@ export default function PromptsTab({ data, reload }) {
             ${t('dashboard.' + (GROUP_NAMES[g] || g))} (${items.length})
           </summary>
           <div style="text-align:right;padding:4px 8px">
-            <button class="btn-danger" style="font-size:12px;padding:4px 12px" onClick=${() => {
+            <button class="adm-btn-action adm-btn-danger" style="font-size:12px;padding:4px 12px" onClick=${() => {
               confirm(
                 t('dashboard.promptsResetGroupConfirm') || 'Reset all prompts in this group to factory defaults?',
                 async () => {

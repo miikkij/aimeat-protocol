@@ -1,10 +1,21 @@
+/**
+ * @file csm-tab.js
+ * @description Admin dashboard CSM (Community Service Manifest) tab — list,
+ *   detail, create and delete of registered CSM templates, plus an AI builder
+ *   prompt view.
+ * @structure default export CsmTab({ data, reload }); list/detail/create/prompt views.
+ * @usage Mounted by the admin dashboard tab router.
+ * @version-history
+ *   v1.1.0 — 2026-06-02 — Admin design unification: inline danger styles → adm-btn-danger
+ *     (2 delete buttons), raw textarea → adm-textarea adm-input-full, error div → <ErrorBox>.
+ */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Empty, ExpandableHelp, useToast, Toast } from './shared.js';
+import { dt, Empty, ExpandableHelp, ErrorBox, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { getCsmDetail, deleteCsm, createCsm, getCsmFileTemplates, getCsmFileTemplate, getCsmBuilderPrompt } from '/js/services/admin.js';
@@ -102,7 +113,7 @@ export default function CsmTab({ data, reload }) {
         <div class="adm-card adm-mt-md">
           <div class="adm-flex-between">
             <h4 style="margin:0">${escHtml(detail.name)}</h4>
-            <button class="adm-btn-sm" style="color:#ef4444;border-color:#ef4444" onClick=${() => doDelete(detail.name)}>
+            <button class="adm-btn-sm adm-btn-danger" onClick=${() => doDelete(detail.name)}>
               ${t('dashboard.delete')}
             </button>
           </div>
@@ -183,13 +194,13 @@ export default function CsmTab({ data, reload }) {
           <label class="adm-text-base adm-text-dim" style="display:block;margin-bottom:4px">${t('dashboard.csmDefinition')}</label>
           <textarea
             rows="16"
-            style="width:100%;font-family:monospace;font-size:.8rem;resize:vertical"
+            class="adm-textarea adm-input-full"
             placeholder=${t('dashboard.csmYamlPlaceholder')}
             value=${yaml}
             onInput=${e => setYaml(e.target.value)}
           />
 
-          ${err && html`<div class="error-box adm-mt-sm">${err}</div>`}
+          ${err && html`<div class="adm-mt-sm"><${ErrorBox} message=${err} /></div>`}
 
           <div class="adm-flex adm-mt-md">
             <button class="adm-btn" onClick=${doCreate} disabled=${loading || !yaml.trim()}>
@@ -239,7 +250,7 @@ export default function CsmTab({ data, reload }) {
                   <td style="white-space:nowrap">
                     <button class="adm-btn-sm" onClick=${() => showDetail(c.name)}>${t('dashboard.details')}</button>
                     ${' '}
-                    <button class="adm-btn-sm" style="color:#ef4444;border-color:#ef4444" onClick=${() => doDelete(c.name)}>
+                    <button class="adm-btn-sm adm-btn-danger" onClick=${() => doDelete(c.name)}>
                       ${t('dashboard.delete')}
                     </button>
                   </td>

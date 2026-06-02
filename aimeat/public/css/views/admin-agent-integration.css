@@ -25,34 +25,8 @@
   margin-bottom: 14px;
 }
 
-/* ── Stats row ── */
-.adm-agi-stats {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-
-.adm-agi-stat-card {
-  background: var(--bg-dim);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px 18px;
-  min-width: 100px;
-  text-align: center;
-}
-
-.adm-agi-stat-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--accent);
-}
-
-.adm-agi-stat-label {
-  font-size: 0.7rem;
-  color: var(--text-dim);
-  margin-top: 2px;
-}
+/* ── Stats row ── the bespoke .adm-agi-stat-* cards were removed; this tab now
+   renders its stat rows via the canonical <StatsGrid> (.adm-stat tones). ── */
 
 /* ── Tables ── */
 .adm-agi-table {
@@ -140,11 +114,6 @@
   font-size: 0.75rem;
   color: var(--text-dim);
 }
-
-/* ── Stat value color variants ── */
-.adm-agi-stat-value--success { color: var(--success); }
-.adm-agi-stat-value--accent { color: var(--accent); }
-.adm-agi-stat-value--warning { color: var(--warning); }
 
 /* ── Mono cell (platform ID, adapter) ── */
 .adm-agi-mono-sm {

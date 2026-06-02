@@ -5,6 +5,10 @@
  *   and delete functionality.
  * @version-history
  *   v1.0.0 — 2026-03-16 — Initial implementation
+ *   v1.1.0 — 2026-06-02 — Admin design unification: fix the broken useToast wiring
+ *     (array hook was used as an object via .show()/.current/.dismiss — toasts never
+ *     rendered and delete threw); now canonical [msg,showErr,showOk,clear] + correct
+ *     <Toast>. The bespoke adm-mem-stat summary → canonical <StatsGrid>.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -12,7 +16,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { num, dt, Empty, useToast, Toast } from './shared.js';
+import { dt, Empty, StatsGrid, useToast, Toast } from './shared.js';
 import { getAdminMemory, deleteAdminMemory } from '/js/services/admin.js';
 
 const PAGE_SIZE = 50;
@@ -31,7 +35,7 @@ export default function MemoryTab({ data, reload, session }) {
   // Expanded rows
   const [expanded, setExpanded] = useState({});
 
-  const toast = useToast();
+  const [toast, showErr, showOk, clearToast] = useToast();
 
   const loadMemory = useCallback(async (off = 0, { showSpinner = true } = {}) => {
     if (showSpinner) setLoading(true);
@@ -73,10 +77,10 @@ export default function MemoryTab({ data, reload, session }) {
     if (!confirm(t('dashboard.memoryDeleteConfirm'))) return;
     try {
       await deleteAdminMemory(ownerGaii, key);
-      toast.show('success', t('dashboard.memoryDeleted'));
+      showOk(t('dashboard.memoryDeleted'));
       loadMemory(offset);
     } catch (e) {
-      toast.show('error', e.message);
+      showErr(e.message);
     }
   }
 
@@ -105,21 +109,13 @@ export default function MemoryTab({ data, reload, session }) {
 
   return html`
     <div>
-      ${toast.current && html`<${Toast} ...${toast.current} onDismiss=${toast.dismiss} />`}
+      ${toast && html`<${Toast} type=${toast.type} text=${toast.text} onDismiss=${clearToast} />`}
 
       <!-- Stats summary -->
-      <div class="adm-mem-stats">
-        <div class="adm-mem-stat">
-          <span class="adm-mem-stat-value">${num(total)}</span>
-          <span class="adm-mem-stat-label">${t('dashboard.memoryTotal')}</span>
-        </div>
-        ${Object.entries(visCounts).map(([vis, count]) => html`
-          <div class="adm-mem-stat">
-            <span class="adm-mem-stat-value">${num(count)}</span>
-            <span class="adm-mem-stat-label">${vis}</span>
-          </div>
-        `)}
-      </div>
+      <${StatsGrid} items=${[
+        { label: t('dashboard.memoryTotal'), value: total },
+        ...Object.entries(visCounts).map(([vis, count]) => ({ label: vis, value: count })),
+      ]} />
 
       <!-- Filter bar -->
       <form class="adm-mem-filters" onSubmit=${handleSearch}>

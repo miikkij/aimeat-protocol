@@ -5,6 +5,11 @@
  *   and shows component breakdowns.
  * @version-history
  *   v1.0.0 — 2026-03-17 — Initial admin cortex management tab
+ *   v1.1.0 — 2026-06-02 — Admin design unification: fix the broken useToast wiring
+ *     (object-destructured the array-returning hook, and passed wrong props to
+ *     <Toast> — toasts never rendered); now uses the canonical [msg,showErr,showOk,
+ *     clear] API with a showToast adapter + correct <Toast type text onDismiss>.
+ *     Main btn-* classes → adm-btn / adm-btn-action / adm-btn adm-btn-danger-solid.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -19,7 +24,8 @@ import * as cortexService from '/js/services/cortex.js';
 const COMP_ICONS = { schema: '\u{1F4D0}', prompt: '\u{1F4AC}', action: '\u26A1', 'board-template': '\u{1F4CC}', ontology: '\u{1F9EC}', 'seed-data': '\u{1F331}', lib: '\u{1F4E6}' };
 
 export default function CortexTab({ data, reload, session }) {
-  const { toast, showToast } = useToast();
+  const [toast, showErr, showOk, clearToast] = useToast();
+  const showToast = (text, isError) => isError ? showErr(text) : showOk(text);
   const { confirm, ConfirmUI } = useConfirm();
   const [extensions, setExtensions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -92,9 +98,9 @@ export default function CortexTab({ data, reload, session }) {
     const isActive = ext.status === 'active';
     const vis = ext.visibility || 'private';
     return html`<div>
-      <${Toast} toast=${toast} />
+      ${toast && html`<${Toast} type=${toast.type} text=${toast.text} onDismiss=${clearToast} />`}
       <${ConfirmUI} />
-      <button class="btn-outline" onClick=${() => setDetail(null)}>${t('dashboard.cortex.back')}</button>
+      <button class="adm-btn-action" onClick=${() => setDetail(null)}>${t('dashboard.cortex.back')}</button>
       <h3 class="adm-section-title" style="margin-top:1rem">${escHtml(ext.name)} <span class="adm-text-dim adm-text-sm">v${ext.version || '?'}</span></h3>
       <p class="adm-text-dim">${escHtml(ext.description || '')}</p>
       <div class="adm-meta-row">
@@ -113,18 +119,18 @@ export default function CortexTab({ data, reload, session }) {
 
       <div class="adm-actions-row" style="margin-top:1.5rem">
         ${isActive
-          ? html`<button class="btn-outline" onClick=${() => handleDeactivate(ext.name)}>${t('dashboard.cortex.deactivate')}</button>`
-          : html`<button class="btn-primary" onClick=${() => handleActivate(ext.name)}>${t('dashboard.cortex.activate')}</button>`}
-        <button class="btn-outline" onClick=${() => handleVisibility(ext.name, vis)}>
+          ? html`<button class="adm-btn-action" onClick=${() => handleDeactivate(ext.name)}>${t('dashboard.cortex.deactivate')}</button>`
+          : html`<button class="adm-btn" onClick=${() => handleActivate(ext.name)}>${t('dashboard.cortex.activate')}</button>`}
+        <button class="adm-btn-action" onClick=${() => handleVisibility(ext.name, vis)}>
           ${vis === 'public' ? t('dashboard.cortex.makePrivate') : t('dashboard.cortex.makePublic')}
         </button>
-        <button class="btn-danger-solid" onClick=${() => handleUninstall(ext.name)}>${t('dashboard.cortex.uninstall')}</button>
+        <button class="adm-btn adm-btn-danger-solid" onClick=${() => handleUninstall(ext.name)}>${t('dashboard.cortex.uninstall')}</button>
       </div>
     </div>`;
   }
 
   return html`<div>
-    <${Toast} toast=${toast} />
+    ${toast && html`<${Toast} type=${toast.type} text=${toast.text} onDismiss=${clearToast} />`}
     <${ConfirmUI} />
     <${StatsGrid} items=${[
       { label: t('dashboard.cortex.total'), value: extensions.length },
@@ -158,8 +164,8 @@ export default function CortexTab({ data, reload, session }) {
                 <td class="adm-text-dim">${types.join(', ')}</td>
                 <td>
                   ${isActive
-                    ? html`<button class="btn-outline btn-sm" onClick=${() => handleDeactivate(ext.name)}>${t('dashboard.cortex.deactivate')}</button>`
-                    : html`<button class="btn-primary btn-sm" onClick=${() => handleActivate(ext.name)}>${t('dashboard.cortex.activate')}</button>`}
+                    ? html`<button class="adm-btn-action" onClick=${() => handleDeactivate(ext.name)}>${t('dashboard.cortex.deactivate')}</button>`
+                    : html`<button class="adm-btn" onClick=${() => handleActivate(ext.name)}>${t('dashboard.cortex.activate')}</button>`}
                 </td>
               </tr>`;
             })}

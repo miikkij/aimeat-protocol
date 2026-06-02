@@ -10,6 +10,9 @@
  *   v1.2.0 -- 2026-05-31 -- Fix: inputs were bound to the saved value, not the
  *     pending edit, so toggling a checkbox / typing snapped straight back on
  *     re-render (looked un-editable). All inputs now reflect pending[path].
+ *   v1.3.0 -- 2026-06-02 -- Admin design unification: inline error <div>
+ *     replaced with shared <ErrorBox>; success message moved to the
+ *     adm-config-result-ok class (no inline color/background styles).
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
@@ -17,7 +20,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { Badge, Empty, ExpandableHelp } from './shared.js';
+import { Badge, Empty, ExpandableHelp, ErrorBox } from './shared.js';
 import { saveConfig, deleteConfig } from '/js/services/admin.js';
 
 // Map config source to Badge type for visual distinction
@@ -113,7 +116,9 @@ export default function ConfigTab({ data, reload }) {
       </div>
     `}
 
-    ${result && html`<div class="adm-mb-md adm-text-base" style="padding:8px 12px;border-radius:6px;background:${result.ok ? '#16a34a22' : '#dc262622'};color:${result.ok ? '#22c55e' : '#ef4444'}">${escHtml(result.msg)}</div>`}
+    ${result && (result.ok
+      ? html`<div class="adm-config-result-ok adm-mb-md adm-text-base">${escHtml(result.msg)}</div>`
+      : html`<div class="adm-mb-md"><${ErrorBox} message=${result.msg} /></div>`)}
 
     <!-- Pending changes banner -->
     ${editable && pendingKeys.length > 0 && html`

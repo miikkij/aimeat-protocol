@@ -1,3 +1,13 @@
+/**
+ * @file federation-tab.js
+ * @description Admin dashboard Federation tab — peer management, peering
+ *   requests, network directory, auth policy, and federation bus overview.
+ * @structure FederationTab (default)
+ * @usage Mounted by the admin dashboard tab router.
+ * @version-history
+ *   v1.1.0 — 2026-06-02 — Admin design unification: inline button color style
+ *     on the approve action → adm-btn-success.
+ */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
@@ -331,7 +341,7 @@ export default function FederationTab({ data, reload }) {
               <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${escHtml(r.message || '\u2014')}</td>
               <td class="adm-text-dim">${dt(r.created_at)}</td>
               <td style="display:flex;gap:4px">
-                <button class="adm-btn-sm" style="color:#22c55e" onClick=${() => doApprove(r.id)}>\u2714 ${t('dashboard.approve')}</button>
+                <button class="adm-btn-sm adm-btn-success" onClick=${() => doApprove(r.id)}>\u2714 ${t('dashboard.approve')}</button>
                 <button class="adm-btn-sm adm-text-error" onClick=${() => doReject(r.id)}>\u2718 ${t('dashboard.fedReject')}</button>
               </td>
             </tr>`)}

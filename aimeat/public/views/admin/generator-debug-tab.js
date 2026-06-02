@@ -5,6 +5,7 @@
  *   content with syntax highlighting.
  * @version-history
  *   v1.0.0 — 2026-03-23 — Initial implementation
+ *   v1.1.0 — 2026-06-02 — Admin design unification: main btn-* classes → adm-btn* (btn-primary→adm-btn, btn-ghost→adm-btn-action, btn-outline→adm-btn-action).
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -173,10 +174,10 @@ export default function GeneratorDebugTab() {
             <div class="adm-card adm-card-clickable" onClick=${() => selectProject(p.projectId)}>
               <div class="adm-card-header">
                 <strong>${p.source === 'foundry' ? '🏭 ' : '🔴 '}${p.projectId}</strong>
-                <button class="btn-primary btn-sm" onClick=${e => { e.stopPropagation(); handleCopyAll(p.projectId); }}>
+                <button class="adm-btn" onClick=${e => { e.stopPropagation(); handleCopyAll(p.projectId); }}>
                   ${copying === 'done' ? '\u2705 Copied!' : copying ? '...' : 'Copy All'}
                 </button>
-                <button class="btn-ghost btn-sm" onClick=${e => { e.stopPropagation(); handleDeleteProject(p.projectId); }}>
+                <button class="adm-btn-action" onClick=${e => { e.stopPropagation(); handleDeleteProject(p.projectId); }}>
                   Delete
                 </button>
               </div>
@@ -193,11 +194,11 @@ export default function GeneratorDebugTab() {
       ${selectedProject && html`
         <div>
           <div class="adm-breadcrumb">
-            <button class="btn-ghost btn-sm" onClick=${() => { setSelectedProject(null); setFiles([]); setSelectedFile(null); }}>
+            <button class="adm-btn-action" onClick=${() => { setSelectedProject(null); setFiles([]); setSelectedFile(null); }}>
               ← Back to projects
             </button>
             <strong>${selectedProject}</strong>
-            <button class="btn-primary btn-sm" onClick=${() => handleCopyAll(selectedProject)}>
+            <button class="adm-btn" onClick=${() => handleCopyAll(selectedProject)}>
               ${copying === 'done' ? '\u2705 Copied!' : copying ? '...' : 'Copy All Debug'}
             </button>
             <span class="adm-count">${files.length} files</span>
@@ -223,7 +224,7 @@ export default function GeneratorDebugTab() {
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid var(--border)">
                   <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:0.85rem">${selectedFile}</span>
                   <span style="flex-shrink:0"><${CopyButton} text=${fileContent}
-                    className="btn-outline btn-sm" label="Copy File" copiedLabel="Copy File" /></span>
+                    className="adm-btn-action" label="Copy File" copiedLabel="Copy File" /></span>
                 </div>
                 ${loadingFile
                   ? html`<p>${t('profile.loading')}</p>`

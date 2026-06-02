@@ -372,6 +372,13 @@
   color: var(--info-fg);
   font-size: .85rem;
 }
+.adm-config-result-ok {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--success-bg);
+  color: var(--success-fg);
+  border: 1px solid var(--success-border);
+}
 
 /* Expandable help sections */
 .adm-help {
@@ -506,16 +513,9 @@
 /* ── Modal ── canonical overlay/box live in theme.css (.modal-overlay / .modal).
    msm-tab uses .modal-overlay directly; no admin-specific override needed. */
 
-/* ── Memory Tab ── */
-.adm-mem-stats {
-  display: flex; gap: 16px; margin-bottom: 16px; flex-wrap: wrap;
-}
-.adm-mem-stat {
-  background: var(--glass-bg); border: 1px solid var(--glass-border);
-  border-radius: 10px; padding: 12px 20px; text-align: center; min-width: 100px;
-}
-.adm-mem-stat-value { display: block; font-size: 1.4rem; font-weight: 700; color: var(--accent); }
-.adm-mem-stat-label { display: block; font-size: .75rem; color: var(--text-dim); margin-top: 2px; }
+/* ── Memory Tab ──
+   (the bespoke .adm-mem-stat summary cards were removed — memory/agent-tasks/
+   sharing-groups now use the canonical <StatsGrid>/.adm-stat pattern.) */
 .adm-mem-filters {
   display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center;
 }
@@ -534,10 +534,24 @@
   padding: 12px 0; border-top: 1px solid var(--glass-border); margin-top: 8px;
 }
 .adm-mem-page-info { font-size: .85rem; color: var(--text-dim); }
+/* Semantic button modifiers — combine with .adm-btn-sm / .adm-btn-action
+   (which supply padding/radius). Theme-aware via tokens, never hardcoded hex.
+   These replace the ad-hoc inline style="color:#ef4444…" overrides that were
+   scattered across the tabs. */
 .adm-btn-danger {
   color: var(--danger-fg); border-color: var(--danger-border);
 }
 .adm-btn-danger:hover { background: var(--danger-bg); }
+.adm-btn-success {
+  color: var(--success-fg); border-color: var(--success-border);
+}
+.adm-btn-success:hover { background: var(--success-bg); }
+/* Solid danger — combine with .adm-btn (which supplies layout); the bg override
+   below wins on source order. For destructive primary actions (e.g. delete). */
+.adm-btn-danger-solid {
+  background: var(--danger); color: #fff; border-color: transparent;
+}
+.adm-btn-danger-solid:hover { background: var(--danger); filter: brightness(0.92); }
 
 /* Subtabs row */
 .adm-subtabs { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
