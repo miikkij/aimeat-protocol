@@ -7,6 +7,8 @@
  *   v1.1.0 — 2026-06-02 — Tokenize all surfaces/text/borders/badges for dark mode (Phase 2).
  *   v1.2.0 — 2026-06-02 — Component unification (#3): remove .adm-modal-overlay
  *     duplicate; msm-tab now uses canonical theme.css .modal-overlay.
+ *   v1.3.0 — 2026-06-02 — Component unification (#16): add tokenized
+ *     .tag--status-* classes (replace agent-tasks-tab inline hex status colors).
  */
 
 /* Admin-scoped variables: indigo accent identity + surfaces mapped to global
@@ -243,6 +245,14 @@
 .adm .empty { color: var(--text-muted); text-align: center; padding: 24px; font-size: .85rem; }
 .adm .error-box { background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: 8px; padding: 16px; color: var(--danger-fg); margin: 20px 0; }
 .adm .tag { display: inline-block; background: var(--bg-surface); color: var(--text-dim); padding: 1px 6px; border-radius: 4px; font-size: .7rem; margin: 1px; }
+/* Status-colored task tags — tokenized (were inline hex colors). Color only;
+   base .adm .tag has no border so border-color stays inert as before. */
+.adm .tag--status-active  { color: var(--accent); }
+.adm .tag--status-done    { color: var(--success); }
+.adm .tag--status-failed  { color: var(--danger); }
+.adm .tag--status-stalled { color: var(--warn); }
+.adm .tag--status-queued  { color: var(--purple); }
+.adm .tag--status-draft   { color: var(--text-dim); }
 
 /* Buttons */
 .adm-btn {

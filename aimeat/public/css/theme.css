@@ -10,6 +10,9 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.11.0 — 2026-06-02 — Component unification (#16 tags): add --accent-border token (translucent accent hairline, light rgba(232,86,74,0.2) / dark rgba(255,111,98,0.30)) so tag/badge clones (mk-tag, hb-tag) can replace their hardcoded rgba(232,86,74,0.2) borders and flip in dark mode.
+     v1.10.0 — 2026-06-02 — Component unification (#17 pagination): add canonical .pagination (prev / "Page X / Y" / next, token-based) + .pagination-info + .load-more (centered load-more wrapper), backing /components/Pagination.js. Consolidates the .adm-mem-pagination shape and the centered load-more wrapper. The numbered .hb-pagination variant is intentionally left in place (different UI).
+     v1.9.0 — 2026-06-02 — Component unification (#18 category cards): add canonical .category-card / -icon / -name / -count (token-based, anchor- and div-safe) so the marketplace .mk-category-* and hobbies .hb-category-* clones converge. Tokenized the formerly hardcoded hover colors (#E8564A → var(--accent); 0 2px 8px rgba(0,0,0,0.06) → var(--shadow-md)) — dark-mode fix. Per-view *-categories-grid wrappers kept (column density differs).
      v1.8.0 — 2026-06-02 — Component unification (#11 status dots): add canonical .status-dot base + semantic token modifiers (online/active/healthy/live → success; warn/degraded/syncing/pending → warn; error/offline/dead/down → danger; idle/inactive/detached/muted → text-muted), backing /components/StatusDot.js, so per-view dots (.peer-dot/.pn-status-dot/.ext-status-dot/.dv-dot/.live-dot) converge. Tokenized away hardcoded hex in the former .ext-status-dot (#4ade80/#9ca3af) so dots flip in dark mode.
      v1.7.0 — 2026-06-02 — Component unification (#15 headers): add canonical .section-title/.section-desc (in-page accent header, lifted generic from .pf) + .page-title/.page-subtitle (top-of-view gradient header), all token-based, so per-view title/subtitle clones (mk-/hb-/cl-welcome-/adm-page-title) can converge.
      v1.6.0 — 2026-06-02 — Component unification (#22): add .card-glass modifier (Card variant="glass") reproducing the former profile .pf-glass-card appearance, fully tokenized (--surface / --border), so profile's GlassCard folds into the canonical Card.
@@ -45,6 +48,7 @@
   --accent-deep: #E8564A;
   --accent-glow: rgba(232, 86, 74, 0.3);
   --accent-subtle: rgba(232, 86, 74, 0.06);
+  --accent-border: rgba(232, 86, 74, 0.2);   /* translucent accent hairline for tag/badge edges */
 
   /* Love palette (profile gradients — now coral-based) */
   --love1: #E8564A;
@@ -177,6 +181,7 @@
   --accent-deep: #E8564A;
   --accent-glow: rgba(255, 111, 98, 0.35);
   --accent-subtle: rgba(255, 111, 98, 0.10);
+  --accent-border: rgba(255, 111, 98, 0.30);   /* translucent accent hairline for tag/badge edges */
 
   /* Text */
   --text: #EDEEF2;
@@ -695,6 +700,21 @@ a { color: inherit; text-decoration: none; }
 /* Shared responsive stat grid wrapper. */
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 32px; }
 
+/* ── Category Card ── */
+/* Canonical clickable directory tile (icon + name + optional count) shared by the
+   marketplace category grid and the hobbies interest grid. Works on both <a> and
+   <div> (text-decoration:none keeps anchors un-underlined). The grid wrapper stays
+   per-view because column density differs (marketplace 160px / hobbies 200px min). */
+.category-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px; text-align: center; text-decoration: none;
+  transition: all 0.2s; cursor: pointer;
+}
+.category-card:hover { background: var(--bg-surface); border-color: var(--accent); box-shadow: var(--shadow-md); }
+.category-icon { font-size: 2rem; margin-bottom: 8px; }
+.category-name { font-size: 0.95rem; font-weight: 600; color: var(--text); }
+.category-count { font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
+
 /* ── Badges ── */
 .badge {
   display: inline-block;
@@ -747,6 +767,29 @@ a { color: inherit; text-decoration: none; }
 .status-dot--live {
   box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
   animation: livePulse 1.5s ease-in-out infinite;
+}
+
+/* ── Pagination + Load more (canonical) ──
+   Backed by /components/Pagination.js. `.pagination` is the prev / "Page X / Y"
+   / next control (arrow buttons + disabled ends); `.load-more` centers a single
+   "load more" button. Consolidates the near-identical .adm-mem-pagination shape
+   and the centered load-more wrapper. All colors are theme tokens so both flip
+   correctly in dark mode. The numbered .hb-pagination variant is intentionally
+   left in place (different UI). */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.pagination-info {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+.load-more {
+  text-align: center;
+  margin-top: 1.5rem;
 }
 
 /* ── Section divider ── */

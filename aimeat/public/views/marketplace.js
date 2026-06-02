@@ -1,3 +1,11 @@
+/**
+ * @file marketplace.js
+ * @description Marketplace SPA view (Preact + HTM) — home/browse/search/sell/detail
+ *   sub-views for the listings directory, category grid, status badges, pagination.
+ * @version-history
+ *   v1.1.0 — 2026-06-02 — Component unification (#18 category cards): category tiles
+ *     use canonical theme.css .category-card / -icon / -name / -count (was .mk-category-*).
+ */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
@@ -154,10 +162,10 @@ function HomeView({ extAction, instanceConfig, onNav, tl }) {
     <h2 class="mk-section-heading">${t('mkt.home.categoriesHeading')}</h2>
     <div class="mk-categories-grid">
       ${categories.map(cat => html`
-        <a class="mk-category-card" onClick=${() => onNav('browse', { category: cat.key })}>
-          <div class="mk-category-icon">${cat.icon}</div>
-          <div class="mk-category-name">${tl('mkt.cat.' + cat.key) !== 'mkt.cat.' + cat.key ? tl('mkt.cat.' + cat.key) : cat.key}</div>
-          ${catCounts[cat.key] ? html`<div class="mk-category-count">${catCounts[cat.key]} ${t('mkt.home.announcements')}</div>` : null}
+        <a class="category-card" onClick=${() => onNav('browse', { category: cat.key })}>
+          <div class="category-icon">${cat.icon}</div>
+          <div class="category-name">${tl('mkt.cat.' + cat.key) !== 'mkt.cat.' + cat.key ? tl('mkt.cat.' + cat.key) : cat.key}</div>
+          ${catCounts[cat.key] ? html`<div class="category-count">${catCounts[cat.key]} ${t('mkt.home.announcements')}</div>` : null}
         </a>
       `)}
     </div>

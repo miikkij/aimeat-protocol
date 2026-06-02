@@ -3,6 +3,9 @@
  * @description Admin dashboard tab for browsing all agent tasks across all owners.
  *   Provides status filtering, pagination, and TODO progress display.
  * @version-history
+ *   v1.1.0 -- 2026-06-02 -- Component unification (#16): replace inline hex status
+ *     colors with tokenized .tag--status-* classes (admin.css) so status tags flip
+ *     correctly in dark mode.
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  */
 import { h } from 'preact';
@@ -57,16 +60,11 @@ export default function AgentTasksTab({ data, reload, session }) {
     setStatusFilter(e.target.value);
   }
 
-  function statusColor(status) {
-    switch (status) {
-      case 'active':  return 'var(--accent, #06b6d4)';
-      case 'done':    return '#22c55e';
-      case 'failed':  return '#ef4444';
-      case 'stalled': return '#eab308';
-      case 'queued':  return '#a855f7';
-      case 'draft':   return 'var(--text-dim)';
-      default:        return 'var(--text-dim)';
-    }
+  // Map a task status to a tokenized status-tag class (colors live in admin.css,
+  // tag--status-* — replaces the former inline hex colors so chips flip in dark mode).
+  function statusTagClass(status) {
+    const known = ['active', 'done', 'failed', 'stalled', 'queued', 'draft'];
+    return known.includes(status) ? `tag tag--status-${status}` : 'tag tag--status-draft';
   }
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -110,7 +108,7 @@ export default function AgentTasksTab({ data, reload, session }) {
                     <td class="mono" style="font-size:.8rem">${escHtml(task.agent_gaii)}</td>
                     <td>${escHtml(task.title)}</td>
                     <td>
-                      <span class="tag" style="color:${statusColor(task.status)};border-color:${statusColor(task.status)}">
+                      <span class=${statusTagClass(task.status)}>
                         ${task.status}
                       </span>
                     </td>

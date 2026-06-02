@@ -312,7 +312,7 @@
 .pf .scope-summary .scope-manage-btn {margin-left:auto;background:none;border:1px solid var(--border,#E5E7EB);color:var(--accent,#E8564A);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:.72rem;font-weight:600;transition:all .2s}
 .pf .scope-summary .scope-manage-btn:hover {border-color:var(--accent,#E8564A);color:var(--accent,#E8564A)}
 .pf .scope-readonly-list {display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.5rem}
-.pf .scope-readonly-list .scope-tag {font-size:.68rem;background:rgba(232,86,74,.08);color:var(--text-dim,#6B7280);padding:.12rem .4rem;border-radius:4px}
+.pf .scope-readonly-list .scope-tag {font-size:.68rem;background:var(--accent-subtle);color:var(--text-dim,#6B7280);padding:.12rem .4rem;border-radius:4px}
 .pf .scope-modal {max-width:560px}
 .pf .scope-modal h3 {margin-bottom:.25rem}
 .pf .scope-modal .scope-agent-info {color:var(--text-dim,#6B7280);font-size:.8rem;margin-bottom:1.25rem;font-family:monospace}

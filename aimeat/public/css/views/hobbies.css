@@ -14,6 +14,18 @@
  *   v1.6.0 — 2026-06-02 — Component unification (#15 headers): tokenize .hb-page-title
  *     gradient (hardcoded #E8564A → var(--accent-deep)); now token-equivalent to
  *     canonical theme.css .page-title/.page-subtitle (candidates for future deletion).
+ *   v1.7.0 — 2026-06-02 — Component unification (#18 category cards): remove .hb-category-card/
+ *     -icon/-name/-count; tiles use canonical theme.css .category-card (kept .hb-categories-grid
+ *     wrapper — 200px columns differ from marketplace's 160px). Removed hardcoded hover #E8564A
+ *     and rgba(0,0,0,0.06) shadow (now tokenized in the canonical class) — dark-mode fix.
+ *   v1.8.0 — 2026-06-02 — Component unification (#17 pagination): tokenize
+ *     .hb-pagination .active background (hardcoded rgba(232,86,74,0.06) →
+ *     var(--accent-subtle)) — dark-mode fix. Numbered markup left in place (scoped
+ *     .hb-, different UI from the canonical prev/page/next Pagination).
+ *   v1.9.0 — 2026-06-02 — Component unification (#16 tags): tokenize .hb-tag
+ *     (rgba(232,86,74,0.06)/0.2 + #E8564A → --accent-subtle/--accent-border/--accent)
+ *     and .hb-tag-shared (rgba(34,197,94,.12)/.3 → --success-bg/-border/-fg) —
+ *     dark-mode fix. Markup left as .hb-tag (rounded-20px pill, bespoke vs .tag-pill).
  */
 /* hobbies view — scoped under .hb */
 .hb-wrap { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 24px 16px 80px; }
@@ -37,8 +49,8 @@
   .hb-card-title { font-size: 1.1rem; font-weight: 600; color: var(--text); margin-bottom: 8px; }
   .hb-card-meta { color: var(--text-dim); font-size: .85rem; margin-bottom: 8px; }
   .hb-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-  .hb-tag { display: inline-block; padding: 4px 12px; background: rgba(232,86,74,0.06); border: 1px solid rgba(232,86,74,0.2); border-radius: 20px; font-size: .8rem; color: #E8564A; white-space: nowrap; }
-  .hb-tag-shared { background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.3); color: var(--success); }
+  .hb-tag { display: inline-block; padding: 4px 12px; background: var(--accent-subtle); border: 1px solid var(--accent-border); border-radius: 20px; font-size: .8rem; color: var(--accent); white-space: nowrap; }
+  .hb-tag-shared { background: var(--success-bg); border-color: var(--success-border); color: var(--success-fg); }
   /* .hb-btn* removed — hobbies uses canonical theme.css .btn-primary / .btn-outline /
      .btn-danger (tokenized) / .btn-sm (anchor-safe). Unified 2026-06-02 (#4 buttons). */
   .hb-form-group { margin-bottom: 16px; }
@@ -48,12 +60,12 @@
   .hb-form-hint { font-size: .78rem; color: var(--text-muted); margin-top: 4px; }
   /* .hb-stat* removed — hobbies stats use canonical .stat-grid / .stat-card /
      .stat-card-value.accent / .stat-card-label. Unified 2026-06-02 (#6). */
+  /* Grid wrapper kept per-view: hobbies uses 200px min-width columns (marketplace 160px). */
   .hb-categories-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 32px; }
-  .hb-category-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-align: center; cursor: pointer; transition: all .2s; }
-  .hb-category-card:hover { background: var(--bg-surface); border-color: #E8564A; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-  .hb-category-icon { font-size: 2rem; margin-bottom: 8px; }
-  .hb-category-name { font-size: .95rem; font-weight: 600; color: var(--text); }
-  .hb-category-count { font-size: .78rem; color: var(--text-muted); margin-top: 4px; }
+  /* .hb-category-card/-icon/-name/-count removed — hobbies interest tiles use canonical
+     theme.css .category-card / -icon / -name / -count. The former rules were token-
+     equivalent; the hover #E8564A and rgba(0,0,0,0.06) shadow are now tokenized
+     (var(--accent)/var(--shadow-md)) — dark-mode fix. Unified 2026-06-02 (#18). */
   .hb-empty { text-align: center; padding: 48px 16px; }
   .hb-empty-icon { font-size: 3rem; margin-bottom: 16px; opacity: .4; }
   .hb-empty-text { color: var(--text-dim); font-size: 1rem; }
@@ -69,7 +81,7 @@
   .hb-pagination { display: flex; gap: 8px; justify-content: center; margin-top: 24px; }
   .hb-pagination a { padding: 8px 16px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); text-decoration: none; font-size: .85rem; cursor: pointer; }
   .hb-pagination a:hover { border-color: var(--accent); color: var(--accent); }
-  .hb-pagination .active { border-color: var(--accent); color: var(--accent); background: rgba(232,86,74,0.06); }
+  .hb-pagination .active { border-color: var(--accent); color: var(--accent); background: var(--accent-subtle); }
   .hb-profile-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
   .hb-profile-avatar { font-size: 2.5rem; }
   .hb-profile-name { font-size: 1.5rem; font-weight: 700; color: var(--text); }

@@ -5,6 +5,8 @@
  *   v1.1.0 — 2026-06-02 — Phase 5: tokenize for dark mode (replaced light-only rgba(255,255,255,...) divider with var(--border))
  *   v1.2.0 — 2026-06-02 — Component unification (#4 buttons): hb-btn* → canonical
  *     theme.css btn-primary / btn-outline / btn-danger / btn-sm.
+ *   v1.3.0 — 2026-06-02 — Component unification (#18 category cards): interest tiles
+ *     use canonical theme.css .category-card / -icon / -name / -count (was .hb-category-*).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -93,10 +95,10 @@ function HomeView({ goTo }) {
       ${HOBBY_CATEGORIES.map(cat => {
         const catName = locale === 'fi' ? cat.nameFi : cat.nameEn;
         const count = (stats.top_interests || []).filter(ti => ti.name.toLowerCase().includes(cat.key)).reduce((s, ti) => s + ti.count, 0);
-        return html`<div class="hb-category-card" onClick=${() => goTo('search', { interest: cat.key })}>
-          <div class="hb-category-icon">${cat.icon}</div>
-          <div class="hb-category-name">${catName}</div>
-          ${count > 0 && html`<div class="hb-category-count">${count} ${t('hobbies.people')}</div>`}
+        return html`<div class="category-card" onClick=${() => goTo('search', { interest: cat.key })}>
+          <div class="category-icon">${cat.icon}</div>
+          <div class="category-name">${catName}</div>
+          ${count > 0 && html`<div class="category-count">${count} ${t('hobbies.people')}</div>`}
         </div>`;
       })}
     </div>

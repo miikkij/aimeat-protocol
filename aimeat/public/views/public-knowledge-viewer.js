@@ -5,6 +5,9 @@
  * @version-history v1.0.0 — 2026-05-26 — Initial implementation
  *   v1.1.0 — 2026-05-26 — Human-readable entry rendering, Copy as Markdown
  *   v1.2.0 — 2026-06-02 — Migrate Copy-as-Markdown button to canonical CopyButton component
+ *   v1.3.0 — 2026-06-02 — Component unification (#17): migrate the "Load more" button to
+ *     the canonical LoadMore component (removes an inline style="text-align:center;
+ *     margin-top:1.5rem;"; identical visual — same .load-more wrapper + .btn-outline).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -12,6 +15,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { CopyButton } from '/components/CopyButton.js';
+import { LoadMore } from '/components/Pagination.js';
 
 const NODE_URL = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -367,9 +371,7 @@ function BrowseView({ onSelect }) {
     ${loading && html`<div class="pkv-loading">${t('pkv.loading')}</div>`}
 
     ${!loading && hasMore && html`
-      <div style="text-align:center; margin-top:1.5rem;">
-        <button class="btn-outline" onClick=${loadMore}>${t('pkv.loadMore')}</button>
-      </div>
+      <${LoadMore} onMore=${loadMore} label=${t('pkv.loadMore')} />
     `}
   `;
 }

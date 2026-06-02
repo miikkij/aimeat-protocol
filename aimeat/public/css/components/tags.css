@@ -1,3 +1,18 @@
+/**
+ * @file tags.css
+ * @description Shared tag/chip styles — the canonical `.tag-pill` / `.tag-cloud` /
+ *   `.tag-editor` classes backing the TagList component (/components/TagList.js).
+ *   All colors come from theme tokens so chips flip correctly in dark mode.
+ * @structure .tag-cloud (flex row) · .tag-pill (chip, +active/clear/clickable/
+ *   overflow modifiers) · .tag-editor (+pills/input) — the editable variant.
+ * @usage Loaded via useViewCSS / view <link>; rendered by /components/TagList.js.
+ * @version-history
+ *   v1.1.0 — 2026-06-02 — Component unification (#16): add layout-only
+ *     .tag-pill--clickable / .tag-pill--overflow flags for TagList; add file
+ *     header. No color changes.
+ *   v1.0.0 — initial shared tag component styles.
+ */
+
 /* ── Shared Tag Components ── */
 
 .tag-cloud {
@@ -27,6 +42,15 @@
   background: var(--accent, #E8564A);
   color: #fff;
   border-color: var(--accent, #E8564A);
+}
+
+/* Layout-only modifiers — no color change vs. base .tag-pill. */
+.tag-pill--clickable {
+  cursor: pointer;
+}
+
+.tag-pill--overflow {
+  cursor: default;
 }
 
 .tag-clear {
