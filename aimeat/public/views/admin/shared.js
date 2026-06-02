@@ -16,30 +16,11 @@ const html = htm.bind(h);
 import { escHtml } from '/js/utils.js';
 import { t } from '/js/i18n.js';
 
-/** Format a number with locale */
-export function num(n) {
-  return typeof n === 'number' ? n.toLocaleString() : String(n ?? '\u2014');
-}
-
-/** Format a date string */
-export function dt(s) {
-  return s ? new Date(s).toLocaleString() : '\u2014';
-}
-
-/** Format uptime seconds to human-readable */
-export function fmtUp(s) {
-  const d = Math.floor(s / 86400);
-  const hr = Math.floor((s % 86400) / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  return (d ? d + 'd ' : '') + (hr ? hr + 'h ' : '') + (m ? m + 'm' : '<1m');
-}
-
-/** Format bytes to human-readable */
-export function fmtBytes(b) {
-  if (b < 1024) return b + ' B';
-  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
-  return (b / 1048576).toFixed(1) + ' MB';
-}
+// Display formatters now live in the shared /js/format.js. Import them into local
+// scope (StatCard etc. call num() directly) AND re-export so the existing admin
+// importers (`import { num, dt, fmtUp, fmtBytes } from './shared.js'`) keep working.
+import { num, dt, fmtUp, fmtBytes } from '/js/format.js';
+export { num, dt, fmtUp, fmtBytes };
 
 /** Render a badge */
 export function Badge({ type }) {
