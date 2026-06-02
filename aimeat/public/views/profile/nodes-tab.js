@@ -7,6 +7,9 @@
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes
  *   v1.2.0 — 2026-06-02 — Component unification (#1): tunnel-URL copy button uses
  *     canonical <CopyButton> (toast preserved via onCopied).
+ *   v1.3.0 — 2026-06-02 — Component unification (#11): node status dot uses
+ *     canonical <StatusDot> (online/offline/degraded/detached) instead of the
+ *     bespoke 10px .pn-status-dot (now 8px, with title tooltip added).
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -16,6 +19,7 @@ import { t } from '/js/i18n.js';
 import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { CopyButton } from '/components/CopyButton.js';
+import { StatusDot } from '/components/StatusDot.js';
 import { useConfirm } from '/components/Modal.js';
 import * as nodesService from '/js/services/nodes.js';
 import { getNodeUrl } from '/js/services/auth.js';
@@ -102,7 +106,7 @@ export default function NodesTab({ session, showToast, onStats }) {
                 setExpandedNodes(s);
               }}>
                 <div class="pn-header-left">
-                  <div class="pn-status-dot ${statusClass}"></div>
+                  <${StatusDot} status=${statusClass} title=${statusLabel} />
                   <span class="pn-name">${escHtml(node.node_id)}</span>
                 </div>
                 <div class="pn-badges">

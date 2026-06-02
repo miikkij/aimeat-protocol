@@ -20,6 +20,9 @@
  *     buttons (copy prompt / script tag / API surface / instance ID / endpoint) now
  *     use the canonical <CopyButton> with onCopied toasts. The two "Create with AI"
  *     hero CTAs keep their labeled buttons + copyToClipboard (not copy buttons).
+ *   v1.4.0 — 2026-06-02 — Component unification (#11): all six extension/instance
+ *     status dots use the canonical <StatusDot> instead of bespoke .ext-status-dot
+ *     (which had hardcoded #4ade80/#9ca3af — now tokenized via the component).
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -30,6 +33,7 @@ import { escHtml, copyToClipboard } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { Modal, useConfirm } from '/components/Modal.js';
 import { CopyButton } from '/components/CopyButton.js';
+import { StatusDot } from '/components/StatusDot.js';
 import * as cortexService from '/js/services/cortex.js';
 import * as v8Ext from '/js/services/extensions.js';
 import { getNodeUrl, getSession } from '/js/services/auth.js';
@@ -655,7 +659,7 @@ export default function ExtensionsTab({ session, showToast }) {
         <div class="ext-meta-row">
           <span>${t('profile.extensions.detail.author')}: ${ext.author || '?'}</span>
           ${ext.license ? html`<span>${t('profile.extensions.detail.license')}: ${ext.license}</span>` : null}
-          <span><span class="ext-status-dot ${ext.status}"></span> ${t('profile.extensions.status.' + ext.status)}</span>
+          <span><${StatusDot} status=${ext.status} /> ${t('profile.extensions.status.' + ext.status)}</span>
           <span>${t('profile.extensions.detail.tags')}: ${(ext.tags || []).join(', ')}</span>
         </div>
       </div>
@@ -733,7 +737,7 @@ export default function ExtensionsTab({ session, showToast }) {
         <div class="ext-description">${ext.description || ''}</div>
         <div class="ext-meta-row-sm">
           <span>${t('profile.v8ext.author')}: ${ext.author || '?'}</span>
-          <span><span class="ext-status-dot ${ext.status}"></span> ${isActive ? t('profile.v8ext.statusActive') : t('profile.v8ext.statusInactive')}</span>
+          <span><${StatusDot} status=${ext.status} /> ${isActive ? t('profile.v8ext.statusActive') : t('profile.v8ext.statusInactive')}</span>
           <span>${t('profile.v8ext.actions')}: ${actions.length}</span>
         </div>
       </div>
@@ -836,7 +840,7 @@ export default function ExtensionsTab({ session, showToast }) {
             : srvInstances.map(inst => html`
               <div class="ext-instance-row">
                 <span class="ext-instance-name">${inst.id}</span>
-                <span class="ext-status-dot ${inst.status}"></span>
+                <${StatusDot} status=${inst.status} />
                 <span class="ext-instance-status">${inst.status}</span>
                 <${CopyButton} text=${inst.id} label=${t('profile.v8ext.copyId')} className="btn-outline btn-sm" onCopied=${() => showToast(t('profile.v8ext.instanceIdCopied'))} />
                 <button class="btn-danger-solid btn-sm" onClick=${() => handleDeleteInstance(ext.name, inst.id)}>${t('profile.v8ext.deleteInstance')}</button>
@@ -900,7 +904,7 @@ export default function ExtensionsTab({ session, showToast }) {
                   ${(ext.actions || []).map(a => html`<span class="ext-comp-tag ext-comp-tag-action">${a.id}</span>`)}
                 </div>
                 <div class="ext-card-footer">
-                  <span class="ext-status"><span class="ext-status-dot ${ext.status}"></span> ${isActive ? t('profile.v8ext.statusActive') : t('profile.v8ext.statusInactive')}</span>
+                  <span class="ext-status"><${StatusDot} status=${ext.status} /> ${isActive ? t('profile.v8ext.statusActive') : t('profile.v8ext.statusInactive')}</span>
                   <span class="ext-card-actions">
                     ${isActive
                       ? html`<button onClick=${(e) => { e.stopPropagation(); handleSrvDeactivate(ext.name); }}>${t('profile.v8ext.deactivate')}</button>`
@@ -942,7 +946,7 @@ export default function ExtensionsTab({ session, showToast }) {
                   ${types.map(ct => html`<span class="ext-comp-tag ${COMP_TAG_CLASSES[ct] || ''}">${t('profile.extensions.components.' + ct) || ct}</span>`)}
                 </div>
                 <div class="ext-card-footer">
-                  <span class="ext-status"><span class="ext-status-dot ${ext.status}"></span> ${t('profile.extensions.status.' + ext.status)}</span>
+                  <span class="ext-status"><${StatusDot} status=${ext.status} /> ${t('profile.extensions.status.' + ext.status)}</span>
                 </div>
               </div>`;
           })}
@@ -968,7 +972,7 @@ export default function ExtensionsTab({ session, showToast }) {
                   ${types.map(ct => html`<span class="ext-comp-tag ${COMP_TAG_CLASSES[ct] || ''}">${t('profile.extensions.components.' + ct) || ct}</span>`)}
                 </div>
                 <div class="ext-card-footer">
-                  <span class="ext-status"><span class="ext-status-dot ${ext.status}"></span> ${t('profile.extensions.status.' + ext.status)}</span>
+                  <span class="ext-status"><${StatusDot} status=${ext.status} /> ${t('profile.extensions.status.' + ext.status)}</span>
                   <span class="ext-card-actions">
                     ${isActive
                       ? html`<button onClick=${(e) => { e.stopPropagation(); deactivateExt(ext.name); }}>${t('profile.extensions.deactivate')}</button>`

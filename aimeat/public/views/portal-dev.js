@@ -1,7 +1,12 @@
 /**
- * Portal Dev — View Module
- * Developer onboarding wizard: select platform → variant → connection type → share app.
- * Animated backgrounds (hearts, aurora, sparkle). Community apps listing.
+ * @file portal-dev.js
+ * @description Portal Dev view module — developer onboarding wizard (select
+ *   platform → variant → connection type → share app). Animated backgrounds
+ *   (hearts, aurora, sparkle) and community apps listing.
+ * @version-history
+ *   v1.1.0 — 2026-06-02 — Component unification (#11): node-badge dot uses
+ *     canonical <StatusDot status="online" /> instead of bespoke .dv-dot
+ *     (which had a hardcoded #22c55e — now tokenized via the component).
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -10,6 +15,7 @@ import { t as globalT } from '/js/i18n.js';
 import { sanitizeHtml, copyToClipboard } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { useViewCSS } from '/components/useViewCSS.js';
+import { StatusDot } from '/components/StatusDot.js';
 
 const html = htm.bind(h);
 const NODE_URL = window.location.origin;
@@ -716,7 +722,7 @@ export default function PortalDevView({ navigate, locale }) {
     <div class="dv-container">
       <h1>\ud83d\udc96 ${dt('title', locale)}</h1>
       <p class="dv-subtitle">${dt('subtitle', locale)}</p>
-      <div class="dv-node-badge"><span class="dv-dot"></span> ${NODE_URL}</div>
+      <div class="dv-node-badge"><${StatusDot} status="online" /> ${NODE_URL}</div>
 
       <!-- Stats -->
       <div class="stat-grid">

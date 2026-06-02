@@ -3,6 +3,8 @@
  * @description Landing/portal view styles (genesis hero, user-world panel, dev
  *   entry). Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v1.2.0 — 2026-06-02 — Component unification (#11): remove the .portal-view
+ *     .live-dot override; the live-feed dot now uses canonical <StatusDot>.
  *   v1.1.0 — 2026-06-02 — Component unification (#6 stat cards): remove
  *     .user-stat/.user-stat-label/.user-stat-value; user-world stats use canonical
  *     .stat-card family (kept .user-world-grid wrapper).
@@ -105,10 +107,6 @@
 }
 .oneliners-header {
   display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0;
-}
-.portal-view .live-dot {
-  background: var(--success);
-  box-shadow: 0 0 6px rgba(16, 185, 129, 0.4);
 }
 .oneliners-label {
   font-size: 0.72rem; font-weight: 700;

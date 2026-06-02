@@ -1,6 +1,10 @@
 /**
- * Portal (Genesis 001) — View Module
- * Main landing page with 3D canvas, live feed, mega-prompts, and expandable world.
+ * @file portal.js
+ * @description Portal (Genesis 001) view module — main landing page with 3D
+ *   canvas, live feed, mega-prompts, and expandable world.
+ * @version-history
+ *   v1.1.0 — 2026-06-02 — Component unification (#11): live-feed header dot uses
+ *     canonical <StatusDot status="live" /> instead of bespoke .live-dot.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -9,6 +13,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { CopyButton as BaseCopyButton } from '/components/CopyButton.js';
 import { useViewCSS } from '/components/useViewCSS.js';
+import { StatusDot } from '/components/StatusDot.js';
 
 const html = htm.bind(h);
 const NODE_URL = window.location.origin;
@@ -991,7 +996,7 @@ function OnelinersFeed({ locale }) {
   return html`
     <div class="content-group">
       <div class="oneliners-header">
-        <div class="live-dot"></div>
+        <${StatusDot} status="live" />
         <span class="oneliners-label">${t('portal.oneliners.title')}</span>
       </div>
       <section class="provocation">

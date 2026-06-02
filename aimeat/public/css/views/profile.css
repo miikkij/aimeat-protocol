@@ -20,6 +20,9 @@
  *     box override + dead .pf-hero .num/.label + .wl-stat/.wl-val/.wl-label +
  *     .wl-val-success/-danger; profile node-stats + wallet tiles use canonical
  *     .stat-card / .stat-card-value(.mono/.success/.danger) / .stat-card-label.
+ *   v1.6.0 — 2026-06-02 — Component unification (#11 status dots): remove
+ *     .peer-dot, .pn-status-dot, and .ext-status-dot (the last had hardcoded
+ *     #4ade80/#9ca3af, a dark-mode bug); these dots now use canonical <StatusDot>.
  */
 .pf-hero{background:var(--pf-hero-gradient);border-bottom:1px solid var(--border,#E5E7EB)}
 .pf-hero-inner{max-width:1000px;margin:0 auto;padding:2rem 1.5rem 0}
@@ -50,6 +53,10 @@
 .pf .section-desc{color:var(--text-dim,#6B7280);font-size:.85rem;margin-bottom:1.25rem;line-height:1.5;max-width:700px}
 .pf .card{background:var(--bg-card);border:1px solid var(--border,#E5E7EB);border-radius:12px;padding:1.25rem;margin-bottom:.75rem;transition:border-color .2s}
 .pf .card:hover{border-color:var(--accent,#E8564A)}
+/* Card variant="glass" (GlassCard, #22) must beat the aggressive .pf .card defaults
+   so it keeps the former .pf-glass-card look (surface bg, 8px radius, 16px pad, no hover). */
+.pf .card.card-glass{background:var(--surface);border-radius:8px;padding:16px;margin-bottom:1rem;box-shadow:none}
+.pf .card.card-glass:hover{border-color:var(--border);box-shadow:none;transform:none}
 .pf .card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem}
 .pf .card-title{font-weight:600;font-size:1rem;color:var(--text)}
 .pf .card-subtitle{color:var(--text-dim,#6B7280);font-size:.8rem}
@@ -145,18 +152,12 @@
 .pf .mem-discover-preview pre{white-space:pre-wrap;word-break:break-all;font-family:monospace;font-size:.75rem;color:var(--text,#1A1A2E);max-height:300px;overflow-y:auto;margin:0}
 .pf .peer-card{display:flex;justify-content:space-between;align-items:center}
 .pf .peer-status{display:flex;align-items:center;gap:.4rem}
-.pf .peer-dot{width:8px;height:8px;border-radius:50%}
-.pf .peer-dot.alive{background:var(--success,#22c55e)}
-.pf .peer-dot.dead{background:var(--danger,#ef4444)}
+/* .peer-dot removed — peer status uses canonical <StatusDot>. Unified 2026-06-02 (#11). */
 .pf .pn-card{background:var(--bg-card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:var(--radius,12px);margin-bottom:.75rem;transition:border-color .2s;overflow:hidden}
 .pf .pn-card:hover{border-color:var(--accent,#E8564A)}
 .pf .pn-header{display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;cursor:pointer;user-select:none}
 .pf .pn-header-left{display:flex;align-items:center;gap:.75rem}
-.pf .pn-status-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-.pf .pn-status-dot.online{background:var(--success,#22c55e);box-shadow:0 0 6px rgba(34,197,94,.4)}
-.pf .pn-status-dot.offline{background:var(--danger,#ef4444)}
-.pf .pn-status-dot.degraded{background:var(--warn,#f59e0b)}
-.pf .pn-status-dot.detached{background:var(--text-dim,#6B7280)}
+/* .pn-status-dot removed — node status uses canonical <StatusDot>. Unified 2026-06-02 (#11). */
 .pf .pn-name{font-weight:600;font-family:monospace;font-size:.9rem}
 .pf .pn-badges{display:flex;gap:.4rem;align-items:center}
 .pf .pn-quick{font-size:.8rem;color:var(--text-dim,#6B7280);padding:0 1.25rem .75rem}
@@ -344,9 +345,7 @@
 .pf .ext-comp-tag{font-size:.7rem;padding:2px 8px;border-radius:6px;background:var(--bg-dim,#F3F4F6)}
 .pf .ext-card-footer{display:flex;justify-content:space-between;align-items:center}
 .pf .ext-status{font-size:.8rem;display:flex;align-items:center;gap:6px}
-.pf .ext-status-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
-.pf .ext-status-dot.active{background:#4ade80}
-.pf .ext-status-dot.inactive{background:#9ca3af}
+/* .ext-status-dot removed — extension status uses canonical <StatusDot> (was hardcoded #4ade80/#9ca3af). Unified 2026-06-02 (#11). */
 .pf .ext-card-actions{display:flex;gap:.5rem}
 .pf .ext-card-actions button{font-size:.75rem;padding:4px 10px;border-radius:6px;border:1px solid var(--border,#E5E7EB);background:transparent;color:var(--text-dim,#6B7280);cursor:pointer;transition:all .15s}
 .pf .ext-card-actions button:hover{background:var(--bg-dim,#F3F4F6)}
@@ -858,13 +857,8 @@
 
 /* Toggle Switch moved to theme.css .toggle* (canonical /components/ToggleSwitch.js, #14). */
 
-/* ── Glass Card (shared: email-tab, notifications-tab) ── */
-.pf-glass-card {
-  padding: 16px; border-radius: 8px;
-  background: var(--surface, #F9FAFB);
-  border: 1px solid var(--border, #E5E7EB);
-  margin-bottom: 1rem;
-}
+/* Glass Card removed (#22): GlassCard now delegates to the canonical
+   /components/Card.js (variant="glass" → .card-glass in theme.css). */
 
 /* ── Generator: live status on type badge (replaces dots) ── */
 .pf-gen-type-badge.live-active    { border-right: 3px solid var(--success, #22c55e); padding-right: 6px; }

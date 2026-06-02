@@ -7,12 +7,15 @@
  *   v1.1.0 — 2026-03-17 — Add VisibilityPill, ToggleSwitch, GlassCard components; refactor recipientBadge to CSS classes
  *   v1.2.0 — 2026-06-02 — Component unification (§2): Spinner now delegates to the
  *     canonical /components/Spinner.js (single source of the .spinner markup).
+ *   v1.3.0 — 2026-06-02 — Component unification (#22): GlassCard now delegates to the
+ *     canonical /components/Card.js via variant="glass" (.card-glass); call sites unchanged.
  */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Spinner as BaseSpinner } from '/components/Spinner.js';
+import { Card } from '/components/Card.js';
 
 /** Loading spinner — delegates to the canonical /components/Spinner.js (single
  *  source of the .spinner markup); keeps the profile default loading label so the
@@ -52,7 +55,8 @@ export function VisibilityPill({ visibility, onClick }) {
  *  re-exported here so notifications-tab/email-tab imports are unchanged. */
 export { ToggleSwitch } from '/components/ToggleSwitch.js';
 
-/** Glass-style card container (email-tab, notifications-tab). */
+/** Glass-style card container (email-tab, notifications-tab) — delegates to the
+ *  canonical /components/Card.js (variant="glass" → .card-glass); call sites unchanged. */
 export function GlassCard({ children }) {
-  return html`<div class="pf-glass-card">${children}</div>`;
+  return html`<${Card} variant="glass" hoverable=${false}>${children}<//>`;
 }

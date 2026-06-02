@@ -12,12 +12,17 @@
  *     stats use canonical .stat-grid / .stat-card / .stat-card-value.accent / .stat-card-label.
  *   v1.5.0 — 2026-06-02 — Component unification (#19): tokenize .mk-alert-success/-error
  *     (hardcoded rgba/#ef4444 → --success/-danger -bg/-fg/-border) — dark-mode fix.
+ *   v1.6.0 — 2026-06-02 — Component unification (#15 headers): tokenize .mk-page-title
+ *     gradient (hardcoded #E8564A → var(--accent-deep)); now token-equivalent to
+ *     canonical theme.css .page-title/.page-subtitle (candidates for future deletion).
  */
 
 /* marketplace view — scoped under .mk- */
+/* mk-page-title is token-equivalent to the canonical theme.css .page-title
+   (candidate for future deletion → use .page-title). */
 .mk-page-title {
   font-size: 1.8rem; font-weight: 700;
-  background: linear-gradient(135deg, var(--accent), #E8564A);
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   background-clip: text; margin-bottom: 8px;
 }

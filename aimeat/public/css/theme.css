@@ -10,6 +10,9 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.8.0 — 2026-06-02 — Component unification (#11 status dots): add canonical .status-dot base + semantic token modifiers (online/active/healthy/live → success; warn/degraded/syncing/pending → warn; error/offline/dead/down → danger; idle/inactive/detached/muted → text-muted), backing /components/StatusDot.js, so per-view dots (.peer-dot/.pn-status-dot/.ext-status-dot/.dv-dot/.live-dot) converge. Tokenized away hardcoded hex in the former .ext-status-dot (#4ade80/#9ca3af) so dots flip in dark mode.
+     v1.7.0 — 2026-06-02 — Component unification (#15 headers): add canonical .section-title/.section-desc (in-page accent header, lifted generic from .pf) + .page-title/.page-subtitle (top-of-view gradient header), all token-based, so per-view title/subtitle clones (mk-/hb-/cl-welcome-/adm-page-title) can converge.
+     v1.6.0 — 2026-06-02 — Component unification (#22): add .card-glass modifier (Card variant="glass") reproducing the former profile .pf-glass-card appearance, fully tokenized (--surface / --border), so profile's GlassCard folds into the canonical Card.
      v1.5.0 — 2026-06-02 — Component unification (#6 stat cards): add canonical .stat-card-value tone (.accent/.success/.danger) + .mono modifiers and a .stat-grid wrapper, so per-view stat clones (mk-stat/hb-stat/dv-stat/wl-stat/...) converge onto .stat-card without losing accent-tint / earned-spent / monospace semantics.
      v1.4.0 — 2026-06-02 — Component unification (#5 inputs): add canonical textarea.input-field (resize/min-height) + select.input-field (cursor) so .input-field works on all field types and views can drop per-view form-input/textarea/select clones (mk-form/hb-form/...).
      v1.3.0 — 2026-06-02 — Component unification (#4): make canonical .btn-* anchor-safe (text-decoration:none) so views can drop their per-view <a>-button clones (mk-btn/hb-btn/...) and use the canonical classes.
@@ -625,6 +628,24 @@ a { color: inherit; text-decoration: none; }
   padding: 1.5rem;
 }
 
+/* Glass variant (Card variant="glass") — reproduces the former profile
+   .pf-glass-card appearance, fully tokenized. Overrides .card defaults
+   (2rem padding, var(--radius), shadow) with the glass card's flatter geometry. */
+.card-glass {
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  margin-bottom: 1rem;
+  box-shadow: none;
+}
+/* Glass card is flat — neutralize the generic .card:hover lift so it looks
+   identical to the former static .pf-glass-card. */
+.card-glass:hover {
+  box-shadow: none;
+  transform: none;
+}
+
 /* ── Content Group Container ── */
 .content-group {
   position: relative;
@@ -690,12 +711,40 @@ a { color: inherit; text-decoration: none; }
 .badge-danger { background: var(--danger-bg); color: var(--danger-fg); }
 .badge-info { background: var(--info-bg); color: var(--info-fg); }
 
-/* ── Live dot ── */
-.live-dot {
+/* ── Status dot (canonical) ──
+   Small circle whose color is driven by a semantic status token. Consolidates
+   the bespoke per-view dots (.live-dot, .peer-dot, .pn-status-dot,
+   .ext-status-dot, .dv-dot). Component: /components/StatusDot.js.
+   All colors are theme tokens so the dot flips correctly in dark mode. */
+.status-dot {
+  display: inline-block;
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--success);
+  flex-shrink: 0;
+  background: var(--text-muted);
+}
+.status-dot--online,
+.status-dot--active,
+.status-dot--healthy,
+.status-dot--alive,
+.status-dot--live { background: var(--success); }
+.status-dot--warn,
+.status-dot--degraded,
+.status-dot--syncing,
+.status-dot--pending { background: var(--warn); }
+.status-dot--error,
+.status-dot--offline,
+.status-dot--dead,
+.status-dot--down { background: var(--danger); }
+.status-dot--idle,
+.status-dot--inactive,
+.status-dot--detached,
+.status-dot--muted { background: var(--text-muted); }
+/* Online keeps the soft glow the former .pn-status-dot.online had */
+.status-dot--online { box-shadow: 0 0 6px rgba(34, 197, 94, 0.4); }
+/* Live additionally pulses (matches former .live-dot behaviour) */
+.status-dot--live {
   box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
   animation: livePulse 1.5s ease-in-out infinite;
 }
@@ -900,6 +949,22 @@ select.input-field { cursor: pointer; }
 
 /* ── Loading text ── */
 .loading-text { margin-left: 0.5rem; color: var(--text-dim); font-size: 0.85rem; }
+
+/* ── Section & page headers (canonical title + subtitle pairs) ──
+   Single source of truth for the "title + supporting copy" header that every
+   view re-implements. Use .section-title/.section-desc for in-page section
+   headers (accent title) and .page-title/.page-subtitle for top-of-view page
+   headers (gradient title). All values are theme tokens so they flip with
+   dark/light mode. Per-view clones (mk-/hb-/cl-/adm-page-title) are
+   token-equivalent and should converge onto these over time. */
+.section-title { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.4rem; color: var(--accent); }
+.section-desc { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 1.25rem; line-height: 1.5; max-width: 700px; }
+.page-title {
+  font-size: 1.8rem; font-weight: 700; margin-bottom: 8px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.page-subtitle { color: var(--text-dim); font-size: 1rem; margin-bottom: 32px; }
 
 /* ── Accessibility ── */
 .visually-hidden { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }

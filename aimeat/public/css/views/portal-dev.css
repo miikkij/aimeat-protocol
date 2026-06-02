@@ -8,6 +8,8 @@
  *     surfaces (#FFFFFF/#E5E7EB/#F3F4F6/#6B7280) for dark mode.
  *   v1.2.0 — 2026-06-02 — Component unification (#6 stat cards): remove .dv-stat*/
  *     .dv-num/.dv-label; dev-portal stats use canonical .stat-card family.
+ *   v1.3.0 — 2026-06-02 — Component unification (#11): remove .dv-dot (had a
+ *     hardcoded #22c55e); node-badge dot uses canonical <StatusDot>.
  */
 /* ── Dev Portal root vars ── */
 :root {
@@ -49,7 +51,7 @@
 .dv-container h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: .5rem; }
 .dv-subtitle { color: var(--love4, #E8564A); font-size: .95rem; margin-bottom: 2rem; }
 .dv-node-badge { display: inline-flex; align-items: center; gap: .5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: .4rem .8rem; font-size: .85rem; font-family: monospace; margin-bottom: 1.5rem; }
-.dv-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block; }
+/* .dv-dot removed — node-badge dot uses canonical <StatusDot>. Unified 2026-06-02 (#11). */
 
 /* Stats — .dv-stat*/.dv-num/.dv-label removed; dev-portal stats use canonical
    .stat-grid / .stat-card / .stat-card-value.accent / .stat-card-label. Unified 2026-06-02 (#6). */
