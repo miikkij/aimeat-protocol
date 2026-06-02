@@ -1,3 +1,12 @@
+/*
+ * @file portal.css
+ * @description Landing/portal view styles (genesis hero, user-world panel, dev
+ *   entry). Consumes theme.css tokens so it flips with dark/light mode.
+ * @version-history
+ *   v1.1.0 — 2026-06-02 — Component unification (#6 stat cards): remove
+ *     .user-stat/.user-stat-label/.user-stat-value; user-world stats use canonical
+ *     .stat-card family (kept .user-world-grid wrapper).
+ */
 /* portal view — scoped under .portal-view */
 /* ── Genesis Hero 3D Canvas ── */
 .gn-hero-3d {
@@ -305,20 +314,9 @@
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 0.55rem; margin-bottom: 0.8rem;
 }
-.user-stat {
-  border: 1px solid var(--border);
-  border-radius: 10px; padding: 0.55rem 0.65rem;
-  background: var(--bg-card);
-  box-shadow: var(--shadow-sm);
-}
-.user-stat-label {
-  font-size: 0.66rem; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: 0.08em;
-}
-.user-stat-value {
-  font-size: 1.05rem; color: var(--text);
-  font-weight: 700; margin-top: 0.15rem;
-}
+/* .user-stat/.user-stat-label/.user-stat-value removed — portal user-world stats use
+   canonical .stat-card / .stat-card-label / .stat-card-value. Unified 2026-06-02 (#6).
+   (.user-world-grid wrapper kept.) */
 .user-meta {
   display: grid; grid-template-columns: 110px 1fr;
   gap: 0.35rem 0.65rem; margin-bottom: 0.8rem; font-size: 0.82rem;

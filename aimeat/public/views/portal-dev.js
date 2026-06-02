@@ -727,11 +727,11 @@ export default function PortalDevView({ navigate, locale }) {
       <div class="dv-node-badge"><span class="dv-dot"></span> ${NODE_URL}</div>
 
       <!-- Stats -->
-      <div class="dv-stats">
-        <div class="dv-stat"><div class="dv-num">${stats.agents}</div><div class="dv-label">${dt('stats.agents', locale)}</div></div>
-        <div class="dv-stat"><div class="dv-num">${stats.chatSessions}</div><div class="dv-label">${dt('stats.chatSessions', locale)}</div></div>
-        <div class="dv-stat"><div class="dv-num">${stats.actions}</div><div class="dv-label">${dt('stats.services', locale)}</div></div>
-        <div class="dv-stat"><div class="dv-num">${stats.boards}</div><div class="dv-label">${dt('stats.boards', locale)}</div></div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-card-value accent">${stats.agents}</div><div class="stat-card-label">${dt('stats.agents', locale)}</div></div>
+        <div class="stat-card"><div class="stat-card-value accent">${stats.chatSessions}</div><div class="stat-card-label">${dt('stats.chatSessions', locale)}</div></div>
+        <div class="stat-card"><div class="stat-card-value accent">${stats.actions}</div><div class="stat-card-label">${dt('stats.services', locale)}</div></div>
+        <div class="stat-card"><div class="stat-card-value accent">${stats.boards}</div><div class="stat-card-label">${dt('stats.boards', locale)}</div></div>
       </div>
 
       <!-- Mode notice -->

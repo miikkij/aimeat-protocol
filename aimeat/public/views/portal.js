@@ -1120,9 +1120,9 @@ function UserWorldAccordion({ navigate }) {
           </div>
           <div class="user-world-grid">
             ${statItems.map(([key, val]) => html`
-              <div class="user-stat" key=${key}>
-                <div class="user-stat-label">${t('portal.userWorld.stats.' + key)}</div>
-                <div class="user-stat-value">${val}</div>
+              <div class="stat-card" key=${key}>
+                <div class="stat-card-label">${t('portal.userWorld.stats.' + key)}</div>
+                <div class="stat-card-value">${val}</div>
               </div>
             `)}
           </div>

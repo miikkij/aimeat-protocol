@@ -6,6 +6,8 @@
  * @version-history
  *   v1.1.0 — 2026-06-02 — Phase 4: tokenize card/panel/border/text/bg-layer/code
  *     surfaces (#FFFFFF/#E5E7EB/#F3F4F6/#6B7280) for dark mode.
+ *   v1.2.0 — 2026-06-02 — Component unification (#6 stat cards): remove .dv-stat*/
+ *     .dv-num/.dv-label; dev-portal stats use canonical .stat-card family.
  */
 /* ── Dev Portal root vars ── */
 :root {
@@ -49,11 +51,8 @@
 .dv-node-badge { display: inline-flex; align-items: center; gap: .5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: .4rem .8rem; font-size: .85rem; font-family: monospace; margin-bottom: 1.5rem; }
 .dv-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block; }
 
-/* Stats */
-.dv-stats { display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
-.dv-stat { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: .75rem 1rem; flex: 1; min-width: 120px; text-align: center; }
-.dv-num { font-size: 1.5rem; font-weight: 700; color: var(--love1); }
-.dv-label { font-size: .75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: .05em; }
+/* Stats — .dv-stat*/.dv-num/.dv-label removed; dev-portal stats use canonical
+   .stat-grid / .stat-card / .stat-card-value.accent / .stat-card-label. Unified 2026-06-02 (#6). */
 
 /* Mode notice */
 .dv-mode-notice { border-radius: 12px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; font-size: .9rem; display: flex; align-items: flex-start; gap: .75rem; }
