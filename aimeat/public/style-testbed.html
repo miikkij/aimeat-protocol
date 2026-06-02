@@ -1,0 +1,402 @@
+<!doctype html>
+<!--
+  @file style-testbed.html
+  @description Dev-only style-decision testbed for the frontend component
+    unification effort. Renders each duplicated UI primitive (buttons, inputs,
+    stat cards) as the CANONICAL theme.css version side-by-side with every
+    real prefixed clone (.pf / .mk / .hb / .cl / .dv / .adm), using the actual
+    stylesheets so the visual differences are truthful. Each clone has a
+    decision dropdown; selections are serialized live into a copyable output
+    box so the developer can choose what to keep/change and hand it back.
+    Reachable at /style-testbed.html on the dev server. Not part of the app
+    nav and not a service — purely an internal decision aid.
+  @version-history
+    v1.0.0 — 2026-06-02 — Initial testbed (buttons, inputs, stat cards)
+-->
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>AIMEAT — Style Decision Testbed</title>
+  <!-- Real app stylesheets so clones render exactly as they do in the app -->
+  <link rel="stylesheet" href="/css/theme.css" />
+  <link rel="stylesheet" href="/css/views/profile.css" />
+  <link rel="stylesheet" href="/css/views/admin.css" />
+  <link rel="stylesheet" href="/css/views/marketplace.css" />
+  <link rel="stylesheet" href="/css/views/hobbies.css" />
+  <link rel="stylesheet" href="/css/views/portal.css" />
+  <link rel="stylesheet" href="/css/views/portal-classic.css" />
+  <link rel="stylesheet" href="/css/views/portal-dev.css" />
+  <link rel="stylesheet" href="/css/views/agents-detail.css" />
+  <link rel="stylesheet" href="/css/views/admin-agent-integration.css" />
+  <!-- Testbed's own layout (loaded LAST so stb-* wins on equal specificity) -->
+  <link rel="stylesheet" href="/css/style-testbed.css" />
+</head>
+<body class="stb">
+  <header class="stb-header">
+    <div class="stb-header-row">
+      <h1 class="stb-title">AIMEAT — Style Decision Testbed</h1>
+      <div class="stb-controls">
+        <span class="stb-theme-label">Theme:</span>
+        <button class="stb-theme-btn" data-theme-set="light" type="button">☀ Light</button>
+        <button class="stb-theme-btn" data-theme-set="dark" type="button">☾ Dark</button>
+      </div>
+    </div>
+    <p class="stb-intro">
+      Each row shows the <strong>canonical</strong> <code>theme.css</code> primitive on the left,
+      then every real <strong>clone</strong> that currently exists. They use the actual stylesheets,
+      so what you see is exactly how each looks in the app. For every clone, pick what to do in its
+      dropdown. <strong>Toggle light/dark</strong> to judge both. Your choices appear in the copyable
+      box at the bottom — paste it back to me and I'll implement it.
+    </p>
+    <p class="stb-intro stb-muted">
+      Decision options: <em>Use canonical</em> = delete the clone, adopt the theme.css look ·
+      <em>Keep this look</em> = make this the standard (I'll fold it into theme.css; other views may change) ·
+      <em>Delete (dead)</em> = unused CSS, safe to remove · <em>Leave separate</em> = no change.
+      Admin (<code>.adm-*</code>) is shown for reference only — per your call it stays its own design
+      system (consolidated separately), so it has no "use canonical" option.
+    </p>
+  </header>
+
+  <main class="stb-main" id="stb-main">
+
+    <!-- ════════════════════════ BUTTONS ════════════════════════ -->
+    <section class="stb-family" data-family="Buttons">
+      <h2 class="stb-fam-title">Buttons</h2>
+      <p class="stb-fam-desc">
+        Canonical primary is a pink-ish gradient (#E8564A→#FF6B6B) with a resting "heart" shadow and
+        <code>var(--radius-sm)</code>. The profile override re-skins ~150 buttons app-wide (darker/flatter,
+        6px radius, no resting shadow). Marketplace/hobbies/classic/dev each reinvent the set.
+      </p>
+
+      <div class="stb-variant-row">
+        <!-- Canonical (reference, no decision) -->
+        <div class="stb-variant stb-canonical">
+          <div class="stb-variant-head"><span class="stb-vname">Canonical · <code>theme.css .btn-*</code></span><span class="stb-tag stb-ref">reference</span></div>
+          <div class="stb-specimens">
+            <button class="btn-primary" type="button">Primary</button>
+            <button class="btn-outline" type="button">Outline</button>
+            <button class="btn-danger-solid" type="button">Danger</button>
+            <button class="btn-ghost" type="button">Ghost</button>
+            <button class="btn-success" type="button">Success</button>
+            <button class="btn-primary btn-sm" type="button">Small</button>
+          </div>
+        </div>
+
+        <!-- Profile .pf .btn-primary -->
+        <div class="stb-variant" data-clone=".pf .btn-primary" data-sites="~150">
+          <div class="stb-variant-head"><span class="stb-vname">Profile · <code>.pf .btn-primary</code></span><span class="stb-tag stb-warn">~150 sites</span></div>
+          <div class="stb-specimens pf stb-scope">
+            <button class="btn-primary" type="button">Primary</button>
+            <button class="btn-outline" type="button">Outline</button>
+            <button class="btn-danger-solid" type="button">Danger</button>
+            <button class="btn-ghost" type="button">Ghost</button>
+            <button class="btn-success" type="button">Success</button>
+            <button class="btn-primary btn-sm" type="button">Small</button>
+          </div>
+          <p class="stb-diff">darker gradient (→#D4493F) · 6px radius · no resting heart-shadow · 8×16 padding · .85rem</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+
+        <!-- Profile pkg-card mini buttons -->
+        <div class="stb-variant" data-clone=".pf .pkg-card-actions button.primary / .danger" data-sites="4">
+          <div class="stb-variant-head"><span class="stb-vname">Profile pkg-card · <code>button.primary/.danger</code></span><span class="stb-tag">4 sites</span></div>
+          <div class="stb-specimens pf stb-scope">
+            <div class="pkg-card-actions">
+              <button class="primary" type="button">Install</button>
+              <button class="danger" type="button">Remove</button>
+            </div>
+          </div>
+          <p class="stb-diff">flat-accent mini pills · bare class names (collision-prone) · danger uses hardcoded rgba(239,68,68) (won't theme-flip)</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+
+        <!-- Marketplace -->
+        <div class="stb-variant" data-clone=".mk-btn*" data-sites="~7">
+          <div class="stb-variant-head"><span class="stb-vname">Marketplace · <code>.mk-btn*</code></span><span class="stb-tag">~7 sites</span></div>
+          <div class="stb-specimens">
+            <button class="mk-btn mk-btn-primary" type="button">Primary</button>
+            <button class="mk-btn mk-btn-secondary" type="button">Secondary</button>
+            <button class="mk-btn mk-btn-primary mk-btn-sm" type="button">Small</button>
+          </div>
+          <p class="stb-diff">gradient 2nd stop #E8564A (not #FF6B6B) · 10px radius · no resting shadow · opacity-fade hover</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+
+        <!-- Hobbies -->
+        <div class="stb-variant" data-clone=".hb-btn*" data-sites="~10">
+          <div class="stb-variant-head"><span class="stb-vname">Hobbies · <code>.hb-btn*</code></span><span class="stb-tag">~10 sites</span></div>
+          <div class="stb-specimens">
+            <button class="hb-btn hb-btn-primary" type="button">Primary</button>
+            <button class="hb-btn hb-btn-secondary" type="button">Secondary</button>
+            <button class="hb-btn hb-btn-danger hb-btn-sm" type="button">Danger</button>
+          </div>
+          <p class="stb-diff">near-twin of mk-btn · danger hardcodes #ef4444/rgba(239,68,68) (won't theme-flip)</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+
+        <!-- Classic portal -->
+        <div class="stb-variant" data-clone=".cl-save-btn / .cl-register-btn / .cl-copy-prompt-btn" data-sites="~4">
+          <div class="stb-variant-head"><span class="stb-vname">Classic · <code>.cl-*-btn</code></span><span class="stb-tag">~4 sites</span></div>
+          <div class="stb-specimens">
+            <button class="cl-save-btn" type="button">Save</button>
+            <button class="cl-save-btn cl-register-btn" type="button">Register</button>
+            <button class="cl-copy-prompt-btn" type="button">Copy prompt</button>
+          </div>
+          <p class="stb-diff">heavier 700/.92rem · 10px radius · has a .loading spinner state · register hardcodes #22c55e/#16a34a</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+
+        <!-- Dev portal -->
+        <div class="stb-variant" data-clone=".dv-copy-btn / .dv-upload-btn" data-sites="2">
+          <div class="stb-variant-head"><span class="stb-vname">Dev portal · <code>.dv-*-btn</code></span><span class="stb-tag">2 sites</span></div>
+          <div class="stb-specimens stb-specimens-relative">
+            <button class="dv-upload-btn" type="button">Upload</button>
+            <span class="stb-mini-note">(<code>.dv-copy-btn</code> is absolute-positioned; uses the --love gradient palette deliberately)</span>
+          </div>
+          <p class="stb-diff">uses the separate --love1/2/3 brand palette · .copied state hardcodes #22c55e (won't theme-flip)</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+
+        <!-- Dead kpkg -->
+        <div class="stb-variant stb-dead" data-clone=".kpkg-btn*" data-sites="0" data-dead="1">
+          <div class="stb-variant-head"><span class="stb-vname">Knowledge · <code>.kpkg-btn*</code></span><span class="stb-tag stb-dead-tag">DEAD · 0 sites</span></div>
+          <div class="stb-specimens">
+            <button class="kpkg-btn kpkg-btn-primary" type="button">Primary</button>
+            <button class="kpkg-btn kpkg-btn-danger" type="button">Danger</button>
+          </div>
+          <p class="stb-diff">orphaned — nothing renders these (knowledge tab already uses canonical btn-outline/btn-danger-solid). Safe to delete.</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+      </div>
+
+      <label class="stb-note-wrap">Family note: <input class="stb-note" data-note="Buttons" type="text" placeholder="e.g. keep profile's deeper red but adopt canonical radius + shadow" /></label>
+    </section>
+
+    <!-- ════════════════════════ INPUTS ════════════════════════ -->
+    <section class="stb-family" data-family="Inputs &amp; form fields">
+      <h2 class="stb-fam-title">Inputs &amp; form fields</h2>
+      <p class="stb-fam-desc">
+        Canonical <code>.input-field</code> is 11×14 padding, 1.5px border, .94rem, <code>var(--radius-sm)</code>, with a
+        3px accent focus ring. Profile/marketplace/hobbies each redefine size/border/focus. Labels diverge too
+        (canonical is UPPERCASE 600; clones are sentence-case 500).
+      </p>
+
+      <div class="stb-variant-row">
+        <!-- Canonical -->
+        <div class="stb-variant stb-canonical">
+          <div class="stb-variant-head"><span class="stb-vname">Canonical · <code>.input-field</code> + <code>.form-label</code></span><span class="stb-tag stb-ref">reference</span></div>
+          <div class="stb-specimens stb-specimens-col">
+            <label class="form-label">Label</label>
+            <input class="input-field" type="text" placeholder="text input" />
+            <textarea class="input-field" rows="2" placeholder="textarea"></textarea>
+            <select class="input-field"><option>select option</option></select>
+          </div>
+        </div>
+
+        <!-- Profile -->
+        <div class="stb-variant" data-clone=".pf .input-field + .pf .form-row label" data-sites="66">
+          <div class="stb-variant-head"><span class="stb-vname">Profile · <code>.pf .input-field</code></span><span class="stb-tag stb-warn">66 sites</span></div>
+          <div class="stb-specimens stb-specimens-col pf stb-scope">
+            <div class="form-row"><label>Label</label></div>
+            <input class="input-field" type="text" placeholder="text input" />
+            <textarea class="input-field" rows="2" placeholder="textarea"></textarea>
+            <select class="input-field"><option>select option</option></select>
+          </div>
+          <p class="stb-diff">10×14 padding · 10px radius · .85rem · var(--bg-surface) bg · focus ring hardcoded rgba(232,86,74,.1) (won't theme-flip)</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+
+        <!-- Marketplace -->
+        <div class="stb-variant" data-clone=".mk-form-input / -textarea / -select / -label" data-sites="~15">
+          <div class="stb-variant-head"><span class="stb-vname">Marketplace · <code>.mk-form-*</code></span><span class="stb-tag">~15 sites</span></div>
+          <div class="stb-specimens stb-specimens-col">
+            <div class="mk-form-group">
+              <label class="mk-form-label">Label</label>
+              <input class="mk-form-input" type="text" placeholder="text input" />
+            </div>
+            <textarea class="mk-form-textarea" rows="2" placeholder="textarea"></textarea>
+            <select class="mk-form-select"><option>select option</option></select>
+          </div>
+          <p class="stb-diff">1px border · 10px radius · hardcoded system-ui font (not var(--font)) · NO focus ring · sentence-case label</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+
+        <!-- Hobbies -->
+        <div class="stb-variant" data-clone=".hb-form-input / -textarea / -select / -label / -hint" data-sites="~14">
+          <div class="stb-variant-head"><span class="stb-vname">Hobbies · <code>.hb-form-*</code></span><span class="stb-tag">~14 sites</span></div>
+          <div class="stb-specimens stb-specimens-col">
+            <div class="hb-form-group">
+              <label class="hb-form-label">Label</label>
+              <input class="hb-form-input" type="text" placeholder="text input" />
+              <div class="hb-form-hint">helper hint text</div>
+            </div>
+            <textarea class="hb-form-textarea" rows="2" placeholder="textarea"></textarea>
+            <select class="hb-form-select"><option>select option</option></select>
+          </div>
+          <p class="stb-diff">token-driven (theme-flips) · 1px border · NO focus ring · sentence-case label · has a hint class</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+
+        <!-- pf-input orphan bug -->
+        <div class="stb-variant stb-dead" data-clone=".pf-input (email-tab — orphan, no CSS)" data-sites="2" data-dead="1">
+          <div class="stb-variant-head"><span class="stb-vname">Profile email · <code>.pf-input</code></span><span class="stb-tag stb-dead-tag">ORPHAN · no rule</span></div>
+          <div class="stb-specimens stb-specimens-col pf stb-scope">
+            <input class="pf-input" type="email" placeholder="you@example.com (unstyled!)" />
+          </div>
+          <p class="stb-diff">latent bug: email-tab emits class="pf-input" but NO such rule exists → renders unstyled. Fix → input-field.</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+
+        <!-- Admin reference -->
+        <div class="stb-variant stb-admin" data-clone=".adm-input (admin — own system)" data-sites="43" data-admin="1">
+          <div class="stb-variant-head"><span class="stb-vname">Admin · <code>.adm-input</code></span><span class="stb-tag stb-admin-tag">admin — separate</span></div>
+          <div class="stb-specimens stb-specimens-col adm stb-scope">
+            <input class="adm-input adm-input-full" type="text" placeholder="text input" />
+          </div>
+          <p class="stb-diff">8×12 · 6px radius · indigo focus ring rgba(99,102,241,.15) (different hue, won't theme-flip). Stays admin; consolidate within admin only.</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+      </div>
+
+      <label class="stb-note-wrap">Family note: <input class="stb-note" data-note="Inputs" type="text" placeholder="e.g. unify on canonical size but keep sentence-case labels" /></label>
+    </section>
+
+    <!-- ════════════════════════ STAT CARDS ════════════════════════ -->
+    <section class="stb-family" data-family="Stat cards">
+      <h2 class="stb-fam-title">Stat cards (metric tiles)</h2>
+      <p class="stb-fam-desc">
+        Canonical <code>.stat-card</code> = centered, neutral bold value over an UPPERCASE muted label.
+        9 live clones diverge on size, value color (several tint the number with the accent), label casing,
+        and even value/label order (admin + portal render label-first).
+      </p>
+
+      <div class="stb-variant-row stb-variant-row-stats">
+        <!-- Canonical -->
+        <div class="stb-variant stb-canonical">
+          <div class="stb-variant-head"><span class="stb-vname">Canonical · <code>.stat-card</code></span><span class="stb-tag stb-ref">reference</span></div>
+          <div class="stb-specimens">
+            <div class="stat-card"><div class="stat-card-value">1,284</div><div class="stat-card-label">Members</div></div>
+          </div>
+          <p class="stb-diff">value-first · 1.35rem/800 neutral · .66rem UPPERCASE label · var(--radius-sm)</p>
+        </div>
+
+        <!-- Marketplace -->
+        <div class="stb-variant" data-clone=".mk-stat-card" data-sites="2">
+          <div class="stb-variant-head"><span class="stb-vname">Marketplace · <code>.mk-stat-*</code></span><span class="stb-tag">2 sites</span></div>
+          <div class="stb-specimens">
+            <div class="mk-stat-card"><div class="mk-stat-value">1,284</div><div class="mk-stat-label">Members</div></div>
+          </div>
+          <p class="stb-diff">value tinted var(--accent) · 1.5rem/700 · 10px radius · sentence-case label · label fallback #6b6b8a</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+
+        <!-- Hobbies -->
+        <div class="stb-variant" data-clone=".hb-stat-card" data-sites="3">
+          <div class="stb-variant-head"><span class="stb-vname">Hobbies · <code>.hb-stat-*</code></span><span class="stb-tag">3 sites</span></div>
+          <div class="stb-specimens">
+            <div class="hb-stat-card"><div class="hb-stat-value">1,284</div><div class="hb-stat-label">Members</div></div>
+          </div>
+          <p class="stb-diff">near-twin of mk-stat · accent-tinted value · token-driven (theme-flips)</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+
+        <!-- Dev portal -->
+        <div class="stb-variant" data-clone=".dv-stat" data-sites="4">
+          <div class="stb-variant-head"><span class="stb-vname">Dev portal · <code>.dv-stat</code></span><span class="stb-tag">4 sites</span></div>
+          <div class="stb-specimens">
+            <div class="dv-stat"><div class="dv-num">1,284</div><div class="dv-label">Members</div></div>
+          </div>
+          <p class="stb-diff">value var(--love1) brand accent · 1.5rem/700 · flex sizing · 12px radius</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+
+        <!-- Profile node-stats -->
+        <div class="stb-variant" data-clone=".pf .card.stat-card + .stat-value/.stat-label" data-sites="~6">
+          <div class="stb-variant-head"><span class="stb-vname">Profile node-stats · <code>.stat-value/.stat-label</code></span><span class="stb-tag">~6 sites</span></div>
+          <div class="stb-specimens pf stb-scope">
+            <div class="card stat-card"><div class="stat-value">1,284</div><div class="stat-label">Members</div></div>
+          </div>
+          <p class="stb-diff">reuses .stat-card box but reinvents children · value color via INLINE style (theme-bypass)</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+
+        <!-- Profile wallet -->
+        <div class="stb-variant" data-clone=".pf .wl-stat + .wl-val/.wl-label" data-sites="4">
+          <div class="stb-variant-head"><span class="stb-vname">Profile wallet · <code>.wl-stat</code></span><span class="stb-tag">4 sites</span></div>
+          <div class="stb-specimens pf stb-scope">
+            <div class="wl-stat"><div class="wl-val wl-val-success">1,284</div><div class="wl-label">Earned</div></div>
+          </div>
+          <p class="stb-diff">monospace value (numeric alignment) · success/danger tints · label fallback #6B7280</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+
+        <!-- Agent detail -->
+        <div class="stb-variant" data-clone=".pf-agd-stat-card / .agd-stat-card" data-sites="~10">
+          <div class="stb-variant-head"><span class="stb-vname">Agent detail · <code>.pf-agd-stat-card</code></span><span class="stb-tag">~10 sites</span></div>
+          <div class="stb-specimens pf stb-scope">
+            <div class="pf-agd-stat-card"><div class="pf-agd-stat-value">1,284</div><div class="pf-agd-stat-label">Tasks</div></div>
+          </div>
+          <p class="stb-diff">two aliased prefixes (.agd-/.pf-agd-) · 1.5rem/600 · light-only fallbacks #FFFFFF/#E5E7EB/#1A1A2E</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+
+        <!-- Portal user-world -->
+        <div class="stb-variant" data-clone=".user-stat (portal)" data-sites="1">
+          <div class="stb-variant-head"><span class="stb-vname">Portal user-world · <code>.user-stat</code></span><span class="stb-tag">1 site</span></div>
+          <div class="stb-specimens">
+            <div class="user-stat"><div class="user-stat-label">Members</div><div class="user-stat-value">1,284</div></div>
+          </div>
+          <p class="stb-diff">LABEL-FIRST order · closest to canonical tokens · 1.05rem/700 smaller value</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+
+        <!-- Admin StatsGrid reference -->
+        <div class="stb-variant stb-admin" data-clone=".adm-card+.adm-stat (admin StatsGrid)" data-sites="~20 tabs" data-admin="1">
+          <div class="stb-variant-head"><span class="stb-vname">Admin StatsGrid · <code>.adm-card/.adm-stat</code></span><span class="stb-tag stb-admin-tag">admin — separate</span></div>
+          <div class="stb-specimens adm stb-scope">
+            <div class="adm-card"><h2>Members</h2><div class="adm-stat indigo">1,284</div><div class="adm-stat-label">last 24h</div></div>
+          </div>
+          <p class="stb-diff">LABEL-FIRST · rich 8-tone color system · the de-facto shared component (~20 tabs). Stays admin; consolidate within admin.</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+
+        <!-- Admin agent-integration reference -->
+        <div class="stb-variant stb-admin" data-clone=".adm-agi-stat-card (admin AgentIntegration)" data-sites="~6" data-admin="1">
+          <div class="stb-variant-head"><span class="stb-vname">Admin AgentIntegration · <code>.adm-agi-stat-*</code></span><span class="stb-tag stb-admin-tag">admin — separate</span></div>
+          <div class="stb-specimens adm stb-scope">
+            <div class="adm-agi-stat-card"><div class="adm-agi-stat-value adm-agi-stat-value--success">1,284</div><div class="adm-agi-stat-label">Completed</div></div>
+          </div>
+          <p class="stb-diff">a SECOND admin stat tile (didn't reuse StatsGrid) — fold into the one admin stat component during admin consolidation</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+
+        <!-- Dead profile hero -->
+        <div class="stb-variant stb-dead" data-clone=".pf .stat-card .num/.label (profile hero)" data-sites="0" data-dead="1">
+          <div class="stb-variant-head"><span class="stb-vname">Profile hero · <code>.stat-card .num/.label</code></span><span class="stb-tag stb-dead-tag">DEAD · 0 sites</span></div>
+          <div class="stb-specimens pf stb-scope">
+            <div class="stat-card"><div class="num heart">1,284</div><div class="label">Hearts</div></div>
+          </div>
+          <p class="stb-diff">orphaned hero-strip CSS (heart/blue/purple/mint) — all hardcoded hex, nothing renders it. Safe to delete.</p>
+          <div class="stb-decide-wrap"></div>
+        </div>
+      </div>
+
+      <label class="stb-note-wrap">Family note: <input class="stb-note" data-note="Stat cards" type="text" placeholder="e.g. one shared component, value-first, neutral value with optional tone+mono modifiers" /></label>
+    </section>
+
+  </main>
+
+  <!-- ════════════════════════ OUTPUT ════════════════════════ -->
+  <footer class="stb-output-bar">
+    <div class="stb-output-head">
+      <span class="stb-output-title">Your decisions <span class="stb-output-count" id="stb-count"></span></span>
+      <button class="stb-copy-btn" id="stb-copy" type="button">Copy to clipboard</button>
+    </div>
+    <textarea class="stb-output" id="stb-output" readonly rows="10"></textarea>
+  </footer>
+
+  <script src="/js/style-testbed.js"></script>
+</body>
+</html>

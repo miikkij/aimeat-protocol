@@ -1,0 +1,132 @@
+/*
+ * @file style-testbed.css
+ * @description Layout/chrome for the dev style-decision testbed
+ *   (style-testbed.html). All page chrome uses theme.css tokens so it flips
+ *   with the light/dark toggle. The .stb-* prefix avoids colliding with the
+ *   real component classes being showcased. Critically, .stb-specimens.pf /
+ *   .stb-specimens.adm RESET the profile/admin container layout (max-width,
+ *   margin, padding) so those wrappers act purely as selector scopes for the
+ *   clone overrides without imposing their page-container geometry.
+ * @version-history
+ *   v1.0.0 — 2026-06-02 — Initial testbed layout
+ */
+
+.stb {
+  margin: 0;
+  padding: 0 0 280px;          /* leave room for the sticky output bar */
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font, system-ui, sans-serif);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+/* ── Header ── */
+.stb-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+}
+.stb-header-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+}
+.stb-title { font-size: 1.25rem; font-weight: 800; margin: 0; }
+.stb-controls { display: flex; align-items: center; gap: 0.5rem; }
+.stb-theme-label { color: var(--text-dim); font-size: 0.8rem; }
+.stb-theme-btn {
+  padding: 6px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg); color: var(--text); cursor: pointer; font-size: 0.82rem;
+}
+.stb-theme-btn.stb-active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.stb-intro { max-width: 1100px; margin: 0.75rem 0 0; color: var(--text); }
+.stb-intro.stb-muted { color: var(--text-dim); font-size: 0.82rem; }
+.stb code { font-family: var(--font-mono, monospace); font-size: 0.85em; background: var(--bg-dim); padding: 1px 5px; border-radius: 4px; }
+
+/* ── Families ── */
+.stb-main { padding: 0 1.5rem; }
+.stb-family { padding: 1.5rem 0; border-bottom: 1px dashed var(--border); }
+.stb-fam-title { font-size: 1.05rem; font-weight: 700; margin: 0 0 0.25rem; }
+.stb-fam-desc { color: var(--text-dim); margin: 0 0 1rem; max-width: 1100px; font-size: 0.84rem; }
+
+/* ── Variant cards (canonical + each clone) ── */
+.stb-variant-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: stretch; }
+.stb-variant {
+  flex: 1 1 280px; min-width: 260px; max-width: 360px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg-card); padding: 12px; display: flex; flex-direction: column; gap: 8px;
+}
+.stb-variant-row-stats .stb-variant { max-width: 300px; }
+.stb-canonical { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.stb-dead { opacity: 0.92; border-style: dashed; }
+
+.stb-variant-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-height: 22px; }
+.stb-vname { font-size: 0.78rem; font-weight: 600; }
+.stb-tag {
+  font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
+  padding: 1px 6px; border-radius: 10px; background: var(--bg-dim); color: var(--text-dim);
+  border: 1px solid var(--border); white-space: nowrap;
+}
+.stb-ref { background: var(--accent-subtle, var(--bg-dim)); color: var(--accent); border-color: var(--accent); }
+.stb-warn { background: var(--warn-bg, var(--bg-dim)); color: var(--warn-fg, var(--text)); border-color: var(--warn-border, var(--border)); }
+.stb-dead-tag { background: var(--danger-bg, var(--bg-dim)); color: var(--danger-fg, var(--text)); border-color: var(--danger-border, var(--border)); }
+.stb-admin-tag { background: var(--bg-dim); color: var(--text-dim); }
+
+/* Specimen containers */
+.stb-specimens {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  padding: 10px; border-radius: var(--radius-sm); background: var(--bg);
+  border: 1px dashed var(--border); min-height: 48px;
+}
+.stb-specimens-col { flex-direction: column; align-items: stretch; }
+.stb-specimens-relative { position: relative; }
+.stb-mini-note { font-size: 0.7rem; color: var(--text-dim); }
+
+/* SCOPE RESET — keep .pf/.adm as selector scopes, drop their page-container layout */
+.stb-specimens.pf,
+.stb-specimens.adm {
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 10px !important;
+  position: static !important;
+  z-index: auto !important;
+}
+
+.stb-diff { font-size: 0.72rem; color: var(--text-dim); margin: 0; }
+
+/* Decision select (injected by JS into .stb-decide-wrap) */
+.stb-decide-wrap { margin-top: auto; }
+.stb-decide {
+  width: 100%; padding: 6px 8px; font-size: 0.78rem;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg); color: var(--text); cursor: pointer;
+}
+.stb-decide.stb-chosen { border-color: var(--accent); font-weight: 600; }
+
+/* Family note */
+.stb-note-wrap { display: block; margin-top: 12px; font-size: 0.8rem; color: var(--text-dim); }
+.stb-note {
+  width: 100%; max-width: 700px; margin-top: 4px; padding: 7px 10px; font-size: 0.82rem;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg); color: var(--text); display: block;
+}
+
+/* ── Sticky output bar ── */
+.stb-output-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+  background: var(--bg-card); border-top: 2px solid var(--accent);
+  padding: 10px 1.5rem 12px; box-shadow: 0 -6px 20px rgba(0,0,0,0.18);
+}
+.stb-output-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.stb-output-title { font-size: 0.85rem; font-weight: 700; }
+.stb-output-count { color: var(--text-dim); font-weight: 500; font-size: 0.78rem; }
+.stb-copy-btn {
+  padding: 6px 14px; border: none; border-radius: var(--radius-sm);
+  background: var(--accent); color: var(--on-inverted, #fff); cursor: pointer; font-size: 0.8rem; font-weight: 600;
+}
+.stb-copy-btn.stb-copied { background: var(--success-fg, #16a34a); }
+.stb-output {
+  width: 100%; box-sizing: border-box; resize: vertical;
+  font-family: var(--font-mono, monospace); font-size: 0.78rem; line-height: 1.4;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg); color: var(--text); padding: 8px 10px;
+}
