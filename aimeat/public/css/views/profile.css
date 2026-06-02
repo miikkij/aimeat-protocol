@@ -12,6 +12,10 @@
  *   v1.3.0 — 2026-06-02 — Component unification (#4 buttons): remove .pf .btn-primary
  *     override (profile buttons now use canonical theme.css .btn-primary) and delete
  *     dead .kpkg-btn* family (0 call sites).
+ *   v1.4.0 — 2026-06-02 — Component unification (#4 pkg-card + #5 inputs): pkg-card
+ *     actions use canonical btn-* (per-button rules removed); remove .pf .input-field
+ *     base+focus override so profile inputs use canonical .input-field (kept
+ *     select/textarea behavior + sentence-case .form-row label).
  */
 .pf-hero{background:var(--pf-hero-gradient);border-bottom:1px solid var(--border,#E5E7EB)}
 .pf-hero-inner{max-width:1000px;margin:0 auto;padding:2rem 1.5rem 0}
@@ -204,8 +208,9 @@
 .pf .sub-tab.active{color:var(--accent,#E8564A);border-color:var(--accent,#E8564A);background:rgba(232,86,74,.1)}
 .pf .action-bar{display:flex;justify-content:space-between;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap}
 .pf .search-bar{display:flex;gap:.5rem;flex:1;max-width:500px}
-.pf .input-field{width:100%;padding:10px 14px;background:var(--bg-surface);border:1.5px solid var(--border,#E5E7EB);border-radius:10px;color:var(--text);font-size:.85rem;font-family:inherit;transition:all .15s;outline:none}
-.pf .input-field:focus{border-color:var(--accent,#E8564A);box-shadow:0 0 0 3px rgba(232,86,74,.1)}
+/* .pf .input-field base+focus override removed — profile inputs use canonical
+   theme.css .input-field (tokenized focus ring, theme-flips). Unified 2026-06-02 (#5).
+   Keep only the select/textarea behavior extensions canonical lacks. */
 .pf select.input-field{cursor:pointer}
 .pf textarea.input-field{resize:vertical;min-height:60px}
 .pf .create-form{background:var(--bg-card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:var(--radius,12px);padding:1.25rem;margin-bottom:1rem}
