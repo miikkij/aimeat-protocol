@@ -26,9 +26,9 @@ export default function RealtimeTab({ data, reload }) {
   return html`
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <${StatsGrid} items=${[
-      { label: t('dashboard.activeRooms'), value: rooms.length, color: '#06b6d4' },
-      { label: t('dashboard.totalPeers'), value: rooms.reduce((a, r) => a + (r.peer_count || r.peers?.length || 0), 0), color: '#22c55e' },
-      { label: t('dashboard.yjsDocs'), value: docs.length, color: '#a855f7' },
+      { label: t('dashboard.activeRooms'), value: rooms.length, tone: 'cyan' },
+      { label: t('dashboard.totalPeers'), value: rooms.reduce((a, r) => a + (r.peer_count || r.peers?.length || 0), 0), tone: 'green' },
+      { label: t('dashboard.yjsDocs'), value: docs.length, tone: 'purple' },
     ]} />
 
     ${rooms.length > 0 && html`

@@ -30,10 +30,10 @@ export default function GenesisTab({ data, reload }) {
     <//>
 
     <${StatsGrid} items=${[
-      { label: t('dashboard.totalPeers'), value: peers.length, color: '#06b6d4' },
-      { label: t('dashboard.approved'), value: peers.filter(p => p.status === 'approved' || p.status === 'active').length, color: '#22c55e' },
-      { label: t('dashboard.suspended'), value: peers.filter(p => p.status === 'suspended').length, color: '#ef4444' },
-      { label: t('dashboard.pending'), value: peers.filter(p => p.status === 'pending').length, color: '#f59e0b' },
+      { label: t('dashboard.totalPeers'), value: peers.length, tone: 'cyan' },
+      { label: t('dashboard.approved'), value: peers.filter(p => p.status === 'approved' || p.status === 'active').length, tone: 'green' },
+      { label: t('dashboard.suspended'), value: peers.filter(p => p.status === 'suspended').length, tone: 'red' },
+      { label: t('dashboard.pending'), value: peers.filter(p => p.status === 'pending').length, tone: 'amber' },
     ]} />
 
     ${!peers.length

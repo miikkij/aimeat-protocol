@@ -176,7 +176,7 @@ export default function ChatInstancesTab({ data, reload }) {
 
     <!-- AI Chat Instances -->
     <${StatsGrid} items=${[
-      { label: t('dashboard.totalSessions'), value: sessions.length, color: '#06b6d4' },
+      { label: t('dashboard.totalSessions'), value: sessions.length, tone: 'cyan' },
     ]} />
 
     ${!sessions.length

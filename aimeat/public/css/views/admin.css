@@ -142,6 +142,7 @@
 .adm-stat.amber  { color: var(--warn); }
 .adm-stat.purple { color: var(--purple); }
 .adm-stat.blue   { color: var(--blue); }
+.adm-stat.orange { color: var(--orange); }
 .adm-stat.red    { color: var(--danger); }
 .adm-stat-label { color: var(--text-muted); font-size: .69rem; margin-top: 2px; }
 

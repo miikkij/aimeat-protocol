@@ -28,9 +28,9 @@ export default function DirectoryTab({ data }) {
     <${ExpandableHelp} title=${t('dashboard.directoryHelpTitle')}>${t('dashboard.directoryHelpDetail')}</${ExpandableHelp}>
 
     <${StatsGrid} items=${[
-      { label: t('dashboard.totalEntries'), value: dir?.total || 0, color: '#06b6d4' },
-      { label: t('dashboard.cities'), value: dir?.cities || 0, color: '#22c55e' },
-      { label: t('dashboard.categories'), value: dir?.categories || 0, color: '#f59e0b' },
+      { label: t('dashboard.totalEntries'), value: dir?.total || 0, tone: 'cyan' },
+      { label: t('dashboard.cities'), value: dir?.cities || 0, tone: 'green' },
+      { label: t('dashboard.categories'), value: dir?.categories || 0, tone: 'amber' },
     ]} />
 
     <div class="adm-card" style="margin-top:12px">

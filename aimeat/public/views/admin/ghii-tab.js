@@ -51,9 +51,9 @@ export default function GhiiTab({ data, reload }) {
     </div>
 
     <${StatsGrid} items=${[
-      { label: t('dashboard.totalGhiiUsers'), value: users.length, color: '#06b6d4' },
-      { label: t('dashboard.totpEnabled'), value: users.filter(u => u.totp_enabled).length, color: '#22c55e' },
-      { label: t('dashboard.verifiedL2'), value: users.filter(u => u.verification_level === 2).length, color: '#a855f7' },
+      { label: t('dashboard.totalGhiiUsers'), value: users.length, tone: 'cyan' },
+      { label: t('dashboard.totpEnabled'), value: users.filter(u => u.totp_enabled).length, tone: 'green' },
+      { label: t('dashboard.verifiedL2'), value: users.filter(u => u.verification_level === 2).length, tone: 'purple' },
     ]} />
 
     ${!users.length

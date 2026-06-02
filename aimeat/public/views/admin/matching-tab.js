@@ -28,9 +28,9 @@ export default function MatchingTab({ data }) {
     <${ExpandableHelp} title=${t('dashboard.matchingHelpTitle')}>${t('dashboard.matchingHelpDetail')}</${ExpandableHelp}>
 
     <${StatsGrid} items=${[
-      { label: t('dashboard.totalProfiles'), value: m?.total_profiles || 0, color: '#06b6d4' },
-      { label: t('dashboard.activeMatches'), value: m?.active_matches || 0, color: '#22c55e' },
-      { label: t('dashboard.lastRun'), value: m?.last_run || '\u2014', color: '#a855f7' },
+      { label: t('dashboard.totalProfiles'), value: m?.total_profiles || 0, tone: 'cyan' },
+      { label: t('dashboard.activeMatches'), value: m?.active_matches || 0, tone: 'green' },
+      { label: t('dashboard.lastRun'), value: m?.last_run || '\u2014', tone: 'purple' },
     ]} />
 
     <div class="adm-card" style="margin-top:12px">

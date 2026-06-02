@@ -37,8 +37,8 @@ export default function PromptsTab({ data, reload }) {
 
   const stats = [
     { label: t('dashboard.promptsTotal'), value: prompts.length },
-    { label: t('dashboard.promptsStatusActive'), value: prompts.filter(p => p.active).length, color: '#22c55e' },
-    { label: t('dashboard.promptsStatusInactive'), value: prompts.filter(p => !p.active).length, color: '#ef4444' },
+    { label: t('dashboard.promptsStatusActive'), value: prompts.filter(p => p.active).length, tone: 'green' },
+    { label: t('dashboard.promptsStatusInactive'), value: prompts.filter(p => !p.active).length, tone: 'red' },
     { label: t('dashboard.promptsGroups'), value: Object.keys(groups).length },
   ];
 

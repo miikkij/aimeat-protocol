@@ -439,6 +439,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/guides',
     '/v1/aimeat-os',
     '/v1/hobbies',
+    '/v1/marketplace',
     '/v1/app-store',
     '/v1/openclaw',
     '/v1/classic',

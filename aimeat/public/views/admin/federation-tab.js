@@ -245,10 +245,10 @@ export default function FederationTab({ data, reload }) {
 
     <!-- ═══ Stats Overview ═══ -->
     <${StatsGrid} items=${[
-      { label: t('dashboard.fedActivePeers'), value: activePeers.length, color: '#22c55e' },
-      { label: t('dashboard.fedDegradedPeers'), value: degradedPeers.length, color: '#f59e0b' },
-      { label: t('dashboard.fedOfflinePeers'), value: offlinePeers.length, color: '#ef4444' },
-      { label: t('dashboard.fedPendingRequests'), value: pendingRequests.length, color: '#06b6d4' },
+      { label: t('dashboard.fedActivePeers'), value: activePeers.length, tone: 'green' },
+      { label: t('dashboard.fedDegradedPeers'), value: degradedPeers.length, tone: 'amber' },
+      { label: t('dashboard.fedOfflinePeers'), value: offlinePeers.length, tone: 'red' },
+      { label: t('dashboard.fedPendingRequests'), value: pendingRequests.length, tone: 'cyan' },
     ]} />
 
     <!-- ═══ Federation Auth Policy ═══ -->

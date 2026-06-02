@@ -59,13 +59,13 @@ export default function OverviewTab({ data }) {
 
     <!-- Stats -->
     <${StatsGrid} items=${[
-      { label: t('dashboard.registeredOwners'), value: c.owners, color: '#3b82f6' },
-      { label: t('dashboard.registeredAgents'), value: c.agents, sub: '(' + c.active_agents_24h + ' ' + t('dashboard.active24h') + ')', color: '#a855f7' },
-      { label: t('dashboard.publishedActions'), value: c.actions, color: '#06b6d4' },
-      { label: t('dashboard.activeBoards'), value: c.boards, color: '#22c55e' },
-      { label: t('dashboard.activeChatSessions'), value: c.chat_instances || 0, color: '#06b6d4' },
-      { label: t('dashboard.agentTasksActiveTasks'), value: activeTaskCount != null ? activeTaskCount : '--', color: '#f97316' },
-      { label: t('dashboard.sharingGroupsTotalCount'), value: sharingGroupCount != null ? sharingGroupCount : '--', color: '#8b5cf6' },
+      { label: t('dashboard.registeredOwners'), value: c.owners, tone: 'blue' },
+      { label: t('dashboard.registeredAgents'), value: c.agents, sub: '(' + c.active_agents_24h + ' ' + t('dashboard.active24h') + ')', tone: 'purple' },
+      { label: t('dashboard.publishedActions'), value: c.actions, tone: 'cyan' },
+      { label: t('dashboard.activeBoards'), value: c.boards, tone: 'green' },
+      { label: t('dashboard.activeChatSessions'), value: c.chat_instances || 0, tone: 'cyan' },
+      { label: t('dashboard.agentTasksActiveTasks'), value: activeTaskCount != null ? activeTaskCount : '--', tone: 'orange' },
+      { label: t('dashboard.sharingGroupsTotalCount'), value: sharingGroupCount != null ? sharingGroupCount : '--', tone: 'purple' },
     ]} />
 
     <!-- Economy & Config -->
