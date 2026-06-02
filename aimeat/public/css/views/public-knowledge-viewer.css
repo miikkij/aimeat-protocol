@@ -1,7 +1,19 @@
 /**
  * @file public-knowledge-viewer.css
  * @description Styles for the public knowledge package viewer (no-auth browsing)
- * @version-history v1.0.0 — 2026-05-26 — Initial implementation
+ * @version-history
+ *   v1.2.0 — 2026-06-02 — Component unification (#23 collapsible): tokenize the
+ *     hardcoded hex fallback in .pkv-entry-arrow (var(--text-dim, #6B7280) →
+ *     var(--text-dim)) so the expand chevron flips in dark mode. The .pkv-entry
+ *     toggle markup is left in place (chevron-left, rotate-90 ▶, view-scoped
+ *     expandedEntries state); canonical /components/Collapsible.js added separately.
+ *   v1.1.0 — 2026-06-02 — Component unification (#24 search bar): tokenize the
+ *     hardcoded hex fallbacks in .pkv-search (var(--border, #E5E7EB) →
+ *     var(--border); var(--card-bg, #FFFFFF) → var(--card); var(--text, #1A1A2E)
+ *     → var(--text); var(--accent, #7c5cff) → var(--accent)) so the package
+ *     search input flips in dark mode. Markup left on .pkv-search (view-scoped
+ *     filter state; not migrated to canonical SearchBar).
+ *   v1.0.0 — 2026-05-26 — Initial implementation
  */
 
 /* ── Layout ── */
@@ -44,17 +56,17 @@
   flex: 1;
   min-width: 200px;
   padding: 0.6rem 1rem;
-  border: 1px solid var(--border, #E5E7EB);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--card-bg, #FFFFFF);
-  color: var(--text, #1A1A2E);
+  background: var(--card);
+  color: var(--text);
   font-size: 0.9rem;
   outline: none;
   transition: border-color 0.15s;
 }
 
 .pkv-search:focus {
-  border-color: var(--accent, #7c5cff);
+  border-color: var(--accent);
 }
 
 .pkv-filter-select {
@@ -254,7 +266,7 @@
 
 .pkv-entry-arrow {
   font-size: 0.75rem;
-  color: var(--text-dim, #6B7280);
+  color: var(--text-dim);
   transition: transform 0.15s;
 }
 

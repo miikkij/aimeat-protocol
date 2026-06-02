@@ -66,6 +66,12 @@ const SCOPE_DOMAINS = [
   { key: 'catalogue', permissions: ['read'] },
   { key: 'generator', permissions: ['read', 'write', 'execute'] },
   { key: 'task', permissions: ['read', 'write', 'manage'] },
+  // cortex:write — install/activate/deactivate/delete cortex libraries (browser-side UI)
+  // ext:write    — activate/deactivate/delete extensions, manage instances (server-side WASM)
+  // Note: extension INSTALL is requireAuth-only at the route (agents can push code that stays
+  // inert until ext:write activates it). Cortex INSTALL requires cortex:write.
+  { key: 'cortex',    permissions: ['write'] },
+  { key: 'ext',       permissions: ['write'] },
 ];
 
 const SCOPE_TEMPLATES = {

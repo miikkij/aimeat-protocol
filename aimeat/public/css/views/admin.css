@@ -4,11 +4,22 @@
  *   its distinct indigo accent and a permanently-dark sidebar, but all content
  *   surfaces map to global theme.css tokens so they flip with dark/light mode.
  * @version-history
+ *   v1.5.0 — 2026-06-02 — Component unification (#13 tables): strip the dead
+ *     `, #E5E7EB` hardcoded fallback from `.adm-breakdown-table th` border
+ *     (.adm always maps --glass-border → --border, so the fallback was dead
+ *     light-frozen code). No visual change. The .adm table look is unchanged
+ *     (scoped .adm table still wins over the new generic .data-table).
  *   v1.1.0 — 2026-06-02 — Tokenize all surfaces/text/borders/badges for dark mode (Phase 2).
  *   v1.2.0 — 2026-06-02 — Component unification (#3): remove .adm-modal-overlay
  *     duplicate; msm-tab now uses canonical theme.css .modal-overlay.
  *   v1.3.0 — 2026-06-02 — Component unification (#16): add tokenized
  *     .tag--status-* classes (replace agent-tasks-tab inline hex status colors).
+ *   v1.4.0 — 2026-06-02 — Component unification (#21 key/value rows): strip the
+ *     dead `, #6366F1` hardcoded hex fallbacks from every `var(--accent, #6366F1)`
+ *     (10 sites incl. .adm-hval) — .adm always defines --accent (indigo light /
+ *     #818CF8 dark), so the fallback was light-mode-frozen dead code. No visual
+ *     change; removes hardcoded hex per Rule 7.3. .adm-erow/.adm-hrow markup left
+ *     in place (mono/bordered look differs from canonical .kv-row).
  */
 
 /* Admin-scoped variables: indigo accent identity + surfaces mapped to global
@@ -83,7 +94,7 @@
 .adm-nav-item.active {
   color: #FFFFFF;
   background: rgba(99,102,241,0.18);
-  border-left-color: var(--accent, #6366F1);
+  border-left-color: var(--accent);
   font-weight: 500;
 }
 .adm-nav-item .icon { font-size: .81rem; width: 16px; text-align: center; }
@@ -139,7 +150,7 @@
   font-weight: 700;
 }
 .adm-stat { font-size: 1.625rem; font-weight: 800; line-height: 1.1; color: var(--text); }
-.adm-stat.indigo { color: var(--accent, #6366F1); }
+.adm-stat.indigo { color: var(--accent); }
 .adm-stat.mint,
 .adm-stat.green  { color: var(--mint); }
 .adm-stat.cyan   { color: var(--teal); }
@@ -231,7 +242,7 @@
 .adm-hrow { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); }
 .adm-hrow:last-child { border-bottom: none; }
 .adm-hmetric { font-size: .84rem; color: var(--text-dim); }
-.adm-hval { font-family: var(--font-mono); font-size: .84rem; color: var(--accent, #6366F1); }
+.adm-hval { font-family: var(--font-mono); font-size: .84rem; color: var(--accent); }
 
 /* Tables */
 .adm table { width: 100%; border-collapse: collapse; font-size: .81rem; }
@@ -256,7 +267,7 @@
 
 /* Buttons */
 .adm-btn {
-  background: var(--accent, #6366F1);
+  background: var(--accent);
   color: #fff;
   border: none;
   padding: 8px 18px;
@@ -272,7 +283,7 @@
 .adm-btn-sm {
   background: none;
   border: 1px solid var(--border);
-  color: var(--accent, #6366F1);
+  color: var(--accent);
   padding: 3px 10px;
   border-radius: 6px;
   cursor: pointer;
@@ -283,7 +294,7 @@
 .adm-btn-action {
   background: none;
   border: 1px solid var(--border);
-  color: var(--accent, #6366F1);
+  color: var(--accent);
   padding: 4px 12px;
   border-radius: 6px;
   cursor: pointer;
@@ -320,7 +331,7 @@
 .adm input:focus,
 .adm textarea:focus,
 .adm select:focus {
-  border-color: var(--accent, #6366F1);
+  border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
   outline: none;
 }
@@ -400,7 +411,7 @@
 .adm-help-summary {
   cursor: pointer;
   padding: 10px 14px;
-  color: var(--accent, #6366F1);
+  color: var(--accent);
   font-size: .85rem;
   font-weight: 600;
   user-select: none;
@@ -420,7 +431,7 @@
   padding: 1px 5px;
   border-radius: 3px;
   font-size: .78rem;
-  color: var(--accent, #6366F1);
+  color: var(--accent);
 }
 .adm-help-body strong { color: var(--text); }
 
@@ -568,7 +579,7 @@
 
 /* Active subtab button */
 .adm-btn-active,
-.adm-btn-active:hover { background: var(--accent, #6366F1); color: #fff; }
+.adm-btn-active:hover { background: var(--accent); color: #fff; }
 
 /* Packages tab seed card */
 .adm-pkg-seed-card { margin-bottom: 16px; text-align: center; padding: 24px; }
@@ -679,7 +690,7 @@
   text-align: left;
   padding: 6px 10px;
   color: var(--text-dim);
-  border-bottom: 1px solid var(--glass-border, #E5E7EB);
+  border-bottom: 1px solid var(--border);
   font-weight: 500;
 }
 .adm-breakdown-table td {

@@ -4,6 +4,16 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.9.0 -- 2026-06-02 -- Component unification (#24 search bar): tokenize the
+ *     hardcoded hex fallbacks in .pf-agd-search-input (var(--border, #E5E7EB) ->
+ *     var(--border); var(--card-bg, #FFFFFF) -> var(--card); var(--text, #1A1A2E)
+ *     -> var(--text)) so the task search input flips in dark mode. Markup left in
+ *     place (view-scoped task filter state; not migrated to canonical SearchBar).
+ *   v1.8.0 -- 2026-06-02 -- Component unification (#21 key/value rows): tokenize the
+ *     hardcoded hex fallbacks in .pf-agd-info-label/.pf-agd-info-value
+ *     (var(--text-dim, #6B7280) -> var(--text-dim); var(--text, #1A1A2E) ->
+ *     var(--text)) so the agent-detail info rows flip in dark mode. Markup left
+ *     in place (borderless look differs from canonical .kv-row).
  *   v1.7.0 -- 2026-06-02 -- Component unification (#6 stat cards): remove .agd-stat*/
  *     .pf-agd-stat*; agent activity/quality stats use canonical .stat-card family.
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
@@ -1985,11 +1995,11 @@
 .pf .pf-agd-info-label {
   font-weight: 500;
   min-width: 120px;
-  color: var(--text-dim, #6B7280);
+  color: var(--text-dim);
   flex-shrink: 0;
 }
 .pf .pf-agd-info-value {
-  color: var(--text, #1A1A2E);
+  color: var(--text);
   word-break: break-all;
 }
 
@@ -3124,10 +3134,10 @@
   flex: 1;
   min-width: 12rem;
   padding: 0.35rem 0.6rem;
-  border: 1px solid var(--border, #E5E7EB);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--card-bg, #FFFFFF);
-  color: var(--text, #1A1A2E);
+  background: var(--card);
+  color: var(--text);
   font-size: 0.85rem;
 }
 .pf .pf-agd-time-chips { display: flex; gap: 0.25rem; }

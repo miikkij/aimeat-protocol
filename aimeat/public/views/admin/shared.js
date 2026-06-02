@@ -6,6 +6,10 @@
  *   self-contained design system (adm-* scoped); these are intentionally separate
  *   from the main /components primitives.
  * @version-history
+ *   v1.2.0 — 2026-06-02 — Component unification (#13 tables): DataTable is now a
+ *     thin wrapper that renders `.adm-card` around the canonical
+ *     /components/DataTable.js (imported, not bare-re-exported). Admin keeps its
+ *     card wrapper and unchanged appearance; the table body is shared.
  *   v1.1.0 — 2026-06-02 — i18n the Spinner/ErrorBox defaults (t('common.loading') /
  *     t('common.error')) — were hardcoded English (Rule 4/7.8).
  */
@@ -16,6 +20,9 @@ const html = htm.bind(h);
 import { escHtml } from '/js/utils.js';
 import { t } from '/js/i18n.js';
 import { EmptyState } from '/components/EmptyState.js';
+// Import (not bare re-export) so we hold a local binding to wrap below — a
+// `export { DataTable } from ...` would NOT create a usable local reference.
+import { DataTable as GenericDataTable } from '/components/DataTable.js';
 
 // Display formatters now live in the shared /js/format.js. Import them into local
 // scope (StatCard etc. call num() directly) AND re-export so the existing admin
@@ -91,33 +98,19 @@ export function ExpandableHelp({ title, children }) {
 }
 
 /**
- * DataTable — renders rows with optional raw HTML cells.
+ * DataTable (admin) — thin wrapper around the canonical
+ * /components/DataTable.js that adds admin's `.adm-card` container. The 36
+ * admin importers keep the same `{ headers, rows, scroll }` signature and the
+ * same admin appearance (the `.adm table` / `.adm .scrollable` / `.adm .mono`
+ * scoped CSS still wins over the generic `.data-table` inside `.adm`).
  *
- * SECURITY: When a cell object has `_html: true`, `cell.text` is rendered
- * as raw HTML via dangerouslySetInnerHTML. Callers MUST ensure `cell.text`
- * is sanitized (use escHtml() for any user-generated content).
- * Only use `_html` for trusted, server-generated markup like badges.
+ * SECURITY: cell objects with `_html: true` render `cell.text` as raw HTML;
+ * callers MUST sanitize (escHtml()) any user-generated content. See the
+ * generic DataTable for the full cell protocol.
  */
 export function DataTable({ headers, rows, scroll }) {
-  const table = html`<table>
-    <thead><tr>${headers.map(h => html`<th>${h}</th>`)}</tr></thead>
-    <tbody>
-      ${rows.map(row => html`<tr>
-        ${row.map(cell => {
-          if (cell && typeof cell === 'object' && cell._html) {
-            return html`<td class=${cell.mono ? 'mono' : ''} title=${cell.title || ''}
-              dangerouslySetInnerHTML=${{ __html: cell.text }}></td>`;
-          }
-          if (cell && typeof cell === 'object' && cell.mono) {
-            return html`<td class="mono" title=${cell.title || ''}>${cell.text}</td>`;
-          }
-          return html`<td>${cell}</td>`;
-        })}
-      </tr>`)}
-    </tbody>
-  </table>`;
   return html`<div class="adm-card">
-    ${scroll ? html`<div class="scrollable">${table}</div>` : table}
+    <${GenericDataTable} headers=${headers} rows=${rows} scroll=${scroll} />
   </div>`;
 }
 

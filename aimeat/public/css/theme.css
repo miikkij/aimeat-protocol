@@ -10,6 +10,10 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.15.0 — 2026-06-02 — Component unification (#23 collapsible): add canonical .collapsible / .collapsible-header / .collapsible-chevron (chevron rotates 180° via .open) / .collapsible-body block, backing /components/Collapsible.js. All colors are theme tokens so it flips in dark mode. Establishes the canonical expand/collapse section for the hand-rolled toggles (.expand-btn + .pf-chevron, .scope-advanced-toggle, .pkv-entry-arrow); those bespoke toggles are left in place where their expanded markup is wired into view state.
+     v1.14.0 — 2026-06-02 — Component unification (#24 search bar): add canonical .search-bar (flex row, gap, flex:1) + .search-bar-input (flex:1) shell, backing /components/SearchBar.js. The input reuses .input-field for all visuals, so the shell only owns layout. Consolidates the hand-rolled search inputs (.pkv-search / .cap-search-input / .pf-agd-search-input) and the profile .search-bar + .input-field combo; the profile-scoped .pf .search-bar (max-width) coexists.
+     v1.13.0 — 2026-06-02 — Component unification (#21 key/value rows): add canonical .kv-row / .kv-label / .kv-value (flex space-between, muted label, emphasized value, --border-subtle divider, last-child no border; .kv-value.mono for monospace ids/amounts), backing /components/KeyValueRow.js. Extracted as the common look of the admin .adm-erow/.adm-hrow and profile .pf-agd-info-row families. Existing per-view classes left in place where their look differs.
+     v1.12.0 — 2026-06-02 — Component unification (#13 tables): add canonical .data-table block (full-width collapsed table, uppercase muted header divided by --border, cells by --border-subtle, --bg-surface hover, .mono cell) + generic .scrollable wrapper, backing /components/DataTable.js. Extracted as the common look of .adm table + .pf .consent-table so both converge on tokens that flip in dark mode.
      v1.11.0 — 2026-06-02 — Component unification (#16 tags): add --accent-border token (translucent accent hairline, light rgba(232,86,74,0.2) / dark rgba(255,111,98,0.30)) so tag/badge clones (mk-tag, hb-tag) can replace their hardcoded rgba(232,86,74,0.2) borders and flip in dark mode.
      v1.10.0 — 2026-06-02 — Component unification (#17 pagination): add canonical .pagination (prev / "Page X / Y" / next, token-based) + .pagination-info + .load-more (centered load-more wrapper), backing /components/Pagination.js. Consolidates the .adm-mem-pagination shape and the centered load-more wrapper. The numbered .hb-pagination variant is intentionally left in place (different UI).
      v1.9.0 — 2026-06-02 — Component unification (#18 category cards): add canonical .category-card / -icon / -name / -count (token-based, anchor- and div-safe) so the marketplace .mk-category-* and hobbies .hb-category-* clones converge. Tokenized the formerly hardcoded hover colors (#E8564A → var(--accent); 0 2px 8px rgba(0,0,0,0.06) → var(--shadow-md)) — dark-mode fix. Per-view *-categories-grid wrappers kept (column density differs).
@@ -769,6 +773,40 @@ a { color: inherit; text-decoration: none; }
   animation: livePulse 1.5s ease-in-out infinite;
 }
 
+/* ── Key/value detail row (canonical) ──
+   Backed by /components/KeyValueRow.js. A label/value pair laid out flex
+   space-between: muted label on the left, emphasized value on the right,
+   separated by a subtle bottom border (none on the last row). Consolidates the
+   common label+value-pair shape (admin .adm-erow / .adm-hrow, profile
+   .pf-agd-info-row). All colors are theme tokens so it flips correctly in dark
+   mode. `.kv-value.mono` renders the value in the monospace font (ids, hashes,
+   amounts). The existing per-view classes are intentionally left in place where
+   their look differs. */
+.kv-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 0.84rem;
+}
+.kv-row:last-child { border-bottom: none; }
+.kv-label {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.kv-value {
+  color: var(--text);
+  font-weight: 600;
+  text-align: right;
+  word-break: break-word;
+}
+.kv-value.mono {
+  font-family: var(--font-mono);
+  font-size: 0.81rem;
+}
+
 /* ── Pagination + Load more (canonical) ──
    Backed by /components/Pagination.js. `.pagination` is the prev / "Page X / Y"
    / next control (arrow buttons + disabled ends); `.load-more` centers a single
@@ -791,6 +829,87 @@ a { color: inherit; text-decoration: none; }
   text-align: center;
   margin-top: 1.5rem;
 }
+
+/* ── Collapsible (canonical) ──
+   Backed by /components/Collapsible.js. A clickable header (title + a chevron
+   that rotates 180° when open) with the body shown only while open. This is the
+   canonical shape for the hand-rolled expand/collapse toggles scattered across
+   views (.expand-btn + .pf-chevron, .scope-advanced-toggle, .pkv-entry-arrow).
+   All colors are theme tokens so it flips correctly in dark mode. Callers own
+   the open state (controlled component). The bespoke per-view toggles are left
+   in place where their expanded markup is wired into view state; this block is
+   the target for new collapsible sections. */
+.collapsible {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.75rem;
+}
+.collapsible-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.collapsible-header:hover {
+  color: var(--accent);
+}
+.collapsible-chevron {
+  display: inline-block;
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  transition: transform 0.2s;
+}
+.collapsible-chevron.open {
+  transform: rotate(180deg);
+}
+.collapsible-body {
+  padding: 0 0.85rem 0.75rem;
+}
+
+/* ── Data table (canonical) ──
+   Generic table look backed by /components/DataTable.js. Extracted as the common
+   denominator of the admin `.adm table` and profile `.pf .consent-table` /
+   `.audit-table` shapes: full-width collapsed borders, an uppercase muted header
+   row divided by `--border`, cells divided by `--border-subtle`, a subtle hover,
+   and a `.mono` cell modifier. All colors are theme tokens so the table flips
+   correctly in dark mode. The `.scrollable` wrapper caps height (admin reuses its
+   own `.adm .scrollable`; this generic one applies outside `.adm`). Callers supply
+   their own container (`.card` / `.adm-card`); this block adds none. */
+.data-table { width: 100%; border-collapse: collapse; font-size: .81rem; }
+.data-table th {
+  text-align: left;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  font-size: .69rem;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+.data-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-dim);
+}
+.data-table tr:hover td { background: var(--bg-surface); }
+.data-table .mono { font-family: var(--font-mono); font-size: .78rem; }
+/* Generic scrollable wrapper (the admin-scoped `.adm .scrollable` already exists
+   for admin tables; this one covers DataTable used outside `.adm`). */
+.scrollable { max-height: 600px; overflow-y: auto; }
 
 /* ── Section divider ── */
 .section-divider {
@@ -828,6 +947,23 @@ a { color: inherit; text-decoration: none; }
    drop per-view form-input/textarea/select clones). */
 textarea.input-field { resize: vertical; min-height: 80px; }
 select.input-field { cursor: pointer; }
+
+/* ── Search bar (canonical shell) ──
+   Backed by /components/SearchBar.js. `.search-bar` is the flex row that wraps a
+   single `type="search"` input; the input itself reuses `.input-field` so all
+   visuals (border, focus ring, placeholder, dark-mode flip) are token-driven and
+   need no per-view restyling. `.search-bar-input` only makes the input grow to
+   fill the row. Consolidates the hand-rolled search inputs (.pkv-search,
+   .cap-search-input, .pf-agd-search-input) and the profile .search-bar +
+   .input-field combo. The profile-scoped `.pf .search-bar` rule (with max-width)
+   coexists; this base provides the layout everywhere else. */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+.search-bar-input { flex: 1; }
 
 .prompt-box {
   width: 100%;

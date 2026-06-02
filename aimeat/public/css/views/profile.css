@@ -23,6 +23,18 @@
  *   v1.6.0 — 2026-06-02 — Component unification (#11 status dots): remove
  *     .peer-dot, .pn-status-dot, and .ext-status-dot (the last had hardcoded
  *     #4ade80/#9ca3af, a dark-mode bug); these dots now use canonical <StatusDot>.
+ *   v1.7.0 — 2026-06-02 — Component unification (#13 tables): tokenize the
+ *     hardcoded accent rgbas in .pf .consent-table / .audit-table — cell border
+ *     rgba(232,86,74,.06) and row-hover rgba(232,86,74,.04) → var(--accent-subtle)
+ *     (a dark-mode bug: frozen light accent), and .dw-expiring-icon #f59e0b →
+ *     var(--warn). consent/audit tables left as bespoke .pf tables (checkbox
+ *     column, per-cell badges/recipient cells) — not migrated to <DataTable>.
+ *   v1.8.0 — 2026-06-02 — Component unification (#23 collapsible): tokenize the
+ *     hardcoded hex fallbacks in the chevron/expand toggle CSS — .pf .expand-btn
+ *     and .pf .scope-advanced-toggle border/color var(--border,#E5E7EB) /
+ *     var(--accent,#E8564A) → bare tokens (a dark-mode bug: frozen light hex). The
+ *     toggles themselves are left in place (expanded markup wired into view state);
+ *     canonical /components/Collapsible.js added for new collapsible sections.
  */
 .pf-hero{background:var(--pf-hero-gradient);border-bottom:1px solid var(--border,#E5E7EB)}
 .pf-hero-inner{max-width:1000px;margin:0 auto;padding:2rem 1.5rem 0}
@@ -187,8 +199,8 @@
 .pf .agent-prompt-box{position:relative;background:var(--bg-surface);border:1.5px solid var(--border,#E5E7EB);border-radius:10px;padding:1rem;font-family:monospace;font-size:.8rem;color:var(--text-dim);white-space:pre-wrap;word-break:break-all;line-height:1.5;margin-bottom:1rem;max-height:300px;overflow-y:auto}
 .pf .copy-prompt-btn{background:var(--accent-dark,#D4493F);color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:.8rem;font-weight:600;transition:all .2s}
 .pf .copy-prompt-btn:hover{background:var(--accent,#E8564A)}
-.pf .expand-btn{background:none;border:1px solid var(--border,#E5E7EB);color:var(--accent,#E8564A);border-radius:8px;padding:8px 16px;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
-.pf .expand-btn:hover{border-color:var(--accent,#E8564A);color:var(--accent,#E8564A)}
+.pf .expand-btn{background:none;border:1px solid var(--border);color:var(--accent);border-radius:8px;padding:8px 16px;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
+.pf .expand-btn:hover{border-color:var(--accent);color:var(--accent)}
 .pf .platform-instructions{display:none;margin-top:1rem}
 .pf .platform-instructions.expanded{display:block}
 .pf .platform-tabs{display:flex;gap:.25rem;flex-wrap:wrap;margin-bottom:1rem}
@@ -291,8 +303,8 @@
 .pf .audit-day-btn.active{color:var(--accent,#E8564A);border-color:var(--accent,#E8564A);background:rgba(232,86,74,.1)}
 .pf .consent-table,.pf .audit-table{width:100%;border-collapse:collapse;font-size:.85rem}
 .pf .consent-table th,.pf .audit-table th{text-align:left;padding:.5rem .6rem;color:var(--text-dim,#6B7280);font-size:.75rem;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--border,#E5E7EB)}
-.pf .consent-table td,.pf .audit-table td{padding:.5rem .6rem;border-bottom:1px solid rgba(232,86,74,.06)}
-.pf .consent-table tr:hover,.pf .audit-table tr:hover{background:rgba(232,86,74,.04)}
+.pf .consent-table td,.pf .audit-table td{padding:.5rem .6rem;border-bottom:1px solid var(--accent-subtle)}
+.pf .consent-table tr:hover,.pf .audit-table tr:hover{background:var(--accent-subtle)}
 .pf .revoke-btn{padding:4px 10px;border-radius:6px;border:1px solid var(--danger,#ef4444);background:transparent;color:var(--danger,#ef4444);cursor:pointer;font-size:.75rem;font-weight:600;transition:all .2s}
 .pf .revoke-btn:hover{background:rgba(239,68,68,.15)}
 @media(max-width:600px){
@@ -320,8 +332,8 @@
 .pf .scope-tpl-btn {flex:1;min-width:100px;padding:.6rem .75rem;background:var(--bg-card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:8px;cursor:pointer;color:var(--text-dim,#6B7280);font-size:.8rem;font-weight:600;transition:all .2s;text-align:center}
 .pf .scope-tpl-btn:hover {color:var(--text,#1A1A2E);border-color:var(--accent,#E8564A)}
 .pf .scope-tpl-btn.active {color:var(--accent,#E8564A);border-color:var(--accent,#E8564A);background:rgba(232,86,74,.1)}
-.pf .scope-advanced-toggle {background:none;border:1px solid var(--border,#E5E7EB);color:var(--accent,#E8564A);border-radius:8px;padding:6px 14px;cursor:pointer;font-size:.8rem;font-weight:600;transition:all .2s;display:inline-flex;align-items:center;gap:6px;margin-bottom:1rem}
-.pf .scope-advanced-toggle:hover {border-color:var(--accent,#E8564A);color:var(--accent,#E8564A)}
+.pf .scope-advanced-toggle {background:none;border:1px solid var(--border);color:var(--accent);border-radius:8px;padding:6px 14px;cursor:pointer;font-size:.8rem;font-weight:600;transition:all .2s;display:inline-flex;align-items:center;gap:6px;margin-bottom:1rem}
+.pf .scope-advanced-toggle:hover {border-color:var(--accent);color:var(--accent)}
 .pf .scope-domain {background:var(--bg-surface);border:1px solid rgba(232,86,74,.1);border-radius:8px;padding:.75rem;margin-bottom:.5rem}
 .pf .scope-domain-header {display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;cursor:pointer}
 .pf .scope-domain-header .domain-label {font-weight:600;font-size:.85rem;color:var(--text,#1A1A2E)}
@@ -1125,7 +1137,7 @@
 .pf .dw-checkbox-col   { width: 30px; }
 .pf .dw-code-accent    { font-family: var(--font-mono, monospace); font-size: .8rem; color: var(--love3); }
 .pf .dw-recipient-cell { display: flex; gap: 4px; align-items: center; }
-.pf .dw-expiring-icon  { color: #f59e0b; font-size: .7rem; margin-right: 4px; }
+.pf .dw-expiring-icon  { color: var(--warn); font-size: .7rem; margin-right: 4px; }
 .pf .dw-consent-card   { margin-bottom: 1rem; padding: 1rem; border-color: var(--love1); }
 .pf .dw-section-title  { margin: 1rem 0 .75rem; }
 .pf .dw-section-heading { color: var(--love1, #E8564A); margin: 1.5rem 0 .75rem; }
