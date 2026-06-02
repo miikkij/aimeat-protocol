@@ -38,11 +38,18 @@ export function Badge({ type }) {
   return html`<span class="adm-badge adm-badge-${type}">${type}</span>`;
 }
 
-/** Render a stat card */
-export function StatCard({ label, value, sub, color }) {
+/**
+ * Render a stat card.
+ * @param {{ label: string, value: any, sub?: string, tone?: string, color?: string }} props
+ *   tone — theme-aware modifier class (indigo|mint|green|cyan|amber|purple|blue|red). Preferred.
+ *   color — legacy inline color (still honored if no tone); migrate callers to `tone`.
+ */
+export function StatCard({ label, value, sub, tone, color }) {
+  const toneClass = tone ? ` ${tone}` : '';
+  const style = !tone && color ? `color:${color}` : '';
   return html`<div class="adm-card">
     <h2>${label}</h2>
-    <div class="adm-stat" style="color:${color || 'var(--accent, #06b6d4)'}">${num(value)}</div>
+    <div class="adm-stat${toneClass}" style=${style}>${num(value)}</div>
     ${sub && html`<div class="adm-stat-label">${sub}</div>`}
   </div>`;
 }
@@ -50,7 +57,7 @@ export function StatCard({ label, value, sub, color }) {
 /** Render a stats grid (4-column) */
 export function StatsGrid({ items }) {
   return html`<div class="adm-grid adm-grid-4">
-    ${items.map(i => html`<${StatCard} label=${i.label} value=${i.value} sub=${i.sub} color=${i.color} />`)}
+    ${items.map(i => html`<${StatCard} label=${i.label} value=${i.value} sub=${i.sub} tone=${i.tone} color=${i.color} />`)}
   </div>`;
 }
 
