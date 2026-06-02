@@ -1197,7 +1197,7 @@ window.__renderSnapshot = null; // Set by test code to capture rendered state
       const ownerName = req.auth!.owner;
       const regGhii = `${ownerName}@${config.nodeId}`;
 
-      let registeredAs: string | null = null;
+      let registeredAs: string;
       try {
         switch (component.type) {
           case 'csm': registeredAs = await registerCsm(component.content, ownerName, storage); break;

@@ -41,7 +41,7 @@ export async function registerCortex(
   //      produced — JSON { manifest: "<yaml>", libs: [{ filename, code }] }. This is what the
   //      register route passes (component.content for cortex is JSON.stringify(validation.extracted)).
   //  (2) Raw text with ```yaml + ```javascript fenced blocks (other callers / hand-authored).
-  let manifest = '';
+  let manifest: string;
   const libs: Record<string, string> = {};
   const trimmed = content.trim();
   let extractedObj: { manifest?: string; libs?: Array<{ filename?: string; code?: string }> } | null = null;
