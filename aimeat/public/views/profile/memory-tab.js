@@ -7,6 +7,8 @@
  *   v1.1.0 — 2026-03-18 — Fix: use AuthImage for thumbnails and authenticated download to avoid 401
  *   v1.2.0 — 2026-05-22 — Add Browse Home / Browse Remote panels for federation memory sync
  *   v1.3.0 — 2026-05-22 — Add timestamps, sort controls, fix group picker rotation bug
+ *   v1.4.0 — 2026-06-02 — Component unification (#2): edit modal uses the canonical
+ *     <Modal> component (Escape/backdrop close + header ✕).
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -24,7 +26,7 @@ import { getNodeUrl } from '/js/services/auth.js';
 import { listGroups } from '/js/services/sharing-groups.js';
 import TagCloud from '/js/components/tag-cloud.js';
 import TagEditor from '/js/components/tag-editor.js';
-import { useConfirm } from '/components/Modal.js';
+import { Modal, useConfirm } from '/components/Modal.js';
 
 export default function MemoryTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -1081,9 +1083,7 @@ function EditMemoryModal({ memKey, initialValue, initialVisibility, initialVersi
     }
   };
   return html`
-    <div class="modal-overlay" onClick=${e => { if (e.target.className.includes('modal-overlay')) onCancel(); }}>
-      <div class="modal">
-        <h3>${t('profile.memory.editTitle')}: ${escHtml(memKey)}</h3>
+    <${Modal} open=${true} onClose=${onCancel} title=${`${t('profile.memory.editTitle')}: ${memKey}`}>
         <div class="form-row flex-row mb-half">
           <label class="pf-label-inline">${t('profile.memory.visLabel')}</label>
           <button class="kpkg-vis-pill"
@@ -1111,6 +1111,5 @@ function EditMemoryModal({ memKey, initialValue, initialVisibility, initialVersi
           <button class="btn-primary" onClick=${() => onSave(value, vis, initialVersion, vis === 'group' ? groupId : undefined)}>${t('profile.save')}</button>
           <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
         </div>
-      </div>
-    </div>`;
+    <//>`;
 }

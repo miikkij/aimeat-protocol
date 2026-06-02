@@ -10,6 +10,8 @@
  *   v1.3.0 -- 2026-05-21 -- Shorten agent prompt to delegate to tier1; add Download/Copy Instructions buttons
  *   v1.4.0 -- 2026-05-21 -- Add sub-tab navigation (Tasks, Directives) in expanded agent detail view
  *   v1.5.0 -- 2026-05-22 -- Add Capabilities sub-tab with technical/domain skill display
+ *   v1.6.0 -- 2026-06-02 -- Component unification (#2): scope modal uses the canonical
+ *     <Modal> component (className="scope-modal" preserves width; adds Escape/✕ close)
  *   v1.6.0 -- 2026-05-22 -- Add Activity sub-tab with stats, chart, scheduled jobs, event log
  *   v1.7.0 -- 2026-05-22 -- Add Services and Messages sub-tabs
  *   v2.1.0 -- 2026-05-24 -- Fix: scroll-to on board click, agent count badge in header
@@ -40,7 +42,7 @@ import { Spinner } from './shared.js';
 import { apiGet, apiPost, apiPatch } from '/js/api.js';
 import { listAgents, updateAgentScopes, deleteAgent } from '/js/services/agents.js';
 import { getNodeUrl } from '/js/services/auth.js';
-import { useConfirm } from '/components/Modal.js';
+import { Modal, useConfirm } from '/components/Modal.js';
 import SharedBoard from './agents/shared-board.js';
 import AgentCard from './agents/agent-card.js';
 import { getOnboarding } from '/js/services/agent-integration.js';
@@ -1114,9 +1116,7 @@ function ScopesModal({ agent, session, onSave, onCancel }) {
   const isReadOnly = !(session.roles?.includes('owner') || session.roles?.includes('operator'));
 
   return html`
-    <div class="modal-overlay" onClick=${e => { if (e.target.className.includes('modal-overlay')) onCancel(); }}>
-      <div class="modal scope-modal">
-        <h3>${t('profile.agents.scopeUi.scopeProfile')}: ${escHtml(agent.display_name || agent.name)}</h3>
+    <${Modal} open=${true} onClose=${onCancel} className="scope-modal" title=${`${t('profile.agents.scopeUi.scopeProfile')}: ${agent.display_name || agent.name}`}>
         <div class="scope-agent-info">${escHtml(agent.gaii || '')}</div>
 
         ${isReadOnly ? html`
@@ -1183,6 +1183,5 @@ function ScopesModal({ agent, session, onSave, onCancel }) {
             <button class="btn-outline" onClick=${onCancel}>${t('profile.agents.scopeUi.cancel')}</button>
           </div>
         `}
-      </div>
-    </div>`;
+    <//>`;
 }
