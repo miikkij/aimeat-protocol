@@ -88,6 +88,78 @@
 
   /* Code */
   --code-bg: #F3F4F6;
+
+  /* ── Drift-alias layer ──
+     Variables referenced across view CSS but never defined (rendered with no
+     fallback = broken). Defined here as aliases of the canonical tokens above,
+     so they (a) work now and (b) inherit the dark override automatically — no
+     entry needed in [data-theme="dark"]. The --sp-* scale is theme-invariant. */
+  --card: var(--bg-card);
+  --surface: var(--bg-surface);
+  --bg-dim: var(--bg-surface);
+  --bg-hover: var(--card-bg-hover);
+  --muted: var(--text-dim);
+  --error: var(--danger);
+  --warning: var(--warn);
+  --primary: var(--accent);
+  --accent-faint: var(--accent-subtle);
+  --mono: var(--font-mono);
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+}
+
+/* ── Dark Theme Override ──
+   Redefines only the color/depth variables that must flip for dark mode.
+   Brand identity (coral accent) preserved; accents brightened for dark
+   contrast. Text tiers verified WCAG-AA on both --bg and --bg-card.
+   Aliases above point at these tokens, so they invert automatically. */
+[data-theme="dark"] {
+  /* Background */
+  --bg: #14151A;
+  --bg-surface: #23262F;
+  --bg-card: #1C1E26;
+  --bg-elevated: #23262F;
+
+  /* Cards & Surfaces */
+  --card-bg: #1C1E26;
+  --card-bg-hover: #23262F;
+  --card-bg-solid: #1C1E26;
+  --card-bg-alt: #23262F;
+  --card-border: #33363F;
+
+  /* Accent (coral heart — brightened for dark contrast, brand stays coral) */
+  --accent: #FF6F62;
+  --accent-bright: #FF7A6E;
+  --accent-deep: #E8564A;
+  --accent-glow: rgba(255, 111, 98, 0.35);
+  --accent-subtle: rgba(255, 111, 98, 0.10);
+
+  /* Text */
+  --text: #EDEEF2;
+  --text-bright: #FFFFFF;
+  --text-dim: #A4A9B6;
+  --text-muted: #868C9B;
+
+  /* Borders */
+  --border: #33363F;
+  --border-subtle: #26282F;
+  --border-focus: #FF6F62;
+
+  /* Shadows (deeper/more opaque so elevation reads on dark surfaces) */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.40);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.50);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.55);
+  --shadow-xl: 0 16px 48px rgba(0,0,0,0.65);
+  --shadow-heart: 0 4px 14px rgba(255,111,98,0.40);
+
+  /* Input */
+  --bg-input: #1C1E26;
+  --bg-input-focus: #23262F;
+
+  /* Code */
+  --code-bg: #0E0F13;
 }
 
 /* ── Base ── */
@@ -316,6 +388,30 @@ a { color: inherit; text-decoration: none; }
 
 .lang-btn:not(.active):hover {
   color: var(--text);
+  background: var(--bg-surface);
+}
+
+/* ── Theme Toggle ── */
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font);
+}
+
+.theme-toggle-btn:hover {
+  color: var(--accent);
   background: var(--bg-surface);
 }
 

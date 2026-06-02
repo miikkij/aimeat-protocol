@@ -959,7 +959,7 @@ window.__renderSnapshot = null; // Set by test code to capture rendered state
 
       const updatedProject = {
         ...(projectRec.value as Record<string, unknown>),
-        blueprint: validation.extracted ?? blueprint,
+        blueprint: validation.parsed ?? validation.extracted ?? blueprint,  // store the PARSED object — every downstream route reads blueprint.components directly (not a JSON string)
         status: 'blueprint_ready',
         updatedAt: now,
       };
