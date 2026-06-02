@@ -6,12 +6,16 @@
  * @version-history
  *   v1.0.0 — 2026-03-16 — Initial work tab
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes; i18n for action labels
+ *   v1.2.0 — 2026-06-02 — Component unification (#2): Rate + Deliver modals use the
+ *     canonical <Modal> component (Escape/backdrop close + header ✕) instead of
+ *     hand-rolled .modal-overlay markup.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { Modal } from '/components/Modal.js';
 import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { listInbox, listSent, submitRating, acceptWork, rejectWork, deliverWork, updateProgress } from '/js/services/work.js';
@@ -179,42 +183,36 @@ function RateModal({ desc, onSubmit, onCancel }) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   return html`
-    <div class="modal-overlay" onClick=${e => { if (e.target.className.includes('modal-overlay')) onCancel(); }}>
-      <div class="modal">
-        <h3>${t('profile.work.rateTitle')}</h3>
-        <p class="text-meta mb-1">${t('profile.work.rateDesc')} ${escHtml(desc || '')}</p>
-        <div class="star-rating mb-1">
-          ${[1,2,3,4,5].map(i => html`
-            <span class="star ${i <= rating ? 'active' : ''}" onClick=${() => setRating(i)}>\u2605</span>
-          `)}
-        </div>
-        <div class="form-row"><label>${t('profile.work.commentLabel')}</label><textarea class="input-field" rows="2" value=${comment} onInput=${e => setComment(e.target.value)}></textarea></div>
-        <div class="form-actions">
-          <button class="btn-primary" onClick=${() => onSubmit(rating, comment)}>${t('profile.work.submitRating')}</button>
-          <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
-        </div>
+    <${Modal} open=${true} onClose=${onCancel} title=${t('profile.work.rateTitle')}>
+      <p class="text-meta mb-1">${t('profile.work.rateDesc')} ${escHtml(desc || '')}</p>
+      <div class="star-rating mb-1">
+        ${[1,2,3,4,5].map(i => html`
+          <span class="star ${i <= rating ? 'active' : ''}" onClick=${() => setRating(i)}>\u2605</span>
+        `)}
       </div>
-    </div>`;
+      <div class="form-row"><label>${t('profile.work.commentLabel')}</label><textarea class="input-field" rows="2" value=${comment} onInput=${e => setComment(e.target.value)}></textarea></div>
+      <div class="form-actions">
+        <button class="btn-primary" onClick=${() => onSubmit(rating, comment)}>${t('profile.work.submitRating')}</button>
+        <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
+      </div>
+    <//>`;
 }
 
 function DeliverModal({ desc, loading, onSubmit, onCancel }) {
   const [result, setResult] = useState('');
   return html`
-    <div class="modal-overlay" onClick=${e => { if (e.target.className.includes('modal-overlay')) onCancel(); }}>
-      <div class="modal">
-        <h3>${t('profile.work.deliver')}</h3>
-        <p class="text-meta mb-1">${t('profile.work.delivering')}: ${escHtml(desc || '')}</p>
-        <div class="form-row">
-          <label>${t('profile.work.commentLabel')}</label>
-          <textarea class="input-field" rows="4" placeholder="Describe the completed work or attach results..."
-            value=${result} onInput=${e => setResult(e.target.value)}></textarea>
-        </div>
-        <div class="form-actions">
-          <button class="btn-primary" disabled=${loading} onClick=${() => onSubmit(result || undefined)}>
-            ${loading ? t('profile.work.delivering') : t('profile.work.deliver')}
-          </button>
-          <button class="btn-outline" disabled=${loading} onClick=${onCancel}>${t('profile.cancel')}</button>
-        </div>
+    <${Modal} open=${true} onClose=${onCancel} title=${t('profile.work.deliver')}>
+      <p class="text-meta mb-1">${t('profile.work.delivering')}: ${escHtml(desc || '')}</p>
+      <div class="form-row">
+        <label>${t('profile.work.commentLabel')}</label>
+        <textarea class="input-field" rows="4" placeholder="Describe the completed work or attach results..."
+          value=${result} onInput=${e => setResult(e.target.value)}></textarea>
       </div>
-    </div>`;
+      <div class="form-actions">
+        <button class="btn-primary" disabled=${loading} onClick=${() => onSubmit(result || undefined)}>
+          ${loading ? t('profile.work.delivering') : t('profile.work.deliver')}
+        </button>
+        <button class="btn-outline" disabled=${loading} onClick=${onCancel}>${t('profile.cancel')}</button>
+      </div>
+    <//>`;
 }

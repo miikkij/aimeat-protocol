@@ -15,6 +15,9 @@
  *     keeps a stable component identity. Previously it was redefined every render,
  *     so any re-render of the host (e.g. the agents list polling) unmounted +
  *     remounted the open dialog, causing it to strobe/flicker.
+ *   v1.4.0 — 2026-06-02 — Add optional `className` prop on Modal (applied to the
+ *     .modal box) so views can pass width modifiers (e.g. scope-modal,
+ *     ext-modal-narrow) when migrating their inline overlays to <Modal> (#2).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -24,9 +27,10 @@ import { t } from '/js/i18n.js';
 
 /**
  * Modal — overlay dialog with close on Escape and backdrop click.
- * @param {{ open: boolean, onClose: () => void, title?: string, children: any }} props
+ * @param {{ open: boolean, onClose: () => void, title?: string, className?: string, children: any }} props
+ *   - className: optional extra class on the .modal box (e.g. a width modifier)
  */
-export function Modal({ open, onClose, title, children }) {
+export function Modal({ open, onClose, title, className = '', children }) {
   useEffect(() => {
     if (!open) return;
     const handler = (e) => { if (e.key === 'Escape') onClose(); };
@@ -41,7 +45,7 @@ export function Modal({ open, onClose, title, children }) {
   if (!open) return null;
   return html`
     <div class="modal-overlay" onClick=${onBackdrop}>
-      <div class="modal">
+      <div class="modal ${className}">
         <div class="modal-header">
           ${title && html`<h3>${title}</h3>`}
           <button class="modal-close" onClick=${onClose}>✕</button>

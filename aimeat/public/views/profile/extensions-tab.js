@@ -14,6 +14,8 @@
  * @version-history
  *   v1.0.0 — 2026-03-10 — Initial implementation with Cortex + Server extension management
  *   v1.1.0 — 2026-03-17 — Refactor: replace all inline style="" attributes with CSS classes
+ *   v1.2.0 — 2026-06-02 — Component unification (#2): both install modals use the
+ *     canonical <Modal> component (className="ext-modal-narrow" preserves width).
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -22,7 +24,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, copyToClipboard } from '/js/utils.js';
 import { Spinner } from './shared.js';
-import { useConfirm } from '/components/Modal.js';
+import { Modal, useConfirm } from '/components/Modal.js';
 import * as cortexService from '/js/services/cortex.js';
 import * as v8Ext from '/js/services/extensions.js';
 import { getNodeUrl, getSession } from '/js/services/auth.js';
@@ -995,9 +997,7 @@ export default function ExtensionsTab({ session, showToast }) {
       </div>` : null}
 
     ${showInstall ? html`
-      <div class="modal-overlay" onClick=${(e) => { if (e.target === e.currentTarget) setShowInstall(false); }}>
-        <div class="modal ext-modal-narrow">
-          <h3>${t('profile.extensions.installModal.title')}</h3>
+      <${Modal} open=${true} onClose=${() => setShowInstall(false)} title=${t('profile.extensions.installModal.title')} className="ext-modal-narrow">
           <form onSubmit=${handleInstall}>
             <div class="ext-modal-section">
               <label>${t('profile.extensions.installModal.manifestLabel')}</label>
@@ -1033,13 +1033,10 @@ export default function ExtensionsTab({ session, showToast }) {
               <button type="submit" class="btn-primary">${t('profile.extensions.installModal.installBtn')}</button>
             </div>
           </form>
-        </div>
-      </div>` : null}
+      <//>` : null}
 
     ${showSrvInstall ? html`
-      <div class="modal-overlay" onClick=${(e) => { if (e.target === e.currentTarget) setShowSrvInstall(false); }}>
-        <div class="modal ext-modal-narrow">
-          <h3>Install Server Extension</h3>
+      <${Modal} open=${true} onClose=${() => setShowSrvInstall(false)} title="Install Server Extension" className="ext-modal-narrow">
           <div class="ext-modal-section">
             <label>YAML Manifest</label>
             <textarea rows="12" class="ext-modal-textarea" placeholder="metadata:\n  name: my-extension\n  version: 1.0.0\n  description: ...\n\nactions:\n  - id: my-action\n    ..." value=${srvManifestText} onInput=${(e) => onSrvManifestChange(e.target.value)}></textarea>
@@ -1057,8 +1054,7 @@ export default function ExtensionsTab({ session, showToast }) {
             <button class="btn-outline" onClick=${() => setShowSrvInstall(false)}>Cancel</button>
             <button class="btn-primary" onClick=${handleSrvInstall}>Install</button>
           </div>
-        </div>
-      </div>` : null}
+      <//>` : null}
 
     <${ConfirmUI} />
   </div>`;
