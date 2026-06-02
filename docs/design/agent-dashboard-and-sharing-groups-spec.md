@@ -904,7 +904,7 @@ lastEventAt?: string;  // updated on every aimeat_task_event call
 ```
 
 Background job `task-stall-detector` runs every 5 minutes:
-- Finds tasks with status `active` where `lastEventAt` is older than `config.taskStallThresholdMinutes` (default: 30)
+- Finds tasks with status `active` where `lastEventAt` is older than `config.taskStallThresholdMinutes` (default: 120)
 - Marks as `stalled`
 - Notifies owner via SSE event + push notification
 - Owner can: reassign, restart, or mark failed

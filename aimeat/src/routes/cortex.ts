@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CortexExtensionRecord, CortexActivationArtifacts } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { parseCortexManifest, validateNamespaceOwnership } from '../services/cortex-manifest.js';
@@ -45,7 +45,8 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── POST /v1/cortex — install a cortex extension from manifest ──
-  router.post('/v1/cortex', requireAuth(), requireRole('owner'), async (req, res) => {
+  // Owner role bypasses scope checks; agents need 'cortex:write' (or 'cortex:*' / '*').
+  router.post('/v1/cortex', requireAuth(), requireScope('cortex:write'), async (req, res) => {
     const { manifest, libs } = req.body ?? {};
 
     if (!manifest || typeof manifest !== 'string') {
@@ -188,7 +189,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── DELETE /v1/cortex/:name — uninstall extension ──
-  router.delete('/v1/cortex/:name', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.delete('/v1/cortex/:name', requireAuth(), requireScope('cortex:write'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
     const ext = await storage.getCortexExtension(name);
 
@@ -227,7 +228,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── POST /v1/cortex/:name/activate — activate extension ──
-  router.post('/v1/cortex/:name/activate', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/cortex/:name/activate', requireAuth(), requireScope('cortex:write'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
     const ext = await storage.getCortexExtension(name);
 
@@ -272,7 +273,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── POST /v1/cortex/:name/deactivate — deactivate extension ──
-  router.post('/v1/cortex/:name/deactivate', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/cortex/:name/deactivate', requireAuth(), requireScope('cortex:write'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
     const ext = await storage.getCortexExtension(name);
 
@@ -318,7 +319,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── POST /v1/cortex/:name/visibility — toggle visibility ──
-  router.post('/v1/cortex/:name/visibility', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/cortex/:name/visibility', requireAuth(), requireScope('cortex:write'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
     const ext = await storage.getCortexExtension(name);
     if (!ext) {
@@ -417,7 +418,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── GET /v1/cortex/:name/export — export manifest + lib files for editing ──
-  router.get('/v1/cortex/:name/export', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.get('/v1/cortex/:name/export', requireAuth(), requireScope('cortex:write'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
     const ext = await storage.getCortexExtension(name);
 

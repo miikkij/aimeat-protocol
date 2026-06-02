@@ -376,7 +376,7 @@ status: 'draft' | 'queued' | 'active' | 'stalled' | 'done' | 'failed';
 - **`draft`** -- Created by owner, not yet visible to agent
 - **`queued`** -- Visible to agent in inbox. Agent can propose/modify todos via PATCH
 - **`active`** -- Started via `POST .../start` (the approval gate)
-- **`stalled`** -- Background job (`aimeat/src/services/task-stall-detector.ts`) transitions active tasks with no events for `taskStallThresholdMinutes` (default 30 min)
+- **`stalled`** -- Background job (`aimeat/src/services/task-stall-detector.ts`) transitions active tasks with no events for `taskStallThresholdMinutes` (default 120 min)
 
 **There is NO separate "approved" or "awaiting_approval" status.** The distinction between "queued without todos" and "queued with proposed todos" is purely whether the `todos` array is empty or populated. The `/start` endpoint is the approval gate: `queued` --> `active`.
 

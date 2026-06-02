@@ -646,6 +646,19 @@ function validateCortex(result: string, blueprint?: Record<string, unknown> | nu
     }
   }
 
+  // SYNTAX CHECK: a cortex that does not PARSE passes every structural check above but crashes at
+  // runtime (e.g. `listTitle className = '...'` — a missing dot → "Unexpected identifier 'className'").
+  // new Function() COMPILES without executing, so undefined globals (window/document/AIMEAT) are
+  // irrelevant — it surfaces only real syntax errors. This gap let broken cortex code register "green".
+  for (let i = 0; i < jsBlocks.length; i++) {
+    try {
+      // eslint-disable-next-line no-new-func
+      new Function(jsBlocks[i]);
+    } catch (e) {
+      if (e instanceof SyntaxError) errors.push(`Cortex JS (lib ${i + 1}) has a syntax error: ${e.message}`);
+    }
+  }
+
   if (errors.length > 0) return { valid: false, errors, extracted: null };
 
   const extracted: CortexExtracted = {

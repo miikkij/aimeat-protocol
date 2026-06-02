@@ -16,6 +16,8 @@
  *   v1.0.0 -- pre-2026-05 -- Initial central config module
  *   v1.1.0 -- 2026-05-29 -- Add OperatorConfig section + helpers. Required for
  *     privacy policy template substitution per CLAUDE.md self-host architecture.
+ *   v1.1.1 -- 2026-06-02 -- Raise default taskStallThresholdMinutes 30 -> 120 so
+ *     long-running orchestrated tasks aren't falsely marked stalled.
  */
 import { loadFileSource } from './services/config-loader.js';
 import { CONFIG_FIELDS, DOT_PATH_TO_ENV, MUTABLE_CONFIG_MAP, parseConfigValue, isImmutable } from './services/config-schema.js';
@@ -759,7 +761,10 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     capabilityLogRetentionDays: parseInt(process.env.AIMEAT_CAPABILITY_LOG_RETENTION_DAYS ?? '30', 10),
 
     // Agent Tasks (Phase 1)
-    taskStallThresholdMinutes: parseInt(process.env.AIMEAT_TASK_STALL_THRESHOLD_MINUTES ?? '30', 10),
+    // Default 2h: orchestrated/multi-agent tasks (e.g. aimeat-app-conductor running
+    // the full generator pipeline) can legitimately run quiet for long stretches; 30m
+    // was too aggressive and falsely failed them. Override via env var if needed.
+    taskStallThresholdMinutes: parseInt(process.env.AIMEAT_TASK_STALL_THRESHOLD_MINUTES ?? '120', 10),
     taskAutoArchive: process.env.AIMEAT_TASK_AUTO_ARCHIVE !== 'false',
     taskArchiveAfterHours: parseInt(process.env.AIMEAT_TASK_ARCHIVE_AFTER_HOURS ?? '24', 10),
 

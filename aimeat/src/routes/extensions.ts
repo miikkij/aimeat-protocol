@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord, ExtensionInstanceRecord, ScheduledJobRecord } from '../storage/interface.js';
-import { requireAuth, requireRole, optionalAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { executeExtensionAction } from '../services/extension-runtime.js';
@@ -291,7 +291,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   });
 
   // ── GET /v1/extensions/:name/actions/:actionId — Get action script content ──
-  router.get('/v1/extensions/:name/actions/:actionId', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.get('/v1/extensions/:name/actions/:actionId', requireAuth(), requireScope('ext:write'), async (req, res) => {
     try {
       const name = req.params.name as string;
       const actionId = req.params.actionId as string;
@@ -450,7 +450,8 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   });
 
   // ── POST /v1/extensions/:name/activate — Activate extension ────
-  router.post('/v1/extensions/:name/activate', requireAuth(), requireRole('owner'), async (req, res) => {
+  // Owner role bypasses scope checks; agents need 'ext:write' (or 'ext:*' / '*').
+  router.post('/v1/extensions/:name/activate', requireAuth(), requireScope('ext:write'), async (req, res) => {
     try {
       const name = req.params.name as string;
       const ext = await storage.getExtension(name);
@@ -512,7 +513,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   });
 
   // ── POST /v1/extensions/:name/deactivate — Deactivate extension ──
-  router.post('/v1/extensions/:name/deactivate', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/extensions/:name/deactivate', requireAuth(), requireScope('ext:write'), async (req, res) => {
     try {
       const name = req.params.name as string;
       const ext = await storage.getExtension(name);
@@ -550,7 +551,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   });
 
   // ── POST /v1/extensions/:name/instances — Create instance ──────────
-  router.post('/v1/extensions/:name/instances', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/extensions/:name/instances', requireAuth(), requireScope('ext:write'), async (req, res) => {
     try {
       const name = req.params.name as string;
       const ext = await storage.getExtension(name);
@@ -680,7 +681,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   });
 
   // ── PATCH /v1/extensions/:name/instances/:instanceId — Update instance ──
-  router.patch('/v1/extensions/:name/instances/:instanceId', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.patch('/v1/extensions/:name/instances/:instanceId', requireAuth(), requireScope('ext:write'), async (req, res) => {
     try {
       const name = req.params.name as string;
       const instanceId = req.params.instanceId as string;
@@ -748,7 +749,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   });
 
   // ── DELETE /v1/extensions/:name/instances/:instanceId — Delete instance ──
-  router.delete('/v1/extensions/:name/instances/:instanceId', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.delete('/v1/extensions/:name/instances/:instanceId', requireAuth(), requireScope('ext:write'), async (req, res) => {
     try {
       const name = req.params.name as string;
       const instanceId = req.params.instanceId as string;

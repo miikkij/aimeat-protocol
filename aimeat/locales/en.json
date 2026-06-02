@@ -330,6 +330,8 @@
         "domainCatalogue": "Catalogue",
         "domainGenerator": "Generator",
         "domainTask": "Tasks",
+        "domainCortex": "Cortex (install/activate browser libraries)",
+        "domainExt": "Extensions (activate server-side extensions)",
         "permExecute": "Execute",
         "permRead": "Read",
         "permWrite": "Write",

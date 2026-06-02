@@ -58,6 +58,20 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_consent_grant: 'consent:manage',
     aimeat_consent_list: 'consent:manage',
     aimeat_consent_revoke: 'consent:manage',
+
+    // Cortex management (POST/DELETE /v1/cortex* → cortex:write)
+    // List/get are NOT gated (mirrors REST: GET /v1/cortex is just requireAuth).
+    aimeat_cortex_install: 'cortex:write',
+    aimeat_cortex_activate: 'cortex:write',
+    aimeat_cortex_deactivate: 'cortex:write',
+    aimeat_cortex_delete: 'cortex:write',
+
+    // Extension lifecycle (POST /v1/extensions/:name/activate etc. → ext:write)
+    // Install is NOT gated (mirrors REST: POST /v1/extensions is just requireAuth — agents
+    // can push code, but it stays inert until ext:write activates it).
+    aimeat_extension_activate: 'ext:write',
+    aimeat_extension_deactivate: 'ext:write',
+    aimeat_extension_delete: 'ext:write',
 };
 
 /** The scope required to use a tool, or undefined if the tool is not scope-gated. */

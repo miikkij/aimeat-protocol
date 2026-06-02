@@ -330,6 +330,8 @@
         "domainCatalogue": "Hakemisto",
         "domainGenerator": "Generaattori",
         "domainTask": "Tehtävät",
+        "domainCortex": "Cortex (asenna/aktivoi selainkirjastoja)",
+        "domainExt": "Laajennukset (aktivoi palvelinpuolen laajennuksia)",
         "permExecute": "Suoritus",
         "permRead": "Luku",
         "permWrite": "Kirjoitus",
