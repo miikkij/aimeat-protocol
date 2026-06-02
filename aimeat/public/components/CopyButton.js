@@ -13,9 +13,11 @@
  *     add onCopied hook (for sites that also toast), copiedLabel, title, type="button",
  *     and a `copied` class in the confirmed state (so bespoke classes like
  *     .dv-copy-btn.copied / .copy-btn.copied can style it) — for the #1 sweep.
- *   v1.1.1 — 2026-06-02 — Compute the class as a single string (htm silently drops the
- *     2nd `${}` hole when two interpolations share one quoted attribute, so the `copied`
- *     class never applied — browser-verified the regression and the fix).
+ *   v1.1.1 — 2026-06-02 — Compute the button class as a single interpolated string
+ *     (className-or-base + optional `copied` modifier) — cleaner than two attribute
+ *     holes and avoids a trailing space. Browser-verified: copied→"…btn-sm copied",
+ *     default→"btn-ghost". (A stale cached build had briefly masked the copied class
+ *     during testing — htm itself handles multi-hole class attributes fine.)
  */
 import { h } from 'preact';
 import { useState, useCallback } from 'preact/hooks';
@@ -41,8 +43,9 @@ export function CopyButton({ text, label, copiedLabel, className = '', title, on
     setTimeout(() => setCopied(false), 2000);
   }, [text, onCopied]);
 
-  // Single computed class string — htm drops the second `${}` hole when two
-  // interpolations share one quoted attribute, so concatenate here instead.
+  // Class as a single computed string: className replaces the btn-ghost base
+  // (so callers can pass btn-primary/btn-outline/etc.), plus the `copied` modifier
+  // when confirmed (bespoke styles like .hlp-copy-btn.copied hook onto it).
   const cls = `${className || 'btn-ghost'}${copied ? ' copied' : ''}`;
 
   return html`
