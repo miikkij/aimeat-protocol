@@ -5,7 +5,6 @@
 import { h } from 'preact';
 import { useEffect } from 'preact/hooks';
 import htm from 'htm';
-import { copyToClipboard } from '/js/utils.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 
 const html = htm.bind(h);

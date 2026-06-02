@@ -1,11 +1,19 @@
+/**
+ * @file portfolio.js
+ * @description Portfolio view — builder (select content, generate AI prompt,
+ *   upload HTML) and public viewer (sandboxed iframe render).
+ * @version-history
+ *   v1.1.0 — 2026-06-02 — Migrate bespoke prompt-copy button to canonical CopyButton component
+ */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml, copyToClipboard, handleImgError } from '/js/utils.js';
+import { escHtml, handleImgError } from '/js/utils.js';
 import { apiGet, apiPut } from '/js/api.js';
 import TagCloud from '/js/components/tag-cloud.js';
+import { CopyButton } from '/components/CopyButton.js';
 
 const NODE_URL = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -238,7 +246,6 @@ function PortfolioBuilder({ session, navigate }) {
 
   // Prompt
   const [generatedPrompt, setGeneratedPrompt] = useState('');
-  const [promptCopied, setPromptCopied] = useState(false);
 
   // Upload
   const [uploading, setUploading] = useState(false);
@@ -311,13 +318,6 @@ function PortfolioBuilder({ session, navigate }) {
       selectedMemories: [...selectedMemories],
       tags: ['portfolio'],
     });
-  };
-
-  // Copy prompt
-  const handleCopyPrompt = async () => {
-    await copyToClipboard(generatedPrompt);
-    setPromptCopied(true);
-    setTimeout(() => setPromptCopied(false), 2000);
   };
 
   // Download prompt as .txt
@@ -614,9 +614,8 @@ function PortfolioBuilder({ session, navigate }) {
           ${generatedPrompt && html`
             <div class="portfolio-prompt-output">${generatedPrompt}</div>
             <div class="portfolio-prompt-actions">
-              <button class="btn btn-primary" onClick=${handleCopyPrompt}>
-                ${promptCopied ? t('portfolio.builder.promptCopied') : t('portfolio.builder.copyPrompt')}
-              </button>
+              <${CopyButton} text=${generatedPrompt} className="btn-primary"
+                label=${t('portfolio.builder.copyPrompt')} copiedLabel=${t('portfolio.builder.promptCopied')} />
               <button class="btn btn-ghost" onClick=${handleDownloadPrompt}>
                 ${t('portfolio.builder.downloadPrompt')}
               </button>

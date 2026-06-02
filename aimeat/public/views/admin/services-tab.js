@@ -17,6 +17,7 @@ import {
   getDiskScript, saveDiskScript, addDiskAction, reinstallExtension,
 } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
+import { CopyButton } from '/components/CopyButton.js';
 
 const inputStyle = 'adm-input';
 const labelStyle = 'adm-text-sm adm-text-dim';
@@ -212,22 +213,6 @@ function TranslationEditor({ extName, inst, onSave }) {
     setSaving(false);
   }
 
-  async function copyAiPrompt() {
-    const prompt = buildTranslationAiPrompt(extName, inst.id, allKeys.length > 0 ? allKeys : ['(no keys detected — add categories to config first)'], locale, translations);
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setMsg({ ok: true, text: t('dashboard.servicesTlPromptCopied') });
-    } catch {
-      const ta = document.createElement('textarea');
-      ta.value = prompt;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      setMsg({ ok: true, text: t('dashboard.servicesTlPromptCopied') });
-    }
-  }
-
   const displayKeys = [...new Set([...allKeys, ...Object.keys(translations)])].sort();
 
   return html`
@@ -241,8 +226,10 @@ function TranslationEditor({ extName, inst, onSave }) {
         </select>
         <button class="adm-btn-sm" onClick=${() => { setJsonMode(!jsonMode); if (!jsonMode) setJsonText(JSON.stringify(translations, null, 2)); }}
           style="font-size:.75rem">${jsonMode ? t('dashboard.servicesTlFormMode') : 'JSON'}</button>
-        <button class="adm-btn-sm" onClick=${copyAiPrompt}
-          style="font-size:.75rem;color:#818cf8;border-color:rgba(79,70,229,0.3)">${t('dashboard.servicesTlAiPrompt')}</button>
+        <${CopyButton} className="adm-btn-sm"
+          text=${buildTranslationAiPrompt(extName, inst.id, allKeys.length > 0 ? allKeys : ['(no keys detected — add categories to config first)'], locale, translations)}
+          label=${t('dashboard.servicesTlAiPrompt')} copiedLabel=${t('dashboard.servicesTlAiPrompt')}
+          onCopied=${() => setMsg({ ok: true, text: t('dashboard.servicesTlPromptCopied') })} />
       </div>
 
       ${jsonMode ? html`

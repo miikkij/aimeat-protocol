@@ -5,14 +5,17 @@
  * @version-history
  *   v1.0.0 — 2026-03-16 — Initial nodes tab
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes
+ *   v1.2.0 — 2026-06-02 — Component unification (#1): tunnel-URL copy button uses
+ *     canonical <CopyButton> (toast preserved via onCopied).
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml, timeAgo, copyToClipboard } from '/js/utils.js';
+import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { useConfirm } from '/components/Modal.js';
 import * as nodesService from '/js/services/nodes.js';
 import { getNodeUrl } from '/js/services/auth.js';
@@ -117,7 +120,7 @@ export default function NodesTab({ session, showToast, onStats }) {
                     <span class="pn-detail-label">${t('profile.nodes.tunnelUrl')}</span>
                     <span class="pn-detail-value flex-row">
                       <code class="text-meta-sm">${tunnelUrl}</code>
-                      <button class="pn-copy-btn" onClick=${() => { copyToClipboard(tunnelUrl).then(() => showToast(t('profile.nodes.copied'))); }}>${t('profile.nodes.copyUrl')}</button>
+                      <${CopyButton} text=${tunnelUrl} label=${t('profile.nodes.copyUrl')} className="pn-copy-btn" onCopied=${() => showToast(t('profile.nodes.copied'))} />
                     </span>
                   </div>
                   <div class="pn-padding-half">

@@ -39,7 +39,7 @@ export function CopyButton({ text, label, copiedLabel, className = '', title, on
   }, [text, onCopied]);
 
   return html`
-    <button class="btn-ghost ${className} ${copied ? 'copied' : ''}" type="button" title=${title} onClick=${handleCopy}>
+    <button class="${className || 'btn-ghost'} ${copied ? 'copied' : ''}" type="button" title=${title} onClick=${handleCopy}>
       ${copied ? (copiedLabel || t('common.copied')) : (label || t('common.copy'))}
     </button>`;
 }

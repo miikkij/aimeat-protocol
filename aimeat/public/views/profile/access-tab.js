@@ -22,6 +22,7 @@ import { escHtml, copyToClipboard } from '/js/utils.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { apiGet, apiPost, apiDelete } from '/js/api.js';
 import { useConfirm } from '/components/Modal.js';
+import { CopyButton } from '/components/CopyButton.js';
 import * as groupsApi from '/js/services/sharing-groups.js';
 import { getOwnerDefaults, upsertOwnerDefaults } from '/js/services/agent-directives.js';
 
@@ -627,7 +628,13 @@ export default function AccessTab({ session, showToast }) {
             onMouseEnter=${() => setKeyBlurred(false)} onMouseLeave=${() => setKeyBlurred(true)}>
             ${escHtml(ownerKey)}
           </div>
-          <span class="badge badge-warn">${t('profile.access.hoverReveal')}</span>
+          <div class="flex-row">
+            <span class="badge badge-warn">${t('profile.access.hoverReveal')}</span>
+            <span onClick=${(e) => e.stopPropagation()}>
+              <${CopyButton} text=${ownerKey} className="btn-sm"
+                onCopied=${() => showToast(t('profile.access.keyCopied'))} />
+            </span>
+          </div>
         </div>
         <div class="access-warn-text">⚠ ${t('profile.access.keepSafe')}</div>
       </div>

@@ -7,12 +7,14 @@
  * @usage import HelpView from '/views/help.js'
  * @version-history
  *   v1.0.0 — 2026-03-23 — Initial implementation
+ *   v1.1.0 — 2026-06-02 — Migrate bespoke copy button to canonical CopyButton component
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { useViewCSS } from '/components/useViewCSS.js';
+import { CopyButton } from '/components/CopyButton.js';
 
 const html = htm.bind(h);
 
@@ -22,7 +24,6 @@ export default function HelpView() {
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     fetch('/v1/help/prompt')
@@ -33,26 +34,6 @@ export default function HelpView() {
       .then(text => { setPrompt(text); setLoading(false); })
       .catch(() => { setError(true); setLoading(false); });
   }, []);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback for older browsers
-      const ta = document.createElement('textarea');
-      ta.value = prompt;
-      ta.style.position = 'fixed';
-      ta.style.left = '-9999px';
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
 
   return html`
     <div class="hlp-container">
@@ -69,9 +50,7 @@ export default function HelpView() {
         </div>
 
         ${!loading && !error && html`
-          <button class="${copied ? 'hlp-copy-btn hlp-copied' : 'hlp-copy-btn'}" onClick=${handleCopy}>
-            ${copied ? t('help.copied') : t('help.copyBtn')}
-          </button>
+          <${CopyButton} text=${prompt} label=${t('help.copyBtn')} copiedLabel=${t('help.copied')} className="hlp-copy-btn" />
         `}
       </div>
     </div>

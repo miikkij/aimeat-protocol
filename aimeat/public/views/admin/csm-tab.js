@@ -6,6 +6,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { dt, Empty, ExpandableHelp, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { getCsmDetail, deleteCsm, createCsm, getCsmFileTemplates, getCsmFileTemplate, getCsmBuilderPrompt } from '/js/services/admin.js';
 
 export default function CsmTab({ data, reload }) {
@@ -17,7 +18,6 @@ export default function CsmTab({ data, reload }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
   const [prompt, setPrompt] = useState('');
-  const [copied, setCopied] = useState(false);
   const [toast, showErr, showOk, clearToast] = useToast();
   const { confirm, ConfirmUI } = useConfirm();
 
@@ -89,15 +89,7 @@ export default function CsmTab({ data, reload }) {
     setLoading(false);
   }
 
-  async function copyPrompt() {
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch { /* fallback — select text */ }
-  }
-
-  function backToList() { setView('list'); setDetail(null); setErr(''); setCopied(false); }
+  function backToList() { setView('list'); setDetail(null); setErr(''); }
 
   // ── Detail view ──
   if (view === 'detail' && detail) {
@@ -149,9 +141,10 @@ export default function CsmTab({ data, reload }) {
 
           <div style="position:relative">
             <pre style="background:var(--bg-deep,#0f172a);padding:16px;border-radius:8px;overflow:auto;font-size:.8rem;max-height:500px;white-space:pre-wrap;line-height:1.5;border:1px solid var(--glass-border,#334155)">${prompt}</pre>
-            <button class="adm-btn" style="position:absolute;top:8px;right:8px" onClick=${copyPrompt}>
-              ${copied ? t('dashboard.copied') : t('dashboard.copy')}
-            </button>
+            <span style="position:absolute;top:8px;right:8px">
+              <${CopyButton} text=${prompt} className="adm-btn"
+                label=${t('dashboard.copy')} copiedLabel=${t('dashboard.copied')} />
+            </span>
           </div>
 
           <div class="adm-mt-lg">

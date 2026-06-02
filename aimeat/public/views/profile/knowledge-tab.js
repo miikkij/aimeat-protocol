@@ -24,7 +24,7 @@ import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
+import { escHtml, copyToClipboard } from '/js/utils.js';
 import { apiGet, apiPost, apiDelete } from '/js/api.js';
 import { listConsents, grantConsent, revokeConsent } from '/js/services/consent.js';
 import { Spinner } from './shared.js';
@@ -178,7 +178,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
         : await knowledgeService.getAgentPrompt();
       const text = resp?.data?.prompt;
       if (text) {
-        await navigator.clipboard.writeText(text);
+        await copyToClipboard(text);
         showToast(t('knowledge.actionBar.copy' + (type === 'human' ? 'HumanPrompt' : 'AgentPrompt')) + ' \u2713');
       } else {
         showToast('Prompt template not available yet');
@@ -276,12 +276,12 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
     try {
       const resp = await knowledgeService.exportPackage(packageId);
       const json = JSON.stringify(resp?.data || manifest, null, 2);
-      await navigator.clipboard.writeText(json);
+      await copyToClipboard(json);
       showToast(t('knowledge.myKnowledge.exportCopied') || 'Package JSON copied to clipboard');
     } catch {
       // Fallback: export the manifest we already have
       try {
-        await navigator.clipboard.writeText(JSON.stringify(manifest, null, 2));
+        await copyToClipboard(JSON.stringify(manifest, null, 2));
         showToast(t('knowledge.myKnowledge.exportCopied') || 'Package JSON copied to clipboard');
       } catch {
         showToast('Failed to export package');

@@ -5,6 +5,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { EconRow, Empty, ExpandableHelp } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { sendTestEmail, getEmailTemplates, sendGroupEmail, saveEmailTemplate, resetEmailTemplate, seedEmailTemplates, resetAllEmailTemplates, saveConfig } from '/js/services/admin.js';
 
 const TEMPLATE_IDS = ['notification', 'verification', 'magic_link', 'match_suggestion'];
@@ -107,23 +108,6 @@ function TemplateEditor({ tpl, locale, onSave, onReset }) {
     }, { danger: true });
   }
 
-  async function copyAiPrompt() {
-    const prompt = buildAiPrompt(tpl, locale);
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setMsg({ ok: true, text: t('dashboard.emailTplAiPromptCopied') });
-    } catch {
-      // Fallback: select textarea
-      const ta = document.createElement('textarea');
-      ta.value = prompt;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      setMsg({ ok: true, text: t('dashboard.emailTplAiPromptCopied') });
-    }
-  }
-
   const hasChanges = editHtml !== (tpl.preview || '') || editText !== (tpl.text || '');
 
   const tabStyle = (active) => `
@@ -186,8 +170,9 @@ function TemplateEditor({ tpl, locale, onSave, onReset }) {
       <div class="adm-flex-center" style="flex-wrap:wrap;margin-top:10px">
         <button class="adm-btn-action adm-text-sm" onClick=${doSave} disabled=${saving || !hasChanges}>
           ${saving ? '...' : t('dashboard.emailTplSave')}</button>
-        <button class="adm-btn-action adm-text-sm" onClick=${copyAiPrompt}
-          style="background:rgba(79,70,229,0.1);border-color:rgba(79,70,229,0.3);color:#818cf8">${t('dashboard.emailTplAiPrompt')}</button>
+        <${CopyButton} text=${buildAiPrompt(tpl, locale)} className="adm-btn-action adm-text-sm"
+          label=${t('dashboard.emailTplAiPrompt')} copiedLabel=${t('dashboard.emailTplAiPrompt')}
+          onCopied=${() => setMsg({ ok: true, text: t('dashboard.emailTplAiPromptCopied') })} />
         ${tpl.isCustom && html`
           <button class="adm-btn-action adm-text-sm" onClick=${doReset} disabled=${saving}
             style="color:#ef4444;border-color:rgba(239,68,68,0.3)">${t('dashboard.emailTplReset')}</button>

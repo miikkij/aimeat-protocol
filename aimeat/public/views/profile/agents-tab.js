@@ -31,13 +31,18 @@
  *   v3.2.0 -- 2026-05-29 -- Tag filter bar + group-by toggle (none / tag / mode)
  *   v3.3.0 -- 2026-05-29 -- Add "Connect a task-runner" collapsible with CrewAI-shaped paste prompt
  *   v3.4.0 -- 2026-05-31 -- Drag-to-reorder agent bars (per-browser localStorage order, ungrouped/unfiltered list only) + pop-out button opening an agent in its own window (/v1/profile?solo=)
+ *   v3.5.0 -- 2026-06-02 -- Component unification: replace 4 bespoke copy-prompt buttons
+ *     (connect command, MCP onboarding, manual agent prompt, task-runner prompt) with the
+ *     canonical <CopyButton> (className="copy-prompt-btn" preserves appearance); removed the
+ *     now-dead copiedAction state + markCopied helper.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml, copyToClipboard } from '/js/utils.js';
+import { escHtml } from '/js/utils.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { Spinner } from './shared.js';
 import { apiGet, apiPost, apiPatch } from '/js/api.js';
 import { listAgents, updateAgentScopes, deleteAgent } from '/js/services/agents.js';
@@ -426,7 +431,6 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
   const [agents, setAgents] = useState(null);
   const [onboardings, setOnboardings] = useState({});
-  const [copiedAction, setCopiedAction] = useState(null);
   const [platExpand, setPlatExpand] = useState(false);
   const [activePlat, setActivePlat] = useState('windows');
   const [scopesModal, setScopesModal] = useState(null);
@@ -476,11 +480,6 @@ export default function AgentsTab({ session, showToast, onStats }) {
     onDragOver: (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; },
     onDrop: (targetName) => { reorderAgents(draggedName.current, targetName); draggedName.current = null; setDraggingName(null); },
     onDragEnd: () => { draggedName.current = null; setDraggingName(null); },
-  };
-
-  const markCopied = (action) => {
-    setCopiedAction(action);
-    setTimeout(() => setCopiedAction(current => current === action ? null : current), 2000);
   };
 
   // Owner opened a tab on an agent → stamp it seen and clear that badge now.
@@ -741,11 +740,11 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
         <p class="mb-half text-bold">${t('profile.agents.cliInstall')}</p>
         <div class="agent-prompt-box"><code>npx aimeat connect --url ${getNodeUrl()} --owner ${session.owner}</code></div>
-        <button class="copy-prompt-btn" onClick=${() => {
-          copyToClipboard(`npx aimeat connect --url ${getNodeUrl()} --owner ${session.owner}`).then(() => {
-            markCopied('connect-command');
-          });
-        }}>${copiedAction === 'connect-command' ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.copyCommand')}</button>
+        <${CopyButton}
+          text=${`npx aimeat connect --url ${getNodeUrl()} --owner ${session.owner}`}
+          className="copy-prompt-btn"
+          label=${t('profile.agents.copyCommand')}
+          copiedLabel=${'\u2705 ' + t('profile.agents.copied')} />
 
         <p class="mt-1 mb-half text-bold">${t('profile.agents.cliServe')}</p>
         <div class="agent-prompt-box"><code>npx aimeat connect serve</code></div>
@@ -755,11 +754,11 @@ export default function AgentsTab({ session, showToast, onStats }) {
         <p class="mt-1 mb-half text-bold">${t('profile.agents.agentInstructionTitle')}</p>
         <p class="text-caption mb-half">${t('profile.agents.agentInstructionDesc')}</p>
         <div class="agent-prompt-box">${buildMcpOnboardingPrompt()}</div>
-        <button class="copy-prompt-btn" onClick=${() => {
-          copyToClipboard(buildMcpOnboardingPrompt()).then(() => {
-            markCopied('agent-instruction');
-          });
-        }}>${copiedAction === 'agent-instruction' ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.copyAgentInstruction')}</button>
+        <${CopyButton}
+          text=${buildMcpOnboardingPrompt()}
+          className="copy-prompt-btn"
+          label=${t('profile.agents.copyAgentInstruction')}
+          copiedLabel=${'\u2705 ' + t('profile.agents.copied')} />
 
         <div class="pf-agent-divider mt-1">
           <button class="expand-btn" onClick=${() => setPlatExpand(!platExpand)}>
@@ -788,11 +787,11 @@ export default function AgentsTab({ session, showToast, onStats }) {
             <div class="mt-half">
               <p class="text-caption mb-half">${t('profile.agents.pasteDesc')}</p>
               <div class="agent-prompt-box">${buildAgentPrompt(session)}</div>
-              <button class="copy-prompt-btn" onClick=${() => {
-                copyToClipboard(buildAgentPrompt(session)).then(() => {
-                  markCopied('manual-agent-prompt');
-                });
-              }}>${copiedAction === 'manual-agent-prompt' ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.copyPrompt')}</button>
+              <${CopyButton}
+                text=${buildAgentPrompt(session)}
+                className="copy-prompt-btn"
+                label=${t('profile.agents.copyPrompt')}
+                copiedLabel=${'\u2705 ' + t('profile.agents.copied')} />
             </div>
           `}
         </div>
@@ -816,11 +815,11 @@ export default function AgentsTab({ session, showToast, onStats }) {
                        onInput=${(e) => setTaskRunnerName(e.target.value)} />
               </div>
               <div class="agent-prompt-box">${buildTaskRunnerPrompt(session, taskRunnerName)}</div>
-              <button class="copy-prompt-btn" onClick=${() => {
-                copyToClipboard(buildTaskRunnerPrompt(session, taskRunnerName)).then(() => {
-                  markCopied('task-runner-prompt');
-                });
-              }}>${copiedAction === 'task-runner-prompt' ? '\u2705 ' + t('profile.agents.copied') : t('profile.agents.taskRunner.copyButton')}</button>
+              <${CopyButton}
+                text=${buildTaskRunnerPrompt(session, taskRunnerName)}
+                className="copy-prompt-btn"
+                label=${t('profile.agents.taskRunner.copyButton')}
+                copiedLabel=${'\u2705 ' + t('profile.agents.copied')} />
             </div>
           `}
         </div>

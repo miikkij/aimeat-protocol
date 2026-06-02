@@ -6,12 +6,16 @@
  * @version-history
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  *   v1.1.0 -- 2026-05-24 -- Add edit/copy/download buttons (F8), edit mode (F9), upload (F10), file metadata (F11)
+ *   v1.2.0 -- 2026-06-02 -- Component unification: route handleCopy through the shared
+ *     copyToClipboard (/js/utils.js) instead of raw navigator.clipboard.writeText, so the
+ *     insecure-context fallback applies; toast preserved (TIER 3, stays a handler)
  */
 
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
+import { copyToClipboard } from '/js/utils.js';
 import { apiGet, apiPut } from '/js/api.js';
 
 const html = htm.bind(h);
@@ -91,7 +95,7 @@ export default function TabAgentConfig({ agent, agentName, session, showToast })
   }
 
   function handleCopy() {
-    navigator.clipboard.writeText(preview).then(() => {
+    copyToClipboard(preview).then(() => {
       showToast(t('profile.agents.detail.agent_config.copy'));
     });
   }

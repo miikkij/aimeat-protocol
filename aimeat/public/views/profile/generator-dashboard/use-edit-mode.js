@@ -30,6 +30,7 @@
  */
 import { useState, useEffect } from 'preact/hooks';
 import { t } from '/js/i18n.js';
+import { copyToClipboard } from '/js/utils.js';
 import {
   loadAllComponents, saveComponent, registerComponent, writeProjectLog,
   savePendingEdit, clearPendingEdit,
@@ -80,7 +81,7 @@ export function useEditMode(core, autopilotState, projectId, orSettings, session
 
   function handleCopyImpactPrompt() {
     const prompt = buildImpactPrompt(changeRequest, core.project?.blueprint);
-    navigator.clipboard.writeText(prompt).catch(() => {});
+    copyToClipboard(prompt).catch(() => {});
     showToast?.(t('profile.generator.impactPromptCopied'));
     setEditMode('impact');
   }
@@ -225,7 +226,7 @@ export function useEditMode(core, autopilotState, projectId, orSettings, session
       suggestedChange || changeRequest,
       upstream || null,
     );
-    navigator.clipboard.writeText(prompt).catch(() => {});
+    copyToClipboard(prompt).catch(() => {});
     showToast?.(t('profile.generator.editPromptCopied').replace('{name}', comp.label));
   }
 

@@ -6,14 +6,18 @@
  * @version-history
  *   v1.0.0 — 2026-03-16 — Initial chat sessions tab
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes; fix fallback strings
+ *   v1.2.0 — 2026-06-02 — Component unification (#1): "Copy GAII" uses canonical
+ *     <CopyButton> (toast preserved); prompt-copy routed through shared copyToClipboard
+ *     (insecure-context fallback) instead of raw navigator.clipboard.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml, timeAgo } from '/js/utils.js';
+import { escHtml, timeAgo, copyToClipboard } from '/js/utils.js';
 import { Spinner } from './shared.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { useConfirm } from '/components/Modal.js';
 import { listAgents, deleteAgent } from '/js/services/agents.js';
 import { apiGet } from '/js/api.js';
@@ -75,7 +79,7 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
       const resp = await apiGet(endpoint);
       const text = resp?.data?.prompt;
       if (text) {
-        await navigator.clipboard.writeText(text);
+        await copyToClipboard(text);
         showToast(t('profile.chatSessions.promptCopied'));
       } else {
         showToast(t('profile.chatSessions.promptError'));
@@ -165,9 +169,9 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
                   </div>
 
                   <div class="card-actions flex-actions">
-                    <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); navigator.clipboard.writeText(s.gaii || s.name); showToast('GAII copied'); }}>
-                      Copy GAII
-                    </button>
+                    <span onClick=${(e) => e.stopPropagation()}>
+                      <${CopyButton} text=${s.gaii || s.name} label=${t('profile.agents.copyGaii')} className="btn-outline btn-sm" onCopied=${() => showToast('GAII copied')} />
+                    </span>
                     <button class="btn-danger-solid btn-sm" onClick=${(e) => { e.stopPropagation(); handleDelete(s); }}
                       disabled=${deleting === s.name}>
                       ${deleting === s.name ? '...' : t('profile.chatSessions.remove')}

@@ -4,6 +4,7 @@
  *   DM Sans body text, JetBrains Mono for the prompt code block.
  * @version-history
  *   v1.0.0 — 2026-03-23 — Initial implementation
+ *   v1.1.0 — 2026-06-02 — Copied-state selector .hlp-copied → .copied (CopyButton component migration)
  */
 
 /* ── Container ── */
@@ -114,7 +115,7 @@
 }
 
 /* ── Copied state ── */
-.hlp-copy-btn.hlp-copied {
+.hlp-copy-btn.copied {
   background: linear-gradient(135deg, #10B981, #059669);
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
 }

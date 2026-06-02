@@ -4,12 +4,14 @@
  *   Browse, search, filter, and read public knowledge packages.
  * @version-history v1.0.0 — 2026-05-26 — Initial implementation
  *   v1.1.0 — 2026-05-26 — Human-readable entry rendering, Copy as Markdown
+ *   v1.2.0 — 2026-06-02 — Migrate Copy-as-Markdown button to canonical CopyButton component
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { CopyButton } from '/components/CopyButton.js';
 
 const NODE_URL = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -453,21 +455,9 @@ function DetailView({ packageId, onBack }) {
     return () => { cancelled = true; };
   }, [packageId]);
 
-  const [copied, setCopied] = useState(false);
-
   const toggleEntry = useCallback((entryKey) => {
     setExpandedEntries(prev => ({ ...prev, [entryKey]: !prev[entryKey] }));
   }, []);
-
-  const handleCopyMarkdown = useCallback(() => {
-    if (!manifest) return;
-    const publicE = (manifest.entries || []).filter(e => e.visibility === 'public');
-    const md = buildFullMarkdown(manifest, publicE, entryData);
-    navigator.clipboard.writeText(md).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }, [manifest, entryData]);
 
   const handleExport = useCallback(async () => {
     try {
@@ -640,9 +630,8 @@ function DetailView({ packageId, onBack }) {
       `}
 
       <div class="pkv-actions">
-        <button class="btn-primary" onClick=${handleCopyMarkdown}>
-          ${copied ? t('pkv.copied') : t('pkv.copyMarkdown')}
-        </button>
+        <${CopyButton} text=${buildFullMarkdown(manifest, publicEntries, entryData)} className="btn-primary"
+          label=${t('pkv.copyMarkdown')} copiedLabel=${t('pkv.copied')} />
         <button class="btn-outline" onClick=${handleExport}>${t('pkv.exportJson')}</button>
       </div>
     </div>

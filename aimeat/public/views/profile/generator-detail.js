@@ -26,6 +26,8 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiPost } from '/js/api.js';
+import { copyToClipboard } from '/js/utils.js';
+import { CopyButton } from '/components/CopyButton.js';
 import {
   saveComponent, saveSpec, registerComponent, reregisterComponent, writeProjectLog, writeDebugArtifact,
 } from '/js/services/generator.js';
@@ -431,7 +433,7 @@ export function ComponentDetail({ component, project, components, projectId, int
   async function handleCopyPrompt() {
     const fresh = await loadPromptFromBackend(projectId, component.id, 'code');
     try {
-      await navigator.clipboard.writeText(fresh);
+      await copyToClipboard(fresh);
       const updated = addHistory(component, 'prompt_copied');
       await saveComponent(projectId, { ...updated, status: 'waiting_user', prompt: fresh });
       showToast?.(t('profile.generator.promptCopied'));
@@ -498,6 +500,14 @@ export function ComponentDetail({ component, project, components, projectId, int
     ? buildExplainPrompt(component.type, result, bpComp)
     : null;
 
+  // Spec fix prompt — derived from current spec validation errors + spec result (shared by Copy and Fix-with-AI buttons)
+  const specFixPrompt = specValidation && !specValidation.valid
+    ? 'Fix the following spec JSON. It has validation errors.\n\n'
+      + '## Errors\n' + specValidation.errors.map((e, i) => (i + 1) + '. ' + e).join('\n')
+      + '\n\n## Current Spec\n```json\n' + specResult + '\n```\n\n'
+      + '## Rules\n- Fix ONLY the listed errors\n- Do NOT remove existing actions\n- Return the COMPLETE fixed JSON'
+    : null;
+
   // Test prompt for testable component types
   const testableTypes = ['extension', 'cortex', 'app'];
   const isTestable = testableTypes.includes(component.type) && component.registeredAs;
@@ -518,7 +528,7 @@ export function ComponentDetail({ component, project, components, projectId, int
   async function handleCopyTestPrompt() {
     if (!currentTestPrompt) return;
     try {
-      await navigator.clipboard.writeText(currentTestPrompt);
+      await copyToClipboard(currentTestPrompt);
       showToast?.(t('profile.generator.test_prompt_copied'));
       await writeProjectLog(projectId, 'test_prompt_copied', { meta: { component: component.label, by: 'user' } });
     } catch { /* clipboard fallback */ }
@@ -633,9 +643,8 @@ export function ComponentDetail({ component, project, components, projectId, int
           <label>SPEC PROMPT</label>
           <pre class="pf-gen-prompt-box" style="max-height:200px;overflow:auto;font-size:11px">${specPrompt || 'Loading spec prompt...'}</pre>
           <div class="flex-row-wrap">
-            <button class="btn-outline btn-sm" onClick=${() => navigator.clipboard.writeText(specPrompt).then(() => showToast?.('Spec prompt copied'))}>
-              Copy Spec Prompt
-            </button>
+            <${CopyButton} text=${specPrompt} label="Copy Spec Prompt" className="btn-outline btn-sm"
+              onCopied=${() => showToast?.('Spec prompt copied')} />
             ${orSettings?.hasApiKey && html`
               <button class="btn-outline btn-sm pf-gen-or-run-btn ${specAiRunning ? 'pf-gen-or-running' : ''}"
                 onClick=${async () => {
@@ -734,23 +743,12 @@ export function ComponentDetail({ component, project, components, projectId, int
               <strong>Spec Validation Errors</strong>
               <ul>${specValidation.errors.map(e => html`<li>${e}</li>`)}</ul>
               <div class="flex-row-wrap" style="margin-top:8px">
-                <button class="btn-outline btn-sm" onClick=${() => {
-                  const fixPrompt = 'Fix the following spec JSON. It has validation errors.\n\n'
-                    + '## Errors\n' + specValidation.errors.map((e, i) => (i + 1) + '. ' + e).join('\n')
-                    + '\n\n## Current Spec\n```json\n' + specResult + '\n```\n\n'
-                    + '## Rules\n- Fix ONLY the listed errors\n- Do NOT remove existing actions\n- Return the COMPLETE fixed JSON';
-                  navigator.clipboard.writeText(fixPrompt);
-                  showToast?.('Fix prompt copied');
-                }}>
-                  Copy Fix Prompt
-                </button>
+                <${CopyButton} text=${specFixPrompt} label="Copy Fix Prompt" className="btn-outline btn-sm"
+                  onCopied=${() => showToast?.('Fix prompt copied')} />
                 ${orSettings?.hasApiKey && html`
                   <button class="btn-outline btn-sm pf-gen-or-run-btn ${specAiRunning ? 'pf-gen-or-running' : ''}"
                     onClick=${async () => {
-                      const fixPrompt = 'Fix the following spec JSON. It has validation errors.\n\n'
-                        + '## Errors\n' + specValidation.errors.map((e, i) => (i + 1) + '. ' + e).join('\n')
-                        + '\n\n## Current Spec\n```json\n' + specResult + '\n```\n\n'
-                        + '## Rules\n- Fix ONLY the listed errors\n- Do NOT remove existing actions\n- Return the COMPLETE fixed JSON';
+                      const fixPrompt = specFixPrompt;
                       setSpecAiRunning(true);
                       try {
                         const fixed = await runWithAi(projectId, fixPrompt);
@@ -823,10 +821,8 @@ export function ComponentDetail({ component, project, components, projectId, int
         />
         <div class="pf-gen-actions">
           ${explainPrompt && html`
-            <button class="btn-ghost btn-sm" onClick=${() => navigator.clipboard.writeText(explainPrompt)}
-              title="Copy explain prompt — ask AI to describe what it built before validating">
-              Explain
-            </button>
+            <${CopyButton} text=${explainPrompt} label="Explain" className="btn-ghost btn-sm"
+              title="Copy explain prompt — ask AI to describe what it built before validating" />
           `}
           ${workflowStep === 'validate' && html`<${StepArrow} />`}
           <button class="btn-primary btn-sm" onClick=${handleValidate} disabled=${!result.trim()}
@@ -858,17 +854,13 @@ export function ComponentDetail({ component, project, components, projectId, int
           </ul>
           ${reflectionPrompt && html`
             <div class="flex-row" style="margin-bottom: 0.5rem">
-              <button class="btn-outline btn-sm" onClick=${() => navigator.clipboard.writeText(reflectionPrompt)}>
-                1. Copy Reflection (diagnose first)
-              </button>
+              <${CopyButton} text=${reflectionPrompt} label="1. Copy Reflection (diagnose first)" className="btn-outline btn-sm" />
             </div>
           `}
           ${fixPrompt && html`
             <div class="flex-row">
               ${workflowStep === 'fix' && html`<${StepArrow} />`}
-              <button class="btn-primary btn-sm" onClick=${() => navigator.clipboard.writeText(fixPrompt)}>
-                2. ${t('profile.generator.copyFixPrompt')}
-              </button>
+              <${CopyButton} text=${fixPrompt} label=${'2. ' + t('profile.generator.copyFixPrompt')} className="btn-primary btn-sm" />
             </div>
           `}
         </div>

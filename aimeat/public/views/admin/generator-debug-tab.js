@@ -12,6 +12,8 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet, apiDelete } from '/js/api.js';
+import { copyToClipboard } from '/js/utils.js';
+import { CopyButton } from '/components/CopyButton.js';
 
 export default function GeneratorDebugTab() {
   const [projects, setProjects] = useState([]);
@@ -127,7 +129,7 @@ export default function GeneratorDebugTab() {
       for (const { path, content } of loaded) {
         parts.push('='.repeat(60), `FILE: ${path}`, '='.repeat(60), content, '');
       }
-      await navigator.clipboard.writeText(parts.join('\n'));
+      await copyToClipboard(parts.join('\n'));
       setCopying('done');
       setTimeout(() => setCopying(false), 2000);
     } catch (e) {
@@ -220,9 +222,8 @@ export default function GeneratorDebugTab() {
               ${selectedFile ? html`
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid var(--border)">
                   <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:0.85rem">${selectedFile}</span>
-                  <button class="btn-outline btn-sm" style="flex-shrink:0" onClick=${() => {
-                    navigator.clipboard.writeText(fileContent).catch(() => {});
-                  }}>Copy File</button>
+                  <span style="flex-shrink:0"><${CopyButton} text=${fileContent}
+                    className="btn-outline btn-sm" label="Copy File" copiedLabel="Copy File" /></span>
                 </div>
                 ${loadingFile
                   ? html`<p>${t('profile.loading')}</p>`

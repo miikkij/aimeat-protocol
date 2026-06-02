@@ -3,7 +3,7 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
+import { escHtml, copyToClipboard } from '/js/utils.js';
 import { dt, Badge, ExpandableHelp, useToast, Toast } from './shared.js';
 import {
   saveSiteTemplate, deleteSiteTemplate, clearSiteCache,
@@ -74,7 +74,7 @@ export default function PortalTab({ data, reload }) {
     try {
       const res = await getSitePrompt();
       const prompt = res.data?.prompt || 'No prompt available';
-      await navigator.clipboard.writeText(prompt);
+      await copyToClipboard(prompt);
       showOk(t('dashboard.portalAiCopied'));
     } catch (e) { showErr(e.message); }
   }

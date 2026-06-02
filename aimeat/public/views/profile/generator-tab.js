@@ -52,6 +52,8 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { apiGet } from '/js/api.js';
+import { copyToClipboard } from '/js/utils.js';
+import { CopyButton } from '/components/CopyButton.js';
 import {
   listProjects, createProject, updateProject, archiveProject,
   loadAllComponents, saveComponent,
@@ -168,7 +170,7 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
   async function handleCopyBlueprintPrompt() {
     try {
       const prompt = await loadGeneratorPrompt(project.projectId, 'blueprint');
-      navigator.clipboard.writeText(prompt).catch(() => {});
+      copyToClipboard(prompt).catch(() => {});
       showToast?.(t('profile.generator.blueprintPromptCopied'));
     } catch (e) {
       showToast?.(e.message, true);
@@ -206,7 +208,7 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
     async function handleCopyInterviewPrompt() {
       try {
         const prompt = await loadGeneratorPrompt(project.projectId, 'interview', getLocale());
-        navigator.clipboard.writeText(prompt).catch(() => {});
+        copyToClipboard(prompt).catch(() => {});
         showToast?.(t('profile.generator.interviewPromptCopied'));
       } catch (e) {
         showToast?.(e.message, true);
@@ -428,9 +430,7 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
             <label>${t('profile.generator.errors')}</label>
             <ul>${blueprintErrors.map(e => html`<li>${e}</li>`)}</ul>
             ${fixPrompt && html`
-              <button class="btn-primary btn-sm" onClick=${() => navigator.clipboard.writeText(fixPrompt)}>
-                ${t('profile.generator.copyFixPrompt')}
-              </button>
+              <${CopyButton} text=${fixPrompt} label=${t('profile.generator.copyFixPrompt')} className="btn-primary btn-sm" />
             `}
           </div>
         `}

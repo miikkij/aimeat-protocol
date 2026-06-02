@@ -22,6 +22,8 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet, apiDelete } from '/js/api.js';
+import { copyToClipboard } from '/js/utils.js';
+import { CopyButton } from '/components/CopyButton.js';
 
 export function DebugPanel({ projectId }) {
   const [files, setFiles] = useState([]);
@@ -105,7 +107,7 @@ export function DebugPanel({ projectId }) {
         }
       }
 
-      await navigator.clipboard.writeText(parts.join('\n'));
+      await copyToClipboard(parts.join('\n'));
       // Brief visual feedback
       setCopying('done');
       setTimeout(() => setCopying(false), 2000);
@@ -175,12 +177,7 @@ export function DebugPanel({ projectId }) {
         ${selectedFile ? html`
           <div class="pf-gen-debug-content-header">
             <span class="pf-gen-debug-path">${selectedFile}</span>
-            <button class="btn-outline btn-sm pf-gen-debug-copy-file" onClick=${() => {
-              if (fileContent) {
-                navigator.clipboard.writeText(fileContent);
-                // TODO: visual feedback
-              }
-            }}>Copy File</button>
+            <${CopyButton} text=${fileContent || ''} label="Copy File" copiedLabel="Copied!" className="btn-outline btn-sm pf-gen-debug-copy-file" />
           </div>
           ${loadingFile
             ? html`<p>${t('profile.loading')}</p>`

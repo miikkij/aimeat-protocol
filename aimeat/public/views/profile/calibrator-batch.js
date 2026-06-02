@@ -33,6 +33,8 @@ function computeWeightedScore(dims) {
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { CopyButton } from '/components/CopyButton.js';
+import { copyToClipboard } from '/js/utils.js';
 import { getBatch, updateBatch, createVersion } from '/js/services/calibrator.js';
 
 
@@ -527,7 +529,7 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
     }).filter(Boolean);
 
     const text = `Here is a prompt that needs improvement:\n\n---\n${currentVersion.prompt}\n---\n\nApply these proposed fixes:\n${selectedProposals.map((p, i) => `${i + 1}. ${p}`).join('\n')}\n\nReturn ONLY the modified prompt text.`;
-    navigator.clipboard.writeText(text).then(() => showToast?.('Copied'));
+    copyToClipboard(text).then(() => showToast?.('Copied'));
   }
 
   // ── Paste handlers ──
@@ -599,10 +601,6 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
       .then(u => { setDetail(u || { ...detail, status: 'synthesized', step4_synthesis: synth }); onUpdate?.(); });
   }
 
-  function copyToClipboard(text, label) {
-    navigator.clipboard.writeText(text).then(() => showToast?.(label + ' copied'));
-  }
-
   // ── Render: Step 1 (Generation) ──
 
   function renderStep1() {
@@ -631,9 +629,7 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
               ` : ''}
               <div class="fnd-cal-run-actions">
                 ${m.step1_generation?.output ? html`
-                  <button class="btn-ghost btn-sm" onClick=${() => copyToClipboard(m.step1_generation.output, 'Output')}>
-                    ${t('profile.calibrator.copy')}
-                  </button>
+                  <${CopyButton} text=${m.step1_generation.output} label=${t('profile.calibrator.copy')} className="btn-sm" onCopied=${() => showToast?.('Output copied')} />
                 ` : ''}
                 <${PasteBack} label=${t('profile.calibrator.pasteOutput')} onSave=${text => handlePasteStep1(i, text)} />
               </div>
@@ -700,9 +696,7 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
                 ${a?.rawResponse ? html`<${CollapsiblePre} label=${t('profile.calibrator.viewRawResponse')} text=${a.rawResponse} />` : ''}
                 <div class="fnd-cal-run-actions">
                   ${a?.analysis ? html`
-                    <button class="btn-ghost btn-sm" onClick=${() => copyToClipboard(typeof a.analysis === 'string' ? a.analysis : JSON.stringify(a.analysis, null, 2), 'Analysis')}>
-                      ${t('profile.calibrator.copy')}
-                    </button>
+                    <${CopyButton} text=${typeof a.analysis === 'string' ? a.analysis : JSON.stringify(a.analysis, null, 2)} label=${t('profile.calibrator.copy')} className="btn-sm" onCopied=${() => showToast?.('Analysis copied')} />
                   ` : ''}
                   <${PasteBack} label=${t('profile.calibrator.pasteAnalysis')} onSave=${text => handlePasteStep2(modelIndex, text)} />
                 </div>

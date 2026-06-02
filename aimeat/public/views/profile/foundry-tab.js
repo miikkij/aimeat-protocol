@@ -52,6 +52,8 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { apiGet } from '/js/api.js';
+import { copyToClipboard } from '/js/utils.js';
+import { CopyButton } from '/components/CopyButton.js';
 import {
   listProjects, createProject, updateProject, archiveProject,
   loadAllComponents, saveComponent,
@@ -168,7 +170,7 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
       }
     } catch { /* proceed without catalog */ }
     const prompt = buildBlueprintPrompt(description, interviewParsed, cortexLibs);
-    navigator.clipboard.writeText(prompt).catch(() => {});
+    await copyToClipboard(prompt);
     showToast?.(t('profile.foundry.blueprintPromptCopied'));
   }
 
@@ -200,12 +202,6 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
   }
 
   if (phase === 'interview') {
-    function handleCopyInterviewPrompt() {
-      const prompt = buildInterviewPrompt(description, getLocale());
-      navigator.clipboard.writeText(prompt).catch(() => {});
-      showToast?.(t('profile.foundry.interviewPromptCopied'));
-    }
-
     async function handleRunInterviewAi() {
       if (!project) return;
       setAiRunning('interview');
@@ -289,9 +285,11 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
         <div class="fnd-section">
           <label>${t('profile.foundry.interviewPrompt')}</label>
           <div class="fnd-or-btn-row">
-            <button class="btn-primary" onClick=${handleCopyInterviewPrompt}>
-              ${t('profile.foundry.copyPrompt')}
-            </button>
+            <${CopyButton}
+              text=${buildInterviewPrompt(description, getLocale())}
+              label=${t('profile.foundry.copyPrompt')}
+              className="btn-primary"
+              onCopied=${() => showToast?.(t('profile.foundry.interviewPromptCopied'))} />
             ${orSettings?.hasApiKey && html`
               <button class="btn-outline fnd-or-run-btn ${aiRunning === 'interview' ? 'fnd-or-running' : ''}"
                 onClick=${handleRunInterviewAi}
@@ -430,9 +428,10 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
             <label>${t('profile.foundry.errors')}</label>
             <ul>${blueprintErrors.map(e => html`<li>${e}</li>`)}</ul>
             ${fixPrompt && html`
-              <button class="btn-primary btn-sm" onClick=${() => navigator.clipboard.writeText(fixPrompt)}>
-                ${t('profile.foundry.copyFixPrompt')}
-              </button>
+              <${CopyButton}
+                text=${fixPrompt}
+                label=${t('profile.foundry.copyFixPrompt')}
+                className="btn-primary btn-sm" />
             `}
           </div>
         `}

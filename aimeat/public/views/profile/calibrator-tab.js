@@ -18,6 +18,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet, apiDelete } from '/js/api.js';
+import { CopyButton } from '/components/CopyButton.js';
 import LlmConfigEditor from '/views/profile/calibrator-llm-editor.js';
 import CalibrationChart from '/views/profile/calibrator-chart.js';
 import BatchCard from '/views/profile/calibrator-batch.js';
@@ -308,10 +309,6 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
     }
   }
 
-  function copyToClipboard(text, label) {
-    navigator.clipboard.writeText(text).then(() => showToast?.(label + ' copied'));
-  }
-
   async function handleArchive() {
     await handleUpdateProject({ status: 'archived' });
     onBack();
@@ -388,14 +385,14 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
               <div class="fnd-cal-editor-label">${t('profile.calibrator.prompt')} (v${selectedVersion || 0})</div>
               <textarea value=${prompt} onInput=${e => setPrompt(e.target.value)} disabled=${isReadOnly} />
               <div class="fnd-cal-editor-actions">
-                <button class="btn-ghost btn-sm" onClick=${() => copyToClipboard(prompt, 'Prompt')}>${t('profile.calibrator.copy')}</button>
+                <${CopyButton} text=${prompt} label=${t('profile.calibrator.copy')} className="btn-sm" onCopied=${() => showToast?.('Prompt copied')} />
               </div>
             </div>
             <div class="fnd-cal-editor-panel">
               <div class="fnd-cal-editor-label">${t('profile.calibrator.targetOutput')}</div>
               <textarea value=${targetOutput} onInput=${e => setTargetOutput(e.target.value)} disabled=${isReadOnly} />
               <div class="fnd-cal-editor-actions">
-                <button class="btn-ghost btn-sm" onClick=${() => copyToClipboard(targetOutput, 'Target')}>${t('profile.calibrator.copy')}</button>
+                <${CopyButton} text=${targetOutput} label=${t('profile.calibrator.copy')} className="btn-sm" onCopied=${() => showToast?.('Target copied')} />
               </div>
             </div>
           </div>
@@ -440,9 +437,7 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
                     <button class="btn-ghost btn-sm" onClick=${() => handleResetTemplate(tc.field)}>
                       ${t('profile.calibrator.resetTemplate')}
                     </button>
-                    <button class="btn-ghost btn-sm" onClick=${() => copyToClipboard(templates[tc.field], 'Template')}>
-                      ${t('profile.calibrator.copy')}
-                    </button>
+                    <${CopyButton} text=${templates[tc.field]} label=${t('profile.calibrator.copy')} className="btn-sm" onCopied=${() => showToast?.('Template copied')} />
                   </div>
                 </div>
               </details>

@@ -6,6 +6,8 @@
  *   v1.0.0 — 2026-03-16 — Initial wallet tab
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes
  *   v1.2.0 — 2026-05-22 — Show info message for federated users instead of infinite spinner
+ *   v1.3.0 — 2026-06-02 — Component unification (#1): copy buttons use canonical
+ *     <CopyButton>; delete local copyToClipboard helper + dead copied-state/handlers.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -14,17 +16,8 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { getWallet, getTransactions, requestMorsels } from '/js/services/wallet.js';
-
-/**
- * Copy text to clipboard, return true on success.
- */
-async function copyToClipboard(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch { return false; }
-}
 
 /**
  * Map backend transaction type to a display label.
@@ -43,8 +36,6 @@ export default function WalletTab({ session, showToast, onStats }) {
   const [walletData, setWalletData] = useState(null);
   const [walletTx, setWalletTx] = useState(null);
   const [expandedTx, setExpandedTx] = useState(null);
-  const [copiedId, setCopiedId] = useState(null);
-  const [balanceCopied, setBalanceCopied] = useState(false);
 
   // Request form state
   const [reqAmount, setReqAmount] = useState('');
@@ -80,33 +71,6 @@ export default function WalletTab({ session, showToast, onStats }) {
   const toggleTx = useCallback((id) => {
     setExpandedTx(prev => prev === id ? null : id);
   }, []);
-
-  async function handleCopyBalance() {
-    const w = walletData;
-    const text = `Balance: ${w.balance ?? 0} | Available: ${(w.balance ?? 0) - (w.in_escrow ?? w.escrow ?? 0)} | Escrow: ${w.in_escrow ?? w.escrow ?? 0}`;
-    const ok = await copyToClipboard(text);
-    if (ok) {
-      setBalanceCopied(true);
-      setTimeout(() => setBalanceCopied(false), 2000);
-    }
-  }
-
-  async function handleCopyTx(tx, e) {
-    e.stopPropagation();
-    const lines = [
-      `ID: ${tx.id || '-'}`,
-      `Type: ${tx.type || '-'}`,
-      `Amount: ${tx.amount}`,
-      tx.counterparty_gaii ? `Counterparty: ${tx.counterparty_gaii}` : null,
-      tx.tracking_code ? `Tracking: ${tx.tracking_code}` : null,
-      tx.timestamp ? `Time: ${tx.timestamp}` : null,
-    ].filter(Boolean).join('\n');
-    const ok = await copyToClipboard(lines);
-    if (ok) {
-      setCopiedId(tx.id);
-      setTimeout(() => setCopiedId(null), 2000);
-    }
-  }
 
   async function handleRequestMorsels(e) {
     e.preventDefault();
@@ -176,9 +140,11 @@ export default function WalletTab({ session, showToast, onStats }) {
 
     <!-- Copy balance button -->
     <div class="mb-1">
-      <button class="btn-outline btn-sm" onClick=${handleCopyBalance}>
-        ${balanceCopied ? t('profile.wallet.copied') : t('profile.wallet.copyBalance')}
-      </button>
+      <${CopyButton}
+        text=${`Balance: ${w.balance ?? 0} | Available: ${(w.balance ?? 0) - escrow} | Escrow: ${escrow}`}
+        label=${t('profile.wallet.copyBalance')}
+        copiedLabel=${t('profile.wallet.copied')}
+        className="btn-outline btn-sm" />
     </div>
 
     <!-- Lifetime stats -->
@@ -230,7 +196,14 @@ export default function WalletTab({ session, showToast, onStats }) {
             const isCredit = tx.amount > 0;
             const typeLabel = txTypeLabel(tx);
             const isExpanded = expandedTx === tx.id;
-            const isCopied = copiedId === tx.id;
+            const txCopyText = [
+              `ID: ${tx.id || '-'}`,
+              `Type: ${tx.type || '-'}`,
+              `Amount: ${tx.amount}`,
+              tx.counterparty_gaii ? `Counterparty: ${tx.counterparty_gaii}` : null,
+              tx.tracking_code ? `Tracking: ${tx.tracking_code}` : null,
+              tx.timestamp ? `Time: ${tx.timestamp}` : null,
+            ].filter(Boolean).join('\n');
             return html`
               <div class="tx-item-wrap">
                 <div class="tx-item" onClick=${() => toggleTx(tx.id)}>
@@ -273,9 +246,13 @@ export default function WalletTab({ session, showToast, onStats }) {
                       <span class="tx-detail-value work-grid-span">${t('profile.wallet.noDetails')}</span>
                     `}
                     <div class="work-grid-span">
-                      <button class="btn-outline btn-sm" onClick=${(e) => handleCopyTx(tx, e)}>
-                        ${isCopied ? t('profile.wallet.copied') : t('profile.wallet.copyTx')}
-                      </button>
+                      <span onClick=${(e) => e.stopPropagation()}>
+                        <${CopyButton}
+                          text=${txCopyText}
+                          label=${t('profile.wallet.copyTx')}
+                          copiedLabel=${t('profile.wallet.copied')}
+                          className="btn-outline btn-sm" />
+                      </span>
                     </div>
                   </div>
                 `}

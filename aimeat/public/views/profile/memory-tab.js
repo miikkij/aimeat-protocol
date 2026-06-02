@@ -9,6 +9,8 @@
  *   v1.3.0 — 2026-05-22 — Add timestamps, sort controls, fix group picker rotation bug
  *   v1.4.0 — 2026-06-02 — Component unification (#2): edit modal uses the canonical
  *     <Modal> component (Escape/backdrop close + header ✕).
+ *   v1.5.0 — 2026-06-02 — Component unification (#1): "Copy URLs" button uses canonical
+ *     <CopyButton> (toast preserved via onCopied).
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -27,6 +29,7 @@ import { listGroups } from '/js/services/sharing-groups.js';
 import TagCloud from '/js/components/tag-cloud.js';
 import TagEditor from '/js/components/tag-editor.js';
 import { Modal, useConfirm } from '/components/Modal.js';
+import { CopyButton } from '/components/CopyButton.js';
 
 export default function MemoryTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -492,15 +495,17 @@ export default function MemoryTab({ session, showToast, onStats }) {
       });
     };
 
-    const copyFileUrls = () => {
-      const urls = filtered.map(f => `${NODE_URL}/v1/memory/files/${encodeURIComponent(f.key || f.name)}`).join('\n');
-      navigator.clipboard.writeText(urls).then(() => showToast(t('profile.files.urlsCopied') || `${filtered.length} URLs copied`));
-    };
+    const fileUrls = filtered.map(f => `${NODE_URL}/v1/memory/files/${encodeURIComponent(f.key || f.name)}`).join('\n');
 
     return html`
       <div class="action-bar">
         <button class="btn-primary" onClick=${() => setShowFileForm(!showFileForm)}>${t('profile.files.uploadBtn')}</button>
-        ${filtered.length > 0 && html`<button class="btn-outline btn-sm" onClick=${copyFileUrls} title="Copy file URLs">\u{1F4CB} ${t('profile.files.copyUrls') || 'Copy URLs'} (${filtered.length})</button>`}
+        ${filtered.length > 0 && html`<${CopyButton}
+          text=${fileUrls}
+          label=${`\u{1F4CB} ${t('profile.files.copyUrls') || 'Copy URLs'} (${filtered.length})`}
+          title="Copy file URLs"
+          className="btn-outline btn-sm"
+          onCopied=${() => showToast(t('profile.files.urlsCopied') || `${filtered.length} URLs copied`)} />`}
         <span class="text-meta-sm">${t('profile.files.sizeLimit')}</span>
       </div>
       <${TagCloud} tags=${[...allTags]} selected=${fileTagFilter} onToggle=${toggleTag} onClear=${() => setFileTagFilter(new Set())} />

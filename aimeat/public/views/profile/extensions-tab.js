@@ -16,6 +16,10 @@
  *   v1.1.0 — 2026-03-17 — Refactor: replace all inline style="" attributes with CSS classes
  *   v1.2.0 — 2026-06-02 — Component unification (#2): both install modals use the
  *     canonical <Modal> component (className="ext-modal-narrow" preserves width).
+ *   v1.3.0 — 2026-06-02 — Component unification (#1): the five tier-2 clipboard
+ *     buttons (copy prompt / script tag / API surface / instance ID / endpoint) now
+ *     use the canonical <CopyButton> with onCopied toasts. The two "Create with AI"
+ *     hero CTAs keep their labeled buttons + copyToClipboard (not copy buttons).
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -25,6 +29,7 @@ import { t } from '/js/i18n.js';
 import { escHtml, copyToClipboard } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { Modal, useConfirm } from '/components/Modal.js';
+import { CopyButton } from '/components/CopyButton.js';
 import * as cortexService from '/js/services/cortex.js';
 import * as v8Ext from '/js/services/extensions.js';
 import { getNodeUrl, getSession } from '/js/services/auth.js';
@@ -664,7 +669,7 @@ export default function ExtensionsTab({ session, showToast }) {
         const content = p._content || p.content || '';
         return html`
           <div class="ext-detail-section">
-            <div class="ext-detail-section-title">${'\u{1F4AC}'} Prompt: ${p.name} <button class="btn-primary btn-sm" onClick=${() => { copyToClipboard(content); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyPrompt')}</button></div>
+            <div class="ext-detail-section-title">${'\u{1F4AC}'} Prompt: ${p.name} <${CopyButton} text=${content} label=${t('profile.extensions.detail.copyPrompt')} className="btn-primary btn-sm" onCopied=${() => showToast(t('profile.extensions.detail.copied'))} /></div>
             <div class="ext-detail-code">${content.substring(0, 500)}${content.length > 500 ? '...' : ''}</div>
           </div>`;
       })}
@@ -676,10 +681,10 @@ export default function ExtensionsTab({ session, showToast }) {
           <div class="ext-detail-section">
             <div class="ext-detail-section-title">${'\u{1F4E6}'} Library: ${lib.filename}</div>
             <div class="ext-lib-meta">${t('profile.extensions.detail.exports')}: ${(lib.exports || []).join(', ')}</div>
-            <div class="ext-lib-label">${t('profile.extensions.detail.scriptTag')} <button class="btn-primary btn-sm" onClick=${() => { copyToClipboard(scriptTag); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyUrl')}</button></div>
+            <div class="ext-lib-label">${t('profile.extensions.detail.scriptTag')} <${CopyButton} text=${scriptTag} label=${t('profile.extensions.detail.copyUrl')} className="btn-primary btn-sm" onCopied=${() => showToast(t('profile.extensions.detail.copied'))} /></div>
             <div class="ext-detail-code">${scriptTag}</div>
             ${lib.api_surface ? html`<div>
-              <div class="ext-lib-label-spaced">${t('profile.extensions.detail.apiSurface')} <button class="btn-primary btn-sm" onClick=${() => { copyToClipboard(lib.api_surface); showToast(t('profile.extensions.detail.copied')); }}>${t('profile.extensions.detail.copyApi')}</button></div>
+              <div class="ext-lib-label-spaced">${t('profile.extensions.detail.apiSurface')} <${CopyButton} text=${lib.api_surface} label=${t('profile.extensions.detail.copyApi')} className="btn-primary btn-sm" onCopied=${() => showToast(t('profile.extensions.detail.copied'))} /></div>
               <div class="ext-detail-code">${lib.api_surface}</div>
             </div>` : null}
           </div>`;
@@ -833,7 +838,7 @@ export default function ExtensionsTab({ session, showToast }) {
                 <span class="ext-instance-name">${inst.id}</span>
                 <span class="ext-status-dot ${inst.status}"></span>
                 <span class="ext-instance-status">${inst.status}</span>
-                <button class="btn-outline btn-sm" onClick=${() => { copyToClipboard(inst.id); showToast(t('profile.v8ext.instanceIdCopied')); }}>${t('profile.v8ext.copyId')}</button>
+                <${CopyButton} text=${inst.id} label=${t('profile.v8ext.copyId')} className="btn-outline btn-sm" onCopied=${() => showToast(t('profile.v8ext.instanceIdCopied'))} />
                 <button class="btn-danger-solid btn-sm" onClick=${() => handleDeleteInstance(ext.name, inst.id)}>${t('profile.v8ext.deleteInstance')}</button>
               </div>`)}
           ${isActive ? html`
@@ -847,7 +852,7 @@ export default function ExtensionsTab({ session, showToast }) {
           <div class="ext-endpoint-box">
             POST ${NODE_URL}/v1/ext/${ext.name}/{actionId}
           </div>
-          <button class="btn-primary btn-sm ext-btn-copy-spaced" onClick=${() => { copyToClipboard(NODE_URL + '/v1/ext/' + ext.name + '/'); showToast(t('profile.v8ext.copied')); }}>${t('profile.v8ext.copyEndpoint')}</button>
+          <${CopyButton} text=${NODE_URL + '/v1/ext/' + ext.name + '/'} label=${t('profile.v8ext.copyEndpoint')} className="btn-primary btn-sm ext-btn-copy-spaced" onCopied=${() => showToast(t('profile.v8ext.copied'))} />
         </div>`}
 
       <div class="ext-actions-bar">

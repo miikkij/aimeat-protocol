@@ -28,6 +28,8 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiPost } from '/js/api.js';
+import { copyToClipboard } from '/js/utils.js';
+import { CopyButton } from '/components/CopyButton.js';
 import {
   saveComponent, registerComponent, reregisterComponent, writeProjectLog, writeDebugArtifact,
   getNextPass, MULTI_PASS_TYPES, saveSkeleton, saveUnit, saveTestCode,
@@ -637,7 +639,7 @@ export function ComponentDetail({ component, project, components, projectId, int
       interviewSpec,
     );
     try {
-      await navigator.clipboard.writeText(fresh);
+      await copyToClipboard(fresh);
       const updated = addHistory(component, 'prompt_copied');
       await saveComponent(projectId, { ...updated, status: 'waiting_user', prompt: fresh });
       showToast?.(t('profile.foundry.promptCopied'));
@@ -719,7 +721,7 @@ export function ComponentDetail({ component, project, components, projectId, int
   async function handleCopyTestPrompt() {
     if (!currentTestPrompt) return;
     try {
-      await navigator.clipboard.writeText(currentTestPrompt);
+      await copyToClipboard(currentTestPrompt);
       showToast?.(t('profile.foundry.test_prompt_copied'));
       await writeProjectLog(projectId, 'test_prompt_copied', { meta: { component: component.label, by: 'user' } });
     } catch { /* clipboard fallback */ }
@@ -817,14 +819,6 @@ export function ComponentDetail({ component, project, components, projectId, int
   // Multi-pass: current pass and submit handler
   const currentPass = isMultiPass && component.passes ? getNextPass(component.passes) : null;
 
-  async function handlePassCopy() {
-    if (!passPrompt) return;
-    try {
-      await navigator.clipboard.writeText(passPrompt);
-      showToast?.(t('profile.foundry.promptCopied'));
-    } catch { /* clipboard fallback */ }
-  }
-
   async function handlePassRunWithAi() {
     if (!currentPass || !passPrompt) return;
     setAiRunning(true);
@@ -899,9 +893,11 @@ export function ComponentDetail({ component, project, components, projectId, int
           <label>${t('profile.foundry.passProgress')} — ${t('profile.foundry.' + (({'test':'passTest','skeleton':'passSkeleton','unit':'passUnit','assembly':'passAssembly','reflection':'passReflection'})[currentPass.type] || currentPass.type))}${currentPass.unitLabel ? ': ' + currentPass.unitLabel : ''}</label>
           <pre class="fnd-prompt-box">${passPrompt}</pre>
           <div class="flex-row-wrap">
-            <button class="btn-outline btn-sm" onClick=${handlePassCopy}>
-              ${t('profile.foundry.copyPrompt')}
-            </button>
+            <${CopyButton}
+              text=${passPrompt}
+              label=${t('profile.foundry.copyPrompt')}
+              className="btn-outline btn-sm"
+              onCopied=${() => showToast?.(t('profile.foundry.promptCopied'))} />
             ${orSettings?.hasApiKey && html`
               <button class="btn-outline btn-sm fnd-or-run-btn ${aiRunning ? 'fnd-or-running' : ''}"
                 onClick=${handlePassRunWithAi}
@@ -982,10 +978,11 @@ export function ComponentDetail({ component, project, components, projectId, int
         />
         <div class="fnd-actions">
           ${explainPrompt && html`
-            <button class="btn-ghost btn-sm" onClick=${() => navigator.clipboard.writeText(explainPrompt)}
-              title="Copy explain prompt — ask AI to describe what it built before validating">
-              Explain
-            </button>
+            <${CopyButton}
+              text=${explainPrompt}
+              label="Explain"
+              className="btn-ghost btn-sm"
+              title="Copy explain prompt — ask AI to describe what it built before validating" />
           `}
           ${workflowStep === 'validate' && html`<${StepArrow} />`}
           <button class="btn-primary btn-sm" onClick=${handleValidate} disabled=${!result.trim()}
@@ -1017,17 +1014,19 @@ export function ComponentDetail({ component, project, components, projectId, int
           </ul>
           ${reflectionPrompt && html`
             <div class="flex-row" style="margin-bottom: 0.5rem">
-              <button class="btn-outline btn-sm" onClick=${() => navigator.clipboard.writeText(reflectionPrompt)}>
-                1. Copy Reflection (diagnose first)
-              </button>
+              <${CopyButton}
+                text=${reflectionPrompt}
+                label="1. Copy Reflection (diagnose first)"
+                className="btn-outline btn-sm" />
             </div>
           `}
           ${fixPrompt && html`
             <div class="flex-row">
               ${workflowStep === 'fix' && html`<${StepArrow} />`}
-              <button class="btn-primary btn-sm" onClick=${() => navigator.clipboard.writeText(fixPrompt)}>
-                2. ${t('profile.foundry.copyFixPrompt')}
-              </button>
+              <${CopyButton}
+                text=${fixPrompt}
+                label=${'2. ' + t('profile.foundry.copyFixPrompt')}
+                className="btn-primary btn-sm" />
             </div>
           `}
         </div>

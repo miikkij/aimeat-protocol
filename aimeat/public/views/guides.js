@@ -1,12 +1,16 @@
 /**
- * Guides — View Module
- * Interactive guide index + detail views with copy-to-clipboard for AI chat.
+ * @file guides.js
+ * @description Guides — interactive guide index + detail views with
+ *   copy-to-clipboard (markdown) for pasting a whole guide into an AI chat.
+ * @version-history
+ *   v1.1.0 — 2026-06-02 — Migrate bespoke copy button to canonical CopyButton component
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { escHtml, copyToClipboard } from '/js/utils.js';
+import { escHtml } from '/js/utils.js';
+import { CopyButton } from '/components/CopyButton.js';
 
 const html = htm.bind(h);
 const NODE_URL = window.location.origin;
@@ -294,7 +298,6 @@ function GuideIndex({ locale, onSelectGuide, navigate }) {
 }
 
 function GuideDetail({ slug, locale, onBack }) {
-  const [copied, setCopied] = useState(false);
   const labels = LABELS[locale] || LABELS.en;
   const guide = GUIDES[slug];
   if (!guide) return html`<div class="gd-container"><p>Guide not found.</p></div>`;
@@ -312,12 +315,6 @@ function GuideDetail({ slug, locale, onBack }) {
     return md;
   }, [data]);
 
-  const handleCopy = useCallback(() => {
-    copyToClipboard(buildMarkdown());
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [buildMarkdown]);
-
   useEffect(() => {
     document.title = data.title + ' | AIME AT';
     window.scrollTo(0, 0);
@@ -334,9 +331,8 @@ function GuideDetail({ slug, locale, onBack }) {
 
       <div class="gd-copy-section">
         <div class="gd-copy-instruction">${labels.copyInstruction}</div>
-        <button class="gd-copy-btn ${copied ? 'copied' : ''}" onClick=${handleCopy}>
-          ${copied ? '\u2714 ' + labels.copiedLabel : '\uD83D\uDCCB ' + labels.copyBtnLabel}
-        </button>
+        <${CopyButton} text=${buildMarkdown()} className="gd-copy-btn"
+          label=${'\uD83D\uDCCB ' + labels.copyBtnLabel} copiedLabel=${'\u2714 ' + labels.copiedLabel} />
       </div>
 
       <div class="gd-tech-warning">${labels.techWarning}</div>
