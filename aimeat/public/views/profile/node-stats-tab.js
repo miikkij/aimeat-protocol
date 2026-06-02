@@ -30,9 +30,9 @@ function fmtBytes(b) {
 }
 
 function StatCard({ label, value, color }) {
-  return html`<div class="card stat-card">
-    <div class="stat-value" style=${`color:${color}`}>${value}</div>
-    <div class="stat-label">${label}</div>
+  return html`<div class="stat-card">
+    <div class="stat-card-value" style=${`color:${color}`}>${value}</div>
+    <div class="stat-card-label">${label}</div>
   </div>`;
 }
 

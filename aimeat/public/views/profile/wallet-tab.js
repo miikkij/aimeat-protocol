@@ -185,10 +185,10 @@ export default function WalletTab({ session, showToast, onStats }) {
     ${(lifetime.earned != null || lifetime.spent != null) && html`
       <div class="section-title">${t('profile.wallet.lifetime')}</div>
       <div class="wallet-lifetime">
-        <div class="wl-stat"><div class="wl-val wl-val-success">${lifetime.earned ?? 0}</div><div class="wl-label">${t('profile.wallet.lifetimeEarned')}</div></div>
-        <div class="wl-stat"><div class="wl-val wl-val-danger">${lifetime.spent ?? 0}</div><div class="wl-label">${t('profile.wallet.lifetimeSpent')}</div></div>
-        <div class="wl-stat"><div class="wl-val">${lifetime.received_allowance ?? 0}</div><div class="wl-label">${t('profile.wallet.lifetimeAllowance')}</div></div>
-        <div class="wl-stat"><div class="wl-val">${lifetime.welcome_bonus ?? 0}</div><div class="wl-label">${t('profile.wallet.lifetimeWelcome')}</div></div>
+        <div class="stat-card"><div class="stat-card-value mono success">${lifetime.earned ?? 0}</div><div class="stat-card-label">${t('profile.wallet.lifetimeEarned')}</div></div>
+        <div class="stat-card"><div class="stat-card-value mono danger">${lifetime.spent ?? 0}</div><div class="stat-card-label">${t('profile.wallet.lifetimeSpent')}</div></div>
+        <div class="stat-card"><div class="stat-card-value mono">${lifetime.received_allowance ?? 0}</div><div class="stat-card-label">${t('profile.wallet.lifetimeAllowance')}</div></div>
+        <div class="stat-card"><div class="stat-card-value mono">${lifetime.welcome_bonus ?? 0}</div><div class="stat-card-label">${t('profile.wallet.lifetimeWelcome')}</div></div>
       </div>
     `}
 

@@ -16,6 +16,10 @@
  *     actions use canonical btn-* (per-button rules removed); remove .pf .input-field
  *     base+focus override so profile inputs use canonical .input-field (kept
  *     select/textarea behavior + sentence-case .form-row label).
+ *   v1.5.0 — 2026-06-02 — Component unification (#6 stat cards): remove .pf .stat-card
+ *     box override + dead .pf-hero .num/.label + .wl-stat/.wl-val/.wl-label +
+ *     .wl-val-success/-danger; profile node-stats + wallet tiles use canonical
+ *     .stat-card / .stat-card-value(.mono/.success/.danger) / .stat-card-label.
  */
 .pf-hero{background:var(--pf-hero-gradient);border-bottom:1px solid var(--border,#E5E7EB)}
 .pf-hero-inner{max-width:1000px;margin:0 auto;padding:2rem 1.5rem 0}
@@ -35,13 +39,9 @@
 .pf-hero-inner .profile-info .ghii,.pf .profile-info .ghii{color:var(--accent,#E8564A);font-family:var(--font-mono,monospace);font-size:.81rem;font-weight:500}
 .pf-hero-inner .profile-info .meta,.pf .profile-info .meta{color:var(--text-dim,#9CA3AF);font-size:.78rem;margin-top:2px}
 .pf-hero-inner .stats-bar,.pf .stats-bar{display:flex;gap:10px;margin-bottom:1.5rem;flex-wrap:wrap}
-.pf-hero-inner .stat-card,.pf .stat-card{background:var(--bg-card);border:1px solid var(--border,#E5E7EB);border-radius:10px;padding:12px 20px;min-width:100px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.04)}
-.pf-hero-inner .stat-card .num,.pf .stat-card .num{font-size:1.4rem;font-weight:800;color:var(--text)}
-.pf-hero-inner .stat-card .num.heart,.pf .stat-card .num.heart{color:#E8564A}
-.pf-hero-inner .stat-card .num.blue,.pf .stat-card .num.blue{color:#3B82F6}
-.pf-hero-inner .stat-card .num.purple,.pf .stat-card .num.purple{color:#8B5CF6}
-.pf-hero-inner .stat-card .num.mint,.pf .stat-card .num.mint{color:#34D399}
-.pf-hero-inner .stat-card .label,.pf .stat-card .label{font-size:.65rem;font-weight:600;color:var(--text-dim,#9CA3AF);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+/* .pf .stat-card box override + dead .pf-hero-inner .stat-card .num/.label (0 sites)
+   removed — profile stat cards (node-stats, wallet) use canonical theme.css
+   .stat-card / .stat-card-value / .stat-card-label. Unified 2026-06-02 (#6). */
 .pf-hero-inner .tabs,.pf .tabs{display:flex;gap:6px 8px;margin-bottom:0;flex-wrap:wrap;padding:0 0 1.5rem}
 .pf-hero-inner .tab,.pf .tab{padding:.45rem .9rem;cursor:pointer;color:var(--text-dim,#6B7280);font-weight:500;font-size:.8rem;border:1px solid var(--border,#E5E7EB);border-radius:999px;transition:all .15s;background:var(--bg-card);white-space:nowrap}
 .pf-hero-inner .tab:hover,.pf .tab:hover{color:var(--text,#1A1A2E);border-color:var(--text-muted);background:var(--bg-surface)}
@@ -108,9 +108,9 @@
 .pf .wallet-request .wr-submit:hover{opacity:.9}
 .pf .wallet-request .wr-submit:disabled{opacity:.5;cursor:not-allowed}
 .pf .wallet-lifetime{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.5rem;margin-top:.5rem}
-.pf .wallet-lifetime .wl-stat{background:var(--bg-card);border:1px solid var(--border,#E5E7EB);border-radius:10px;padding:.75rem;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.04)}
-.pf .wallet-lifetime .wl-stat .wl-val{font-size:1.1rem;font-weight:700;font-family:monospace}
-.pf .wallet-lifetime .wl-stat .wl-label{font-size:.7rem;color:var(--text-dim,#6B7280);text-transform:uppercase;margin-top:.1rem}
+/* .wl-stat/.wl-val/.wl-label removed — wallet lifetime tiles use canonical
+   .stat-card / .stat-card-value.mono(.success/.danger) / .stat-card-label.
+   Unified 2026-06-02 (#6). (.pf .wallet-lifetime grid wrapper kept.) */
 .pf .wallet-balance-copy{display:inline-block;margin-left:.5rem;font-size:.7rem;padding:2px 8px;background:rgba(232,86,74,.15);border:1px solid rgba(232,86,74,.3);border-radius:4px;color:var(--text,#1A1A2E);cursor:pointer;vertical-align:middle}
 .pf .wallet-balance-copy:hover{background:rgba(232,86,74,.25)}
 .pf .mem-item{display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid rgba(232,86,74,.08);font-size:.85rem;cursor:pointer;gap:.5rem}
@@ -1227,9 +1227,8 @@
 /* ── Node Stats tab ── */
 .pf .stat-grid       { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .75rem; margin-bottom: 1.5rem; }
 .pf .stat-grid-sm    { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: .75rem; margin-bottom: 1rem; }
-.pf .stat-card       { text-align: center; padding: 1rem; }
-.pf .stat-value      { font-size: 1.5rem; font-weight: 700; }
-.pf .stat-label      { font-size: .75rem; color: var(--muted); margin-top: .25rem; }
+/* .pf .stat-card/.stat-value/.stat-label removed — node-stats uses canonical
+   .stat-card / .stat-card-value / .stat-card-label. Unified 2026-06-02 (#6). */
 .pf .stat-two-col    { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
 .pf .stat-section-h3 { color: var(--love1); margin: 1.5rem 0 .75rem; font-size: 1rem; }
 .pf .stat-panel-h4   { color: var(--love1); margin: 0 0 .75rem; font-size: .9rem; }
@@ -1273,8 +1272,7 @@
 .pf .access-fed-add  { margin-top: .5rem; }
 
 /* ── Wallet tab ── */
-.pf .wl-val-success  { color: var(--success, #22c55e); }
-.pf .wl-val-danger   { color: var(--danger, #ef4444); }
+/* .wl-val-success/-danger removed — wallet uses canonical .stat-card-value.success/.danger. (#6) */
 .pf .wallet-input-w  { width: 120px; }
 .pf .wallet-reason-field { flex: 1; min-width: 150px; }
 
