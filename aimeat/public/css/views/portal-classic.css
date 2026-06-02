@@ -1,3 +1,11 @@
+/*
+ * @file portal-classic.css
+ * @description Styles for the classic portal landing view (scoped under .cl) — hero,
+ *   welcome board, cards grid, mega-prompt, and economy footer.
+ * @version-history
+ *   v1.1.0 — 2026-06-02 — Phase 5: tokenize for dark mode (replace bare light-only
+ *     surface/border/text literals with theme tokens that flip between light/dark)
+ */
 /* portal-classic view — scoped under .cl */
 /* ── Hero Section ── */
 .cl-hero {
@@ -29,7 +37,7 @@
   border: 1px solid rgba(124, 58, 237, 0.15);
   border-radius: 10px;
   font-size: 0.82rem;
-  color: #6D28D9;
+  color: var(--purple);
   margin-bottom: 1.5rem;
   max-width: 720px;
   margin-left: auto;
@@ -39,7 +47,7 @@
 /* ── Welcome Board ── */
 .cl-welcome-section {
   background: rgba(232, 86, 74, 0.06);
-  border: 1px solid #E5E7EB;
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 1.5rem;
   margin-bottom: 2rem;
@@ -62,9 +70,9 @@
 .cl-board-list {
   max-height: 200px;
   overflow-y: auto;
-  border: 1px solid #E5E7EB;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: #FFFFFF;
+  background: var(--bg-card);
 }
 .cl-board-empty {
   padding: 1rem;
@@ -75,7 +83,7 @@
 }
 .cl-board-msg {
   padding: 0.6rem 0.85rem;
-  border-bottom: 1px solid #F3F4F6;
+  border-bottom: 1px solid var(--border);
   font-size: 0.88rem;
   color: var(--text, #374151);
   line-height: 1.5;
@@ -101,8 +109,8 @@
 .cl-memory-input {
   flex: 1;
   padding: 0.85rem 1rem;
-  background: #FFFFFF;
-  border: 1px solid #E5E7EB;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 10px;
   color: var(--text, #1A1A2E);
   font-size: 0.95rem;
@@ -114,7 +122,7 @@
 .cl-memory-input:focus {
   border-color: var(--accent, #E8564A);
   box-shadow: 0 0 0 3px rgba(232, 86, 74, 0.15);
-  background: #FFFFFF;
+  background: var(--bg-card);
 }
 .cl-memory-input::placeholder { color: var(--text-muted, #9CA3AF); }
 .cl-welcome-result {
@@ -194,15 +202,15 @@
 
 /* ── Card ── */
 .cl-card {
-  background: #FFFFFF;
-  border: 1px solid #E5E7EB;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 16px;
   overflow: hidden;
   transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease, transform 0.35s ease;
   cursor: pointer;
 }
 .cl-card:hover {
-  background: #FFFFFF;
+  background: var(--bg-card);
   border-color: rgba(232, 86, 74, 0.4);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06), 0 8px 32px rgba(0, 0, 0, 0.04);
   transform: translateY(-2px);
@@ -248,7 +256,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: #F3F4F6;
+  background: var(--bg-surface);
   color: var(--text-dim, #6B7280);
   font-size: 0.75rem;
   transition: transform 0.3s ease, background 0.3s ease, color 0.3s ease;
@@ -272,7 +280,7 @@
 
 .cl-card-desc {
   font-size: 0.92rem;
-  color: #6B7280;
+  color: var(--text-dim);
   line-height: 1.7;
   margin-bottom: 1.25rem;
 }
@@ -287,7 +295,7 @@
   border-color: rgba(99, 102, 241, 0.15);
 }
 .cl-group-agents.expanded {
-  border-color: #6366f1;
+  border-color: var(--purple);
   box-shadow: 0 4px 24px rgba(99, 102, 241, 0.1), 0 8px 32px rgba(0, 0, 0, 0.06);
 }
 .cl-group-builders .cl-card-icon {
@@ -314,8 +322,8 @@
   min-height: 200px;
   max-height: 400px;
   padding: 1rem;
-  background: #F3F4F6;
-  border: 1px solid #E5E7EB;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
   border-radius: 10px;
   color: var(--text, #374151);
   font-family: 'Courier New', monospace;
@@ -363,7 +371,7 @@
 .cl-prompt-steps {
   margin-top: 0.75rem;
   font-size: 0.82rem;
-  color: #6B7280;
+  color: var(--text-dim);
   line-height: 1.7;
 }
 .cl-prompt-steps ol { padding-left: 1.2rem; }
@@ -396,14 +404,14 @@
   transform: translateY(-1px);
 }
 .cl-launcher-cta.secondary {
-  background: #F3F4F6;
-  border-color: #E5E7EB;
+  background: var(--bg-surface);
+  border-color: var(--border);
   font-weight: 600;
   font-size: 0.85rem;
   padding: 0.45rem 1rem;
 }
 .cl-launcher-cta.secondary:hover {
-  background: #E5E7EB;
+  background: var(--border);
   border-color: rgba(251, 191, 36, 0.3);
 }
 
@@ -419,11 +427,11 @@
   font-weight: 700;
   font-size: 0.95rem;
   margin-bottom: 0.5rem;
-  color: #374151;
+  color: var(--text-dim);
 }
 .cl-return-motivation {
   font-size: 0.85rem;
-  color: #6B7280;
+  color: var(--text-dim);
   margin-bottom: 0.5rem;
 }
 
@@ -439,20 +447,20 @@
   font-weight: 700;
   font-size: 0.95rem;
   margin-bottom: 0.5rem;
-  color: #374151;
+  color: var(--text-dim);
 }
 .cl-connect-desc {
   font-size: 0.88rem;
-  color: #6B7280;
+  color: var(--text-dim);
   margin-bottom: 0.75rem;
 }
 .cl-connect-link {
-  color: #7C3AED;
+  color: var(--purple);
   text-decoration: underline;
   text-underline-offset: 2px;
   font-size: 0.9rem;
 }
-.cl-connect-link:hover { color: #6D28D9; }
+.cl-connect-link:hover { color: var(--purple); }
 
 /* ── Morsels economy footer ── */
 .cl-morsels-economy {

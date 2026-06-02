@@ -1,6 +1,8 @@
 /**
- * Hobbies — View Module
- * Multi-view hobby directory: home, search, profile, join, me, matches.
+ * @file hobbies.js
+ * @description Hobbies view module — multi-view hobby directory (home, search, profile, join, me, matches) rendered with Preact + HTM.
+ * @version-history
+ *   v1.1.0 — 2026-06-02 — Phase 5: tokenize for dark mode (replaced light-only rgba(255,255,255,...) divider with var(--border))
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -287,9 +289,9 @@ function ProfileView({ goTo, ghii }) {
     </div>
     ${locStr && html`<div class="hb-profile-section"><div class="hb-profile-section-label">${t('hobbies.profile.location')}</div><div class="hb-profile-detail">${locStr}</div></div>`}
     ${isLoggedIn() && html`
-      <div style="margin-top:24px;padding-top:16px;border-top:1px solid rgba(255,255,255,.06);">
+      <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border);">
         <button onClick=${doFlag} class="hb-btn hb-btn-danger hb-btn-sm">${t('hobbies.profile.flagBtn')}</button>
-        ${flagResult && html`<div style="margin-top:8px;color:${flagResult === t('hobbies.profile.flagSent') ? 'var(--success)' : '#ef4444'}">${flagResult}</div>`}
+        ${flagResult && html`<div style="margin-top:8px;color:${flagResult === t('hobbies.profile.flagSent') ? 'var(--success)' : 'var(--danger)'}">${flagResult}</div>`}
       </div>
     `}
     <div style="margin-top:24px;"><a class="hb-btn hb-btn-secondary" onClick=${() => goTo('search')}>${t('hobbies.profile.backToSearch')}</a></div>
@@ -414,7 +416,7 @@ function JoinView({ goTo }) {
         </label>
       </div>
       <button type="submit" class="hb-btn hb-btn-primary" disabled=${status === 'saving'}>${status === 'saving' ? t('hobbies.join.saving') : t('hobbies.join.submitBtn')}</button>
-      ${errorMsg && html`<div style="margin-top:12px;color:#ef4444;">${errorMsg}</div>`}
+      ${errorMsg && html`<div style="margin-top:12px;color:var(--danger);">${errorMsg}</div>`}
     </form>
   `;
 }
@@ -568,7 +570,7 @@ function MeView({ goTo }) {
         <div class="hb-form-hint" style="margin-top:4px;">${t(notifyEnabled ? 'hobbies.me.notificationsOn' : 'hobbies.me.notificationsOff')}</div>
       </div>
       <button type="submit" class="hb-btn hb-btn-primary">${t('hobbies.me.saveBtn')}</button>
-      ${saveMsg && html`<div style="margin-top:12px;color:${saveMsg === t('hobbies.me.saved') ? 'var(--success)' : '#ef4444'}">${saveMsg}</div>`}
+      ${saveMsg && html`<div style="margin-top:12px;color:${saveMsg === t('hobbies.me.saved') ? 'var(--success)' : 'var(--danger)'}">${saveMsg}</div>`}
     </form>
     <div style="margin-top:24px;"><a class="hb-btn hb-btn-secondary" onClick=${() => goTo('profile', myGhii)}>${t('hobbies.me.viewPublic')}</a></div>
   `;
