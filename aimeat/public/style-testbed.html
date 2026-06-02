@@ -12,6 +12,9 @@
     nav and not a service — purely an internal decision aid.
   @version-history
     v1.0.0 — 2026-06-02 — Initial testbed (buttons, inputs, stat cards)
+    v1.1.0 — 2026-06-02 — Add "Add / merge into canonical" decision option; per-clone
+      "maps to" annotations (each variant's canonical equivalent); relabel canonical
+      Outline as (= secondary) + add Info variant, so "delete clone" is never lossy.
 -->
 <html lang="en" data-theme="dark">
 <head>
@@ -51,11 +54,15 @@
       box at the bottom — paste it back to me and I'll implement it.
     </p>
     <p class="stb-intro stb-muted">
-      Decision options: <em>Use canonical</em> = delete the clone, adopt the theme.css look ·
-      <em>Keep this look</em> = make this the standard (I'll fold it into theme.css; other views may change) ·
-      <em>Delete (dead)</em> = unused CSS, safe to remove · <em>Leave separate</em> = no change.
-      Admin (<code>.adm-*</code>) is shown for reference only — per your call it stays its own design
-      system (consolidated separately), so it has no "use canonical" option.
+      Decision options: <em>Use canonical as-is</em> = the clone is a redundant duplicate, delete it; its
+      variants already exist in canonical (e.g. a clone's "Secondary" <strong>is</strong> canonical
+      <code>.btn-outline</code>) · <em>Add / merge into canonical</em> = this look — or a variant canonical
+      doesn't have — is worth keeping, so I fold it into <code>theme.css</code> for every view, then delete the
+      clone · <em>Leave separate</em> = no change · <em>Delete (dead)</em> = unused, safe to remove.
+      <strong>Nothing is ever lost:</strong> "delete clone" only removes a duplicate whose look already lives in
+      canonical — if a clone has something canonical lacks, pick <em>Add / merge into canonical</em>. The
+      "maps&nbsp;to" line under each clone shows exactly which canonical class each variant becomes.
+      Admin (<code>.adm-*</code>) stays its own design system, consolidated separately.
     </p>
   </header>
 
@@ -76,12 +83,14 @@
           <div class="stb-variant-head"><span class="stb-vname">Canonical · <code>theme.css .btn-*</code></span><span class="stb-tag stb-ref">reference</span></div>
           <div class="stb-specimens">
             <button class="btn-primary" type="button">Primary</button>
-            <button class="btn-outline" type="button">Outline</button>
+            <button class="btn-outline" type="button">Outline (= secondary)</button>
             <button class="btn-danger-solid" type="button">Danger</button>
             <button class="btn-ghost" type="button">Ghost</button>
             <button class="btn-success" type="button">Success</button>
+            <button class="btn-info" type="button">Info</button>
             <button class="btn-primary btn-sm" type="button">Small</button>
           </div>
+          <p class="stb-map">Full canonical set: <code>btn-primary</code> · <code>btn-outline</code> (secondary) · <code>btn-danger</code>/<code>btn-danger-solid</code> · <code>btn-ghost</code> · <code>btn-success</code> · <code>btn-info</code> · <code>btn-sm</code></p>
         </div>
 
         <!-- Profile .pf .btn-primary -->
@@ -96,6 +105,7 @@
             <button class="btn-primary btn-sm" type="button">Small</button>
           </div>
           <p class="stb-diff">darker gradient (→#D4493F) · 6px radius · no resting heart-shadow · 8×16 padding · .85rem</p>
+          <p class="stb-map">maps to: every variant already exists in canonical (Primary→<code>btn-primary</code>, Outline→<code>btn-outline</code>, Danger→<code>btn-danger-solid</code>, Ghost→<code>btn-ghost</code>, Success→<code>btn-success</code>, Small→<code>btn-sm</code>). Only the <em>look</em> differs.</p>
           <div class="stb-decide-wrap"></div>
         </div>
 
@@ -109,6 +119,7 @@
             </div>
           </div>
           <p class="stb-diff">flat-accent mini pills · bare class names (collision-prone) · danger uses hardcoded rgba(239,68,68) (won't theme-flip)</p>
+          <p class="stb-map">maps to: Install→<code>btn-primary btn-sm</code> · Remove→<code>btn-danger-solid btn-sm</code> (same as how the knowledge tab already migrated)</p>
           <div class="stb-decide-wrap"></div>
         </div>
 
@@ -121,6 +132,7 @@
             <button class="mk-btn mk-btn-primary mk-btn-sm" type="button">Small</button>
           </div>
           <p class="stb-diff">gradient 2nd stop #E8564A (not #FF6B6B) · 10px radius · no resting shadow · opacity-fade hover</p>
+          <p class="stb-map">maps to: Primary→<code>btn-primary</code> · Secondary→<code>btn-outline</code> · Small→<code>btn-sm</code></p>
           <div class="stb-decide-wrap"></div>
         </div>
 
@@ -133,6 +145,7 @@
             <button class="hb-btn hb-btn-danger hb-btn-sm" type="button">Danger</button>
           </div>
           <p class="stb-diff">near-twin of mk-btn · danger hardcodes #ef4444/rgba(239,68,68) (won't theme-flip)</p>
+          <p class="stb-map">maps to: Primary→<code>btn-primary</code> · Secondary→<code>btn-outline</code> · Danger→<code>btn-danger</code> · Small→<code>btn-sm</code></p>
           <div class="stb-decide-wrap"></div>
         </div>
 
@@ -145,6 +158,7 @@
             <button class="cl-copy-prompt-btn" type="button">Copy prompt</button>
           </div>
           <p class="stb-diff">heavier 700/.92rem · 10px radius · has a .loading spinner state · register hardcodes #22c55e/#16a34a</p>
+          <p class="stb-map stb-map-warn">maps to: Save→<code>btn-primary</code> · Register→<code>btn-success</code> · Copy→<code>btn-primary</code>. ⚠ the <code>.loading</code> spinner state has NO canonical equivalent → pick "Add / merge into canonical" to keep it.</p>
           <div class="stb-decide-wrap"></div>
         </div>
 
@@ -156,6 +170,7 @@
             <span class="stb-mini-note">(<code>.dv-copy-btn</code> is absolute-positioned; uses the --love gradient palette deliberately)</span>
           </div>
           <p class="stb-diff">uses the separate --love1/2/3 brand palette · .copied state hardcodes #22c55e (won't theme-flip)</p>
+          <p class="stb-map">maps to: Upload→<code>btn-primary</code> · Copy→<code>btn-ghost</code>/<code>CopyButton</code>. The --love palette is a deliberate dev-portal identity — "Leave separate" is reasonable here.</p>
           <div class="stb-decide-wrap"></div>
         </div>
 
@@ -167,6 +182,7 @@
             <button class="kpkg-btn kpkg-btn-danger" type="button">Danger</button>
           </div>
           <p class="stb-diff">orphaned — nothing renders these (knowledge tab already uses canonical btn-outline/btn-danger-solid). Safe to delete.</p>
+          <p class="stb-map">maps to: Primary→<code>btn-outline</code>, Danger→<code>btn-danger-solid</code> (already what the knowledge tab uses). But if you like this flat-indigo look, "Add to canonical" keeps it.</p>
           <div class="stb-decide-wrap"></div>
         </div>
       </div>
@@ -289,6 +305,7 @@
             <div class="mk-stat-card"><div class="mk-stat-value">1,284</div><div class="mk-stat-label">Members</div></div>
           </div>
           <p class="stb-diff">value tinted var(--accent) · 1.5rem/700 · 10px radius · sentence-case label · label fallback #6b6b8a</p>
+          <p class="stb-map">the accent-tinted value is a variant canonical lacks → "Add / merge into canonical" would add an optional <code>.stat-card-value.accent</code> tone everyone could use.</p>
           <div class="stb-decide-wrap"></div>
         </div>
 
@@ -329,6 +346,7 @@
             <div class="wl-stat"><div class="wl-val wl-val-success">1,284</div><div class="wl-label">Earned</div></div>
           </div>
           <p class="stb-diff">monospace value (numeric alignment) · success/danger tints · label fallback #6B7280</p>
+          <p class="stb-map">monospace value + success/danger tints are variants canonical lacks → "Add / merge into canonical" would add <code>.stat-card-value.mono</code> / <code>.success</code> / <code>.danger</code> modifiers.</p>
           <div class="stb-decide-wrap"></div>
         </div>
 

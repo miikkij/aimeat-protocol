@@ -15,20 +15,22 @@
   const OPTIONS = {
     standard: [
       ['', '— decide —'],
-      ['canonical', 'Use canonical (delete this clone)'],
-      ['keep', 'Keep THIS look (make it the standard)'],
+      ['canonical', 'Use canonical as-is (delete clone; variants already exist)'],
+      ['promote', 'Add / merge into canonical (make this look shared)'],
       ['separate', 'Leave separate (no change)'],
       ['delete', 'Delete (unused)'],
     ],
     admin: [
       ['', '— decide —'],
       ['consolidate', 'Consolidate into the ONE admin design'],
+      ['promote', 'Promote this variant to admin-shared'],
       ['keep', 'Keep as-is'],
       ['separate', 'Leave separate'],
     ],
     dead: [
       ['delete', 'Delete (confirmed dead)'],
-      ['keep', 'Actually keep it'],
+      ['promote', 'Actually keep → add to canonical'],
+      ['keep', 'Keep as-is'],
       ['', '— decide —'],
     ],
   };
@@ -36,7 +38,8 @@
   // Human-readable labels for the output summary.
   const LABEL = {
     canonical: 'USE CANONICAL',
-    keep: 'KEEP THIS LOOK',
+    promote: 'ADD TO CANONICAL',
+    keep: 'KEEP AS-IS',
     separate: 'LEAVE SEPARATE',
     delete: 'DELETE',
     consolidate: 'CONSOLIDATE (admin)',
