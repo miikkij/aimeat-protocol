@@ -7,6 +7,8 @@
  *     hobbies buttons use canonical theme.css .btn-primary / .btn-outline / .btn-danger / .btn-sm.
  *   v1.3.0 — 2026-06-02 — Component unification (#5 inputs): remove .hb-form-input/
  *     -textarea/-select; fields use canonical .input-field (kept hb-form-group/-label/-hint).
+ *   v1.4.0 — 2026-06-02 — Component unification (#6 stat cards): remove .hb-stat*;
+ *     stats use canonical .stat-grid / .stat-card / .stat-card-value.accent / .stat-card-label.
  */
 /* hobbies view — scoped under .hb */
 .hb-wrap { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 24px 16px 80px; }
@@ -38,10 +40,8 @@
   /* .hb-form-input/-textarea/-select removed — hobbies form fields use canonical
      theme.css .input-field (focus ring added). Unified 2026-06-02 (#5). */
   .hb-form-hint { font-size: .78rem; color: var(--text-muted); margin-top: 4px; }
-  .hb-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 32px; }
-  .hb-stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; text-align: center; }
-  .hb-stat-value { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
-  .hb-stat-label { font-size: .78rem; color: var(--text-muted); margin-top: 4px; }
+  /* .hb-stat* removed — hobbies stats use canonical .stat-grid / .stat-card /
+     .stat-card-value.accent / .stat-card-label. Unified 2026-06-02 (#6). */
   .hb-categories-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 32px; }
   .hb-category-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-align: center; cursor: pointer; transition: all .2s; }
   .hb-category-card:hover { background: var(--bg-surface); border-color: #E8564A; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }

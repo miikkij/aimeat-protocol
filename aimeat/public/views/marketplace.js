@@ -146,9 +146,9 @@ function HomeView({ extAction, instanceConfig, onNav, tl }) {
     <h1 class="mk-page-title">${instanceConfig.name || t('mkt.home.title')}</h1>
     <p class="mk-page-subtitle">${instanceConfig.description || t('mkt.home.subtitle')}</p>
 
-    <div class="mk-stats-grid">
-      <div class="mk-stat-card"><div class="mk-stat-value">${total}</div><div class="mk-stat-label">${t('mkt.home.listings')}</div></div>
-      <div class="mk-stat-card"><div class="mk-stat-value">${Object.keys(catCounts).length}</div><div class="mk-stat-label">${t('mkt.home.categories')}</div></div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-card-value accent">${total}</div><div class="stat-card-label">${t('mkt.home.listings')}</div></div>
+      <div class="stat-card"><div class="stat-card-value accent">${Object.keys(catCounts).length}</div><div class="stat-card-label">${t('mkt.home.categories')}</div></div>
     </div>
 
     <h2 class="mk-section-heading">${t('mkt.home.categoriesHeading')}</h2>

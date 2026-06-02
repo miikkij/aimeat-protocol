@@ -83,10 +83,10 @@ function HomeView({ goTo }) {
   return html`
     <h1 class="hb-page-title">${t('hobbies.title')}</h1>
     <p class="hb-page-subtitle">${t('hobbies.subtitle')}</p>
-    <div class="hb-stats-grid">
-      <div class="hb-stat-card"><div class="hb-stat-value">${stats.total_people}</div><div class="hb-stat-label">${t('hobbies.members')}</div></div>
-      <div class="hb-stat-card"><div class="hb-stat-value">${stats.top_interests?.length || 0}</div><div class="hb-stat-label">${t('hobbies.hobbies')}</div></div>
-      <div class="hb-stat-card"><div class="hb-stat-value">${stats.top_cities?.length || 0}</div><div class="hb-stat-label">${t('hobbies.cities')}</div></div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-card-value accent">${stats.total_people}</div><div class="stat-card-label">${t('hobbies.members')}</div></div>
+      <div class="stat-card"><div class="stat-card-value accent">${stats.top_interests?.length || 0}</div><div class="stat-card-label">${t('hobbies.hobbies')}</div></div>
+      <div class="stat-card"><div class="stat-card-value accent">${stats.top_cities?.length || 0}</div><div class="stat-card-label">${t('hobbies.cities')}</div></div>
     </div>
     <h2 style="font-size:1.1rem;color:var(--text-bright);margin-bottom:16px;">${t('hobbies.browseByCategory')}</h2>
     <div class="hb-categories-grid">

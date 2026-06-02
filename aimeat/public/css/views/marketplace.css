@@ -8,6 +8,8 @@
  *     marketplace buttons use canonical theme.css .btn-primary / .btn-outline / .btn-sm.
  *   v1.3.0 — 2026-06-02 — Component unification (#5 inputs): remove .mk-form-input/
  *     -textarea/-select; fields use canonical .input-field (kept mk-form-group/-label/-grid).
+ *   v1.4.0 — 2026-06-02 — Component unification (#6 stat cards): remove .mk-stat*;
+ *     stats use canonical .stat-grid / .stat-card / .stat-card-value.accent / .stat-card-label.
  */
 
 /* marketplace view — scoped under .mk- */
@@ -59,10 +61,8 @@
 .mk-status-completed { background: var(--info-bg); border: 1px solid var(--info-border); color: var(--info-fg); }
 .mk-status-delisted { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger-fg); }
 
-.mk-stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 32px; }
-.mk-stat-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
-.mk-stat-value { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
-.mk-stat-label { font-size: 0.78rem; color: var(--text-muted, #6b6b8a); margin-top: 4px; }
+/* .mk-stat* removed — marketplace stats use canonical .stat-grid / .stat-card /
+   .stat-card-value.accent / .stat-card-label. Unified 2026-06-02 (#6). */
 
 .mk-categories-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 32px; }
 .mk-category-card {
