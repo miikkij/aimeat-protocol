@@ -448,7 +448,8 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         const filename = req.params.filename as string;
 
         // Same lookup order as DELETE: canonical owner-GHII bucket first,
-        // then agent-GAII shadow bucket (pre-fix rows), then bare owner.
+        // then agent-GAII shadow bucket (pre-fix rows), then bare owner,
+        // then a last-resort lookup by ownerName across all buckets.
         let app = await storage.getApp(ownerGhii, filename);
         let effectiveGaii = ownerGhii;
         if (!app) {
@@ -458,6 +459,10 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         if (!app) {
             app = await storage.getApp(owner, filename);
             if (app) effectiveGaii = owner;
+        }
+        if (!app) {
+            const found = await storage.getAppByOwnerName(owner, filename);
+            if (found && found.ownerName === owner) { app = found; effectiveGaii = found.ownerGaii; }
         }
         if (!app) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found in your uploads`));
@@ -486,9 +491,11 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
     // DELETE /v1/apps/:filename — Remove an app you own (supports ?version=N)
     // Apps are owner-scoped: an agent acting on behalf of its owner can delete
-    // the owner's apps. We resolve to the owner's GHII first, then fall through
-    // to historical buckets (callerGaii, bareOwner) for rows created before the
-    // POST handler started always-keying-by-owner-GHII.
+    // the owner's apps. To clean up "ghost" rows created by old buggy publish
+    // paths (different ownerGaii buckets for the same owner+filename), the
+    // no-version case sweeps ALL buckets that match the owner name. A
+    // single-version delete still targets one bucket (you might want to keep
+    // versions in one bucket while removing a stray version from another).
     router.delete('/v1/apps/:filename', requireAuth(), async (req, res) => {
         const callerGaii = resolveIdentity(req.auth!, config.nodeId);
         const owner = req.auth!.owner;
@@ -497,32 +504,45 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         const versionParam = req.query.version as string | undefined;
         const version = versionParam ? parseInt(versionParam, 10) : undefined;
 
-        // Lookup order:
-        //   1. owner GHII  — the canonical place since the keying fix
-        //   2. caller GAII — agent-bucket shadow rows from before the fix
-        //   3. bare owner  — even older rows (pre-GHII formatting)
-        // Returning the first hit is correct: any of those buckets belongs to
-        // this user, so they are allowed to delete it.
-        let app = await storage.getApp(ownerGhii, filename, version);
-        let effectiveGaii = ownerGhii;
-        if (!app) {
-            app = await storage.getApp(callerGaii, filename, version);
-            if (app) effectiveGaii = callerGaii;
-        }
-        if (!app) {
-            app = await storage.getApp(owner, filename, version);
-            if (app) effectiveGaii = owner;
-        }
-        if (!app) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found in your uploads${version ? ` (version ${version})` : ''}`));
-            return;
-        }
-
-        await storage.deleteApp(effectiveGaii, filename, version);
-
+        // ── No-version case: sweep every bucket this owner has for this filename ──
+        // getAppByOwnerName finds the latest version in any bucket; we delete
+        // that bucket entirely (deleteApp without version removes all its
+        // versions), then loop until no more rows exist. This handles ghost
+        // entries from old shadow-bucket bugs in one user click.
         if (!version) {
-            // Full delete — also remove screenshot stored under the same bucket
-            await storage.deleteStorageFile(effectiveGaii, `apps/screenshots/${filename}`);
+            let sweepCount = 0;
+            for (;;) {
+                const app = await storage.getAppByOwnerName(owner, filename);
+                if (!app) break;
+                // Authorization sanity check: ownerName MUST match the caller's
+                // owner. (It always will, because getAppByOwnerName takes
+                // ownerName as the key — but defense in depth.)
+                if (app.ownerName !== owner) break;
+                await storage.deleteApp(app.ownerGaii, filename);
+                await storage.deleteStorageFile(app.ownerGaii, `apps/screenshots/${filename}`).catch(() => {});
+                sweepCount++;
+                if (sweepCount > 10) break; // safety cap, no real owner has >10 buckets
+            }
+            if (sweepCount === 0) {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found in your uploads`));
+                return;
+            }
+        } else {
+            // ── Single-version case: try buckets in order, delete from the one that has it ──
+            let app = await storage.getApp(ownerGhii, filename, version);
+            let effectiveGaii = ownerGhii;
+            if (!app) { app = await storage.getApp(callerGaii, filename, version); if (app) effectiveGaii = callerGaii; }
+            if (!app) { app = await storage.getApp(owner, filename, version); if (app) effectiveGaii = owner; }
+            if (!app) {
+                // Last-resort: find the row by ownerName across all buckets
+                const found = await storage.getAppByOwnerName(owner, filename, version);
+                if (found && found.ownerName === owner) { app = found; effectiveGaii = found.ownerGaii; }
+            }
+            if (!app) {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found in your uploads (version ${version})`));
+                return;
+            }
+            await storage.deleteApp(effectiveGaii, filename, version);
         }
 
         await storage.addSiteChangeLog({
