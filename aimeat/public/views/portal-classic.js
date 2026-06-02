@@ -6,7 +6,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
-import { copyToClipboard } from '/js/utils.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { t as globalT } from '/js/i18n.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 
@@ -318,21 +318,10 @@ function WelcomeBoard() {
 /* ══════════════════════════════════════════════
    COPY BUTTON COMPONENT
    ══════════════════════════════════════════════ */
+// Thin wrapper over the canonical CopyButton \u2014 keeps the classic-portal labels +
+// the .cl-copy-prompt-btn styling; the copy/feedback logic lives in the component.
 function CopyPromptBtn({ text, label, copiedLabel, className }) {
-  const [copied, setCopied] = useState(false);
-  const handleCopy = useCallback(() => {
-    copyToClipboard(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }, [text]);
-  return html`
-    <button
-      class=${className || 'cl-copy-prompt-btn'}
-      type="button"
-      onClick=${handleCopy}
-    >${copied ? (copiedLabel || '\u2714') : label}</button>
-  `;
+  return html`<${CopyButton} text=${text} label=${label} copiedLabel=${copiedLabel || '\u2714'} className=${className || 'cl-copy-prompt-btn'} />`;
 }
 
 /* ══════════════════════════════════════════════

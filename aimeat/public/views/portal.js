@@ -6,7 +6,8 @@ import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { escHtml, copyToClipboard } from '/js/utils.js';
+import { escHtml } from '/js/utils.js';
+import { CopyButton as BaseCopyButton } from '/components/CopyButton.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 
 const html = htm.bind(h);
@@ -1016,21 +1017,10 @@ function OnelinersFeed({ locale }) {
 /* ══════════════════════════════════════════════
    COPY BUTTON COMPONENT
    ══════════════════════════════════════════════ */
+// Thin wrapper over the canonical CopyButton (aliased to avoid the name clash) \u2014
+// keeps the .copy-btn styling + the "<copied> \u2714" confirmed label.
 function CopyButton({ text, label, copiedLabel }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = useCallback(() => {
-    copyToClipboard(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }, [text]);
-
-  return html`
-    <button class="copy-btn ${copied ? 'copied' : ''}" type="button" onClick=${handleCopy}>
-      ${copied ? (copiedLabel || t('portal.prompt.copied')) + ' \u2714' : label}
-    </button>
-  `;
+  return html`<${BaseCopyButton} text=${text} label=${label} copiedLabel=${(copiedLabel || t('portal.prompt.copied')) + ' \u2714'} className="copy-btn" />`;
 }
 
 /* ══════════════════════════════════════════════

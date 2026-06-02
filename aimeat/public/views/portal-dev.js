@@ -7,7 +7,8 @@ import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t as globalT } from '/js/i18n.js';
-import { copyToClipboard, sanitizeHtml } from '/js/utils.js';
+import { sanitizeHtml } from '/js/utils.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 
 const html = htm.bind(h);
@@ -50,19 +51,10 @@ const GOAL_LIST = [
 /* ══════════════════════════════════════════════
    COPY BUTTON
    ══════════════════════════════════════════════ */
+// Thin wrapper over the canonical CopyButton — keeps the dev-portal locale labels
+// (dt) + the .dv-copy-btn styling; the copy/feedback logic lives in the component.
 function CopyBtn({ text, locale }) {
-  const [copied, setCopied] = useState(false);
-  const handleCopy = useCallback(() => {
-    copyToClipboard(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }, [text]);
-  return html`
-    <button class="dv-copy-btn ${copied ? 'copied' : ''}" type="button" onClick=${handleCopy}>
-      ${copied ? dt('copied', locale) : dt('copy', locale)}
-    </button>
-  `;
+  return html`<${CopyButton} text=${text} label=${dt('copy', locale)} copiedLabel=${dt('copied', locale)} className="dv-copy-btn" />`;
 }
 
 /* ══════════════════════════════════════════════

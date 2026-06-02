@@ -10,8 +10,9 @@
  * @version-history
  *   v1.0.0 — 2026-03 — Initial copy button with copied-state feedback
  *   v1.1.0 — 2026-06-02 — i18n the labels (default t('common.copy') / t('common.copied')),
- *     add onCopied hook (for sites that also toast), title, and type="button" — for
- *     the #1 CopyButton adoption sweep.
+ *     add onCopied hook (for sites that also toast), copiedLabel, title, type="button",
+ *     and a `copied` class in the confirmed state (so bespoke classes like
+ *     .dv-copy-btn.copied / .copy-btn.copied can style it) — for the #1 sweep.
  */
 import { h } from 'preact';
 import { useState, useCallback } from 'preact/hooks';
@@ -38,7 +39,7 @@ export function CopyButton({ text, label, copiedLabel, className = '', title, on
   }, [text, onCopied]);
 
   return html`
-    <button class="btn-ghost ${className}" type="button" title=${title} onClick=${handleCopy}>
+    <button class="btn-ghost ${className} ${copied ? 'copied' : ''}" type="button" title=${title} onClick=${handleCopy}>
       ${copied ? (copiedLabel || t('common.copied')) : (label || t('common.copy'))}
     </button>`;
 }
