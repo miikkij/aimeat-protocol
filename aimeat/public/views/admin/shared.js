@@ -1,12 +1,20 @@
 /**
- * Admin Dashboard — Shared UI helpers
- * Reusable utilities used across admin tab components.
+ * @file shared.js
+ * @description Admin Dashboard shared UI helpers — the admin design system's own
+ *   primitives (Badge, StatCard, StatsGrid, Spinner, Empty, ErrorBox, DataTable,
+ *   ExpandableHelp, useToast/Toast, EconRow/HealthRow) + formatters. Admin is a
+ *   self-contained design system (adm-* scoped); these are intentionally separate
+ *   from the main /components primitives.
+ * @version-history
+ *   v1.1.0 — 2026-06-02 — i18n the Spinner/ErrorBox defaults (t('common.loading') /
+ *     t('common.error')) — were hardcoded English (Rule 4/7.8).
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { escHtml } from '/js/utils.js';
+import { t } from '/js/i18n.js';
 
 /** Format a number with locale */
 export function num(n) {
@@ -79,7 +87,7 @@ export function HealthRow({ label, obj }) {
 
 /** Loading spinner */
 export function Spinner({ text }) {
-  return html`<div class="empty"><div class="spinner"></div> ${text || 'Loading...'}</div>`;
+  return html`<div class="empty"><div class="spinner"></div> ${text || t('common.loading')}</div>`;
 }
 
 /** Empty state */
@@ -89,7 +97,7 @@ export function Empty({ text }) {
 
 /** Error box */
 export function ErrorBox({ message }) {
-  return html`<div class="error-box"><strong>Error</strong><br/>${escHtml(message)}</div>`;
+  return html`<div class="error-box"><strong>${t('common.error')}</strong><br/>${escHtml(message)}</div>`;
 }
 
 /** Expandable/collapsible help section — reusable across all tabs and portal pages */

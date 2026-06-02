@@ -5,15 +5,20 @@
  * @version-history
  *   v1.0.0 — 2026-03-07 — Initial shared helpers (Spinner, recipientBadge, isExpiringSoon)
  *   v1.1.0 — 2026-03-17 — Add VisibilityPill, ToggleSwitch, GlassCard components; refactor recipientBadge to CSS classes
+ *   v1.2.0 — 2026-06-02 — Component unification (§2): Spinner now delegates to the
+ *     canonical /components/Spinner.js (single source of the .spinner markup).
  */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { Spinner as BaseSpinner } from '/components/Spinner.js';
 
-/** Loading spinner. */
+/** Loading spinner — delegates to the canonical /components/Spinner.js (single
+ *  source of the .spinner markup); keeps the profile default loading label so the
+ *  23 profile call sites that rely on it are unchanged. */
 export function Spinner({ text }) {
-  return html`<span class="spinner"></span><span class="loading-text">${text || t('profile.loading')}</span>`;
+  return html`<${BaseSpinner} text=${text || t('profile.loading')} />`;
 }
 
 /** Render a colored recipient-type badge. */

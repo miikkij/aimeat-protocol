@@ -16,7 +16,8 @@
     "yes": "Kyllä",
     "no": "Ei",
     "copy": "Kopioi",
-    "copied": "✓ Kopioitu"
+    "copied": "✓ Kopioitu",
+    "error": "Virhe"
   },
   "nav": {
     "try": "Kokeile",
