@@ -1,7 +1,17 @@
 /* ═══════════════════════════════════════════════════════
-   AIMEAT Unified Theme
-   Single source of truth for all portal CSS variables,
-   base styles, animations, and shared components.
+   @file theme.css
+   @description AIMEAT Unified Theme — single source of truth for all portal
+     CSS variables (tokens), base styles, animations, and shared components.
+     Defines the light theme in :root, a dark override in [data-theme="dark"],
+     and a drift-alias layer so undefined-but-referenced vars resolve.
+   @structure :root tokens, drift aliases, [data-theme="dark"] override,
+     base/reset, animations, topnav, buttons, cards, badges, inputs, modal,
+     toast, alert.
+   @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
+     which flips the data-theme attribute on <html>.
+   @version-history
+     v1.1.0 — 2026-06-02 — Add dark theme override + drift-alias layer + .theme-toggle-btn.
+     v1.0.0 — prior — Light theme tokens, base styles, shared components.
    ═══════════════════════════════════════════════════════ */
 
 /* ── Reset ── */

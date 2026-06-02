@@ -326,6 +326,23 @@ box-shadow: var(--shadow-sm);    /* Subtle elevation */
 box-shadow: var(--shadow-heart); /* Coral glow for primary buttons */
 ```
 
+#### Dark theme (`[data-theme="dark"]`)
+
+The app supports light **and** dark themes. `theme.css` defines the light values
+in `:root` and overrides the color/depth tokens in `[data-theme="dark"]`
+(`/js/theme.js` flips the `data-theme` attribute on `<html>`, persists the
+choice to `localStorage['aimeat-theme']`, and otherwise follows the OS
+`prefers-color-scheme`). **This is exactly why hardcoded colors are banned:** a
+literal like `#FFFFFF` or `#1A1A2E` stays put when the theme flips, so it looks
+broken in dark mode. Only tokens invert automatically.
+
+Canonical surface/text tokens (all defined in `:root`, all flip in dark):
+`--bg`, `--bg-surface`, `--bg-card`, `--card-bg-alt`, `--text`, `--text-dim`,
+`--text-muted`, `--border`, `--border-subtle`. A small alias layer maps common
+shorthands to these (`--card`→`--bg-card`, `--surface`/`--bg-dim`→`--bg-surface`,
+`--muted`→`--text-dim`, `--error`→`--danger`, `--warning`→`--warn`), so those
+inherit dark mode too — but prefer the canonical names in new code.
+
 ### Button Classes (Available in theme.css)
 
 Always use these classes — **never set button colors via inline styles**:
@@ -433,7 +450,7 @@ These patterns MUST NOT appear in any `public/` JS or CSS file:
 | `class="btn btn-` | "btn" base class doesn't exist | Use `class="btn-primary"` etc. directly |
 | `class="revoke-btn"` | Non-standard class | Use `class="btn-danger-solid btn-sm"` |
 | `style="` in `.js` files | Inline styles banned | Move to CSS file |
-| `rgba(255,255,255` in CSS | Dark-theme only | Use `var(--card)`, `var(--border)`, `var(--bg-dim)` |
+| `rgba(255,255,255` or hardcoded hex in CSS | Won't flip for dark theme | Use tokens that invert: `var(--bg-surface)`, `var(--card-bg-alt)`, `var(--border)` |
 | Raw `<h3>` for section titles | Inconsistent styling | Use `<div class="section-title">` |
 | Hardcoded colors in JS | Theme-unaware | Use CSS variables via classes |
 

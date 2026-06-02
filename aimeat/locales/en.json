@@ -25,7 +25,9 @@
     "logout": "Log Out",
     "loggedInAs": "logged in as",
     "help": "Help",
-    "admin": "Admin"
+    "admin": "Admin",
+    "themeToDark": "Switch to dark mode",
+    "themeToLight": "Switch to light mode"
   },
   "hero": {
     "title": "Your data is yours. Your AI works for you.",

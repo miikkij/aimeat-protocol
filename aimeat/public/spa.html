@@ -46,6 +46,22 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#FAFAF8">
+  <!-- No-flash theme boot: set data-theme on <html> before first paint.
+       Plain inline JS (NOT a module — modules defer and reintroduce the flash).
+       Unset key = follow OS until the user makes an explicit choice. -->
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('aimeat-theme'); // 'light' | 'dark' | null
+        var theme = (stored === 'light' || stored === 'dark')
+          ? stored
+          : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.dataset.theme = theme;
+      } catch (e) {
+        document.documentElement.dataset.theme = 'light';
+      }
+    })();
+  </script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/theme.css">
   <!-- View CSS preloaded so they are ready before any view renders (prevents FOUC) -->
@@ -75,6 +91,7 @@
       "preact/hooks": "/lib/preact-hooks.mjs",
       "htm": "/lib/htm.mjs",
       "/js/i18n.js": "/js/i18n.js",
+      "/js/theme.js": "/js/theme.js",
       "/js/utils.js": "/js/utils.js",
       "/js/api.js": "/js/api.js",
       "/js/hooks.js": "/js/hooks.js",
@@ -178,6 +195,7 @@
     import { useState, useEffect, useCallback } from 'preact/hooks';
     import htm from 'htm';
     import { loadTranslations, t, getLocale, switchLocale, onLocaleChange } from '/js/i18n.js';
+    import { initThemeSystem, getTheme, toggleTheme, onThemeChange } from '/js/theme.js';
     // generateStars no longer needed for light theme
 
     const html = htm.bind(h);
@@ -342,6 +360,21 @@
       `;
     }
 
+    // ── Theme Toggle ──
+    // Renders next to the language buttons; flips light <-> dark and persists.
+    // Shows a moon in light mode (click → dark) and a sun in dark mode.
+    function ThemeToggle() {
+      const [theme, setThemeState] = useState(getTheme());
+      useEffect(() => onThemeChange((next) => setThemeState(next)), []);
+      const isDark = theme === 'dark';
+      const label = isDark ? t('nav.themeToLight') : t('nav.themeToDark');
+      return html`
+        <button class="theme-toggle-btn" onClick=${toggleTheme} title=${label} aria-label=${label}>
+          ${isDark ? '☀' : '☾'}
+        </button>
+      `;
+    }
+
     // ── Header Component ──
     function Header({ navigate, locale }) {
       const [session, setSession] = useState(null);
@@ -410,6 +443,7 @@
               `}
             `}
             <div class="topnav-center">
+              <${ThemeToggle} />
               <button class="lang-btn ${locale === 'en' ? 'active' : ''}" onClick=${() => handleLangSwitch('en')}>EN</button>
               <button class="lang-btn ${locale === 'fi' ? 'active' : ''}" onClick=${() => handleLangSwitch('fi')}>FI</button>
             </div>
@@ -423,6 +457,10 @@
     async function boot() {
       // Load translations
       await loadTranslations();
+
+      // Initialize theme system (head snippet already set the initial theme;
+      // this keeps meta in sync and tracks OS preference until an explicit choice).
+      initThemeSystem();
 
       // Load auth library (served from /v1/libs/aimeat-auth.js)
       await new Promise((resolve) => {

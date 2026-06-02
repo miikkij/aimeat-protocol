@@ -25,7 +25,9 @@
     "logout": "Kirjaudu ulos",
     "loggedInAs": "kirjautuneena",
     "help": "Apua",
-    "admin": "Hallinta"
+    "admin": "Hallinta",
+    "themeToDark": "Vaihda tummaan tilaan",
+    "themeToLight": "Vaihda vaaleaan tilaan"
   },
   "hero": {
     "title": "Tietosi on sinun. AI:si työskentelee puolestasi.",
