@@ -36,14 +36,32 @@ export async function registerCortex(
   storage: Storage,
   config: AimeatConfig,
 ): Promise<void> {
-  const manifestMatch = content.match(/```yaml\n([\s\S]*?)```/);
-  const jsMatch = content.match(/```javascript\n([\s\S]*?)```/);
-  if (!manifestMatch) throw new Error('Cortex content has no ```yaml manifest block');
-  const manifest = manifestMatch[1].trim();
-  const nameMatch = manifest.match(/name:\s*"?([^\s"]+)"?/);
-  const cortexName = nameMatch?.[1] || '';
+  // Two input shapes are supported:
+  //  (1) The generator submit route stores cortex as the EXTRACTED object the cortex validator
+  //      produced — JSON { manifest: "<yaml>", libs: [{ filename, code }] }. This is what the
+  //      register route passes (component.content for cortex is JSON.stringify(validation.extracted)).
+  //  (2) Raw text with ```yaml + ```javascript fenced blocks (other callers / hand-authored).
+  let manifest = '';
   const libs: Record<string, string> = {};
-  if (jsMatch && cortexName) libs[`${cortexName}.js`] = jsMatch[1].trim();
+  const trimmed = content.trim();
+  let extractedObj: { manifest?: string; libs?: Array<{ filename?: string; code?: string }> } | null = null;
+  if (trimmed.startsWith('{')) {
+    try { extractedObj = JSON.parse(trimmed); } catch { extractedObj = null; }
+  }
+  if (extractedObj && typeof extractedObj.manifest === 'string') {
+    manifest = extractedObj.manifest.trim();
+    for (const lib of extractedObj.libs ?? []) {
+      if (lib.filename && typeof lib.code === 'string') libs[lib.filename] = lib.code;
+    }
+  } else {
+    const manifestMatch = content.match(/```yaml\n([\s\S]*?)```/);
+    const jsMatch = content.match(/```javascript\n([\s\S]*?)```/);
+    if (!manifestMatch) throw new Error('Cortex content has no ```yaml manifest block');
+    manifest = manifestMatch[1].trim();
+    const nameMatch = manifest.match(/name:\s*"?([^\s"]+)"?/);
+    const cortexName = nameMatch?.[1] || '';
+    if (jsMatch && cortexName) libs[`${cortexName}.js`] = jsMatch[1].trim();
+  }
   const parseRes = parseCortexManifest(manifest, ownerName, libs);
   if (!parseRes.ok || !parseRes.extension) {
     throw new Error('Cortex manifest invalid: ' + (parseRes.errors ?? []).join('; '));
