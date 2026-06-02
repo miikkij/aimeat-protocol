@@ -268,8 +268,8 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
                   </div>
                   <div class="pkg-card-footer">
                     <div class="pkg-card-actions">
-                      <button onClick=${() => handleCheckUpdate(inst.id)}>${t('packages.checkUpdate') || 'Check Update'}</button>
-                      <button class="danger" onClick=${() => handleRemove(inst.id)}>${t('packages.remove') || 'Remove'}</button>
+                      <button class="btn-outline btn-sm" onClick=${() => handleCheckUpdate(inst.id)}>${t('packages.checkUpdate') || 'Check Update'}</button>
+                      <button class="btn-danger btn-sm" onClick=${() => handleRemove(inst.id)}>${t('packages.remove') || 'Remove'}</button>
                     </div>
                   </div>
                 </div>
@@ -325,19 +325,19 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
                   `}
                   <div class="pkg-card-footer">
                     <div class="pkg-card-actions">
-                      <button class="primary" onClick=${() => handleInstall(pkg.packageGroupId)}>
+                      <button class="btn-primary btn-sm" onClick=${() => handleInstall(pkg.packageGroupId)}>
                         ${t('packages.install') || 'Install'}
                       </button>
-                      <button onClick=${() => handleDownloadZip(pkg.packageGroupId, pkg.name)}>
+                      <button class="btn-outline btn-sm" onClick=${() => handleDownloadZip(pkg.packageGroupId, pkg.name)}>
                         ${t('packages.downloadZip') || 'Download ZIP'}
                       </button>
-                      <button onClick=${() => handleOpenInGenerator(pkg.packageGroupId, pkg.author)}>
+                      <button class="btn-outline btn-sm" onClick=${() => handleOpenInGenerator(pkg.packageGroupId, pkg.author)}>
                         ${pkg.author === session?.owner
                           ? (t('packages.editInGenerator') || 'Edit in Generator')
                           : (t('packages.openInGenerator') || 'Open in Generator')}
                       </button>
                       ${pkg.status === 'published' && !pkg.templateStatus && pkg.author === session?.owner && html`
-                        <button class="btn-outline" onClick=${() => handleProposeAsTemplate(pkg.packageGroupId)}>
+                        <button class="btn-outline btn-sm" onClick=${() => handleProposeAsTemplate(pkg.packageGroupId)}>
                           ${t('packages.proposeAsTemplate') || 'Propose as Template'}
                         </button>
                       `}
@@ -371,13 +371,13 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
                   </div>
                   <div class="pkg-card-footer">
                     <div class="pkg-card-actions">
-                      <button class="primary" onClick=${() => handleInstall(tpl.packageGroupId)}>
+                      <button class="btn-primary btn-sm" onClick=${() => handleInstall(tpl.packageGroupId)}>
                         ${t('packages.install') || 'Install'}
                       </button>
-                      <button onClick=${() => handleDownloadZip(tpl.packageGroupId, tpl.title)}>
+                      <button class="btn-outline btn-sm" onClick=${() => handleDownloadZip(tpl.packageGroupId, tpl.title)}>
                         ${t('packages.downloadZip') || 'Download ZIP'}
                       </button>
-                      <button onClick=${() => handleOpenInGenerator(tpl.packageGroupId, tpl.packageAuthor)}>
+                      <button class="btn-outline btn-sm" onClick=${() => handleOpenInGenerator(tpl.packageGroupId, tpl.packageAuthor)}>
                         ${tpl.packageAuthor === session?.owner
                           ? (t('packages.editInGenerator') || 'Edit in Generator')
                           : (t('packages.openInGenerator') || 'Open in Generator')}
@@ -416,10 +416,10 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
                   <div class="pkg-card-footer">
                     <div class="pkg-card-actions">
                       ${rt.packageGroupId ? html`
-                        <button class="primary" onClick=${() => handleInstall(rt.packageGroupId)}>
+                        <button class="btn-primary btn-sm" onClick=${() => handleInstall(rt.packageGroupId)}>
                           ${t('packages.federation.installFromRemote') || 'Install'}
                         </button>
-                        <button onClick=${() => handleDownloadZip(rt.packageGroupId, rt.title || rt.name)}>
+                        <button class="btn-outline btn-sm" onClick=${() => handleDownloadZip(rt.packageGroupId, rt.title || rt.name)}>
                           ${t('packages.downloadZip') || 'Download ZIP'}
                         </button>
                       ` : null}
