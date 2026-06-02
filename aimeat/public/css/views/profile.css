@@ -593,13 +593,13 @@
 .pf-gen-type-badge {
   font-size: 0.7em; padding: 1px 6px; border-radius: 3px; font-weight: 600; text-transform: uppercase;
 }
-.pf-gen-type-badge.type-csm { background: rgba(34,197,94,0.12); color: #16a34a; }
-.pf-gen-type-badge.type-msm { background: rgba(245,158,11,0.12); color: #b45309; }
-.pf-gen-type-badge.type-extension { background: rgba(168,85,247,0.12); color: #7c3aed; }
-.pf-gen-type-badge.type-app { background: rgba(59,130,246,0.12); color: #2563eb; }
-.pf-gen-type-badge.type-memory { background: rgba(107,114,128,0.12); color: #4b5563; }
-.pf-gen-type-badge.type-translation { background: rgba(6,182,212,0.12); color: #0891b2; }
-.pf-gen-type-badge.type-cortex { background: rgba(155,89,182,0.12); color: #9b59b6; }
+.pf-gen-type-badge.type-csm { background: var(--success-bg); color: var(--success-fg); }
+.pf-gen-type-badge.type-msm { background: var(--warn-bg); color: var(--warn-fg); }
+.pf-gen-type-badge.type-extension { background: var(--purple-bg); color: var(--purple-fg); }
+.pf-gen-type-badge.type-app { background: var(--info-bg); color: var(--info-fg); }
+.pf-gen-type-badge.type-memory { background: var(--bg-surface); color: var(--text-dim); }
+.pf-gen-type-badge.type-translation { background: var(--info-bg); color: var(--info-fg); }
+.pf-gen-type-badge.type-cortex { background: var(--purple-bg); color: var(--purple-fg); }
 
 /* Editable project name */
 .pf-gen-name-editable { margin: 0; flex: 1; cursor: pointer; border-bottom: 1px dashed transparent; transition: border-color 0.2s; }
@@ -630,11 +630,11 @@
 .pf-gen-status-badge {
   font-size: 0.75em; padding: 2px 8px; border-radius: 10px; font-weight: 500;
 }
-.pf-gen-status-badge.status-done { background: rgba(34,197,94,0.12); color: #16a34a; }
-.pf-gen-status-badge.status-errors { background: rgba(239,68,68,0.12); color: #dc2626; }
+.pf-gen-status-badge.status-done { background: var(--success-bg); color: var(--success-fg); }
+.pf-gen-status-badge.status-errors { background: var(--danger-bg); color: var(--danger-fg); }
 .pf-gen-status-badge.status-waiting_user,
-.pf-gen-status-badge.status-waiting_agent { background: rgba(245,158,11,0.12); color: #b45309; }
-.pf-gen-status-badge.status-prompt_ready { background: rgba(59,130,246,0.12); color: #2563eb; }
+.pf-gen-status-badge.status-waiting_agent { background: var(--warn-bg); color: var(--warn-fg); }
+.pf-gen-status-badge.status-prompt_ready { background: var(--info-bg); color: var(--info-fg); }
 
 .pf-gen-mode-toggle { display: flex; gap: 4px; margin-bottom: 16px; }
 
@@ -656,14 +656,14 @@
   background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: 6px;
   padding: 12px; margin-top: 12px;
 }
-.pf-gen-errors label { color: #dc2626; }
+.pf-gen-errors label { color: var(--danger-fg); }
 .pf-gen-errors ul { margin: 8px 0; padding-left: 20px; font-size: 0.85em; }
-.pf-gen-errors li { margin-bottom: 4px; color: #991b1b; }
-.pf-gen-error-line { color: #dc2626; font-size: 0.85em; margin: 2px 0; }
+.pf-gen-errors li { margin-bottom: 4px; color: var(--danger-fg); }
+.pf-gen-error-line { color: var(--danger-fg); font-size: 0.85em; margin: 2px 0; }
 
 .pf-gen-settings-collection { max-width: 700px; }
 .pf-gen-settings-collection input { width: 100%; padding: 8px 10px; border: 1px solid var(--border,#E5E7EB); border-radius: 6px; background: var(--card,#fff); color: var(--text); font-size: 0.9em; }
-.pf-gen-required { color: #dc2626; font-weight: 700; }
+.pf-gen-required { color: var(--danger-fg); font-weight: 700; }
 .pf-gen-notice { color: var(--muted); font-style: italic; padding: 12px 0; }
 
 .pf-gen-agent-status { margin-top: 8px; color: var(--muted); font-style: italic; }
@@ -699,7 +699,7 @@
 .pf-gen-log-empty { color: var(--muted); font-style: italic; padding: 8px 0; }
 .pf-gen-log-entry { padding: 2px 0; display: flex; gap: 8px; }
 .pf-gen-log-time { color: var(--text-dim,#6B7280); flex-shrink: 0; }
-.pf-gen-log-comp { color: #7c3aed; flex-shrink: 0; }
+.pf-gen-log-comp { color: var(--purple-fg); flex-shrink: 0; }
 .pf-gen-log-msg { color: var(--muted); }
 
 /* Lifecycle Toolbar (Phase 5) */
@@ -737,9 +737,9 @@
 
 .pf-gen-impact-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .pf-gen-impact-badge { font-size: 0.7em; padding: 1px 6px; border-radius: 3px; font-weight: 700; text-transform: uppercase; }
-.pf-gen-impact-badge.impact-root { background: rgba(239,68,68,0.12); color: #dc2626; }
-.pf-gen-impact-badge.impact-update { background: rgba(245,158,11,0.12); color: #b45309; }
-.pf-gen-impact-badge.impact-none { background: rgba(107,114,128,0.12); color: #6b7280; }
+.pf-gen-impact-badge.impact-root { background: var(--danger-bg); color: var(--danger-fg); }
+.pf-gen-impact-badge.impact-update { background: var(--warn-bg); color: var(--warn-fg); }
+.pf-gen-impact-badge.impact-none { background: var(--bg-surface); color: var(--text-dim); }
 .pf-gen-impact-label { font-weight: 600; font-size: 0.9em; }
 .pf-gen-impact-reason { font-size: 0.82em; color: var(--muted); }
 
@@ -773,9 +773,9 @@
 .pf-gen-diag-table td { padding: 5px 8px; border-bottom: 1px solid rgba(0,0,0,0.04); }
 .pf-gen-diag-table tr.diag-active td:first-child { font-weight: 600; }
 
-.pf-gen-live-active { color: #16a34a; font-weight: 500; }
-.pf-gen-live-installed { color: #b45309; }
-.pf-gen-live-missing { color: #9ca3af; }
+.pf-gen-live-active { color: var(--success-fg); font-weight: 500; }
+.pf-gen-live-installed { color: var(--warn-fg); }
+.pf-gen-live-missing { color: var(--text-muted); }
 .pf-gen-diag-action { color: var(--muted); font-size: 0.9em; }
 
 @media(max-width:700px) {
