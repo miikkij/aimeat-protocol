@@ -594,7 +594,7 @@ Return ONLY valid JSON. No markdown fences, no explanation text.
 
 # Task: Generate Data API Spec
 
-Design the public API for a DATA CORTEX — a client-side JS library wrapping an AIMEAT extension.
+Design the public API for a DATA CORTEX — a client-side JS library that exposes clean async data methods. It EITHER wraps an AIMEAT extension's actions, OR (when the Extension Spec below is empty \`{}\` — i.e. this app has NO extension) reads the owner's own data directly via AIMEAT.data.get(ownerGaii, key). Both are fully supported; pick based on whether an Extension Spec is present.
 
 ## Extension Spec
 \`\`\`json
@@ -609,7 +609,7 @@ Return ONLY valid JSON:
   "name": "<kebab-case>",
   "libName": "<camelCase — AIMEAT.<libName>>",
   "description": "<one-line>",
-  "wrapsExtension": "<extension name>",
+  "wrapsExtension": "<extension name — or null if the Extension Spec above is empty / this app has no extension>",
   "methods": [
     { "name": "<method>", "description": "<what>", "params": "<type>", "returns": "Promise<type>",
       "example": "const r = await AIMEAT.<libName>.<name>(<args>);",
@@ -630,9 +630,12 @@ Return ONLY valid JSON:
 
 {{blueprint_methods}}
 
-Each method wraps one or more extension actions. Map them appropriately.
+If an Extension Spec is provided, each method wraps one or more extension actions — map them appropriately.
 For example, if the blueprint requires "getItems" and the extension has "fetchAllItems",
 create a method named "getItems" that internally calls the extension's "fetchAllItems".
+If the Extension Spec is empty (NO extension), each method instead reads and transforms the owner's own
+data via AIMEAT.data.get(ownerGaii, "<memory key from the blueprint dataModel>"); set wrapsExtension to null
+and take "returnsExample" from the blueprint structures rather than an extension spec.
 
 ## Rules
 1. Method names MUST match the blueprint list above EXACTLY. Do NOT use extension action names as method names.

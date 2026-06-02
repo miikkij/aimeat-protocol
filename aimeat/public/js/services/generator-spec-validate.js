@@ -64,7 +64,11 @@ export function validateDataApiSpec(spec) {
 
   if (!spec.name) errors.push('Missing spec.name');
   if (!spec.libName) errors.push('Missing spec.libName — apps need AIMEAT.<libName> to call methods');
-  if (!spec.wrapsExtension) errors.push('Missing spec.wrapsExtension — must reference the extension it wraps');
+  // wrapsExtension is OPTIONAL — a data cortex may wrap an extension OR read the owner's own data
+  // directly via AIMEAT.data (no-extension apps). The real contract is `methods`.
+  if (spec.wrapsExtension != null && typeof spec.wrapsExtension !== 'string') {
+    errors.push('spec.wrapsExtension, if present, must be the extension name (string) — omit it for own-data cortexes');
+  }
 
   if (!Array.isArray(spec.methods) || spec.methods.length === 0) {
     errors.push('Missing or empty spec.methods array');

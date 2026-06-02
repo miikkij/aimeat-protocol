@@ -90,7 +90,12 @@ export function validateDataApiSpec(spec: Record<string, unknown> | null): Valid
   if (!spec.name) errors.push('Missing spec.name');
   if (!spec.libName) errors.push('Missing spec.libName');
   validateSpecNames(spec, errors);
-  if (!spec.wrapsExtension) errors.push('Missing spec.wrapsExtension');
+  // wrapsExtension is OPTIONAL: a data cortex may wrap an AIMEAT extension OR read the owner's own
+  // data directly via AIMEAT.data (no-extension / own-data apps — a first-class supported pattern).
+  // The real contract is `methods`. Only flag a malformed (non-string) value.
+  if (spec.wrapsExtension != null && typeof spec.wrapsExtension !== 'string') {
+    errors.push('spec.wrapsExtension, if present, must be the extension name (string) — omit or null it for own-data cortexes');
+  }
 
   const methods = spec.methods as SpecMethod[] | undefined;
   if (!Array.isArray(methods) || methods.length === 0) {
