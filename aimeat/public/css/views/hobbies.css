@@ -3,6 +3,8 @@
  * @description Styles for the Hobbies directory view (home, search, profile, join, me, matches). All classes scoped under the .hb- prefix.
  * @version-history
  *   v1.1.0 — 2026-06-02 — Phase 5: tokenize for dark mode (replaced bare light-only color literals with theme tokens)
+ *   v1.2.0 — 2026-06-02 — Component unification (#4 buttons): remove .hb-btn* family;
+ *     hobbies buttons use canonical theme.css .btn-primary / .btn-outline / .btn-danger / .btn-sm.
  */
 /* hobbies view — scoped under .hb */
 .hb-wrap { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 24px 16px 80px; }
@@ -27,14 +29,8 @@
   .hb-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
   .hb-tag { display: inline-block; padding: 4px 12px; background: rgba(232,86,74,0.06); border: 1px solid rgba(232,86,74,0.2); border-radius: 20px; font-size: .8rem; color: #E8564A; white-space: nowrap; }
   .hb-tag-shared { background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.3); color: var(--success); }
-  .hb-btn { display: inline-flex; align-items: center; justify-content: center; padding: 10px 24px; border: none; border-radius: var(--radius-sm); font-size: .9rem; font-weight: 600; cursor: pointer; transition: all .2s; text-decoration: none; }
-  .hb-btn-primary { background: linear-gradient(135deg, var(--accent), #E8564A); color: #fff; }
-  .hb-btn-primary:hover { opacity: .9; box-shadow: 0 2px 8px rgba(232,86,74,0.2); }
-  .hb-btn-secondary { background: var(--bg-surface); border: 1px solid var(--border); color: var(--text); }
-  .hb-btn-secondary:hover { background: var(--border); border-color: var(--accent); color: var(--accent); }
-  .hb-btn-danger { background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.3); color: #ef4444; }
-  .hb-btn-danger:hover { background: rgba(239,68,68,.25); }
-  .hb-btn-sm { padding: 6px 14px; font-size: .8rem; }
+  /* .hb-btn* removed — hobbies uses canonical theme.css .btn-primary / .btn-outline /
+     .btn-danger (tokenized) / .btn-sm (anchor-safe). Unified 2026-06-02 (#4 buttons). */
   .hb-form-group { margin-bottom: 16px; }
   .hb-form-label { display: block; font-size: .85rem; color: var(--text-dim); margin-bottom: 6px; font-weight: 500; }
   .hb-form-input, .hb-form-textarea, .hb-form-select { width: 100%; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: .9rem; font-family: var(--font); transition: border-color .2s; }

@@ -35,7 +35,7 @@ export async function registerCortex(
   ownerGhii: string,
   storage: Storage,
   config: AimeatConfig,
-): Promise<void> {
+): Promise<string> {
   // Two input shapes are supported:
   //  (1) The generator submit route stores cortex as the EXTRACTED object the cortex validator
   //      produced — JSON { manifest: "<yaml>", libs: [{ filename, code }] }. This is what the
@@ -81,13 +81,14 @@ export async function registerCortex(
       activationArtifacts: artifacts,
     });
   }
+  return ext.name;
 }
 
 /**
  * Register a CSM service definition on behalf of ownerName.
  * Content is a YAML or JSON string. Mirrors POST /v1/csm logic exactly.
  */
-export async function registerCsm(content: string, ownerName: string, storage: Storage): Promise<void> {
+export async function registerCsm(content: string, ownerName: string, storage: Storage): Promise<string> {
 
   let definition: ReturnType<typeof parseCsm>;
   try {
@@ -148,13 +149,14 @@ export async function registerCsm(content: string, ownerName: string, storage: S
     updatedAt: now,
     ...(serviceSemantic ? { semantic: serviceSemantic } : {}),
   });
+  return definition.service.name;
 }
 
 /**
  * Register an MSM integration on behalf of ownerName.
  * Content is a YAML or JSON string. Mirrors POST /v1/msm logic exactly.
  */
-export async function registerMsm(content: string, ownerName: string, storage: Storage): Promise<void> {
+export async function registerMsm(content: string, ownerName: string, storage: Storage): Promise<string> {
 
   let definition: ReturnType<typeof parseMsm>;
   try {
@@ -185,6 +187,7 @@ export async function registerMsm(content: string, ownerName: string, storage: S
     registeredAt: now,
     updatedAt: now,
   });
+  return definition.service.name;
 }
 
 /**
@@ -194,7 +197,7 @@ export async function registerMsm(content: string, ownerName: string, storage: S
  * Mirrors POST /v1/extensions logic exactly.
  * @param maxExtensionsPerOwner — optional per-owner limit; throws if exceeded
  */
-export async function registerExtension(content: string, ownerName: string, ownerGhii: string, storage: Storage, maxExtensionsPerOwner?: number): Promise<void> {
+export async function registerExtension(content: string, ownerName: string, ownerGhii: string, storage: Storage, maxExtensionsPerOwner?: number): Promise<string> {
 
   // Split content into manifest YAML and embedded scripts.
   // The generator stores YAML at the top, followed by ```javascript ... ``` blocks.
@@ -353,6 +356,7 @@ export async function registerExtension(content: string, ownerName: string, owne
   };
 
   await storage.createExtension(record);
+  return name;
 }
 
 /**
@@ -361,7 +365,7 @@ export async function registerExtension(content: string, ownerName: string, owne
  * The generator stores raw HTML; we accept both base64 and raw.
  * @param callerGaii — storage identity used as ownerGaii (matches what apps.ts stores for agents)
  */
-export async function registerApp(content: string, ownerName: string, callerGaii: string, storage: Storage): Promise<void> {
+export async function registerApp(content: string, ownerName: string, callerGaii: string, storage: Storage): Promise<string> {
 
   // Detect if content is base64 — try to decode; if it looks like HTML, treat as raw
   let data: Buffer;
@@ -436,4 +440,5 @@ export async function registerApp(content: string, ownerName: string, callerGaii
     data,
     createdAt: now,
   });
+  return filename;
 }

@@ -3,6 +3,8 @@
  * @description Hobbies view module — multi-view hobby directory (home, search, profile, join, me, matches) rendered with Preact + HTM.
  * @version-history
  *   v1.1.0 — 2026-06-02 — Phase 5: tokenize for dark mode (replaced light-only rgba(255,255,255,...) divider with var(--border))
+ *   v1.2.0 — 2026-06-02 — Component unification (#4 buttons): hb-btn* → canonical
+ *     theme.css btn-primary / btn-outline / btn-danger / btn-sm.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -115,8 +117,8 @@ function HomeView({ goTo }) {
       </div></div>
     `}
     <div style="text-align:center;margin-top:32px;">
-      <a class="hb-btn hb-btn-primary" style="margin-right:8px;" onClick=${() => goTo('search')}>${t('hobbies.searchPeople')}</a>
-      <a class="hb-btn hb-btn-secondary" onClick=${() => goTo('join')}>${t('hobbies.joinDirectory')}</a>
+      <a class="btn-primary" style="margin-right:8px;" onClick=${() => goTo('search')}>${t('hobbies.searchPeople')}</a>
+      <a class="btn-outline" onClick=${() => goTo('join')}>${t('hobbies.joinDirectory')}</a>
     </div>
   `;
 }
@@ -168,7 +170,7 @@ function SearchView({ goTo, initData }) {
           <label class="hb-form-label">${t('hobbies.search.area')}</label>
           <input class="hb-form-input" value=${area} onInput=${e => setArea(e.target.value)} onKeyDown=${onKey} placeholder=${t('hobbies.search.areaPlaceholder')} />
         </div>
-        <button class="hb-btn hb-btn-primary hb-btn-sm" onClick=${() => doSearch(1)}>${t('hobbies.search.btn')}</button>
+        <button class="btn-primary btn-sm" onClick=${() => doSearch(1)}>${t('hobbies.search.btn')}</button>
       </div>
     </div>
     ${loading && html`<div style="color:var(--text-dim);text-align:center;padding:24px;">...</div>`}
@@ -268,8 +270,8 @@ function ProfileView({ goTo, ghii }) {
   };
 
   if (error) return html`<div class="hb-alert hb-alert-error">${t('hobbies.profile.loadError')}</div>`;
-  if (notFound) return html`<div class="hb-empty"><div class="hb-empty-icon">\uD83D\uDE15</div><div class="hb-empty-text">${t('hobbies.profile.notFound')}</div><a class="hb-btn hb-btn-secondary" style="margin-top:16px;" onClick=${() => goTo('search')}>${t('hobbies.profile.backToSearch')}</a></div>`;
-  if (hidden) return html`<div class="hb-empty"><div class="hb-empty-icon">\uD83D\uDEAB</div><div class="hb-empty-text">${t('hobbies.profile.hidden')}</div><a class="hb-btn hb-btn-secondary" style="margin-top:16px;" onClick=${() => goTo('search')}>${t('hobbies.profile.backToSearch')}</a></div>`;
+  if (notFound) return html`<div class="hb-empty"><div class="hb-empty-icon">\uD83D\uDE15</div><div class="hb-empty-text">${t('hobbies.profile.notFound')}</div><a class="btn-outline" style="margin-top:16px;" onClick=${() => goTo('search')}>${t('hobbies.profile.backToSearch')}</a></div>`;
+  if (hidden) return html`<div class="hb-empty"><div class="hb-empty-icon">\uD83D\uDEAB</div><div class="hb-empty-text">${t('hobbies.profile.hidden')}</div><a class="btn-outline" style="margin-top:16px;" onClick=${() => goTo('search')}>${t('hobbies.profile.backToSearch')}</a></div>`;
   if (!entry) return html`<div style="color:var(--text-dim);text-align:center;padding:24px;">...</div>`;
 
   const locStr = [entry.city, entry.area, entry.country].filter(Boolean).join(', ');
@@ -290,11 +292,11 @@ function ProfileView({ goTo, ghii }) {
     ${locStr && html`<div class="hb-profile-section"><div class="hb-profile-section-label">${t('hobbies.profile.location')}</div><div class="hb-profile-detail">${locStr}</div></div>`}
     ${isLoggedIn() && html`
       <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border);">
-        <button onClick=${doFlag} class="hb-btn hb-btn-danger hb-btn-sm">${t('hobbies.profile.flagBtn')}</button>
+        <button onClick=${doFlag} class="btn-danger btn-sm">${t('hobbies.profile.flagBtn')}</button>
         ${flagResult && html`<div style="margin-top:8px;color:${flagResult === t('hobbies.profile.flagSent') ? 'var(--success)' : 'var(--danger)'}">${flagResult}</div>`}
       </div>
     `}
-    <div style="margin-top:24px;"><a class="hb-btn hb-btn-secondary" onClick=${() => goTo('search')}>${t('hobbies.profile.backToSearch')}</a></div>
+    <div style="margin-top:24px;"><a class="btn-outline" onClick=${() => goTo('search')}>${t('hobbies.profile.backToSearch')}</a></div>
   `;
 }
 
@@ -315,7 +317,7 @@ function JoinView({ goTo }) {
     return html`
       <h1 class="hb-page-title">${t('hobbies.join.title')}</h1>
       <div class="hb-card"><div class="hb-alert hb-alert-success">${t('hobbies.join.success')}</div>
-        <a class="hb-btn hb-btn-primary" style="margin-top:12px;" onClick=${() => goTo('search')}>${t('hobbies.join.browseBtn')}</a>
+        <a class="btn-primary" style="margin-top:12px;" onClick=${() => goTo('search')}>${t('hobbies.join.browseBtn')}</a>
       </div>
     `;
   }
@@ -415,7 +417,7 @@ function JoinView({ goTo }) {
           <span>${t('hobbies.join.notifications')}</span>
         </label>
       </div>
-      <button type="submit" class="hb-btn hb-btn-primary" disabled=${status === 'saving'}>${status === 'saving' ? t('hobbies.join.saving') : t('hobbies.join.submitBtn')}</button>
+      <button type="submit" class="btn-primary" disabled=${status === 'saving'}>${status === 'saving' ? t('hobbies.join.saving') : t('hobbies.join.submitBtn')}</button>
       ${errorMsg && html`<div style="margin-top:12px;color:var(--danger);">${errorMsg}</div>`}
     </form>
   `;
@@ -518,7 +520,7 @@ function MeView({ goTo }) {
   if (status === 'loading') return html`<div style="color:var(--text-dim);text-align:center;padding:24px;">...</div>`;
   if (status === 'error') return html`<div class="hb-alert hb-alert-error">${t('hobbies.me.loadError')}</div>`;
   if (status === 'noGhii') return html`<div class="hb-empty"><div class="hb-empty-icon">\uD83D\uDE15</div><div class="hb-empty-text">${t('hobbies.me.noGhii')} <a href="/v1/portal" style="color:var(--accent);">${t('hobbies.me.registerFirst')}</a></div></div>`;
-  if (status === 'notInDir') return html`<h1 class="hb-page-title">${t('hobbies.me.title')}</h1><div class="hb-card"><p style="color:var(--text-dim);">${t('hobbies.me.notInDirectory')}</p><a class="hb-btn hb-btn-primary" style="margin-top:12px;" onClick=${() => goTo('join')}>${t('hobbies.me.joinBtn')}</a></div>`;
+  if (status === 'notInDir') return html`<h1 class="hb-page-title">${t('hobbies.me.title')}</h1><div class="hb-card"><p style="color:var(--text-dim);">${t('hobbies.me.notInDirectory')}</p><a class="btn-primary" style="margin-top:12px;" onClick=${() => goTo('join')}>${t('hobbies.me.joinBtn')}</a></div>`;
 
   const locStr = [myEntry.city, myEntry.area, myEntry.country].filter(Boolean).join(', ');
 
@@ -569,10 +571,10 @@ function MeView({ goTo }) {
         </label>
         <div class="hb-form-hint" style="margin-top:4px;">${t(notifyEnabled ? 'hobbies.me.notificationsOn' : 'hobbies.me.notificationsOff')}</div>
       </div>
-      <button type="submit" class="hb-btn hb-btn-primary">${t('hobbies.me.saveBtn')}</button>
+      <button type="submit" class="btn-primary">${t('hobbies.me.saveBtn')}</button>
       ${saveMsg && html`<div style="margin-top:12px;color:${saveMsg === t('hobbies.me.saved') ? 'var(--success)' : 'var(--danger)'}">${saveMsg}</div>`}
     </form>
-    <div style="margin-top:24px;"><a class="hb-btn hb-btn-secondary" onClick=${() => goTo('profile', myGhii)}>${t('hobbies.me.viewPublic')}</a></div>
+    <div style="margin-top:24px;"><a class="btn-outline" onClick=${() => goTo('profile', myGhii)}>${t('hobbies.me.viewPublic')}</a></div>
   `;
 }
 

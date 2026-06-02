@@ -950,7 +950,7 @@ window.__renderSnapshot = null; // Set by test code to capture rendered state
       const existingComponents = await storage.listMemory(gaii, { prefix: `generator.${projectId}.component.` });
       const hasSubmitted = existingComponents.some(r => {
         const val = r.value as { status?: string };
-        return val.status === 'ready' || val.status === 'registered';
+        return val.status === 'ready' || val.status === 'registered' || val.status === 'done';
       });
       if (hasSubmitted) {
         res.status(409).json(error(config.nodeId, 'BLUEPRINT_LOCKED', 'Cannot overwrite blueprint — components have already been submitted. Delete components first or create a new project.'));
@@ -1197,16 +1197,17 @@ window.__renderSnapshot = null; // Set by test code to capture rendered state
       const ownerName = req.auth!.owner;
       const regGhii = `${ownerName}@${config.nodeId}`;
 
+      let registeredAs: string | null = null;
       try {
         switch (component.type) {
-          case 'csm': await registerCsm(component.content, ownerName, storage); break;
-          case 'msm': await registerMsm(component.content, ownerName, storage); break;
-          case 'extension': await registerExtension(component.content, ownerName, regGhii, storage, config.maxExtensionsPerOwner); break;
-          case 'app': await registerApp(component.content, ownerName, regGhii, storage); break;
+          case 'csm': registeredAs = await registerCsm(component.content, ownerName, storage); break;
+          case 'msm': registeredAs = await registerMsm(component.content, ownerName, storage); break;
+          case 'extension': registeredAs = await registerExtension(component.content, ownerName, regGhii, storage, config.maxExtensionsPerOwner); break;
+          case 'app': registeredAs = await registerApp(component.content, ownerName, regGhii, storage); break;
           case 'cortex':
             // Install + activate via the service layer (the public /v1/cortex routes are owner-only;
             // the agent JWT would 403 and the install would silently fail). See registerCortex.
-            await registerCortex(component.content, ownerName, regGhii, storage, config);
+            registeredAs = await registerCortex(component.content, ownerName, regGhii, storage, config);
             break;
           case 'memory':
           case 'translation': {
@@ -1240,6 +1241,7 @@ window.__renderSnapshot = null; // Set by test code to capture rendered state
             } catch (e) {
               console.error(`[generator] Failed to store ${component.type} in memory:`, e);
             }
+            registeredAs = slug;
             break;
           }
           default:
@@ -1250,11 +1252,14 @@ window.__renderSnapshot = null; // Set by test code to capture rendered state
         const now = new Date().toISOString();
         await storage.setMemory({
           ...componentRec,
-          value: { ...component, status: 'registered', registeredAt: now },
+          // status 'done' (not 'registered') + registeredAs is what the generator UI keys on to render
+          // the component GREEN/registered and to look it up as active in the live catalogue. Clear
+          // validationErrors — a successful register implies it validated. Mirrors the UI registerComponent.
+          value: { ...component, status: 'done', registeredAt: now, registeredAs, validationErrors: [] },
           version: (componentRec.version ?? 1) + 1,
           updatedAt: now,
         });
-        res.json(success(config.nodeId, { registered: true, componentId }));
+        res.json(success(config.nodeId, { registered: true, componentId, registeredAs }));
         emitChange('memory');
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -1382,8 +1387,10 @@ window.__renderSnapshot = null; // Set by test code to capture rendered state
       // Guard: require at least one registered component before marking complete
       const componentRecords = await storage.listMemory(gaii, { prefix: `generator.${projectId}.component.` });
       const registeredCount = componentRecords.filter(r => {
-        const val = r.value as { status?: string };
-        return val.status === 'registered';
+        const val = r.value as { status?: string; registeredAs?: string };
+        // "registered" = has a registeredAs (the UI's own definition); accept legacy
+        // status 'registered'/'done' too for backward compatibility with older records.
+        return !!val.registeredAs || val.status === 'registered' || val.status === 'done';
       }).length;
 
       if (registeredCount === 0) {
