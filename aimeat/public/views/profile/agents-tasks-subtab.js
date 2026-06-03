@@ -9,6 +9,9 @@
  *   - TaskItem -- task row with expand/collapse, todo list, start button
  *   - RequestChangesModal -- inline modal for owner to send a free-text change request
  * @version-history
+ *   v4.9.0 -- 2026-06-03 -- Render a task's description as Markdown via the shared
+ *     safe Markdown component (headings, lists, code, line breaks) instead of a
+ *     single collapsed text blob, so long agent-authored prompts are readable.
  *   v4.8.3 -- 2026-06-02 -- Render non-JSON memory values (e.g. an agent's
  *     latest_output) as Markdown via the shared safe Markdown component, instead
  *     of raw monospace text.
@@ -567,7 +570,7 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
       </div>
       ${expanded && html`
         <div class="pf-agd-task-expanded">
-          ${task.description && html`<div class="pf-agd-task-desc">${task.description}</div>`}
+          ${task.description && html`<div class="pf-agd-task-desc"><${Markdown} text=${task.description} /></div>`}
 
           ${task.deliverableKey && html`
             <div class="pf-agd-deliverable">

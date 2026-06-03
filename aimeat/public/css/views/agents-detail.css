@@ -49,6 +49,7 @@
  *   v2.22.0 -- 2026-06-02 -- Add divider line above the tab bar (border-top + spacing) so tabs don't blend with the status row above
  *   v2.23.0 -- 2026-06-02 -- Compact .md-body styles for agent message bubbles (Markdown-rendered outbound replies)
  *   v2.24.0 -- 2026-06-02 -- Compact .md-body styles for Markdown-rendered non-JSON task memory values (pf-agd-task-memory-md)
+ *   v2.25.0 -- 2026-06-03 -- Compact .md-body styles for Markdown-rendered task descriptions (pf-agd-task-desc) so long agent-authored prompts render with structure
  *   v2.11.0 -- 2026-05-31 -- Widen the solo pop-out window (and pf-agd-solo max-width) so the agent card matches the list-view width and the full tab bar fits
  *   v2.12.0 -- 2026-05-31 -- Add completed-task deliverable styles (pf-agd-deliverable*) linking a task to its agent-memory output key
  *   v2.13.0 -- 2026-05-31 -- Add per-task blur-title toggle styles (pf-agd-blur-toggle, pf-agd-task-title--blurred) for hiding sensitive titles in screen recordings
@@ -3294,6 +3295,76 @@
   text-align: left;
 }
 .pf .pf-agd-task-memory-md .md-body th { background: var(--card-bg, #FFFFFF); }
+
+/* Markdown-rendered task descriptions (agent-authored prompts are often long and
+   structured). Compact, mirroring the task-memory variant. The expanded card
+   background is grey (--card-bg-alt), so code chips get a white fill + border for
+   contrast. Paragraphs keep the dim base colour; headings use the normal text
+   colour to stand out. */
+.pf .pf-agd-task-desc .md-body > :first-child { margin-top: 0; }
+.pf .pf-agd-task-desc .md-body > :last-child { margin-bottom: 0; }
+.pf .pf-agd-task-desc .md-body p { margin: 0.3rem 0; }
+.pf .pf-agd-task-desc .md-body h1,
+.pf .pf-agd-task-desc .md-body h2,
+.pf .pf-agd-task-desc .md-body h3,
+.pf .pf-agd-task-desc .md-body h4 {
+  margin: 0.5rem 0 0.2rem;
+  line-height: 1.3;
+  font-size: 0.85rem;
+  color: var(--text, #1A1A2E);
+}
+.pf .pf-agd-task-desc .md-body h1 { font-size: 0.95rem; }
+.pf .pf-agd-task-desc .md-body h2 { font-size: 0.9rem; }
+.pf .pf-agd-task-desc .md-body ul,
+.pf .pf-agd-task-desc .md-body ol { margin: 0.3rem 0; padding-left: 1.3rem; }
+.pf .pf-agd-task-desc .md-body li { margin: 0.12rem 0; }
+.pf .pf-agd-task-desc .md-body a { color: var(--accent, #E8564A); }
+.pf .pf-agd-task-desc .md-body strong { color: var(--text, #1A1A2E); }
+.pf .pf-agd-task-desc .md-body blockquote {
+  margin: 0.35rem 0;
+  padding: 0.15rem 0.55rem;
+  border-left: 3px solid var(--border, #E5E7EB);
+  color: var(--text-dim, #6B7280);
+}
+.pf .pf-agd-task-desc .md-body .md-code {
+  font-family: var(--font-mono, ui-monospace, Menlo, Consolas, monospace);
+  font-size: 0.72rem;
+  background: var(--card-bg, #FFFFFF);
+  border: 1px solid var(--border, #E5E7EB);
+  padding: 0.02rem 0.3rem;
+  border-radius: 4px;
+}
+.pf .pf-agd-task-desc .md-body .md-pre {
+  margin: 0.4rem 0;
+  padding: 0.55rem;
+  background: var(--card-bg, #FFFFFF);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+.pf .pf-agd-task-desc .md-body .md-pre .md-code {
+  display: block;
+  white-space: pre;
+  background: none;
+  border: none;
+  padding: 0;
+  tab-size: 4;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--text, #1A1A2E);
+}
+.pf .pf-agd-task-desc .md-body table {
+  border-collapse: collapse;
+  margin: 0.35rem 0;
+  font-size: 0.72rem;
+}
+.pf .pf-agd-task-desc .md-body th,
+.pf .pf-agd-task-desc .md-body td {
+  border: 1px solid var(--border, #E5E7EB);
+  padding: 0.2rem 0.45rem;
+  text-align: left;
+}
+.pf .pf-agd-task-desc .md-body th { background: var(--card-bg, #FFFFFF); }
 
 /* Structured JSON view: key/value rows, nested blocks indented with a guide line. */
 .pf .pf-agd-json-block { display: flex; flex-direction: column; gap: 0.05rem; }
