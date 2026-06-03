@@ -394,6 +394,7 @@
     function Header({ navigate, locale }) {
       const [session, setSession] = useState(null);
       const [morsels, setMorsels] = useState(null);
+      const [menuOpen, setMenuOpen] = useState(false);
 
       // Check auth state
       useEffect(() => {
@@ -443,24 +444,28 @@
           </div>
 
           <div class="topnav-right">
-            <a href="/v1/classic" onClick=${(e) => handleNav(e, '/v1/classic')} class="${currentPath === '/v1/classic' ? 'active' : ''}">${t('nav.try')}</a>
-            <a href="/v1/portal?view=dev" onClick=${(e) => handleNav(e, '/v1/portal?view=dev')}>${t('nav.devView')}</a>
-            <a href="/v1/help" onClick=${(e) => handleNav(e, '/v1/help')} class="${currentPath === '/v1/help' ? 'active' : ''}">${t('nav.help')}</a>
-            ${session && html`
-              <a href="/app-catalog.html" target="_blank" class="${currentPath === '/app-catalog.html' ? 'active' : ''}">${t('nav.apps') || 'Apps'}</a>
-              <a href="/v1/profile" class="profile-link visible ${currentPath === '/v1/profile' ? 'active' : ''}" onClick=${(e) => handleNav(e, '/v1/profile')}>
-                ${t('nav.profile')}
-              </a>
-              ${session.roles && session.roles.includes('operator') && html`
-                <a href="/v1/admin" class="${currentPath === '/v1/admin' ? 'active' : ''}" onClick=${(e) => handleNav(e, '/v1/admin')}>
-                  ${t('nav.admin')}
+            <button class="topnav-burger" aria-label="Menu" aria-expanded=${menuOpen ? 'true' : 'false'}
+              onClick=${() => setMenuOpen(o => !o)}>☰</button>
+            <div class="topnav-menu ${menuOpen ? 'open' : ''}">
+              <a href="/v1/classic" onClick=${(e) => { handleNav(e, '/v1/classic'); setMenuOpen(false); }} class="${currentPath === '/v1/classic' ? 'active' : ''}">${t('nav.try')}</a>
+              <a href="/v1/portal?view=dev" onClick=${(e) => { handleNav(e, '/v1/portal?view=dev'); setMenuOpen(false); }}>${t('nav.devView')}</a>
+              <a href="/v1/help" onClick=${(e) => { handleNav(e, '/v1/help'); setMenuOpen(false); }} class="${currentPath === '/v1/help' ? 'active' : ''}">${t('nav.help')}</a>
+              ${session && html`
+                <a href="/app-catalog.html" target="_blank" onClick=${() => setMenuOpen(false)} class="${currentPath === '/app-catalog.html' ? 'active' : ''}">${t('nav.apps') || 'Apps'}</a>
+                <a href="/v1/profile" class="profile-link visible ${currentPath === '/v1/profile' ? 'active' : ''}" onClick=${(e) => { handleNav(e, '/v1/profile'); setMenuOpen(false); }}>
+                  ${t('nav.profile')}
                 </a>
+                ${session.roles && session.roles.includes('operator') && html`
+                  <a href="/v1/admin" class="${currentPath === '/v1/admin' ? 'active' : ''}" onClick=${(e) => { handleNav(e, '/v1/admin'); setMenuOpen(false); }}>
+                    ${t('nav.admin')}
+                  </a>
+                `}
               `}
-            `}
-            <div class="topnav-center">
-              <${ThemeToggle} />
-              <button class="lang-btn ${locale === 'en' ? 'active' : ''}" onClick=${() => handleLangSwitch('en')}>EN</button>
-              <button class="lang-btn ${locale === 'fi' ? 'active' : ''}" onClick=${() => handleLangSwitch('fi')}>FI</button>
+              <div class="topnav-center">
+                <${ThemeToggle} />
+                <button class="lang-btn ${locale === 'en' ? 'active' : ''}" onClick=${() => handleLangSwitch('en')}>EN</button>
+                <button class="lang-btn ${locale === 'fi' ? 'active' : ''}" onClick=${() => handleLangSwitch('fi')}>FI</button>
+              </div>
             </div>
             <span class="header-auth-slot" id="headerAuth"></span>
           </div>

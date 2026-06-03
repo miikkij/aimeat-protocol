@@ -4,6 +4,9 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.14.0 - 2026-06-03 - mountLoginButton: add hook classes (aimeat-auth-pill/-dot/
+ *   -label/-ghii/-logout) so the logged-in pill can go compact on mobile (theme.css
+ *   hides label+ghii, keeping the dot + Logout). Pill markup/styles otherwise unchanged.
  * v1.13.0 - 2026-06-03 - aimeat-auth.js owner sessions now refresh via the httpOnly
  *   refresh cookie (POST /v1/auth/refresh) instead of owner-key signing: single-flight
  *   refresh, refresh-on-boot, logout revokes server-side. Cross-device login no longer
@@ -888,25 +891,25 @@ const auth = {
     function render() {
       const stored = load('session');
       if (stored) {
-        container.innerHTML = '<div style="display:inline-flex;align-items:center;gap:10px;padding:8px 18px;'
+        container.innerHTML = '<div class="aimeat-auth-pill" style="display:inline-flex;align-items:center;gap:10px;padding:8px 18px;'
           + 'background:linear-gradient(160deg,#3d2e1a 0%,#6b4c2a 15%,#c9a84c 30%,#f5e6a3 45%,#c9a84c 55%,#8b6914 70%,#4a3520 100%);'
           + 'border:1px solid rgba(201,168,76,.6);border-top-color:rgba(245,230,163,.5);border-bottom-color:rgba(75,53,32,.8);'
           + 'border-radius:10px;'
           + 'box-shadow:0 1px 0 rgba(245,230,163,.3) inset,0 -1px 0 rgba(75,53,32,.5) inset,0 3px 10px rgba(0,0,0,.4),0 0 20px rgba(201,168,76,.15);'
           + 'font-family:system-ui;font-size:14px">'
-          + '<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;letter-spacing:.5px;color:#a0ffb8;text-shadow:0 0 4px rgba(0,210,80,.6),0 0 10px rgba(0,180,70,.3)">'
-          + '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;'
+          + '<span class="aimeat-auth-dot" style="display:inline-block;flex:0 0 auto;width:9px;height:9px;border-radius:50%;'
           + 'background:radial-gradient(circle at 35% 35%,#b0ffc8,#00c853 40%,#00802e 80%,#003d15);'
           + 'box-shadow:0 0 5px rgba(0,200,83,.7),0 0 12px rgba(0,200,83,.3),inset 0 -1px 2px rgba(0,0,0,.3)"></span>'
+          + '<span class="aimeat-auth-label" style="display:inline-flex;align-items:center;font-size:12px;font-weight:600;letter-spacing:.5px;color:#a0ffb8;text-shadow:0 0 4px rgba(0,210,80,.6),0 0 10px rgba(0,180,70,.3)">'
           + escHtml(i.loggedIn || 'logged in') + '</span>'
-          + '<span style="color:rgba(90,65,20,.7);font-weight:700;letter-spacing:.5px;font-size:13px;'
+          + '<span class="aimeat-auth-ghii" style="color:rgba(90,65,20,.7);font-weight:700;letter-spacing:.5px;font-size:13px;'
           + 'text-shadow:0 1px 0 rgba(245,230,163,.6),0 -1px 0 rgba(50,35,10,.3);'
           + '-webkit-text-stroke:.2px rgba(120,85,20,.3)">'
           + escHtml(stored.ghii || stored.owner) + '</span>'
           + (stored.federated ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;letter-spacing:.5px;color:#7dd3fc;'
             + 'background:rgba(56,189,248,.15);padding:2px 6px;border-radius:4px;border:1px solid rgba(56,189,248,.3)">'
             + '\\u{1F310} ' + escHtml(i.federated || 'Federated') + '</span>' : '')
-          + '<button id="aimeat-logout-btn" style="'
+          + '<button id="aimeat-logout-btn" class="aimeat-auth-logout" style="'
           + 'background:radial-gradient(ellipse at 50% 30%,#ff6b6b 0%,#dc2626 35%,#991b1b 70%,#7f1d1d 100%);'
           + 'color:#ffd7d7;border:1px solid rgba(220,38,38,.6);border-top-color:rgba(255,130,130,.4);border-bottom-color:rgba(100,20,20,.8);'
           + 'border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.3px;'

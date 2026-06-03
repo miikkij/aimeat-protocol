@@ -1992,5 +1992,7 @@
     display: block; position: fixed; inset: var(--nav-height, 56px) 0 0;
     background: var(--overlay-scrim, rgba(0,0,0,.35)); z-index: 45;
   }
-  .pf-content { padding: 0.5rem 1rem 1rem; }
+  /* Screen space is valuable on mobile — minimal side margins. */
+  .pf { padding: 0.6rem 0.35rem 1.5rem; }
+  .pf-content { padding: 0.5rem 0.35rem 1.5rem; }
 }
