@@ -1,4 +1,6 @@
 {
+  "profile.landing.home": "Etusivu",
+  "profile.landing.menu": "Valikko",
   "profile.tabs.scheduler": "Ajastin",
   "profile.agents.detail.tabs.schedules": "Ajastukset",
   "profile.scheduler.title": "Ajastin",

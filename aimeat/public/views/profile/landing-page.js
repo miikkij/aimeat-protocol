@@ -1,16 +1,22 @@
 /**
  * @file landing-page.js
- * @description Adaptive profile landing page with three user tier variants
- *   (new / active / experienced). Shows tier-specific dashboard content with
- *   onboarding, app strip, menu sections, and inline preview panels.
+ * @description Profile landing page. Navigation is a PERSISTENT, grouped sidebar
+ *   (every tab always visible — no activity-based hiding) plus a content column
+ *   showing either the selected tab or the home dashboard (ProfileCard +
+ *   tier-based onboarding/app-strip). On mobile the sidebar is an off-canvas
+ *   drawer. The logged-in pill + Logout live in the global shell header
+ *   (spa.html), not here. Replaced the old new/active/experienced tier-adaptive
+ *   menu, which was unpredictable for humans and agentic developers.
  * @structure
- *   - computeTier() — exported heuristic for user tier detection
+ *   - computeTier() — exported heuristic; now gates only the home onboarding content
  *   - tierLevel() — exported numeric tier comparison helper
- *   - ProfileCard, HeroOnboarding, KnowledgeCallout, KnowledgeButton,
- *     GhostTiles, CortexSection, AppStrip — section sub-components
- *   - MenuSection, MenuItem — generic menu layout components
+ *   - SIDEBAR_GROUPS — grouped, always-visible tab list
+ *   - ProfileCard, HeroOnboarding, KnowledgeCallout, GhostTiles, CortexSection,
+ *     AppStrip — home/section sub-components
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v2.0.0 — 2026-06-03 — Replace tier-adaptive menu with a persistent grouped sidebar
+ *     + content column + mobile drawer; computeTier now only gates home onboarding.
  *   v1.2.0 — 2026-03-19 — Expandable AppStrip chips with launch button; remove Generator primary style
  *   v1.1.0 — 2026-03-19 — Persist open tab to localStorage across page reloads
  *   v1.0.0 — 2026-03-18 — Initial adaptive landing page implementation
@@ -503,6 +509,50 @@ function InlineView({ tabId, label, onClose, renderTab }) {
   `;
 }
 
+/* ───── Persistent sidebar groups (replaces the tier-adaptive menu) ─────
+ * Every tab is always present and grouped into stable sections — no activity-based
+ * hiding, so humans and agentic developers can predict where each tab lives.
+ * Group titles reuse existing i18n keys; tab labels reuse profile.tabs.* / *.tabLabel. */
+const SIDEBAR_GROUPS = [
+  { titleKey: 'profile.landing.menuDaily', items: [
+    { id: 'agents', icon: '\u{1F916}', labelKey: 'profile.tabs.agents', badgeStat: 'agents' },
+    { id: 'scheduler', icon: '⏰', labelKey: 'profile.tabs.scheduler' },
+    { id: 'memory', icon: '\u{1F9E0}', labelKey: 'profile.tabs.memory' },
+    { id: 'boards', icon: '\u{1F4CB}', labelKey: 'profile.tabs.boards' },
+    { id: 'knowledge', icon: '\u{1F4DA}', labelKey: 'knowledge.tabLabel' },
+    { id: 'notifications', icon: '\u{1F514}', labelKey: 'profile.tabs.notifications' },
+    { id: 'apps', icon: '⚙️', labelKey: 'profile.tabs.apps' },
+  ] },
+  { titleKey: 'profile.landing.menuBuildShare', items: [
+    { id: 'generator', icon: '\u{1F534}', labelKey: 'profile.generator.tabLabel' },
+    { id: 'foundry', icon: '\u{1F3ED}', labelKey: 'profile.foundry.tabLabel' },
+    { id: 'calibrator', icon: '\u{1F3AF}', labelKey: 'profile.calibrator.tabLabel' },
+    { id: 'extensions', icon: '\u{1F50C}', labelKey: 'profile.tabs.extensions' },
+    { id: 'capabilities', icon: '⚡', labelKey: 'capabilities.tabLabel' },
+    { id: 'portfolio', icon: '\u{1F3A8}', labelKey: 'portfolio.tabLabel' },
+    { id: 'packages', icon: '\u{1F4E6}', labelKey: 'profile.tabs.packages' },
+  ] },
+  { titleKey: 'profile.landing.menuTechnical', items: [
+    { id: 'actions', icon: '\u{1F6E0}️', labelKey: 'profile.tabs.services' },
+    { id: 'work', icon: '\u{1F4CB}', labelKey: 'profile.tabs.work' },
+    { id: 'mcp', icon: '\u{1F517}', labelKey: 'profile.tabs.mcp' },
+    { id: 'chatsessions', icon: '\u{1F4AC}', labelKey: 'profile.tabs.chatSessions' },
+  ] },
+  { titleKey: 'profile.landing.menuPersonal', items: [
+    { id: 'wallet', icon: '\u{1F48E}', labelKey: 'profile.tabs.wallet' },
+    { id: 'email', icon: '\u{1F4E7}', labelKey: 'profile.tabs.email' },
+    { id: 'access', icon: '\u{1F510}', labelKey: 'profile.tabs.access' },
+    { id: 'organisms', icon: '\u{1F3E2}', labelKey: 'profile.tabs.organisms' },
+    { id: 'dataWallet', icon: '\u{1F512}', labelKey: 'profile.tabs.dataWallet' },
+  ] },
+  { titleKey: 'profile.landing.menuInfra', items: [
+    { id: 'federation', icon: '\u{1F310}', labelKey: 'profile.tabs.federation' },
+    { id: 'nodes', icon: '\u{1F5A5}️', labelKey: 'profile.tabs.nodes' },
+    { id: 'nodeStats', icon: '\u{1F4CA}', labelKey: 'profile.tabs.nodeStats' },
+    { id: 'security', icon: '\u{1F6E1}️', labelKey: 'profile.tabs.security' },
+  ] },
+];
+
 /* ───── Main landing page ───── */
 
 export default function LandingPage({ tier, stats, session, navigate, showToast, locale, renderTab, getTabLabel }) {
@@ -520,6 +570,7 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
     return null;
   });
   const [expanded, setExpanded] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const owner = session.owner;
 
@@ -578,11 +629,7 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
   const isExperienced = tier === 'experienced';
 
   return html`
-    <div class="pf-landing">
-
-      <${ProfileCard} tier=${tier} stats=${stats} session=${session}
-        onEditProfile=${() => setEditOpen(true)}
-        onChangePassword=${() => setPwOpen(true)} />
+    <div class="pf-shell${drawerOpen ? ' pf-shell--open' : ''}">
 
       ${editOpen && html`<${EditProfileModal}
         session=${session}
@@ -595,150 +642,54 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
         onChanged=${() => { setPwOpen(false); showToast?.(t('profile.landing.passwordChanged')); }}
       />`}
 
-      ${isNew && html`
-        <${HeroOnboarding} switchTab=${(id) => open(id, 'hero')} />
-        ${viewAt('hero')}
+      <button class="pf-mnav-toggle" onClick=${() => setDrawerOpen(o => !o)}>☰ ${t('profile.landing.menu')}</button>
+      <div class="pf-scrim" onClick=${() => setDrawerOpen(false)}></div>
 
-        <${KnowledgeCallout} switchTab=${() => open('knowledge', 'knowledge-new')} />
-        ${viewAt('knowledge-new')}
+      <aside class="pf-sidebar">
+        <div class="pf-side-identity">
+          <div class="pf-side-avatar"></div>
+          <div class="pf-side-id-name">${session.displayName || owner}</div>
+        </div>
 
-        <${GhostTiles} switchTab=${() => open('packages', 'ghost')} />
-        ${viewAt('ghost')}
+        <button class="pf-side-item${!openView ? ' pf-side-item--active' : ''}"
+          onClick=${() => { close(); setDrawerOpen(false); }}>
+          <span class="pf-side-ico">\u{1F3E0}</span><span class="pf-side-label">${t('profile.landing.home')}</span>
+        </button>
 
-        <${CortexSection} switchTab=${() => open('extensions', 'cortex')} />
-        ${viewAt('cortex')}
-
-        <${MenuSection} title=${t('profile.landing.menuManagement')}>
-          <div class="pf-menu-grid">
-            <${MenuItem} icon="\u{1F9E0}" label=${t('profile.tabs.memory')} active=${isOpen('memory')} onClick=${() => open('memory', 'manage-new')} />
-            <${MenuItem} icon="\u{1F48E}" label=${t('profile.tabs.wallet')} active=${isOpen('wallet')} onClick=${() => open('wallet', 'manage-new')} />
-            <${MenuItem} icon="\u{1F510}" label=${t('profile.tabs.access')} active=${isOpen('access')} onClick=${() => open('access', 'manage-new')} />
-            <${MenuItem} icon="\u{1F4E7}" label=${t('profile.tabs.email')} active=${isOpen('email')} onClick=${() => open('email', 'manage-new')} />
+        ${SIDEBAR_GROUPS.map(g => html`
+          <div class="pf-side-group">
+            <div class="pf-side-group-title">${t(g.titleKey)}</div>
+            ${g.items.map(it => html`
+              <button class="pf-side-item${isOpen(it.id) ? ' pf-side-item--active' : ''}"
+                onClick=${() => { open(it.id, 'main'); setDrawerOpen(false); }}>
+                <span class="pf-side-ico">${it.icon}</span>
+                <span class="pf-side-label">${t(it.labelKey)}</span>
+                ${it.badgeStat && typeof stats?.[it.badgeStat] === 'number' && stats[it.badgeStat] > 0
+                  ? html`<span class="pf-side-badge">${stats[it.badgeStat]}</span>` : null}
+              </button>
+            `)}
           </div>
-          <div class="pf-expand-trigger" onClick=${() => setExpanded(!expanded)}>
-            ${expanded ? '\u25BE' : '\u25B8'} ${t('profile.landing.expandAll')}
+        `)}
+      </aside>
+
+      <main class="pf-content">
+        ${openView ? html`
+          <div class="pf-content-head">
+            <button class="pf-back-btn" onClick=${close}>← ${t('profile.landing.home')}</button>
+            <span class="pf-back-current">${getTabLabel(openView.tabId)}</span>
           </div>
-          ${expanded && html`
-            <div class="pf-menu-grid pf-menu-grid-expanded">
-              <${MenuItem} icon="\u{1F916}" label=${t('profile.tabs.agents')} active=${isOpen('agents')} onClick=${() => open('agents', 'manage-new')} />
-              <${MenuItem} icon="\u{1F4AC}" label=${t('profile.tabs.chatSessions')} active=${isOpen('chatsessions')} onClick=${() => open('chatsessions', 'manage-new')} />
-              <${MenuItem} icon="\u{1F50C}" label=${t('profile.tabs.extensions')} active=${isOpen('extensions')} onClick=${() => open('extensions', 'manage-new')} />
-              <${MenuItem} icon="\u{1F534}" label=${t('profile.generator.tabLabel')} active=${isOpen('generator')} onClick=${() => open('generator', 'manage-new')} />
-              <${MenuItem} icon="\u{1F3ED}" label=${t('profile.foundry.tabLabel')} active=${isOpen('foundry')} onClick=${() => open('foundry', 'manage-new')} />
-              <${MenuItem} icon="\u{1F3AF}" label=${t('profile.calibrator.tabLabel')} active=${isOpen('calibrator')} onClick=${() => open('calibrator', 'manage-new')} />
-              <${MenuItem} icon="\u{1F4E6}" label=${t('profile.tabs.packages')} active=${isOpen('packages')} onClick=${() => open('packages', 'manage-new')} />
-              <${MenuItem} icon="\u{1F4DA}" label=${t('knowledge.tabLabel')} active=${isOpen('knowledge')} onClick=${() => open('knowledge', 'manage-new')} />
-              <${MenuItem} icon="\u{1F4CB}" label=${t('profile.tabs.boards')} active=${isOpen('boards')} onClick=${() => open('boards', 'manage-new')} />
-              <${MenuItem} icon="\u{1F3A8}" label=${t('portfolio.tabLabel')} active=${isOpen('portfolio')} onClick=${() => open('portfolio', 'manage-new')} />
-              <${MenuItem} icon="\u{1F6E0}\uFE0F" label=${t('profile.tabs.services')} active=${isOpen('actions')} onClick=${() => open('actions', 'manage-new')} />
-              <${MenuItem} icon="\u{1F4CB}" label=${t('profile.tabs.work')} active=${isOpen('work')} onClick=${() => open('work', 'manage-new')} />
-              <${MenuItem} icon="\u{1F3E2}" label=${t('profile.tabs.organisms')} active=${isOpen('organisms')} onClick=${() => open('organisms', 'manage-new')} />
-              <${MenuItem} icon="\u{1F512}" label=${t('profile.tabs.dataWallet')} active=${isOpen('dataWallet')} onClick=${() => open('dataWallet', 'manage-new')} />
-              <${MenuItem} icon="\u{1F514}" label=${t('profile.tabs.notifications')} active=${isOpen('notifications')} onClick=${() => open('notifications', 'manage-new')} />
-              <${MenuItem} icon="\u{1F512}" label=${t('profile.tabs.security')} active=${isOpen('security')} onClick=${() => open('security', 'manage-new')} />
-              <${MenuItem} icon="⚡" label=${t('capabilities.tabLabel')} active=${isOpen('capabilities')} onClick=${() => open('capabilities', 'manage-new')} />
-            </div>
-          `}
-        <//>
-        ${viewAt('manage-new')}
-      `}
-
-      ${(isActive || isExperienced) && html`
-        <${AppStrip} apps=${apps} switchTab=${(id) => open(id, 'apps')} />
-        ${viewAt('apps')}
-
-        <${MenuSection} title=${t('profile.landing.menuDaily')}>
-          <div class="pf-menu-grid">
-            <${MenuItem} icon="\u{1F4E6}" label=${t('profile.landing.packagesExt')} active=${isOpen('packages')} onClick=${() => open('packages', 'daily')} />
-            <${MenuItem} icon="\u{1F514}" label=${t('profile.landing.notificationsBadge')} active=${isOpen('notifications')} onClick=${() => open('notifications', 'daily')} />
-            <${MenuItem} icon="\u{1F916}" label=${t('profile.tabs.agents')}
-              badge=${typeof stats.agents === 'number' ? stats.agents : 0} badgeMuted
-              active=${isOpen('agents')} onClick=${() => open('agents', 'daily')} />
-            <${MenuItem} icon="\u{1F9E0}" label=${t('profile.tabs.memory')} active=${isOpen('memory')} onClick=${() => open('memory', 'daily')} />
-            <${MenuItem} icon="\u{1F4CB}" label=${t('profile.tabs.boards')} active=${isOpen('boards')} onClick=${() => open('boards', 'daily')} />
-            <${MenuItem} icon="\u{1F4DA}" label=${t('knowledge.tabLabel')} active=${isOpen('knowledge')} onClick=${() => open('knowledge', 'daily')} />
-          </div>
-        <//>
-        ${viewAt('daily')}
-
-        ${isActive && html`
-          <${KnowledgeButton} switchTab=${() => open('knowledge', 'knowledge-btn')} />
-          ${viewAt('knowledge-btn')}
-        `}
-
-        <${MenuSection} title=${t('profile.landing.menuBuildShare')}>
-          <div class="pf-menu-grid">
-            <${MenuItem} icon="\u{1F534}" label=${t('profile.generator.tabLabel')} active=${isOpen('generator')} onClick=${() => open('generator', 'build')} />
-            <${MenuItem} icon="\u{1F3ED}" label=${t('profile.foundry.tabLabel')} active=${isOpen('foundry')} onClick=${() => open('foundry', 'build')} />
-            <${MenuItem} icon="\u{1F3AF}" label=${t('profile.calibrator.tabLabel')} active=${isOpen('calibrator')} onClick=${() => open('calibrator', 'build')} />
-            <${MenuItem} icon="\u{1F50C}" label=${t('profile.tabs.extensions')} active=${isOpen('extensions')} onClick=${() => open('extensions', 'build')} />
-            <${MenuItem} icon="⚡" label=${t('capabilities.tabLabel')} active=${isOpen('capabilities')} onClick=${() => open('capabilities', 'build')} />
-            <${MenuItem} icon="\u{1F3A8}" label=${t('portfolio.tabLabel')} active=${isOpen('portfolio')} onClick=${() => open('portfolio', 'build')} />
-            ${isExperienced && html`
-              <${MenuItem} icon="\u{1F4E4}" label=${t('profile.landing.ownPackages')} active=${isOpen('packages')} onClick=${() => open('packages', 'build')} />
-            `}
-          </div>
-        <//>
-        ${viewAt('build')}
-
-        ${isExperienced ? html`
-          <${MenuSection} title=${t('profile.landing.menuManagement')}>
-            <div class="pf-menu-subgroup">
-              <div class="pf-menu-subgroup-title">${t('profile.landing.menuTechnical')}</div>
-              <div class="pf-menu-grid">
-                <${MenuItem} icon="\u2699\uFE0F" label=${t('profile.tabs.apps')} active=${isOpen('apps')} onClick=${() => open('apps', 'manage')} />
-                <${MenuItem} icon="\u{1F517}" label=${t('profile.tabs.mcp')} active=${isOpen('mcp')} onClick=${() => open('mcp', 'manage')} />
-                <${MenuItem} icon="\u{1F6E0}\uFE0F" label=${t('profile.tabs.services')} active=${isOpen('actions')} onClick=${() => open('actions', 'manage')} />
-                <${MenuItem} icon="\u{1F4CB}" label=${t('profile.tabs.work')} active=${isOpen('work')} onClick=${() => open('work', 'manage')} />
-                <${MenuItem} icon="\u{1F4AC}" label=${t('profile.tabs.chatSessions')} active=${isOpen('chatsessions')} onClick=${() => open('chatsessions', 'manage')} />
-              </div>
-            </div>
-            <div class="pf-menu-subgroup">
-              <div class="pf-menu-subgroup-title">${t('profile.landing.menuPersonal')}</div>
-              <div class="pf-menu-grid">
-                <${MenuItem} icon="\u{1F48E}" label=${t('profile.tabs.wallet')} active=${isOpen('wallet')} onClick=${() => open('wallet', 'manage')} />
-                <${MenuItem} icon="\u{1F4E7}" label=${t('profile.tabs.email')} active=${isOpen('email')} onClick=${() => open('email', 'manage')} />
-                <${MenuItem} icon="\u{1F510}" label=${t('profile.tabs.access')} active=${isOpen('access')} onClick=${() => open('access', 'manage')} />
-                <${MenuItem} icon="\u{1F3E2}" label=${t('profile.tabs.organisms')} active=${isOpen('organisms')} onClick=${() => open('organisms', 'manage')} />
-              </div>
-            </div>
-          <//>
-          ${viewAt('manage')}
-
-          <${MenuSection} title=${t('profile.landing.menuInfra')} annotation=${t('profile.landing.menuInfraAnnotation')}>
-            <div class="pf-menu-grid">
-              <${MenuItem} icon="\u{1F310}" label=${t('profile.tabs.federation')} indigo active=${isOpen('federation')} onClick=${() => open('federation', 'infra')} />
-              <${MenuItem} icon="\u{1F5A5}\uFE0F" label=${t('profile.tabs.nodes')} active=${isOpen('nodes')} onClick=${() => open('nodes', 'infra')} />
-              <${MenuItem} icon="\u{1F4CA}" label=${t('profile.tabs.nodeStats')} active=${isOpen('nodeStats')} onClick=${() => open('nodeStats', 'infra')} />
-              <${MenuItem} icon="\u{1F512}" label=${t('profile.tabs.security')} active=${isOpen('security')} onClick=${() => open('security', 'infra')} />
-            </div>
-          <//>
-          ${viewAt('infra')}
+          <div class="pf-content-body">${renderTab(openView.tabId)}</div>
         ` : html`
-          <${MenuSection} title=${t('profile.landing.menuManagement')}>
-            <div class="pf-menu-grid">
-              <${MenuItem} icon="\u2699\uFE0F" label=${t('profile.tabs.apps')} active=${isOpen('apps')} onClick=${() => open('apps', 'manage')} />
-              <${MenuItem} icon="\u{1F517}" label=${t('profile.tabs.mcp')} active=${isOpen('mcp')} onClick=${() => open('mcp', 'manage')} />
-              <${MenuItem} icon="\u{1F48E}" label=${t('profile.tabs.wallet')} active=${isOpen('wallet')} onClick=${() => open('wallet', 'manage')} />
-              <${MenuItem} icon="\u{1F4E7}" label=${t('profile.tabs.email')} active=${isOpen('email')} onClick=${() => open('email', 'manage')} />
-              <${MenuItem} icon="\u{1F510}" label=${t('profile.tabs.access')} active=${isOpen('access')} onClick=${() => open('access', 'manage')} />
-            </div>
-            <div class="pf-expand-trigger" onClick=${() => setExpanded(!expanded)}>
-              ${expanded ? '\u25BE' : '\u25B8'} ${t('profile.landing.expandMore')}
-            </div>
-            ${expanded && html`
-              <div class="pf-menu-grid pf-menu-grid-expanded">
-                <${MenuItem} icon="\u{1F6E0}\uFE0F" label=${t('profile.tabs.services')} active=${isOpen('actions')} onClick=${() => open('actions', 'manage')} />
-                <${MenuItem} icon="\u{1F4CB}" label=${t('profile.tabs.work')} active=${isOpen('work')} onClick=${() => open('work', 'manage')} />
-                <${MenuItem} icon="\u{1F4AC}" label=${t('profile.tabs.chatSessions')} active=${isOpen('chatsessions')} onClick=${() => open('chatsessions', 'manage')} />
-                <${MenuItem} icon="\u{1F512}" label=${t('profile.tabs.dataWallet')} active=${isOpen('dataWallet')} onClick=${() => open('dataWallet', 'manage')} />
-                <${MenuItem} icon="\u{1F3E2}" label=${t('profile.tabs.organisms')} active=${isOpen('organisms')} onClick=${() => open('organisms', 'manage')} />
-              </div>
-            `}
-          <//>
-          ${viewAt('manage')}
+          <${ProfileCard} tier=${tier} stats=${stats} session=${session}
+            onEditProfile=${() => setEditOpen(true)}
+            onChangePassword=${() => setPwOpen(true)} />
+          ${isNew ? html`<${HeroOnboarding} switchTab=${(id) => open(id, 'main')} />` : null}
+          ${(isNew || isActive) ? html`<${KnowledgeCallout} switchTab=${() => open('knowledge', 'main')} />` : null}
+          ${isNew ? html`<${GhostTiles} switchTab=${() => open('packages', 'main')} />` : null}
+          <${CortexSection} switchTab=${() => open('extensions', 'main')} />
+          <${AppStrip} apps=${apps} switchTab=${(id) => open(id, 'main')} />
         `}
-      `}
+      </main>
     </div>
   `;
 }

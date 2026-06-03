@@ -1,4 +1,6 @@
 {
+  "profile.landing.home": "Home",
+  "profile.landing.menu": "Menu",
   "profile.tabs.scheduler": "Scheduler",
   "profile.agents.detail.tabs.schedules": "Schedules",
   "profile.scheduler.title": "Scheduler",
