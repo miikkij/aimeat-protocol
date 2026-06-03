@@ -7,6 +7,12 @@
  * @version-history
  *   v1.1.0 — 2026-06-02 — Admin design unification: raw template textarea →
  *     adm-textarea adm-input-full (drop inline mono/border/background styles).
+ *   v1.2.0 — 2026-06-03 — Active-source status (custom template vs built-in SPA)
+ *     + "Load current page" button that seeds the editor with the live / HTML.
+ *   v1.3.0 — 2026-06-03 — Fix portal memory keys writing to the wrong namespace
+ *     (now /v1/site/memory → __site__ so {{memory:portal/*}} resolves); add AI
+ *     bundle import (/v1/site/import) so the AI-Assisted result no longer 422s in
+ *     the template box; reload the preview iframe after every change + Clear Cache.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -17,7 +23,8 @@ import { escHtml, copyToClipboard } from '/js/utils.js';
 import { dt, Badge, ExpandableHelp, useToast, Toast } from './shared.js';
 import {
   saveSiteTemplate, deleteSiteTemplate, clearSiteCache,
-  getSiteMemoryKeys, getSitePrompt, addMemory, deleteMemory, triggerLbSync,
+  getSiteMemoryKeys, getSitePrompt, setSiteMemory, deleteSiteMemory,
+  importSiteBundle, triggerLbSync,
 } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
 
@@ -28,12 +35,17 @@ export default function PortalTab({ data, reload }) {
   const tmpl = p.template || {};
   const changes = (p.changelog?.entries) || [];
   const isLb = meta.lb_mode?.enabled;
+  const hasCustom = !!meta.has_custom_template;
 
   const { confirm, ConfirmUI } = useConfirm();
   const [template, setTemplate] = useState(tmpl.template || '');
   const [memKeys, setMemKeys] = useState(null);
   const [newKey, setNewKey] = useState('');
   const [newVal, setNewVal] = useState('');
+  const [aiBundle, setAiBundle] = useState('');
+  // Bumped after any change so the preview iframe re-fetches `/` (busts browser cache).
+  const [previewNonce, setPreviewNonce] = useState(0);
+  const bumpPreview = () => setPreviewNonce(n => n + 1);
 
   useEffect(() => { loadMemKeys(); }, []);
 
@@ -45,8 +57,54 @@ export default function PortalTab({ data, reload }) {
   }
 
   async function saveTemplate() {
-    try { await saveSiteTemplate(template); reload(); }
+    // The AI-Assisted prompt produces a JSON import bundle, not raw HTML. If the
+    // user pasted that here, the template route would 422 — point them to Import.
+    if (template.trimStart().startsWith('{')) {
+      showErr(t('dashboard.portalSaveLooksLikeJson'));
+      return;
+    }
+    try { await saveSiteTemplate(template); bumpPreview(); reload(); }
     catch (e) { showErr(e.message); }
+  }
+
+  async function importAiBundle() {
+    let bundle;
+    try { bundle = JSON.parse(aiBundle); }
+    catch { showErr(t('dashboard.portalImportInvalid')); return; }
+    if (!bundle || typeof bundle !== 'object' || (!bundle.template && !bundle.memory && !bundle.kv)) {
+      showErr(t('dashboard.portalImportInvalid'));
+      return;
+    }
+    try {
+      const res = await importSiteBundle(bundle);
+      const d = res.data || {};
+      const parts = [];
+      if (d.template_stored) parts.push('template');
+      if (d.memory_keys_written) parts.push(d.memory_keys_written + ' memory');
+      if (d.kv_pairs_updated) parts.push(d.kv_pairs_updated + ' KV');
+      showOk(t('dashboard.portalImportDone').replace('{summary}', parts.join(', ') || '—'));
+      if (typeof bundle.template === 'string') setTemplate(bundle.template);
+      setAiBundle('');
+      loadMemKeys();
+      bumpPreview();
+      reload();
+    } catch (e) { showErr(e.message); }
+  }
+
+  async function loadCurrentAsTemplate() {
+    const run = async () => {
+      try {
+        const resp = await fetch('/', { headers: { Accept: 'text/html' }, cache: 'no-store' });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        setTemplate(await resp.text());
+        showOk(t('dashboard.portalLoadedCurrent'));
+      } catch (e) { showErr(e.message); }
+    };
+    if (template && template.trim()) {
+      confirm(t('dashboard.portalLoadCurrentConfirm'), run);
+    } else {
+      run();
+    }
   }
 
   function downloadTemplate() {
@@ -58,24 +116,28 @@ export default function PortalTab({ data, reload }) {
 
   function resetTemplate() {
     confirm(t('dashboard.portalResetDefault') + '?', async () => {
-      try { await deleteSiteTemplate(); reload(); }
+      try { await deleteSiteTemplate(); setTemplate(''); bumpPreview(); reload(); }
       catch (e) { showErr(e.message); }
     }, { danger: true });
   }
 
   async function doClearCache() {
-    try { await clearSiteCache(); } catch (e) { showErr(e.message); }
+    try { await clearSiteCache(); bumpPreview(); } catch (e) { showErr(e.message); }
   }
 
   async function addMem() {
     if (!newKey.trim()) return;
-    try { await addMemory(newKey, newVal); setNewKey(''); setNewVal(''); loadMemKeys(); }
-    catch (e) { showErr(e.message); }
+    try {
+      await setSiteMemory(newKey.trim(), newVal);
+      setNewKey(''); setNewVal('');
+      showOk(t('dashboard.portalMemorySaved'));
+      loadMemKeys(); bumpPreview();
+    } catch (e) { showErr(e.message); }
   }
 
   function delMem(key) {
     confirm(t('dashboard.portalDeleteKeyConfirm').replace('{key}', key), async () => {
-      try { await deleteMemory(key); loadMemKeys(); }
+      try { await deleteSiteMemory(key); loadMemKeys(); bumpPreview(); }
       catch (e) { showErr(e.message); }
     }, { danger: true });
   }
@@ -120,7 +182,7 @@ export default function PortalTab({ data, reload }) {
     <!-- Preview -->
     <div class="adm-card">
       <h3>${t('dashboard.portalPreview')}</h3>
-      <iframe src="/" style="width:100%;height:400px;border:1px solid var(--glass-border);border-radius:8px;background:#fff" sandbox="allow-same-origin allow-scripts"></iframe>
+      <iframe src=${'/?_preview=' + previewNonce} style="width:100%;height:400px;border:1px solid var(--glass-border);border-radius:8px;background:#fff" sandbox="allow-same-origin allow-scripts"></iframe>
       <div class="adm-flex adm-mt-sm">
         <button class="adm-btn-action" onClick=${doClearCache}>\u{1F6AB} ${t('dashboard.portalClearCache')}</button>
       </div>
@@ -129,6 +191,22 @@ export default function PortalTab({ data, reload }) {
     <!-- Template editor -->
     <div class="adm-card">
       <h3>${t('dashboard.portalTemplate')}</h3>
+      <div class="adm-erow">
+        <span class="adm-elabel">${t('dashboard.portalActiveSource')}</span>
+        <span class="adm-eval">
+          ${hasCustom
+            ? html`<span class="adm-badge adm-badge-active">${t('dashboard.portalCustomActive')}</span>${tmpl.updated_at ? html` · ${dt(tmpl.updated_at)}` : ''}`
+            : html`<span class="adm-badge adm-badge-info">${t('dashboard.portalDefaultActive')}</span>`}
+        </span>
+      </div>
+      <p class="adm-text-dim adm-text-base adm-mb-sm">
+        ${hasCustom
+          ? t('dashboard.portalCustomExplain')
+          : t('dashboard.portalDefaultExplain').replace('{action}', t('dashboard.portalLoadCurrent'))}
+      </p>
+      <div class="adm-mb-sm">
+        <button class="adm-btn-action" onClick=${loadCurrentAsTemplate}>\u{1F4C4} ${t('dashboard.portalLoadCurrent')}</button>
+      </div>
       <${ExpandableHelp} title=${t('dashboard.portalTagHelpTitle')}>
         <p>${t('dashboard.portalTagHelpDetail')}</p>
         <table>
@@ -194,8 +272,15 @@ export default function PortalTab({ data, reload }) {
     <div class="adm-card">
       <h3>${t('dashboard.portalAiChat')}</h3>
       <p class="adm-text-dim adm-text-base">${t('dashboard.portalAiExplain')}</p>
-      <div class="adm-mt-sm">
+      <div class="adm-mt-sm adm-mb-sm">
         <button class="adm-btn-action" onClick=${copyPrompt}>\u{1F4CB} ${t('dashboard.portalAiLoadPrompt')}</button>
+      </div>
+      <p class="adm-text-dim adm-text-base adm-mb-sm">${t('dashboard.portalAiBundleExplain')}</p>
+      <textarea class="adm-textarea adm-input-full" rows="6" value=${aiBundle}
+        onInput=${e => setAiBundle(e.target.value)}
+        placeholder=${t('dashboard.portalAiBundlePlaceholder')} style="font-size:13px"></textarea>
+      <div class="adm-flex adm-mt-sm">
+        <button class="adm-btn-action" onClick=${importAiBundle}>\u{1F4E5} ${t('dashboard.portalAiImport')}</button>
       </div>
     </div>
 

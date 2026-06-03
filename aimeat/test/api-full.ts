@@ -1342,14 +1342,15 @@ await test('GET /v1/site/template — download uploaded template', async () => {
 });
 
 await test('GET / — serves resolved custom template', async () => {
-    // Bootstrap router redirects Accept:text/html to /v1/portal (SPA).
-    // Custom template is served by site router, but bootstrap takes priority.
-    // Just verify we get HTML (either SPA or resolved template).
+    // With a custom template set, GET / (Accept: text/html) serves the resolved
+    // template instead of redirecting humans to the SPA. The {{config:nodeName}}
+    // tag must be resolved, and the template's static text must be present.
     const res = await fetch(`${BASE}/`, { headers: { Accept: 'text/html' }, redirect: 'follow' });
     const ct = res.headers.get('content-type') ?? '';
     assert(ct.includes('text/html'), `expected HTML, got ${ct}`);
     const html = await res.text();
-    assert(html.length > 100, 'got substantial HTML response');
+    assert(html.includes('Hello from'), `served HTML should be the custom template, got: ${html.slice(0, 160)}`);
+    assert(!html.includes('{{config:nodeName}}'), 'config tag should be resolved, not literal');
 });
 
 await test('POST /v1/site/import — import bundle', async () => {
@@ -1378,6 +1379,76 @@ await test('POST /v1/site/import — reject invalid memory keys', async () => {
     });
     assert(status === 422, `expected 422, got ${status}`);
     assert(body.ok === false, 'not ok');
+});
+
+// ── Single portal memory key set/delete (→ __site__ namespace so tags resolve) ──
+await test('POST /v1/site/memory — set portal memory key', async () => {
+    const { status, body } = await json('/v1/site/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: 'portal/about', value: 'About this node' }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body.error)}`);
+    assert(body.data?.stored === true, 'stored');
+});
+
+await test('GET /v1/site/memory-keys — lists the new key under __site__', async () => {
+    const { status, body } = await json('/v1/site/memory-keys', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}`);
+    const found = (body.data?.keys || []).find((k: any) => k.key === 'portal/about');
+    assert(found, 'portal/about should be listed');
+    assert(found.value === 'About this node', `value: ${found.value}`);
+});
+
+await test('{{memory:portal/about}} resolves in served portal (bootstrap serves custom template)', async () => {
+    const template = '<!DOCTYPE html><html><body><main id="about">{{memory:portal/about}}</main></body></html>';
+    const { status: up } = await json('/v1/site/template', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ template }),
+    });
+    assert(up === 200, `upload status ${up}`);
+    // A custom template is set → GET / for a browser must serve it (resolved), not redirect to the SPA.
+    const res = await fetch(`${BASE}/`, { headers: { Accept: 'text/html' } });
+    const htmlText = await res.text();
+    assert(htmlText.includes('About this node'), `served portal should resolve memory value (status ${res.status})`);
+});
+
+await test('POST /v1/site/memory — reject non-portal key', async () => {
+    const { status, body } = await json('/v1/site/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: 'notportal/x', value: 'v' }),
+    });
+    assert(status === 422, `expected 422, got ${status}`);
+    assert(body.ok === false, 'not ok');
+});
+
+await test('DELETE /v1/site/memory/:key — delete portal memory key', async () => {
+    const { status, body } = await json(`/v1/site/memory/${encodeURIComponent('portal/about')}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}`);
+    assert(body.data?.deleted === true, 'deleted');
+});
+
+await test('DELETE /v1/site/memory/:key — 404 for missing key', async () => {
+    const { status } = await json(`/v1/site/memory/${encodeURIComponent('portal/missing-key')}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 404, `expected 404, got ${status}`);
+});
+
+await test('POST /v1/site/memory — 401 without auth', async () => {
+    const { status } = await json('/v1/site/memory', {
+        method: 'POST',
+        body: JSON.stringify({ key: 'portal/x', value: 'v' }),
+    });
+    assert(status === 401, `expected 401, got ${status}`);
 });
 
 await test('GET /v1/site/changelog — view changes', async () => {

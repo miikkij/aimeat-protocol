@@ -175,8 +175,12 @@ export async function mountRoutes(
   app.use(uploadRouter(config, storage));
 
   // Mount routes
+  // SiteService is created early so the bootstrap GET / handler can serve a
+  // custom portal template (set via the admin Template Editor) instead of
+  // always redirecting human visitors to the SPA. Reused by siteRouter below.
+  const siteService = new SiteService(config, storage);
   app.use(setupRouter(config, storage, invalidateHasOwnersCache));
-  app.use(bootstrapRouter(config, storage, tunnelManager ?? undefined));
+  app.use(bootstrapRouter(config, storage, tunnelManager ?? undefined, siteService));
   app.use(statsRouter(config, storage, stats, metricsRegistry));
   app.use(wellknownRouter(config, storage));
 
@@ -311,7 +315,6 @@ export async function mountRoutes(
   app.use(storageFilesRouter(config, storage));
   app.use(validateRouter(config));
   app.use(mcpRouter(config, storage));
-  const siteService = new SiteService(config, storage);
   app.use(siteRouter(config, storage, siteService));    // Node Portal — GET / + /v1/site/*
 
   // Site LB sync — manual trigger endpoint + background job

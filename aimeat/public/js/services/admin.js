@@ -152,6 +152,9 @@ export const saveSiteTemplate = (tmpl)  => apiPost('/v1/site/template', { templa
 export const deleteSiteTemplate = ()    => apiDelete('/v1/site/template');
 export const getSiteChangelog = ()      => apiGet('/v1/site/changelog');
 export const getSiteMemoryKeys = ()     => apiGet('/v1/site/memory-keys');
+export const setSiteMemory    = (key, value) => apiPost('/v1/site/memory', { key, value });
+export const deleteSiteMemory = (key)   => apiDelete(`/v1/site/memory/${encodeURIComponent(key)}`);
+export const importSiteBundle = (bundle) => apiPost('/v1/site/import', bundle);
 export const clearSiteCache   = ()      => apiPost('/v1/site/cache-invalidate');
 export const getSitePrompt    = ()      => apiGet('/v1/site/prompt');
 export const triggerLbSync    = ()      => apiPost('/v1/admin/site/sync');

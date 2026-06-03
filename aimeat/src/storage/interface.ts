@@ -830,7 +830,7 @@ export interface RealtimeRoomRecord {
 // Node Portal (Site)
 export interface SiteChangeLogEntry {
   id: string;
-  action: 'template_upload' | 'template_delete' | 'import' | 'cache_invalidate' | 'app_publish' | 'app_update' | 'app_delete';
+  action: 'template_upload' | 'template_delete' | 'import' | 'cache_invalidate' | 'app_publish' | 'app_update' | 'app_delete' | 'memory_set' | 'memory_delete';
   summary: string;
   changedBy: string;
   changedAt: string;

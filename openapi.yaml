@@ -12587,6 +12587,126 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /v1/site/memory-keys:
+    get:
+      operationId: getSiteMemoryKeys
+      summary: List portal memory keys
+      description: |
+        List memory keys under the `portal/*` namespace (site `__site__` owner)
+        with their values. These resolve in templates via `{{memory:portal/key}}`.
+        Operator-only (Tier 2).
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Portal memory keys
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          keys:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                key:
+                                  type: string
+                                value: {}
+
+  /v1/site/memory:
+    post:
+      operationId: setSiteMemory
+      summary: Set a portal memory key
+      description: |
+        Set a single portal memory key in the site (`__site__`) namespace so it
+        resolves in templates via `{{memory:portal/key}}`. The key must start with
+        `portal/`. Operator-only (Tier 2). Blocked in load-balancer mode.
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, value]
+              properties:
+                key:
+                  type: string
+                  description: Memory key, must start with `portal/`
+                  example: portal/about
+                value:
+                  type: string
+                  description: Value (may contain operator-trusted HTML)
+      responses:
+        '200':
+          description: Memory key stored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          stored:
+                            type: boolean
+                          key:
+                            type: string
+        '409':
+          description: Portal is read-only (load-balancer mode)
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /v1/site/memory/{key}:
+    delete:
+      operationId: deleteSiteMemory
+      summary: Delete a portal memory key
+      description: |
+        Delete a single portal memory key from the site (`__site__`) namespace.
+        Operator-only (Tier 2). Blocked in load-balancer mode.
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          description: URL-encoded portal memory key (e.g. `portal%2Fabout`)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Memory key deleted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          deleted:
+                            type: boolean
+                          key:
+                            type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Portal is read-only (load-balancer mode)
+
   /v1/site/changelog:
     get:
       operationId: getSiteChangelog

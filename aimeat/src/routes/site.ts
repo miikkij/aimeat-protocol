@@ -173,6 +173,43 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
         res.json(success(config.nodeId, { keys }));
     });
 
+    // POST /v1/site/memory — Set a single portal memory key (operator)
+    // Writes to the site (__site__) namespace so {{memory:portal/*}} tags resolve.
+    router.post('/v1/site/memory', requireAuth(), requireRole('operator'), requireNotLb, async (req, res) => {
+        const { key, value } = req.body ?? {};
+        if (!key || typeof key !== 'string') {
+            res.status(422).json(error(config.nodeId, 'MEMORY_INVALID', 'Request body must include "key" string'));
+            return;
+        }
+        if (typeof value !== 'string') {
+            res.status(422).json(error(config.nodeId, 'MEMORY_INVALID', 'Request body must include "value" string'));
+            return;
+        }
+        try {
+            await site.setPortalMemory(key, value, req.auth!.sub);
+            res.json(success(config.nodeId, { stored: true, key }));
+            emitChange('site');
+        } catch (err) {
+            if (err instanceof SiteError) {
+                res.status(err.httpStatus).json(error(config.nodeId, err.code, err.message));
+                return;
+            }
+            throw err;
+        }
+    });
+
+    // DELETE /v1/site/memory/:key — Delete a single portal memory key (operator)
+    router.delete('/v1/site/memory/:key', requireAuth(), requireRole('operator'), requireNotLb, async (req, res) => {
+        const key = req.params.key as string;
+        const deleted = await site.deletePortalMemory(key, req.auth!.sub);
+        if (!deleted) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Portal memory key "${key}" not found`));
+            return;
+        }
+        res.json(success(config.nodeId, { deleted: true, key }));
+        emitChange('site');
+    });
+
     // GET /v1/site/sync — Origin sync endpoint for LB nodes (no auth, portal content is public)
     router.get('/v1/site/sync', async (req, res) => {
         const since = req.query.since as string | undefined;

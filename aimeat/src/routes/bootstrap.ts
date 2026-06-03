@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { TunnelManager } from '../services/personal-tunnel.js';
+import type { SiteService } from '../services/site.js';
 import { success } from '../middleware/envelope.js';
 import { getSiteSyncState } from '../services/site-sync.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
@@ -41,6 +42,7 @@ export function bootstrapRouter(
   config: AimeatConfig,
   storage: Storage,
   tunnelManager?: TunnelManager,
+  siteService?: SiteService,
 ): Router {
   const router = Router();
 
@@ -82,10 +84,22 @@ export function bootstrapRouter(
   });
 
   router.get('/', async (_req, res) => {
-    // Browsers send Accept: text/html — redirect humans to the onboarding portal
-    // Skip redirect when ?format=json is set (used by AIs given the quick-start URL)
+    // Browsers send Accept: text/html — serve a custom portal template if the
+    // operator has set one (so the Template Editor actually changes what visitors
+    // see), otherwise redirect humans to the onboarding portal SPA.
+    // Skip both when ?format=json is set (used by AIs given the quick-start URL).
     const accept = _req.headers.accept ?? '';
     if (accept.includes('text/html') && !accept.includes('application/json') && _req.query.format !== 'json') {
+      if (siteService && config.siteEnabled && await siteService.hasCustomTemplate()) {
+        const customHtml = await siteService.getPortalHtml(
+          _req.query.lang as string | undefined,
+          _req.headers.cookie,
+          _req.headers['accept-language'] as string | undefined,
+        );
+        res.set('Cache-Control', `public, max-age=${config.siteCacheTtlSeconds}`);
+        res.type('text/html').send(customHtml);
+        return;
+      }
       res.redirect('/v1/portal');
       return;
     }

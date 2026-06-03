@@ -194,6 +194,37 @@ export class SiteService {
         return { templateStored, memoryKeysWritten, kvPairsUpdated, changelogEntryId: entryId };
     }
 
+    /** Set a single portal memory key (portal/* namespace, public). Used by the admin Portal Memory Keys editor. */
+    async setPortalMemory(key: string, value: string, changedBy: string): Promise<void> {
+        if (!key.startsWith('portal/')) {
+            throw new SiteError('MEMORY_INVALID', 'Portal memory key must start with "portal/"', 422);
+        }
+        const now = new Date().toISOString();
+        await this.storage.setMemory({
+            key,
+            ownerGaii: SITE_OWNER_GAII,
+            value,
+            visibility: 'public',
+            tags: ['site'],
+            ttlHours: null,
+            version: 1,
+            createdAt: now,
+            updatedAt: now,
+        });
+        this.invalidateCache();
+        await this.addChangeLog('memory_set', `Set portal memory key ${key}`, changedBy);
+    }
+
+    /** Delete a single portal memory key. Returns false if the key did not exist. */
+    async deletePortalMemory(key: string, changedBy: string): Promise<boolean> {
+        const deleted = await this.storage.deleteMemory(SITE_OWNER_GAII, key);
+        if (deleted) {
+            this.invalidateCache();
+            await this.addChangeLog('memory_delete', `Deleted portal memory key ${key}`, changedBy);
+        }
+        return deleted;
+    }
+
     /** Force-clear the resolved HTML cache. */
     async invalidateCacheAction(changedBy: string): Promise<void> {
         this.invalidateCache();
