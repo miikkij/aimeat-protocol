@@ -98,3 +98,19 @@
 .sch-form-actions { display: flex; justify-content: flex-end; }
 
 .sch-budget-section { margin-bottom: 1rem; }
+
+/* ── Editable schedule card (master + agent views) ── */
+.sch-card-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.sch-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 0.75rem 0.9rem; display: flex; flex-direction: column; gap: 0.5rem;
+}
+.sch-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; }
+.sch-card-title { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; min-width: 0; }
+.sch-card-meta { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; font-size: 0.82rem; color: var(--text); }
+.sch-meta-k { color: var(--text-dim); }
+.sch-card-dispatch { background: var(--bg-dim); border-radius: var(--radius-sm); padding: 0.5rem 0.7rem; }
+.sch-dispatch-label { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.2rem; }
+.sch-dispatch-title { font-weight: 600; font-size: 0.9rem; color: var(--text); white-space: pre-wrap; }
+.sch-dispatch-body { font-size: 0.84rem; color: var(--text-dim); margin-top: 0.15rem; white-space: pre-wrap; word-break: break-word; }
+.sch-edit { display: flex; flex-direction: column; gap: 0.55rem; border-top: 1px solid var(--border); padding-top: 0.6rem; }

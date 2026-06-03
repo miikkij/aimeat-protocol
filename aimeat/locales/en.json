@@ -80,6 +80,13 @@
   "profile.scheduler.budgetDesc": "Default opt-in limits applied to schedules created for this agent.",
   "profile.scheduler.budgetSave": "Save budget guards",
   "profile.scheduler.budgetSaved": "Budget guards saved",
+  "profile.scheduler.edit": "Edit",
+  "profile.scheduler.save": "Save",
+  "profile.scheduler.saved": "Schedule updated",
+  "profile.scheduler.dispatches": "Creates each run",
+  "profile.scheduler.soon": "soon",
+  "profile.scheduler.paused": "paused",
+  "profile.scheduler.autoKey": "(auto)",
   "common": {
     "cancel": "Cancel",
     "confirm": "Confirm",

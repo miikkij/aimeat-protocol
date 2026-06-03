@@ -17,10 +17,8 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { listAgents } from '/js/services/agents.js';
-import {
-  listAllSchedules, createSchedule, setScheduleEnabled,
-  triggerSchedule, deleteSchedule,
-} from '/js/services/schedules.js';
+import { listAllSchedules, createSchedule } from '/js/services/schedules.js';
+import ScheduleItem from './schedule-item.js';
 
 const html = htm.bind(h);
 
@@ -79,42 +77,6 @@ export default function SchedulerTab({ showToast }) {
     return () => { window.removeEventListener('aimeat-live-update', handler); clearInterval(poller); };
   }, [loadData]);
 
-  const onToggle = async (job) => {
-    try { await setScheduleEnabled(job.id, !job.enabled); await loadData(); }
-    catch (e) { showToast?.(e.message, true); }
-  };
-  const onTrigger = async (job) => {
-    try { await triggerSchedule(job.id); showToast?.(t('profile.scheduler.triggered')); await loadData(); }
-    catch (e) { showToast?.(e.message, true); }
-  };
-  const onCancel = async (job) => {
-    if (!window.confirm(t('profile.scheduler.confirmCancel'))) return;
-    try { await deleteSchedule(job.id); showToast?.(t('profile.scheduler.cancelled')); await loadData(); }
-    catch (e) { showToast?.(e.message, true); }
-  };
-
-  const renderManagedRow = (job) => html`
-    <tr key=${job.id}>
-      <td>
-        <div class="sch-name">${job.displayName || job.name}</div>
-        ${job.purpose && html`<div class="sch-muted sch-purpose">${job.purpose}</div>`}
-        ${job.createdByAgent && html`<span class="sch-tag">${t('profile.scheduler.byAgent')}</span>`}
-      </td>
-      <td>${kindBadge(job.type)}</td>
-      <td><code class="sch-cron">${job.cron}</code>${job.timezone && html`<div class="sch-muted">${job.timezone}</div>`}</td>
-      <td>${job.agentName || html`<span class="sch-muted">—</span>`}</td>
-      <td>${job.lastRunAt ? timeAgo(job.lastRunAt) : html`<span class="sch-muted">${t('profile.scheduler.never')}</span>`} ${resultBadge(job.lastRunResult)}</td>
-      <td>${job.nextRunAt ? timeAgo(job.nextRunAt) : html`<span class="sch-muted">—</span>`}</td>
-      <td>${job.runCount ?? 0}</td>
-      <td class="sch-actions">
-        <button class="btn-ghost sch-btn" onClick=${() => onToggle(job)} title=${job.enabled ? t('profile.scheduler.pause') : t('profile.scheduler.resume')}>
-          ${job.enabled ? t('profile.scheduler.pause') : t('profile.scheduler.resume')}
-        </button>
-        <button class="btn-ghost sch-btn" onClick=${() => onTrigger(job)}>${t('profile.scheduler.runNow')}</button>
-        <button class="btn-danger sch-btn" onClick=${() => onCancel(job)}>${t('profile.scheduler.cancel')}</button>
-      </td>
-    </tr>`;
-
   if (loading) return html`<div class="sch-loading">${t('profile.scheduler.loading')}</div>`;
 
   return html`
@@ -139,16 +101,7 @@ export default function SchedulerTab({ showToast }) {
         <h3 class="sch-section-title">${t('profile.scheduler.managedTitle')}</h3>
         ${data.managed.length === 0
           ? html`<div class="sch-empty">${t('profile.scheduler.noManaged')}</div>`
-          : html`<table class="sch-table"><thead><tr>
-              <th>${t('profile.scheduler.col.name')}</th>
-              <th>${t('profile.scheduler.col.kind')}</th>
-              <th>${t('profile.scheduler.col.cron')}</th>
-              <th>${t('profile.scheduler.col.agent')}</th>
-              <th>${t('profile.scheduler.col.lastRun')}</th>
-              <th>${t('profile.scheduler.col.nextRun')}</th>
-              <th>${t('profile.scheduler.col.runs')}</th>
-              <th></th>
-            </tr></thead><tbody>${data.managed.map(renderManagedRow)}</tbody></table>`}
+          : html`<div class="sch-card-list">${data.managed.map(j => html`<${ScheduleItem} key=${j.id} schedule=${j} onChanged=${loadData} showToast=${showToast} />`)}</div>`}
       </div>
 
       <!-- Owner extension cron -->

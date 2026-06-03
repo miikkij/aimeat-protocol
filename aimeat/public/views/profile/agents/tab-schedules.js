@@ -11,13 +11,11 @@ import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { timeAgo } from '/js/utils.js';
-import { listAgentSchedules, setScheduleEnabled, triggerSchedule, deleteSchedule } from '/js/services/schedules.js';
+import { listAgentSchedules } from '/js/services/schedules.js';
 import { CreateForm } from '../scheduler-tab.js';
+import ScheduleItem from '../schedule-item.js';
 
 const html = htm.bind(h);
-
-const KIND_LABEL = { ai: 'profile.scheduler.kind.ai', agent_task: 'profile.scheduler.kind.agent_task', extension: 'profile.scheduler.kind.extension', core: 'profile.scheduler.kind.core' };
 
 export default function TabSchedules({ agentName, allAgents = [], showToast }) {
   const [managed, setManaged] = useState([]);
@@ -45,13 +43,6 @@ export default function TabSchedules({ agentName, allAgents = [], showToast }) {
     return () => { window.removeEventListener('aimeat-live-update', handler); clearInterval(poller); };
   }, [loadData]);
 
-  const onToggle = async (j) => { try { await setScheduleEnabled(j.id, !j.enabled); await loadData(); } catch (e) { showToast?.(e.message, true); } };
-  const onTrigger = async (j) => { try { await triggerSchedule(j.id); showToast?.(t('profile.scheduler.triggered')); await loadData(); } catch (e) { showToast?.(e.message, true); } };
-  const onCancel = async (j) => {
-    if (!window.confirm(t('profile.scheduler.confirmCancel'))) return;
-    try { await deleteSchedule(j.id); showToast?.(t('profile.scheduler.cancelled')); await loadData(); } catch (e) { showToast?.(e.message, true); }
-  };
-
   if (loading) return html`<div class="sch-loading">${t('profile.scheduler.loading')}</div>`;
 
   return html`
@@ -70,27 +61,7 @@ export default function TabSchedules({ agentName, allAgents = [], showToast }) {
         <h3 class="sch-section-title">${t('profile.scheduler.dispatchedTitle')}</h3>
         ${managed.length === 0
           ? html`<div class="sch-empty">${t('profile.scheduler.noDispatched')}</div>`
-          : html`<table class="sch-table"><thead><tr>
-              <th>${t('profile.scheduler.col.name')}</th>
-              <th>${t('profile.scheduler.col.kind')}</th>
-              <th>${t('profile.scheduler.col.cron')}</th>
-              <th>${t('profile.scheduler.col.lastRun')}</th>
-              <th>${t('profile.scheduler.col.nextRun')}</th>
-              <th></th>
-            </tr></thead><tbody>
-            ${managed.map(j => html`<tr key=${j.id}>
-              <td><div class="sch-name">${j.displayName || j.name}</div>${j.createdByAgent && html`<span class="sch-tag">${t('profile.scheduler.byAgent')}</span>`}</td>
-              <td><span class="sch-badge sch-badge--${j.type === 'ai' ? 'ai' : j.type === 'extension' ? 'ext' : 'agent'}">${t(KIND_LABEL[j.type] || KIND_LABEL.core)}</span></td>
-              <td><code class="sch-cron">${j.cron}</code>${j.timezone && html`<div class="sch-muted">${j.timezone}</div>`}</td>
-              <td>${j.lastRunAt ? timeAgo(j.lastRunAt) : html`<span class="sch-muted">${t('profile.scheduler.never')}</span>`} ${j.lastRunResult ? html`<span class="sch-badge ${j.lastRunResult === 'error' ? 'sch-badge--err' : 'sch-badge--ok'}">${j.lastRunResult}</span>` : ''}</td>
-              <td>${j.nextRunAt ? timeAgo(j.nextRunAt) : html`<span class="sch-muted">—</span>`}</td>
-              <td class="sch-actions">
-                <button class="btn-ghost sch-btn" onClick=${() => onToggle(j)}>${j.enabled ? t('profile.scheduler.pause') : t('profile.scheduler.resume')}</button>
-                <button class="btn-ghost sch-btn" onClick=${() => onTrigger(j)}>${t('profile.scheduler.runNow')}</button>
-                <button class="btn-danger sch-btn" onClick=${() => onCancel(j)}>${t('profile.scheduler.cancel')}</button>
-              </td>
-            </tr>`)}
-          </tbody></table>`}
+          : html`<div class="sch-card-list">${managed.map(j => html`<${ScheduleItem} key=${j.id} schedule=${j} onChanged=${loadData} showToast=${showToast} />`)}</div>`}
       </div>
 
       <div class="sch-section">

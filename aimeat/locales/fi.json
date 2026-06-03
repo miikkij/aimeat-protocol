@@ -80,6 +80,13 @@
   "profile.scheduler.budgetDesc": "Oletusarvoiset valinnaiset rajat, jotka koskevat tälle agentille luotuja ajastuksia.",
   "profile.scheduler.budgetSave": "Tallenna budjettirajat",
   "profile.scheduler.budgetSaved": "Budjettirajat tallennettu",
+  "profile.scheduler.edit": "Muokkaa",
+  "profile.scheduler.save": "Tallenna",
+  "profile.scheduler.saved": "Ajastus päivitetty",
+  "profile.scheduler.dispatches": "Luo joka ajolla",
+  "profile.scheduler.soon": "pian",
+  "profile.scheduler.paused": "tauolla",
+  "profile.scheduler.autoKey": "(auto)",
   "common": {
     "cancel": "Peruuta",
     "confirm": "Vahvista",
