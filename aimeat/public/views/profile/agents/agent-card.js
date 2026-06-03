@@ -3,6 +3,10 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v1.13.0 -- 2026-06-03 -- Deep-link props: preSelectedTab forces a tab (and
+ *     locks it past the async README default), openTaskId + openTaskNonce are
+ *     threaded to the Tasks sub-tab so the fleet "running now" panel can open a
+ *     specific task directly.
  *   v1.12.0 -- 2026-06-02 -- Active tracked tab never shows its own badge and is
  *     kept marked-seen as new items arrive (so a message landing while you're on
  *     the Messages tab doesn't raise a (1) you're already looking at).
@@ -111,7 +115,7 @@ function totalChanges(changes) {
   return (changes.tasks || 0) + (changes.messages || 0) + (changes.memory || 0);
 }
 
-export default function AgentCard({ agent, onboarding, expanded, onToggle, session, showToast, allAgents, changes, onTabSeen, onScopesClick, onDeleteClick, onFederateToggle, onPopOut, soloMode = false }) {
+export default function AgentCard({ agent, onboarding, expanded, onToggle, session, showToast, allAgents, changes, onTabSeen, onScopesClick, onDeleteClick, onFederateToggle, onPopOut, soloMode = false, preSelectedTab = null, openTaskId = null, openTaskNonce = 0 }) {
   const state = detectAgentState(agent, onboarding);
   const [activeTab, setActiveTab] = useState(null);
   // README markdown: undefined = not loaded, '' = none published, string = show tab.
@@ -119,6 +123,9 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
   // True once the user clicks a tab, so the async README default never yanks
   // them off a tab they chose.
   const userPickedTab = useRef(false);
+  // Last deep-link nonce we acted on, so a fresh panel click re-forces the tab
+  // but a plain re-expand (same nonce) does not override the README default.
+  const lastDeepLinkNonce = useRef(0);
 
   // Load the README once the card is expanded (lazy — collapsed cards skip it).
   useEffect(() => {
@@ -140,6 +147,19 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
     if (readme === undefined) return;
     setActiveTab(hasReadme ? 'readme' : getDefaultTab(state));
   }, [expanded, readme]);
+
+  // Deep-link: when the fleet "running now" panel requests this agent's Tasks
+  // tab (preSelectedTab), force that tab and lock it (userPickedTab) so the
+  // async README default can't yank it away. Gated on a NEW openTaskNonce so a
+  // fresh panel click re-forces it, but a plain manual re-expand (same nonce)
+  // leaves the README default / the user's own tab choice alone.
+  useEffect(() => {
+    if (!expanded || !preSelectedTab || !openTaskNonce) return;
+    if (openTaskNonce === lastDeepLinkNonce.current) return;
+    lastDeepLinkNonce.current = openTaskNonce;
+    userPickedTab.current = true;
+    setActiveTab(preSelectedTab);
+  }, [expanded, preSelectedTab, openTaskNonce]);
 
   // While the owner is actively viewing a tracked tab (Tasks/Messages/Memory),
   // keep it marked-seen as new items arrive. Without this, a message landing
@@ -256,7 +276,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
 
         <!-- Tab Content -->
         <div class="pf-agd-tab-content" onClick=${(e) => e.stopPropagation()}>
-          ${renderTabContent(activeTab, agent, onboarding, session, showToast, allAgents, readme)}
+          ${renderTabContent(activeTab, agent, onboarding, session, showToast, allAgents, readme, openTaskId, openTaskNonce)}
         </div>
 
         <!-- Card Footer: Scopes + Delete -->
@@ -550,12 +570,12 @@ function ProblemZone2({ agent, setActiveTab, showToast }) {
   `;
 }
 
-function renderTabContent(activeTab, agent, onboarding, session, showToast, allAgents, readme) {
+function renderTabContent(activeTab, agent, onboarding, session, showToast, allAgents, readme, openTaskId, openTaskNonce) {
   const props = { agent, onboarding, session, showToast, agentName: agent.name, allAgents };
   switch (activeTab) {
     case 'readme': return html`<${TabReadme} readme=${readme} />`;
     case 'integration': return html`<${TabIntegration} ...${props} />`;
-    case 'tasks': return html`<${TabTasks} ...${props} />`;
+    case 'tasks': return html`<${TabTasks} ...${props} openTaskId=${openTaskId} openTaskNonce=${openTaskNonce} />`;
     case 'messages': return html`<${TabMessages} ...${props} />`;
     case 'data-access': return html`<${TabDataAccess} ...${props} />`;
     case 'directives': return html`<${TabDirectives} ...${props} />`;

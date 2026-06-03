@@ -354,6 +354,13 @@
     },
     "agents": {
       "title": "Your Agents",
+      "active": {
+        "title": "Running now",
+        "empty": "No tasks running right now.",
+        "openHint": "Open this task",
+        "untitled": "Untitled task",
+        "more": "more running (open an agent to see all)"
+      },
       "desc": "Agents are AI identities registered under your account, each with their own identity, scopes, tools, tasks, and memory access. Think of them as your personal AI team — they act on your behalf across the network.",
       "connect": "Connect an Automation Agent",
       "connectDesc": "Connect an AI agent to your account using the AIMEAT connector CLI or an agent-capable runtime. The connector is the easiest path because it gives the agent a persistent identity, approved scopes, local skill bundle, and MCP access to AIMEAT tools:",

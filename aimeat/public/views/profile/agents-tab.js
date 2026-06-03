@@ -35,13 +35,18 @@
  *     (connect command, MCP onboarding, manual agent prompt, task-runner prompt) with the
  *     canonical <CopyButton> (className="copy-prompt-btn" preserves appearance); removed the
  *     now-dead copiedAction state + markCopied helper.
+ *   v3.6.0 -- 2026-06-03 -- Fleet "running now" panel between the agent board and
+ *     the list: every agent's currently-active tasks in one list (reuses the
+ *     active tasks already fetched in loadData, so no extra requests); clicking a
+ *     row deep-links into that agent's Tasks tab and auto-opens the task
+ *     (expandedAgent + deepLink → AgentCard preSelectedTab/openTaskId).
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
+import { escHtml, timeAgo } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { Spinner } from './shared.js';
 import { apiGet, apiPost, apiPatch } from '/js/api.js';
@@ -449,6 +454,13 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [taskRunnerExpanded, setTaskRunnerExpanded] = useState(false);
   const [taskRunnerName, setTaskRunnerName] = useState('');
   const [taskStatsMap, setTaskStatsMap] = useState({});
+  // Currently-active tasks per agent { name: Task[] } — powers the fleet
+  // "running now" panel. Reuses the active list already fetched in loadData().
+  const [activeTasksMap, setActiveTasksMap] = useState({});
+  // Deep-link request from the running-now panel: { agent, taskId, nonce }.
+  // The nonce makes a repeat click re-fire the open even for the same task.
+  const [deepLink, setDeepLink] = useState(null);
+  const deepLinkNonce = useRef(0);
   // Per-agent unseen-change counts { name: { tasks, messages, memory } } driving
   // the collapsed mini-badge + per-tab number badges. Computed in loadData()
   // from the localStorage "last seen per tab" baseline (see loadSeen/countNewer).
@@ -534,6 +546,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
       }));
       setOnboardings(obMap);
       const tsMap = {};
+      const atsMap = {};
       const seen = loadSeen(session.owner);
       let seenSeeded = false;
       const chMap = {};
@@ -550,6 +563,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
           const activeTasks = activeResp?.data?.tasks || [];
           const doneToday = doneTasks.filter(tk => tk.completedAt?.startsWith(today)).length;
           tsMap[a.name] = { done: doneToday, active: activeTasks.length };
+          atsMap[a.name] = activeTasks;
 
           // Per-tab unseen-change counts. First observation of a tab seeds its
           // baseline to "now" (count 0) so an agent's whole history is never
@@ -568,9 +582,10 @@ export default function AgentsTab({ session, showToast, onStats }) {
             else ch[tab] = countNewer(items, agentSeen[tab], fields);
           }
           chMap[a.name] = ch;
-        } catch { tsMap[a.name] = null; chMap[a.name] = null; }
+        } catch { tsMap[a.name] = null; chMap[a.name] = null; atsMap[a.name] = []; }
       }));
       setTaskStatsMap(tsMap);
+      setActiveTasksMap(atsMap);
       // Persist any freshly-seeded baselines. Merge against the latest storage
       // so a tab the user opened mid-fetch (markTabSeen) is not overwritten.
       if (seenSeeded) {
@@ -602,6 +617,19 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
   function toggleAgent(name) {
     setExpandedAgent(prev => prev === name ? null : name);
+  }
+
+  // Running-now panel → open a specific agent's Tasks tab on a specific task.
+  // Expand the agent, record the deep-link (nonce bump re-fires repeat clicks),
+  // and scroll the agent's card into view.
+  function openAgentTask(name, taskId) {
+    setExpandedAgent(name);
+    deepLinkNonce.current += 1;
+    setDeepLink({ agent: name, taskId, nonce: deepLinkNonce.current });
+    requestAnimationFrame(() => {
+      const el = document.querySelector(`[data-agent-name="${name}"]`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   }
 
   async function handleSaveScopes(agentName, newScopes) {
@@ -846,6 +874,11 @@ export default function AgentsTab({ session, showToast, onStats }) {
             });
           }}
         />
+        <${ActiveTasksPanel}
+          activeTasksMap=${activeTasksMap}
+          agents=${agents}
+          onOpen=${openAgentTask}
+        />
         ${renderFilterBar(agents, tagFilter, setTagFilter, groupBy, setGroupBy)}
         ${renderAgentGroups({
           agents,
@@ -865,6 +898,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
           onPopOut: popOutAgent,
           dnd,
           agentOrder,
+          deepLink,
         })}
       `
     }
@@ -930,7 +964,53 @@ function renderFilterBar(agents, tagFilter, setTagFilter, groupBy, setGroupBy) {
   `;
 }
 
-function renderAgentGroups({ agents, tagFilter, groupBy, onboardings, taskStatsMap, changesMap, onTabSeen, expandedAgent, toggleAgent, session, showToast, setScopesModal, handleDeleteAgent, toggleFederate, onPopOut, dnd, agentOrder }) {
+// Fleet-wide "running now" panel shown between the agent board and the list.
+// Flattens every agent's currently-active tasks into one newest-first list.
+// Clicking a row asks the parent (onOpen) to expand that agent and open the
+// task. Reuses the active tasks already fetched in loadData() — no extra calls.
+function ActiveTasksPanel({ activeTasksMap, agents, onOpen }) {
+  const nameToDisplay = new Map((agents || []).map(a => [a.name, a.display_name || a.name]));
+  const rows = [];
+  for (const [name, tasks] of Object.entries(activeTasksMap || {})) {
+    for (const task of (tasks || [])) {
+      rows.push({ agentName: name, agentDisplay: nameToDisplay.get(name) || name, task });
+    }
+  }
+  rows.sort((a, b) =>
+    String(b.task.updatedAt || b.task.createdAt || '').localeCompare(
+      String(a.task.updatedAt || a.task.createdAt || '')));
+
+  // Cap the rendered rows so a very busy fleet can't produce an enormous list;
+  // the overflow is surfaced explicitly (never silently dropped).
+  const CAP = 50;
+  const shown = rows.slice(0, CAP);
+  const overflow = rows.length - shown.length;
+
+  return html`
+    <div class="pf-agd-active">
+      <div class="pf-agd-active-head">
+        <span class="section-title">${t('profile.agents.active.title')}${rows.length > 0 ? html` <span class="pf-agd-count-badge">(${rows.length})</span>` : ''}</span>
+      </div>
+      ${rows.length === 0
+        ? html`<div class="pf-agd-active-empty">${t('profile.agents.active.empty')}</div>`
+        : html`<div class="pf-agd-active-list">
+            ${shown.map(r => html`
+              <button class="pf-agd-active-row" key=${r.task.id}
+                      onClick=${() => onOpen(r.agentName, r.task.id)}
+                      title=${t('profile.agents.active.openHint')}>
+                <span class="pf-agd-active-dot" aria-hidden="true"></span>
+                <span class="pf-agd-active-agent">${r.agentDisplay}</span>
+                <span class="pf-agd-active-title">${r.task.title || t('profile.agents.active.untitled')}</span>
+                <span class="pf-agd-active-time">${timeAgo(r.task.updatedAt || r.task.createdAt)}</span>
+              </button>
+            `)}
+            ${overflow > 0 && html`<div class="pf-agd-active-empty">+ ${overflow} ${t('profile.agents.active.more')}</div>`}
+          </div>`}
+    </div>
+  `;
+}
+
+function renderAgentGroups({ agents, tagFilter, groupBy, onboardings, taskStatsMap, changesMap, onTabSeen, expandedAgent, toggleAgent, session, showToast, setScopesModal, handleDeleteAgent, toggleFederate, onPopOut, dnd, agentOrder, deepLink }) {
   // Tag filter: agent must have ALL selected tags (intersection)
   const filtered = tagFilter.size === 0
     ? agents
@@ -959,6 +1039,9 @@ function renderAgentGroups({ agents, tagFilter, groupBy, onboardings, taskStatsM
       onDeleteClick=${handleDeleteAgent}
       onFederateToggle=${toggleFederate}
       onPopOut=${onPopOut}
+      preSelectedTab=${deepLink?.agent === a.name ? 'tasks' : null}
+      openTaskId=${deepLink?.agent === a.name ? deepLink.taskId : null}
+      openTaskNonce=${deepLink?.agent === a.name ? deepLink.nonce : 0}
     />
   `;
 

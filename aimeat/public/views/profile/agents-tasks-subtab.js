@@ -9,6 +9,11 @@
  *   - TaskItem -- task row with expand/collapse, todo list, start button
  *   - RequestChangesModal -- inline modal for owner to send a free-text change request
  * @version-history
+ *   v4.10.0 -- 2026-06-03 -- Deep-link support: AgentTasksSubtab accepts
+ *     openTaskId + openTaskNonce; a nonce bump resets the bucket to 'recent'
+ *     (clears search/time) so the target task is visible, and TaskItem auto-opens
+ *     (expand + fetch events + scroll into view). Lets the fleet "running now"
+ *     panel jump straight to a specific task.
  *   v4.9.1 -- 2026-06-03 -- Fix: task Scope row rendered structured provenance
  *     entries (e.g. the scheduler's { name, value, type, description }) as
  *     "[object Object]" via a naive join(). Add formatScopeEntry() and render
@@ -329,9 +334,13 @@ function TaskMemoryEntry({ entry }) {
   `;
 }
 
-function TaskItem({ task, agentName, showToast, onRefresh }) {
+function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }) {
   const [expanded, setExpanded] = useState(false);
   const [events, setEvents] = useState(null);
+  // Deep-link target: the parent bumps `autoOpen` (a nonce) when this exact task
+  // should be opened. taskRef scrolls it into view.
+  const taskRef = useRef(null);
+  const autoOpenedNonce = useRef(0);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [starting, setStarting] = useState(false);
   const [showRevisionModal, setShowRevisionModal] = useState(false);
@@ -441,6 +450,21 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [expanded, task.id, agentName]);
+
+  // Deep-link from the fleet "running now" panel: when autoOpen bumps to a new
+  // nonce for this task, expand it, load its events, and scroll it into view.
+  useEffect(() => {
+    if (!autoOpen || autoOpen === autoOpenedNonce.current) return;
+    autoOpenedNonce.current = autoOpen;
+    setExpanded(true);
+    // Always refresh the event log on a fresh deep-link open (don't gate on the
+    // possibly-stale `events` closure — the task's log may have moved on since a
+    // previous open).
+    fetchEvents();
+    requestAnimationFrame(() => {
+      taskRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }, [autoOpen]);
 
   async function handleStart(e) {
     e.stopPropagation();
@@ -572,7 +596,7 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
   }
 
   return html`
-    <div>
+    <div ref=${taskRef}>
       <div class="pf-agd-task-item" onClick=${handleExpand}>
         <div class="pf-agd-task-title-row">
           <button
@@ -797,7 +821,7 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
   `;
 }
 
-export default function AgentTasksSubtab({ agent, agentName, showToast }) {
+export default function AgentTasksSubtab({ agent, agentName, showToast, openTaskId = null, openTaskNonce = 0 }) {
   const [tasks, setTasks] = useState(null);
   const [counts, setCounts] = useState({ recent: 0, keep: 0, archive: 0 });
   const [bucket, setBucket] = useState('recent');
@@ -855,6 +879,17 @@ export default function AgentTasksSubtab({ agent, agentName, showToast }) {
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, []);
+
+  // Deep-link (from the fleet "running now" panel): a target task may live in a
+  // bucket/filter that isn't currently shown. Reset to the default Recent view
+  // (where active tasks always appear) so the target TaskItem renders and can
+  // auto-open. Keyed on the nonce so repeat clicks re-trigger.
+  useEffect(() => {
+    if (!openTaskId || !openTaskNonce) return;
+    setBucket('recent');
+    setQ('');
+    setTimeChip('all');
+  }, [openTaskId, openTaskNonce]);
 
   function handleCreated() {
     setShowCreate(false);
@@ -934,7 +969,8 @@ export default function AgentTasksSubtab({ agent, agentName, showToast }) {
       `}
 
       ${tasks.length > 0 ? tasks.map(task => html`
-        <${TaskItem} key=${task.id} task=${task} agentName=${agentName} showToast=${showToast} onRefresh=${loadTasks} />
+        <${TaskItem} key=${task.id} task=${task} agentName=${agentName} showToast=${showToast} onRefresh=${loadTasks}
+          autoOpen=${task.id === openTaskId ? openTaskNonce : 0} />
       `) : html`
         <div class="pf-agd-empty">${q ? t('profile.agents.tasks.search.noResults') : t(`profile.agents.tasks.bucket.empty.${bucket}`)}</div>
       `}

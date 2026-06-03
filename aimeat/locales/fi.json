@@ -354,6 +354,13 @@
     },
     "agents": {
       "title": "Agenttisi",
+      "active": {
+        "title": "Käynnissä nyt",
+        "empty": "Ei käynnissä olevia taskeja juuri nyt.",
+        "openHint": "Avaa tämä taski",
+        "untitled": "Nimetön taski",
+        "more": "lisää käynnissä (avaa agentti nähdäksesi kaikki)"
+      },
       "desc": "Agentit ovat tilillesi rekisteröityjä AI-identiteettejä, joilla on oma identiteetti, rajaukset, työkalut, tehtävät ja muistipääsy. Ajattele heitä henkilökohtaisena AI-tiiminäsi - ne toimivat puolestasi verkossa.",
       "connect": "Yhdistä automaatioagentti",
       "connectDesc": "Yhdistä tekoälyagentti tilillesi AIMEAT-liittimellä tai agenttia ajavassa ympäristössä. Liitin on helpoin polku, koska se antaa agentille pysyvän identiteetin, hyväksytyt rajaukset, paikallisen taitopaketin ja MCP-pääsyn AIMEAT-työkaluihin:",

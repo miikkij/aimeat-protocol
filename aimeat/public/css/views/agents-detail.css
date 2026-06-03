@@ -4,6 +4,10 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.10.0 -- 2026-06-03 -- Add fleet "running now" panel styles (.pf-agd-active,
+ *     -head, -empty, -list, -row, -dot, -agent, -title, -time) for the cross-agent
+ *     active-tasks list between the board and the agent list. All colors tokenized
+ *     (var(--success) running dot/hover, var(--card-bg)/-alt, --border, --text-dim/-muted).
  *   v1.9.0 -- 2026-06-02 -- Component unification (#24 search bar): tokenize the
  *     hardcoded hex fallbacks in .pf-agd-search-input (var(--border, #E5E7EB) ->
  *     var(--border); var(--card-bg, #FFFFFF) -> var(--card); var(--text, #1A1A2E)
@@ -1231,6 +1235,76 @@
   border-radius: var(--radius, 8px);
   padding: 1rem;
   margin-bottom: 1rem;
+}
+
+/* Fleet "running now" panel (between the board and the agent list). */
+.pf .pf-agd-active {
+  background: var(--card-bg, #FFFFFF);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: var(--radius, 8px);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+.pf .pf-agd-active-head {
+  margin-bottom: 0.5rem;
+}
+.pf .pf-agd-active-empty {
+  font-size: 0.8rem;
+  color: var(--text-dim, #6B7280);
+}
+.pf .pf-agd-active-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.pf .pf-agd-active-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  background: var(--card-bg-alt, #F3F4F6);
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: var(--radius-xs, 6px);
+  padding: 0.4rem 0.6rem;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.pf .pf-agd-active-row:hover {
+  background: var(--card-bg, #FFFFFF);
+  border-color: var(--success, #10B981);
+}
+.pf .pf-agd-active-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success, #10B981);
+}
+.pf .pf-agd-active-agent {
+  flex: 0 0 auto;
+  max-width: 30%;
+  font-weight: 600;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pf .pf-agd-active-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.8rem;
+  color: var(--text-dim, #6B7280);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pf .pf-agd-active-time {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  color: var(--text-muted, #9CA3AF);
 }
 .pf .pf-agd-board-grid {
   display: grid;
