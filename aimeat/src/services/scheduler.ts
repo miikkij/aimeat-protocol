@@ -25,6 +25,15 @@ import { logger } from '../utils/logger.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
+/**
+ * Process-wide handle to the active Scheduler. Set once during service init so
+ * surfaces created per-request (e.g. the MCP server) can register/reschedule a
+ * job on the live cron without threading the instance through every signature.
+ */
+let _activeScheduler: Scheduler | null = null;
+export function setActiveScheduler(scheduler: Scheduler): void { _activeScheduler = scheduler; }
+export function getActiveScheduler(): Scheduler | null { return _activeScheduler; }
+
 export type JobTrigger = 'cron' | 'manual' | 'activate';
 
 /** Result returned by a kind-specific executor (memory I/O + optional spawned task). */

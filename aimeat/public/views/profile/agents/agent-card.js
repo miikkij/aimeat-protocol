@@ -51,6 +51,7 @@ import TabDataAccess from './tab-data-access.js';
 import TabDirectives from './tab-directives.js';
 import TabAgentConfig from './tab-agent-config.js';
 import TabActivity from './tab-activity.js';
+import TabSchedules from './tab-schedules.js';
 import TabQuality from './tab-quality.js';
 import TabServices from './tab-services.js';
 
@@ -72,6 +73,7 @@ const TABS = [
   { id: 'data-access', key: 'profile.agents.detail.tabs.data_access' },
   { id: 'quality', key: 'profile.agents.detail.tabs.quality' },
   { id: 'activity', key: 'profile.agents.detail.tabs.activity' },
+  { id: 'schedules', key: 'profile.agents.detail.tabs.schedules' },
   { id: 'directives', key: 'profile.agents.detail.tabs.directives' },
   { id: 'agent-config', key: 'profile.agents.detail.tabs.agent_config' },
   { id: 'services', key: 'profile.agents.detail.tabs.services' },
@@ -559,6 +561,7 @@ function renderTabContent(activeTab, agent, onboarding, session, showToast, allA
     case 'directives': return html`<${TabDirectives} ...${props} />`;
     case 'agent-config': return html`<${TabAgentConfig} ...${props} />`;
     case 'activity': return html`<${TabActivity} ...${props} />`;
+    case 'schedules': return html`<${TabSchedules} ...${props} />`;
     case 'quality': return html`<${TabQuality} ...${props} />`;
     case 'services': return html`<${TabServices} ...${props} />`;
     default: return null;

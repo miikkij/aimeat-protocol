@@ -16,9 +16,56 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { copyToClipboard } from '/js/utils.js';
-import { apiGet, apiPut } from '/js/api.js';
+import { apiGet, apiPut, apiPatch } from '/js/api.js';
 
 const html = htm.bind(h);
+
+/** Opt-in budget guards applied as defaults to schedules created for this agent. */
+function ScheduleBudgetSection({ agent, agentName, showToast }) {
+  const defaults = Array.isArray(agent?.schedule_constraint_defaults) ? agent.schedule_constraint_defaults : [];
+  const findC = (type) => defaults.find(c => c.type === type);
+  const [maxRuns, setMaxRuns] = useState({ enabled: !!findC('max_runs')?.enabled, limit: findC('max_runs')?.params?.limit ?? 7 });
+  const [dailyLimit, setDailyLimit] = useState({ enabled: !!findC('daily_limit')?.enabled, limit: agent?.daily_spend_limit ?? findC('daily_limit')?.params?.limit ?? 1 });
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    const constraints = [];
+    if (maxRuns.enabled) constraints.push({ type: 'max_runs', enabled: true, params: { limit: Number(maxRuns.limit) } });
+    if (dailyLimit.enabled) constraints.push({ type: 'daily_limit', enabled: true, params: { limit: Number(dailyLimit.limit) } });
+    setSaving(true);
+    try {
+      await apiPatch(`/v1/agents/${encodeURIComponent(agentName)}/schedule-constraints`, {
+        constraints,
+        daily_spend_limit: dailyLimit.enabled ? Number(dailyLimit.limit) : null,
+      });
+      showToast?.(t('profile.scheduler.budgetSaved'));
+    } catch (e) { showToast?.(e.message, true); }
+    finally { setSaving(false); }
+  };
+
+  return html`
+    <div class="sch-form sch-budget-section">
+      <div class="section-title">${t('profile.scheduler.budgetTitle')}</div>
+      <div class="section-desc">${t('profile.scheduler.budgetDesc')}</div>
+      <div class="sch-constraints">
+        <label class="sch-check">
+          <input type="checkbox" checked=${maxRuns.enabled} onChange=${e => setMaxRuns(s => ({ ...s, enabled: e.target.checked }))} />
+          ${t('profile.scheduler.maxRuns')}
+          <input type="number" min="1" value=${maxRuns.limit} disabled=${!maxRuns.enabled}
+            onInput=${e => setMaxRuns(s => ({ ...s, limit: e.target.value }))} class="sch-num" />
+        </label>
+        <label class="sch-check">
+          <input type="checkbox" checked=${dailyLimit.enabled} onChange=${e => setDailyLimit(s => ({ ...s, enabled: e.target.checked }))} />
+          ${t('profile.scheduler.dailyLimit')}
+          <input type="number" min="0" step="0.1" value=${dailyLimit.limit} disabled=${!dailyLimit.enabled}
+            onInput=${e => setDailyLimit(s => ({ ...s, limit: e.target.value }))} class="sch-num" />
+        </label>
+      </div>
+      <div class="sch-form-actions">
+        <button class="btn-primary btn-sm" disabled=${saving} onClick=${save}>${saving ? t('profile.scheduler.saving') : t('profile.scheduler.budgetSave')}</button>
+      </div>
+    </div>`;
+}
 
 export default function TabAgentConfig({ agent, agentName, session, showToast }) {
   const [files, setFiles] = useState([]);
@@ -144,6 +191,7 @@ export default function TabAgentConfig({ agent, agentName, session, showToast })
   if (files.length === 0) {
     return html`
       <div>
+        <${ScheduleBudgetSection} agent=${agent} agentName=${agentName} showToast=${showToast} />
         <div class="pf-agd-config-upload">
           <button class="btn-outline btn-sm" onClick=${handleUploadClick}>+ ${t('profile.agents.detail.agent_config.upload')}</button>
           <input ref=${fileInputRef} type="file" accept=".md,.yaml,.yml,.json" class="pf-agd-hidden-input" onChange=${handleFileUpload} />
@@ -155,6 +203,7 @@ export default function TabAgentConfig({ agent, agentName, session, showToast })
 
   return html`
     <div>
+      <${ScheduleBudgetSection} agent=${agent} agentName=${agentName} showToast=${showToast} />
       <div class="pf-agd-config-upload">
         <button class="btn-outline btn-sm" onClick=${handleUploadClick}>+ ${t('profile.agents.detail.agent_config.upload')}</button>
         <input ref=${fileInputRef} type="file" accept=".md,.yaml,.yml,.json" class="pf-agd-hidden-input" onChange=${handleFileUpload} />

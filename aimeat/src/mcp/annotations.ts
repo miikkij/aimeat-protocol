@@ -111,6 +111,13 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_task_complete: { title: 'Complete Task', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_task_fail: { title: 'Fail Task', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
+    // ── Schedules (agent-created recurring jobs) ──
+    aimeat_schedule_create: { title: 'Create Schedule', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_schedule_list: { title: 'List Schedules', readOnlyHint: true },
+    aimeat_schedule_update: { title: 'Update Schedule', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_schedule_delete: { title: 'Delete Schedule', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    aimeat_schedule_report_internal: { title: 'Report Internal Schedules', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+
     // ── Work queue ──
     aimeat_work_inbox: { title: 'List Work Inbox', readOnlyHint: true },
     aimeat_work_accept: { title: 'Accept Work', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

@@ -101,9 +101,33 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
         },
         {
           envVar: 'AIMEAT_JWT_TTL',
-          description: 'How long login tokens last (in seconds)',
+          description: 'Legacy / agent JWT lifetime (in seconds)',
           value: String(config.jwtTtlSeconds),
           defaultVal: '3600',
+        },
+        {
+          envVar: 'AIMEAT_ACCESS_TTL',
+          description: 'Owner access-token (JWT) lifetime (in seconds)',
+          value: String(config.accessTtlSeconds),
+          defaultVal: '900',
+        },
+        {
+          envVar: 'AIMEAT_REFRESH_IDLE_DAYS',
+          description: 'Owner refresh-cookie idle window (in days)',
+          value: String(config.refreshIdleDays),
+          defaultVal: '30',
+        },
+        {
+          envVar: 'AIMEAT_REFRESH_ABSOLUTE_DAYS',
+          description: 'Owner refresh-cookie hard cap (in days)',
+          value: String(config.refreshAbsoluteDays),
+          defaultVal: '90',
+        },
+        {
+          envVar: 'AIMEAT_REFRESH_GRACE_MS',
+          description: 'Refresh-rotation grace window (in milliseconds)',
+          value: String(config.refreshGraceMs),
+          defaultVal: '60000',
         },
         {
           envVar: 'AIMEAT_OTK_TTL_MS',

@@ -17,8 +17,9 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { verify } from '../auth/keypair.js';
 import { issueJWT, revokeToken, generateSessionId } from '../auth/jwt.js';
-import { requireAuth, requireRole, isAnonymousMode, getAnonymousCredentials } from '../auth/middleware.js';
+import { requireAuth, requireRole, optionalAuth, isAnonymousMode, getAnonymousCredentials } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { readRefreshCookie, refreshOwnerSession, hashToken, clearRefreshCookie } from '../services/owner-session.js';
 import { parseGAII, validateAgentName, buildGAII } from '../utils/gaii.js';
 import { randomBytes } from 'node:crypto';
 import { generateOtk } from '../utils/otk.js';
@@ -367,7 +368,31 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/auth/refresh
-  router.post('/v1/auth/refresh', requireAuth(), async (req, res) => {
+  // Two modes: (1) owner session refresh via the httpOnly aimeat_rt cookie with token
+  // rotation + reuse detection; (2) legacy Bearer-based refresh for agents / pre-cookie
+  // clients. optionalAuth() resolves a Bearer if present without rejecting cookie clients.
+  router.post('/v1/auth/refresh', optionalAuth(), async (req, res) => {
+    // (1) Cookie-based owner session refresh (rotation + reuse detection).
+    if (readRefreshCookie(req)) {
+      const result = await refreshOwnerSession(storage, config, req, res);
+      if (!result.ok) {
+        res.status(result.status).json(error(config.nodeId, result.code, result.message));
+        return;
+      }
+      res.json(success(config.nodeId, {
+        token: result.token,
+        expires_in: result.expiresIn,
+        expires_at: new Date(Date.now() + result.expiresIn * 1000).toISOString(),
+        ttl_seconds: result.expiresIn,
+      }));
+      return;
+    }
+
+    // (2) Legacy Bearer-based refresh (agents / pre-cookie clients).
+    if (!req.auth || req.auth.anonymous) {
+      res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Authentication required'));
+      return;
+    }
     // Re-read roles from storage to prevent stale privilege persistence
     const ownerRecord = await storage.getOwner(req.auth!.owner);
     if (!ownerRecord) {
@@ -422,11 +447,22 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/auth/revoke
-  router.post('/v1/auth/revoke', requireAuth(), async (req, res) => {
+  // Logout: revoke the owner refresh session (identified by the cookie) and/or the
+  // bearer token, then clear the refresh cookie. optionalAuth so it still works when
+  // the short-lived access token has already expired.
+  router.post('/v1/auth/revoke', optionalAuth(), async (req, res) => {
+    const rt = readRefreshCookie(req);
+    if (rt) {
+      const session = await storage.getSessionByRefreshHash(hashToken(rt));
+      if (session) await storage.revokeSession(session.sessionId);
+      clearRefreshCookie(req, res);
+    }
+
     const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith('Bearer ')) {
+    if (authHeader?.startsWith('Bearer ') && req.auth && !req.auth.anonymous) {
       const token = authHeader.slice(7);
-      await revokeToken(token, req.auth!.exp);
+      await revokeToken(token, req.auth.exp);
+      if (req.auth.sessionId) await storage.revokeSession(req.auth.sessionId);
     }
 
     res.json(success(config.nodeId, {
@@ -448,6 +484,8 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
         gaii: s.gaii,
         issued_at: s.issuedAt,
         expires_at: s.expiresAt,
+        last_used_at: s.lastUsedAt ?? null,
+        device_label: s.deviceLabel ?? null,
         current: s.sessionId === currentSessionId,
       })),
       total: sessions.length,
@@ -465,6 +503,11 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
     await storage.revokeSession(sessionId);
+    // If the caller revoked the device they're currently on, clear its cookie too.
+    const rt = readRefreshCookie(req);
+    if (rt && (hashToken(rt) === target.refreshTokenHash || hashToken(rt) === target.prevTokenHash)) {
+      clearRefreshCookie(req, res);
+    }
     res.json(success(config.nodeId, { revoked: true, session_id: sessionId }));
   });
 
@@ -472,6 +515,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
   router.delete('/v1/auth/sessions', requireAuth(), async (req, res) => {
     const owner = req.auth!.owner;
     const count = await storage.revokeAllSessions(owner);
+    clearRefreshCookie(req, res); // the caller's own device is included in "all"
 
     res.json(success(config.nodeId, {
       revoked_sessions: count,

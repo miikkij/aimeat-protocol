@@ -204,6 +204,25 @@ accepted by \`aimeat connect call <name>\`):
 
 Use \`${bundle.metadata.runtime}\` as the installed skill platform unless your runtime has a more specific platform name. For the bundle version field, use \`local\` when no version is shown by the runtime.
 
+## Scheduling (recurring work)
+
+When the user asks for something recurring ("every morning…", "each evening…"), create a server-run schedule instead of relying on your own uptime — the AIMEAT server owns the clock, so it fires even when you are offline, and the owner can pause/cancel it any time.
+
+- \`aimeat_schedule_create\` — kinds:
+  - \`extension\` — run an installed extension action (fetch + store), **zero tokens**. Prefer this for pure data work (AIMEAT-first).
+  - \`ai\` — the server runs a model on the owner's key over predefined memory keys and stores the result. Use for "translate/summarise the news every morning". Provide \`input_keys\`, a \`prompt\`, and optionally an \`output_key\`.
+  - \`agent_task\` — the server queues a task into your queue each fire (for work that needs your own tools/reasoning).
+  Always pass a \`timezone\` (IANA, e.g. \`Europe/Helsinki\`) for daily schedules.
+- \`aimeat_schedule_list\` / \`aimeat_schedule_update\` (pause/resume/edit) / \`aimeat_schedule_delete\`.
+
+If YOU run your own recurring jobs outside AIMEAT, publish them with \`aimeat_schedule_report_internal\` so the owner can see them in the scheduler (AIMEAT displays these but does not run them). The mirror is stored at the owner-visibility memory key \`agents.<your-name>.scheduler\` with this shape:
+
+\`\`\`json
+{ "version": 1, "updatedAt": "<ISO>", "entries": [
+  { "id": "...", "name": "Morning sync", "purpose": "...", "cron": "0 7 * * *",
+    "timezone": "Europe/Helsinki", "status": "active", "kind": "..." } ] }
+\`\`\`
+
 ## Updating
 
 Run \`npx aimeat connect refresh\` to download the newest bundle for this agent. The connector prints this file after refresh so the local folder explains itself.

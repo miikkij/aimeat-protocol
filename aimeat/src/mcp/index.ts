@@ -52,6 +52,7 @@ import { registerCortexTools } from './cortex.js';
 import { registerAppsTools } from './apps.js';
 import { registerSharingGroupTools } from './sharing-groups.js';
 import { registerAgentTaskTools } from './agent-tasks.js';
+import { registerAgentScheduleTools } from './agent-schedules.js';
 import { registerAgentCapabilityTools } from './agent-capabilities.js';
 import { registerAgentMessageTools } from './agent-messages.js';
 import { registerAgentOnboardingTools } from './agent-onboarding.js';
@@ -155,6 +156,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         registerAppsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerSharingGroupTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentTaskTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentCapabilityTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentMessageTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentTelemetryTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);

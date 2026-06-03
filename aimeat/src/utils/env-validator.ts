@@ -132,6 +132,10 @@ export function validateEnv(): ValidationResult[] {
   // ── Numeric fields ──
   const numericFields: Array<{ key: string; name: string; defaultVal: string; min?: number; max?: number }> = [
     { key: 'AIMEAT_JWT_TTL', name: 'JWT TTL', defaultVal: '3600', min: 60 },
+    { key: 'AIMEAT_ACCESS_TTL', name: 'Owner access token TTL', defaultVal: '900', min: 60 },
+    { key: 'AIMEAT_REFRESH_IDLE_DAYS', name: 'Refresh idle window (days)', defaultVal: '30', min: 1 },
+    { key: 'AIMEAT_REFRESH_ABSOLUTE_DAYS', name: 'Refresh absolute cap (days)', defaultVal: '90', min: 1 },
+    { key: 'AIMEAT_REFRESH_GRACE_MS', name: 'Refresh rotation grace (ms)', defaultVal: '60000', min: 0 },
     { key: 'AIMEAT_WELCOME_BONUS', name: 'Welcome Bonus', defaultVal: '100', min: 0 },
     { key: 'AIMEAT_DAILY_ALLOWANCE', name: 'Daily Allowance', defaultVal: '50', min: 0 },
     { key: 'AIMEAT_DAILY_ALLOWANCE_CAP', name: 'Daily Allowance Cap', defaultVal: '500', min: 0 },

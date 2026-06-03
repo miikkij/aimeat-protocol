@@ -4,6 +4,10 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.13.0 - 2026-06-03 - aimeat-auth.js owner sessions now refresh via the httpOnly
+ *   refresh cookie (POST /v1/auth/refresh) instead of owner-key signing: single-flight
+ *   refresh, refresh-on-boot, logout revokes server-side. Cross-device login no longer
+ *   breaks other sessions. Agent/federated paths unchanged. (Phase 3 of refresh-tokens.)
  * v1.12.0 - 2026-06-03 - Session resilience: aimeat-auth.js now refreshes the
  *   JWT on tab focus/visibilitychange (timers don't fire while the machine sleeps
  *   or the tab is frozen, so the proactive setTimeout was unreliable). loginWithPassword
@@ -453,6 +457,20 @@ async function authApi(path, jwt, opts = {}) {
 
 let currentSession = null;
 let refreshTimer = null;
+let ownerRefreshInFlight = null; // shared promise so concurrent owner refreshes don't each rotate
+
+// Persist non-secret session metadata (+ short-lived access token) to localStorage.
+// The long-lived refresh token is an httpOnly cookie and is never readable here.
+function persistSession(session) {
+  save('session', {
+    owner: session.owner, gaii: session.gaii, ghii: session.ghii,
+    jwt: session.jwt, publicKey: session.publicKey, roles: session.roles,
+    displayName: session.displayName || '',
+    federated: session.federated || false,
+    homeNode: session.homeNode || '',
+    homeUrl: session.homeUrl || '',
+  });
+}
 
 function scheduleAutoRefresh(session) {
   if (refreshTimer) clearTimeout(refreshTimer);
@@ -508,52 +526,54 @@ function createSession(data) {
       return resp.json();
     },
 
-    // Re-authenticate using CryptoKey from IndexedDB
+    // Get a fresh access token. Owner sessions use the httpOnly refresh cookie
+    // (POST /v1/auth/refresh, rotation + reuse-detection server-side); agent sessions
+    // still re-sign with their IndexedDB key. Concurrent owner refreshes share one
+    // in-flight request so they don't each rotate the cookie.
     async refresh() {
-      // Federated sessions cannot be refreshed via key signing -- user must re-login
+      // Federated sessions can't self-refresh yet — user must re-login.
       if (session.federated) {
         throw new Error('Federated session expired. Please log in again.');
       }
 
-      // Load CryptoKey from IndexedDB (or use in-memory ref)
-      let key = session._cryptoKey;
-      let body;
-
       if (session.gaii) {
-        // Agent session refresh (for future agent-mode sessions)
-        if (!key) key = await loadKey('agent_key');
+        // Agent session — legacy key-signing refresh.
+        const key = session._cryptoKey || await loadKey('agent_key');
         if (!key) throw new Error('Cannot refresh — no signing key found in IndexedDB');
         const timestamp = new Date().toISOString();
-        const message = session.gaii + timestamp;
-        const signature = await sign(key, message);
-        body = { gaii: session.gaii, timestamp, signature };
-      } else {
-        // Owner session refresh (human user)
-        if (!key) key = await loadKey('owner_key');
-        if (!key) throw new Error('Cannot refresh — no signing key found in IndexedDB');
-        const timestamp = new Date().toISOString();
-        const message = session.owner + NODE_ID + timestamp;
-        const signature = await sign(key, message);
-        body = { owner: session.owner, timestamp, signature };
+        const signature = await sign(key, session.gaii + timestamp);
+        const data = await api('/v1/auth/token', {
+          method: 'POST',
+          body: JSON.stringify({ gaii: session.gaii, timestamp, signature }),
+        });
+        session.jwt = data.data.token;
+        session.roles = (parseJwt(session.jwt) || {}).roles || session.roles || [];
+        persistSession(session);
+        scheduleAutoRefresh(session);
+        return session;
       }
 
-      const data = await api('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      });
-      session.jwt = data.data.token;
-      session.roles = (parseJwt(session.jwt) || {}).roles || session.roles || [];
-      // SECURITY: Only save metadata to localStorage (no private keys)
-      save('session', {
-        owner: session.owner, gaii: session.gaii, ghii: session.ghii,
-        jwt: session.jwt, publicKey: session.publicKey, roles: session.roles,
-        displayName: session.displayName || '',
-        federated: session.federated || false,
-        homeNode: session.homeNode || '',
-        homeUrl: session.homeUrl || '',
-      });
-      scheduleAutoRefresh(session);
-      return session;
+      // Owner session — httpOnly refresh-cookie rotation (single-flight).
+      if (ownerRefreshInFlight) return ownerRefreshInFlight;
+      ownerRefreshInFlight = (async () => {
+        const resp = await fetch(NODE_URL + '/v1/auth/refresh', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', 'X-AIMEAT-Refresh': '1' },
+        });
+        let data = null;
+        try { data = await resp.json(); } catch (_) { /* no body */ }
+        if (!resp.ok || !data || data.ok === false) {
+          throw new Error(data?.error?.message || 'Session refresh failed');
+        }
+        session.jwt = data.data.token;
+        session.roles = (parseJwt(session.jwt) || {}).roles || session.roles || [];
+        persistSession(session);
+        scheduleAutoRefresh(session);
+        return session;
+      })();
+      try { return await ownerRefreshInFlight; }
+      finally { ownerRefreshInFlight = null; }
     },
 
     // Check if session is valid
@@ -583,6 +603,7 @@ const auth = {
     // Register GHII (creates owner + human profile)
     const regData = await api('/v1/ghii', {
       method: 'POST',
+      credentials: 'include',
       body: JSON.stringify({
         username,
         display_name: displayName,
@@ -593,6 +614,13 @@ const auth = {
       }),
     });
 
+    // With a password, establish a cookie-backed session via the login endpoint
+    // (owner sessions refresh via the httpOnly cookie — no signing key needed).
+    if (opts.password) {
+      return this.loginWithPassword(username, opts.password);
+    }
+
+    // ── Legacy no-password path: key-signing token, no refresh cookie ──
     const ownerName = regData.data.owner.name;
     const ghii = regData.data.ghii.ghii;
     // Normal registration returns private_key/public_key; dev-mode reset returns owner_private_key/owner_public_key.
@@ -663,7 +691,11 @@ const auth = {
     const cryptoKey = stored.gaii ? await loadKey('agent_key') : await loadKey('owner_key');
     const session = createSession({ ...stored, _cryptoKey: cryptoKey });
 
-    if (isExpired(session.jwt)) {
+    // Owner-local sessions ALWAYS refresh on boot: the httpOnly cookie is the source of
+    // truth (the stored access token may be stale or predate the cookie system). Agent /
+    // federated sessions refresh only when their token is actually expired (legacy path).
+    const isOwnerLocal = !session.federated && !session.gaii;
+    if (isOwnerLocal || isExpired(session.jwt)) {
       try {
         await session.refresh();
       } catch(e) {
@@ -687,23 +719,20 @@ const auth = {
    * @returns {Promise<object>} Session object
    */
   async loginWithPassword(username, password) {
-    // Only ask the server to mint a fresh owner signing key when THIS device
-    // holds none. Re-minting on every login rotates the server's public key and
-    // invalidates the signing key on every other device, breaking their silent
-    // token refresh. If we already have a key in IndexedDB, reuse it.
-    let hasOwnerKey = false;
-    try { hasOwnerKey = !!(await loadKey('owner_key')); } catch (_) { hasOwnerKey = false; }
+    // Owner sessions refresh via the httpOnly cookie, so no signing key is needed and
+    // we never ask the server to mint/rotate one (that used to break other devices).
+    // credentials:'include' lets the server set the refresh cookie.
     const data = await api('/v1/ghii/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password, request_owner_key: !hasOwnerKey }),
+      credentials: 'include',
+      body: JSON.stringify({ username, password }),
     });
 
     const d = data.data;
 
-    // Federated sessions have no owner key pair -- the home node owns the keys
+    // Federated logins may still return an owner key pair; store it if present (harmless).
     let ownerCryptoKey = null;
     if (d.owner_private_key) {
-      // SECURITY: Import owner private key as non-extractable CryptoKey in IndexedDB
       ownerCryptoKey = await importEd25519Key(d.owner_private_key);
       await storeKey('owner_key', ownerCryptoKey);
     }
@@ -722,15 +751,7 @@ const auth = {
       homeUrl: d.home_url || '',
     });
 
-    // SECURITY: Only save metadata to localStorage (no private keys)
-    save('session', {
-      owner: d.owner.name, gaii: null, ghii: d.ghii.ghii,
-      jwt: d.token, publicKey: d.owner_public_key || '', roles: session.roles,
-      displayName: session.displayName || '',
-      federated: d.federated || false,
-      homeNode: d.home_node || '',
-      homeUrl: d.home_url || '',
-    });
+    persistSession(session);
 
     currentSession = session;
     scheduleAutoRefresh(session);
@@ -746,6 +767,18 @@ const auth = {
   /** Logout — clear stored credentials from localStorage and IndexedDB */
   async logout() {
     if (refreshTimer) { clearTimeout(refreshTimer); refreshTimer = null; }
+    ownerRefreshInFlight = null;
+    // Revoke the session and clear the httpOnly refresh cookie server-side.
+    try {
+      await fetch(NODE_URL + '/v1/auth/revoke', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(currentSession?.jwt ? { 'Authorization': 'Bearer ' + currentSession.jwt } : {}),
+        },
+      });
+    } catch (_) { /* best effort — still clear local state below */ }
     currentSession = null;
     remove('session');
     remove('owner_key');
@@ -1227,7 +1260,7 @@ if (typeof window !== 'undefined' && window.addEventListener) {
 // ── Expose globally ──
 if (!global.AIMEAT) global.AIMEAT = {};
 global.AIMEAT.auth = auth;
-global.AIMEAT.version = '2026-06-03-001';
+global.AIMEAT.version = '2026-06-03-002';
 
 })(typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : this);
 `;

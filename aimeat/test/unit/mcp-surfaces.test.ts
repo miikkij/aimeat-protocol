@@ -79,7 +79,7 @@ describe('v2 MCP surfaces', () => {
 
     it('surface sizes are in the expected ballpark', () => {
         expect(MCP_SURFACES.appdev.length).toBe(20);
-        expect(MCP_SURFACES.agent.length).toBe(45); // task_request_changes omitted (connector-only); message_history included
+        expect(MCP_SURFACES.agent.length).toBe(50); // +5 schedule tools (create/list/update/delete/report_internal)
         expect(MCP_SURFACES.service.length).toBe(52);
         expect(MCP_SURFACES.admin.length).toBe(15);
     });

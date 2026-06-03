@@ -1,0 +1,100 @@
+/**
+ * @file scheduler.css
+ * @description Styles for the Profile › Scheduler master view (scheduler-tab.js)
+ *   and the agent Schedules sub-tab (agents/tab-schedules.js). Prefix: sch-.
+ *   Theme-token driven (no hardcoded colors) so it flips with dark/light mode.
+ * @version-history
+ *   v1.0.0 -- 2026-06-03 -- Initial scheduler styles
+ */
+
+.sch-tab { display: flex; flex-direction: column; gap: 1.25rem; }
+
+.sch-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+}
+
+.sch-loading, .sch-empty, .sch-internal-note {
+  color: var(--text-dim); padding: 0.75rem 0; font-size: 0.92rem;
+}
+.sch-error {
+  background: var(--danger-bg); color: var(--danger-fg);
+  border: 1px solid var(--danger-border); border-radius: var(--radius-sm);
+  padding: 0.6rem 0.85rem;
+}
+
+.sch-section { display: flex; flex-direction: column; gap: 0.5rem; }
+.sch-section-title { font-size: 1rem; font-weight: 700; color: var(--text); margin: 0.25rem 0; }
+
+.sch-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.sch-table th {
+  text-align: left; font-weight: 600; color: var(--text-dim);
+  padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); font-size: 0.82rem;
+}
+.sch-table td {
+  padding: 0.55rem 0.6rem; border-bottom: 1px solid var(--border-subtle, var(--border));
+  vertical-align: top; color: var(--text);
+}
+.sch-name { font-weight: 600; }
+.sch-purpose { margin-top: 0.15rem; }
+.sch-muted { color: var(--text-dim); font-size: 0.82rem; }
+.sch-cron { font-family: var(--font-mono, monospace); font-size: 0.82rem; color: var(--text); }
+
+.sch-badge {
+  display: inline-block; padding: 0.1rem 0.5rem; border-radius: var(--radius-full, 999px);
+  font-size: 0.72rem; font-weight: 700; line-height: 1.5;
+}
+.sch-badge--ai { background: var(--info-bg); color: var(--info-fg); }
+.sch-badge--agent { background: var(--warn-bg); color: var(--warn-fg); }
+.sch-badge--ext { background: var(--success-bg); color: var(--success-fg); }
+.sch-badge--core { background: var(--bg-dim); color: var(--text-dim); }
+.sch-badge--ok { background: var(--success-bg); color: var(--success-fg); }
+.sch-badge--err { background: var(--danger-bg); color: var(--danger-fg); }
+
+.sch-tag {
+  display: inline-block; margin-top: 0.2rem; padding: 0.05rem 0.45rem;
+  border-radius: var(--radius-full, 999px); font-size: 0.68rem;
+  background: var(--accent-faint, var(--bg-dim)); color: var(--accent);
+}
+
+.sch-actions { white-space: nowrap; }
+.sch-btn { margin-left: 0.35rem; padding: 0.25rem 0.6rem; font-size: 0.8rem; }
+
+.sch-internal-group { margin-bottom: 0.75rem; }
+.sch-internal-agent { font-weight: 600; color: var(--text); margin: 0.35rem 0 0.15rem; }
+
+/* ── Create form ── */
+.sch-form {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.75rem;
+}
+.sch-form-row { display: flex; flex-direction: column; gap: 0.3rem; }
+.sch-form-row > label { font-size: 0.82rem; font-weight: 600; color: var(--text-dim); }
+.sch-form-row input[type="text"], .sch-form-row input[type="number"],
+.sch-form-row select, .sch-form-row textarea {
+  background: var(--bg-input); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 0.45rem 0.6rem; font: inherit; width: 100%;
+}
+.sch-kind-fields {
+  border-left: 2px solid var(--accent-soft, var(--border)); padding-left: 0.85rem;
+  display: flex; flex-direction: column; gap: 0.6rem;
+}
+.sch-presets { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.35rem; }
+.sch-preset {
+  padding: 0.3rem 0.7rem; border-radius: var(--radius-full, 999px);
+  border: 1px solid var(--border); background: var(--bg-dim); color: var(--text-dim);
+  font-size: 0.8rem; cursor: pointer;
+}
+.sch-preset--on { background: var(--accent); color: var(--on-inverted, #fff); border-color: var(--accent); }
+.sch-cron-input { font-family: var(--font-mono, monospace); }
+
+.sch-constraints {
+  border-top: 1px solid var(--border); padding-top: 0.65rem; display: flex; flex-direction: column; gap: 0.4rem;
+}
+.sch-constraints-title { font-size: 0.82rem; font-weight: 700; color: var(--text-dim); }
+.sch-check { display: flex; align-items: center; gap: 0.5rem; font-size: 0.88rem; color: var(--text); }
+.sch-num { width: 5rem !important; }
+
+.sch-form-actions { display: flex; justify-content: flex-end; }
+
+.sch-budget-section { margin-bottom: 1rem; }

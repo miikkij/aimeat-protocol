@@ -859,6 +859,8 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
         tags: a.tags ?? [],
         mode: a.mode ?? 'interactive',
         max_concurrent_tasks: a.maxConcurrentTasks ?? 1,
+        daily_spend_limit: a.dailySpendLimit ?? null,
+        schedule_constraint_defaults: a.scheduleConstraintDefaults ?? [],
       })),
     }, [
       { description: 'Register a new agent', method: 'POST', url: '/v1/agents' },
@@ -991,6 +993,51 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
       gaii: updated.gaii,
       name: updated.name,
       max_concurrent_tasks: updated.maxConcurrentTasks ?? 1,
+    }));
+    emitChange('agents');
+  });
+
+  // PATCH /v1/agents/:name/schedule-constraints — owner sets this agent's default
+  // budget guards (applied to schedules created for it). Opt-in; off by default.
+  // Body: { daily_spend_limit?: number|null, constraints?: ScheduleConstraint[] }
+  router.patch('/v1/agents/:name/schedule-constraints', requireAuth(), requireRole('owner'), async (req, res) => {
+    const identifier = decodeURIComponent(req.params.name as string);
+    const gaii = identifier.includes('#') ? identifier : buildGAII(identifier, req.auth!.owner, config.nodeId);
+    const agent = await storage.getAgent(gaii);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${identifier}`));
+      return;
+    }
+    if (agent.owner !== req.auth!.owner) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only update your own agents'));
+      return;
+    }
+
+    const body = req.body as { daily_spend_limit?: number | null; constraints?: unknown };
+    const updates: Record<string, unknown> = {};
+    if ('daily_spend_limit' in body) {
+      const v = body.daily_spend_limit;
+      if (v === null) updates.dailySpendLimit = null;
+      else if (typeof v === 'number' && v >= 0) updates.dailySpendLimit = v;
+      else { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'daily_spend_limit must be a non-negative number or null')); return; }
+    }
+    if (Array.isArray(body.constraints)) {
+      updates.scheduleConstraintDefaults = body.constraints.filter(
+        (c): c is { type: string; enabled: boolean; params: Record<string, unknown> } =>
+          !!c && typeof c === 'object' && typeof (c as { type?: unknown }).type === 'string',
+      );
+    }
+
+    const updated = await storage.updateAgent(gaii, updates);
+    if (!updated) {
+      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${identifier}`));
+      return;
+    }
+    res.json(success(config.nodeId, {
+      gaii: updated.gaii,
+      name: updated.name,
+      daily_spend_limit: updated.dailySpendLimit ?? null,
+      schedule_constraint_defaults: updated.scheduleConstraintDefaults ?? [],
     }));
     emitChange('agents');
   });

@@ -126,6 +126,11 @@ export interface AimeatConfig {
   anonymousMode: boolean;
   jwtTtlSeconds: number;
   agentJwtTtlSeconds: number;
+  // Owner session refresh tokens (plan 2026-06-03-owner-session-refresh-tokens)
+  accessTtlSeconds: number;     // owner access-token (JWT) lifetime — short
+  refreshIdleDays: number;      // sliding idle window for the refresh cookie
+  refreshAbsoluteDays: number;  // hard cap for the refresh cookie, never extended
+  refreshGraceMs: number;       // previous token honored this long after rotation (concurrency)
   welcomeBonus: number;
   dailyAllowance: number;
   dailyAllowanceCap: number;
@@ -527,6 +532,11 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     anonymousMode: process.env.AIMEAT_ANONYMOUS === 'true',
     jwtTtlSeconds: parseInt(process.env.AIMEAT_JWT_TTL ?? '3600', 10),
     agentJwtTtlSeconds: parseInt(process.env.AIMEAT_AGENT_JWT_TTL ?? '7776000', 10), // 90 days
+    accessTtlSeconds: parseInt(process.env.AIMEAT_ACCESS_TTL ?? '900', 10),          // 15 min
+    refreshIdleDays: parseInt(process.env.AIMEAT_REFRESH_IDLE_DAYS ?? '30', 10),
+    refreshAbsoluteDays: parseInt(process.env.AIMEAT_REFRESH_ABSOLUTE_DAYS ?? '90', 10),
+    refreshGraceMs: parseInt(process.env.AIMEAT_REFRESH_GRACE_MS ?? '60000', 10),     // 60s
+
     welcomeBonus: parseInt(process.env.AIMEAT_WELCOME_BONUS ?? '100', 10),
     dailyAllowance: parseInt(process.env.AIMEAT_DAILY_ALLOWANCE ?? '50', 10),
     dailyAllowanceCap: parseInt(process.env.AIMEAT_DAILY_ALLOWANCE_CAP ?? '500', 10),

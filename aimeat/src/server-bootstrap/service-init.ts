@@ -15,7 +15,7 @@ import { seedBundledCortexes } from '../services/cortex-seeder.js';
 import { DirectoryService } from '../services/directory.js';
 import { RealtimeManager } from '../services/realtime-manager.js';
 import { MailboxNotificationService } from '../services/mailbox-notification.js';
-import { Scheduler } from '../services/scheduler.js';
+import { Scheduler, setActiveScheduler } from '../services/scheduler.js';
 import { createEmailService } from '../services/email.js';
 import { enqueueCatalogueSync } from '../services/catalogue-sync.js';
 import { initializeNode } from '../auth/node-keys.js';
@@ -59,6 +59,7 @@ export async function initializeServices(
   // Internal Scheduler System — centralized cron-based job scheduler
   const emailService = createEmailService(config);
   const scheduler = new Scheduler(config, storage, emailService);
+  setActiveScheduler(scheduler);
 
   // Register core job handlers
   registerCoreHandlers(scheduler, config, storage);

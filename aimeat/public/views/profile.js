@@ -61,6 +61,7 @@ import FoundryTab from './profile/foundry-tab.js';
 import CalibratorTab from './profile/calibrator-tab.js';
 import PackagesTab from './profile/packages-tab.js';
 import CapabilitiesTab from './profile/capabilities-tab.js';
+import SchedulerTab from './profile/scheduler-tab.js';
 
 // Each tab has a minTier: 'new' | 'active' | 'experienced'
 // Tabs with minTier <= current tier are visible in the tab bar.
@@ -68,6 +69,7 @@ import CapabilitiesTab from './profile/capabilities-tab.js';
 const TABS = [
   { id: 'portfolio',     key: 'portfolio.tabLabel',          component: PortfolioTab,      minTier: 'active' },
   { id: 'agents',        key: 'profile.tabs.agents',         component: AgentsTab,         minTier: 'active' },
+  { id: 'scheduler',     key: 'profile.tabs.scheduler',      component: SchedulerTab,      minTier: 'active' },
   { id: 'chatsessions',  key: 'profile.tabs.chatSessions',   component: ChatSessionsTab,   minTier: 'active' },
   { id: 'mcp',           key: 'profile.tabs.mcp',            component: McpTab,            minTier: 'active' },
   { id: 'wallet',        key: 'profile.tabs.wallet',         component: WalletTab,         minTier: 'new' },

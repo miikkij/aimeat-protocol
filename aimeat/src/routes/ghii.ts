@@ -8,6 +8,7 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { validateOwnerName, buildGAII } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
+import { establishOwnerSession } from '../services/owner-session.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { validateTotpCode, validateBackupCode } from '../services/totp.js';
 import type { TotpConfig } from '../services/totp.js';
@@ -588,12 +589,12 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
           }
         }
 
-        const token = await issueJWT({
-            sub: loginName,
-            owner: loginName,
-            node: config.nodeId,
-            roles,
-        }, config.jwtTtlSeconds);
+        // Establish an owner session: short-lived access JWT (bound to the session via
+        // jti) + a rotating refresh token delivered as an httpOnly cookie. Refresh no
+        // longer depends on the owner keypair, so other devices are never invalidated.
+        const { token, sessionId, expiresIn } = await establishOwnerSession(
+            storage, config, req, res, { owner: loginName, roles },
+        );
 
         // SECURITY: Prevent caching of response containing private keys
         res.set('Cache-Control', 'no-store');
@@ -606,7 +607,9 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             },
             owner: { name: loginName },
             token,
-            expires_at: new Date(Date.now() + config.jwtTtlSeconds * 1000).toISOString(),
+            session_id: sessionId,
+            expires_in: expiresIn,
+            expires_at: new Date(Date.now() + expiresIn * 1000).toISOString(),
             // Only hand back the private key when a new one was minted — otherwise
             // the client keeps the key it already holds in IndexedDB (see above).
             ...(ownerKeyPair ? { owner_private_key: ownerKeyPair.privateKey } : {}),

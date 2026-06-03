@@ -2786,6 +2786,71 @@ components:
         failureReason:
           type: string
 
+    ScheduleConstraint:
+      type: object
+      description: An opt-in budget/run guard on a schedule. type 'max_runs' or 'daily_limit' in v1.
+      required: [type, enabled, params]
+      properties:
+        type: { type: string, example: max_runs }
+        enabled: { type: boolean }
+        params: { type: object, example: { limit: 7 } }
+        state: { type: object }
+
+    Schedule:
+      type: object
+      description: A recurring schedule owned by the server clock (reuses ScheduledJobRecord).
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [extension, core, ai, agent_task] }
+        cron: { type: string }
+        enabled: { type: boolean }
+        timezone: { type: string, description: IANA timezone }
+        displayName: { type: string }
+        description: { type: string }
+        purpose: { type: string }
+        ownerScope: { type: string, description: Owner GHII }
+        agentName: { type: string }
+        agentGaii: { type: string }
+        createdByAgent: { type: boolean }
+        runCount: { type: integer }
+        constraints: { type: array, items: { $ref: '#/components/schemas/ScheduleConstraint' } }
+        input: { type: object, description: 'Kind-specific config (ai params, agent_task template, or extension input).' }
+        lastRunAt: { type: string, format: date-time }
+        lastRunResult: { type: string, enum: [success, error] }
+        nextRunAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ScheduleCreate:
+      type: object
+      required: [kind, cron, display_name]
+      properties:
+        kind: { type: string, enum: [ai, agent_task, extension] }
+        cron: { type: string, example: '0 7 * * *' }
+        display_name: { type: string }
+        timezone: { type: string, example: Europe/Helsinki }
+        description: { type: string }
+        purpose: { type: string }
+        agent_name: { type: string, description: 'Target agent (required for agent_task; optional association for ai/extension).' }
+        constraints: { type: array, items: { $ref: '#/components/schemas/ScheduleConstraint' } }
+        prompt: { type: string, description: 'ai: instruction applied to the input memory values.' }
+        input_keys: { type: array, items: { type: string }, description: 'ai: owner memory keys fed in as context.' }
+        input_namespaces: { type: array, items: { type: string } }
+        system_prompt: { type: string }
+        model: { type: string }
+        output_key: { type: string, description: 'ai: memory key for the result (auto-generated if omitted).' }
+        output_visibility: { type: string, enum: [private, owner, public] }
+        task_template:
+          type: object
+          description: 'agent_task: the task materialised each fire.'
+          properties:
+            title: { type: string }
+            description: { type: string }
+        extension_name: { type: string }
+        action_id: { type: string }
+        instance_id: { type: string }
+        input: { type: object }
+
   # === Reusable Response Wrappers ===
   responses:
     AimeatSuccess:
@@ -3237,23 +3302,45 @@ paths:
   /v1/auth/refresh:
     post:
       operationId: refreshToken
-      summary: Refresh JWT
+      summary: Refresh access token
+      description: |
+        Refresh an access token. Two modes:
+          * **Owner session (cookie):** send the httpOnly `aimeat_rt` refresh cookie (set at
+            login) plus the `X-AIMEAT-Refresh: 1` header (CSRF guard). The refresh token is
+            rotated one-time-use with a short grace window and a new cookie is set; replaying
+            a consumed token revokes the whole session. Returns `{ token, expires_in }`.
+          * **Legacy (Bearer):** send a valid Bearer access token (agents / pre-cookie clients).
       tags: [Auth]
+      parameters:
+        - in: header
+          name: X-AIMEAT-Refresh
+          required: false
+          schema:
+            type: string
+            enum: ['1']
+          description: Required for cookie-mode refresh (CSRF guard).
       security:
         - BearerAuth: []
+        - {}
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          description: Cookie refresh missing the X-AIMEAT-Refresh header
         '401':
           $ref: '#/components/responses/Unauthorized'
 
   /v1/auth/revoke:
     post:
       operationId: revokeToken
-      summary: Revoke JWT
+      summary: Revoke session / logout
+      description: |
+        Revoke the current session and clear the `aimeat_rt` refresh cookie. Accepts the
+        refresh cookie and/or a Bearer token, and works even after the access token expired.
       tags: [Auth]
       security:
         - BearerAuth: []
+        - {}
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -16263,6 +16350,254 @@ paths:
   # Agent Tasks
   # ============================================================
 
+  /v1/schedules:
+    get:
+      operationId: listSchedules
+      summary: List all of the owner's schedules (master scheduler view)
+      description: >
+        Aggregates the owner's AIMEAT-managed schedules (ai / agent_task /
+        extension), the owner's extension cron jobs, and each agent's
+        self-reported internal scheduler mirror.
+      tags: [Schedules]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Aggregated schedules
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          managed: { type: array, items: { $ref: '#/components/schemas/Schedule' } }
+                          extensions: { type: array, items: { $ref: '#/components/schemas/Schedule' } }
+                          agentInternal:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                agentName: { type: string }
+                                gaii: { type: string }
+                                entries: { type: array, items: { type: object } }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createSchedule
+      summary: Create a schedule (profile-level or agent-targeted)
+      tags: [Schedules]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleCreate'
+      responses:
+        '201':
+          description: Schedule created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          schedule: { $ref: '#/components/schemas/Schedule' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/schedules/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getSchedule
+      summary: Get a schedule plus its recent execution log
+      tags: [Schedules]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Schedule detail
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          schedule: { $ref: '#/components/schemas/Schedule' }
+                          runs: { type: array, items: { type: object } }
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateSchedule
+      summary: Edit a schedule (cron, enabled/pause, timezone, constraints, input)
+      tags: [Schedules]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled: { type: boolean, description: 'false = pause, true = resume' }
+                cron: { type: string }
+                timezone: { type: string }
+                display_name: { type: string }
+                purpose: { type: string }
+                constraints: { type: array, items: { $ref: '#/components/schemas/ScheduleConstraint' } }
+                input: { type: object }
+      responses:
+        '200':
+          description: Schedule updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteSchedule
+      summary: Cancel and remove a schedule (the owner may delete agent-created ones)
+      tags: [Schedules]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Schedule deleted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/schedules/{id}/trigger:
+    post:
+      operationId: triggerSchedule
+      summary: Run a schedule immediately
+      tags: [Schedules]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Triggered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/agents/{name}/schedules:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema: { type: string }
+        description: Agent name (not full GAII)
+    get:
+      operationId: listAgentSchedules
+      summary: List a single agent's schedules (managed + internal mirror)
+      tags: [Schedules]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Agent schedules
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          managed: { type: array, items: { $ref: '#/components/schemas/Schedule' } }
+                          agentInternal: { type: array, items: { type: object } }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createAgentSchedule
+      summary: Create a schedule targeting this agent
+      tags: [Schedules]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleCreate'
+      responses:
+        '201':
+          description: Schedule created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/agents/{name}/schedule-constraints:
+    patch:
+      operationId: setAgentScheduleConstraints
+      summary: Set an agent's default budget guards for schedules (opt-in)
+      tags: [Schedules]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                daily_spend_limit: { type: number, nullable: true }
+                constraints: { type: array, items: { $ref: '#/components/schemas/ScheduleConstraint' } }
+      responses:
+        '200':
+          description: Defaults updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /v1/agents/{name}/tasks:
     post:
       operationId: createAgentTask

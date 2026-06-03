@@ -20,6 +20,7 @@ const ALL_SUITES = [
     'test/e2e-agent-capabilities.ts',
     'test/e2e-anonymous.ts',
     'test/e2e-auth-lib.ts',
+    'test/e2e-session-refresh.ts',
     'test/e2e-board-access.ts',
     'test/e2e-board-ttl.ts',
     'test/e2e-calibrator.ts',
@@ -63,6 +64,7 @@ const ALL_SUITES = [
     'test/ai.ts',
     'test/e2e-sharing-groups.ts',
     'test/e2e-agent-tasks.ts',
+    'test/e2e-agent-schedules.ts',
     'test/e2e-agent-quality.ts',
     'test/e2e-agent-directives.ts',
     'test/e2e-agent-messages.ts',
@@ -150,6 +152,9 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_ADMIN_PASSWORD: process.env.AIMEAT_ADMIN_PASSWORD ?? 'TestAdminPw123!',
         AIMEAT_ANONYMOUS: process.env.AIMEAT_ANONYMOUS ?? 'true',
         AIMEAT_FEDERATION_AUTH_POLICY: process.env.AIMEAT_FEDERATION_AUTH_POLICY ?? 'all_peers',
+        // Short refresh-token rotation grace so e2e-session-refresh can exercise
+        // reuse-detection (prev-token-after-grace) without a 60s wait.
+        AIMEAT_REFRESH_GRACE_MS: process.env.AIMEAT_REFRESH_GRACE_MS ?? '1500',
     };
 
     const serverArgs = ['--import', 'tsx', 'src/index.ts', 'start', '--db', DB_TYPE];
