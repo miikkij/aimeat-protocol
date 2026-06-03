@@ -9,6 +9,10 @@
  *   - TaskItem -- task row with expand/collapse, todo list, start button
  *   - RequestChangesModal -- inline modal for owner to send a free-text change request
  * @version-history
+ *   v4.9.1 -- 2026-06-03 -- Fix: task Scope row rendered structured provenance
+ *     entries (e.g. the scheduler's { name, value, type, description }) as
+ *     "[object Object]" via a naive join(). Add formatScopeEntry() and render
+ *     each entry on its own line as "name: value — description".
  *   v4.9.0 -- 2026-06-03 -- Render a task's description as Markdown via the shared
  *     safe Markdown component (headings, lists, code, line breaks) instead of a
  *     single collapsed text blob, so long agent-authored prompts are readable.
@@ -200,6 +204,23 @@ function todoStatusIcon(status) {
   if (status === 'active') return '▶';
   if (status === 'outdated') return '·';
   return '⬜';
+}
+
+// Render one task scope entry as readable text. Scope is an array whose entries
+// may be plain strings (legacy free-text scopes) or structured provenance objects
+// stamped by the scheduler, e.g.
+//   { name:'schedule', value:'0 9 * * *', type:'cron', description:'Uutisputki – aamukirjoitus' }
+// A naive join()/String() prints "[object Object]" for the structured form, so
+// format the parts we know into e.g. "schedule: 0 9 * * * — Uutisputki – aamukirjoitus".
+function formatScopeEntry(s) {
+  if (s == null) return '';
+  if (typeof s !== 'object') return String(s);
+  const head = s.name || s.type || '';
+  const val = s.value != null && s.value !== '' ? String(s.value) : '';
+  const lead = [head, val].filter(Boolean).join(': ');
+  const desc = s.description ? ` — ${s.description}` : '';
+  const out = `${lead}${desc}`.trim();
+  return out || JSON.stringify(s);
 }
 
 function todoProgress(todos) {
@@ -619,10 +640,14 @@ function TaskItem({ task, agentName, showToast, onRefresh }) {
             </div>
           `}
 
-          ${task.scope && html`
+          ${task.scope && (!Array.isArray(task.scope) || task.scope.length > 0) && html`
             <div class="pf-agd-info-row">
               <span class="pf-agd-info-label">${t('profile.agents.detail.tasks.scope')}</span>
-              <span class="pf-agd-info-value">${Array.isArray(task.scope) ? task.scope.join(', ') : task.scope}</span>
+              <span class="pf-agd-info-value">
+                ${Array.isArray(task.scope)
+                  ? task.scope.map((s, i) => html`<div key=${i}>${formatScopeEntry(s)}</div>`)
+                  : formatScopeEntry(task.scope)}
+              </span>
             </div>
           `}
           ${task.rules && task.rules.length > 0 && html`
