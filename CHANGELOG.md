@@ -4,6 +4,177 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+### Scheduled tasks for agents
+
+Owners — and agents on their behalf — can now schedule **recurring jobs** ("get the
+morning news every day", "translate the shared-memory news every morning"). The
+**AIMEAT server owns the clock** (reusing the existing `croner` scheduler), so jobs
+survive an agent disconnect and the owner can **pause or cancel anything instantly —
+including schedules an agent created**. Execution is hybrid: zero-token sandboxed
+extension runs, server-side AI on the owner's OpenRouter key, or dispatch into an
+agent's task queue. Surfaced in a new **Profile → Scheduler** master view and a
+per-agent **Schedules** sub-tab. Full design:
+`aimeat/docs/plans/2026-06-03-agent-scheduler-and-scheduled-tasks-plan.md`.
+
+#### Added
+
+- **Three schedule kinds on one server-owned clock** — `extension` (run an installed
+  extension action in the sandbox, zero tokens), `ai` (server-side OpenRouter
+  completion that reads predefined input memory keys, applies a prompt, and stores the
+  result to an output key — runs even while the agent is offline), and `agent_task`
+  (materialises an `AgentTaskRecord` into the agent's queue on each fire and wakes it
+  via the existing webhook/MCP/poll fan-out). IANA-timezone/DST aware; overlap guard;
+  per-run `ExecutionLogEntry`; failure push notifications.
+- **Owner REST API** — `GET/POST /v1/schedules`, `GET/PATCH/DELETE /v1/schedules/{id}`,
+  `POST /v1/schedules/{id}/trigger`, plus `GET/POST /v1/agents/{name}/schedules`. The
+  master `GET /v1/schedules` aggregates AIMEAT-managed schedules, the owner's extension
+  cron jobs, and each agent's self-reported internal scheduler.
+- **MCP tools (agent self-service)** — `aimeat_schedule_create` / `_list` / `_update`
+  (pause/resume/edit) / `_delete`, plus `aimeat_schedule_report_internal` for an agent
+  to publish its own out-of-AIMEAT cron into the `agents.<name>.scheduler` mirror.
+  Registered in the catalog, annotations, and the `agent` v2 surface.
+- **Server-side AI completion service** — `services/ai-completion.ts`, extracted so both
+  `POST /v1/ai/complete` and the scheduler's `ai` jobs share one budget/key/usage path.
+- **Extensible, opt-in budget guards** — `services/schedule-constraints.ts`: `max_runs`
+  (auto-disable after N fires) and `daily_limit` (cap daily AI spend), off by default,
+  set per-schedule or as per-agent defaults in the **Agent Config** tab (finally wiring
+  the previously-declared `AgentRecord.dailySpendLimit`). New guard types are one
+  registry entry — no schema change.
+- **Frontend** — Profile → Scheduler master view (managed / extension-cron /
+  agent-internal groups, with create form, pause/resume, run-now, cancel) and a
+  per-agent Schedules sub-tab (AIMEAT-dispatched vs Agent-internal), `sch-*` styles,
+  `js/services/schedules.js`, and en/fi i18n.
+- **Storage** — extended `ScheduledJobRecord` (`ai`/`agent_task` types, `ownerScope`,
+  `agentName`/`agentGaii`, `displayName`/`purpose`, `timezone`, `constraints`,
+  `runCount`), `ExecutionLogEntry.taskId`, and `AgentRecord.scheduleConstraintDefaults`
+  across SQLite + MongoDB/Prisma (additive migration).
+- **Tests + spec** — `test/e2e-agent-schedules.ts` (18 cases: CRUD, cross-owner authz,
+  agent_task dispatch → task materialisation, overlap skip, max_runs auto-disable, AI
+  failure mode, owner cancels agent-created); OpenAPI documents all new endpoints +
+  schemas.
+
+#### Changed
+
+- **`POST /v1/ai/complete` refactored onto the shared `ai-completion` service** — no
+  behaviour change; the route is now a thin wrapper.
+
+### Profile navigation: persistent sidebar
+
+The profile page's navigation is now a **persistent, grouped sidebar** with every tab
+always visible, replacing the new/active/experienced **tier-adaptive menu** that hid
+and reordered items by activity level — unpredictable for both humans and agentic
+developers.
+
+#### Added
+
+- **Persistent grouped sidebar** (Daily / Build & Share / Technical / Personal /
+  Network & Admin) + a content column showing either the open tab or the home dashboard
+  (ProfileCard + tier-based onboarding + app strip). On mobile it becomes an off-canvas
+  drawer. The new **Scheduler** tab lives in the Daily group.
+
+#### Changed
+
+- **`computeTier()` now gates only the home onboarding content, not the menu** — the
+  tier-branched `MenuSection` layout in `landing-page.js` was removed in favour of the
+  always-visible sidebar.
+
+### Mobile header (responsive top bar)
+
+The global shell header now works on narrow widths: the **gold logged-in pill (and
+Logout) stays reachable on mobile**, the site-nav links collapse into a **hamburger
+dropdown**, and content uses the screen width.
+
+#### Added
+
+- **Hamburger nav + compact pill** — at ≤1180px the header nav links + theme/language
+  toggles collapse into a dropdown, while the gold pill stays in the bar and goes
+  compact (green dot + Logout). Auth-pill hook classes added in `aimeat-auth.js`.
+
+#### Fixed
+
+- **Logged-in pill overflowed the viewport** in the ~900–1180px band (full inline nav +
+  wide pill, wider still for operators) — the collapse breakpoint was raised to 1180px,
+  the GHII is ellipsis-truncated in the pill, the morsel chip is hidden on mobile (still
+  shown in the dashboard), and mobile content side margins were reduced.
+
+### Owner session refresh tokens
+
+Human (owner) login sessions now stay alive reliably and no longer log you out
+mid-task after ~an hour. Sessions are backed by a rotating, server-side **refresh
+token delivered as an httpOnly cookie** instead of re-signing with the owner key, so
+session continuity is decoupled from the owner keypair — logging in on one device no
+longer breaks another device's session. Full design:
+`aimeat/docs/plans/2026-06-03-owner-session-refresh-tokens-plan.md`.
+
+#### Added
+
+- **Rotating refresh-token sessions** — login establishes a per-device session (one
+  row per device) with a short access JWT (`AIMEAT_ACCESS_TTL`, default 15 min) and an
+  httpOnly `aimeat_rt` refresh cookie (`SameSite=Strict`, `Path=/v1/auth`).
+  `POST /v1/auth/refresh` rotates the token one-time-use with **reuse detection**
+  (replaying a consumed token revokes the whole device session) and a short grace
+  window for in-flight concurrency. Sliding **30-day idle / 90-day absolute** lifetime.
+  Extends `SessionRecord` across SQLite + MongoDB/Prisma.
+- **Refresh on tab focus / visibility** — `aimeat-auth.js` re-checks the token when the
+  tab regains focus or becomes visible and refreshes if it is within 5 min of expiry.
+  The previous proactive `setTimeout` never fired while the machine was asleep or the
+  tab was frozen — the root cause of the ~60-min logout.
+- **Device session list** — `GET /v1/auth/sessions` now returns `device_label` and
+  `last_used_at`; logout / `DELETE /v1/auth/sessions[/{id}]` revoke the session and
+  clear the cookie.
+- **New config:** `AIMEAT_ACCESS_TTL` (900), `AIMEAT_REFRESH_IDLE_DAYS` (30),
+  `AIMEAT_REFRESH_ABSOLUTE_DAYS` (90), `AIMEAT_REFRESH_GRACE_MS` (60000) — wired into
+  `.env.example`, `aimeat config`, the env validator, and the init wizard.
+
+#### Changed
+
+- **Owner sessions refresh via the cookie, not the owner key** — `session.refresh()`
+  calls `POST /v1/auth/refresh` (single-flight); boot restores from the cookie; the
+  short access token lives in memory (only non-secret metadata in localStorage). Agent
+  and federated paths are unchanged.
+- **`/v1/ghii/login` no longer rotates the owner keypair on every login** — it mints a
+  fresh key only when the device holds none (`request_owner_key`), so logging in on a
+  new device no longer invalidates other devices' refresh.
+
+#### Fixed
+
+- **~60-minute logout while away from the machine** — the only refresh trigger was an
+  in-page `setTimeout` that does not fire during OS sleep / tab suspension; combined
+  with owner-key rotation on every login, returning users were logged out. Both causes
+  are removed.
+
+### Agent access tokens
+
+Owners can create, in **profile → Access**, a reusable, revocable token an AI agent
+uses (as an `Authorization: Bearer` header) to authenticate transparently — like a
+logged-in user — and verify a web app it built. The auth middleware recognises the
+token on every request, so there is **no app-side login step**. Full design:
+`aimeat/docs/plans/2026-06-03-agent-access-tokens-plan.md`.
+
+#### Added
+
+- **Personal Access Tokens** — `POST` / `GET /v1/access/tokens` and
+  `DELETE /v1/access/tokens/{id}` (owner-only). A token grants either selected agent
+  scopes (a scoped, sandboxed test GAII) or, when chosen, **full owner** or **operator**
+  access (operator only mintable by an operator; roles re-derived from the owner's
+  current roles so a token never grants more than the owner holds). Opaque 256-bit
+  token (`aimeat_pat_…`), stored as a SHA-256 hash only, shown once. Optional expiry;
+  revocation takes effect immediately. New `PatRecord` + `personal_access_tokens` table
+  across SQLite + MongoDB/Prisma.
+- **Header-based recognition** — the auth middleware accepts a PAT directly as
+  `Authorization: Bearer`, so every authenticated endpoint works with no client
+  changes. Optional `POST /v1/auth/token/exchange` swaps the token for a short
+  stateless JWT.
+- **Browser "logged in" via cookie** — when an owner/operator token reaches the server
+  on a browser request, the server sets the httpOnly `aimeat_rt` cookie to the token;
+  `aimeat-auth.js` boot restores a session from the cookie alone, so the web app shows
+  as genuinely logged in. The cookie is validated on every refresh, so revoking the
+  token logs the browser out immediately. (Scoped tokens: header only, no cookie.)
+- **Access tab UI** — a new "Agent Access Tokens" section: create form (agent scope
+  checklist + **Full (owner)** / **Operator** + optional expiry), the raw token shown
+  once with a ready-made copy-paste agent prompt, and a list with level badge,
+  last-used / expiry and one-click revoke. Bilingual (en + fi).
+
 ## [1.17.0] - 2026-06-01
 
 Agent **Tasks** tab triage — long task lists are split into three buckets so the
