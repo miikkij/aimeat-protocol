@@ -374,6 +374,10 @@ export const GhiiLoginSchema = z.object({
     password: z.string().min(1).max(256),
     totp_code: z.string().max(10).optional(),
     backup_code: z.string().max(32).optional(),
+    // Set by clients that hold no owner signing key locally (a brand-new device),
+    // asking the server to mint a fresh owner keypair. Omitted/false reuses the
+    // existing key so other devices' signing keys stay valid. See ghii.ts login.
+    request_owner_key: z.boolean().optional(),
 });
 
 // ── Flags (security audit -- authenticated endpoints) ──

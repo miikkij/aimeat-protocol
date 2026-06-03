@@ -658,12 +658,21 @@ export function initializeSchema(db: Database.Database): void {
 
     -- ── Sessions (P3-7: Server-Side Session Tracking) ──
     CREATE TABLE IF NOT EXISTS sessions (
-      sessionId      TEXT PRIMARY KEY,
-      gaii           TEXT NOT NULL,
-      owner          TEXT NOT NULL,
-      issuedAt       TEXT NOT NULL,
-      expiresAt      TEXT NOT NULL,
-      revoked        INTEGER NOT NULL DEFAULT 0
+      sessionId         TEXT PRIMARY KEY,
+      gaii              TEXT NOT NULL,
+      owner             TEXT NOT NULL,
+      issuedAt          TEXT NOT NULL,
+      expiresAt         TEXT NOT NULL,
+      revoked           INTEGER NOT NULL DEFAULT 0,
+      -- Owner refresh-token fields (NULL for legacy JWT-tracking sessions)
+      refreshTokenHash  TEXT,
+      prevTokenHash     TEXT,
+      prevValidUntil    TEXT,
+      lastUsedAt        TEXT,
+      idleExpiresAt     TEXT,
+      absoluteExpiresAt TEXT,
+      deviceLabel       TEXT,
+      userAgent         TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_sessions_owner ON sessions(owner);
     CREATE INDEX IF NOT EXISTS idx_sessions_gaii ON sessions(gaii);
@@ -867,7 +876,18 @@ export function initializeSchema(db: Database.Database): void {
       nextRunAt       TEXT,
       createdBy       TEXT NOT NULL,
       createdAt       TEXT NOT NULL,
-      updatedAt       TEXT NOT NULL
+      updatedAt       TEXT NOT NULL,
+      -- Agent-scheduler additions (additive / nullable)
+      ownerScope      TEXT,
+      agentName       TEXT,
+      agentGaii       TEXT,
+      createdByAgent  INTEGER NOT NULL DEFAULT 0,
+      displayName     TEXT,
+      description     TEXT,
+      purpose         TEXT,
+      timezone        TEXT,
+      constraints     TEXT,
+      runCount        INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS execution_log (
@@ -883,6 +903,7 @@ export function initializeSchema(db: Database.Database): void {
       durationMs      INTEGER NOT NULL DEFAULT 0,
       memoryReads     TEXT NOT NULL DEFAULT '[]',
       memoryWrites    TEXT NOT NULL DEFAULT '[]',
+      taskId          TEXT,
       createdAt       TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_execution_log_jobId ON execution_log(jobId);
@@ -1332,6 +1353,20 @@ export function initializeSchema(db: Database.Database): void {
     try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`); } catch { /* column already exists */ }
   };
 
+  // Owner session refresh tokens — add columns to existing sessions tables, then
+  // index the lookup columns (must run AFTER the ALTERs so the columns exist).
+  // See docs/plans/2026-06-03-owner-session-refresh-tokens-plan.md
+  safeAddColumn('sessions', 'refreshTokenHash', 'TEXT');
+  safeAddColumn('sessions', 'prevTokenHash', 'TEXT');
+  safeAddColumn('sessions', 'prevValidUntil', 'TEXT');
+  safeAddColumn('sessions', 'lastUsedAt', 'TEXT');
+  safeAddColumn('sessions', 'idleExpiresAt', 'TEXT');
+  safeAddColumn('sessions', 'absoluteExpiresAt', 'TEXT');
+  safeAddColumn('sessions', 'deviceLabel', 'TEXT');
+  safeAddColumn('sessions', 'userAgent', 'TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_refreshTokenHash ON sessions(refreshTokenHash)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_prevTokenHash ON sessions(prevTokenHash)');
+
   // Phase 2 CORS — GHII-level allowed origins
   safeAddColumn('ghiis', 'allowedOrigins', 'TEXT');
 
@@ -1391,6 +1426,22 @@ export function initializeSchema(db: Database.Database): void {
 
   // Governance Phase C — budget limits on agent directives
   safeAddColumn('agent_directives', 'budgetLimits', 'TEXT');
+
+  // Agent Scheduler — recurring schedules (ai/agent_task kinds), owner scoping,
+  // budget constraints, timezone. All additive/nullable; existing core/extension
+  // rows read back unchanged.
+  safeAddColumn('scheduled_jobs', 'ownerScope', 'TEXT');
+  safeAddColumn('scheduled_jobs', 'agentName', 'TEXT');
+  safeAddColumn('scheduled_jobs', 'agentGaii', 'TEXT');
+  safeAddColumn('scheduled_jobs', 'createdByAgent', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('scheduled_jobs', 'displayName', 'TEXT');
+  safeAddColumn('scheduled_jobs', 'description', 'TEXT');
+  safeAddColumn('scheduled_jobs', 'purpose', 'TEXT');
+  safeAddColumn('scheduled_jobs', 'timezone', 'TEXT');
+  safeAddColumn('scheduled_jobs', 'constraints', 'TEXT');
+  safeAddColumn('scheduled_jobs', 'runCount', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('execution_log', 'taskId', 'TEXT');
+  safeAddColumn('agents', 'scheduleConstraintDefaults', 'TEXT');
 
   // Push Layer Phase A — webhook delivery fields
   safeAddColumn('agents', 'webhookUrl', 'TEXT');

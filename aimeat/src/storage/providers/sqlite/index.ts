@@ -315,7 +315,8 @@ export class SqliteStorage implements Storage {
        technicalCapabilities = ?, domainCapabilities = ?, activityStats = ?,
        modulesLoaded = ?, agentLimitations = ?, languages = ?,
        webhookUrl = ?, webhookSecret = ?, webhookEnabled = ?, webhookLastSuccess = ?, webhookLastFailure = ?, webhookFailCount = ?,
-       platform = ?, platformVersion = ?, platformDetectedBy = ?, tags = ?, mode = ?, maxConcurrentTasks = ?
+       platform = ?, platformVersion = ?, platformDetectedBy = ?, tags = ?, mode = ?, maxConcurrentTasks = ?,
+       dailySpendLimit = ?, scheduleConstraintDefaults = ?
        WHERE gaii = ?`
     ).run(
       updated.name, updated.owner,
@@ -339,6 +340,8 @@ export class SqliteStorage implements Storage {
       updated.tags ? JSON.stringify(updated.tags) : null,
       updated.mode ?? 'interactive',
       updated.maxConcurrentTasks ?? 1,
+      updated.dailySpendLimit ?? null,
+      updated.scheduleConstraintDefaults ? JSON.stringify(updated.scheduleConstraintDefaults) : null,
       gaii,
     );
     return updated;
@@ -470,6 +473,8 @@ export class SqliteStorage implements Storage {
     if (row.tags) record.tags = JSON.parse(row.tags as string);
     if (row.mode) record.mode = row.mode as 'autonomous' | 'interactive' | 'task-runner' | 'coordinator';
     if (row.maxConcurrentTasks != null) record.maxConcurrentTasks = row.maxConcurrentTasks as number;
+    if (row.dailySpendLimit != null) record.dailySpendLimit = row.dailySpendLimit as number;
+    if (row.scheduleConstraintDefaults) record.scheduleConstraintDefaults = JSON.parse(row.scheduleConstraintDefaults as string);
     return record;
   }
 
@@ -3859,16 +3864,74 @@ export class SqliteStorage implements Storage {
   // ── Sessions (P3-7: Server-Side Session Tracking) ──
   // ══════════════════════════════════════════════════════════
 
+  private mapSessionRow(row: Record<string, unknown>): import('../../../storage/repositories/session.repository.js').SessionRecord {
+    return {
+      sessionId: row.sessionId as string,
+      gaii: row.gaii as string,
+      owner: row.owner as string,
+      issuedAt: row.issuedAt as string,
+      expiresAt: row.expiresAt as string,
+      revoked: row.revoked === 1 || row.revoked === true,
+      refreshTokenHash: (row.refreshTokenHash as string | null) ?? null,
+      prevTokenHash: (row.prevTokenHash as string | null) ?? null,
+      prevValidUntil: (row.prevValidUntil as string | null) ?? null,
+      lastUsedAt: (row.lastUsedAt as string | null) ?? null,
+      idleExpiresAt: (row.idleExpiresAt as string | null) ?? null,
+      absoluteExpiresAt: (row.absoluteExpiresAt as string | null) ?? null,
+      deviceLabel: (row.deviceLabel as string | null) ?? null,
+      userAgent: (row.userAgent as string | null) ?? null,
+    };
+  }
+
   async createSession(session: { sessionId: string; gaii: string; owner: string; issuedAt: string; expiresAt: string }): Promise<void> {
     this.db.prepare(
       'INSERT INTO sessions (sessionId, gaii, owner, issuedAt, expiresAt, revoked) VALUES (?, ?, ?, ?, ?, 0)'
     ).run(session.sessionId, session.gaii, session.owner, session.issuedAt, session.expiresAt);
   }
 
+  async createOwnerSession(session: {
+    sessionId: string; gaii: string; owner: string; issuedAt: string;
+    refreshTokenHash: string; idleExpiresAt: string; absoluteExpiresAt: string;
+    lastUsedAt: string; deviceLabel?: string | null; userAgent?: string | null;
+  }): Promise<void> {
+    // expiresAt mirrors the idle window so listActiveSessions reflects refresh-token life.
+    this.db.prepare(
+      `INSERT INTO sessions
+         (sessionId, gaii, owner, issuedAt, expiresAt, revoked,
+          refreshTokenHash, idleExpiresAt, absoluteExpiresAt, lastUsedAt, deviceLabel, userAgent)
+       VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      session.sessionId, session.gaii, session.owner, session.issuedAt, session.idleExpiresAt,
+      session.refreshTokenHash, session.idleExpiresAt, session.absoluteExpiresAt, session.lastUsedAt,
+      session.deviceLabel ?? null, session.userAgent ?? null,
+    );
+  }
+
   async listActiveSessions(owner: string): Promise<import('../../../storage/repositories/session.repository.js').SessionRecord[]> {
-    return this.db.prepare(
-      'SELECT sessionId, gaii, owner, issuedAt, expiresAt, revoked FROM sessions WHERE owner = ? AND revoked = 0 ORDER BY issuedAt DESC'
-    ).all(owner) as import('../../../storage/repositories/session.repository.js').SessionRecord[];
+    const rows = this.db.prepare(
+      'SELECT * FROM sessions WHERE owner = ? AND revoked = 0 ORDER BY issuedAt DESC'
+    ).all(owner) as Record<string, unknown>[];
+    return rows.map((r) => this.mapSessionRow(r));
+  }
+
+  async getSessionByRefreshHash(tokenHash: string): Promise<import('../../../storage/repositories/session.repository.js').SessionRecord | null> {
+    const row = this.db.prepare(
+      'SELECT * FROM sessions WHERE refreshTokenHash = ? OR prevTokenHash = ? LIMIT 1'
+    ).get(tokenHash, tokenHash) as Record<string, unknown> | undefined;
+    return row ? this.mapSessionRow(row) : null;
+  }
+
+  async rotateSessionRefresh(sessionId: string, update: {
+    refreshTokenHash: string; prevTokenHash: string | null; prevValidUntil: string | null;
+    idleExpiresAt: string; expiresAt: string; lastUsedAt: string;
+  }): Promise<void> {
+    this.db.prepare(
+      `UPDATE sessions SET refreshTokenHash = ?, prevTokenHash = ?, prevValidUntil = ?,
+         idleExpiresAt = ?, expiresAt = ?, lastUsedAt = ? WHERE sessionId = ?`
+    ).run(
+      update.refreshTokenHash, update.prevTokenHash, update.prevValidUntil,
+      update.idleExpiresAt, update.expiresAt, update.lastUsedAt, sessionId,
+    );
   }
 
   async revokeSession(sessionId: string): Promise<boolean> {
@@ -3885,6 +3948,18 @@ export class SqliteStorage implements Storage {
     const row = this.db.prepare('SELECT revoked FROM sessions WHERE sessionId = ?').get(sessionId) as { revoked: number } | undefined;
     if (!row) return false; // session not tracked = not revoked
     return row.revoked === 1;
+  }
+
+  async pruneExpiredSessions(nowIso: string): Promise<number> {
+    // Remove fully-dead rows: past their expiry (legacy JWT exp / owner idle window)
+    // or past the absolute cap. Revoked-but-unexpired rows are kept so isSessionRevoked
+    // still rejects their (short-lived) access tokens.
+    const result = this.db.prepare(
+      `DELETE FROM sessions
+        WHERE expiresAt < ?
+           OR (absoluteExpiresAt IS NOT NULL AND absoluteExpiresAt < ?)`
+    ).run(nowIso, nowIso);
+    return result.changes;
   }
 
   // ══════════════════════════════════════════════════════════
@@ -4265,8 +4340,11 @@ export class SqliteStorage implements Storage {
       this.db.prepare(
         `INSERT INTO scheduled_jobs (id, name, type, extensionName, instanceId, actionId,
          coreHandler, cron, enabled, input, lastRunAt, lastRunResult, lastRunError,
-         lastRunDurationMs, nextRunAt, createdBy, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         lastRunDurationMs, nextRunAt, createdBy, createdAt, updatedAt,
+         ownerScope, agentName, agentGaii, createdByAgent, displayName, description,
+         purpose, timezone, constraints, runCount)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         record.id, record.name, record.type,
         record.extensionName ?? null, record.instanceId ?? null, record.actionId ?? null,
@@ -4275,6 +4353,11 @@ export class SqliteStorage implements Storage {
         record.lastRunAt ?? null, record.lastRunResult ?? null, record.lastRunError ?? null,
         record.lastRunDurationMs ?? null, record.nextRunAt ?? null,
         record.createdBy, record.createdAt, record.updatedAt,
+        record.ownerScope ?? null, record.agentName ?? null, record.agentGaii ?? null,
+        record.createdByAgent ? 1 : 0, record.displayName ?? null, record.description ?? null,
+        record.purpose ?? null, record.timezone ?? null,
+        record.constraints ? JSON.stringify(record.constraints) : null,
+        record.runCount ?? 0,
       );
       return record;
     } catch (err: unknown) {
@@ -4290,13 +4373,15 @@ export class SqliteStorage implements Storage {
     return row ? this.deserializeScheduledJob(row) : null;
   }
 
-  async listScheduledJobs(filter?: { type?: string; extensionName?: string; enabled?: boolean }): Promise<ScheduledJobRecord[]> {
+  async listScheduledJobs(filter?: { type?: string; extensionName?: string; enabled?: boolean; ownerScope?: string; agentGaii?: string }): Promise<ScheduledJobRecord[]> {
     let sql = 'SELECT * FROM scheduled_jobs';
     const conditions: string[] = [];
     const params: unknown[] = [];
     if (filter?.type) { conditions.push('type = ?'); params.push(filter.type); }
     if (filter?.extensionName) { conditions.push('extensionName = ?'); params.push(filter.extensionName); }
     if (filter?.enabled !== undefined) { conditions.push('enabled = ?'); params.push(filter.enabled ? 1 : 0); }
+    if (filter?.ownerScope) { conditions.push('ownerScope = ?'); params.push(filter.ownerScope); }
+    if (filter?.agentGaii) { conditions.push('agentGaii = ?'); params.push(filter.agentGaii); }
     if (conditions.length > 0) sql += ' WHERE ' + conditions.join(' AND ');
     const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
     return rows.map(r => this.deserializeScheduledJob(r));
@@ -4310,7 +4395,10 @@ export class SqliteStorage implements Storage {
       `UPDATE scheduled_jobs SET name = ?, type = ?, extensionName = ?, instanceId = ?,
        actionId = ?, coreHandler = ?, cron = ?, enabled = ?, input = ?,
        lastRunAt = ?, lastRunResult = ?, lastRunError = ?, lastRunDurationMs = ?,
-       nextRunAt = ?, createdBy = ?, createdAt = ?, updatedAt = ? WHERE id = ?`
+       nextRunAt = ?, createdBy = ?, createdAt = ?, updatedAt = ?,
+       ownerScope = ?, agentName = ?, agentGaii = ?, createdByAgent = ?,
+       displayName = ?, description = ?, purpose = ?, timezone = ?,
+       constraints = ?, runCount = ? WHERE id = ?`
     ).run(
       updated.name, updated.type,
       updated.extensionName ?? null, updated.instanceId ?? null, updated.actionId ?? null,
@@ -4318,7 +4406,12 @@ export class SqliteStorage implements Storage {
       updated.input ? JSON.stringify(updated.input) : null,
       updated.lastRunAt ?? null, updated.lastRunResult ?? null, updated.lastRunError ?? null,
       updated.lastRunDurationMs ?? null, updated.nextRunAt ?? null,
-      updated.createdBy, updated.createdAt, updated.updatedAt, id,
+      updated.createdBy, updated.createdAt, updated.updatedAt,
+      updated.ownerScope ?? null, updated.agentName ?? null, updated.agentGaii ?? null,
+      updated.createdByAgent ? 1 : 0, updated.displayName ?? null, updated.description ?? null,
+      updated.purpose ?? null, updated.timezone ?? null,
+      updated.constraints ? JSON.stringify(updated.constraints) : null,
+      updated.runCount ?? 0, id,
     );
     return updated;
   }
@@ -4349,6 +4442,16 @@ export class SqliteStorage implements Storage {
     if (row.lastRunError) record.lastRunError = row.lastRunError as string;
     if (row.lastRunDurationMs !== null && row.lastRunDurationMs !== undefined) record.lastRunDurationMs = row.lastRunDurationMs as number;
     if (row.nextRunAt) record.nextRunAt = row.nextRunAt as string;
+    if (row.ownerScope) record.ownerScope = row.ownerScope as string;
+    if (row.agentName) record.agentName = row.agentName as string;
+    if (row.agentGaii) record.agentGaii = row.agentGaii as string;
+    if ((row.createdByAgent as number) === 1) record.createdByAgent = true;
+    if (row.displayName) record.displayName = row.displayName as string;
+    if (row.description) record.description = row.description as string;
+    if (row.purpose) record.purpose = row.purpose as string;
+    if (row.timezone) record.timezone = row.timezone as string;
+    if (row.constraints) record.constraints = JSON.parse(row.constraints as string);
+    if (row.runCount !== null && row.runCount !== undefined) record.runCount = row.runCount as number;
     return record;
   }
 
@@ -4359,8 +4462,8 @@ export class SqliteStorage implements Storage {
   async createExecutionLog(entry: ExecutionLogEntry): Promise<ExecutionLogEntry> {
     this.db.prepare(
       `INSERT INTO execution_log (id, jobId, jobName, type, extensionName, actionId,
-       "trigger", result, errorMessage, durationMs, memoryReads, memoryWrites, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       "trigger", result, errorMessage, durationMs, memoryReads, memoryWrites, taskId, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       entry.id, entry.jobId, entry.jobName, entry.type,
       entry.extensionName ?? null, entry.actionId ?? null,
@@ -4368,6 +4471,7 @@ export class SqliteStorage implements Storage {
       entry.durationMs,
       JSON.stringify(entry.memoryReads),
       JSON.stringify(entry.memoryWrites),
+      entry.taskId ?? null,
       entry.createdAt,
     );
     return entry;
@@ -4426,6 +4530,7 @@ export class SqliteStorage implements Storage {
       durationMs: row.durationMs as number,
       memoryReads: JSON.parse(row.memoryReads as string || '[]'),
       memoryWrites: JSON.parse(row.memoryWrites as string || '[]'),
+      taskId: (row.taskId as string) || undefined,
       createdAt: row.createdAt as string,
     };
   }

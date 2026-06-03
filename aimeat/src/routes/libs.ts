@@ -4,6 +4,11 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.12.0 - 2026-06-03 - Session resilience: aimeat-auth.js now refreshes the
+ *   JWT on tab focus/visibilitychange (timers don't fire while the machine sleeps
+ *   or the tab is frozen, so the proactive setTimeout was unreliable). loginWithPassword
+ *   sends request_owner_key only when this device holds no key, so password login
+ *   no longer rotates the owner key and breaks other devices' refresh.
  * v1.11.0 - 2026-05-31 - Add aimeat-agents.js — apps commission & observe the
  *   owner's agents (list, createTask/run, watch via SSE, deliverables,
  *   option-prompt answer loop). Registered as a route + in the /v1/libs catalogue.
@@ -682,9 +687,15 @@ const auth = {
    * @returns {Promise<object>} Session object
    */
   async loginWithPassword(username, password) {
+    // Only ask the server to mint a fresh owner signing key when THIS device
+    // holds none. Re-minting on every login rotates the server's public key and
+    // invalidates the signing key on every other device, breaking their silent
+    // token refresh. If we already have a key in IndexedDB, reuse it.
+    let hasOwnerKey = false;
+    try { hasOwnerKey = !!(await loadKey('owner_key')); } catch (_) { hasOwnerKey = false; }
     const data = await api('/v1/ghii/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, request_owner_key: !hasOwnerKey }),
     });
 
     const d = data.data;
@@ -1176,10 +1187,47 @@ function showLoginModal(opts, renderBtn) {
   });
 }
 
+// ── Refresh on focus / visibility ──
+// The auto-refresh setTimeout fires 5 min before expiry, but timers do NOT fire
+// while the machine is asleep or the tab is frozen/discarded by the browser. So
+// after the user steps away and returns, the proactive refresh never happened and
+// the JWT may already be expired. Re-check the token whenever the tab regains
+// visibility or focus, and refresh if it is within the 5-min window (or expired).
+let focusRefreshInFlight = null;
+function refreshOnFocus() {
+  const session = currentSession;
+  // Federated sessions cannot self-refresh by signing — leave them to re-login.
+  if (!session || !session.jwt || session.federated) return;
+  const payload = parseJwt(session.jwt);
+  if (!payload || !payload.exp) return;
+  const msUntilExpiry = (payload.exp * 1000) - Date.now();
+  if (msUntilExpiry > 5 * 60 * 1000) return; // still comfortably valid
+  if (focusRefreshInFlight) return; // focus + visibilitychange can both fire — de-dupe
+  const wasExpired = msUntilExpiry <= 0;
+  focusRefreshInFlight = session.refresh()
+    .then(() => { emit('refreshed', session); })
+    .catch((e) => {
+      console.warn('[aimeat-auth] Focus refresh failed:', e.message);
+      // Only declare the session dead if the token had actually expired. A
+      // transient failure while still inside the pre-expiry window can be
+      // retried by the scheduled timer or the next API call.
+      if (wasExpired) emit('expired', { reason: 'refresh_failed', error: e.message });
+    })
+    .finally(() => { focusRefreshInFlight = null; });
+}
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') refreshOnFocus();
+  });
+}
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('focus', refreshOnFocus);
+}
+
 // ── Expose globally ──
 if (!global.AIMEAT) global.AIMEAT = {};
 global.AIMEAT.auth = auth;
-global.AIMEAT.version = '2026-05-28-002';
+global.AIMEAT.version = '2026-06-03-001';
 
 })(typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : this);
 `;

@@ -29,6 +29,12 @@ export interface AgentRecord {
   defaultScopes?: string[];      // REQ-006 — scopes assigned at registration
   allowedOrigins?: string[];     // CORS — per-agent origin restrictions (Phase 3)
   dailySpendLimit?: number | null;
+  /**
+   * Default budget/run guards applied to this agent's schedules at creation
+   * time (opt-in; the owner toggles these in the Agent Config tab). A schedule
+   * inherits these and may override per-schedule. See ScheduleConstraint.
+   */
+  scheduleConstraintDefaults?: ScheduleConstraint[];
   federate?: boolean;
   technicalCapabilities?: AgentTechnicalCapability[];
   domainCapabilities?: string[];
@@ -868,25 +874,62 @@ export interface ExtensionRecord {
 
 // ── Scheduled Jobs ────────────────────────────────────────────────
 
+/**
+ * A single budget/run guard attached to a schedule. Extensible: new guard
+ * `type`s only need a registry entry in services/schedule-constraints.ts plus a
+ * UI toggle — no schema change (constraints are stored as a JSON array).
+ * `enabled` defaults to false so guards are strictly opt-in.
+ */
+export interface ScheduleConstraint {
+  type: string;                          // e.g. 'max_runs' | 'daily_limit'
+  enabled: boolean;                      // opt-in; off by default
+  params: Record<string, unknown>;       // e.g. { limit: 7 }
+  state?: Record<string, unknown>;       // accumulator state (e.g. spent today)
+}
+
 export interface ScheduledJobRecord {
   id: string;
   name: string;
-  type: 'extension' | 'core';
+  /**
+   * 'core'/'extension' are the original server-run kinds. 'ai' runs a
+   * server-side OpenRouter completion (zero agent involvement); 'agent_task'
+   * materialises an AgentTaskRecord into the target agent's queue on each fire.
+   */
+  type: 'extension' | 'core' | 'ai' | 'agent_task';
   extensionName?: string;
   instanceId?: string;
   actionId?: string;
   coreHandler?: string;
   cron: string;
   enabled: boolean;
+  /**
+   * Kind-specific config (round-tripped as JSON):
+   *  - extension: scheduler input passed to the action (existing behaviour)
+   *  - ai:        { inputKeys: string[]; inputNamespaces?: string[]; prompt: string;
+   *                 systemPrompt?: string; model?: string; outputKey?: string;
+   *                 outputVisibility?: 'private'|'owner'|'public' }
+   *  - agent_task:{ taskTemplate: { title; description; scope?; rules?; verification?; resources? } }
+   */
   input?: Record<string, unknown>;
   lastRunAt?: string;
-  lastRunResult?: 'success' | 'error';
+  lastRunResult?: 'success' | 'error' | 'skipped';
   lastRunError?: string;
   lastRunDurationMs?: number;
   nextRunAt?: string;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  // ── Agent-scheduler additions (all optional / additive) ──
+  ownerScope?: string;       // GHII owner — scopes the profile scheduler + authz
+  agentName?: string;        // target/associated agent (agent_task; optional otherwise)
+  agentGaii?: string;        // resolved GAII of the target agent
+  createdByAgent?: boolean;  // true = created via MCP by an agent
+  displayName?: string;      // human label ("Morning news translation")
+  description?: string;      // human description
+  purpose?: string;          // why this runs (shown in the master scheduler)
+  timezone?: string;         // IANA tz, e.g. "Europe/Helsinki" (DST-correct via croner)
+  constraints?: ScheduleConstraint[];  // budget/run guards (opt-in)
+  runCount?: number;         // lifetime successful fires (constraint state)
 }
 
 // ── Execution Log (Scheduler Run History) ────────────────────────────
@@ -895,7 +938,7 @@ export interface ExecutionLogEntry {
   id: string;
   jobId: string;
   jobName: string;
-  type: 'extension' | 'core';
+  type: 'extension' | 'core' | 'ai' | 'agent_task';
   extensionName?: string;
   actionId?: string;
   trigger: 'cron' | 'manual' | 'activate';
@@ -904,6 +947,7 @@ export interface ExecutionLogEntry {
   durationMs: number;
   memoryReads: string[];   // memory keys read during execution
   memoryWrites: string[];  // memory keys written during execution
+  taskId?: string;         // agent_task fires: the spawned AgentTaskRecord id
   createdAt: string;
 }
 

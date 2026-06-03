@@ -3,7 +3,7 @@ import type { ScheduledJobRecord, ExecutionLogEntry } from '../interface.js';
 export interface SchedulerRepository {
   createScheduledJob(record: ScheduledJobRecord): Promise<ScheduledJobRecord>;
   getScheduledJob(id: string): Promise<ScheduledJobRecord | null>;
-  listScheduledJobs(filter?: { type?: string; extensionName?: string; enabled?: boolean }): Promise<ScheduledJobRecord[]>;
+  listScheduledJobs(filter?: { type?: string; extensionName?: string; enabled?: boolean; ownerScope?: string; agentGaii?: string }): Promise<ScheduledJobRecord[]>;
   updateScheduledJob(id: string, updates: Partial<ScheduledJobRecord>): Promise<ScheduledJobRecord | null>;
   deleteScheduledJob(id: string): Promise<boolean>;
 

@@ -11,13 +11,28 @@
 import { Cron } from 'croner';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, ScheduledJobRecord, ExecutionLogEntry } from '../storage/interface.js';
+import type { Storage, ScheduledJobRecord, ExecutionLogEntry, AgentTaskRecord, AgentTaskScope, ScheduleConstraint } from '../storage/interface.js';
 import { executeExtensionAction, trackMemoryAccess } from './extension-runtime.js';
 import type { ExtensionCtx } from './extension-runtime.js';
 import type { EmailService } from './email.js';
+import type { PushService } from './push.js';
+import type { createWebhookDispatcher } from './webhook-dispatcher.js';
+import { completeForOwner } from './ai-completion.js';
+import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
+import { emitChange } from './event-bus.js';
+import { emitResourceUpdated } from '../mcp/index.js';
 import { logger } from '../utils/logger.js';
 
+type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
+
 export type JobTrigger = 'cron' | 'manual' | 'activate';
+
+/** Result returned by a kind-specific executor (memory I/O + optional spawned task). */
+interface JobRunResult {
+  reads: string[];
+  writes: string[];
+  taskId?: string;
+}
 
 export class Scheduler {
   private config: AimeatConfig;
@@ -26,11 +41,25 @@ export class Scheduler {
   private coreHandlers = new Map<string, () => Promise<void>>();
   private running = false;
   private emailService?: EmailService;
+  private webhookDispatcher?: WebhookDispatcher;
+  private pushService?: PushService;
+  /** Guards against overlapping fires of the same job (one run at a time). */
+  private executing = new Set<string>();
 
   constructor(config: AimeatConfig, storage: Storage, emailService?: EmailService) {
     this.config = config;
     this.storage = storage;
     this.emailService = emailService;
+  }
+
+  /** Inject the webhook dispatcher used to wake agents for `agent_task` fires. */
+  setWebhookDispatcher(dispatcher: WebhookDispatcher): void {
+    this.webhookDispatcher = dispatcher;
+  }
+
+  /** Inject the push service used to notify the owner on failed/auto-paused schedules. */
+  setPushService(pushService: PushService): void {
+    this.pushService = pushService;
   }
 
   /**
@@ -156,7 +185,11 @@ export class Scheduler {
     if (existing) existing.stop();
 
     try {
-      const cron = new Cron(job.cron, { name: job.id }, async () => {
+      // Pass IANA timezone through to croner so "every morning" stays correct
+      // across DST. Omitted when unset → server-local interpretation (unchanged).
+      const cronOpts: { name: string; timezone?: string } = { name: job.id };
+      if (job.timezone) cronOpts.timezone = job.timezone;
+      const cron = new Cron(job.cron, cronOpts, async () => {
         await this.executeJob(job, 'cron');
       });
 
@@ -181,33 +214,69 @@ export class Scheduler {
   }
 
   private async executeJob(job: ScheduledJobRecord, trigger: JobTrigger): Promise<void> {
+    // ── Overlap guard: never run two fires of the same job concurrently ──
+    if (this.executing.has(job.id)) {
+      logger.warn(`Scheduler skipped overlapping fire: ${job.id}`);
+      await this.writeLog(job, trigger, 'skipped', { errorMessage: 'previous run still in progress', durationMs: 0, reads: [], writes: [] });
+      return;
+    }
+
+    // ── Pre-fire budget/run guards (opt-in; only when constraints are attached) ──
+    if (job.constraints?.length) {
+      try {
+        const agent = job.agentGaii ? await this.storage.getAgent(job.agentGaii) : null;
+        const verdict = await evaluateConstraints(job, { storage: this.storage, config: this.config, ownerGaii: job.ownerScope, agent });
+        if (!verdict.allow) {
+          logger.info(`Scheduler skipped ${job.id}: ${verdict.reason}`);
+          await this.writeLog(job, trigger, 'skipped', { errorMessage: verdict.reason, durationMs: 0, reads: [], writes: [] });
+          if (verdict.disable) await this.autoDisable(job, verdict.reason ?? 'constraint reached');
+          return;
+        }
+      } catch (err) {
+        logger.error(`Scheduler constraint check failed for ${job.id}`, { error: String(err) });
+      }
+    }
+
+    this.executing.add(job.id);
     const startTime = Date.now();
-    const logId = randomUUID();
     logger.info(`Scheduler executing job: ${job.id} (${job.name}) [${trigger}]`);
 
     let result: ExecutionLogEntry['result'] = 'success';
     let errorMessage: string | undefined;
-    let memoryReads: string[] = [];
-    let memoryWrites: string[] = [];
+    let run: JobRunResult = { reads: [], writes: [] };
 
     try {
       if (job.type === 'core') {
         await this.executeCoreJob(job);
       } else if (job.type === 'extension') {
-        const accessLog = await this.executeExtensionJob(job);
-        memoryReads = accessLog.reads;
-        memoryWrites = accessLog.writes;
+        run = await this.executeExtensionJob(job);
+      } else if (job.type === 'ai') {
+        run = await this.executeAiJob(job);
+      } else if (job.type === 'agent_task') {
+        run = await this.executeAgentTaskJob(job);
       }
     } catch (err) {
       result = 'error';
       errorMessage = err instanceof Error ? err.message : String(err);
+    } finally {
+      this.executing.delete(job.id);
     }
 
     const durationMs = Date.now() - startTime;
-
-    // Update lastRun on the job record
     const cron = this.cronJobs.get(job.id);
     const nextRun = cron?.nextRun();
+
+    // On success, advance runCount + apply post-run constraint state.
+    let newRunCount = job.runCount ?? 0;
+    let updatedConstraints: ScheduleConstraint[] | undefined;
+    if (result === 'success') {
+      newRunCount = (job.runCount ?? 0) + 1;
+      job.runCount = newRunCount;
+      try {
+        const agent = job.agentGaii ? await this.storage.getAgent(job.agentGaii) : null;
+        updatedConstraints = await applyAfterRun(job, { storage: this.storage, config: this.config, ownerGaii: job.ownerScope, agent });
+      } catch { /* non-fatal */ }
+    }
 
     await this.storage.updateScheduledJob(job.id, {
       lastRunAt: new Date().toISOString(),
@@ -215,12 +284,35 @@ export class Scheduler {
       lastRunError: errorMessage,
       lastRunDurationMs: durationMs,
       nextRunAt: nextRun ? nextRun.toISOString() : undefined,
+      runCount: newRunCount,
+      ...(updatedConstraints ? { constraints: updatedConstraints } : {}),
       updatedAt: new Date().toISOString(),
     }).catch(() => { /* don't let update failure mask original error */ });
 
-    // Write execution log entry
-    const logEntry: ExecutionLogEntry = {
-      id: logId,
+    await this.writeLog(job, trigger, result, {
+      errorMessage, durationMs, reads: run.reads, writes: run.writes, taskId: run.taskId,
+    });
+
+    if (result === 'error') {
+      logger.error(`Scheduler job failed: ${job.id}`, { error: errorMessage, durationMs, trigger });
+      this.notifyOwner(job, 'Schedule failed', errorMessage ?? 'Unknown error');
+    } else {
+      logger.info(`Scheduler job completed: ${job.id} (${durationMs}ms) [${trigger}]`, {
+        memoryReads: run.reads.length,
+        memoryWrites: run.writes.length,
+      });
+      // Stop the cron proactively when a max_runs cap is now reached.
+      await this.maybeAutoDisableMaxRuns(job, newRunCount);
+    }
+  }
+
+  /** Write one ExecutionLogEntry (best-effort). */
+  private async writeLog(
+    job: ScheduledJobRecord, trigger: JobTrigger, result: ExecutionLogEntry['result'],
+    opts: { errorMessage?: string; durationMs: number; reads: string[]; writes: string[]; taskId?: string },
+  ): Promise<void> {
+    const entry: ExecutionLogEntry = {
+      id: randomUUID(),
       jobId: job.id,
       jobName: job.name,
       type: job.type,
@@ -228,24 +320,196 @@ export class Scheduler {
       actionId: job.actionId,
       trigger,
       result,
-      errorMessage,
-      durationMs,
-      memoryReads,
-      memoryWrites,
+      errorMessage: opts.errorMessage,
+      durationMs: opts.durationMs,
+      memoryReads: opts.reads,
+      memoryWrites: opts.writes,
+      taskId: opts.taskId,
       createdAt: new Date().toISOString(),
     };
-
-    await this.storage.createExecutionLog(logEntry).catch(err =>
+    await this.storage.createExecutionLog(entry).catch(err =>
       logger.error('Failed to write execution log', { jobId: job.id, error: String(err) }));
+  }
 
-    if (result === 'error') {
-      logger.error(`Scheduler job failed: ${job.id}`, { error: errorMessage, durationMs, trigger });
-    } else {
-      logger.info(`Scheduler job completed: ${job.id} (${durationMs}ms) [${trigger}]`, {
-        memoryReads: memoryReads.length,
-        memoryWrites: memoryWrites.length,
+  /** Disable a schedule (stop the cron, persist enabled:false) and notify the owner. */
+  private async autoDisable(job: ScheduledJobRecord, reason: string): Promise<void> {
+    this.removeJob(job.id);
+    job.enabled = false;
+    await this.storage.updateScheduledJob(job.id, { enabled: false, updatedAt: new Date().toISOString() }).catch(() => {});
+    emitChange('scheduler');
+    this.notifyOwner(job, 'Schedule auto-paused', reason);
+    logger.info(`Scheduler auto-disabled job ${job.id}: ${reason}`);
+  }
+
+  /** After a successful run, disable the schedule if a max_runs cap is now reached. */
+  private async maybeAutoDisableMaxRuns(job: ScheduledJobRecord, runCount: number): Promise<void> {
+    for (const c of job.constraints ?? []) {
+      if (!c.enabled || c.type !== 'max_runs') continue;
+      const limit = typeof c.params?.limit === 'number' ? c.params.limit : undefined;
+      if (limit !== undefined && limit > 0 && runCount >= limit) {
+        await this.autoDisable(job, `max_runs reached (${runCount}/${limit})`);
+        return;
+      }
+    }
+  }
+
+  /** Send an owner push notification (best-effort; no-op if push disabled). */
+  private notifyOwner(job: ScheduledJobRecord, title: string, body: string): void {
+    if (!this.pushService?.enabled || !job.ownerScope) return;
+    const ownerName = job.ownerScope.split('@')[0];
+    const label = job.displayName || job.name;
+    this.pushService.sendNotification(ownerName, {
+      title,
+      body: `${label}: ${body}`,
+      url: '/v1/profile?tab=scheduler',
+      tag: `schedule:${job.id}`,
+    }).catch(() => { /* push best-effort */ });
+  }
+
+  /**
+   * `ai` kind: gather predefined input memory keys, compose the prompt, run a
+   * server-side completion on the owner's OpenRouter key, and store the result
+   * to the owner's output key. Zero agent involvement; runs even when offline.
+   */
+  private async executeAiJob(job: ScheduledJobRecord): Promise<JobRunResult> {
+    const owner = job.ownerScope;
+    if (!owner) throw new Error(`AI job "${job.id}" missing ownerScope`);
+    const cfg = (job.input ?? {}) as {
+      inputKeys?: string[]; inputNamespaces?: string[]; prompt?: string;
+      systemPrompt?: string; model?: string; outputKey?: string;
+      outputVisibility?: 'private' | 'owner' | 'public';
+    };
+    if (!cfg.prompt || typeof cfg.prompt !== 'string') {
+      throw new Error(`AI job "${job.id}" missing prompt`);
+    }
+
+    const inputKeys = Array.isArray(cfg.inputKeys) ? cfg.inputKeys : [];
+    const reads: string[] = [];
+    const parts: string[] = [cfg.prompt];
+    for (let i = 0; i < inputKeys.length; i++) {
+      const key = inputKeys[i];
+      const ns = cfg.inputNamespaces?.[i] || owner;
+      const rec = await this.storage.getMemory(ns, key);
+      reads.push(ns === owner ? key : `${ns}::${key}`);
+      const valueText = rec == null
+        ? '(empty)'
+        : (typeof rec.value === 'string' ? rec.value : JSON.stringify(rec.value, null, 2));
+      parts.push(`\n--- INPUT: ${key} ---\n${valueText}`);
+    }
+    const composedPrompt = parts.join('\n');
+
+    const result = await completeForOwner(this.storage, this.config, owner, {
+      prompt: composedPrompt,
+      systemPrompt: cfg.systemPrompt,
+      model: cfg.model,
+      appId: `schedule:${job.id}`,
+    });
+
+    const outputKey = cfg.outputKey || `scheduler.${job.id}.output`;
+    const now = new Date().toISOString();
+    const existing = await this.storage.getMemory(owner, outputKey);
+    await this.storage.setMemory({
+      key: outputKey,
+      ownerGaii: owner,
+      value: result.content,
+      visibility: cfg.outputVisibility || 'private',
+      tags: ['scheduler', 'ai-output'],
+      ttlHours: null,
+      version: existing ? existing.version + 1 : 1,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    });
+
+    return { reads, writes: [outputKey] };
+  }
+
+  /**
+   * `agent_task` kind: materialise an AgentTaskRecord into the target agent's
+   * queue and wake it via the existing webhook/MCP/SSE fan-out. The schedule is
+   * the parent (parentTaskId); offline agents pick it up on reconnect.
+   */
+  private async executeAgentTaskJob(job: ScheduledJobRecord): Promise<JobRunResult> {
+    const owner = job.ownerScope;
+    const agentGaii = job.agentGaii;
+    const agentName = job.agentName;
+    if (!owner || !agentGaii || !agentName) {
+      throw new Error(`agent_task job "${job.id}" missing ownerScope/agentGaii/agentName`);
+    }
+    const cfg = (job.input ?? {}) as {
+      taskTemplate?: {
+        title?: string; description?: string; scope?: AgentTaskScope[]; rules?: string[];
+        verification?: { userExpects?: string; technicalChecks?: string[] };
+        resources?: { knowledgePackages?: string[]; memoryKeys?: string[]; memoryPrefixes?: string[] };
+      };
+    };
+    const tmpl = cfg.taskTemplate;
+    if (!tmpl?.title) throw new Error(`agent_task job "${job.id}" missing taskTemplate.title`);
+
+    // Overlap guard: skip if a prior occurrence of this schedule is still in flight.
+    const { tasks } = await this.storage.listAgentTasks(agentGaii, { perPage: 200 });
+    const inFlight = tasks.find(t => t.parentTaskId === job.id && !['done', 'failed'].includes(t.status));
+    if (inFlight) {
+      logger.info(`agent_task ${job.id}: occurrence ${inFlight.id} still ${inFlight.status}; skipping this fire`);
+      return { reads: [], writes: [] };
+    }
+
+    const agent = await this.storage.getAgent(agentGaii);
+    const autoActivated = agent?.mode === 'task-runner';
+    const now = new Date().toISOString();
+    const scheduleScope: AgentTaskScope = {
+      name: 'schedule', value: job.cron, type: 'cron', description: job.displayName || job.name,
+    };
+    const record: AgentTaskRecord = {
+      id: randomUUID(),
+      agentGaii,
+      ownerGaii: owner,
+      title: tmpl.title,
+      description: tmpl.description ?? '',
+      scope: [...(tmpl.scope ?? []), scheduleScope],
+      rules: tmpl.rules ?? [],
+      verification: {
+        userExpects: tmpl.verification?.userExpects ?? '',
+        technicalChecks: tmpl.verification?.technicalChecks ?? [],
+      },
+      resources: tmpl.resources,
+      todos: [],
+      status: autoActivated ? 'active' : 'queued',
+      parentTaskId: job.id,
+      createdAt: now,
+      updatedAt: now,
+      lastEventAt: autoActivated ? now : undefined,
+    };
+    const created = await this.storage.createAgentTask(record);
+
+    if (autoActivated) {
+      await this.storage.appendTaskEvent({
+        id: randomUUID(),
+        taskId: record.id,
+        type: 'started',
+        message: `Task auto-activated from schedule "${job.displayName || job.name}"`,
+        timestamp: now,
       });
     }
+
+    // Wake fan-out — same channels a normally-created task uses.
+    const eventName = autoActivated ? 'task.approved' : 'task.queued';
+    if (this.webhookDispatcher) {
+      this.webhookDispatcher.dispatchWebhookEvent(agentGaii, eventName, {
+        task_id: record.id,
+        title: record.title,
+        description: record.description ?? '',
+        has_todos: false,
+        todo_count: 0,
+        scope_summary: record.scope.slice(0, 5).map(s => `${s.type || s.name}:${s.value}`),
+        created_at: record.createdAt,
+        auto_activated: autoActivated,
+        schedule_id: job.id,
+      });
+    }
+    try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/tasks`); } catch { /* MCP not connected */ }
+    emitChange('agent-tasks');
+
+    return { reads: [], writes: [], taskId: created.id };
   }
 
   private async executeCoreJob(job: ScheduledJobRecord): Promise<void> {

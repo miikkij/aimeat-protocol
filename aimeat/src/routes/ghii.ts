@@ -249,9 +249,13 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
     };
 
     // POST /v1/ghii/login — Login with username + password from any device
-    // Regenerates keys, creates agent if missing, returns full session
+    // Mints a fresh owner keypair only when the client has none locally
+    // (request_owner_key) or the owner has no key yet; otherwise reuses the
+    // existing key so other devices keep their refresh capability.
     router.post('/v1/ghii/login', rateLimit({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs }), validateBody(GhiiLoginSchema, config.nodeId), async (req, res) => {
         const { username, password, totp_code, backup_code } = req.body ?? {};
+        // Only mint a fresh owner signing key when the client has none locally.
+        const wantsOwnerKey = req.body?.request_owner_key === true;
 
         if (!username || typeof username !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required'));
@@ -543,18 +547,33 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             }
         }
 
-        // Password (+ TOTP if enabled) verified — track login and regenerate owner keys
+        // Password (+ TOTP if enabled) verified — track login
         const loginNow = new Date().toISOString();
         await storage.updateGHII(ghiiRecord.ghii, {
             lastLoginAt: loginNow,
             loginCount: (ghiiRecord.loginCount ?? 0) + 1,
         });
 
-        const ownerKeyPair = await generateKeyPair();
-        await storage.updateOwner(loginName, { publicKey: ownerKeyPair.publicKey });
-
         // Issue OWNER JWT (human users authenticate as owners, not agents)
         const ownerRecord = await storage.getOwner(loginName);
+
+        // Owner signing-key handling — mint a fresh keypair ONLY when necessary.
+        // Rotating the key on every login (the previous behaviour) rewrote the
+        // stored public key, which silently invalidated the private key held by
+        // every OTHER device/tab in IndexedDB. Those sessions could then no longer
+        // sign a refresh and were force-logged-out at JWT expiry. The server only
+        // persists the public key (the private key lives solely in the browser),
+        // so we re-mint only when the owner has no key yet, or the client asks for
+        // one because it holds none locally (a brand-new device). Otherwise we keep
+        // the existing key and return no private key, leaving every already-signed-in
+        // device's refresh capability intact.
+        const needsNewOwnerKey = wantsOwnerKey || !ownerRecord?.publicKey;
+        let ownerKeyPair: { publicKey: string; privateKey: string } | null = null;
+        if (needsNewOwnerKey) {
+            ownerKeyPair = await generateKeyPair();
+            await storage.updateOwner(loginName, { publicKey: ownerKeyPair.publicKey });
+        }
+
         const roles: string[] = [];
         if (ownerRecord?.roles.includes('owner')) roles.push('owner');
         if (ownerRecord?.roles.includes('operator')) roles.push('operator');
@@ -588,8 +607,10 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             owner: { name: loginName },
             token,
             expires_at: new Date(Date.now() + config.jwtTtlSeconds * 1000).toISOString(),
-            owner_private_key: ownerKeyPair.privateKey,
-            owner_public_key: ownerKeyPair.publicKey,
+            // Only hand back the private key when a new one was minted — otherwise
+            // the client keeps the key it already holds in IndexedDB (see above).
+            ...(ownerKeyPair ? { owner_private_key: ownerKeyPair.privateKey } : {}),
+            owner_public_key: ownerKeyPair?.publicKey ?? ownerRecord?.publicKey ?? '',
         }, [
             { description: 'Store data in memory', method: 'POST', url: '/v1/memory' },
             { description: 'Upload an app', method: 'POST', url: '/v1/apps' },

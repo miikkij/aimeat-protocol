@@ -83,6 +83,7 @@ import { openrouterRouter } from '../routes/openrouter.js';
 import { aiRouter } from '../routes/ai.js';
 import { uploadRouter } from '../routes/upload.js';
 import { agentTasksRouter } from '../routes/agent-tasks.js';
+import { schedulesRouter } from '../routes/schedules.js';
 import { agentIntegrationRouter } from '../routes/agent-integration.js';
 import { agentDirectivesRouter } from '../routes/agent-directives.js';
 import { adminAgentTasksRouter } from '../routes/admin-agent-tasks.js';
@@ -228,6 +229,7 @@ export async function mountRoutes(
 
   // Agent tasks, directives, capabilities, and integration BEFORE agentsRouter to avoid /v1/agents/:name param conflicts
   app.use(agentTasksRouter(config, storage, webhookDispatcher));
+  app.use(schedulesRouter(config, storage, scheduler));
   app.use(agentDirectivesRouter(config, storage, webhookDispatcher));
   app.use(agentCapabilitiesRouter(config, storage));
   app.use(agentActivityRouter(config, storage));
@@ -435,6 +437,10 @@ export async function mountRoutes(
   // Seed core scheduled jobs (idempotent — only creates if not already present)
   seedCoreScheduledJobs(config, storage).catch(err =>
     logger.error('Failed to seed core scheduled jobs', { error: String(err) }));
+
+  // Wire dispatch + notification deps for ai/agent_task schedules before start.
+  scheduler.setWebhookDispatcher(webhookDispatcher);
+  scheduler.setPushService(pushService);
 
   // Start the scheduler (loads enabled jobs from storage)
   scheduler.start().catch(err => logger.error('Scheduler start failed', { error: String(err) }));

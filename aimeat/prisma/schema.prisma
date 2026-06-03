@@ -50,6 +50,7 @@ model Agent {
   platformVersion   String?
   mode              String?
   maxConcurrentTasks Int     @default(1)
+  scheduleConstraintDefaults Json?
   platformDetectedBy String?
   tags              String[]
   createdAt     DateTime @default(now())
@@ -832,8 +833,21 @@ model Session {
   expiresAt DateTime
   revoked   Boolean  @default(false)
 
+  // Owner refresh-token fields (null for legacy JWT-tracking sessions).
+  // See docs/plans/2026-06-03-owner-session-refresh-tokens-plan.md
+  refreshTokenHash  String?
+  prevTokenHash     String?
+  prevValidUntil    DateTime?
+  lastUsedAt        DateTime?
+  idleExpiresAt     DateTime?
+  absoluteExpiresAt DateTime?
+  deviceLabel       String?
+  userAgent         String?
+
   @@index([owner])
   @@index([expiresAt])
+  @@index([refreshTokenHash])
+  @@index([prevTokenHash])
 }
 
 model RevokedToken {
@@ -941,10 +955,22 @@ model ScheduledJob {
   createdBy        String
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
+  ownerScope       String?
+  agentName        String?
+  agentGaii        String?
+  createdByAgent   Boolean   @default(false)
+  displayName      String?
+  description      String?
+  purpose          String?
+  timezone         String?
+  constraints      Json?
+  runCount         Int       @default(0)
 
   @@index([type])
   @@index([extensionName])
   @@index([enabled])
+  @@index([ownerScope])
+  @@index([agentGaii])
 }
 
 model ExecutionLog {
@@ -960,6 +986,7 @@ model ExecutionLog {
   durationMs      Int      @default(0)
   memoryReads     Json     @default("[]")
   memoryWrites    Json     @default("[]")
+  taskId          String?
   createdAt       DateTime @default(now())
 
   @@index([jobId])

@@ -265,14 +265,16 @@ await test('POST /v1/ghii — register with password', async () => {
     assert(data.data.has_password === true, 'should indicate password is set');
 });
 
-await test('POST /v1/ghii/login — login with correct password', async () => {
+await test('POST /v1/ghii/login — login with correct password (new device requests key)', async () => {
+    // request_owner_key simulates a fresh device that holds no signing key locally,
+    // so the server mints one and returns the private key.
     const data = await api('/v1/ghii/login', {
         method: 'POST',
-        body: JSON.stringify({ username: pwUsername, password: pwPassword }),
+        body: JSON.stringify({ username: pwUsername, password: pwPassword, request_owner_key: true }),
     });
     assert(data.ok === true, `Login failed: ${data.error?.message}`);
     assert(typeof data.data.token === 'string', 'should return JWT');
-    assert(typeof data.data.owner_private_key === 'string', 'should return owner private key');
+    assert(typeof data.data.owner_private_key === 'string', 'should return owner private key when requested');
     assert(typeof data.data.owner_public_key === 'string', 'should return owner public key');
     assert(data.data.ghii.username === pwUsername, `username mismatch: ${data.data.ghii.username}`);
     pwOwnerJwt = data.data.token;
@@ -314,8 +316,11 @@ await test('POST /v1/ghii/login — no-password account rejected', async () => {
     assert(data.error?.code === 'NO_PASSWORD', `expected NO_PASSWORD, got: ${data.error?.code}`);
 });
 
-await test('POST /v1/ghii/login — re-login regenerates keys and still works', async () => {
-    // Login a second time — owner keys should be regenerated
+await test('POST /v1/ghii/login — re-login without request_owner_key reuses the existing key', async () => {
+    // A device that already holds its key logs in again. The server must NOT
+    // rotate the owner key (rotating it would invalidate the signing key held by
+    // every other device and break their silent refresh), so no private key is
+    // returned — but the public key and a working JWT are.
     const data = await api('/v1/ghii/login', {
         method: 'POST',
         body: JSON.stringify({ username: pwUsername, password: pwPassword }),
@@ -323,11 +328,28 @@ await test('POST /v1/ghii/login — re-login regenerates keys and still works', 
     assert(data.ok === true, `Second login failed: ${data.error?.message}`);
     const newJwt = data.data.token;
     assert(typeof newJwt === 'string' && newJwt.length > 0, 'should get a JWT');
-    assert(typeof data.data.owner_private_key === 'string', 'should return new owner private key');
+    assert(data.data.owner_private_key === undefined, 'must NOT return/rotate a private key when not requested');
+    assert(typeof data.data.owner_public_key === 'string', 'should still return the existing owner public key');
 
     // New owner JWT should work for authenticated ops
     const memData = await authApi('/v1/memory/pw-test', newJwt);
     assert(memData.ok === true, 'new JWT from re-login should work');
+    assert(memData.data.value.from === 'password login', 'data should match');
+});
+
+await test('POST /v1/ghii/login — request_owner_key mints a fresh owner key that works', async () => {
+    // A brand-new device (holds no key) explicitly requests one; the server mints
+    // and returns it, and the resulting JWT authenticates successfully.
+    const data = await api('/v1/ghii/login', {
+        method: 'POST',
+        body: JSON.stringify({ username: pwUsername, password: pwPassword, request_owner_key: true }),
+    });
+    assert(data.ok === true, `Key-minting login failed: ${data.error?.message}`);
+    assert(typeof data.data.owner_private_key === 'string', 'should return a freshly minted owner private key');
+    assert(typeof data.data.owner_public_key === 'string', 'should return owner public key');
+
+    const memData = await authApi('/v1/memory/pw-test', data.data.token);
+    assert(memData.ok === true, 'JWT from key-minting login should work');
     assert(memData.data.value.from === 'password login', 'data should match');
 });
 

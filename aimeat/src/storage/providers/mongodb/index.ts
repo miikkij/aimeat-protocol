@@ -275,6 +275,8 @@ export class MongoStorage implements Storage {
                 languages: agent.languages as any ?? null,
                 mode: agent.mode ?? 'interactive',
                 maxConcurrentTasks: agent.maxConcurrentTasks ?? 1,
+                dailySpendLimit: agent.dailySpendLimit ?? null,
+                scheduleConstraintDefaults: agent.scheduleConstraintDefaults as any ?? null,
                 webhookUrl: agent.webhookUrl ?? null,
                 webhookSecret: agent.webhookSecret ?? null,
                 webhookEnabled: agent.webhookEnabled ?? false,
@@ -1511,7 +1513,7 @@ export class MongoStorage implements Storage {
     }
 
     private toAgentRecord(row: any): AgentRecord {
-        return { name: row.name, owner: row.owner, gaii: row.gaii, displayName: row.displayName ?? undefined, description: row.description ?? undefined, capabilities: row.capabilities, publicKey: row.publicKey, trustScore: row.trustScore, morselBalance: row.morselBalance, defaultScopes: row.defaultScopes?.length ? row.defaultScopes : undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined, federate: row.federate ?? false, technicalCapabilities: row.technicalCapabilities ?? undefined, domainCapabilities: row.domainCapabilities ?? undefined, languages: row.languages ?? undefined, activityStats: row.activityStats ?? undefined, modulesLoaded: row.modulesLoaded ?? undefined, agentLimitations: row.agentLimitations ?? undefined, webhookUrl: row.webhookUrl ?? undefined, webhookSecret: row.webhookSecret ?? undefined, webhookEnabled: row.webhookEnabled ?? false, webhookLastSuccess: row.webhookLastSuccess ? row.webhookLastSuccess.toISOString() : undefined, webhookLastFailure: row.webhookLastFailure ? row.webhookLastFailure.toISOString() : undefined, webhookFailCount: row.webhookFailCount ?? 0, platform: row.platform ?? undefined, platformVersion: row.platformVersion ?? undefined, platformDetectedBy: row.platformDetectedBy ?? undefined, tags: row.tags?.length ? row.tags : undefined, mode: (row.mode ?? 'interactive') as AgentRecord['mode'], maxConcurrentTasks: row.maxConcurrentTasks ?? 1, createdAt: row.createdAt.toISOString(), lastSeen: row.lastSeen.toISOString() };
+        return { name: row.name, owner: row.owner, gaii: row.gaii, displayName: row.displayName ?? undefined, description: row.description ?? undefined, capabilities: row.capabilities, publicKey: row.publicKey, trustScore: row.trustScore, morselBalance: row.morselBalance, defaultScopes: row.defaultScopes?.length ? row.defaultScopes : undefined, allowedOrigins: row.allowedOrigins?.length ? row.allowedOrigins : undefined, federate: row.federate ?? false, technicalCapabilities: row.technicalCapabilities ?? undefined, domainCapabilities: row.domainCapabilities ?? undefined, languages: row.languages ?? undefined, activityStats: row.activityStats ?? undefined, modulesLoaded: row.modulesLoaded ?? undefined, agentLimitations: row.agentLimitations ?? undefined, webhookUrl: row.webhookUrl ?? undefined, webhookSecret: row.webhookSecret ?? undefined, webhookEnabled: row.webhookEnabled ?? false, webhookLastSuccess: row.webhookLastSuccess ? row.webhookLastSuccess.toISOString() : undefined, webhookLastFailure: row.webhookLastFailure ? row.webhookLastFailure.toISOString() : undefined, webhookFailCount: row.webhookFailCount ?? 0, platform: row.platform ?? undefined, platformVersion: row.platformVersion ?? undefined, platformDetectedBy: row.platformDetectedBy ?? undefined, tags: row.tags?.length ? row.tags : undefined, mode: (row.mode ?? 'interactive') as AgentRecord['mode'], maxConcurrentTasks: row.maxConcurrentTasks ?? 1, dailySpendLimit: row.dailySpendLimit ?? undefined, scheduleConstraintDefaults: row.scheduleConstraintDefaults ?? undefined, createdAt: row.createdAt.toISOString(), lastSeen: row.lastSeen.toISOString() };
     }
 
     private toMemoryRecord(row: any): MemoryRecord {
@@ -3330,6 +3332,34 @@ export class MongoStorage implements Storage {
 
     // ── Sessions (P3-7: Server-Side Session Tracking) ──────────
 
+    private mapPrismaSession(s: {
+        sessionId: string; gaii: string; owner: string;
+        issuedAt: Date | string; expiresAt: Date | string; revoked: boolean;
+        refreshTokenHash?: string | null; prevTokenHash?: string | null;
+        prevValidUntil?: Date | string | null; lastUsedAt?: Date | string | null;
+        idleExpiresAt?: Date | string | null; absoluteExpiresAt?: Date | string | null;
+        deviceLabel?: string | null; userAgent?: string | null;
+    }): import('../../../storage/repositories/session.repository.js').SessionRecord {
+        const iso = (d: Date | string | null | undefined): string | null =>
+            d == null ? null : (d instanceof Date ? d.toISOString() : String(d));
+        return {
+            sessionId: s.sessionId,
+            gaii: s.gaii,
+            owner: s.owner,
+            issuedAt: iso(s.issuedAt) as string,
+            expiresAt: iso(s.expiresAt) as string,
+            revoked: s.revoked,
+            refreshTokenHash: s.refreshTokenHash ?? null,
+            prevTokenHash: s.prevTokenHash ?? null,
+            prevValidUntil: iso(s.prevValidUntil),
+            lastUsedAt: iso(s.lastUsedAt),
+            idleExpiresAt: iso(s.idleExpiresAt),
+            absoluteExpiresAt: iso(s.absoluteExpiresAt),
+            deviceLabel: s.deviceLabel ?? null,
+            userAgent: s.userAgent ?? null,
+        };
+    }
+
     async createSession(session: { sessionId: string; gaii: string; owner: string; issuedAt: string; expiresAt: string }): Promise<void> {
         this.ensureReady();
         await this.prisma.session.create({
@@ -3344,20 +3374,64 @@ export class MongoStorage implements Storage {
         });
     }
 
+    async createOwnerSession(session: {
+        sessionId: string; gaii: string; owner: string; issuedAt: string;
+        refreshTokenHash: string; idleExpiresAt: string; absoluteExpiresAt: string;
+        lastUsedAt: string; deviceLabel?: string | null; userAgent?: string | null;
+    }): Promise<void> {
+        this.ensureReady();
+        await this.prisma.session.create({
+            data: {
+                sessionId: session.sessionId,
+                gaii: session.gaii,
+                owner: session.owner,
+                issuedAt: new Date(session.issuedAt),
+                // expiresAt mirrors the idle window so listActiveSessions reflects refresh-token life.
+                expiresAt: new Date(session.idleExpiresAt),
+                revoked: false,
+                refreshTokenHash: session.refreshTokenHash,
+                idleExpiresAt: new Date(session.idleExpiresAt),
+                absoluteExpiresAt: new Date(session.absoluteExpiresAt),
+                lastUsedAt: new Date(session.lastUsedAt),
+                deviceLabel: session.deviceLabel ?? null,
+                userAgent: session.userAgent ?? null,
+            },
+        });
+    }
+
     async listActiveSessions(owner: string): Promise<import('../../../storage/repositories/session.repository.js').SessionRecord[]> {
         this.ensureReady();
         const sessions = await this.prisma.session.findMany({
             where: { owner, revoked: false },
             orderBy: { issuedAt: 'desc' },
         });
-        return sessions.map((s: { sessionId: string; gaii: string; owner: string; issuedAt: Date | string; expiresAt: Date | string; revoked: boolean }) => ({
-            sessionId: s.sessionId,
-            gaii: s.gaii,
-            owner: s.owner,
-            issuedAt: s.issuedAt instanceof Date ? s.issuedAt.toISOString() : String(s.issuedAt),
-            expiresAt: s.expiresAt instanceof Date ? s.expiresAt.toISOString() : String(s.expiresAt),
-            revoked: s.revoked,
-        }));
+        return sessions.map((s: import('@prisma/client').Session) => this.mapPrismaSession(s));
+    }
+
+    async getSessionByRefreshHash(tokenHash: string): Promise<import('../../../storage/repositories/session.repository.js').SessionRecord | null> {
+        this.ensureReady();
+        const s = await this.prisma.session.findFirst({
+            where: { OR: [{ refreshTokenHash: tokenHash }, { prevTokenHash: tokenHash }] },
+        });
+        return s ? this.mapPrismaSession(s) : null;
+    }
+
+    async rotateSessionRefresh(sessionId: string, update: {
+        refreshTokenHash: string; prevTokenHash: string | null; prevValidUntil: string | null;
+        idleExpiresAt: string; expiresAt: string; lastUsedAt: string;
+    }): Promise<void> {
+        this.ensureReady();
+        await this.prisma.session.update({
+            where: { sessionId },
+            data: {
+                refreshTokenHash: update.refreshTokenHash,
+                prevTokenHash: update.prevTokenHash,
+                prevValidUntil: update.prevValidUntil ? new Date(update.prevValidUntil) : null,
+                idleExpiresAt: new Date(update.idleExpiresAt),
+                expiresAt: new Date(update.expiresAt),
+                lastUsedAt: new Date(update.lastUsedAt),
+            },
+        });
     }
 
     async revokeSession(sessionId: string): Promise<boolean> {
@@ -3382,6 +3456,17 @@ export class MongoStorage implements Storage {
         const session = await this.prisma.session.findUnique({ where: { sessionId } });
         if (!session) return false;
         return session.revoked;
+    }
+
+    async pruneExpiredSessions(nowIso: string): Promise<number> {
+        this.ensureReady();
+        const now = new Date(nowIso);
+        // Remove fully-dead rows; keep revoked-but-unexpired rows so isSessionRevoked
+        // still rejects their short-lived access tokens.
+        const result = await this.prisma.session.deleteMany({
+            where: { OR: [{ expiresAt: { lt: now } }, { absoluteExpiresAt: { lt: now } }] },
+        });
+        return result.count;
     }
 
     // ── Token Revocation ──────────────────────────────────────
@@ -3822,7 +3907,7 @@ export class MongoStorage implements Storage {
         return {
             id: row.id,
             name: row.name,
-            type: row.type as 'extension' | 'core',
+            type: row.type as ScheduledJobRecord['type'],
             extensionName: row.extensionName ?? undefined,
             instanceId: row.instanceId ?? undefined,
             actionId: row.actionId ?? undefined,
@@ -3831,13 +3916,23 @@ export class MongoStorage implements Storage {
             enabled: row.enabled,
             input: row.input as Record<string, unknown> | undefined,
             lastRunAt: row.lastRunAt instanceof Date ? row.lastRunAt.toISOString() : row.lastRunAt ?? undefined,
-            lastRunResult: row.lastRunResult as 'success' | 'error' | undefined,
+            lastRunResult: row.lastRunResult as ScheduledJobRecord['lastRunResult'],
             lastRunError: row.lastRunError ?? undefined,
             lastRunDurationMs: row.lastRunDurationMs ?? undefined,
             nextRunAt: row.nextRunAt instanceof Date ? row.nextRunAt.toISOString() : row.nextRunAt ?? undefined,
             createdBy: row.createdBy,
             createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
             updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+            ownerScope: row.ownerScope ?? undefined,
+            agentName: row.agentName ?? undefined,
+            agentGaii: row.agentGaii ?? undefined,
+            createdByAgent: row.createdByAgent ?? undefined,
+            displayName: row.displayName ?? undefined,
+            description: row.description ?? undefined,
+            purpose: row.purpose ?? undefined,
+            timezone: row.timezone ?? undefined,
+            constraints: (row.constraints as ScheduledJobRecord['constraints']) ?? undefined,
+            runCount: row.runCount ?? undefined,
         };
     }
 
@@ -3863,6 +3958,16 @@ export class MongoStorage implements Storage {
                 createdBy: record.createdBy,
                 createdAt: new Date(record.createdAt),
                 updatedAt: new Date(record.updatedAt),
+                ownerScope: record.ownerScope,
+                agentName: record.agentName,
+                agentGaii: record.agentGaii,
+                createdByAgent: record.createdByAgent ?? false,
+                displayName: record.displayName,
+                description: record.description,
+                purpose: record.purpose,
+                timezone: record.timezone,
+                constraints: record.constraints as any,
+                runCount: record.runCount ?? 0,
             },
         });
         return record;
@@ -3874,12 +3979,14 @@ export class MongoStorage implements Storage {
         return row ? this.toScheduledJobRecord(row) : null;
     }
 
-    async listScheduledJobs(filter?: { type?: string; extensionName?: string; enabled?: boolean }): Promise<ScheduledJobRecord[]> {
+    async listScheduledJobs(filter?: { type?: string; extensionName?: string; enabled?: boolean; ownerScope?: string; agentGaii?: string }): Promise<ScheduledJobRecord[]> {
         this.ensureReady();
         const where: any = {};
         if (filter?.type !== undefined) where.type = filter.type;
         if (filter?.extensionName !== undefined) where.extensionName = filter.extensionName;
         if (filter?.enabled !== undefined) where.enabled = filter.enabled;
+        if (filter?.ownerScope !== undefined) where.ownerScope = filter.ownerScope;
+        if (filter?.agentGaii !== undefined) where.agentGaii = filter.agentGaii;
         const rows = await this.prisma.scheduledJob.findMany({ where });
         return rows.map((r: any) => this.toScheduledJobRecord(r));
     }
@@ -3903,6 +4010,16 @@ export class MongoStorage implements Storage {
         if (updates.lastRunError !== undefined) data.lastRunError = updates.lastRunError;
         if (updates.lastRunDurationMs !== undefined) data.lastRunDurationMs = updates.lastRunDurationMs;
         if (updates.nextRunAt !== undefined) data.nextRunAt = updates.nextRunAt ? new Date(updates.nextRunAt) : null;
+        if (updates.ownerScope !== undefined) data.ownerScope = updates.ownerScope;
+        if (updates.agentName !== undefined) data.agentName = updates.agentName;
+        if (updates.agentGaii !== undefined) data.agentGaii = updates.agentGaii;
+        if (updates.createdByAgent !== undefined) data.createdByAgent = updates.createdByAgent;
+        if (updates.displayName !== undefined) data.displayName = updates.displayName;
+        if (updates.description !== undefined) data.description = updates.description;
+        if (updates.purpose !== undefined) data.purpose = updates.purpose;
+        if (updates.timezone !== undefined) data.timezone = updates.timezone;
+        if (updates.constraints !== undefined) data.constraints = updates.constraints as any;
+        if (updates.runCount !== undefined) data.runCount = updates.runCount;
         const row = await this.prisma.scheduledJob.update({ where: { id }, data });
         return this.toScheduledJobRecord(row);
     }
@@ -3933,6 +4050,7 @@ export class MongoStorage implements Storage {
                 durationMs: entry.durationMs,
                 memoryReads: entry.memoryReads as any,
                 memoryWrites: entry.memoryWrites as any,
+                taskId: entry.taskId,
                 createdAt: new Date(entry.createdAt),
             },
         });
@@ -3983,7 +4101,7 @@ export class MongoStorage implements Storage {
             id: row.id,
             jobId: row.jobId,
             jobName: row.jobName,
-            type: row.type as 'extension' | 'core',
+            type: row.type as ExecutionLogEntry['type'],
             extensionName: row.extensionName ?? undefined,
             actionId: row.actionId ?? undefined,
             trigger: row.trigger as 'cron' | 'manual' | 'activate',
@@ -3992,6 +4110,7 @@ export class MongoStorage implements Storage {
             durationMs: row.durationMs,
             memoryReads: Array.isArray(row.memoryReads) ? row.memoryReads : JSON.parse(row.memoryReads || '[]'),
             memoryWrites: Array.isArray(row.memoryWrites) ? row.memoryWrites : JSON.parse(row.memoryWrites || '[]'),
+            taskId: row.taskId ?? undefined,
             createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
         };
     }
