@@ -1953,6 +1953,11 @@ language buttons yourself; the library provides the real, live versions.
 - Content inside \`{{memory:*}}\` tags can contain HTML (operator-trusted)
 - \`{{config:*}}\` and \`{{kv:*}}\` values are HTML-escaped automatically
 - Place \`{{memory:*}}\` tags outside \`<script>\` blocks (tags inside scripts are blocked)
+- The node's Content-Security-Policy allows \`<script>\` blocks (they are nonce-stamped
+  automatically) but BLOCKS inline event handlers and \`javascript:\` URLs. Do NOT write
+  \`onclick="..."\`, \`onload="..."\`, etc. — give the element an \`id\` and wire it inside a
+  \`<script>\` block with \`addEventListener\`. Example:
+  \`<button id="copy">Copy</button>\` + \`<script>document.getElementById('copy').addEventListener('click', doCopy);</script>\`
 - Keep templates under 512 KB
 
 ## API Endpoints
