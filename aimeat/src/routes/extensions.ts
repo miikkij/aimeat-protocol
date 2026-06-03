@@ -46,17 +46,44 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
     }
   });
 
+  // Local helper: does this caller have permission to write extensions?
+  // Operator role bypasses everything. Owner role respects the configured
+  // extInstallRole gate. Agents pass if they carry the ext:write scope
+  // (granted by the owner via the profile agent settings).
+  function hasExtWritePermission(req: import('express').Request): boolean {
+    const auth = req.auth;
+    if (!auth) return false;
+    const roles = auth.roles || [];
+    if (roles.includes('operator')) return true;
+    const allowOwner = config.extInstallRole === 'owner';
+    if (allowOwner && roles.includes('owner') && !roles.includes('agent')) return true;
+    const scopes = (auth as { scopes?: string[] }).scopes || [];
+    return scopes.includes('*') || scopes.includes('ext:*') || scopes.includes('ext:write');
+  }
+
+  // Local helper: can this caller manage an already-installed extension whose
+  // installedBy field is the given owner name? Operators bypass; otherwise the
+  // caller's owner field must match installedBy (so they can't touch another
+  // owner's extensions) AND they must have write permission (owner role or
+  // ext:write scope).
+  function canManageInstalledExt(req: import('express').Request, installedBy: string): boolean {
+    const auth = req.auth;
+    if (!auth) return false;
+    if ((auth.roles || []).includes('operator')) return true;
+    if (auth.owner !== installedBy) return false;
+    return hasExtWritePermission(req);
+  }
+
   // ── POST /v1/extensions — Install extension from YAML manifest + JS scripts ──
   router.post('/v1/extensions', requireAuth(), validateBody(ExtensionInstallSchema, config.nodeId), async (req, res) => {
     try {
       const roles = req.auth!.roles;
-      const allowOwner = config.extInstallRole === 'owner';
       const isOperator = roles.includes('operator');
       const isOwner = roles.includes('owner');
 
-      if (!isOperator && !(allowOwner && isOwner)) {
+      if (!hasExtWritePermission(req)) {
         res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE',
-          `Extension install requires ${config.extInstallRole} role`));
+          `Extension install requires ${config.extInstallRole} role or ext:write scope`));
         return;
       }
 
@@ -144,8 +171,10 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         return;
       }
 
-      // Owner-level limit check
-      if (!isOperator && isOwner) {
+      // Owner-level limit check — counts installs by the OWNER (or any of
+      // their agents installing on the owner's behalf with ext:write).
+      // Operators bypass.
+      if (!isOperator) {
         const ownerExts = existing.filter(e => e.installedBy === req.auth!.owner);
         if (ownerExts.length >= config.maxExtensionsPerOwner) {
           res.status(429).json(error(config.nodeId, 'EXTENSION_LIMIT',
@@ -153,6 +182,8 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
           return;
         }
       }
+      // Silence unused-var warning for legacy isOwner reference.
+      void isOwner;
 
       // Reject if extension name already exists
       const name = metadata.name as string;
@@ -259,11 +290,19 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         return;
       }
 
-      // ?full=true includes scriptContent -- requires authenticated owner/operator
+      // ?full=true includes scriptContent. Allowed for operator, owner, or
+      // an agent of the installing owner that carries ext:write — so agents
+      // can introspect what they installed without leaking scripts publicly.
       const wantFull = req.query.full === 'true';
-      if (wantFull && (!req.auth || req.auth.anonymous || (!req.auth.roles.includes('owner') && !req.auth.roles.includes('operator')))) {
-        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Script content requires authentication'));
-        return;
+      if (wantFull) {
+        if (!req.auth || req.auth.anonymous) {
+          res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Script content requires authentication'));
+          return;
+        }
+        if (!canManageInstalledExt(req, ext.installedBy)) {
+          res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Script content requires owner/operator or ext:write scope'));
+          return;
+        }
       }
       const includeScripts = wantFull;
 
@@ -332,13 +371,11 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         return;
       }
 
-      // Allow operator always, owner only if they installed it
-      const roles = req.auth!.roles;
-      if (!roles.includes('operator')) {
-        if (config.extInstallRole !== 'owner' || !roles.includes('owner') || ext.installedBy !== req.auth!.owner) {
-          res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
-          return;
-        }
+      // Allow operator always; the original owner (or one of their agents
+      // carrying ext:write) only on their own installed extensions.
+      if (!canManageInstalledExt(req, ext.installedBy)) {
+        res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
+        return;
       }
       const actionIdx = ext.actions.findIndex(a => a.id === actionId);
       if (actionIdx === -1) {
@@ -392,13 +429,11 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         return;
       }
 
-      // Allow operator always, owner only if they installed it
-      const roles = req.auth!.roles;
-      if (!roles.includes('operator')) {
-        if (config.extInstallRole !== 'owner' || !roles.includes('owner') || ext.installedBy !== req.auth!.owner) {
-          res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
-          return;
-        }
+      // Allow operator always; the original owner (or one of their agents
+      // carrying ext:write) only on their own installed extensions.
+      if (!canManageInstalledExt(req, ext.installedBy)) {
+        res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
+        return;
       }
 
       // Clean scheduled jobs before deletion (same as deactivate)
@@ -560,13 +595,11 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         return;
       }
 
-      // Allow operator always, owner only if they installed it
-      const roles = req.auth!.roles;
-      if (!roles.includes('operator')) {
-        if (ext.installedBy !== req.auth!.owner) {
-          res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
-          return;
-        }
+      // Allow operator always; the original owner (or one of their agents
+      // carrying ext:write) only on their own installed extensions.
+      if (!canManageInstalledExt(req, ext.installedBy)) {
+        res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
+        return;
       }
 
       if (ext.status !== 'active') {
@@ -691,13 +724,11 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         return;
       }
 
-      // Allow operator always, owner only if they installed it
-      const roles = req.auth!.roles;
-      if (!roles.includes('operator')) {
-        if (ext.installedBy !== req.auth!.owner) {
-          res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
-          return;
-        }
+      // Allow operator always; the original owner (or one of their agents
+      // carrying ext:write) only on their own installed extensions.
+      if (!canManageInstalledExt(req, ext.installedBy)) {
+        res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
+        return;
       }
 
       const instance = await storage.getExtensionInstance(name, instanceId);
@@ -759,13 +790,11 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         return;
       }
 
-      // Allow operator always, owner only if they installed it
-      const roles = req.auth!.roles;
-      if (!roles.includes('operator')) {
-        if (ext.installedBy !== req.auth!.owner) {
-          res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
-          return;
-        }
+      // Allow operator always; the original owner (or one of their agents
+      // carrying ext:write) only on their own installed extensions.
+      if (!canManageInstalledExt(req, ext.installedBy)) {
+        res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
+        return;
       }
 
       const instance = await storage.getExtensionInstance(name, instanceId);

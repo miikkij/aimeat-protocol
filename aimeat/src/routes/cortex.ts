@@ -326,6 +326,10 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
       return;
     }
+    // Operator can touch any. Otherwise: the cortex's installedBy must match
+    // the caller's owner name (so cross-owner cortexes are protected) — both
+    // the owner and any of their agents with cortex:write satisfy this
+    // because `req.auth!.owner` is the owner's bare name for both.
     if (ext.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
       return;
