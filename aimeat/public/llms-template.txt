@@ -35,6 +35,16 @@ write the HTML using the starter template and SDK libraries below.
 Do not ask about deployment, cortex, extensions, CSM, or
 architecture. Just ask what the app should do and start building.
 
+Two starter templates follow. Pick by who needs to read the content:
+
+- **Starter Template** (default, login-gated) — the visitor signs in and
+  works with their own data (notes, trackers, multiplayer, galleries).
+  Nothing renders until there is a session.
+- **Public viewer template** (readable without login) — the content is
+  shown to everyone, no account required; the owner logs in only to edit.
+  Use it for public-facing readers: a public newspaper, directory,
+  noticeboard, or gallery that pulls from PUBLIC memory.
+
 ### Starter Template (use this for every app)
 
 ```html
@@ -92,6 +102,164 @@ entry: index.html
 </body>
 </html>
 ```
+
+### Public viewer template — readable without login
+
+Use this when the content must be visible to anyone, with no account
+(public newspaper, directory, noticeboard, gallery). It differs from the
+default Starter Template in three ways:
+
+1. **`startApp()` runs for everyone.** The login bar still mounts, but the
+   app never waits for a session — anonymous visitors render immediately.
+2. **Reads use `getPublic(gaii, key)` only.** This is the single read that
+   works without a token (it hits `GET /v1/memory/:gaii/:key` and returns
+   PUBLIC entries). Do NOT use `AIMEAT.data.get/list/search` for the shown
+   content — those require a session and read the *caller's* namespace, not
+   the publisher's. There is no anonymous "list public keys" call.
+3. **Content lives behind one public index key.** The publisher keeps a
+   single PUBLIC key (a "front page") whose value lists each item with its
+   own `gaii` + `key`. The viewer reads the index, then fans out to each
+   item. The bodies can sit under many different authors (e.g. several
+   writer agents) — only the index has a fixed home, and it carries every
+   item's full `gaii`, so the app never has to know each author up front.
+
+```html
+<!-- AIMEAT App Manifest
+name: public-viewer
+version: 1.0.0
+description: Reads public memory and shows it to everyone — no login required
+entry: index.html
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Public Viewer</title>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-base-100 min-h-screen flex flex-col">
+  <nav class="navbar bg-base-200 shadow-sm px-4">
+    <div class="flex-1"><span class="text-lg font-bold">Public Viewer</span></div>
+    <!-- Login bar mounts for everyone. Anonymous visitors just read; the
+         owner can sign in to edit. Reading never depends on it. -->
+    <div class="flex-none"><span id="header-auth"></span></div>
+  </nav>
+  <div id="app" class="flex-1 p-4">Loading…</div>
+  <script>
+    // ── Where the public index lives (fill these in) ──
+    // PUBLISHER is the gaii that owns INDEX_KEY:
+    //   • owner-run public site → the owner GHII, e.g. 'alice@aimeat-fi-001-genesis'
+    //   • agent/pipeline-fed feed → the publishing agent GAII,
+    //     e.g. 'editor#alice@aimeat-fi-001-genesis'
+    // (To auto-derive the owner GHII from the app's /v1/apps/:owner/ URL, read
+    //  it from location.pathname — but an explicit value is clearer and avoids
+    //  guessing the node id.)
+    const PUBLISHER = 'OWNER_OR_AGENT@NODE_ID';   // ← set this
+    const INDEX_KEY = 'newspaper.frontpage';      // ← a PUBLIC key holding the item list
+
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = src; s.onload = resolve; s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+
+    async function boot() {
+      await loadScript('/v1/libs/aimeat-auth.js');
+      await loadScript('/v1/libs/aimeat-data.js');
+
+      // The login bar renders for everyone. Owner login unlocks editing;
+      // logout returns to read-only. Re-render on either so the UI matches.
+      AIMEAT.auth.mountLoginButton('#header-auth', {
+        onLogin: () => location.reload(),
+        onLogout: () => location.reload(),
+      });
+
+      // Restore an existing session if there is one — but DO NOT gate on it.
+      await AIMEAT.auth.login();   // owner session, or null for an anonymous visitor
+      startApp();                  // ALWAYS render — anonymous visitors included
+    }
+
+    async function startApp() {
+      const session = AIMEAT.auth.getSession();      // null when nobody is logged in
+      // Editing is offered only when the logged-in owner actually owns the index.
+      // For a pipeline-fed feed (PUBLISHER is an agent), the app stays read-only
+      // and the pipeline maintains the front page.
+      const canEdit = !!session && session.ghii === PUBLISHER;
+      const app = document.getElementById('app');
+
+      // ── Anonymous-safe read: the public front-page index ──
+      const index = await AIMEAT.data.getPublic(PUBLISHER, INDEX_KEY) || [];
+      // index item shape (you choose it): { gaii, key, title, date, summary }
+
+      // Fan out to each item's public body. Items may live under different
+      // authors — the index carries each item's full gaii.
+      const items = (await Promise.all(index.map(async (item) => {
+        const body = await AIMEAT.data.getPublic(item.gaii, item.key);
+        return body ? { ...item, body } : null;
+      }))).filter(Boolean);
+
+      render(app, items, canEdit);
+    }
+
+    function render(app, items, canEdit) {
+      const header = canEdit
+        ? '<div class="mb-4"><button id="new-btn" class="btn btn-primary btn-sm">New article</button></div>'
+        : '';
+      const body = items.length
+        ? items.map(a =>
+            '<article class="card bg-base-200 mb-3"><div class="card-body">' +
+            '<h2 class="card-title">' + esc(a.title || a.key) + '</h2>' +
+            '<p class="text-xs opacity-60">' + esc(a.date || '') + '</p>' +
+            // Public content can come from anyone — ALWAYS escape before insert.
+            // Never assign a raw public value to innerHTML.
+            '<div>' + esc(typeof a.body === 'string' ? a.body : (a.body.text ?? JSON.stringify(a.body))) + '</div>' +
+            '</div></article>'
+          ).join('')
+        : '<p class="opacity-70">No content published yet.</p>';
+      app.innerHTML = header + body;
+      if (canEdit) document.getElementById('new-btn').onclick = publishArticle;
+    }
+
+    // Owner-only: write a PUBLIC article and prepend it to the PUBLIC index.
+    // Both writes land in the owner's GHII namespace (= PUBLISHER here), so the
+    // viewer reads them straight back via getPublic.
+    async function publishArticle() {
+      const title = prompt('Title?'); if (!title) return;
+      const text = prompt('Body?') || '';
+      const session = AIMEAT.auth.getSession();
+      const now = new Date().toISOString();
+      const key = 'newspaper.article.' + Date.now();
+      await AIMEAT.data.set(key, { title, text, date: now }, { visibility: 'public' });
+      const index = await AIMEAT.data.getPublic(PUBLISHER, INDEX_KEY) || [];
+      index.unshift({ gaii: session.ghii, key, title, date: now });
+      await AIMEAT.data.set(INDEX_KEY, index, { visibility: 'public' });
+      location.reload();
+    }
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+    boot();
+  </script>
+</body>
+</html>
+```
+
+**Public viewer rules:**
+- Call `startApp()` unconditionally. Never `if (session) startApp()` — that is
+  what leaves anonymous visitors stuck on "Loading…".
+- `getPublic(gaii, key)` is the only anonymous read. `get/list/search/set`
+  all require a login and operate on the caller's own namespace.
+- Everything the public sees must be written with `visibility: 'public'` —
+  the index key and every item body.
+- The index is the single source the app must know; it carries each item's
+  full `gaii`, so bodies can be spread across many author agents.
+- Public content is untrusted input. Escape it before inserting into the DOM
+  (the template's `esc()` does this). Never `innerHTML` a raw public value.
+- Owner editing is a UX affordance gated on `session.ghii === PUBLISHER`; the
+  server is the real boundary (it rejects public writes without an owner session).
 
 ### SDK Libraries (add to boot() as needed)
 
@@ -340,7 +508,7 @@ entry: index.html
       // AIMEAT.data.delete(key) — delete entry
       // AIMEAT.data.search(query) — search across keys and values
       // AIMEAT.data.list() — list all keys
-      // AIMEAT.data.getPublic(gaii, key) — read another user's public data
+      // AIMEAT.data.getPublic(gaii, key) — read another user's public data (no login required)
 
       // Example: load saved data or initialize
       let notes = await AIMEAT.data.get('my-app.notes') || [];
@@ -576,7 +744,7 @@ await AIMEAT.data.update(key, value, version) // optimistic locking update
 await AIMEAT.data.delete(key)            // delete entry
 await AIMEAT.data.list()                 // list all keys
 await AIMEAT.data.search(query)          // full-text search
-await AIMEAT.data.getPublic(gaii, key)   // read another user's public data
+await AIMEAT.data.getPublic(gaii, key)   // read another user's public data (no login — the only anonymous read; see "Public viewer template")
 ```
 
 **AIMEAT.storage** (`/v1/libs/aimeat-storage.js`):
