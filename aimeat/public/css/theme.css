@@ -468,7 +468,10 @@ a { color: inherit; text-decoration: none; }
 /* Truncate a long GHII in the gold pill so it never blows out the bar (desktop). */
 .aimeat-auth-ghii { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-@media (max-width: 900px) {
+/* Collapse the header to a hamburger well before the full inline nav (links +
+   theme/lang + gold pill, wider still for operators with the Admin link) runs
+   out of room — otherwise the pill overflows in the ~900–1180px band. */
+@media (max-width: 1180px) {
   .topnav { padding: 0 0.5rem; }
   .topnav-right { gap: 0.5rem; }
   /* Free up bar width so the gold pill never overflows — the morsel count is
