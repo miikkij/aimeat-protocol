@@ -10,6 +10,7 @@
  * @usage Registered in profile.js TABS as { id:'scheduler', component: SchedulerTab }.
  * @version-history
  *   v1.0.0 -- 2026-06-03 -- Initial master scheduler view
+ *   v1.0.1 -- 2026-06-03 -- Extension cron "Next run" uses formatUntil (was timeAgo → negative "ago")
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -18,7 +19,7 @@ import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { listAgents } from '/js/services/agents.js';
 import { listAllSchedules, createSchedule } from '/js/services/schedules.js';
-import ScheduleItem from './schedule-item.js';
+import ScheduleItem, { formatUntil } from './schedule-item.js';
 
 const html = htm.bind(h);
 
@@ -119,7 +120,7 @@ export default function SchedulerTab({ showToast }) {
             <td><code class="sch-cron">${j.extensionName}${j.actionId ? '/' + j.actionId : ''}</code></td>
             <td><code class="sch-cron">${j.cron}</code></td>
             <td>${j.lastRunAt ? timeAgo(j.lastRunAt) : '—'} ${resultBadge(j.lastRunResult)}</td>
-            <td>${j.nextRunAt ? timeAgo(j.nextRunAt) : '—'}</td>
+            <td>${formatUntil(j.nextRunAt)}</td>
           </tr>`)}
         </tbody></table>
       </div>`}
