@@ -81,6 +81,37 @@ aimeat_schedule_create({
 })
 ```
 
+### Cross-agent REST:llä (headless / deterministiset agentit)
+
+**Ei tarvita kohdeagentin tokenia.** Kohdistus tapahtuu **polulla**, ja kohde
+ratkaistaan kutsujan oman omistajan alta — eli minkä tahansa saman omistajan agentin
+token (tai omistajan token) voi ajastaa sisaragentin. `createdBy` kirjaa silti todellisen
+luojan, ja luonut agentti voi itse hallita ajastusta.
+
+```bash
+# Agentti A:n omalla tokenilla, kohteena agentti "news-fetcher" (sama omistaja):
+curl -X POST $NODE/v1/agents/news-fetcher/schedules \
+  -H "Authorization: Bearer $A_TOKEN" -H "Content-Type: application/json" \
+  -d '{ "kind":"agent_task", "cron":"0 6 * * *", "timezone":"Europe/Helsinki",
+        "display_name":"Aamun uutishaku",
+        "task_template": { "title":"Hae uutiset",
+          "description":"Hae uutiset ja tallenna owner-näkyvyydellä avaimeen news.today.raw" } }'
+```
+
+- **Kohde = polun agentti** (`/v1/agents/<KOHDE>/schedules`). Bodyn agenttikenttä ei ole
+  pakollinen tällä polulla.
+- **Juuressa** `POST /v1/schedules` kohde annetaan bodyssä: kentät **`agent_name`** tai
+  (aliaksena) **`target_agent`** / `agent`.
+- **agent_task vaatii tehtäväsisällön:** joko `task_template:{title,description}` TAI litteät
+  `task_title` / `task_description` (molemmat hyväksytään).
+- **Eri omistajan agenttia ei voi kohdistaa** → 404. (Sama omistaja = luotettu fleet.)
+
+> **`aimeat connect call aimeat_schedule_*` ei toimi** — ajastustyökalut ovat
+> palvelin-MCP- + REST-pinnalla, eivät paikallisen connector-CLI:n fallback-listalla.
+> Headless/deterministiselle agentille (ei LLM-MCP-liaisonia per kutsu) **suositeltu tapa
+> on REST suoraan** yllä olevalla tavalla. (MCP `aimeat_schedule_*` -työkalut ovat
+> `connect serve` -tilan LLM-agenteille.)
+
 ## Tärkeät asiat jotta ketju toimii
 
 1. **Muistiavaimet ovat vaiheiden väylä — ei automaattista riippuvuusketjua.** Ajastukset

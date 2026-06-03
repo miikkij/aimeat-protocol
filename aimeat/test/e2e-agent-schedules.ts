@@ -54,6 +54,16 @@ async function registerOwnerAndAgent(prefix: string, agentName: string) {
     assert(ar.status === 201, `agent reg: ${JSON.stringify(ar.body)}`);
     return { ownerName, ownerToken, agentName, agentGaii: ar.body.data.agent.gaii };
 }
+async function registerAgent(ownerName: string, ownerToken: string, agentName: string) {
+    const ar = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: agentName, owner: ownerName, capabilities: ['memory', 'actions'] }),
+    });
+    assert(ar.status === 201, `agent reg: ${JSON.stringify(ar.body)}`);
+    const gaii = ar.body.data.agent.gaii;
+    const token = await getToken(gaii, ar.body.data.private_key, true);
+    return { agentName, gaii, token };
+}
 
 console.log('\n=== AIMEAT Agent Schedules E2E Test ===\n');
 
@@ -218,6 +228,57 @@ await test('16. Owner sets agent schedule-constraint defaults', async () => {
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.daily_spend_limit === 2, 'daily_spend_limit saved');
+});
+
+console.log('\nPhase 9 -- Cross-agent targeting (sibling agent token, no token-borrowing)');
+
+let sibling: { agentName: string; gaii: string; token: string };
+await test('17. Register a sibling agent under owner 1', async () => {
+    sibling = await registerAgent(o1.ownerName, o1.ownerToken, 'schedsibling');
+    assert(!!sibling.token, 'got sibling agent token');
+});
+
+await test('18. Sibling token schedules schedbot via path → targets schedbot, fires into schedbot queue', async () => {
+    const create = await json(`/v1/agents/${o1.agentName}/schedules`, {
+        method: 'POST', headers: { Authorization: `Bearer ${sibling.token}` },
+        body: JSON.stringify({
+            kind: 'agent_task', cron: '0 5 * * *', display_name: 'Cross-agent dispatch',
+            task_template: { title: 'XAGENT_OCCURRENCE', description: 'created by sibling, must run in schedbot queue' },
+        }),
+    });
+    assert(create.status === 201, `status ${create.status}: ${JSON.stringify(create.body)}`);
+    const sched = create.body.data.schedule;
+    assert(sched.agentName === o1.agentName, `target should be ${o1.agentName} (path), got ${sched.agentName}`);
+    assert(sched.agentGaii === o1.agentGaii, 'agentGaii resolves to the target agent (same owner)');
+    assert(sched.createdByAgent === true, 'createdByAgent true (creating agent can manage it)');
+    assert(sched.createdBy === sibling.gaii, `createdBy records the real creator (${sibling.gaii}), got ${sched.createdBy}`);
+    // The creating sibling can trigger its OWN cross-agent schedule (canManage), and the
+    // occurrence must land in the TARGET's (schedbot) queue — not the creator's.
+    const trig = await json(`/v1/schedules/${sched.id}/trigger`, { method: 'POST', headers: { Authorization: `Bearer ${sibling.token}` } });
+    assert(trig.status === 200, `sibling trigger status ${trig.status}`);
+    const tasks = await json(`/v1/agents/${o1.agentName}/tasks?status=queued&per_page=100`, { headers: auth1 });
+    const found = (tasks.body.data.tasks || []).filter((t: any) => t.title === 'XAGENT_OCCURRENCE').length;
+    assert(found >= 1, `expected occurrence in ${o1.agentName} queue, found ${found}`);
+});
+
+await test('19. target_agent body alias targets the sibling on the /v1/schedules root', async () => {
+    const { status, body } = await json('/v1/schedules', {
+        method: 'POST', headers: { Authorization: `Bearer ${sibling.token}` },
+        body: JSON.stringify({
+            kind: 'agent_task', cron: '0 4 * * *', display_name: 'Alias target',
+            target_agent: o1.agentName, task_template: { title: 'ALIAS_OCCURRENCE' },
+        }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.schedule.agentName === o1.agentName, `alias target should be ${o1.agentName}, got ${body.data.schedule.agentName}`);
+});
+
+await test('20. Cross-owner target is rejected (sibling cannot schedule another owner\'s agent)', async () => {
+    const { status } = await json(`/v1/agents/${o2.agentName}/schedules`, {
+        method: 'POST', headers: { Authorization: `Bearer ${sibling.token}` },
+        body: JSON.stringify({ kind: 'agent_task', cron: '0 3 * * *', display_name: 'x', task_template: { title: 'x' } }),
+    });
+    assert(status === 404 || status === 403, `expected 404/403 cross-owner, got ${status}`);
 });
 
 console.log('\nCleanup');

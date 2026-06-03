@@ -114,7 +114,17 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
       return { status: 400, code: 'INVALID_CRON', message: 'cron is missing or invalid' };
     }
 
-    const agentName = forcedAgentName ?? (typeof body.agent_name === 'string' ? body.agent_name : undefined);
+    // Target agent = the path param when present, else a body field. Accept
+    // agent_name / target_agent / agent as aliases (target_agent mirrors the MCP
+    // tool's field) so the same payload works across REST and MCP. The target is
+    // resolved under the CALLER'S owner, so any same-owner agent's token can
+    // schedule any sibling agent — no token-borrowing needed; createdBy still
+    // records the real creator.
+    const bodyAgent = ['agent_name', 'target_agent', 'agent'].reduce(
+      (acc, k) => acc ?? (typeof body[k] === 'string' ? (body[k] as string) : undefined),
+      undefined as string | undefined,
+    );
+    const agentName = forcedAgentName ?? bodyAgent;
     let agentGaii: string | undefined;
     if (agentName) {
       agentGaii = buildGAII(agentName, req.auth!.owner as string, config.nodeId);
@@ -139,7 +149,10 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
       ownerScope: owner,
       agentName,
       agentGaii,
-      createdByAgent: req.auth!.roles.includes('agent') && !req.auth!.roles.includes('owner'),
+      // True whenever a non-owner (agent) session created it — used by canManage so
+      // the creating agent can manage its own schedules. Derived from session type
+      // (not a literal 'agent' role, which agent tokens don't always carry).
+      createdByAgent: !isOwnerSession(req),
       displayName: displayName.slice(0, 200),
       description: typeof body.description === 'string' ? body.description.slice(0, 2000) : undefined,
       purpose: typeof body.purpose === 'string' ? body.purpose.slice(0, 500) : undefined,
@@ -180,14 +193,18 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
       if (!agentName || !agentGaii) {
         return { status: 400, code: 'AGENT_REQUIRED', message: 'agent_name is required for agent_task schedules' };
       }
+      // Accept either nested task_template.{title,description} or flat
+      // task_title / task_description (mirrors the MCP tool's flat fields).
       const tmpl = body.task_template as Record<string, unknown> | undefined;
-      const title = tmpl && typeof tmpl.title === 'string' ? tmpl.title : '';
-      if (!title) return { status: 400, code: 'INVALID_TASK_TEMPLATE', message: 'task_template.title is required for agent_task schedules' };
+      const title = (tmpl && typeof tmpl.title === 'string' ? tmpl.title : '')
+        || (typeof body.task_title === 'string' ? body.task_title : '');
+      if (!title) return { status: 400, code: 'INVALID_TASK_TEMPLATE', message: 'task_template.title (or task_title) is required for agent_task schedules' };
       const v = (tmpl?.verification ?? {}) as { user_expects?: string; technical_checks?: string[] };
+      const flatDesc = typeof body.task_description === 'string' ? body.task_description : '';
       base.input = {
         taskTemplate: {
           title,
-          description: typeof tmpl?.description === 'string' ? tmpl.description : '',
+          description: typeof tmpl?.description === 'string' ? tmpl.description : flatDesc,
           scope: Array.isArray(tmpl?.scope) ? (tmpl!.scope as AgentTaskScope[]) : [],
           rules: Array.isArray(tmpl?.rules) ? tmpl!.rules : [],
           verification: {
