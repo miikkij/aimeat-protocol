@@ -1915,6 +1915,36 @@ Generate a JSON bundle matching the \`POST /v1/site/import\` body schema:
 }
 \`\`\`
 
+## Header & Navigation (IMPORTANT — ask first)
+
+A custom template REPLACES the entire landing page, including the default AIMEAT
+header/navigation bar (logo, nav links, language switcher, theme toggle, and the
+golden login/logout pill that the SPA normally renders). If your template has no
+header, visitors land on a page with no visible way to log in or reach their
+profile/admin — they get stranded.
+
+Before generating the template, ASK the user this exact choice (do not guess):
+"Do you want the standard AIMEAT header at the top — the real logo, nav, language +
+theme toggles, and the live login pill — so visitors can log in and get back into
+their profile/admin? Or a clean standalone page with no header?"
+
+If the user wants the header (recommend this by default), DO NOT hand-build a fake
+nav bar. Use the official drop-in header library — it renders the EXACT same header
+as the rest of the site, including the real (golden) login pill, theme toggle, and
+language switcher, and it stays in sync automatically:
+
+1. In \`<head>\`, before your own \`<style>\`, link the theme stylesheet so the header
+   matches exactly (your own \`<style>\` still wins on shared selectors because it
+   loads after):
+   \`<link rel="stylesheet" href="/css/theme.css">\`
+2. In \`<body>\`, add the mount point where the header should appear (usually first):
+   \`<div id="aimeat-header"></div>\`
+3. Before \`</body>\`, include the library:
+   \`<script src="/v1/libs/aimeat-header.js"></script>\`
+
+That is the entire integration — do not replicate the login pill, theme toggle, or
+language buttons yourself; the library provides the real, live versions.
+
 ## Guidelines
 
 - Use semantic HTML with CSS classes for styling

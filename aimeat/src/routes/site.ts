@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { SiteService, SiteError } from '../services/site.js';
+import { injectCspNonce } from '../utils/csp-nonce.js';
 
 export function siteRouter(config: AimeatConfig, storage: Storage, siteService?: SiteService): Router {
     const router = Router();
@@ -30,7 +31,8 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
             const langParam = req.query.lang as string | undefined;
             const html = await site.getPortalHtml(langParam, req.headers.cookie, req.headers['accept-language']);
             res.set('Cache-Control', `public, max-age=${config.siteCacheTtlSeconds}`);
-            res.type('text/html').send(html);
+            // Stamp the per-request CSP nonce so operator-template inline <script> runs.
+            res.type('text/html').send(injectCspNonce(html, res.locals.cspNonce as string | undefined));
         } catch (err) {
             if (err instanceof SiteError) {
                 res.status(err.httpStatus).json(error(config.nodeId, err.code, err.message));

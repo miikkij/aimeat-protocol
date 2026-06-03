@@ -52,11 +52,15 @@ export async function seedSystemPrompts(storage: Storage): Promise<void> {
       // Always update generator and builder prompt content from seeds.
       // These prompts are code — they must match the source code version.
       // Admin edits are preserved in version history and can be restored.
+      // syncIds extends this to individual code-owned prompts in other groups
+      // (e.g. the portal template-editor prompt, which must track its tag/header
+      // guidance in source). bootstrap-anon and other portal prompts are NOT synced.
       const syncGroups = ['generator', 'builders', 'tiers'];
-      if (syncGroups.includes(seed.group) && existing.content !== seed.content) {
+      const syncIds = ['site-portal'];
+      if ((syncGroups.includes(seed.group) || syncIds.includes(seed.id)) && existing.content !== seed.content) {
         metaUpdate.content = seed.content;
         metaUpdate.updatedAt = new Date().toISOString();
-        logger.info(`Generator prompt "${seed.id}" content synced from seed (${seed.content.length} chars)`);
+        logger.info(`System prompt "${seed.id}" content synced from seed (${seed.content.length} chars)`);
       }
 
       await storage.upsertSystemPrompt(metaUpdate as unknown as import('../storage/interface.js').SystemPromptRecord);

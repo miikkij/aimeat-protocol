@@ -18,6 +18,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { TunnelManager } from '../services/personal-tunnel.js';
 import type { SiteService } from '../services/site.js';
+import { injectCspNonce } from '../utils/csp-nonce.js';
 import { success } from '../middleware/envelope.js';
 import { getSiteSyncState } from '../services/site-sync.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
@@ -97,7 +98,9 @@ export function bootstrapRouter(
           _req.headers['accept-language'] as string | undefined,
         );
         res.set('Cache-Control', `public, max-age=${config.siteCacheTtlSeconds}`);
-        res.type('text/html').send(customHtml);
+        // Operator templates are trusted and may include inline <script>; stamp the
+        // per-request CSP nonce so they pass script-src 'self' 'nonce-...'.
+        res.type('text/html').send(injectCspNonce(customHtml, res.locals.cspNonce as string | undefined));
         return;
       }
       res.redirect('/v1/portal');

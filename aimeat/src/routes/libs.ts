@@ -44,6 +44,7 @@ import { aimeatSpeechLib } from './lib-speech.js';
 import { aimeatCapabilitiesLib } from './lib-capabilities.js';
 import { aimeatAiLib } from './lib-ai.js';
 import { aimeatAgentsLib } from './lib-agents.js';
+import { aimeatHeaderLib } from './lib-header.js';
 
 function sendJavascriptLibrary(res: Response, source: string): void {
   res.set('Cache-Control', 'no-store');
@@ -62,6 +63,12 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   // GET /v1/libs/aimeat-auth.js — Auth helper library
   router.get('/v1/libs/aimeat-auth.js', (_req, res) => {
     sendJavascriptLibrary(res, aimeatAuthLib(config));
+  });
+
+  // GET /v1/libs/aimeat-header.js — Drop-in canonical site header (nav + theme +
+  // language + live login pill) for standalone pages such as custom portal templates.
+  router.get('/v1/libs/aimeat-header.js', (_req, res) => {
+    sendJavascriptLibrary(res, aimeatHeaderLib(config));
   });
 
   // GET /v1/libs/aimeat-data.js — Memory & Micro-Memory library
@@ -130,6 +137,13 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
           description: 'Identity & session: registration, Ed25519 auth, JWT lifecycle, login UI',
           size_estimate: '~25KB',
           include: `<script src="${config.baseUrl}/v1/libs/aimeat-auth.js"></script>`,
+        },
+        {
+          name: 'aimeat-header',
+          url: '/v1/libs/aimeat-header.js',
+          description: 'Canonical site header for standalone pages (custom portal templates): brand + morsels, nav, language switcher, theme toggle, and the live golden login pill. Mounts into #aimeat-header or prepends to <body>.',
+          size_estimate: '~7KB',
+          include: `<div id="aimeat-header"></div>\n<script src="${config.baseUrl}/v1/libs/aimeat-header.js"></script>`,
         },
         {
           name: 'aimeat-data',
