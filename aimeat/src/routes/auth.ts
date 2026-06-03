@@ -20,6 +20,7 @@ import { issueJWT, revokeToken, generateSessionId } from '../auth/jwt.js';
 import { requireAuth, requireRole, optionalAuth, isAnonymousMode, getAnonymousCredentials } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { readRefreshCookie, refreshOwnerSession, hashToken, clearRefreshCookie } from '../services/owner-session.js';
+import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import { parseGAII, validateAgentName, buildGAII } from '../utils/gaii.js';
 import { randomBytes } from 'node:crypto';
 import { generateOtk } from '../utils/otk.js';
@@ -374,6 +375,34 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
   router.post('/v1/auth/refresh', optionalAuth(), async (req, res) => {
     // (1) Cookie-based owner session refresh (rotation + reuse detection).
     if (readRefreshCookie(req)) {
+      const cookieVal = readRefreshCookie(req)!;
+      // PAT-backed browser session: the cookie value IS the access token (set by a browser
+      // PAT request) — validate it per refresh so revocation takes effect immediately.
+      if (cookieVal.startsWith(PAT_PREFIX)) {
+        if (req.headers['x-aimeat-refresh'] !== '1') {
+          res.status(400).json(error(config.nodeId, 'CSRF_REQUIRED', 'Missing X-AIMEAT-Refresh header'));
+          return;
+        }
+        const r = await resolvePat(storage, cookieVal);
+        if (!r) {
+          clearRefreshCookie(req, res);
+          res.status(401).json(error(config.nodeId, 'INVALID_TOKEN', 'Access token is invalid, revoked, or expired'));
+          return;
+        }
+        await storage.touchPat(r.patId, new Date().toISOString());
+        const includeScopes = r.roles.includes('agent');
+        const patToken = await issueJWT({
+          sub: r.sub, owner: r.owner, node: config.nodeId, roles: r.roles,
+          ...(includeScopes ? { scopes: r.scopes } : {}),
+        }, config.accessTtlSeconds);
+        res.json(success(config.nodeId, {
+          token: patToken,
+          expires_in: config.accessTtlSeconds,
+          expires_at: new Date(Date.now() + config.accessTtlSeconds * 1000).toISOString(),
+          ttl_seconds: config.accessTtlSeconds,
+        }));
+        return;
+      }
       const result = await refreshOwnerSession(storage, config, req, res);
       if (!result.ok) {
         res.status(result.status).json(error(config.nodeId, result.code, result.message));

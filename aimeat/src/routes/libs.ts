@@ -4,6 +4,9 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.15.0 - 2026-06-03 - aimeat-auth.js boot restores a session from the httpOnly refresh
+ *   cookie alone (no localStorage) so a browser an agent authenticated with an owner access
+ *   token shows as logged in. (Agent access tokens, Phase 3b.)
  * v1.14.0 - 2026-06-03 - mountLoginButton: add hook classes (aimeat-auth-pill/-dot/
  *   -label/-ghii/-logout) so the logged-in pill can go compact on mobile (theme.css
  *   hides label+ghii, keeping the dot + Logout). Pill markup/styles otherwise unchanged.
@@ -475,6 +478,40 @@ function persistSession(session) {
   });
 }
 
+// Restore a session purely from the httpOnly refresh cookie, with NO local metadata. Makes
+// the app boot "logged in" when a cookie exists but localStorage is empty — e.g. a browser
+// an agent authenticated with an owner Personal Access Token (the server set the cookie to
+// the token). Returns null when there is no usable cookie.
+async function restoreSessionFromCookie() {
+  try {
+    const data = await api('/v1/auth/refresh', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'X-AIMEAT-Refresh': '1' },
+    });
+    const token = data && data.data && data.data.token;
+    if (!token) return null;
+    const payload = parseJwt(token) || {};
+    const ownerName = payload.owner || payload.sub;
+    if (!ownerName) return null;
+    const session = createSession({
+      owner: ownerName,
+      ghii: String(ownerName).indexOf('@') >= 0 ? ownerName : (ownerName + '@' + NODE_ID),
+      gaii: null,
+      jwt: token,
+      roles: payload.roles || [],
+      displayName: '',
+    });
+    persistSession(session);
+    currentSession = session;
+    scheduleAutoRefresh(session);
+    emit('login', session);
+    return session;
+  } catch (_) {
+    return null;
+  }
+}
+
 function scheduleAutoRefresh(session) {
   if (refreshTimer) clearTimeout(refreshTimer);
   if (!session?.jwt) return;
@@ -678,7 +715,9 @@ const auth = {
    */
   async login(username) {
     const stored = load('session');
-    if (!stored) return null;
+    // No local metadata — but an httpOnly refresh cookie may exist (e.g. a browser an agent
+    // authenticated with an owner access token). Restore the session from the cookie alone.
+    if (!stored) return await restoreSessionFromCookie();
     if (username && stored.owner !== username) return null;
 
     // SECURITY: Run one-time migration from localStorage to IndexedDB
@@ -1263,7 +1302,7 @@ if (typeof window !== 'undefined' && window.addEventListener) {
 // ── Expose globally ──
 if (!global.AIMEAT) global.AIMEAT = {};
 global.AIMEAT.auth = auth;
-global.AIMEAT.version = '2026-06-03-002';
+global.AIMEAT.version = '2026-06-03-003';
 
 })(typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : this);
 `;

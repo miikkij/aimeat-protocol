@@ -850,6 +850,26 @@ model Session {
   @@index([prevTokenHash])
 }
 
+// Owner-created Personal Access Tokens for agents.
+// See docs/plans/2026-06-03-agent-access-tokens-plan.md
+model PersonalAccessToken {
+  id            String    @id @map("_id")
+  tokenHash     String    @unique
+  label         String
+  owner         String
+  scopes        String[]
+  grantOwner    Boolean   @default(false)
+  grantOperator Boolean   @default(false)
+  readOwnerData Boolean   @default(false)
+  gaii          String
+  createdAt     DateTime
+  expiresAt     DateTime?
+  lastUsedAt    DateTime?
+  revoked       Boolean   @default(false)
+
+  @@index([owner])
+}
+
 model RevokedToken {
   id        String @id @default(auto()) @map("_id") @db.ObjectId
   tokenHash String @unique

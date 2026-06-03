@@ -3469,6 +3469,81 @@ export class MongoStorage implements Storage {
         return result.count;
     }
 
+    // ── Personal Access Tokens ────────────────────────────────
+
+    private mapPat(p: {
+        id: string; tokenHash: string; label: string; owner: string; scopes: string[];
+        grantOwner: boolean; grantOperator: boolean; readOwnerData: boolean; gaii: string;
+        createdAt: Date | string; expiresAt?: Date | string | null; lastUsedAt?: Date | string | null; revoked: boolean;
+    }): import('../../../storage/repositories/pat.repository.js').PatRecord {
+        const iso = (d: Date | string | null | undefined): string | null =>
+            d == null ? null : (d instanceof Date ? d.toISOString() : String(d));
+        return {
+            id: p.id,
+            tokenHash: p.tokenHash,
+            label: p.label,
+            owner: p.owner,
+            scopes: p.scopes ?? [],
+            grantOwner: p.grantOwner,
+            grantOperator: p.grantOperator,
+            readOwnerData: p.readOwnerData,
+            gaii: p.gaii,
+            createdAt: iso(p.createdAt) as string,
+            expiresAt: iso(p.expiresAt),
+            lastUsedAt: iso(p.lastUsedAt),
+            revoked: p.revoked,
+        };
+    }
+
+    async createPat(pat: import('../../../storage/repositories/pat.repository.js').PatRecord): Promise<void> {
+        this.ensureReady();
+        await this.prisma.personalAccessToken.create({
+            data: {
+                id: pat.id,
+                tokenHash: pat.tokenHash,
+                label: pat.label,
+                owner: pat.owner,
+                scopes: pat.scopes ?? [],
+                grantOwner: pat.grantOwner,
+                grantOperator: pat.grantOperator,
+                readOwnerData: pat.readOwnerData,
+                gaii: pat.gaii,
+                createdAt: new Date(pat.createdAt),
+                expiresAt: pat.expiresAt ? new Date(pat.expiresAt) : null,
+                lastUsedAt: pat.lastUsedAt ? new Date(pat.lastUsedAt) : null,
+                revoked: false,
+            },
+        });
+    }
+
+    async getPatByHash(tokenHash: string): Promise<import('../../../storage/repositories/pat.repository.js').PatRecord | null> {
+        this.ensureReady();
+        const p = await this.prisma.personalAccessToken.findFirst({ where: { tokenHash, revoked: false } });
+        return p ? this.mapPat(p) : null;
+    }
+
+    async listPats(owner: string): Promise<import('../../../storage/repositories/pat.repository.js').PatRecord[]> {
+        this.ensureReady();
+        const pats = await this.prisma.personalAccessToken.findMany({
+            where: { owner, revoked: false },
+            orderBy: { createdAt: 'desc' },
+        });
+        return pats.map((p: import('@prisma/client').PersonalAccessToken) => this.mapPat(p));
+    }
+
+    async revokePat(id: string, owner: string): Promise<boolean> {
+        this.ensureReady();
+        const existing = await this.prisma.personalAccessToken.findFirst({ where: { id, owner, revoked: false } });
+        if (!existing) return false;
+        await this.prisma.personalAccessToken.update({ where: { id }, data: { revoked: true } });
+        return true;
+    }
+
+    async touchPat(id: string, usedAtIso: string): Promise<void> {
+        this.ensureReady();
+        await this.prisma.personalAccessToken.update({ where: { id }, data: { lastUsedAt: new Date(usedAtIso) } });
+    }
+
     // ── Token Revocation ──────────────────────────────────────
 
     async revokeToken(tokenHash: string, expiresAt: number): Promise<void> {

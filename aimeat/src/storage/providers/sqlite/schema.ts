@@ -677,6 +677,25 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_sessions_owner ON sessions(owner);
     CREATE INDEX IF NOT EXISTS idx_sessions_gaii ON sessions(gaii);
 
+    -- ── Personal Access Tokens (owner-created tokens for agents) ──
+    CREATE TABLE IF NOT EXISTS personal_access_tokens (
+      id             TEXT PRIMARY KEY,
+      tokenHash      TEXT NOT NULL,
+      label          TEXT NOT NULL,
+      owner          TEXT NOT NULL,
+      scopes         TEXT,
+      grantOwner     INTEGER NOT NULL DEFAULT 0,
+      grantOperator  INTEGER NOT NULL DEFAULT 0,
+      readOwnerData  INTEGER NOT NULL DEFAULT 0,
+      gaii           TEXT NOT NULL,
+      createdAt      TEXT NOT NULL,
+      expiresAt      TEXT,
+      lastUsedAt     TEXT,
+      revoked        INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_pat_tokenHash ON personal_access_tokens(tokenHash);
+    CREATE INDEX IF NOT EXISTS idx_pat_owner ON personal_access_tokens(owner);
+
     -- ── Revoked Tokens ──
     CREATE TABLE IF NOT EXISTS revoked_tokens (
       token_hash     TEXT PRIMARY KEY,

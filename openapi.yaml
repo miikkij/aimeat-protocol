@@ -3345,6 +3345,93 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /v1/access/tokens:
+    post:
+      operationId: createAccessToken
+      summary: Create a Personal Access Token
+      description: |
+        Owner creates a reusable, revocable token an agent uses (as `Authorization: Bearer`)
+        to authenticate transparently — like a logged-in user — and test the owner's apps.
+        The token grants either selected agent scopes (a scoped, sandboxed test identity) or,
+        when chosen, full owner / operator access. The raw token is returned **once**; only its
+        SHA-256 hash is stored. `grant_operator` requires the caller to be an operator.
+      tags: [Auth]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [label]
+              properties:
+                label: { type: string, description: User-facing name }
+                scopes: { type: array, items: { type: string }, description: Agent scopes (required unless grant_owner/grant_operator) }
+                grant_owner: { type: boolean, description: Act as the owner (full access) }
+                grant_operator: { type: boolean, description: Owner + operator (operators only) }
+                read_owner_data: { type: boolean, description: Scoped tokens — read owner data instead of a sandbox }
+                expires_in: { type: integer, description: Optional lifetime in seconds (omit = no expiry) }
+      responses:
+        '201':
+          description: Token created (raw token returned once)
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403':
+          description: Only an operator can create an operator-level token
+    get:
+      operationId: listAccessTokens
+      summary: List the owner's access tokens
+      description: Returns active (non-revoked) tokens. The raw token is never returned.
+      tags: [Auth]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/access/tokens/{id}:
+    delete:
+      operationId: revokeAccessToken
+      summary: Revoke an access token
+      description: Revocation takes effect immediately — the next request carrying the token is rejected.
+      tags: [Auth]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/auth/token/exchange:
+    post:
+      operationId: exchangeAccessToken
+      summary: Exchange a Personal Access Token for a short access JWT
+      description: |
+        Optional convenience: present the token (as `Authorization: Bearer` or `{ token }`) and
+        receive a short stateless access JWT at the token's level. The token can also be used
+        directly as a Bearer credential on any endpoint without exchanging.
+      tags: [Auth]
+      security:
+        - BearerAuth: []
+        - {}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token: { type: string, description: The access token (if not sent as a Bearer header) }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /v1/auth/connectivity-key:
     post:
       operationId: generateConnectivityKey

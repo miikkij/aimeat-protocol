@@ -119,8 +119,8 @@ export async function initializeConfig(
   // Wire storage into token revocation system for persistent revocation
   initRevocationStorage(storage);
 
-  // P3-7: Wire storage into session-aware auth middleware
-  initSessionAuth(storage);
+  // P3-7: Wire storage into session-aware auth middleware (+ config for PAT browser cookies)
+  initSessionAuth(storage, config);
 
   return { storage, provenance, consulService };
 }

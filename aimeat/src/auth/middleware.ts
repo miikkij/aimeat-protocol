@@ -1,5 +1,8 @@
 import type { Request, Response, NextFunction } from 'express';
 import { verifyJWT, isRevoked, type VerifiedToken } from './jwt.js';
+import { setRefreshCookie, readRefreshCookie } from '../services/owner-session.js';
+import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
+import type { AimeatConfig } from '../config.js';
 import { getStats } from '../services/stats.js';
 import { getPromMetrics } from '../services/prometheus.js';
 import type { Storage } from '../storage/interface.js';
@@ -7,10 +10,12 @@ import { logger } from '../utils/logger.js';
 
 // P3-7: Reference to storage for session revocation checks
 let _sessionStorage: Storage | null = null;
+let _config: AimeatConfig | null = null;
 
 /** Initialize session-aware auth middleware. Called once during server startup. */
-export function initSessionAuth(storage: Storage): void {
+export function initSessionAuth(storage: Storage, config?: AimeatConfig): void {
   _sessionStorage = storage;
+  _config = config ?? null;
 }
 
 const _lastSeenCache = new Map<string, number>();
@@ -25,6 +30,46 @@ function touchAgentLastSeen(auth: VerifiedToken): void {
   if (now - last < LAST_SEEN_THROTTLE_MS) return;
   _lastSeenCache.set(gaii, now);
   _sessionStorage.updateAgent(gaii, { lastSeen: new Date(now).toISOString() }).catch(() => {});
+}
+
+// Personal Access Tokens are presented as a Bearer credential (Authorization: Bearer
+// aimeat_pat_...). They are recognised transparently by the auth middleware so an agent
+// is authenticated by the header alone — like a logged-in user — with no app/client changes.
+
+/**
+ * Resolve a Personal Access Token to a verified identity (operator/owner act as the owner
+ * GHII; otherwise a scoped agent identity; roles re-derived from the owner's CURRENT roles).
+ * Returns null if missing/revoked/expired. Records usage without blocking the request.
+ */
+async function resolvePatToken(token: string): Promise<VerifiedToken | null> {
+  if (!_sessionStorage) return null;
+  const r = await resolvePat(_sessionStorage, token);
+  if (!r) return null;
+  _sessionStorage.touchPat(r.patId, new Date().toISOString()).catch(() => {});
+  return {
+    sub: r.sub,
+    owner: r.owner,
+    node: '',
+    roles: r.roles,
+    scopes: r.scopes,
+    exp: r.expiresAt ? Math.floor(Date.parse(r.expiresAt) / 1000) : Math.floor(Date.now() / 1000) + 3600,
+  };
+}
+
+/**
+ * For a BROWSER request carrying an owner/operator PAT, set the httpOnly refresh cookie to the
+ * PAT itself (once) so the webapp boots "logged in" via the cookie — like a normal login,
+ * without re-sending the header on every request. The refresh endpoint validates the PAT
+ * cookie on every refresh, so revoking the token takes effect immediately. Skipped for scoped
+ * tokens, non-browsers, /v1/auth/* (which manage their own cookies), and when a cookie exists.
+ */
+function maybeSetPatBrowserSession(req: Request, res: Response, rawToken: string, patAuth: VerifiedToken): void {
+  if (!_config) return;
+  if (!patAuth.roles.includes('owner')) return;
+  if (req.path.startsWith('/v1/auth/')) return;
+  if (!String(req.headers['user-agent'] || '').includes('Mozilla')) return;
+  if (readRefreshCookie(req)) return;
+  setRefreshCookie(req, res, _config, rawToken);
 }
 
 // Anonymous mode: when enabled, inject this identity for unauthenticated requests
@@ -64,10 +109,16 @@ declare global {
  * Use requireAuth() or requireRole() for endpoints that need auth.
  */
 export function optionalAuth() {
-  return async (req: Request, _res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     const token = extractToken(req);
     if (token) {
-      if (await isRevoked(token)) {
+      if (token.startsWith(PAT_PREFIX)) {
+        const patAuth = await resolvePatToken(token);
+        if (patAuth) {
+          req.auth = patAuth;
+          maybeSetPatBrowserSession(req, res, token, patAuth);
+        }
+      } else if (await isRevoked(token)) {
         req.auth = undefined;
       } else {
         const verified = await verifyJWT(token);
@@ -121,6 +172,25 @@ export function requireAuth() {
       const prom = getPromMetrics();
       if (prom) prom.authFailuresTotal.inc();
       res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Authentication required'));
+      return;
+    }
+
+    // Personal Access Token presented as a Bearer credential — authenticate via the
+    // header transparently (no app/client changes; acts like a logged-in user).
+    if (token.startsWith(PAT_PREFIX)) {
+      const patAuth = await resolvePatToken(token);
+      if (!patAuth) {
+        const stats = getStats();
+        if (stats) stats.increment('auth_failures_total');
+        const prom = getPromMetrics();
+        if (prom) prom.authFailuresTotal.inc();
+        res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Invalid or revoked access token'));
+        return;
+      }
+      req.auth = patAuth;
+      maybeSetPatBrowserSession(req, res, token, patAuth);
+      touchAgentLastSeen(patAuth);
+      next();
       return;
     }
 
