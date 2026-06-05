@@ -4,6 +4,42 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+### SynthTraces — synthetic agent-session traces (dev tool)
+
+A self-play harness (`aimeat/tools/synthtraces/`, no backend changes) that generates
+synthetic AIMEAT agent-session traces: a *persona* model plays the human owner and an
+*agent* model drives a real node, producing task-driven traces for benchmarking and
+fine-tuning models on the AIMEAT protocol. Inspired by Hugging Face's SynthTraces, but
+the environment is the AIMEAT protocol itself rather than a code repo. Dev-only tool —
+runs on top of the public APIs, the backend is untouched.
+
+#### Added
+
+- **Two-model self-play** over native owner↔agent messaging + the task lifecycle; the
+  task's own immutable event timeline + telemetry form the trace backbone.
+- **Providers** — OpenRouter (free `owl-alpha`), x.ai (Grok), Anthropic, **Ollama
+  (local, no key)**, and a key-free `scripted` provider. Agent and persona can use
+  **different** providers (e.g. free cloud agent + local user model — the SynthTraces
+  "small local model plays the user" pattern).
+- **Transports** — REST, MCP, and `hybrid` behind an `AgentDriver` boundary; each trace
+  tool-call records which channel handled it (`via`).
+- **Telemetry** — per-turn token/duration captured into `trace.usage` and pushed as a
+  `task_event` `details.telemetry`, so the node's native `task.telemetry` accumulates
+  real cost per session.
+- **Eval** (`eval.ts`) — protocol-correctness checks (task reached done, no hallucinated
+  tools, no failed calls, persisted something, valid memory keys/visibility, completed
+  after real work) plus token-cost and transport-mix reporting. Verified over a
+  30-session dataset: cloud `owl-alpha` mean 0.971, fully-local `qwen2.5:7b` mean 0.950,
+  both with 0 hallucinated tools and 0 failed calls.
+- **Docs** — `aimeat/tools/README.md` (rationale / what to observe / roadmap) and
+  `aimeat/tools/synthtraces/README.md` (run guide).
+
+#### Fixed
+
+- **Stale doc** — the app-developer AI guide claimed `POST /v1/ai/complete` "caps at 4000
+  tokens regardless"; no such cap exists in the code (the saved-default clamp is ≤128,000,
+  and spend is bounded by the daily USD budget). Corrected the guide.
+
 ### Scheduled tasks for agents
 
 Owners — and agents on their behalf — can now schedule **recurring jobs** ("get the

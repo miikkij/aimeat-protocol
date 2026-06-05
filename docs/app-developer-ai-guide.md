@@ -194,7 +194,7 @@ Run one completion.
 | `modelRole` | `'reasoning'` \| `'execution'` | Pick from user's per-role default. Use `'execution'` for cheap routine tasks; `'reasoning'` for hard ones. |
 | `temperature` | number | 0–2. Falls back to user's default. |
 | `top_p` | number | Falls back to user's default. |
-| `max_tokens` | number | Falls back to user's default. Server caps at 4000 regardless. |
+| `max_tokens` | number | Falls back to user's default. No hard server cap on the per-call value — the provider enforces its own per-model output limit, and spend stays bounded by the daily USD budget. (The user's *saved default* is clamped to ≤128,000 when set via `/v1/openrouter/settings`.) |
 | `app_id` | string | **Always set this.** Identifies your app for per-app quotas and the user's spend dashboard. |
 
 Returns:

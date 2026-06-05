@@ -375,6 +375,10 @@ cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2
 
 > The legacy `pnpm test:e2e` (in-memory backend) is deprecated and produces stale failures. Use the SQLite or MongoDB commands instead.
 
+### Synthetic agent traces (dev tool)
+
+[`aimeat/tools/synthtraces/`](aimeat/tools/synthtraces/) is a small self-play harness that generates synthetic AIMEAT agent-session traces: a *persona* model plays the human owner while an *agent* model drives a real node over REST or MCP, producing task-driven traces you can use to benchmark or fine-tune models on the protocol. It runs on free cloud models (OpenRouter `owl-alpha`) or **fully local** via Ollama (`qwen2.5` + `llama3.2`), and ships an eval that scores protocol-correctness (no hallucinated tools, valid memory keys, task completion, token cost). See [tools/README.md](aimeat/tools/README.md).
+
 ---
 
 ## Documentation

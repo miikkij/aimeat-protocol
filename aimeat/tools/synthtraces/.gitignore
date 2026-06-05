@@ -1,0 +1,6 @@
+# Generated traces and embedded-node sqlite files
+out/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
