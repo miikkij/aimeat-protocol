@@ -59,7 +59,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_consent_list: 'consent:manage',
     aimeat_consent_revoke: 'consent:manage',
 
-    // Cortex management (POST/DELETE /v1/cortex* → cortex:write)
+    // Cortex management (POST/PUT/DELETE /v1/cortex* → cortex:write; PUT is the idempotent upsert)
     // List/get are NOT gated (mirrors REST: GET /v1/cortex is just requireAuth).
     aimeat_cortex_install: 'cortex:write',
     aimeat_cortex_activate: 'cortex:write',

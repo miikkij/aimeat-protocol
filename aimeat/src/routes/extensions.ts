@@ -1,3 +1,17 @@
+/**
+ * @file extensions.ts
+ * @description REST routes for the WASM/sandbox Extension system — install (POST), idempotent
+ *   upsert/redeploy (PUT), inspect, activate/deactivate, action-script patch, instances, action
+ *   execution (/v1/ext/...), and uninstall (DELETE). Extensions run server-side action scripts
+ *   in a sandbox with a scoped ctx (memory/fetch/wallet/consent/...).
+ * @structure extensionsRouter() — all routes; buildExtensionRecordFromManifest() — shared
+ *   manifest→record validator used by both POST and PUT.
+ * @usage app.use(extensionsRouter(config, storage, scheduler, emailService)) in server.ts
+ * @version-history
+ *   v1.1.0 — 2026-06-05 — Add PUT /v1/extensions/:name idempotent upsert: redeploy in place
+ *     (preserving ext:{name} memory + instances) instead of DELETE→re-POST; extract shared
+ *     manifest validator so POST and PUT stay in sync.
+ */
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
@@ -13,6 +27,133 @@ import { logger } from '../utils/logger.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { ExtensionInstallSchema, validateBody } from '../models/schemas.js';
+
+/** Discriminated result of validating an extension install/upsert payload. */
+type ExtBuildResult =
+  | { ok: true; record: ExtensionRecord }
+  | { ok: false; status: number; code: string; message: string };
+
+/**
+ * Validate an extension install payload (YAML manifest + scripts map) and build the
+ * ExtensionRecord it describes. Shared by POST (install) and PUT (upsert) so both validate the
+ * manifest identically and produce the same record. Does NOT enforce quota, duplicate-name, or
+ * permission — those are caller-specific (create vs. update). The caller supplies the lifecycle
+ * fields (installedBy/installedAt); status defaults to 'inactive'.
+ */
+function buildExtensionRecordFromManifest(
+  manifestYaml: string | undefined,
+  scripts: Record<string, string> | undefined,
+  config: AimeatConfig,
+  installedBy: string,
+  installedAt: string,
+): ExtBuildResult {
+  if (!manifestYaml || typeof manifestYaml !== 'string') {
+    return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'manifest (YAML string) is required' };
+  }
+  if (!scripts || typeof scripts !== 'object') {
+    return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'scripts object is required' };
+  }
+
+  let manifest: Record<string, unknown>;
+  try {
+    manifest = parseYaml(manifestYaml) as Record<string, unknown>;
+  } catch {
+    return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: 'Failed to parse manifest YAML' };
+  }
+
+  const metadata = manifest.metadata as Record<string, unknown> | undefined;
+  if (!metadata?.name || !metadata?.version || !metadata?.description || !metadata?.author) {
+    return { ok: false, status: 400, code: 'INVALID_MANIFEST',
+      message: 'metadata.name, metadata.version, metadata.description, and metadata.author are required' };
+  }
+
+  const actions = manifest.actions as Array<Record<string, unknown>> | undefined;
+  if (!Array.isArray(actions) || actions.length === 0) {
+    return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: 'actions array is required and must not be empty' };
+  }
+  for (const action of actions) {
+    if (!action.id || !action.method || !action.path || !action.script) {
+      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: 'Each action must have id, method, path, and script fields' };
+    }
+    if (!scripts[action.script as string]) {
+      return { ok: false, status: 400, code: 'MISSING_SCRIPT',
+        message: `Script "${action.script as string}" referenced in action "${action.id as string}" not found in scripts object` };
+    }
+  }
+
+  const manifestInstances = manifest.instances as Record<string, unknown> | undefined;
+  if (manifestInstances) {
+    if (typeof manifestInstances.supported !== 'boolean') {
+      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: 'instances.supported must be a boolean' };
+    }
+    if (manifestInstances.config_per_instance !== undefined
+      && (typeof manifestInstances.config_per_instance !== 'object' || manifestInstances.config_per_instance === null)) {
+      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: 'instances.config_per_instance must be an object (JSON Schema)' };
+    }
+  }
+
+  for (const [scriptKey, scriptContent] of Object.entries(scripts)) {
+    const sizeKb = Buffer.byteLength(scriptContent, 'utf8') / 1024;
+    if (sizeKb > config.extensionMaxCodeSizeKb) {
+      return { ok: false, status: 400, code: 'CODE_TOO_LARGE',
+        message: `Script "${scriptKey}" is ${sizeKb.toFixed(1)}KB, max is ${config.extensionMaxCodeSizeKb}KB` };
+    }
+  }
+
+  const manifestConfig = manifest.config as Record<string, unknown> | undefined;
+  const manifestLimits = manifest.limits as Record<string, unknown> | undefined;
+  const manifestFederation = manifest.federation as Record<string, unknown> | undefined;
+  const manifestSchedules = manifest.schedules as Array<Record<string, unknown>> | undefined;
+
+  const record: ExtensionRecord = {
+    name: metadata.name as string,
+    version: metadata.version as string,
+    description: metadata.description as string,
+    author: metadata.author as string,
+    status: 'inactive',
+    requiredApis: (manifest.required_apis as string[]) ?? [],
+    actions: actions.map(a => ({
+      id: a.id as string,
+      method: (a.method as string).toUpperCase(),
+      path: a.path as string,
+      inputSchema: (a.input as Record<string, unknown>) ?? {},
+      outputSchema: (a.output as Record<string, unknown>) ?? {},
+      scriptContent: scripts[a.script as string],
+    })),
+    config: {
+      ...(manifestConfig
+        ? Object.fromEntries(
+            Object.entries(manifestConfig).map(([k, v]) => {
+              if (v && typeof v === 'object' && 'default' in (v as Record<string, unknown>)) {
+                return [k, (v as Record<string, unknown>).default];
+              }
+              return [k, v];
+            }),
+          )
+        : {}),
+      ...(manifestSchedules ? { __schedules: manifestSchedules } : {}),
+    },
+    limits: {
+      memoryMb: Math.min((manifestLimits?.memory_mb as number) ?? config.extensionMaxMemoryMb, config.extensionMaxMemoryMb),
+      timeoutMs: Math.min((manifestLimits?.timeout_ms as number) ?? config.extensionTimeoutMs, config.extensionTimeoutMs),
+      maxApiCalls: Math.min((manifestLimits?.max_api_calls as number) ?? config.extensionMaxApiCalls, config.extensionMaxApiCalls),
+    },
+    federation: {
+      advertise: (manifestFederation?.advertise as boolean) ?? false,
+      capabilities: (manifestFederation?.capabilities as string[]) ?? [],
+    },
+    ...(manifestInstances?.supported ? {
+      instances: {
+        supported: true,
+        configSchema: (manifestInstances.config_per_instance as Record<string, unknown>) ?? undefined,
+      },
+    } : {}),
+    installedBy,
+    installedAt,
+  };
+
+  return { ok: true, record };
+}
 
 export function extensionsRouter(config: AimeatConfig, storage: Storage, scheduler?: Scheduler, emailService?: import('../services/email.js').EmailService): Router {
   const router = Router();
@@ -100,68 +241,14 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
         scriptSizes: scripts ? Object.fromEntries(Object.entries(scripts).map(([k, v]) => [k, typeof v === 'string' ? v.length : typeof v])) : {},
       });
 
-      if (!manifestYaml || typeof manifestYaml !== 'string') {
-        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'manifest (YAML string) is required'));
+      // Validate the payload + build the record (shared with PUT upsert).
+      const built = buildExtensionRecordFromManifest(manifestYaml, scripts, config, req.auth!.owner, new Date().toISOString());
+      if (!built.ok) {
+        res.status(built.status).json(error(config.nodeId, built.code, built.message));
         return;
       }
-      if (!scripts || typeof scripts !== 'object') {
-        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'scripts object is required'));
-        return;
-      }
-
-      // Parse manifest YAML
-      let manifest: Record<string, unknown>;
-      try {
-        manifest = parseYaml(manifestYaml) as Record<string, unknown>;
-      } catch {
-        res.status(400).json(error(config.nodeId, 'INVALID_MANIFEST', 'Failed to parse manifest YAML'));
-        return;
-      }
-
-      // Validate required metadata fields
-      const metadata = manifest.metadata as Record<string, unknown> | undefined;
-      if (!metadata?.name || !metadata?.version || !metadata?.description || !metadata?.author) {
-        res.status(400).json(error(config.nodeId, 'INVALID_MANIFEST',
-          'metadata.name, metadata.version, metadata.description, and metadata.author are required'));
-        return;
-      }
-
-      // Validate actions array
-      const actions = manifest.actions as Array<Record<string, unknown>> | undefined;
-      if (!Array.isArray(actions) || actions.length === 0) {
-        res.status(400).json(error(config.nodeId, 'INVALID_MANIFEST', 'actions array is required and must not be empty'));
-        return;
-      }
-
-      for (const action of actions) {
-        if (!action.id || !action.method || !action.path || !action.script) {
-          res.status(400).json(error(config.nodeId, 'INVALID_MANIFEST',
-            'Each action must have id, method, path, and script fields'));
-          return;
-        }
-        // Validate that referenced script exists in scripts object
-        if (!scripts[action.script as string]) {
-          res.status(400).json(error(config.nodeId, 'MISSING_SCRIPT',
-            `Script "${action.script as string}" referenced in action "${action.id as string}" not found in scripts object`));
-          return;
-        }
-      }
-
-      // Validate instances section if present
-      const manifestInstances = manifest.instances as Record<string, unknown> | undefined;
-      if (manifestInstances) {
-        if (typeof manifestInstances.supported !== 'boolean') {
-          res.status(400).json(error(config.nodeId, 'INVALID_MANIFEST',
-            'instances.supported must be a boolean'));
-          return;
-        }
-        if (manifestInstances.config_per_instance !== undefined
-          && (typeof manifestInstances.config_per_instance !== 'object' || manifestInstances.config_per_instance === null)) {
-          res.status(400).json(error(config.nodeId, 'INVALID_MANIFEST',
-            'instances.config_per_instance must be an object (JSON Schema)'));
-          return;
-        }
-      }
+      const record = built.record;
+      const name = record.name;
 
       // Enforce max installed limit
       const existing = await storage.listExtensions();
@@ -186,85 +273,12 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       void isOwner;
 
       // Reject if extension name already exists
-      const name = metadata.name as string;
       const existingExt = await storage.getExtension(name);
       if (existingExt) {
         res.status(409).json(error(config.nodeId, 'ALREADY_EXISTS',
           `Extension "${name}" is already installed`));
         return;
       }
-
-      // Enforce code size limit per script
-      for (const [scriptKey, scriptContent] of Object.entries(scripts)) {
-        const sizeKb = Buffer.byteLength(scriptContent, 'utf8') / 1024;
-        if (sizeKb > config.extensionMaxCodeSizeKb) {
-          res.status(400).json(error(config.nodeId, 'CODE_TOO_LARGE',
-            `Script "${scriptKey}" is ${sizeKb.toFixed(1)}KB, max is ${config.extensionMaxCodeSizeKb}KB`));
-          return;
-        }
-      }
-
-      // Build ExtensionRecord
-      const manifestConfig = manifest.config as Record<string, unknown> | undefined;
-      const manifestLimits = manifest.limits as Record<string, unknown> | undefined;
-      const manifestFederation = manifest.federation as Record<string, unknown> | undefined;
-      const manifestSchedules = manifest.schedules as Array<Record<string, unknown>> | undefined;
-
-      const record: ExtensionRecord = {
-        name,
-        version: metadata.version as string,
-        description: metadata.description as string,
-        author: metadata.author as string,
-        status: 'inactive',
-        requiredApis: (manifest.required_apis as string[]) ?? [],
-        actions: actions.map(a => ({
-          id: a.id as string,
-          method: (a.method as string).toUpperCase(),
-          path: a.path as string,
-          inputSchema: (a.input as Record<string, unknown>) ?? {},
-          outputSchema: (a.output as Record<string, unknown>) ?? {},
-          scriptContent: scripts[a.script as string],
-        })),
-        config: {
-          ...(manifestConfig
-            ? Object.fromEntries(
-                Object.entries(manifestConfig).map(([k, v]) => {
-                  if (v && typeof v === 'object' && 'default' in (v as Record<string, unknown>)) {
-                    return [k, (v as Record<string, unknown>).default];
-                  }
-                  return [k, v];
-                }),
-              )
-            : {}),
-          ...(manifestSchedules ? { __schedules: manifestSchedules } : {}),
-        },
-        limits: {
-          memoryMb: Math.min(
-            (manifestLimits?.memory_mb as number) ?? config.extensionMaxMemoryMb,
-            config.extensionMaxMemoryMb,
-          ),
-          timeoutMs: Math.min(
-            (manifestLimits?.timeout_ms as number) ?? config.extensionTimeoutMs,
-            config.extensionTimeoutMs,
-          ),
-          maxApiCalls: Math.min(
-            (manifestLimits?.max_api_calls as number) ?? config.extensionMaxApiCalls,
-            config.extensionMaxApiCalls,
-          ),
-        },
-        federation: {
-          advertise: (manifestFederation?.advertise as boolean) ?? false,
-          capabilities: (manifestFederation?.capabilities as string[]) ?? [],
-        },
-        ...(manifestInstances?.supported ? {
-          instances: {
-            supported: true,
-            configSchema: (manifestInstances.config_per_instance as Record<string, unknown>) ?? undefined,
-          },
-        } : {}),
-        installedBy: req.auth!.owner,
-        installedAt: new Date().toISOString(),
-      };
 
       const created = await storage.createExtension(record);
       logger.info(`Extension installed: ${created.name}`, { version: created.version, by: req.auth!.owner });
@@ -277,6 +291,152 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
     } catch (err) {
       logger.error('Failed to install extension', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to install extension'));
+    }
+  });
+
+  // ── PUT /v1/extensions/:name — idempotent upsert (create, or replace in place) ──
+  // Redeploy without a destructive DELETE. Updating an existing extension keeps its identity,
+  // its ext:{name} namespace memory, and its instances; the action scripts + manifest are
+  // swapped atomically (single-row UPDATE), so the next /v1/ext/... call runs the new code and
+  // the action endpoint never disappears mid-redeploy. For an active extension, schedules are
+  // re-registered from the new manifest and @activate jobs re-run (the init equivalent of the
+  // old DELETE→re-POST→activate). Identical bytes are a safe 200 no-op. Updating never consumes
+  // a quota slot. Create requires ext:write (like POST); update requires owning the extension.
+  router.put('/v1/extensions/:name', requireAuth(), validateBody(ExtensionInstallSchema, config.nodeId), async (req, res) => {
+    try {
+      const name = req.params.name as string;
+      const { manifest: manifestYaml, scripts } = req.body as { manifest?: string; scripts?: Record<string, string> };
+      const existing = await storage.getExtension(name);
+
+      // Permission: create mirrors POST (ext:write / install role); update requires ownership.
+      if (!existing) {
+        if (!hasExtWritePermission(req)) {
+          res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE',
+            `Extension install requires ${config.extInstallRole} role or ext:write scope`));
+          return;
+        }
+      } else if (!canManageInstalledExt(req, existing.installedBy)) {
+        res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
+        return;
+      }
+
+      // Validate + build the record. Preserve the original installer/timestamp on update.
+      const built = buildExtensionRecordFromManifest(
+        manifestYaml, scripts, config,
+        existing ? existing.installedBy : req.auth!.owner,
+        existing ? existing.installedAt : new Date().toISOString(),
+      );
+      if (!built.ok) {
+        res.status(built.status).json(error(config.nodeId, built.code, built.message));
+        return;
+      }
+      const record = built.record;
+
+      // metadata.name identifies the resource — it must match the URL.
+      if (record.name !== name) {
+        res.status(400).json(error(config.nodeId, 'NAME_MISMATCH',
+          `Manifest metadata.name "${record.name}" does not match URL name "${name}"`));
+        return;
+      }
+
+      // ── CREATE branch — brand-new extension. Mirrors POST quota checks. ──
+      if (!existing) {
+        const all = await storage.listExtensions();
+        if (all.length >= config.extensionMaxInstalled) {
+          res.status(409).json(error(config.nodeId, 'LIMIT_EXCEEDED',
+            `Maximum ${config.extensionMaxInstalled} extensions allowed`));
+          return;
+        }
+        if (!req.auth!.roles.includes('operator')) {
+          const ownerExts = all.filter(e => e.installedBy === req.auth!.owner);
+          if (ownerExts.length >= config.maxExtensionsPerOwner) {
+            res.status(429).json(error(config.nodeId, 'EXTENSION_LIMIT',
+              `Maximum ${config.maxExtensionsPerOwner} extensions per owner`));
+            return;
+          }
+        }
+        const created = await storage.createExtension(record);
+        logger.info(`Extension installed via upsert: ${created.name}`, { version: created.version, by: req.auth!.owner });
+        res.status(201).json(success(config.nodeId, { extension: created, action: 'created' }, [
+          { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${created.name}/activate` },
+          { description: 'View extension details', method: 'GET', url: `/v1/extensions/${created.name}` },
+        ]));
+        emitChange('extensions');
+        return;
+      }
+
+      // ── UPDATE branch — idempotency: identical derived bytes ⇒ 200 no-op. ──
+      const signature = (r: ExtensionRecord) => JSON.stringify({
+        version: r.version, description: r.description, author: r.author,
+        requiredApis: r.requiredApis, actions: r.actions, config: r.config,
+        limits: r.limits, federation: r.federation, instances: r.instances ?? null,
+      });
+      if (signature(record) === signature(existing)) {
+        res.json(success(config.nodeId, { extension: existing, action: 'unchanged', message: 'Extension is already up to date' }, [
+          { description: 'View extension details', method: 'GET', url: `/v1/extensions/${name}` },
+        ]));
+        return;
+      }
+
+      const wasActive = existing.status === 'active';
+
+      // Swap code + metadata in place atomically. Lifecycle fields (status, installedBy,
+      // installedAt, activatedAt) and the ext:{name} memory + instances are preserved.
+      const updated = await storage.updateExtension(name, {
+        version: record.version,
+        description: record.description,
+        author: record.author,
+        requiredApis: record.requiredApis,
+        actions: record.actions,
+        config: record.config,
+        limits: record.limits,
+        federation: record.federation,
+        instances: record.instances,
+      });
+
+      // Re-run init for an active extension: re-register schedules from the (possibly changed)
+      // manifest and re-run @activate jobs. New action scriptContent is already live — each
+      // /v1/ext/... call reads it fresh from storage.
+      let reinitialized = false;
+      if (wasActive && scheduler) {
+        const jobs = await storage.listScheduledJobs({ extensionName: name });
+        for (const job of jobs) {
+          scheduler.removeJob(job.id);
+          await storage.deleteScheduledJob(job.id);
+        }
+        const schedules = (record.config.__schedules as Array<Record<string, unknown>> | undefined) ?? [];
+        for (const sched of schedules) {
+          const jobId = `ext:${name}:${sched.id as string}`;
+          const jobRecord: ScheduledJobRecord = {
+            id: jobId,
+            name: (sched.description as string) ?? `${name}/${sched.id as string}`,
+            type: 'extension',
+            extensionName: name,
+            actionId: sched.action as string,
+            cron: sched.cron as string,
+            enabled: true,
+            input: (sched.input as Record<string, unknown>) ?? undefined,
+            createdBy: req.auth!.sub,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          await storage.createScheduledJob(jobRecord);
+          scheduler.addJob(jobRecord);
+        }
+        scheduler.runActivateJobs(name).catch(err =>
+          logger.error(`Failed to run @activate jobs for ${name}`, { error: String(err) }));
+        reinitialized = true;
+      }
+
+      logger.info(`Extension upserted: ${name}`, { version: record.version, by: req.auth!.sub, reinitialized });
+      res.json(success(config.nodeId, { extension: updated, action: 'updated', reinitialized }, [
+        { description: 'Execute an action', method: 'POST', url: `/v1/ext/${name}/<actionId>` },
+        { description: 'View extension details', method: 'GET', url: `/v1/extensions/${name}` },
+      ]));
+      emitChange('extensions');
+    } catch (err) {
+      logger.error('Failed to upsert extension', { error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to upsert extension'));
     }
   });
 

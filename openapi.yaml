@@ -12930,6 +12930,60 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+    put:
+      operationId: upsertExtension
+      summary: Upsert (redeploy) an extension
+      description: |
+        Idempotent upsert. Creates the extension if it does not exist, otherwise replaces it in
+        place WITHOUT a destructive delete: the extension keeps its identity, its `ext:{name}`
+        namespace memory, and its instances. Action scripts + manifest are swapped atomically, so
+        the next `/v1/ext/...` call runs the new code and the action endpoint never disappears
+        mid-redeploy. For an active extension, schedules are re-registered from the new manifest
+        and `@activate` jobs re-run. Identical bytes are a safe 200 no-op, and updating never
+        consumes a quota slot. Create requires ext:write (like POST); update requires owning the
+        extension.
+      tags: [Extensions]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Extension name (must match metadata.name in the manifest)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [manifest, scripts]
+              properties:
+                manifest:
+                  type: string
+                  description: Extension manifest as a YAML string.
+                scripts:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: Map of script filename to JavaScript source.
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Install limit exceeded.
+        '429':
+          description: Per-owner extension limit exceeded.
+
     delete:
       operationId: uninstallExtension
       summary: Uninstall an extension
@@ -13746,6 +13800,55 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '404':
           $ref: '#/components/responses/NotFound'
+    put:
+      operationId: upsertCortexModel
+      summary: Upsert (redeploy) a cortex model
+      description: |
+        Idempotent upsert. Creates the cortex if it does not exist, otherwise replaces it
+        in place WITHOUT a delete: the cortex keeps its identity and stays served for the
+        whole call (lib files are swapped in place, never delete-then-recreated for files
+        that persist, so GET /v1/cortex/{name}/libs/{libFile} never 404s mid-upsert). For an
+        active cortex, init is re-run so new behaviour goes live (unlike re-activate, which
+        skips init when already active). Updating an existing cortex never consumes a quota
+        slot, and an identical manifest + libs is a safe 200 no-op.
+        Same scope as POST /v1/cortex (cortex:write); owner/operator bypass scope, and only the
+        installing owner may update.
+      tags: [Cortex]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [manifest]
+              properties:
+                manifest:
+                  type: string
+                  description: Cortex manifest as a YAML string. metadata.name must match the URL name.
+                libs:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: Map of lib filename to JavaScript source.
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          description: Manifest, lib, or quota limit exceeded.
     delete:
       operationId: deleteCortexModel
       summary: Delete cortex model
