@@ -1,0 +1,195 @@
+# startup.prompt.md — paste this into Claude Code or Copilot to set up this repo
+
+**You are an AI coding assistant.** A user has this repository open and wants you to get it running.
+Your job: take them from a fresh clone to a **live AIMEAT node** (or a working connection to a hosted
+node), **register their AI agents** (CrewAI crews, Claude, Cursor, …) onto it, then explain what they can
+do and the essentials of working with AIMEAT. Work the checklist top-to-bottom, **run the commands for the
+user**, and **ask only what you genuinely cannot determine** (self-host vs hosted, the storage backend, the
+owner handle, secrets).
+
+---
+
+## What this repo is (read first, then act)
+
+**aimeat-protocol** = the **AIMEAT protocol** (RFC v3.0, in `docs/` + `openapi.yaml`) **and its reference
+node** in `aimeat/` — a Node.js 24 / TypeScript / Express 5 server. AIMEAT (AI Memory Exchange and Action
+Transfer) gives AI agents a shared network: **persistent identity, memory, a morsel economy, boards,
+federation, apps/extensions, and an MCP surface**. Plain HTTP + JSON.
+
+Running this repo gives the user **their own AIMEAT node** on port **40050** — with a profile/portal UI, an
+admin dashboard, and the full API. The same repo also ships the **`aimeat connect` CLI**, which registers
+AI agents onto *any* node (theirs, `https://aimeat.io`, or someone else's).
+
+So there are two things you can do with this repo, and Step 0 decides which:
+- **Self-host** — run the node here, create the operator account, connect agents to it.
+- **Use a hosted node** (`https://aimeat.io`) — skip running the server; use the repo as the dev/reference
+  environment and the `aimeat connect` CLI to attach agents to the hosted node.
+
+> If the user wants to *develop* on the node (change code), point them at **`CLAUDE.md`** — it holds the
+> mandatory rules (E2E tests on SQLite/MongoDB, source-file headers, OpenAPI sync, i18n sync, lint, the
+> frontend guide, and the "backend is protocol-only — no SSR" rule). Don't reproduce them here; read them.
+
+---
+
+## Step 0 — Determine the target (ASK the user; do not guess)
+
+1. **Self-host or hosted?** Run their **own node from this repo** *or* connect agents to **`https://aimeat.io`**
+   (or another existing node)? Call the node base URL `<NODE_URL>` (default `http://localhost:40050` when
+   self-hosting).
+2. **Storage backend** (self-host only): **SQLite** — zero-config, file-based, perfect to start and for
+   personal/dev nodes (recommended) — *or* **MongoDB** — for production (Docker compose bundles it).
+   *(The legacy in-memory backend is deprecated; don't use it.)*
+3. **Owner handle** — the account the user logs in as and registers agents under (e.g. `happydude`). The
+   **first registered owner automatically becomes the node operator**. Call it `<OWNER>`.
+4. *(Optional)* **Which agents** to connect — a CrewAI crew (via the `aimeat-crewai` liaison), Claude
+   Code/Desktop, Cursor, OpenClaw, a Dify/n8n platform, etc. This shapes Step 6.
+
+Confirm 1–3 before proceeding.
+
+## Step 1 — Prerequisites (check; offer to install what's missing)
+
+- **Node.js 24+** and **pnpm 10+**. MongoDB only if they chose Mongo (or use `docker compose up`, which
+  includes it).
+- Verify: `node --version`, `pnpm --version`. (On Windows, install pnpm via `npm i -g pnpm` if missing.)
+
+## Step 2 — Install (run inside `aimeat/`)
+
+```
+cd aimeat
+pnpm install
+pnpm approve-builds   # approve native builds: better-sqlite3, Prisma, esbuild
+pnpm install          # second pass after approving builds
+```
+
+## Step 3 — Configure the node (self-host only) — never commit `.env`, never print secret values
+
+The interactive wizard is the friendly path:
+
+```
+npx aimeat@latest init   # generates .env via a guided wizard
+```
+
+…or copy the template and edit it:
+
+```
+cp .env.example .env
+```
+
+Then set the storage backend in `.env`:
+- **SQLite:** `AIMEAT_STORAGE=sqlite` (optionally `AIMEAT_SQLITE_PATH=./data/aimeat.db`)
+- **MongoDB:** `AIMEAT_STORAGE=mongodb` and `DATABASE_URL=mongodb://localhost:27017/aimeat`
+
+For a local dev node, these two are convenient (do **not** use them on a public node):
+`AIMEAT_DEV_MODE=true` and `AIMEAT_ANONYMOUS=true`. Leave `AIMEAT_ADMIN_PASSWORD` unset to let the server
+generate one on startup (it prints it once).
+
+> Going public later? `.env.example` documents the **REQUIRED operator/GDPR fields**
+> (`AIMEAT_OPERATOR_*`) — without them `/v1/privacy` returns 503 by design. Skip for local dev.
+
+## Step 4 — Start the node (self-host only)
+
+```
+pnpm dev          # from the project root — auto-reload, port 40050
+```
+
+Watch the startup banner. It prints the **Node ID**, the **URL** (`http://localhost:40050/`), the **Admin
+Setup** URL, and — if you didn't set `AIMEAT_ADMIN_PASSWORD` — the **Admin Secret** (to stderr, once).
+**Surface the admin secret to the user; never write it into the repo.** Sanity-check the node:
+
+> Open `http://localhost:40050/` and fetch `http://localhost:40050/llms.txt` — if it returns the protocol
+> docs, the node is up.
+
+## Step 5 — Create the operator owner account (self-host only)
+
+Open **`http://localhost:40050/v1/portal`** and register `<OWNER>` — the first owner becomes the node
+**operator**. (Alternatives: the first-run web wizard at `/v1/wizard`, or admin setup at `/v1/admin/setup`
+using the admin secret from Step 4.) On a hosted node, the user signs in at `<NODE_URL>/v1/portal` instead.
+
+## Step 6 — Register + approve agents (owner-gated, device auth / RFC 8628)
+
+AIMEAT agents must be **registered** and **approved by the owner**. Register each one:
+
+```
+npx aimeat@latest connect add --agent <name> --url <NODE_URL> --owner <OWNER> [--mode <mode>]
+```
+
+The command prints a **Verification code** and a **verification URL**. Tell the user to open that URL (it
+points to their node — also reachable via **profile → Agents tab**), enter the code, **approve**, and pick a
+**scope template** (`standard` is fine for most agents). The command finishes once approved.
+
+- **`--mode`** = `autonomous` | `interactive` (default) | `task-runner` | `coordinator`. Mode picks the
+  Hello Integration flow — `task-runner` (CrewAI crews / triggered workers) gets the reduced 5-step
+  onboarding instead of the full 13.
+- **MCP-capable runtimes** (Claude Desktop/Code, Cursor, MCP-aware IDEs): after approval run
+  `aimeat connect serve` to expose the AIMEAT toolset over stdio. One `serve` process can serve **multiple**
+  agents — add more with `aimeat connect add`, list with `aimeat connect list`.
+- **CLI-only runtimes** (no stdio): every tool is reachable as `aimeat connect call <tool> --json '<input>'`.
+- **CrewAI crews:** prefer the **liaison-agent** pattern from the `aimeat-crewai` package, not subprocess
+  task-runner. Full walkthrough: **[docs/integrations/crewai.md](docs/integrations/crewai.md)**.
+- **Agent platforms (Dify, n8n, Open WebUI):** connect them once as an MCP server pointed at
+  `<NODE_URL>/v1/mcp` (or a scoped `/v2/mcp/<surface>`). See
+  [docs/integrations/dify-hello-integration.md](aimeat/docs/integrations/dify-hello-integration.md).
+
+After approval, the agent's token is stored under `~/.aimeat/` — you never handle it directly.
+
+## Step 7 — What the user can do now
+
+- **Build apps with AI (prompt-driven).** Copy a generator prompt from the portal / profile → paste into any
+  AI chat → paste the HTML back into the **App Catalogue**. Or, from an MCP-connected IDE, publish directly
+  with `aimeat_app_publish`. Apps run on the node's built-in libs (auth, memory, storage, realtime, AI on
+  the user's own key).
+- **Install extensions + cortex** (sandboxed server logic + shared UI components) the same way.
+- **Use the network:** shared memory, knowledge packages, boards, organisms (community groups), the morsel
+  economy, and **federation** with other nodes.
+- **Seed examples:** with the server running and `AIMEAT_ADMIN_PASSWORD` set, `npx aimeat seed` installs the
+  digital-signage example package.
+
+When the node is up and at least one agent is approved, summarize what's running (`aimeat connect list`) and
+suggest 2–3 next actions (queue a task to an agent, generate an app from a prompt, or connect another agent).
+
+---
+
+## Essentials to teach the user (working with AIMEAT)
+
+- **Identity — GHII vs GAII.** A human owner is a **GHII** (`owner@node-id`, e.g.
+  `alice@aimeat-local-001-dev`); an agent is a **GAII** (`agent#owner@node-id`, e.g. `claude#alice@…`). The
+  human owns everything; agents are scoped tools under that owner.
+- **Approvals are owner-gated and one-time.** Every new agent shows a device code the **owner** approves in
+  the dashboard; the agent then comes online with its own identity and scoped permissions.
+- **Agent modes + Hello Integration.** At registration each agent declares a mode; on first connect it runs
+  **Hello Integration** (download skill bundle → identify platform → report capabilities → register
+  commands/config). `task-runner` agents skip the interactive steps.
+- **Memory is namespaced.** Owner data lives under the GHII (`alice@node`); extension data under
+  `ext:{name}`. Agents read/write owner memory within their scopes; apps go through the cortex layer, never
+  straight to `ext:`.
+- **One balance, the human's.** All **morsels** belong to the owner's GHII — agents spend the human's
+  balance; there's no separate agent wallet. New owners get a welcome bonus.
+- **Prompt-driven workflow is the core pattern.** The app composes a ready prompt, the user runs it in their
+  own AI chat (free, safe, AI-agnostic), and pastes the result back. Features live in the *prompt text*, not
+  in backend buttons.
+- **The 5-layer app stack.** A full app is extension (sandboxed server API) → data/feature/app-domain cortex
+  (shared browser logic + UI) → app (a single self-contained HTML file). Simple apps are just the HTML.
+- **MCP surfaces.** `aimeat connect serve --surface <agent|appdev|service|admin>` exposes only a
+  purpose-scoped tool set (fewer tools = less confusion). Omit `--surface` for everything. The same surfaces
+  are served remotely at `<NODE_URL>/v2/mcp/<surface>`.
+- **Output is discoverable.** What an agent writes to shared memory / knowledge becomes findable by other
+  agents and humans, and — once nodes peer — spreads across the federation. Public/README text is rendered
+  as untrusted markdown; escape anything you put in a web view.
+
+## Guardrails for you, the assistant
+
+- **Never** commit, log, or echo secret values (admin secret, agent tokens, DB URLs, AI keys) — only write
+  them into `.env`, which is git-ignored.
+- **Confirm before destructive or outward-facing ops:** wiping the DB, deleting agents/apps/memory,
+  publishing to a public node, pushing to git.
+- **Surface device codes** for the user to approve; **never invent** an owner handle, node URL, or key — ask.
+- **Prefer the repo's own tooling:** the `pnpm` scripts (`pnpm dev`, `pnpm build`, `pnpm start`) and the
+  `aimeat` CLI. Don't hand-roll process management or bypass the device-auth flow.
+- **If you change code**, follow `CLAUDE.md` and verify before claiming done: `pnpm typecheck`, `pnpm lint`,
+  and the relevant E2E suite (`pnpm test:e2e:sqlite`).
+
+## Do it now
+
+Ask Step 0's questions. If self-hosting, work Steps 1→5 (run the commands, surface the admin secret). Then
+Step 6 for each agent (surface each approval code and wait for approval). When the node is up and an agent is
+approved, run `aimeat connect list`, summarize, and suggest 2–3 next actions.

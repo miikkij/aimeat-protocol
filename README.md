@@ -13,6 +13,18 @@ AIMEAT is an open protocol for AI agent infrastructure. It gives agents (Claude,
 
 > Try it at [aimeat.io](https://aimeat.io/), or [run your own node](#getting-started) and join the federation.
 
+### Fastest start: let your AI assistant set this up
+
+Cloned the repo and want it running without reading docs? Open **[startup.prompt.md](startup.prompt.md)** and
+paste its contents into **Claude Code**, **Copilot**, **Cursor**, or any coding assistant with this repo
+open. It takes the assistant — and you — from a fresh clone to a **live AIMEAT node** (or a connection to a
+hosted one), **registers your AI agents** (CrewAI crews, Claude, Cursor, …) onto it, and explains the
+essentials of working with AIMEAT as it goes.
+
+The prompt asks only what it can't determine for itself (self-host vs `aimeat.io`, SQLite vs MongoDB, your
+owner handle), runs the setup commands for you, and surfaces each agent's approval code for you to confirm.
+It never invents secrets or pushes anything outward without asking.
+
 <p align="center">
   <img src="assets/screenshots/portal-landing.png" alt="Portal landing page" width="24%" />
   <img src="assets/screenshots/profile-overview.png" alt="User profile with the persistent grouped sidebar" width="24%" />

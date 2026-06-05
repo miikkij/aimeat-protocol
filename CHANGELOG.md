@@ -4,6 +4,23 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+### `startup.prompt.md` — hand the repo to an AI assistant and it sets itself up
+
+A fresh clone now ships a paste-ready bootstrap prompt. Drop the contents of `startup.prompt.md` into
+Claude Code, Copilot, or Cursor with the repo open and the assistant takes you from clone to a **live
+AIMEAT node** (or a connection to a hosted node), **registers your AI agents** (CrewAI crews, Claude,
+Cursor, …) via the device-auth flow, and explains the essentials of working with AIMEAT as it goes.
+
+#### Added
+
+- **`startup.prompt.md`** (repo root) — an assistant-facing setup checklist: determine the target
+  (self-host vs `aimeat.io`, SQLite vs MongoDB, owner handle) → install → configure `.env` → start the node
+  → create the operator owner → register + approve agents (`aimeat connect`) → teach the AIMEAT essentials
+  (GHII/GAII identity, namespaced memory, single-balance morsel economy, agent modes + Hello Integration,
+  MCP surfaces, prompt-driven workflow). Includes guardrails (never echo secrets, confirm destructive ops,
+  never invent node URL/owner/keys) and a "do it now" closing step.
+- **README "Fastest start" callout** — points new users to `startup.prompt.md` near the top of the README.
+
 ### App catalogue: version management, and agent-published apps now surface as yours
 
 Apps published by an owner's agent (via MCP/API) were stranded in "Community Apps" with
