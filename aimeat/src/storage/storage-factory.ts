@@ -1,6 +1,6 @@
 import type { Storage } from './interface.js';
 
-export type StorageProvider = 'memory' | 'sqlite' | 'mongodb';
+export type StorageProvider = 'memory' | 'sqlite' | 'mongodb' | 'postgresql';
 
 export interface StorageOptions {
   provider: StorageProvider;
@@ -33,6 +33,12 @@ export async function createStorage(opts: StorageOptions): Promise<Storage> {
       const mongo = new MongoStorage(opts.dbUrl!);
       await mongo.ready;
       return mongo;
+    }
+    case 'postgresql': {
+      const { PostgresStorage } = await import('./providers/postgres/index.js');
+      const pg = new PostgresStorage(opts.dbUrl!);
+      await pg.ready;
+      return pg;
     }
     default: {
       try {

@@ -16,5 +16,5 @@
     "sourceMap": true
   },
   "include": ["src/**/*", "bin/**/*", "scripts/**/*"],
-  "exclude": ["node_modules", "dist", "test"]
+  "exclude": ["node_modules", "dist", "test", "src/generated/prisma-postgres"]
 }

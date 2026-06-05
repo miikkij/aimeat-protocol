@@ -1,13 +1,17 @@
 /**
  * @file mongodb/index.ts
- * @description MongoDB Storage Implementation using Prisma Client.
- *   Auto-syncs collections & indexes on startup via `prisma db push`.
+ * @description Prisma-backed Storage implementation, shared by the MongoDB and
+ *   PostgreSQL backends. The class `PrismaStorage` holds all the query logic and
+ *   uses only portable Prisma Client CRUD; `MongoStorage` and `PostgresStorage`
+ *   are thin subclasses that differ only in which Prisma schema + generated client
+ *   they load (via the `schemaFileName()` / `prismaClientSpecifier()` hooks).
+ *   Auto-syncs the schema on startup via `prisma db push`.
  *
  * To use:
  *   1. pnpm add @prisma/client prisma
- *   2. npx prisma generate
+ *   2. npx prisma generate  (MongoDB) / pnpm db:generate:postgres (PostgreSQL)
  *   3. Set DATABASE_URL environment variable
- *   4. Start with: aimeat --db mongodb://localhost:27017/aimeat
+ *   4. Start with: aimeat --db mongodb (or --db postgresql)
  *
  * @version-history
  *   v1.0.0 — 2025-01-15 — Initial MongoDB storage implementation
@@ -20,6 +24,10 @@
  *                          full-GHII app ownerName values to the bare owner name.
  *   v1.2.1 — 2026-06-05 — deleteAgentTask now removes any non-active task
  *                          (status != 'active'), not just draft/queued.
+ *   v1.3.0 — 2026-06-05 — Generalised MongoStorage into a shared `PrismaStorage`
+ *                          base (schemaFileName/prismaClientSpecifier hooks) so the
+ *                          PostgreSQL backend can reuse the same query logic;
+ *                          MongoStorage kept as a thin back-compat subclass.
  */
 
 import { execSync } from 'node:child_process';
@@ -98,34 +106,57 @@ import { parseGaiiLoose } from '../../../utils/gaii.js';
 // Prisma client will be imported dynamically at runtime
 // import { PrismaClient } from '@prisma/client';
 
-export class MongoStorage implements Storage {
-    private prisma: any; // PrismaClient — typed as any until @prisma/client is installed
+export class PrismaStorage implements Storage {
+    private prisma: any; // PrismaClient — typed as any (loaded dynamically; two generated clients exist)
     private chunkedUploads = new Map<string, ChunkedUploadRecord>(); // kept in-memory (transient)
     readonly ready: Promise<void>;
 
     constructor(databaseUrl: string) {
-        // Dynamic import to avoid requiring @prisma/client at compile time
+        // Dynamic import to avoid requiring a generated Prisma client at compile time
         this.prisma = null;
         this.ready = this.init(databaseUrl);
     }
 
+    /**
+     * Prisma schema filename this backend syncs from (under `prisma/`).
+     * Overridden by PostgresStorage to point at `schema.postgres.prisma`.
+     */
+    protected schemaFileName(): string { return 'schema.prisma'; }
+
+    /**
+     * Module specifier for the generated Prisma client. MongoDB uses the default
+     * `@prisma/client`; PostgresStorage returns an absolute path to its own
+     * custom-output client so both backends can coexist in one build.
+     */
+    protected prismaClientSpecifier(): string { return '@prisma/client'; }
+
     private async init(databaseUrl: string) {
         this.syncSchema(databaseUrl);
 
-        const { PrismaClient } = await import('@prisma/client');
+        let PrismaClient: any;
+        try {
+            ({ PrismaClient } = await import(this.prismaClientSpecifier()));
+        } catch (err: any) {
+            throw new Error(
+                `Failed to load the Prisma client (${this.prismaClientSpecifier()}). ` +
+                `Generate it first — run "pnpm db:generate:postgres" for PostgreSQL or ` +
+                `"pnpm db:generate" for MongoDB.`,
+                { cause: err },
+            );
+        }
         this.prisma = new PrismaClient({ datasourceUrl: databaseUrl });
         await this.prisma.$connect();
     }
 
     /**
      * Run `prisma db push --skip-generate` to create any missing
-     * MongoDB collections & indexes. Safe and idempotent — never drops data.
+     * tables/collections & indexes. Safe and idempotent — never drops data.
      * Skips silently if the prisma CLI is not available.
      */
     private syncSchema(databaseUrl: string): void {
         const schemaPath = this.findPrismaSchema();
         if (!schemaPath) {
-            logger.warn('prisma/schema.prisma not found — skipping auto schema sync');
+            logger.warn(`prisma/${this.schemaFileName()} not found — skipping auto schema sync`);
             return;
         }
 
@@ -135,18 +166,18 @@ export class MongoStorage implements Storage {
                 env: { ...process.env, DATABASE_URL: databaseUrl },
                 timeout: 30_000,
             });
-            logger.info('MongoDB schema synced');
+            logger.info('Prisma schema synced');
         } catch (err: any) {
             const stderr = err.stderr?.toString() ?? '';
             logger.warn(`Auto schema sync skipped — run "pnpm db:push" manually if needed. ${stderr || err.message}`);
         }
     }
 
-    /** Walk up from this file to find the nearest prisma/schema.prisma */
+    /** Walk up from this file to find the nearest prisma/<schema file> */
     private findPrismaSchema(): string | null {
         let dir = dirname(fileURLToPath(import.meta.url));
         for (let i = 0; i < 10; i++) {
-            const candidate = resolve(dir, 'prisma', 'schema.prisma');
+            const candidate = resolve(dir, 'prisma', this.schemaFileName());
             if (existsSync(candidate)) return candidate;
             const parent = dirname(dir);
             if (parent === dir) break;
@@ -156,7 +187,7 @@ export class MongoStorage implements Storage {
     }
 
     private ensureReady() {
-        if (!this.prisma) throw new Error('MongoDB storage not yet initialized');
+        if (!this.prisma) throw new Error('Prisma storage not yet initialized');
     }
 
     // ── Owners ──────────────────────────────────────────────────
@@ -6532,3 +6563,10 @@ function mongoConsentMatchPattern(pattern: string, key: string): boolean {
         .join('\\.');
     return new RegExp(`^${regex}$`).test(key);
 }
+
+/**
+ * MongoDB-backed storage. Thin subclass of {@link PrismaStorage} kept so existing
+ * imports (`new MongoStorage(url)`) keep working; the MongoDB defaults
+ * (`schema.prisma` + `@prisma/client`) live in the base class.
+ */
+export class MongoStorage extends PrismaStorage {}

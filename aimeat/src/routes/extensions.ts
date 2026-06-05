@@ -26,6 +26,7 @@ import { parse as parseYaml } from 'yaml';
 import { logger } from '../utils/logger.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
+import { stableStringify } from '../utils/stable-json.js';
 import { ExtensionInstallSchema, validateBody } from '../models/schemas.js';
 
 /** Discriminated result of validating an extension install/upsert payload. */
@@ -366,7 +367,10 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
       }
 
       // ── UPDATE branch — idempotency: identical derived bytes ⇒ 200 no-op. ──
-      const signature = (r: ExtensionRecord) => JSON.stringify({
+      // stableStringify (not JSON.stringify): config/actions/limits/federation/instances
+      // are Json fields, and PostgreSQL jsonb does not preserve object key order — a naive
+      // stringify would see identical data as "changed" on Postgres. See utils/stable-json.ts.
+      const signature = (r: ExtensionRecord) => stableStringify({
         version: r.version, description: r.description, author: r.author,
         requiredApis: r.requiredApis, actions: r.actions, config: r.config,
         limits: r.limits, federation: r.federation, instances: r.instances ?? null,

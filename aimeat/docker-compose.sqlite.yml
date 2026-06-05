@@ -1,0 +1,23 @@
+# AIMEAT node on SQLite (zero external services — the database is a file on a volume).
+#   docker compose -f docker-compose.sqlite.yml up --build
+services:
+  aimeat:
+    build: .
+    ports:
+      - "${AIMEAT_PORT:-40050}:40050"
+    environment:
+      - AIMEAT_PORT=40050
+      - AIMEAT_NODE_ID=${AIMEAT_NODE_ID:-aimeat-local-001-dev}
+      - AIMEAT_ADMIN_PASSWORD=${AIMEAT_ADMIN_PASSWORD:-changeme}
+      - AIMEAT_STORAGE=sqlite
+      - AIMEAT_SQLITE_PATH=/data/aimeat.db
+      - AIMEAT_WELCOME_BONUS=${AIMEAT_WELCOME_BONUS:-100}
+      - AIMEAT_DAILY_ALLOWANCE=${AIMEAT_DAILY_ALLOWANCE:-50}
+      - AIMEAT_DAILY_ALLOWANCE_CAP=${AIMEAT_DAILY_ALLOWANCE_CAP:-500}
+      - AIMEAT_BURN_RATE=${AIMEAT_BURN_RATE:-0.10}
+    volumes:
+      - sqlite_data:/data
+    restart: unless-stopped
+
+volumes:
+  sqlite_data:

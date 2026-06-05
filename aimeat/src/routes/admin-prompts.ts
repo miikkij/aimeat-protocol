@@ -3,6 +3,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { stableStringify } from '../utils/stable-json.js';
 import { PROMPT_SEEDS } from '../services/prompt-defaults.js';
 import { seedSystemPrompts } from '../services/prompt-seeder.js';
 
@@ -92,8 +93,10 @@ export function adminPromptsRouter(config: AimeatConfig, storage: Storage): Rout
       }
     }
 
+    // stableStringify: locales is a Json field; Postgres jsonb doesn't preserve key
+    // order, so a naive stringify would falsely bump the version on an identical re-save.
     const contentChanged = (content !== undefined && content !== existing.content) ||
-                           (locales !== undefined && JSON.stringify(locales) !== JSON.stringify(existing.locales));
+                           (locales !== undefined && stableStringify(locales) !== stableStringify(existing.locales));
 
     const now = new Date().toISOString();
     const owner = req.auth!.owner;

@@ -68,7 +68,7 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
       entries: [
         {
           envVar: 'AIMEAT_STORAGE',
-          description: 'Storage backend (memory | sqlite | mongodb)',
+          description: 'Storage backend (memory | sqlite | mongodb | postgresql)',
           value: config.storageProvider,
           defaultVal: 'memory',
         },
@@ -80,10 +80,10 @@ export function formatConfig(config: AimeatConfig, provenance?: ConfigProvenance
         },
         {
           envVar: 'DATABASE_URL',
-          description: 'MongoDB connection URL (when mongodb)',
-          value: config.storageProvider === 'mongodb'
-            ? (config.dbUrl ? maskUrl(config.dbUrl) : '(not set — required for mongodb)')
-            : '(n/a — not using mongodb)',
+          description: 'MongoDB / PostgreSQL connection URL (when mongodb or postgresql)',
+          value: (config.storageProvider === 'mongodb' || config.storageProvider === 'postgresql')
+            ? (config.dbUrl ? maskUrl(config.dbUrl) : `(not set — required for ${config.storageProvider})`)
+            : '(n/a — not using mongodb/postgresql)',
           defaultVal: '(none)',
           secret: true,
         },

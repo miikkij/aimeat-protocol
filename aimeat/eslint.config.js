@@ -9,6 +9,7 @@
  * @version-history
  *   v1.0.0 — 2026-03-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-03-13 — Added custom aimeat plugin (file-header, max-file-lines)
+ *   v1.2.0 — 2026-06-05 — Ignore src/generated/** (Prisma clients, openapi types)
  */
 
 import eslint from '@eslint/js';
@@ -19,7 +20,7 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    ignores: ['dist/**', 'node_modules/**', 'test/**', 'src/static/**'],
+    ignores: ['dist/**', 'node_modules/**', 'test/**', 'src/static/**', 'src/generated/**'],
   },
   {
     plugins: {

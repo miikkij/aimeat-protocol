@@ -7,6 +7,7 @@ services:
       - AIMEAT_PORT=40050
       - AIMEAT_NODE_ID=${AIMEAT_NODE_ID:-aimeat-local-001-dev}
       - AIMEAT_ADMIN_PASSWORD=${AIMEAT_ADMIN_PASSWORD:-changeme}
+      - AIMEAT_STORAGE=mongodb
       - DATABASE_URL=mongodb://${MONGO_INITDB_ROOT_USERNAME:-dbuser}:${MONGO_INITDB_ROOT_PASSWORD:-dbpassword}@mongo:27017/AIMEAT?replicaSet=myReplicaSet&authSource=admin
       - AIMEAT_WELCOME_BONUS=${AIMEAT_WELCOME_BONUS:-100}
       - AIMEAT_DAILY_ALLOWANCE=${AIMEAT_DAILY_ALLOWANCE:-50}

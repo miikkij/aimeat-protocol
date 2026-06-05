@@ -47,7 +47,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'nodeId', dotPath: 'node.id', envVar: 'AIMEAT_NODE_ID', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'Unique node identifier' },
   { key: 'port', dotPath: 'node.port', envVar: 'AIMEAT_PORT', type: 'number', validate: v => typeof v === 'number' && v >= 1 && v <= 65535, immutable: true, description: 'HTTP listen port', range: '1-65535' },
   { key: 'nodeType', dotPath: 'node.type', envVar: 'AIMEAT_NODE_TYPE', type: 'string', validate: v => ['full', 'personal', 'relay'].includes(v as string), immutable: true, description: 'Node type: full, relay, or personal' },
-  { key: 'storageProvider', dotPath: 'storage.type', envVar: 'AIMEAT_STORAGE', type: 'string', validate: v => ['mongodb', 'sqlite', 'memory'].includes(v as string), immutable: true, description: 'Storage backend type' },
+  { key: 'storageProvider', dotPath: 'storage.type', envVar: 'AIMEAT_STORAGE', type: 'string', validate: v => ['mongodb', 'sqlite', 'memory', 'postgresql', 'postgres'].includes(v as string), immutable: true, description: 'Storage backend type' },
   { key: 'dbUrl', dotPath: 'database_url', envVar: 'DATABASE_URL', type: 'string', validate: () => true, immutable: true, description: 'Database connection URL', adminDisplay: 'hidden' },
   { key: 'sqlitePath', dotPath: 'sqlite_path', envVar: 'AIMEAT_SQLITE_PATH', type: 'string', validate: () => true, immutable: true, description: 'SQLite database file path', adminDisplay: 'hidden' },
   { key: 'adminPassword', dotPath: 'admin_password', envVar: 'AIMEAT_ADMIN_PASSWORD', type: 'string', validate: () => true, immutable: true, description: 'Operator admin password', adminDisplay: 'hidden' },

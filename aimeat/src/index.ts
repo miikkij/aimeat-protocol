@@ -96,7 +96,7 @@ USAGE
   aimeat restore <FILE>          Import data from JSON backup
 
 START OPTIONS
-  --db <type>              Storage type: mongodb, sqlite, memory
+  --db <type>              Storage type: mongodb, postgresql, sqlite, memory
   --db-url <url>           Database connection URL (MongoDB)
   --db-path <path>         SQLite database file path
   -p, --port <port>        HTTP port (default: 40050)

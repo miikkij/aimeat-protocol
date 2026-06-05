@@ -13,8 +13,13 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { resolve } from 'node:path';
 
 const PORT = process.env.AIMEAT_PORT ?? '40251';
-const BASE_URL = process.env.AIMEAT_BASE_URL ?? `http://localhost:${PORT}`;
-const USE_EXTERNAL_SERVER = !!process.env.AIMEAT_BASE_URL;
+// External mode must be opted into explicitly (see run-e2e-ci.ts) so a stray
+// AIMEAT_BASE_URL pointing at a remote node can't hijack a local test run.
+const USE_EXTERNAL_SERVER = process.env.AIMEAT_E2E_EXTERNAL === '1' && !!process.env.AIMEAT_BASE_URL;
+const BASE_URL = (USE_EXTERNAL_SERVER ? (process.env.AIMEAT_BASE_URL as string) : `http://localhost:${PORT}`).replace(/\/+$/, '');
+if (!USE_EXTERNAL_SERVER && process.env.AIMEAT_BASE_URL) {
+    console.warn(`⚠ Ignoring AIMEAT_BASE_URL=${process.env.AIMEAT_BASE_URL} — auto-starting a local server on :${PORT}. Set AIMEAT_E2E_EXTERNAL=1 to test that external server instead.`);
+}
 const DB_TYPE = process.env.AIMEAT_DB ?? 'memory';
 
 // ── Server lifecycle (copied from run-e2e-ci.ts) ──

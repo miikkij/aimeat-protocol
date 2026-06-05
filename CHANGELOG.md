@@ -4,6 +4,54 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+### PostgreSQL storage backend + per-backend Docker Compose
+
+AIMEAT now supports **PostgreSQL** as a third first-class persistent backend, alongside SQLite and MongoDB.
+PostgreSQL reuses the entire MongoDB Prisma provider (which uses only portable Prisma CRUD), so the two
+share one code path and behave identically — the only differences are a relational schema and a second
+generated client. Each backend also gets its own Docker Compose file.
+
+#### Added
+
+- **`PrismaStorage` base class** (`src/storage/providers/mongodb/index.ts`) — `MongoStorage` was generalised
+  into a shared base with two overridable hooks (`schemaFileName()`, `prismaClientSpecifier()`); `MongoStorage`
+  remains as a thin back-compat subclass. No query logic changed.
+- **`PostgresStorage`** (`src/storage/providers/postgres/index.ts`) — a ~10-line subclass that loads
+  `schema.postgres.prisma` + a custom-output Prisma client.
+- **`prisma/schema.postgres.prisma`** — relational mirror of the MongoDB schema, derived deterministically by
+  **`scripts/gen-postgres-schema.mjs`** (regenerate after any `schema.prisma` change). 50 Prisma-generated ids
+  become `@default(cuid())`; 38 app-supplied ids drop only the `_id` mapping.
+- **Config wiring** — `AIMEAT_STORAGE=postgresql` (with `postgres` accepted as an alias) threaded through the
+  storage factory, config schema/validator, `aimeat config`, the `aimeat init` wizard (with EN/FI i18n), and
+  `--db` help.
+- **Build & scripts** — `pnpm build` now generates both Prisma clients; new `db:generate:postgres`,
+  `db:push:postgres`, and `test:e2e:postgresql` scripts; PostgreSQL added to `test:e2e:all-backends`.
+- **Docker Compose per backend** — `docker-compose.postgres.yml` (adds a `postgres:16` service) and
+  `docker-compose.sqlite.yml` (no external DB), alongside the existing MongoDB `docker-compose.yml`.
+- **E2E** — `run-e2e-ci.ts` gained a PostgreSQL branch (server `--db-url` + `prisma db push --force-reset`
+  resets); `.env.test.postgres.example` template added.
+
+#### Fixed
+
+- **Dockerfile** never copied `prisma/` (so `prisma generate` had no schema) and pulled `node_modules` from a
+  prod-only stage (so the generated Prisma client was absent at runtime) — both pre-existing gaps that also
+  affected MongoDB-in-Docker. The image now carries the schema, both generated clients, and the Prisma CLI.
+- **`docker-compose.yml`** set `DATABASE_URL` but not `AIMEAT_STORAGE`, so it silently ran the in-memory
+  backend instead of MongoDB. It now sets `AIMEAT_STORAGE=mongodb`.
+- **E2E/Playwright runners no longer hijack to an external server from a stray `AIMEAT_BASE_URL`.** A bare
+  `AIMEAT_BASE_URL` (commonly exported to point the CLI at a remote node like `https://aimeat.io`) used to
+  silently make the local DB-backed test suites run against that remote URL. External mode now requires an
+  explicit `AIMEAT_E2E_EXTERNAL=1`; otherwise the runner warns and auto-starts a local server. The external
+  `BASE_URL` also gets its trailing slash trimmed (fixes `//v1/...` 404s).
+- **Extension upsert idempotency on PostgreSQL.** `PUT /v1/extensions/{name}` with an identical manifest
+  returned `action: "updated"` instead of the no-op `action: "unchanged"` on Postgres, because the
+  change-detection used `JSON.stringify` over `Json` fields and Postgres `jsonb` does not preserve object
+  key order. Now uses a canonical key-sorted serializer (`utils/stable-json.ts`), so the comparison is
+  backend-agnostic.
+- **E2E runner PostgreSQL reset** now truncates all tables (fast, and not blocked by Prisma's AI-agent
+  guard) instead of `prisma db push --force-reset` (which dropped+recreated 88 tables between every suite —
+  slow, and whose timing race could intermittently surface as upload/download-token `401`s).
+
 ### `startup.prompt.md` — hand the repo to an AI assistant and it sets itself up
 
 A fresh clone now ships a paste-ready bootstrap prompt. Drop the contents of `startup.prompt.md` into

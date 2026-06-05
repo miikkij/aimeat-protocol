@@ -37,8 +37,8 @@ So there are two things you can do with this repo, and Step 0 decides which:
    (or another existing node)? Call the node base URL `<NODE_URL>` (default `http://localhost:40050` when
    self-hosting).
 2. **Storage backend** (self-host only): **SQLite** — zero-config, file-based, perfect to start and for
-   personal/dev nodes (recommended) — *or* **MongoDB** — for production (Docker compose bundles it).
-   *(The legacy in-memory backend is deprecated; don't use it.)*
+   personal/dev nodes (recommended) — *or* **MongoDB** / **PostgreSQL** for production (each has its own
+   Docker compose file). *(The legacy in-memory backend is deprecated; don't use it.)*
 3. **Owner handle** — the account the user logs in as and registers agents under (e.g. `happydude`). The
    **first registered owner automatically becomes the node operator**. Call it `<OWNER>`.
 4. *(Optional)* **Which agents** to connect — a CrewAI crew (via the `aimeat-crewai` liaison), Claude
@@ -78,6 +78,7 @@ cp .env.example .env
 Then set the storage backend in `.env`:
 - **SQLite:** `AIMEAT_STORAGE=sqlite` (optionally `AIMEAT_SQLITE_PATH=./data/aimeat.db`)
 - **MongoDB:** `AIMEAT_STORAGE=mongodb` and `DATABASE_URL=mongodb://localhost:27017/aimeat`
+- **PostgreSQL:** `AIMEAT_STORAGE=postgresql` and `DATABASE_URL=postgresql://user:pass@localhost:5432/aimeat`
 
 For a local dev node, these two are convenient (do **not** use them on a public node):
 `AIMEAT_DEV_MODE=true` and `AIMEAT_ANONYMOUS=true`. Leave `AIMEAT_ADMIN_PASSWORD` unset to let the server

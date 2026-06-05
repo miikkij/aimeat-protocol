@@ -232,9 +232,12 @@ function validateUrl(val: string | undefined, t: TFunction): string | undefined 
   }
 }
 
-function validateDbUrl(val: string | undefined, t: TFunction): string | undefined {
+function validateDbUrl(val: string | undefined, t: TFunction, backend: 'mongodb' | 'postgresql' = 'mongodb'): string | undefined {
   if (!val) return;
-  if (!val.startsWith('mongodb://') && !val.startsWith('mongodb+srv://')) {
+  const ok = backend === 'postgresql'
+    ? (val.startsWith('postgresql://') || val.startsWith('postgres://'))
+    : (val.startsWith('mongodb://') || val.startsWith('mongodb+srv://'));
+  if (!ok) {
     return t('init.dbUrlInvalid');
   }
 }
@@ -618,6 +621,7 @@ async function askCoreSettings(
         { value: 'memory', label: t('init.storage_memory') },
         { value: 'sqlite', label: t('init.storage_sqlite') },
         { value: 'mongodb', label: t('init.storage_mongodb') },
+        { value: 'postgresql', label: t('init.storage_postgresql') },
       ],
       initialValue: useCase === 'dev' ? 'memory' : useCase === 'personal' ? 'sqlite' : 'mongodb',
     }),
@@ -638,18 +642,22 @@ async function askCoreSettings(
     settings.AIMEAT_SQLITE_PATH = sqlitePath;
   }
 
-  // MongoDB URL — only when mongodb storage is selected
-  if (storageBackend === 'mongodb') {
+  // DATABASE_URL — when mongodb or postgresql storage is selected
+  if (storageBackend === 'mongodb' || storageBackend === 'postgresql') {
+    const dbBackend = storageBackend as 'mongodb' | 'postgresql';
+    const samplePlaceholder = dbBackend === 'postgresql'
+      ? 'postgresql://user:pass@localhost:5432/aimeat'
+      : 'mongodb://user:pass@localhost:27017/aimeat';
     if (useCase === 'public') {
       const dbDefault = env.DATABASE_URL || preset.dbUrl || '';
       const dbUrl = checkCancel(
         await p.text({
           message: t('init.dbUrl'),
-          placeholder: dbDefault || 'mongodb://user:pass@localhost:27017/aimeat',
+          placeholder: dbDefault || samplePlaceholder,
           ...(dbDefault ? { defaultValue: dbDefault } : {}),
           validate: val => {
             if (!val) return undefined;
-            return validateDbUrl(val, t);
+            return validateDbUrl(val, t, dbBackend);
           },
         }),
         t,
@@ -660,9 +668,9 @@ async function askCoreSettings(
       const dbUrl = checkCancel(
         await p.text({
           message: t('init.dbUrl'),
-          placeholder: dbDefault || t('init.dbUrlHint'),
+          placeholder: dbDefault || samplePlaceholder,
           defaultValue: dbDefault,
-          validate: val => validateDbUrl(val, t),
+          validate: val => validateDbUrl(val, t, dbBackend),
         }),
         t,
       );

@@ -1,21 +1,23 @@
-// This is your Prisma schema file for MongoDB.
-// Learn more: https://pris.ly/d/prisma-schema
-//
-// MIRROR NOTE: this is the source of truth for BOTH backends. The PostgreSQL
-// schema (prisma/schema.postgres.prisma) is derived from this file — after any
-// model/field change here, regenerate it: `node scripts/gen-postgres-schema.mjs`.
+// AIMEAT — PostgreSQL Prisma schema (GENERATED — do not edit by hand).
+// Source of truth: prisma/schema.prisma (MongoDB). Regenerate with:
+//   node scripts/gen-postgres-schema.mjs
+// MIRROR NOTE: models & fields are identical to schema.prisma; only the id
+// strategy (cuid() vs ObjectId) and the generator/datasource blocks differ.
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../src/generated/prisma-postgres"
 }
 
 datasource db {
-  provider = "mongodb"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+
+
 model Owner {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  id          String   @id @default(cuid())
   name        String   @unique
   displayName String?
   publicKey   String
@@ -24,7 +26,7 @@ model Owner {
 }
 
 model Agent {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  id            String   @id @default(cuid())
   name          String
   owner         String
   gaii          String   @unique
@@ -64,7 +66,7 @@ model Agent {
 }
 
 model Memory {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  id         String   @id @default(cuid())
   key        String
   ownerGaii  String
   value      Json?
@@ -83,7 +85,7 @@ model Memory {
 }
 
 model Action {
-  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  id                   String   @id @default(cuid())
   actionId             String
   providerGaii         String
   displayName          String
@@ -108,7 +110,7 @@ model Action {
 }
 
 model Work {
-  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  id             String   @id @default(cuid())
   trackingCode   String   @unique
   status         String
   actionId       String
@@ -132,7 +134,7 @@ model Work {
 }
 
 model Transaction {
-  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  id               String   @id @default(cuid())
   txId             String
   gaii             String
   type             String
@@ -145,7 +147,7 @@ model Transaction {
 }
 
 model Board {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  id           String   @id @default(cuid())
   boardId      String   @unique
   name         String
   description  String?
@@ -159,7 +161,7 @@ model Board {
 }
 
 model BoardPost {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  id           String   @id @default(cuid())
   postId       String   @unique
   boardId      String
   authorGaii   String
@@ -176,7 +178,7 @@ model BoardPost {
 }
 
 model Otk {
-  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  id        String    @id @default(cuid())
   key       String    @unique
   ownerGaii String
   action    String
@@ -192,7 +194,7 @@ model Otk {
 }
 
 model Dispute {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  id           String   @id @default(cuid())
   disputeId    String   @unique
   trackingCode String
   status       String
@@ -206,7 +208,7 @@ model Dispute {
 }
 
 model DisputeAudit {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  id           String   @id @default(cuid())
   disputeId    String
   sequence     Int
   event        String
@@ -220,7 +222,7 @@ model DisputeAudit {
 }
 
 model MicroMemory {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  id         String   @id @default(cuid())
   gaii       String
   setName    String
   entries    Json
@@ -232,7 +234,7 @@ model MicroMemory {
 }
 
 model StorageFile {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  id         String   @id @default(cuid())
   key        String
   ownerGaii  String
   visibility String
@@ -248,7 +250,7 @@ model StorageFile {
 }
 
 model PeeringRequest {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  id          String   @id @default(cuid())
   requestId   String   @unique
   fromNodeUrl String
   fromNodeId  String?
@@ -262,19 +264,19 @@ model PeeringRequest {
 }
 
 model NodeKey {
-  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  id         String @id @default(cuid())
   publicKey  String
   privateKey String
 }
 
 model SystemSetting {
-  id    String @id @default(auto()) @map("_id") @db.ObjectId
+  id    String @id @default(cuid())
   key   String @unique
   value String
 }
 
 model RealtimeRoom {
-  id             String   @id @map("_id")
+  id             String   @id
   appType        String
   name           String
   createdBy      String
@@ -287,7 +289,7 @@ model RealtimeRoom {
 }
 
 model SiteChangeLog {
-  id        String   @id @map("_id")
+  id        String   @id
   action    String
   summary   String
   changedBy String
@@ -295,7 +297,7 @@ model SiteChangeLog {
 }
 
 model Ghii {
-  id                         String   @id @default(auto()) @map("_id") @db.ObjectId
+  id                         String   @id @default(cuid())
   username                   String
   nodeId                     String
   ghii                       String   @unique
@@ -335,7 +337,7 @@ model Ghii {
 }
 
 model Extension {
-  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  id           String    @id @default(cuid())
   name         String    @unique
   version      String
   description  String
@@ -355,7 +357,7 @@ model Extension {
 }
 
 model ExtensionInstance {
-  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  id            String    @id @default(cuid())
   instanceId    String
   extensionName String
   config        Json      @default("{}")
@@ -371,7 +373,7 @@ model ExtensionInstance {
 }
 
 model EscrowHold {
-  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  id            String    @id @default(cuid())
   holdId        String    @unique
   fromGaii      String
   amount        Int
@@ -388,7 +390,7 @@ model EscrowHold {
 }
 
 model PushSubscription {
-  id         String   @id @map("_id")
+  id         String   @id
   ownerName  String   @unique
   endpoint   String
   keys       Json
@@ -397,7 +399,7 @@ model PushSubscription {
 }
 
 model NotificationTemplate {
-  id          String   @id @map("_id")
+  id          String   @id
   templateId  String
   locale      String
   fields      Json
@@ -409,7 +411,7 @@ model NotificationTemplate {
 }
 
 model BoardSubscription {
-  id          String   @id @map("_id")
+  id          String   @id
   boardId     String
   gaii        String
   callbackUrl String?
@@ -422,7 +424,7 @@ model BoardSubscription {
 }
 
 model PersonalNode {
-  id                String   @id @map("_id")
+  id                String   @id
   ownerName         String
   anchorNodeId      String
   publicKey         String
@@ -439,7 +441,7 @@ model PersonalNode {
 }
 
 model MailboxItem {
-  id             String   @id @map("_id")
+  id             String   @id
   personalNodeId String
   type           String
   fromGaii       String
@@ -455,7 +457,7 @@ model MailboxItem {
 }
 
 model ChatInstance {
-  id          String   @id @map("_id")
+  id          String   @id
   platform    String
   appName     String
   ownerName   String
@@ -473,7 +475,7 @@ model ChatInstance {
 }
 
 model SchemaLock {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  id              String   @id @default(cuid())
   keyPattern      String
   applyTo         String
   schemaJson      Json
@@ -487,7 +489,7 @@ model SchemaLock {
 }
 
 model Consent {
-  id          String    @id @map("_id")
+  id          String    @id
   ownerGaii   String
   dataPattern String
   recipient   String
@@ -504,7 +506,7 @@ model Consent {
 }
 
 model ConsentAudit {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  id           String   @id @default(cuid())
   consentId    String
   ownerGaii    String
   accessorGaii String
@@ -518,7 +520,7 @@ model ConsentAudit {
 }
 
 model Csm {
-  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  id             String   @id @default(cuid())
   name           String   @unique
   definition     Json
   jsonSchemaKey  String
@@ -531,7 +533,7 @@ model Csm {
 }
 
 model Msm {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  id           String   @id @default(cuid())
   name         String   @unique
   definition   Json
   category     String
@@ -544,7 +546,7 @@ model Msm {
 }
 
 model EmailVerification {
-  id         String    @id @map("_id")
+  id         String    @id
   ownerName  String
   emailHash  String
   code       String
@@ -560,7 +562,7 @@ model EmailVerification {
 }
 
 model Flag {
-  id         String    @id @map("_id")
+  id         String    @id
   targetType String
   targetId   String
   flaggedBy  String
@@ -576,7 +578,7 @@ model Flag {
 }
 
 model Match {
-  id          String    @id @map("_id")
+  id          String    @id
   profileA    String
   profileB    String
   score       Float
@@ -593,7 +595,7 @@ model Match {
 }
 
 model Organism {
-  id               String   @id @map("_id")
+  id               String   @id
   name             String
   description      String
   type             String
@@ -618,7 +620,7 @@ model Organism {
 }
 
 model OrganismMembership {
-  id         String   @id @map("_id")
+  id         String   @id
   organismId String
   ghii       String
   role       String
@@ -632,7 +634,7 @@ model OrganismMembership {
 }
 
 model JoinRequest {
-  id         String    @id @map("_id")
+  id         String    @id
   organismId String
   ghii       String
   message    String?
@@ -646,7 +648,7 @@ model JoinRequest {
 }
 
 model Appeal {
-  id         String    @id @map("_id")
+  id         String    @id
   flagId     String
   appealedBy String
   reason     String
@@ -661,7 +663,7 @@ model Appeal {
 }
 
 model Listing {
-  id          String   @id @map("_id")
+  id          String   @id
   ownerName   String
   sellerGhii  String
   title       String
@@ -686,7 +688,7 @@ model Listing {
 }
 
 model Purchase {
-  id                   String    @id @map("_id")
+  id                   String    @id
   listingId            String
   buyerOwner           String
   sellerOwner          String
@@ -706,7 +708,7 @@ model Purchase {
 }
 
 model TrustedIssuer {
-  id        String   @id @map("_id")
+  id        String   @id
   name      String
   url       String
   publicKey String
@@ -719,7 +721,7 @@ model TrustedIssuer {
 }
 
 model VerificationNonce {
-  id          String   @id @map("_id")
+  id          String   @id
   owner       String
   type        String
   state       String   @unique
@@ -732,7 +734,7 @@ model VerificationNonce {
 }
 
 model GenesisPeer {
-  id            String   @id @map("_id")
+  id            String   @id
   genesisNodeId String
   genesisUrl    String
   publicKey     String
@@ -747,7 +749,7 @@ model GenesisPeer {
 }
 
 model FederationPeer {
-  nodeId               String   @id @map("_id")
+  nodeId               String   @id
   url                  String
   publicKey            String   @default("")
   status               String   @default("pending")
@@ -764,7 +766,7 @@ model FederationPeer {
 }
 
 model OrganismReputation {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  id           String   @id @default(cuid())
   organismId   String   @unique
   score        Float
   breakdown    Json
@@ -772,7 +774,7 @@ model OrganismReputation {
 }
 
 model CortexExtension {
-  id                  String    @id @default(auto()) @map("_id") @db.ObjectId
+  id                  String    @id @default(cuid())
   name                String    @unique
   namespace           String
   shortName           String
@@ -795,7 +797,7 @@ model CortexExtension {
 }
 
 model CortexLibFile {
-  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  id       String @id @default(cuid())
   extName  String
   libName  String
   content  String
@@ -804,7 +806,7 @@ model CortexLibFile {
 }
 
 model PersonalPushSubscription {
-  id             String    @id @map("_id")
+  id             String    @id
   personalNodeId String
   ownerName      String
   endpoint       String
@@ -817,7 +819,7 @@ model PersonalPushSubscription {
 }
 
 model NotificationPreference {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  id              String   @id @default(cuid())
   personalNodeId  String   @unique
   enabled         Boolean  @default(true)
   channels        String[]
@@ -829,7 +831,7 @@ model NotificationPreference {
 }
 
 model Session {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  id        String   @id @default(cuid())
   sessionId String   @unique
   gaii      String
   owner     String
@@ -857,7 +859,7 @@ model Session {
 // Owner-created Personal Access Tokens for agents.
 // See docs/plans/2026-06-03-agent-access-tokens-plan.md
 model PersonalAccessToken {
-  id            String    @id @map("_id")
+  id            String    @id
   tokenHash     String    @unique
   label         String
   owner         String
@@ -875,7 +877,7 @@ model PersonalAccessToken {
 }
 
 model RevokedToken {
-  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  id        String @id @default(cuid())
   tokenHash String @unique
   expiresAt Int
 
@@ -883,7 +885,7 @@ model RevokedToken {
 }
 
 model App {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  id            String   @id @default(cuid())
   ownerGaii     String
   ownerName     String
   filename      String
@@ -901,7 +903,7 @@ model App {
 }
 
 model AppDownload {
-  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  id        String @id @default(cuid())
   ownerGaii String
   filename  String
   count     Int    @default(0)
@@ -910,7 +912,7 @@ model AppDownload {
 }
 
 model AppPurchase {
-  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  id                   String   @id @default(cuid())
   transactionId        String   @unique
   buyerGaii            String
   buyerOwner           String
@@ -935,7 +937,7 @@ model AppPurchase {
 }
 
 model KnowledgeLink {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  id          String   @id @default(cuid())
   source      String
   target      String
   relation    String
@@ -949,7 +951,7 @@ model KnowledgeLink {
 }
 
 model KnowledgeReview {
-  id            String   @id @map("_id")
+  id            String   @id
   packageId     String
   operatorGaii  String
   reason        String
@@ -961,7 +963,7 @@ model KnowledgeReview {
 }
 
 model ScheduledJob {
-  id               String    @id @map("_id")
+  id               String    @id
   name             String
   type             String
   extensionName    String?
@@ -998,7 +1000,7 @@ model ScheduledJob {
 }
 
 model ExecutionLog {
-  id              String   @id @map("_id")
+  id              String   @id
   jobId           String
   jobName         String
   type            String
@@ -1020,7 +1022,7 @@ model ExecutionLog {
 }
 
 model DeviceAuth {
-  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  id               String   @id @default(cuid())
   deviceCode       String   @unique
   userCode         String   @unique
   ownerName        String
@@ -1039,7 +1041,7 @@ model DeviceAuth {
 }
 
 model OAuthClient {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  id           String   @id @default(cuid())
   clientId     String   @unique
   clientSecret String
   clientName   String
@@ -1048,7 +1050,7 @@ model OAuthClient {
 }
 
 model OAuthRefreshToken {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  id        String   @id @default(cuid())
   tokenHash String   @unique
   clientId  String
   gaii      String
@@ -1058,7 +1060,7 @@ model OAuthRefreshToken {
 }
 
 model OAuthApproval {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  id         String   @id @default(cuid())
   clientId   String
   gaii       String
   owner      String
@@ -1069,7 +1071,7 @@ model OAuthApproval {
 }
 
 model SystemPrompt {
-  id          String   @id @map("_id")
+  id          String   @id
   group       String
   name        String
   description String   @default("")
@@ -1084,7 +1086,7 @@ model SystemPrompt {
 }
 
 model SystemPromptVersion {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  id         String   @id @default(cuid())
   promptId   String
   version    Int
   content    String
@@ -1097,7 +1099,7 @@ model SystemPromptVersion {
 }
 
 model Package {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  id              String   @id @default(cuid())
   packageGroupId  String
   name            String
   author          String
@@ -1121,7 +1123,7 @@ model Package {
 }
 
 model TemplateListing {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  id              String   @id @default(cuid())
   packageGroupId  String   @unique
   packageName     String
   packageAuthor   String
@@ -1152,7 +1154,7 @@ model TemplateListing {
 }
 
 model TemplateReview {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  id          String   @id @default(cuid())
   listingId   String
   authorGhii  String
   authorName  String
@@ -1165,7 +1167,7 @@ model TemplateReview {
 }
 
 model TemplateDiscussion {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  id          String   @id @default(cuid())
   listingId   String
   authorGhii  String
   authorName  String
@@ -1177,7 +1179,7 @@ model TemplateDiscussion {
 }
 
 model PackageInstance {
-  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  id                  String   @id @default(cuid())
   packageGroupId      String
   packageVersion      String
   packageRecordId     String
@@ -1194,7 +1196,7 @@ model PackageInstance {
 }
 
 model Capability {
-  id                 String   @id @map("_id")
+  id                 String   @id
   name               String
   summary            String   @default("")
   ownerGhii          String
@@ -1239,7 +1241,7 @@ model Capability {
 }
 
 model CapabilityLog {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  id           String   @id @default(cuid())
   capabilityId String
   callerGhii   String
   input        Json     @default("{}")
@@ -1255,7 +1257,7 @@ model CapabilityLog {
 }
 
 model CapabilityVouch {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  id           String   @id @default(cuid())
   capabilityId String
   userGhii     String
   comment      String?
@@ -1267,7 +1269,7 @@ model CapabilityVouch {
 }
 
 model ReplicationQueue {
-  id            String   @id @map("_id")
+  id            String   @id
   type          String
   targetPeers   String[]
   payload       String?
@@ -1281,12 +1283,12 @@ model ReplicationQueue {
 }
 
 model StatsCounter {
-  id    String @id @map("_id")
+  id    String @id
   value Int    @default(0)
 }
 
 model StatsDailyHistory {
-  id    String @id @default(auto()) @map("_id") @db.ObjectId
+  id    String @id @default(cuid())
   date  String
   key   String
   value Int    @default(0)
@@ -1295,7 +1297,7 @@ model StatsDailyHistory {
 }
 
 model AgentTask {
-  id               String    @id @map("_id")
+  id               String    @id
   agentGaii        String
   ownerGaii        String
   title            String
@@ -1322,7 +1324,7 @@ model AgentTask {
 }
 
 model AgentTaskEvent {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  id        String   @id @default(cuid())
   taskId    String
   type      String
   message   String
@@ -1333,7 +1335,7 @@ model AgentTaskEvent {
 }
 
 model AgentDirective {
-  id           String   @id @map("_id")
+  id           String   @id
   agentGaii    String   @unique
   purpose      String   @default("")
   rules        Json     @default("[]")
@@ -1344,7 +1346,7 @@ model AgentDirective {
 }
 
 model OwnerAgentDefault {
-  id                 String   @id @map("_id")
+  id                 String   @id
   ownerGaii          String   @unique
   rules              Json     @default("[]")
   defaultTokenBudget Int?
@@ -1353,7 +1355,7 @@ model OwnerAgentDefault {
 }
 
 model SharingGroup {
-  id                 String   @id @map("_id")
+  id                 String   @id
   name               String
   description        String?
   ownerGaii          String
@@ -1366,7 +1368,7 @@ model SharingGroup {
 }
 
 model AgentActivity {
-  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  id        String @id @default(cuid())
   agentGaii String
   date      String
   hour      Int
@@ -1378,7 +1380,7 @@ model AgentActivity {
 }
 
 model TelemetryEvent {
-  id        String   @id @map("_id")
+  id        String   @id
   agentGaii String
   type      String
   data      Json
@@ -1390,7 +1392,7 @@ model TelemetryEvent {
 }
 
 model WebhookDeliveryLog {
-  id           String   @id @map("_id")
+  id           String   @id
   agentGaii    String
   event        String
   payload      Json
@@ -1405,7 +1407,7 @@ model WebhookDeliveryLog {
 }
 
 model AgentOnboarding {
-  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  id                   String   @id @default(cuid())
   agentGaii            String   @unique
   status               String   @default("pending")
   startedAt            DateTime @default(now())
@@ -1425,7 +1427,7 @@ model AgentOnboarding {
 }
 
 model AgentMessage {
-  id           String    @id @map("_id")
+  id           String    @id
   agentGaii    String
   threadId     String
   direction    String

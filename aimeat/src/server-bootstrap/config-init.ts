@@ -35,6 +35,7 @@ export async function initializeConfig(
     memory: 'in-memory (data will not persist across restarts)',
     sqlite: `SQLite (${config.sqlitePath})`,
     mongodb: `MongoDB (${config.dbUrl?.replace(/\/\/.*@/, '//<credentials>@') ?? 'no URL'})`,
+    postgresql: `PostgreSQL (${config.dbUrl?.replace(/\/\/.*@/, '//<credentials>@') ?? 'no URL'})`,
   };
   logger.info(`Using ${storageLabels[config.storageProvider]} storage`);
 

@@ -369,8 +369,10 @@ aimeat validate    # check for problems
 pnpm dev                     # development with auto-reload
 pnpm build && pnpm start     # production
 
-# Docker (includes MongoDB)
-docker compose up
+# Docker — one compose file per backend (run from the aimeat/ directory)
+docker compose up                                      # MongoDB (default)
+docker compose -f docker-compose.postgres.yml up --build   # PostgreSQL
+docker compose -f docker-compose.sqlite.yml up --build     # SQLite (no external DB)
 ```
 
 Server runs on port 40050. Quick test: paste this into any AI chat:
@@ -385,7 +387,7 @@ If the AI reads the docs and explains the protocol, everything works. Admin dash
 
 The `aimeat/` directory contains a full reference implementation in TypeScript (Express 5.2, Node 24). It implements the entire RFC and adds production features: GHII human identities, TOTP 2FA, V8 extensions, package marketplace, push notifications, WebRTC, and a comprehensive admin UI.
 
-Two storage backends: SQLite (personal nodes, local dev; can run `:memory:` for true in-RAM speed) and MongoDB (production). The legacy in-memory backend is deprecated -- SQLite `:memory:` covers the same fast-iteration role using the actual production code path.
+Three storage backends: SQLite (personal nodes, local dev; can run `:memory:` for true in-RAM speed), MongoDB (production), and PostgreSQL (production). MongoDB and PostgreSQL share one Prisma-backed code path, so behaviour is identical across both. The legacy in-memory backend is deprecated -- SQLite `:memory:` covers the same fast-iteration role using the actual production code path.
 
 See the [Implementation Guide v3.0](docs/AIMEAT-IO-Implementation-Guide-v3.0.md) for full details.
 
@@ -394,6 +396,7 @@ See the [Implementation Guide v3.0](docs/AIMEAT-IO-Implementation-Guide-v3.0.md)
 ```bash
 pnpm test:e2e:sqlite        # fast iteration default
 pnpm test:e2e:mongodb       # most realistic; run before a PR
+pnpm test:e2e:postgresql    # PostgreSQL backend (needs a running Postgres)
 pnpm test:playwright:sqlite # browser tests, scoped
 pnpm test                   # unit tests
 pnpm typecheck && pnpm lint
