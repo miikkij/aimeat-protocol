@@ -1,3 +1,16 @@
+/**
+ * @file sqlite/index.ts
+ * @description SQLite Storage implementation (better-sqlite3) of the full Storage
+ *   interface. Synchronous prepared statements; schema created/migrated on
+ *   construction via initializeSchema(). Backs `:memory:`, dev, and personal nodes.
+ * @structure SqliteStorage class — one method group per domain (owners, agents,
+ *   memory, apps, wallet, federation, …), each delegating to a dedicated table.
+ * @usage new SqliteStorage(dbPath) — dbPath may be ':memory:' or a file path.
+ * @version-history
+ *   v1.0.0 — pre-2026-06 — Initial SQLite storage implementation
+ *   v1.1.0 — 2026-06-05 — Add normalizeAppOwnerNames() to strip the legacy
+ *     `@node` suffix from app ownerName values (bare-name normalization).
+ */
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
@@ -4181,6 +4194,16 @@ export class SqliteStorage implements Storage {
       `INSERT INTO app_downloads (ownerGaii, filename, downloads) VALUES (?, ?, 1)
        ON CONFLICT(ownerGaii, filename) DO UPDATE SET downloads = downloads + 1`
     ).run(ownerGaii, filename);
+  }
+
+  async normalizeAppOwnerNames(): Promise<number> {
+    // Strip the `@node` suffix from any ownerName stored as a full GHII. Owner
+    // names never contain '@', so `instr` finds only the GHII separator.
+    const result = this.db.prepare(
+      `UPDATE apps SET ownerName = substr(ownerName, 1, instr(ownerName, '@') - 1)
+       WHERE ownerName LIKE '%@%'`
+    ).run();
+    return result.changes;
   }
 
   private deserializeApp(row: Record<string, unknown>): AppRecord {

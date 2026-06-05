@@ -9,6 +9,9 @@
  *   edit (PATCH), and cancel itself; calls onChanged() to let the parent refetch.
  * @version-history
  *   v1.0.0 -- 2026-06-03 -- Initial editable schedule card
+ *   v1.1.0 -- 2026-06-05 -- "Run now" reads the trigger outcome and reports it:
+ *     a warning toast when no task was created (a previous run is still active,
+ *     or a run limit was reached) instead of a misleading "started" success.
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
@@ -82,7 +85,18 @@ export default function ScheduleItem({ schedule: s, onChanged, showToast }) {
     try { await fn(); onChanged?.(); } catch (e) { showToast?.(e.message, true); } finally { setBusy(false); }
   };
   const onToggle = () => run(() => setScheduleEnabled(s.id, !s.enabled));
-  const onTrigger = () => run(async () => { await triggerSchedule(s.id); showToast?.(t('profile.scheduler.triggered')); });
+  // "Run now" surfaces what actually happened: agent_task schedules can decline
+  // to create a task (a previous run is still active, or a run limit is reached),
+  // which used to look like success. Map the backend outcome to a clear toast.
+  const onTrigger = () => run(async () => {
+    const res = await triggerSchedule(s.id);
+    const d = res?.data || {};
+    if (d.outcome === 'created') showToast?.(t('profile.scheduler.runCreated'));
+    else if (d.outcome === 'busy') showToast?.(t('profile.scheduler.runBusy'), true);
+    else if (d.outcome === 'limited') showToast?.(t('profile.scheduler.runLimited'), true);
+    else if (d.outcome === 'error') showToast?.(d.reason || t('profile.scheduler.runError'), true);
+    else showToast?.(t('profile.scheduler.triggered')); // 'ran' (ai/extension) or older server
+  });
   const onCancel = () => { if (window.confirm(t('profile.scheduler.confirmCancel'))) run(() => deleteSchedule(s.id)); };
 
   const onSave = async () => {

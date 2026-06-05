@@ -4,6 +4,127 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+### App catalogue: version management, and agent-published apps now surface as yours
+
+Apps published by an owner's agent (via MCP/API) were stranded in "Community Apps" with
+only a View button — they couldn't be managed and didn't appear as the owner's own. The
+catalogue also gained per-app version management (the data was always stored; only the UI
+was missing).
+
+#### Added
+
+- **Versions modal** on owned published cards (`src/static/app-catalog.html`) — lists every
+  stored version (View per version), **Restore** re-publishes an older version as the new
+  latest (non-destructive; history kept), and **Fork** copies a version into a new app.
+  Community cards gained a **Fork** button so any public app can be copied into your own
+  catalogue.
+- **`Storage.normalizeAppOwnerNames()`** (SQLite + MongoDB), run once at startup
+  (`src/server-bootstrap/service-init.ts`) — rewrites legacy app `ownerName` values stored as
+  a full GHII (`owner@node`) to the bare owner name, idempotently, so agent-published apps
+  reunite under the owner's "Published Apps".
+- **Tests** — `test/e2e-apps.ts` (version history, restore→new latest, fork, GHII-owner
+  download fallback, missing-version `404`) and `test/unit/app-owner-normalization.test.ts`.
+
+#### Fixed
+
+- **"My apps" filter** now matches on the bare owner prefix, so apps stored under a full-GHII
+  `ownerName` show as the user's own (manageable) instead of in "Community".
+- **`/versions` and `/screenshot` routes** (`src/routes/apps.ts`) scanned per-agent GAII
+  buckets, but apps and their screenshots live in the owner's GHII bucket — both `404`'d for
+  every app published under the current scheme. They now resolve the row via
+  `getAppByOwnerName()` and read that bucket directly.
+- **`GET /v1/apps/:owner/:filename`** tolerates the legacy full-GHII owner segment (retries
+  the bare prefix), so links shared before ownerName normalization still resolve.
+
+### App catalogue: working dark theme, English/Finnish, header quick-toggles, interview-style prompt
+
+UX overhaul of the standalone catalogue page (`src/static/app-catalog.html`).
+
+#### Added
+
+- **Dark theme that actually works** — the dark CSS had been removed (light was hardcoded),
+  so the theme setting did nothing. Restored a full `[data-theme="dark"]` token set, converted
+  ~75 hardcoded light colours to CSS variables, and added `color-scheme`, so every surface
+  (cards, modals, context menu, inputs, the prompt preview) flips. A quick 🌙/☀️ light-dark
+  toggle now sits in the header next to Settings.
+- **English / Finnish** — a standalone i18n layer (en/fi) covering the visible chrome (header,
+  section headers, card buttons, context menu, settings, every modal, empty states), an EN/FI
+  picker in the header plus a Language row in Settings, persisted and re-rendered on switch.
+- **Generate App Prompt — rewritten and brought up to date** — listed 6 client libraries; the
+  node serves 13, and the central **aimeat-ai** (AI completions on the user's own key) was
+  missing. The prompt now covers all libraries (grouped), an AI usage section, a realtime/rooms
+  section, light+dark design guidance, and an **interview-first** structure (Step 1 asks app
+  type / name / look & feel / shared-or-private / AI, Step 2 builds). The "Copy with AI Prompt"
+  / share prompt was aligned to match. The live preview now shows the full prompt instead of a
+  2000-character clip.
+
+#### Fixed
+
+- **Context menu no longer runs off the bottom of the screen** — it estimated a fixed height,
+  so with many apps the lower actions (Publish/Delete) were pushed out of reach. It now measures
+  the real menu height (`offsetHeight`, immune to the entry-animation transform) and clamps to
+  the viewport, with `max-height`/scroll as a backstop.
+
+### Agent tasks: delete any non-active task + clean its operational traces
+
+The expanded task view (Profile → Agents → agent → Tasks) only offered **Delete** on
+`draft`/`queued` tasks, so a `paused`, `stalled`, `done`, `failed`, or archived task could
+not be removed and just lingered in the list. Delete now covers every non-active task and
+clears the leftovers a stale task otherwise leaves behind for the runner daemon.
+
+#### Changed
+
+- **Delete works on any non-active task** — `DELETE /v1/agents/{name}/tasks/{id}` now removes
+  a task in any state except `active` (was `draft`/`queued` only). An `active` task returns
+  `409` ("cancel or pause the task first") and keeps the existing Cancel button; everything
+  else (`draft`/`queued`/`revision_requested`/`paused`/`stalled`/`done`/`failed`) is
+  deletable. Guard relaxed to `status != 'active'` in both storage backends and the route
+  (`src/routes/agent-tasks.ts`, `src/storage/providers/{sqlite,mongodb}`).
+- **Tasks tab shows Delete on every non-active task** — the expanded task card renders the
+  Delete button for all deletable states, not just queued/draft/revision_requested
+  (`public/views/profile/agents-tasks-subtab.js`).
+- **OpenAPI** — `deleteAgentTask` description updated (non-active rule + trace cleanup) and a
+  `409` response added (`openapi.yaml`).
+
+#### Added
+
+- **Operational-trace cleanup on delete** — deleting a task now also clears its event log
+  (unchanged), the agent's live-status keys `agents.<agent>.tasks.<id>.*`, and the owner's
+  cancel marker `agents.cancel.task.<id>` (which the CrewAI daemon scans on every poll), so a
+  deleted task can't keep disturbing the runner. The agent's produced deliverable/output
+  memory is deliberately preserved; cleanup is best-effort and never fails the delete.
+- **E2E coverage** (`test/e2e-agent-tasks.ts`) — active→`409`, pause-then-delete→`200`, and a
+  deleted task's live key + cancel marker verified gone afterward (SQLite + MongoDB).
+
+### Scheduler "Run now": report the outcome + stop a set-aside task from blocking it
+
+"Run now" on an `agent_task` schedule could silently create nothing: the scheduler's overlap
+guard treated any non-terminal prior occurrence — including a `paused` or `archived` one the
+owner had set aside — as "still in flight", skipped, and the route still returned success. The
+owner saw a "started" toast but no task ever appeared.
+
+#### Changed
+
+- **Manual runs no longer blocked by a set-aside occurrence** — a manual "Run now" now only
+  defers to an occurrence that is pending or running on its own (queued/draft/revision_requested/
+  active/stalled); a `paused` occurrence — or any `archived`-triaged one — no longer blocks it.
+  Cron/@activate keep the stricter guard (anything not done/failed defers the next fire), but an
+  archived occurrence never blocks either path (`src/services/scheduler.ts`).
+- **Skipped/limited runs no longer inflate stats** — an overlap skip is recorded as `skipped`
+  in the run log and no longer bumps `runCount` or marks the schedule's last run `success`.
+
+#### Added
+
+- **"Run now" reports what happened** — `POST /v1/schedules/{id}/trigger` returns
+  `data.outcome` (`created` | `ran` | `busy` | `limited` | `error`), with `data.task_id` on
+  `created` and `data.reason` on `busy`/`limited`/`error` (`scheduler.ts` `triggerNow`/`JobOutcome`,
+  `src/routes/schedules.ts`). The Scheduler UI maps it to a clear toast — e.g. a warning "No task
+  created — a previous run is still active…" instead of a misleading success (`schedule-item.js`).
+  New i18n keys `profile.scheduler.run{Created,Busy,Limited,Error}` (en + fi); OpenAPI updated.
+- **E2E coverage** (`test/e2e-agent-schedules.ts`) — trigger returns `outcome=created` (+`task_id`);
+  a queued occurrence yields `busy`; a `paused` occurrence and an `archived` occurrence each still
+  produce a fresh run (SQLite + MongoDB).
+
 ## [1.19.0] - 2026-06-05
 
 ### Dify integration toolkit + MCP OAuth consent fixes

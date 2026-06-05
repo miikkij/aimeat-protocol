@@ -9,6 +9,11 @@
  *   - TaskItem -- task row with expand/collapse, todo list, start button
  *   - RequestChangesModal -- inline modal for owner to send a free-text change request
  * @version-history
+ *   v4.11.0 -- 2026-06-05 -- Show the Delete button on every non-active task
+ *     (was queued/draft/revision_requested only) so done/failed/paused/stalled/
+ *     archived tasks can be removed; active tasks still use Cancel. The backend
+ *     delete also cleans the task's operational traces (events, live-status
+ *     memory keys, cancel marker), preserving the deliverable.
  *   v4.10.0 -- 2026-06-03 -- Deep-link support: AgentTasksSubtab accepts
  *     openTaskId + openTaskNonce; a nonce bump resets the bucket to 'recent'
  *     (clears search/time) so the target task is visible, and TaskItem auto-opens
@@ -581,6 +586,11 @@ function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }) {
   const isRevisionRequested = task.status === 'revision_requested';
   const isActive = task.status === 'active';
   const isDone = task.status === 'done';
+  // Any non-active task can be deleted (done/failed/paused/stalled/queued/draft/
+  // revision_requested). An active task uses Cancel instead -- the owner stops
+  // the running work first, then deletes it. Delete also cleans the task's
+  // operational traces server-side (event log, live-status keys, cancel marker).
+  const canDelete = !isActive;
   const rating = task.rating;
   const canStart = isQueued && hasTodos;
   const canRequestChanges = task.status === 'queued' && hasTodos;
@@ -787,7 +797,7 @@ function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }) {
             ${(isActive || task.status === 'stalled') && html`
               <button class="btn-danger btn-sm" onClick=${handleCancel}>${t('profile.agents.tasks.cancel')}</button>
             `}
-            ${(isQueued || task.status === 'draft' || isRevisionRequested) && html`
+            ${canDelete && html`
               <button class="btn-danger btn-sm" onClick=${handleDelete}>${t('profile.agents.tasks.delete')}</button>
             `}
             <span class="pf-agd-task-actions-spacer"></span>

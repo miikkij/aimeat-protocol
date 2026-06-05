@@ -370,12 +370,82 @@ await test('12. Delete draft task', async () => {
     assert(body.data.deleted === true, 'deleted should be true');
 });
 
-await test('13. Cannot delete completed task', async () => {
-    const { status } = await json(`/v1/agents/${agentName}/tasks/${queuedTaskId}`, {
-        method: 'DELETE',
+await test('13. Active task cannot be deleted (409); pausing then deleting works', async () => {
+    // Create a queued task and start it so it is 'active'.
+    const { body: createBody } = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            title: 'Active task to protect',
+            todos: [{ id: 'a-1', order: 1, title: 'Step', environment: 'agent' }],
+            status: 'queued',
+        }),
+    });
+    const activeId = createBody.data.task.id;
+    await json(`/v1/agents/${agentName}/tasks/${activeId}/start`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+
+    // Deleting a running task must be refused.
+    const refused = await json(`/v1/agents/${agentName}/tasks/${activeId}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(refused.status === 409, `active delete: expected 409, got ${refused.status}`);
+
+    // Pause it (active -> paused); a non-active task IS deletable.
+    await json(`/v1/agents/${agentName}/tasks/${activeId}/pause`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const ok = await json(`/v1/agents/${agentName}/tasks/${activeId}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(ok.status === 200, `paused delete: expected 200, got ${ok.status}: ${JSON.stringify(ok.body)}`);
+    assert(ok.body.data.deleted === true, 'deleted should be true');
+});
+
+await test('13b. Deleting a failed task removes it and cleans operational traces', async () => {
+    // failTaskId is in 'failed' state (Phase 4). Seed the two operational traces
+    // that a deleted task would otherwise leave behind for the runner/UI:
+    //   - the agent's live-status key (agent namespace)
+    //   - the owner's cancel marker (owner GHII namespace) the daemon scans
+    const liveKey = `agents.${agentName}.tasks.${failTaskId}.live`;
+    const cancelKey = `agents.cancel.task.${failTaskId}`;
+
+    const liveWrite = await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key: liveKey, value: { state: 'failed' }, visibility: 'owner' }),
+    });
+    assert([200, 201].includes(liveWrite.status), `seed live key: ${liveWrite.status}: ${JSON.stringify(liveWrite.body)}`);
+
+    const cancelWrite = await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: cancelKey, value: [failTaskId], visibility: 'owner' }),
+    });
+    assert([200, 201].includes(cancelWrite.status), `seed cancel marker: ${cancelWrite.status}: ${JSON.stringify(cancelWrite.body)}`);
+
+    // Delete the failed task.
+    const del = await json(`/v1/agents/${agentName}/tasks/${failTaskId}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(del.status === 200, `delete failed task: expected 200, got ${del.status}: ${JSON.stringify(del.body)}`);
+
+    // The task itself is gone.
+    const gone = await json(`/v1/agents/${agentName}/tasks/${failTaskId}`, {
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
-    assert(status === 409, `expected 409, got ${status}`);
+    assert(gone.status === 404, `task should be gone: got ${gone.status}`);
+
+    // The agent's live-status key was cleaned (agent namespace).
+    const liveGone = await json(`/v1/memory/${encodeURIComponent(liveKey)}`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(liveGone.status === 404, `live key should be cleaned: got ${liveGone.status}`);
+
+    // The owner's cancel marker was cleaned (owner namespace).
+    const cancelGone = await json(`/v1/memory/${encodeURIComponent(cancelKey)}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(cancelGone.status === 404, `cancel marker should be cleaned: got ${cancelGone.status}`);
 });
 
 // ─── Phase 6: Integration endpoints ───

@@ -16,6 +16,10 @@
  *                          INSERT OR REPLACE semantics (re-uploads to the same
  *                          key now replace the file instead of throwing on the
  *                          (ownerGaii, key) unique constraint).
+ *   v1.2.0 — 2026-06-05 — Add normalizeAppOwnerNames() to rewrite legacy
+ *                          full-GHII app ownerName values to the bare owner name.
+ *   v1.2.1 — 2026-06-05 — deleteAgentTask now removes any non-active task
+ *                          (status != 'active'), not just draft/queued.
  */
 
 import { execSync } from 'node:child_process';
@@ -3722,6 +3726,28 @@ export class MongoStorage implements Storage {
         });
     }
 
+    async normalizeAppOwnerNames(): Promise<number> {
+        this.ensureReady();
+        // Find rows whose ownerName still carries the `@node` suffix and rewrite
+        // each to its bare prefix. Owner names never contain '@', so the split
+        // is unambiguous. Idempotent: a second pass finds nothing.
+        const rows = await this.prisma.app.findMany({
+            where: { ownerName: { contains: '@' } },
+            select: { ownerGaii: true, filename: true, versionNumber: true, ownerName: true },
+        });
+        let count = 0;
+        for (const r of rows) {
+            const bare = (r.ownerName as string).split('@')[0];
+            if (!bare || bare === r.ownerName) continue;
+            await this.prisma.app.update({
+                where: { ownerGaii_filename_versionNumber: { ownerGaii: r.ownerGaii, filename: r.filename, versionNumber: r.versionNumber } },
+                data: { ownerName: bare },
+            });
+            count++;
+        }
+        return count;
+    }
+
     // ── App Marketplace (Prisma-persisted purchase receipts) ──
 
     private toAppPurchaseRecord(row: any): AppPurchaseRecord {
@@ -5786,8 +5812,11 @@ export class MongoStorage implements Storage {
     async deleteAgentTask(id: string): Promise<boolean> {
         this.ensureReady();
         try {
+            // Any non-active task is deletable; an active (running) task must be
+            // cancelled/paused first so we never orphan a live runner. The status
+            // guard is also a race safety-net for the route-level check.
             const result = await this.prisma.agentTask.deleteMany({
-                where: { id, status: { in: ['draft', 'queued'] } },
+                where: { id, status: { not: 'active' } },
             });
             if (result.count > 0) {
                 await this.prisma.agentTaskEvent.deleteMany({ where: { taskId: id } });

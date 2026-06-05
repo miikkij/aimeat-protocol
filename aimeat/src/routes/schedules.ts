@@ -338,9 +338,17 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
     if (!job) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Schedule "${id}" not found`)); return; }
     if (!canManage(req, job)) { res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not allowed to trigger this schedule')); return; }
     try {
-      await scheduler.triggerNow(id);
+      const outcome = await scheduler.triggerNow(id);
       const updated = await storage.getScheduledJob(id);
-      res.json(success(config.nodeId, { triggered: true, schedule: updated }));
+      // Relay what actually happened so the UI can tell the owner whether a task
+      // was created and, if not, why (e.g. a previous run is still active).
+      res.json(success(config.nodeId, {
+        triggered: true,
+        outcome: outcome.code,
+        ...(outcome.taskId ? { task_id: outcome.taskId } : {}),
+        ...(outcome.detail ? { reason: outcome.detail } : {}),
+        schedule: updated,
+      }));
       emitChange('scheduler');
     } catch (err) {
       res.status(500).json(error(config.nodeId, 'TRIGGER_FAILED', `Run failed: ${(err as Error).message}`));

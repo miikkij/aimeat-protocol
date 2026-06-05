@@ -1,3 +1,18 @@
+/**
+ * @file service-init.ts
+ * @description Server bootstrap step that initializes runtime services after
+ *   storage is ready: scheduler + core job handlers, federation heartbeat/peer
+ *   recovery, directory indexing, personal-node tunnels, anonymous mode, mailbox
+ *   push, and one-shot data seeding/hygiene jobs (profile/CSM/knowledge/prompt/
+ *   cortex seeds, legacy app ownerName normalization).
+ * @structure initializeServices() — wires all of the above and returns the
+ *   shared service handles consumed by route mounting.
+ * @usage const services = await initializeServices(config, storage);
+ * @version-history
+ *   v1.0.0 — pre-2026-06 — Initial service bootstrap extraction
+ *   v1.1.0 — 2026-06-05 — Run storage.normalizeAppOwnerNames() at startup to
+ *     reunite agent-published apps with the owner's "Published Apps".
+ */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MaintenanceState } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
@@ -87,6 +102,14 @@ export async function initializeServices(
   seedBundledCortexes(storage, `system@${config.nodeId}`)
     .then(count => { if (count > 0) logger.info(`Auto-installed ${count} bundled cortex extensions`); })
     .catch(err => logger.error('Failed to seed bundled cortexes', { error: String(err) }));
+
+  // Data hygiene: legacy publish paths stored app ownerName as the full GHII
+  // (owner@node). The catalog "my apps" filter and the by-owner-name delete
+  // sweep both key on the bare name, so those rows were stranded as
+  // unmanageable "community" apps. Normalize them to the bare owner name (idempotent).
+  storage.normalizeAppOwnerNames()
+    .then(count => { if (count > 0) logger.info(`Normalized ${count} legacy app ownerName row(s) to bare owner names`); })
+    .catch(err => logger.error('Failed to normalize app ownerName rows', { error: String(err) }));
 
   // Directory service — Phase 1.4 (indexes GHII profiles for local + thematic search)
   const directoryService = new DirectoryService(config, storage);

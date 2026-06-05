@@ -18,6 +18,13 @@
  *     and accepted raw HTML, yielding successful publishes with tiny garbage
  *     payloads served as 200 to downloaders. Now rejects with 400 INVALID_INPUT
  *     before storage write.
+ *   v1.2.0 -- 2026-06-05 -- GET download tolerates the legacy full-GHII owner
+ *     segment (owner@node) by retrying the lookup with the bare prefix, so links
+ *     shared before ownerName normalization still resolve. Fix /versions and
+ *     /screenshot routes: they scanned per-agent GAII buckets, but apps + their
+ *     screenshots live in the owner's GHII bucket, so both 404'd for every app
+ *     published under the current scheme. Now resolve the row via
+ *     getAppByOwnerName() and read that bucket directly.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -112,40 +119,40 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
     // GET /v1/apps/:owner/:filename/versions — List all versions
     router.get('/v1/apps/:owner/:filename/versions', async (req, res) => {
-        const owner = req.params.owner as string;
+        const ownerParam = req.params.owner as string;
         const filename = req.params.filename as string;
+        // Tolerate the legacy full-GHII owner segment (owner@node) in old links.
+        const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
 
-        const agents = await storage.getAgentsByOwner(owner);
-        if (agents.length === 0) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner "${owner}" not found`));
+        // Apps live in the owner's canonical bucket (ownerGaii = owner@nodeId),
+        // not under any agent GAII. Resolve the row by owner name, then list that
+        // exact bucket so every published version is returned.
+        const app = await storage.getAppByOwnerName(owner, filename);
+        if (!app) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
             return;
         }
 
-        for (const agent of agents) {
-            const versions = await storage.listAppVersions(agent.gaii, filename);
-            if (versions.length > 0) {
-                res.json(success(config.nodeId, {
-                    owner,
-                    filename,
-                    versions: versions.map(v => ({
-                        version_number: v.versionNumber,
-                        version: v.manifest.version,
-                        size: v.size,
-                        created_at: v.createdAt,
-                    })),
-                    total: versions.length,
-                }));
-                return;
-            }
-        }
-
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
+        const versions = await storage.listAppVersions(app.ownerGaii, filename);
+        res.json(success(config.nodeId, {
+            owner,
+            filename,
+            versions: versions.map(v => ({
+                version_number: v.versionNumber,
+                version: v.manifest.version,
+                size: v.size,
+                created_at: v.createdAt,
+            })),
+            total: versions.length,
+        }));
     });
 
     // GET /v1/apps/:owner/:filename/screenshot — Serve app screenshot (no auth)
     router.get('/v1/apps/:owner/:filename/screenshot', async (req, res) => {
-        const owner = req.params.owner as string;
+        const ownerParam = req.params.owner as string;
         const filename = req.params.filename as string;
+        // Tolerate the legacy full-GHII owner segment (owner@node) in old links.
+        const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
 
         // SECURITY: Defense-in-depth path traversal protection
         const decodedFn = decodeURIComponent(filename);
@@ -157,22 +164,22 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             return;
         }
 
-        const agents = await storage.getAgentsByOwner(owner);
-        if (agents.length === 0) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner "${owner}" not found`));
+        // Screenshots are stored alongside the app under its ownerGaii bucket
+        // (see POST /v1/apps), not under any agent GAII. Resolve the app first.
+        const app = await storage.getAppByOwnerName(owner, filename);
+        if (!app) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
             return;
         }
 
         const screenshotKey = `apps/screenshots/${filename}`;
-        for (const agent of agents) {
-            const file = await storage.getStorageFile(agent.gaii, screenshotKey);
-            if (file) {
-                res.setHeader('Content-Type', file.mimeType);
-                res.setHeader('Content-Length', file.size.toString());
-                res.setHeader('Cache-Control', 'public, max-age=3600');
-                res.send(file.data);
-                return;
-            }
+        const file = await storage.getStorageFile(app.ownerGaii, screenshotKey);
+        if (file) {
+            res.setHeader('Content-Type', file.mimeType);
+            res.setHeader('Content-Length', file.size.toString());
+            res.setHeader('Cache-Control', 'public, max-age=3600');
+            res.send(file.data);
+            return;
         }
 
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Screenshot not found for app "${filename}"`));
@@ -196,7 +203,13 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             return;
         }
 
-        const app = await storage.getAppByOwnerName(owner, filename, version);
+        let app = await storage.getAppByOwnerName(owner, filename, version);
+        // Backward-compat: older links carry the full GHII (`owner@node`) as the
+        // owner segment. ownerName is now normalized to the bare name, so retry
+        // with the bare prefix when the literal lookup misses.
+        if (!app && owner.includes('@')) {
+            app = await storage.getAppByOwnerName(owner.split('@')[0], filename, version);
+        }
         if (!app) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"${version ? ` (version ${version})` : ''}`));
             return;

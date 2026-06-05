@@ -8,7 +8,7 @@
  *   - GET    /v1/agents/:name/tasks           -- List tasks
  *   - GET    /v1/agents/:name/tasks/:id       -- Get task detail
  *   - PATCH  /v1/agents/:name/tasks/:id       -- Update task
- *   - DELETE /v1/agents/:name/tasks/:id       -- Delete task (draft/queued only)
+ *   - DELETE /v1/agents/:name/tasks/:id       -- Delete task (any non-active) + clean operational traces
  *   - POST   /v1/agents/:name/tasks/:id/start -- Start task (queued->active)
  *   - POST   /v1/agents/:name/tasks/:id/event -- Append event
  *   - POST   /v1/agents/:name/tasks/:id/complete -- Complete task (active->done)
@@ -18,6 +18,10 @@
  *   - PATCH  /v1/agents/:name/tasks/:id/todos/:todoId -- Update individual todo status
  *   - GET    /v1/agents/:name/tasks/:id/events -- List events
  * @version-history
+ *   v1.6.0 -- 2026-06-05 -- DELETE now removes any non-active task (not just
+ *     draft/queued) -- active tasks must be cancelled/paused first -- and cleans
+ *     the task's operational memory traces (live-status keys + cancel marker)
+ *     so a leftover can't disturb the runner; the deliverable is preserved.
  *   v1.5.0 -- 2026-06-01 -- Tasks-tab triage: PATCH /tasks/:id/triage (Keep/Archive/Restore) + GET /tasks gains bucket/q/updated_before/after params and per-bucket counts
  *   v1.4.1 -- 2026-05-31 -- /rate: add optional free-form `metadata` (temperature/tokens/cost) stored on the rating for later slicing (size-capped)
  *   v1.4.0 -- 2026-05-31 -- Add POST /tasks/:id/rate (Quality tab): per-context star rating with source-grounding hard gate; refreshes the public statistics cache
@@ -444,9 +448,23 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     try { emitResourceUpdated(resolveAgentGaii(req, req.params.name as string), `aimeat://agents/${req.params.name as string}/tasks`); } catch { /* MCP not connected */ }
   });
 
-  /* ── DELETE /v1/agents/:name/tasks/:id -- Delete task (draft/queued only) ── */
+  /* ── DELETE /v1/agents/:name/tasks/:id -- Delete a task + clean its traces ──
+   *
+   * Owner-only. Deletable in any state EXCEPT 'active' -- a running task must be
+   * cancelled or paused first so we don't orphan a live runner mid-execution.
+   * Everything else (draft/queued/revision_requested/paused/stalled/done/failed)
+   * can be removed.
+   *
+   * Trace cleanup (best-effort, after the task + its event log are gone):
+   *   - the live-status memory keys the agent wrote under its own namespace
+   *     (`agents.<name>.tasks.<id>.*`)
+   *   - the owner-written cancel marker (`agents.cancel.task.<id>`) that the
+   *     runner daemon scans on every poll
+   * The agent's actual deliverable/output memory is intentionally preserved.
+   */
   router.delete('/v1/agents/:name/tasks/:id', requireAuth(), requireRole('owner'), async (req, res) => {
     const id = req.params.id as string;
+    const agentName = req.params.name as string;
 
     const task = await storage.getAgentTask(id);
     if (!task) {
@@ -459,15 +477,34 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
       return;
     }
 
-    const deleted = await storage.deleteAgentTask(id);
-    if (!deleted) {
+    if (task.status === 'active') {
       res.status(409).json(error(config.nodeId, 'INVALID_STATE',
-        'Only draft or queued tasks can be deleted'));
+        'Active tasks cannot be deleted -- cancel or pause the task first, then delete it'));
       return;
     }
 
+    const deleted = await storage.deleteAgentTask(id);
+    if (!deleted) {
+      res.status(409).json(error(config.nodeId, 'INVALID_STATE',
+        'Task could not be deleted (it may have just become active)'));
+      return;
+    }
+
+    // Clean the task's operational memory traces so a leftover doesn't confuse
+    // the runner or the per-task memory view. Best-effort: a cleanup failure
+    // must not fail the delete (the task itself is already gone).
+    try {
+      const livePrefix = `agents.${agentName}.tasks.${id}.`;
+      const liveEntries = await storage.listMemory(task.agentGaii, { prefix: livePrefix });
+      for (const m of liveEntries) await storage.deleteMemory(task.agentGaii, m.key);
+    } catch { /* best-effort trace cleanup */ }
+    try {
+      await storage.deleteMemory(task.ownerGaii, `agents.cancel.task.${id}`);
+    } catch { /* best-effort trace cleanup */ }
+
     res.json(success(config.nodeId, { deleted: true }));
     emitChange('agent-tasks');
+    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${agentName}/tasks`); } catch { /* MCP not connected */ }
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/start -- Start task (queued|paused|stalled -> active) ── */

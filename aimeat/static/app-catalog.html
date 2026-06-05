@@ -10,6 +10,7 @@
   <title>My Apps — AIMEAT</title>
   <style>
     :root {
+      color-scheme: light;
       --bg: #FAFAF8;
       --surface: #FFFFFF;
       --text: #1A1A2E;
@@ -17,12 +18,34 @@
       --accent2: #F3E8E6;
       --surface-glass: rgba(255, 255, 255, .85);
       --border-subtle: #E5E7EB;
-      --border-hover: #D1D5DB;
-      --text-muted: #6B7280;
-      --text-dim: #9CA3AF;
+      --border-hover: var(--border-hover);
+      --text-muted: var(--text-muted);
+      --text-dim: var(--text-dim);
+      --bg-subtle: var(--bg-subtle);
+      --hover: var(--hover);
+      --on-accent: #FFFFFF;
       --radius: 16px;
       --radius-sm: 10px;
       --transition: .25s cubic-bezier(.16, 1, .3, 1);
+    }
+
+    /* ── Dark theme ── overrides every token + native controls. Surfaces that
+       hardcode light colors are converted to these vars throughout the CSS. */
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #14141C;
+      --surface: #1E1E2A;
+      --text: #ECECF4;
+      --accent: #F0685C;
+      --accent2: #3A2A28;
+      --surface-glass: rgba(28, 28, 40, .85);
+      --border-subtle: #2E2E40;
+      --border-hover: #45455E;
+      --text-muted: #9AA0AD;
+      --text-dim: #717784;
+      --bg-subtle: #242432;
+      --hover: #2A2A3A;
+      --on-accent: #FFFFFF;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -55,10 +78,10 @@
       position: sticky;
       top: 0;
       z-index: 100;
-      background: rgba(255, 255, 255, .92);
+      background: var(--surface-glass);
       backdrop-filter: blur(24px);
       -webkit-backdrop-filter: blur(24px);
-      border-bottom: 1px solid #E5E7EB;
+      border-bottom: 1px solid var(--border-subtle);
       padding: 16px 24px;
       display: flex;
       align-items: center;
@@ -69,7 +92,7 @@
     header h1 {
       font-size: 1.3rem;
       font-weight: 700;
-      color: #1A1A2E;
+      color: var(--text);
       white-space: nowrap;
       flex-shrink: 0;
     }
@@ -125,11 +148,45 @@
     }
 
     .mode-btn:hover:not(.active) {
-      background: rgba(0,0,0,.05);
+      background: var(--hover);
+    }
+
+    .lang-toggle {
+      display: flex;
+      gap: 1px;
+      align-items: center;
+      flex-shrink: 0;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 2px;
+    }
+
+    .lang-btn {
+      padding: 6px 8px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: .72rem;
+      font-weight: 600;
+      letter-spacing: .03em;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .lang-btn.active {
+      background: var(--accent);
+      color: var(--on-accent);
+    }
+
+    .lang-btn:hover:not(.active) {
+      background: var(--hover);
     }
 
     .header-actions {
       display: flex;
+      align-items: center;
       gap: 8px;
       flex-shrink: 0;
     }
@@ -155,7 +212,7 @@
       border-color: var(--border-hover);
       transform: translateY(-1px);
       box-shadow: 0 4px 16px rgba(0, 0, 0, .06);
-      background: #F3F4F6;
+      background: var(--hover);
     }
 
     .icon-btn:active {
@@ -235,8 +292,8 @@
     }
 
     .app-card {
-      background: #FFFFFF;
-      border: 1px solid #E5E7EB;
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
       border-radius: var(--radius);
       padding: 20px 16px;
       display: flex;
@@ -287,7 +344,7 @@
       justify-content: center;
       font-size: 1.8rem;
       background: #F3E8E6;
-      border: 1px solid #E5E7EB;
+      border: 1px solid var(--border-subtle);
       flex-shrink: 0;
     }
 
@@ -460,8 +517,8 @@
     }
 
     .modal {
-      background: #FFFFFF;
-      border: 1px solid #E5E7EB;
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
       border-radius: var(--radius);
       padding: 32px;
       max-width: 480px;
@@ -473,7 +530,7 @@
     .modal h2 {
       font-size: 1.15rem;
       margin-bottom: 20px;
-      color: #1A1A2E;
+      color: var(--text);
     }
 
     /* ── Modal Form Elements ──────────────────────────── */
@@ -505,7 +562,7 @@
 
     .modal-tab:hover {
       color: var(--text);
-      background: #F9FAFB;
+      background: var(--bg-subtle);
     }
 
     .modal-tab.active {
@@ -686,7 +743,7 @@
 
     .browse-btn:hover {
       border-color: var(--border-hover);
-      background: #F3F4F6;
+      background: var(--hover);
     }
 
     .drop-zone-selected {
@@ -717,10 +774,10 @@
       align-items: center;
       gap: 12px;
       padding: 10px 16px;
-      background: rgba(255, 255, 255, .95);
+      background: var(--surface-glass);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
-      border-bottom: 1px solid #E5E7EB;
+      border-bottom: 1px solid var(--border-subtle);
     }
 
     #iframe-view .iframe-toolbar .iframe-title {
@@ -744,13 +801,15 @@
     #context-menu {
       position: fixed;
       z-index: 700;
-      background: rgba(255, 255, 255, .98);
+      background: var(--surface-glass);
       backdrop-filter: blur(24px);
       -webkit-backdrop-filter: blur(24px);
-      border: 1px solid #E5E7EB;
+      border: 1px solid var(--border-subtle);
       border-radius: var(--radius-sm);
       padding: 6px 0;
       min-width: 180px;
+      max-height: calc(100vh - 16px);
+      overflow-y: auto;
       box-shadow: 0 8px 32px rgba(0, 0, 0, .12);
       animation: cardIn .2s cubic-bezier(.16, 1, .3, 1);
     }
@@ -776,7 +835,7 @@
     }
 
     #context-menu button:hover {
-      background: #F3F4F6;
+      background: var(--hover);
     }
 
     #context-menu button.danger {
@@ -826,7 +885,7 @@
       }
     }
 
-    /* Light theme is now the default — no data-theme overrides needed */
+    /* Theme tokens live in :root (light) and [data-theme="dark"] above. */
 
     /* ── Source Modal ──────────────────────────────── */
 
@@ -852,8 +911,8 @@
       width: 100%;
       min-height: 400px;
       max-height: 60vh;
-      background: #F9FAFB;
-      color: #1A1A2E;
+      background: var(--bg-subtle);
+      color: var(--text);
       border: 1px solid var(--border-subtle);
       border-radius: 8px;
       padding: 1rem;
@@ -1015,7 +1074,8 @@
 
     /* ── Publish Modal ──────────────────────────────── */
 
-    #publish-overlay {
+    #publish-overlay,
+    #versions-overlay {
       position: fixed;
       inset: 0;
       z-index: 560;
@@ -1028,7 +1088,8 @@
       padding: 24px;
     }
 
-    #publish-overlay[hidden] {
+    #publish-overlay[hidden],
+    #versions-overlay[hidden] {
       display: none;
     }
 
@@ -1127,7 +1188,7 @@
 
     .published-card-actions button:hover {
       border-color: var(--border-hover);
-      background: #F3F4F6;
+      background: var(--hover);
     }
 
     .published-card-actions button.danger:hover {
@@ -1142,6 +1203,44 @@
       color: var(--text-dim);
       font-size: .85rem;
     }
+
+    /* ── Versions modal rows ── */
+    .version-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 4px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .version-row:last-child { border-bottom: none; }
+    .version-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .version-num { font-weight: 600; font-size: .85rem; color: var(--text); }
+    .version-current {
+      font-weight: 600;
+      font-size: .64rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: #15803d;
+      background: rgba(34, 197, 94, .12);
+      border-radius: 999px;
+      padding: 1px 7px;
+      margin-left: 4px;
+    }
+    .version-sub { font-size: .72rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .version-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .version-actions button {
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 4px 9px;
+      color: var(--text);
+      font-size: .72rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition);
+    }
+    .version-actions button:hover { border-color: var(--border-hover); background: var(--hover); }
 
     .published-source-badge {
       display: inline-block;
@@ -1175,10 +1274,10 @@
 
     /* ── Cortex Extensions Bar ──────────────────────── */
 
-    .cortex-mini-card{background:#FFFFFF;border:1px solid #E5E7EB;border-radius:10px;padding:.75rem 1rem;cursor:pointer;min-width:160px;flex-shrink:0;transition:all .15s}
-    .cortex-mini-card:hover{background:#F9FAFB;border-color:#D1D5DB}
+    .cortex-mini-card{background:var(--surface);border:1px solid var(--border-subtle);border-radius:10px;padding:.75rem 1rem;cursor:pointer;min-width:160px;flex-shrink:0;transition:all .15s}
+    .cortex-mini-card:hover{background:var(--bg-subtle);border-color:var(--border-hover)}
     .cortex-mini-name{font-weight:600;font-size:.85rem;margin-bottom:.25rem;white-space:nowrap}
-    .cortex-mini-meta{font-size:.7rem;color:#6B7280}
+    .cortex-mini-meta{font-size:.7rem;color:var(--text-muted)}
 
     /* ── Prompt Builder Panel ──────────────────────── */
     #prompt-builder-overlay {
@@ -1187,8 +1286,8 @@
       display: none; align-items: center; justify-content: center; padding: 24px;
     }
     .prompt-builder-modal {
-      background: #FFFFFF;
-      border: 1px solid #E5E7EB; border-radius: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border-subtle); border-radius: 16px;
       padding: 28px; max-width: 900px; width: 96vw; max-height: 90vh;
       display: flex; flex-direction: column; overflow: hidden;
       box-shadow: 0 8px 40px rgba(0,0,0,.12);
@@ -1199,7 +1298,7 @@
     .pb-mode-radio input { accent-color: #E8564A; }
     .pb-desc-area {
       width: 100%; min-height: 60px; max-height: 120px; resize: vertical;
-      background: #F9FAFB; border: 1px solid #E5E7EB;
+      background: var(--bg-subtle); border: 1px solid var(--border-subtle);
       border-radius: 10px; padding: 10px 14px; color: inherit; font-size: .85rem;
       font-family: inherit; line-height: 1.5; margin-bottom: 14px;
     }
@@ -1208,42 +1307,47 @@
     .pb-ext-toggle input { accent-color: #E8564A; }
     .pb-ext-list {
       display: none; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; padding: 10px;
-      background: #F9FAFB; border: 1px solid #E5E7EB;
+      background: var(--bg-subtle); border: 1px solid var(--border-subtle);
       border-radius: 10px; max-height: 160px; overflow-y: auto;
     }
     .pb-ext-list.open { display: flex; }
     .pb-ext-chip {
       display: flex; align-items: center; gap: 6px; padding: 6px 12px;
-      background: #F9FAFB; border: 1px solid #E5E7EB;
+      background: var(--bg-subtle); border: 1px solid var(--border-subtle);
       border-radius: 8px; cursor: pointer; font-size: .8rem; transition: all .15s;
     }
-    .pb-ext-chip:hover { background: #F3F4F6; }
+    .pb-ext-chip:hover { background: var(--hover); }
     .pb-ext-chip.selected { background: rgba(232,86,74,.08); border-color: rgba(232,86,74,.35); }
     .pb-ext-chip input { accent-color: #E8564A; pointer-events: none; }
     .pb-preview {
       flex: 1; min-height: 120px; overflow-y: auto; margin-bottom: 14px; padding: 12px;
-      background: #F9FAFB; border: 1px solid #E5E7EB;
+      background: var(--bg-subtle); border: 1px solid var(--border-subtle);
       border-radius: 10px; font-family: 'Consolas','Monaco','Courier New',monospace;
       font-size: .75rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
-      color: #6B7280;
+      color: var(--text-muted);
     }
-    .pb-preview-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; color: #6B7280; margin-bottom: 6px; }
+    .pb-preview-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); margin-bottom: 6px; }
   </style>
 </head>
 <body>
 
   <header>
-    <h1>My Apps</h1>
+    <h1 data-i18n="header.title">My Apps</h1>
     <div class="mode-toggle">
-      <button id="mode-global" class="mode-btn active" onclick="window._launcher.switchDbMode('global')" title="Shared across all accounts on this browser">&#x1F310; Global</button>
-      <button id="mode-personal" class="mode-btn" onclick="window._launcher.switchDbMode('personal')" title="Private to your account">&#x1F464; Personal</button>
+      <button id="mode-global" class="mode-btn active" onclick="window._launcher.switchDbMode('global')" data-i18n="mode.global" data-i18n-title="mode.global.title" title="Shared across all accounts on this browser">&#x1F310; Global</button>
+      <button id="mode-personal" class="mode-btn" onclick="window._launcher.switchDbMode('personal')" data-i18n="mode.personal" data-i18n-title="mode.personal.title" title="Private to your account">&#x1F464; Personal</button>
     </div>
-    <input type="text" id="search-input" placeholder="Search apps..." autocomplete="off" spellcheck="false"/>
+    <input type="text" id="search-input" placeholder="Search apps..." data-i18n-ph="search.ph" autocomplete="off" spellcheck="false"/>
     <div class="header-actions">
-      <button class="icon-btn" id="add-btn" title="Add app">+</button>
-      <button class="icon-btn" id="generate-btn" title="Generate with AI">&#x2728;</button>
-      <button class="icon-btn" id="homepage-btn" title="Generate Homepage">&#x1F3E0;</button>
-      <button class="icon-btn" id="settings-btn" title="Settings">&#x2699;</button>
+      <button class="icon-btn" id="add-btn" data-i18n-title="action.add" title="Add app">+</button>
+      <button class="icon-btn" id="generate-btn" data-i18n-title="action.generate" title="Generate with AI">&#x2728;</button>
+      <button class="icon-btn" id="homepage-btn" data-i18n-title="action.homepage" title="Generate Homepage">&#x1F3E0;</button>
+      <div class="lang-toggle" id="lang-toggle" title="Language / Kieli">
+        <button class="lang-btn" data-lang="en" onclick="window._launcher.setLanguage('en')">EN</button>
+        <button class="lang-btn" data-lang="fi" onclick="window._launcher.setLanguage('fi')">FI</button>
+      </div>
+      <button class="icon-btn" id="theme-btn" onclick="window._launcher.toggleTheme()" data-i18n-title="action.theme" title="Toggle theme">&#x1F319;</button>
+      <button class="icon-btn" id="settings-btn" data-i18n-title="action.settings" title="Settings">&#x2699;</button>
     </div>
   </header>
 
@@ -1252,40 +1356,40 @@
   <!-- Active Extensions Bar -->
   <div id="cortex-bar" style="display:none;margin:0 24px 1.5rem;position:relative;z-index:1">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
-      <h3 style="margin:0;font-size:.95rem;color:#6B7280">&#x1F50C; Active Extensions</h3>
-      <button onclick="document.getElementById('cortex-bar-grid').style.display=document.getElementById('cortex-bar-grid').style.display==='none'?'flex':'none'" style="background:none;border:none;color:#6B7280;cursor:pointer;font-size:.8rem">&#x25BC; toggle</button>
+      <h3 style="margin:0;font-size:.95rem;color:var(--text-muted)" data-i18n="cortex.active">&#x1F50C; Active Extensions</h3>
+      <button onclick="document.getElementById('cortex-bar-grid').style.display=document.getElementById('cortex-bar-grid').style.display==='none'?'flex':'none'" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.8rem">&#x25BC; <span data-i18n="common.toggle">toggle</span></button>
     </div>
     <div id="cortex-bar-grid" style="display:flex;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
   </div>
 
   <!-- Extension Popup Overlay -->
   <div id="cortex-popup-overlay" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.3);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:24px">
-    <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:16px;padding:32px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.12)">
+    <div style="background:var(--surface);border:1px solid var(--border-subtle);border-radius:16px;padding:32px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.12)">
       <div id="cortex-popup-content"></div>
       <div style="display:flex;justify-content:flex-end;margin-top:1rem">
-        <button onclick="document.getElementById('cortex-popup-overlay').style.display='none'" style="padding:6px 16px;border-radius:8px;border:1px solid #E5E7EB;background:transparent;color:#6B7280;cursor:pointer">Close</button>
+        <button onclick="document.getElementById('cortex-popup-overlay').style.display='none'" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer" data-i18n="common.close">Close</button>
       </div>
     </div>
   </div>
 
   <!-- Cortex Extension Editor Overlay -->
   <div id="cortex-editor-overlay" style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.35);backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:24px">
-    <div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:16px;padding:32px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.12)">
-      <h2 style="margin-top:0;font-size:1.1rem">&#x1F6E0;&#xFE0F; Extension Editor</h2>
-      <p id="cortex-editor-name" style="color:#6B7280;font-size:.85rem;margin-top:-.5rem"></p>
+    <div style="background:var(--surface);border:1px solid var(--border-subtle);border-radius:16px;padding:32px;max-width:800px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.12)">
+      <h2 style="margin-top:0;font-size:1.1rem" data-i18n="cortex.editorTitle">&#x1F6E0;&#xFE0F; Extension Editor</h2>
+      <p id="cortex-editor-name" style="color:var(--text-muted);font-size:.85rem;margin-top:-.5rem"></p>
       <div id="cortex-editor-status" style="font-size:.8rem;margin-bottom:1rem;min-height:1.2em;color:#34d399"></div>
       <div style="margin-bottom:1rem">
-        <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.5rem">Manifest (YAML)</label>
-        <textarea id="cortex-editor-manifest" spellcheck="false" style="width:100%;min-height:300px;background:#F9FAFB;color:#1A1A2E;border:1px solid #E5E7EB;border-radius:8px;padding:12px;font-family:monospace;font-size:.8rem;resize:vertical;tab-size:2"></textarea>
+        <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.5rem" data-i18n="cortex.manifest">Manifest (YAML)</label>
+        <textarea id="cortex-editor-manifest" spellcheck="false" style="width:100%;min-height:300px;background:var(--bg-subtle);color:var(--text);border:1px solid var(--border-subtle);border-radius:8px;padding:12px;font-family:monospace;font-size:.8rem;resize:vertical;tab-size:2"></textarea>
       </div>
       <div id="cortex-editor-libs"></div>
       <div style="margin-bottom:1.5rem">
-        <button onclick="window._launcher.cortexEditorAddLib()" style="font-size:.8rem;padding:4px 12px;border-radius:6px;border:1px solid #E5E7EB;background:transparent;color:#6B7280;cursor:pointer">+ Add Lib File</button>
+        <button onclick="window._launcher.cortexEditorAddLib()" style="font-size:.8rem;padding:4px 12px;border-radius:6px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer" data-i18n="cortex.addLib">+ Add Lib File</button>
       </div>
       <div style="display:flex;gap:.75rem;justify-content:flex-end;flex-wrap:wrap">
-        <button onclick="window._launcher.cortexEditorExport()" style="padding:6px 16px;border-radius:8px;border:1px solid #E5E7EB;background:transparent;color:#6B7280;cursor:pointer">&#x1F4E5; Export Files</button>
-        <button onclick="window._launcher.cortexEditorSave()" id="cortex-editor-save-btn" style="padding:6px 20px;border-radius:8px;border:none;background:#E8564A;color:#fff;font-weight:600;cursor:pointer">Save &amp; Re-install</button>
-        <button onclick="window._launcher.closeCortexEditor()" style="padding:6px 16px;border-radius:8px;border:1px solid #E5E7EB;background:transparent;color:#6B7280;cursor:pointer">Cancel</button>
+        <button onclick="window._launcher.cortexEditorExport()" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer" data-i18n="cortex.exportFiles">&#x1F4E5; Export Files</button>
+        <button onclick="window._launcher.cortexEditorSave()" id="cortex-editor-save-btn" style="padding:6px 20px;border-radius:8px;border:none;background:#E8564A;color:#fff;font-weight:600;cursor:pointer" data-i18n="cortex.saveReinstall">Save &amp; Re-install</button>
+        <button onclick="window._launcher.closeCortexEditor()" style="padding:6px 16px;border-radius:8px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer" data-i18n="common.cancel">Cancel</button>
       </div>
     </div>
   </div>
@@ -1293,7 +1397,7 @@
   <!-- Published Apps Section (own) -->
   <div id="published-section" style="display:none">
     <div class="published-header" onclick="window._launcher.togglePublished()">
-      <h2>&#x1F680; Published Apps <span id="published-count"></span></h2>
+      <h2><span data-i18n="sec.published">&#x1F680; Published Apps</span> <span id="published-count"></span></h2>
       <span class="arrow open" id="published-arrow">&#x25BC;</span>
     </div>
     <div id="published-grid" class="published-grid"></div>
@@ -1302,7 +1406,7 @@
   <!-- Community Apps Section (other users) -->
   <div id="community-section" style="display:none">
     <div class="published-header" onclick="window._launcher.toggleCommunity()">
-      <h2>&#x1F30D; Community Apps <span id="community-count"></span></h2>
+      <h2><span data-i18n="sec.community">&#x1F30D; Community Apps</span> <span id="community-count"></span></h2>
       <span class="arrow open" id="community-arrow">&#x25BC;</span>
     </div>
     <div id="community-grid" class="published-grid"></div>
@@ -1310,12 +1414,12 @@
 
   <!-- Recently Opened Strip -->
   <div id="recent-section" style="display:none;margin:0 24px 1rem">
-    <h3 style="margin:0 0 .5rem;font-size:.9rem;color:#6B7280">&#x1F552; Recently Opened</h3>
+    <h3 style="margin:0 0 .5rem;font-size:.9rem;color:var(--text-muted)" data-i18n="sec.recent">&#x1F552; Recently Opened</h3>
     <div id="recent-strip" style="display:flex;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
   </div>
 
   <div id="local-apps-header" style="display:none;margin:0 24px 8px">
-    <h2 style="font-size:1rem;font-weight:700;color:#6366f1;display:flex;align-items:center;gap:8px">&#x1F4BE; Local Apps <span id="local-apps-count" style="opacity:.6;font-weight:400"></span></h2>
+    <h2 style="font-size:1rem;font-weight:700;color:#6366f1;display:flex;align-items:center;gap:8px"><span data-i18n="sec.local">&#x1F4BE; Local Apps</span> <span id="local-apps-count" style="opacity:.6;font-weight:400"></span></h2>
   </div>
   <main id="app-grid"></main>
 
@@ -1326,30 +1430,30 @@
 
   <div id="modal-overlay" hidden>
     <div class="modal" id="add-app-modal">
-      <h2 id="modal-title">Add App</h2>
+      <h2 id="modal-title" data-i18n="addModal.title">Add App</h2>
 
       <!-- Source tabs -->
       <div class="modal-tabs">
-        <button class="modal-tab active" data-tab="url">URL</button>
-        <button class="modal-tab" data-tab="file">File</button>
-        <button class="modal-tab" data-tab="paste">Paste</button>
-        <button class="modal-tab" data-tab="aimeat">AIMEAT</button>
+        <button class="modal-tab active" data-tab="url" data-i18n="tab.url">URL</button>
+        <button class="modal-tab" data-tab="file" data-i18n="tab.file">File</button>
+        <button class="modal-tab" data-tab="paste" data-i18n="tab.paste">Paste</button>
+        <button class="modal-tab" data-tab="aimeat" data-i18n="tab.aimeat">AIMEAT</button>
       </div>
 
       <!-- URL tab content -->
       <div class="tab-content active" id="tab-url">
-        <label class="modal-label" for="app-url">App URL</label>
+        <label class="modal-label" for="app-url" data-i18n="addModal.url">App URL</label>
         <input type="url" id="app-url" class="modal-input" placeholder="https://example.com/app.html" autocomplete="off"/>
       </div>
 
       <!-- File tab content -->
       <div class="tab-content" id="tab-file">
-        <label class="modal-label">HTML File</label>
+        <label class="modal-label" data-i18n="addModal.htmlFile">HTML File</label>
         <div class="drop-zone" id="drop-zone">
           <div class="drop-zone-icon">&#x1F4C4;</div>
-          <p class="drop-zone-text">Drag &amp; drop an HTML file here</p>
-          <p class="drop-zone-hint">or</p>
-          <button type="button" class="browse-btn" id="browse-btn">Browse files</button>
+          <p class="drop-zone-text" data-i18n="addModal.drop">Drag &amp; drop an HTML file here</p>
+          <p class="drop-zone-hint" data-i18n="common.or">or</p>
+          <button type="button" class="browse-btn" id="browse-btn" data-i18n="addModal.browse">Browse files</button>
           <input type="file" id="file-input" accept=".html,.htm,.zip" hidden/>
           <p class="drop-zone-selected" id="selected-file-name"></p>
         </div>
@@ -1357,16 +1461,16 @@
 
       <!-- Paste tab content -->
       <div class="tab-content" id="tab-paste">
-        <label class="modal-label" for="app-paste-code">Paste HTML Source Code</label>
-        <textarea id="app-paste-code" class="modal-input" rows="10" placeholder="Paste your HTML source code here..." style="font-family:'Consolas','Monaco','Courier New',monospace;font-size:.8rem;resize:vertical;min-height:160px;line-height:1.4"></textarea>
+        <label class="modal-label" for="app-paste-code" data-i18n="addModal.paste">Paste HTML Source Code</label>
+        <textarea id="app-paste-code" class="modal-input" rows="10" placeholder="Paste your HTML source code here..." data-i18n-ph="addModal.pastePh" style="font-family:'Consolas','Monaco','Courier New',monospace;font-size:.8rem;resize:vertical;min-height:160px;line-height:1.4"></textarea>
       </div>
 
       <!-- AIMEAT tab content -->
       <div class="tab-content" id="tab-aimeat">
-        <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:14px;line-height:1.5">
+        <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:14px;line-height:1.5" data-i18n="addModal.aimeatHelp">
           Import apps from a connected AIMEAT server. Configure the server URL in Settings first.
         </p>
-        <button type="button" class="modal-btn primary" onclick="window._launcher.importFromAimeat()" style="width:100%">
+        <button type="button" class="modal-btn primary" onclick="window._launcher.importFromAimeat()" style="width:100%" data-i18n="addModal.fetch">
           Fetch Available Apps
         </button>
       </div>
@@ -1375,31 +1479,31 @@
       <div class="modal-fields">
         <div class="modal-row">
           <div class="modal-field" style="flex:1">
-            <label class="modal-label" for="app-name">App Name</label>
-            <input type="text" id="app-name" class="modal-input" placeholder="My App" autocomplete="off"/>
+            <label class="modal-label" for="app-name" data-i18n="addModal.name">App Name</label>
+            <input type="text" id="app-name" class="modal-input" placeholder="My App" data-i18n-ph="addModal.namePh" autocomplete="off"/>
           </div>
           <div class="modal-field" style="width:72px">
-            <label class="modal-label" for="app-icon">Icon</label>
+            <label class="modal-label" for="app-icon" data-i18n="addModal.icon">Icon</label>
             <input type="text" id="app-icon" class="modal-input" maxlength="4" placeholder="&#x1F4DD;" style="text-align:center;font-size:1.2rem"/>
           </div>
         </div>
         <div class="modal-field">
-          <label class="modal-label" for="app-tags">Tags <span class="label-hint">(comma separated)</span></label>
-          <input type="text" id="app-tags" class="modal-input" placeholder="tools, productivity" autocomplete="off"/>
+          <label class="modal-label" for="app-tags"><span data-i18n="addModal.tags">Tags</span> <span class="label-hint" data-i18n="addModal.tagsHint">(comma separated)</span></label>
+          <input type="text" id="app-tags" class="modal-input" placeholder="tools, productivity" data-i18n-ph="addModal.tagsPh" autocomplete="off"/>
         </div>
         <div class="modal-field">
-          <label class="modal-label" for="app-open-mode">Open Mode</label>
+          <label class="modal-label" for="app-open-mode" data-i18n="addModal.openMode">Open Mode</label>
           <select id="app-open-mode" class="modal-input">
-            <option value="tab">New Tab</option>
-            <option value="iframe">Inline (iframe)</option>
+            <option value="tab" data-i18n="openMode.tab">New Tab</option>
+            <option value="iframe" data-i18n="openMode.iframe">Inline (iframe)</option>
           </select>
         </div>
       </div>
 
       <!-- Actions -->
       <div class="modal-actions">
-        <button type="button" class="modal-btn secondary" id="modal-cancel-btn">Cancel</button>
-        <button type="button" class="modal-btn primary" id="modal-save-btn">Save</button>
+        <button type="button" class="modal-btn secondary" id="modal-cancel-btn" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="modal-btn primary" id="modal-save-btn" data-i18n="common.save">Save</button>
       </div>
     </div>
   </div>
@@ -1414,70 +1518,77 @@
   </div>
 
   <div id="context-menu" hidden>
-    <button data-action="edit">&#x270F;&#xFE0F; Edit</button>
-    <button data-action="favorite">&#x2B50; Toggle favorite</button>
-    <button data-action="toggle-mode">&#x1F504; Switch open mode</button>
-    <button data-action="view-source">&#x1F441; View / Edit Source</button>
-    <button data-action="improve-ai">&#x2728; Improve with AI</button>
-    <button data-action="share-prompt">&#x1F4E4; Share as Prompt</button>
+    <button data-action="edit" data-i18n="ctx.edit">&#x270F;&#xFE0F; Edit</button>
+    <button data-action="favorite" data-i18n="ctx.favorite">&#x2B50; Toggle favorite</button>
+    <button data-action="toggle-mode" data-i18n="ctx.toggleMode">&#x1F504; Switch open mode</button>
+    <button data-action="view-source" data-i18n="ctx.viewSource">&#x1F441; View / Edit Source</button>
+    <button data-action="improve-ai" data-i18n="ctx.improveAi">&#x2728; Improve with AI</button>
+    <button data-action="share-prompt" data-i18n="ctx.sharePrompt">&#x1F4E4; Share as Prompt</button>
     <hr>
-    <button data-action="publish">&#x1F680; Publish to server</button>
+    <button data-action="publish" data-i18n="ctx.publish">&#x1F680; Publish to server</button>
     <hr>
-    <button data-action="delete" class="danger">&#x1F5D1;&#xFE0F; Delete</button>
+    <button data-action="delete" class="danger" data-i18n="ctx.delete">&#x1F5D1;&#xFE0F; Delete</button>
   </div>
 
   <!-- Settings Modal -->
   <div id="settings-overlay" hidden>
     <div class="modal" id="settings-modal">
-      <h2>Settings</h2>
+      <h2 data-i18n="settings.title">Settings</h2>
 
       <div class="settings-section">
-        <div class="settings-section-title">Appearance</div>
+        <div class="settings-section-title" data-i18n="settings.appearance">Appearance</div>
         <div class="settings-row">
-          <label for="setting-theme">Theme</label>
+          <label for="setting-theme" data-i18n="settings.theme">Theme</label>
           <select id="setting-theme" class="modal-input">
-            <option value="dark">Dark</option>
-            <option value="light">Light</option>
+            <option value="dark" data-i18n="theme.dark">Dark</option>
+            <option value="light" data-i18n="theme.light">Light</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <label for="setting-language" data-i18n="settings.language">Language</label>
+          <select id="setting-language" class="modal-input" onchange="window._launcher.setLanguage(this.value)">
+            <option value="en">English</option>
+            <option value="fi">Suomi</option>
           </select>
         </div>
       </div>
 
       <div class="settings-section">
-        <div class="settings-section-title">Defaults</div>
+        <div class="settings-section-title" data-i18n="settings.defaults">Defaults</div>
         <div class="settings-row">
-          <label for="setting-open-mode">Default open mode</label>
+          <label for="setting-open-mode" data-i18n="settings.defaultOpenMode">Default open mode</label>
           <select id="setting-open-mode" class="modal-input">
-            <option value="tab">New Tab</option>
-            <option value="iframe">Inline (iframe)</option>
+            <option value="tab" data-i18n="openMode.tab">New Tab</option>
+            <option value="iframe" data-i18n="openMode.iframe">Inline (iframe)</option>
           </select>
         </div>
       </div>
 
       <div class="settings-section">
-        <div class="settings-section-title">AIMEAT Server</div>
+        <div class="settings-section-title" data-i18n="settings.server">AIMEAT Server</div>
         <div class="settings-row">
-          <label for="setting-aimeat-url">Server URL</label>
+          <label for="setting-aimeat-url" data-i18n="settings.serverUrl">Server URL</label>
           <input type="url" id="setting-aimeat-url" class="modal-input" placeholder="http://localhost:40050" autocomplete="off"/>
         </div>
       </div>
 
       <div class="settings-section">
-        <div class="settings-section-title">Backup &amp; Restore</div>
+        <div class="settings-section-title" data-i18n="settings.backup">Backup &amp; Restore</div>
         <div class="settings-backup-actions">
-          <button type="button" class="modal-btn secondary" onclick="window._launcher.exportBackup()">Export JSON</button>
-          <button type="button" class="modal-btn secondary" onclick="document.getElementById('import-file-input').click()">Import JSON</button>
+          <button type="button" class="modal-btn secondary" onclick="window._launcher.exportBackup()" data-i18n="settings.exportJson">Export JSON</button>
+          <button type="button" class="modal-btn secondary" onclick="document.getElementById('import-file-input').click()" data-i18n="settings.importJson">Import JSON</button>
           <input type="file" id="import-file-input" accept=".json" hidden/>
         </div>
       </div>
 
       <div class="settings-section" style="margin-bottom:0">
-        <div class="settings-section-title">Danger Zone</div>
-        <button type="button" class="modal-btn danger" onclick="window._launcher.clearAllData()">Clear All Data</button>
+        <div class="settings-section-title" data-i18n="settings.danger">Danger Zone</div>
+        <button type="button" class="modal-btn danger" onclick="window._launcher.clearAllData()" data-i18n="settings.clearAll">Clear All Data</button>
       </div>
 
       <div class="modal-actions" style="margin-top:24px">
-        <button type="button" class="modal-btn secondary" id="settings-cancel-btn">Cancel</button>
-        <button type="button" class="modal-btn primary" id="settings-save-btn">Save</button>
+        <button type="button" class="modal-btn secondary" id="settings-cancel-btn" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="modal-btn primary" id="settings-save-btn" data-i18n="common.save">Save</button>
       </div>
     </div>
   </div>
@@ -1488,10 +1599,10 @@
       <h2 id="source-title">View Source</h2>
       <textarea id="source-code"></textarea>
       <div class="modal-actions">
-        <button class="modal-btn secondary" id="copy-source-btn">Copy Source</button>
-        <button class="modal-btn primary" id="copy-prompt-btn">Copy with AI Prompt</button>
-        <button class="modal-btn primary" id="save-source-btn" disabled>Save Changes</button>
-        <button class="modal-btn secondary" id="close-source-btn">Close</button>
+        <button class="modal-btn secondary" id="copy-source-btn" data-i18n="source.copy">Copy Source</button>
+        <button class="modal-btn primary" id="copy-prompt-btn" data-i18n="source.copyPrompt">Copy with AI Prompt</button>
+        <button class="modal-btn primary" id="save-source-btn" disabled data-i18n="source.save">Save Changes</button>
+        <button class="modal-btn secondary" id="close-source-btn" data-i18n="common.close">Close</button>
       </div>
     </div>
   </div>
@@ -1499,11 +1610,11 @@
   <!-- AIMEAT Import Dialog (dynamically populated) -->
   <div id="aimeat-import-overlay" hidden>
     <div class="modal" id="aimeat-import-modal">
-      <h2>Import from AIMEAT</h2>
+      <h2 data-i18n="import.title">Import from AIMEAT</h2>
       <div class="aimeat-app-list" id="aimeat-app-list"></div>
       <div class="modal-actions">
-        <button type="button" class="modal-btn secondary" onclick="document.getElementById('aimeat-import-overlay').hidden = true">Cancel</button>
-        <button type="button" class="modal-btn primary" onclick="window._launcher.processAimeatImport()">Import Selected</button>
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('aimeat-import-overlay').hidden = true" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="modal-btn primary" onclick="window._launcher.processAimeatImport()" data-i18n="import.selected">Import Selected</button>
       </div>
     </div>
   </div>
@@ -1511,21 +1622,34 @@
   <!-- Publish Modal -->
   <div id="publish-overlay" hidden>
     <div class="modal" id="publish-modal">
-      <h2>&#x1F680; Publish App</h2>
+      <h2 data-i18n="publish.title">&#x1F680; Publish App</h2>
       <div class="form-group">
-        <label for="publish-filename">Filename</label>
+        <label for="publish-filename" data-i18n="publish.filename">Filename</label>
         <input type="text" id="publish-filename" class="modal-input" placeholder="my-app.html" autocomplete="off"/>
-        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">Letters, numbers, dots, hyphens, underscores. Must end in .html</div>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" data-i18n="publish.filenameHint">Letters, numbers, dots, hyphens, underscores. Must end in .html</div>
       </div>
       <div class="form-group">
-        <label for="publish-access-code">Access Code (optional)</label>
-        <input type="text" id="publish-access-code" class="modal-input" placeholder="Leave empty for public" autocomplete="off"/>
-        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px">4-64 chars. If set, only people with the code can download.</div>
+        <label for="publish-access-code" data-i18n="publish.accessCode">Access Code (optional)</label>
+        <input type="text" id="publish-access-code" class="modal-input" placeholder="Leave empty for public" data-i18n-ph="publish.accessCodePh" autocomplete="off"/>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" data-i18n="publish.accessCodeHint">4-64 chars. If set, only people with the code can download.</div>
       </div>
       <div id="publish-status" style="margin-top:8px;font-size:.85rem"></div>
       <div class="modal-actions">
-        <button type="button" class="modal-btn secondary" onclick="document.getElementById('publish-overlay').hidden = true">Cancel</button>
-        <button type="button" class="modal-btn primary" id="publish-submit-btn" onclick="window._launcher.submitPublish()">Publish</button>
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('publish-overlay').hidden = true" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="modal-btn primary" id="publish-submit-btn" onclick="window._launcher.submitPublish()" data-i18n="publish.submit">Publish</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Versions Modal -->
+  <div id="versions-overlay" hidden>
+    <div class="modal" id="versions-modal">
+      <h2>&#x1F551; <span id="versions-title">App Versions</span></h2>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:8px" data-i18n="versions.help">Every publish is kept. Restore re-publishes an older version as the new latest; Fork copies it into a new app. Older versions are never lost.</div>
+      <div id="versions-status" style="margin:6px 0;font-size:.85rem;min-height:1.1em"></div>
+      <div id="versions-list" style="max-height:48vh;overflow-y:auto"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('versions-overlay').hidden = true" data-i18n="common.close">Close</button>
       </div>
     </div>
   </div>
@@ -1533,19 +1657,19 @@
   <!-- Prompt Builder Panel -->
   <div id="prompt-builder-overlay">
     <div class="prompt-builder-modal">
-      <h2 id="pb-title">&#x2728; Generate App Prompt</h2>
+      <h2 id="pb-title" data-i18n="pb.title">&#x2728; Generate App Prompt</h2>
       <div class="pb-mode-row">
-        <label class="pb-mode-radio"><input type="radio" name="pb-mode" value="new" checked> New App</label>
-        <label class="pb-mode-radio"><input type="radio" name="pb-mode" value="improve"> Improve This App</label>
+        <label class="pb-mode-radio"><input type="radio" name="pb-mode" value="new" checked> <span data-i18n="pb.new">New App</span></label>
+        <label class="pb-mode-radio"><input type="radio" name="pb-mode" value="improve"> <span data-i18n="pb.improve">Improve This App</span></label>
       </div>
-      <textarea class="pb-desc-area" id="pb-description" placeholder="Describe what the app should do, or what changes to make..."></textarea>
-      <label class="pb-ext-toggle"><input type="checkbox" id="pb-ext-checkbox"> Include Cortex Extensions</label>
+      <textarea class="pb-desc-area" id="pb-description" placeholder="Describe what the app should do, or what changes to make..." data-i18n-ph="pb.descPh"></textarea>
+      <label class="pb-ext-toggle"><input type="checkbox" id="pb-ext-checkbox"> <span data-i18n="pb.includeCortex">Include Cortex Extensions</span></label>
       <div class="pb-ext-list" id="pb-ext-list"></div>
-      <div class="pb-preview-label">Live Preview</div>
+      <div class="pb-preview-label" data-i18n="pb.livePreview">Live Preview</div>
       <div class="pb-preview" id="pb-preview"></div>
       <div class="modal-actions">
-        <button class="modal-btn secondary" id="pb-cancel-btn">Cancel</button>
-        <button class="modal-btn primary" id="pb-copy-btn">Copy Prompt</button>
+        <button class="modal-btn secondary" id="pb-cancel-btn" data-i18n="common.cancel">Cancel</button>
+        <button class="modal-btn primary" id="pb-copy-btn" data-i18n="pb.copy">Copy Prompt</button>
       </div>
     </div>
   </div>
@@ -1555,6 +1679,279 @@
 <script>
 (function () {
   'use strict';
+
+  // ── i18n (en / fi) ─────────────────────────────────
+  // Standalone catalogue page: its own translation table + picker, independent
+  // of the SPA. Static chrome is annotated with data-i18n / data-i18n-ph /
+  // data-i18n-title; JS-rendered strings use t(). Dynamic app data (names,
+  // tags) is user content and stays as-is.
+  var I18N = {
+    en: {
+      'header.title': 'My Apps',
+      'mode.global': '🌐 Global',
+      'mode.global.title': 'Shared across all accounts on this browser',
+      'mode.personal': '👤 Personal',
+      'mode.personal.title': 'Private to your account',
+      'search.ph': 'Search apps...',
+      'action.add': 'Add app',
+      'action.generate': 'Generate with AI',
+      'action.homepage': 'Generate Homepage',
+      'action.settings': 'Settings',
+      'action.theme': 'Toggle light / dark',
+      'lang.label': 'Language',
+      'common.close': 'Close',
+      'common.cancel': 'Cancel',
+      'common.save': 'Save',
+      'common.or': 'or',
+      'common.toggle': 'toggle',
+      'cortex.active': '🔌 Active Extensions',
+      'cortex.editorTitle': '🛠️ Extension Editor',
+      'cortex.manifest': 'Manifest (YAML)',
+      'cortex.addLib': '+ Add Lib File',
+      'cortex.exportFiles': '📥 Export Files',
+      'cortex.saveReinstall': 'Save & Re-install',
+      'sec.published': '🚀 Published Apps',
+      'sec.community': '🌍 Community Apps',
+      'sec.recent': '🕒 Recently Opened',
+      'sec.local': '💾 Local Apps',
+      'stats.apps': 'apps',
+      'stats.stored': 'stored',
+      'addModal.title': 'Add App',
+      'tab.url': 'URL',
+      'tab.file': 'File',
+      'tab.paste': 'Paste',
+      'tab.aimeat': 'AIMEAT',
+      'addModal.url': 'App URL',
+      'addModal.htmlFile': 'HTML File',
+      'addModal.drop': 'Drag & drop an HTML file here',
+      'addModal.browse': 'Browse files',
+      'addModal.paste': 'Paste HTML Source Code',
+      'addModal.pastePh': 'Paste your HTML source code here...',
+      'addModal.aimeatHelp': 'Import apps from a connected AIMEAT server. Configure the server URL in Settings first.',
+      'addModal.fetch': 'Fetch Available Apps',
+      'addModal.name': 'App Name',
+      'addModal.namePh': 'My App',
+      'addModal.icon': 'Icon',
+      'addModal.tags': 'Tags',
+      'addModal.tagsHint': '(comma separated)',
+      'addModal.tagsPh': 'tools, productivity',
+      'addModal.openMode': 'Open Mode',
+      'openMode.tab': 'New Tab',
+      'openMode.iframe': 'Inline (iframe)',
+      'ctx.edit': '✏️ Edit',
+      'ctx.favorite': '⭐ Toggle favorite',
+      'ctx.toggleMode': '🔄 Switch open mode',
+      'ctx.viewSource': '👁 View / Edit Source',
+      'ctx.improveAi': '✨ Improve with AI',
+      'ctx.sharePrompt': '📤 Share as Prompt',
+      'ctx.publish': '🚀 Publish to server',
+      'ctx.delete': '🗑️ Delete',
+      'settings.title': 'Settings',
+      'settings.appearance': 'Appearance',
+      'settings.theme': 'Theme',
+      'theme.dark': 'Dark',
+      'theme.light': 'Light',
+      'settings.language': 'Language',
+      'settings.defaults': 'Defaults',
+      'settings.defaultOpenMode': 'Default open mode',
+      'settings.server': 'AIMEAT Server',
+      'settings.serverUrl': 'Server URL',
+      'settings.backup': 'Backup & Restore',
+      'settings.exportJson': 'Export JSON',
+      'settings.importJson': 'Import JSON',
+      'settings.danger': 'Danger Zone',
+      'settings.clearAll': 'Clear All Data',
+      'source.title': 'View Source',
+      'source.copy': 'Copy Source',
+      'source.copyPrompt': 'Copy with AI Prompt',
+      'source.save': 'Save Changes',
+      'import.title': 'Import from AIMEAT',
+      'import.selected': 'Import Selected',
+      'publish.title': '🚀 Publish App',
+      'publish.filename': 'Filename',
+      'publish.filenameHint': 'Letters, numbers, dots, hyphens, underscores. Must end in .html',
+      'publish.accessCode': 'Access Code (optional)',
+      'publish.accessCodePh': 'Leave empty for public',
+      'publish.accessCodeHint': '4-64 chars. If set, only people with the code can download.',
+      'publish.submit': 'Publish',
+      'versions.title': 'App Versions',
+      'versions.help': 'Every publish is kept. Restore re-publishes an older version as the new latest; Fork copies it into a new app. Older versions are never lost.',
+      'versions.current': 'current',
+      'versions.stored': 'versions stored',
+      'pb.title': '✨ Generate App Prompt',
+      'pb.new': 'New App',
+      'pb.improve': 'Improve This App',
+      'pb.descPh': 'Describe what the app should do, or what changes to make...',
+      'pb.includeCortex': 'Include Cortex Extensions',
+      'pb.livePreview': 'Live Preview',
+      'pb.copy': 'Copy Prompt',
+      'card.view': '👁 View',
+      'card.remove': '🗑 Remove',
+      'card.versions': '🕑 Versions',
+      'card.fork': '⑂ Fork',
+      'card.restore': '↺ Restore',
+      'tag.all': 'All',
+      'tag.favorites': '⭐ Favorites',
+      'empty.noApps': 'No apps yet',
+      'empty.noAppsDesc': 'Add your first app using the + button above',
+      'empty.formats': 'Supports: HTML files, URLs, ZIP packages, AIMEAT imports',
+      'empty.noMatch': 'No matches',
+      'empty.noMatchDesc': 'No apps match the current filter. Try a different search term or tag.'
+    },
+    fi: {
+      'header.title': 'Omat sovellukset',
+      'mode.global': '🌐 Globaali',
+      'mode.global.title': 'Jaettu kaikille tämän selaimen tileille',
+      'mode.personal': '👤 Henkilökohtainen',
+      'mode.personal.title': 'Yksityinen tilillesi',
+      'search.ph': 'Etsi sovelluksia...',
+      'action.add': 'Lisää sovellus',
+      'action.generate': 'Luo tekoälyllä',
+      'action.homepage': 'Luo kotisivu',
+      'action.settings': 'Asetukset',
+      'action.theme': 'Vaihda vaalea / tumma',
+      'lang.label': 'Kieli',
+      'common.close': 'Sulje',
+      'common.cancel': 'Peruuta',
+      'common.save': 'Tallenna',
+      'common.or': 'tai',
+      'common.toggle': 'näytä/piilota',
+      'cortex.active': '🔌 Aktiiviset laajennukset',
+      'cortex.editorTitle': '🛠️ Laajennuseditori',
+      'cortex.manifest': 'Manifesti (YAML)',
+      'cortex.addLib': '+ Lisää lib-tiedosto',
+      'cortex.exportFiles': '📥 Vie tiedostot',
+      'cortex.saveReinstall': 'Tallenna & asenna uudelleen',
+      'sec.published': '🚀 Julkaistut sovellukset',
+      'sec.community': '🌍 Yhteisön sovellukset',
+      'sec.recent': '🕒 Viimeksi avatut',
+      'sec.local': '💾 Paikalliset sovellukset',
+      'stats.apps': 'sovellusta',
+      'stats.stored': 'tallennettu',
+      'addModal.title': 'Lisää sovellus',
+      'tab.url': 'URL',
+      'tab.file': 'Tiedosto',
+      'tab.paste': 'Liitä',
+      'tab.aimeat': 'AIMEAT',
+      'addModal.url': 'Sovelluksen URL',
+      'addModal.htmlFile': 'HTML-tiedosto',
+      'addModal.drop': 'Raahaa ja pudota HTML-tiedosto tähän',
+      'addModal.browse': 'Selaa tiedostoja',
+      'addModal.paste': 'Liitä HTML-lähdekoodi',
+      'addModal.pastePh': 'Liitä HTML-lähdekoodisi tähän...',
+      'addModal.aimeatHelp': 'Tuo sovelluksia yhdistetyltä AIMEAT-palvelimelta. Määritä palvelimen URL ensin Asetuksissa.',
+      'addModal.fetch': 'Hae saatavilla olevat sovellukset',
+      'addModal.name': 'Sovelluksen nimi',
+      'addModal.namePh': 'Oma sovellus',
+      'addModal.icon': 'Kuvake',
+      'addModal.tags': 'Tunnisteet',
+      'addModal.tagsHint': '(pilkulla eroteltuna)',
+      'addModal.tagsPh': 'työkalut, tuottavuus',
+      'addModal.openMode': 'Avaustapa',
+      'openMode.tab': 'Uusi välilehti',
+      'openMode.iframe': 'Upotettu (iframe)',
+      'ctx.edit': '✏️ Muokkaa',
+      'ctx.favorite': '⭐ Lisää/poista suosikki',
+      'ctx.toggleMode': '🔄 Vaihda avaustapa',
+      'ctx.viewSource': '👁 Näytä / muokkaa lähdekoodia',
+      'ctx.improveAi': '✨ Paranna tekoälyllä',
+      'ctx.sharePrompt': '📤 Jaa promptina',
+      'ctx.publish': '🚀 Julkaise palvelimelle',
+      'ctx.delete': '🗑️ Poista',
+      'settings.title': 'Asetukset',
+      'settings.appearance': 'Ulkoasu',
+      'settings.theme': 'Teema',
+      'theme.dark': 'Tumma',
+      'theme.light': 'Vaalea',
+      'settings.language': 'Kieli',
+      'settings.defaults': 'Oletukset',
+      'settings.defaultOpenMode': 'Oletusavaustapa',
+      'settings.server': 'AIMEAT-palvelin',
+      'settings.serverUrl': 'Palvelimen URL',
+      'settings.backup': 'Varmuuskopiointi & palautus',
+      'settings.exportJson': 'Vie JSON',
+      'settings.importJson': 'Tuo JSON',
+      'settings.danger': 'Vaaravyöhyke',
+      'settings.clearAll': 'Tyhjennä kaikki tiedot',
+      'source.title': 'Näytä lähdekoodi',
+      'source.copy': 'Kopioi lähdekoodi',
+      'source.copyPrompt': 'Kopioi tekoälypromptilla',
+      'source.save': 'Tallenna muutokset',
+      'import.title': 'Tuo AIMEATista',
+      'import.selected': 'Tuo valitut',
+      'publish.title': '🚀 Julkaise sovellus',
+      'publish.filename': 'Tiedostonimi',
+      'publish.filenameHint': 'Kirjaimia, numeroita, pisteitä, viivoja, alaviivoja. Päätteen oltava .html',
+      'publish.accessCode': 'Pääsykoodi (valinnainen)',
+      'publish.accessCodePh': 'Jätä tyhjäksi julkiseksi',
+      'publish.accessCodeHint': '4–64 merkkiä. Jos asetettu, vain koodin tietävät voivat ladata.',
+      'publish.submit': 'Julkaise',
+      'versions.title': 'Sovelluksen versiot',
+      'versions.help': 'Jokainen julkaisu säilytetään. Palauta julkaisee vanhan version uudelleen uusimmaksi; Haaroita kopioi sen uudeksi sovellukseksi. Vanhoja versioita ei koskaan menetetä.',
+      'versions.current': 'nykyinen',
+      'versions.stored': 'versiota tallennettu',
+      'pb.title': '✨ Luo sovellusprompti',
+      'pb.new': 'Uusi sovellus',
+      'pb.improve': 'Paranna tätä sovellusta',
+      'pb.descPh': 'Kuvaile mitä sovelluksen tulisi tehdä, tai mitä muutoksia haluat...',
+      'pb.includeCortex': 'Sisällytä Cortex-laajennukset',
+      'pb.livePreview': 'Esikatselu',
+      'pb.copy': 'Kopioi prompti',
+      'card.view': '👁 Näytä',
+      'card.remove': '🗑 Poista',
+      'card.versions': '🕑 Versiot',
+      'card.fork': '⑂ Haaroita',
+      'card.restore': '↺ Palauta',
+      'tag.all': 'Kaikki',
+      'tag.favorites': '⭐ Suosikit',
+      'empty.noApps': 'Ei vielä sovelluksia',
+      'empty.noAppsDesc': 'Lisää ensimmäinen sovellus yllä olevalla +-painikkeella',
+      'empty.formats': 'Tukee: HTML-tiedostot, URL-osoitteet, ZIP-paketit, AIMEAT-tuonnit',
+      'empty.noMatch': 'Ei osumia',
+      'empty.noMatchDesc': 'Mikään sovellus ei vastaa nykyistä suodatinta. Kokeile eri hakusanaa tai tunnistetta.'
+    }
+  };
+
+  var currentLang = 'en';
+
+  function t(key) {
+    var table = I18N[currentLang] || I18N.en;
+    if (table[key] != null) return table[key];
+    if (I18N.en[key] != null) return I18N.en[key];
+    return key;
+  }
+
+  function applyI18n() {
+    var i, nodes;
+    nodes = document.querySelectorAll('[data-i18n]');
+    for (i = 0; i < nodes.length; i++) nodes[i].textContent = t(nodes[i].getAttribute('data-i18n'));
+    nodes = document.querySelectorAll('[data-i18n-ph]');
+    for (i = 0; i < nodes.length; i++) nodes[i].setAttribute('placeholder', t(nodes[i].getAttribute('data-i18n-ph')));
+    nodes = document.querySelectorAll('[data-i18n-title]');
+    for (i = 0; i < nodes.length; i++) nodes[i].setAttribute('title', t(nodes[i].getAttribute('data-i18n-title')));
+    document.documentElement.lang = currentLang;
+    document.title = t('header.title') + ' — AIMEAT';
+    updateLangToggle();
+  }
+
+  function updateLangToggle() {
+    var btns = document.querySelectorAll('#lang-toggle .lang-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('active', btns[i].getAttribute('data-lang') === currentLang);
+    }
+  }
+
+  function setLanguage(lang) {
+    currentLang = (lang === 'fi') ? 'fi' : 'en';
+    try { var config = loadConfig(); config.language = currentLang; saveConfig(config); } catch (e) {}
+    applyI18n();
+    // Re-render dynamic sections so JS-built strings pick up the new language.
+    try { renderApps(); } catch (e) {}
+    try { renderTags(); } catch (e) {}
+    try { loadPublishedApps(); } catch (e) {}
+    try { renderRecentlyOpened(); } catch (e) {}
+    try { loadCortexExtensions(); } catch (e) {}
+  }
 
   // ── IndexedDB wrapper ──────────────────────────────
 
@@ -2254,11 +2651,11 @@
     var html = '';
 
     // "All" button
-    html += '<button class="tag' + (activeTag === null ? ' active' : '') + '" onclick="window._launcher.filterByTag(null)">All</button>';
+    html += '<button class="tag' + (activeTag === null ? ' active' : '') + '" onclick="window._launcher.filterByTag(null)">' + t('tag.all') + '</button>';
 
     // Favorites button (only if any favorites exist)
     if (hasFavorites) {
-      html += '<button class="tag' + (activeTag === '__favorites__' ? ' active' : '') + '" onclick="window._launcher.filterByTag(\'__favorites__\')">\u2B50 Favorites</button>';
+      html += '<button class="tag' + (activeTag === '__favorites__' ? ' active' : '') + '" onclick="window._launcher.filterByTag(\'__favorites__\')">' + t('tag.favorites') + '</button>';
     }
 
     // One button per unique tag
@@ -2393,17 +2790,17 @@
           grid.innerHTML =
             '<div class="empty-state">' +
               '<div class="empty-icon">\u{1F680}</div>' +
-              '<h3>No apps yet</h3>' +
-              '<p>Add your first app using the <strong>+</strong> button above</p>' +
-              '<span class="empty-formats">Supports: HTML files, URLs, ZIP packages, AIMEAT imports</span>' +
+              '<h3>' + t('empty.noApps') + '</h3>' +
+              '<p>' + t('empty.noAppsDesc') + '</p>' +
+              '<span class="empty-formats">' + t('empty.formats') + '</span>' +
             '</div>';
         } else {
           // Filters active but no matches
           grid.innerHTML =
             '<div class="empty-state">' +
               '<div class="empty-icon">\u{1F50D}</div>' +
-              '<h3>No matches</h3>' +
-              '<p>No apps match the current filter. Try a different search term or tag.</p>' +
+              '<h3>' + t('empty.noMatch') + '</h3>' +
+              '<p>' + t('empty.noMatchDesc') + '</p>' +
             '</div>';
         }
       } else {
@@ -2438,7 +2835,7 @@
       var sizeLabel = totalSize < 1024 ? totalSize + ' B'
         : totalSize < 1048576 ? (totalSize / 1024).toFixed(1) + ' KB'
         : (totalSize / 1048576).toFixed(1) + ' MB';
-      statsEl.textContent = allApps.length + ' app' + (allApps.length !== 1 ? 's' : '') + ' \u00B7 ' + sizeLabel + ' stored';
+      statsEl.textContent = allApps.length + ' ' + t('stats.apps') + ' \u00B7 ' + sizeLabel + ' ' + t('stats.stored');
 
       // Render tag bar
       renderTags();
@@ -2459,7 +2856,7 @@
     section.style.display = 'block';
     strip.innerHTML = recent.map(function(app) {
       var icon = app.icon || '\u{1F4DD}';
-      return '<div style="background:var(--surface-glass);border:1px solid var(--border-subtle);border-radius:10px;padding:.6rem .8rem;cursor:pointer;min-width:120px;flex-shrink:0;transition:all .15s" onclick="window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'' + escapeHtml(app.openMode || 'tab') + '\')" onmouseover="this.style.borderColor=\'#D1D5DB\'" onmouseout="this.style.borderColor=\'#E5E7EB\'">' +
+      return '<div style="background:var(--surface-glass);border:1px solid var(--border-subtle);border-radius:10px;padding:.6rem .8rem;cursor:pointer;min-width:120px;flex-shrink:0;transition:all .15s" onclick="window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'' + escapeHtml(app.openMode || 'tab') + '\')" onmouseover="this.style.borderColor=\'var(--border-hover)\'" onmouseout="this.style.borderColor=\'var(--border-subtle)\'">' +
         '<div style="font-size:1.3rem;text-align:center">' + escapeHtml(icon) + '</div>' +
         '<div style="font-size:.75rem;font-weight:600;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px">' + escapeHtml(app.name) + '</div>' +
       '</div>';
@@ -2505,20 +2902,35 @@
     contextAppId = id;
 
     var menu = document.getElementById('context-menu');
+    // Reveal off-screen first so we can measure the REAL height — the menu has
+    // a variable number of items (Edit, Favorite, Open mode, Source, Improve,
+    // Share, Publish, Delete…), so a hardcoded estimate overflowed the viewport
+    // and pushed the lower actions out of reach.
+    menu.style.left = '-9999px';
+    menu.style.top = '0px';
     menu.hidden = false;
 
-    // Position at cursor, but keep on screen
-    var x = event.clientX;
-    var y = event.clientY;
-    var menuWidth = 200; // approximate min-width
-    var menuHeight = 160; // approximate height
+    // offsetWidth/Height give the true layout size and ignore the cardIn entry
+    // animation's transform: scale() (getBoundingClientRect would under-measure
+    // mid-animation and let the menu spill off the bottom edge).
+    var menuWidth = menu.offsetWidth || 200;
+    var menuHeight = menu.offsetHeight || 160;
+    var margin = 8;
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
 
-    if (x + menuWidth > window.innerWidth) {
-      x = window.innerWidth - menuWidth - 8;
-    }
-    if (y + menuHeight > window.innerHeight) {
-      y = window.innerHeight - menuHeight - 8;
-    }
+    var x = (event.clientX != null) ? event.clientX : 0;
+    var y = (event.clientY != null) ? event.clientY : 0;
+
+    // Clamp horizontally within the viewport.
+    if (x + menuWidth + margin > vw) x = vw - menuWidth - margin;
+    if (x < margin) x = margin;
+
+    // Clamp vertically: pin to the bottom edge if it would overflow below,
+    // and never let the top go above the viewport. (Combined with the
+    // max-height in CSS, a menu taller than the screen scrolls instead.)
+    if (y + menuHeight + margin > vh) y = vh - menuHeight - margin;
+    if (y < margin) y = margin;
 
     menu.style.left = x + 'px';
     menu.style.top = y + 'px';
@@ -2716,18 +3128,41 @@
   // ── Theme ────────────────────────────────────────
 
   function applyTheme(theme) {
-    if (theme === 'light') {
-      document.documentElement.setAttribute('data-theme', 'light');
+    // Light is the default (:root). Dark applies the [data-theme="dark"] overrides.
+    if (theme === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
     } else {
       document.documentElement.removeAttribute('data-theme');
     }
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', theme === 'dark' ? '#14141C' : '#FAFAF8');
+    updateThemeToggle();
+  }
+
+  function updateThemeToggle() {
+    // Show the icon for the mode you'd switch TO: moon while light, sun while dark.
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var btn = document.getElementById('theme-btn');
+    if (btn) btn.textContent = dark ? '☀️' : '🌙';
+  }
+
+  // Quick light/dark switch from the header (no need to open Settings).
+  function toggleTheme() {
+    var config = loadConfig();
+    var next = (config.theme === 'dark') ? 'light' : 'dark';
+    config.theme = next;
+    saveConfig(config);
+    applyTheme(next);
+    var sel = document.getElementById('setting-theme');
+    if (sel) sel.value = next;
   }
 
   // ── Settings ────────────────────────────────────
 
   function openSettings() {
     var config = loadConfig();
-    document.getElementById('setting-theme').value = config.theme || 'dark';
+    document.getElementById('setting-theme').value = config.theme || 'light';
+    document.getElementById('setting-language').value = currentLang;
     document.getElementById('setting-open-mode').value = config.defaultOpenMode || 'tab';
     document.getElementById('setting-aimeat-url').value = config.aimeatUrl || '';
     document.getElementById('settings-overlay').hidden = false;
@@ -3215,6 +3650,23 @@
     arrow.classList.toggle('open', communityVisible);
   }
 
+  // Owner-match: an app belongs to the logged-in user when the bare owner names
+  // match, regardless of whether either side carries a `@node` suffix. Legacy
+  // publish paths stored ownerName as the full GHII, so an exact string compare
+  // wrongly dumped the user's own apps into "Community".
+  function bareOwnerName(name) {
+    return (name || '').split('@')[0].toLowerCase();
+  }
+  function sameOwner(appOwner, sessionOwner) {
+    if (!sessionOwner) return false;
+    var a = bareOwnerName(appOwner);
+    return !!a && a === bareOwnerName(sessionOwner);
+  }
+
+  // Manifest cache keyed by "owner\nfilename" — lets Restore/Fork reuse the
+  // app's metadata (name, description, category, tags, icon) without a re-fetch.
+  var serverAppManifests = {};
+
   function loadPublishedApps() {
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : '';
@@ -3263,11 +3715,18 @@
         .then(function(json) {
           var serverApps = json.data && json.data.apps ? json.data.apps : [];
 
+          // Cache manifests for Restore/Fork before partitioning
+          serverAppManifests = {};
+          for (var mi = 0; mi < serverApps.length; mi++) {
+            var msa = serverApps[mi];
+            serverAppManifests[(msa.owner || '') + '\n' + (msa.filename || '')] = msa.manifest || {};
+          }
+
           var ownApps = currentOwner
-            ? serverApps.filter(function(a) { return a.owner === currentOwner; })
+            ? serverApps.filter(function(a) { return sameOwner(a.owner, currentOwner); })
             : [];
           var communityApps = currentOwner
-            ? serverApps.filter(function(a) { return a.owner !== currentOwner; })
+            ? serverApps.filter(function(a) { return !sameOwner(a.owner, currentOwner); })
             : serverApps;
 
           renderPublishedApps(localPublished, ownApps, localByFilename, aimeatUrl, section, grid, countEl);
@@ -3311,7 +3770,8 @@
             '<span style="color:var(--accent)">&#x1F464; ' + escapeHtml(author) + '</span>' +
           '</div>' +
           '<div class="published-card-actions">' +
-            '<button onclick="window.open(\'' + escapeHtml(viewUrl) + '?mode=inline\', \'_blank\')">&#x1F441; View</button>' +
+            '<button onclick="window.open(\'' + escapeHtml(viewUrl) + '?mode=inline\', \'_blank\')">' + t('card.view') + '</button>' +
+            '<button onclick="window._launcher.forkVersion(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\', ' + (sa.version_number || 0) + ')" title="Copy into your own apps">' + t('card.fork') + '</button>' +
           '</div>' +
         '</div>';
     }
@@ -3384,9 +3844,10 @@
             '<span>' + app.date + '</span>' +
           '</div>' +
           '<div class="published-card-actions">' +
-            (app.viewUrl ? '<button onclick="window.open(\'' + escapeHtml(app.viewUrl) + '?mode=inline\', \'_blank\')">&#x1F441; View</button>' : '') +
-            (app.localId ? '<button onclick="window._launcher.unpublishApp(\'' + escapeHtml(app.localId) + '\')" class="danger">&#x1F5D1; Remove</button>' :
-             app.isOwn ? '<button onclick="window._launcher.deleteServerApp(\'' + escapeHtml(app.filename) + '\')" class="danger">&#x1F5D1; Remove</button>' : '') +
+            (app.viewUrl ? '<button onclick="window.open(\'' + escapeHtml(app.viewUrl) + '?mode=inline\', \'_blank\')">' + t('card.view') + '</button>' : '') +
+            (app.isOwn && app.filename ? '<button onclick="window._launcher.showVersionsModal(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\')">' + t('card.versions') + '</button>' : '') +
+            (app.localId ? '<button onclick="window._launcher.unpublishApp(\'' + escapeHtml(app.localId) + '\')" class="danger">' + t('card.remove') + '</button>' :
+             app.isOwn ? '<button onclick="window._launcher.deleteServerApp(\'' + escapeHtml(app.filename) + '\')" class="danger">' + t('card.remove') + '</button>' : '') +
           '</div>' +
         '</div>';
     }
@@ -3453,6 +3914,188 @@
       .catch(function(err) { alert('Error: ' + (err.message || err)); });
   }
 
+  // ── App Versions / Restore / Fork ─────────────────
+
+  // Fetch one app version's raw bytes and return them base64-encoded. Chunked
+  // String.fromCharCode avoids a call-stack overflow on large apps.
+  function fetchAppContentBase64(aimeatUrl, owner, filename, version) {
+    var url = aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + (version ? '?version=' + version : '');
+    var token = getCortexOwnerToken();
+    var headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+    return fetch(url, { headers: headers }).then(function(resp) {
+      if (!resp.ok) throw new Error('Could not fetch app content (HTTP ' + resp.status + ')');
+      return resp.arrayBuffer();
+    }).then(function(buf) {
+      var bytes = new Uint8Array(buf);
+      var binary = '';
+      var chunk = 0x8000;
+      for (var i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+      }
+      return btoa(binary);
+    });
+  }
+
+  function showVersionsModal(owner, filename) {
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : '';
+    if (!aimeatUrl) { alert('Set AIMEAT server URL in Settings first'); return; }
+
+    document.getElementById('versions-title').textContent = filename;
+    var statusEl = document.getElementById('versions-status');
+    var listEl = document.getElementById('versions-list');
+    statusEl.textContent = 'Loading versions…';
+    statusEl.style.color = 'var(--text-muted)';
+    listEl.innerHTML = '';
+    document.getElementById('versions-overlay').hidden = false;
+
+    fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '/versions')
+      .then(function(resp) {
+        if (!resp.ok) throw new Error('Server returned ' + resp.status);
+        return resp.json();
+      })
+      .then(function(json) {
+        var versions = json.data && json.data.versions ? json.data.versions : [];
+        if (versions.length === 0) { statusEl.textContent = 'No versions found.'; return; }
+        statusEl.textContent = versions.length + ' ' + t('versions.stored');
+        statusEl.style.color = 'var(--text-muted)';
+
+        var ownerArg = "'" + escapeHtml(owner).replace(/'/g, "\\'") + "'";
+        var fileArg = "'" + escapeHtml(filename).replace(/'/g, "\\'") + "'";
+        var html = '';
+        for (var i = 0; i < versions.length; i++) {
+          var v = versions[i];
+          var isLatest = (i === 0);
+          var kb = v.size ? (Math.round(v.size / 102.4) / 10) + ' KB' : '';
+          var when = v.created_at ? new Date(v.created_at).toLocaleString() : '';
+          var viewU = aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '?version=' + v.version_number + '&mode=inline';
+          html +=
+            '<div class="version-row">' +
+              '<div class="version-meta">' +
+                '<span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t('versions.current') + '</span>' : '') + '</span>' +
+                '<span class="version-sub">' + escapeHtml(v.version || '') + (kb ? ' · ' + kb : '') + (when ? ' · ' + when : '') + '</span>' +
+              '</div>' +
+              '<div class="version-actions">' +
+                '<button onclick="window.open(\'' + escapeHtml(viewU) + '\', \'_blank\')">' + t('card.view') + '</button>' +
+                (isLatest ? '' : '<button onclick="window._launcher.restoreVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')" title="Re-publish this version as the new latest">' + t('card.restore') + '</button>') +
+                '<button onclick="window._launcher.forkVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')" title="Copy this version into a new app">' + t('card.fork') + '</button>' +
+              '</div>' +
+            '</div>';
+        }
+        listEl.innerHTML = html;
+      })
+      .catch(function(err) {
+        statusEl.textContent = '✘ ' + (err.message || 'Failed to load versions');
+        statusEl.style.color = 'var(--accent)';
+      });
+  }
+
+  function restoreVersion(owner, filename, version) {
+    if (!confirm('Restore version ' + version + ' of "' + filename + '"?\n\nIt will be re-published as a new latest version. Older versions are kept.')) return;
+    var token = getCortexOwnerToken();
+    if (!token) { alert('You must be logged in as the owner to restore a version. Sign in first.'); return; }
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
+    var statusEl = document.getElementById('versions-status');
+    statusEl.textContent = 'Restoring version ' + version + '…';
+    statusEl.style.color = '#34d399';
+
+    var meta = serverAppManifests[owner + '\n' + filename] || {};
+    fetchAppContentBase64(aimeatUrl, owner, filename, version)
+      .then(function(b64) {
+        var body = {
+          filename: filename,
+          content: b64,
+          mime_type: 'text/html',
+          name: meta.name || filename.replace(/\.html?$/i, ''),
+          description: meta.description || '',
+          category: meta.category || 'utility',
+          tags: meta.tags || [],
+          uses_cortex: meta.usesCortex || []
+        };
+        if (meta.icon) body.icon = meta.icon;
+        return fetch(aimeatUrl + '/v1/apps', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify(body)
+        });
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(json) {
+        if (json.ok) {
+          statusEl.textContent = '✔ Restored — now published as v' + (json.data.version_number || '?');
+          statusEl.style.color = '#34d399';
+          loadPublishedApps();
+          setTimeout(function() { showVersionsModal(owner, filename); }, 500);
+        } else {
+          statusEl.textContent = '✘ ' + (json.error_description || (json.error && json.error.message) || 'Restore failed');
+          statusEl.style.color = 'var(--accent)';
+        }
+      })
+      .catch(function(err) {
+        statusEl.textContent = '✘ ' + (err.message || 'Restore failed');
+        statusEl.style.color = 'var(--accent)';
+      });
+  }
+
+  function forkVersion(owner, filename, version) {
+    var token = getCortexOwnerToken();
+    if (!token) { alert('You must be logged in to fork an app into your own catalogue. Sign in first.'); return; }
+    var base = (filename || 'app').replace(/\.html?$/i, '');
+    var suggested = base + '-fork.html';
+    var newName = prompt('Fork version ' + version + ' of "' + filename + '" into a new app.\n\nNew filename:', suggested);
+    if (!newName) return;
+    newName = newName.trim();
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(newName)) {
+      alert('Invalid filename. Use letters, numbers, dots, hyphens, underscores (max 100 chars).');
+      return;
+    }
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
+    var statusEl = document.getElementById('versions-status');
+    var inVersionsModal = !document.getElementById('versions-overlay').hidden;
+    if (inVersionsModal) { statusEl.textContent = 'Forking…'; statusEl.style.color = '#34d399'; }
+
+    var meta = serverAppManifests[owner + '\n' + filename] || {};
+    fetchAppContentBase64(aimeatUrl, owner, filename, version)
+      .then(function(b64) {
+        var body = {
+          filename: newName,
+          content: b64,
+          mime_type: 'text/html',
+          name: (meta.name || base) + ' (fork)',
+          description: meta.description || '',
+          category: meta.category || 'utility',
+          tags: meta.tags || [],
+          uses_cortex: meta.usesCortex || []
+        };
+        if (meta.icon) body.icon = meta.icon;
+        return fetch(aimeatUrl + '/v1/apps', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify(body)
+        });
+      })
+      .then(function(resp) { return resp.json(); })
+      .then(function(json) {
+        if (json.ok) {
+          var msg = '✔ Forked to "' + newName + '" (v' + (json.data.version_number || 1) + ')';
+          if (inVersionsModal) { statusEl.textContent = msg; statusEl.style.color = '#34d399'; }
+          else alert(msg);
+          loadPublishedApps();
+        } else {
+          var err = json.error_description || (json.error && json.error.message) || 'Fork failed';
+          if (inVersionsModal) { statusEl.textContent = '✘ ' + err; statusEl.style.color = 'var(--accent)'; }
+          else alert('Fork failed: ' + err);
+        }
+      })
+      .catch(function(err) {
+        var m = err.message || 'Fork failed';
+        if (inVersionsModal) { statusEl.textContent = '✘ ' + m; statusEl.style.color = 'var(--accent)'; }
+        else alert('Error: ' + m);
+      });
+  }
+
   // ── Cortex Extensions Bar ─────────────────────────
 
   var cortexToken = null;
@@ -3517,7 +4160,7 @@
         var ext = data.data;
         var comps = ext.components || [];
         var html = '<h2 style="margin-top:0">' + cortexEsc(ext.name) + '</h2>';
-        html += '<p style="color:#6B7280">' + cortexEsc(ext.description || '') + '</p>';
+        html += '<p style="color:var(--text-muted)">' + cortexEsc(ext.description || '') + '</p>';
         html += '<h3 style="font-size:.9rem">Available for your apps:</h3>';
 
         // Libs
@@ -3526,12 +4169,12 @@
           var tag = '<script src="' + scriptUrl + '"><\/script>';
           html += '<div style="margin-bottom:1rem">'
             + '<div style="font-weight:600;font-size:.85rem">&#x1F4E6; Lib: ' + cortexEsc(lib.filename) + '</div>'
-            + '<div style="font-family:monospace;font-size:.75rem;background:#F3F4F6;padding:8px;border-radius:6px;margin-top:4px;word-break:break-all">' + cortexEsc(tag) + '</div>'
-            + '<button onclick="cortexCopy(\'' + tag.replace(/'/g, "\\'").replace(/"/g, '&quot;') + '\',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid #E5E7EB;background:transparent;color:#6B7280;cursor:pointer">Copy</button>';
+            + '<div style="font-family:monospace;font-size:.75rem;background:var(--hover);padding:8px;border-radius:6px;margin-top:4px;word-break:break-all">' + cortexEsc(tag) + '</div>'
+            + '<button onclick="cortexCopy(\'' + tag.replace(/'/g, "\\'").replace(/"/g, '&quot;') + '\',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer">Copy</button>';
           if (lib.api_surface) {
             html += '<div style="font-size:.8rem;font-weight:600;margin-top:8px">API Surface:</div>'
-              + '<div style="font-family:monospace;font-size:.75rem;background:#F3F4F6;padding:8px;border-radius:6px;margin-top:4px;white-space:pre-wrap">' + cortexEsc(lib.api_surface) + '</div>'
-              + '<button onclick="cortexCopy(\'' + (lib.api_surface || '').replace(/\\/g,'\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n') + '\',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid #E5E7EB;background:transparent;color:#6B7280;cursor:pointer">Copy API</button>';
+              + '<div style="font-family:monospace;font-size:.75rem;background:var(--hover);padding:8px;border-radius:6px;margin-top:4px;white-space:pre-wrap">' + cortexEsc(lib.api_surface) + '</div>'
+              + '<button onclick="cortexCopy(\'' + (lib.api_surface || '').replace(/\\/g,'\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n') + '\',this)" style="font-size:.7rem;margin-top:4px;padding:2px 8px;border-radius:4px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer">Copy API</button>';
           }
           html += '</div>';
         });
@@ -3546,8 +4189,8 @@
           var preview = (p.content || '').substring(0, 150);
           html += '<div style="margin-bottom:.5rem">'
             + '<div style="font-size:.85rem">&#x1F4AC; Prompt: ' + cortexEsc(p.name) + '</div>'
-            + '<div style="font-size:.75rem;color:#6B7280">&ldquo;' + cortexEsc(preview) + '...&rdquo;</div>'
-            + '<button onclick="cortexCopy(\'' + (p.content || '').replace(/\\/g,'\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n') + '\',this)" style="font-size:.7rem;margin-top:2px;padding:2px 8px;border-radius:4px;border:1px solid #E5E7EB;background:transparent;color:#6B7280;cursor:pointer">Copy Prompt</button>'
+            + '<div style="font-size:.75rem;color:var(--text-muted)">&ldquo;' + cortexEsc(preview) + '...&rdquo;</div>'
+            + '<button onclick="cortexCopy(\'' + (p.content || '').replace(/\\/g,'\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n') + '\',this)" style="font-size:.7rem;margin-top:2px;padding:2px 8px;border-radius:4px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-muted);cursor:pointer">Copy Prompt</button>'
             + '</div>';
         });
 
@@ -3555,7 +4198,7 @@
         var hasSession = false;
         try { hasSession = !!getCortexOwnerToken(); } catch(e) {}
         if (hasSession) {
-          html += '<div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid #E5E7EB">'
+          html += '<div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border-subtle)">'
             + '<button onclick="window._launcher.openCortexEditor(\'' + encodedName + '\')" style="padding:6px 16px;border-radius:8px;border:1px solid var(--accent,#34d399);background:transparent;color:var(--accent,#34d399);cursor:pointer;font-size:.85rem">&#x1F6E0;&#xFE0F; Edit Extension</button>'
             + '</div>';
         }
@@ -3644,12 +4287,12 @@
   }
 
   function cortexEditorLibSection(id, filename, content) {
-    return '<div id="cortex-lib-' + id + '" style="margin-bottom:1rem;border:1px solid #E5E7EB;border-radius:8px;padding:12px">'
+    return '<div id="cortex-lib-' + id + '" style="margin-bottom:1rem;border:1px solid var(--border-subtle);border-radius:8px;padding:12px">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">'
-      + '<label style="font-size:.85rem;font-weight:600">Lib: <input type="text" value="' + cortexEsc(filename) + '" data-lib-name="' + id + '" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:4px;padding:2px 6px;color:#1A1A2E;font-family:monospace;font-size:.8rem;width:200px" /></label>'
+      + '<label style="font-size:.85rem;font-weight:600">Lib: <input type="text" value="' + cortexEsc(filename) + '" data-lib-name="' + id + '" style="background:var(--bg-subtle);border:1px solid var(--border-subtle);border-radius:4px;padding:2px 6px;color:var(--text);font-family:monospace;font-size:.8rem;width:200px" /></label>'
       + '<button onclick="document.getElementById(\'cortex-lib-' + id + '\').remove()" style="font-size:.7rem;padding:2px 8px;border-radius:4px;border:1px solid rgba(232,86,74,.3);background:transparent;color:#E8564A;cursor:pointer">Remove</button>'
       + '</div>'
-      + '<textarea data-lib-content="' + id + '" spellcheck="false" style="width:100%;min-height:150px;background:#F9FAFB;color:#1A1A2E;border:1px solid #E5E7EB;border-radius:8px;padding:10px;font-family:monospace;font-size:.78rem;resize:vertical;tab-size:2">' + cortexEsc(content || '') + '</textarea>'
+      + '<textarea data-lib-content="' + id + '" spellcheck="false" style="width:100%;min-height:150px;background:var(--bg-subtle);color:var(--text);border:1px solid var(--border-subtle);border-radius:8px;padding:10px;font-family:monospace;font-size:.78rem;resize:vertical;tab-size:2">' + cortexEsc(content || '') + '</textarea>'
       + '</div>';
   }
 
@@ -3949,28 +4592,48 @@
     var prompt = '';
 
     // Header
-    if (mode === 'improve' && pbSourceApp) {
+    var isImprove = (mode === 'improve' && pbSourceApp);
+    if (isImprove) {
       prompt += 'Here is an HTML app called "' + (pbSourceApp.name || 'Untitled') + '".\n';
-      prompt += 'Make the following change: ' + (description || '[DESCRIBE YOUR CHANGE HERE]') + '\n\n';
-      prompt += 'Return the COMPLETE updated HTML file. Do not omit any parts.\n\n';
+      prompt += 'I want to change it: ' + (description || '(I will describe the change — ask me if it is not clear)') + '\n\n';
+      prompt += 'If anything about the change is ambiguous, ask me first. Then return the COMPLETE updated HTML file — do not omit any parts.\n\n';
     } else {
-      prompt += 'Create a new single-file HTML app.\n';
-      prompt += 'Description: ' + (description || '[DESCRIBE WHAT THE APP SHOULD DO]') + '\n\n';
+      prompt += 'Help me build a single-file HTML app that runs on AIMEAT.\n';
+      prompt += 'My initial idea: ' + (description || '(not specified yet — ask me in Step 1)') + '\n\n';
+      prompt += '## Step 1 — Interview me first\n';
+      prompt += 'Before writing any code, ask me these in ONE message and wait for my answers:\n';
+      prompt += '1. What kind of app? (message board · multiplayer game · notes/journal · habit or expense tracker · family tools like shared lists/calendar · drawing/creative · music jam · real-time collaboration · offer or need help/services · something else)\n';
+      prompt += '2. What should it be called?\n';
+      prompt += '3. How should it look and feel? (e.g. dark neon · cozy · sleek minimal · fun colorful) — it must support BOTH light and dark.\n';
+      prompt += '4. Data: SHARED (a community space others can see and add to) or PRIVATE (only mine)?\n';
+      prompt += '5. Should it use AI features (summaries, suggestions, generation)? If yes I can enable them via aimeat-ai.\n';
+      prompt += 'Skip any question I already answered in my idea above. Use my answers to customise everything in Step 2.\n\n';
     }
 
-    // AIMEAT Platform Instructions
-    prompt += '## AIMEAT Platform Instructions\n\n';
+    // Build instructions — framed as Step 2 for new apps.
+    prompt += isImprove ? '## AIMEAT Platform Instructions\n\n' : '## Step 2 — Build it (once I have answered)\n\n';
     prompt += 'This app runs in the AIMEAT ecosystem. Here is what you need to know:\n\n';
 
     // Core libraries
     prompt += '### Available Client Libraries\n';
-    prompt += 'Load via script tags from the AIMEAT node (' + nodeUrl + '):\n';
-    prompt += '- aimeat-auth (' + nodeUrl + '/v1/libs/aimeat-auth.js) - Identity, login, JWT, session management\n';
-    prompt += '- aimeat-data (' + nodeUrl + '/v1/libs/aimeat-data.js) - Memory storage, search, key-value data\n';
-    prompt += '- aimeat-storage (' + nodeUrl + '/v1/libs/aimeat-storage.js) - File upload/download\n';
-    prompt += '- aimeat-social (' + nodeUrl + '/v1/libs/aimeat-social.js) - Boards, posts, reactions\n';
-    prompt += '- aimeat-wallet (' + nodeUrl + '/v1/libs/aimeat-wallet.js) - Balance, transactions\n';
-    prompt += '- aimeat-work (' + nodeUrl + '/v1/libs/aimeat-work.js) - Actions, work requests\n\n';
+    prompt += 'Load with <script src> from the node base ' + nodeUrl + '/v1/libs/. Include ONLY the ones you use. Load aimeat-auth first — the others build on its session.\n\n';
+    prompt += 'Core:\n';
+    prompt += '- aimeat-auth.js — login button, JWT, session (`AIMEAT.auth`, `session.fetch()`)\n';
+    prompt += '- aimeat-data.js — private/public key-value memory + search (`AIMEAT.data`)\n';
+    prompt += '- aimeat-storage.js — file upload/download (`AIMEAT.storage`)\n\n';
+    prompt += 'AI (prompt-driven — see the AI section below):\n';
+    prompt += '- aimeat-ai.js — LLM completions on the USER\'s own OpenRouter key (`AIMEAT.ai.complete`). Requires aimeat-auth.\n\n';
+    prompt += 'Social & economy:\n';
+    prompt += '- aimeat-social.js — boards, posts, reactions (`AIMEAT.social`)\n';
+    prompt += '- aimeat-wallet.js — morsel balance + transactions (`AIMEAT.wallet`)\n';
+    prompt += '- aimeat-work.js — actions / work requests (`AIMEAT.work`)\n';
+    prompt += '- aimeat-agents.js — commission & watch the owner\'s AI agents (`AIMEAT.agents`)\n';
+    prompt += '- aimeat-capabilities.js — discover & invoke shared capabilities (`AIMEAT.capabilities`)\n\n';
+    prompt += 'Media & misc:\n';
+    prompt += '- aimeat-audio.js — audio engine: instruments, synth, soundboard\n';
+    prompt += '- aimeat-speech.js — text-to-speech / speech helpers\n';
+    prompt += '- aimeat-header.js — drop-in canonical site header (nav + theme)\n';
+    prompt += '- aimeat-tunnel.js — personal-node tunnel client (advanced)\n\n';
 
     // Cortex extension instructions
     if (selectedExts.length > 0) {
@@ -4027,27 +4690,66 @@
 
     // Data storage
     prompt += '### Data Storage\n';
+    prompt += 'Match the PRIVATE vs SHARED choice from Step 1:\n';
     prompt += '```javascript\n';
-    prompt += 'await AIMEAT.data.set("key", "value", { visibility: "private", tags: ["t1"] });\n';
-    prompt += 'var val = await AIMEAT.data.get("key");\n';
-    prompt += 'var results = await AIMEAT.data.search("query");\n';
-    prompt += '```\n\n';
+    prompt += '// PRIVATE — scoped to the logged-in owner, only they can read it:\n';
+    prompt += 'await AIMEAT.data.set("myapp.notes", data, { visibility: "private", tags: ["myapp"] });\n';
+    prompt += 'const mine = await AIMEAT.data.get("myapp.notes");\n';
+    prompt += '// SHARED/community — public so everyone can read; each user writes their own key:\n';
+    prompt += 'await AIMEAT.data.set("myapp.shared.<unique-id>", entry, { visibility: "public" });\n';
+    prompt += 'const theirs = await AIMEAT.data.getPublic(ownerGaii, "myapp.shared.<id>");  // read others\n';
+    prompt += 'const results = await AIMEAT.data.search("query");\n';
+    prompt += '```\n';
+    prompt += 'Works only when logged in. After a write, read it back to confirm it persisted.\n\n';
+
+    // AI — prompt-driven completions on the user's own key
+    prompt += '### AI (prompt-driven)\n';
+    prompt += 'aimeat-ai runs an LLM on the LOGGED-IN USER\'s own OpenRouter key — free for the app, and the user controls spend. Load aimeat-auth first, then gate every "Use AI" control on isAvailable().\n';
+    prompt += '```html\n';
+    prompt += '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"></' + 'script>\n';
+    prompt += '<script src="' + nodeUrl + '/v1/libs/aimeat-ai.js"></' + 'script>\n';
+    prompt += '```\n';
+    prompt += '```javascript\n';
+    prompt += 'if (await AIMEAT.ai.isAvailable()) {            // false until login + key configured\n';
+    prompt += '  const r = await AIMEAT.ai.complete({ app_id: "my-app", prompt: "Summarise:\\n" + text });\n';
+    prompt += '  render(r.content);                            // also: r.model, r.usage, r.budget\n';
+    prompt += '} else { showHint("Log in and add an AI key to enable this."); }\n';
+    prompt += '// Structured output: const { parsed } = await AIMEAT.ai.completeJson({ app_id, prompt, schema });\n';
+    prompt += '```\n';
+    prompt += 'Always handle isAvailable()===false and catch errors; never hardcode an API key in the app.\n\n';
+
+    // Real-time / multiplayer
+    prompt += '### Real-time / multiplayer (optional)\n';
+    prompt += 'For shared live state (presence boards, 1v1 games) use realtime rooms via your authenticated session.fetch:\n';
+    prompt += '```javascript\n';
+    prompt += '// 1) create or join a room\n';
+    prompt += 'const room = (await session.fetch("/v1/realtime/rooms", { method: "POST",\n';
+    prompt += '  body: JSON.stringify({ name: "my-room" }) })).data;   // → { id, ws_url }\n';
+    prompt += '// 2) open a WebSocket for live presence + messages\n';
+    prompt += 'const ws = new WebSocket(location.origin.replace(/^http/, "ws") + room.ws_url);\n';
+    prompt += 'ws.onmessage = (e) => handle(JSON.parse(e.data));\n';
+    prompt += '// 3) for low-latency P2P, GET /v1/realtime/ice-servers and use WebRTC\n';
+    prompt += '```\n';
+    prompt += 'Simpler apps can skip rooms and just observe shared AIMEAT.data keys on a timer.\n\n';
 
     // Design guidelines
     prompt += '### Design Guidelines\n';
-    prompt += 'Recommended light theme:\n';
+    prompt += 'Use CSS variables so the app themes cleanly. Support light AND dark:\n';
     prompt += '```css\n';
-    prompt += ':root { --bg:#FAFAF8; --card:#FFFFFF; --text:#1A1A2E;\n';
-    prompt += '  --accent:#E8564A; --border:#E5E7EB; --radius:12px; }\n';
+    prompt += ':root { --bg:#fafaf8; --card:#fff; --text:#1a1a2e; --accent:#e8564a; --border:#e5e7eb; --radius:12px; }\n';
+    prompt += '@media (prefers-color-scheme: dark) {\n';
+    prompt += '  :root { --bg:#14141c; --card:#1e1e2a; --text:#ececf4; --border:#2e2e40; } }\n';
     prompt += '```\n';
-    prompt += 'Always include: <meta name="viewport" content="width=device-width, initial-scale=1.0">\n';
-    prompt += 'Mobile-first responsive. Single HTML file with embedded CSS and JS.\n\n';
+    prompt += 'Always include <meta name="viewport" content="width=device-width, initial-scale=1.0">. Mobile-first, single self-contained HTML file with embedded CSS + JS.\n\n';
 
     // Rules
     prompt += '### Important Rules\n';
     prompt += '- Return the COMPLETE HTML file, not fragments\n';
     prompt += '- Never use literal closing script tags in JS comments or strings\n';
     prompt += '- Keep it as a single self-contained HTML file\n';
+    prompt += '- Load only the libraries you actually use; load aimeat-auth before libs that need a session\n';
+    prompt += '- Gate AI features on AIMEAT.ai.isAvailable() and handle the logged-out / no-key case\n';
+    prompt += '- Theme with CSS variables and support both light and dark\n';
     prompt += '- Include error handling and loading states for API calls\n\n';
 
     // Source code for improve mode
@@ -4061,13 +4763,9 @@
 
   function updatePbPreview() {
     var preview = document.getElementById('pb-preview');
-    var prompt = buildPromptFromBuilder();
-    // Show first ~2000 chars with truncation indicator
-    if (prompt.length > 2000) {
-      preview.textContent = prompt.substring(0, 2000) + '\n\n... (' + prompt.length + ' chars total)';
-    } else {
-      preview.textContent = prompt;
-    }
+    // Show the full prompt — the preview box scrolls. "Copy Prompt" copies this
+    // same text verbatim.
+    preview.textContent = buildPromptFromBuilder();
   }
 
   // ── Drag & Drop Reordering ─────────────────────
@@ -4188,6 +4886,9 @@
     switchDbMode: switchDbMode,
     unpublishApp: unpublishApp,
     deleteServerApp: deleteServerApp,
+    showVersionsModal: showVersionsModal,
+    restoreVersion: restoreVersion,
+    forkVersion: forkVersion,
     renderRecentlyOpened: renderRecentlyOpened,
     loadCortexExtensions: loadCortexExtensions,
     showCortexPopup: showCortexPopup,
@@ -4204,7 +4905,10 @@
     onCardDragOver: onCardDragOver,
     onCardDrop: onCardDrop,
     syncConfigToServer: syncConfigToServer,
-    loadConfigFromServer: loadConfigFromServer
+    loadConfigFromServer: loadConfigFromServer,
+    setLanguage: setLanguage,
+    applyI18n: applyI18n,
+    toggleTheme: toggleTheme
   };
 
   // Expose cortex functions globally for inline onclick handlers
@@ -4221,8 +4925,10 @@
   // ── Bootstrap ─────────────────────────────────────
 
   document.addEventListener('DOMContentLoaded', function () {
-    // ── Apply theme on load ─────────────────────────
+    // ── Apply theme + language on load ──────────────
     applyTheme(loadConfig().theme);
+    currentLang = (loadConfig().language === 'fi') ? 'fi' : 'en';
+    applyI18n();
     updateModeToggle();
 
     renderApps();
@@ -4284,6 +4990,13 @@
 
     // ── Click publish overlay to close ──────────────
     document.getElementById('publish-overlay').addEventListener('click', function (e) {
+      if (e.target === this) {
+        this.hidden = true;
+      }
+    });
+
+    // ── Click versions overlay to close ─────────────
+    document.getElementById('versions-overlay').addEventListener('click', function (e) {
       if (e.target === this) {
         this.hidden = true;
       }
@@ -4500,13 +5213,12 @@
         '## AIMEAT Platform Instructions\n\n' +
         'This app runs in the AIMEAT ecosystem. Here is what you need to know:\n\n' +
         '### Available Client Libraries\n' +
-        'Load via script tags from the AIMEAT node (' + nodeUrl + '):\n' +
-        '- aimeat-auth (' + nodeUrl + '/v1/libs/aimeat-auth.js) - Identity, login, JWT, session management\n' +
-        '- aimeat-data (' + nodeUrl + '/v1/libs/aimeat-data.js) - Memory storage, search, key-value data\n' +
-        '- aimeat-storage (' + nodeUrl + '/v1/libs/aimeat-storage.js) - File upload/download\n' +
-        '- aimeat-social (' + nodeUrl + '/v1/libs/aimeat-social.js) - Boards, posts, reactions\n' +
-        '- aimeat-wallet (' + nodeUrl + '/v1/libs/aimeat-wallet.js) - Balance, transactions\n' +
-        '- aimeat-work (' + nodeUrl + '/v1/libs/aimeat-work.js) - Actions, work requests\n\n' +
+        'Load with <script src> from ' + nodeUrl + '/v1/libs/. Load aimeat-auth first; use only what you need:\n\n' +
+        'Core: aimeat-auth.js (login/session, `AIMEAT.auth`), aimeat-data.js (key-value memory + search, `AIMEAT.data`), aimeat-storage.js (files, `AIMEAT.storage`).\n' +
+        'AI: aimeat-ai.js — LLM completions on the USER\'s own OpenRouter key (`AIMEAT.ai.complete`, requires aimeat-auth).\n' +
+        'Social & economy: aimeat-social.js (boards), aimeat-wallet.js (morsels), aimeat-work.js (actions), aimeat-agents.js (commission agents), aimeat-capabilities.js (shared capabilities).\n' +
+        'Media & misc: aimeat-audio.js, aimeat-speech.js, aimeat-header.js, aimeat-tunnel.js.\n' +
+        'Real-time multiplayer: no lib — POST/GET ' + nodeUrl + '/v1/realtime/rooms then WebSocket /v1/realtime/ws?room=ID (ICE config at /v1/realtime/ice-servers).\n\n' +
         '### Auth Pattern\n' +
         '```html\n' +
         '<script src="' + nodeUrl + '/v1/libs/aimeat-auth.js"></' + 'script>\n' +
@@ -4546,10 +5258,11 @@
         'Notifications, Drag & Drop, Clipboard, Speech API, Fullscreen, Web Workers,\n' +
         'CSS Animations, SVG, Gamepad API, Share API.\n\n' +
         '### Design Guidelines\n' +
-        'Recommended light theme:\n' +
+        'Use CSS variables and support light AND dark:\n' +
         '```css\n' +
-        ':root { --bg:#FAFAF8; --card:#FFFFFF; --text:#1A1A2E;\n' +
-        '  --accent:#E8564A; --border:#E5E7EB; --radius:12px; }\n' +
+        ':root { --bg:#fafaf8; --card:#fff; --text:#1a1a2e; --accent:#e8564a; --border:#e5e7eb; --radius:12px; }\n' +
+        '@media (prefers-color-scheme: dark) {\n' +
+        '  :root { --bg:#14141c; --card:#1e1e2a; --text:#ececf4; --border:#2e2e40; } }\n' +
         '```\n' +
         'Always include: <meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
         'Mobile-first responsive. Single HTML file with embedded CSS and JS.\n\n' +
@@ -4557,6 +5270,8 @@
         '- Return the COMPLETE HTML file, not fragments\n' +
         '- Never use literal closing script tags in JS comments or strings (breaks HTML parser)\n' +
         '- Keep it as a single self-contained HTML file\n' +
+        '- Gate AI features on AIMEAT.ai.isAvailable(); never hardcode an API key\n' +
+        '- Theme with CSS variables; support light and dark\n' +
         '- Include error handling and loading states for API calls\n\n' +
         '--- Source Code ---\n' + code;
     }

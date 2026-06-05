@@ -7,6 +7,10 @@
  * @version-history
  *   v1.0.0 — 2026-03-01 — Initial implementation with croner
  *   v2.0.0 — 2026-03-15 — Add @activate trigger, execution log, memory access tracking
+ *   v2.1.0 — 2026-06-05 — executeJob/triggerNow return a JobOutcome so a manual
+ *     "Run now" can report whether a task was created (and why not); agent_task
+ *     overlap guard relaxed for manual triggers (only a genuinely running
+ *     active/stalled occurrence defers it; archived tasks never block).
  */
 import { Cron } from 'croner';
 import { randomUUID } from 'node:crypto';
@@ -41,6 +45,27 @@ interface JobRunResult {
   reads: string[];
   writes: string[];
   taskId?: string;
+  /** The executor deliberately did nothing (e.g. an occurrence is still running). */
+  skipped?: boolean;
+  /** Human-readable explanation for a skip, surfaced to manual-trigger callers. */
+  skipReason?: string;
+}
+
+/**
+ * Outcome of one job execution, returned by triggerNow() so a manual "Run now"
+ * can tell the owner what happened. `code` is a stable token the UI maps to a
+ * localized message; `detail` carries the specific (English) explanation.
+ *   created  — an agent_task occurrence was queued/activated (taskId set)
+ *   ran      — a non-task job (ai/extension/core) executed successfully
+ *   busy     — skipped: a previous occurrence is still running, or the job was
+ *              already executing
+ *   limited  — skipped by a constraint (daily_limit / max_runs / budget)
+ *   error    — the job ran but failed (detail = error message)
+ */
+export interface JobOutcome {
+  code: 'created' | 'ran' | 'busy' | 'limited' | 'error';
+  taskId?: string;
+  detail?: string;
 }
 
 export class Scheduler {
@@ -144,11 +169,13 @@ export class Scheduler {
 
   /**
    * Manually trigger a job immediately, regardless of its cron schedule.
+   * Returns the outcome so the caller can tell the owner whether a task was
+   * created (and, if not, why).
    */
-  async triggerNow(id: string): Promise<void> {
+  async triggerNow(id: string): Promise<JobOutcome> {
     const job = await this.storage.getScheduledJob(id);
     if (!job) throw new Error(`Job "${id}" not found`);
-    await this.executeJob(job, 'manual');
+    return this.executeJob(job, 'manual');
   }
 
   /**
@@ -222,12 +249,12 @@ export class Scheduler {
     }
   }
 
-  private async executeJob(job: ScheduledJobRecord, trigger: JobTrigger): Promise<void> {
+  private async executeJob(job: ScheduledJobRecord, trigger: JobTrigger): Promise<JobOutcome> {
     // ── Overlap guard: never run two fires of the same job concurrently ──
     if (this.executing.has(job.id)) {
       logger.warn(`Scheduler skipped overlapping fire: ${job.id}`);
       await this.writeLog(job, trigger, 'skipped', { errorMessage: 'previous run still in progress', durationMs: 0, reads: [], writes: [] });
-      return;
+      return { code: 'busy', detail: 'A previous run is still in progress.' };
     }
 
     // ── Pre-fire budget/run guards (opt-in; only when constraints are attached) ──
@@ -239,7 +266,7 @@ export class Scheduler {
           logger.info(`Scheduler skipped ${job.id}: ${verdict.reason}`);
           await this.writeLog(job, trigger, 'skipped', { errorMessage: verdict.reason, durationMs: 0, reads: [], writes: [] });
           if (verdict.disable) await this.autoDisable(job, verdict.reason ?? 'constraint reached');
-          return;
+          return { code: 'limited', detail: verdict.reason ?? 'a run limit was reached' };
         }
       } catch (err) {
         logger.error(`Scheduler constraint check failed for ${job.id}`, { error: String(err) });
@@ -262,7 +289,7 @@ export class Scheduler {
       } else if (job.type === 'ai') {
         run = await this.executeAiJob(job);
       } else if (job.type === 'agent_task') {
-        run = await this.executeAgentTaskJob(job);
+        run = await this.executeAgentTaskJob(job, trigger);
       }
     } catch (err) {
       result = 'error';
@@ -272,6 +299,16 @@ export class Scheduler {
     }
 
     const durationMs = Date.now() - startTime;
+
+    // ── Executor declined to act (e.g. an occurrence is still running) ──
+    // Treat like the constraint skip: record it in the run log but leave the
+    // schedule's last-run state and runCount untouched (nothing actually ran).
+    if (run.skipped) {
+      logger.info(`Scheduler job skipped: ${job.id} [${trigger}] — ${run.skipReason ?? 'no-op'}`);
+      await this.writeLog(job, trigger, 'skipped', { errorMessage: run.skipReason, durationMs, reads: run.reads, writes: run.writes });
+      return { code: 'busy', detail: run.skipReason };
+    }
+
     const cron = this.cronJobs.get(job.id);
     const nextRun = cron?.nextRun();
 
@@ -305,14 +342,19 @@ export class Scheduler {
     if (result === 'error') {
       logger.error(`Scheduler job failed: ${job.id}`, { error: errorMessage, durationMs, trigger });
       this.notifyOwner(job, 'Schedule failed', errorMessage ?? 'Unknown error');
-    } else {
-      logger.info(`Scheduler job completed: ${job.id} (${durationMs}ms) [${trigger}]`, {
-        memoryReads: run.reads.length,
-        memoryWrites: run.writes.length,
-      });
-      // Stop the cron proactively when a max_runs cap is now reached.
-      await this.maybeAutoDisableMaxRuns(job, newRunCount);
+      return { code: 'error', detail: errorMessage };
     }
+
+    logger.info(`Scheduler job completed: ${job.id} (${durationMs}ms) [${trigger}]`, {
+      memoryReads: run.reads.length,
+      memoryWrites: run.writes.length,
+    });
+    // Stop the cron proactively when a max_runs cap is now reached.
+    await this.maybeAutoDisableMaxRuns(job, newRunCount);
+
+    // agent_task that materialised a task → 'created'; otherwise a non-task job ran.
+    if (run.taskId) return { code: 'created', taskId: run.taskId };
+    return { code: 'ran' };
   }
 
   /** Write one ExecutionLogEntry (best-effort). */
@@ -437,7 +479,7 @@ export class Scheduler {
    * queue and wake it via the existing webhook/MCP/SSE fan-out. The schedule is
    * the parent (parentTaskId); offline agents pick it up on reconnect.
    */
-  private async executeAgentTaskJob(job: ScheduledJobRecord): Promise<JobRunResult> {
+  private async executeAgentTaskJob(job: ScheduledJobRecord, trigger: JobTrigger): Promise<JobRunResult> {
     const owner = job.ownerScope;
     const agentGaii = job.agentGaii;
     const agentName = job.agentName;
@@ -454,12 +496,27 @@ export class Scheduler {
     const tmpl = cfg.taskTemplate;
     if (!tmpl?.title) throw new Error(`agent_task job "${job.id}" missing taskTemplate.title`);
 
-    // Overlap guard: skip if a prior occurrence of this schedule is still in flight.
+    // Overlap guard: don't pile up occurrences of the same schedule. A task the
+    // owner has set aside — `paused` (manual only) or any `archived` task — never
+    // blocks, which fixes the trap where a paused/archived occurrence silently
+    // swallowed every "Run now".
+    //  - Manual "Run now": defer only to an occurrence that is pending or running
+    //    on its own (queued/draft/revision_requested/active/stalled). A paused
+    //    one was deliberately stopped, so an explicit run gets a fresh occurrence.
+    //  - Cron/@activate: keep the stricter guard so unfinished occurrences don't
+    //    accumulate (anything not done/failed defers the next fire).
     const { tasks } = await this.storage.listAgentTasks(agentGaii, { perPage: 200 });
-    const inFlight = tasks.find(t => t.parentTaskId === job.id && !['done', 'failed'].includes(t.status));
+    const TERMINAL = ['done', 'failed'];
+    const blocks = trigger === 'manual'
+      ? (t: AgentTaskRecord) => t.status !== 'paused' && !TERMINAL.includes(t.status)
+      : (t: AgentTaskRecord) => !TERMINAL.includes(t.status);
+    const inFlight = tasks.find(t => t.parentTaskId === job.id && t.triage !== 'archived' && blocks(t));
     if (inFlight) {
-      logger.info(`agent_task ${job.id}: occurrence ${inFlight.id} still ${inFlight.status}; skipping this fire`);
-      return { reads: [], writes: [] };
+      logger.info(`agent_task ${job.id}: occurrence ${inFlight.id} still ${inFlight.status}; skipping this fire [${trigger}]`);
+      return {
+        reads: [], writes: [], skipped: true,
+        skipReason: `A previous run is still ${inFlight.status}; finish, fail, or delete it to run again.`,
+      };
     }
 
     const agent = await this.storage.getAgent(agentGaii);

@@ -139,24 +139,64 @@ await test('6. Per-agent list filters to that agent', async () => {
 
 console.log('\nPhase 3 -- Trigger + agent_task materialization');
 
+async function listOccurrences(status?: string): Promise<any[]> {
+    const q = status ? `?status=${status}&per_page=100` : '?per_page=100';
+    const { body } = await json(`/v1/agents/${o1.agentName}/tasks${q}`, { headers: auth1 });
+    return (body.data.tasks || []).filter((t: any) => t.title === 'SCHED_OCCURRENCE');
+}
 async function countOccurrences(): Promise<number> {
-    const { body } = await json(`/v1/agents/${o1.agentName}/tasks?status=queued&per_page=100`, { headers: auth1 });
-    return (body.data.tasks || []).filter((t: any) => t.title === 'SCHED_OCCURRENCE').length;
+    return (await listOccurrences('queued')).length;
 }
 
-await test('7. Trigger agent_task → materializes a queued task', async () => {
+await test('7. Trigger agent_task → materializes a queued task (outcome=created)', async () => {
     const before = await countOccurrences();
-    const { status } = await json(`/v1/schedules/${agentTaskScheduleId}/trigger`, { method: 'POST', headers: auth1 });
+    const { status, body } = await json(`/v1/schedules/${agentTaskScheduleId}/trigger`, { method: 'POST', headers: auth1 });
     assert(status === 200, `trigger status ${status}`);
+    assert(body.data.outcome === 'created', `expected outcome=created, got ${body.data.outcome}`);
+    assert(typeof body.data.task_id === 'string', 'trigger returns the created task_id');
     const after = await countOccurrences();
     assert(after === before + 1, `expected +1 occurrence (before ${before}, after ${after})`);
 });
 
-await test('8. Overlap guard: second trigger skips while occurrence in-flight', async () => {
+await test('8. A pending (queued) occurrence makes the next trigger busy (no duplicate)', async () => {
     const before = await countOccurrences();
-    await json(`/v1/schedules/${agentTaskScheduleId}/trigger`, { method: 'POST', headers: auth1 });
+    const { body } = await json(`/v1/schedules/${agentTaskScheduleId}/trigger`, { method: 'POST', headers: auth1 });
+    assert(body.data.outcome === 'busy', `expected outcome=busy, got ${body.data.outcome}`);
+    assert(typeof body.data.reason === 'string', 'busy outcome carries a reason');
     const after = await countOccurrences();
     assert(after === before, `expected no new occurrence (before ${before}, after ${after})`);
+});
+
+await test('8b. A paused occurrence does NOT block a manual run (the Run-now fix)', async () => {
+    // Drive the pending occurrence to paused: queued -> active -> paused.
+    const queued = await listOccurrences('queued');
+    assert(queued.length >= 1, 'have a queued occurrence to pause');
+    const occ = queued[0];
+    let r = await json(`/v1/agents/${o1.agentName}/tasks/${occ.id}/start`, { method: 'POST', headers: auth1 });
+    assert(r.status === 200, `start occurrence: ${r.status}`);
+    r = await json(`/v1/agents/${o1.agentName}/tasks/${occ.id}/pause`, { method: 'POST', headers: auth1 });
+    assert(r.status === 200, `pause occurrence: ${r.status}`);
+    // The only occurrence is now paused (owner set aside). A manual run must
+    // create a fresh occurrence instead of silently skipping.
+    const before = await countOccurrences();
+    const { body } = await json(`/v1/schedules/${agentTaskScheduleId}/trigger`, { method: 'POST', headers: auth1 });
+    assert(body.data.outcome === 'created', `paused must not block; expected created, got ${body.data.outcome}`);
+    const after = await countOccurrences();
+    assert(after === before + 1, `expected +1 occurrence (before ${before}, after ${after})`);
+});
+
+await test('8c. An archived occurrence does NOT block a manual run', async () => {
+    // Archive the queued occurrence from 8b so the only occurrences are
+    // paused + archived — both set aside; the trigger must still create one.
+    const queued = await listOccurrences('queued');
+    assert(queued.length >= 1, 'have a queued occurrence to archive');
+    const occ = queued[0];
+    const tr = await json(`/v1/agents/${o1.agentName}/tasks/${occ.id}/triage`, {
+        method: 'PATCH', headers: auth1, body: JSON.stringify({ triage: 'archived' }),
+    });
+    assert(tr.status === 200, `archive triage: ${tr.status}`);
+    const { body } = await json(`/v1/schedules/${agentTaskScheduleId}/trigger`, { method: 'POST', headers: auth1 });
+    assert(body.data.outcome === 'created', `archived must not block; expected created, got ${body.data.outcome}`);
 });
 
 console.log('\nPhase 4 -- max_runs constraint auto-disable');

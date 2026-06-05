@@ -16807,6 +16807,15 @@ paths:
     post:
       operationId: triggerSchedule
       summary: Run a schedule immediately
+      description: >
+        Runs the schedule now (owner only). The response `data.outcome` reports
+        what happened: `created` (an agent_task occurrence was queued/activated —
+        `data.task_id` is set), `ran` (a non-task ai/extension job executed),
+        `busy` (skipped — a previous occurrence is still running; `data.reason`
+        explains), `limited` (skipped — a run limit such as daily/max was
+        reached), or `error` (the job ran but failed; `data.reason` has the
+        message). A manual run only defers to a genuinely running (active/stalled)
+        occurrence — a paused/queued/archived one no longer blocks it.
       tags: [Schedules]
       security:
         - BearerAuth: []
@@ -16817,7 +16826,10 @@ paths:
           schema: { type: string }
       responses:
         '200':
-          description: Triggered
+          description: >
+            Triggered. `data.outcome` is one of created | ran | busy | limited |
+            error; `data.task_id` is present when a task was created;
+            `data.reason` is present on busy/limited/error.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
@@ -17123,7 +17135,13 @@ paths:
     delete:
       operationId: deleteAgentTask
       summary: Delete a task
-      description: Delete a task. Only draft and queued tasks can be deleted.
+      description: >
+        Delete a task (owner only). Any task can be deleted EXCEPT one that is
+        currently `active` -- a running task must be cancelled or paused first.
+        Deletion also removes the task's event log and cleans its operational
+        memory traces (the agent's live-status keys `agents.{name}.tasks.{id}.*`
+        and the owner-written cancel marker `agents.cancel.task.{id}`). The
+        agent's produced deliverable/output memory is preserved.
       tags: [Agent Tasks]
       security:
         - BearerAuth: []
@@ -17145,6 +17163,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   /v1/agents/{name}/tasks/{id}/propose-todos:
     post:

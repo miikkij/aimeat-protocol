@@ -2,6 +2,7 @@
  * @file agent-task.ts
  * @description SQLite implementation for agent task CRUD, events, and stall detection
  * @version-history
+ *   v1.1.0 -- 2026-06-05 -- deleteAgentTask now removes any non-active task (was draft/queued only)
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  */
 
@@ -194,8 +195,11 @@ export function updateAgentTask(
 }
 
 export function deleteAgentTask(db: Database.Database, id: string): boolean {
+  // Any non-active task is deletable; an active (running) task must be cancelled
+  // or paused first so we never orphan a live runner mid-execution. The status
+  // guard is also a race safety-net for the route-level check.
   const result = db.prepare(
-    "DELETE FROM agent_tasks WHERE id = ? AND status IN ('draft', 'queued')"
+    "DELETE FROM agent_tasks WHERE id = ? AND status != 'active'"
   ).run(id);
   if (result.changes > 0) {
     db.prepare('DELETE FROM agent_task_events WHERE taskId = ?').run(id);
