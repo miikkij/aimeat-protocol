@@ -22,6 +22,7 @@ fn main() {
             node_manager::read_config,
             node_manager::read_node_logs,
             node_manager::clear_node_logs,
+            node_manager::open_portal,
             ai_connector::detect_ai_services,
             ai_connector::connect_ai_service,
         ])

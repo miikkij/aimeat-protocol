@@ -1,12 +1,13 @@
 {
   "productName": "AIMEAT Personal Node",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "com.overscale.aimeat-desktop",
   "build": {
     "frontendDist": "../src",
     "devUrl": "../src"
   },
   "app": {
+    "withGlobalTauri": true,
     "security": {
       "csp": null
     },
@@ -35,6 +36,8 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "targets": "all"
+    "targets": "all",
+    "externalBin": ["binaries/node"],
+    "resources": ["resources/server/**/*"]
   }
 }

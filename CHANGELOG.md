@@ -38,19 +38,23 @@ generated client. Each backend also gets its own Docker Compose file.
   affected MongoDB-in-Docker. The image now carries the schema, both generated clients, and the Prisma CLI.
 - **`docker-compose.yml`** set `DATABASE_URL` but not `AIMEAT_STORAGE`, so it silently ran the in-memory
   backend instead of MongoDB. It now sets `AIMEAT_STORAGE=mongodb`.
-- **E2E/Playwright runners no longer hijack to an external server from a stray `AIMEAT_BASE_URL`.** A bare
+- **E2E/Playwright runners no longer leak a stray `AIMEAT_BASE_URL` into the test run.** A bare
   `AIMEAT_BASE_URL` (commonly exported to point the CLI at a remote node like `https://aimeat.io`) used to
-  silently make the local DB-backed test suites run against that remote URL. External mode now requires an
-  explicit `AIMEAT_E2E_EXTERNAL=1`; otherwise the runner warns and auto-starts a local server. The external
-  `BASE_URL` also gets its trailing slash trimmed (fixes `//v1/...` 404s).
+  cause two problems: (1) the runner silently tested that remote server instead of a local one — external
+  mode now requires an explicit `AIMEAT_E2E_EXTERNAL=1`, else the runner warns and auto-starts locally
+  (external `BASE_URL` also gets its trailing slash trimmed, fixing `//v1/...` 404s); and (2) it leaked via
+  `...process.env` into the spawned **test server**, so it built presigned upload/download URLs pointing at
+  the remote node — the local server signed the token but the `PUT`/`GET` hit the remote, which verified
+  with a different key → `401 "signature verification failed"`. The runner now forces the spawned server's
+  `AIMEAT_BASE_URL` to the local address.
 - **Extension upsert idempotency on PostgreSQL.** `PUT /v1/extensions/{name}` with an identical manifest
   returned `action: "updated"` instead of the no-op `action: "unchanged"` on Postgres, because the
   change-detection used `JSON.stringify` over `Json` fields and Postgres `jsonb` does not preserve object
   key order. Now uses a canonical key-sorted serializer (`utils/stable-json.ts`), so the comparison is
-  backend-agnostic.
+  backend-agnostic. The same hardening was applied to the system-prompt locales change-check.
 - **E2E runner PostgreSQL reset** now truncates all tables (fast, and not blocked by Prisma's AI-agent
-  guard) instead of `prisma db push --force-reset` (which dropped+recreated 88 tables between every suite —
-  slow, and whose timing race could intermittently surface as upload/download-token `401`s).
+  guard) instead of `prisma db push --force-reset` (which dropped + recreated all 88 tables between every
+  suite).
 
 ### `startup.prompt.md` — hand the repo to an AI assistant and it sets itself up
 

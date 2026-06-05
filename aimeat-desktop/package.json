@@ -5,7 +5,11 @@
   "private": true,
   "scripts": {
     "dev": "tauri dev",
-    "build": "tauri build",
+    "build": "pnpm stage && tauri build",
+    "package": "pnpm stage && tauri build",
+    "stage": "node scripts/stage-node.mjs && node scripts/stage-server.mjs",
+    "stage:node": "node scripts/stage-node.mjs",
+    "stage:server": "node scripts/stage-server.mjs",
     "tauri": "tauri"
   },
   "dependencies": {},

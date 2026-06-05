@@ -118,8 +118,8 @@ fn toggle_node(handle: &AppHandle) {
             }
         }
     } else {
-        // Start the node with default config path
-        if let Err(e) = node_manager::start_node(".env".to_string()) {
+        // Start the node (paths/config resolved from the app handle)
+        if let Err(e) = node_manager::start_node(handle.clone()) {
             eprintln!("Failed to start node: {}", e);
         }
     }

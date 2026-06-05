@@ -169,6 +169,13 @@ async function startServer(): Promise<ChildProcess> {
     const env = {
         ...process.env,
         AIMEAT_PORT: PORT,
+        // Force the test server's public base URL to the local address. Otherwise a
+        // stray AIMEAT_BASE_URL in the shell (e.g. https://aimeat.io) leaks in via
+        // ...process.env and the server builds presigned upload/download URLs pointing
+        // at that remote node — the local server signs the token but the PUT/GET hits
+        // the remote, which verifies with a different key → 401 "signature verification
+        // failed". --env-file cannot override an already-set shell var, so do it here.
+        AIMEAT_BASE_URL: BASE_URL,
         AIMEAT_RL_GLOBAL: process.env.AIMEAT_RL_GLOBAL ?? '10000',
         AIMEAT_RL_AUTH: process.env.AIMEAT_RL_AUTH ?? '1000',
         AIMEAT_RL_WORK: process.env.AIMEAT_RL_WORK ?? '1000',

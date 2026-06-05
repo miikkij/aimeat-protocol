@@ -359,7 +359,10 @@
           <p id="nodeStatus">Loading...</p>
           <p id="nodeUptime" style="font-size: 0.85rem; color: #a78bfa; margin-top: 8px;"></p>
           <br />
-          <button class="btn" id="startStopBtn" onclick="toggleNode()">Start Node</button>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <button class="btn" id="startStopBtn" onclick="toggleNode()">Start Node</button>
+            <button class="btn secondary" id="openPortalBtn" onclick="openPortal()" disabled>Open Dashboard in Browser</button>
+          </div>
         </div>
 
         <div class="card">
@@ -371,6 +374,10 @@
             <dd id="dashPort">--</dd>
             <dt>Role</dt>
             <dd id="dashRole">--</dd>
+            <dt>Storage</dt>
+            <dd id="dashStorage">SQLite (persistent)</dd>
+            <dt>Data folder</dt>
+            <dd id="dashDataDir">--</dd>
           </dl>
         </div>
       </div>
@@ -478,6 +485,19 @@
         </div>
 
         <div class="card">
+          <h2>Storage</h2>
+          <dl class="info-grid">
+            <dt>Backend</dt>
+            <dd>SQLite (persistent — survives restarts)</dd>
+            <dt>Database</dt>
+            <dd id="settingsDbPath">--</dd>
+          </dl>
+          <p class="form-hint" style="margin-top: 12px;">
+            Your data lives in this folder. Back it up by copying the whole folder while the node is stopped.
+          </p>
+        </div>
+
+        <div class="card">
           <h2>Federation</h2>
           <div class="form-group">
             <label for="settingsGenesisUrl">Genesis URL</label>
@@ -536,7 +556,9 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    const { invoke } = window.__TAURI__.tauri;
+    // Tauri v2 exposes the invoke API at window.__TAURI__.core.invoke
+    // (requires app.withGlobalTauri=true in tauri.conf.json).
+    const invoke = window.__TAURI__.core.invoke;
 
     // ── Navigation Routing ──────────────────────────────────────
     const navLinks = document.querySelectorAll('nav a[data-page]');
@@ -580,12 +602,14 @@
         const dot = document.getElementById('statusDot');
         const text = document.getElementById('statusText');
         const btn = document.getElementById('startStopBtn');
+        const portalBtn = document.getElementById('openPortalBtn');
         const portEl = document.getElementById('statusPort');
 
         if (status.running) {
           dot.className = 'status-dot';
           text.textContent = 'Node running (PID: ' + status.pid + ')';
           btn.textContent = 'Stop Node';
+          if (portalBtn) portalBtn.disabled = false;
           document.getElementById('nodeStatus').textContent =
             'Running on port ' + status.port;
           if (status.uptime_seconds != null) {
@@ -598,6 +622,7 @@
           dot.className = 'status-dot offline';
           text.textContent = 'Node stopped';
           btn.textContent = 'Start Node';
+          if (portalBtn) portalBtn.disabled = true;
           document.getElementById('nodeStatus').textContent = 'Node is not running';
           document.getElementById('nodeUptime').textContent = '';
         }
@@ -627,8 +652,19 @@
         document.getElementById('dashNodeId').textContent = config.node_id;
         document.getElementById('dashPort').textContent = config.port;
         document.getElementById('dashRole').textContent = config.federation_role;
+        document.getElementById('dashStorage').textContent =
+          (config.storage === 'sqlite' ? 'SQLite (persistent)' : config.storage);
+        document.getElementById('dashDataDir').textContent = config.data_dir || '--';
       } catch (err) {
         document.getElementById('dashNodeId').textContent = 'Not configured';
+      }
+    }
+
+    async function openPortal() {
+      try {
+        await invoke('open_portal', { port: 40050 });
+      } catch (err) {
+        showToast('Failed to open browser: ' + err, 'error');
       }
     }
 
@@ -741,6 +777,8 @@
         document.getElementById('settingsRole').value = config.federation_role;
         document.getElementById('settingsGenesisUrl').value = config.genesis_url || '';
         document.getElementById('settingsAiEndpoint').value = config.ai_endpoint || '';
+        document.getElementById('settingsDbPath').textContent =
+          config.data_dir ? (config.data_dir + '\\data\\aimeat.db') : '--';
 
         // AI status indicator
         const aiStatusEl = document.getElementById('settingsAiStatus');
