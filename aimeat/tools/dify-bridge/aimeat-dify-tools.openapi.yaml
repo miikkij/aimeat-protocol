@@ -1,0 +1,266 @@
+openapi: 3.0.3
+info:
+  title: AIMEAT Tools for Dify
+  description: >-
+    Curated AIMEAT operations for use as Dify Custom Tools. Import this spec in
+    Dify (Tools -> Custom -> Create Custom Tool). For auth choose Header -> Bearer,
+    Key "Authorization", and set Value to the RAW token only (the JWT printed by
+    connect-onboard.ts, or a PAT from AIMEAT profile -> Access) -- Dify adds the
+    "Bearer " prefix itself, so do NOT include it. Every operation here was verified
+    against the AIMEAT reference node. After import, an Agent node can call these
+    tools by their operationId/summary.
+  version: 1.0.0
+servers:
+  # RECOMMENDED (zero networking setup): the public hosted node. Works straight from
+  # Dify's Docker container over HTTPS -- no firewall, no host.docker.internal, and it
+  # passes Dify's SSRF guard (public domain, not a private IP). Use a token minted on
+  # aimeat.io (Profile -> Access). This is the path that "just works".
+  - url: https://aimeat.io
+    description: Public hosted AIMEAT node (aimeat-finland-001-genesis)
+  # LOCAL dev alternative -- ONLY reliable with Docker Desktop (host.docker.internal ->
+  # Windows host). With native Docker inside WSL2 it maps to the WSL host instead, and
+  # a private-IP fallback (192.168.x) is rejected by Dify's SSRF guard. Bind AIMEAT on
+  # 0.0.0.0 and open the host firewall for the port if you go this route.
+  # - url: http://host.docker.internal:40050
+  #   description: Local AIMEAT node as seen from inside Dify's Docker network
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: The AIMEAT agent JWT or PAT.
+security:
+  - bearerAuth: []
+paths:
+  /v1/memory:
+    post:
+      operationId: aimeat_memory_write
+      summary: Store or update a memory entry in AIMEAT
+      description: >-
+        Persist a key/value entry under the agent's identity. Use this to save
+        results, state, or anything that should survive across sessions. To EDIT
+        an existing entry, write the same key again with the new value (version
+        increments automatically).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, value]
+              properties:
+                key:
+                  type: string
+                  description: Dotted key, e.g. "project.notes.summary".
+                value:
+                  type: object
+                  description: Arbitrary JSON value to store.
+                visibility:
+                  type: string
+                  enum: [private, owner, group, public]
+                  default: private
+                  description: private=agent only; owner=same-owner agents; public=anyone.
+                tags:
+                  type: array
+                  items: { type: string }
+                ttl_hours:
+                  type: number
+                  description: Optional expiry in hours.
+      responses:
+        "201": { description: Stored }
+    get:
+      operationId: aimeat_memory_list
+      summary: List the agent's memory entries
+      description: List keys/metadata for the agent's stored memory.
+      parameters:
+        - in: query
+          name: prefix
+          schema: { type: string }
+          description: Only return keys starting with this prefix.
+      responses:
+        "200": { description: A list of memory entries }
+  /v1/memory/search:
+    get:
+      operationId: aimeat_memory_search
+      summary: Search the agent's memory
+      description: Full-text/tag search over the agent's memory entries.
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+          description: Search query.
+        - in: query
+          name: tags
+          schema: { type: string }
+          description: Comma-separated tags to filter by.
+      responses:
+        "200": { description: Matching memory entries }
+  /v1/memory/{key}:
+    get:
+      operationId: aimeat_memory_read
+      summary: Read one memory entry by key
+      description: Fetch the current value (and version) of a memory key the agent owns.
+      parameters:
+        - in: path
+          name: key
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: The memory entry }
+        "404": { description: Not found }
+    delete:
+      operationId: aimeat_memory_delete
+      summary: Delete a memory entry
+      description: Permanently remove a memory key the agent owns.
+      parameters:
+        - in: path
+          name: key
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: Deleted }
+  /v1/storage:
+    post:
+      operationId: aimeat_storage_upload
+      summary: Upload a file to AIMEAT storage
+      description: >-
+        Store a binary/text file (base64-encoded) under a storage key. Use this
+        for documents, images, or any artifact larger or more file-like than a
+        memory value. Returns the stored key + size.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, data]
+              properties:
+                key:
+                  type: string
+                  description: Storage key/path, e.g. "reports/2026/q2.pdf".
+                data:
+                  type: string
+                  description: Base64-encoded file content.
+                mime_type:
+                  type: string
+                  default: application/octet-stream
+                visibility:
+                  type: string
+                  enum: [private, owner, group, public]
+                  default: private
+      responses:
+        "201": { description: Stored }
+  /v1/storage/{key}:
+    get:
+      operationId: aimeat_storage_download
+      summary: Download a file from AIMEAT storage
+      description: Retrieve a previously uploaded file by its storage key.
+      parameters:
+        - in: path
+          name: key
+          required: true
+          schema: { type: string }
+          description: The storage key. For nested keys include the full path.
+      responses:
+        "200": { description: The file content }
+        "404": { description: Not found }
+  /v1/knowledge/import:
+    post:
+      operationId: aimeat_knowledge_import
+      summary: Create a knowledge package from structured data
+      description: >-
+        Build a coherent, versioned knowledge package. Provide a package object
+        with a name, a content_type (one of idea, research, plan, dataset,
+        document, tutorial, collection, article, story, fiction, guide), and an
+        entries array. content_type is REQUIRED. Other fields (version, author,
+        synthesis, sharing, tags, language) are auto-filled if omitted. Use this
+        after an LLM has organized raw material into titled entries.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [package]
+              properties:
+                package:
+                  type: object
+                  required: [name, content_type, entries]
+                  properties:
+                    name: { type: string }
+                    content_type:
+                      type: string
+                      enum: [idea, research, plan, dataset, document, tutorial, collection, article, story, fiction, guide]
+                    description: { type: string }
+                    tags:
+                      type: array
+                      items: { type: string }
+                    entries:
+                      type: array
+                      minItems: 1
+                      items:
+                        type: object
+                        required: [key, title, visibility]
+                        properties:
+                          key: { type: string }
+                          title: { type: string }
+                          visibility:
+                            type: string
+                            enum: [private, owner, group, public]
+      responses:
+        "201": { description: Package created (returns package_id) }
+        "400": { description: Manifest validation failed (often a missing content_type) }
+  /v1/knowledge/{id}:
+    get:
+      operationId: aimeat_knowledge_get
+      summary: Get a knowledge package
+      description: Fetch a knowledge package's manifest and entries by its package id.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { description: The package manifest + entries }
+  /v1/capabilities:
+    get:
+      operationId: aimeat_capability_list
+      summary: Discover capabilities offered by other agents/services
+      description: >-
+        List callable capabilities on the node (and federation). Use this to find
+        what other agents/services can do before invoking one.
+      parameters:
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: tags
+          schema: { type: string }
+      responses:
+        "200": { description: A list of capabilities }
+  /v1/capabilities/{id}/invoke:
+    post:
+      operationId: aimeat_capability_invoke
+      summary: Invoke another agent's/service's capability
+      description: >-
+        Call a capability discovered via aimeat_capability_list. This is how the
+        Dify agent "uses" other agents/systems on AIMEAT (their tools run and the
+        result is returned). Pass the capability's expected input object.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [input]
+              properties:
+                input:
+                  type: object
+                  description: The capability-specific input payload.
+      responses:
+        "200": { description: The capability result }

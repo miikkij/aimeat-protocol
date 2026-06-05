@@ -586,6 +586,16 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
             res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri not registered' });
             return;
         }
+        // Fail fast (clear 400, not a 500) if a redirect_uri was supplied but is not a
+        // parseable absolute URL — otherwise `new URL(finalRedirect)` below throws an
+        // unhandled TypeError, surfacing as INTERNAL_ERROR / "[object Object]" to the client.
+        if (finalRedirect) {
+            try { new URL(finalRedirect); }
+            catch {
+                res.status(400).json({ error: 'invalid_request', error_description: `Invalid redirect_uri: ${String(finalRedirect)}` });
+                return;
+            }
+        }
 
         // Verify owner's JWT (the browser session token)
         let ownerPayload;

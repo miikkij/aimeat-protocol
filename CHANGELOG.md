@@ -4,6 +4,41 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.19.0] - 2026-06-05
+
+### Dify integration toolkit + MCP OAuth consent fixes
+
+Connected AIMEAT to Dify end-to-end (both directions) and hardened the remote MCP OAuth
+consent flow that the integration exercised. The takeaway: AIMEAT's already-built remote
+OAuth 2.1 MCP server is the universal connector — paste the node's `/v1/mcp` (or a `/v2/mcp/:role`
+surface) URL into Dify (or n8n / Open WebUI / Claude), authorize once, and an agent can even
+self-run Hello Integration from the canonical instruction.
+
+#### Added
+
+- **Dify integration toolkit** (`aimeat/tools/dify-bridge/`) — a zero-dependency bridge shim
+  (`src/shim.ts`) that turns a webhook-backed AIMEAT capability into a call to a Dify workflow
+  (capability-invoke → Dify Service API → result, with `DIFY_MODE=mock` for local testing); a
+  curated OpenAPI spec (`aimeat-dify-tools.openapi.yaml`, default server = the public node) for
+  importing AIMEAT operations as Dify Custom Tools; and a one-time `connect-onboard.ts` that
+  registers an agent via device auth and drives Hello Integration to completion. README covers
+  the recommended **MCP** path and the self-onboarding pattern (canonical Hello Integration
+  instruction + MCP connection = an agent that onboards itself).
+- **Dify integration design doc** (`aimeat/docs/integrations/dify-hello-integration.md`) — the
+  two integration directions, identity model (device-auth vs PAT), exact request/response
+  contracts, and the hard constraints (10s capability timeout, SSRF, networking).
+
+#### Fixed
+
+- **MCP OAuth consent crashed on a non-absolute `redirect_uri`** — `POST /v1/mcp/authorize-consent`
+  called `new URL(finalRedirect)` on a relative redirect_uri (e.g. a Dify instance with an unset
+  `CONSOLE_API_URL` sends `/console/api/mcp/oauth/callback`), throwing an unhandled `TypeError`
+  → `500 INTERNAL_ERROR`. It now fails fast with a clear `400 invalid_request` that names the bad
+  value (`src/mcp/index.ts`).
+- **OAuth consent page rendered errors as `[object Object]`** — the approve handler built
+  `new Error(d.error_description || d.error || …)` where `d.error` can be an envelope object; it
+  now surfaces the real message (`public/oauth-consent.html`).
+
 ### Portal: custom templates are actually served + embeddable site header
 
 The custom portal template feature (admin **Portal** tab) was effectively dead for

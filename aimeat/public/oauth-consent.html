@@ -363,7 +363,13 @@
               });
             }
           } else {
-            throw new Error(d.error_description || d.error || t('errorGeneric'));
+            // d.error may be an OAuth string ("invalid_request") OR an AIMEAT
+            // envelope object ({code,message}); never stringify the object as
+            // "[object Object]" — surface the real message.
+            const msg = d.error_description
+              || (typeof d.error === 'string' ? d.error : d.error && d.error.message)
+              || t('errorGeneric');
+            throw new Error(msg);
           }
         } catch (err) {
           errEl.textContent = err.message;

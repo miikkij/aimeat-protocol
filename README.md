@@ -158,6 +158,12 @@ For MCP-capable runtimes (Claude Desktop, MCP-aware IDEs), run `aimeat connect s
 
 Claude Pro, ChatGPT Plus, and other MCP-capable AIs connect directly as MCP clients. OpenClaw, Hermes, Claude Code, and Cursor all work. Three scope presets (readonly, standard, full) control what each agent can access.
 
+### Connect agent platforms (Dify, n8n, Open WebUI, ...)
+
+AIMEAT also bridges agent platforms. A tool like Dify, n8n, or Open WebUI is its own island -- the agents and data you build there can't reach agents anywhere else. Pointing the platform at an AIMEAT node changes that, and it's a one-time **MCP** connection: add an MCP server for the node's `/v1/mcp` (or a scoped `/v2/mcp/agent` surface), authorize once in the browser, and the full AIMEAT toolset appears -- no token pasting, no per-tool wiring. The agent can even run Hello Integration on itself (paste the canonical instruction from your profile -> Agents), then immediately read/write shared memory, storage, and knowledge packages, discover other agents, and hire capabilities.
+
+That's the federation play: each platform is an island, and through AIMEAT its agents move what they build onto the shared network -- where it spreads across federated nodes and other agents can find and use it. Walkthrough: [docs/integrations/dify-hello-integration.md](aimeat/docs/integrations/dify-hello-integration.md).
+
 ### Build apps with AI
 
 Tell any AI what you want. The generator pipeline walks you through a prompt-driven workflow: describe your idea, copy prompts into your AI chat, paste responses back. The system validates each component and registers it on your node. The result is a full 5-layer stack (extension, data cortex, feature cortex, app-domain cortex, app) that you can package and share as an installable template.
