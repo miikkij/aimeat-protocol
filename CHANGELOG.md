@@ -4,6 +4,59 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+### Portal: custom templates are actually served + embeddable site header
+
+The custom portal template feature (admin **Portal** tab) was effectively dead for
+human visitors and stored portal data in the wrong place. This makes it real: a custom
+template now reaches browsers, its dynamic data resolves, the AI-assisted flow round-trips,
+and any standalone template can pull in the exact same site header as the rest of AIMEAT.
+
+#### Added
+
+- **Embeddable site header** — new drop-in library `GET /v1/libs/aimeat-header.js`
+  (`src/routes/lib-header.ts`) renders the canonical header (brand + live morsel balance,
+  nav, language switcher, theme toggle, and the **real** gold login pill via the existing
+  `aimeat-auth.js` `mountLoginButton`) into any page. A custom portal template adds three
+  lines (`<link rel="stylesheet" href="/css/theme.css">`, `<div id="aimeat-header">`,
+  `<script src="/v1/libs/aimeat-header.js">`) and gets a header identical to the SPA,
+  including working login, theme, and EN/FI — sharing the same `aimeat-theme`/`aimeat-lang`
+  state. Listed in the `/v1/libs` catalogue.
+- **`POST /v1/site/memory` + `DELETE /v1/site/memory/:key`** (`src/routes/site.ts`,
+  `SiteService.setPortalMemory`/`deletePortalMemory`) — operator endpoints that write a
+  single portal memory key under the site (`__site__`) namespace so `{{memory:portal/*}}`
+  tags resolve. New changelog actions `memory_set` / `memory_delete`. OpenAPI + E2E
+  coverage added; the undocumented `GET /v1/site/memory-keys` is now in the spec too.
+- **Template Editor: active-source status + "Load current page"** — the tab now shows
+  whether a custom template or the built-in SPA is active, and a button seeds the editor
+  with the live `/` HTML as a starting point.
+- **AI-Assisted Editor: "Import AI Result"** — paste the JSON bundle the prompt produces
+  and it imports via `/v1/site/import` (template + portal memory + KV in one shot).
+- **CSP nonce for operator templates** — custom templates are now stamped with the
+  per-request CSP nonce (`src/utils/csp-nonce.ts`, applied in `bootstrap.ts` + `site.ts`),
+  so inline `<script>` blocks in a trusted operator template execute.
+- **Portal editor prompt guidance** — the `site-portal` system prompt now tells the AI to
+  ask whether to include the standard header (and use the drop-in library, not a hand-rolled
+  nav), and to avoid CSP-blocked inline event handlers (`onclick="…"`) in favor of
+  `addEventListener`. The prompt content now syncs from code on startup.
+
+#### Fixed
+
+- **Custom portal template was never shown to humans** — `GET /` (bootstrap router, mounted
+  before the site router) unconditionally redirected `Accept: text/html` requests to the SPA,
+  so the site router's template-serving `/` was dead code. Bootstrap now serves the resolved
+  custom template when one is set (else redirects as before); the shared `SiteService` is
+  created once and passed to both routers so the resolved-HTML cache stays coherent.
+- **Portal Memory Keys wrote to the wrong namespace** — the admin "Portal Memory Keys"
+  add/delete used the generic `/v1/memory` route, storing keys under the operator's own
+  identity instead of `__site__`. They never appeared in the list and never resolved in
+  templates. Now routed through the new site-memory endpoints.
+- **AI-Assisted result 422'd** — the prompt emits a `/v1/site/import` JSON bundle, but the
+  only place to paste it was the Template Editor, whose **Save** posts raw HTML to
+  `/v1/site/template` (422 on `{`). Added the dedicated import box; **Save** now detects a
+  pasted JSON bundle and points to it instead of failing.
+- **Admin preview didn't refresh** — the Portal tab preview iframe and "Clear Cache" now
+  reload the preview after every change (cache-busted), so edits are visible immediately.
+
 ### Agents tab: fleet "running now" panel + task deep-link
 
 A cross-agent **"Running now"** panel between the agent board and the agent list shows

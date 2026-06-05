@@ -304,6 +304,12 @@ With `AIMEAT_ANONYMOUS=true`, anyone can read and do limited writes without regi
 
 Each node runs independently with its own identity and portal. Operators customize through CSS themes (`theme.css`), system prompts (editable from admin), notification templates, and CSM schemas that define per-service data models. Run your own node, your own branding.
 
+### Custom portal templates
+
+The public landing page (`/`) is editable live from the admin **Portal** tab — write the HTML template (with serve-time `{{config:*}}`, `{{memory:portal/*}}`, `{{kv:*}}`, `{{board:*}}` tags), manage portal memory keys and KV pairs, and watch the result render in the inline preview. Following AIMEAT's prompt-driven workflow, the **AI-Assisted Editor** hands you a ready prompt: paste it into any AI chat, paste the JSON bundle it returns back into **Import AI Result**, and your node's front page immediately looks custom. Drop in `<script src="/v1/libs/aimeat-header.js"></script>` and the page also carries the **exact same site header** as the rest of AIMEAT — brand, navigation, theme and language switchers, and the live gold login pill — so visitors can always sign in and reach their profile. Operator templates are trusted: their inline `<script>` runs under the node's CSP via a per-request nonce.
+
+<img src="assets/screenshots/portal-admin-editor.png" alt="Admin Portal tab: live preview of the custom landing page, the HTML template editor with tag reference and active-source status, portal memory keys, KV pairs, and the AI-Assisted Editor (Load AI Prompt -> Import AI Result)" width="760" />
+
 ---
 
 ## Getting Started
