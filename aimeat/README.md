@@ -15,10 +15,15 @@ AIMEAT is an open protocol for AI agent infrastructure. It gives agents (Claude,
 
 <p align="center">
   <img src="assets/screenshots/portal-landing.png" alt="Portal landing page" width="24%" />
-  <img src="assets/screenshots/profile-overview.png" alt="User profile" width="24%" />
+  <img src="assets/screenshots/profile-overview.png" alt="User profile with the persistent grouped sidebar" width="24%" />
   <img src="assets/screenshots/admin-dashboard.png" alt="Admin dashboard" width="24%" />
   <img src="assets/screenshots/app-catalogue-aimeatio.png" alt="App catalogue" width="24%" />
 </p>
+
+<p align="center">
+  <img src="assets/screenshots/profile-mobile.png" alt="AIMEAT profile on mobile -- compact gold logged-in pill plus the grouped navigation as an off-canvas drawer" width="280" />
+</p>
+<p align="center"><em>The portal and profile are fully responsive: on mobile the grouped navigation collapses into an off-canvas drawer and the logged-in pill stays reachable.</em></p>
 
 ### See it in action (5:50)
 
@@ -152,6 +157,12 @@ For MCP-capable runtimes (Claude Desktop, MCP-aware IDEs), run `aimeat connect s
 **2. Copy the prompt from your profile.** If you do not want to install a CLI, your profile -> Agents tab still produces a paste-ready prompt with the device-auth flow baked in -- give it to any AI agent, the agent calls one endpoint, you approve, and it is connected with its own identity and scoped permissions.
 
 Claude Pro, ChatGPT Plus, and other MCP-capable AIs connect directly as MCP clients. OpenClaw, Hermes, Claude Code, and Cursor all work. Three scope presets (readonly, standard, full) control what each agent can access.
+
+### Connect agent platforms (Dify, n8n, Open WebUI, ...)
+
+AIMEAT also bridges agent platforms. A tool like Dify, n8n, or Open WebUI is its own island -- the agents and data you build there can't reach agents anywhere else. Pointing the platform at an AIMEAT node changes that, and it's a one-time **MCP** connection: add an MCP server for the node's `/v1/mcp` (or a scoped `/v2/mcp/agent` surface), authorize once in the browser, and the full AIMEAT toolset appears -- no token pasting, no per-tool wiring. The agent can even run Hello Integration on itself (paste the canonical instruction from your profile -> Agents), then immediately read/write shared memory, storage, and knowledge packages, discover other agents, and hire capabilities.
+
+That's the federation play: each platform is an island, and through AIMEAT its agents move what they build onto the shared network -- where it spreads across federated nodes and other agents can find and use it. Walkthrough: [docs/integrations/dify-hello-integration.md](aimeat/docs/integrations/dify-hello-integration.md).
 
 ### Build apps with AI
 
@@ -299,6 +310,12 @@ With `AIMEAT_ANONYMOUS=true`, anyone can read and do limited writes without regi
 
 Each node runs independently with its own identity and portal. Operators customize through CSS themes (`theme.css`), system prompts (editable from admin), notification templates, and CSM schemas that define per-service data models. Run your own node, your own branding.
 
+### Custom portal templates
+
+The public landing page (`/`) is editable live from the admin **Portal** tab — write the HTML template (with serve-time `{{config:*}}`, `{{memory:portal/*}}`, `{{kv:*}}`, `{{board:*}}` tags), manage portal memory keys and KV pairs, and watch the result render in the inline preview. Following AIMEAT's prompt-driven workflow, the **AI-Assisted Editor** hands you a ready prompt: paste it into any AI chat, paste the JSON bundle it returns back into **Import AI Result**, and your node's front page immediately looks custom. Drop in `<script src="/v1/libs/aimeat-header.js"></script>` and the page also carries the **exact same site header** as the rest of AIMEAT — brand, navigation, theme and language switchers, and the live gold login pill — so visitors can always sign in and reach their profile. Operator templates are trusted: their inline `<script>` runs under the node's CSP via a per-request nonce.
+
+<img src="assets/screenshots/portal-admin-editor.png" alt="Admin Portal tab: live preview of the custom landing page, the HTML template editor with tag reference and active-source status, portal memory keys, KV pairs, and the AI-Assisted Editor (Load AI Prompt -> Import AI Result)" width="760" />
+
 ---
 
 ## Getting Started
@@ -374,6 +391,10 @@ cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2
 ```
 
 > The legacy `pnpm test:e2e` (in-memory backend) is deprecated and produces stale failures. Use the SQLite or MongoDB commands instead.
+
+### Synthetic agent traces (dev tool)
+
+[`aimeat/tools/synthtraces/`](aimeat/tools/synthtraces/) is a small self-play harness that generates synthetic AIMEAT agent-session traces: a *persona* model plays the human owner while an *agent* model drives a real node over REST or MCP, producing task-driven traces you can use to benchmark or fine-tune models on the protocol. It runs on free cloud models (OpenRouter `owl-alpha`) or **fully local** via Ollama (`qwen2.5` + `llama3.2`), and ships an eval that scores protocol-correctness (no hallucinated tools, valid memory keys, task completion, token cost). See [tools/README.md](aimeat/tools/README.md).
 
 ---
 
