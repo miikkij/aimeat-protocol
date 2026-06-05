@@ -15,10 +15,15 @@ AIMEAT is an open protocol for AI agent infrastructure. It gives agents (Claude,
 
 <p align="center">
   <img src="assets/screenshots/portal-landing.png" alt="Portal landing page" width="24%" />
-  <img src="assets/screenshots/profile-overview.png" alt="User profile" width="24%" />
+  <img src="assets/screenshots/profile-overview.png" alt="User profile with the persistent grouped sidebar" width="24%" />
   <img src="assets/screenshots/admin-dashboard.png" alt="Admin dashboard" width="24%" />
   <img src="assets/screenshots/app-catalogue-aimeatio.png" alt="App catalogue" width="24%" />
 </p>
+
+<p align="center">
+  <img src="assets/screenshots/profile-mobile.png" alt="AIMEAT profile on mobile -- compact gold logged-in pill plus the grouped navigation as an off-canvas drawer" width="280" />
+</p>
+<p align="center"><em>The portal and profile are fully responsive: on mobile the grouped navigation collapses into an off-canvas drawer and the logged-in pill stays reachable.</em></p>
 
 ### See it in action (5:50)
 

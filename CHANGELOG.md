@@ -4,6 +4,32 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+### Agents tab: fleet "running now" panel + task deep-link
+
+A cross-agent **"Running now"** panel between the agent board and the agent list shows
+every agent's currently-active tasks in one place; clicking a row jumps straight into
+that agent's **Tasks** tab and opens the exact task.
+
+#### Added
+
+- **"Running now" panel** (Profile → Agents) — flattens every agent's `active` tasks
+  into one newest-first list (agent · task · "time ago", live dot). Reuses the active
+  tasks already fetched per-agent in `loadData()`, so it adds **no new requests**;
+  refreshes on the existing `aimeat-live-update` signal. Capped at 50 rows with an
+  explicit "+N more" overflow note (never silently truncated). en/fi i18n.
+- **Click-to-open deep-link** — a new `preSelectedTab` / `openTaskId` / `openTaskNonce`
+  prop chain (agents-tab → agent-card → tab-tasks → agents-tasks-subtab → TaskItem)
+  expands the target agent, selects its Tasks tab, resets the task bucket to Recent so
+  the task is visible, and auto-opens + scrolls to it. Nonce-gated so a fresh panel
+  click re-fires while a plain manual re-expand still respects the default tab.
+
+#### Fixed
+
+- **Task "Scope" rendered `[object Object]`** — the task-detail Scope row stringified its
+  structured provenance entries (e.g. the scheduler's `{ name, value, type, description }`)
+  via a naive `join()`. It now formats each entry as `name: value — description`
+  (e.g. `schedule: 0 9 * * * — Morning pipeline`), one per line.
+
 ### SynthTraces — synthetic agent-session traces (dev tool)
 
 A self-play harness (`aimeat/tools/synthtraces/`, no backend changes) that generates
@@ -84,9 +110,25 @@ per-agent **Schedules** sub-tab. Full design:
   `agentName`/`agentGaii`, `displayName`/`purpose`, `timezone`, `constraints`,
   `runCount`), `ExecutionLogEntry.taskId`, and `AgentRecord.scheduleConstraintDefaults`
   across SQLite + MongoDB/Prisma (additive migration).
-- **Tests + spec** — `test/e2e-agent-schedules.ts` (18 cases: CRUD, cross-owner authz,
+- **Editable schedules + readable timing** — every managed schedule renders as an
+  inline-editable card (shared `schedule-item.js`, used by both the master view and the
+  per-agent sub-tab): edit cron, timezone, display name, purpose, and the kind-specific
+  **dispatch payload** (the agent_task title/description or the AI prompt + input/output
+  keys — i.e. *what the run actually produces*, shown on its own row). "Next run" is a
+  human "time until" (e.g. `20h 46min`) instead of a raw/negative timestamp, including in
+  the extension-cron table.
+- **Cross-agent scheduling** — one agent can schedule a **sibling** (same owner) via
+  `POST /v1/agents/{name}/schedules`; the target is the path, resolved under the caller's
+  owner, so no token-borrowing is needed. The root `POST /v1/schedules` accepts
+  `target_agent`/`agent` as aliases for `agent_name` and flat `task_title` /
+  `task_description` (mirroring the MCP tool). `createdByAgent` is now recorded correctly
+  (agent tokens don't carry a literal `agent` role), so the creating agent can manage its
+  own schedules. Agent guide: `aimeat/docs/agent-scheduler-guide.md` (FI), incl. the
+  headless/deterministic REST path.
+- **Tests + spec** — `test/e2e-agent-schedules.ts` (22 cases: CRUD, cross-owner authz,
   agent_task dispatch → task materialisation, overlap skip, max_runs auto-disable, AI
-  failure mode, owner cancels agent-created); OpenAPI documents all new endpoints +
+  failure mode, owner cancels agent-created, **cross-agent targeting via path + aliases,
+  sibling self-management, cross-owner reject**); OpenAPI documents all new endpoints +
   schemas.
 
 #### Changed
