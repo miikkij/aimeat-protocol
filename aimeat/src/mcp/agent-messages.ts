@@ -12,6 +12,9 @@
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  *   v1.3.0 -- 2026-05-30 -- Add aimeat_message_history (full thread context, oldest-first) so agents can
  *     read prior messages and correlate option-prompt answers (metadata.promptAnswer) to their questions.
+ *   v1.4.0 -- 2026-06-06 -- Task-based threads: threadId now defaults to linked_task_id when no
+ *     thread_id is given, so a task's whole conversation stays in one thread instead of a new random
+ *     thread per message. Updated param descriptions to steer agents toward passing linked_task_id.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -64,8 +67,8 @@ export function registerAgentMessageTools(
         descriptionFor('aimeat_message_send'),
         {
             content: z.string().min(1).max(10000).describe('Message content (markdown supported)'),
-            thread_id: z.string().uuid().optional().describe('Thread ID to reply in (omit to start new conversation)'),
-            linked_task_id: z.string().uuid().optional().describe('Link this message to a task ID'),
+            thread_id: z.string().uuid().optional().describe('Thread ID to reply in (omit to start a new conversation; if you pass linked_task_id, the message auto-joins that task\'s thread)'),
+            linked_task_id: z.string().uuid().optional().describe('Link this message to a task ID. Strongly recommended for task-related messages: all messages sharing a linked_task_id are grouped into one conversation thread (the task\'s thread), instead of each message starting a new thread.'),
             metadata: z.object({
                 tokens_used: z.number().optional().describe('Tokens consumed for this response'),
                 processing_ms: z.number().optional().describe('Processing time in ms'),
@@ -78,7 +81,10 @@ export function registerAgentMessageTools(
         annotationsFor('aimeat_message_send'),
         async ({ content, thread_id, linked_task_id, metadata }) => {
             const now = new Date().toISOString();
-            const threadId = thread_id ?? randomUUID();
+            // Thread = task: group a message under its linked task so the whole
+            // task conversation stays in one thread (omit thread_id and just pass
+            // linked_task_id). Random thread only for ad-hoc, task-less chat.
+            const threadId = thread_id ?? linked_task_id ?? randomUUID();
 
             const record = await storage.createMessage({
                 id: randomUUID(),

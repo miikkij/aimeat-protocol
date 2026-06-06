@@ -18,6 +18,14 @@
       min-height: 100vh;
     }
 
+    /* Pinned header (nav + status bar) — stays put while content scrolls. */
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #0a0a1a;
+    }
+
     /* ── Navigation ─────────────────────────────────────────── */
     nav {
       background: rgba(26, 26, 46, 0.95);
@@ -311,6 +319,48 @@
       font-size: 0.8rem;
       color: #a78bfa;
     }
+    .ai-model-select {
+      padding: 6px 10px;
+      background: rgba(15, 15, 30, 0.8);
+      border: 1px solid rgba(167, 139, 250, 0.25);
+      border-radius: 8px;
+      color: #e0d4f5;
+      font-size: 0.8rem;
+      font-family: inherit;
+      max-width: 180px;
+      cursor: pointer;
+    }
+    .ai-model-select option {
+      background: #1a1a2e;
+      color: #e0d4f5;
+    }
+
+    /* ── Help / onboarding ──────────────────────────────────── */
+    .steps {
+      margin: 0 0 0 18px;
+      line-height: 1.9;
+      font-size: 0.9rem;
+      color: #e0d4f5;
+    }
+    .steps li { margin-bottom: 4px; }
+    .steps .btn {
+      margin-left: 8px;
+      padding: 3px 10px;
+      font-size: 0.72rem;
+    }
+    .code-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(10, 10, 20, 0.9);
+      border: 1px solid rgba(167, 139, 250, 0.15);
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-top: 6px;
+      font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+    }
+    .code-box code { color: #d8b4fe; flex: 1; word-break: break-all; }
 
     /* ── Empty State ────────────────────────────────────────── */
     .empty-state {
@@ -331,6 +381,7 @@
 </head>
 <body>
   <div class="app">
+    <header class="app-header">
     <nav>
       <span class="brand">AIMEAT</span>
       <a href="#" class="active" data-page="dashboard">Dashboard</a>
@@ -345,6 +396,7 @@
       <span id="statusText">Checking node status...</span>
       <span id="statusPort" style="margin-left: auto; color: #a78bfa;">Port: 40050</span>
     </div>
+    </header>
 
     <main id="content">
 
@@ -353,6 +405,17 @@
            ═══════════════════════════════════════════════════════ -->
       <div class="page active" id="page-dashboard">
         <h1>Dashboard</h1>
+
+        <div class="card">
+          <h2>Getting Started</h2>
+          <ol class="steps">
+            <li><strong>Start your node</strong> — click <em>Start Node</em> below.</li>
+            <li><strong>Create your account</strong> — open the web dashboard and register (Kirjaudu / Rekisteröidy).
+              <button class="btn secondary" onclick="openPortal()">Open Dashboard</button></li>
+            <li><strong>Connect a local AI</strong> (optional) — go to <em>AI Setup</em>, sign in, pick a model.
+              <button class="btn secondary" onclick="navigateTo('ai-setup')">AI Setup</button></li>
+          </ol>
+        </div>
 
         <div class="card">
           <h2>Node Status</h2>
@@ -429,28 +492,88 @@
         <h1>AI Setup</h1>
 
         <div class="card">
+          <h2>Sign in to your node</h2>
+          <p style="font-size: 0.85rem; color: rgba(167,139,250,0.6); margin-bottom: 16px;">
+            Choosing an AI below saves it to your owner account on this node (the same place the web Dashboard
+            stores it). Start the node, then sign in. No account yet? Open the Dashboard in your browser and register first.
+          </p>
+          <div id="aiAuthSignedOut">
+            <div class="form-group">
+              <label for="aiUser">Owner username</label>
+              <input type="text" id="aiUser" placeholder="e.g. alice" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label for="aiPass">Password</label>
+              <input type="password" id="aiPass" placeholder="Your password" autocomplete="off" />
+            </div>
+            <button class="btn" onclick="signInToNode()">Sign In</button>
+          </div>
+          <div id="aiAuthSignedIn" style="display: none;">
+            <span class="status-indicator online"><span class="dot"></span>Signed in as <span id="aiSignedInUser"></span></span>
+            <button class="btn secondary" onclick="signOutOfNode()" style="margin-left: 12px; padding: 6px 14px; font-size: 0.8rem;">Sign out</button>
+          </div>
+        </div>
+
+        <div class="card" id="currentAiCard" style="display: none;">
+          <h2>Current node AI</h2>
+          <dl class="info-grid">
+            <dt>Provider</dt>
+            <dd id="curAiProvider">--</dd>
+            <dt>Model</dt>
+            <dd id="curAiModel">--</dd>
+            <dt>Endpoint</dt>
+            <dd id="curAiEndpoint">--</dd>
+          </dl>
+          <p class="form-hint" style="margin-top: 12px;">This is what your node uses for AI right now.</p>
+        </div>
+
+        <div class="card">
           <h2>Local AI Services</h2>
           <p style="font-size: 0.85rem; color: rgba(167,139,250,0.6); margin-bottom: 16px;">
-            Scanning for LM Studio, Ollama, and OpenAI-compatible endpoints on your machine.
+            Detect a local AI (LM Studio, Ollama) and set it as your node's AI. Pick a model, then "Use this".
           </p>
           <div id="aiServicesList">
-            <p id="aiStatus">Scanning for local AI services...</p>
+            <p>Scanning for local AI services...</p>
           </div>
           <br />
           <button class="btn secondary" onclick="detectAI()">Scan Again</button>
         </div>
 
         <div class="card">
+          <h2>No local AI yet? Set up Ollama (free)</h2>
+          <p style="font-size: 0.85rem; color: rgba(167,139,250,0.6); margin-bottom: 16px;">
+            Ollama runs open models locally on your machine and serves them at http://localhost:11434.
+          </p>
+          <ol class="steps">
+            <li><strong>Download &amp; install Ollama</strong>
+              <button class="btn secondary" onclick="openExternal('https://ollama.com/download')">Get Ollama</button></li>
+            <li><strong>Pull a model</strong> — open a terminal (PowerShell) and run:
+              <div class="code-box">
+                <code>ollama pull qwen2.5:7b</code>
+                <button class="btn secondary" onclick="copyText('ollama pull qwen2.5:7b')" style="padding: 4px 10px; font-size: 0.72rem;">Copy</button>
+              </div>
+            </li>
+            <li><strong>Come back</strong> and click <em>Scan Again</em> above — it'll show up as Available.</li>
+          </ol>
+        </div>
+
+        <div class="card">
           <h2>Custom AI Endpoint</h2>
           <p style="font-size: 0.85rem; color: rgba(167,139,250,0.6); margin-bottom: 16px;">
-            Manually configure a custom OpenAI-compatible endpoint.
+            Manually set an OpenAI-compatible endpoint. Saves to your account's AI settings on this node
+            (same as the web Dashboard).
           </p>
           <div class="form-group">
             <label for="customAiUrl">Endpoint URL</label>
             <input type="url" id="customAiUrl" placeholder="http://localhost:1234/v1" />
-            <div class="form-hint">Must expose an OpenAI-compatible /v1/models endpoint</div>
+            <div class="form-hint">The OpenAI-compatible base URL (include /v1)</div>
           </div>
-          <button class="btn secondary" onclick="saveCustomAi()">Save Endpoint</button>
+          <div class="form-group">
+            <label for="customAiModel">Model</label>
+            <input type="text" id="customAiModel" placeholder="e.g. qwen2.5:7b" />
+            <div class="form-hint">The model id the endpoint should use</div>
+          </div>
+          <button class="btn" onclick="saveCustomAi()">Save Endpoint</button>
         </div>
       </div>
 
@@ -560,6 +683,12 @@
     // (requires app.withGlobalTauri=true in tauri.conf.json).
     const invoke = window.__TAURI__.core.invoke;
 
+    // ── AI Setup state ──────────────────────────────────────────
+    let nodeJwt = null;          // owner JWT obtained via node_login (session-only)
+    let currentPort = 40050;     // updated from node status
+    let lastServices = [];       // most recent AI scan results
+    let currentAi = null;        // the AI settings currently active on the node
+
     // ── Navigation Routing ──────────────────────────────────────
     const navLinks = document.querySelectorAll('nav a[data-page]');
     const pages = document.querySelectorAll('.page');
@@ -576,7 +705,7 @@
       // Run page-specific init
       if (pageName === 'connections') loadConnections();
       if (pageName === 'settings') loadSettings();
-      if (pageName === 'ai-setup') detectAI();
+      if (pageName === 'ai-setup') aiSetupOpened();
       if (pageName === 'logs') refreshLogs();
     }
 
@@ -599,6 +728,7 @@
     async function checkStatus() {
       try {
         const status = await invoke('get_node_status');
+        currentPort = status.port || currentPort;
         const dot = document.getElementById('statusDot');
         const text = document.getElementById('statusText');
         const btn = document.getElementById('startStopBtn');
@@ -662,7 +792,7 @@
 
     async function openPortal() {
       try {
-        await invoke('open_portal', { port: 40050 });
+        await invoke('open_portal');
       } catch (err) {
         showToast('Failed to open browser: ' + err, 'error');
       }
@@ -705,65 +835,158 @@
     }
 
     // ── AI Setup ────────────────────────────────────────────────
-    async function detectAI() {
+    async function signInToNode() {
+      const username = document.getElementById('aiUser').value.trim();
+      const password = document.getElementById('aiPass').value;
+      if (!username || !password) {
+        showToast('Enter your owner username and password', 'error');
+        return;
+      }
       try {
-        document.getElementById('aiStatus').textContent = 'Scanning...';
+        nodeJwt = await invoke('node_login', { port: currentPort, username, password });
+        document.getElementById('aiSignedInUser').textContent = username;
+        document.getElementById('aiAuthSignedOut').style.display = 'none';
+        document.getElementById('aiAuthSignedIn').style.display = 'block';
+        document.getElementById('aiPass').value = '';
+        showToast('Signed in');
+        await refreshCurrentAi();
+        detectAI();
+      } catch (err) {
+        showToast('Sign in failed: ' + err, 'error');
+      }
+    }
+
+    function signOutOfNode() {
+      nodeJwt = null;
+      currentAi = null;
+      document.getElementById('aiAuthSignedOut').style.display = 'block';
+      document.getElementById('aiAuthSignedIn').style.display = 'none';
+      document.getElementById('currentAiCard').style.display = 'none';
+      detectAI();
+    }
+
+    // Called when the AI Setup tab opens: refresh current settings, then the scan.
+    async function aiSetupOpened() {
+      await refreshCurrentAi();
+      detectAI();
+    }
+
+    // Read back and display the AI settings currently active on the node.
+    async function refreshCurrentAi() {
+      const card = document.getElementById('currentAiCard');
+      if (!nodeJwt) { currentAi = null; card.style.display = 'none'; return; }
+      try {
+        currentAi = await invoke('get_ai_settings', { port: currentPort, token: nodeJwt });
+        document.getElementById('curAiProvider').textContent = currentAi.provider || '(default)';
+        document.getElementById('curAiModel').textContent = currentAi.model || '(none)';
+        document.getElementById('curAiEndpoint').textContent = currentAi.base_url || '(provider default)';
+        card.style.display = 'block';
+      } catch (err) {
+        currentAi = null;
+        card.style.display = 'none';
+      }
+    }
+
+    async function detectAI() {
+      const container = document.getElementById('aiServicesList');
+      try {
+        container.innerHTML = '<p>Scanning...</p>';
         const services = await invoke('detect_ai_services');
-        const container = document.getElementById('aiServicesList');
-        const available = services.filter(s => s.status === 'available');
+        lastServices = services;
+
+        let html = '';
+        const available = services
+          .map((s, i) => ({ s, i }))
+          .filter(x => x.s.status === 'available');
 
         if (available.length > 0) {
-          container.innerHTML = available.map(s =>
-            '<div class="service-item">' +
+          html += available.map(({ s, i }) => {
+            const models = s.models || [];
+            const baseUrl = s.url.replace(/\/+$/, '') + '/v1';
+            const inUse = currentAi && currentAi.base_url === baseUrl;
+            const options = models.length
+              ? models.map(m => {
+                  const sel = (inUse && currentAi.model === m) ? ' selected' : '';
+                  return '<option value="' + escapeHtml(m) + '"' + sel + '>' + escapeHtml(m) + '</option>';
+                }).join('')
+              : '<option value="">no models</option>';
+            const badge = inUse
+              ? '<span class="status-indicator online" style="margin-right: 8px;"><span class="dot"></span>In use</span>'
+              : '';
+            return '<div class="service-item">' +
               '<div class="service-info">' +
                 '<span class="service-name">' + escapeHtml(s.service_type) + '</span>' +
                 '<span class="service-url">' + escapeHtml(s.url) + '</span>' +
-                '<span class="service-models">' + s.models.length + ' model(s): ' +
-                  escapeHtml(s.models.slice(0, 3).join(', ')) +
-                  (s.models.length > 3 ? '...' : '') +
-                '</span>' +
+                '<span class="service-models">' + models.length + ' model(s)</span>' +
               '</div>' +
-              '<span class="status-indicator online"><span class="dot"></span>Available</span>' +
-            '</div>'
-          ).join('');
-        } else {
-          container.innerHTML =
-            '<div class="empty-state" style="padding: 24px;">' +
-              '<p>No AI services detected.<br>Start LM Studio or Ollama first.</p>' +
+              '<div style="display: flex; gap: 8px; align-items: center;">' +
+                badge +
+                '<select id="aiModel_' + i + '" class="ai-model-select">' + options + '</select>' +
+                '<button class="btn" style="padding: 8px 16px; font-size: 0.85rem;" onclick="useDetected(' + i + ')">Use this</button>' +
+              '</div>' +
             '</div>';
+          }).join('');
+        } else {
+          html += '<div class="empty-state" style="padding: 24px;">' +
+            '<p>No AI services detected.<br>Start LM Studio or Ollama first.</p></div>';
         }
 
-        // Also show unavailable services
         const unavailable = services.filter(s => s.status !== 'available');
-        if (unavailable.length > 0) {
-          container.innerHTML += unavailable.map(s =>
-            '<div class="service-item">' +
-              '<div class="service-info">' +
-                '<span class="service-name" style="opacity: 0.5;">' + escapeHtml(s.service_type) + '</span>' +
-                '<span class="service-url" style="opacity: 0.4;">' + escapeHtml(s.url) + '</span>' +
-              '</div>' +
-              '<span class="status-indicator offline"><span class="dot"></span>Unavailable</span>' +
-            '</div>'
-          ).join('');
-        }
+        html += unavailable.map(s =>
+          '<div class="service-item">' +
+            '<div class="service-info">' +
+              '<span class="service-name" style="opacity: 0.5;">' + escapeHtml(s.service_type) + '</span>' +
+              '<span class="service-url" style="opacity: 0.4;">' + escapeHtml(s.url) + '</span>' +
+            '</div>' +
+            '<span class="status-indicator offline"><span class="dot"></span>Unavailable</span>' +
+          '</div>'
+        ).join('');
+
+        container.innerHTML = html;
       } catch (err) {
-        document.getElementById('aiServicesList').innerHTML =
+        container.innerHTML =
           '<p style="color: #fca5a5;">Detection failed: ' + escapeHtml(String(err)) + '</p>';
       }
     }
 
+    // Save a detected service as the node's AI. The scan URL is the host root;
+    // the OpenAI-compatible base URL is <url>/v1.
+    function useDetected(idx) {
+      const service = lastServices[idx];
+      const sel = document.getElementById('aiModel_' + idx);
+      if (!service) return;
+      const model = sel ? sel.value : '';
+      const baseUrl = service.url.replace(/\/+$/, '') + '/v1';
+      saveNodeAi(baseUrl, model);
+    }
+
     async function saveCustomAi() {
       const url = document.getElementById('customAiUrl').value.trim();
-      if (!url) {
-        showToast('Please enter a URL', 'error');
+      const model = document.getElementById('customAiModel').value.trim();
+      if (!url) { showToast('Enter an endpoint URL', 'error'); return; }
+      if (!model) { showToast('Enter a model id', 'error'); return; }
+      // The custom field is the full base URL already (includes /v1) — pass as-is.
+      saveNodeAi(url, model);
+    }
+
+    // Push the chosen endpoint to the owner's account settings on the node.
+    async function saveNodeAi(baseUrl, model) {
+      if (!nodeJwt) {
+        showToast('Sign in to your node first (top of this tab)', 'error');
+        navigateTo('ai-setup');
         return;
       }
+      if (!model) { showToast('Pick a model first', 'error'); return; }
       try {
-        const config = await invoke('read_config');
-        config.ai_endpoint = url;
-        await invoke('write_config', { config });
-        showToast('AI endpoint saved');
+        await invoke('save_ai_endpoint', { port: currentPort, token: nodeJwt, baseUrl, model });
+        showToast('Set as your node AI: ' + model);
+        await refreshCurrentAi();
+        detectAI();
       } catch (err) {
+        // A 401 usually means the session expired — drop it so the user re-signs in.
+        if (String(err).toLowerCase().includes('auth') || String(err).includes('401')) {
+          signOutOfNode();
+        }
         showToast('Failed to save: ' + err, 'error');
       }
     }
@@ -878,6 +1101,39 @@
       const div = document.createElement('div');
       div.textContent = str;
       return div.innerHTML;
+    }
+
+    // Open an external link in the system browser (not inside the app webview).
+    async function openExternal(url) {
+      try {
+        await invoke('open_external', { url });
+      } catch (err) {
+        showToast('Failed to open link: ' + err, 'error');
+      }
+    }
+
+    // Copy text to clipboard (clipboard API first, hidden-textarea fallback).
+    async function copyText(text) {
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          showToast('Copied');
+          return;
+        }
+      } catch (e) { /* fall through to legacy path */ }
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('Copied');
+      } catch (e) {
+        showToast('Copy failed — select the text manually', 'error');
+      }
     }
 
     // ── Init ────────────────────────────────────────────────────

@@ -381,6 +381,27 @@ Server runs on port 40050. Quick test: paste this into any AI chat:
 
 If the AI reads the docs and explains the protocol, everything works. Admin dashboard URL is shown in the startup log.
 
+### Desktop app (Windows) — no terminal needed
+
+For a personal node without the command line, **AIMEAT Personal Node** is a one-click Windows installer that
+bundles everything — the node server, a Node.js runtime, and a persistent SQLite database — so there are **no
+prerequisites** to install. A small control panel starts/stops the node, shows status and live logs, configures
+it (port, federation role), connects a local AI (Ollama / LM Studio) to your account, and opens the web
+dashboard in your browser. Your data lives in your own app-data folder and survives restarts.
+
+<p align="center">
+  <img src="assets/screenshots/aimeat-desktop.png" alt="AIMEAT Personal Node desktop app — control panel with Getting Started steps, node status (running on port 40050), and node info" width="640" />
+</p>
+
+Build the installer from source (a Rust toolchain + Node 24 + pnpm are needed to *build* it, not to *run* it):
+
+```bash
+pnpm build-desktop   # installer lands in aimeat-desktop/src-tauri/target/release/bundle/
+```
+
+Built with [Tauri](https://tauri.app). Windows is the supported target today (macOS/Linux can follow via per-OS
+CI). Developer docs: [aimeat-desktop/README.md](aimeat-desktop/README.md).
+
 ---
 
 ## Reference Implementation

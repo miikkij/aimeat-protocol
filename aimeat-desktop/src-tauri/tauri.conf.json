@@ -3,8 +3,7 @@
   "version": "0.2.0",
   "identifier": "com.overscale.aimeat-desktop",
   "build": {
-    "frontendDist": "../src",
-    "devUrl": "../src"
+    "frontendDist": "../src"
   },
   "app": {
     "withGlobalTauri": true,
@@ -21,11 +20,7 @@
         "minWidth": 800,
         "minHeight": 600
       }
-    ],
-    "trayIcon": {
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": true
-    }
+    ]
   },
   "bundle": {
     "active": true,
@@ -38,6 +33,6 @@
     ],
     "targets": "all",
     "externalBin": ["binaries/node"],
-    "resources": ["resources/server/**/*"]
+    "resources": ["resources/server/**/*", "WebView2Loader.*"]
   }
 }

@@ -3,6 +3,10 @@
  * @description Messages tab with command palette, "/" autocomplete, and chat area.
  *   Wraps the existing messages subtab and adds command discovery.
  * @version-history
+ *   v1.5.0 -- 2026-06-06 -- Thread buttons: fix field-name mismatch (use threadId/lastMessage from the
+ *     API, not the non-existent id/title/preview) so selecting a thread actually filters and each
+ *     button shows a real label. Label task-based threads by their task title, snippet others; collapse
+ *     long lists behind a "show more" toggle (THREAD_LIMIT), always keeping the active thread visible.
  *   v1.4.0 -- 2026-06-02 -- Render agent (outbound) message bodies as Markdown via the
  *     shared safe vnode Markdown component, so LLM replies (bold, lists, code,
  *     tables) display formatted. Owner inbound messages stay literal text.
@@ -24,6 +28,19 @@ import { getAgentCommands } from '/js/services/agent-integration.js';
 import { Markdown } from '/components/Markdown.js';
 
 const html = htm.bind(h);
+
+// How many thread buttons to show before collapsing the rest behind "show more".
+const THREAD_LIMIT = 6;
+
+// A short, human-readable label for a thread button. Prefers the linked task's
+// title (task-based threads), then a snippet of the last message, and only
+// falls back to a generic label when neither exists.
+function threadLabel(thread) {
+  if (thread.title) return thread.title;
+  const last = (thread.lastMessage || '').replace(/\s+/g, ' ').trim();
+  if (last) return last.length > 28 ? last.slice(0, 28) + '…' : last;
+  return t('profile.agents.messages.threadFallback');
+}
 
 function CommandPalette({ commands, onSend }) {
   const [expanded, setExpanded] = useState(false);
@@ -88,6 +105,7 @@ export default function TabMessages({ agent, agentName, session, showToast }) {
   const [messages, setMessages] = useState([]);
   const [threads, setThreads] = useState([]);
   const [activeThread, setActiveThread] = useState(null);
+  const [showAllThreads, setShowAllThreads] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState('');
@@ -211,6 +229,14 @@ export default function TabMessages({ agent, agentName, session, showToast }) {
     return commands.filter(c => c.name.toLowerCase().startsWith(search));
   }, [draft, commands]);
 
+  // Only surface threads worth selecting: a task-linked thread (has a title) or a
+  // real back-and-forth (more than one message). Single stray messages stay under
+  // the "all" view rather than each becoming its own button.
+  const meaningfulThreads = useMemo(
+    () => threads.filter(thread => thread.title || thread.messageCount > 1),
+    [threads],
+  );
+
   function selectCommand(cmdName) {
     setDraft(cmdName);
     setShowAutocomplete(false);
@@ -270,19 +296,37 @@ export default function TabMessages({ agent, agentName, session, showToast }) {
     <div>
       <${CommandPalette} commands=${commands} onSend=${(cmd) => handleSend(cmd)} />
 
-      ${threads.length > 0 && html`
+      ${meaningfulThreads.length > 0 && html`
         <div class="pf-agd-msg-threads">
           <button class="pf-agd-msg-thread-btn ${!activeThread ? 'pf-agd-msg-thread-btn-active' : ''}"
                   onClick=${() => setActiveThread(null)}>
             ${t('profile.agents.messages.threads')}
           </button>
-          ${threads.filter(thread => thread.title || thread.messageCount > 1).map(thread => html`
-            <button key=${thread.id}
-                    class="pf-agd-msg-thread-btn ${activeThread === thread.id ? 'pf-agd-msg-thread-btn-active' : ''}"
-                    onClick=${() => setActiveThread(thread.id)}>
-              ${thread.title || thread.preview?.slice(0, 20) || 'Thread'}
+          ${(() => {
+            // Collapse a long thread list behind a "show more" toggle, but always
+            // keep the currently-selected thread visible even when collapsed.
+            let visible = showAllThreads ? meaningfulThreads : meaningfulThreads.slice(0, THREAD_LIMIT);
+            if (activeThread && !visible.some(th => th.threadId === activeThread)) {
+              const active = meaningfulThreads.find(th => th.threadId === activeThread);
+              if (active) visible = [active, ...visible];
+            }
+            return visible.map(thread => html`
+              <button key=${thread.threadId}
+                      class="pf-agd-msg-thread-btn ${activeThread === thread.threadId ? 'pf-agd-msg-thread-btn-active' : ''}"
+                      title=${thread.title || thread.lastMessage || ''}
+                      onClick=${() => setActiveThread(thread.threadId)}>
+                ${threadLabel(thread)}
+              </button>
+            `);
+          })()}
+          ${meaningfulThreads.length > THREAD_LIMIT && html`
+            <button class="pf-agd-msg-thread-btn pf-agd-msg-thread-more"
+                    onClick=${() => setShowAllThreads(v => !v)}>
+              ${showAllThreads
+                ? t('profile.agents.messages.threadsShowLess')
+                : t('profile.agents.messages.threadsShowMore', { count: meaningfulThreads.length - THREAD_LIMIT })}
             </button>
-          `)}
+          `}
         </div>
       `}
 

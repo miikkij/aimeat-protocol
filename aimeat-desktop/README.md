@@ -49,9 +49,16 @@ contract. To **back up** your node, stop it and copy the whole app-data folder.
 
 ### Prerequisites (build machine only — not the end user)
 
-- **Rust** toolchain (`rustup`, stable) + the MSVC build tools (Visual Studio C++ Build Tools).
+- **Rust** toolchain. Either works:
+  - **MSVC** (Tauri's recommended Windows setup): `rustup` + Visual Studio C++ Build Tools, or
+  - **GNU** (`x86_64-pc-windows-gnu`, e.g. via Chocolatey `rust`): also needs **mingw-w64** (`gcc` + `windres`)
+    **on `PATH`** — Tauri's resource step shells out to `windres`, which uses `gcc` as its preprocessor. If
+    `windres`/`gcc` aren't on `PATH` you'll see `windres: preprocessing failed`.
 - **Node.js 24+** and **pnpm**.
 - The Tauri CLI is already a dev dependency of this folder (`pnpm install` here installs it).
+
+> `pnpm stage` stages the Node sidecar under **both** Windows triples (`-gnu` and `-msvc`) because the Tauri
+> compiler and the Tauri CLI bundler can each resolve a different one. Whichever your toolchain uses, it's covered.
 
 ### Produce a Windows installer
 
@@ -77,15 +84,25 @@ src-tauri/target/release/bundle/nsis/    *-setup.exe   (recommended)
 src-tauri/target/release/bundle/msi/     *.msi
 ```
 
-### Develop the GUI (fast iteration)
+### Develop the GUI
 
 ```bash
-cd ../aimeat && pnpm build      # build the server once (dev mode runs it from ../aimeat/dist)
-cd ../aimeat-desktop && pnpm dev   # tauri dev — uses system `node` + ../aimeat/dist, no staging needed
+cd aimeat-desktop
+pnpm dev          # = pnpm stage && tauri dev  (stages the sidecar + server, then runs)
 ```
 
-In dev mode the app detects that the bundled resource is absent and falls back to the sibling repo tree +
-`node` on your `PATH`, while still writing runtime state to the app-data folder.
+`tauri.conf.json` declares the Node sidecar and server resources unconditionally, so `tauri dev` needs them
+present — hence `pnpm dev` stages first. For **fast GUI iteration** (editing `src/index.html` only), stage once
+then re-run the dev binary directly:
+
+```bash
+pnpm stage        # once
+pnpm tauri dev    # repeat — skips re-staging
+```
+
+The Rust layer still contains a **dev fallback**: if the bundled server resource is absent it runs
+`../aimeat/dist` with `node` from your `PATH`. Either way, runtime state (`.env`, SQLite DB, logs) is written to
+the app-data folder. To iterate on the **server** itself, run it the normal way (`cd ../aimeat && pnpm dev`).
 
 ---
 
@@ -117,6 +134,15 @@ In dev mode the app detects that the bundled resource is absent and falls back t
 - **"Failed to start node" / native module error** — the bundled `better-sqlite3` was built for a different Node
   ABI than the bundled sidecar. Rebuild the package with a single Node version so `pnpm stage` produces a
   matching pair (`stage-node` and `stage-server` both use the host's Node).
+- **`windres: preprocessing failed`** (GNU toolchain) — `windres` can't find its `gcc` preprocessor. Put the
+  mingw-w64 `bin` dir (e.g. `C:\ProgramData\mingw64\mingw64\bin`) on `PATH` before building.
+- **`icon ... is not RGBA`** — the icons under `src-tauri/icons/` must be 32-bit RGBA PNGs. Regenerate the full
+  set from the source SVG: `pnpm tauri icon src-tauri/icons/icon.svg`.
+- **`WebView2Loader.dll was not found`** (at app launch) — the GNU toolchain links this loader dynamically, so it
+  must ship next to the exe. `pnpm stage` stages it (`scripts/stage-webview2.mjs`) and `tauri.conf.json` bundles it
+  as a top-level resource. If it ever goes missing, run `pnpm stage:webview2` and rebuild. (MSVC links it
+  statically and never needs the DLL.) Note this is the *loader*; the Edge **WebView2 runtime** itself ships with
+  Windows 11 / is auto-installed by the installer.
 - **Logs** — check the **Logs** tab, or open
   `%APPDATA%\com.overscale.aimeat-desktop\aimeat-node.log` directly.
 - **Port already in use** — another process holds `40050`. Stop it, or change `AIMEAT_PORT` in the Settings tab.

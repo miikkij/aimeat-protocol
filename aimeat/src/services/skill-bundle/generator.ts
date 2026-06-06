@@ -17,6 +17,8 @@
  *   v1.1.5 -- 2026-05-28 -- State that Hello Integration is required first-run onboarding
  *   v1.1.6 -- 2026-05-28 -- Clarify post-onboarding setup uses actual commands, config, and knowledge artifacts
  *   v1.1.7 -- 2026-05-28 -- Add shared owner-memory tag guidance
+ *   v1.1.8 -- 2026-06-06 -- Message Threading guidance: pass linked_task_id so task messages group
+ *     into one thread per task, instead of a new thread per question.
  */
 
 import { createHash } from 'node:crypto';
@@ -385,15 +387,19 @@ POST /v1/agents/${ctx.agentName}/messages
 {
   "content": "Your response text",
   "direction": "outbound",
-  "thread_id": "{thread_id}"
+  "linked_task_id": "{task_id}"
 }
 \`\`\`
 
 ## Message Threading
-- Messages belong to threads (thread_id)
-- Threads can be linked to tasks (linked_task_id)
-- Reply in the same thread to continue a conversation
-- New conversations start a new thread (omit thread_id)
+- Messages belong to threads (thread_id) and a thread can be tied to a task.
+- **When a message is about a task, pass \`linked_task_id\` (and omit \`thread_id\`).** Every message
+  sharing the same \`linked_task_id\` is grouped into that task's single conversation thread.
+- Do NOT start a fresh thread for each question. Clarifications about the same task belong together —
+  passing \`linked_task_id\` keeps them in one thread instead of cluttering the owner with one thread
+  per message.
+- To reply within an existing thread, pass its \`thread_id\`.
+- Only omit both \`linked_task_id\` and \`thread_id\` for genuinely new, task-less conversations.
 
 ## Slash Commands
 If you support owner-facing slash commands, register the actual commands you can handle by writing to memory. Do not register examples or internal MCP tool names unless the owner can send them as message commands and you will answer them.

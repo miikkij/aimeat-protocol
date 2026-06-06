@@ -37,6 +37,7 @@
 //   v5.0.0 — 2026-03-20 — Remove agent guide, my-assignments, and session endpoints (replaced by OpenRouter autopilot)
 //   v5.1.0 — 2026-03-21 — Add settings collection endpoints (POST/GET /v1/generator/:projectId/settings)
 //   v5.2.0 — 2026-03-21 — Add test execution endpoint, screenshot serving, and screenshot cleanup on delete (Task 16)
+//   v5.3.0 — 2026-06-06 — prompts/:componentId now merges stored specs (generator.<project>.spec.<id>) onto completedComponents, matching the browser's loadAllComponents merge — so dependency specs reach the prompt from their canonical key, not just from the component record
 
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -1457,6 +1458,18 @@ window.__renderSnapshot = null; // Set by test code to capture rendered state
       // Load completed components for context
       // Include 'done' status — autopilot uses 'done' while UI uses 'registered'/'ready'
       const allComponentRecords = await storage.listMemory(gaii, { prefix: `generator.${projectId}.component.` });
+      // Load every stored spec and merge it onto the matching component — the SAME thing the
+      // browser's loadAllComponents() does (generator.js: specMap[component.id]). Specs live under
+      // their own key (generator.<project>.spec.<id>), NOT on the component record, so without this
+      // merge a dependency's spec — e.g. the data cortex's methods/returnsExample that a component
+      // cortex prompt needs via resolveCortexComponent → completedComponents[].spec — would be missing
+      // and the prompt would silently degrade. Reading from the spec key makes the chain consume the
+      // spec from the exact same canonical place the autopilot/UI wrote it.
+      const componentKeyPrefix = `generator.${projectId}.component.`;
+      const specKeyPrefix = `generator.${projectId}.spec.`;
+      const allSpecRecords = await storage.listMemory(gaii, { prefix: specKeyPrefix });
+      const specByComponentId = new Map<string, unknown>();
+      for (const sr of allSpecRecords) specByComponentId.set(sr.key.slice(specKeyPrefix.length), sr.value);
       const completedComponents = allComponentRecords
         .filter(r => {
           const val = r.value as { status?: string; registeredAs?: string };
@@ -1471,6 +1484,11 @@ window.__renderSnapshot = null; // Set by test code to capture rendered state
               val.subtype = (bpc as Record<string, unknown>).subtype;
               logger.warn(`⚠️ SUBTYPE MISSING from stored component "${val.id || val.label}" — enriched from blueprint as "${(bpc as Record<string, unknown>).subtype}". Autopilot will auto-fix this.`);
             }
+          }
+          // Merge the spec from its canonical key if the record doesn't already carry it
+          if (!val.spec) {
+            const compId = (val.id as string) || r.key.slice(componentKeyPrefix.length);
+            if (specByComponentId.has(compId)) val.spec = specByComponentId.get(compId);
           }
           return val;
         });

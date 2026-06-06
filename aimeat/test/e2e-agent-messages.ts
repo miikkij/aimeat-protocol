@@ -1,5 +1,8 @@
 // E2E Tests for Agent Messages
 // Run: cd aimeat && pnpm exec tsx test/e2e-agent-messages.ts
+// v1.2.0 -- 2026-06-06 -- Add Phase 5 (tests 11-15): task-based threads -- a message with
+//   linked_task_id (no thread_id) joins the task's thread, subsequent linked messages share it,
+//   the thread listing labels it by task title, and a task-less message stays in its own thread.
 // v1.1.0 -- 2026-05-30 -- Add option-prompt tests (4b/4c): prompt metadata round-trip and
 //   prompt_answer correlation via thread history (the path aimeat_message_history reads).
 
@@ -328,6 +331,84 @@ await test('10. Consolidated inbox shows pending messages', async () => {
     assert(typeof first.preview === 'string', 'pending message has preview');
     assert(typeof first.from === 'string', 'pending message has from');
     assert(typeof first.id === 'string', 'pending message has id');
+});
+
+// ─── Phase 5: Task-based threads ───
+console.log('\nPhase 5 -- Task-based threads');
+
+let taskId = '';
+const taskTitle = `Build the landing page ${Date.now()}`;
+
+await test('11. Create a task', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ title: taskTitle, description: 'Design and build it.', status: 'queued' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    taskId = body.data.task.id;
+    assert(typeof taskId === 'string', 'has task id');
+});
+
+await test('12. Message with linked_task_id (no thread_id) joins the task thread', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({
+            direction: 'outbound',
+            content: 'Clarification: what color scheme should I use?',
+            linked_task_id: taskId,
+        }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.message.threadId === taskId, `threadId should equal task id, got ${body.data.message.threadId}`);
+    assert(body.data.message.linkedTaskId === taskId, 'linkedTaskId is set on the message');
+});
+
+await test('13. A second linked message lands in the SAME task thread', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            direction: 'inbound',
+            content: 'Use blue and white.',
+            linked_task_id: taskId,
+        }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.message.threadId === taskId, `second message should join the task thread, got ${body.data.message.threadId}`);
+});
+
+await test('14. Thread listing labels the task thread by task title', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/messages/threads`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const taskThread = body.data.threads.find((t: any) => t.threadId === taskId);
+    assert(taskThread !== undefined, 'task thread appears in listing');
+    assert(taskThread.title === taskTitle, `thread title should be the task title, got ${JSON.stringify(taskThread.title)}`);
+    assert(taskThread.linkedTaskId === taskId, 'thread linkedTaskId is set to the task id');
+    assert(taskThread.messageCount >= 2, `task thread should have >=2 messages, got ${taskThread.messageCount}`);
+});
+
+await test('15. Failure mode: a task-less message does NOT join the task thread', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            direction: 'inbound',
+            content: 'Unrelated ad-hoc question with no task.',
+        }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.message.threadId !== taskId, 'task-less message gets its own thread, not the task thread');
+    // And the thread listing must not mislabel it with a task title.
+    const threads = await json(`/v1/agents/${agentName}/messages/threads`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const adhoc = threads.body.data.threads.find((t: any) => t.threadId === body.data.message.threadId);
+    assert(adhoc !== undefined, 'ad-hoc thread appears in listing');
+    assert(adhoc.title === null, `ad-hoc thread should have no task title, got ${JSON.stringify(adhoc.title)}`);
 });
 
 // ─── Cleanup ───

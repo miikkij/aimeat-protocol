@@ -5,6 +5,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.1.0 -- 2026-06-06 -- Messaging guidance: steer agents to pass linked_task_id so task-related
+ *     messages group into one thread per task (not a new thread per question).
  *   v1.0.0 -- 2026-05-30 -- Initial agent-surface handbook
  */
 
@@ -31,9 +33,12 @@ a handle/URL, not bytes — never read large binaries into context.
 appending events + flipping TODO status → complete (with a summary) or fail (with a reason).
 
 **Messages — the owner conversation.** \`aimeat_message_inbox\` (pending inbound) ·
-\`aimeat_message_send\` (markdown; omit thread_id to start a thread, pass one to reply; can carry a
-proposed_task or a single-select prompt for the owner) · \`aimeat_message_history\` (full thread,
-oldest-first — use it to read back the owner's answer to a prompt you sent).
+\`aimeat_message_send\` (markdown; can carry a proposed_task or a single-select prompt for the owner)
+· \`aimeat_message_history\` (full thread, oldest-first — use it to read back the owner's answer to a
+prompt you sent). **Threading: when a message is about a task, pass \`linked_task_id\` — every message
+sharing it is grouped into that task's one conversation thread. Only omit it (or pass \`thread_id\` to
+reply) for ad-hoc, task-less chat. Don't start a fresh thread per question — clarifications about the
+same task belong in the same thread.**
 
 **Knowledge — share refined knowledge under a contract.** \`aimeat_knowledge_list\` ·
 \`aimeat_knowledge_get\` · \`aimeat_knowledge_contribute\` · \`aimeat_knowledge_links\`. Prefer a real

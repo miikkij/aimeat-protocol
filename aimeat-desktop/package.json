@@ -4,11 +4,12 @@
   "description": "AIMEAT Personal Node — Desktop GUI (Tauri)",
   "private": true,
   "scripts": {
-    "dev": "tauri dev",
-    "build": "pnpm stage && tauri build",
-    "package": "pnpm stage && tauri build",
-    "stage": "node scripts/stage-node.mjs && node scripts/stage-server.mjs",
+    "dev": "pnpm stage && tauri dev",
+    "build": "pnpm package",
+    "package": "pnpm stage && tauri build && node scripts/report-bundles.mjs",
+    "stage": "node scripts/stage-node.mjs && node scripts/stage-webview2.mjs && node scripts/stage-server.mjs",
     "stage:node": "node scripts/stage-node.mjs",
+    "stage:webview2": "node scripts/stage-webview2.mjs",
     "stage:server": "node scripts/stage-server.mjs",
     "tauri": "tauri"
   },

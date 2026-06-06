@@ -2620,9 +2620,17 @@ components:
         thread_id:
           type: string
           format: uuid
+          description: >-
+            Thread to post into. Omit to start a new thread. If omitted but
+            linked_task_id is given, the message auto-joins that task's thread
+            (threadId defaults to linked_task_id).
         linked_task_id:
           type: string
           format: uuid
+          description: >-
+            Task this message relates to. Messages sharing a linked_task_id are
+            grouped into one conversation thread (the task's thread) when no
+            explicit thread_id is provided.
         metadata:
           type: object
           properties:
@@ -18179,7 +18187,11 @@ paths:
     get:
       operationId: listAgentMessageThreads
       summary: List conversation threads
-      description: Returns thread summaries with last message preview and message count
+      description: >-
+        Returns thread summaries (last message text, message count, last-updated
+        time). Threads are task-based: when a thread is tied to a task, its
+        threadId equals the task id and `title`/`linkedTaskId` are populated with
+        the task's title and id so clients can label the thread by task name.
       tags: [Agent Messages]
       security:
         - BearerAuth: []
@@ -18211,9 +18223,22 @@ paths:
                                   type: string
                                   format: uuid
                                 lastMessage:
-                                  $ref: '#/components/schemas/AgentMessageRecord'
+                                  type: string
+                                  description: Content of the most recent message in the thread
                                 messageCount:
                                   type: integer
+                                updatedAt:
+                                  type: string
+                                  format: date-time
+                                title:
+                                  type: string
+                                  nullable: true
+                                  description: Linked task's title when the thread is task-based, else null
+                                linkedTaskId:
+                                  type: string
+                                  format: uuid
+                                  nullable: true
+                                  description: Task id this thread belongs to when task-based, else null
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':

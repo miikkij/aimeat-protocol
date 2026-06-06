@@ -23,7 +23,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { cpSync, copyFileSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { cpSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -52,18 +52,44 @@ rmSync(serverDir, { recursive: true, force: true });
 mkdirSync(serverDir, { recursive: true });
 cpSync(distDir, join(serverDir, 'dist'), { recursive: true });
 
-// 3. Copy package.json (carries "type":"module" + pnpm.onlyBuiltDependencies) and lockfile.
-copyFileSync(join(aimeatDir, 'package.json'), join(serverDir, 'package.json'));
+// 3. Copy runtime assets the server reads from the package root (not from dist/).
+//    These mirror aimeat package.json "files": docs read at startup
+//    (e.g. routes/bootstrap.ts loads ../../../docs/AIMEAT_Help_Prompt.md).
+const helpPrompt = join(aimeatDir, 'docs', 'AIMEAT_Help_Prompt.md');
+if (existsSync(helpPrompt)) {
+  mkdirSync(join(serverDir, 'docs'), { recursive: true });
+  copyFileSync(helpPrompt, join(serverDir, 'docs', 'AIMEAT_Help_Prompt.md'));
+}
+const csmExamples = join(aimeatDir, 'docs', 'csm-examples');
+if (existsSync(csmExamples)) {
+  cpSync(csmExamples, join(serverDir, 'docs', 'csm-examples'), { recursive: true });
+}
+
+// 4. Write the staging package.json (carries "type":"module" + pnpm.onlyBuiltDependencies),
+//    but with optionalDependencies stripped. The ONLY optional dep is @prisma/client,
+//    which the SQLite bundle never imports and whose engines are large. We must NOT use
+//    pnpm's --no-optional, though: quickjs-emscripten pulls quickjs-emscripten-core and
+//    the @jitl/quickjs-wasmfile-* WASM variants, which pnpm treats as platform-optional —
+//    --no-optional would drop the entire QuickJS runtime and crash the server at startup.
+const pkg = JSON.parse(readFileSync(join(aimeatDir, 'package.json'), 'utf8'));
+delete pkg.optionalDependencies;
+writeFileSync(join(serverDir, 'package.json'), JSON.stringify(pkg, null, 2));
 const lockfile = join(aimeatDir, 'pnpm-lock.yaml');
 if (existsSync(lockfile)) {
   copyFileSync(lockfile, join(serverDir, 'pnpm-lock.yaml'));
 }
 
-// 4. Install production dependencies only (with build scripts so better-sqlite3
-//    yields its native binary; --no-optional drops Prisma engines).
-run('pnpm install --prod --no-optional --config.confirmModulesPurge=false', serverDir);
+// 5. Install production dependencies (with build scripts so better-sqlite3 yields its
+//    native binary). Key flags:
+//    --node-linker=hoisted : produce a FLAT, symlink-free node_modules. pnpm's default
+//      isolated linker uses symlinks with absolute build-machine targets, which the
+//      NSIS/MSI bundler breaks on copy — severing module resolution in the installed app
+//      (manifests as ERR_MODULE_NOT_FOUND / "lstat 'C:'" at startup). Hoisted = real dirs.
+//    --no-frozen-lockfile : reconcile the lockfile with the prisma-stripped package.json.
+//    Optionals stay ON so QuickJS's WASM variants ship.
+run('pnpm install --prod --no-frozen-lockfile --node-linker=hoisted --config.confirmModulesPurge=false', serverDir);
 
-// 5. Sanity check: the native SQLite binary must be present, or the packaged app
+// 6. Sanity check: the native SQLite binary must be present, or the packaged app
 //    will fail to start the node.
 const nativeBinary = join(
   serverDir,

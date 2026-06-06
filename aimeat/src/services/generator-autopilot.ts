@@ -9,6 +9,18 @@
  *
  * @version-history
  *   v1.0.0 — 2026-04-01 — Initial backend autopilot
+ *   v1.1.0 — 2026-06-06 — Spec/code/test prompts now built via the canonical
+ *     GET /v1/generator/:projectId/prompts/:cid?type=spec|code|test route — the exact
+ *     same path the browser UI uses (generator-detail.js loadPromptFromBackend). Removes
+ *     divergent inline prompt construction that gated spec generation on in-memory
+ *     comp.spec and silently produced empty specs / specs that never reached the code
+ *     prompt. Order now matches the UI: spec → validate → store → code (with stored spec).
+ *   v1.2.0 — 2026-06-06 — Spec persistence now goes through the canonical
+ *     POST /v1/generator/:projectId/components/:cid/spec endpoint (the same store the UI's
+ *     "Save Spec" writes to: generator.<project>.spec.<id>), replacing a direct
+ *     storage.setMemory with hardcoded version:1 + swallowed error that silently dropped
+ *     the spec on re-runs. The browser reads specs back from this key (loadAllComponents
+ *     merges specMap[id]), so this is what makes generated specs appear in the UI on refresh.
  */
 
 import { type Storage } from '../storage/interface.js';
@@ -313,43 +325,20 @@ export async function runAutopilot(
         if (specTypes.includes(compType)) {
           const bpComp = ((blueprint.components as Array<Record<string, unknown>>) || []).find((c: Record<string, unknown>) => c.label === compLabel);
           if (bpComp) {
-            let specPrompt: string | null = null;
-
-            if (compType === 'extension') {
-              specPrompt = await buildPrompt(storage, 'gen-extension-spec', { blueprint, blueprintComponent: bpComp, interviewSpec } as unknown as PromptRuntimeData);
-            } else if ((bpComp.subtype as string) === 'data') {
-              const extComp = comps.find(c => c.type === 'extension' && c.spec);
-              if (extComp?.spec) specPrompt = await buildPrompt(storage, 'gen-data-api-spec', { blueprint, extensionSpec: extComp.spec as Record<string, unknown> } as unknown as PromptRuntimeData);
-            } else if ((bpComp.subtype as string) === 'component' || (bpComp.id as string)?.startsWith('component-')) {
-              const dataCortex = comps.find(c => c.type === 'cortex' && c.spec && ((c.subtype as string) === 'data'));
-              if (dataCortex?.spec) {
-                const translationKeys = comps.filter(c => c.type === 'translation' && (c as Record<string, unknown>).contextBundle)
-                  .flatMap(c => ((c as Record<string, unknown>).contextBundle as Record<string, unknown>)?.keys as string[] || []);
-                specPrompt = await buildPrompt(storage, 'gen-component-spec', { blueprint, dataApiSpec: dataCortex.spec as Record<string, unknown>, componentLabel: compLabel, translationKeys } as unknown as PromptRuntimeData);
-              }
-            } else if ((bpComp.subtype as string) === 'app-domain') {
-              const dataCortex = comps.find(c => c.type === 'cortex' && c.spec && ((c.subtype as string) === 'data'));
-              const componentSpecs = comps.filter(c => c.spec && ((c.subtype as string) === 'component')).map(c => c.spec);
-              const translationKeys = comps.filter(c => c.type === 'translation' && (c as Record<string, unknown>).contextBundle)
-                .flatMap(c => ((c as Record<string, unknown>).contextBundle as Record<string, unknown>)?.keys as string[] || []);
-              if (dataCortex?.spec) {
-                specPrompt = await buildPrompt(storage, 'gen-app-domain-spec', {
-                  blueprint, componentSpecs: componentSpecs as Array<Record<string, unknown>>,
-                  dataApiSpec: dataCortex.spec as Record<string, unknown>,
-                  useCases: interviewSpec?.useCases as unknown[], translationKeys,
-                  views: interviewSpec?.views as unknown[],
-                } as unknown as PromptRuntimeData);
-              }
-            } else if (compType === 'app') {
-              const appDomainComp = comps.find(c => c.type === 'cortex' && c.spec && ((c.subtype as string) === 'app-domain'));
-              if (appDomainComp) {
-                const allCortexes = comps.filter(c => c.type === 'cortex' && c.registeredAs);
-                specPrompt = await buildPrompt(storage, 'gen-app-spec', {
-                  blueprint, componentLabel: compLabel,
-                  projectDescription: project.description as string,
-                  completedComponents: allCortexes as unknown as ComponentState[],
-                } as unknown as PromptRuntimeData);
-              }
+            // Build the spec prompt through the SAME backend route the browser UI uses
+            // (GET /prompts/:cid?type=spec) — identical to loadPromptFromBackend(projectId,
+            // id, 'spec') in generator-detail.js. The route ALWAYS produces a spec prompt for
+            // spec-bearing types and pulls cross-component dependencies (extension spec, data-API
+            // spec, translation keys) from the canonical generator.<project>.spec.<id> memory
+            // keys. The old inline construction gated on comp.spec being present on the in-memory
+            // component records and silently produced a null prompt → no spec generated → empty
+            // specs. Never reconstruct the prompt logic here; defer to the route, like the UI does.
+            const specPromptResp = await internalFetch(config, `/v1/generator/${projectId}/prompts/${encodeURIComponent(cid)}?type=spec`, jwt);
+            const specPrompt: string | null = specPromptResp.ok
+              ? (((specPromptResp.data as Record<string, unknown>)?.prompt as string) || null)
+              : null;
+            if (!specPrompt) {
+              alog.warn(`[${cid}] No spec prompt for ${compLabel} (status ${specPromptResp.status}) — continuing without spec`);
             }
 
             if (specPrompt) {
@@ -429,13 +418,22 @@ export async function runAutopilot(
               if (spec) {
                 comp = { ...comp, spec };
                 await saveComp(comp);
-                // Save spec independently
-                await storage.setMemory({
-                  key: `generator.${projectId}.spec.${cid}`,
-                  ownerGaii: ownerGhii, value: spec, visibility: 'owner',
-                  version: 1, tags: ['generator', 'spec'], ttlHours: null,
-                  createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-                }).catch(() => {});
+                // Persist the spec to its canonical key (generator.<project>.spec.<cid>) through the
+                // SAME backend endpoint that backs the browser's "Save Spec" — POST .../components/:cid/spec.
+                // This is EXACTLY where the UI reads specs back from on F5: loadAllComponents() queries
+                // generator.<project>.spec.* and merges specMap[component.id] onto each component, so the
+                // spec only needs to live under this key — it does NOT need to be on the component record.
+                // The endpoint validates and version-bumps correctly (existing ? version+1 : 1); the old
+                // direct storage.setMemory used a hardcoded version:1 with a swallowed error, so a re-run
+                // (key already present) silently failed and the spec never reached the UI.
+                const storeResp = await internalFetch(config, `/v1/generator/${projectId}/components/${encodeURIComponent(cid)}/spec`, jwt, {
+                  method: 'POST', body: { spec },
+                });
+                if (storeResp.ok) {
+                  alog.info(`[${cid}] Spec stored at generator.${projectId}.spec.${cid} — UI will show it on refresh`);
+                } else {
+                  alog.error(`[${cid}] Spec store FAILED (status ${storeResp.status}): ${JSON.stringify(storeResp.error)} — spec will NOT appear in the UI`);
+                }
               }
             }
           }
@@ -444,51 +442,20 @@ export async function runAutopilot(
         if (entry.cancelFlag) break;
 
         // ── CODE GENERATION ──
+        // Build the code prompt through the SAME backend route the browser UI uses
+        // (GET /prompts/:cid?type=code) — identical to loadPromptFromBackend(projectId, id,
+        // 'code') in generator-detail.js, which the UI re-runs right after "Save Spec". The
+        // route loads THIS component's just-stored spec (generator.<project>.spec.<cid>) as
+        // selfSpec, plus every prior registered component (with their specs + context bundles),
+        // so the spec is embedded in the code prompt exactly as in the manual UI flow. The old
+        // inline construction duplicated this logic and read selfSpec from comp.spec, which was
+        // often empty — so the spec never reached the prompt.
         alog.info(`[${cid}] Building code prompt for ${compLabel}`);
-        const freshComps = await loadComponents();
-        // Enrich stored components with subtype from blueprint (subtype is not stored in component records)
-        const bpComponents = (blueprint.components as Array<Record<string, unknown>>) || [];
-        for (const fc of freshComps) {
-          if (!fc.subtype) {
-            const bpc = bpComponents.find(b => b.label === fc.label || b.id === fc.id);
-            if (bpc?.subtype) {
-              fc.subtype = bpc.subtype;
-              alog.warn(`[${fc.id}] ⚠️ SUBTYPE MISSING from stored component — enriched from blueprint as "${bpc.subtype}". Run will auto-fix this component record.`);
-            }
-          }
+        const codePromptResp = await internalFetch(config, `/v1/generator/${projectId}/prompts/${encodeURIComponent(cid)}?type=code`, jwt);
+        const prompt: string = ((codePromptResp.data as Record<string, unknown>)?.prompt as string) || '';
+        if (!codePromptResp.ok || !prompt) {
+          throw new Error(`Failed to build code prompt for ${compLabel} (status ${codePromptResp.status}): ${JSON.stringify(codePromptResp.error)}`);
         }
-        const completedComponents = freshComps.filter(c => c.status === 'done' && c.registeredAs);
-        // Map component type to the appropriate DB prompt ID
-        const promptIdMap: Record<string, string> = {
-          csm: 'gen-csm', memory: 'gen-memory', translation: 'gen-translation',
-          extension: 'gen-extension-code', app: 'gen-app',
-        };
-        let promptId = promptIdMap[compType];
-        // Cortex subtypes
-        if (compType === 'cortex') {
-          const bpC = (blueprint.components as Array<Record<string, unknown>>)?.find((c: Record<string, unknown>) => c.label === compLabel);
-          const sub = (bpC?.subtype as string) || '';
-          if (sub === 'data') promptId = 'gen-cortex-data';
-          else if (sub === 'component' || (bpC?.id as string)?.startsWith('component-')) promptId = 'gen-cortex-component';
-          else if (sub === 'app-domain') promptId = 'gen-cortex-app-domain';
-          else promptId = 'gen-cortex-component'; // default
-        }
-        if (!promptId) promptId = 'gen-extension-code'; // fallback
-
-        const prompt = await buildPrompt(storage, promptId, {
-          blueprint: blueprint as unknown as Blueprint,
-          interviewSpec: interviewSpec as unknown as InterviewSpec,
-          componentLabel: compLabel,
-          componentType: compType,
-          completedComponents: completedComponents as unknown as ComponentState[],
-          selfSpec: comp.spec as Record<string, unknown> | undefined,
-          projectDescription: project.description as string,
-          blueprintComponent: ((blueprint.components as Array<Record<string, unknown>>) || []).find((c: Record<string, unknown>) => c.label === compLabel) as unknown as undefined,
-          extensionSpec: completedComponents.find(c => (c as Record<string, unknown>).type === 'extension' && (c as Record<string, unknown>).spec)?.spec as Record<string, unknown> | undefined,
-          dataApiSpec: completedComponents.find(c => (c as Record<string, unknown>).subtype === 'data' && (c as Record<string, unknown>).spec)?.spec as Record<string, unknown> | undefined,
-          translationKeys: completedComponents.filter(c => (c as Record<string, unknown>).type === 'translation' && ((c as Record<string, unknown>).contextBundle as Record<string, unknown>)?.keys)
-            .flatMap(c => (((c as Record<string, unknown>).contextBundle as Record<string, unknown>)?.keys as string[]) || []),
-        } as unknown as PromptRuntimeData);
 
         alog.info(`[${cid}] Calling OpenRouter for ${compLabel} (prompt: ${(prompt as string).length} chars)`);
         debug.writeComponentPrompt(cid, prompt as string).catch(() => {});
@@ -767,57 +734,17 @@ export async function runAutopilot(
         let testPassed = true; // assume passed unless test runs and fails
         if (['extension', 'cortex', 'app'].includes(compType) && comp.registeredAs) {
           try {
-            let testPromptText: string;
-            if (compType === 'cortex') {
-              // Route to subtype-specific test prompt
-              const freshCompsForTest = await loadComponents();
-              // Enrich with subtype from blueprint
-              const bpCompsForTest = (blueprint.components as Array<Record<string, unknown>>) || [];
-              for (const fc of freshCompsForTest) {
-                if (!fc.subtype) {
-                  const bpc = bpCompsForTest.find(b => b.label === fc.label || b.id === fc.id);
-                  if (bpc?.subtype) {
-                    fc.subtype = bpc.subtype;
-                    alog.warn(`[${fc.id}] ⚠️ SUBTYPE MISSING from stored component — enriched from blueprint as "${bpc.subtype}". Run will auto-fix this component record.`);
-                  }
-                }
-              }
-              const bpC = bpCompsForTest.find((c: Record<string, unknown>) => c.label === compLabel);
-              const cortexSubtype = (bpC?.subtype as string) || (comp.subtype as string) || 'data';
-              const testPromptId = cortexSubtype === 'component' ? 'gen-test-cortex-component'
-                : cortexSubtype === 'app-domain' ? 'gen-test-cortex-app-domain'
-                : 'gen-test-cortex-spec'; // data cortex
-              testPromptText = await buildPrompt(storage, testPromptId, {
-                blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec,
-                selfSpec: comp.spec as Record<string, unknown> | undefined,
-                componentLabel: compLabel,
-                componentType: compType,
-                completedComponents: freshCompsForTest.filter(c => c.registeredAs) as unknown as ComponentState[],
-              } as unknown as PromptRuntimeData);
-            } else if (compType === 'app') {
-              // App test — uses gen-app test prompt (browser-based, loads all cortexes)
-              const freshCompsForApp = await loadComponents();
-              testPromptText = await buildPrompt(storage, 'gen-test-app', {
-                blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec,
-                selfSpec: comp.spec as Record<string, unknown> | undefined,
-                componentLabel: compLabel,
-                componentType: compType,
-                completedComponents: freshCompsForApp.filter(c => c.registeredAs) as unknown as ComponentState[],
-              } as unknown as PromptRuntimeData);
-            } else if (comp.spec && compType === 'extension') {
-              testPromptText = await buildPrompt(storage, 'gen-test-extension-spec', {
-                blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec,
-                selfSpec: comp.spec as Record<string, unknown>, extensionName: comp.registeredAs as string,
-                completedComponents: [comp] as unknown as ComponentState[], // pass current comp with probeResults for golden samples
-              } as unknown as PromptRuntimeData);
-            } else {
-              // Fallback — extension without spec
-              testPromptText = await buildPrompt(storage, 'gen-test-extension-spec', {
-                blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec,
-                selfSpec: comp.spec as Record<string, unknown>,
-                extensionName: comp.registeredAs as string,
-                completedComponents: [comp] as unknown as ComponentState[],
-              } as unknown as PromptRuntimeData);
+            // Build the test prompt through the SAME backend route the browser UI uses
+            // (GET /prompts/:cid?type=test) — identical to loadPromptFromBackend(projectId, id,
+            // 'test') in generator-detail.js. The route selects the subtype-specific test prompt
+            // (gen-test-cortex-component / -app-domain / -spec, gen-test-extension-spec,
+            // gen-test-app) and loads this component's stored spec plus golden samples (the
+            // extension's stored probeResults) from the canonical records — the same inputs the
+            // inline branches assembled, with no risk of subtype/dependency drift.
+            const testPromptResp = await internalFetch(config, `/v1/generator/${projectId}/prompts/${encodeURIComponent(cid)}?type=test`, jwt);
+            const testPromptText = ((testPromptResp.data as Record<string, unknown>)?.prompt as string) || '';
+            if (!testPromptResp.ok || !testPromptText) {
+              throw new Error(`Failed to build test prompt for ${compLabel} (status ${testPromptResp.status}): ${JSON.stringify(testPromptResp.error)}`);
             }
 
             alog.info(`[${cid}] Generating test for ${compLabel}`);

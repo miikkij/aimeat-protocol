@@ -8,6 +8,9 @@
  *   - GET    /v1/agents/:name/messages         -- List message history
  *   - PATCH  /v1/agents/:name/messages/:id     -- Update message status
  * @version-history
+ *   v1.2.0 -- 2026-06-06 -- Task-based threads: threadId defaults to linked_task_id when no
+ *     thread_id is given (a task's whole conversation stays in one thread). The threads list now
+ *     resolves the linked task's title so the UI can label threads by task name, not "Thread".
  *   v1.1.0 -- 2026-05-23 -- Add webhook dispatch for message.inbound events
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 3
  */
@@ -80,7 +83,12 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
     const body = parsed.data;
     const now = new Date().toISOString();
     const id = randomUUID();
-    const threadId = body.thread_id ?? randomUUID();
+    // Thread = task: when a message is linked to a task but no explicit thread is
+    // given, group it under the task's id so a task's whole conversation (the
+    // agent's clarifications + the owner's answers) stays in ONE thread instead
+    // of spawning a fresh random thread per message. Falls back to a random
+    // thread only for ad-hoc, task-less chat.
+    const threadId = body.thread_id ?? body.linked_task_id ?? randomUUID();
 
     // Determine sender identity
     const roles = req.auth!.roles as string[];
@@ -173,7 +181,24 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
     const agentGaii = resolveAgentGaii(req, agentName);
     const threads = await storage.listThreads(agentGaii);
 
-    res.json(success(config.nodeId, { threads }));
+    // Threads are task-based: a task-linked thread uses the task id as its
+    // threadId. Resolve the task title so the UI can label the thread with the
+    // task name instead of a generic "Thread". Cache lookups so several threads
+    // pointing at the same task only hit storage once.
+    const taskCache = new Map<string, string | null>();
+    const resolveTaskTitle = async (threadId: string): Promise<string | null> => {
+      if (taskCache.has(threadId)) return taskCache.get(threadId) ?? null;
+      const task = await storage.getAgentTask(threadId).catch(() => null);
+      const title = task?.title ?? null;
+      taskCache.set(threadId, title);
+      return title;
+    };
+    const enriched = await Promise.all(threads.map(async (thread) => {
+      const title = await resolveTaskTitle(thread.threadId);
+      return { ...thread, title, linkedTaskId: title !== null ? thread.threadId : null };
+    }));
+
+    res.json(success(config.nodeId, { threads: enriched }));
   });
 
   /* ── GET /v1/agents/:name/messages -- List message history ── */

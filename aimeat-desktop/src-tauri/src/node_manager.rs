@@ -11,8 +11,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
-use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
+use std::io::{BufRead, BufReader, Write};
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::time::Instant;
@@ -74,14 +74,33 @@ fn node_exe_name() -> &'static str {
     }
 }
 
+/// Strip the Windows extended-length / verbatim prefix (`\\?\`) from a path.
+/// Tauri's resource resolver (and current_exe / app_data_dir) can return verbatim
+/// paths, and Node's CJS main-module resolver chokes on them — `realpathSync`
+/// fails with `EISDIR: illegal operation on a directory, lstat 'C:'`, so the node
+/// crashes before loading a single module. UNC verbatim (`\\?\UNC\srv\share`)
+/// maps back to `\\srv\share`. No-op on non-verbatim paths and on non-Windows.
+fn strip_verbatim(p: PathBuf) -> PathBuf {
+    let s = p.to_string_lossy();
+    if let Some(rest) = s.strip_prefix(r"\\?\UNC\") {
+        PathBuf::from(format!(r"\\{rest}"))
+    } else if let Some(rest) = s.strip_prefix(r"\\?\") {
+        PathBuf::from(rest)
+    } else {
+        p
+    }
+}
+
 /// Resolve runtime paths, preferring the bundled server resource and falling back
 /// to the sibling repo tree when running under `tauri dev`.
 fn resolve_runtime(app: &AppHandle) -> Result<Runtime, String> {
     // Writable runtime state always lives in the OS app-data dir.
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Failed to resolve app data dir: {}", e))?;
+    // strip_verbatim: paths passed to / used by Node must not carry the `\\?\` prefix.
+    let data_dir = strip_verbatim(
+        app.path()
+            .app_data_dir()
+            .map_err(|e| format!("Failed to resolve app data dir: {}", e))?,
+    );
     let env_file = data_dir.join(".env");
     let log_file = data_dir.join("aimeat-node.log");
 
@@ -93,13 +112,16 @@ fn resolve_runtime(app: &AppHandle) -> Result<Runtime, String> {
             tauri::path::BaseDirectory::Resource,
         )
         .ok()
+        .map(strip_verbatim)
         .filter(|p| p.exists());
 
     if let Some(server_entry) = bundled_entry {
-        let exe_dir = std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|d| d.to_path_buf()))
-            .ok_or_else(|| "Failed to resolve executable directory".to_string())?;
+        let exe_dir = strip_verbatim(
+            std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+                .ok_or_else(|| "Failed to resolve executable directory".to_string())?,
+        );
         return Ok(Runtime {
             node_bin: exe_dir.join(node_exe_name()),
             server_entry,
@@ -144,6 +166,16 @@ fn default_env(node_id: &str) -> String {
     )
 }
 
+/// Append a dated, human-readable marker line to the node log file. Bookends each
+/// session so the log carries date/time context even across crashes (node's own
+/// crash stack traces are otherwise untimestamped).
+fn log_marker(log_file: &Path, message: &str) {
+    if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(log_file) {
+        let ts = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
+        let _ = writeln!(f, "\n========== {ts} — {message} ==========");
+    }
+}
+
 /// Ensure the data dir exists and a default SQLite `.env` is present.
 fn ensure_env_file(rt: &Runtime) -> Result<(), String> {
     std::fs::create_dir_all(&rt.data_dir)
@@ -172,6 +204,16 @@ pub fn start_node(app: AppHandle) -> Result<u32, String> {
             "Server entry not found at {}. In dev, run `pnpm stage` first; in a packaged app, reinstall.",
             rt.server_entry.display()
         ));
+    }
+
+    // Dated session header so the log carries date/time even if the node crashes.
+    log_marker(&rt.log_file, "AIMEAT node starting");
+    // Diagnostic: record the resolved spawn paths (these must NOT carry a `\\?\` prefix).
+    if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(&rt.log_file) {
+        let _ = writeln!(f, "  node:  {}", rt.node_bin.display());
+        let _ = writeln!(f, "  entry: {}", rt.server_entry.display());
+        let _ = writeln!(f, "  cwd:   {}", rt.data_dir.display());
+        let _ = writeln!(f, "  env:   {}", rt.env_file.display());
     }
 
     // Capture stdout/stderr to the log file.
@@ -209,11 +251,14 @@ pub fn start_node(app: AppHandle) -> Result<u32, String> {
         *start_time = Some(Instant::now());
     }
 
+    // Keep the tray icon in sync (running). refresh_tray must not lock NODE_PROCESS.
+    crate::tray::refresh_tray(&app, true);
+
     Ok(pid)
 }
 
 #[tauri::command]
-pub fn stop_node(pid: u32) -> Result<(), String> {
+pub fn stop_node(app: AppHandle, pid: u32) -> Result<(), String> {
     let mut process = NODE_PROCESS.lock().map_err(|e| e.to_string())?;
     if let Some(ref mut child) = *process {
         if child.id() == pid {
@@ -226,6 +271,11 @@ pub fn stop_node(pid: u32) -> Result<(), String> {
                 *start_time = None;
             }
 
+            if let Ok(rt) = resolve_runtime(&app) {
+                log_marker(&rt.log_file, "AIMEAT node stopped");
+            }
+
+            crate::tray::refresh_tray(&app, false);
             return Ok(());
         }
     }
@@ -233,8 +283,25 @@ pub fn stop_node(pid: u32) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn get_node_status() -> Result<NodeStatus, String> {
-    let process = NODE_PROCESS.lock().map_err(|e| e.to_string())?;
+pub fn get_node_status(app: AppHandle) -> Result<NodeStatus, String> {
+    let port = read_configured_port(&app);
+    let mut process = NODE_PROCESS.lock().map_err(|e| e.to_string())?;
+
+    // Reap a process that exited on its own (e.g. crashed at startup) so the UI
+    // doesn't keep reporting "running" for a dead node.
+    let exited = matches!(
+        process.as_mut().map(|child| child.try_wait()),
+        Some(Ok(Some(_)))
+    );
+    if exited {
+        *process = None;
+        if let Ok(mut start_time) = NODE_START_TIME.lock() {
+            *start_time = None;
+        }
+        // The node died on its own — reflect "stopped" in the tray.
+        crate::tray::refresh_tray(&app, false);
+    }
+
     let uptime = NODE_START_TIME
         .lock()
         .ok()
@@ -244,16 +311,31 @@ pub fn get_node_status() -> Result<NodeStatus, String> {
         Some(child) => Ok(NodeStatus {
             running: true,
             pid: Some(child.id()),
-            port: DEFAULT_PORT,
+            port,
             uptime_seconds: uptime,
         }),
         None => Ok(NodeStatus {
             running: false,
             pid: None,
-            port: DEFAULT_PORT,
+            port,
             uptime_seconds: None,
         }),
     }
+}
+
+/// Read the configured AIMEAT_PORT from the managed `.env`, falling back to the default.
+fn read_configured_port(app: &AppHandle) -> u16 {
+    if let Ok(rt) = resolve_runtime(app) {
+        if let Ok(content) = std::fs::read_to_string(&rt.env_file) {
+            if let Some(port) = parse_env(&content)
+                .get("AIMEAT_PORT")
+                .and_then(|v| v.parse().ok())
+            {
+                return port;
+            }
+        }
+    }
+    DEFAULT_PORT
 }
 
 #[tauri::command]
@@ -377,11 +459,20 @@ pub fn clear_node_logs(app: AppHandle) -> Result<(), String> {
         .map_err(|e| format!("Failed to clear log file: {}", e))
 }
 
-/// Open the node's web portal in the user's default browser.
+/// Open the node's web portal in the user's default browser (uses the configured port).
 #[tauri::command]
-pub fn open_portal(port: Option<u16>) -> Result<(), String> {
-    let port = port.unwrap_or(DEFAULT_PORT);
+pub fn open_portal(app: AppHandle) -> Result<(), String> {
+    let port = read_configured_port(&app);
     let url = format!("http://localhost:{}/v1/portal", port);
+    open_url(&url)
+}
+
+/// Open an external http(s) URL in the user's default browser (used for help links).
+#[tauri::command]
+pub fn open_external(url: String) -> Result<(), String> {
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err("Only http(s) URLs are allowed".to_string());
+    }
     open_url(&url)
 }
 

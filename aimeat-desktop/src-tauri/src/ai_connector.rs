@@ -65,6 +65,145 @@ pub fn connect_ai_service(service: AIService) -> Result<(), String> {
     Ok(())
 }
 
+/// Log in to the local node as an owner and return the JWT.
+/// POST /v1/ghii/login { username, password } -> success envelope { data: { token } }.
+#[tauri::command]
+pub async fn node_login(port: u16, username: String, password: String) -> Result<String, String> {
+    let url = format!("http://localhost:{}/v1/ghii/login", port);
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let resp = client
+        .post(&url)
+        .json(&serde_json::json!({ "username": username, "password": password }))
+        .send()
+        .await
+        .map_err(|e| format!("Cannot reach node on port {}: {}", port, e))?;
+
+    let status = resp.status();
+    let body: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Unexpected response from node: {}", e))?;
+
+    if !status.is_success() {
+        let msg = body
+            .pointer("/error/message")
+            .and_then(|m| m.as_str())
+            .unwrap_or("Login failed");
+        return Err(msg.to_string());
+    }
+
+    // Owner JWT lives at data.token. Absent token usually means TOTP/backup code is required.
+    body.pointer("/data/token")
+        .and_then(|t| t.as_str())
+        .map(|t| t.to_string())
+        .ok_or_else(|| {
+            "Login succeeded but no token was returned (this account may require a TOTP code).".to_string()
+        })
+}
+
+/// The AI settings currently stored for the signed-in owner (for display).
+#[derive(Serialize)]
+pub struct AiSettings {
+    pub provider: String,
+    pub base_url: String,
+    pub model: String,
+    pub has_api_key: bool,
+}
+
+/// Read the owner's current AI settings. GET /v1/openrouter/settings (Bearer token).
+#[tauri::command]
+pub async fn get_ai_settings(port: u16, token: String) -> Result<AiSettings, String> {
+    let url = format!("http://localhost:{}/v1/openrouter/settings", port);
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let resp = client
+        .get(&url)
+        .bearer_auth(&token)
+        .send()
+        .await
+        .map_err(|e| format!("Cannot reach node on port {}: {}", port, e))?;
+
+    let status = resp.status();
+    let body: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+
+    if !status.is_success() {
+        let msg = body
+            .pointer("/error/message")
+            .and_then(|m| m.as_str())
+            .unwrap_or("Failed to read AI settings");
+        return Err(msg.to_string());
+    }
+
+    Ok(AiSettings {
+        provider: body
+            .pointer("/data/provider")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        base_url: body
+            .pointer("/data/baseUrl")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        model: body
+            .pointer("/data/model")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        has_api_key: body
+            .pointer("/data/hasApiKey")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+    })
+}
+
+/// Save the chosen AI endpoint to the owner's account settings on the node.
+/// PUT /v1/openrouter/settings (Bearer token) { provider: "custom", baseUrl, model }.
+#[tauri::command]
+pub async fn save_ai_endpoint(
+    port: u16,
+    token: String,
+    base_url: String,
+    model: String,
+) -> Result<(), String> {
+    let url = format!("http://localhost:{}/v1/openrouter/settings", port);
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let resp = client
+        .put(&url)
+        .bearer_auth(&token)
+        .json(&serde_json::json!({
+            "provider": "custom",
+            "baseUrl": base_url,
+            "model": model,
+        }))
+        .send()
+        .await
+        .map_err(|e| format!("Cannot reach node on port {}: {}", port, e))?;
+
+    let status = resp.status();
+    if status.is_success() {
+        return Ok(());
+    }
+
+    let body: serde_json::Value = resp.json().await.unwrap_or_default();
+    let msg = body
+        .pointer("/error/message")
+        .and_then(|m| m.as_str())
+        .unwrap_or("Failed to save AI settings");
+    Err(msg.to_string())
+}
+
 async fn check_openai_compatible(base_url: &str) -> Result<Vec<String>, String> {
     let url = format!("{}/v1/models", base_url);
     let client = reqwest::Client::builder()

@@ -13,6 +13,7 @@
   },
   "scripts": {
     "build": "cd aimeat && pnpm build",
+    "build-desktop": "cd aimeat-desktop && pnpm package",
     "dev": "cd aimeat && pnpm dev",
     "start": "cd aimeat && pnpm start",
     "link:global": "cd aimeat && npm link",
