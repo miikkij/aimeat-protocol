@@ -4,6 +4,7 @@
  *   Start, poll status, and cancel the background pipeline.
  * @version-history
  *   v1.0.0 — 2026-04-01 — Initial backend autopilot endpoints
+ *   v1.1.0 — 2026-06-06 — start accepts { testScope } from the "Testauslaajuus" selector and forwards it to runAutopilot (scope 'none' skips the test phase)
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -28,6 +29,12 @@ export function generatorAutopilotRouter(config: AimeatConfig, storage: Storage)
       const ownerGhii = resolve(req);
       const ownerName = req.auth!.owner;
       const jwt = (req.headers.authorization ?? '').replace('Bearer ', '');
+      // Test scope from the "Testauslaajuus" selector — 'none' tells the autopilot to skip the test
+      // phase entirely (spec + code + register still run for every component). Defaults to
+      // 'comprehensive' for older clients that don't send it.
+      const rawScope = (req.body as { testScope?: unknown } | undefined)?.testScope;
+      const testScope: 'comprehensive' | 'basic' | 'none' =
+        rawScope === 'none' || rawScope === 'basic' ? rawScope : 'comprehensive';
 
       if (isAutopilotRunning(projectId)) {
         res.status(409).json(error(config.nodeId, 'ALREADY_RUNNING', 'Autopilot is already running for this project'));
@@ -42,12 +49,12 @@ export function generatorAutopilotRouter(config: AimeatConfig, storage: Storage)
       }
 
       // Start autopilot in background — don't await, return immediately
-      runAutopilot(projectId, ownerGhii, ownerName, jwt, config, storage)
+      runAutopilot(projectId, ownerGhii, ownerName, jwt, config, storage, testScope)
         .catch(err => {
           logger.error(`Autopilot crashed for ${projectId}: ${err.message}`);
         });
 
-      res.json(success(config.nodeId, { started: true, projectId }));
+      res.json(success(config.nodeId, { started: true, projectId, testScope }));
     }
   );
 

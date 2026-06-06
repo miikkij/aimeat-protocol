@@ -21,6 +21,11 @@
  *     storage.setMemory with hardcoded version:1 + swallowed error that silently dropped
  *     the spec on re-runs. The browser reads specs back from this key (loadAllComponents
  *     merges specMap[id]), so this is what makes generated specs appear in the UI on refresh.
+ *   v1.3.0 — 2026-06-06 — (a) Validation auto-retry count now honors the user's configured
+ *     openrouter.settings.maxRetries (1-10) instead of a hardcoded 3 — each retry still sends the
+ *     validator errors back to the LLM via gen-fix. (b) Honors the "Testauslaajuus" test scope:
+ *     scope 'none' skips the test phase so a test failure can no longer break the pipeline before
+ *     later components get their spec/code/register steps (which left their spec boxes empty).
  */
 
 import { type Storage } from '../storage/interface.js';
@@ -108,6 +113,7 @@ export async function runAutopilot(
   _jwt: string,
   config: AimeatConfig,
   storage: Storage,
+  testScope: 'comprehensive' | 'basic' | 'none' = 'comprehensive',
 ): Promise<void> {
   // Logger is the module-level winston wrapper defined above
 
@@ -147,6 +153,13 @@ export async function runAutopilot(
   const baseUrl = (prefs.baseUrl as string) || (provider === 'lmstudio' ? 'http://localhost:1234/v1' : 'https://openrouter.ai/api/v1');
   const model = (prefs.model as string) || (prefs.executionModel as string) || 'anthropic/claude-sonnet-4';
   const temperature = (prefs.temperature as number) ?? undefined;
+  // Validation auto-retry count — honor the user's OpenRouter setting (clamped 1-10, default 3),
+  // the SAME value the browser UI uses (orSettings.maxRetries, generator-detail.js:461). The old
+  // hardcoded 3 ignored the configured value, so a project set to 10 still gave up after 3 and
+  // `break`ed the whole pipeline. The autopilot always retries up to this many times (it can't
+  // fall back to a manual copy-paste like the UI can when autoRetry is off).
+  const maxValidationRetries = Math.max(1, Math.min(10, Number(prefs.maxRetries) || 3));
+  log.info(`Autopilot validation auto-retry budget: ${maxValidationRetries} (from openrouter.settings.maxRetries)`);
 
   // Decrypt API key
   let apiKey: string | undefined;
@@ -471,11 +484,13 @@ export async function runAutopilot(
         // ── VALIDATE ──
         let vr = validateComponent(compType, content, blueprint as unknown as Blueprint);
 
-        // Auto-retry on validation failure
+        // Auto-retry on validation failure — each retry sends the validator's errors back to the
+        // LLM via the gen-fix prompt (original task + failing code + errors), exactly like the UI's
+        // buildFixPrompt. Count comes from the user's configured maxRetries (not a hardcoded 3).
         if (!vr.valid) {
-          const maxRetries = 3;
+          const maxRetries = maxValidationRetries;
           for (let attempt = 1; attempt <= maxRetries && !vr.valid && !entry.cancelFlag; attempt++) {
-            alog.info(`[${cid}] Retry ${attempt}/${maxRetries} for ${compLabel}`);
+            alog.info(`[${cid}] Validation retry ${attempt}/${maxRetries} for ${compLabel} — sending ${vr.errors.length} validator error(s) back to the LLM`);
             const fixPrompt = await buildPrompt(storage, 'gen-fix', { blueprint: blueprint as unknown as Blueprint, interviewSpec: interviewSpec as unknown as InterviewSpec, originalPrompt: prompt, code: content, errors: vr.errors, componentType: compType } as unknown as PromptRuntimeData);
             debug.writeArtifact(cid, `validation-fix-${attempt}-prompt`, fixPrompt).catch(() => {});
             content = await callLLM(fixPrompt);
@@ -731,8 +746,17 @@ export async function runAutopilot(
         }
 
         // ── TEST ──
+        // Honor the user's "Testauslaajuus" (test scope) selection: 'none' = skip the whole test
+        // phase. This is what "Ei testejä — ohita testaus" must do — without it, tests always ran
+        // and a single test failure `break`ed the entire pipeline, so later components never reached
+        // their spec/code/register steps and their SPEC boxes stayed empty. Skipping tests lets
+        // spec + code + register run for every component. Test scope does NOT gate spec generation
+        // (specs are produced in the spec phase, long before this block).
         let testPassed = true; // assume passed unless test runs and fails
-        if (['extension', 'cortex', 'app'].includes(compType) && comp.registeredAs) {
+        if (testScope === 'none') {
+          alog.info(`[${cid}] Test scope "none" — skipping test phase (spec + code + register already done)`);
+        }
+        if (testScope !== 'none' && ['extension', 'cortex', 'app'].includes(compType) && comp.registeredAs) {
           try {
             // Build the test prompt through the SAME backend route the browser UI uses
             // (GET /prompts/:cid?type=test) — identical to loadPromptFromBackend(projectId, id,

@@ -37,8 +37,11 @@ export function useAutopilot(core, autopilotState, projectId, orSettings, sessio
     if (!orSettings?.hasApiKey || autopilotState.running) return;
 
     try {
-      // Start the backend autopilot — returns immediately, runs in background
-      const resp = await apiPost(`/v1/generator/${projectId}/autopilot/start`);
+      // Start the backend autopilot — returns immediately, runs in background.
+      // Pass the selected test scope ("Testauslaajuus") so the server can skip the test phase
+      // when 'none' is chosen (spec + code + register still run for every component).
+      const testScope = testExec?.testScopeRef?.current || testExec?.testScope || 'comprehensive';
+      const resp = await apiPost(`/v1/generator/${projectId}/autopilot/start`, { testScope });
       if (!resp?.ok && !resp?.data?.started) {
         showToast?.('Failed to start autopilot: ' + (resp?.error?.message || 'Unknown error'), true);
         return;
