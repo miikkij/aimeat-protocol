@@ -95,14 +95,17 @@ export function workspaceAccessMiddleware(
     // Consent IS required for:
     //   - All READ operations on shared/meta namespaces
     //   - Writes to shared namespace (not own member namespace)
-    const isRead = ['GET', 'HEAD'].includes(req.method);
     const ownMemberPrefix = `organism.${organismId}.member.${ownerName}.`;
     const isOwnMemberNamespace = key.startsWith(ownMemberPrefix);
 
-    // Skip consent for writes to your own member namespace
-    const needsConsent = isRead
-      ? !isOwnMemberNamespace   // reads outside own namespace need consent
-      : !isOwnMemberNamespace;  // writes outside own namespace need consent
+    // A human owner-role session (not an agent) acting as an active member is the principal — it
+    // does not consent to itself. The consent layer governs AGENT access (and cross-node sharing);
+    // agent sessions below still require a matching grant. This is what lets a logged-in human use
+    // their own project workspace from the UI without provisioning an agent-owned consent.
+    const isHumanOwnerSession = (req.auth?.roles ?? []).includes('owner') && !(req.auth?.roles ?? []).includes('agent');
+
+    // Consent needed unless writing your own member namespace, or you're the human owner-principal.
+    const needsConsent = !isOwnMemberNamespace && !isHumanOwnerSession;
 
     if (needsConsent) {
       // Look up all agents for this owner

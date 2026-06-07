@@ -461,9 +461,10 @@ describe('workspaceAccessMiddleware', () => {
     });
   });
 
-  // ── Consent checks (shared namespace) ───────────────────
+  // ── Consent checks (shared namespace) — AGENT sessions still require consent ──
+  // (A human owner-role session is the principal and skips consent; see the block below.)
 
-  describe('shared namespace (consent required)', () => {
+  describe('shared namespace (agent consent required)', () => {
     beforeEach(async () => {
       await storage.createOrganism(makeOrganism({ id: 'org-1' }));
       await storage.createGHII(makeGHII({ username: 'alice', ghii: 'alice@test-node', ownerName: 'alice' }));
@@ -477,7 +478,7 @@ describe('workspaceAccessMiddleware', () => {
 
     it('returns 403 CONSENT_REQUIRED when owner has no agents', async () => {
       // No owner or agent records created
-      const req = mockReq('organism.org-1.shared.chat', 'GET', { sub: 'agent1#alice@test-node', owner: 'alice', roles: ['owner'] });
+      const req = mockReq('organism.org-1.shared.chat', 'GET', { sub: 'agent1#alice@test-node', owner: 'alice', roles: ['agent'] });
       const res = mockRes();
       let nextCalled = false;
 
@@ -494,7 +495,7 @@ describe('workspaceAccessMiddleware', () => {
       await storage.createAgent(makeAgent({ name: 'agent1', owner: 'alice', gaii: 'agent1#alice@test-node' }));
       // No consent created
 
-      const req = mockReq('organism.org-1.shared.chat', 'GET', { sub: 'agent1#alice@test-node', owner: 'alice', roles: ['owner'] });
+      const req = mockReq('organism.org-1.shared.chat', 'GET', { sub: 'agent1#alice@test-node', owner: 'alice', roles: ['agent'] });
       const res = mockRes();
       let nextCalled = false;
 
@@ -517,7 +518,7 @@ describe('workspaceAccessMiddleware', () => {
         status: 'active',
       }));
 
-      const req = mockReq('organism.org-1.shared.chat', 'GET', { sub: 'agent1#alice@test-node', owner: 'alice', roles: ['owner'] });
+      const req = mockReq('organism.org-1.shared.chat', 'GET', { sub: 'agent1#alice@test-node', owner: 'alice', roles: ['agent'] });
       const res = mockRes();
       let nextCalled = false;
 
@@ -537,7 +538,7 @@ describe('workspaceAccessMiddleware', () => {
         status: 'active',
       }));
 
-      const req = mockReq('organism.org-1.shared.notes', 'POST', { sub: 'agent1#alice@test-node', owner: 'alice', roles: ['owner'] });
+      const req = mockReq('organism.org-1.shared.notes', 'POST', { sub: 'agent1#alice@test-node', owner: 'alice', roles: ['agent'] });
       const res = mockRes();
       let nextCalled = false;
 
@@ -558,7 +559,7 @@ describe('workspaceAccessMiddleware', () => {
         status: 'active',
       }));
 
-      const req = mockReq('organism.org-1.shared.data', 'GET', { sub: 'agent1#alice@test-node', owner: 'alice', roles: ['owner'] });
+      const req = mockReq('organism.org-1.shared.data', 'GET', { sub: 'agent1#alice@test-node', owner: 'alice', roles: ['agent'] });
       const res = mockRes();
       let nextCalled = false;
 
@@ -577,7 +578,7 @@ describe('workspaceAccessMiddleware', () => {
         status: 'active',
       }));
 
-      const req = mockReq('organism.org-1.shared.data', 'GET', { sub: 'agent1#alice@test-node', owner: 'alice', roles: ['owner'] });
+      const req = mockReq('organism.org-1.shared.data', 'GET', { sub: 'agent1#alice@test-node', owner: 'alice', roles: ['agent'] });
       const res = mockRes();
       let nextCalled = false;
 
@@ -598,7 +599,7 @@ describe('workspaceAccessMiddleware', () => {
         status: 'revoked',
       }));
 
-      const req = mockReq('organism.org-1.shared.data', 'GET', { sub: 'agent1#alice@test-node', owner: 'alice', roles: ['owner'] });
+      const req = mockReq('organism.org-1.shared.data', 'GET', { sub: 'agent1#alice@test-node', owner: 'alice', roles: ['agent'] });
       const res = mockRes();
       let nextCalled = false;
 
@@ -609,9 +610,9 @@ describe('workspaceAccessMiddleware', () => {
     });
   });
 
-  // ── Consent checks (meta namespace read) ────────────────
+  // ── Consent checks (meta namespace read) — AGENT sessions still require consent ──
 
-  describe('meta namespace read (consent required)', () => {
+  describe('meta namespace read (agent consent required)', () => {
     beforeEach(async () => {
       await storage.createOrganism(makeOrganism({ id: 'org-1' }));
       await storage.createGHII(makeGHII({ username: 'alice', ghii: 'alice@test-node', ownerName: 'alice' }));
@@ -633,7 +634,7 @@ describe('workspaceAccessMiddleware', () => {
         status: 'active',
       }));
 
-      const req = mockReq('organism.org-1.meta.config', 'GET', { sub: 'agent1#alice@test-node', owner: 'alice', roles: ['owner'] });
+      const req = mockReq('organism.org-1.meta.config', 'GET', { sub: 'agent1#alice@test-node', owner: 'alice', roles: ['agent'] });
       const res = mockRes();
       let nextCalled = false;
 
@@ -643,7 +644,7 @@ describe('workspaceAccessMiddleware', () => {
     });
 
     it('denies meta namespace read without consent', async () => {
-      const req = mockReq('organism.org-1.meta.config', 'GET', { sub: 'agent1#alice@test-node', owner: 'alice', roles: ['owner'] });
+      const req = mockReq('organism.org-1.meta.config', 'GET', { sub: 'agent1#alice@test-node', owner: 'alice', roles: ['agent'] });
       const res = mockRes();
       let nextCalled = false;
 
@@ -652,6 +653,53 @@ describe('workspaceAccessMiddleware', () => {
       expect(nextCalled).toBe(false);
       expect(res._status).toBe(403);
       expect(res._body.error.code).toBe('CONSENT_REQUIRED');
+    });
+  });
+
+  // ── Human owner-role sessions are the principal — they SKIP consent ──
+
+  describe('human owner session (skips consent)', () => {
+    beforeEach(async () => {
+      await storage.createOrganism(makeOrganism({ id: 'org-1' }));
+      await storage.createGHII(makeGHII({ username: 'alice', ghii: 'alice@test-node', ownerName: 'alice' }));
+      await storage.createMembership(makeMembership({
+        organismId: 'org-1',
+        ghii: 'alice',
+        role: 'creator',
+        status: 'active',
+      }));
+      // No agents, no consents — an owner session must NOT need them.
+    });
+
+    it('allows shared write with no agent and no consent', async () => {
+      const req = mockReq('organism.org-1.shared.notes', 'POST', { sub: 'alice', owner: 'alice', roles: ['owner'] });
+      const res = mockRes();
+      let nextCalled = false;
+
+      await middleware(req, res, () => { nextCalled = true; });
+
+      expect(nextCalled).toBe(true);
+      expect(res._status).toBeUndefined();
+    });
+
+    it('allows meta write (creator) with no consent', async () => {
+      const req = mockReq('organism.org-1.meta.manifest', 'POST', { sub: 'alice', owner: 'alice', roles: ['owner'] });
+      const res = mockRes();
+      let nextCalled = false;
+
+      await middleware(req, res, () => { nextCalled = true; });
+
+      expect(nextCalled).toBe(true);
+    });
+
+    it('allows meta read with no consent', async () => {
+      const req = mockReq('organism.org-1.meta.config', 'GET', { sub: 'alice', owner: 'alice', roles: ['owner'] });
+      const res = mockRes();
+      let nextCalled = false;
+
+      await middleware(req, res, () => { nextCalled = true; });
+
+      expect(nextCalled).toBe(true);
     });
   });
 
