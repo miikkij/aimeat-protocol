@@ -123,6 +123,52 @@ function projectManifest(orgId, name, summary) {
   };
 }
 
+/** Fetch the managed "manifest architect" prompt (the generator's instruction set). */
+export async function getManifestArchitectPrompt() {
+  try {
+    const resp = await apiGet('/v1/portal/prompts/manifest-architect');
+    return resp?.data?.prompt || '';
+  } catch { return ''; }
+}
+
+/** Generate a custom workspace ({ manifest, schemas }) from a description, using the user's
+ *  OpenRouter key + the manifest-architect prompt. One-shot (no interview). Throws on AI/parse error. */
+export async function generateWorkspace(description) {
+  const base = await getManifestArchitectPrompt();
+  const systemPrompt = `${base}
+
+=== ONE-SHOT GENERATION MODE ===
+Do NOT interview. From the user's description, output ONLY a single JSON object:
+{
+  "manifest": { a valid manifest — manifestVersion,id(""),name,kind,status:"active",objectTypes:[{name,schemaRef,namespace,cardinality,backing:"memory",writeRole,versioned}], policy:{agentAutonomy,alwaysGate} },
+  "schemas": { "<namespace>": <a JSON Schema {type:"object",required:[...],properties:{...}} for that objectType>, ... one per memory-backed objectType, keyed by its namespace }
+}
+Namespaces: owner-controlled types use "meta.<plural>", collaborative use "shared.<plural>". Every memory-backed objectType needs a schema entry under its namespace, and an "id" string property. Use bounded enums for status-like fields. No prose, no markdown fences.`;
+
+  const resp = await apiPost('/v1/ai/complete', {
+    prompt: description,
+    systemPrompt,
+    modelRole: 'execution',
+    max_tokens: 3000,
+    app_id: 'organism-workspace',
+  });
+  if (resp?.ok === false) { const e = new Error(resp?.error?.message || 'AI call failed'); e.code = resp?.error?.code; throw e; }
+  const content = String(resp?.data?.content || '').replace(/^```(?:json)?\s*|\s*```$/g, '').trim();
+  const generated = JSON.parse(content);
+  if (!generated.manifest || !generated.schemas) throw new Error('AI output missing manifest or schemas');
+  return generated;
+}
+
+/** Apply a generated (or any) workspace to an organism: register its schemas + write the manifest. */
+export async function applyGeneratedWorkspace(orgId, generated) {
+  for (const [namespace, schema] of Object.entries(generated.schemas || {})) {
+    await apiPut(`/v1/memory/${encodeURIComponent(`organism.${orgId}.${namespace}`)}/schema`, { schema, apply_to: 'prefix', schema_mode: 'strict' });
+  }
+  const manifest = { ...generated.manifest, id: orgId, status: generated.manifest.status || 'active' };
+  await apiPost('/v1/memory', { key: `organism.${orgId}.meta.manifest`, value: manifest, visibility: 'private' });
+  await apiPost('/v1/memory', { key: `organism.${orgId}.meta.readme`, value: `# ${manifest.name || 'Workspace'}\n\n${manifest.summary || ''}`, visibility: 'private' });
+}
+
 /** Apply the project template to an EXISTING organism (register schemas + write the manifest + readme). */
 export async function applyProjectTemplate(orgId, name, summary) {
   for (const [namespace, schema] of Object.entries(PROJECT_SCHEMAS)) {

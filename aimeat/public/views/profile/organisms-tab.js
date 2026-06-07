@@ -432,6 +432,8 @@ function Workspace({ org, showToast, onBack }) {
   const [sName, setSName] = useState('');
   const [sSummary, setSSummary] = useState('');
   const [sAutonomy, setSAutonomy] = useState('L3');
+  const [genDesc, setGenDesc] = useState('');
+  const [genBusy, setGenBusy] = useState(false);
 
   const load = useCallback(async () => {
     const w = await orgService.getWorkspace(orgId).catch(() => null);
@@ -462,6 +464,22 @@ function Workspace({ org, showToast, onBack }) {
     } catch (e) { showToast((e && e.message) || (t('organisms.setupError') || 'Failed to set up workspace')); }
     finally { setBusy(false); }
   }, [orgId, org, showToast, load]);
+
+  const generate = useCallback(async () => {
+    if (!genDesc.trim()) return;
+    setGenBusy(true);
+    try {
+      const generated = await orgService.generateWorkspace(genDesc.trim());
+      await orgService.applyGeneratedWorkspace(orgId, generated);
+      showToast(t('organisms.workspaceReady') || 'Workspace ready');
+      await load();
+    } catch (e) {
+      const msg = e?.code === 'NO_API_KEY'
+        ? (t('organisms.noAiKey') || 'Set up your OpenRouter key first (Profile → Generator settings).')
+        : ((e && e.message) || (t('organisms.generateError') || 'Generation failed'));
+      showToast(msg);
+    } finally { setGenBusy(false); }
+  }, [genDesc, orgId, showToast, load]);
 
   const startAdd = useCallback(async (ot) => {
     setAdding(ot.name); setAddingSchema(null);
@@ -540,7 +558,20 @@ function Workspace({ org, showToast, onBack }) {
         ${back}
         <div class="section-title">${escHtml(org.name || 'Organism')}</div>
         <div class="section-desc">${t('organisms.noWorkspace') || 'This organism has no workspace yet. Set one up to track goals, plans, deliverables and decisions — versioned on publish.'}</div>
-        <button class="btn-primary" onClick=${setup} disabled=${busy}>${busy ? '...' : (t('organisms.setupWorkspace') || 'Set up workspace')}</button>
+        <button class="btn-primary" onClick=${setup} disabled=${busy || genBusy}>${busy ? '...' : (t('organisms.setupWorkspace') || 'Set up workspace (project template)')}</button>
+
+        <div class="pj-section">
+          <div class="pj-section-title">${t('organisms.generateTitle') || 'Or generate a custom workspace with AI'}</div>
+          <div class="section-desc">${t('organisms.generateDesc') || 'Describe what you want to track. The AI designs the object types using your OpenRouter key.'}</div>
+          <textarea class="input-field input-sm" rows="3"
+            placeholder=${t('organisms.generatePlaceholder') || 'e.g. A research study tracking hypotheses, experiments and validated findings'}
+            value=${genDesc} onInput=${e => setGenDesc(e.target.value)}></textarea>
+          <div class="form-actions">
+            <button class="btn-primary btn-sm" onClick=${generate} disabled=${genBusy || !genDesc.trim()}>
+              ${genBusy ? (t('organisms.generating') || 'Generating…') : (t('organisms.generate') || 'Generate with AI')}
+            </button>
+          </div>
+        </div>
       </div>
     `;
   }
