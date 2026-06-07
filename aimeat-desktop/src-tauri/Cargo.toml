@@ -16,6 +16,7 @@ serde_json = "1.0"
 tokio = { version = "1.0", features = ["full"] }
 reqwest = { version = "0.12", features = ["json"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+getrandom = "0.2"
 
 [features]
 default = ["custom-protocol"]

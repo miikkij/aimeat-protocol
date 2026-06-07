@@ -621,6 +621,17 @@
         </div>
 
         <div class="card">
+          <h2>Security</h2>
+          <dl class="info-grid">
+            <dt>API-key encryption</dt>
+            <dd id="settingsEncStatus">--</dd>
+          </dl>
+          <p class="form-hint" style="margin-top: 12px;">
+            Required to store your OpenRouter API key. Auto-generated on this node — no setup needed.
+          </p>
+        </div>
+
+        <div class="card">
           <h2>Federation</h2>
           <div class="form-group">
             <label for="settingsGenesisUrl">Genesis URL</label>
@@ -1002,6 +1013,16 @@
         document.getElementById('settingsAiEndpoint').value = config.ai_endpoint || '';
         document.getElementById('settingsDbPath').textContent =
           config.data_dir ? (config.data_dir + '\\data\\aimeat.db') : '--';
+
+        // Encryption status (needed to use OpenRouter)
+        const encEl = document.getElementById('settingsEncStatus');
+        if (config.encryption_configured) {
+          encEl.innerHTML =
+            '<span class="status-indicator online"><span class="dot"></span>Configured — OpenRouter ready</span>';
+        } else {
+          encEl.innerHTML =
+            '<span class="status-indicator offline"><span class="dot"></span>Not set — Start the node once to generate</span>';
+        }
 
         // AI status indicator
         const aiStatusEl = document.getElementById('settingsAiStatus');

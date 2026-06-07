@@ -49,6 +49,10 @@ pub struct NodeConfig {
     /// Output-only: populated by read_config, ignored (and optional) on write_config.
     #[serde(default)]
     pub data_dir: String,
+    /// Whether an encryption key is configured (enables OpenRouter / TOTP secret storage).
+    /// Output-only: populated by read_config, ignored (and optional) on write_config.
+    #[serde(default)]
+    pub encryption_configured: bool,
 }
 
 /// Resolved runtime paths, differing between a bundled install and `tauri dev`.
@@ -151,18 +155,39 @@ fn resolve_runtime(app: &AppHandle) -> Result<Runtime, String> {
     })
 }
 
+/// Generate a 256-bit secret as a 64-char lowercase hex string, from the OS CSPRNG.
+/// The server requires encryption keys to be exactly 32 bytes hex (see
+/// aimeat/src/services/encryption.ts). Used for AIMEAT_ENCRYPTION_KEY / TOTP key.
+fn gen_hex_key() -> String {
+    let mut bytes = [0u8; 32];
+    getrandom::getrandom(&mut bytes).expect("OS random number generator unavailable");
+    let mut out = String::with_capacity(64);
+    for b in bytes {
+        out.push_str(&format!("{b:02x}"));
+    }
+    out
+}
+
 /// Default `.env` contents for a fresh personal node (persistent SQLite).
 /// The SQLite path is relative to the working dir (the data dir) so the DB file
 /// lands in `<data_dir>/data/aimeat.db` with no platform-specific path escaping.
+/// Encryption keys are generated once here so OpenRouter (and TOTP) work out of the box.
 fn default_env(node_id: &str) -> String {
     format!(
         "AIMEAT_STORAGE=\"sqlite\"\n\
          AIMEAT_SQLITE_PATH=\"./data/aimeat.db\"\n\
          AIMEAT_PORT={port}\n\
          AIMEAT_NODE_ID=\"{node_id}\"\n\
-         AIMEAT_FEDERATION_ROLE=\"standalone\"\n",
+         AIMEAT_FEDERATION_ROLE=\"standalone\"\n\
+         \n\
+         # Security keys — auto-generated once. Keep secret; do not share or regenerate.\n\
+         # Enables encrypted storage of your OpenRouter API key and TOTP secrets.\n\
+         AIMEAT_ENCRYPTION_KEY=\"{enc}\"\n\
+         AIMEAT_TOTP_ENCRYPTION_KEY=\"{totp}\"\n",
         port = DEFAULT_PORT,
         node_id = node_id,
+        enc = gen_hex_key(),
+        totp = gen_hex_key(),
     )
 }
 
@@ -176,15 +201,52 @@ fn log_marker(log_file: &Path, message: &str) {
     }
 }
 
-/// Ensure the data dir exists and a default SQLite `.env` is present.
+/// Ensure the data dir exists, a default SQLite `.env` is present, and the security
+/// keys are set. Keys are generated ONCE: a fresh `.env` includes them; an existing
+/// `.env` missing them is backfilled without touching any value already set.
 fn ensure_env_file(rt: &Runtime) -> Result<(), String> {
     std::fs::create_dir_all(&rt.data_dir)
         .map_err(|e| format!("Failed to create data dir: {}", e))?;
+
     if !rt.env_file.exists() {
         std::fs::write(&rt.env_file, default_env(DEFAULT_NODE_ID))
             .map_err(|e| format!("Failed to write default .env: {}", e))?;
+        return Ok(());
+    }
+
+    // Backfill missing security keys into an existing .env (idempotent).
+    let content = std::fs::read_to_string(&rt.env_file).unwrap_or_default();
+    let vars = parse_env(&content);
+    let mut additions = String::new();
+    if !vars.contains_key("AIMEAT_ENCRYPTION_KEY") {
+        additions.push_str(&format!("AIMEAT_ENCRYPTION_KEY=\"{}\"\n", gen_hex_key()));
+    }
+    if !vars.contains_key("AIMEAT_TOTP_ENCRYPTION_KEY") {
+        additions.push_str(&format!("AIMEAT_TOTP_ENCRYPTION_KEY=\"{}\"\n", gen_hex_key()));
+    }
+    if !additions.is_empty() {
+        let mut updated = content;
+        if !updated.ends_with('\n') {
+            updated.push('\n');
+        }
+        updated.push_str(
+            "\n# Security keys — auto-generated once. Keep secret; do not share or regenerate.\n",
+        );
+        updated.push_str(&additions);
+        std::fs::write(&rt.env_file, updated)
+            .map_err(|e| format!("Failed to update .env with security keys: {}", e))?;
     }
     Ok(())
+}
+
+/// True if a valid (64-char hex) encryption key is configured under either env var.
+fn encryption_configured(vars: &HashMap<String, String>) -> bool {
+    let valid = |k: &str| {
+        vars.get(k)
+            .map(|v| v.len() == 64 && v.chars().all(|c| c.is_ascii_hexdigit()))
+            .unwrap_or(false)
+    };
+    valid("AIMEAT_ENCRYPTION_KEY") || valid("AIMEAT_TOTP_ENCRYPTION_KEY")
 }
 
 #[tauri::command]
@@ -432,6 +494,7 @@ pub fn read_config(app: AppHandle) -> Result<NodeConfig, String> {
             .cloned()
             .unwrap_or_else(|| "sqlite".to_string()),
         data_dir: rt.data_dir.to_string_lossy().to_string(),
+        encryption_configured: encryption_configured(&vars),
     })
 }
 
