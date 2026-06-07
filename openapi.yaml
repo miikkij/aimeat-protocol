@@ -10879,6 +10879,118 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/organisms/{id}/publish:
+    post:
+      operationId: publishOrganismDraft
+      summary: Publish a draft into a new version + latest
+      description: |
+        Snapshot `organism.{id}.{namespace}.{instance}.draft` into a new `.version.N` and overwrite
+        `.latest` (the versioning capability is a memory-key convention — no memory-core change). The
+        draft is schema-validated. If the organism's `meta.config` enables a publish gate
+        (`gates.publish.enabled`), this instead creates a pending approval (202) for human review;
+        on approval the publish runs. Default (no config) publishes immediately.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [namespace, id]
+              properties:
+                namespace: { type: string, description: "Relative namespace, e.g. meta.goals or shared.deliverables" }
+                id: { type: string, description: The instance id whose .draft to publish }
+      responses:
+        '200': { description: Published (version returned) }
+        '202': { description: Publish requires approval — a pending approval was created }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { description: Draft does not match the schema }
+
+  /v1/organisms/{id}/approvals:
+    post:
+      operationId: createOrganismApproval
+      summary: Request approval for an action (gate or auto-run)
+      description: |
+        Generic gate primitive. Evaluates the manifest's gate policy (`policy.agentAutonomy` +
+        `policy.alwaysGate`, via gate-policy): a consequential action becomes a `pending` approval;
+        everything else auto-runs and is recorded as a decision. Members (incl. agents) may create.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, description: "e.g. flow:advance, data-model-change, external-release, publish" }
+                arguments: { type: object, description: The proposed change payload }
+                risk: { type: string, enum: [low, medium, high] }
+                rule: { type: string, enum: [approve, auto] }
+                approverRole: { type: string, enum: [owner, admin, member] }
+                stageId: { type: string }
+                flowGateId: { type: string }
+                prompt: { type: string }
+                deadline: { type: string, description: ISO timestamp; on expiry the approval is aborted }
+      responses:
+        '201': { description: Created — gated (pending) or auto-approved }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    get:
+      operationId: listOrganismApprovals
+      summary: Approval inbox — pending approvals for an organism
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: status, in: query, schema: { type: string, enum: [pending, approved, rejected, edited] } }
+      responses:
+        '200': { description: List of approvals }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/approvals/{aid}:
+    post:
+      operationId: resolveOrganismApproval
+      summary: Resolve a pending approval (approve | reject | edit)
+      description: |
+        Human-only (owner-role session), gated by the approval's `approverRole`. On approve/edit of a
+        `publish` action, the draft is published. Every resolution appends a decision-log entry.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: aid, in: path, required: true, schema: { type: string }, description: Approval ID }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approve, reject, edit] }
+                note: { type: string }
+                editedArguments: { type: object }
+      responses:
+        '200': { description: Resolved }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Already resolved }
+
   /v1/organisms/{id}/join-requests:
     get:
       operationId: listJoinRequests

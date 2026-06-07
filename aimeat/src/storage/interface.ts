@@ -656,6 +656,33 @@ export interface JoinRequestRecord {
   reviewedAt?: string;
 }
 
+/**
+ * Phase 4 — Gate primitive. A durable human-approval checkpoint for a consequential action an
+ * agent (or the flow) wants to take inside an organism workspace. Created when a gate's
+ * condition fires (or an `alwaysGate` action is requested); resolved by an approver. Every
+ * resolution writes a decision-log entry + audit. `arguments` holds the proposed change
+ * (e.g. the data model, the email payload, the plan diff) so the approver can view/edit it.
+ */
+export interface PendingApprovalRecord {
+  id: string;
+  organismId: string;
+  flowGateId?: string;        // gate id from manifest flow.gates[] (omitted for ad-hoc gates)
+  stageId?: string;           // the guarded flow stage id, if any
+  actor: string;              // GAII/identity that requested the action
+  action: string;             // e.g. 'flow:advance' | 'data-model-change' | 'deliverable:accept' | 'egress' | 'spend'
+  arguments?: Record<string, unknown>;  // the proposed change payload (viewed/edited by the approver)
+  risk: 'low' | 'medium' | 'high';
+  approverRole: 'owner' | 'admin' | 'member';
+  prompt?: string;            // human-facing question
+  status: 'pending' | 'approved' | 'rejected' | 'edited';
+  decidedBy?: string;         // owner name / GHII that resolved it
+  decidedAt?: string;
+  resolutionNote?: string;
+  deadline?: string;          // ISO; durable pause — on expiry the expiry job escalates it
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Phase 2.6 — Marketplace (DEPRECATED: listings now live in extension memory via marketplace-behaviors extension)
 /** @deprecated Use marketplace-behaviors extension instead */
 export interface ListingRecord {

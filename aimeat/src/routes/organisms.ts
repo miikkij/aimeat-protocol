@@ -11,16 +11,28 @@
  * @usage app.use(organismsRouter(config, storage));
  * @version-history
  *   v1.1.0 -- 2026-06-07 -- Phase 3: add the generic GET /:id/workspace read.
+ *   v1.2.0 -- 2026-06-07 -- Phase 4: gate primitive (approvals) + draft/publish/versioning + publish-gate.
  */
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, MemoryRecord } from '../storage/interface.js';
+import type { Storage, MemoryRecord, PendingApprovalRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { authorizeRead } from '../services/access-guard.js';
+import { shouldGate, gatePolicyFromManifest, type Risk } from '../services/gate-policy.js';
+import { validateMemoryWrite } from '../services/schema-validator.js';
+import { expireOverdueApprovals, isOverdue } from '../services/gate-expiry.js';
+
+/** Whether a membership role satisfies an approval's required approverRole. */
+function roleSatisfies(approverRole: string, membershipRole: string): boolean {
+  if (approverRole === 'member') return true;                                  // any active member
+  if (approverRole === 'admin') return membershipRole === 'creator' || membershipRole === 'admin';
+  if (approverRole === 'owner') return membershipRole === 'creator';           // the organism owner
+  return false;
+}
 
 export function organismsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -551,15 +563,41 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const readme = byKey.get(`${nsRoot}meta.readme`)?.value ?? null;
 
     // Build the generic objects map from whatever objectTypes the manifest declares.
+    // Versioning convention: each instance is one key, optionally suffixed `.draft` (working
+    // copy), `.latest` (published), or `.version.N` (history). The current value is `.latest`
+    // (falling back to a bare unsuffixed write); drafts are surfaced separately; versions are
+    // history (hidden here — list `…{instance}.version.*` via the memory API to read them).
     const objectTypes = (manifest?.objectTypes as Array<Record<string, unknown>> | undefined) ?? [];
     const memoryBackings = new Set(['memory', 'knowledge', 'storage']);
     const objects: Record<string, unknown[]> = {};
+    const drafts: Record<string, unknown[]> = {};
     for (const ot of objectTypes) {
       const name = typeof ot.name === 'string' ? ot.name : undefined;
       const namespace = typeof ot.namespace === 'string' ? ot.namespace : undefined;
       if (!name || !namespace || !memoryBackings.has(ot.backing as string)) continue;
       const nsPrefix = `${nsRoot}${namespace}.`;
-      objects[name] = readable.filter(r => r.key.startsWith(nsPrefix)).map(r => r.value);
+      const instances = new Map<string, { bare?: unknown; latest?: unknown; draft?: unknown }>();
+      for (const r of readable) {
+        if (!r.key.startsWith(nsPrefix)) continue;
+        const parts = r.key.slice(nsPrefix.length).split('.');
+        const instanceId = parts[0];
+        const role = parts.slice(1).join('.');
+        const slot = instances.get(instanceId) ?? {};
+        if (role === '') slot.bare = r.value;
+        else if (role === 'draft') slot.draft = r.value;
+        else if (role === 'latest') slot.latest = r.value;
+        // role startsWith 'version.' → history, skip
+        instances.set(instanceId, slot);
+      }
+      const current: unknown[] = [];
+      const draftList: unknown[] = [];
+      for (const slot of instances.values()) {
+        const c = slot.latest ?? slot.bare;
+        if (c !== undefined) current.push(c);
+        if (slot.draft !== undefined) draftList.push(slot.draft);
+      }
+      objects[name] = current;
+      if (draftList.length) drafts[name] = draftList;
     }
 
     // Convenience aliases — generic, empty when the manifest declares no such type.
@@ -581,10 +619,306 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       /* best-effort: leave todos empty if the task store is unavailable */
     }
 
-    res.json(success(config.nodeId, { manifest, readme, objects, decisions, resources, todos }, [
+    res.json(success(config.nodeId, { manifest, readme, objects, drafts, decisions, resources, todos }, [
       { description: 'Read the manifest directly', method: 'GET', url: `/v1/memory/${encodeURIComponent(`${nsRoot}meta.manifest`)}` },
-      { description: 'Write a workspace record', method: 'POST', url: '/v1/memory' },
+      { description: 'Write a draft record', method: 'POST', url: '/v1/memory' },
+      { description: 'Publish a draft', method: 'POST', url: `/v1/organisms/${id}/publish` },
     ]));
+  });
+
+  /* ── Gate primitive (Phase 4) — PendingApproval ──
+   *
+   * Generic over any organism/manifest. The gate ENGINE is here; the gate CONDITIONS are data
+   * (the manifest's policy.agentAutonomy / policy.alwaysGate, via gate-policy.ts). Creating an
+   * approval evaluates that policy: a consequential action pauses as `pending`; everything else
+   * auto-runs (audited as a decision). Resolution is human-only (a pending approval, by
+   * definition, escaped auto-run) and role-gated by the approval's approverRole.
+   */
+
+  // Active membership keyed by bare owner name (or org agent) — returns { role } or null.
+  const memberRole = async (req: Express.Request, organism: { agentGaiis: string[] }, id: string): Promise<string | null> => {
+    if (req.auth!.sub && organism.agentGaiis.includes(req.auth!.sub)) return 'member';
+    const ownerName = req.auth!.owner;
+    if (!ownerName) return null;
+    const m = await storage.getMembership(id, ownerName);
+    return m && m.status === 'active' ? m.role : null;
+  };
+
+  // Read the organism's manifest value (for gate policy).
+  const readManifest = async (id: string): Promise<unknown> => {
+    const key = `organism.${id}.meta.manifest`;
+    const { items } = await storage.listAllMemory({ prefix: key, limit: 5 });
+    return items.find(r => r.key === key)?.value ?? null;
+  };
+
+  // Append a signed-by-convention decision-log entry (the audit/Prove trail).
+  const writeDecision = async (organismId: string, by: string, summary: string, refs: string[]): Promise<void> => {
+    const did = uuidv4();
+    const now = new Date().toISOString();
+    await storage.setMemory({
+      key: `organism.${organismId}.meta.decisions.${did}`,
+      ownerGaii: by,
+      value: { ts: now, kind: 'decision', by, summary, refs },
+      visibility: 'private', tags: ['gate'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+    });
+  };
+
+  // Read the organism's runtime config entry (organism.{id}.meta.config) — UI-editable; absent = defaults.
+  const readConfig = async (organismId: string): Promise<Record<string, unknown> | null> => {
+    const key = `organism.${organismId}.meta.config`;
+    const { items } = await storage.listAllMemory({ prefix: key, limit: 5 });
+    return (items.find(r => r.key === key)?.value as Record<string, unknown> | undefined) ?? null;
+  };
+
+  // meta.* writes require admin/creator; shared.* (and others) need only membership.
+  const canWriteNamespace = (role: string, namespace: string): boolean =>
+    namespace.startsWith('meta.') ? (role === 'creator' || role === 'admin') : true;
+
+  // Publish a draft: snapshot organism.{id}.{ns}.{instance}.draft → a new .version.N and .latest.
+  // Schema-validated (the draft must be a valid object). Returns the new version number.
+  const publishDraft = async (
+    organismId: string, namespace: string, instance: string, publisher: string,
+  ): Promise<{ ok: true; version: number } | { ok: false; code: 'NO_DRAFT' | 'INVALID'; violations?: unknown }> => {
+    const base = `organism.${organismId}.${namespace}.${instance}`;
+    const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000 });
+    const draft = items.find(r => r.key === `${base}.draft`);
+    if (!draft) return { ok: false, code: 'NO_DRAFT' };
+
+    const validation = await validateMemoryWrite(`${base}.latest`, draft.value, storage);
+    if (!validation.valid) return { ok: false, code: 'INVALID', violations: validation.errors };
+
+    let maxN = 0;
+    const vPrefix = `${base}.version.`;
+    for (const r of items) {
+      if (r.key.startsWith(vPrefix)) {
+        const suffix = r.key.slice(vPrefix.length);
+        if (/^\d+$/.test(suffix)) maxN = Math.max(maxN, parseInt(suffix, 10));
+      }
+    }
+    const n = maxN + 1;
+    const now = new Date().toISOString();
+    const vis = draft.visibility;
+    const tags = draft.tags ?? [];
+
+    await storage.setMemory({
+      key: `${base}.version.${n}`, ownerGaii: publisher, value: draft.value,
+      visibility: vis, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+    });
+    const existingLatest = items.find(r => r.key === `${base}.latest`);
+    await storage.setMemory({
+      key: `${base}.latest`, ownerGaii: publisher, value: draft.value,
+      visibility: vis, tags, ttlHours: null,
+      version: (existingLatest?.version ?? 0) + 1,
+      createdAt: existingLatest?.createdAt ?? now, updatedAt: now,
+    });
+    return { ok: true, version: n };
+  };
+
+  // POST /v1/organisms/:id/approvals — request approval for an action (gate or auto-run).
+  router.post('/v1/organisms/:id/approvals', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      return;
+    }
+    if (!(await memberRole(req, organism, id))) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism'));
+      return;
+    }
+
+    // `arguments` is reserved in ESM strict mode — destructure it under a new name.
+    const { action, arguments: actionArgs, risk, rule, stageId, flowGateId, approverRole, prompt, deadline } = req.body ?? {};
+    if (!action || typeof action !== 'string') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'action is required'));
+      return;
+    }
+    const riskVal: Risk = ['low', 'medium', 'high'].includes(risk) ? risk : 'medium';
+    const approverRoleVal = ['owner', 'admin', 'member'].includes(approverRole) ? approverRole : 'owner';
+
+    const policy = gatePolicyFromManifest(await readManifest(id));
+    const decision = shouldGate({ action, risk: riskVal, rule, policy });
+
+    const actor = resolveIdentity(req.auth!, config.nodeId);
+    const now = new Date().toISOString();
+    const aid = uuidv4();
+    const record: PendingApprovalRecord = {
+      id: aid, organismId: id, actor, action,
+      ...(actionArgs !== undefined ? { arguments: actionArgs } : {}),
+      risk: riskVal, approverRole: approverRoleVal as PendingApprovalRecord['approverRole'],
+      ...(typeof prompt === 'string' ? { prompt } : {}),
+      ...(typeof stageId === 'string' ? { stageId } : {}),
+      ...(typeof flowGateId === 'string' ? { flowGateId } : {}),
+      ...(typeof deadline === 'string' ? { deadline } : {}),
+      status: decision.gate ? 'pending' : 'approved',
+      ...(decision.gate ? {} : { decidedBy: 'system', decidedAt: now, resolutionNote: `auto: ${decision.reason}` }),
+      createdAt: now, updatedAt: now,
+    };
+    await storage.createPendingApproval(record);
+    if (!decision.gate) {
+      await writeDecision(id, actor, `auto-approved action: ${action}`, [aid]);
+    }
+
+    res.status(201).json(success(config.nodeId, { approval: record, gated: decision.gate, reason: decision.reason }, [
+      { description: 'List pending approvals', method: 'GET', url: `/v1/organisms/${id}/approvals?status=pending` },
+      ...(decision.gate ? [{ description: 'Resolve this approval', method: 'POST', url: `/v1/organisms/${id}/approvals/${aid}` }] : []),
+    ]));
+    emitChange('organisms');
+  });
+
+  // GET /v1/organisms/:id/approvals — the approval inbox (members).
+  router.get('/v1/organisms/:id/approvals', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      return;
+    }
+    if (!(await memberRole(req, organism, id))) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism'));
+      return;
+    }
+    // Durable pause: lazily abort any overdue pending approvals before listing.
+    await expireOverdueApprovals(storage, new Date().toISOString());
+    const status = req.query.status as string | undefined;
+    const approvals = await storage.listPendingApprovals(id, status ? { status } : undefined);
+    res.json(success(config.nodeId, { approvals, total: approvals.length }));
+  });
+
+  // POST /v1/organisms/:id/publish — snapshot a draft into a new version + latest (or gate it).
+  router.post('/v1/organisms/:id/publish', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      return;
+    }
+    const role = await memberRole(req, organism, id);
+    if (!role) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism'));
+      return;
+    }
+
+    const { namespace, id: instance } = req.body ?? {};
+    if (!namespace || typeof namespace !== 'string' || !instance || typeof instance !== 'string') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'namespace and id (instance) are required'));
+      return;
+    }
+    if (!canWriteNamespace(role, namespace)) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Admin/creator role required to publish in a meta.* namespace'));
+      return;
+    }
+
+    const publisher = resolveIdentity(req.auth!, config.nodeId);
+
+    // Config decides whether publishing needs a review gate. Absent / disabled = publish now.
+    const cfg = await readConfig(id);
+    const pg = (cfg?.gates as Record<string, { enabled?: boolean; approverRole?: string }> | undefined)?.publish;
+    if (pg?.enabled === true) {
+      const approverRole = ['owner', 'admin', 'member'].includes(pg.approverRole as string) ? pg.approverRole! : 'owner';
+      const now = new Date().toISOString();
+      const aid = uuidv4();
+      const record: PendingApprovalRecord = {
+        id: aid, organismId: id, actor: publisher, action: 'publish',
+        arguments: { namespace, instance }, risk: 'medium',
+        approverRole: approverRole as PendingApprovalRecord['approverRole'],
+        prompt: `Publish ${namespace}.${instance}?`, status: 'pending', createdAt: now, updatedAt: now,
+      };
+      await storage.createPendingApproval(record);
+      res.status(202).json(success(config.nodeId, { gated: true, approval: record }, [
+        { description: 'Review pending approvals', method: 'GET', url: `/v1/organisms/${id}/approvals?status=pending` },
+        { description: 'Resolve this approval', method: 'POST', url: `/v1/organisms/${id}/approvals/${aid}` },
+      ]));
+      emitChange('organisms');
+      return;
+    }
+
+    const result = await publishDraft(id, namespace, instance, publisher);
+    if (!result.ok) {
+      if (result.code === 'NO_DRAFT') {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft to publish at ${namespace}.${instance}`));
+      } else {
+        res.status(422).json(error(config.nodeId, 'SCHEMA_VALIDATION_FAILED', 'Draft does not match the schema', 422, { violations: result.violations }));
+      }
+      return;
+    }
+    await writeDecision(id, publisher, `published ${namespace}.${instance} v${result.version}`, [`${namespace}.${instance}`]);
+    res.json(success(config.nodeId, { published: true, namespace, id: instance, version: result.version }, [
+      { description: 'View the workspace', method: 'GET', url: `/v1/organisms/${id}/workspace` },
+      { description: 'List version history', method: 'GET', url: `/v1/memory?prefix=${encodeURIComponent(`organism.${id}.${namespace}.${instance}.version.`)}` },
+    ]));
+    emitChange('organisms');
+  });
+
+  // POST /v1/organisms/:id/approvals/:aid — resolve (approve | reject | edit). Human-only, role-gated.
+  router.post('/v1/organisms/:id/approvals/:aid', requireAuth(), requireRole('owner'), async (req, res) => {
+    const id = req.params.id as string;
+    const aid = req.params.aid as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      return;
+    }
+    // Durable pause: abort overdue approvals first, so a resolve of an expired one 409s below.
+    await expireOverdueApprovals(storage, new Date().toISOString());
+    const approval = await storage.getPendingApproval(aid);
+    if (!approval || approval.organismId !== id) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Approval not found'));
+      return;
+    }
+    if (approval.status !== 'pending') {
+      res.status(409).json(error(config.nodeId, 'ALREADY_RESOLVED', `Approval already ${approval.status}`));
+      return;
+    }
+
+    // Approver must be an active member whose role satisfies the approval's approverRole.
+    const role = await memberRole(req, organism, id);
+    if (!role || !roleSatisfies(approval.approverRole, role)) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', `Resolving this approval requires role "${approval.approverRole}"`));
+      return;
+    }
+
+    const { decision: d, note, editedArguments } = req.body ?? {};
+    if (!['approve', 'reject', 'edit'].includes(d)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'decision must be "approve", "reject", or "edit"'));
+      return;
+    }
+
+    const decider = resolveIdentity(req.auth!, config.nodeId);
+    const now = new Date().toISOString();
+
+    // A publish gate executes the publish on approve/edit BEFORE the decision is recorded, so a
+    // failed publish (no draft / invalid) leaves the approval pending rather than falsely approved.
+    if (approval.action === 'publish' && d !== 'reject') {
+      const pargs = approval.arguments as Record<string, unknown> | undefined;
+      const ns = typeof pargs?.namespace === 'string' ? pargs.namespace : undefined;
+      const inst = typeof pargs?.instance === 'string' ? pargs.instance : undefined;
+      if (ns && inst) {
+        const pub = await publishDraft(id, ns, inst, decider);
+        if (!pub.ok) {
+          if (pub.code === 'NO_DRAFT') {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft to publish at ${ns}.${inst}`));
+          } else {
+            res.status(422).json(error(config.nodeId, 'SCHEMA_VALIDATION_FAILED', 'Draft does not match the schema', 422, { violations: pub.violations }));
+          }
+          return;
+        }
+      }
+    }
+
+    const newStatus: PendingApprovalRecord['status'] = d === 'approve' ? 'approved' : d === 'reject' ? 'rejected' : 'edited';
+    const updates: Partial<PendingApprovalRecord> = { status: newStatus, decidedBy: decider, decidedAt: now, updatedAt: now };
+    if (typeof note === 'string') updates.resolutionNote = note;
+    if (d === 'edit' && editedArguments !== undefined) updates.arguments = editedArguments;
+
+    const updated = await storage.updatePendingApproval(aid, updates);
+    const verb = d === 'approve' ? 'approved' : d === 'reject' ? 'rejected' : 'edited & approved';
+    await writeDecision(id, decider, `${verb} gate: ${approval.action}`, [aid]);
+
+    res.json(success(config.nodeId, { approval: updated, decision: d }, [
+      { description: 'View the decision log', method: 'GET', url: `/v1/organisms/${id}/workspace` },
+    ]));
+    emitChange('organisms');
   });
 
   return router;

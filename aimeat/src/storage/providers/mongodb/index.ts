@@ -2517,6 +2517,74 @@ export class PrismaStorage implements Storage {
         return { id: row.id, organismId: row.organismId, ghii: row.ghii, message: row.message ?? undefined, status: row.status, reviewedBy: row.reviewedBy ?? undefined, createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt, reviewedAt: row.reviewedAt ? (row.reviewedAt instanceof Date ? row.reviewedAt.toISOString() : row.reviewedAt) : undefined };
     }
 
+    // ── Pending Approvals (Phase 4 — Gate primitive) ──
+
+    async createPendingApproval(record: import('../../interface.js').PendingApprovalRecord): Promise<import('../../interface.js').PendingApprovalRecord> {
+        this.ensureReady();
+        await this.prisma.pendingApproval.create({ data: {
+            id: record.id, organismId: record.organismId, flowGateId: record.flowGateId ?? null, stageId: record.stageId ?? null,
+            actor: record.actor, action: record.action, arguments: (record.arguments ?? undefined) as any, risk: record.risk,
+            approverRole: record.approverRole, prompt: record.prompt ?? null, status: record.status,
+            decidedBy: record.decidedBy ?? null, decidedAt: record.decidedAt ? new Date(record.decidedAt) : null,
+            resolutionNote: record.resolutionNote ?? null, deadline: record.deadline ? new Date(record.deadline) : null,
+            createdAt: new Date(record.createdAt), updatedAt: new Date(record.updatedAt),
+        } });
+        return record;
+    }
+
+    async getPendingApproval(id: string): Promise<import('../../interface.js').PendingApprovalRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.pendingApproval.findUnique({ where: { id } });
+        return row ? this.toPendingApprovalRecord(row) : null;
+    }
+
+    async listPendingApprovals(organismId: string, opts?: { status?: string }): Promise<import('../../interface.js').PendingApprovalRecord[]> {
+        this.ensureReady();
+        const where: any = { organismId };
+        if (opts?.status) where.status = opts.status;
+        const rows = await this.prisma.pendingApproval.findMany({ where, orderBy: { createdAt: 'desc' } });
+        return rows.map((r: any) => this.toPendingApprovalRecord(r));
+    }
+
+    async updatePendingApproval(id: string, updates: Partial<import('../../interface.js').PendingApprovalRecord>): Promise<import('../../interface.js').PendingApprovalRecord | null> {
+        this.ensureReady();
+        try {
+            const data: any = {};
+            if (updates.status !== undefined) data.status = updates.status;
+            if (updates.decidedBy !== undefined) data.decidedBy = updates.decidedBy;
+            if (updates.decidedAt !== undefined) data.decidedAt = updates.decidedAt ? new Date(updates.decidedAt) : null;
+            if (updates.resolutionNote !== undefined) data.resolutionNote = updates.resolutionNote;
+            if (updates.arguments !== undefined) data.arguments = updates.arguments as any;
+            if (updates.deadline !== undefined) data.deadline = updates.deadline ? new Date(updates.deadline) : null;
+            data.updatedAt = updates.updatedAt ? new Date(updates.updatedAt) : new Date();
+            const row = await this.prisma.pendingApproval.update({ where: { id }, data });
+            return this.toPendingApprovalRecord(row);
+        } catch { return null; }
+    }
+
+    async listOverduePendingApprovals(nowIso: string): Promise<import('../../interface.js').PendingApprovalRecord[]> {
+        this.ensureReady();
+        // Mirror SQLite: only approvals WITH a deadline that has passed. `not: null` is required —
+        // in MongoDB a bare `{ lt: date }` also matches null deadlines, which would wrongly expire
+        // gates that have no deadline (e.g. publish gates).
+        const rows = await this.prisma.pendingApproval.findMany({ where: { status: 'pending', deadline: { not: null, lt: new Date(nowIso) } } });
+        return rows.map((r: any) => this.toPendingApprovalRecord(r));
+    }
+
+    private toPendingApprovalRecord(row: any): import('../../interface.js').PendingApprovalRecord {
+        return {
+            id: row.id, organismId: row.organismId, flowGateId: row.flowGateId ?? undefined, stageId: row.stageId ?? undefined,
+            actor: row.actor, action: row.action, arguments: row.arguments ?? undefined, risk: row.risk,
+            approverRole: row.approverRole, prompt: row.prompt ?? undefined, status: row.status,
+            decidedBy: row.decidedBy ?? undefined,
+            decidedAt: row.decidedAt ? (row.decidedAt instanceof Date ? row.decidedAt.toISOString() : row.decidedAt) : undefined,
+            resolutionNote: row.resolutionNote ?? undefined,
+            deadline: row.deadline ? (row.deadline instanceof Date ? row.deadline.toISOString() : row.deadline) : undefined,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+            updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+        };
+    }
+
     // ── Appeals (Phase 2.4) ──
 
     async createAppeal(record: import('../../interface.js').AppealRecord): Promise<import('../../interface.js').AppealRecord> {

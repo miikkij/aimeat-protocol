@@ -480,6 +480,27 @@ export function initializeSchema(db: Database.Database): void {
       reviewedAt     TEXT
     );
 
+    -- ── Pending Approvals (Phase 4 — Gate primitive) ──
+    CREATE TABLE IF NOT EXISTS pending_approvals (
+      id             TEXT PRIMARY KEY,
+      organismId     TEXT NOT NULL,
+      flowGateId     TEXT,
+      stageId        TEXT,
+      actor          TEXT NOT NULL,
+      action         TEXT NOT NULL,
+      arguments      TEXT,
+      risk           TEXT NOT NULL DEFAULT 'medium',
+      approverRole   TEXT NOT NULL DEFAULT 'owner',
+      prompt         TEXT,
+      status         TEXT NOT NULL DEFAULT 'pending',
+      decidedBy      TEXT,
+      decidedAt      TEXT,
+      resolutionNote TEXT,
+      deadline       TEXT,
+      createdAt      TEXT NOT NULL,
+      updatedAt      TEXT NOT NULL
+    );
+
     -- ── Listings (Marketplace) ──
     CREATE TABLE IF NOT EXISTS listings (
       id             TEXT PRIMARY KEY,
@@ -835,6 +856,8 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_memberships_organismId ON organism_memberships(organismId);
     CREATE INDEX IF NOT EXISTS idx_memberships_ghii ON organism_memberships(ghii);
     CREATE INDEX IF NOT EXISTS idx_join_requests_organismId ON join_requests(organismId);
+    CREATE INDEX IF NOT EXISTS idx_pending_approvals_organismId ON pending_approvals(organismId);
+    CREATE INDEX IF NOT EXISTS idx_pending_approvals_status ON pending_approvals(organismId, status);
     CREATE INDEX IF NOT EXISTS idx_listings_status ON listings(status);
     CREATE INDEX IF NOT EXISTS idx_purchases_buyerOwner ON purchases(buyerOwner);
     CREATE INDEX IF NOT EXISTS idx_purchases_sellerOwner ON purchases(sellerOwner);

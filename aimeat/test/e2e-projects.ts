@@ -357,6 +357,97 @@ await test('Workspace reads the research-study identically (objects.hypothesis)'
   assert(body.data.objects.goal === undefined, 'no project goal type in a research-study workspace');
 });
 
+// ─── Versioning: draft → publish → .version.N + .latest ───
+console.log('\nVersioning — draft / publish / history');
+
+const publish = (token: string, ns: string, instance: string) =>
+  json(`/v1/organisms/${orgId}/publish`, { method: 'POST', headers: bearer(token), body: JSON.stringify({ namespace: ns, id: instance }) });
+
+await test('Draft write shows under drafts, not objects', async () => {
+  const w = await writeMemory(u1.ownerToken, `organism.${orgId}.meta.goals.gv1.draft`, { id: 'gv1', title: 'Versioned goal', status: 'open' });
+  assert(w.status === 200 || w.status === 201, `draft ${w.status}: ${JSON.stringify(w.body)}`);
+  const { body } = await json(`/v1/organisms/${orgId}/workspace`, { headers: bearer(u1.ownerToken) });
+  assert(Array.isArray(body.data.drafts?.goal) && body.data.drafts.goal.some((x: any) => x.id === 'gv1'), 'draft surfaced in drafts.goal');
+  assert(!(body.data.objects?.goal ?? []).some((x: any) => x.id === 'gv1'), 'unpublished draft NOT in objects.goal');
+});
+
+await test('Publish (permissive) → version 1 + latest, appears in objects', async () => {
+  const p = await publish(u1.ownerToken, 'meta.goals', 'gv1');
+  assert(p.status === 200, `publish ${p.status}: ${JSON.stringify(p.body)}`);
+  assert(p.body.data.version === 1, `version ${p.body.data.version}`);
+  const { body } = await json(`/v1/organisms/${orgId}/workspace`, { headers: bearer(u1.ownerToken) });
+  assert((body.data.objects?.goal ?? []).some((x: any) => x.id === 'gv1'), 'published goal now in objects.goal');
+});
+
+await test('Edit draft + publish again → version 2; history retained', async () => {
+  await writeMemory(u1.ownerToken, `organism.${orgId}.meta.goals.gv1.draft`, { id: 'gv1', title: 'Versioned goal v2', status: 'met' });
+  const p = await publish(u1.ownerToken, 'meta.goals', 'gv1');
+  assert(p.status === 200 && p.body.data.version === 2, `expected v2, got ${p.body.data?.version}`);
+  const { body } = await json(`/v1/memory?prefix=${encodeURIComponent(`organism.${orgId}.meta.goals.gv1.version.`)}`, { headers: bearer(u1.ownerToken) });
+  const versionKeys = body.data.items.map((i: any) => i.key);
+  assert(versionKeys.includes(`organism.${orgId}.meta.goals.gv1.version.1`), 'version.1 retained');
+  assert(versionKeys.includes(`organism.${orgId}.meta.goals.gv1.version.2`), 'version.2 created');
+  const latest = await json(`/v1/memory/${encodeURIComponent(`organism.${orgId}.meta.goals.gv1.latest`)}`, { headers: bearer(u1.ownerToken) });
+  assert(latest.body.data.value.title === 'Versioned goal v2', `latest reflects edit: ${latest.body.data.value?.title}`);
+});
+
+await test('Publishing with no draft → 404', async () => {
+  const p = await publish(u1.ownerToken, 'meta.goals', 'does-not-exist');
+  assert(p.status === 404, `expected 404, got ${p.status}`);
+});
+
+// ─── Publish gate (configurable via meta.config; default off) ───
+console.log('\nPublish gate (opt-in via meta.config)');
+
+await test('Turn on the publish gate in meta.config', async () => {
+  const w = await writeMemory(u1.ownerToken, `organism.${orgId}.meta.config`, { gates: { publish: { enabled: true, approverRole: 'owner' } } });
+  assert(w.status === 200 || w.status === 201, `config ${w.status}: ${JSON.stringify(w.body)}`);
+});
+
+let gatedApprovalId = '';
+await test('Publish while gated → 202 pending (not yet published)', async () => {
+  await writeMemory(u1.ownerToken, `organism.${orgId}.meta.goals.gv2.draft`, { id: 'gv2', title: 'Gated goal', status: 'open' });
+  const p = await publish(u1.ownerToken, 'meta.goals', 'gv2');
+  assert(p.status === 202, `expected 202, got ${p.status}: ${JSON.stringify(p.body)}`);
+  assert(p.body.data.gated === true, 'gated true');
+  gatedApprovalId = p.body.data.approval.id;
+  const w = await json(`/v1/organisms/${orgId}/workspace`, { headers: bearer(u1.ownerToken) });
+  assert(!(w.body.data.objects?.goal ?? []).some((x: any) => x.id === 'gv2'), 'gv2 not published until approved');
+});
+
+await test('Approval inbox lists the pending publish', async () => {
+  const { body } = await json(`/v1/organisms/${orgId}/approvals?status=pending`, { headers: bearer(u1.ownerToken) });
+  assert(body.data.approvals.some((a: any) => a.id === gatedApprovalId && a.action === 'publish'), 'pending publish in inbox');
+});
+
+await test('Non-approver (member) cannot resolve → 403', async () => {
+  const r = await json(`/v1/organisms/${orgId}/approvals/${gatedApprovalId}`, { method: 'POST', headers: bearer(u2.ownerToken), body: JSON.stringify({ decision: 'approve' }) });
+  assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+
+await test('Approver approves → draft is published', async () => {
+  const r = await json(`/v1/organisms/${orgId}/approvals/${gatedApprovalId}`, { method: 'POST', headers: bearer(u1.ownerToken), body: JSON.stringify({ decision: 'approve' }) });
+  assert(r.status === 200, `resolve ${r.status}: ${JSON.stringify(r.body)}`);
+  const w = await json(`/v1/organisms/${orgId}/workspace`, { headers: bearer(u1.ownerToken) });
+  assert((w.body.data.objects?.goal ?? []).some((x: any) => x.id === 'gv2'), 'gv2 published after approval');
+});
+
+// ─── Generic gate primitive (auto vs gate, via autonomy + alwaysGate floor) ───
+console.log('\nGeneric approvals (autonomy + always-gate floor)');
+
+await test('Low-risk action auto-approves (default autonomy)', async () => {
+  const r = await json(`/v1/organisms/${orgId}/approvals`, { method: 'POST', headers: bearer(u1.ownerToken), body: JSON.stringify({ action: 'flow:advance', risk: 'low' }) });
+  assert(r.status === 201, `create ${r.status}: ${JSON.stringify(r.body)}`);
+  assert(r.body.data.gated === false && r.body.data.approval.status === 'approved', 'auto-approved');
+});
+
+await test('Always-gate action pauses even at low risk', async () => {
+  // The org manifest's policy.alwaysGate is ['external-release'] — that floor gates regardless of risk.
+  const r = await json(`/v1/organisms/${orgId}/approvals`, { method: 'POST', headers: bearer(u1.ownerToken), body: JSON.stringify({ action: 'external-release', risk: 'low' }) });
+  assert(r.status === 201, `create ${r.status}`);
+  assert(r.body.data.gated === true && r.body.data.approval.status === 'pending', 'always-gate floor held');
+});
+
 // ─── Manifest Architect prompt (the generator "good prompt") ───
 console.log('\nManifest Architect prompt (managed, public)');
 

@@ -69,6 +69,7 @@ export const MANIFEST_FORMAT_SCHEMA: Record<string, unknown> = {
           backing: { enum: ['memory', 'tasks', 'storage', 'knowledge'] },
           writeRole: { enum: ['owner', 'admin', 'member'] },
           append: { type: 'boolean' },
+          versioned: { type: 'boolean' },  // draft → publish → .version.N + .latest history (default true)
         },
       },
     },

@@ -1,4 +1,4 @@
-import type { OrganismRecord, OrganismMembershipRecord, JoinRequestRecord, OrganismReputationRecord } from '../interface.js';
+import type { OrganismRecord, OrganismMembershipRecord, JoinRequestRecord, OrganismReputationRecord, PendingApprovalRecord } from '../interface.js';
 
 export interface OrganismRepository {
   createOrganism(record: OrganismRecord): Promise<OrganismRecord>;
@@ -18,4 +18,10 @@ export interface OrganismRepository {
   updateJoinRequest(id: string, updates: Partial<JoinRequestRecord>): Promise<JoinRequestRecord | null>;
   setOrganismReputation(record: OrganismReputationRecord): Promise<OrganismReputationRecord>;
   getOrganismReputation(organismId: string): Promise<OrganismReputationRecord | null>;
+  // Phase 4 — Gate primitive (PendingApproval)
+  createPendingApproval(record: PendingApprovalRecord): Promise<PendingApprovalRecord>;
+  getPendingApproval(id: string): Promise<PendingApprovalRecord | null>;
+  listPendingApprovals(organismId: string, opts?: { status?: string }): Promise<PendingApprovalRecord[]>;
+  updatePendingApproval(id: string, updates: Partial<PendingApprovalRecord>): Promise<PendingApprovalRecord | null>;
+  listOverduePendingApprovals(nowIso: string): Promise<PendingApprovalRecord[]>;
 }

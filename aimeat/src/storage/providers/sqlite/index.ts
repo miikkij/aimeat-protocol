@@ -24,7 +24,7 @@ import type {
   GHIIRecord, PersonalNodeRecord, MailboxItemRecord, MaintenanceState,
   SchemaRecord, ConsentRecord, ConsentAuditEntry, CsmRecord, MsmRecord,
   EmailVerificationRecord, FlagRecord, FlagSummary, MatchRecord,
-  OrganismRecord, OrganismMembershipRecord, JoinRequestRecord,
+  OrganismRecord, OrganismMembershipRecord, JoinRequestRecord, PendingApprovalRecord,
   AppealRecord, ListingRecord, PurchaseRecord,
   PushSubscriptionRecord, TrustedIssuerRecord, VerificationNonceRecord,
   GenesisPeerRecord, OrganismReputationRecord,
@@ -2891,6 +2891,86 @@ export class SqliteStorage implements Storage {
     if (row.message) record.message = row.message as string;
     if (row.reviewedBy) record.reviewedBy = row.reviewedBy as string;
     if (row.reviewedAt) record.reviewedAt = row.reviewedAt as string;
+    return record;
+  }
+
+  // ══════════════════════════════════════════════════════════
+  // ── Pending Approvals (Phase 4 — Gate primitive) ──
+  // ══════════════════════════════════════════════════════════
+
+  async createPendingApproval(record: PendingApprovalRecord): Promise<PendingApprovalRecord> {
+    this.db.prepare(
+      `INSERT INTO pending_approvals (id, organismId, flowGateId, stageId, actor, action, arguments,
+         risk, approverRole, prompt, status, decidedBy, decidedAt, resolutionNote, deadline, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      record.id, record.organismId, record.flowGateId ?? null, record.stageId ?? null,
+      record.actor, record.action, record.arguments !== undefined ? JSON.stringify(record.arguments) : null,
+      record.risk, record.approverRole, record.prompt ?? null, record.status,
+      record.decidedBy ?? null, record.decidedAt ?? null, record.resolutionNote ?? null,
+      record.deadline ?? null, record.createdAt, record.updatedAt,
+    );
+    return record;
+  }
+
+  async getPendingApproval(id: string): Promise<PendingApprovalRecord | null> {
+    const row = this.db.prepare('SELECT * FROM pending_approvals WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    return row ? this.deserializePendingApproval(row) : null;
+  }
+
+  async listPendingApprovals(organismId: string, opts?: { status?: string }): Promise<PendingApprovalRecord[]> {
+    let sql = 'SELECT * FROM pending_approvals WHERE organismId = ?';
+    const params: unknown[] = [organismId];
+    if (opts?.status) { sql += ' AND status = ?'; params.push(opts.status); }
+    sql += ' ORDER BY createdAt DESC';
+    const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
+    return rows.map(r => this.deserializePendingApproval(r));
+  }
+
+  async updatePendingApproval(id: string, updates: Partial<PendingApprovalRecord>): Promise<PendingApprovalRecord | null> {
+    const existing = await this.getPendingApproval(id);
+    if (!existing) return null;
+    const updated = { ...existing, ...updates, id: existing.id };
+    this.db.prepare(
+      `UPDATE pending_approvals SET organismId = ?, flowGateId = ?, stageId = ?, actor = ?, action = ?,
+         arguments = ?, risk = ?, approverRole = ?, prompt = ?, status = ?, decidedBy = ?, decidedAt = ?,
+         resolutionNote = ?, deadline = ?, createdAt = ?, updatedAt = ? WHERE id = ?`
+    ).run(
+      updated.organismId, updated.flowGateId ?? null, updated.stageId ?? null, updated.actor, updated.action,
+      updated.arguments !== undefined ? JSON.stringify(updated.arguments) : null, updated.risk, updated.approverRole,
+      updated.prompt ?? null, updated.status, updated.decidedBy ?? null, updated.decidedAt ?? null,
+      updated.resolutionNote ?? null, updated.deadline ?? null, updated.createdAt, updated.updatedAt, id,
+    );
+    return updated;
+  }
+
+  async listOverduePendingApprovals(nowIso: string): Promise<PendingApprovalRecord[]> {
+    const rows = this.db.prepare(
+      `SELECT * FROM pending_approvals WHERE status = 'pending' AND deadline IS NOT NULL AND deadline < ?`
+    ).all(nowIso) as Record<string, unknown>[];
+    return rows.map(r => this.deserializePendingApproval(r));
+  }
+
+  private deserializePendingApproval(row: Record<string, unknown>): PendingApprovalRecord {
+    const record: PendingApprovalRecord = {
+      id: row.id as string,
+      organismId: row.organismId as string,
+      actor: row.actor as string,
+      action: row.action as string,
+      risk: row.risk as PendingApprovalRecord['risk'],
+      approverRole: row.approverRole as PendingApprovalRecord['approverRole'],
+      status: row.status as PendingApprovalRecord['status'],
+      createdAt: row.createdAt as string,
+      updatedAt: row.updatedAt as string,
+    };
+    if (row.flowGateId) record.flowGateId = row.flowGateId as string;
+    if (row.stageId) record.stageId = row.stageId as string;
+    if (row.arguments) record.arguments = JSON.parse(row.arguments as string);
+    if (row.prompt) record.prompt = row.prompt as string;
+    if (row.decidedBy) record.decidedBy = row.decidedBy as string;
+    if (row.decidedAt) record.decidedAt = row.decidedAt as string;
+    if (row.resolutionNote) record.resolutionNote = row.resolutionNote as string;
+    if (row.deadline) record.deadline = row.deadline as string;
     return record;
   }
 

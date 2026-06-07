@@ -13,12 +13,12 @@
     "primaryGoal": ""
   },
   "objectTypes": [
-    { "name": "goal",        "description": "Requirement + definition-of-done.",                  "schemaRef": "schema:project/goal@1",        "namespace": "meta.goals",          "cardinality": "many", "backing": "memory", "writeRole": "owner" },
-    { "name": "plan",        "description": "Approach + steps, versioned, gated before work.",      "schemaRef": "schema:project/plan@1",        "namespace": "meta.plans",          "cardinality": "many", "backing": "memory", "writeRole": "owner" },
+    { "name": "goal",        "description": "Requirement + definition-of-done.",                  "schemaRef": "schema:project/goal@1",        "namespace": "meta.goals",          "cardinality": "many", "backing": "memory", "writeRole": "owner",  "versioned": true },
+    { "name": "plan",        "description": "Approach + steps, versioned, gated before work.",      "schemaRef": "schema:project/plan@1",        "namespace": "meta.plans",          "cardinality": "many", "backing": "memory", "writeRole": "owner",  "versioned": true },
     { "name": "task",        "description": "Execution unit (the task system).",                   "schemaRef": "schema:project/task@1",        "namespace": "(tasks)",             "cardinality": "many", "backing": "tasks",  "writeRole": "member" },
-    { "name": "deliverable", "description": "Outcome + acceptance criteria + rating.",              "schemaRef": "schema:project/deliverable@1", "namespace": "shared.deliverables", "cardinality": "many", "backing": "memory", "writeRole": "member" },
-    { "name": "decision",    "description": "Append-only decision / plan-change / rating log.",      "schemaRef": "schema:project/decision@1",    "namespace": "meta.decisions",      "cardinality": "many", "backing": "memory", "writeRole": "member", "append": true },
-    { "name": "resource",    "description": "Index entry -> repo / zip / asset / knowledge.",        "schemaRef": "schema:project/resource@1",    "namespace": "shared.resources",    "cardinality": "many", "backing": "memory", "writeRole": "member" }
+    { "name": "deliverable", "description": "Outcome + acceptance criteria + rating.",              "schemaRef": "schema:project/deliverable@1", "namespace": "shared.deliverables", "cardinality": "many", "backing": "memory", "writeRole": "member", "versioned": true },
+    { "name": "decision",    "description": "Append-only decision / plan-change / rating log.",      "schemaRef": "schema:project/decision@1",    "namespace": "meta.decisions",      "cardinality": "many", "backing": "memory", "writeRole": "member", "append": true, "versioned": false },
+    { "name": "resource",    "description": "Index entry -> repo / zip / asset / knowledge.",        "schemaRef": "schema:project/resource@1",    "namespace": "shared.resources",    "cardinality": "many", "backing": "memory", "writeRole": "member", "versioned": true }
   ],
   "flow": {
     "stages": [

@@ -645,6 +645,29 @@ model JoinRequest {
   @@index([organismId, status])
 }
 
+model PendingApproval {
+  id             String    @id @map("_id")
+  organismId     String
+  flowGateId     String?
+  stageId        String?
+  actor          String
+  action         String
+  arguments      Json?
+  risk           String    @default("medium")
+  approverRole   String    @default("owner")
+  prompt         String?
+  status         String    @default("pending")
+  decidedBy      String?
+  decidedAt      DateTime?
+  resolutionNote String?
+  deadline       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now())
+
+  @@index([organismId])
+  @@index([organismId, status])
+}
+
 model Appeal {
   id         String    @id @map("_id")
   flagId     String
