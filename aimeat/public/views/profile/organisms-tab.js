@@ -22,6 +22,8 @@ import { escHtml } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as orgService from '/js/services/organisms.js';
+import { OpenRouterSettings } from './generator-settings.js';
+import { copyToClipboard } from '/js/utils.js';
 
 export default function OrganismsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -434,6 +436,8 @@ function Workspace({ org, showToast, onBack }) {
   const [sAutonomy, setSAutonomy] = useState('L3');
   const [genDesc, setGenDesc] = useState('');
   const [genBusy, setGenBusy] = useState(false);
+  const [hasAiKey, setHasAiKey] = useState(false);
+  const [pasteText, setPasteText] = useState('');
 
   const load = useCallback(async () => {
     const w = await orgService.getWorkspace(orgId).catch(() => null);
@@ -475,11 +479,29 @@ function Workspace({ org, showToast, onBack }) {
       await load();
     } catch (e) {
       const msg = e?.code === 'NO_API_KEY'
-        ? (t('organisms.noAiKey') || 'Set up your OpenRouter key first (Profile → Generator settings).')
+        ? (t('organisms.noAiKey') || 'Set up your OpenRouter key above, or copy the prompt to your own AI chat.')
         : ((e && e.message) || (t('organisms.generateError') || 'Generation failed'));
       showToast(msg);
     } finally { setGenBusy(false); }
   }, [genDesc, orgId, showToast, load]);
+
+  const copyPrompt = useCallback(async () => {
+    try {
+      await copyToClipboard(await orgService.buildGeneratorPrompt(genDesc.trim()));
+      showToast(t('organisms.promptCopied') || 'Prompt copied — paste it into any AI chat, then paste the JSON it returns below.');
+    } catch (e) { showToast((e && e.message) || 'Failed to copy'); }
+  }, [genDesc, showToast]);
+
+  const applyPasted = useCallback(async () => {
+    if (!pasteText.trim()) return;
+    setGenBusy(true);
+    try {
+      await orgService.applyGeneratedWorkspace(orgId, orgService.parseGenerated(pasteText));
+      showToast(t('organisms.workspaceReady') || 'Workspace ready');
+      await load();
+    } catch (e) { showToast((e && e.message) || (t('organisms.applyError') || 'Could not apply — check the pasted JSON.')); }
+    finally { setGenBusy(false); }
+  }, [pasteText, orgId, showToast, load]);
 
   const startAdd = useCallback(async (ot) => {
     setAdding(ot.name); setAddingSchema(null);
@@ -562,14 +584,29 @@ function Workspace({ org, showToast, onBack }) {
 
         <div class="pj-section">
           <div class="pj-section-title">${t('organisms.generateTitle') || 'Or generate a custom workspace with AI'}</div>
-          <div class="section-desc">${t('organisms.generateDesc') || 'Describe what you want to track. The AI designs the object types using your OpenRouter key.'}</div>
+          <div class="section-desc">${t('organisms.generateDesc') || 'Describe what you want to track — the AI designs the object types. Use your OpenRouter key for one-click generation, or copy the prompt into any AI chat (free) and paste the result back.'}</div>
+
           <textarea class="input-field input-sm" rows="3"
             placeholder=${t('organisms.generatePlaceholder') || 'e.g. A research study tracking hypotheses, experiments and validated findings'}
             value=${genDesc} onInput=${e => setGenDesc(e.target.value)}></textarea>
+
+          <${OpenRouterSettings} onSettingsChange=${s => setHasAiKey(!!(s && s.hasApiKey))} />
+
           <div class="form-actions">
-            <button class="btn-primary btn-sm" onClick=${generate} disabled=${genBusy || !genDesc.trim()}>
-              ${genBusy ? (t('organisms.generating') || 'Generating…') : (t('organisms.generate') || 'Generate with AI')}
-            </button>
+            ${hasAiKey ? html`
+              <button class="btn-primary btn-sm" onClick=${generate} disabled=${genBusy || !genDesc.trim()}>
+                ${genBusy ? (t('organisms.generating') || 'Generating…') : (t('organisms.generate') || 'Generate with AI')}
+              </button>
+            ` : null}
+            <button class="btn-outline btn-sm" onClick=${copyPrompt} disabled=${!genDesc.trim()}>${t('organisms.copyPrompt') || 'Copy prompt'}</button>
+          </div>
+
+          <div class="section-desc">${t('organisms.pasteHelp') || 'No key? Copy the prompt above into any AI chat, then paste the JSON it returns here:'}</div>
+          <textarea class="input-field input-sm" rows="3"
+            placeholder=${t('organisms.pastePlaceholder') || 'Paste the AI JSON response here'}
+            value=${pasteText} onInput=${e => setPasteText(e.target.value)}></textarea>
+          <div class="form-actions">
+            <button class="btn-primary btn-sm" onClick=${applyPasted} disabled=${genBusy || !pasteText.trim()}>${t('organisms.applyPasted') || 'Apply pasted workspace'}</button>
           </div>
         </div>
       </div>

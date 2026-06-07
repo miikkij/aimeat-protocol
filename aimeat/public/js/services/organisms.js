@@ -131,11 +131,7 @@ export async function getManifestArchitectPrompt() {
   } catch { return ''; }
 }
 
-/** Generate a custom workspace ({ manifest, schemas }) from a description, using the user's
- *  OpenRouter key + the manifest-architect prompt. One-shot (no interview). Throws on AI/parse error. */
-export async function generateWorkspace(description) {
-  const base = await getManifestArchitectPrompt();
-  const systemPrompt = `${base}
+const GEN_FORMAT_INSTRUCTION = `
 
 === ONE-SHOT GENERATION MODE ===
 Do NOT interview. From the user's description, output ONLY a single JSON object:
@@ -145,18 +141,41 @@ Do NOT interview. From the user's description, output ONLY a single JSON object:
 }
 Namespaces: owner-controlled types use "meta.<plural>", collaborative use "shared.<plural>". Every memory-backed objectType needs a schema entry under its namespace, and an "id" string property. Use bounded enums for status-like fields. No prose, no markdown fences.`;
 
+/** The system instructions for the generator (manifest-architect prompt + output format). */
+export async function generatorSystemPrompt() {
+  return (await getManifestArchitectPrompt()) + GEN_FORMAT_INSTRUCTION;
+}
+
+/** The full text to copy into any AI chat (instructions + the user's request). */
+export async function buildGeneratorPrompt(description) {
+  return (await generatorSystemPrompt()) + `\n\nUser request: ${description || '(describe the workspace you want)'}`;
+}
+
+/** Parse an AI response into { manifest, schemas } — strips markdown fences + surrounding prose. */
+export function parseGenerated(text) {
+  const stripped = String(text || '').replace(/^```(?:json)?\s*|\s*```$/g, '').trim();
+  let json;
+  try { json = JSON.parse(stripped); }
+  catch {
+    const m = stripped.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('No JSON object found in the response');
+    json = JSON.parse(m[0]);
+  }
+  if (!json.manifest || !json.schemas) throw new Error('Response is missing "manifest" or "schemas"');
+  return json;
+}
+
+/** Generate a custom workspace ({ manifest, schemas }) via the user's OpenRouter key. */
+export async function generateWorkspace(description) {
   const resp = await apiPost('/v1/ai/complete', {
     prompt: description,
-    systemPrompt,
+    systemPrompt: await generatorSystemPrompt(),
     modelRole: 'execution',
     max_tokens: 3000,
     app_id: 'organism-workspace',
   });
   if (resp?.ok === false) { const e = new Error(resp?.error?.message || 'AI call failed'); e.code = resp?.error?.code; throw e; }
-  const content = String(resp?.data?.content || '').replace(/^```(?:json)?\s*|\s*```$/g, '').trim();
-  const generated = JSON.parse(content);
-  if (!generated.manifest || !generated.schemas) throw new Error('AI output missing manifest or schemas');
-  return generated;
+  return parseGenerated(resp?.data?.content);
 }
 
 /** Apply a generated (or any) workspace to an organism: register its schemas + write the manifest. */
