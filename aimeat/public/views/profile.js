@@ -55,7 +55,6 @@ import SecurityTab from './profile/security-tab.js';
 import EmailTab from './profile/email-tab.js';
 import KnowledgeTab from './profile/knowledge-tab.js';
 import OrganismsTab from './profile/organisms-tab.js';
-import ProjectsTab from './profile/projects-tab.js';
 import NotificationsTab from './profile/notifications-tab.js';
 import GeneratorTab from './profile/generator-tab.js';
 import FoundryTab from './profile/foundry-tab.js';
@@ -76,7 +75,6 @@ const TABS = [
   { id: 'wallet',        key: 'profile.tabs.wallet',         component: WalletTab,         minTier: 'new' },
   { id: 'knowledge',     key: 'knowledge.tabLabel',          component: KnowledgeTab,      minTier: 'active' },
   { id: 'organisms',     key: 'profile.tabs.organisms',      component: OrganismsTab,      minTier: 'active' },
-  { id: 'projects',      key: 'projects.tabLabel',           component: ProjectsTab,       minTier: 'active' },
   { id: 'memory',        key: 'profile.tabs.memory',         component: MemoryTab,         minTier: 'new' },
   { id: 'work',          key: 'profile.tabs.work',           component: WorkTab,           minTier: 'active' },
   { id: 'actions',       key: 'profile.tabs.services',       component: ServicesTab,       minTier: 'active' },

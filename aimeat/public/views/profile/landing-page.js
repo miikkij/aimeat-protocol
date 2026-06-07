@@ -516,7 +516,6 @@ function InlineView({ tabId, label, onClose, renderTab }) {
 const SIDEBAR_GROUPS = [
   { titleKey: 'profile.landing.menuDaily', items: [
     { id: 'agents', icon: '\u{1F916}', labelKey: 'profile.tabs.agents', badgeStat: 'agents' },
-    { id: 'projects', icon: '\u{1F4C1}', labelKey: 'projects.tabLabel' },
     { id: 'scheduler', icon: '⏰', labelKey: 'profile.tabs.scheduler' },
     { id: 'memory', icon: '\u{1F9E0}', labelKey: 'profile.tabs.memory' },
     { id: 'boards', icon: '\u{1F4CB}', labelKey: 'profile.tabs.boards' },

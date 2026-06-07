@@ -28,6 +28,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const [myOrganisms, setMyOrganisms] = useState(null);
   const [publicOrganisms, setPublicOrganisms] = useState([]);
   const [expanded, setExpanded] = useState(null);
+  const [openId, setOpenId] = useState(null);   // organism whose workspace is open
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -299,6 +300,11 @@ export default function OrganismsTab({ session, showToast, onStats }) {
             </div>
 
             <div class="card-actions">
+              ${(isMine || isMember) ? html`
+                <button class="btn-primary btn-sm" onClick=${(e) => { e.stopPropagation(); setOpenId(org.id); }}>
+                  ${t('organisms.openWorkspace') || 'Open workspace'}
+                </button>
+              ` : null}
               ${canEdit ? html`
                 <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); startEdit(org); }}>
                   ${t('organisms.edit') || 'Edit'}
@@ -327,6 +333,11 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       </div>
     `;
   };
+
+  if (openId) {
+    const org = [...(myOrganisms || []), ...publicOrganisms].find(o => o.id === openId) || { id: openId };
+    return html`<${Workspace} org=${org} session=${session} showToast=${showToast} onBack=${() => { setOpenId(null); loadData(); }} />`;
+  }
 
   if (!myOrganisms) return html`<${Spinner} text=${t('organisms.loading') || 'Loading organisms...'} />`;
 
@@ -398,5 +409,198 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       ${publicOrganisms.map(org => renderOrgCard(org, false))}
     `}
     <${ConfirmUI} />
+  `;
+}
+
+/* ───────────────── Organism workspace (manifest-driven) ─────────────────
+ * Any organism can have a governed workspace. If it has no manifest yet, offer
+ * "Set up workspace" (applies the project template). Otherwise render the
+ * manifest's object types with the draft → publish → version loop, the publish
+ * gate, the approval inbox, and the decision log. */
+
+const PRIMARY_FIELD = { goal: 'title', plan: 'approach', deliverable: 'title', resource: 'label', decision: 'summary' };
+
+function Workspace({ org, showToast, onBack }) {
+  const orgId = org.id;
+  const [ws, setWs] = useState(undefined); // undefined=loading, null=no manifest, object=workspace
+  const [approvals, setApprovals] = useState([]);
+  const [gateOn, setGateOn] = useState(false);
+  const [adding, setAdding] = useState(null);
+  const [draftId, setDraftId] = useState('');
+  const [draftText, setDraftText] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    const w = await orgService.getWorkspace(orgId).catch(() => null);
+    if (w && w.manifest) {
+      const [ap, cfg] = await Promise.all([
+        orgService.listApprovals(orgId, 'pending').catch(() => []),
+        orgService.getConfig(orgId).catch(() => ({})),
+      ]);
+      setApprovals(ap); setGateOn(!!(cfg?.gates?.publish?.enabled));
+    }
+    setWs(w && w.manifest ? w : null);
+  }, [orgId]);
+
+  useEffect(() => { load(); }, [load]);
+  const liveRef = useRef(load); liveRef.current = load;
+  useEffect(() => {
+    const handler = () => liveRef.current();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, []);
+
+  const setup = useCallback(async () => {
+    setBusy(true);
+    try {
+      await orgService.applyProjectTemplate(orgId, org.name || 'Project', org.description || '');
+      showToast(t('organisms.workspaceReady') || 'Workspace ready');
+      await load();
+    } catch (e) { showToast((e && e.message) || (t('organisms.setupError') || 'Failed to set up workspace')); }
+    finally { setBusy(false); }
+  }, [orgId, org, showToast, load]);
+
+  const saveDraft = useCallback(async (ot) => {
+    const id = (draftId.trim() || `${ot.name}-${Date.now().toString(36)}`).replace(/[^a-zA-Z0-9_-]/g, '-');
+    const field = PRIMARY_FIELD[ot.name] || 'title';
+    const value = { id };
+    value[field] = draftText.trim();
+    if (ot.name === 'goal') value.status = 'open';
+    if (ot.name === 'deliverable') value.status = 'proposed';
+    if (ot.name === 'plan') { value.version = 1; value.status = 'proposed'; }
+    if (ot.name === 'resource') { value.kind = 'link'; value.origin = 'link'; value.pointer = draftText.trim(); value.visibility = 'private'; }
+    setBusy(true);
+    try {
+      const r = await orgService.writeDraft(orgId, ot.namespace, id, value);
+      if (r?.ok === false) { showToast(r?.error?.message || 'Draft rejected'); }
+      else { showToast(t('organisms.draftSaved') || 'Draft saved'); setAdding(null); setDraftId(''); setDraftText(''); await load(); }
+    } catch (e) { showToast((e && e.message) || 'Failed to save draft'); }
+    finally { setBusy(false); }
+  }, [draftId, draftText, orgId, showToast, load]);
+
+  const publish = useCallback(async (ot, instanceId) => {
+    setBusy(true);
+    try {
+      const r = await orgService.publishDraft(orgId, ot.namespace, instanceId);
+      if (r?.data?.gated) showToast(t('organisms.publishGated') || 'Sent for review (publish gate is on)');
+      else showToast((t('organisms.published') || 'Published') + (r?.data?.version ? ` v${r.data.version}` : ''));
+      await load();
+    } catch (e) { showToast((e && e.message) || 'Failed to publish'); }
+    finally { setBusy(false); }
+  }, [orgId, showToast, load]);
+
+  const resolve = useCallback(async (aid, decision) => {
+    setBusy(true);
+    try { await orgService.resolveApproval(orgId, aid, decision); showToast(decision === 'approve' ? (t('organisms.approved') || 'Approved') : (t('organisms.rejected') || 'Rejected')); await load(); }
+    catch (e) { showToast((e && e.message) || 'Failed to resolve'); }
+    finally { setBusy(false); }
+  }, [orgId, showToast, load]);
+
+  const toggleGate = useCallback(async () => {
+    setBusy(true);
+    try { await orgService.setPublishGate(orgId, !gateOn); setGateOn(!gateOn); showToast(t('organisms.gateToggled') || 'Publish gate updated'); }
+    catch (e) { showToast((e && e.message) || 'Failed to update gate'); }
+    finally { setBusy(false); }
+  }, [orgId, gateOn, showToast]);
+
+  const back = html`<div class="card-actions mb-half"><button class="btn-ghost btn-sm" onClick=${onBack}>${'← '}${t('organisms.backToList') || 'All organisms'}</button></div>`;
+
+  if (ws === undefined) return html`<div>${back}<${Spinner} text=${t('organisms.loading') || 'Loading...'} /></div>`;
+
+  if (ws === null) {
+    return html`
+      <div class="pj-ws">
+        ${back}
+        <div class="section-title">${escHtml(org.name || 'Organism')}</div>
+        <div class="section-desc">${t('organisms.noWorkspace') || 'This organism has no workspace yet. Set one up to track goals, plans, deliverables and decisions — versioned on publish.'}</div>
+        <button class="btn-primary" onClick=${setup} disabled=${busy}>${busy ? '...' : (t('organisms.setupWorkspace') || 'Set up workspace')}</button>
+      </div>
+    `;
+  }
+
+  const types = (ws.manifest?.objectTypes || []).filter(ot => ot.backing === 'memory');
+  const draftsFor = (name) => (ws.drafts && ws.drafts[name]) || [];
+  const objectsFor = (name) => (ws.objects && ws.objects[name]) || [];
+
+  return html`
+    <div class="pj-ws">
+      ${back}
+      <div class="section-title">${escHtml(ws.manifest?.name || org.name || 'Workspace')}</div>
+      <div class="section-desc">
+        <span class="badge badge-success">${escHtml(ws.manifest?.status || 'active')}</span>
+        ${ws.manifest?.summary ? html` ${escHtml(ws.manifest.summary)}` : null}
+      </div>
+
+      <div class="pj-gate">
+        <label class="pj-gate-label">
+          <input type="checkbox" checked=${gateOn} onChange=${toggleGate} disabled=${busy} />
+          ${' '}${t('organisms.publishGate') || 'Require review before publishing'}
+        </label>
+      </div>
+
+      ${approvals.length > 0 && html`
+        <div class="pj-inbox">
+          <div class="card-h3">${t('organisms.needsDecision') || 'Needs your decision'} (${approvals.length})</div>
+          ${approvals.map(a => html`
+            <div class="pj-approval" key=${a.id}>
+              <div class="pj-approval-text">${escHtml(a.prompt || a.action)}</div>
+              <div class="card-actions">
+                <button class="btn-success btn-sm" onClick=${() => resolve(a.id, 'approve')} disabled=${busy}>${t('organisms.approve') || 'Approve'}</button>
+                <button class="btn-danger btn-sm" onClick=${() => resolve(a.id, 'reject')} disabled=${busy}>${t('organisms.reject') || 'Reject'}</button>
+              </div>
+            </div>
+          `)}
+        </div>
+      `}
+
+      ${types.map(ot => html`
+        <div class="pj-section" key=${ot.name}>
+          <div class="pj-section-head">
+            <span class="pj-section-title">${escHtml(ot.name)}</span>
+            ${ot.append ? null : html`<button class="btn-outline btn-sm" onClick=${() => { setAdding(ot.name); setDraftId(''); setDraftText(''); }}>${'+ '}${t('organisms.addDraft') || 'Add draft'}</button>`}
+          </div>
+
+          ${adding === ot.name && html`
+            <div class="create-form pj-draft-form">
+              <div class="flex-col">
+                <input type="text" class="input-field input-sm" placeholder=${t('organisms.idOptional') || 'id (optional)'} value=${draftId} onInput=${e => setDraftId(e.target.value)} />
+                <input type="text" class="input-field input-sm" placeholder=${(PRIMARY_FIELD[ot.name] || 'title')} value=${draftText} onInput=${e => setDraftText(e.target.value)} />
+                <div class="form-actions">
+                  <button class="btn-primary btn-sm" onClick=${() => saveDraft(ot)} disabled=${busy || !draftText.trim()}>${t('organisms.saveDraft') || 'Save draft'}</button>
+                  <button class="btn-ghost btn-sm" onClick=${() => setAdding(null)}>${t('organisms.cancel') || 'Cancel'}</button>
+                </div>
+              </div>
+            </div>
+          `}
+
+          ${draftsFor(ot.name).map((d, i) => html`
+            <div class="pj-item pj-item-draft" key=${'d' + i}>
+              <span class="badge badge-warn">${t('organisms.draft') || 'draft'}</span>
+              <span class="pj-item-text">${escHtml(String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id || ''))}</span>
+              <button class="btn-primary btn-sm" onClick=${() => publish(ot, d.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>
+            </div>
+          `)}
+
+          ${objectsFor(ot.name).length === 0 && draftsFor(ot.name).length === 0
+            ? html`<div class="pj-empty">${t('organisms.noneYet') || 'none yet'}</div>`
+            : objectsFor(ot.name).map((o, i) => html`
+              <div class="pj-item" key=${'o' + i}>
+                <span class="pj-item-text">${escHtml(String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.summary || o.id || ''))}</span>
+                ${o.status ? html`<span class="badge badge-info">${escHtml(o.status)}</span>` : null}
+              </div>
+            `)
+          }
+        </div>
+      `)}
+
+      ${(ws.decisions || []).length > 0 && html`
+        <div class="pj-section">
+          <div class="pj-section-title">${t('organisms.decisions') || 'Recent decisions'}</div>
+          ${ws.decisions.slice(-8).reverse().map((d, i) => html`
+            <div class="pj-item pj-decision" key=${'dec' + i}><span class="pj-item-text">${escHtml(String(d.summary || ''))}</span></div>
+          `)}
+        </div>
+      `}
+    </div>
   `;
 }
