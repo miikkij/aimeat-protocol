@@ -5,10 +5,10 @@ import type { StorageFileRecord, ChunkedUploadRecord, MicroMemoryRecord } from '
 
 export function createStorageFile(db: Database.Database, file: StorageFileRecord): StorageFileRecord {
   db.prepare(
-    `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, mimeType, size, data, accessCode, tags, createdAt, federate)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, groupId, mimeType, size, data, accessCode, tags, createdAt, federate)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
-    file.ownerGaii, file.key, file.visibility,
+    file.ownerGaii, file.key, file.visibility, file.groupId ?? null,
     file.mimeType, file.size, file.data,
     file.accessCode ?? null, JSON.stringify(file.tags || []), file.createdAt,
     file.federate ? 1 : 0,
@@ -30,6 +30,7 @@ export function getStorageFile(db: Database.Database, ownerGaii: string, key: st
     createdAt: row.createdAt as string,
   };
   if (row.accessCode) record.accessCode = row.accessCode as string;
+  if (row.groupId) record.groupId = row.groupId as string;
   record.federate = (row as any).federate === 1;
   return record;
 }
@@ -48,6 +49,7 @@ export function listStorageFiles(db: Database.Database, ownerGaii: string): Stor
       createdAt: r.createdAt as string,
     };
     if (r.accessCode) record.accessCode = r.accessCode as string;
+    if (r.groupId) record.groupId = r.groupId as string;
     record.federate = (r as any).federate === 1;
     return record;
   });

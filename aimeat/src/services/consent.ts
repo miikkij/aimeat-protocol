@@ -1,6 +1,23 @@
+/**
+ * @file consent.ts
+ * @description Consent decision engine for non-public reads: recipient matching, read
+ *   authorization (visibility + group + private consent + organism-member resolution),
+ *   audit-entry writing, and the consent-expiry background job. Used by the shared
+ *   access-guard and every identity-scoped read path (memory, storage, knowledge).
+ * @structure
+ *   - matchesRecipient() — pure recipient-pattern matcher (sync; organism.* resolved elsewhere)
+ *   - checkConsentForRead() — full read decision incl. async organism-membership resolution
+ *   - auditDataAccess() — write a ConsentAuditEntry
+ *   - expireConsents() / startConsentExpiryJob() — periodic expiry of stale grants
+ * @usage
+ *   import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
+ * @version-history
+ *   v1.1.0 -- 2026-06-07 -- Resolve organism.{id} grants via active-membership lookup in
+ *     checkConsentForRead (previously matchesRecipient returned false with no resolver).
+ */
 import { v4 as uuidv4 } from 'uuid';
 import type { Storage, ConsentAuditEntry } from '../storage/interface.js';
-import { globMatchSimple } from '../storage/pattern-utils.js';
+import { globMatchSimple, consentMatchPattern } from '../storage/pattern-utils.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 
 /**
@@ -132,6 +149,28 @@ export async function checkConsentForRead(
       consentId: matchingConsents[0].id,
       reason: 'consent_granted',
     };
+  }
+
+  // `organism.{id}` recipients can't be resolved by the sync matchesRecipient() — they
+  // require an async membership lookup. Honor such a grant when the accessor is an active
+  // member of the granted organism. Membership is keyed by the bare owner name (see
+  // organisms.ts / knowledge.ts, which call getMembership with req.auth.owner).
+  const orgGrants = (await storage.listConsents(ownerGaii, { status: 'active' })).filter(c =>
+    c.recipient.startsWith('organism.') &&
+    consentMatchPattern(c.dataPattern, memoryKey) &&
+    (!c.expires || new Date(c.expires) > new Date()),
+  );
+  if (orgGrants.length > 0) {
+    const accessorOwner = parseGaiiLoose(accessorGaii).owner;
+    if (accessorOwner) {
+      for (const c of orgGrants) {
+        const orgId = c.recipient.slice('organism.'.length);
+        const membership = await storage.getMembership(orgId, accessorOwner);
+        if (membership && membership.status === 'active') {
+          return { allowed: true, consentId: c.id, reason: 'organism_member_consent' };
+        }
+      }
+    }
   }
 
   return {

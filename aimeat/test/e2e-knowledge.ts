@@ -353,12 +353,127 @@ await test('Package owner can see operator reviews', async () => {
   assert(body.data?.reviews[0]?.action === 'approve', 'Expected approve action');
 });
 
+// ─── Phase 5: Organism-Member Consent Resolution (Fix 2) ───
+// A consent grant with recipient "organism.{id}" must resolve for an ACTIVE member of
+// that organism, and only for members. Uses a dot-keyed pattern (analysis.*) — the
+// canonical consent pattern form that findMatchingConsents/consentMatchPattern supports.
+console.log('\nPhase 5: Organism-Member Consent Resolution');
+
+async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean): Promise<string> {
+  const timestamp = new Date().toISOString();
+  const message = isAgent ? ownerOrGaii + timestamp : ownerOrGaii + NODE_ID + timestamp;
+  const signature = await signMsg(privKey, message);
+  const payload = isAgent ? { gaii: ownerOrGaii, timestamp, signature } : { owner: ownerOrGaii, timestamp, signature };
+  const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
+  return body.data?.token;
+}
+
+async function makeOwnerAgent(name: string): Promise<{ owner: string; ownerToken: string; agentGaii: string; agentToken: string }> {
+  const { body: oBody } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
+  const oToken = await getToken(name, oBody.data.private_key, false);
+  const { body: aBody } = await json('/v1/agents', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${oToken}` },
+    body: JSON.stringify({ name: 'orgagent', owner: name, capabilities: ['memory'], model: 'test-model' }),
+  });
+  const gaii = aBody.data.agent.gaii;
+  const aToken = await getToken(gaii, aBody.data.private_key, true);
+  return { owner: name, ownerToken: oToken, agentGaii: gaii, agentToken: aToken };
+}
+
+let organismId = '';
+let member = { owner: '', ownerToken: '', agentGaii: '', agentToken: '' };
+let nonMember = { owner: '', ownerToken: '', agentGaii: '', agentToken: '' };
+const analysisKey = 'analysis.solar';
+
+await test('Owner-1 agent creates an open organism', async () => {
+  const { status, body } = await json('/v1/organisms', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${agentToken}` },
+    body: JSON.stringify({ name: 'Knowledge Org', type: 'community', join_policy: 'open', visibility: 'public' }),
+  });
+  assert(status === 201, `Expected 201, got ${status}: ${JSON.stringify(body)}`);
+  organismId = body.data.organism.id;
+  assert(typeof organismId === 'string' && organismId.length > 0, 'got organism id');
+});
+
+await test('Register member + non-member owners/agents', async () => {
+  member = await makeOwnerAgent(`korgmem${Date.now()}`);
+  nonMember = await makeOwnerAgent(`korgnon${Date.now()}`);
+  assert(member.agentToken && nonMember.agentToken, 'both have agent tokens');
+});
+
+await test('Member joins the organism (open policy)', async () => {
+  const { status, body } = await json(`/v1/organisms/${organismId}/join`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${member.agentToken}` },
+  });
+  assert(status === 201, `Expected 201, got ${status}: ${JSON.stringify(body)}`);
+  assert(body.data?.status === 'joined', `status: ${body.data?.status}`);
+});
+
+await test('Owner-1 grants consent to the organism (analysis.*)', async () => {
+  const { status, body } = await json('/v1/consent', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${agentToken}` },
+    body: JSON.stringify({
+      data_pattern: 'analysis.*',
+      recipient: `organism.${organismId}`,
+      purpose: 'organism knowledge sharing',
+      scope: 'private',
+    }),
+  });
+  assert(status === 201, `Expected 201, got ${status}: ${JSON.stringify(body)}`);
+});
+
+await test('Owner-1 writes a private analysis.* memory', async () => {
+  const { status, body } = await json('/v1/memory', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${agentToken}` },
+    body: JSON.stringify({ key: analysisKey, value: { finding: 'solar output up 12%' }, visibility: 'private' }),
+  });
+  assert(status === 201, `Expected 201, got ${status}: ${JSON.stringify(body)}`);
+});
+
+await test('Active member reads owner-1 analysis.solar → 200', async () => {
+  const { status, body } = await json(`/v1/memory/${encodeURIComponent(agentGaii)}/${encodeURIComponent(analysisKey)}`, {
+    headers: { Authorization: `Bearer ${member.agentToken}` },
+  });
+  assert(status === 200, `Expected 200, got ${status}: ${JSON.stringify(body)}`);
+  assert((body.data?.value as any)?.finding?.includes('solar'), 'got the analysis value');
+});
+
+await test('Non-member reads owner-1 analysis.solar → 403', async () => {
+  const { status } = await json(`/v1/memory/${encodeURIComponent(agentGaii)}/${encodeURIComponent(analysisKey)}`, {
+    headers: { Authorization: `Bearer ${nonMember.agentToken}` },
+  });
+  assert(status === 403, `Expected 403, got ${status}`);
+});
+
+await test('Member read is audited as organism_member_consent (allowed)', async () => {
+  const { status, body } = await json('/v1/consent/audit?days=1', {
+    headers: { Authorization: `Bearer ${agentToken}` },
+  });
+  assert(status === 200, `Expected 200, got ${status}`);
+  const entries = (body.data?.entries as any[]) ?? [];
+  const allowed = entries.some(e => e.memory_key === analysisKey && e.allowed === true);
+  const denied = entries.some(e => e.memory_key === analysisKey && e.allowed === false);
+  assert(allowed, `expected an allowed audit entry for ${analysisKey}`);
+  assert(denied, `expected a denied audit entry for ${analysisKey} (non-member)`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 await json(`/v1/owners/${ownerName}?cascade=true`, {
   method: 'DELETE',
   headers: { Authorization: `Bearer ${ownerToken}` },
 });
+if (member.owner) {
+  await json(`/v1/owners/${member.owner}?cascade=true`, { method: 'DELETE', headers: { Authorization: `Bearer ${member.ownerToken}` } });
+}
+if (nonMember.owner) {
+  await json(`/v1/owners/${nonMember.owner}?cascade=true`, { method: 'DELETE', headers: { Authorization: `Bearer ${nonMember.ownerToken}` } });
+}
 
 console.log(`\n📊 Results: ${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

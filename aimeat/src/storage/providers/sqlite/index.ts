@@ -1389,10 +1389,10 @@ export class SqliteStorage implements Storage {
 
   async createStorageFile(file: StorageFileRecord): Promise<StorageFileRecord> {
     this.db.prepare(
-      `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, mimeType, size, data, accessCode, tags, createdAt, federate)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, groupId, mimeType, size, data, accessCode, tags, createdAt, federate)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
-      file.ownerGaii, file.key, file.visibility,
+      file.ownerGaii, file.key, file.visibility, file.groupId ?? null,
       file.mimeType, file.size, file.data,
       file.accessCode ?? null, JSON.stringify(file.tags || []), file.createdAt,
       file.federate ? 1 : 0,

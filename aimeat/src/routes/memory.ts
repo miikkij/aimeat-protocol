@@ -7,6 +7,8 @@
  *   v1.1.0 — 2026-05-22 — Add list-home, list-remote, pull-remote federation endpoints
  *   v1.2.0 — 2026-05-22 — Add discover and copy endpoints for cross-user public memory
  *   v1.3.0 -- 2026-05-28 -- Include owner_gaii in memory listing responses
+ *   v1.4.0 -- 2026-06-07 -- Route public-read through shared authorizeRead() (access-guard) so
+ *     memory and file storage share one access decision + audit path.
  */
 
 import { Router } from 'express';
@@ -30,7 +32,7 @@ function isAnonymousGaii(gaii: string): boolean {
   return gaii.includes('#anonymous@');
 }
 import type { StatsCollector } from '../services/stats.js';
-import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
+import { authorizeRead } from '../services/access-guard.js';
 import { emitChange } from '../services/event-bus.js';
 
 /** Map memory visibility to DMZ zone (Phase 0.6) */
@@ -1397,11 +1399,14 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     if (record.visibility === 'public') {
       stats?.increment('memory_reads');
 
-      // Audit if consent layer is enabled
-      if (config.consentEnabled) {
-        const accessorGaii = req.auth?.sub ?? 'anonymous';
-        await auditDataAccess(storage, null, record.ownerGaii, accessorGaii, key, 'read', true);
-      }
+      // Shared guard: audits the public read when the consent layer is enabled.
+      await authorizeRead(storage, config, {
+        ownerGaii: record.ownerGaii,
+        accessorGaii: req.auth?.sub ?? 'anonymous',
+        resourceKey: key,
+        visibility: 'public',
+        action: 'read',
+      });
 
       res.json(success(config.nodeId, {
         key: record.key,
@@ -1429,12 +1434,16 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       return;
     }
 
-    // Non-public data with consent enabled: check consent
+    // Non-public data with consent enabled: shared guard decides + audits the attempt.
     const accessorGaii = req.auth?.sub ?? 'anonymous';
-    const consentResult = await checkConsentForRead(storage, key, record.ownerGaii, accessorGaii, record.visibility, record.groupId);
-
-    // Audit the access attempt
-    await auditDataAccess(storage, consentResult.consentId ?? null, record.ownerGaii, accessorGaii, key, 'read', consentResult.allowed);
+    const consentResult = await authorizeRead(storage, config, {
+      ownerGaii: record.ownerGaii,
+      accessorGaii,
+      resourceKey: key,
+      visibility: record.visibility,
+      groupId: record.groupId,
+      action: 'read',
+    });
 
     if (!consentResult.allowed) {
       res.status(403).json(error(config.nodeId, 'CONSENT_DENIED', `Access denied: ${consentResult.reason}`));

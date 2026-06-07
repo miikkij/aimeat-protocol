@@ -11,6 +11,9 @@
  * @version-history
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 2 (F11): presigned GET /v1/download/:token + storage
  *     GET ?mode=handle|inline so binary bytes are fetched out-of-band, never base64'd into context.
+ *   v1.2.0 -- 2026-06-07 -- Access parity with memory: read paths go through shared authorizeRead()
+ *     (threads file.groupId so visibility:'group' is membership-checked); presigned downloads now
+ *     write an audit entry; /v1/pub authenticated-but-denied returns 403 (was 404).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -18,7 +21,8 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
-import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
+import { auditDataAccess } from '../services/consent.js';
+import { authorizeRead } from '../services/access-guard.js';
 import { randomBytes } from 'node:crypto';
 import { decodeStrictBase64 } from '../utils/base64.js';
 import { ChunkedUploadInitSchema, validateBody } from '../models/schemas.js';
@@ -78,6 +82,13 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         if (!file) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'File not found'));
             return;
+        }
+
+        // Audit the out-of-band fetch. The presigned token IS the capability (already
+        // owner-authorized), so we don't re-run consent — but the access is now logged
+        // like every other storage/memory read when the consent layer is enabled.
+        if (config.consentEnabled) {
+            await auditDataAccess(storage, null, file.ownerGaii, verified.sub, `storage:${verified.key}`, 'read', true);
         }
 
         const rangeHeader = req.headers.range;
@@ -467,8 +478,16 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
 
-        // Public files are always accessible
+        // Public files are always accessible (audited when the consent layer is on,
+        // mirroring memory's public read).
         if (file.visibility === 'public') {
+            await authorizeRead(storage, config, {
+                ownerGaii: gaii,
+                accessorGaii: req.auth?.sub ?? 'anonymous',
+                resourceKey: `storage:${key}`,
+                visibility: 'public',
+                action: 'read',
+            });
             res.setHeader('Cache-Control', 'public, max-age=300');
             res.setHeader('Content-Type', file.mimeType);
             res.setHeader('Content-Length', file.size);
@@ -476,27 +495,34 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
 
-        // Non-public files: attempt consent check if authenticated
-        if (!req.auth?.sub) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
-            return;
-        }
-
+        // Consent layer off → preserve the legacy existence-hiding behavior.
         if (!config.consentEnabled) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
             return;
         }
 
-        const result = await checkConsentForRead(
-            storage, `storage:${key}`, gaii, req.auth.sub, file.visibility,
-        );
-
-        // Audit the access attempt
-        await auditDataAccess(storage, result.consentId ?? null,
-            gaii, req.auth.sub, `storage:${key}`, 'read', result.allowed);
+        // Same access decision + audit as memory, threading file.groupId so visibility:'group'
+        // files are membership-checked. An anonymous caller holding a matching grant can still
+        // be allowed (parity with the prior behavior).
+        const accessorGaii = req.auth?.sub ?? 'anonymous';
+        const result = await authorizeRead(storage, config, {
+            ownerGaii: gaii,
+            accessorGaii,
+            resourceKey: `storage:${key}`,
+            visibility: file.visibility,
+            groupId: file.groupId,
+            action: 'read',
+        });
 
         if (!result.allowed) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
+            // Authenticated-but-denied → 403 (matches GET /v1/memory/:gaii/:key). Anonymous or
+            // unauthenticated callers keep the 404 existence-hiding convention for file URLs.
+            const isAnonymous = !req.auth?.sub || req.auth.anonymous === true;
+            if (isAnonymous) {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
+                return;
+            }
+            res.status(403).json(error(config.nodeId, 'CONSENT_DENIED', `Access denied: ${result.reason}`));
             return;
         }
 
@@ -524,14 +550,20 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         }
 
         // Cross-agent access: if the file is not owned by the requester, enforce consent
+        // through the shared guard (threads file.groupId for visibility:'group').
         if (file.ownerGaii !== resolve(req)) {
             if (file.visibility === 'public') {
                 // Public files are always accessible
             } else if (config.consentEnabled) {
-                const consentResult = await checkConsentForRead(
-                    storage, `storage:${key}`, file.ownerGaii, resolve(req), file.visibility,
-                );
-                if (!consentResult.allowed) {
+                const result = await authorizeRead(storage, config, {
+                    ownerGaii: file.ownerGaii,
+                    accessorGaii: resolve(req),
+                    resourceKey: `storage:${key}`,
+                    visibility: file.visibility,
+                    groupId: file.groupId,
+                    action: 'read',
+                });
+                if (!result.allowed) {
                     res.status(403).end();
                     return;
                 }
@@ -559,16 +591,20 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         }
 
         // Cross-agent access: if the file is not owned by the requester, enforce consent
+        // through the shared guard (one decision + audit, threads file.groupId).
         if (file.ownerGaii !== resolve(req)) {
             if (file.visibility === 'public') {
                 // Public files are always accessible
             } else if (config.consentEnabled) {
-                const consentResult = await checkConsentForRead(
-                    storage, `storage:${key}`, file.ownerGaii, resolve(req), file.visibility,
-                );
-                await auditDataAccess(storage, consentResult.consentId ?? null,
-                    file.ownerGaii, resolve(req), `storage:${key}`, 'read', consentResult.allowed);
-                if (!consentResult.allowed) {
+                const result = await authorizeRead(storage, config, {
+                    ownerGaii: file.ownerGaii,
+                    accessorGaii: resolve(req),
+                    resourceKey: `storage:${key}`,
+                    visibility: file.visibility,
+                    groupId: file.groupId,
+                    action: 'read',
+                });
+                if (!result.allowed) {
                     res.status(403).json(error(config.nodeId, 'CONSENT_REQUIRED', 'You do not have consent to access this file'));
                     return;
                 }

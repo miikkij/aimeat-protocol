@@ -5660,6 +5660,8 @@ paths:
         GET /v1/storage/{key}?mode=handle) encodes the owner and key and has a TTL.
         No Authorization header needed; supports Range headers. Not single-use — the handle
         may be fetched multiple times within its TTL (e.g. Range requests, resumes).
+        Each fetch is written to the file owner's consent audit log when the consent
+        layer is enabled.
       tags: [Storage]
       parameters:
         - name: token
@@ -14095,8 +14097,14 @@ paths:
       operationId: getPublicFile
       summary: Download public file
       description: |
-        Download a public file by agent GAII and key. No auth required for
-        public files. Supports wildcard keys with path separators.
+        Download a file by owner GAII and key. Public files need no auth.
+        Non-public files apply the same consent/visibility rules as memory:
+        the caller must hold a matching consent grant or (for `visibility:'group'`)
+        be a member of the file's sharing group; `organism.{id}` grants resolve for
+        active organism members. Every read is written to the consent audit log.
+        An authenticated caller without access gets 403; anonymous/unauthenticated
+        callers get 404 (file existence is hidden on public URLs).
+        Supports wildcard keys with path separators.
       tags: [Storage]
       parameters:
         - name: gaii
