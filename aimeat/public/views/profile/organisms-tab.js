@@ -783,6 +783,15 @@ function SchemaForm({ schema, busy, onSave, onCancel }) {
           <option value="">—</option>${def.enum.map(o => html`<option value=${o} key=${o}>${o}</option>`)}
         </select></label>`;
     }
+    // Date / datetime fields → native pickers (by schema format, or a name ending in _date).
+    if (def.format === 'date-time') {
+      return html`<label class="pj-field" key=${k}><span>${label}</span>
+        <input type="datetime-local" class="input-field input-sm" value=${vals[k] ?? ''} onInput=${e => set(k, e.target.value)} /></label>`;
+    }
+    if (def.format === 'date' || (def.type === 'string' && !def.enum && /(_date$|^date$)/i.test(k))) {
+      return html`<label class="pj-field" key=${k}><span>${label}</span>
+        <input type="date" class="input-field input-sm" value=${vals[k] ?? ''} onInput=${e => set(k, e.target.value)} /></label>`;
+    }
     if (def.type === 'integer' || def.type === 'number') {
       return html`<label class="pj-field" key=${k}><span>${label}</span>
         <input type="number" class="input-field input-sm" value=${vals[k] ?? ''} onInput=${e => set(k, e.target.value)} /></label>`;

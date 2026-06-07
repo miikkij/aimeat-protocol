@@ -137,9 +137,10 @@ const GEN_FORMAT_INSTRUCTION = `
 Do NOT interview. From the user's description, output ONLY a single JSON object:
 {
   "manifest": { a valid manifest — manifestVersion,id(""),name,kind,status:"active",objectTypes:[{name,schemaRef,namespace,cardinality,backing:"memory",writeRole,versioned}], policy:{agentAutonomy,alwaysGate} },
-  "schemas": { "<namespace>": <a JSON Schema {type:"object",required:[...],properties:{...}} for that objectType>, ... one per memory-backed objectType, keyed by its namespace }
+  "schemas": { "<namespace>": <a JSON Schema {type:"object",required:[...],properties:{...}} for that objectType>, ... one per memory-backed objectType, keyed by its namespace },
+  "examples": { "<namespace>": [ 1-3 realistic sample instances that VALIDATE against that namespace's schema, each with id "example-1","example-2",... ], ... }
 }
-Namespaces: owner-controlled types use "meta.<plural>", collaborative use "shared.<plural>". Every memory-backed objectType needs a schema entry under its namespace, and an "id" string property. Use bounded enums for status-like fields. No prose, no markdown fences.`;
+Namespaces: owner-controlled types use "meta.<plural>", collaborative use "shared.<plural>". Every memory-backed objectType needs a schema entry under its namespace, and an "id" string property. Use bounded enums for status-like fields, and "format":"date" (or "date-time") on any date field. Always include a few clearly-labelled example instances per type in "examples" (ids starting with "example-") so the user can see the shape. No prose, no markdown fences.`;
 
 /** The system instructions for the generator (manifest-architect prompt + output format). */
 export async function generatorSystemPrompt() {
@@ -232,6 +233,17 @@ export async function applyGeneratedWorkspace(orgId, generated) {
   const manifest = { ...generated.manifest, id: orgId, status: generated.manifest.status || 'active' };
   await apiPost('/v1/memory', { key: `organism.${orgId}.meta.manifest`, value: manifest, visibility: 'private' });
   await apiPost('/v1/memory', { key: `organism.${orgId}.meta.readme`, value: `# ${manifest.name || 'Workspace'}\n\n${manifest.summary || ''}`, visibility: 'private' });
+  // Write any example instances as DRAFTS (clearly not-yet-published samples). Best-effort: a
+  // sample that doesn't validate is skipped, not fatal.
+  let n = 0;
+  for (const [namespace, items] of Object.entries(generated.examples || {})) {
+    if (!Array.isArray(items)) continue;
+    for (const item of items.slice(0, 5)) {
+      n++;
+      const id = String((item && item.id) || `example-${n}`).replace(/[^a-zA-Z0-9_-]/g, '-');
+      await apiPost('/v1/memory', { key: `organism.${orgId}.${namespace}.${id}.draft`, value: { ...item, id }, visibility: 'private' }).catch(() => {});
+    }
+  }
 }
 
 /** Apply the project template to an EXISTING organism (register schemas + write the manifest + readme). */
