@@ -425,10 +425,13 @@ function Workspace({ org, showToast, onBack }) {
   const [ws, setWs] = useState(undefined); // undefined=loading, null=no manifest, object=workspace
   const [approvals, setApprovals] = useState([]);
   const [gateOn, setGateOn] = useState(false);
-  const [adding, setAdding] = useState(null);
-  const [draftId, setDraftId] = useState('');
-  const [draftText, setDraftText] = useState('');
+  const [adding, setAdding] = useState(null);          // objectType name being added
+  const [addingSchema, setAddingSchema] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [sName, setSName] = useState('');
+  const [sSummary, setSSummary] = useState('');
+  const [sAutonomy, setSAutonomy] = useState('L3');
 
   const load = useCallback(async () => {
     const w = await orgService.getWorkspace(orgId).catch(() => null);
@@ -460,23 +463,22 @@ function Workspace({ org, showToast, onBack }) {
     finally { setBusy(false); }
   }, [orgId, org, showToast, load]);
 
-  const saveDraft = useCallback(async (ot) => {
-    const id = (draftId.trim() || `${ot.name}-${Date.now().toString(36)}`).replace(/[^a-zA-Z0-9_-]/g, '-');
-    const field = PRIMARY_FIELD[ot.name] || 'title';
-    const value = { id };
-    value[field] = draftText.trim();
-    if (ot.name === 'goal') value.status = 'open';
-    if (ot.name === 'deliverable') value.status = 'proposed';
-    if (ot.name === 'plan') { value.version = 1; value.status = 'proposed'; }
-    if (ot.name === 'resource') { value.kind = 'link'; value.origin = 'link'; value.pointer = draftText.trim(); value.visibility = 'private'; }
+  const startAdd = useCallback(async (ot) => {
+    setAdding(ot.name); setAddingSchema(null);
+    const s = await orgService.getObjectSchema(orgId, ot.namespace);
+    setAddingSchema(s || { properties: { id: { type: 'string' }, title: { type: 'string' } }, required: ['title'] });
+  }, [orgId]);
+
+  const saveDraft = useCallback(async (ot, value) => {
+    const id = (String(value.id || '').trim() || `${ot.name}-${Date.now().toString(36)}`).replace(/[^a-zA-Z0-9_-]/g, '-');
     setBusy(true);
     try {
-      const r = await orgService.writeDraft(orgId, ot.namespace, id, value);
+      const r = await orgService.writeDraft(orgId, ot.namespace, id, { ...value, id });
       if (r?.ok === false) { showToast(r?.error?.message || 'Draft rejected'); }
-      else { showToast(t('organisms.draftSaved') || 'Draft saved'); setAdding(null); setDraftId(''); setDraftText(''); await load(); }
+      else { showToast(t('organisms.draftSaved') || 'Draft saved'); setAdding(null); setAddingSchema(null); await load(); }
     } catch (e) { showToast((e && e.message) || 'Failed to save draft'); }
     finally { setBusy(false); }
-  }, [draftId, draftText, orgId, showToast, load]);
+  }, [orgId, showToast, load]);
 
   const publish = useCallback(async (ot, instanceId) => {
     setBusy(true);
@@ -502,6 +504,31 @@ function Workspace({ org, showToast, onBack }) {
     catch (e) { showToast((e && e.message) || 'Failed to update gate'); }
     finally { setBusy(false); }
   }, [orgId, gateOn, showToast]);
+
+  const openSettings = () => {
+    setSName(ws?.manifest?.name || '');
+    setSSummary(ws?.manifest?.summary || '');
+    setSAutonomy(ws?.manifest?.policy?.agentAutonomy || 'L3');
+    setShowSettings(true);
+  };
+
+  const saveSettings = useCallback(async () => {
+    setBusy(true);
+    try {
+      const m = {
+        ...ws.manifest,
+        name: sName.trim() || ws.manifest.name,
+        summary: sSummary.trim(),
+        policy: { ...(ws.manifest.policy || {}), agentAutonomy: sAutonomy },
+        updatedAt: new Date().toISOString(),
+      };
+      await orgService.saveManifest(orgId, m);
+      showToast(t('organisms.settingsSaved') || 'Settings saved');
+      setShowSettings(false);
+      await load();
+    } catch (e) { showToast((e && e.message) || 'Failed to save settings'); }
+    finally { setBusy(false); }
+  }, [ws, sName, sSummary, sAutonomy, orgId, showToast, load]);
 
   const back = html`<div class="card-actions mb-half"><button class="btn-ghost btn-sm" onClick=${onBack}>${'← '}${t('organisms.backToList') || 'All organisms'}</button></div>`;
 
@@ -532,11 +559,31 @@ function Workspace({ org, showToast, onBack }) {
       </div>
 
       <div class="pj-gate">
+        <button class="btn-outline btn-sm" onClick=${() => showSettings ? setShowSettings(false) : openSettings()}>${'⚙ '}${t('organisms.settings') || 'Settings'}</button>
         <label class="pj-gate-label">
           <input type="checkbox" checked=${gateOn} onChange=${toggleGate} disabled=${busy} />
           ${' '}${t('organisms.publishGate') || 'Require review before publishing'}
         </label>
       </div>
+
+      ${showSettings && html`
+        <div class="pj-inbox">
+          <div class="card-h3">${t('organisms.settings') || 'Workspace settings'}</div>
+          <label class="pj-field"><span>${t('organisms.wsName') || 'Name'}</span>
+            <input type="text" class="input-field input-sm" value=${sName} onInput=${e => setSName(e.target.value)} /></label>
+          <label class="pj-field"><span>${t('organisms.wsSummary') || 'Summary'}</span>
+            <textarea class="input-field input-sm" rows="2" value=${sSummary} onInput=${e => setSSummary(e.target.value)}></textarea></label>
+          <label class="pj-field"><span>${t('organisms.autonomy') || 'AI autonomy (L1 cautious → L5 free)'}</span>
+            <select class="input-field input-sm" value=${sAutonomy} onChange=${e => setSAutonomy(e.target.value)}>
+              ${['L1', 'L2', 'L3', 'L4', 'L5'].map(l => html`<option value=${l} key=${l}>${l}</option>`)}
+            </select></label>
+          <div class="pj-empty">${t('organisms.template') || 'Template'}: ${escHtml(ws.manifest?.kind || '')} — ${escHtml((ws.manifest?.objectTypes || []).map(o => o.name).join(', '))}</div>
+          <div class="form-actions">
+            <button class="btn-primary btn-sm" onClick=${saveSettings} disabled=${busy}>${t('organisms.save') || 'Save'}</button>
+            <button class="btn-ghost btn-sm" onClick=${() => setShowSettings(false)}>${t('organisms.cancel') || 'Cancel'}</button>
+          </div>
+        </div>
+      `}
 
       ${approvals.length > 0 && html`
         <div class="pj-inbox">
@@ -557,20 +604,12 @@ function Workspace({ org, showToast, onBack }) {
         <div class="pj-section" key=${ot.name}>
           <div class="pj-section-head">
             <span class="pj-section-title">${escHtml(ot.name)}</span>
-            ${ot.append ? null : html`<button class="btn-outline btn-sm" onClick=${() => { setAdding(ot.name); setDraftId(''); setDraftText(''); }}>${'+ '}${t('organisms.addDraft') || 'Add draft'}</button>`}
+            ${ot.append ? null : html`<button class="btn-outline btn-sm" onClick=${() => startAdd(ot)}>${'+ '}${t('organisms.addDraft') || 'Add draft'}</button>`}
           </div>
 
           ${adding === ot.name && html`
-            <div class="create-form pj-draft-form">
-              <div class="flex-col">
-                <input type="text" class="input-field input-sm" placeholder=${t('organisms.idOptional') || 'id (optional)'} value=${draftId} onInput=${e => setDraftId(e.target.value)} />
-                <input type="text" class="input-field input-sm" placeholder=${(PRIMARY_FIELD[ot.name] || 'title')} value=${draftText} onInput=${e => setDraftText(e.target.value)} />
-                <div class="form-actions">
-                  <button class="btn-primary btn-sm" onClick=${() => saveDraft(ot)} disabled=${busy || !draftText.trim()}>${t('organisms.saveDraft') || 'Save draft'}</button>
-                  <button class="btn-ghost btn-sm" onClick=${() => setAdding(null)}>${t('organisms.cancel') || 'Cancel'}</button>
-                </div>
-              </div>
-            </div>
+            <${SchemaForm} schema=${addingSchema} busy=${busy}
+              onSave=${(v) => saveDraft(ot, v)} onCancel=${() => { setAdding(null); setAddingSchema(null); }} />
           `}
 
           ${draftsFor(ot.name).map((d, i) => html`
@@ -601,6 +640,69 @@ function Workspace({ org, showToast, onBack }) {
           `)}
         </div>
       `}
+    </div>
+  `;
+}
+
+/* A form rendered from a JSON Schema — typed inputs (enum→select, integer→number,
+ * array→lines, boolean→checkbox, else text). Works for any objectType, including ones a
+ * generated manifest declares. `id` is auto-generated when blank, so it's never required here. */
+function SchemaForm({ schema, busy, onSave, onCancel }) {
+  const props = (schema && schema.properties) || {};
+  const required = new Set(((schema && schema.required) || []).filter(k => k !== 'id'));
+  const fieldNames = Object.keys(props);
+  const [vals, setVals] = useState({});
+  const set = (k, v) => setVals(s => ({ ...s, [k]: v }));
+
+  const buildValue = () => {
+    const out = {};
+    for (const [k, def] of Object.entries(props)) {
+      const raw = vals[k];
+      if (raw === undefined || raw === '') continue;
+      if (def.type === 'integer' || def.type === 'number') out[k] = Number(raw);
+      else if (def.type === 'boolean') out[k] = !!raw;
+      else if (def.type === 'array') out[k] = String(raw).split('\n').map(s => s.trim()).filter(Boolean);
+      else out[k] = raw;
+    }
+    return out;
+  };
+
+  const canSave = [...required].every(k => vals[k] !== undefined && String(vals[k]).trim() !== '');
+
+  const field = (k, def) => {
+    const label = k + (required.has(k) ? ' *' : '');
+    if (def.type === 'string' && Array.isArray(def.enum)) {
+      return html`<label class="pj-field" key=${k}><span>${label}</span>
+        <select class="input-field input-sm" value=${vals[k] ?? ''} onChange=${e => set(k, e.target.value)}>
+          <option value="">—</option>${def.enum.map(o => html`<option value=${o} key=${o}>${o}</option>`)}
+        </select></label>`;
+    }
+    if (def.type === 'integer' || def.type === 'number') {
+      return html`<label class="pj-field" key=${k}><span>${label}</span>
+        <input type="number" class="input-field input-sm" value=${vals[k] ?? ''} onInput=${e => set(k, e.target.value)} /></label>`;
+    }
+    if (def.type === 'boolean') {
+      return html`<label class="pj-field pj-field-inline" key=${k}><input type="checkbox" checked=${!!vals[k]} onChange=${e => set(k, e.target.checked)} /><span>${label}</span></label>`;
+    }
+    if (def.type === 'array') {
+      return html`<label class="pj-field" key=${k}><span>${label} ${'(' + (t('organisms.onePerLine') || 'one per line') + ')'}</span>
+        <textarea class="input-field input-sm" rows="2" value=${vals[k] ?? ''} onInput=${e => set(k, e.target.value)}></textarea></label>`;
+    }
+    return html`<label class="pj-field" key=${k}><span>${label}</span>
+      <input type="text" class="input-field input-sm" value=${vals[k] ?? ''} onInput=${e => set(k, e.target.value)} /></label>`;
+  };
+
+  return html`
+    <div class="create-form pj-draft-form">
+      <div class="flex-col">
+        ${fieldNames.length === 0
+          ? html`<div class="pj-empty">${t('organisms.loading') || 'Loading...'}</div>`
+          : fieldNames.map(k => field(k, props[k]))}
+        <div class="form-actions">
+          <button class="btn-primary btn-sm" onClick=${() => onSave(buildValue())} disabled=${busy || !canSave}>${t('organisms.saveDraft') || 'Save draft'}</button>
+          <button class="btn-ghost btn-sm" onClick=${onCancel}>${t('organisms.cancel') || 'Cancel'}</button>
+        </div>
+      </div>
     </div>
   `;
 }

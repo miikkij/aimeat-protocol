@@ -138,6 +138,21 @@ export async function getWorkspace(orgId) {
   return resp?.data || null;
 }
 
+/** Overwrite the organism's manifest (e.g. edited name/summary/policy from Settings). */
+export async function saveManifest(orgId, manifest) {
+  return apiPost('/v1/memory', { key: `organism.${orgId}.meta.manifest`, value: manifest, visibility: 'private' });
+}
+
+/** Fetch the JSON Schema registered for an object-type namespace (drives schema-aware forms).
+ *  Probes a sub-key so the prefix schema resolves (a prefix schema doesn't self-match its own key). */
+export async function getObjectSchema(orgId, namespace) {
+  const key = `organism.${orgId}.${namespace}._form`;
+  try {
+    const resp = await apiGet(`/v1/memory/${encodeURIComponent(key)}/schema`);
+    return resp?.data?.has_schema ? resp.data.schema : null;
+  } catch { return null; }
+}
+
 /** Write/overwrite an object's draft (`…{namespace}.{id}.draft`). */
 export async function writeDraft(orgId, namespace, instanceId, value) {
   return apiPost('/v1/memory', { key: `organism.${orgId}.${namespace}.${instanceId}.draft`, value, visibility: 'private' });

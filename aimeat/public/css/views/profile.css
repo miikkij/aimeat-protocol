@@ -2019,3 +2019,6 @@
 .pj-item-text { flex: 1; font-size: 0.9rem; }
 .pj-empty { color: var(--muted); font-size: 0.85rem; padding: 0.2rem 0; }
 .pj-decision { font-size: 0.85rem; color: var(--muted); }
+.pj-field { display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 0.35rem; }
+.pj-field > span { font-size: 0.75rem; color: var(--muted); }
+.pj-field-inline { flex-direction: row; align-items: center; gap: 0.4rem; }
