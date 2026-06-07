@@ -10814,6 +10814,71 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/organisms/{id}/workspace:
+    get:
+      operationId: getOrganismWorkspace
+      summary: Read an organism's manifest-driven workspace
+      description: |
+        Generic, manifest-driven aggregation of an organism's workspace. Reads the manifest at
+        `organism.{id}.meta.manifest` and, for every memory-backed `objectTypes[]` it declares,
+        returns the records under that namespace — following whatever vocabulary the manifest
+        declares (works identically for a `kind:'project'` or `kind:'research-study'` manifest;
+        the core enumerates no fixed type list). Object records themselves are written/read via
+        the generic memory API (`POST/GET /v1/memory`); this is a convenience read.
+
+        Access: the caller must be an active member (or an organism agent) — non-members get 403.
+        Each non-owned record is then gated through the shared read-authorization guard, so a
+        member only sees records their consent/visibility allows.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organism ID
+      responses:
+        '200':
+          description: The aggregated workspace
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          manifest:
+                            type: object
+                            nullable: true
+                            description: The manifest at organism.{id}.meta.manifest (null if unreadable/absent)
+                          readme:
+                            nullable: true
+                            description: Markdown readme at organism.{id}.meta.readme
+                          objects:
+                            type: object
+                            additionalProperties:
+                              type: array
+                              items: {}
+                            description: Records keyed by the manifest's objectType name
+                          decisions:
+                            type: array
+                            items: {}
+                          resources:
+                            type: array
+                            items: {}
+                          todos:
+                            type: array
+                            items: {}
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /v1/organisms/{id}/join-requests:
     get:
       operationId: listJoinRequests

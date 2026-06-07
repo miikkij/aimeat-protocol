@@ -1,0 +1,31 @@
+# Project object type: deliverable — an outcome + acceptance criteria + rating.
+# Registered organism-scoped at organism.{id}.shared.deliverables.* when applied.
+csm: "1.0"
+service:
+  name: "project-deliverable"
+  type: "record"
+  description: "A project outcome with acceptance criteria and an optional rating."
+  version: "1.0"
+schema_mode: "strict"
+data_schema:
+  required:
+    id: { type: string, min: 1 }
+    title: { type: string, min: 1 }
+    status: { type: string, enum: ["proposed", "in_progress", "delivered", "accepted", "rejected"] }
+  optional:
+    description: { type: string }
+    acceptanceCriteria: { type: array, items: string }
+    inputs: { type: array, items: string }
+    rating:
+      type: object
+      properties:
+        stars: { type: integer, min: 1, max: 5, required: false }
+        ratedBy: { type: string, required: false }
+        raterType: { type: string, enum: ["human-owner", "agent", "source-grounded-agent"], required: false }
+        reason: { type: string, required: false }
+    gateId: { type: string }
+consent_requirements:
+  visibility_default: "private"
+  requires_consent: true
+  consent_purpose: "Project workspace deliverable record"
+  data_retention: "until_revoked"

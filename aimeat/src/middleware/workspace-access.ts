@@ -1,3 +1,16 @@
+/**
+ * @file workspace-access.ts
+ * @description Express middleware that gates memory operations on `organism.{id}.*` keys by
+ *   organism membership, namespace role (meta = admin/creator write, shared = member, member.{owner}
+ *   = self), and the consent layer. Memberships are keyed by the BARE owner name (matching
+ *   organisms.ts and consent.ts). Mounted by the memory routes for every organism-namespace key.
+ * @structure
+ *   - workspaceAccessMiddleware(config, storage) — RequestHandler that allows or 401/403/404s
+ * @usage const ws = workspaceAccessMiddleware(config, storage); router.get('/v1/memory/:key', ws, ...);
+ * @version-history
+ *   v1.0.0 -- 2026-02 -- Phase 2.3 organism workspace access control.
+ *   v1.1.0 -- 2026-06-07 -- Key the membership lookup by bare owner name (was full GHII → 403'd members).
+ */
 import type { RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -58,7 +71,7 @@ export function workspaceAccessMiddleware(
       return;
     }
 
-    // Resolve the user's GHII via their ownerName
+    // Confirm the user is a registered GHII on this node.
     const userGhii = await storage.getGHIIByOwner(ownerName);
 
     if (!userGhii) {
@@ -66,7 +79,10 @@ export function workspaceAccessMiddleware(
       return;
     }
 
-    const membership = await storage.getMembership(organismId, userGhii.ghii);
+    // Memberships are keyed by the BARE owner name — organisms.ts (join/leave/admin) and
+    // consent.ts (organism resolution) both look up membership with req.auth.owner, NOT the
+    // full GHII. Looking it up by userGhii.ghii here silently 403'd every real member.
+    const membership = await storage.getMembership(organismId, ownerName);
     if (!membership || membership.status !== 'active') {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism'));
       return;

@@ -1,0 +1,24 @@
+# Project object type: resource — an index entry pointing at a repo / zip / asset / knowledge.
+# Registered organism-scoped at organism.{id}.shared.resources.* when applied.
+csm: "1.0"
+service:
+  name: "project-resource"
+  type: "record"
+  description: "An index entry pointing at a doc, code, asset, knowledge package or link."
+  version: "1.0"
+schema_mode: "strict"
+data_schema:
+  required:
+    id: { type: string, min: 1 }
+    kind: { type: string, enum: ["doc", "code", "asset", "knowledge", "link"] }
+    label: { type: string, min: 1 }
+    origin: { type: string, enum: ["local", "referenced", "link"] }
+    pointer: { type: string, min: 1 }
+    visibility: { type: string, enum: ["private", "owner", "group", "public"] }
+  optional:
+    sourceOwnerGaii: { type: string }
+consent_requirements:
+  visibility_default: "private"
+  requires_consent: true
+  consent_purpose: "Project workspace resource index"
+  data_retention: "until_revoked"

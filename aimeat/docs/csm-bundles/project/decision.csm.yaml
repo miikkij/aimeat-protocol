@@ -1,0 +1,23 @@
+# Project object type: decision — an append-only decision / plan-change / rating log entry.
+# Registered organism-scoped at organism.{id}.meta.decisions.* when applied.
+csm: "1.0"
+service:
+  name: "project-decision"
+  type: "record"
+  description: "An append-only decision, plan-change, deliverable or rating log entry."
+  version: "1.0"
+schema_mode: "strict"
+data_schema:
+  required:
+    ts: { type: string, min: 1 }
+    kind: { type: string, enum: ["decision", "plan-change", "deliverable", "rating"] }
+    by: { type: string, min: 1 }
+    summary: { type: string, min: 1 }
+  optional:
+    detail: { type: string }
+    refs: { type: array, items: string }
+consent_requirements:
+  visibility_default: "private"
+  requires_consent: true
+  consent_purpose: "Project workspace decision log"
+  data_retention: "until_revoked"

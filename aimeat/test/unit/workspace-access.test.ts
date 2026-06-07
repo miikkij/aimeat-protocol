@@ -66,7 +66,7 @@ function makeMembership(overrides: Partial<OrganismMembershipRecord> = {}): Orga
   return {
     id: `mem-${Math.random().toString(36).slice(2, 10)}`,
     organismId: 'org-1',
-    ghii: 'alice@test-node',
+    ghii: 'alice',
     role: 'member',
     status: 'active',
     joinedAt: new Date().toISOString(),
@@ -369,7 +369,7 @@ describe('workspaceAccessMiddleware', () => {
     it('returns 403 when membership status is suspended (not active)', async () => {
       await storage.createMembership(makeMembership({
         organismId: 'org-1',
-        ghii: 'alice@test-node',
+        ghii: 'alice',
         role: 'member',
         status: 'banned',
       }));
@@ -388,7 +388,7 @@ describe('workspaceAccessMiddleware', () => {
     it('returns 403 when membership status is pending', async () => {
       await storage.createMembership(makeMembership({
         organismId: 'org-1',
-        ghii: 'alice@test-node',
+        ghii: 'alice',
         role: 'member',
         status: 'pending',
       }));
@@ -412,7 +412,7 @@ describe('workspaceAccessMiddleware', () => {
       await storage.createGHII(makeGHII({ username: 'alice', ghii: 'alice@test-node', ownerName: 'alice' }));
       await storage.createMembership(makeMembership({
         organismId: 'org-1',
-        ghii: 'alice@test-node',
+        ghii: 'alice',
         role: 'member',
         status: 'active',
       }));
@@ -469,7 +469,7 @@ describe('workspaceAccessMiddleware', () => {
       await storage.createGHII(makeGHII({ username: 'alice', ghii: 'alice@test-node', ownerName: 'alice' }));
       await storage.createMembership(makeMembership({
         organismId: 'org-1',
-        ghii: 'alice@test-node',
+        ghii: 'alice',
         role: 'member',
         status: 'active',
       }));
@@ -617,7 +617,7 @@ describe('workspaceAccessMiddleware', () => {
       await storage.createGHII(makeGHII({ username: 'alice', ghii: 'alice@test-node', ownerName: 'alice' }));
       await storage.createMembership(makeMembership({
         organismId: 'org-1',
-        ghii: 'alice@test-node',
+        ghii: 'alice',
         role: 'member',
         status: 'active',
       }));
@@ -674,7 +674,7 @@ describe('workspaceAccessMiddleware', () => {
     it('allows admin to write meta namespace', async () => {
       await storage.createMembership(makeMembership({
         organismId: 'org-1',
-        ghii: 'alice@test-node',
+        ghii: 'alice',
         role: 'admin',
         status: 'active',
       }));
@@ -691,7 +691,7 @@ describe('workspaceAccessMiddleware', () => {
     it('allows creator to write meta namespace', async () => {
       await storage.createMembership(makeMembership({
         organismId: 'org-1',
-        ghii: 'alice@test-node',
+        ghii: 'alice',
         role: 'creator',
         status: 'active',
       }));
@@ -708,7 +708,7 @@ describe('workspaceAccessMiddleware', () => {
     it('denies regular member from writing meta namespace', async () => {
       await storage.createMembership(makeMembership({
         organismId: 'org-1',
-        ghii: 'alice@test-node',
+        ghii: 'alice',
         role: 'member',
         status: 'active',
       }));
@@ -728,7 +728,7 @@ describe('workspaceAccessMiddleware', () => {
     it('denies member from DELETE on meta namespace', async () => {
       await storage.createMembership(makeMembership({
         organismId: 'org-1',
-        ghii: 'alice@test-node',
+        ghii: 'alice',
         role: 'member',
         status: 'active',
       }));
@@ -756,7 +756,7 @@ describe('workspaceAccessMiddleware', () => {
       await storage.createGHII(makeGHII({ username: 'alice', ghii: 'alice@test-node', ownerName: 'alice' }));
       await storage.createMembership(makeMembership({
         organismId: 'org-1',
-        ghii: 'alice@test-node',
+        ghii: 'alice',
         role: 'member',
         status: 'active',
       }));
@@ -838,7 +838,7 @@ describe('workspaceAccessMiddleware', () => {
       await storage.createGHII(makeGHII({ username: 'alice', ghii: 'alice@test-node', ownerName: 'alice' }));
       await storage.createMembership(makeMembership({
         organismId: 'org-1',
-        ghii: 'alice@test-node',
+        ghii: 'alice',
         role: 'member',
         status: 'active',
       }));
@@ -866,7 +866,7 @@ describe('workspaceAccessMiddleware', () => {
       await storage.createGHII(makeGHII({ username: 'alice', ghii: 'alice@test-node', ownerName: 'alice' }));
       await storage.createMembership(makeMembership({
         organismId: 'my-org-123',
-        ghii: 'alice@test-node',
+        ghii: 'alice',
         role: 'member',
         status: 'active',
       }));
@@ -893,7 +893,7 @@ describe('workspaceAccessMiddleware', () => {
       await storage.createGHII(makeGHII({ username: 'alice', ghii: 'alice@test-node', ownerName: 'alice' }));
       await storage.createMembership(makeMembership({
         organismId: 'org-1',
-        ghii: 'alice@test-node',
+        ghii: 'alice',
         role: 'admin',
         status: 'active',
       }));

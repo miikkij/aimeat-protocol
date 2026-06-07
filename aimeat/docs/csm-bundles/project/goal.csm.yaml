@@ -1,0 +1,23 @@
+# Project object type: goal — a requirement with a definition-of-done.
+# Compiled to JSON Schema (csmToJsonSchema) and registered organism-scoped at
+# organism.{id}.meta.goals.* when the project template is applied.
+csm: "1.0"
+service:
+  name: "project-goal"
+  type: "record"
+  description: "A project requirement with a definition-of-done."
+  version: "1.0"
+schema_mode: "strict"
+data_schema:
+  required:
+    id: { type: string, min: 1 }
+    title: { type: string, min: 1 }
+    status: { type: string, enum: ["open", "met", "dropped"] }
+  optional:
+    definitionOfDone: { type: array, items: string }
+    gateId: { type: string }
+consent_requirements:
+  visibility_default: "private"
+  requires_consent: true
+  consent_purpose: "Project workspace goal record"
+  data_retention: "until_revoked"

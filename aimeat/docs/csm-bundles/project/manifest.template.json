@@ -1,0 +1,44 @@
+{
+  "_comment": "Project template manifest skeleton. A client/agent applying this template replaces __ORGANISM_ID__, __NAME__ and __SUMMARY__, registers each objectType's organism-scoped schema (compiled from the sibling *.csm.yaml files, fetchable globally as csm.project-<type>), then writes this object to organism.{id}.meta.manifest. See docs/csm-bundles/README.md for the apply recipe. 'flow' is stored + validated here but executed in a later phase.",
+  "manifestVersion": "1.0",
+  "id": "__ORGANISM_ID__",
+  "name": "__NAME__",
+  "kind": "project",
+  "language": "en",
+  "summary": "__SUMMARY__",
+  "status": "active",
+  "entry": {
+    "readme": "organism.__ORGANISM_ID__.meta.readme",
+    "loadHint": "Read readme -> primaryGoal -> latest approved plan -> open deliverables + todos -> recent decisions.",
+    "primaryGoal": ""
+  },
+  "objectTypes": [
+    { "name": "goal",        "description": "Requirement + definition-of-done.",                  "schemaRef": "schema:project/goal@1",        "namespace": "meta.goals",          "cardinality": "many", "backing": "memory", "writeRole": "owner" },
+    { "name": "plan",        "description": "Approach + steps, versioned, gated before work.",      "schemaRef": "schema:project/plan@1",        "namespace": "meta.plans",          "cardinality": "many", "backing": "memory", "writeRole": "owner" },
+    { "name": "task",        "description": "Execution unit (the task system).",                   "schemaRef": "schema:project/task@1",        "namespace": "(tasks)",             "cardinality": "many", "backing": "tasks",  "writeRole": "member" },
+    { "name": "deliverable", "description": "Outcome + acceptance criteria + rating.",              "schemaRef": "schema:project/deliverable@1", "namespace": "shared.deliverables", "cardinality": "many", "backing": "memory", "writeRole": "member" },
+    { "name": "decision",    "description": "Append-only decision / plan-change / rating log.",      "schemaRef": "schema:project/decision@1",    "namespace": "meta.decisions",      "cardinality": "many", "backing": "memory", "writeRole": "member", "append": true },
+    { "name": "resource",    "description": "Index entry -> repo / zip / asset / knowledge.",        "schemaRef": "schema:project/resource@1",    "namespace": "shared.resources",    "cardinality": "many", "backing": "memory", "writeRole": "member" }
+  ],
+  "flow": {
+    "stages": [
+      { "id": "g", "type": "goal", "ref": "meta.goals.primary" },
+      { "id": "p", "type": "plan", "ref": "meta.plans.v1", "dependsOn": ["g"] },
+      { "id": "d", "type": "deliverable", "ref": "shared.deliverables.first", "dependsOn": ["p"] }
+    ],
+    "gates": [
+      { "id": "gp", "after": "p", "rule": "approve", "risk": "high", "approverRole": "owner", "prompt": "Approve the plan before building?" }
+    ],
+    "branches": []
+  },
+  "sharing": {
+    "publicEntries": ["organism.__ORGANISM_ID__.meta.readme"],
+    "sharingGroups": []
+  },
+  "policy": {
+    "agentAutonomy": "L3",
+    "alwaysGate": ["data-model-change", "external-release", "data-egress", "spend"],
+    "budget": { "dailyMorsels": null },
+    "synthesis": null
+  }
+}

@@ -1,11 +1,26 @@
+/**
+ * @file organisms.ts
+ * @description Generic organism (group/team/club/cooperative/project) routes: CRUD, join/leave,
+ *   membership + admin management, join-request review, and the manifest-driven workspace read.
+ *   An organism is the one container; a "project" is just `type:'project'` + a `meta.manifest`.
+ *   The backend stays protocol-only — object records are read/written via the generic memory API;
+ *   this router adds no per-object-type endpoints.
+ * @structure
+ *   - organismsRouter(config, storage) — POST/GET/PUT/DELETE /v1/organisms (+ :id sub-resources)
+ *   - GET /v1/organisms/:id/workspace — manifest-driven, membership-gated workspace aggregation
+ * @usage app.use(organismsRouter(config, storage));
+ * @version-history
+ *   v1.1.0 -- 2026-06-07 -- Phase 3: add the generic GET /:id/workspace read.
+ */
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { authorizeRead } from '../services/access-guard.js';
 
 export function organismsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -474,6 +489,102 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
 
     res.json(success(config.nodeId, { demoted: targetGhii, role: 'member' }));
     emitChange('organisms');
+  });
+
+  /* ── GET /v1/organisms/:id/workspace — Manifest-driven workspace read ──
+   *
+   * Generic over ANY manifest: reads `organism.{id}.meta.manifest`, then for each
+   * memory-backed `objectTypes[]` it declares, returns the records under that namespace.
+   * Works identically for a `kind:'project'` or a `kind:'research-study'` / Finnish
+   * `kind:'tutkimus'` manifest — the core enumerates whatever the manifest declares,
+   * never a hardcoded type list.
+   *
+   * Access: the caller must be an active member (or an organism agent) — non-members 403.
+   * Each non-owned record is then gated through the shared `authorizeRead` guard, so a
+   * member only sees records their consent/visibility allows (own records pass directly).
+   */
+  router.get('/v1/organisms/:id/workspace', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      return;
+    }
+
+    // Membership gate — an organism agent, or an active member. Memberships are keyed by the
+    // BARE owner name (matches organisms.ts join/leave + consent.ts organism resolution).
+    const callerSub = req.auth!.sub;
+    const ownerName = req.auth!.owner;
+    let isMember = !!callerSub && organism.agentGaiis.includes(callerSub);
+    if (!isMember && ownerName) {
+      const membership = await storage.getMembership(id, ownerName);
+      isMember = !!membership && membership.status === 'active';
+    }
+    if (!isMember) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism'));
+      return;
+    }
+
+    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+    const nsRoot = `organism.${id}.`;
+
+    // Enumerate the whole workspace by key prefix across all member identities, then
+    // access-filter: own records pass directly; others go through the shared read guard.
+    const { items } = await storage.listAllMemory({ prefix: nsRoot, limit: 5000 });
+    const readable: MemoryRecord[] = [];
+    for (const rec of items) {
+      if (rec.ownerGaii === callerGaii) { readable.push(rec); continue; }
+      const decision = await authorizeRead(storage, config, {
+        ownerGaii: rec.ownerGaii,
+        accessorGaii: callerGaii,
+        resourceKey: rec.key,
+        visibility: rec.visibility,
+        groupId: rec.groupId,
+        action: 'read',
+      });
+      if (decision.allowed) readable.push(rec);
+    }
+    const byKey = new Map(readable.map(r => [r.key, r]));
+
+    const manifestRec = byKey.get(`${nsRoot}meta.manifest`);
+    const manifest = (manifestRec?.value as Record<string, unknown> | undefined) ?? null;
+    const readme = byKey.get(`${nsRoot}meta.readme`)?.value ?? null;
+
+    // Build the generic objects map from whatever objectTypes the manifest declares.
+    const objectTypes = (manifest?.objectTypes as Array<Record<string, unknown>> | undefined) ?? [];
+    const memoryBackings = new Set(['memory', 'knowledge', 'storage']);
+    const objects: Record<string, unknown[]> = {};
+    for (const ot of objectTypes) {
+      const name = typeof ot.name === 'string' ? ot.name : undefined;
+      const namespace = typeof ot.namespace === 'string' ? ot.namespace : undefined;
+      if (!name || !namespace || !memoryBackings.has(ot.backing as string)) continue;
+      const nsPrefix = `${nsRoot}${namespace}.`;
+      objects[name] = readable.filter(r => r.key.startsWith(nsPrefix)).map(r => r.value);
+    }
+
+    // Convenience aliases — generic, empty when the manifest declares no such type.
+    const appendType = objectTypes.find(ot => ot.append === true);
+    const decisions = appendType ? (objects[appendType.name as string] ?? []) : [];
+    const resourceType = objectTypes.find(ot =>
+      ot.name === 'resource' || (typeof ot.namespace === 'string' && ot.namespace.endsWith('resources')));
+    const resources = resourceType ? (objects[resourceType.name as string] ?? []) : [];
+
+    // todos — tasks linked to this organism by the memoryPrefix convention (no native
+    // organismId on tasks). Best-effort: empty if none match.
+    let todos: unknown[] = [];
+    try {
+      const { tasks } = await storage.listAgentTasksByOwner(callerGaii, { perPage: 200 });
+      todos = tasks
+        .filter(t => (t.resources?.memoryPrefixes ?? []).some(p => p.startsWith(`organism.${id}`)))
+        .map(t => ({ id: t.id, title: t.title, status: t.status, todos: t.todos }));
+    } catch {
+      /* best-effort: leave todos empty if the task store is unavailable */
+    }
+
+    res.json(success(config.nodeId, { manifest, readme, objects, decisions, resources, todos }, [
+      { description: 'Read the manifest directly', method: 'GET', url: `/v1/memory/${encodeURIComponent(`${nsRoot}meta.manifest`)}` },
+      { description: 'Write a workspace record', method: 'POST', url: '/v1/memory' },
+    ]));
   });
 
   return router;

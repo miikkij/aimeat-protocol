@@ -1,0 +1,23 @@
+# Project object type: plan — a versioned approach, gated before work begins.
+# Registered organism-scoped at organism.{id}.meta.plans.* when the template is applied.
+csm: "1.0"
+service:
+  name: "project-plan"
+  type: "record"
+  description: "A versioned approach + steps for reaching a goal; gated before build."
+  version: "1.0"
+schema_mode: "strict"
+data_schema:
+  required:
+    id: { type: string, min: 1 }
+    approach: { type: string, min: 1 }
+    version: { type: integer, min: 1 }
+    status: { type: string, enum: ["proposed", "approved", "superseded"] }
+  optional:
+    steps: { type: array, items: string }
+    gateId: { type: string }
+consent_requirements:
+  visibility_default: "private"
+  requires_consent: true
+  consent_purpose: "Project workspace plan record"
+  data_retention: "until_revoked"

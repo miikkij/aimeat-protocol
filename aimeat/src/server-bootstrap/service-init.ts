@@ -24,6 +24,8 @@ import { performKeyExchange } from '../routes/federation.js';
 import { TunnelManager } from '../services/personal-tunnel.js';
 import { seedProfileSchemas } from '../services/profile-schemas.js';
 import { seedCsmTemplates } from '../services/csm-seed.js';
+import { seedManifestSchema } from '../services/manifest-schema.js';
+import { seedTemplateBundles } from '../services/template-bundles.js';
 import { seedKnowledgeTemplates } from '../services/knowledge.js';
 import { seedSystemPrompts } from '../services/prompt-seeder.js';
 import { seedBundledCortexes } from '../services/cortex-seeder.js';
@@ -88,6 +90,16 @@ export async function initializeServices(
   seedCsmTemplates(storage, `system@${config.nodeId}`)
     .then(count => { if (count > 0) logger.info(`Seeded ${count} CSM schemas`); })
     .catch(err => logger.error('Failed to seed CSM schemas', { error: err }));
+
+  // Seed the generic manifest-format schema (organism.*.meta.manifest) — Phase 3
+  seedManifestSchema(storage, `system@${config.nodeId}`)
+    .then(count => { if (count > 0) logger.info('Seeded manifest-format schema'); })
+    .catch(err => logger.error('Failed to seed manifest schema', { error: err }));
+
+  // Seed organism template bundles (project object-type CSMs) globally — Phase 3
+  seedTemplateBundles(storage, `system@${config.nodeId}`)
+    .then(count => { if (count > 0) logger.info(`Seeded ${count} template-bundle CSMs`); })
+    .catch(err => logger.error('Failed to seed template bundles', { error: err }));
 
   // Seed knowledge packager prompt templates
   seedKnowledgeTemplates(storage, `system@${config.nodeId}`)
