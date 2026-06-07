@@ -149,9 +149,17 @@ export async function generatorSystemPrompt() {
   return (await getManifestArchitectPrompt()) + GEN_FORMAT_INSTRUCTION;
 }
 
+/** Frame the request — when restructuring an existing workspace, give the AI the current manifest
+ *  so it EXTENDS rather than starts over (additive: keep existing types unless told to remove). */
+function frameRequest(description, currentManifest) {
+  const req = description || '(describe the workspace you want)';
+  if (!currentManifest) return req;
+  return `Current manifest — EXTEND it: keep its existing objectTypes and their namespaces unless I explicitly ask to remove them, and add what I describe.\n${JSON.stringify(currentManifest)}\n\nWhat to change or add: ${req}`;
+}
+
 /** The full text to copy into any AI chat (instructions + the user's request). */
-export async function buildGeneratorPrompt(description) {
-  return (await generatorSystemPrompt()) + `\n\nUser request: ${description || '(describe the workspace you want)'}`;
+export async function buildGeneratorPrompt(description, currentManifest) {
+  return (await generatorSystemPrompt()) + `\n\nUser request: ${frameRequest(description, currentManifest)}`;
 }
 
 /** Parse an AI response into { manifest, schemas } — strips markdown fences + surrounding prose. */
@@ -170,11 +178,11 @@ export function parseGenerated(text) {
 
 /** Call the AI and return the RAW content string (the caller shows + validates it).
  *  Uses a long timeout (slow free models can take minutes) and no retry on timeout. */
-export async function generateRaw(description) {
+export async function generateRaw(description, currentManifest) {
   const resp = await api('/v1/ai/complete', {
     method: 'POST',
     body: JSON.stringify({
-      prompt: description,
+      prompt: frameRequest(description, currentManifest),
       systemPrompt: await generatorSystemPrompt(),
       modelRole: 'execution',
       max_tokens: 3000,
@@ -185,6 +193,12 @@ export async function generateRaw(description) {
   });
   if (resp?.ok === false) { const e = new Error(resp?.error?.message || 'AI call failed'); e.code = resp?.error?.code; throw e; }
   return String(resp?.data?.content || '');
+}
+
+/** Delete a workspace entirely — removes all organism.{id}.* memory + its schema locks. The
+ *  organism stays (returns to "no workspace yet"). Deliberate typed-confirmation lives in the UI. */
+export async function deleteWorkspace(orgId) {
+  return apiDelete(`/v1/organisms/${encodeURIComponent(orgId)}/workspace`);
 }
 
 /** Client-side validation of a parsed { manifest, schemas }. Returns an array of human-readable

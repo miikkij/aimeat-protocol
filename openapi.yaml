@@ -10878,6 +10878,47 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteOrganismWorkspace
+      summary: Delete an organism's workspace (manifest + all data + schemas)
+      description: |
+        Destructive. Removes every `organism.{id}.*` memory key (manifest, readme, config, and all
+        object instances — drafts, `.latest`, and `.version.N` history) and unregisters the
+        workspace's schema locks. The organism itself (membership, etc.) is kept — it returns to
+        "no workspace yet". Creator/admin only. The deliberate typed-confirmation lives in the UI.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organism ID
+      responses:
+        '200':
+          description: Workspace deleted (counts of removed keys/schemas)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          deleted:
+                            type: boolean
+                          memoryKeys:
+                            type: integer
+                          schemas:
+                            type: integer
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /v1/organisms/{id}/publish:
     post:

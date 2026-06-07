@@ -718,6 +718,29 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     return { ok: true, version: n };
   };
 
+  /* ── DELETE /v1/organisms/:id/workspace — wipe the workspace (manifest + readme + config + ALL
+   * object data: drafts, latest, version history) and unregister its schema locks. The organism
+   * itself (membership, etc.) stays — it returns to "no workspace yet". Creator/admin only; the
+   * deliberate typed-confirmation lives in the UI. Memory under organism.{id}.* is removed entirely. */
+  router.delete('/v1/organisms/:id/workspace', requireAuth(), requireRole('agent'), async (req, res) => {
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const role = await memberRole(req, organism, id);
+    if (role !== 'creator' && role !== 'admin') {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can delete the workspace'));
+      return;
+    }
+    const prefix = `organism.${id}.`;
+    const { items } = await storage.listAllMemory({ prefix, limit: 100000 });
+    let memoryKeys = 0;
+    for (const r of items) { if (await storage.deleteMemory(r.ownerGaii, r.key)) memoryKeys++; }
+    let schemas = 0;
+    for (const s of await storage.listSchemas(prefix)) { if (await storage.deleteSchema(s.keyPattern)) schemas++; }
+    res.json(success(config.nodeId, { deleted: true, memoryKeys, schemas }));
+    emitChange('organisms');
+  });
+
   // POST /v1/organisms/:id/approvals — request approval for an action (gate or auto-run).
   router.post('/v1/organisms/:id/approvals', requireAuth(), async (req, res) => {
     const id = req.params.id as string;
