@@ -462,6 +462,57 @@ await test('Member read is audited as organism_member_consent (allowed)', async 
   assert(denied, `expected a denied audit entry for ${analysisKey} (non-member)`);
 });
 
+// ── G13: contributed knowledge package readable by a fellow organism member ──
+// The contribute flow grants `packages/{id}/*` (a SLASH-keyed pattern). Before the
+// slash-aware matcher fix this never matched `packages/{id}/manifest`, so contributed
+// packages were unreadable even by members. Now it resolves via organism membership.
+let contributedPkgId = '';
+
+await test('Owner-1 imports a non-catalog (owner-visibility) package', async () => {
+  const { status, body } = await json('/v1/knowledge/import', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${agentToken}` },
+    body: JSON.stringify({
+      package: {
+        type: 'knowledge-package', name: 'Org Shared Pkg', version: '1.0.0',
+        author: ownerName, content_type: 'research', tags: ['org-share'],
+        language: 'en', maturity: 'published',
+        synthesis: { level: 'original', description: 'member-only package' },
+        references: [], entries: [{ key: 'data', title: 'Data', visibility: 'owner' }],
+        links: [], sharing: { catalog_listed: false, allow_clone: false, morsel_price: 0 },
+      },
+      entry_data: { data: { title: 'Data', summary: 'org-only content' } },
+    }),
+  });
+  assert(status === 201, `Expected 201, got ${status}: ${JSON.stringify(body)}`);
+  contributedPkgId = body.data.package_id;
+});
+
+await test('Owner-1 contributes the package to the organism', async () => {
+  const { status, body } = await json(`/v1/knowledge/${contributedPkgId}/contribute`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${agentToken}` },
+    body: JSON.stringify({ organism_id: organismId }),
+  });
+  assert(status === 201, `Expected 201, got ${status}: ${JSON.stringify(body)}`);
+});
+
+await test('Fellow organism member can read the contributed package manifest → 200', async () => {
+  const key = `packages/${contributedPkgId}/manifest`;
+  const { status, body } = await json(`/v1/memory/${encodeURIComponent(agentGaii)}/${encodeURIComponent(key)}`, {
+    headers: { Authorization: `Bearer ${member.agentToken}` },
+  });
+  assert(status === 200, `Expected 200, got ${status}: ${JSON.stringify(body)}`);
+});
+
+await test('Non-member cannot read the contributed package manifest → 403', async () => {
+  const key = `packages/${contributedPkgId}/manifest`;
+  const { status } = await json(`/v1/memory/${encodeURIComponent(agentGaii)}/${encodeURIComponent(key)}`, {
+    headers: { Authorization: `Bearer ${nonMember.agentToken}` },
+  });
+  assert(status === 403, `Expected 403, got ${status}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 await json(`/v1/owners/${ownerName}?cascade=true`, {

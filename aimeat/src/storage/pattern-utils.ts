@@ -1,4 +1,19 @@
 /**
+ * @file pattern-utils.ts
+ * @description Glob-style pattern matchers used across schema locking, consent, and federation.
+ * @structure
+ *   - matchWildcardPattern() — dot-segment matcher for schema key patterns
+ *   - globMatchSimple() — plain-string glob (node IDs, domain names)
+ *   - consentMatchPattern() — consent dataPattern matcher (dot AND slash structural separators)
+ * @usage
+ *   import { consentMatchPattern } from '../storage/pattern-utils.js';
+ * @version-history
+ *   v1.1.0 -- 2026-06-07 -- consentMatchPattern is now slash-aware (G13): '.' and '/' are both
+ *     literal structural separators, '*' = one segment (spans neither), so slash-keyed grants
+ *     like 'packages/{id}/*' and 'storage:images/*' resolve. Strictly non-widening vs v1.0.0.
+ */
+
+/**
  * Wildcard pattern matching for schema key patterns.
  * Supports '*' (one segment) and '**' (rest of key).
  * Example: 'profile.*.interests' matches 'profile.alice.interests'
@@ -42,16 +57,29 @@ export function globMatchSimple(pattern: string, value: string): boolean {
 
 /**
  * Glob pattern matching for consent data patterns.
- * Supports '*' (one segment) and '**' (multiple segments).
+ *
+ * BOTH `.` and `/` are treated as literal structural separators that must match exactly
+ * and are NOT interchangeable (so `a.*` matches `a.b` but never `a/b`). Wildcards:
+ *   - `*`  → exactly one segment, spanning neither `.` nor `/`  (regex `[^./]+`)
+ *   - `**` → the rest of the key, including separators            (regex `.*`)
+ * Any other character is escaped to a literal.
+ *
+ * This makes slash-keyed grants resolve — e.g. `packages/{id}/*` matches
+ * `packages/{id}/manifest`, and `storage:images/*` matches `storage:images/a.png`.
+ *
+ * Non-widening vs the prior dot-only matcher: separators stay literal and `*` is narrower
+ * (`[^./]+` ⊂ the old `[^.]+`), so no pattern matches a key it did not match before.
  */
 export function consentMatchPattern(pattern: string, key: string): boolean {
   const regex = pattern
-    .split('.')
-    .map(segment => {
-      if (segment === '**') return '.*';
-      if (segment === '*') return '[^.]+';
-      return segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    .split(/([./])/) // keep '.' and '/' as their own tokens
+    .map(tok => {
+      if (tok === '**') return '.*';
+      if (tok === '*') return '[^./]+';
+      if (tok === '.') return '\\.';
+      if (tok === '/') return '/';
+      return tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     })
-    .join('\\.');
+    .join('');
   return new RegExp(`^${regex}$`).test(key);
 }
