@@ -165,14 +165,20 @@ export function parseGenerated(text) {
   return json;
 }
 
-/** Call the AI and return the RAW content string (the caller shows + validates it). */
+/** Call the AI and return the RAW content string (the caller shows + validates it).
+ *  Uses a long timeout (slow free models can take minutes) and no retry on timeout. */
 export async function generateRaw(description) {
-  const resp = await apiPost('/v1/ai/complete', {
-    prompt: description,
-    systemPrompt: await generatorSystemPrompt(),
-    modelRole: 'execution',
-    max_tokens: 3000,
-    app_id: 'organism-workspace',
+  const resp = await api('/v1/ai/complete', {
+    method: 'POST',
+    body: JSON.stringify({
+      prompt: description,
+      systemPrompt: await generatorSystemPrompt(),
+      modelRole: 'execution',
+      max_tokens: 3000,
+      app_id: 'organism-workspace',
+    }),
+    timeoutMs: 600_000,
+    retries: 0,
   });
   if (resp?.ok === false) { const e = new Error(resp?.error?.message || 'AI call failed'); e.code = resp?.error?.code; throw e; }
   return String(resp?.data?.content || '');

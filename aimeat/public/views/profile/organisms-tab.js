@@ -438,7 +438,8 @@ function Workspace({ org, showToast, onBack }) {
   const [genBusy, setGenBusy] = useState(false);
   const [hasAiKey, setHasAiKey] = useState(false);
   const [pasteText, setPasteText] = useState('');
-  const [genErrors, setGenErrors] = useState([]);
+  const [genErrors, setGenErrors] = useState([]);   // validation errors (JSON present, fixable)
+  const [genFail, setGenFail] = useState('');        // generation failure (AI call timed out / errored)
 
   const load = useCallback(async () => {
     const w = await orgService.getWorkspace(orgId).catch(() => null);
@@ -472,7 +473,7 @@ function Workspace({ org, showToast, onBack }) {
 
   // Validate the JSON first; save only if clean. On errors, surface them (+ a fix prompt for the AI).
   const validateAndApply = useCallback(async (jsonText, fromGenerator) => {
-    setGenErrors([]);
+    setGenErrors([]); setGenFail('');
     let generated;
     try { generated = orgService.parseGenerated(jsonText); }
     catch (e) { setGenErrors([(e && e.message) || 'Invalid JSON']); return; }
@@ -490,16 +491,15 @@ function Workspace({ org, showToast, onBack }) {
 
   const generate = useCallback(async () => {
     if (!genDesc.trim()) return;
-    setGenBusy(true); setGenErrors([]);
+    setGenBusy(true); setGenErrors([]); setGenFail('');
     try {
       const raw = await orgService.generateRaw(genDesc.trim());
       setPasteText(raw);                  // show the generated JSON in the box
       await validateAndApply(raw, true);
     } catch (e) {
-      const msg = e?.code === 'NO_API_KEY'
+      setGenFail(e?.code === 'NO_API_KEY'
         ? (t('organisms.noAiKey') || 'Set up your OpenRouter key above, or copy the prompt to your own AI chat.')
-        : ((e && e.message) || (t('organisms.generateError') || 'Generation failed'));
-      setGenErrors([msg]);
+        : ((e && e.message) || (t('organisms.generateError') || 'Generation failed')));
     } finally { setGenBusy(false); }
   }, [genDesc, validateAndApply]);
 
@@ -623,6 +623,13 @@ function Workspace({ org, showToast, onBack }) {
           <textarea class="input-field input-sm" rows="4"
             placeholder=${t('organisms.pastePlaceholder') || 'Paste the AI JSON response here'}
             value=${pasteText} onInput=${e => setPasteText(e.target.value)}></textarea>
+
+          ${genFail && html`
+            <div class="pj-errors">
+              <div class="pj-errors-title">${t('organisms.genFailed') || 'Generation failed — try again'}</div>
+              <div class="pj-error-line">${escHtml(genFail)}</div>
+            </div>
+          `}
 
           ${genErrors.length > 0 && html`
             <div class="pj-errors">

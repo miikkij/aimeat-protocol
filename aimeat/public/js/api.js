@@ -33,10 +33,16 @@ export async function api(path, opts = {}) {
     }
   }
 
+  // Per-call timeout override (ms) — default 30s; long-running calls (e.g. AI completion on a
+  // slow model) pass a larger value. Don't raise the global default — failed normal calls would hang.
+  const timeoutMs = opts.timeoutMs || 30_000;
+  // Per-call retry override — a long AI call passes 0 so a timeout doesn't re-run the slow request.
+  const maxRetries = opts.retries != null ? opts.retries : MAX_RETRIES;
+
   let lastError;
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const resp = await fetch(path, { ...opts, headers, signal: controller.signal });
 
@@ -52,7 +58,7 @@ export async function api(path, opts = {}) {
         }
       }
 
-      if (resp.status === 429 || (resp.status >= 500 && attempt < MAX_RETRIES)) {
+      if (resp.status === 429 || (resp.status >= 500 && attempt < maxRetries)) {
         await sleep(RETRY_BASE_MS * Math.pow(2, attempt));
         continue;
       }
@@ -67,13 +73,13 @@ export async function api(path, opts = {}) {
       return json;
     } catch (err) {
       if (err.name === 'AbortError') {
-        if (attempt === MAX_RETRIES) throw new Error('Request timed out after 30s');
+        if (attempt === maxRetries) throw new Error('Request timed out after ' + Math.round(timeoutMs / 1000) + 's');
         continue;
       }
       // Don't retry client errors (4xx) — only retry network/server errors
       if (err.status && err.status >= 400 && err.status < 500) throw err;
       lastError = err;
-      if (attempt < MAX_RETRIES) {
+      if (attempt < maxRetries) {
         await sleep(RETRY_BASE_MS * Math.pow(2, attempt));
         continue;
       }
