@@ -2022,3 +2022,6 @@
 .pj-field { display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 0.35rem; }
 .pj-field > span { font-size: 0.75rem; color: var(--muted); }
 .pj-field-inline { flex-direction: row; align-items: center; gap: 0.4rem; }
+.pj-errors { border: 1px solid var(--danger); border-radius: 10px; padding: 0.6rem 0.75rem; margin: 0.5rem 0; background: var(--bg-dim); }
+.pj-errors-title { font-weight: 600; margin-bottom: 0.3rem; color: var(--danger); }
+.pj-error-line { font-size: 0.82rem; color: var(--text); padding: 0.1rem 0; }

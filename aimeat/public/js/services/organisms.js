@@ -165,8 +165,8 @@ export function parseGenerated(text) {
   return json;
 }
 
-/** Generate a custom workspace ({ manifest, schemas }) via the user's OpenRouter key. */
-export async function generateWorkspace(description) {
+/** Call the AI and return the RAW content string (the caller shows + validates it). */
+export async function generateRaw(description) {
   const resp = await apiPost('/v1/ai/complete', {
     prompt: description,
     systemPrompt: await generatorSystemPrompt(),
@@ -175,7 +175,47 @@ export async function generateWorkspace(description) {
     app_id: 'organism-workspace',
   });
   if (resp?.ok === false) { const e = new Error(resp?.error?.message || 'AI call failed'); e.code = resp?.error?.code; throw e; }
-  return parseGenerated(resp?.data?.content);
+  return String(resp?.data?.content || '');
+}
+
+/** Client-side validation of a parsed { manifest, schemas }. Returns an array of human-readable
+ *  errors (empty = valid). Mirrors the backend manifest-format rules so we validate BEFORE saving. */
+export function validateGenerated(generated) {
+  const errors = [];
+  const m = (generated && generated.manifest) || {};
+  const schemas = (generated && generated.schemas) || {};
+  if (!m.manifestVersion) errors.push('manifest.manifestVersion is required');
+  if (!m.name) errors.push('manifest.name is required');
+  if (!m.kind) errors.push('manifest.kind is required');
+  if (!['active', 'paused', 'done', 'archived'].includes(m.status)) errors.push('manifest.status must be one of: active, paused, done, archived');
+  const ots = Array.isArray(m.objectTypes) ? m.objectTypes : [];
+  if (ots.length === 0) errors.push('manifest.objectTypes must have at least one entry');
+  const backings = ['memory', 'tasks', 'storage', 'knowledge'];
+  const roles = ['owner', 'admin', 'member'];
+  for (const ot of ots) {
+    const n = (ot && ot.name) || '(unnamed)';
+    if (!ot || !ot.name) errors.push('an objectType is missing "name"');
+    if (!ot || !ot.namespace) errors.push(`objectType "${n}" is missing "namespace"`);
+    if (!ot || !backings.includes(ot.backing)) errors.push(`objectType "${n}" backing must be one of: ${backings.join(', ')}`);
+    if (!ot || !roles.includes(ot.writeRole)) errors.push(`objectType "${n}" writeRole must be one of: ${roles.join(', ')}`);
+    if (ot && ot.cardinality && !['one', 'many'].includes(ot.cardinality)) errors.push(`objectType "${n}" cardinality must be "one" or "many"`);
+    if (ot && ot.backing === 'memory' && !schemas[ot.namespace]) errors.push(`no schema provided for memory objectType "${n}" (namespace "${ot.namespace}")`);
+  }
+  for (const [ns, sc] of Object.entries(schemas)) {
+    if (!sc || typeof sc !== 'object' || sc.type !== 'object') errors.push(`schema "${ns}" must be a JSON Schema object with type:"object"`);
+  }
+  return errors;
+}
+
+/** A prompt the user can paste back to their AI chat to fix the listed validation problems. */
+export function buildFixPrompt(jsonText, errors) {
+  return `The JSON you produced for an AIMEAT workspace has validation problems. Fix ONLY these issues and output the corrected JSON object again (with "manifest" and "schemas"), no prose, no markdown fences.
+
+Problems:
+${(errors || []).map(e => '- ' + e).join('\n')}
+
+The JSON you produced:
+${jsonText}`;
 }
 
 /** Apply a generated (or any) workspace to an organism: register its schemas + write the manifest. */

@@ -438,6 +438,7 @@ function Workspace({ org, showToast, onBack }) {
   const [genBusy, setGenBusy] = useState(false);
   const [hasAiKey, setHasAiKey] = useState(false);
   const [pasteText, setPasteText] = useState('');
+  const [genErrors, setGenErrors] = useState([]);
 
   const load = useCallback(async () => {
     const w = await orgService.getWorkspace(orgId).catch(() => null);
@@ -469,21 +470,38 @@ function Workspace({ org, showToast, onBack }) {
     finally { setBusy(false); }
   }, [orgId, org, showToast, load]);
 
-  const generate = useCallback(async () => {
-    if (!genDesc.trim()) return;
+  // Validate the JSON first; save only if clean. On errors, surface them (+ a fix prompt for the AI).
+  const validateAndApply = useCallback(async (jsonText, fromGenerator) => {
+    setGenErrors([]);
+    let generated;
+    try { generated = orgService.parseGenerated(jsonText); }
+    catch (e) { setGenErrors([(e && e.message) || 'Invalid JSON']); return; }
+    const errs = orgService.validateGenerated(generated);
+    if (errs.length) { setGenErrors(errs); return; }
     setGenBusy(true);
     try {
-      const generated = await orgService.generateWorkspace(genDesc.trim());
       await orgService.applyGeneratedWorkspace(orgId, generated);
       showToast(t('organisms.workspaceReady') || 'Workspace ready');
+      if (fromGenerator) setShowSettings(true);   // open settings so the user can tweak the generated workspace
       await load();
+    } catch (e) { setGenErrors([(e && e.message) || (t('organisms.applyError') || 'Could not apply — check the JSON.')]); }
+    finally { setGenBusy(false); }
+  }, [orgId, showToast, load]);
+
+  const generate = useCallback(async () => {
+    if (!genDesc.trim()) return;
+    setGenBusy(true); setGenErrors([]);
+    try {
+      const raw = await orgService.generateRaw(genDesc.trim());
+      setPasteText(raw);                  // show the generated JSON in the box
+      await validateAndApply(raw, true);
     } catch (e) {
       const msg = e?.code === 'NO_API_KEY'
         ? (t('organisms.noAiKey') || 'Set up your OpenRouter key above, or copy the prompt to your own AI chat.')
         : ((e && e.message) || (t('organisms.generateError') || 'Generation failed'));
-      showToast(msg);
+      setGenErrors([msg]);
     } finally { setGenBusy(false); }
-  }, [genDesc, orgId, showToast, load]);
+  }, [genDesc, validateAndApply]);
 
   const copyPrompt = useCallback(async () => {
     try {
@@ -492,16 +510,14 @@ function Workspace({ org, showToast, onBack }) {
     } catch (e) { showToast((e && e.message) || 'Failed to copy'); }
   }, [genDesc, showToast]);
 
-  const applyPasted = useCallback(async () => {
-    if (!pasteText.trim()) return;
-    setGenBusy(true);
+  const applyPasted = useCallback(() => { if (pasteText.trim()) validateAndApply(pasteText, false); }, [pasteText, validateAndApply]);
+
+  const copyFixPrompt = useCallback(async () => {
     try {
-      await orgService.applyGeneratedWorkspace(orgId, orgService.parseGenerated(pasteText));
-      showToast(t('organisms.workspaceReady') || 'Workspace ready');
-      await load();
-    } catch (e) { showToast((e && e.message) || (t('organisms.applyError') || 'Could not apply — check the pasted JSON.')); }
-    finally { setGenBusy(false); }
-  }, [pasteText, orgId, showToast, load]);
+      await copyToClipboard(orgService.buildFixPrompt(pasteText, genErrors));
+      showToast(t('organisms.fixPromptCopied') || 'Fix prompt copied — paste it back to your AI, then paste the corrected JSON.');
+    } catch (e) { showToast((e && e.message) || 'Failed to copy'); }
+  }, [pasteText, genErrors, showToast]);
 
   const startAdd = useCallback(async (ot) => {
     setAdding(ot.name); setAddingSchema(null);
@@ -545,12 +561,14 @@ function Workspace({ org, showToast, onBack }) {
     finally { setBusy(false); }
   }, [orgId, gateOn, showToast]);
 
-  const openSettings = () => {
-    setSName(ws?.manifest?.name || '');
-    setSSummary(ws?.manifest?.summary || '');
-    setSAutonomy(ws?.manifest?.policy?.agentAutonomy || 'L3');
-    setShowSettings(true);
-  };
+  // Populate the settings fields from the manifest whenever the panel opens (incl. after generation).
+  useEffect(() => {
+    if (showSettings && ws?.manifest) {
+      setSName(ws.manifest.name || '');
+      setSSummary(ws.manifest.summary || '');
+      setSAutonomy(ws.manifest.policy?.agentAutonomy || 'L3');
+    }
+  }, [showSettings, ws]);
 
   const saveSettings = useCallback(async () => {
     setBusy(true);
@@ -595,18 +613,31 @@ function Workspace({ org, showToast, onBack }) {
           <div class="form-actions">
             ${hasAiKey ? html`
               <button class="btn-primary btn-sm" onClick=${generate} disabled=${genBusy || !genDesc.trim()}>
-                ${genBusy ? (t('organisms.generating') || 'Generating…') : (t('organisms.generate') || 'Generate with AI')}
+                ${genBusy ? html`<span class="spinner"></span> ${t('organisms.generating') || 'Generating…'}` : (t('organisms.generate') || 'Generate with AI')}
               </button>
             ` : null}
             <button class="btn-outline btn-sm" onClick=${copyPrompt} disabled=${!genDesc.trim()}>${t('organisms.copyPrompt') || 'Copy prompt'}</button>
           </div>
 
           <div class="section-desc">${t('organisms.pasteHelp') || 'No key? Copy the prompt above into any AI chat, then paste the JSON it returns here:'}</div>
-          <textarea class="input-field input-sm" rows="3"
+          <textarea class="input-field input-sm" rows="4"
             placeholder=${t('organisms.pastePlaceholder') || 'Paste the AI JSON response here'}
             value=${pasteText} onInput=${e => setPasteText(e.target.value)}></textarea>
+
+          ${genErrors.length > 0 && html`
+            <div class="pj-errors">
+              <div class="pj-errors-title">${t('organisms.fixNeeded') || 'This needs fixing before it can be saved:'}</div>
+              ${genErrors.map((e, i) => html`<div class="pj-error-line" key=${i}>${escHtml(e)}</div>`)}
+              <div class="form-actions">
+                <button class="btn-outline btn-sm" onClick=${copyFixPrompt}>${t('organisms.copyFixPrompt') || 'Copy fix prompt for the AI'}</button>
+              </div>
+            </div>
+          `}
+
           <div class="form-actions">
-            <button class="btn-primary btn-sm" onClick=${applyPasted} disabled=${genBusy || !pasteText.trim()}>${t('organisms.applyPasted') || 'Apply pasted workspace'}</button>
+            <button class="btn-primary btn-sm" onClick=${applyPasted} disabled=${genBusy || !pasteText.trim()}>
+              ${genBusy ? html`<span class="spinner"></span> ` : ''}${t('organisms.applyPasted') || 'Validate & apply'}
+            </button>
           </div>
         </div>
       </div>
@@ -627,7 +658,7 @@ function Workspace({ org, showToast, onBack }) {
       </div>
 
       <div class="pj-gate">
-        <button class="btn-outline btn-sm" onClick=${() => showSettings ? setShowSettings(false) : openSettings()}>${'⚙ '}${t('organisms.settings') || 'Settings'}</button>
+        <button class="btn-outline btn-sm" onClick=${() => setShowSettings(s => !s)}>${'⚙ '}${t('organisms.settings') || 'Settings'}</button>
         <label class="pj-gate-label">
           <input type="checkbox" checked=${gateOn} onChange=${toggleGate} disabled=${busy} />
           ${' '}${t('organisms.publishGate') || 'Require review before publishing'}
