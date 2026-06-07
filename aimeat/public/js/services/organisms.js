@@ -140,7 +140,9 @@ Do NOT interview. From the user's description, output ONLY a single JSON object:
   "schemas": { "<namespace>": <a JSON Schema {type:"object",required:[...],properties:{...}} for that objectType>, ... one per memory-backed objectType, keyed by its namespace },
   "examples": { "<namespace>": [ 1-3 realistic sample instances that VALIDATE against that namespace's schema, each with id "example-1","example-2",... ], ... }
 }
-Namespaces: owner-controlled types use "meta.<plural>", collaborative use "shared.<plural>". Every memory-backed objectType needs a schema entry under its namespace, and an "id" string property. Use bounded enums for status-like fields, and "format":"date" (or "date-time") on any date field. Always include a few clearly-labelled example instances per type in "examples" (ids starting with "example-") so the user can see the shape. No prose, no markdown fences.`;
+Namespaces: owner-controlled types use "meta.<plural>", collaborative use "shared.<plural>". Every memory-backed objectType needs a schema entry under its namespace, and an "id" string property. Use bounded enums for status-like fields, and "format":"date" (or "date-time") on any date field. Always include a few clearly-labelled example instances per type in "examples" (ids starting with "example-") so the user can see the shape.
+An objectType may instead be FREE-FORM DOCUMENTS: set "mode":"document" (no schema needed — omit it from "schemas" and "examples") for narrative/wiki content like design docs, lore, guides or notes — use this when the content is prose that should grow organically rather than fixed fields. Records-style types keep their schemas as above.
+No prose, no markdown fences.`;
 
 /** The system instructions for the generator (manifest-architect prompt + output format). */
 export async function generatorSystemPrompt() {
@@ -206,7 +208,7 @@ export function validateGenerated(generated) {
     if (!ot || !backings.includes(ot.backing)) errors.push(`objectType "${n}" backing must be one of: ${backings.join(', ')}`);
     if (!ot || !roles.includes(ot.writeRole)) errors.push(`objectType "${n}" writeRole must be one of: ${roles.join(', ')}`);
     if (ot && ot.cardinality && !['one', 'many'].includes(ot.cardinality)) errors.push(`objectType "${n}" cardinality must be "one" or "many"`);
-    if (ot && ot.backing === 'memory' && !schemas[ot.namespace]) errors.push(`no schema provided for memory objectType "${n}" (namespace "${ot.namespace}")`);
+    if (ot && ot.backing === 'memory' && ot.mode !== 'document' && !schemas[ot.namespace]) errors.push(`no schema provided for memory objectType "${n}" (namespace "${ot.namespace}")`);
   }
   for (const [ns, sc] of Object.entries(schemas)) {
     if (!sc || typeof sc !== 'object' || sc.type !== 'object') errors.push(`schema "${ns}" must be a JSON Schema object with type:"object"`);

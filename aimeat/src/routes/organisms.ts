@@ -711,6 +711,10 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       version: (existingLatest?.version ?? 0) + 1,
       createdAt: existingLatest?.createdAt ?? now, updatedAt: now,
     });
+    // Consume the draft — it was the proposal-for-publishing; now it's a frozen version + the new
+    // .latest. Re-editing the published instance starts a fresh draft. (Without this the workspace
+    // shows a stale draft alongside the identical published copy.)
+    await storage.deleteMemory(draft.ownerGaii, `${base}.draft`);
     return { ok: true, version: n };
   };
 

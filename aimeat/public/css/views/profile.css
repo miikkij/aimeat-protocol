@@ -2025,3 +2025,14 @@
 .pj-errors { border: 1px solid var(--danger); border-radius: 10px; padding: 0.6rem 0.75rem; margin: 0.5rem 0; background: var(--bg-dim); }
 .pj-errors-title { font-weight: 600; margin-bottom: 0.3rem; color: var(--danger); }
 .pj-error-line { font-size: 0.82rem; color: var(--text); padding: 0.1rem 0; }
+.pj-doc-tag { font-size: 0.68rem; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 0 0.3rem; margin-left: 0.4rem; vertical-align: middle; }
+.pj-doc-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
+.pj-doc-link { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.9rem; text-align: left; flex: 1; padding: 0; }
+.pj-doc-link:hover { text-decoration: underline; }
+.pj-doc-view { border: 1px solid var(--border); border-radius: 10px; padding: 0.4rem 0.8rem; margin: 0.4rem 0; background: var(--bg-dim); }
+.pj-doc-editor { margin: 0.4rem 0; }
+.pj-doc-editor > input { margin-bottom: 0.4rem; }
+.pj-doc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.pj-doc-md { font-family: var(--mono, ui-monospace, monospace); font-size: 0.82rem; line-height: 1.4; }
+.pj-doc-preview { border: 1px solid var(--border); border-radius: 10px; padding: 0.4rem 0.8rem; background: var(--bg-dim); overflow: auto; max-height: 360px; }
+@media (max-width: 640px) { .pj-doc-grid { grid-template-columns: 1fr; } }

@@ -24,6 +24,7 @@ import { useConfirm } from '/components/Modal.js';
 import * as orgService from '/js/services/organisms.js';
 import { OpenRouterSettings } from './generator-settings.js';
 import { copyToClipboard } from '/js/utils.js';
+import { Markdown } from '/components/Markdown.js';
 
 export default function OrganismsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -440,6 +441,7 @@ function Workspace({ org, showToast, onBack }) {
   const [pasteText, setPasteText] = useState('');
   const [genErrors, setGenErrors] = useState([]);   // validation errors (JSON present, fixable)
   const [genFail, setGenFail] = useState('');        // generation failure (AI call timed out / errored)
+  const [activeDoc, setActiveDoc] = useState(null);  // { type, mode:'view'|'edit', page } for document-mode types
 
   const load = useCallback(async () => {
     const w = await orgService.getWorkspace(orgId).catch(() => null);
@@ -533,6 +535,18 @@ function Workspace({ org, showToast, onBack }) {
       if (r?.ok === false) { showToast(r?.error?.message || 'Draft rejected'); }
       else { showToast(t('organisms.draftSaved') || 'Draft saved'); setAdding(null); setAddingSchema(null); await load(); }
     } catch (e) { showToast((e && e.message) || 'Failed to save draft'); }
+    finally { setBusy(false); }
+  }, [orgId, showToast, load]);
+
+  // Document-mode pages are free-form markdown records ({id,title,markdown}) — same draft/publish path.
+  const savePage = useCallback(async (ot, page) => {
+    const id = (String(page.id || '').trim() || `page-${Date.now().toString(36)}`).replace(/[^a-zA-Z0-9_-]/g, '-');
+    setBusy(true);
+    try {
+      const r = await orgService.writeDraft(orgId, ot.namespace, id, { id, title: page.title, markdown: page.markdown });
+      if (r?.ok === false) { showToast(r?.error?.message || 'Page rejected'); }
+      else { showToast(t('organisms.pageSaved') || 'Page saved'); setActiveDoc(null); await load(); }
+    } catch (e) { showToast((e && e.message) || 'Failed to save page'); }
     finally { setBusy(false); }
   }, [orgId, showToast, load]);
 
@@ -706,7 +720,42 @@ function Workspace({ org, showToast, onBack }) {
         </div>
       `}
 
-      ${types.map(ot => html`
+      ${types.map(ot => ot.mode === 'document' ? html`
+        <div class="pj-section" key=${ot.name}>
+          <div class="pj-section-head">
+            <span class="pj-section-title">${escHtml(ot.name)}<span class="pj-doc-tag">${t('organisms.docs') || 'docs'}</span></span>
+            <button class="btn-outline btn-sm" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' } })}>${'+ '}${t('organisms.newPage') || 'New page'}</button>
+          </div>
+
+          ${activeDoc && activeDoc.type === ot.name && activeDoc.mode === 'edit' && html`
+            <${DocumentEditor} page=${activeDoc.page} busy=${busy}
+              onSave=${(p) => savePage(ot, p)} onCancel=${() => setActiveDoc(null)} />
+          `}
+
+          ${draftsFor(ot.name).length === 0 && objectsFor(ot.name).length === 0
+            ? html`<div class="pj-empty">${t('organisms.noneYet') || 'none yet'}</div>` : null}
+
+          ${draftsFor(ot.name).map((d, i) => html`
+            <div class="pj-doc-row" key=${'pd' + i}>
+              <span class="badge badge-warn">${t('organisms.draft') || 'draft'}</span>
+              <button class="pj-doc-link" onClick=${() => setActiveDoc({ type: ot.name, mode: 'view', page: d })}>${escHtml(d.title || d.id)}</button>
+              <button class="btn-ghost btn-sm" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: d })}>${t('organisms.edit') || 'Edit'}</button>
+              <button class="btn-primary btn-sm" onClick=${() => publish(ot, d.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>
+            </div>
+          `)}
+
+          ${objectsFor(ot.name).map((o, i) => html`
+            <div class="pj-doc-row" key=${'po' + i}>
+              <button class="pj-doc-link" onClick=${() => setActiveDoc({ type: ot.name, mode: 'view', page: o })}>${escHtml(o.title || o.id)}</button>
+              <button class="btn-ghost btn-sm" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: o })}>${t('organisms.edit') || 'Edit'}</button>
+            </div>
+          `)}
+
+          ${activeDoc && activeDoc.type === ot.name && activeDoc.mode === 'view' && html`
+            <div class="pj-doc-view"><${Markdown} text=${activeDoc.page.markdown || ''} /></div>
+          `}
+        </div>
+      ` : html`
         <div class="pj-section" key=${ot.name}>
           <div class="pj-section-head">
             <span class="pj-section-title">${escHtml(ot.name)}</span>
@@ -817,6 +866,28 @@ function SchemaForm({ schema, busy, onSave, onCancel }) {
           <button class="btn-primary btn-sm" onClick=${() => onSave(buildValue())} disabled=${busy || !canSave}>${t('organisms.saveDraft') || 'Save draft'}</button>
           <button class="btn-ghost btn-sm" onClick=${onCancel}>${t('organisms.cancel') || 'Cancel'}</button>
         </div>
+      </div>
+    </div>
+  `;
+}
+
+/* Free-form markdown page editor for document-mode object types: a title + a markdown textarea
+ * with a live preview (reusing the safe Markdown renderer). Saves as a draft, versioned on publish. */
+function DocumentEditor({ page, busy, onSave, onCancel }) {
+  const [title, setTitle] = useState((page && page.title) || '');
+  const [md, setMd] = useState((page && page.markdown) || '');
+  return html`
+    <div class="pj-doc-editor">
+      <input type="text" class="input-field input-sm" placeholder=${t('organisms.pageTitle') || 'Page title'}
+        value=${title} onInput=${e => setTitle(e.target.value)} />
+      <div class="pj-doc-grid">
+        <textarea class="input-field pj-doc-md" rows="14" placeholder=${t('organisms.writeMarkdown') || 'Write markdown…'}
+          value=${md} onInput=${e => setMd(e.target.value)}></textarea>
+        <div class="pj-doc-preview"><${Markdown} text=${md} /></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-primary btn-sm" onClick=${() => onSave({ ...page, title: title.trim(), markdown: md })} disabled=${busy || !title.trim()}>${t('organisms.saveDraft') || 'Save draft'}</button>
+        <button class="btn-ghost btn-sm" onClick=${onCancel}>${t('organisms.cancel') || 'Cancel'}</button>
       </div>
     </div>
   `;

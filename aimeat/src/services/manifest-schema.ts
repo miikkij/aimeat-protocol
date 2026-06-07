@@ -68,6 +68,7 @@ export const MANIFEST_FORMAT_SCHEMA: Record<string, unknown> = {
           cardinality: { enum: ['one', 'many'] },
           backing: { enum: ['memory', 'tasks', 'storage', 'knowledge'] },
           writeRole: { enum: ['owner', 'admin', 'member'] },
+          mode: { enum: ['records', 'document'] },  // 'records' (schema-locked form, default) | 'document' (free-form markdown pages)
           append: { type: 'boolean' },
           versioned: { type: 'boolean' },  // draft → publish → .version.N + .latest history (default true)
         },
