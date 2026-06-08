@@ -24,7 +24,7 @@ import { useConfirm } from '/components/Modal.js';
 import * as orgService from '/js/services/organisms.js';
 import { OpenRouterSettings } from './generator-settings.js';
 import { copyToClipboard } from '/js/utils.js';
-import { Markdown } from '/components/Markdown.js';
+import { Markdown, slugifyHeading } from '/components/Markdown.js';
 
 export default function OrganismsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -444,6 +444,8 @@ function Workspace({ org, showToast, onBack }) {
   const [genFail, setGenFail] = useState('');        // generation failure (AI call timed out / errored)
   const [activeDoc, setActiveDoc] = useState(null);  // { type, mode:'view'|'edit', page } for document-mode types
   const [sectionsByType, setSectionsByType] = useState({});  // { typeName: [{id,name,parentId,documents:[docId]}] }
+  const [editingSec, setEditingSec] = useState(null);        // section id currently being renamed inline
+  const draggedDoc = useRef(null);                            // { type, id } of the doc being dragged
   const [showRegenerate, setShowRegenerate] = useState(false);
   const [delConfirm, setDelConfirm] = useState('');   // typed-name confirmation for delete
   const [newSpaceName, setNewSpaceName] = useState('');
@@ -573,16 +575,27 @@ function Workspace({ org, showToast, onBack }) {
   const addSection = (typeName, parentId) => {
     const id = 'sec-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
     updateSections(typeName, [...(sectionsByType[typeName] || []), { id, name: '', parentId: parentId || null, documents: [] }]);
+    setEditingSec(id);   // open the new section in rename mode; it becomes plain text once named/blurred
   };
   const renameSection = (typeName, secId, name) =>
     updateSections(typeName, (sectionsByType[typeName] || []).map(s => s.id === secId ? { ...s, name } : s));
-  const removeSection = (typeName, secId) =>
-    updateSections(typeName, (sectionsByType[typeName] || []).filter(s => s.id !== secId).map(s => s.parentId === secId ? { ...s, parentId: null } : s));
+  const removeSection = (typeName, secId, secName) => {
+    confirm(
+      (t('organisms.confirmRemoveSection') || 'Remove the section “{name}”? Its documents move to Unsorted — they are not deleted.').replace('{name}', secName || '…'),
+      () => updateSections(typeName, (sectionsByType[typeName] || []).filter(s => s.id !== secId).map(s => s.parentId === secId ? { ...s, parentId: null } : s)),
+      { danger: true, title: t('organisms.removeSection') || 'Remove section' },
+    );
+  };
   const moveDocToSection = (typeName, docId, targetSecId) => {
     const secs = (sectionsByType[typeName] || []).map(s => ({ ...s, documents: (s.documents || []).filter(d => d !== docId) }));
     if (targetSecId) { const i = secs.findIndex(s => s.id === targetSecId); if (i >= 0) secs[i] = { ...secs[i], documents: [...secs[i].documents, docId] }; }
     updateSections(typeName, secs);
   };
+  // Inline rename: update the name locally per keystroke, persist once on blur (no write storm).
+  const sectionsRef = useRef(sectionsByType); sectionsRef.current = sectionsByType;
+  const setSecName = (typeName, secId, name) =>
+    setSectionsByType(s => ({ ...s, [typeName]: (s[typeName] || []).map(x => x.id === secId ? { ...x, name } : x) }));
+  const commitSecName = (typeName) => { setEditingSec(null); orgService.saveSections(orgId, typeName, sectionsRef.current[typeName] || []).catch(() => {}); };
 
   const publish = useCallback(async (ot, instanceId) => {
     setBusy(true);
@@ -774,7 +787,11 @@ function Workspace({ org, showToast, onBack }) {
     const isActive = (d) => activeDoc?.type === ot.name && activeDoc.page?.id === d.id;
 
     const docItem = (d) => html`
-      <div class="pj-doc-item ${isActive(d) ? 'active' : ''}" key=${'di' + d.id}>
+      <div class="pj-doc-item ${isActive(d) ? 'active' : ''}" key=${'di' + d.id}
+        draggable=${true}
+        onDragStart=${(e) => { draggedDoc.current = { type: ot.name, id: d.id }; if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', d.id); } catch (x) { /* noop */ } } }}
+        onDragEnd=${() => { draggedDoc.current = null; }}>
+        <span class="pj-grip" title=${t('organisms.dragHint') || 'Drag into a section'}>⠿</span>
         <button class="pj-doc-link" onClick=${() => setActiveDoc({ type: ot.name, mode: 'view', page: d })}>
           ${d._draft ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span> ` : ''}${escHtml(d.title || d.id)}
         </button>
@@ -785,14 +802,22 @@ function Workspace({ org, showToast, onBack }) {
         </select>
       </div>`;
 
+    // A section is a drop target — dragging a document onto it (or its header) files it here.
+    const dropOn = (secId) => (e) => { e.preventDefault(); e.stopPropagation(); if (draggedDoc.current?.type === ot.name) { moveDocToSection(ot.name, draggedDoc.current.id, secId); draggedDoc.current = null; } };
+    const allowDrop = (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; };
+
     const renderSection = (sec) => html`
-      <div class="pj-sec" key=${sec.id}>
+      <div class="pj-sec" key=${sec.id} onDragOver=${allowDrop} onDrop=${dropOn(sec.id)}>
         <div class="pj-sec-head">
-          <input class="input-field input-xs pj-sec-name" placeholder=${t('organisms.sectionName') || 'Section name'}
-            value=${sec.name} onBlur=${e => { if (e.target.value !== sec.name) renameSection(ot.name, sec.id, e.target.value); }} />
+          ${editingSec === sec.id
+            ? html`<input class="input-field input-xs pj-sec-name" autofocus placeholder=${t('organisms.sectionName') || 'Section name'}
+                value=${sec.name} onInput=${e => setSecName(ot.name, sec.id, e.target.value)}
+                onBlur=${() => commitSecName(ot.name)} onKeyDown=${e => { if (e.key === 'Enter') e.target.blur(); }} />`
+            : html`<span class="pj-sec-name-text" onDblClick=${() => setEditingSec(sec.id)}>${escHtml(sec.name || t('organisms.unnamed') || '(unnamed)')}</span>`}
+          <button class="pj-icon-btn" title=${t('organisms.rename') || 'Rename'} onClick=${() => setEditingSec(sec.id)}>✎</button>
           <button class="pj-icon-btn" title=${t('organisms.newDocHere') || 'New document here'} onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' }, sectionId: sec.id })}>+</button>
           <button class="pj-icon-btn" title=${t('organisms.addSubsection') || 'Sub-section'} onClick=${() => addSection(ot.name, sec.id)}>⊕</button>
-          <button class="pj-icon-btn" title=${t('organisms.remove') || 'Remove'} onClick=${() => removeSection(ot.name, sec.id)}>✕</button>
+          <button class="pj-icon-btn" title=${t('organisms.remove') || 'Remove'} onClick=${() => removeSection(ot.name, sec.id, sec.name)}>✕</button>
         </div>
         ${(sec.documents || []).map(id => docById[id]).filter(Boolean).map(docItem)}
         ${childrenOf(sec.id).map(renderSection)}
@@ -809,7 +834,7 @@ function Workspace({ org, showToast, onBack }) {
           <div class="pj-doc-index">
             ${childrenOf(null).map(renderSection)}
             ${unsorted.length > 0 ? html`
-              <div class="pj-sec"><div class="pj-sec-head"><span class="pj-sec-name pj-muted">${t('organisms.unsorted') || 'Unsorted'}</span></div>${unsorted.map(docItem)}</div>` : null}
+              <div class="pj-sec" onDragOver=${allowDrop} onDrop=${dropOn(null)}><div class="pj-sec-head"><span class="pj-sec-name pj-muted">${t('organisms.unsorted') || 'Unsorted'}</span></div>${unsorted.map(docItem)}</div>` : null}
             ${docs.length === 0 && secs.length === 0 ? html`<div class="pj-empty">${t('organisms.noneYet') || 'none yet'}</div>` : null}
           </div>
           <div class="pj-doc-main">
@@ -822,9 +847,14 @@ function Workspace({ org, showToast, onBack }) {
                 ${activeDoc.page._draft ? html`<button class="btn-primary btn-sm" onClick=${() => publish(ot, activeDoc.page.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>` : null}
               </div>
               <div class="pj-doc-view"><${Markdown} text=${activeDoc.page.markdown || ''}
-                onWikiLink=${(title) => {
+                onWikiLink=${(content) => {
+                  const [titlePart, headingPart] = String(content).split('#');
+                  const title = titlePart.trim();
+                  const anchor = (headingPart || '').trim();
+                  const scrollToAnchor = () => { if (anchor) setTimeout(() => { const el = document.querySelector('.pj-doc-view [id="' + slugifyHeading(anchor) + '"]'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 80); };
+                  if (!title) { scrollToAnchor(); return; }   // [[#Heading]] → jump within the current document
                   const target = docs.find(d => (d.title || '').toLowerCase() === title.toLowerCase());
-                  if (target) setActiveDoc({ type: ot.name, mode: 'view', page: target });
+                  if (target) { setActiveDoc({ type: ot.name, mode: 'view', page: target }); scrollToAnchor(); }
                   else showToast((t('organisms.docNotFound') || 'No document titled “{title}”').replace('{title}', title));
                 }} /></div>
             ` : html`<div class="pj-empty">${t('organisms.selectDoc') || 'Select a document, or create one.'}</div>`}

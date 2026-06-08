@@ -27,6 +27,11 @@ import { h } from 'preact';
 // data:, vbscript:, file:, etc.) is dropped — the anchor renders without href.
 const SAFE_SCHEME = /^(https?:|mailto:)/i;
 
+// Slug used for heading anchor ids — kept in sync with the [[Doc#Heading]] wiki-link resolver.
+export function slugifyHeading(text) {
+  return String(text).toLowerCase().trim().replace(/[`*_~[\]()#]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
 export function sanitizeHref(url) {
   if (typeof url !== 'string') return null;
   const trimmed = url.trim();
@@ -69,7 +74,7 @@ function parseInline(text, onWikiLink) {
         flush();
         const title = text.slice(i + 2, end).trim();
         out.push(onWikiLink
-          ? h('a', { href: '#', class: 'md-wikilink', onClick: (e) => { e.preventDefault(); onWikiLink(title); } }, title)
+          ? h('a', { href: '#', class: 'md-wikilink', onClick: (e) => { e.preventDefault(); onWikiLink(title); } }, title.replace('#', ' › '))
           : '[[' + title + ']]');
         i = end + 2;
         continue;
@@ -181,7 +186,7 @@ function parseBlocks(src, onWikiLink) {
     const heading = line.match(/^(#{1,6})\s+(.*)$/);
     if (heading) {
       const level = heading[1].length;
-      blocks.push(h('h' + level, null, parseInline(heading[2].trim(), onWikiLink)));
+      blocks.push(h('h' + level, { id: slugifyHeading(heading[2].trim()) }, parseInline(heading[2].trim(), onWikiLink)));
       i++;
       continue;
     }

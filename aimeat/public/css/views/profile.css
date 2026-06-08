@@ -2048,6 +2048,9 @@
 .pj-sec-head { display: flex; align-items: center; gap: 0.2rem; }
 .pj-sec-name { flex: 1; font-weight: 600; font-size: 0.82rem; }
 .pj-sec-name.pj-muted { color: var(--muted); font-weight: 500; padding: 0.15rem 0; }
+.pj-sec-name-text { flex: 1; font-weight: 600; font-size: 0.82rem; cursor: text; }
+.pj-grip { cursor: grab; color: var(--muted); font-size: 0.8rem; user-select: none; }
+.pj-doc-item[draggable="true"] { cursor: grab; }
 .pj-icon-btn { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 0.85rem; padding: 0 0.2rem; line-height: 1; }
 .pj-icon-btn:hover { color: var(--accent); }
 .pj-doc-item { display: flex; align-items: center; gap: 0.3rem; padding: 0.1rem 0 0.1rem 0.3rem; border-radius: 6px; }
