@@ -443,6 +443,7 @@ function Workspace({ org, showToast, onBack }) {
   const [genErrors, setGenErrors] = useState([]);   // validation errors (JSON present, fixable)
   const [genFail, setGenFail] = useState('');        // generation failure (AI call timed out / errored)
   const [activeDoc, setActiveDoc] = useState(null);  // { type, mode:'view'|'edit', page } for document-mode types
+  const [sectionsByType, setSectionsByType] = useState({});  // { typeName: [{id,name,parentId,documents:[docId]}] }
   const [showRegenerate, setShowRegenerate] = useState(false);
   const [delConfirm, setDelConfirm] = useState('');   // typed-name confirmation for delete
   const [newSpaceName, setNewSpaceName] = useState('');
@@ -451,11 +452,12 @@ function Workspace({ org, showToast, onBack }) {
   const load = useCallback(async () => {
     const w = await orgService.getWorkspace(orgId).catch(() => null);
     if (w && w.manifest) {
-      const [ap, cfg] = await Promise.all([
+      const [ap, cfg, secs] = await Promise.all([
         orgService.listApprovals(orgId, 'pending').catch(() => []),
         orgService.getConfig(orgId).catch(() => ({})),
+        orgService.getAllSections(orgId).catch(() => ({})),
       ]);
-      setApprovals(ap); setGateOn(!!(cfg?.gates?.publish?.enabled));
+      setApprovals(ap); setGateOn(!!(cfg?.gates?.publish?.enabled)); setSectionsByType(secs);
     }
     setWs(w && w.manifest ? w : null);
   }, [orgId]);
@@ -543,17 +545,44 @@ function Workspace({ org, showToast, onBack }) {
     finally { setBusy(false); }
   }, [orgId, showToast, load]);
 
-  // Document-mode pages are free-form markdown records ({id,title,markdown}) — same draft/publish path.
-  const savePage = useCallback(async (ot, page) => {
-    const id = (String(page.id || '').trim() || `page-${Date.now().toString(36)}`).replace(/[^a-zA-Z0-9_-]/g, '-');
+  // Documents are free-form markdown records ({id,title,markdown}) — same draft/publish path.
+  // When created from a section, file the new id into that section's documents[].
+  const savePage = useCallback(async (ot, page, sectionId) => {
+    const id = (String(page.id || '').trim() || `doc-${Date.now().toString(36)}`).replace(/[^a-zA-Z0-9_-]/g, '-');
     setBusy(true);
     try {
       const r = await orgService.writeDraft(orgId, ot.namespace, id, { id, title: page.title, markdown: page.markdown });
-      if (r?.ok === false) { showToast(r?.error?.message || 'Page rejected'); }
-      else { showToast(t('organisms.pageSaved') || 'Document saved'); setActiveDoc(null); await load(); }
-    } catch (e) { showToast((e && e.message) || 'Failed to save page'); }
+      if (r?.ok === false) { showToast(r?.error?.message || 'Document rejected'); }
+      else {
+        if (sectionId) {
+          const secs = (sectionsByType[ot.name] || []).map(s => s.id === sectionId
+            ? { ...s, documents: [...(s.documents || []).filter(d => d !== id), id] } : s);
+          await orgService.saveSections(orgId, ot.name, secs).catch(() => {});
+        }
+        showToast(t('organisms.pageSaved') || 'Document saved'); setActiveDoc(null); await load();
+      }
+    } catch (e) { showToast((e && e.message) || 'Failed to save document'); }
     finally { setBusy(false); }
-  }, [orgId, showToast, load]);
+  }, [orgId, sectionsByType, showToast, load]);
+
+  // ── Section index ops (persist organism.{id}.meta.sections.{typeName}) ──
+  const updateSections = useCallback(async (typeName, sections) => {
+    setSectionsByType(s => ({ ...s, [typeName]: sections }));
+    await orgService.saveSections(orgId, typeName, sections).catch(e => showToast((e && e.message) || 'Failed to save sections'));
+  }, [orgId, showToast]);
+  const addSection = (typeName, parentId) => {
+    const id = 'sec-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    updateSections(typeName, [...(sectionsByType[typeName] || []), { id, name: '', parentId: parentId || null, documents: [] }]);
+  };
+  const renameSection = (typeName, secId, name) =>
+    updateSections(typeName, (sectionsByType[typeName] || []).map(s => s.id === secId ? { ...s, name } : s));
+  const removeSection = (typeName, secId) =>
+    updateSections(typeName, (sectionsByType[typeName] || []).filter(s => s.id !== secId).map(s => s.parentId === secId ? { ...s, parentId: null } : s));
+  const moveDocToSection = (typeName, docId, targetSecId) => {
+    const secs = (sectionsByType[typeName] || []).map(s => ({ ...s, documents: (s.documents || []).filter(d => d !== docId) }));
+    if (targetSecId) { const i = secs.findIndex(s => s.id === targetSecId); if (i >= 0) secs[i] = { ...secs[i], documents: [...secs[i].documents, docId] }; }
+    updateSections(typeName, secs);
+  };
 
   const publish = useCallback(async (ot, instanceId) => {
     setBusy(true);
@@ -732,6 +761,73 @@ function Workspace({ org, showToast, onBack }) {
   const draftsFor = (name) => (ws.drafts && ws.drafts[name]) || [];
   const objectsFor = (name) => (ws.objects && ws.objects[name]) || [];
 
+  // A document-space: left index (section tree + documents, with an Unsorted group) + a main
+  // area showing the active document (view/edit). Sections nest via parentId; documents are
+  // tied to a section's documents[] (or unsorted). Edits to the tree persist immediately.
+  const renderDocSpace = (ot) => {
+    const secs = sectionsByType[ot.name] || [];
+    const docs = [...draftsFor(ot.name).map(d => ({ ...d, _draft: true })), ...objectsFor(ot.name)];
+    const docById = {}; docs.forEach(d => { docById[d.id] = d; });
+    const used = new Set(); secs.forEach(s => (s.documents || []).forEach(id => used.add(id)));
+    const unsorted = docs.filter(d => !used.has(d.id));
+    const childrenOf = (pid) => secs.filter(s => (s.parentId || null) === (pid || null));
+    const isActive = (d) => activeDoc?.type === ot.name && activeDoc.page?.id === d.id;
+
+    const docItem = (d) => html`
+      <div class="pj-doc-item ${isActive(d) ? 'active' : ''}" key=${'di' + d.id}>
+        <button class="pj-doc-link" onClick=${() => setActiveDoc({ type: ot.name, mode: 'view', page: d })}>
+          ${d._draft ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span> ` : ''}${escHtml(d.title || d.id)}
+        </button>
+        <select class="input-field input-xs pj-move" onChange=${e => { const v = e.target.value; e.target.value = ''; if (!v) return; moveDocToSection(ot.name, d.id, v === '__unsorted' ? null : v); }}>
+          <option value="">${t('organisms.moveTo') || 'move…'}</option>
+          <option value="__unsorted">${t('organisms.unsorted') || 'Unsorted'}</option>
+          ${secs.map(s => html`<option value=${s.id} key=${s.id}>${escHtml(s.name || '(unnamed)')}</option>`)}
+        </select>
+      </div>`;
+
+    const renderSection = (sec) => html`
+      <div class="pj-sec" key=${sec.id}>
+        <div class="pj-sec-head">
+          <input class="input-field input-xs pj-sec-name" placeholder=${t('organisms.sectionName') || 'Section name'}
+            value=${sec.name} onBlur=${e => { if (e.target.value !== sec.name) renameSection(ot.name, sec.id, e.target.value); }} />
+          <button class="pj-icon-btn" title=${t('organisms.newDocHere') || 'New document here'} onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' }, sectionId: sec.id })}>+</button>
+          <button class="pj-icon-btn" title=${t('organisms.addSubsection') || 'Sub-section'} onClick=${() => addSection(ot.name, sec.id)}>⊕</button>
+          <button class="pj-icon-btn" title=${t('organisms.remove') || 'Remove'} onClick=${() => removeSection(ot.name, sec.id)}>✕</button>
+        </div>
+        ${(sec.documents || []).map(id => docById[id]).filter(Boolean).map(docItem)}
+        ${childrenOf(sec.id).map(renderSection)}
+      </div>`;
+
+    return html`
+      <div class="pj-section" key=${ot.name}>
+        <div class="pj-section-head">
+          <span class="pj-section-title">${escHtml(ot.name)}<span class="pj-doc-tag">${t('organisms.docs') || 'docs'}</span></span>
+          <button class="btn-outline btn-sm" onClick=${() => addSection(ot.name, null)}>${'+ '}${t('organisms.section') || 'Section'}</button>
+          <button class="btn-outline btn-sm" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' } })}>${'+ '}${t('organisms.newPage') || 'New document'}</button>
+        </div>
+        <div class="pj-docspace">
+          <div class="pj-doc-index">
+            ${childrenOf(null).map(renderSection)}
+            ${unsorted.length > 0 ? html`
+              <div class="pj-sec"><div class="pj-sec-head"><span class="pj-sec-name pj-muted">${t('organisms.unsorted') || 'Unsorted'}</span></div>${unsorted.map(docItem)}</div>` : null}
+            ${docs.length === 0 && secs.length === 0 ? html`<div class="pj-empty">${t('organisms.noneYet') || 'none yet'}</div>` : null}
+          </div>
+          <div class="pj-doc-main">
+            ${activeDoc?.type === ot.name && activeDoc.mode === 'edit' ? html`
+              <${DocumentEditor} page=${activeDoc.page} busy=${busy} onSave=${(p) => savePage(ot, p, activeDoc.sectionId)} onCancel=${() => setActiveDoc(null)} />
+            ` : activeDoc?.type === ot.name && activeDoc.mode === 'view' ? html`
+              <div class="pj-doc-toolbar">
+                <span class="pj-doc-vtitle">${escHtml(activeDoc.page.title || activeDoc.page.id)}</span>
+                <button class="btn-ghost btn-sm" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: activeDoc.page })}>${t('organisms.edit') || 'Edit'}</button>
+                ${activeDoc.page._draft ? html`<button class="btn-primary btn-sm" onClick=${() => publish(ot, activeDoc.page.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>` : null}
+              </div>
+              <div class="pj-doc-view"><${Markdown} text=${activeDoc.page.markdown || ''} /></div>
+            ` : html`<div class="pj-empty">${t('organisms.selectDoc') || 'Select a document, or create one.'}</div>`}
+          </div>
+        </div>
+      </div>`;
+  };
+
   return html`
     <div class="pj-ws">
       <${ConfirmUI} />
@@ -816,42 +912,7 @@ function Workspace({ org, showToast, onBack }) {
         </div>
       `}
 
-      ${types.map(ot => ot.mode === 'document' ? html`
-        <div class="pj-section" key=${ot.name}>
-          <div class="pj-section-head">
-            <span class="pj-section-title">${escHtml(ot.name)}<span class="pj-doc-tag">${t('organisms.docs') || 'docs'}</span></span>
-            <button class="btn-outline btn-sm" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' } })}>${'+ '}${t('organisms.newPage') || 'New document'}</button>
-          </div>
-
-          ${activeDoc && activeDoc.type === ot.name && activeDoc.mode === 'edit' && html`
-            <${DocumentEditor} page=${activeDoc.page} busy=${busy}
-              onSave=${(p) => savePage(ot, p)} onCancel=${() => setActiveDoc(null)} />
-          `}
-
-          ${draftsFor(ot.name).length === 0 && objectsFor(ot.name).length === 0
-            ? html`<div class="pj-empty">${t('organisms.noneYet') || 'none yet'}</div>` : null}
-
-          ${draftsFor(ot.name).map((d, i) => html`
-            <div class="pj-doc-row" key=${'pd' + i}>
-              <span class="badge badge-warn">${t('organisms.draft') || 'draft'}</span>
-              <button class="pj-doc-link" onClick=${() => setActiveDoc({ type: ot.name, mode: 'view', page: d })}>${escHtml(d.title || d.id)}</button>
-              <button class="btn-ghost btn-sm" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: d })}>${t('organisms.edit') || 'Edit'}</button>
-              <button class="btn-primary btn-sm" onClick=${() => publish(ot, d.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>
-            </div>
-          `)}
-
-          ${objectsFor(ot.name).map((o, i) => html`
-            <div class="pj-doc-row" key=${'po' + i}>
-              <button class="pj-doc-link" onClick=${() => setActiveDoc({ type: ot.name, mode: 'view', page: o })}>${escHtml(o.title || o.id)}</button>
-              <button class="btn-ghost btn-sm" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: o })}>${t('organisms.edit') || 'Edit'}</button>
-            </div>
-          `)}
-
-          ${activeDoc && activeDoc.type === ot.name && activeDoc.mode === 'view' && html`
-            <div class="pj-doc-view"><${Markdown} text=${activeDoc.page.markdown || ''} /></div>
-          `}
-        </div>
-      ` : html`
+      ${types.map(ot => ot.mode === 'document' ? renderDocSpace(ot) : html`
         <div class="pj-section" key=${ot.name}>
           <div class="pj-section-head">
             <span class="pj-section-title">${escHtml(ot.name)}</span>

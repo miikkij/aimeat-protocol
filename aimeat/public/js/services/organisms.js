@@ -402,6 +402,25 @@ export async function getConfig(orgId) {
   } catch { return {}; }
 }
 
+/** Section indexes for every document-space, keyed by objectType name. A section is
+ *  { id, name, parentId, documents:[docId] } — a flat array forming a tree via parentId. */
+export async function getAllSections(orgId) {
+  const out = {};
+  try {
+    const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(`organism.${orgId}.meta.sections.`)}`);
+    for (const it of (resp?.data?.items || [])) {
+      const m = String(it.key || '').match(/\.meta\.sections\.(.+)$/);
+      if (m) out[m[1]] = Array.isArray(it.value?.sections) ? it.value.sections : [];
+    }
+  } catch { /* none yet */ }
+  return out;
+}
+
+/** Persist the section index for one document-space (organism.{id}.meta.sections.{typeName}). */
+export async function saveSections(orgId, typeName, sections) {
+  return apiPost('/v1/memory', { key: `organism.${orgId}.meta.sections.${typeName}`, value: { sections }, visibility: 'private' });
+}
+
 /** Toggle the publish-review gate in the org's config. */
 export async function setPublishGate(orgId, enabled, approverRole = 'owner') {
   const cfg = await getConfig(orgId);
