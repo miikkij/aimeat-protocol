@@ -4,6 +4,11 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v1.11.0 — 2026-06-08 — Full-bleed dashboard shell: drop the 1000px cap on the
+ *     .pf wrapper so the sidebar+content fill the viewport like the admin dashboard
+ *     (tab content was squeezed to ~760px). Sidebar stays left-anchored; .pf-content
+ *     caps at 1360px (~1600px total) for readability on ultra-wide; login prompt
+ *     stays a centered 1000px column.
  *   v1.1.0 — 2026-06-02 — Phase 3a: tokenize hero/cta/callout gradients, card/tab/
  *     stat/input surfaces, feedback banners, and undefined-var drift (via theme.css
  *     alias layer) for dark mode. pf-gen-* badge contrast deferred to 3b.
@@ -51,7 +56,13 @@
  */
 .pf-hero{background:var(--pf-hero-gradient);border-bottom:1px solid var(--border,#E5E7EB)}
 .pf-hero-inner{max-width:1000px;margin:0 auto;padding:2rem 1.5rem 0}
-.pf{max-width:1000px;margin:0 auto;padding:1.5rem 1.5rem 2rem;position:relative;z-index:1}
+/* Full-bleed dashboard shell (like the admin dashboard): the sidebar+content
+   flex fills the viewport instead of being capped to a narrow centered column.
+   The old 1000px cap squeezed tab content (organisms, etc.) into ~760px. The
+   not-logged-in login prompt is centered on its own (.login-prompt), and the
+   home dashboard / tab content get breathing room via .pf-content padding. */
+.pf{max-width:none;margin:0;padding:0;position:relative;z-index:1}
+.pf .login-prompt{max-width:1000px;margin:0 auto}
 .pf .bg-aurora{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none}
 .pf .aurora-wave{position:absolute;width:200%;height:60%;left:-50%;border-radius:50%;filter:blur(80px);opacity:.25;animation:pfAurora 8s ease-in-out infinite alternate}
 .pf .aurora-wave:nth-child(1){top:10%;background:linear-gradient(90deg,#ff6b9d,#c44569,#ff8a80,#f48fb1);animation-duration:8s}
@@ -1969,7 +1980,11 @@
 .pf-side-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pf-side-badge { margin-left: auto; font-size: 0.68rem; background: var(--bg-dim); color: var(--text-dim); padding: 0.05rem 0.45rem; border-radius: var(--radius-full, 999px); }
 
-.pf-content { flex: 1 1 auto; min-width: 0; padding: 1.25rem 1.5rem; }
+/* Content fills the space next to the (left-anchored) sidebar, but caps at
+   ~1360px so the total usable width settles around 1600px on ultra-wide
+   monitors — readable line lengths, no full-bleed stretch. Extra space falls
+   to the right; the sidebar stays flush to the screen's left edge. */
+.pf-content { flex: 1 1 auto; min-width: 0; max-width: 1360px; padding: 1.25rem 1.5rem; }
 .pf-content-head { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
 .pf-back-btn { background: none; border: 1px solid var(--border); color: var(--text-dim); border-radius: var(--radius-sm, 8px); padding: 0.3rem 0.7rem; cursor: pointer; font: inherit; font-size: 0.85rem; }
 .pf-back-btn:hover { background: var(--bg-hover, var(--bg-dim)); }
