@@ -15,6 +15,10 @@
  *     AppStrip — home/section sub-components
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v2.1.0 — 2026-06-09 — Remembered open view (openView) now persists in
+ *     sessionStorage instead of localStorage, so it is per browser TAB: with
+ *     multiple profile tabs open, an F5 restores that tab's own view rather than
+ *     whichever tab last wrote the shared value.
  *   v2.0.0 — 2026-06-03 — Replace tier-adaptive menu with a persistent grouped sidebar
  *     + content column + mobile drawer; computeTier now only gates home onboarding.
  *   v1.2.0 — 2026-03-19 — Expandable AppStrip chips with launch button; remove Generator primary style
@@ -559,9 +563,13 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
   const [apps, setApps] = useState([]);
   const [editOpen, setEditOpen] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
+  // Which inline view is open (and under which slot), restored on F5. Stored in
+  // sessionStorage, NOT localStorage, so the remembered position is per browser
+  // TAB: with several profile tabs open, refreshing one restores ITS own view
+  // instead of whichever tab last wrote a shared localStorage value.
   const [openView, setOpenView] = useState(() => {
     try {
-      const saved = localStorage.getItem('aimeat-profile-tab');
+      const saved = sessionStorage.getItem('aimeat-profile-tab');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.tabId && parsed.slot) return parsed;
@@ -598,16 +606,16 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
     setOpenView(prev => {
       const next = (prev?.tabId === tabId) ? null : { tabId, slot };
       if (next) {
-        localStorage.setItem('aimeat-profile-tab', JSON.stringify(next));
+        sessionStorage.setItem('aimeat-profile-tab', JSON.stringify(next));
       } else {
-        localStorage.removeItem('aimeat-profile-tab');
+        sessionStorage.removeItem('aimeat-profile-tab');
       }
       return next;
     });
   }, []);
 
   const close = useCallback(() => {
-    localStorage.removeItem('aimeat-profile-tab');
+    sessionStorage.removeItem('aimeat-profile-tab');
     setOpenView(null);
   }, []);
 

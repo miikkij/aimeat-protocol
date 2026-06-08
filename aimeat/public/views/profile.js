@@ -8,6 +8,9 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   v1.2.0 — 2026-06-09 — Persist the remembered tab in sessionStorage instead of
+ *     localStorage (aimeat-profile-tab) so it is per browser tab; matches the
+ *     landing page, which owns the actual restored-on-F5 view.
  *   v1.1.0 — 2026-06-02 — Component unification (#10 toast): tokenized the
  *     shared .toast colors in theme.css (--toast-*) and documented this shell's
  *     showToast as a distinct, intentionally-not-migrated toast pathway. Added
@@ -100,7 +103,7 @@ export default function Profile({ navigate, locale }) {
   const NODE_URL = getNodeUrl();
   const [session, setSession] = useState(null);
   const savedTab = () => {
-    const id = localStorage.getItem('aimeat-profile-tab');
+    const id = sessionStorage.getItem('aimeat-profile-tab');
     // Default to 'home' (landing page) instead of a specific tab
     if (id === 'home') return 'home';
     return id && TABS.some(t => t.id === id) ? id : 'home';
@@ -152,7 +155,7 @@ export default function Profile({ navigate, locale }) {
       if (!ns) {
         setActiveTab('home');
         setVisitedTabs(new Set());
-        localStorage.removeItem('aimeat-profile-tab');
+        sessionStorage.removeItem('aimeat-profile-tab');
       }
     });
   }, []);
@@ -238,7 +241,7 @@ export default function Profile({ navigate, locale }) {
   // Tab switching
   function switchTab(tabId) {
     setActiveTab(tabId);
-    localStorage.setItem('aimeat-profile-tab', tabId);
+    sessionStorage.setItem('aimeat-profile-tab', tabId);
     if (tabId !== 'home') {
       setVisitedTabs(prev => {
         const next = new Set(prev);
