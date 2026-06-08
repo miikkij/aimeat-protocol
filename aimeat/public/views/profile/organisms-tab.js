@@ -23,6 +23,11 @@
  *     so other viewers can load it, private → /v1/storage/<key> owner-only).
  *   v1.4.0 — 2026-06-08 — SourcesPanel: attach memory/storage/knowledge references (own or external/
  *     discover) the workspace draws on; pointers only, stored at organism.{id}.meta.sources.
+ *   v1.5.0 — 2026-06-08 — UI pass to reuse core primitives + readability: doc view shows Created/
+ *     Last-saved/Published (KeyValueRow + dt); canonical .seg replaces per-view version/picker tabs;
+ *     VisibilityPill + EmptyState + SearchBar + fmtBytes reused; "move…" dropdown dropped (drag-and-
+ *     drop only); recognizable upload button; tree/detail/panels recolored (white cards on the gray
+ *     section so a selected item's accent actually stands out); "File visibility" rename.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -30,13 +35,17 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { Spinner } from './shared.js';
+import { Spinner, VisibilityPill } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
+import { EmptyState } from '/components/EmptyState.js';
+import { KeyValueRow } from '/components/KeyValueRow.js';
+import { SearchBar } from '/components/SearchBar.js';
 import * as orgService from '/js/services/organisms.js';
 import * as memoryService from '/js/services/memory.js';
 import * as knowledgeService from '/js/services/knowledge.js';
 import { OpenRouterSettings } from './generator-settings.js';
 import { copyToClipboard } from '/js/utils.js';
+import { dt, fmtBytes } from '/js/format.js';
 import { Markdown, slugifyHeading } from '/components/Markdown.js';
 
 export default function OrganismsTab({ session, showToast, onStats }) {
@@ -848,11 +857,6 @@ function Workspace({ org, showToast, onBack }) {
         <button class="pj-doc-link" onClick=${() => setActiveDoc({ type: ot.name, mode: 'view', page: d })}>
           ${d._draft ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span> ` : ''}${escHtml(d.title || d.id)}
         </button>
-        <select class="input-field input-xs pj-move" onChange=${e => { const v = e.target.value; e.target.value = ''; if (!v) return; moveDocToSection(ot.name, d.id, v === '__unsorted' ? null : v); }}>
-          <option value="">${t('organisms.moveTo') || 'move…'}</option>
-          <option value="__unsorted">${t('organisms.unsorted') || 'Unsorted'}</option>
-          ${secs.map(s => html`<option value=${s.id} key=${s.id}>${escHtml(s.name || '(unnamed)')}</option>`)}
-        </select>
       </div>`;
 
     // A section is a drop target — dragging a document onto it (or its header) files it here.
@@ -888,11 +892,11 @@ function Workspace({ org, showToast, onBack }) {
             ${childrenOf(null).map(renderSection)}
             ${unsorted.length > 0 ? html`
               <div class="pj-sec" onDragOver=${allowDrop} onDrop=${dropOn(null)}><div class="pj-sec-head"><span class="pj-sec-name pj-muted">${t('organisms.unsorted') || 'Unsorted'}</span></div>${unsorted.map(docItem)}</div>` : null}
-            ${docs.length === 0 && secs.length === 0 ? html`<div class="pj-empty">${t('organisms.noneYet') || 'none yet'}</div>` : null}
+            ${docs.length === 0 && secs.length === 0 ? html`<${EmptyState} text=${t('organisms.noneYet') || 'none yet'} />` : null}
           </div>
           <div class="pj-doc-main">
             ${(() => {
-              if (activeDoc?.type !== ot.name) return html`<div class="pj-empty">${t('organisms.selectDoc') || 'Select a document, or create one.'}</div>`;
+              if (activeDoc?.type !== ot.name) return html`<${EmptyState} icon="📄" text=${t('organisms.selectDoc') || 'Select a document, or create one.'} />`;
               // Re-resolve the open document against the freshly-loaded list by id, so after a save (or
               // a live-update / F5 restore that only kept the id) the view shows the current draft —
               // with its correct draft badge, published copy, and Draft/Published toggle.
@@ -1135,7 +1139,7 @@ function SourcesPanel({ orgId, showToast }) {
   const resultRow = (item, i) => {
     let label, meta;
     if (tab === 'memory') { label = item.key; meta = (scope === 'discover' ? (item.owner_gaii + ' · ') : '') + (item.visibility || ''); }
-    else if (tab === 'storage') { label = item.key; meta = (item.mime_type || '') + ' · ' + Math.round((item.size || 0) / 1024) + ' KB'; }
+    else if (tab === 'storage') { label = item.key; meta = (item.mime_type || '') + ' · ' + fmtBytes(item.size || 0); }
     else { label = scope === 'mine' ? (item.value?.name || item.key) : (item.name || item.package_id); meta = (scope === 'mine' ? (item.value?.entries?.length || 0) : (item.entries_count || 0)) + ' ' + (t('organisms.entries') || 'entries'); }
     return html`
       <div class="pj-src-result" key=${'r' + i}>
@@ -1157,27 +1161,26 @@ function SourcesPanel({ orgId, showToast }) {
 
       ${picking ? html`
         <div class="pj-src-picker">
-          <div class="pj-ver-tabs" role="tablist">
-            ${['memory', 'storage', 'knowledge'].map(tk => html`<button class="pj-ver-tab ${tab === tk ? 'active' : ''}" key=${tk} onClick=${() => setTab(tk)}>${SRC_ICON[tk]} ${t('organisms.src_' + tk) || tk}</button>`)}
+          <div class="seg" role="tablist">
+            ${['memory', 'storage', 'knowledge'].map(tk => html`<button class="seg-btn ${tab === tk ? 'active' : ''}" key=${tk} onClick=${() => setTab(tk)}>${SRC_ICON[tk]} ${t('organisms.src_' + tk) || tk}</button>`)}
           </div>
           <div class="pj-src-controls">
             ${tab !== 'storage' ? html`
-              <div class="pj-ver-tabs">
-                <button class="pj-ver-tab ${scope === 'mine' ? 'active' : ''}" onClick=${() => setScope('mine')}>${t('organisms.mine') || 'Mine'}</button>
-                <button class="pj-ver-tab ${scope === 'discover' ? 'active' : ''}" onClick=${() => setScope('discover')}>${t('organisms.discover') || 'Discover'}</button>
+              <div class="seg">
+                <button class="seg-btn ${scope === 'mine' ? 'active' : ''}" onClick=${() => setScope('mine')}>${t('organisms.mine') || 'Mine'}</button>
+                <button class="seg-btn ${scope === 'discover' ? 'active' : ''}" onClick=${() => setScope('discover')}>${t('organisms.discover') || 'Discover'}</button>
               </div>` : null}
-            <input class="input-field input-sm pj-src-search" placeholder=${t('organisms.searchSources') || 'Search…'}
-              value=${q} onInput=${e => setQ(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter') doSearch(); }} />
+            <div class="pj-src-search"><${SearchBar} value=${q} onInput=${e => setQ(e.target.value)} onSubmit=${() => doSearch()} placeholder=${t('organisms.searchSources') || 'Search…'} /></div>
             <button class="btn-ghost btn-sm" onClick=${doSearch} disabled=${loading}>${t('organisms.search') || 'Search'}</button>
           </div>
           <div class="pj-src-results">
-            ${loading ? html`<div class="pj-empty">${t('organisms.loading') || 'Loading…'}</div>`
-              : results.length === 0 ? html`<div class="pj-empty">${t('organisms.noResults') || 'No results'}</div>`
+            ${loading ? html`<${EmptyState} text=${t('organisms.loading') || 'Loading…'} />`
+              : results.length === 0 ? html`<${EmptyState} text=${t('organisms.noResults') || 'No results'} />`
               : results.slice(0, 100).map(resultRow)}
           </div>
         </div>` : null}
 
-      ${sources.length === 0 ? html`<div class="pj-empty">${t('organisms.noSources') || 'No sources yet'}</div>`
+      ${sources.length === 0 ? html`<${EmptyState} text=${t('organisms.noSources') || 'No sources yet'} />`
         : html`<div class="pj-src-list">
           ${sources.map(s => html`
             <div class="pj-src-item" key=${s.id}>
@@ -1316,17 +1319,28 @@ function DocumentView({ page, busy, onEdit, onPublish, onWikiLink }) {
     return () => { cancelled = true; created.forEach(u => { try { URL.revokeObjectURL(u); } catch (e) { /* noop */ } }); };
   }, [shown.markdown]);
 
+  // created/saved/published timestamps come from the workspace read (record metadata on the value).
+  const created = page._createdAt || page._pub?._createdAt;
+  const savedAt = page._draft ? page._updatedAt : null;          // draft = working copy → "last saved"
+  const publishedAt = page._pub?._updatedAt || (!page._draft && page._published ? page._updatedAt : null);
+
   return html`
     <div class="pj-doc-toolbar">
       <span class="pj-doc-vtitle">${escHtml(shown.title || shown.id || page.id)}</span>
       ${hasBoth ? html`
-        <div class="pj-ver-tabs" role="tablist">
-          <button class="pj-ver-tab ${tab === 'draft' ? 'active' : ''}" onClick=${() => setTab('draft')}>${t('organisms.draftVersion') || 'Draft'}</button>
-          <button class="pj-ver-tab ${tab === 'published' ? 'active' : ''}" onClick=${() => setTab('published')}>${t('organisms.publishedVersion') || 'Published'}</button>
+        <div class="seg" role="tablist">
+          <button class="seg-btn ${tab === 'draft' ? 'active' : ''}" onClick=${() => setTab('draft')}>${t('organisms.draftVersion') || 'Draft'}</button>
+          <button class="seg-btn ${tab === 'published' ? 'active' : ''}" onClick=${() => setTab('published')}>${t('organisms.publishedVersion') || 'Published'}</button>
         </div>` : null}
       <button class="btn-ghost btn-sm" onClick=${onEdit}>${t('organisms.edit') || 'Edit'}</button>
       ${page._draft ? html`<button class="btn-primary btn-sm" onClick=${onPublish} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>` : null}
     </div>
+    ${(created || savedAt || publishedAt) ? html`
+      <div class="pj-doc-meta">
+        ${created ? html`<${KeyValueRow} label=${t('organisms.createdAt') || 'Created'} value=${dt(created)} />` : null}
+        ${savedAt ? html`<${KeyValueRow} label=${t('organisms.lastSaved') || 'Last saved'} value=${dt(savedAt)} />` : null}
+        ${publishedAt ? html`<${KeyValueRow} label=${t('organisms.publishedAt') || 'Published'} value=${dt(publishedAt)} />` : null}
+      </div>` : null}
     <div class="pj-doc-view"><${Markdown} text=${rendered} onWikiLink=${onWikiLink} /></div>`;
 }
 
@@ -1470,8 +1484,8 @@ function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
       <input type="text" class="input-field input-sm" placeholder=${t('organisms.pageTitle') || 'Document title'}
         value=${title} onInput=${e => setTitle(e.target.value)} />
       <div class="pj-doc-imgbar">
-        <label class="btn-ghost btn-sm pj-file-btn">
-          ${t('organisms.insertImage') || '📷 Upload image from file'}
+        <label class="btn-outline btn-sm pj-file-btn">
+          <span class="pj-file-btn-icon">📷</span> ${t('organisms.insertImage') || 'Upload image from file'}
           <input type="file" accept="image/*" hidden onChange=${e => { insertFromFile(e.target.files && e.target.files[0]); e.target.value = ''; }} />
         </label>
         <span class="pj-imgbar-hint">${t('organisms.orPaste') || '…or paste / drag an image into the editor'}</span>
@@ -1479,18 +1493,14 @@ function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
       ${images.length ? html`
         <div class="pj-img-vis">
           <div class="pj-img-vis-head">
-            <span class="pj-img-vis-title">${t('organisms.imageVisibility') || 'Image visibility'}</span>
-            <span class="pj-img-vis-note">${t('organisms.imageVisibilityNote') || 'Private images only load for you — make them public to share the document.'}</span>
+            <span class="pj-img-vis-title">${t('organisms.fileVisibility') || 'File visibility'}</span>
+            <span class="pj-img-vis-note">${t('organisms.fileVisibilityNote') || 'Private files only load for you — make them public to share the document.'}</span>
             ${images.some(i => i.visibility !== 'public') ? html`<button class="btn-ghost btn-sm" disabled=${imgBusy} onClick=${makeAllImagesPublic}>${t('organisms.makeAllPublic') || 'Make all public'}</button>` : null}
           </div>
           ${images.map(i => html`
             <div class="pj-img-vis-row" key=${i.key}>
               <span class="pj-img-vis-name" title=${i.key}>${escHtml(i.alt)}</span>
-              <button class="pj-vis-pill ${i.visibility === 'public' ? 'pub' : 'prv'}" disabled=${imgBusy}
-                title=${t('organisms.toggleVisibility') || 'Click to toggle public / private'}
-                onClick=${() => changeImageVisibility(i.key, i.visibility === 'public' ? 'private' : 'public')}>
-                ${i.visibility === 'public' ? (t('organisms.public') || 'Public') : (t('organisms.private') || 'Private')}
-              </button>
+              <${VisibilityPill} visibility=${i.visibility} onClick=${() => { if (!imgBusy) changeImageVisibility(i.key, i.visibility === 'public' ? 'private' : 'public'); }} />
             </div>`)}
         </div>` : null}
       ${mode === 'rich'

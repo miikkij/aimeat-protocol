@@ -576,25 +576,35 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       const namespace = typeof ot.namespace === 'string' ? ot.namespace : undefined;
       if (!name || !namespace || !memoryBackings.has(ot.backing as string)) continue;
       const nsPrefix = `${nsRoot}${namespace}.`;
-      const instances = new Map<string, { bare?: unknown; latest?: unknown; draft?: unknown }>();
+      const instances = new Map<string, { bare?: MemoryRecord; latest?: MemoryRecord; draft?: MemoryRecord }>();
       for (const r of readable) {
         if (!r.key.startsWith(nsPrefix)) continue;
         const parts = r.key.slice(nsPrefix.length).split('.');
         const instanceId = parts[0];
         const role = parts.slice(1).join('.');
         const slot = instances.get(instanceId) ?? {};
-        if (role === '') slot.bare = r.value;
-        else if (role === 'draft') slot.draft = r.value;
-        else if (role === 'latest') slot.latest = r.value;
+        if (role === '') slot.bare = r;
+        else if (role === 'draft') slot.draft = r;
+        else if (role === 'latest') slot.latest = r;
         // role startsWith 'version.' → history, skip
         instances.set(instanceId, slot);
       }
+      // Surface the record's timestamps on the returned value (when it's an object) as `_createdAt`/
+      // `_updatedAt`/`_version` — so a client can show "created / last saved / published" without an
+      // extra read. Underscore-prefixed so they never collide with manifest-declared fields; the
+      // write paths re-pick {id,title,markdown}/form fields, so these are never persisted back.
+      const withMeta = (rec: MemoryRecord): unknown => {
+        const v = rec.value;
+        return (v && typeof v === 'object' && !Array.isArray(v))
+          ? { ...(v as Record<string, unknown>), _createdAt: rec.createdAt, _updatedAt: rec.updatedAt, _version: rec.version }
+          : v;
+      };
       const current: unknown[] = [];
       const draftList: unknown[] = [];
       for (const slot of instances.values()) {
-        const c = slot.latest ?? slot.bare;
-        if (c !== undefined) current.push(c);
-        if (slot.draft !== undefined) draftList.push(slot.draft);
+        const pub = slot.latest ?? slot.bare;
+        if (pub !== undefined) current.push(withMeta(pub));
+        if (slot.draft !== undefined) draftList.push(withMeta(slot.draft));
       }
       objects[name] = current;
       if (draftList.length) drafts[name] = draftList;

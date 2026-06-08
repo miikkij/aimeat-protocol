@@ -824,6 +824,17 @@ a { color: inherit; text-decoration: none; }
 }
 .pill:hover { opacity: 0.8; }
 
+/* ── Segmented control (canonical) ──
+   A row of buttons in a bordered pill; the active segment is filled with the accent. Token-only so
+   it flips in dark mode. The start of the deferred #8 tab-family consolidation — use this for new
+   in-place view toggles (Draft/Published, picker tabs, scope toggles) instead of a per-view clone. */
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--card); }
+.seg-btn { padding: 0.25rem 0.7rem; font-size: 0.8rem; line-height: 1.3; background: transparent; color: var(--text-dim); border: none; cursor: pointer; transition: background 0.15s, color 0.15s; }
+.seg-btn + .seg-btn { border-left: 1px solid var(--border); }
+.seg-btn:hover:not(:disabled) { background: var(--bg-surface); }
+.seg-btn.active { background: var(--accent); color: #fff; }
+.seg-btn:disabled { opacity: 0.6; cursor: default; }
+
 /* ── Status dot (canonical) ──
    Small circle whose color is driven by a semantic status token. Consolidates
    the bespoke per-view dots (.live-dot, .peer-dot, .pn-status-dot,
