@@ -6061,6 +6061,20 @@
     }
   },
   "admin": {
+    "security": {
+      "title": "Tietoturva",
+      "desc": "Hylätyt / karanteeniin laitetut lataukset ja muut tietoturvatapahtumat.",
+      "open": "auki",
+      "none": "Ei tietoturvatapahtumia 🎉",
+      "actor": "Kenen puolesta",
+      "source": "Lähde",
+      "resolve": "Merkitse hoidetuksi",
+      "resolved": "Tapahtuma hoidettu",
+      "delete": "Poista",
+      "deleted": "Poistettu",
+      "deleteConfirm": "Poistetaanko tämä tapahtuma ja sen karanteenitiedosto?",
+      "evidence": "Tiedosto"
+    },
     "tabs": {
       "agentIntegration": "Agenttiintegraatio"
     },

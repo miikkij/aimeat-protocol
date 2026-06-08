@@ -6059,6 +6059,20 @@
     }
   },
   "admin": {
+    "security": {
+      "title": "Security",
+      "desc": "Rejected / quarantined uploads and other security incidents.",
+      "open": "open",
+      "none": "No security incidents 🎉",
+      "actor": "On behalf of",
+      "source": "Source",
+      "resolve": "Resolve",
+      "resolved": "Incident resolved",
+      "delete": "Delete",
+      "deleted": "Deleted",
+      "deleteConfirm": "Delete this incident and its quarantined file?",
+      "evidence": "Payload"
+    },
     "tabs": {
       "agentIntegration": "Agent Integration"
     },

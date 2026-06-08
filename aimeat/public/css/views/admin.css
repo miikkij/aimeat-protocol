@@ -728,3 +728,19 @@
   vertical-align: middle;
   margin-left: 6px;
 }
+
+/* Security tab — incident list */
+.adm-sec-title { font-size: 1.05rem; font-weight: 700; margin: 0 0 0.3rem; }
+.adm-sec-desc { color: var(--muted); font-size: 0.85rem; margin: 0 0 0.75rem; }
+.adm-sec-empty { color: var(--muted); padding: 0.75rem 0; }
+.adm-sec-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.adm-sec-row { display: flex; gap: 0.75rem; justify-content: space-between; align-items: flex-start; border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.75rem; background: var(--card); }
+.adm-sec-row.open { border-color: var(--danger); border-left-width: 3px; }
+.adm-sec-main { min-width: 0; flex: 1; }
+.adm-sec-line1 { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.adm-sec-type { font-weight: 600; color: var(--text); }
+.adm-sec-code { font-size: 0.78rem; background: var(--bg-dim); padding: 0.05rem 0.35rem; border-radius: 4px; }
+.adm-sec-when { font-size: 0.74rem; color: var(--muted); margin-left: auto; }
+.adm-sec-line2 { font-size: 0.82rem; color: var(--text); margin: 0.25rem 0; word-break: break-word; }
+.adm-sec-line3 { font-size: 0.76rem; color: var(--muted); }
+.adm-sec-actions { display: flex; gap: 0.35rem; flex-shrink: 0; flex-wrap: wrap; }

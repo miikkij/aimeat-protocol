@@ -17,6 +17,7 @@ import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
 import OverviewTab     from './admin/overview-tab.js';
 import EconomyTab      from './admin/economy-tab.js';
 import ConfigTab       from './admin/config-tab.js';
+import SecurityTab     from './admin/security-tab.js';
 import CorsTab         from './admin/cors-tab.js';
 import MaintenanceTab  from './admin/maintenance-tab.js';
 import HooksTab        from './admin/hooks-tab.js';
@@ -58,6 +59,7 @@ const NAV_GROUPS = [
     { id: 'overview',     icon: '\u{1F4CA}', key: 'dashboard.overview',   component: OverviewTab },
     { id: 'economy',      icon: '\u{1FA99}', key: 'dashboard.economy',    component: EconomyTab },
     { id: 'config',       icon: '\u2699',    key: 'dashboard.config',     component: ConfigTab },
+    { id: 'security',     icon: '\u{1F6E1}', key: 'admin.security.title',  component: SecurityTab },
     { id: 'cors',         icon: '\u{1F512}', key: 'dashboard.cors',       component: CorsTab },
     { id: 'maintenance',  icon: '\u{1F6A7}', key: 'dashboard.maintenance',component: MaintenanceTab },
     { id: 'hooks',        icon: '\u{1F517}', key: 'dashboard.hooks',      component: HooksTab },
