@@ -814,7 +814,7 @@ function Workspace({ org, showToast, onBack }) {
           </div>
           <div class="pj-doc-main">
             ${activeDoc?.type === ot.name && activeDoc.mode === 'edit' ? html`
-              <${DocumentEditor} page=${activeDoc.page} busy=${busy} onSave=${(p) => savePage(ot, p, activeDoc.sectionId)} onCancel=${() => setActiveDoc(null)} />
+              <${DocumentEditor} key=${'ed-' + (activeDoc.page.id || 'new')} page=${activeDoc.page} busy=${busy} onSave=${(p) => savePage(ot, p, activeDoc.sectionId)} onCancel=${() => setActiveDoc(null)} />
             ` : activeDoc?.type === ot.name && activeDoc.mode === 'view' ? html`
               <div class="pj-doc-toolbar">
                 <span class="pj-doc-vtitle">${escHtml(activeDoc.page.title || activeDoc.page.id)}</span>
@@ -1030,20 +1030,71 @@ function SchemaForm({ schema, busy, onSave, onCancel }) {
 
 /* Free-form markdown page editor for document-mode object types: a title + a markdown textarea
  * with a live preview (reusing the safe Markdown renderer). Saves as a draft, versioned on publish. */
+// Lazy-load the vendored Toast UI Editor (MIT, /lib/toastui/) only when a document is edited —
+// it's ~520KB, so it stays out of the main bundle. Resolves window.toastui.Editor.
+let _tuiPromise = null;
+function loadToastUI() {
+  if (window.toastui && window.toastui.Editor) return Promise.resolve(window.toastui.Editor);
+  if (_tuiPromise) return _tuiPromise;
+  _tuiPromise = new Promise((resolve, reject) => {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet'; css.href = '/lib/toastui/toastui-editor.min.css';
+    document.head.appendChild(css);
+    const s = document.createElement('script');
+    s.src = '/lib/toastui/toastui-editor-all.min.js';
+    s.onload = () => (window.toastui && window.toastui.Editor) ? resolve(window.toastui.Editor) : reject(new Error('editor missing'));
+    s.onerror = () => reject(new Error('failed to load editor'));
+    document.head.appendChild(s);
+  });
+  return _tuiPromise;
+}
+
+/* Document editor: a Toast UI Editor (WYSIWYG, with its own built-in Markdown⇄WYSIWYG toggle, so
+ * non-technical users type like a document). Falls back to a plain markdown textarea + live preview
+ * if the editor can't load. Title is a separate Preact-controlled field. */
 function DocumentEditor({ page, busy, onSave, onCancel }) {
   const [title, setTitle] = useState((page && page.title) || '');
+  const [mode, setMode] = useState('rich');               // 'rich' = Toast UI; 'markdown' = fallback textarea
   const [md, setMd] = useState((page && page.markdown) || '');
+  const containerRef = useRef(null);
+  const editorRef = useRef(null);
+
+  useEffect(() => {
+    if (mode !== 'rich') return undefined;
+    let inst = null, cancelled = false;
+    loadToastUI().then((Editor) => {
+      if (cancelled || !containerRef.current) return;
+      inst = new Editor({
+        el: containerRef.current,
+        height: '440px',
+        initialEditType: 'wysiwyg',
+        previewStyle: 'tab',
+        initialValue: (page && page.markdown) || '',
+        usageStatistics: false,
+      });
+      editorRef.current = inst;
+    }).catch(() => { if (!cancelled) setMode('markdown'); });
+    return () => { cancelled = true; if (inst) { try { inst.destroy(); } catch (e) { /* noop */ } } editorRef.current = null; };
+  }, [mode]);
+
+  const save = () => onSave({
+    ...page, title: title.trim(),
+    markdown: (mode === 'rich' && editorRef.current) ? editorRef.current.getMarkdown() : md,
+  });
+
   return html`
     <div class="pj-doc-editor">
       <input type="text" class="input-field input-sm" placeholder=${t('organisms.pageTitle') || 'Document title'}
         value=${title} onInput=${e => setTitle(e.target.value)} />
-      <div class="pj-doc-grid">
-        <textarea class="input-field pj-doc-md" rows="14" placeholder=${t('organisms.writeMarkdown') || 'Write markdown…'}
-          value=${md} onInput=${e => setMd(e.target.value)}></textarea>
-        <div class="pj-doc-preview"><${Markdown} text=${md} /></div>
-      </div>
+      ${mode === 'rich'
+        ? html`<div ref=${containerRef} class="pj-tui"></div>`
+        : html`<div class="pj-doc-grid">
+            <textarea class="input-field pj-doc-md" rows="14" placeholder=${t('organisms.writeMarkdown') || 'Write markdown…'}
+              value=${md} onInput=${e => setMd(e.target.value)}></textarea>
+            <div class="pj-doc-preview"><${Markdown} text=${md} /></div>
+          </div>`}
       <div class="form-actions">
-        <button class="btn-primary btn-sm" onClick=${() => onSave({ ...page, title: title.trim(), markdown: md })} disabled=${busy || !title.trim()}>${t('organisms.saveDraft') || 'Save draft'}</button>
+        <button class="btn-primary btn-sm" onClick=${save} disabled=${busy || !title.trim()}>${t('organisms.saveDraft') || 'Save draft'}</button>
         <button class="btn-ghost btn-sm" onClick=${onCancel}>${t('organisms.cancel') || 'Cancel'}</button>
       </div>
     </div>

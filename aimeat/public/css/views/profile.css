@@ -2058,4 +2058,5 @@
 .pj-mini { font-size: 0.6rem; padding: 0 0.25rem; vertical-align: middle; }
 .pj-doc-toolbar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
 .pj-doc-vtitle { flex: 1; font-weight: 600; }
+.pj-tui { margin: 0.3rem 0 0.5rem; }
 @media (max-width: 640px) { .pj-docspace { flex-direction: column; } .pj-doc-index { flex: none; width: 100%; } }
