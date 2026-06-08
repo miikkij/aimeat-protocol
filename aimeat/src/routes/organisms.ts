@@ -928,6 +928,50 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     }
   });
 
+  /* ── GET /v1/organisms/:id/workspace/activity?ws= — deterministic activity feed for a workspace,
+   * derived from the version history: who did what, in which space, draft-edit vs publish, when.
+   * Each .version.N = a publish event; each .draft = an edit event. Member-gated; access-filtered. ── */
+  router.get('/v1/organisms/:id/workspace/activity', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const ws = typeof req.query.ws === 'string' ? req.query.ws : undefined;
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    if (!(await memberRole(req, organism, id))) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    if (!ws) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws is required')); return; }
+    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+    const root = `organism.${id}.w.${ws}`;
+    const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 10000 });
+
+    // namespace → objectType name, from the manifest (best-effort, for friendly labels).
+    const manRec = items.find(r => r.key === `${root}.meta.manifest`);
+    const types = ((manRec?.value as { objectTypes?: Array<{ name?: string; namespace?: string }> } | undefined)?.objectTypes) ?? [];
+    const typeByNs = new Map(types.filter(o => o.namespace && o.name).map(o => [o.namespace as string, o.name as string]));
+
+    const events: Array<{ at: string; actor: string; namespace: string; type: string; instance: string; action: 'publish' | 'draft' }> = [];
+    for (const r of items) {
+      if (r.ownerGaii !== callerGaii) {
+        const d = await authorizeRead(storage, config, { ownerGaii: r.ownerGaii, accessorGaii: callerGaii, resourceKey: r.key, visibility: r.visibility, groupId: r.groupId, action: 'read' });
+        if (!d.allowed) continue;
+      }
+      const rel = r.key.slice(root.length + 1);
+      if (rel.startsWith('meta.') || rel.startsWith('access.')) continue;
+      const parts = rel.split('.');
+      const last = parts[parts.length - 1];
+      const secondLast = parts[parts.length - 2];
+      let action: 'publish' | 'draft';
+      let core: string[];
+      if (last === 'draft') { action = 'draft'; core = parts.slice(0, -1); }
+      else if (secondLast === 'version' && /^\d+$/.test(last)) { action = 'publish'; core = parts.slice(0, -2); }
+      else continue;   // .latest / bare → skip (publishes come from .version.N; avoids double-count)
+      const instance = core[core.length - 1];
+      const namespace = core.slice(0, -1).join('.');
+      if (!instance || !namespace) continue;
+      events.push({ at: action === 'draft' ? r.updatedAt : r.createdAt, actor: bareOwner(r.ownerGaii), namespace, type: typeByNs.get(namespace) || namespace, instance, action });
+    }
+    events.sort((a, b) => (b.at || '').localeCompare(a.at || ''));
+    res.json(success(config.nodeId, { ws, events: events.slice(0, 300), total: events.length }));
+  });
+
   /* ── GET /v1/organisms/:id/workspace/export?ws= — download a full-fidelity ZIP backup of a
    * workspace (workspace.json + images/). The workspace creator (or an org admin) only. ── */
   router.get('/v1/organisms/:id/workspace/export', requireAuth(), async (req, res) => {

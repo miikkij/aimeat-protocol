@@ -695,6 +695,59 @@ function WorkspaceList({ org, showToast, onOpen, onBack }) {
     </div>`;
 }
 
+/* Activity panel — a deterministic, color-coded feed of a workspace's history (who did what, in
+ * which space, draft-edit vs publish, when). A small per-day bar strip for the temporal overview +
+ * the most recent events. Built from GET …/workspace/activity (derived from the version history). */
+function ActivityPanel({ orgId, wsId }) {
+  const [data, setData] = useState(null);
+  const [show, setShow] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    orgService.getWorkspaceActivity(orgId, wsId).then(d => { if (!cancelled) setData(d); }).catch(() => {});
+    const h = () => orgService.getWorkspaceActivity(orgId, wsId).then(d => { if (!cancelled) setData(d); }).catch(() => {});
+    window.addEventListener('aimeat-live-update', h);
+    return () => { cancelled = true; window.removeEventListener('aimeat-live-update', h); };
+  }, [orgId, wsId]);
+  if (!data || !(data.events || []).length) return null;
+  const events = data.events;
+  const byDay = new Map();
+  for (const e of events) { const day = (e.at || '').slice(0, 10); if (!day) continue; const b = byDay.get(day) || { draft: 0, publish: 0 }; b[e.action] = (b[e.action] || 0) + 1; byDay.set(day, b); }
+  const days = [...byDay.keys()].sort();
+  const maxCount = Math.max(1, ...[...byDay.values()].map(b => b.draft + b.publish));
+  return html`
+    <div class="pj-chart">
+      <div class="pj-chart-head">
+        <span class="pj-chart-title">${'📊 '}${t('organisms.activity') || 'Activity'}</span>
+        <button class="btn-ghost btn-sm" onClick=${() => setShow(s => !s)}>${show ? (t('organisms.hide') || 'Hide') : (t('organisms.show') || 'Show')}</button>
+      </div>
+      ${show ? html`
+        <div class="pj-act">
+          <div class="pj-act-legend">
+            <span class="pj-act-key"><span class="pj-act-dot draft"></span>${t('organisms.draftEdit') || 'Draft edit'}</span>
+            <span class="pj-act-key"><span class="pj-act-dot publish"></span>${t('organisms.publishedWord') || 'Published'}</span>
+          </div>
+          <div class="pj-act-strip">
+            ${days.map(day => { const b = byDay.get(day); const tot = b.draft + b.publish; const hp = Math.max(6, Math.round((tot / maxCount) * 100));
+              return html`<div class="pj-act-col" key=${day} title=${day + ' — ' + b.publish + ' published, ' + b.draft + ' edited'}>
+                <div class="pj-act-bar" style=${'height:' + hp + '%'}>
+                  ${b.publish ? html`<div class="pj-act-seg publish" style=${'flex:' + b.publish}></div>` : null}
+                  ${b.draft ? html`<div class="pj-act-seg draft" style=${'flex:' + b.draft}></div>` : null}
+                </div>
+              </div>`; })}
+          </div>
+          <div class="pj-act-list">
+            ${events.slice(0, 15).map((e, i) => html`<div class="pj-act-item" key=${i}>
+              <span class="pj-act-dot ${e.action}"></span>
+              <span class="pj-act-time">${dt(e.at)}</span>
+              <span class="pj-act-who">${escHtml(e.actor)}</span>
+              <span class="pj-act-act">${e.action === 'publish' ? (t('organisms.publishedVerb') || 'published') : (t('organisms.editedVerb') || 'edited')}</span>
+              <span class="pj-act-what">${escHtml(e.type)}${' / '}${escHtml(e.instance)}</span>
+            </div>`)}
+          </div>
+        </div>` : null}
+    </div>`;
+}
+
 function Workspace({ org, wsId, showToast, onBack }) {
   const orgId = org.id;
   const { confirm, ConfirmUI } = useConfirm();
@@ -1315,6 +1368,8 @@ function Workspace({ org, wsId, showToast, onBack }) {
           </div>
           ${showFlow ? html`<${Mermaid} chart=${orgService.buildEditFlowMermaid(ws.manifest, gateOn)} />` : null}
         </div>` : null}
+
+      <${ActivityPanel} orgId=${orgId} wsId=${wsId} />
 
       ${types.map(ot => ot.mode === 'document' ? renderDocSpace(ot) : html`
         <div class="pj-section" key=${ot.name}>

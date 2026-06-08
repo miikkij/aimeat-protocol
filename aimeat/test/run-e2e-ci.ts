@@ -50,6 +50,7 @@ const ALL_SUITES = [
     'test/e2e-organism-workspace-access.ts',
     'test/e2e-workspace-export-import.ts',
     'test/e2e-zip-security.ts',
+    'test/e2e-workspace-activity.ts',
     'test/e2e-mcp-catalogue.ts',
     'test/e2e-mcp-memory-extended.ts',
     'test/e2e-mcp-wallet-extended.ts',

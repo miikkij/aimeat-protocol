@@ -331,6 +331,14 @@ export async function applyProjectTemplate(orgId, wsId, name, summary) {
   await apiPost('/v1/memory', { key: `${root}.meta.readme`, value: `# ${name}\n\n${summary || ''}`, visibility: 'private' });
 }
 
+/** Activity feed for a workspace (who did what / where / draft-edit vs publish / when). */
+export async function getWorkspaceActivity(orgId, wsId) {
+  try {
+    const r = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/activity?ws=${encodeURIComponent(wsId)}`);
+    return r?.data || { events: [], total: 0 };
+  } catch { return { events: [], total: 0 }; }
+}
+
 /** Read the manifest-driven workspace. Returns null if the workspace has no manifest yet. */
 export async function getWorkspace(orgId, wsId) {
   const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace?ws=${encodeURIComponent(wsId)}`);

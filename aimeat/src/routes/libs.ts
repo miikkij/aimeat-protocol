@@ -4,6 +4,10 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.16.0 - 2026-06-09 - Sign-in modal (showLoginModal) gains a self-contained EN/FI
+ *   language switcher. The modal now loads its own translations (same 'aimeat-lang'
+ *   key + cookie as the header) and re-renders in place on switch, so it shows/lets
+ *   you change the language even when shown standalone without the canonical header.
  * v1.15.0 - 2026-06-03 - aimeat-auth.js boot restores a session from the httpOnly refresh
  *   cookie alone (no localStorage) so a browser an agent authenticated with an owner access
  *   token shows as logged in. (Agent access tokens, Phase 3b.)
@@ -996,15 +1000,123 @@ const auth = {
 
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+// ── Sign-in modal language helpers ──
+// The modal can be shown standalone (e.g. a custom portal page) where the
+// canonical header — and its language switcher — is not present. So the modal
+// owns its own EN/FI switcher and can (re)load translations itself, using the
+// same 'aimeat-lang' localStorage key + cookie the header uses, so the choice
+// stays in sync with the SPA.
+var MODAL_LANG_KEY = 'aimeat-lang';
+
+function currentModalLang() {
+  try {
+    var u = new URLSearchParams(location.search).get('lang');
+    if (u === 'en' || u === 'fi') return u;
+    var s = localStorage.getItem(MODAL_LANG_KEY);
+    if (s === 'en' || s === 'fi') return s;
+  } catch (e) {}
+  return (navigator.language || 'en').slice(0, 2).toLowerCase() === 'fi' ? 'fi' : 'en';
+}
+
+function flattenModalI18n(obj, prefix, out) {
+  out = out || {}; prefix = prefix || '';
+  for (var k in obj) {
+    if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+    var key = prefix ? prefix + '.' + k : k;
+    var v = obj[k];
+    if (v && typeof v === 'object' && !Array.isArray(v)) flattenModalI18n(v, key, out);
+    else out[key] = v;
+  }
+  return out;
+}
+
+// Fetch en.json (base) + <lang>.json (overrides) from the node and return just
+// the modal.* strings with the 'modal.' prefix stripped — the shape the modal
+// (and every mountLoginButton caller) expects for opts.i18n.
+async function loadModalI18n(lang) {
+  var v = Date.now();
+  var t = {};
+  try {
+    var enRes = await fetch(NODE_URL + '/locales/en.json?v=' + v);
+    if (enRes.ok) t = flattenModalI18n(await enRes.json());
+  } catch (e) {}
+  if (lang !== 'en') {
+    try {
+      var locRes = await fetch(NODE_URL + '/locales/' + lang + '.json?v=' + v);
+      if (locRes.ok) {
+        var loc = flattenModalI18n(await locRes.json());
+        for (var lk in loc) if (Object.prototype.hasOwnProperty.call(loc, lk)) t[lk] = loc[lk];
+      }
+    } catch (e) {}
+  }
+  var out = {};
+  for (var k in t) {
+    if (Object.prototype.hasOwnProperty.call(t, k) && k.indexOf('modal.') === 0) out[k.slice(6)] = t[k];
+  }
+  return out;
+}
+
 function showLoginModal(opts, renderBtn) {
-  const i = opts.i18n || {};
+  var i = opts.i18n || {};
+  var lang = currentModalLang();
   // Remove existing modal
   const old = document.getElementById('aimeat-modal');
   if (old) old.remove();
 
   const modal = document.createElement('div');
   modal.id = 'aimeat-modal';
-  modal.innerHTML = '<style>'
+
+  // Capture typed values so they survive a re-render (language change).
+  function captureInputs() {
+    var g = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
+    return { u: g('aimeat-username'), p: g('aimeat-password'), d: g('aimeat-displayname') };
+  }
+  function restoreInputs(vals) {
+    var s = function (id, val) { var el = document.getElementById(id); if (el && val) el.value = val; };
+    s('aimeat-username', vals.u); s('aimeat-password', vals.p); s('aimeat-displayname', vals.d);
+  }
+
+  // Switch language: persist the choice (same key/cookie as the header), reload
+  // translations, and re-render the modal in place — no full page reload, so the
+  // user stays in the modal.
+  function switchLang(next) {
+    if (next === lang) return;
+    try {
+      localStorage.setItem(MODAL_LANG_KEY, next);
+      document.cookie = 'aimeat-lang=' + next + ';path=/;max-age=31536000;SameSite=Lax';
+    } catch (e) {}
+    var vals = captureInputs();
+    loadModalI18n(next).then(function (fresh) {
+      lang = next;
+      if (fresh && Object.keys(fresh).length) i = fresh;
+      render(false);
+      restoreInputs(vals);
+    });
+  }
+
+  function render(anim) {
+    modal.innerHTML = buildModalInner(i, lang, anim);
+    wireModal();
+  }
+
+  document.body.appendChild(modal);
+  render(true);
+
+  // The host page passed opts.i18n in whatever language it had loaded. When the
+  // modal is shown standalone that can be the wrong language; correct it to the
+  // stored/preferred language by loading fresh translations and re-rendering
+  // (only if they actually differ, to avoid a needless flicker).
+  loadModalI18n(lang).then(function (fresh) {
+    if (!fresh || !Object.keys(fresh).length) return;
+    if (fresh.signInBtn === i.signInBtn && fresh.descNew === i.descNew) return;
+    var vals = captureInputs();
+    i = fresh;
+    render(false);
+    restoreInputs(vals);
+  });
+
+  function buildModalInner(i, lang, anim) {
+   return '<style>'
     + '.aimeat-inp{width:100%;padding:11px 14px;border:1.5px solid #E5E7EB;border-radius:10px;font-family:DM Sans,system-ui,sans-serif;font-size:15px;color:#1A1A2E;background:#FAFAF8;box-sizing:border-box;transition:all .15s;outline:none}'
     + '.aimeat-inp:focus{border-color:#E8564A;box-shadow:0 0 0 3px rgba(232,86,74,.1)}'
     + '.aimeat-inp::placeholder{color:#9CA3AF}'
@@ -1014,12 +1126,20 @@ function showLoginModal(opts, renderBtn) {
     + '.aimeat-cancel{padding:12px 20px;background:none;color:#1A1A2E;border:1px solid #E5E7EB;border-radius:10px;cursor:pointer;font-size:15px;font-weight:500;font-family:DM Sans,system-ui,sans-serif;transition:background .15s}'
     + '.aimeat-cancel:hover{background:#F3F4F6}'
     + '.aimeat-fi{width:20px;height:20px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px}'
+    + '.aimeat-langsw{position:absolute;top:24px;right:28px;display:flex;gap:5px}'
+    + '.aimeat-lang{padding:4px 9px;border:1px solid #E5E7EB;background:#fff;color:#6B7280;border-radius:7px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.4px;line-height:1;font-family:DM Sans,system-ui,sans-serif;transition:all .15s}'
+    + '.aimeat-lang:hover{border-color:#E8564A;color:#E8564A}'
+    + '.aimeat-lang.active{background:#E8564A;color:#fff;border-color:#E8564A;cursor:default}'
     + '@keyframes aimeatModalIn{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}'
     + '</style>'
     + '<div style="position:fixed;inset:0;background:rgba(26,26,46,.4);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:DM Sans,system-ui,sans-serif;padding:24px">'
-    + '<div style="background:#FFFFFF;border-radius:16px;max-width:420px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.05);animation:aimeatModalIn .3s ease">'
+    + '<div style="background:#FFFFFF;border-radius:16px;max-width:420px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.05);' + (anim ? 'animation:aimeatModalIn .3s ease' : '') + '">'
     // Header
-    + '<div style="padding:28px 32px 0">'
+    + '<div style="padding:28px 32px 0;position:relative">'
+    + '<div class="aimeat-langsw">'
+    + '<button type="button" class="aimeat-lang' + (lang === 'en' ? ' active' : '') + '" data-lang="en">EN</button>'
+    + '<button type="button" class="aimeat-lang' + (lang === 'fi' ? ' active' : '') + '" data-lang="fi">FI</button>'
+    + '</div>'
     + '<h2 style="margin:0;font-size:22px;font-weight:800;display:flex;align-items:center;gap:8px;color:#1A1A2E">'
     + 'AIME <span style="width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#E8564A,#D4493F);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:14px">\\u2665</span> AT Sign In'
     + '</h2>'
@@ -1093,7 +1213,14 @@ function showLoginModal(opts, renderBtn) {
     + '<div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;line-height:1.45"><div class="aimeat-fi" style="background:#FFF1F0;color:#E8564A">\\u2665</div><span><strong>' + escHtml(i.whyMorsels || '100 free heart morsels to start! E.g. memory request ~ 1, board post ~ 2. You get 50 more every day') + '</strong></span></div>'
     + '</div>'
     + '</div></div>';
-  document.body.appendChild(modal);
+  } // end buildModalInner
+
+  function wireModal() {
+
+  // Language switcher (EN/FI) — persists choice + re-renders the modal in place
+  modal.querySelectorAll('.aimeat-lang').forEach(function(b) {
+    b.addEventListener('click', function() { switchLang(b.getAttribute('data-lang')); });
+  });
 
   document.getElementById('aimeat-cancel-btn').addEventListener('click', () => modal.remove());
 
@@ -1274,6 +1401,8 @@ function showLoginModal(opts, renderBtn) {
       }
     }
   });
+
+  } // end wireModal
 }
 
 // ── Refresh on focus / visibility ──

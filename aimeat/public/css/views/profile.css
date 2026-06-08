@@ -2060,6 +2060,25 @@
 .mmd { overflow-x: auto; text-align: center; }
 .mmd svg { max-width: 100%; height: auto; }
 .mmd-fallback { font-size: 0.74rem; white-space: pre-wrap; color: var(--text-dim); background: var(--bg-dim); padding: 0.5rem; border-radius: 6px; overflow: auto; }
+/* Activity panel — color-coded temporal feed (draft edits vs publishes) */
+.pj-act { padding: 0.1rem; }
+.pj-act-legend { display: flex; gap: 1rem; font-size: 0.78rem; color: var(--muted); margin-bottom: 0.5rem; }
+.pj-act-key { display: flex; align-items: center; gap: 0.35rem; }
+.pj-act-dot { width: 9px; height: 9px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
+.pj-act-dot.draft { background: var(--orange); }
+.pj-act-dot.publish { background: var(--success); }
+.pj-act-strip { display: flex; align-items: flex-end; gap: 2px; height: 46px; margin-bottom: 0.65rem; }
+.pj-act-col { flex: 1; height: 100%; display: flex; align-items: flex-end; min-width: 3px; }
+.pj-act-bar { width: 100%; display: flex; flex-direction: column; border-radius: 2px; overflow: hidden; min-height: 3px; }
+.pj-act-seg { width: 100%; }
+.pj-act-seg.publish { background: var(--success); }
+.pj-act-seg.draft { background: var(--orange); }
+.pj-act-list { display: flex; flex-direction: column; gap: 0.25rem; }
+.pj-act-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; }
+.pj-act-time { color: var(--muted); font-size: 0.72rem; min-width: 130px; }
+.pj-act-who { font-weight: 600; color: var(--text); }
+.pj-act-act { color: var(--muted); }
+.pj-act-what { color: var(--text); }
 /* Workspace list (an organism's many workspaces) */
 .pj-ws-bar { display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0 0.75rem; }
 .pj-ws-name-input { flex: 0 1 260px; }
