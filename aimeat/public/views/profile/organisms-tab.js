@@ -15,6 +15,9 @@
  *   v1.1.0 — 2026-06-08 — Doc index merges draft+published per id (draft badge no longer hidden by a
  *     published version); editor hydrates private /v1/storage images to auth'd blob URLs; new
  *     DocumentView with a Draft/Published comparison toggle.
+ *   v1.2.0 — 2026-06-08 — DocumentView resolves storage images in the markdown text (re-render-safe,
+ *     fixes broken image after toggling versions); saving a draft opens it (no more empty state);
+ *     open workspace + document persist to sessionStorage so an F5 returns to where you were.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -34,7 +37,8 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const [myOrganisms, setMyOrganisms] = useState(null);
   const [publicOrganisms, setPublicOrganisms] = useState([]);
   const [expanded, setExpanded] = useState(null);
-  const [openId, setOpenId] = useState(null);   // organism whose workspace is open
+  // organism whose workspace is open — restored from sessionStorage so an F5 returns to it
+  const [openId, setOpenId] = useState(() => { try { return sessionStorage.getItem('aimeat.ws.openId') || null; } catch (e) { return null; } });
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -72,6 +76,14 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   useEffect(() => {
     if (session) loadData();
   }, [session, loadData]);
+
+  // Persist the open workspace (F5 restore), and drop a restored id the user can no longer open.
+  useEffect(() => {
+    try { if (openId) sessionStorage.setItem('aimeat.ws.openId', openId); else sessionStorage.removeItem('aimeat.ws.openId'); } catch (e) { /* noop */ }
+  }, [openId]);
+  useEffect(() => {
+    if (openId && myOrganisms && !myOrganisms.some(o => o.id === openId)) setOpenId(null);
+  }, [openId, myOrganisms]);
 
   // Live update listener
   const liveRef = useRef(loadData);
@@ -445,7 +457,16 @@ function Workspace({ org, showToast, onBack }) {
   const [pasteText, setPasteText] = useState('');
   const [genErrors, setGenErrors] = useState([]);   // validation errors (JSON present, fixable)
   const [genFail, setGenFail] = useState('');        // generation failure (AI call timed out / errored)
-  const [activeDoc, setActiveDoc] = useState(null);  // { type, mode:'view'|'edit', page } for document-mode types
+  // { type, mode:'view'|'edit', page } for document-mode types. Restored from sessionStorage on F5
+  // so the user returns to the document they were on (only the id is kept; renderDocSpace re-resolves
+  // it to the live entry once the workspace loads).
+  const [activeDoc, setActiveDoc] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem('aimeat.ws.' + orgId + '.activeDoc');
+      if (raw) { const v = JSON.parse(raw); if (v && v.type && v.id) return { type: v.type, mode: v.mode === 'edit' ? 'edit' : 'view', page: { id: v.id } }; }
+    } catch (e) { /* noop */ }
+    return null;
+  });
   const [sectionsByType, setSectionsByType] = useState({});  // { typeName: [{id,name,parentId,documents:[docId]}] }
   const [editingSec, setEditingSec] = useState(null);        // section id currently being renamed inline
   const draggedDoc = useRef(null);                            // { type, id } of the doc being dragged
@@ -468,6 +489,16 @@ function Workspace({ org, showToast, onBack }) {
   }, [orgId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Persist the open document (id only) so an F5 returns to it. Skip unsaved new docs (no id yet).
+  useEffect(() => {
+    try {
+      const key = 'aimeat.ws.' + orgId + '.activeDoc';
+      if (activeDoc?.type && activeDoc.page?.id) sessionStorage.setItem(key, JSON.stringify({ type: activeDoc.type, id: activeDoc.page.id, mode: activeDoc.mode }));
+      else sessionStorage.removeItem(key);
+    } catch (e) { /* noop */ }
+  }, [activeDoc, orgId]);
+
   const liveRef = useRef(load); liveRef.current = load;
   useEffect(() => {
     const handler = () => liveRef.current();
@@ -564,7 +595,9 @@ function Workspace({ org, showToast, onBack }) {
             ? { ...s, documents: [...(s.documents || []).filter(d => d !== id), id] } : s);
           await orgService.saveSections(orgId, ot.name, secs).catch(() => {});
         }
-        showToast(t('organisms.pageSaved') || 'Document saved'); setActiveDoc(null); await load();
+        // Reload, then open the just-saved document (view mode). renderDocSpace re-resolves the id
+        // to the fresh merged entry, so the new draft shows with its badge instead of the empty state.
+        showToast(t('organisms.pageSaved') || 'Document saved'); await load(); setActiveDoc({ type: ot.name, mode: 'view', page: { id } });
       }
     } catch (e) { showToast((e && e.message) || 'Failed to save document'); }
     finally { setBusy(false); }
@@ -851,23 +884,29 @@ function Workspace({ org, showToast, onBack }) {
             ${docs.length === 0 && secs.length === 0 ? html`<div class="pj-empty">${t('organisms.noneYet') || 'none yet'}</div>` : null}
           </div>
           <div class="pj-doc-main">
-            ${activeDoc?.type === ot.name && activeDoc.mode === 'edit' ? html`
-              <${DocumentEditor} key=${'ed-' + (activeDoc.page.id || 'new')} orgId=${orgId} page=${activeDoc.page} busy=${busy} onSave=${(p) => savePage(ot, p, activeDoc.sectionId)} onCancel=${() => setActiveDoc(null)} />
-            ` : activeDoc?.type === ot.name && activeDoc.mode === 'view' ? html`
-              <${DocumentView} key=${'view-' + activeDoc.page.id} page=${activeDoc.page} busy=${busy}
-                onEdit=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: activeDoc.page })}
-                onPublish=${() => publish(ot, activeDoc.page.id)}
-                onWikiLink=${(content) => {
-                  const [titlePart, headingPart] = String(content).split('#');
-                  const title = titlePart.trim();
-                  const anchor = (headingPart || '').trim();
-                  const scrollToAnchor = () => { if (anchor) setTimeout(() => { const el = document.querySelector('.pj-doc-view [id="' + slugifyHeading(anchor) + '"]'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 80); };
-                  if (!title) { scrollToAnchor(); return; }   // [[#Heading]] → jump within the current document
-                  const target = docs.find(d => (d.title || '').toLowerCase() === title.toLowerCase());
-                  if (target) { setActiveDoc({ type: ot.name, mode: 'view', page: target }); scrollToAnchor(); }
-                  else showToast((t('organisms.docNotFound') || 'No document titled “{title}”').replace('{title}', title));
-                }} />
-            ` : html`<div class="pj-empty">${t('organisms.selectDoc') || 'Select a document, or create one.'}</div>`}
+            ${(() => {
+              if (activeDoc?.type !== ot.name) return html`<div class="pj-empty">${t('organisms.selectDoc') || 'Select a document, or create one.'}</div>`;
+              // Re-resolve the open document against the freshly-loaded list by id, so after a save (or
+              // a live-update / F5 restore that only kept the id) the view shows the current draft —
+              // with its correct draft badge, published copy, and Draft/Published toggle.
+              const livePage = (activeDoc.page && activeDoc.page.id && docById[activeDoc.page.id]) || activeDoc.page;
+              if (activeDoc.mode === 'edit') return html`
+                <${DocumentEditor} key=${'ed-' + (livePage.id || 'new')} orgId=${orgId} page=${livePage} busy=${busy} onSave=${(p) => savePage(ot, p, activeDoc.sectionId)} onCancel=${() => setActiveDoc(null)} />`;
+              return html`
+                <${DocumentView} key=${'view-' + livePage.id} page=${livePage} busy=${busy}
+                  onEdit=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: livePage })}
+                  onPublish=${() => publish(ot, livePage.id)}
+                  onWikiLink=${(content) => {
+                    const [titlePart, headingPart] = String(content).split('#');
+                    const title = titlePart.trim();
+                    const anchor = (headingPart || '').trim();
+                    const scrollToAnchor = () => { if (anchor) setTimeout(() => { const el = document.querySelector('.pj-doc-view [id="' + slugifyHeading(anchor) + '"]'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 80); };
+                    if (!title) { scrollToAnchor(); return; }   // [[#Heading]] → jump within the current document
+                    const target = docs.find(d => (d.title || '').toLowerCase() === title.toLowerCase());
+                    if (target) { setActiveDoc({ type: ot.name, mode: 'view', page: target }); scrollToAnchor(); }
+                    else showToast((t('organisms.docNotFound') || 'No document titled “{title}”').replace('{title}', title));
+                  }} />`;
+            })()}
           </div>
         </div>
       </div>`;
