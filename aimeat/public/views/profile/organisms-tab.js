@@ -989,6 +989,20 @@ function Workspace({ org, wsId, showToast, onBack }) {
     finally { setBusy(false); }
   }, [orgId, showToast, load]);
 
+  // Delete a record or document (draft + published + all versions), with a confirm dialog.
+  const removeObject = useCallback((namespace, instanceId, label) => {
+    confirm(
+      (t('organisms.confirmDeleteItem') || 'Delete “{name}”? Its draft, published version and full history are removed. This cannot be undone.').replace('{name}', label || instanceId),
+      async () => {
+        setBusy(true);
+        try { await orgService.deleteWorkspaceObject(orgId, wsId, namespace, instanceId); showToast(t('organisms.deletedItem') || 'Deleted'); await load(); }
+        catch (e) { showToast((e && e.message) || 'Failed to delete'); }
+        finally { setBusy(false); }
+      },
+      { danger: true, title: t('organisms.delete') || 'Delete' },
+    );
+  }, [orgId, wsId, confirm, showToast, load]);
+
   const toggleGate = useCallback(async () => {
     setBusy(true);
     try { await orgService.setPublishGate(orgId, !gateOn); setGateOn(!gateOn); showToast(t('organisms.gateToggled') || 'Publish gate updated'); }
@@ -1189,6 +1203,7 @@ function Workspace({ org, wsId, showToast, onBack }) {
         <button class="pj-doc-link" onClick=${() => setActiveDoc({ type: ot.name, mode: 'view', page: d })}>
           ${d._draft ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span> ` : ''}${escHtml(d.title || d.id)}
         </button>
+        <button class="pj-icon-btn pj-doc-del" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, d.id, d.title || d.id)}>🗑</button>
       </div>`;
 
     // A section is a drop target — dragging a document onto it (or its header) files it here.
@@ -1390,6 +1405,7 @@ function Workspace({ org, wsId, showToast, onBack }) {
                 <button class="pj-rec-title" onClick=${() => toggleExpand(ot, d.id)}>${escHtml(String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id || ''))}</button>
                 <button class="btn-ghost btn-sm" onClick=${() => startEdit(ot, d)} disabled=${busy}>${t('organisms.edit') || 'Edit'}</button>
                 <button class="btn-primary btn-sm" onClick=${() => publish(ot, d.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>
+                <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, d.id, String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id))}>🗑</button>
               </div>
               ${expandedRec[ot.name + ':' + d.id] ? html`<div class="pj-rec-fields">${recordFields(d)}</div>` : null}
             </div>
@@ -1402,6 +1418,7 @@ function Workspace({ org, wsId, showToast, onBack }) {
                 <div class="pj-item">
                   <button class="pj-rec-title" onClick=${() => toggleExpand(ot, o.id)}>${escHtml(String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.summary || o.id || ''))}</button>
                   ${o.status ? html`<span class="badge badge-info">${escHtml(o.status)}</span>` : null}
+                  <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, o.id, String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.id))}>🗑</button>
                 </div>
                 ${expandedRec[ot.name + ':' + o.id] ? html`<div class="pj-rec-fields">${recordFields(o)}</div>` : null}
               </div>

@@ -5509,6 +5509,8 @@
     "publishedWord": "Julkaistu",
     "publishedVerb": "julkaisi",
     "editedVerb": "muokkasi",
+    "confirmDeleteItem": "Poistetaanko “{name}”? Sen luonnos, julkaistu versio ja koko historia poistetaan. Tätä ei voi perua.",
+    "deletedItem": "Poistettu",
     "overview": "Yleiskuva — ketkä ja mitkä käyttävät tätä organismia",
     "hide": "Piilota",
     "show": "Näytä",

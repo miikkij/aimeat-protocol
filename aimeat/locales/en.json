@@ -5509,6 +5509,8 @@
     "publishedWord": "Published",
     "publishedVerb": "published",
     "editedVerb": "edited",
+    "confirmDeleteItem": "Delete “{name}”? Its draft, published version and full history are removed. This cannot be undone.",
+    "deletedItem": "Deleted",
     "overview": "Overview — who & what uses this organism",
     "hide": "Hide",
     "show": "Show",
