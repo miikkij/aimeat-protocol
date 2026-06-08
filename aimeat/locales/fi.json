@@ -5479,6 +5479,7 @@
     "newDocHere": "Uusi dokumentti tähän",
     "addSubsection": "Alaosio",
     "selectDoc": "Valitse dokumentti tai luo uusi.",
+    "docNotFound": "Ei dokumenttia nimeltä ”{title}”",
     "confirmDeleteWorkspace": "Haluatko varmasti poistaa tämän työtilan? Kaikki sen dokumentit, tietueet ja versiohistoria poistetaan pysyvästi. Tätä ei voi perua.",
     "spaces": "Tilat",
     "recordsMode": "tietueet",

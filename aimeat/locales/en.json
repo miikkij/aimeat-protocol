@@ -5479,6 +5479,7 @@
     "newDocHere": "New document here",
     "addSubsection": "Sub-section",
     "selectDoc": "Select a document, or create one.",
+    "docNotFound": "No document titled “{title}”",
     "confirmDeleteWorkspace": "Are you sure you want to delete this workspace? All its documents, records and version history are permanently removed. This cannot be undone.",
     "spaces": "Spaces",
     "recordsMode": "records",

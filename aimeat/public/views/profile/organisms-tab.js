@@ -821,7 +821,12 @@ function Workspace({ org, showToast, onBack }) {
                 <button class="btn-ghost btn-sm" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: activeDoc.page })}>${t('organisms.edit') || 'Edit'}</button>
                 ${activeDoc.page._draft ? html`<button class="btn-primary btn-sm" onClick=${() => publish(ot, activeDoc.page.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>` : null}
               </div>
-              <div class="pj-doc-view"><${Markdown} text=${activeDoc.page.markdown || ''} /></div>
+              <div class="pj-doc-view"><${Markdown} text=${activeDoc.page.markdown || ''}
+                onWikiLink=${(title) => {
+                  const target = docs.find(d => (d.title || '').toLowerCase() === title.toLowerCase());
+                  if (target) setActiveDoc({ type: ot.name, mode: 'view', page: target });
+                  else showToast((t('organisms.docNotFound') || 'No document titled “{title}”').replace('{title}', title));
+                }} /></div>
             ` : html`<div class="pj-empty">${t('organisms.selectDoc') || 'Select a document, or create one.'}</div>`}
           </div>
         </div>

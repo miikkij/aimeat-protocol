@@ -37,7 +37,7 @@ export function sanitizeHref(url) {
 
 // ── Inline parsing: code, bold, italic, links. Returns an array of vnodes/strings.
 // Order matters: inline code is extracted first so markup inside it is literal.
-function parseInline(text) {
+function parseInline(text, onWikiLink) {
   const out = [];
   let i = 0;
   let buf = '';
@@ -45,6 +45,36 @@ function parseInline(text) {
 
   while (i < text.length) {
     const c = text[i];
+
+    // Image ![alt](url) — checked before links so the leading ! is consumed.
+    if (c === '!' && text[i + 1] === '[') {
+      const close = text.indexOf(']', i + 2);
+      if (close > i && text[close + 1] === '(') {
+        const paren = text.indexOf(')', close + 2);
+        if (paren > close) {
+          const alt = text.slice(i + 2, close);
+          const src = sanitizeHref(text.slice(close + 2, paren));
+          flush();
+          if (src) out.push(h('img', { src, alt, class: 'md-img', loading: 'lazy' }));
+          i = paren + 1;
+          continue;
+        }
+      }
+    }
+
+    // Wiki link [[Document Title]] — resolves to another document when a resolver is supplied.
+    if (c === '[' && text[i + 1] === '[') {
+      const end = text.indexOf(']]', i + 2);
+      if (end > i) {
+        flush();
+        const title = text.slice(i + 2, end).trim();
+        out.push(onWikiLink
+          ? h('a', { href: '#', class: 'md-wikilink', onClick: (e) => { e.preventDefault(); onWikiLink(title); } }, title)
+          : '[[' + title + ']]');
+        i = end + 2;
+        continue;
+      }
+    }
 
     // Inline code `...` — contents are literal (no further parsing).
     if (c === '`') {
@@ -69,8 +99,8 @@ function parseInline(text) {
           flush();
           out.push(
             href
-              ? h('a', { href, target: '_blank', rel: 'noopener noreferrer nofollow' }, parseInline(label))
-              : h('span', null, parseInline(label)),
+              ? h('a', { href, target: '_blank', rel: 'noopener noreferrer nofollow' }, parseInline(label, onWikiLink))
+              : h('span', null, parseInline(label, onWikiLink)),
           );
           i = paren + 1;
           continue;
@@ -83,7 +113,7 @@ function parseInline(text) {
       const end = text.indexOf('**', i + 2);
       if (end > i) {
         flush();
-        out.push(h('strong', null, parseInline(text.slice(i + 2, end))));
+        out.push(h('strong', null, parseInline(text.slice(i + 2, end), onWikiLink)));
         i = end + 2;
         continue;
       }
@@ -94,7 +124,7 @@ function parseInline(text) {
       const end = text.indexOf('*', i + 1);
       if (end > i) {
         flush();
-        out.push(h('em', null, parseInline(text.slice(i + 1, end))));
+        out.push(h('em', null, parseInline(text.slice(i + 1, end), onWikiLink)));
         i = end + 1;
         continue;
       }
@@ -121,7 +151,7 @@ function isTableDivider(line) {
 }
 
 // ── Block parsing. Walks lines, emits block-level vnodes.
-function parseBlocks(src) {
+function parseBlocks(src, onWikiLink) {
   const lines = src.replace(/\r\n?/g, '\n').split('\n');
   const blocks = [];
   let i = 0;
@@ -151,7 +181,7 @@ function parseBlocks(src) {
     const heading = line.match(/^(#{1,6})\s+(.*)$/);
     if (heading) {
       const level = heading[1].length;
-      blocks.push(h('h' + level, null, parseInline(heading[2].trim())));
+      blocks.push(h('h' + level, null, parseInline(heading[2].trim(), onWikiLink)));
       i++;
       continue;
     }
@@ -163,7 +193,7 @@ function parseBlocks(src) {
         quoted.push(lines[i].replace(/^\s*>\s?/, ''));
         i++;
       }
-      blocks.push(h('blockquote', null, parseBlocks(quoted.join('\n'))));
+      blocks.push(h('blockquote', null, parseBlocks(quoted.join('\n'), onWikiLink)));
       continue;
     }
 
@@ -177,9 +207,9 @@ function parseBlocks(src) {
         i++;
       }
       blocks.push(h('table', null, [
-        h('thead', null, h('tr', null, header.map((c, ci) => h('th', { key: ci }, parseInline(c))))),
+        h('thead', null, h('tr', null, header.map((c, ci) => h('th', { key: ci }, parseInline(c, onWikiLink))))),
         h('tbody', null, rows.map((r, ri) =>
-          h('tr', { key: ri }, r.map((c, ci) => h('td', { key: ci }, parseInline(c)))))),
+          h('tr', { key: ri }, r.map((c, ci) => h('td', { key: ci }, parseInline(c, onWikiLink)))))),
       ]));
       continue;
     }
@@ -193,7 +223,7 @@ function parseBlocks(src) {
       while (i < lines.length) {
         const m = lines[i].match(ordered ? /^(\s*)(\d+)\.\s+(.*)$/ : /^(\s*)([-*+])\s+(.*)$/);
         if (!m) break;
-        items.push(h('li', { key: items.length }, parseInline(m[3])));
+        items.push(h('li', { key: items.length }, parseInline(m[3], onWikiLink)));
         i++;
       }
       blocks.push(h(ordered ? 'ol' : 'ul', null, items));
@@ -215,15 +245,15 @@ function parseBlocks(src) {
       i++;
     }
     // Join wrapped lines with a space (standard markdown paragraph behavior).
-    blocks.push(h('p', null, parseInline(para.join(' '))));
+    blocks.push(h('p', null, parseInline(para.join(' '), onWikiLink)));
   }
 
   return blocks;
 }
 
-export function Markdown({ text }) {
+export function Markdown({ text, onWikiLink }) {
   const src = typeof text === 'string' ? text : '';
-  return h('div', { class: 'md-body' }, parseBlocks(src));
+  return h('div', { class: 'md-body' }, parseBlocks(src, onWikiLink));
 }
 
 export default Markdown;
