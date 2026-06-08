@@ -695,48 +695,84 @@ function WorkspaceList({ org, showToast, onOpen, onBack }) {
     </div>`;
 }
 
-/* Activity panel — a deterministic, color-coded feed of a workspace's history (who did what, in
- * which space, draft-edit vs publish, when). A small per-day bar strip for the temporal overview +
- * the most recent events. Built from GET …/workspace/activity (derived from the version history). */
+/* Build a GitHub-style contribution calendar from activity events: a grid of weeks (columns) × days
+ * (rows), cell intensity = how many events that day. Returns { cols, monthLabels } where each col is
+ * 7 cells (Sun→Sat); a null cell is a future day past today. Deterministic from the event timestamps. */
+function buildHeatmap(byDay, today) {
+  const iso = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const dayKeys = [...byDay.keys()].sort();
+  const earliest = dayKeys.length ? new Date(dayKeys[0] + 'T00:00:00') : new Date(today);
+  let weeks = Math.ceil((today - earliest) / (7 * 86400000)) + 1;
+  weeks = Math.max(18, Math.min(53, weeks));               // at least a few months, at most a year
+  const start = new Date(today);
+  start.setDate(start.getDate() - (weeks * 7 - 1));
+  start.setDate(start.getDate() - start.getDay());          // align to the start of a week (Sunday)
+  const cols = []; const monthLabels = [];
+  let cur = new Date(start); let prevMonth = -1;
+  while (cur <= today) {
+    monthLabels.push(cur.getMonth() !== prevMonth ? cur.toLocaleString(undefined, { month: 'short' }) : '');
+    prevMonth = cur.getMonth();
+    const col = [];
+    for (let dow = 0; dow < 7; dow++) {
+      if (cur > today) { col.push(null); }
+      else { const b = byDay.get(iso(cur)); col.push({ date: iso(cur), count: b ? b.total : 0, b }); }
+      cur = new Date(cur); cur.setDate(cur.getDate() + 1);
+    }
+    cols.push(col);
+  }
+  return { cols, monthLabels };
+}
+const hmLevel = (n) => (n === 0 ? 0 : n <= 1 ? 1 : n <= 3 ? 2 : n <= 6 ? 3 : 4);
+
+/* Activity panel — a GitHub-style contribution heatmap of the workspace's history (intensity = events
+ * per day) + the recent activity log (who did what, in which space, draft-edit vs publish, when) —
+ * which doubles as an audit trail. Built from GET …/workspace/activity (derived from version history). */
 function ActivityPanel({ orgId, wsId }) {
   const [data, setData] = useState(null);
   const [show, setShow] = useState(true);
   useEffect(() => {
     let cancelled = false;
-    orgService.getWorkspaceActivity(orgId, wsId).then(d => { if (!cancelled) setData(d); }).catch(() => {});
-    const h = () => orgService.getWorkspaceActivity(orgId, wsId).then(d => { if (!cancelled) setData(d); }).catch(() => {});
-    window.addEventListener('aimeat-live-update', h);
-    return () => { cancelled = true; window.removeEventListener('aimeat-live-update', h); };
+    const fetchIt = () => orgService.getWorkspaceActivity(orgId, wsId).then(d => { if (!cancelled) setData(d); }).catch(() => {});
+    fetchIt();
+    window.addEventListener('aimeat-live-update', fetchIt);
+    return () => { cancelled = true; window.removeEventListener('aimeat-live-update', fetchIt); };
   }, [orgId, wsId]);
   if (!data || !(data.events || []).length) return null;
   const events = data.events;
   const byDay = new Map();
-  for (const e of events) { const day = (e.at || '').slice(0, 10); if (!day) continue; const b = byDay.get(day) || { draft: 0, publish: 0 }; b[e.action] = (b[e.action] || 0) + 1; byDay.set(day, b); }
-  const days = [...byDay.keys()].sort();
-  const maxCount = Math.max(1, ...[...byDay.values()].map(b => b.draft + b.publish));
+  for (const e of events) { const day = (e.at || '').slice(0, 10); if (!day) continue; const b = byDay.get(day) || { draft: 0, publish: 0, total: 0 }; b[e.action] = (b[e.action] || 0) + 1; b.total++; byDay.set(day, b); }
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const { cols, monthLabels } = buildHeatmap(byDay, today);
+
   return html`
     <div class="pj-chart">
       <div class="pj-chart-head">
-        <span class="pj-chart-title">${'📊 '}${t('organisms.activity') || 'Activity'}</span>
+        <span class="pj-chart-title">${'📊 '}${t('organisms.activity') || 'Activity'}<span class="pj-act-count">${data.total} ${t('organisms.events') || 'events'}</span></span>
         <button class="btn-ghost btn-sm" onClick=${() => setShow(s => !s)}>${show ? (t('organisms.hide') || 'Hide') : (t('organisms.show') || 'Show')}</button>
       </div>
       ${show ? html`
         <div class="pj-act">
-          <div class="pj-act-legend">
-            <span class="pj-act-key"><span class="pj-act-dot draft"></span>${t('organisms.draftEdit') || 'Draft edit'}</span>
-            <span class="pj-act-key"><span class="pj-act-dot publish"></span>${t('organisms.publishedWord') || 'Published'}</span>
-          </div>
-          <div class="pj-act-strip">
-            ${days.map(day => { const b = byDay.get(day); const tot = b.draft + b.publish; const hp = Math.max(6, Math.round((tot / maxCount) * 100));
-              return html`<div class="pj-act-col" key=${day} title=${day + ' — ' + b.publish + ' published, ' + b.draft + ' edited'}>
-                <div class="pj-act-bar" style=${'height:' + hp + '%'}>
-                  ${b.publish ? html`<div class="pj-act-seg publish" style=${'flex:' + b.publish}></div>` : null}
-                  ${b.draft ? html`<div class="pj-act-seg draft" style=${'flex:' + b.draft}></div>` : null}
-                </div>
-              </div>`; })}
+          <div class="pj-hm">
+            <div class="pj-hm-monthrow">${monthLabels.map((m, i) => html`<span class="pj-hm-month" key=${i}>${m}</span>`)}</div>
+            <div class="pj-hm-body">
+              <div class="pj-hm-daycol"><span></span><span>${t('organisms.mon') || 'Mon'}</span><span></span><span>${t('organisms.wed') || 'Wed'}</span><span></span><span>${t('organisms.fri') || 'Fri'}</span><span></span></div>
+              <div class="pj-hm-cols">
+                ${cols.map((col, ci) => html`<div class="pj-hm-col" key=${ci}>
+                  ${col.map((cell, ri) => cell === null
+                    ? html`<span class="pj-hm-cell empty" key=${ri}></span>`
+                    : html`<span class="pj-hm-cell lvl${hmLevel(cell.count)}" key=${ri}
+                        title=${cell.date + (cell.count ? ` — ${cell.b.publish} published, ${cell.b.draft} edited` : ' — no activity')}></span>`)}
+                </div>`)}
+              </div>
+            </div>
+            <div class="pj-hm-legend">
+              <span>${t('organisms.less') || 'Less'}</span>
+              <span class="pj-hm-cell lvl0"></span><span class="pj-hm-cell lvl1"></span><span class="pj-hm-cell lvl2"></span><span class="pj-hm-cell lvl3"></span><span class="pj-hm-cell lvl4"></span>
+              <span>${t('organisms.more') || 'More'}</span>
+            </div>
           </div>
           <div class="pj-act-list">
-            ${events.slice(0, 15).map((e, i) => html`<div class="pj-act-item" key=${i}>
+            ${events.slice(0, 20).map((e, i) => html`<div class="pj-act-item" key=${i}>
               <span class="pj-act-dot ${e.action}"></span>
               <span class="pj-act-time">${dt(e.at)}</span>
               <span class="pj-act-who">${escHtml(e.actor)}</span>
