@@ -12,6 +12,9 @@
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
  *   v1.0.0 — 2026-03-17 — Remove all inline style attributes; use CSS utility classes
+ *   v1.1.0 — 2026-06-08 — Doc index merges draft+published per id (draft badge no longer hidden by a
+ *     published version); editor hydrates private /v1/storage images to auth'd blob URLs; new
+ *     DocumentView with a Draft/Published comparison toggle.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -472,22 +475,6 @@ function Workspace({ org, showToast, onBack }) {
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, []);
 
-  // Storage images in a viewed document can't load via a plain <img> (GET /v1/storage needs auth),
-  // so fetch each with the session token and swap in an object URL.
-  useEffect(() => {
-    if (activeDoc?.mode !== 'view') return undefined;
-    let revoked = false; const created = [];
-    const id = setTimeout(() => {
-      document.querySelectorAll('.pj-doc-view img').forEach((img) => {
-        const src = img.getAttribute('src') || '';
-        if (!src.includes('/v1/storage/') || img.dataset.resolved) return;
-        img.dataset.resolved = '1';
-        orgService.fetchStorageObjectUrl(src).then((u) => { if (!revoked) { created.push(u); img.src = u; } }).catch(() => {});
-      });
-    }, 50);
-    return () => { revoked = true; clearTimeout(id); created.forEach(u => URL.revokeObjectURL(u)); };
-  }, [activeDoc]);
-
   const setup = useCallback(async () => {
     setBusy(true);
     try {
@@ -795,7 +782,17 @@ function Workspace({ org, showToast, onBack }) {
   // tied to a section's documents[] (or unsorted). Edits to the tree persist immediately.
   const renderDocSpace = (ot) => {
     const secs = sectionsByType[ot.name] || [];
-    const docs = [...draftsFor(ot.name).map(d => ({ ...d, _draft: true })), ...objectsFor(ot.name)];
+    // One entry per document id. A draft (working copy) takes precedence over its published
+    // version, so the index shows the draft badge even when a published `.latest` also exists.
+    // (Without this, keying docById by id let the published entry overwrite the draft and the
+    // "draft" badge silently disappeared whenever a doc had both versions.)
+    const byId = new Map();
+    for (const d of objectsFor(ot.name)) byId.set(d.id, { ...d, _draft: false, _published: true });
+    for (const d of draftsFor(ot.name)) {
+      const pub = byId.get(d.id);   // the published version, if one exists — kept on `_pub` for the view's Draft/Published toggle
+      byId.set(d.id, { ...d, _draft: true, _published: !!pub, _pub: pub || null });
+    }
+    const docs = [...byId.values()];
     const docById = {}; docs.forEach(d => { docById[d.id] = d; });
     const used = new Set(); secs.forEach(s => (s.documents || []).forEach(id => used.add(id)));
     const unsorted = docs.filter(d => !used.has(d.id));
@@ -857,12 +854,9 @@ function Workspace({ org, showToast, onBack }) {
             ${activeDoc?.type === ot.name && activeDoc.mode === 'edit' ? html`
               <${DocumentEditor} key=${'ed-' + (activeDoc.page.id || 'new')} orgId=${orgId} page=${activeDoc.page} busy=${busy} onSave=${(p) => savePage(ot, p, activeDoc.sectionId)} onCancel=${() => setActiveDoc(null)} />
             ` : activeDoc?.type === ot.name && activeDoc.mode === 'view' ? html`
-              <div class="pj-doc-toolbar">
-                <span class="pj-doc-vtitle">${escHtml(activeDoc.page.title || activeDoc.page.id)}</span>
-                <button class="btn-ghost btn-sm" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: activeDoc.page })}>${t('organisms.edit') || 'Edit'}</button>
-                ${activeDoc.page._draft ? html`<button class="btn-primary btn-sm" onClick=${() => publish(ot, activeDoc.page.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>` : null}
-              </div>
-              <div class="pj-doc-view"><${Markdown} text=${activeDoc.page.markdown || ''}
+              <${DocumentView} key=${'view-' + activeDoc.page.id} page=${activeDoc.page} busy=${busy}
+                onEdit=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: activeDoc.page })}
+                onPublish=${() => publish(ot, activeDoc.page.id)}
                 onWikiLink=${(content) => {
                   const [titlePart, headingPart] = String(content).split('#');
                   const title = titlePart.trim();
@@ -872,7 +866,7 @@ function Workspace({ org, showToast, onBack }) {
                   const target = docs.find(d => (d.title || '').toLowerCase() === title.toLowerCase());
                   if (target) { setActiveDoc({ type: ot.name, mode: 'view', page: target }); scrollToAnchor(); }
                   else showToast((t('organisms.docNotFound') || 'No document titled “{title}”').replace('{title}', title));
-                }} /></div>
+                }} />
             ` : html`<div class="pj-empty">${t('organisms.selectDoc') || 'Select a document, or create one.'}</div>`}
           </div>
         </div>
@@ -1100,6 +1094,52 @@ function loadToastUI() {
   return _tuiPromise;
 }
 
+/* Read-only document view. Renders the markdown, resolves private /v1/storage images (the GET needs
+ * the session token, so a plain <img> would break), and — when the document has BOTH an unpublished
+ * draft and a published version — offers a Draft/Published toggle so the two can be compared. The
+ * parent passes the merged `page` (the draft, carrying the published copy on `page._pub`). Remounted
+ * per document via `key`, so the toggle resets to "Draft" each time a document is opened. */
+function DocumentView({ page, busy, onEdit, onPublish, onWikiLink }) {
+  const hasBoth = page._draft && page._pub;
+  const [tab, setTab] = useState('draft');
+  const shown = (hasBoth && tab === 'published') ? page._pub : page;
+  const [rendered, setRendered] = useState(shown.markdown || '');
+
+  // Resolve private /v1/storage images to auth'd blob: URLs IN THE MARKDOWN TEXT (declarative), then
+  // render that. Doing it in the text — instead of mutating <img src> after render — means a
+  // re-render (toggling Draft/Published, a live-update refresh) can never leave a stale or revoked
+  // object URL on a reused <img> node, which previously showed a broken image. Re-runs per version.
+  useEffect(() => {
+    let cancelled = false; const created = [];
+    const raw = shown.markdown || '';
+    setRendered(raw);   // show text/structure at once; images swap in a moment later
+    (async () => {
+      const urls = [...new Set(raw.match(/\/v1\/storage\/[^\s)\]"'>]+/g) || [])];
+      if (!urls.length) return;
+      let out = raw;
+      for (const su of urls) {
+        try { const bu = await orgService.fetchStorageObjectUrl(su); created.push(bu); out = out.split(su).join(bu); }
+        catch (e) { /* leave the storage URL — renders broken but never throws */ }
+      }
+      if (!cancelled) setRendered(out);
+    })();
+    return () => { cancelled = true; created.forEach(u => { try { URL.revokeObjectURL(u); } catch (e) { /* noop */ } }); };
+  }, [shown.markdown]);
+
+  return html`
+    <div class="pj-doc-toolbar">
+      <span class="pj-doc-vtitle">${escHtml(shown.title || shown.id || page.id)}</span>
+      ${hasBoth ? html`
+        <div class="pj-ver-tabs" role="tablist">
+          <button class="pj-ver-tab ${tab === 'draft' ? 'active' : ''}" onClick=${() => setTab('draft')}>${t('organisms.draftVersion') || 'Draft'}</button>
+          <button class="pj-ver-tab ${tab === 'published' ? 'active' : ''}" onClick=${() => setTab('published')}>${t('organisms.publishedVersion') || 'Published'}</button>
+        </div>` : null}
+      <button class="btn-ghost btn-sm" onClick=${onEdit}>${t('organisms.edit') || 'Edit'}</button>
+      ${page._draft ? html`<button class="btn-primary btn-sm" onClick=${onPublish} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>` : null}
+    </div>
+    <div class="pj-doc-view"><${Markdown} text=${rendered} onWikiLink=${onWikiLink} /></div>`;
+}
+
 /* Document editor: a Toast UI Editor (WYSIWYG, with its own built-in Markdown⇄WYSIWYG toggle, so
  * non-technical users type like a document). Falls back to a plain markdown textarea + live preview
  * if the editor can't load. Title is a separate Preact-controlled field. */
@@ -1110,6 +1150,7 @@ function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
   const containerRef = useRef(null);
   const editorRef = useRef(null);
   const imageMap = useRef({});                             // data: URL (shown in editor) → /v1/storage URL (saved)
+  const displayMap = useRef({});                           // blob: URL (shown in editor) → /v1/storage URL (saved) — for already-stored images
   const pending = useRef([]);                              // in-flight image uploads — save() awaits these
   const [saving, setSaving] = useState(false);
 
@@ -1133,15 +1174,30 @@ function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
 
   useEffect(() => {
     if (mode !== 'rich') return undefined;
-    let inst = null, cancelled = false;
-    loadToastUI().then((Editor) => {
+    let inst = null, cancelled = false; const blobUrls = [];
+    (async () => {
+      const Editor = await loadToastUI().catch(() => null);
+      if (cancelled) return;
+      if (!Editor) { setMode('markdown'); return; }
+      // Already-stored images embed a private /v1/storage URL, which a plain <img> in the editor
+      // can't load (the GET needs the session token). Fetch each with auth, show it as a blob: URL,
+      // and remember blob→storage so save() rewrites it back to the canonical storage URL.
+      let initial = (page && page.markdown) || '';
+      const urls = [...new Set(initial.match(/\/v1\/storage\/[^\s)\]"'>]+/g) || [])];
+      for (const su of urls) {
+        try {
+          const bu = await orgService.fetchStorageObjectUrl(su);
+          displayMap.current[bu] = su; blobUrls.push(bu);
+          initial = initial.split(su).join(bu);
+        } catch (e) { /* leave the storage URL — it renders broken but saves intact */ }
+      }
       if (cancelled || !containerRef.current) return;
       inst = new Editor({
         el: containerRef.current,
         height: '440px',
         initialEditType: 'wysiwyg',
         previewStyle: 'tab',
-        initialValue: (page && page.markdown) || '',
+        initialValue: initial,
         usageStatistics: false,
         // Drop Toast UI's own image button — its file popup is unreliable; the "📷 Insert image"
         // button above is the image path (and paste/drag still work via the hook below).
@@ -1162,8 +1218,13 @@ function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
         },
       });
       editorRef.current = inst;
-    }).catch(() => { if (!cancelled) setMode('markdown'); });
-    return () => { cancelled = true; if (inst) { try { inst.destroy(); } catch (e) { /* noop */ } } editorRef.current = null; };
+    })();
+    return () => {
+      cancelled = true;
+      if (inst) { try { inst.destroy(); } catch (e) { /* noop */ } }
+      editorRef.current = null;
+      blobUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch (e) { /* noop */ } });
+    };
   }, [mode]);
 
   const save = async () => {
@@ -1172,6 +1233,7 @@ function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
       if (pending.current.length) { await Promise.all(pending.current); pending.current = []; }  // finish uploads first
       let markdown = (mode === 'rich' && editorRef.current) ? editorRef.current.getMarkdown() : md;
       for (const [dataUrl, storageUrl] of Object.entries(imageMap.current)) markdown = markdown.split(dataUrl).join(storageUrl);
+      for (const [blobUrl, storageUrl] of Object.entries(displayMap.current)) markdown = markdown.split(blobUrl).join(storageUrl);
       onSave({ ...page, title: title.trim(), markdown });
     } finally { setSaving(false); }
   };

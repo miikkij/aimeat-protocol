@@ -15,17 +15,23 @@
  * @structure
  *   - Markdown ({ text }) -> vnode tree wrapped in a div.md-body
  *   - sanitizeHref(url) -> safe href or null
+ *   - sanitizeImgSrc(url) -> safe <img> src or null (also permits blob: object URLs)
  * @usage
  *   import { Markdown } from '/components/Markdown.js';
  *   html`<${Markdown} text=${someMarkdownString} />`
  * @version-history
  *   v1.0.0 -- 2026-05-31 -- Initial creation for the agent README tab
+ *   v1.1.0 -- 2026-06-08 -- Image src sanitized separately, allowing blob: (auth'd object URLs)
+ *     so callers can swap a private /v1/storage URL to a fetched blob in the markdown text.
  */
 import { h } from 'preact';
 
 // Only these schemes may appear in a rendered link. Everything else (javascript:,
 // data:, vbscript:, file:, etc.) is dropped — the anchor renders without href.
 const SAFE_SCHEME = /^(https?:|mailto:)/i;
+// Image src may additionally be a blob: object URL — a caller resolving a private /v1/storage image
+// to an auth'd `blob:` URL (scripts never execute from an <img src>, and blob: is same-origin).
+const SAFE_IMG_SCHEME = /^(https?:|blob:)/i;
 
 // Slug used for heading anchor ids — kept in sync with the [[Doc#Heading]] wiki-link resolver.
 export function slugifyHeading(text) {
@@ -38,6 +44,13 @@ export function sanitizeHref(url) {
   // Relative links (no scheme) and fragment/anchor links are safe.
   if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;
   return SAFE_SCHEME.test(trimmed) ? trimmed : null;
+}
+
+export function sanitizeImgSrc(url) {
+  if (typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;   // relative (e.g. /v1/storage/…)
+  return SAFE_IMG_SCHEME.test(trimmed) ? trimmed : null;
 }
 
 // ── Inline parsing: code, bold, italic, links. Returns an array of vnodes/strings.
@@ -58,7 +71,7 @@ function parseInline(text, onWikiLink) {
         const paren = text.indexOf(')', close + 2);
         if (paren > close) {
           const alt = text.slice(i + 2, close);
-          const src = sanitizeHref(text.slice(close + 2, paren));
+          const src = sanitizeImgSrc(text.slice(close + 2, paren));
           flush();
           if (src) out.push(h('img', { src, alt, class: 'md-img', loading: 'lazy' }));
           i = paren + 1;

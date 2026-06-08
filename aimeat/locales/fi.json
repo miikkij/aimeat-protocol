@@ -5455,6 +5455,8 @@
     "draft": "luonnos",
     "publish": "Julkaise",
     "published": "Julkaistu",
+    "draftVersion": "Luonnos",
+    "publishedVersion": "Julkaistu",
     "publishGated": "Lähetetty tarkistettavaksi (julkaisuportti päällä)",
     "publishGate": "Vaadi tarkistus ennen julkaisua",
     "gateToggled": "Julkaisuportti päivitetty",

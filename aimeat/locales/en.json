@@ -5455,6 +5455,8 @@
     "draft": "draft",
     "publish": "Publish",
     "published": "Published",
+    "draftVersion": "Draft",
+    "publishedVersion": "Published",
     "publishGated": "Sent for review (publish gate is on)",
     "publishGate": "Require review before publishing",
     "gateToggled": "Publish gate updated",

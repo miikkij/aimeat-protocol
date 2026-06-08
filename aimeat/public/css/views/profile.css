@@ -2061,6 +2061,10 @@
 .pj-mini { font-size: 0.6rem; padding: 0 0.25rem; vertical-align: middle; }
 .pj-doc-toolbar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
 .pj-doc-vtitle { flex: 1; font-weight: 600; }
+.pj-ver-tabs { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.pj-ver-tab { padding: 0.2rem 0.6rem; font-size: 0.78rem; background: var(--surface); color: var(--text-dim); border: none; cursor: pointer; }
+.pj-ver-tab + .pj-ver-tab { border-left: 1px solid var(--border); }
+.pj-ver-tab.active { background: var(--accent, #E8564A); color: #fff; }
 .pj-tui { margin: 0.3rem 0 0.5rem; }
 .pj-doc-imgbar { margin: 0.3rem 0; display: flex; align-items: center; flex-wrap: wrap; gap: 0.3rem; }
 .pj-file-btn { cursor: pointer; }
