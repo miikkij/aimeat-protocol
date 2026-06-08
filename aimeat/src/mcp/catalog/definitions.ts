@@ -981,6 +981,18 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_workspace_delete',
+        description: 'Permanently remove ONE object (record or document) from a workspace — its draft, its published .latest, and all .version.N history — and unfile it from any document section. Use this to retract a mistake or clean up a duplicate. Irreversible; member-only. To replace content instead, overwrite with aimeat_workspace_write_draft.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            ws: { type: 'string', required: true, description: 'Workspace id.' },
+            namespace: { type: 'string', required: true, description: "The objectType's namespace, e.g. shared.deliverables." },
+            id: { type: 'string', required: true, description: 'The instance id to delete (draft + latest + all versions).' },
+        },
+    },
+    {
         name: 'aimeat_wallet_transactions',
         description: 'View recent morsel transactions for your owner\'s wallet (id, type, amount, counterparty, tracking code, timestamp; default 20, max 200). Transactions are keyed to the owner GHII, shared across agents. For the current balance/escrow snapshot use aimeat_wallet_balance.',
         caller: 'agent',

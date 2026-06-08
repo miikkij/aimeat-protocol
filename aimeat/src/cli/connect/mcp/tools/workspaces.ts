@@ -104,4 +104,40 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       }
       return text({ written: key, doc_id: docId, type, section: section ?? null });
     });
+
+  mcp.tool('aimeat_workspace_delete', descriptionFor('aimeat_workspace_delete'),
+    {
+      organism_id: z.string(), ws: z.string(),
+      namespace: z.string().describe("The objectType's namespace, e.g. shared.deliverables"),
+      id: z.string().describe('The instance id to delete (draft + latest + all versions)'),
+    },
+    annotationsFor('aimeat_workspace_delete'),
+    async ({ organism_id, ws, namespace, id }) => {
+      const base = `${root(organism_id, ws)}.${namespace}.${id}`;
+      const listed = await client.get(`/v1/memory?prefix=${encodeURIComponent(base + '.')}`);
+      const items = (listed.data as { items?: { key: string }[] } | undefined)?.items ?? [];
+      let deleted = 0;
+      for (const it of items) {
+        const role = it.key.slice(base.length + 1);
+        if (role === 'draft' || role === 'latest' || /^version\.\d+$/.test(role)) {
+          const dr = await client.delete(`/v1/memory/${encodeURIComponent(it.key)}`);
+          if (dr.ok !== false) deleted++;
+        }
+      }
+      if (deleted === 0) return text({ error: `Nothing to delete at ${base} (no draft/latest/version).` }, true);
+      // Best-effort: unfile the id from the document section tree (find the type by namespace).
+      const wsResp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace?ws=${encodeURIComponent(ws)}`);
+      const ot = ((wsResp.data as { manifest?: { objectTypes?: { name: string; namespace?: string }[] } } | undefined)?.manifest?.objectTypes ?? []).find(o => o.namespace === namespace);
+      if (ot) {
+        const secKey = `${root(organism_id, ws)}.meta.sections.${ot.name}`;
+        const secResp = await client.get(`/v1/memory?prefix=${encodeURIComponent(secKey)}`);
+        const sections = (secResp.data as { items?: { key: string; value?: { sections?: { documents?: string[] }[] } }[] } | undefined)?.items?.find(i => i.key === secKey)?.value?.sections;
+        if (sections) {
+          let changed = false;
+          for (const s of sections) { if ((s.documents ?? []).includes(id)) { s.documents = (s.documents ?? []).filter(d => d !== id); changed = true; } }
+          if (changed) await client.post('/v1/memory', { key: secKey, value: { sections }, visibility: 'private' });
+        }
+      }
+      return text({ deleted: base, keys: deleted });
+    });
 }

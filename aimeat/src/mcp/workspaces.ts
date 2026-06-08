@@ -196,4 +196,40 @@ export function registerWorkspaceTools(
             }
             return ok({ written: key, doc_id: docId, type, section: section ?? null });
         });
+
+    // ── aimeat_workspace_delete ──
+    mcp.tool('aimeat_workspace_delete', descriptionFor('aimeat_workspace_delete'),
+        { organism_id: z.string(), ws: z.string(), namespace: z.string(), id: z.string() },
+        annotationsFor('aimeat_workspace_delete'),
+        async ({ organism_id, ws, namespace, id }): Promise<TextResult> => {
+            const deny = await denyReason(organism_id); if (deny) return fail(deny);
+            const root = wsRoot(organism_id, ws);
+            const base = `${root}.${namespace}.${id}`;
+            const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000 });
+            let deleted = 0;
+            for (const r of items) {
+                if (r.ownerGaii !== ownerGhii) continue;
+                const role = r.key.slice(base.length + 1);   // after `${base}.`
+                if (role === 'draft' || role === 'latest' || /^version\.\d+$/.test(role)) {
+                    if (await storage.deleteMemory(ownerGhii, r.key)) deleted++;
+                }
+            }
+            if (deleted === 0) return fail(`Nothing to delete at ${base} (no draft/latest/version).`);
+            // Best-effort: unfile the id from the document section tree (find the type by namespace).
+            const man = await storage.getMemory(ownerGhii, `${root}.meta.manifest`);
+            const ot = ((man?.value as Manifest | undefined)?.objectTypes ?? []).find(o => o.namespace === namespace);
+            if (ot) {
+                const secKey = `${root}.meta.sections.${ot.name}`;
+                const secRec = await storage.getMemory(ownerGhii, secKey);
+                const sections = (secRec?.value as { sections?: { documents?: string[] }[] } | undefined)?.sections;
+                if (sections) {
+                    let changed = false;
+                    for (const s of sections) {
+                        if ((s.documents ?? []).includes(id)) { s.documents = (s.documents ?? []).filter(d => d !== id); changed = true; }
+                    }
+                    if (changed) await writeRecord(secKey, { sections }, secRec);
+                }
+            }
+            return ok({ deleted: base, keys: deleted });
+        });
 }
