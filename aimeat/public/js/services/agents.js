@@ -52,6 +52,25 @@ export async function setAgentCors(name, origins) {
   });
 }
 
+/** Custom agent groups (sections) for the Agents tab. Stored server-side in the
+ *  owner's memory at `agents.groups` so the grouping follows the owner across
+ *  devices/browsers. A group is { id, name, agents: [agentName] }; an agent
+ *  belongs to at most one group, and any agent not listed in a group renders
+ *  under "Ungrouped". The per-browser collapsed/expanded state is NOT stored
+ *  here — it lives in localStorage (see agents-tab.js). */
+export async function getAgentGroups() {
+  try {
+    const resp = await apiGet('/v1/memory?prefix=agents.groups');
+    const item = (resp?.data?.items || []).find(i => i.key === 'agents.groups');
+    return Array.isArray(item?.value?.groups) ? item.value.groups : [];
+  } catch { return []; }
+}
+
+/** Persist the owner's custom agent groups. */
+export async function saveAgentGroups(groups) {
+  return apiPost('/v1/memory', { key: 'agents.groups', value: { groups }, visibility: 'private' });
+}
+
 /** List chat instances (includes MCP sessions). Returns array. */
 export async function listChatInstances() {
   const data = await apiGet('/v1/chat-instances');

@@ -35,6 +35,10 @@
  *     (connect command, MCP onboarding, manual agent prompt, task-runner prompt) with the
  *     canonical <CopyButton> (className="copy-prompt-btn" preserves appearance); removed the
  *     now-dead copiedAction state + markCopied helper.
+ *   v3.7.0 -- 2026-06-09 -- Custom agent groups: new "Custom groups" group-by mode with
+ *     user-created, drag-to-assign sections (definitions in AIMEAT memory via
+ *     getAgentGroups/saveAgentGroups) and per-browser collapse/expand state
+ *     (localStorage). Group-by selector now always shown (was hidden when no tags).
  *   v3.6.0 -- 2026-06-03 -- Fleet "running now" panel between the agent board and
  *     the list: every agent's currently-active tasks in one list (reuses the
  *     active tasks already fetched in loadData, so no extra requests); clicking a
@@ -50,7 +54,7 @@ import { escHtml, timeAgo } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { Spinner } from './shared.js';
 import { apiGet, apiPost, apiPatch } from '/js/api.js';
-import { listAgents, updateAgentScopes, deleteAgent } from '/js/services/agents.js';
+import { listAgents, updateAgentScopes, deleteAgent, getAgentGroups, saveAgentGroups } from '/js/services/agents.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { Modal, useConfirm } from '/components/Modal.js';
 import SharedBoard from './agents/shared-board.js';
@@ -379,6 +383,26 @@ function saveAgentOrder(owner, names) {
   catch { /* ignore quota/availability errors */ }
 }
 
+// ── Custom agent groups (server-side) + per-browser collapse state ──
+// The group DEFINITIONS (which groups exist, which agent is in which) live in the
+// owner's AIMEAT memory so they follow the owner across devices — see
+// getAgentGroups/saveAgentGroups. The collapsed/expanded toggle is purely a
+// per-device view preference, so (like the agent ordering above) it lives in
+// localStorage, keyed by owner. Stored as an array of collapsed group ids; the
+// special id below tracks the "Ungrouped" section.
+const UNGROUPED_ID = '__ungrouped__';
+const COLLAPSE_KEY_PREFIX = 'aimeat-agent-groups-collapsed:';
+function loadCollapsedGroups(owner) {
+  if (!owner) return new Set();
+  try { return new Set(JSON.parse(localStorage.getItem(COLLAPSE_KEY_PREFIX + owner) || '[]') || []); }
+  catch { return new Set(); }
+}
+function saveCollapsedGroups(owner, set) {
+  if (!owner) return;
+  try { localStorage.setItem(COLLAPSE_KEY_PREFIX + owner, JSON.stringify([...set])); }
+  catch { /* ignore quota/availability errors */ }
+}
+
 // ── Per-browser "last seen per tab" state (localStorage) ──
 // Drives the per-agent change badges: how many tasks / messages / memory
 // entries have updated since the owner last opened that tab. Per-browser, keyed
@@ -466,11 +490,81 @@ export default function AgentsTab({ session, showToast, onStats }) {
   // from the localStorage "last seen per tab" baseline (see loadSeen/countNewer).
   const [changesMap, setChangesMap] = useState({});
   const [tagFilter, setTagFilter] = useState(new Set());
-  const [groupBy, setGroupBy] = useState('none'); // 'none' | 'tag' | 'mode'
+  const [groupBy, setGroupBy] = useState('none'); // 'none' | 'tag' | 'mode' | 'custom'
   // Per-browser drag-to-reorder of the agent bars (localStorage-backed).
   const [agentOrder, setAgentOrder] = useState(() => loadAgentOrder(session?.owner));
   const [draggingName, setDraggingName] = useState(null);
   const draggedName = useRef(null);
+  // Custom groups: definitions are server-side (AIMEAT memory), the collapse
+  // toggle is per-browser. editingGroup holds the id of the group being renamed.
+  const [agentGroups, setAgentGroups] = useState([]);
+  const [collapsedGroups, setCollapsedGroups] = useState(() => loadCollapsedGroups(session?.owner));
+  const [editingGroup, setEditingGroup] = useState(null);
+  const draggedAgent = useRef(null);
+  const [draggingAgentName, setDraggingAgentName] = useState(null);
+
+  // Load the owner's saved group definitions once per session. Mutations below
+  // update state optimistically and persist, so no need to re-fetch on the poll.
+  useEffect(() => {
+    if (!session) { setAgentGroups([]); return; }
+    setCollapsedGroups(loadCollapsedGroups(session.owner));
+    getAgentGroups().then(g => setAgentGroups(Array.isArray(g) ? g : [])).catch(() => setAgentGroups([]));
+  }, [session]);
+
+  function persistGroups(next) {
+    setAgentGroups(next);
+    saveAgentGroups(next).catch(e => showToast((e && e.message) || t('profile.agents.groups.saveError'), true));
+  }
+  function addGroup() {
+    const id = 'grp-' + Date.now().toString(36);
+    persistGroups([...agentGroups, { id, name: '', agents: [] }]);
+    setEditingGroup(id); // open the new group in rename mode immediately
+  }
+  function renameGroup(id, name) {
+    persistGroups(agentGroups.map(g => g.id === id ? { ...g, name } : g));
+  }
+  function removeGroup(id) {
+    const grp = agentGroups.find(g => g.id === id);
+    confirm(
+      t('profile.agents.groups.confirmRemove').replace('{name}', grp?.name || '…'),
+      () => persistGroups(agentGroups.filter(g => g.id !== id)),
+    );
+  }
+  // Move an agent into targetId (a group id, or UNGROUPED_ID to remove it from
+  // every group). An agent belongs to at most one group.
+  function moveAgentToGroup(agentName, targetId) {
+    if (!agentName) return;
+    const cleaned = agentGroups.map(g => ({ ...g, agents: (g.agents || []).filter(n => n !== agentName) }));
+    const next = targetId === UNGROUPED_ID
+      ? cleaned
+      : cleaned.map(g => g.id === targetId ? { ...g, agents: [...g.agents, agentName] } : g);
+    persistGroups(next);
+  }
+  function toggleGroupCollapsed(id) {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      saveCollapsedGroups(session?.owner, next);
+      return next;
+    });
+  }
+
+  // Drag-to-assign for custom-group mode: drag an agent bar (grip handle) onto a
+  // group header to file it there. Mirrors the document-space section pattern.
+  const groupDnd = {
+    draggingAgentName,
+    onDragStart: (name, e) => {
+      draggedAgent.current = name;
+      setDraggingAgentName(name);
+      if (e?.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', name); } catch { /* ignore */ }
+      }
+    },
+    onDragOver: (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; },
+    onDropToGroup: (targetId) => { moveAgentToGroup(draggedAgent.current, targetId); draggedAgent.current = null; setDraggingAgentName(null); },
+    onDragEnd: () => { draggedAgent.current = null; setDraggingAgentName(null); },
+  };
 
   function reorderAgents(fromName, toName) {
     if (!fromName || !toName || fromName === toName || !session || !agents) return;
@@ -899,6 +993,15 @@ export default function AgentsTab({ session, showToast, onStats }) {
           dnd,
           agentOrder,
           deepLink,
+          agentGroups,
+          collapsedGroups,
+          editingGroup,
+          setEditingGroup,
+          addGroup,
+          renameGroup,
+          removeGroup,
+          toggleGroupCollapsed,
+          groupDnd,
         })}
       `
     }
@@ -924,7 +1027,6 @@ function collectTags(agents) {
 
 function renderFilterBar(agents, tagFilter, setTagFilter, groupBy, setGroupBy) {
   const tags = collectTags(agents);
-  if (tags.length === 0 && groupBy === 'none') return null;
 
   function toggleTag(tag) {
     const next = new Set(tagFilter);
@@ -956,6 +1058,7 @@ function renderFilterBar(agents, tagFilter, setTagFilter, groupBy, setGroupBy) {
         <span class="pf-agd-filter-label">${t('profile.agents.filter.groupBy')}</span>
         <select class="pf-agd-filter-select" value=${groupBy} onChange=${(e) => setGroupBy(e.target.value)}>
           <option value="none">${t('profile.agents.filter.groupByNone')}</option>
+          <option value="custom">${t('profile.agents.filter.groupByCustom')}</option>
           <option value="tag">${t('profile.agents.filter.groupByTag')}</option>
           <option value="mode">${t('profile.agents.filter.groupByMode')}</option>
         </select>
@@ -1010,7 +1113,7 @@ function ActiveTasksPanel({ activeTasksMap, agents, onOpen }) {
   `;
 }
 
-function renderAgentGroups({ agents, tagFilter, groupBy, onboardings, taskStatsMap, changesMap, onTabSeen, expandedAgent, toggleAgent, session, showToast, setScopesModal, handleDeleteAgent, toggleFederate, onPopOut, dnd, agentOrder, deepLink }) {
+function renderAgentGroups({ agents, tagFilter, groupBy, onboardings, taskStatsMap, changesMap, onTabSeen, expandedAgent, toggleAgent, session, showToast, setScopesModal, handleDeleteAgent, toggleFederate, onPopOut, dnd, agentOrder, deepLink, agentGroups, collapsedGroups, editingGroup, setEditingGroup, addGroup, renameGroup, removeGroup, toggleGroupCollapsed, groupDnd }) {
   // Tag filter: agent must have ALL selected tags (intersection)
   const filtered = tagFilter.size === 0
     ? agents
@@ -1068,6 +1171,83 @@ function renderAgentGroups({ agents, tagFilter, groupBy, onboardings, taskStatsM
         ${card(a)}
       </div>
     `);
+  }
+
+  if (groupBy === 'custom') {
+    const filteredNames = new Set(filtered.map(a => a.name));
+    const byName = new Map(filtered.map(a => [a.name, a]));
+    const assigned = new Set();
+    const groups = agentGroups || [];
+
+    // A draggable agent bar — drag by the grip handle onto a group header to
+    // file it there (mirrors the document-space section pattern). The card is
+    // not draggable while expanded so its inner controls stay usable.
+    const draggableCard = (a) => html`
+      <div data-agent-name=${a.name} key=${a.name}
+           class="pf-agd-dnd-row ${groupDnd.draggingAgentName === a.name ? 'pf-agd-dnd-dragging' : ''}"
+           draggable=${expandedAgent !== a.name}
+           onDragStart=${(e) => groupDnd.onDragStart(a.name, e)}
+           onDragEnd=${groupDnd.onDragEnd}>
+        ${expandedAgent !== a.name ? html`<span class="pf-agd-dnd-grip" title=${t('profile.agents.groups.dragHint')}>⠿</span>` : ''}
+        ${card(a)}
+      </div>
+    `;
+
+    const groupSection = (g) => {
+      (g.agents || []).forEach(n => assigned.add(n));
+      const members = (g.agents || []).filter(n => filteredNames.has(n)).map(n => byName.get(n));
+      const collapsed = collapsedGroups?.has(g.id);
+      return html`
+        <div class="pf-agd-group" key=${'cg-' + g.id}>
+          <div class="pf-agd-group-header pf-agd-cgroup-header"
+               onDragOver=${groupDnd.onDragOver}
+               onDrop=${(e) => { e.preventDefault(); groupDnd.onDropToGroup(g.id); }}>
+            <button class="pf-agd-cgroup-toggle" onClick=${() => toggleGroupCollapsed(g.id)} title=${t('profile.agents.groups.toggle')}>
+              <span class="pf-chevron ${collapsed ? '' : 'pf-chevron-open'}">▼</span>
+            </button>
+            ${editingGroup === g.id
+              ? html`<input class="input-field input-xs pf-agd-cgroup-name-input" autofocus
+                       placeholder=${t('profile.agents.groups.namePlaceholder')}
+                       value=${g.name}
+                       onInput=${(e) => renameGroup(g.id, e.target.value)}
+                       onBlur=${() => setEditingGroup(null)}
+                       onKeyDown=${(e) => { if (e.key === 'Enter') setEditingGroup(null); }} />`
+              : html`<button class="pf-agd-cgroup-name" onClick=${() => setEditingGroup(g.id)} title=${t('profile.agents.groups.rename')}>${g.name || t('profile.agents.groups.unnamed')}</button>`}
+            <span class="pf-agd-group-count">${members.length}</span>
+            <button class="pj-icon-btn" title=${t('profile.agents.groups.remove')} onClick=${() => removeGroup(g.id)}>✕</button>
+          </div>
+          ${!collapsed && (members.length === 0
+            ? html`<div class="pf-agd-cgroup-empty">${t('profile.agents.groups.emptyDrop')}</div>`
+            : members.map(draggableCard))}
+        </div>
+      `;
+    };
+
+    // Render groups first (populates `assigned`), then everything not in any
+    // group falls into Ungrouped (also a drop target — drop here to unfile).
+    const groupSections = groups.map(groupSection);
+    const ungrouped = filtered.filter(a => !assigned.has(a.name));
+    const ungCollapsed = collapsedGroups?.has(UNGROUPED_ID);
+
+    return html`
+      <div class="pf-agd-cgroup-bar">
+        <button class="btn-outline btn-sm" onClick=${addGroup}>+ ${t('profile.agents.groups.addGroup')}</button>
+        <span class="text-caption pf-agd-cgroup-hint">${t('profile.agents.groups.hint')}</span>
+      </div>
+      ${groupSections}
+      <div class="pf-agd-group" key="cg-ungrouped">
+        <div class="pf-agd-group-header pf-agd-cgroup-header"
+             onDragOver=${groupDnd.onDragOver}
+             onDrop=${(e) => { e.preventDefault(); groupDnd.onDropToGroup(UNGROUPED_ID); }}>
+          <button class="pf-agd-cgroup-toggle" onClick=${() => toggleGroupCollapsed(UNGROUPED_ID)} title=${t('profile.agents.groups.toggle')}>
+            <span class="pf-chevron ${ungCollapsed ? '' : 'pf-chevron-open'}">▼</span>
+          </button>
+          <span class="pf-agd-cgroup-name pf-agd-group-untagged">${t('profile.agents.groups.ungrouped')}</span>
+          <span class="pf-agd-group-count">${ungrouped.length}</span>
+        </div>
+        ${!ungCollapsed && ungrouped.map(draggableCard)}
+      </div>
+    `;
   }
 
   if (groupBy === 'mode') {

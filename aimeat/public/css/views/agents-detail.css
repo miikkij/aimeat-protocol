@@ -57,6 +57,7 @@
  *   v2.11.0 -- 2026-05-31 -- Widen the solo pop-out window (and pf-agd-solo max-width) so the agent card matches the list-view width and the full tab bar fits
  *   v2.12.0 -- 2026-05-31 -- Add completed-task deliverable styles (pf-agd-deliverable*) linking a task to its agent-memory output key
  *   v2.13.0 -- 2026-05-31 -- Add per-task blur-title toggle styles (pf-agd-blur-toggle, pf-agd-task-title--blurred) for hiding sensitive titles in screen recordings
+ *   v2.26.0 -- 2026-06-09 -- Add custom agent-group styles (pf-agd-cgroup-bar/header/toggle/name/empty) for the drag-to-assign "Custom groups" list mode
  */
 
 /* Header row: title left, connect button right */
@@ -1633,6 +1634,60 @@
   font-size: 0.85rem;
   font-style: italic;
   color: var(--text-muted, #6B7280);
+}
+
+/* ── Custom groups (user-defined sections, drag-to-assign) ── */
+.pf .pf-agd-cgroup-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.pf .pf-agd-cgroup-hint {
+  color: var(--text-muted, #6B7280);
+  font-size: 0.78rem;
+}
+/* The header doubles as the drop target for filing agents into the group. */
+.pf .pf-agd-cgroup-header {
+  cursor: default;
+}
+.pf .pf-agd-cgroup-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted, #9CA3AF);
+  font-size: 0.7rem;
+  padding: 0 0.1rem;
+  line-height: 1;
+}
+.pf .pf-agd-cgroup-toggle:hover { color: var(--accent, #E8564A); }
+.pf .pf-agd-cgroup-name {
+  flex: 1;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: text;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text, #1A1A2E);
+  padding: 0.1rem 0.2rem;
+  border-radius: 4px;
+}
+.pf .pf-agd-cgroup-name:hover { background: var(--bg-surface, #F3F4F6); }
+.pf .pf-agd-cgroup-name-input {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.pf .pf-agd-cgroup-empty {
+  font-size: 0.82rem;
+  color: var(--text-muted, #9CA3AF);
+  font-style: italic;
+  padding: 0.5rem 0.25rem;
+  border: 1px dashed var(--border, #E5E7EB);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
 }
 
 /* ── Expanded Card ── */

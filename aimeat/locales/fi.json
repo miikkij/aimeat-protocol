@@ -498,11 +498,26 @@
         "byTag": "Suodata tagilla:",
         "groupBy": "Ryhmittele:",
         "groupByNone": "Ei ryhmittelyä",
+        "groupByCustom": "Omat ryhmät",
         "groupByTag": "Tagin mukaan",
         "groupByMode": "Tilan mukaan",
         "clear": "Tyhjennä",
         "untagged": "Ei tageja",
         "noMatches": "Yksikään agentti ei vastaa nykyistä suodatinta."
+      },
+      "groups": {
+        "addGroup": "Lisää ryhmä",
+        "hint": "Raahaa agentti kahvasta ryhmän päälle liittääksesi sen siihen.",
+        "ungrouped": "Ryhmittelemättömät",
+        "unnamed": "Nimetön ryhmä",
+        "namePlaceholder": "Ryhmän nimi",
+        "rename": "Nimeä uudelleen napsauttamalla",
+        "remove": "Poista ryhmä",
+        "toggle": "Pienennä / laajenna",
+        "dragHint": "Raahaa ryhmän päälle liittääksesi",
+        "emptyDrop": "Raahaa agentteja tähän lisätäksesi ne tähän ryhmään.",
+        "confirmRemove": "Poistetaanko ryhmä ”{name}”? Sen agentit siirtyvät Ryhmittelemättömiin — niitä ei poisteta.",
+        "saveError": "Ryhmien tallennus epäonnistui."
       },
       "reorderHint": "Raahaa järjestääksesi",
       "solo": {

@@ -498,11 +498,26 @@
         "byTag": "Filter by tag:",
         "groupBy": "Group by:",
         "groupByNone": "No grouping",
+        "groupByCustom": "Custom groups",
         "groupByTag": "Tag",
         "groupByMode": "Mode",
         "clear": "Clear",
         "untagged": "Untagged",
         "noMatches": "No agents match the current filter."
+      },
+      "groups": {
+        "addGroup": "Add group",
+        "hint": "Drag an agent by its grip handle onto a group to file it there.",
+        "ungrouped": "Ungrouped",
+        "unnamed": "Untitled group",
+        "namePlaceholder": "Group name",
+        "rename": "Click to rename",
+        "remove": "Remove group",
+        "toggle": "Collapse / expand",
+        "dragHint": "Drag onto a group to file it",
+        "emptyDrop": "Drag agents here to add them to this group.",
+        "confirmRemove": "Remove the group “{name}”? Its agents move to Ungrouped — they are not deleted.",
+        "saveError": "Failed to save groups."
       },
       "reorderHint": "Drag to reorder",
       "solo": {
