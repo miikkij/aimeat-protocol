@@ -124,6 +124,29 @@ await test('6. base64 export + JSON import round-trip (the MCP/connector path)',
     assert(imp.status === 201 && typeof imp.body.data.ws === 'string', `json import ${imp.status}: ${JSON.stringify(imp.body.error)}`);
 });
 
+// ── Organism-level bundle export/import (Phase 2) ──
+let orgZip: Buffer;
+await test('7. organism export → ZIP bundling its workspace(s)', async () => {
+    const res = await fetch(`${BASE}/v1/organisms/${orgId}/export`, { headers: auth(token) });
+    assert(res.status === 200 && (res.headers.get('content-type') || '').includes('zip'), `org export ${res.status}`);
+    orgZip = Buffer.from(await res.arrayBuffer());
+    assert(orgZip[0] === 0x50 && orgZip[1] === 0x4b, 'PK zip');
+});
+
+let newOrgId = '';
+await test('8. organism import → a NEW organism with the workspace restored', async () => {
+    const res = await fetch(`${BASE}/v1/organisms/import`, { method: 'POST', headers: { ...auth(token), 'Content-Type': 'application/zip' }, body: orgZip });
+    const body = await res.json() as any;
+    assert(res.status === 201, `org import ${res.status}: ${JSON.stringify(body.error)}`);
+    newOrgId = body.data.organism_id;
+    assert(typeof newOrgId === 'string' && newOrgId !== orgId, 'new org id differs');
+    assert((body.data.workspaces || []).length >= 1, `restored >=1 workspace (${body.data.workspaces?.length})`);
+    const wsId = body.data.workspaces[0].ws;
+    const r = await json(`/v1/organisms/${newOrgId}/workspace?ws=${wsId}`, { headers: auth(token) });
+    assert(r.body.data.manifest?.name === 'Backup Me', 'workspace restored inside the new organism');
+    assert((r.body.data.objects?.item || []).some((o: any) => o.id === 'i1'), 'record restored in the new org');
+});
+
 await test('Cleanup', async () => { await json(`/v1/owners/${ownerName}`, { method: 'DELETE', headers: auth(token) }); });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

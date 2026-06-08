@@ -24,6 +24,8 @@
  *   v1.6.0 -- 2026-06-09 -- Workspace backup/portability: GET /:id/workspace/export (full-fidelity
  *     ZIP, ?format=base64) + POST /:id/workspace/import (restore as a new workspace, raw ZIP or
  *     { zip_base64 }). See services/workspace-export.ts + workspace-import.ts.
+ *   v1.7.0 -- 2026-06-09 -- Organism-level bundle: GET /:id/export (whole organism + all workspaces)
+ *     + POST /organisms/import (restore as a NEW organism). See services/organism-export+import.ts.
  */
 import { Router, raw } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -40,6 +42,8 @@ import { expireOverdueApprovals, isOverdue } from '../services/gate-expiry.js';
 import { notify } from '../services/notify.js';
 import { exportWorkspace } from '../services/workspace-export.js';
 import { importWorkspace } from '../services/workspace-import.js';
+import { exportOrganism } from '../services/organism-export.js';
+import { importOrganism } from '../services/organism-import.js';
 
 /** Whether a membership role satisfies an approval's required approverRole. */
 function roleSatisfies(approverRole: string, membershipRole: string): boolean {
@@ -976,6 +980,42 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       res.status(201).json(success(config.nodeId, result));
     } catch (e) {
       res.status(400).json(error(config.nodeId, 'IMPORT_FAILED', (e as Error).message || 'Could not import the workspace'));
+    }
+  });
+
+  /* ── GET /v1/organisms/:id/export — download a ZIP backup of the WHOLE organism (settings + all
+   * its workspaces). Creator/admin only. ?format=base64 for a size-capped JSON payload. ── */
+  router.get('/v1/organisms/:id/export', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const role = await memberRole(req, organism, id);
+    if (role !== 'creator' && role !== 'admin') { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the organism creator or an admin can export the organism')); return; }
+    const { buffer, filename } = await exportOrganism(storage, config, { orgId: id, exporterGaii: resolveIdentity(req.auth!, config.nodeId), exportedAt: new Date().toISOString() });
+    if (req.query.format === 'base64') {
+      if (buffer.length > 1_500_000) { res.status(413).json(error(config.nodeId, 'TOO_LARGE', 'Organism too large for inline (base64) export — use the UI/REST binary download.')); return; }
+      res.json(success(config.nodeId, { filename, size_bytes: buffer.length, zip_base64: buffer.toString('base64') }));
+      return;
+    }
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  });
+
+  /* ── POST /v1/organisms/import — restore an organism bundle ZIP as a NEW organism (the importer
+   * becomes its creator). Body is the raw ZIP (application/zip) or JSON { zip_base64 }. ── */
+  router.post('/v1/organisms/import', requireAuth(), requireRole('agent'),
+    raw({ type: (r) => !/application\/json/i.test(r.headers['content-type'] || ''), limit: '128mb' }),
+    async (req, res) => {
+    const b64 = (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) ? (req.body as { zip_base64?: string }).zip_base64 : undefined;
+    const buf = Buffer.isBuffer(req.body) ? req.body : (typeof b64 === 'string' ? Buffer.from(b64, 'base64') : null);
+    if (!buf || buf.length === 0) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Send the organism ZIP as the raw body (Content-Type: application/zip) or JSON { zip_base64 }')); return; }
+    try {
+      const result = await importOrganism(storage, config, { importerGaii: resolveIdentity(req.auth!, config.nodeId), importerOwner: req.auth!.owner as string, zip: buf });
+      emitChange('organisms');
+      res.status(201).json(success(config.nodeId, result));
+    } catch (e) {
+      res.status(400).json(error(config.nodeId, 'IMPORT_FAILED', (e as Error).message || 'Could not import the organism'));
     }
   });
 

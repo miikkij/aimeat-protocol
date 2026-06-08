@@ -25,6 +25,8 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { exportOrganism } from '../services/organism-export.js';
+import { importOrganism } from '../services/organism-import.js';
 
 export function registerOrganismsTools(
     mcp: McpServer,
@@ -408,4 +410,37 @@ export function registerOrganismsTools(
             };
         },
     );
+
+    const ownerOf = () => { const p = parseGAII(agentGaii); return p ? p.owner : agentGaii; };
+
+    // ── Tool 7: aimeat_organism_export ──
+    mcp.tool('aimeat_organism_export', descriptionFor('aimeat_organism_export'),
+        { organism_id: z.string() },
+        annotationsFor('aimeat_organism_export'),
+        async ({ organism_id }) => {
+            const organism = await storage.getOrganism(organism_id);
+            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
+            const ownerName = ownerOf();
+            const m = await storage.getMembership(organism_id, ownerName);
+            const role = m && m.status === 'active' ? m.role : null;
+            if (role !== 'creator' && role !== 'admin') return { content: [{ type: 'text' as const, text: 'Only the organism creator or an admin can export.' }], isError: true };
+            const { buffer, filename, workspaces } = await exportOrganism(storage, config, { orgId: organism_id, exporterGaii: `${ownerName}@${config.nodeId}`, exportedAt: new Date().toISOString() });
+            if (buffer.length > 1_500_000) return { content: [{ type: 'text' as const, text: `Organism too large for inline export (${buffer.length} bytes) — download it from the UI/REST instead.` }], isError: true };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ filename, size_bytes: buffer.length, workspaces, zip_base64: buffer.toString('base64') }, null, 2) }] };
+        });
+
+    // ── Tool 8: aimeat_organism_import ──
+    mcp.tool('aimeat_organism_import', descriptionFor('aimeat_organism_import'),
+        { zip_base64: z.string() },
+        annotationsFor('aimeat_organism_import'),
+        async ({ zip_base64 }) => {
+            const ownerName = ownerOf();
+            const buf = Buffer.from(zip_base64, 'base64');
+            if (!buf.length) return { content: [{ type: 'text' as const, text: 'zip_base64 is empty or invalid.' }], isError: true };
+            try {
+                const result = await importOrganism(storage, config, { importerGaii: `${ownerName}@${config.nodeId}`, importerOwner: ownerName, zip: buf });
+                emitResourceListChanged(agentGaii);
+                return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+            } catch (e) { return { content: [{ type: 'text' as const, text: (e as Error).message || 'Import failed' }], isError: true }; }
+        });
 }

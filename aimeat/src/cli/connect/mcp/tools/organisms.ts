@@ -75,4 +75,18 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     const resp = await client.post('/v1/organisms', body);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
+
+  mcp.tool('aimeat_organism_export', descriptionFor('aimeat_organism_export'), {
+    organism_id: z.string().describe('Organism to export'),
+  }, annotationsFor('aimeat_organism_export'), async ({ organism_id }) => {
+    const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/export?format=base64`);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
+  });
+
+  mcp.tool('aimeat_organism_import', descriptionFor('aimeat_organism_import'), {
+    zip_base64: z.string().describe('Organism export ZIP, base64-encoded'),
+  }, annotationsFor('aimeat_organism_import'), async ({ zip_base64 }) => {
+    const resp = await client.post('/v1/organisms/import', { zip_base64 });
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
+  });
 }

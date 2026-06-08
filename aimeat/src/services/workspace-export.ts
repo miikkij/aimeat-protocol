@@ -41,11 +41,14 @@ export interface WorkspaceExportJson {
 /** Pull storage keys out of an image URL: /v1/storage/<key> or /v1/pub/<ghii>/<key>. */
 const STORAGE_URL_RE = /\/v1\/(?:storage|pub\/[^/)\s]+)\/([^\s)\]"'>]+)/g;
 
-export async function exportWorkspace(
+/** Collect a workspace's full data + image binaries WITHOUT zipping — the reusable core shared by
+ *  the single-workspace export and the organism bundle export. Image file names are relative
+ *  ("images/img-N.ext"), as referenced by each object's `img.file`. */
+export async function collectWorkspace(
   storage: Storage,
   config: AimeatConfig,
   opts: { orgId: string; ws: string; exporterGaii: string; exportedAt: string },
-): Promise<{ buffer: Buffer; filename: string }> {
+): Promise<{ json: WorkspaceExportJson; images: Map<string, Buffer> }> {
   const { orgId, ws, exporterGaii, exportedAt } = opts;
   const root = `organism.${orgId}.w.${ws}`;
 
@@ -105,15 +108,7 @@ export async function exportWorkspace(
     for (const f of files) if (f.key.startsWith(`${root}.`) || f.key.startsWith(`organism.${orgId}.img.`)) imageKeys.add(f.key);
   } catch { /* listing is best-effort */ }
 
-  // Build the ZIP: images first, then workspace.json (so it references real entries).
-  const archive = archiver('zip', { zlib: { level: 6 } });
-  const chunks: Buffer[] = [];
-  const done = new Promise<Buffer>((resolve, reject) => {
-    archive.on('data', (c: Buffer) => chunks.push(c));
-    archive.on('end', () => resolve(Buffer.concat(chunks)));
-    archive.on('error', reject);
-  });
-
+  const images = new Map<string, Buffer>();
   let imgN = 0;
   for (const key of imageKeys) {
     const file = await storage.getStorageFile(exporterGaii, key).catch(() => null);
@@ -121,12 +116,29 @@ export async function exportWorkspace(
     const ext = (file.mimeType.split('/')[1] || 'bin').replace(/[^a-z0-9]/gi, '').slice(0, 8) || 'bin';
     const fileName = `images/img-${imgN++}.${ext}`;
     out.images.push({ key, file: fileName, mimeType: file.mimeType, visibility: file.visibility });
-    archive.append(file.data, { name: fileName });
+    images.set(fileName, file.data);
   }
-  archive.append(JSON.stringify(out, null, 2), { name: 'workspace.json' });
-  archive.finalize();
+  return { json: out, images };
+}
 
+/** Export a single workspace as a standalone ZIP (workspace.json + images/). */
+export async function exportWorkspace(
+  storage: Storage,
+  config: AimeatConfig,
+  opts: { orgId: string; ws: string; exporterGaii: string; exportedAt: string },
+): Promise<{ buffer: Buffer; filename: string }> {
+  const { json, images } = await collectWorkspace(storage, config, opts);
+  const archive = archiver('zip', { zlib: { level: 6 } });
+  const chunks: Buffer[] = [];
+  const done = new Promise<Buffer>((resolve, reject) => {
+    archive.on('data', (c: Buffer) => chunks.push(c));
+    archive.on('end', () => resolve(Buffer.concat(chunks)));
+    archive.on('error', reject);
+  });
+  for (const [name, data] of images) archive.append(data, { name });
+  archive.append(JSON.stringify(json, null, 2), { name: 'workspace.json' });
+  archive.finalize();
   const buffer = await done;
-  const safe = String(out.name).replace(/[^a-z0-9_-]+/gi, '-').slice(0, 40) || 'workspace';
+  const safe = String(json.name).replace(/[^a-z0-9_-]+/gi, '-').slice(0, 40) || 'workspace';
   return { buffer, filename: `workspace-${safe}.zip` };
 }

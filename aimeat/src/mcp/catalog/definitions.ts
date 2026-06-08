@@ -1072,6 +1072,24 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_organism_export',
+        description: 'Export a whole organism (its settings + every workspace you can read) as one base64 ZIP backup. Organism creator or admin. Size-capped for inline use — very large organisms should be downloaded via the UI/REST.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism to export.' },
+        },
+    },
+    {
+        name: 'aimeat_organism_import',
+        description: 'Import an organism bundle (base64 ZIP from aimeat_organism_export) as a NEW organism — you become its creator, and every workspace inside is restored (ids remapped, schemas re-locked, images re-created). Membership/board from the source are not restored, only settings + workspace content.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            zip_base64: { type: 'string', required: true, description: 'The organism export ZIP, base64-encoded (from aimeat_organism_export).' },
+        },
+    },
+    {
         name: 'aimeat_wallet_transactions',
         description: 'View recent morsel transactions for your owner\'s wallet (id, type, amount, counterparty, tracking code, timestamp; default 20, max 200). Transactions are keyed to the owner GHII, shared across agents. For the current balance/escrow snapshot use aimeat_wallet_balance.',
         caller: 'agent',

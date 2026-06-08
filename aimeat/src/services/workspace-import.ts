@@ -43,17 +43,31 @@ const STORAGE_URL_RE = /\/v1\/(?:storage|pub\/[^/)\s]+)\/([^\s)\]"'>]+)/g;
 
 export interface ImportResult { ws: string; objects: number; documents: number; images: number; images_deduped: number; schemas: number }
 
+/** Unzip a workspace ZIP into a filename → Buffer map (also used by the organism bundle import). */
+export async function unzipBuffer(zip: Buffer): Promise<Map<string, Buffer>> { return unzip(zip); }
+
+/** Import a single standalone workspace ZIP. */
 export async function importWorkspace(
   storage: Storage,
   config: AimeatConfig,
   opts: { orgId: string; importerGaii: string; importerOwner: string; zip: Buffer },
 ): Promise<ImportResult> {
-  const { orgId, importerGaii, importerOwner, zip } = opts;
-  const files = await unzip(zip);
+  const files = await unzip(opts.zip);
   const jsonBuf = files.get('workspace.json');
   if (!jsonBuf) throw new Error('workspace.json missing from the ZIP');
   let data: WorkspaceExportJson;
   try { data = JSON.parse(jsonBuf.toString('utf8')); } catch { throw new Error('workspace.json is not valid JSON'); }
+  return restoreWorkspace(storage, config, { orgId: opts.orgId, importerGaii: opts.importerGaii, importerOwner: opts.importerOwner, data, images: files });
+}
+
+/** Restore a workspace from already-parsed data + an image map (filename → bytes). The reusable core
+ *  shared by the single-workspace import and the organism bundle import. */
+export async function restoreWorkspace(
+  storage: Storage,
+  config: AimeatConfig,
+  opts: { orgId: string; importerGaii: string; importerOwner: string; data: WorkspaceExportJson; images: Map<string, Buffer> },
+): Promise<ImportResult> {
+  const { orgId, importerGaii, importerOwner, data, images: imageFiles } = opts;
   if (!data || data.aimeatWorkspaceExport !== WS_EXPORT_VERSION || !data.manifest) {
     throw new Error('Unrecognised workspace export (wrong format/version)');
   }
@@ -92,7 +106,7 @@ export async function importWorkspace(
   const urlByOldKey = new Map<string, string>();
   let imagesCreated = 0, imagesDeduped = 0;
   for (const img of (data.images || []) as ExportImage[]) {
-    const bin = files.get(img.file);
+    const bin = imageFiles.get(img.file);
     const newKey = remapKey(img.key);
     const isPublic = img.visibility === 'public';
     urlByOldKey.set(img.key, isPublic ? `/v1/pub/${importerGaii}/${newKey}` : `/v1/storage/${encodeURIComponent(newKey)}`);

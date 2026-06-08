@@ -49,6 +49,8 @@
  *     a request inbox (approve/deny/revoke) on workspaces you created.
  *   v1.11.0 — 2026-06-09 — Workspace backup: Export (⬇ on each owned card, downloads a ZIP) + Import
  *     (⬆ in the bar, uploads a ZIP → new workspace) buttons.
+ *   v1.12.0 — 2026-06-09 — Organism-level backup: "Export organism" (whole org ZIP) in the org view +
+ *     "Import organism" (→ new org) in the My Organisms header.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -116,6 +118,24 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   useEffect(() => {
     if (session) loadData();
   }, [session, loadData]);
+
+  // Import a whole organism from a ZIP backup → creates a new organism + opens it.
+  const orgFileRef = useRef(null);
+  const [importingOrg, setImportingOrg] = useState(false);
+  const doImportOrg = async (file) => {
+    if (!file) return;
+    setImportingOrg(true);
+    try {
+      const jwt = window.AIMEAT?.auth?.getSession?.()?.jwt || '';
+      const res = await fetch('/v1/organisms/import', { method: 'POST', headers: { Authorization: 'Bearer ' + jwt, 'Content-Type': 'application/zip' }, body: file });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.error?.message || 'Import failed');
+      showToast(t('organisms.orgImported') || 'Organism imported');
+      await loadData();
+      if (body.data?.organism_id) setOpenId(body.data.organism_id);
+    } catch (e) { showToast((e && e.message) || 'Import failed'); }
+    finally { setImportingOrg(false); }
+  };
 
   // Persist the open organism + workspace (F5 restore), and drop a restored id the user can no longer open.
   useEffect(() => {
@@ -464,7 +484,11 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     </div>
 
     <!-- My Organisms -->
-    <div class="section-title">${t('organisms.myOrganisms') || 'My Organisms'}</div>
+    <input type="file" accept=".zip,application/zip" ref=${orgFileRef} style="display:none" onChange=${(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; doImportOrg(f); }} />
+    <div class="pj-ws-topbar">
+      <div class="section-title">${t('organisms.myOrganisms') || 'My Organisms'}</div>
+      <button class="btn-outline btn-sm" disabled=${importingOrg} title=${t('organisms.importOrgHint') || 'Restore an organism from a .zip backup'} onClick=${() => orgFileRef.current && orgFileRef.current.click()}>${'⬆ '}${t('organisms.importOrg') || 'Import organism'}</button>
+    </div>
     ${myOrganisms.length === 0
       ? html`<div class="empty">${t('organisms.empty') || 'You are not part of any organisms yet.'}</div>`
       : myOrganisms.map(org => renderOrgCard(org, true))
@@ -588,12 +612,26 @@ function WorkspaceList({ org, showToast, onOpen, onBack }) {
     } catch (e) { showToast((e && e.message) || 'Import failed'); }
     finally { setBusy(false); }
   };
+  const doExportOrg = async () => {
+    try {
+      const res = await fetch(`/v1/organisms/${encodeURIComponent(orgId)}/export`, { headers: { Authorization: 'Bearer ' + jwt() } });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `organism-${String(org.name || orgId).replace(/[^a-z0-9_-]+/gi, '-').slice(0, 40)}.zip`;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    } catch (e) { showToast((e && e.message) || 'Export failed'); }
+  };
 
   return html`
     <div class="pj-ws">
       <${ConfirmUI} />
       <input type="file" accept=".zip,application/zip" ref=${fileRef} style="display:none" onChange=${(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; doImport(f); }} />
-      <button class="btn-ghost btn-sm" onClick=${onBack}>${'← '}${t('organisms.allOrganisms') || 'All organisms'}</button>
+      <div class="pj-ws-topbar">
+        <button class="btn-ghost btn-sm" onClick=${onBack}>${'← '}${t('organisms.allOrganisms') || 'All organisms'}</button>
+        <button class="btn-ghost btn-sm" title=${t('organisms.exportOrgHint') || 'Download a ZIP backup of the whole organism (all workspaces)'} onClick=${doExportOrg}>${'⬇ '}${t('organisms.exportOrg') || 'Export organism'}</button>
+      </div>
       <div class="section-title">${escHtml(org.name || 'Organism')}</div>
       <div class="section-desc">${t('organisms.workspacesDesc') || 'Workspaces in this organism — each is an independent space with its own documents, records and history.'}</div>
 

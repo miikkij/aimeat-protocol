@@ -11127,6 +11127,50 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/organisms/{id}/export:
+    get:
+      operationId: exportOrganism
+      summary: Download a ZIP backup of a whole organism
+      description: |
+        Exports the organism's settings + every workspace the caller can read (each under
+        workspaces/{ws}/) as one ZIP. Organism creator/admin only. `?format=base64` returns a
+        size-capped base64 JSON payload instead of the binary. Membership/board are not exported.
+      tags: [Organisms]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: format, in: query, required: false, schema: { type: string, enum: [base64] } }
+      responses:
+        '200': { description: The organism ZIP (application/zip) or base64 JSON }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { description: Too large for base64 mode }
+
+  /v1/organisms/import:
+    post:
+      operationId: importOrganism
+      summary: Import an organism bundle ZIP as a new organism
+      description: |
+        Restores an organism export ZIP as a NEW organism (settings from organism.json; the importer
+        becomes creator) and restores every workspace inside it. Body is the raw ZIP
+        (Content-Type: application/zip) or JSON `{ zip_base64 }`.
+      tags: [Organisms]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/zip:
+            schema: { type: string, format: binary }
+          application/json:
+            schema:
+              type: object
+              required: [zip_base64]
+              properties:
+                zip_base64: { type: string, description: The organism export ZIP, base64-encoded }
+      responses:
+        '201': { description: Imported — returns the new organism id + restored workspaces }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
   /v1/notifications:
     get:
       operationId: listNotifications
