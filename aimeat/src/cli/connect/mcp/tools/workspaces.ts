@@ -183,4 +183,30 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       await client.post('/v1/memory', { key: regKey, value: { workspaces: [...workspaces, { id: wsId, name: String(name || 'Workspace').trim() || 'Workspace', createdAt: now }] }, visibility: 'private' });
       return text({ created: true, ws: wsId, types: (man.objectTypes as { name: string }[]).map(o => o.name), schemas: schemaResults });
     });
+
+  mcp.tool('aimeat_workspace_request_access', descriptionFor('aimeat_workspace_request_access'),
+    { organism_id: z.string(), ws: z.string(), message: z.string().optional() },
+    annotationsFor('aimeat_workspace_request_access'),
+    async ({ organism_id, ws, message }) => {
+      const body: Record<string, unknown> = { ws };
+      if (message != null) body.message = message;
+      const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace-access`, body);
+      return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
+    });
+
+  mcp.tool('aimeat_workspace_list_requests', descriptionFor('aimeat_workspace_list_requests'),
+    { organism_id: z.string(), ws: z.string() },
+    annotationsFor('aimeat_workspace_list_requests'),
+    async ({ organism_id, ws }) => {
+      const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace-access?ws=${encodeURIComponent(ws)}`);
+      return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
+    });
+
+  mcp.tool('aimeat_workspace_approve_access', descriptionFor('aimeat_workspace_approve_access'),
+    { organism_id: z.string(), ws: z.string(), requester: z.string(), decision: z.string().optional() },
+    annotationsFor('aimeat_workspace_approve_access'),
+    async ({ organism_id, ws, requester, decision }) => {
+      const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace-access/decision`, { ws, requester, decision: decision === 'deny' ? 'deny' : 'approve' });
+      return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
+    });
 }

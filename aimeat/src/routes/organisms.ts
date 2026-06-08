@@ -15,6 +15,10 @@
  *   v1.3.0 -- 2026-06-08 -- Multi-workspace: one organism holds many workspaces under
  *     organism.{id}.w.{ws}.*. Workspace read (?ws), publish (body.ws), and DELETE (?ws) are all
  *     workspace-scoped; the registry lives at organism.{id}.meta.workspaces (client-managed).
+ *   v1.4.0 -- 2026-06-08 -- Per-workspace access control: GET /:id/workspaces (membership-gated
+ *     discovery + access status), POST /:id/workspace-access (request), GET (list requests), and
+ *     POST /:id/workspace-access/decision (creator approves/denies → consent grant). Content stays
+ *     gated by the workspace creator; org membership only grants discovery.
  */
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -734,6 +738,161 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     await storage.deleteMemory(draft.ownerGaii, `${base}.draft`);
     return { ok: true, version: n };
   };
+
+  /* ══ Workspace access (per-workspace, creator-controlled, consent-backed) ══
+   * Organism membership lets you SEE the workspace LIST (names + who made each); reading/writing a
+   * workspace's CONTENT needs the workspace creator's consent. Flow: discover → request → the
+   * workspace creator approves → a consent grant is created. Each workspace's creator owns its
+   * access — if another member makes their own workspace, THEY consent to it, not the organism owner. */
+
+  const wsRegPrefix = (id: string) => `organism.${id}.meta.workspaces`;
+  const bareOwner = (gaii: string) => (gaii.includes('#') ? gaii.split('#')[1] : gaii).split('@')[0];
+
+  /** Find a workspace's registry entry across every member's registry (one key per owner). */
+  const findWsEntry = async (id: string, ws: string): Promise<{ id: string; name?: string; createdBy?: string; createdAt?: string; ownerGaii: string } | null> => {
+    const { items } = await storage.listAllMemory({ prefix: wsRegPrefix(id), limit: 1000 });
+    for (const rec of items) {
+      if (rec.key !== wsRegPrefix(id)) continue;
+      const list = (rec.value as { workspaces?: Array<{ id: string; name?: string; createdBy?: string; createdAt?: string }> } | null)?.workspaces ?? [];
+      const entry = list.find(w => w.id === ws);
+      if (entry) return { ...entry, ownerGaii: rec.ownerGaii };
+    }
+    return null;
+  };
+
+  /** Can this accessor read the workspace's content (i.e. its manifest)? */
+  const canReadWs = async (id: string, ws: string, callerGaii: string): Promise<boolean> => {
+    const mkey = `organism.${id}.w.${ws}.meta.manifest`;
+    const { items } = await storage.listAllMemory({ prefix: mkey, limit: 10 });
+    const man = items.find(r => r.key === mkey);
+    if (!man) return false;
+    if (man.ownerGaii === callerGaii) return true;
+    const d = await authorizeRead(storage, config, { ownerGaii: man.ownerGaii, accessorGaii: callerGaii, resourceKey: man.key, visibility: man.visibility, groupId: man.groupId, action: 'read' });
+    return d.allowed;
+  };
+
+  /** Create a consent grant if an equivalent active one doesn't already exist (idempotent). */
+  const ensureConsent = async (ownerGaii: string, dataPattern: string, recipient: string, purpose: string): Promise<void> => {
+    const existing = await storage.listConsents(ownerGaii, { status: 'active' });
+    if (existing.some(c => c.dataPattern === dataPattern && c.recipient === recipient)) return;
+    const now = new Date().toISOString();
+    await storage.createConsent({ id: uuidv4(), ownerGaii, dataPattern, recipient, purpose, scope: 'private', expires: null, status: 'active', grantedAt: now, revokedAt: null });
+  };
+
+  /* ── GET /v1/organisms/:id/workspaces — discover every workspace in the org (membership-gated,
+   * names + creator + your access status). Discovery is open to members; content stays gated. ── */
+  router.get('/v1/organisms/:id/workspaces', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    if (!(await memberRole(req, organism, id))) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+    const ownerName = req.auth!.owner as string;
+    const { items } = await storage.listAllMemory({ prefix: wsRegPrefix(id), limit: 1000 });
+    const seen = new Map<string, { id: string; name: string; created_by: string; created_at?: string; access: 'owner' | 'granted' | 'none' }>();
+    for (const rec of items) {
+      if (rec.key !== wsRegPrefix(id)) continue;
+      const list = (rec.value as { workspaces?: Array<{ id: string; name?: string; createdBy?: string; createdAt?: string }> } | null)?.workspaces ?? [];
+      for (const w of list) {
+        if (!w.id || seen.has(w.id)) continue;
+        const createdBy = w.createdBy ?? bareOwner(rec.ownerGaii);
+        let access: 'owner' | 'granted' | 'none' = 'none';
+        if (createdBy === ownerName) access = 'owner';
+        else if (await canReadWs(id, w.id, callerGaii)) access = 'granted';
+        seen.set(w.id, { id: w.id, name: w.name ?? w.id, created_by: createdBy, created_at: w.createdAt, access });
+      }
+    }
+    res.json(success(config.nodeId, { workspaces: [...seen.values()] }));
+  });
+
+  /* ── POST /v1/organisms/:id/workspace-access — request access to a workspace. Records the request
+   * and grants the requester's OWN contributions to the organism, so once approved their additions
+   * are visible to the creator + other members. Body: { ws, message? }. ── */
+  router.post('/v1/organisms/:id/workspace-access', requireAuth(), requireRole('agent'), async (req, res) => {
+    const id = req.params.id as string;
+    const { ws, message } = req.body ?? {};
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    if (!(await memberRole(req, organism, id))) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    if (!ws || typeof ws !== 'string') { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws is required')); return; }
+    const entry = await findWsEntry(id, ws);
+    if (!entry) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Workspace not found')); return; }
+    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+    const ownerName = req.auth!.owner as string;
+    const createdBy = entry.createdBy ?? bareOwner(entry.ownerGaii);
+    if (createdBy === ownerName) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'You created this workspace')); return; }
+    const now = new Date().toISOString();
+    await storage.setMemory({
+      key: `organism.${id}.w.${ws}.access.request.${ownerName}`, ownerGaii: callerGaii,
+      value: { ws, requester: ownerName, requester_gaii: callerGaii, message: typeof message === 'string' ? message : '', status: 'pending', createdAt: now },
+      visibility: 'private', tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+    });
+    // Share the requester's own future contributions with the organism (read).
+    await ensureConsent(callerGaii, `organism.${id}.w.${ws}.**`, `organism.${id}`, 'workspace-contribution');
+    res.status(201).json(success(config.nodeId, { status: 'requested', ws, workspace_creator: createdBy }));
+  });
+
+  /* ── GET /v1/organisms/:id/workspace-access?ws= — the workspace creator (or org admin) lists the
+   * pending/decided access requests for a workspace they own. ── */
+  router.get('/v1/organisms/:id/workspace-access', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const ws = typeof req.query.ws === 'string' ? req.query.ws : undefined;
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const role = await memberRole(req, organism, id);
+    if (!role) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    if (!ws) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws is required')); return; }
+    const entry = await findWsEntry(id, ws);
+    if (!entry) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Workspace not found')); return; }
+    const ownerName = req.auth!.owner as string;
+    const createdBy = entry.createdBy ?? bareOwner(entry.ownerGaii);
+    if (createdBy !== ownerName && role !== 'creator' && role !== 'admin') {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the workspace creator or an org admin can see access requests')); return;
+    }
+    const creatorGhii = `${createdBy}@${config.nodeId}`;
+    const grants = (await storage.listConsents(creatorGhii, { status: 'active' })).filter(c => c.dataPattern === `organism.${id}.w.${ws}.**` && c.purpose === 'workspace-access');
+    const approved = new Set(grants.map(c => c.recipient));
+    const { items } = await storage.listAllMemory({ prefix: `organism.${id}.w.${ws}.access.request.`, limit: 1000 });
+    const requests = items.map(r => {
+      const v = r.value as { requester?: string; message?: string; createdAt?: string };
+      const requester = v.requester ?? bareOwner(r.ownerGaii);
+      return { requester, message: v.message ?? '', created_at: v.createdAt, status: approved.has(`ghii:${requester}@${config.nodeId}`) ? 'approved' : 'pending' };
+    });
+    res.json(success(config.nodeId, { ws, requests }));
+  });
+
+  /* ── POST /v1/organisms/:id/workspace-access/decision — the workspace creator approves or denies a
+   * request. Approve → grant the requester read access to the workspace's content. Body:
+   * { ws, requester, decision: 'approve' | 'deny' }. ── */
+  router.post('/v1/organisms/:id/workspace-access/decision', requireAuth(), requireRole('agent'), async (req, res) => {
+    const id = req.params.id as string;
+    const { ws, requester, decision } = req.body ?? {};
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const role = await memberRole(req, organism, id);
+    if (!role) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    if (!ws || !requester || (decision !== 'approve' && decision !== 'deny')) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws, requester and decision (approve|deny) are required')); return;
+    }
+    const entry = await findWsEntry(id, ws);
+    if (!entry) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Workspace not found')); return; }
+    const ownerName = req.auth!.owner as string;
+    const createdBy = entry.createdBy ?? bareOwner(entry.ownerGaii);
+    if (createdBy !== ownerName && role !== 'creator' && role !== 'admin') {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the workspace creator or an org admin can decide access')); return;
+    }
+    const creatorGhii = resolveIdentity(req.auth!, config.nodeId);
+    const recipient = `ghii:${requester}@${config.nodeId}`;
+    const pattern = `organism.${id}.w.${ws}.**`;
+    if (decision === 'approve') {
+      await ensureConsent(creatorGhii, pattern, recipient, 'workspace-access');
+      res.json(success(config.nodeId, { status: 'approved', ws, requester }));
+    } else {
+      const grants = (await storage.listConsents(creatorGhii, { status: 'active' })).filter(c => c.dataPattern === pattern && c.recipient === recipient && c.purpose === 'workspace-access');
+      for (const g of grants) await storage.updateConsent(g.id, { status: 'revoked', revokedAt: new Date().toISOString() });
+      res.json(success(config.nodeId, { status: 'denied', ws, requester }));
+    }
+  });
 
   /* ── DELETE /v1/organisms/:id/workspace — wipe the workspace (manifest + readme + config + ALL
    * object data: drafts, latest, version history) and unregister its schema locks. The organism

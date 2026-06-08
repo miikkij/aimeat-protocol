@@ -44,6 +44,9 @@
  *     top of the workspace list, and the manifest-defined edit→publish→version flow as the first
  *     item inside a workspace. Built from stable data — orgService.buildOrganismOverviewMermaid /
  *     buildEditFlowMermaid.
+ *   v1.10.0 — 2026-06-08 — Per-workspace access control in WorkspaceList: discovers all org
+ *     workspaces (not just own), shows access status, a "Request access" button for locked ones, and
+ *     a request inbox (approve/deny/revoke) on workspaces you created.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -494,9 +497,30 @@ function WorkspaceList({ org, showToast, onOpen, onBack }) {
   const [busy, setBusy] = useState(false);
   const [overview, setOverview] = useState('');           // organism dependency-overview chart (mermaid)
   const [showOverview, setShowOverview] = useState(true);
+  const [openReqWs, setOpenReqWs] = useState(null);       // which owned workspace's request-inbox is open
+  const [reqInbox, setReqInbox] = useState([]);           // access requests for openReqWs
 
-  const load = useCallback(async () => { setList(await orgService.listWorkspaces(orgId)); }, [orgId]);
+  // Discovery: every workspace in the org (membership-gated) with this user's access status. A member
+  // sees workspaces they can't yet read (access:'none') so they can request access.
+  const load = useCallback(async () => { setList(await orgService.discoverWorkspaces(orgId)); }, [orgId]);
   useEffect(() => { load(); }, [load]);
+
+  const requestAccess = async (w) => {
+    setBusy(true);
+    try { await orgService.requestWorkspaceAccess(orgId, w.id); showToast((t('organisms.accessRequested') || 'Access requested — {creator} will decide.').replace('{creator}', w.created_by || '')); }
+    catch (e) { showToast((e && e.message) || 'Failed to request access'); }
+    finally { setBusy(false); }
+  };
+  const toggleInbox = async (w) => {
+    if (openReqWs === w.id) { setOpenReqWs(null); return; }
+    setOpenReqWs(w.id); setReqInbox(await orgService.listWorkspaceRequests(orgId, w.id));
+  };
+  const decide = async (w, requester, decision) => {
+    setBusy(true);
+    try { await orgService.decideWorkspaceAccess(orgId, w.id, requester, decision); setReqInbox(await orgService.listWorkspaceRequests(orgId, w.id)); }
+    catch (e) { showToast((e && e.message) || 'Failed'); }
+    finally { setBusy(false); }
+  };
   // Rebuild the overview whenever the workspace set changes (deterministic — aggregates members,
   // agents, workspaces + their structure, and knowledge packages).
   useEffect(() => {
@@ -566,11 +590,33 @@ function WorkspaceList({ org, showToast, onOpen, onBack }) {
         : html`<div class="pj-ws-list">
           ${list.map(w => html`
             <div class="pj-ws-card" key=${w.id}>
-              <button class="pj-ws-open" onClick=${() => onOpen(w.id)}>
-                <span class="pj-ws-card-name">${escHtml(w.name || w.id)}</span>
-                ${w.createdAt ? html`<span class="pj-ws-card-meta">${dt(w.createdAt)}</span>` : null}
-              </button>
-              <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => remove(w.id, w.name || w.id)}>✕</button>
+              ${w.access === 'none' ? html`
+                <div class="pj-ws-open pj-ws-locked">
+                  <span class="pj-ws-card-name">${'🔒 '}${escHtml(w.name || w.id)}</span>
+                  <span class="pj-ws-card-meta">${(t('organisms.byCreator') || 'by {creator}').replace('{creator}', w.created_by || '?')}</span>
+                </div>
+                <button class="btn-outline btn-sm" disabled=${busy} onClick=${() => requestAccess(w)}>${t('organisms.requestAccess') || 'Request access'}</button>
+              ` : html`
+                <button class="pj-ws-open" onClick=${() => onOpen(w.id)}>
+                  <span class="pj-ws-card-name">${escHtml(w.name || w.id)}</span>
+                  <span class="pj-ws-card-meta">${w.access === 'owner' ? (t('organisms.yours') || 'yours') : (t('organisms.byCreator') || 'by {creator}').replace('{creator}', w.created_by || '?')}${w.created_at ? ' · ' + dt(w.created_at) : ''}</span>
+                </button>
+                ${w.access === 'owner' ? html`
+                  <button class="pj-icon-btn" title=${t('organisms.requests') || 'Access requests'} onClick=${() => toggleInbox(w)}>👥</button>
+                  <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => remove(w.id, w.name || w.id)}>✕</button>
+                ` : null}
+              `}
+              ${openReqWs === w.id ? html`
+                <div class="pj-ws-inbox">
+                  ${reqInbox.length === 0 ? html`<div class="pj-ws-inbox-empty">${t('organisms.noRequests') || 'No access requests.'}</div>`
+                    : reqInbox.map(r => html`
+                      <div class="pj-ws-req" key=${r.requester}>
+                        <span class="pj-ws-req-who">${escHtml(r.requester)}${r.message ? html` <span class="pj-ws-req-msg">— ${escHtml(r.message)}</span>` : null}</span>
+                        ${r.status === 'approved'
+                          ? html`<span class="pj-ws-req-ok">✓ ${t('organisms.approved') || 'approved'}</span><button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.revoke') || 'Revoke'}</button>`
+                          : html`<button class="btn-success btn-sm" disabled=${busy} onClick=${() => decide(w, r.requester, 'approve')}>${t('organisms.approve') || 'Approve'}</button><button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.deny') || 'Deny'}</button>`}
+                      </div>`)}
+                </div>` : null}
             </div>`)}
         </div>`}
     </div>`;

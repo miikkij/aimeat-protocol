@@ -18,8 +18,12 @@
  *   v1.1.0 -- 2026-06-08 -- write_draft coerces a JSON-stringified value (clients stringify untyped
  *     object params); add _delete (retract an object) and _create (bootstrap a workspace from a
  *     custom manifest + per-namespace schemas, locked under the owner GHII).
+ *   v1.2.0 -- 2026-06-08 -- Per-workspace access: _request_access / _list_requests / _approve_access
+ *     (consent-backed, creator-controlled). _read now aggregates across member identities + the
+ *     consent guard, so a granted member reads a shared workspace over MCP.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
@@ -27,6 +31,7 @@ import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
+import { authorizeRead } from '../services/access-guard.js';
 
 type ObjType = { name: string; namespace?: string; backing?: string; mode?: string };
 type Manifest = { objectTypes?: ObjType[] } & Record<string, unknown>;
@@ -80,6 +85,33 @@ export function registerWorkspaceTools(
         });
     };
 
+    // ── workspace-access helpers (shared with the GET/POST workspace-access routes) ──
+    const bareOwner = (gaii: string) => (gaii.includes('#') ? gaii.split('#')[1] : gaii).split('@')[0];
+    /** Find a workspace's registry entry across every member's registry. */
+    const findWsEntry = async (orgId: string, ws: string): Promise<{ createdBy: string; ownerGaii: string } | null> => {
+        const regKey = `organism.${orgId}.meta.workspaces`;
+        const { items } = await storage.listAllMemory({ prefix: regKey, limit: 1000 });
+        for (const rec of items) {
+            if (rec.key !== regKey) continue;
+            const list = (rec.value as { workspaces?: Array<{ id: string; createdBy?: string }> } | null)?.workspaces ?? [];
+            const entry = list.find(w => w.id === ws);
+            if (entry) return { createdBy: entry.createdBy ?? bareOwner(rec.ownerGaii), ownerGaii: rec.ownerGaii };
+        }
+        return null;
+    };
+    /** Active membership role of the agent's owner in an org, or null. */
+    const roleOf = async (orgId: string): Promise<string | null> => {
+        const m = await storage.getMembership(orgId, ownerName);
+        return m && m.status === 'active' ? m.role : null;
+    };
+    /** Create a consent grant if no equivalent active one exists (idempotent). */
+    const ensureConsent = async (owner: string, dataPattern: string, recipient: string, purpose: string): Promise<void> => {
+        const existing = await storage.listConsents(owner, { status: 'active' });
+        if (existing.some(c => c.dataPattern === dataPattern && c.recipient === recipient)) return;
+        const now = new Date().toISOString();
+        await storage.createConsent({ id: randomUUID(), ownerGaii: owner, dataPattern, recipient, purpose, scope: 'private', expires: null, status: 'active', grantedAt: now, revokedAt: null });
+    };
+
     // ── aimeat_workspace_list ──
     mcp.tool('aimeat_workspace_list', descriptionFor('aimeat_workspace_list'),
         { organism_id: z.string().describe('Organism id') },
@@ -98,11 +130,18 @@ export function registerWorkspaceTools(
         async ({ organism_id, ws }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const root = wsRoot(organism_id, ws);
-            const man = await storage.getMemory(ownerGhii, `${root}.meta.manifest`);
-            if (!man) return fail(`No manifest at ${root}.meta.manifest — empty workspace or wrong ws id.`);
-            const manifest = man.value as Manifest;
+            // Aggregate across all member identities, then access-filter: own records pass; others go
+            // through the consent guard (so a member who was granted access reads the shared workspace).
             const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 5000 });
-            const mine = items.filter(r => r.ownerGaii === ownerGhii);
+            const mine: MemoryRecord[] = [];
+            for (const r of items) {
+                if (r.ownerGaii === ownerGhii) { mine.push(r); continue; }
+                const d = await authorizeRead(storage, config, { ownerGaii: r.ownerGaii, accessorGaii: ownerGhii, resourceKey: r.key, visibility: r.visibility, groupId: r.groupId, action: 'read' });
+                if (d.allowed) mine.push(r);
+            }
+            const manRec = mine.find(r => r.key === `${root}.meta.manifest`);
+            if (!manRec) return fail(`No manifest at ${root}.meta.manifest — empty workspace, wrong ws id, or no access (request access with aimeat_workspace_request_access).`);
+            const manifest = manRec.value as Manifest;
             const objects: Record<string, unknown[]> = {};
             const drafts: Record<string, unknown[]> = {};
             for (const ot of manifest.objectTypes ?? []) {
@@ -281,7 +320,64 @@ export function registerWorkspaceTools(
             const regKey = `organism.${organism_id}.meta.workspaces`;
             const regRec = await storage.getMemory(ownerGhii, regKey);
             const workspaces = ((regRec?.value as { workspaces?: unknown[] } | undefined)?.workspaces) ?? [];
-            await writeRecord(regKey, { workspaces: [...workspaces, { id: wsId, name: String(name || 'Workspace').trim() || 'Workspace', createdAt: now }] }, regRec);
+            await writeRecord(regKey, { workspaces: [...workspaces, { id: wsId, name: String(name || 'Workspace').trim() || 'Workspace', createdAt: now, createdBy: ownerName }] }, regRec);
             return ok({ created: true, ws: wsId, types: man.objectTypes.map(o => o.name), schemas_locked: Object.keys(schemaMap) });
+        });
+
+    // ── aimeat_workspace_request_access ──
+    mcp.tool('aimeat_workspace_request_access', descriptionFor('aimeat_workspace_request_access'),
+        { organism_id: z.string(), ws: z.string(), message: z.string().optional() },
+        annotationsFor('aimeat_workspace_request_access'),
+        async ({ organism_id, ws, message }): Promise<TextResult> => {
+            const deny = await denyReason(organism_id); if (deny) return fail(deny);
+            const entry = await findWsEntry(organism_id, ws);
+            if (!entry) return fail('Workspace not found');
+            if (entry.createdBy === ownerName) return fail('You created this workspace.');
+            await writeRecord(`organism.${organism_id}.w.${ws}.access.request.${ownerName}`, { ws, requester: ownerName, requester_gaii: ownerGhii, message: message ?? '', status: 'pending', createdAt: new Date().toISOString() }, null);
+            await ensureConsent(ownerGhii, `organism.${organism_id}.w.${ws}.**`, `organism.${organism_id}`, 'workspace-contribution');
+            return ok({ status: 'requested', ws, workspace_creator: entry.createdBy });
+        });
+
+    // ── aimeat_workspace_list_requests ──
+    mcp.tool('aimeat_workspace_list_requests', descriptionFor('aimeat_workspace_list_requests'),
+        { organism_id: z.string(), ws: z.string() },
+        annotationsFor('aimeat_workspace_list_requests'),
+        async ({ organism_id, ws }): Promise<TextResult> => {
+            const deny = await denyReason(organism_id); if (deny) return fail(deny);
+            const entry = await findWsEntry(organism_id, ws);
+            if (!entry) return fail('Workspace not found');
+            const role = await roleOf(organism_id);
+            if (entry.createdBy !== ownerName && role !== 'creator' && role !== 'admin') return fail('Only the workspace creator or an org admin can see access requests.');
+            const creatorGhii = `${entry.createdBy}@${config.nodeId}`;
+            const grants = (await storage.listConsents(creatorGhii, { status: 'active' })).filter(c => c.dataPattern === `organism.${organism_id}.w.${ws}.**` && c.purpose === 'workspace-access');
+            const approved = new Set(grants.map(c => c.recipient));
+            const { items } = await storage.listAllMemory({ prefix: `organism.${organism_id}.w.${ws}.access.request.`, limit: 1000 });
+            const requests = items.map(r => {
+                const v = r.value as { requester?: string; message?: string; createdAt?: string };
+                const requester = v.requester ?? bareOwner(r.ownerGaii);
+                return { requester, message: v.message ?? '', created_at: v.createdAt, status: approved.has(`ghii:${requester}@${config.nodeId}`) ? 'approved' : 'pending' };
+            });
+            return ok({ ws, requests });
+        });
+
+    // ── aimeat_workspace_approve_access ──
+    mcp.tool('aimeat_workspace_approve_access', descriptionFor('aimeat_workspace_approve_access'),
+        { organism_id: z.string(), ws: z.string(), requester: z.string(), decision: z.string().optional() },
+        annotationsFor('aimeat_workspace_approve_access'),
+        async ({ organism_id, ws, requester, decision }): Promise<TextResult> => {
+            const deny = await denyReason(organism_id); if (deny) return fail(deny);
+            const entry = await findWsEntry(organism_id, ws);
+            if (!entry) return fail('Workspace not found');
+            const role = await roleOf(organism_id);
+            if (entry.createdBy !== ownerName && role !== 'creator' && role !== 'admin') return fail('Only the workspace creator or an org admin can decide access.');
+            const recipient = `ghii:${requester}@${config.nodeId}`;
+            const pattern = `organism.${organism_id}.w.${ws}.**`;
+            if (decision === 'deny') {
+                const grants = (await storage.listConsents(ownerGhii, { status: 'active' })).filter(c => c.dataPattern === pattern && c.recipient === recipient && c.purpose === 'workspace-access');
+                for (const g of grants) await storage.updateConsent(g.id, { status: 'revoked', revokedAt: new Date().toISOString() });
+                return ok({ status: 'denied', ws, requester });
+            }
+            await ensureConsent(ownerGhii, pattern, recipient, 'workspace-access');
+            return ok({ status: 'approved', ws, requester });
         });
 }

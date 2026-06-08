@@ -254,6 +254,32 @@ await test('14. the locked schema validates new drafts (valid passes, invalid re
     assert(badDraft.result.isError === true, 'invalid draft rejected by the locked schema');
 });
 
+// ── Cross-member access over MCP: B discovers → requests → A approves → B reads ──
+await test('15. owner 2 joins owner 1\'s bootstrapped org', async () => {
+    const j = await json(`/v1/organisms/${bootOrgId}/join`, { method: 'POST', headers: { Authorization: `Bearer ${B.ownerToken}` }, body: '{}' });
+    assert(j.status === 200 || j.status === 201, `join ${j.status}: ${JSON.stringify(j.body.error)}`);
+});
+
+await test('16. B cannot read the workspace before approval', async () => {
+    const b = await B.client.call('aimeat_workspace_read', { organism_id: bootOrgId, ws: bootWs.id }, 116);
+    assert(b.result.isError === true, 'denied before access is granted');
+});
+
+await test('17. B requests access; A sees it and approves (all over MCP)', async () => {
+    const rq = await B.client.call('aimeat_workspace_request_access', { organism_id: bootOrgId, ws: bootWs.id, message: 'let me help' }, 117);
+    assert(rq.result.isError !== true, `request: ${rq.result.content?.[0]?.text}`);
+    const ls = await A.client.call('aimeat_workspace_list_requests', { organism_id: bootOrgId, ws: bootWs.id }, 1171);
+    assert((JSON.parse(ls.result.content[0].text).requests || []).some((r: any) => r.requester === B.ownerName && r.status === 'pending'), 'A sees B pending');
+    const ap = await A.client.call('aimeat_workspace_approve_access', { organism_id: bootOrgId, ws: bootWs.id, requester: B.ownerName, decision: 'approve' }, 1172);
+    assert(JSON.parse(ap.result.content[0].text).status === 'approved', 'approved');
+});
+
+await test('18. B can now read the shared workspace over MCP', async () => {
+    const b = await B.client.call('aimeat_workspace_read', { organism_id: bootOrgId, ws: bootWs.id }, 118);
+    assert(b.result.isError !== true, `read after approval: ${b.result.content?.[0]?.text}`);
+    assert(JSON.parse(b.result.content[0].text).manifest?.name === 'Bootstrapped', 'manifest readable after approval');
+});
+
 await test('Cleanup owner 1', async () => { const r = await json(`/v1/owners/${A.ownerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${A.ownerToken}` } }); assert(r.status === 200, `del ${r.status}`); });
 await test('Cleanup owner 2', async () => { const r = await json(`/v1/owners/${B.ownerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${B.ownerToken}` } }); assert(r.status === 200, `del ${r.status}`); });
 

@@ -1019,6 +1019,39 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_workspace_request_access',
+        description: 'Request access to a workspace you can see but cannot read. Organism membership lets you DISCOVER workspaces (names + who made each), but a workspace\'s CONTENT is gated by its creator. This files a request the creator approves (aimeat_workspace_approve_access). Member-only.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            ws: { type: 'string', required: true, description: 'Workspace id to request access to.' },
+            message: { type: 'string', description: 'Optional note to the workspace creator.' },
+        },
+    },
+    {
+        name: 'aimeat_workspace_list_requests',
+        description: 'List the access requests for a workspace YOU created (or you are an org admin) — who has asked, and whether they are pending or approved. Use before aimeat_workspace_approve_access.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            ws: { type: 'string', required: true, description: 'Workspace id you created.' },
+        },
+    },
+    {
+        name: 'aimeat_workspace_approve_access',
+        description: 'Approve or deny a member\'s request to access a workspace YOU created (or you are an org admin). Approve grants the requester read access to the workspace content (a consent grant); deny revokes it. You control who collaborates on your workspace.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            ws: { type: 'string', required: true, description: 'Workspace id you created.' },
+            requester: { type: 'string', required: true, description: "The requesting member's owner name (from aimeat_workspace_list_requests)." },
+            decision: { type: 'string', description: "'approve' (default) or 'deny'." },
+        },
+    },
+    {
         name: 'aimeat_wallet_transactions',
         description: 'View recent morsel transactions for your owner\'s wallet (id, type, amount, counterparty, tracking code, timestamp; default 20, max 200). Transactions are keyed to the owner GHII, shared across agents. For the current balance/escrow snapshot use aimeat_wallet_balance.',
         caller: 'agent',

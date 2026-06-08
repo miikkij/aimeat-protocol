@@ -361,11 +361,42 @@ export async function saveWorkspaceRegistry(orgId, workspaces) {
   return apiPost('/v1/memory', { key: `organism.${orgId}.meta.workspaces`, value: { workspaces }, visibility: 'private' });
 }
 
+/* ── Workspace access (per-workspace, creator-controlled, consent-backed) ──
+ * Organism membership lets you DISCOVER every workspace (names + creator + your access status);
+ * reading a workspace's content needs the creator's approval. ── */
+
+/** Discover all workspaces in the org with your access status ('owner' | 'granted' | 'none'). */
+export async function discoverWorkspaces(orgId) {
+  try {
+    const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspaces`);
+    return Array.isArray(resp?.data?.workspaces) ? resp.data.workspaces : [];
+  } catch { return []; }
+}
+
+/** Request access to a workspace you can see but not read. */
+export async function requestWorkspaceAccess(orgId, ws, message) {
+  return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access`, { ws, message: message || '' });
+}
+
+/** List access requests for a workspace you created (creator/admin only). */
+export async function listWorkspaceRequests(orgId, ws) {
+  try {
+    const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access?ws=${encodeURIComponent(ws)}`);
+    return Array.isArray(resp?.data?.requests) ? resp.data.requests : [];
+  } catch { return []; }
+}
+
+/** Approve or deny a member's access request to your workspace. */
+export async function decideWorkspaceAccess(orgId, ws, requester, decision) {
+  return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access/decision`, { ws, requester, decision });
+}
+
 /** Create a new (empty) workspace: register it, return its { id, name }. The manifest is written
  *  later by setup/generate. */
 export async function createWorkspace(orgId, name) {
   const id = 'ws-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-  const entry = { id, name: String(name || '').trim() || 'Workspace', createdAt: new Date().toISOString() };
+  const createdBy = (currentGhii().split('@')[0]) || '';   // bare owner name — who controls this workspace's access
+  const entry = { id, name: String(name || '').trim() || 'Workspace', createdAt: new Date().toISOString(), createdBy };
   const list = await listWorkspaces(orgId);
   await saveWorkspaceRegistry(orgId, [...list, entry]);
   return entry;

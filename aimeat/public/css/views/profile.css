@@ -2064,7 +2064,15 @@
 .pj-ws-bar { display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0 0.75rem; }
 .pj-ws-name-input { flex: 0 1 260px; }
 .pj-ws-list { display: flex; flex-direction: column; gap: 0.4rem; }
-.pj-ws-card { display: flex; align-items: center; gap: 0.5rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.1rem 0.5rem 0.1rem 0.1rem; box-shadow: var(--shadow-sm); }
+.pj-ws-card { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.1rem 0.5rem 0.1rem 0.1rem; box-shadow: var(--shadow-sm); }
+.pj-ws-locked { cursor: default; }
+.pj-ws-locked:hover { background: none; }
+.pj-ws-inbox { flex-basis: 100%; width: 100%; border-top: 1px solid var(--border-subtle); margin: 0.1rem 0.3rem 0.4rem; padding-top: 0.45rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.pj-ws-inbox-empty { font-size: 0.8rem; color: var(--muted); padding-left: 0.3rem; }
+.pj-ws-req { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; padding-left: 0.3rem; }
+.pj-ws-req-who { flex: 1; color: var(--text); }
+.pj-ws-req-msg { color: var(--muted); }
+.pj-ws-req-ok { color: var(--accent); font-size: 0.8rem; }
 .pj-ws-open { flex: 1; display: flex; align-items: baseline; gap: 0.6rem; background: none; border: none; cursor: pointer; text-align: left; padding: 0.7rem 0.85rem; border-radius: 10px; }
 .pj-ws-open:hover { background: var(--bg-surface); }
 .pj-ws-card-name { font-weight: 600; font-size: 0.95rem; color: var(--text); }

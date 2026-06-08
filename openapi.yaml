@@ -10987,6 +10987,94 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/organisms/{id}/workspaces:
+    get:
+      operationId: discoverOrganismWorkspaces
+      summary: Discover every workspace in an organism (membership-gated)
+      description: |
+        Lists all workspaces in the organism — aggregated across every member's registry
+        (`organism.{id}.meta.workspaces`) — with each workspace's name, creator, and the caller's
+        access status (`owner` | `granted` | `none`). Organism membership lets you SEE the list;
+        reading a workspace's CONTENT is gated by the workspace creator (see workspace-access).
+      tags: [Organisms]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+      responses:
+        '200':
+          description: Workspaces with the caller's per-workspace access status
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/workspace-access:
+    get:
+      operationId: listWorkspaceAccessRequests
+      summary: List access requests for a workspace you created
+      description: The workspace creator (or an org admin) lists who has requested access and whether each is pending or approved.
+      tags: [Organisms]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id you created }
+      responses:
+        '200': { description: The workspace's access requests }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      operationId: requestWorkspaceAccess
+      summary: Request access to a workspace
+      description: |
+        An organism member requests access to a workspace they can discover but not read. Records the
+        request and grants the requester's own future contributions to the organism (so once approved
+        their additions are visible). The workspace creator approves via workspace-access/decision.
+      tags: [Organisms]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ws]
+              properties:
+                ws: { type: string, description: Workspace id to request access to }
+                message: { type: string, description: Optional note to the workspace creator }
+      responses:
+        '201': { description: Request recorded }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/workspace-access/decision:
+    post:
+      operationId: decideWorkspaceAccess
+      summary: Approve or deny a workspace access request
+      description: |
+        The workspace creator (or an org admin) approves or denies a member's request. Approve creates
+        a consent grant giving the requester read access to the workspace content; deny revokes it.
+      tags: [Organisms]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ws, requester, decision]
+              properties:
+                ws: { type: string, description: Workspace id you created }
+                requester: { type: string, description: The requesting member's owner name }
+                decision: { type: string, enum: [approve, deny], description: Approve grants access; deny revokes it }
+      responses:
+        '200': { description: Decision applied }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/organisms/{id}/publish:
     post:
       operationId: publishOrganismDraft
