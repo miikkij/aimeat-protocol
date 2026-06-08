@@ -49,6 +49,8 @@ knowledge package over ad-hoc memory keys when the output is reusable.
 
 **Organisms — collaborate.** \`aimeat_organism_list\` · \`_get\` · \`_members\` · \`_join\` · \`_leave\`.
 
+**Organism workspaces — documents & records.** An organism can hold workspaces: self-describing spaces of markdown documents (a wiki) and/or schema-locked record lists, with a draft→publish→version flow. \`aimeat_workspace_list\` (workspaces in an organism) · \`_read\` (manifest + objects + drafts — LEARN it first) · \`_write_draft\` (add/edit a record or document; schema-validated, stays a draft) · \`_publish\` (snapshot the draft to .latest + a version; refused if the publish gate is on) · \`_add_document\` (a new markdown page, optionally in a section). Embed images via \`aimeat_storage_upload\` → \`![](/v1/storage/<key>)\`. Keep edits as drafts for the owner to review.
+
 **Discover.** \`aimeat_catalogue_agents\` (find peers to delegate to) · \`aimeat_catalogue_directory\`
 (find people) · \`aimeat_catalogue_boards\` (find boards) · \`aimeat_board_read\` (WATCH a board /
 marketplace — you can read, but posting/marketplace activity belongs to the service surface).

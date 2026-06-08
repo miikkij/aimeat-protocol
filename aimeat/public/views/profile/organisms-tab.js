@@ -36,6 +36,9 @@
  *     (SchemaForm pre-filled, gated on schema load so it seeds) + click-to-expand field view
  *     (KeyValueRow); published records expand too. "+ Space" surfaced in the workspace bar (was
  *     Settings-only) with an inline document/records add form.
+ *   v1.8.0 — 2026-06-08 — "AI access prompt" buttons (For chat / For coding agent) copy a ready
+ *     prompt teaching an AI how to access + use THIS workspace (full schema inlined) — bridges the
+ *     MCP discovery gap. See orgService.buildAccessPrompt.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -874,6 +877,16 @@ function Workspace({ org, wsId, showToast, onBack }) {
     );
   }, [ws, orgId, confirm, showToast, load]);
 
+  // Copy a ready prompt that teaches an AI/agent how to access + use THIS workspace (the MCP gap
+  // bridge). 'human' = paste into a chat; 'agent' = imperative, assumes tool access.
+  const copyAccessPrompt = useCallback(async (variant) => {
+    try {
+      const text = await orgService.buildAccessPrompt(orgId, org.name, wsId, ws, variant);
+      await copyToClipboard(text);
+      showToast(t('organisms.promptCopied') || 'Access prompt copied — paste it to your AI.');
+    } catch (e) { showToast((e && e.message) || 'Failed to build prompt'); }
+  }, [orgId, org, wsId, ws, showToast]);
+
   // The AI / paste generator — reused for a fresh workspace AND for "restructure" (where, via
   // showRegenerate, generate/copyPrompt pass the current manifest so the AI EXTENDS it additively).
   const renderGenerator = () => html`
@@ -1058,6 +1071,11 @@ function Workspace({ org, wsId, showToast, onBack }) {
       <div class="pj-gate">
         <button class="btn-outline btn-sm" onClick=${() => setShowSettings(s => !s)}>${'⚙ '}${t('organisms.settings') || 'Settings'}</button>
         <button class="btn-outline btn-sm" onClick=${() => setShowSpaces(s => !s)}>${'+ '}${t('organisms.addSpaceBtn') || 'Space'}</button>
+        <span class="pj-ai-prompt">
+          <span class="pj-ai-prompt-label">${'🤖 '}${t('organisms.aiPrompt') || 'AI access prompt:'}</span>
+          <button class="btn-ghost btn-sm" onClick=${() => copyAccessPrompt('human')}>${t('organisms.aiPromptHuman') || 'For chat'}</button>
+          <button class="btn-ghost btn-sm" onClick=${() => copyAccessPrompt('agent')}>${t('organisms.aiPromptAgent') || 'For coding agent'}</button>
+        </span>
         <label class="pj-gate-label">
           <input type="checkbox" checked=${gateOn} onChange=${toggleGate} disabled=${busy} />
           ${' '}${t('organisms.publishGate') || 'Require review before publishing'}

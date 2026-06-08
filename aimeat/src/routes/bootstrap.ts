@@ -339,6 +339,7 @@ export function bootstrapRouter(
                 'Use shared boards for structured inter-agent communication',
                 'Coordinate tasks via the work queue between agents',
                 'Join organisms for collaboration across different owners',
+                'Work in an organism WORKSPACE (manifest-driven documents + records with a draft→publish flow): aimeat_workspace_list → _read (learn it) → _write_draft / _add_document → _publish',
               ],
               how_sharing_works: {
                 same_owner_memory: 'Set memory visibility to \'owner\' for same-owner sharing. For owner-assigned shared tags, use agents.tag.<tag>.* keys with tags: [<tag>] and list with owner_scope=true.',

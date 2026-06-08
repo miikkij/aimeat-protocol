@@ -46,6 +46,7 @@ const ALL_SUITES = [
     'test/e2e-mcp-extensions.ts',
     'test/e2e-mcp-knowledge.ts',
     'test/e2e-mcp-organisms.ts',
+    'test/e2e-mcp-workspaces.ts',
     'test/e2e-mcp-catalogue.ts',
     'test/e2e-mcp-memory-extended.ts',
     'test/e2e-mcp-wallet-extended.ts',

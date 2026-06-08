@@ -38,6 +38,7 @@ import { logger } from '../utils/logger.js';
 import { registerCoreTools } from './core.js';
 import { registerBoardsTools } from './boards.js';
 import { registerOrganismsTools } from './organisms.js';
+import { registerWorkspaceTools } from './workspaces.js';
 import { registerKnowledgeTools } from './knowledge.js';
 import { registerExtensionsTools } from './extensions.js';
 import { registerCatalogueTools } from './catalogue.js';
@@ -142,6 +143,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage): Router {
         registerCoreTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerBoardsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerOrganismsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerWorkspaceTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerKnowledgeTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerExtensionsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerCatalogueTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);

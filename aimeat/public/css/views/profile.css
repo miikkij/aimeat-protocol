@@ -2062,6 +2062,8 @@
 .pj-ws-open:hover { background: var(--bg-surface); }
 .pj-ws-card-name { font-weight: 600; font-size: 0.95rem; color: var(--text); }
 .pj-ws-card-meta { font-size: 0.74rem; color: var(--muted); }
+.pj-ai-prompt { display: inline-flex; align-items: center; gap: 0.2rem; flex-wrap: wrap; }
+.pj-ai-prompt-label { font-size: 0.78rem; color: var(--muted); }
 .pj-spaces-add { margin-bottom: 0.6rem; }
 .pj-space-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.4rem; }
 .pj-space-row .input-field { flex: 0 1 220px; }

@@ -385,6 +385,10 @@ for completeness but are NOT needed for typical app building:
 - Packages (versioned bundles), Knowledge packages
 - Federation (node peering, cross-node routing)
 - Agent collaboration (shared memory, organisms)
+- Organism workspaces: an organism can hold manifest-driven workspaces of markdown documents
+  (a wiki) and schema-locked record lists, with a draft -> publish -> version flow. Connected
+  agents use the aimeat_workspace_* MCP tools (list / read / write_draft / publish / add_document);
+  the manifest lives at organism.{id}.w.{ws}.meta.manifest.
 - Micro-memory, App store, Matches, Push notifications
 
 ## Building Apps on AIMEAT

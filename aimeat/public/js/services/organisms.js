@@ -376,6 +376,123 @@ function slug(name) {
   return String(name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'item';
 }
 
+// ── Access prompt: a copy-paste prompt teaching an AI/agent how to use THIS workspace ──
+// Bridges the MCP gap (no workspace-aware tools yet) by injecting the real structure + the exact
+// conventions. Two variants: 'human' (paste into a chat) and 'agent' (imperative, assumes tools).
+
+/** Format one objectType's full schema for the prompt's STRUCTURE block. */
+function describeType(ot, schema) {
+  if (ot.mode === 'document') {
+    return `• ${ot.name} (document) — namespace "${ot.namespace}". Free-form markdown pages { id, title, markdown }, organised into sections (read organism.{id}.w.{ws}.meta.sections.${ot.name}).`;
+  }
+  const props = (schema && schema.properties) || {};
+  const req = new Set((schema && schema.required) || []);
+  const fields = Object.entries(props).map(([k, d]) => {
+    const bits = [d.type || 'string'];
+    if (req.has(k)) bits.push('required');
+    if (Array.isArray(d.enum)) bits.push('enum: ' + d.enum.join(' | '));
+    if (d.type === 'array' && d.items?.type) bits.push('of ' + d.items.type);
+    return `    - ${k} (${bits.join(', ')})`;
+  });
+  return `• ${ot.name} (records) — namespace "${ot.namespace}", writeRole ${ot.writeRole || 'member'}. Fields:\n${fields.join('\n') || '    (no schema)'}`;
+}
+
+/** Build the workspace-access prompt for an AI/agent. variant: 'human' | 'agent'. Async — fetches
+ *  each records-type's schema so the FULL field list is inlined. */
+export async function buildAccessPrompt(orgId, orgName, wsId, ws, variant = 'human') {
+  const nodeUrl = window.location.origin;
+  const m = ws?.manifest || {};
+  const wsName = m.name || wsId;
+  const types = (m.objectTypes || []).filter(ot => ot.backing === 'memory');
+  const described = [];
+  for (const ot of types) {
+    // records is the default mode (mode may be undefined) — fetch the schema unless it's a document.
+    const schema = ot.mode !== 'document' ? await getObjectSchema(orgId, wsId, ot.namespace).catch(() => null) : null;
+    described.push(describeType(ot, schema));
+  }
+  const structure = described.join('\n') || '(no spaces declared yet)';
+
+  const access = [
+    `- Read the manifest:   aimeat_memory_read key="organism.${orgId}.w.${wsId}.meta.manifest"`,
+    `- List everything:     aimeat_memory_list prefix="organism.${orgId}.w.${wsId}." limit=500`,
+    `    (keys end in .draft = working copy, .latest = published, .version.N = history)`,
+    `- Document sections:   aimeat_memory_read key="organism.${orgId}.w.${wsId}.meta.sections.{type}"`,
+    `- Write/refresh a draft: aimeat_memory_write key="organism.${orgId}.w.${wsId}.{namespace}.{id}.draft" value={...}`,
+    `- Attach a file/screenshot: aimeat_storage_upload key="organism.${orgId}.w.${wsId}.img.{name}"`,
+    `    then embed it in a document's markdown as  ![alt](/v1/storage/<returned key>)`,
+    `- Publish a draft:     POST ${nodeUrl}/v1/organisms/${orgId}/publish   body { "ws":"${wsId}", "namespace":"...", "id":"..." }`,
+    `    (snapshots .version.N + .latest, consumes the draft; may require operator approval if the publish gate is on)`,
+  ].join('\n');
+
+  const intents = [
+    `  (a) Status update — read .latest, refresh a status document, publish it.`,
+    `  (b) Manage tasks / deliverables — add or edit drafts in a records space, publish when ready.`,
+    `  (c) Be a coding agent — pull specs + tasks from here, implement them, then update the task`,
+    `      records' status + the related documents + the status page as you go.`,
+  ].join('\n');
+
+  if (variant === 'agent') {
+    return [
+      `TASK: operate an AIMEAT organism workspace. Connect, learn it, interview the operator, then act.`,
+      ``,
+      `CONNECTION`,
+      `- Node: ${nodeUrl}`,
+      `- Organism: "${orgName || orgId}"  id: ${orgId}`,
+      `- Workspace: "${wsName}"  ws: ${wsId}`,
+      `- Use the AIMEAT MCP tools (aimeat_memory_*, aimeat_storage_*) + the REST publish endpoint below.`,
+      `  If AIMEAT tools are unavailable, STOP and report — do not invent data.`,
+      ``,
+      `STEP 1 — LEARN (do before acting; then summarise the structure back):`,
+      access,
+      ``,
+      `STRUCTURE (objectTypes — full schema):`,
+      structure,
+      ``,
+      `STEP 2 — INTERVIEW the operator (ask, don't assume) which of:`,
+      intents,
+      `  Get specifics: which space, what to change, definition of done.`,
+      ``,
+      `STEP 3 — ACT (only after the operator confirms). Records: validate against the schema above`,
+      `before writing. Keep edits as DRAFTS unless told to publish. The status page is just a document —`,
+      `rewrite its markdown and publish.`,
+      ``,
+      `RULES: never publish without the operator's OK unless told to run autonomously; re-read .latest`,
+      `before overwriting (avoid clobbering a newer update); report which keys you wrote and what changed.`,
+    ].join('\n');
+  }
+
+  return [
+    `I'm using an AIMEAT organism workspace and I'd like your help with it. First LEARN its structure,`,
+    `then ASK me what I want to do, then help me do it.`,
+    ``,
+    `CONNECTION`,
+    `- Node: ${nodeUrl}`,
+    `- Organism: "${orgName || orgId}"  (id: ${orgId})`,
+    `- Workspace: "${wsName}"  (ws: ${wsId})`,
+    `If you're connected to AIMEAT (its MCP tools), you can read and write this workspace directly.`,
+    `If you're not connected, tell me and I'll paste content back and forth manually.`,
+    ``,
+    `WHAT THIS IS`,
+    `A workspace is a set of "spaces". Each space is either a DOCUMENT space (a free-form wiki: markdown`,
+    `pages in sections) or a RECORDS space (a schema-locked list, like a form). Items have a working`,
+    `DRAFT and, once published, a LATEST version (with history).`,
+    ``,
+    `STRUCTURE (read this back to me so I know you understand it):`,
+    structure,
+    ``,
+    `HOW TO ACCESS IT (AIMEAT MCP + REST):`,
+    access,
+    ``,
+    `WHAT I MIGHT WANT (ask me which):`,
+    intents,
+    ``,
+    `RULES: keep changes as drafts so I can review; don't publish without my OK; re-read .latest before`,
+    `overwriting so you don't clobber a newer update; tell me which keys you wrote and what changed.`,
+    ``,
+    `Start by reading the manifest + structure, then ask me which of (a)/(b)/(c) and the specifics.`,
+  ].join('\n');
+}
+
 /** Manually add an object type to the manifest (no AI). mode 'document' needs no schema;
  *  'records' gets a starter {id,title} schema that can be refined later via Restructure. */
 export async function addSpace(orgId, wsId, manifest, name, mode) {

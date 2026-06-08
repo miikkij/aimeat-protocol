@@ -19,6 +19,8 @@
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
  *   v1.0.0 -- 2026-05-30 -- MCP audit v2 S1: purpose-scoped surface allowlists
+ *   v1.1.0 -- 2026-06-08 -- Organism workspaces: add aimeat_workspace_* (list/read/write_draft/
+ *     publish/add_document) to appdev/agent/service; also add the organism tools to appdev.
  */
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
 
@@ -43,6 +45,8 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_extension_install', 'aimeat_extension_invoke', 'aimeat_extension_get', 'aimeat_extension_list',
         'aimeat_extension_activate', 'aimeat_extension_deactivate', 'aimeat_extension_delete',
         'aimeat_cortex_install', 'aimeat_cortex_activate', 'aimeat_cortex_deactivate', 'aimeat_cortex_list', 'aimeat_cortex_delete',
+        'aimeat_organism_list', 'aimeat_organism_get', 'aimeat_organism_members', 'aimeat_organism_join', 'aimeat_organism_leave',
+        'aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_write_draft', 'aimeat_workspace_publish', 'aimeat_workspace_add_document',
         'aimeat_handbook_get',
     ],
     agent: [
@@ -58,6 +62,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_knowledge_list', 'aimeat_knowledge_get', 'aimeat_knowledge_contribute', 'aimeat_knowledge_links',
         'aimeat_capabilities_list', 'aimeat_capabilities_get', 'aimeat_capabilities_invoke',
         'aimeat_organism_list', 'aimeat_organism_get', 'aimeat_organism_members', 'aimeat_organism_join', 'aimeat_organism_leave',
+        'aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_write_draft', 'aimeat_workspace_publish', 'aimeat_workspace_add_document',
         'aimeat_catalogue_agents', 'aimeat_catalogue_directory', 'aimeat_catalogue_boards',
         'aimeat_board_read',
         'aimeat_agent_profile', 'aimeat_agent_activity', 'aimeat_agent_capabilities_report', 'aimeat_agent_telemetry_report', 'aimeat_agents_list',
@@ -78,6 +83,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_capabilities_list', 'aimeat_capabilities_get', 'aimeat_capabilities_invoke',
         'aimeat_capabilities_create', 'aimeat_capabilities_update', 'aimeat_capabilities_delete', 'aimeat_capabilities_vouch',
         'aimeat_organism_list', 'aimeat_organism_get', 'aimeat_organism_members', 'aimeat_organism_join', 'aimeat_organism_leave',
+        'aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_write_draft', 'aimeat_workspace_publish', 'aimeat_workspace_add_document',
         'aimeat_agent_profile', 'aimeat_agent_activity', 'aimeat_agent_capabilities_report', 'aimeat_agent_telemetry_report', 'aimeat_agents_list',
         'aimeat_onboarding_status', 'aimeat_onboarding_identify_platform', 'aimeat_onboarding_confirm_skill_installed',
         'aimeat_onboarding_confirm_directives_read', 'aimeat_onboarding_declare_services',
