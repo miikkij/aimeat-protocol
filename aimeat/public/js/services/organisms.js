@@ -412,6 +412,16 @@ function blobToBase64(blob) {
   });
 }
 
+/** Full data: URL (for immediate display in the editor before the storage upload finishes). */
+export function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+
 /** Upload an image blob to the organism's private storage. Returns a /v1/storage/<key> URL to
  *  embed in markdown; the document view resolves it with the session token (storage GET needs auth). */
 export async function uploadImage(orgId, blob, mime) {

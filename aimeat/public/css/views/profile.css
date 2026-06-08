@@ -2062,6 +2062,7 @@
 .pj-doc-toolbar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
 .pj-doc-vtitle { flex: 1; font-weight: 600; }
 .pj-tui { margin: 0.3rem 0 0.5rem; }
+.pj-doc-imgbar { margin: 0.3rem 0; }
 .md-wikilink { color: var(--accent); cursor: pointer; text-decoration: none; border-bottom: 1px dashed var(--accent); }
 .md-wikilink:hover { border-bottom-style: solid; }
 .md-img { max-width: 100%; height: auto; border-radius: 6px; }

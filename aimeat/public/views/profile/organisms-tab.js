@@ -1109,6 +1109,23 @@ function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
   const [md, setMd] = useState((page && page.markdown) || '');
   const containerRef = useRef(null);
   const editorRef = useRef(null);
+  const fileRef = useRef(null);
+  const imageMap = useRef({});                             // data: URL (shown in editor) → /v1/storage URL (saved)
+
+  // Show the image instantly via a data URL, upload to storage in the background, and remember the
+  // mapping so save() rewrites the data URL to the storage URL. If the upload fails, the image stays
+  // inline (still renders + saves, just larger) — so an image NEVER silently disappears.
+  const uploadAndMap = async (blob, dataUrl) => {
+    try { imageMap.current[dataUrl] = await orgService.uploadImage(orgId, blob, blob.type || 'image/png'); }
+    catch (e) { /* keep the inline data URL */ }
+  };
+  const insertFromFile = async (file) => {
+    if (!file) return;
+    const dataUrl = await orgService.blobToDataUrl(file);
+    if (mode === 'rich' && editorRef.current) editorRef.current.exec('addImage', { imageUrl: dataUrl, altText: file.name || 'image' });
+    else setMd((m) => m + `\n\n![${file.name || 'image'}](${dataUrl})\n`);
+    uploadAndMap(file, dataUrl);
+  };
 
   useEffect(() => {
     if (mode !== 'rich') return undefined;
@@ -1123,12 +1140,11 @@ function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
         initialValue: (page && page.markdown) || '',
         usageStatistics: false,
         hooks: {
-          // Drag/paste/insert an image → upload it to the organism's private storage and embed
-          // the /v1/storage URL. (It shows in the saved document VIEW, which fetches it with the
-          // session token; the editor preview can't auth, so it shows a placeholder until saved.)
+          // Paste/drag an image → insert it as a data URL (shows at once) + upload in the background.
           addImageBlobHook: async (blob, callback) => {
-            try { callback(await orgService.uploadImage(orgId, blob, blob.type || 'image/png'), ''); }
-            catch (e) { callback('', (e && e.message) || 'upload failed'); }
+            const dataUrl = await orgService.blobToDataUrl(blob);
+            callback(dataUrl, '');
+            uploadAndMap(blob, dataUrl);
           },
         },
       });
@@ -1137,15 +1153,20 @@ function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
     return () => { cancelled = true; if (inst) { try { inst.destroy(); } catch (e) { /* noop */ } } editorRef.current = null; };
   }, [mode]);
 
-  const save = () => onSave({
-    ...page, title: title.trim(),
-    markdown: (mode === 'rich' && editorRef.current) ? editorRef.current.getMarkdown() : md,
-  });
+  const save = () => {
+    let markdown = (mode === 'rich' && editorRef.current) ? editorRef.current.getMarkdown() : md;
+    for (const [dataUrl, storageUrl] of Object.entries(imageMap.current)) markdown = markdown.split(dataUrl).join(storageUrl);
+    onSave({ ...page, title: title.trim(), markdown });
+  };
 
   return html`
     <div class="pj-doc-editor">
       <input type="text" class="input-field input-sm" placeholder=${t('organisms.pageTitle') || 'Document title'}
         value=${title} onInput=${e => setTitle(e.target.value)} />
+      <div class="pj-doc-imgbar">
+        <button class="btn-ghost btn-sm" onClick=${() => fileRef.current && fileRef.current.click()}>${t('organisms.insertImage') || '📷 Insert image'}</button>
+        <input type="file" accept="image/*" ref=${fileRef} hidden onChange=${e => { insertFromFile(e.target.files && e.target.files[0]); e.target.value = ''; }} />
+      </div>
       ${mode === 'rich'
         ? html`<div ref=${containerRef} class="pj-tui"></div>`
         : html`<div class="pj-doc-grid">
