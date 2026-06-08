@@ -46,6 +46,14 @@ export function registerWorkspaceTools(
     const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
     const fail = (msg: string): TextResult => ({ content: [{ type: 'text', text: msg }], isError: true });
 
+    /** A draft value should be an object; tolerate a JSON-string (some clients stringify object
+     *  params) by parsing it, then stamp the instance id so the stored record/document carries it. */
+    const coerceValue = (value: unknown, id: string): unknown => {
+        let v = value;
+        if (typeof v === 'string') { try { const p = JSON.parse(v); if (p && typeof p === 'object') v = p; } catch { /* leave as string → schema rejects clearly */ } }
+        return (v && typeof v === 'object' && !Array.isArray(v)) ? { ...(v as Record<string, unknown>), id } : v;
+    };
+
     /** Membership gate — an organism agent, or the owner is an active member. Returns null if allowed. */
     async function denyReason(orgId: string): Promise<string | null> {
         const org = await storage.getOrganism(orgId);
@@ -115,13 +123,16 @@ export function registerWorkspaceTools(
             organism_id: z.string(), ws: z.string(),
             namespace: z.string().describe("The objectType's namespace, e.g. shared.deliverables"),
             id: z.string().describe('Instance id (new or existing to overwrite)'),
-            value: z.any().describe("The record/document object. For records, match the manifest schema; for documents use { id, title, markdown }."),
+            // Some clients JSON-stringify an untyped object param — the handler's coerceValue parses
+            // a string back to an object so records still validate and documents aren't stored corrupt.
+            // (Kept as z.any() — a z.record/union here broke the MCP SDK's schema conversion.)
+            value: z.any().describe('The record/document as a JSON OBJECT (not a string). Records must match the manifest schema; documents are { id, title, markdown }.'),
         },
         annotationsFor('aimeat_workspace_write_draft'),
         async ({ organism_id, ws, namespace, id, value }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const key = `${wsRoot(organism_id, ws)}.${namespace}.${id}.draft`;
-            const v = (value && typeof value === 'object' && !Array.isArray(value)) ? { ...(value as Record<string, unknown>), id } : value;
+            const v = coerceValue(value, id);
             const valid = await validateMemoryWrite(key, v, storage);
             if (!valid.valid) return fail('Draft rejected by schema: ' + JSON.stringify(valid.errors));
             await writeRecord(key, v, await storage.getMemory(ownerGhii, key));

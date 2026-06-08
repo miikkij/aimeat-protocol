@@ -144,10 +144,20 @@ await test('2. workspace_read returns the manifest + objectTypes', async () => {
     assert((data.manifest.objectTypes || []).some((o: any) => o.name === 'note'), 'has note type');
 });
 
-await test('3. write_draft creates a records draft', async () => {
+await test('3. write_draft creates a records draft (object value)', async () => {
     const b = await A.client.call('aimeat_workspace_write_draft', { organism_id: orgId, ws: WS, namespace: 'shared.notes', id: 'n1', value: { title: 'Hello', body: 'first note' } }, 103);
     assert(b.result.isError !== true, `error: ${b.result.content?.[0]?.text}`);
     assert(JSON.parse(b.result.content[0].text).written.endsWith('shared.notes.n1.draft'), 'wrote draft key');
+});
+
+await test('3b. write_draft accepts a JSON-STRINGIFIED value (client coercion)', async () => {
+    // Regression: an untyped value made some clients stringify object params → records failed
+    // schema ("must be object") and documents stored the raw string. The tool must coerce it.
+    const b = await A.client.call('aimeat_workspace_write_draft', { organism_id: orgId, ws: WS, namespace: 'shared.notes', id: 'n2', value: JSON.stringify({ title: 'From string', body: 'coerced' }) }, 1031);
+    assert(b.result.isError !== true, `stringified value should be coerced, not rejected: ${b.result.content?.[0]?.text}`);
+    const rd = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS }, 1032);
+    const note = (JSON.parse(rd.result.content[0].text).drafts?.note || []).find((d: any) => d.id === 'n2');
+    assert(note && note.title === 'From string', 'stored as an object with the right fields (not a raw string)');
 });
 
 await test('4. write_draft rejects a schema-invalid record', async () => {

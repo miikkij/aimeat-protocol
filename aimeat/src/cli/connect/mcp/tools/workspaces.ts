@@ -22,6 +22,13 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
     content: [{ type: 'text' as const, text: JSON.stringify(obj, null, 2) }],
     ...(isError ? { isError: true } : {}),
   });
+  /** A draft value should be an object; tolerate a JSON-string (some clients stringify object
+   *  params) by parsing it, then stamp the instance id. */
+  const coerceValue = (value: unknown, id: string): unknown => {
+    let v = value;
+    if (typeof v === 'string') { try { const p = JSON.parse(v); if (p && typeof p === 'object') v = p; } catch { /* leave as string → schema rejects */ } }
+    return (v && typeof v === 'object' && !Array.isArray(v)) ? { ...(v as Record<string, unknown>), id } : v;
+  };
 
   mcp.tool('aimeat_workspace_list', descriptionFor('aimeat_workspace_list'),
     { organism_id: z.string().describe('Organism id') },
@@ -47,11 +54,13 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       organism_id: z.string(), ws: z.string(),
       namespace: z.string().describe("The objectType's namespace, e.g. shared.deliverables"),
       id: z.string().describe('Instance id (new or existing to overwrite)'),
-      value: z.any().describe('The record/document object. Records must match the schema; documents are { id, title, markdown }.'),
+      // coerceValue parses a JSON-stringified object so records still validate + documents store
+      // correctly. (Kept as z.any() — a z.record/union here broke the MCP SDK's schema conversion.)
+      value: z.any().describe('The record/document as a JSON OBJECT (not a string). Records must match the schema; documents are { id, title, markdown }.'),
     },
     annotationsFor('aimeat_workspace_write_draft'),
     async ({ organism_id, ws, namespace, id, value }) => {
-      const v = (value && typeof value === 'object' && !Array.isArray(value)) ? { ...(value as Record<string, unknown>), id } : value;
+      const v = coerceValue(value, id);
       const key = `${root(organism_id, ws)}.${namespace}.${id}.draft`;
       const resp = await client.post('/v1/memory', { key, value: v, visibility: 'private' });
       return text(resp.ok === false ? (resp.error ?? resp) : { written: key }, resp.ok === false);
