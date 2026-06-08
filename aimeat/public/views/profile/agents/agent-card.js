@@ -3,6 +3,12 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v1.14.0 -- 2026-06-09 -- Tag strip in the expanded header is now editable
+ *     (inline add via "+ tag" input + per-chip remove ×), writing through
+ *     PATCH /v1/agents/:name/tags. Lets the owner manage the tags that drive the
+ *     list filter / "Group by: Tag" without opening the Data Access (Muisti) tab.
+ *     renderTagStrip() replaced by the <TagStrip> component; always rendered so
+ *     an untagged agent still shows the add affordance.
  *   v1.13.0 -- 2026-06-03 -- Deep-link props: preSelectedTab forces a tab (and
  *     locks it past the async README default), openTaskId + openTaskNonce are
  *     threaded to the Tasks sub-tab so the fleet "running now" panel can open a
@@ -43,7 +49,7 @@ import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { apiGet } from '/js/api.js';
+import { apiGet, apiPatch } from '/js/api.js';
 import { timeAgo } from '/js/utils.js';
 import { detectAgentState, getDefaultTab, getStateColor } from './state-detector.js';
 import { testWebhook, updateWebhook } from '/js/services/agent-integration.js';
@@ -228,8 +234,8 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
           </span>
         </div>
 
-        <!-- Tags -->
-        ${renderTagStrip(agent)}
+        <!-- Tags (editable) -->
+        <${TagStrip} agent=${agent} showToast=${showToast} />
 
         <!-- Capabilities -->
         ${(agent.technical_capabilities?.length > 0 || agent.domain_capabilities?.length > 0 || agent.languages?.length > 0) && html`
@@ -481,12 +487,65 @@ function renderModeBadge(agent) {
   return html`<span class="pf-agd-badge pf-agd-badge--mode pf-agd-badge--mode-${mode}" title=${t('profile.agents.mode.tooltip') || ''}>${label}</span>`;
 }
 
-function renderTagStrip(agent) {
-  const tags = agent.tags ?? [];
-  if (tags.length === 0) return null;
+// Editable tag strip shown in the expanded card header. The same owner-managed
+// tags drive the list's tag filter and "Group by: Tag" (and double as the shared
+// memory namespace agents.tag.<tag>.*), so editing here is the convenient inline
+// path — no need to dig into the Data Access (Muisti) sub-tab. Writes go through
+// the same PATCH /v1/agents/:name/tags route; the server emits an `agents`
+// change so the live-update refresh keeps the list's filter/grouping in sync.
+function TagStrip({ agent, showToast }) {
+  const [tags, setTags] = useState(agent.tags ?? []);
+  const [adding, setAdding] = useState(false);
+  const [newTag, setNewTag] = useState('');
+  // Re-sync when the parent reloads the agent (e.g. after a live-update).
+  useEffect(() => { setTags(agent.tags ?? []); }, [agent.tags]);
+
+  const agentName = agent.name;
+
+  async function addTag() {
+    const tag = newTag.trim().toLowerCase();
+    if (!tag || tags.includes(tag)) { setNewTag(''); setAdding(false); return; }
+    try {
+      const updated = [...tags, tag];
+      await apiPatch(`/v1/agents/${encodeURIComponent(agentName)}/tags`, { tags: updated });
+      setTags(updated);
+      setNewTag(''); setAdding(false);
+      showToast?.(t('profile.agents.detail.data_access.tagAdded'));
+    } catch (err) {
+      showToast?.(err.message || t('profile.agents.detail.data_access.addTagError'), true);
+    }
+  }
+
+  async function removeTag(tag) {
+    try {
+      const updated = tags.filter(x => x !== tag);
+      await apiPatch(`/v1/agents/${encodeURIComponent(agentName)}/tags`, { tags: updated });
+      setTags(updated);
+      showToast?.(t('profile.agents.detail.data_access.tagRemoved'));
+    } catch (err) {
+      showToast?.(err.message || t('profile.agents.detail.data_access.removeTagError'), true);
+    }
+  }
+
   return html`
-    <div class="pf-agd-tag-strip">
-      ${tags.map(tag => html`<span key=${tag} class="pf-agd-tag-chip">${tag}</span>`)}
+    <div class="pf-agd-tag-strip pf-agd-tag-strip--editable">
+      ${tags.map(tag => html`
+        <span key=${tag} class="pf-agd-tag-chip pf-agd-tag-chip--editable">
+          ${tag}
+          <button class="pf-agd-tag-chip-remove" title=${t('profile.agents.detail.data_access.tagRemoved')}
+                  onClick=${(e) => { e.stopPropagation(); removeTag(tag); }}>×</button>
+        </span>
+      `)}
+      ${adding
+        ? html`<input class="pf-agd-tag-add-input" autofocus value=${newTag}
+                 placeholder=${t('profile.agents.detail.data_access.tagPlaceholder')}
+                 onInput=${(e) => setNewTag(e.target.value)}
+                 onKeyDown=${(e) => {
+                   if (e.key === 'Enter') addTag();
+                   else if (e.key === 'Escape') { setAdding(false); setNewTag(''); }
+                 }}
+                 onBlur=${() => { if (newTag.trim()) addTag(); else setAdding(false); }} />`
+        : html`<button class="pf-agd-tag-add-btn" onClick=${() => setAdding(true)}>+ ${t('profile.agents.detail.data_access.addTag')}</button>`}
     </div>
   `;
 }

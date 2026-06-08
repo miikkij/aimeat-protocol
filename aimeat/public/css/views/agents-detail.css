@@ -58,6 +58,7 @@
  *   v2.12.0 -- 2026-05-31 -- Add completed-task deliverable styles (pf-agd-deliverable*) linking a task to its agent-memory output key
  *   v2.13.0 -- 2026-05-31 -- Add per-task blur-title toggle styles (pf-agd-blur-toggle, pf-agd-task-title--blurred) for hiding sensitive titles in screen recordings
  *   v2.26.0 -- 2026-06-09 -- Add custom agent-group styles (pf-agd-cgroup-bar/header/toggle/name/empty) for the drag-to-assign "Custom groups" list mode
+ *   v2.27.0 -- 2026-06-09 -- Add editable tag-strip styles (pf-agd-tag-chip--editable, pf-agd-tag-chip-remove, pf-agd-tag-add-btn/input) for inline tag add/remove in the expanded card header
  */
 
 /* Header row: title left, connect button right */
@@ -1575,6 +1576,43 @@
   background: var(--accent-subtle, rgba(59, 130, 246, 0.1));
   color: var(--blue, #3B82F6);
   border-color: var(--blue, #3B82F6);
+}
+
+/* Editable tag strip in the expanded card header (inline add/remove) */
+.pf .pf-agd-tag-chip--editable { cursor: default; gap: 0.3rem; padding-right: 0.3rem; }
+.pf .pf-agd-tag-chip-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted, #9CA3AF);
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0 0.1rem;
+  border-radius: 9999px;
+}
+.pf .pf-agd-tag-chip-remove:hover { color: var(--danger, #E8564A); }
+.pf .pf-agd-tag-add-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 9999px;
+  background: none;
+  color: var(--accent, #E8564A);
+  border: 1px dashed var(--border, #E5E7EB);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pf .pf-agd-tag-add-btn:hover { border-color: var(--accent, #E8564A); }
+.pf .pf-agd-tag-add-input {
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid var(--accent, #E8564A);
+  background: var(--card-bg, #FFFFFF);
+  color: var(--text, #1A1A2E);
+  width: 9rem;
 }
 
 /* Tag filter bar + group-by control */
