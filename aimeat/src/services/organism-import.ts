@@ -22,13 +22,19 @@ interface OrgJson {
 
 export interface OrganismImportResult { organism_id: string; name: string; workspaces: Array<{ from: string; ws: string }> }
 
+/** Allowed entry layout for an organism bundle ZIP — anything else is rejected as a bad format. */
+const ORGANISM_ALLOW = (n: string) =>
+  n === 'organism.json' ||
+  /^workspaces\/[A-Za-z0-9_-]+\/workspace\.json$/.test(n) ||
+  /^workspaces\/[A-Za-z0-9_-]+\/images\/[A-Za-z0-9._-]+$/.test(n);
+
 export async function importOrganism(
   storage: Storage,
   config: AimeatConfig,
   opts: { importerGaii: string; importerOwner: string; zip: Buffer },
 ): Promise<OrganismImportResult> {
   const { importerGaii, importerOwner, zip } = opts;
-  const files = await unzipBuffer(zip);
+  const files = await unzipBuffer(zip, ORGANISM_ALLOW);
   const ojBuf = files.get('organism.json');
   if (!ojBuf) throw new Error('organism.json missing from the ZIP');
   let oj: OrgJson;

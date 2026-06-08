@@ -10,41 +10,25 @@
  * @version-history
  *   v1.0.0 -- 2026-06-09 -- Initial: ZIP import with id remap, schema re-lock, image dedup + URL rewrite.
  */
-import yauzl from 'yauzl';
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import type { WorkspaceExportJson, ExportObject, ExportImage } from './workspace-export.js';
 import { WS_EXPORT_VERSION } from './workspace-export.js';
-
-/** Read every entry of a ZIP buffer into a filename → Buffer map. */
-function unzip(buffer: Buffer): Promise<Map<string, Buffer>> {
-  return new Promise((resolve, reject) => {
-    yauzl.fromBuffer(buffer, { lazyEntries: true }, (err, zipfile) => {
-      if (err || !zipfile) { reject(err || new Error('not a zip')); return; }
-      const files = new Map<string, Buffer>();
-      zipfile.on('error', reject);
-      zipfile.on('entry', (entry: yauzl.Entry) => {
-        if (/\/$/.test(entry.fileName)) { zipfile.readEntry(); return; }   // directory
-        zipfile.openReadStream(entry, (e, stream) => {
-          if (e || !stream) { reject(e || new Error('read fail')); return; }
-          const chunks: Buffer[] = [];
-          stream.on('data', (c: Buffer) => chunks.push(c));
-          stream.on('end', () => { files.set(entry.fileName, Buffer.concat(chunks)); zipfile.readEntry(); });
-          stream.on('error', reject);
-        });
-      });
-      zipfile.on('end', () => resolve(files));
-      zipfile.readEntry();
-    });
-  });
-}
+import { safeUnzip, BACKUP_ZIP_LIMITS } from './safe-zip.js';
 
 const STORAGE_URL_RE = /\/v1\/(?:storage|pub\/[^/)\s]+)\/([^\s)\]"'>]+)/g;
 
+/** Allowed entry layout for a single-workspace ZIP — anything else is rejected as a bad format. */
+const WORKSPACE_ALLOW = (n: string) => n === 'workspace.json' || /^images\/[A-Za-z0-9._-]+$/.test(n);
+
 export interface ImportResult { ws: string; objects: number; documents: number; images: number; images_deduped: number; schemas: number }
 
-/** Unzip a workspace ZIP into a filename → Buffer map (also used by the organism bundle import). */
-export async function unzipBuffer(zip: Buffer): Promise<Map<string, Buffer>> { return unzip(zip); }
+/** Safely unzip a backup ZIP into a filename → Buffer map (hardened: bomb/traversal/format guards).
+ *  Pass the format allowlist for the layout you expect; throws ZipSecurityError on a hostile/malformed
+ *  archive. Used by the workspace import and (with the organism allowlist) the bundle import. */
+export async function unzipBuffer(zip: Buffer, allowName?: (n: string) => boolean): Promise<Map<string, Buffer>> {
+  return safeUnzip(zip, { ...BACKUP_ZIP_LIMITS, allowName });
+}
 
 /** Import a single standalone workspace ZIP. */
 export async function importWorkspace(
@@ -52,7 +36,7 @@ export async function importWorkspace(
   config: AimeatConfig,
   opts: { orgId: string; importerGaii: string; importerOwner: string; zip: Buffer },
 ): Promise<ImportResult> {
-  const files = await unzip(opts.zip);
+  const files = await unzipBuffer(opts.zip, WORKSPACE_ALLOW);
   const jsonBuf = files.get('workspace.json');
   if (!jsonBuf) throw new Error('workspace.json missing from the ZIP');
   let data: WorkspaceExportJson;

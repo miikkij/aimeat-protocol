@@ -44,6 +44,8 @@ import { exportWorkspace } from '../services/workspace-export.js';
 import { importWorkspace } from '../services/workspace-import.js';
 import { exportOrganism } from '../services/organism-export.js';
 import { importOrganism } from '../services/organism-import.js';
+import { ZipSecurityError } from '../services/safe-zip.js';
+import { recordSecurityIncident } from '../services/security-incident.js';
 
 /** Whether a membership role satisfies an approval's required approverRole. */
 function roleSatisfies(approverRole: string, membershipRole: string): boolean {
@@ -979,6 +981,11 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       emitChange('organisms');
       res.status(201).json(success(config.nodeId, result));
     } catch (e) {
+      if (e instanceof ZipSecurityError) {
+        const inc = await recordSecurityIncident(storage, config, { type: 'zip_import', code: e.code, actorGhii: resolveIdentity(req.auth!, config.nodeId), actorName: req.auth!.owner as string, detail: e.message, source: 'workspace_import', blob: buf });
+        res.status(422).json(error(config.nodeId, 'ZIP_REJECTED', `Upload rejected by safety checks (${e.code}) and quarantined for review (incident ${inc.id}).`));
+        return;
+      }
       res.status(400).json(error(config.nodeId, 'IMPORT_FAILED', (e as Error).message || 'Could not import the workspace'));
     }
   });
@@ -1015,6 +1022,11 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       emitChange('organisms');
       res.status(201).json(success(config.nodeId, result));
     } catch (e) {
+      if (e instanceof ZipSecurityError) {
+        const inc = await recordSecurityIncident(storage, config, { type: 'zip_import', code: e.code, actorGhii: resolveIdentity(req.auth!, config.nodeId), actorName: req.auth!.owner as string, detail: e.message, source: 'organism_import', blob: buf });
+        res.status(422).json(error(config.nodeId, 'ZIP_REJECTED', `Upload rejected by safety checks (${e.code}) and quarantined for review (incident ${inc.id}).`));
+        return;
+      }
       res.status(400).json(error(config.nodeId, 'IMPORT_FAILED', (e as Error).message || 'Could not import the organism'));
     }
   });

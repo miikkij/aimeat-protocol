@@ -36,6 +36,8 @@ import { validateMemoryWrite } from '../services/schema-validator.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { exportWorkspace } from '../services/workspace-export.js';
 import { importWorkspace } from '../services/workspace-import.js';
+import { ZipSecurityError } from '../services/safe-zip.js';
+import { recordSecurityIncident } from '../services/security-incident.js';
 
 type ObjType = { name: string; namespace?: string; backing?: string; mode?: string };
 type Manifest = { objectTypes?: ObjType[] } & Record<string, unknown>;
@@ -411,6 +413,12 @@ export function registerWorkspaceTools(
             try {
                 const result = await importWorkspace(storage, config, { orgId: organism_id, importerGaii: ownerGhii, importerOwner: ownerName, zip: buf });
                 return ok(result);
-            } catch (e) { return fail((e as Error).message || 'Import failed'); }
+            } catch (e) {
+                if (e instanceof ZipSecurityError) {
+                    const inc = await recordSecurityIncident(storage, config, { type: 'zip_import', code: e.code, actorGhii: ownerGhii, actorName: ownerName, detail: e.message, source: 'workspace_import_mcp', blob: buf });
+                    return fail(`Upload rejected by safety checks (${e.code}) and quarantined for review (incident ${inc.id}).`);
+                }
+                return fail((e as Error).message || 'Import failed');
+            }
         });
 }

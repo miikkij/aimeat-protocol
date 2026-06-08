@@ -36,6 +36,7 @@ import { adminRouter } from '../routes/admin.js';
 import { federationRouter } from '../routes/federation.js';
 import { organismsRouter } from '../routes/organisms.js';
 import { notificationsRouter } from '../routes/notifications.js';
+import { adminSecurityRouter } from '../routes/admin-security.js';
 import { sharingGroupsRouter } from '../routes/sharing-groups.js';
 import { specRouter } from '../routes/spec.js';
 import { disputesRouter } from '../routes/disputes.js';
@@ -307,6 +308,7 @@ export async function mountRoutes(
   app.use(adminRouter(config, storage, maintenanceState, provenance, consulService, peers));
   app.use(organismsRouter(config, storage));
   app.use(notificationsRouter(config, storage));
+  app.use(adminSecurityRouter(config, storage));
   app.use(sharingGroupsRouter(config, storage));
   app.use(federationRouter(config, storage, peers, networkDirectory));
   app.use(disputesRouter(config, storage));

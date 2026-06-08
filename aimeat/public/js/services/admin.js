@@ -19,6 +19,10 @@ export const getTranslations = (lang)   => apiGet(`/v1/admin/translations?lang=$
 // ── Agents & Owners ──
 export const getAdminAgents  = ()       => apiGet('/v1/admin/agents');
 export const getAdminOwners  = ()       => apiGet('/v1/admin/owners');
+// Security incidents (rejected/quarantined uploads, etc.)
+export const getSecurityIncidents    = ()   => apiGet('/v1/admin/security/incidents');
+export const resolveSecurityIncident = (id) => apiPost(`/v1/admin/security/incidents/${encodeURIComponent(id)}/resolve`);
+export const deleteSecurityIncident  = (id) => apiDelete(`/v1/admin/security/incidents/${encodeURIComponent(id)}`);
 export const getAgentDetail  = (gaii)   => apiGet(`/v1/agents/${encodeURIComponent(gaii)}`);
 export const getOwnerDetail  = (name)   => apiGet(`/v1/owners/${encodeURIComponent(name)}`);
 export const grantRole       = (owner, role) => apiPost('/v1/admin/roles/grant', { owner, role });

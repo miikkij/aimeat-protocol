@@ -27,6 +27,8 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { exportOrganism } from '../services/organism-export.js';
 import { importOrganism } from '../services/organism-import.js';
+import { ZipSecurityError } from '../services/safe-zip.js';
+import { recordSecurityIncident } from '../services/security-incident.js';
 
 export function registerOrganismsTools(
     mcp: McpServer,
@@ -441,6 +443,12 @@ export function registerOrganismsTools(
                 const result = await importOrganism(storage, config, { importerGaii: `${ownerName}@${config.nodeId}`, importerOwner: ownerName, zip: buf });
                 emitResourceListChanged(agentGaii);
                 return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-            } catch (e) { return { content: [{ type: 'text' as const, text: (e as Error).message || 'Import failed' }], isError: true }; }
+            } catch (e) {
+                if (e instanceof ZipSecurityError) {
+                    const inc = await recordSecurityIncident(storage, config, { type: 'zip_import', code: e.code, actorGhii: `${ownerName}@${config.nodeId}`, actorName: ownerName, detail: e.message, source: 'organism_import_mcp', blob: buf });
+                    return { content: [{ type: 'text' as const, text: `Upload rejected by safety checks (${e.code}) and quarantined for review (incident ${inc.id}).` }], isError: true };
+                }
+                return { content: [{ type: 'text' as const, text: (e as Error).message || 'Import failed' }], isError: true };
+            }
         });
 }
