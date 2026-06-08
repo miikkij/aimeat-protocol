@@ -376,6 +376,113 @@ function slug(name) {
   return String(name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'item';
 }
 
+// ── Deterministic Mermaid charts (built from stable workspace/organism data — no AI) ──
+
+/** Sanitise a label for a Mermaid node (strip chars that break the syntax; keep it single-line). */
+function mlbl(s) {
+  const t = String(s == null ? '' : s).replace(/["[\]{}|<>;`\\]/g, ' ').replace(/\s+/g, ' ').trim();
+  return (t.length > 96 ? t.slice(0, 95).replace(/\s+\S*$/, '') + '…' : t) || '—';
+}
+
+/** Chart 1 — organism dependency overview: who/what uses this organism. Async (aggregates members,
+ *  agents, workspaces + their structure, and knowledge packages). Returns Mermaid source text. */
+export async function buildOrganismOverviewMermaid(orgId) {
+  const nodeId = (currentGhii().split('@')[1]) || '';
+  const [orgResp, memResp, wsList] = await Promise.all([
+    getOrganism(orgId).catch(() => null),
+    listMembers(orgId).catch(() => null),
+    listWorkspaces(orgId).catch(() => []),
+  ]);
+  const org = orgResp?.data?.organism || {};
+  const members = memResp?.data?.members || [];
+  const agents = org.agentGaiis || [];
+  const wsData = [];
+  for (const w of wsList) {
+    const ws = await getWorkspace(orgId, w.id).catch(() => null);
+    const sources = await getWorkspaceSources(orgId, w.id).catch(() => []);
+    const types = (ws?.manifest?.objectTypes || []).filter(o => o.backing === 'memory')
+      .map(o => `${o.name} (${o.mode === 'document' ? 'doc' : 'rec'})`);
+    const knowledge = sources.filter(s => s.type === 'knowledge').map(s => s.label || s.packageId);
+    wsData.push({ name: w.name || w.id, types, knowledge });
+  }
+
+  const nodes = [`  ORG(["🏢 ${mlbl(org.name || orgId)}"])`];
+  const edges = [];
+  const externalIds = new Set();
+
+  if (members.length) {
+    nodes.push('  subgraph USERS["👥 Users"]', '  direction TB');
+    members.forEach((m, i) => {
+      // External = a member whose GHII names a DIFFERENT node (federated). Local members are keyed by
+      // the bare owner name (no @node), so only an explicit @other-node counts as external.
+      const isExt = !!m.ghii && m.ghii.includes('@') && !!nodeId && !m.ghii.endsWith('@' + nodeId);
+      if (isExt) externalIds.add('U' + i);
+      nodes.push(`    U${i}["👤 ${mlbl(m.ghii)}${m.role ? ' · ' + mlbl(m.role) : ''}${isExt ? ' · 🌐 external' : ''}"]`);
+    });
+    nodes.push('  end');
+    members.forEach((m, i) => edges.push(externalIds.has('U' + i) ? `  U${i} -. consent .-> ORG` : `  U${i} --> ORG`));
+  }
+  if (agents.length) {
+    nodes.push('  subgraph AGENTS["🤖 Agents"]', '  direction TB');
+    agents.forEach((a, i) => nodes.push(`    A${i}["🤖 ${mlbl(a)}"]`));
+    nodes.push('  end');
+    agents.forEach((a, i) => edges.push(`  A${i} --> ORG`));
+  }
+
+  const kmap = new Map();   // knowledge label -> node id
+  for (const w of wsData) for (const k of w.knowledge) if (!kmap.has(k)) kmap.set(k, 'K' + kmap.size);
+  if (kmap.size) {
+    nodes.push('  subgraph KNOWLEDGE["📚 Knowledge packages"]', '  direction TB');
+    for (const [label, kid] of kmap) nodes.push(`    ${kid}["📚 ${mlbl(label)}"]`);
+    nodes.push('  end');
+  }
+  if (wsData.length) {
+    nodes.push('  subgraph WORKSPACES["🗂️ Workspaces"]', '  direction TB');
+    wsData.forEach((w, i) => {
+      nodes.push(`    W${i}["🗂️ ${mlbl(w.name)}"]`);
+      if (w.types.length) nodes.push(`    W${i}S["${mlbl(w.types.join(' · '))}"]`);
+    });
+    nodes.push('  end');
+    wsData.forEach((w, i) => {
+      edges.push(`  ORG --> W${i}`);
+      if (w.types.length) edges.push(`  W${i} --> W${i}S`);
+      for (const k of w.knowledge) edges.push(`  W${i} -. uses .-> ${kmap.get(k)}`);
+    });
+  }
+  if (!members.length && !agents.length && !wsData.length) {
+    edges.push('  EMPTY["No members, agents or workspaces yet"] --> ORG');
+  }
+  return ['graph LR', ...nodes, ...edges].join('\n');
+}
+
+/** Chart 2 — the edit→publish lifecycle this workspace's manifest defines (deterministic). Records
+ *  are schema-validated; the publish gate + the manifest's policy.alwaysGate add a review step. */
+export function buildEditFlowMermaid(manifest, gateOn) {
+  const types = (manifest?.objectTypes || []).filter(o => o.backing === 'memory');
+  const recTypes = types.filter(o => o.mode !== 'document').map(o => o.name);
+  const docTypes = types.filter(o => o.mode === 'document').map(o => o.name);
+  const alwaysGate = (manifest?.policy && manifest.policy.alwaysGate) || [];
+
+  const L = ['flowchart LR'];
+  L.push('  START(["Pick what to edit"])');
+  if (recTypes.length) L.push(`  REC["📋 Records: ${mlbl(recTypes.join(', '))} · schema form"]`);
+  if (docTypes.length) L.push(`  DOC["📄 Documents: ${mlbl(docTypes.join(', '))} · free-form markdown"]`);
+  L.push('  DRAFT["✏️ Save as DRAFT · working copy"]');
+  if (gateOn) L.push('  GATE{"🔍 Owner review · publish gate on"}');
+  L.push('  PUB["✅ Publish"]');
+  L.push('  VER["📌 .version.N + .latest"]');
+
+  if (recTypes.length) L.push('  START --> REC --> DRAFT');
+  if (docTypes.length) L.push('  START --> DOC --> DRAFT');
+  if (!recTypes.length && !docTypes.length) L.push('  START --> DRAFT');
+  if (gateOn) { L.push('  DRAFT --> GATE'); L.push('  GATE -- approve --> PUB'); L.push('  GATE -- reject --> DRAFT'); }
+  else L.push('  DRAFT --> PUB');
+  L.push('  PUB --> VER');
+  L.push('  VER -. edit again .-> DRAFT');
+  if (alwaysGate.length) { L.push(`  NOTE["⚠️ Always needs approval: ${mlbl(alwaysGate.join(', '))}"]`); L.push(`  NOTE -.-> ${gateOn ? 'GATE' : 'PUB'}`); }
+  return L.join('\n');
+}
+
 // ── Access prompt: a copy-paste prompt teaching an AI/agent how to use THIS workspace ──
 // Bridges the MCP gap (no workspace-aware tools yet) by injecting the real structure + the exact
 // conventions. Two variants: 'human' (paste into a chat) and 'agent' (imperative, assumes tools).

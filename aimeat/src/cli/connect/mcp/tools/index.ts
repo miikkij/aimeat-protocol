@@ -27,6 +27,7 @@ import { registerCortexTools } from './cortex.js';
 import { registerAppsTools } from './apps.js';
 import { registerKnowledgeTools } from './knowledge.js';
 import { registerOrganismsTools } from './organisms.js';
+import { registerWorkspaceTools } from './workspaces.js';
 import { registerConsentTools } from './consent.js';
 import { registerGroupsTools } from './groups.js';
 import { registerInstancesTools } from './instances.js';
@@ -51,6 +52,7 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerAppsTools(mcp, registry);
   registerKnowledgeTools(mcp, registry);
   registerOrganismsTools(mcp, registry);
+  registerWorkspaceTools(mcp, registry);
   registerConsentTools(mcp, registry);
   registerGroupsTools(mcp, registry);
   registerInstancesTools(mcp, registry);

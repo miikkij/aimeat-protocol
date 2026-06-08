@@ -39,6 +39,11 @@
  *   v1.8.0 — 2026-06-08 — "AI access prompt" buttons (For chat / For coding agent) copy a ready
  *     prompt teaching an AI how to access + use THIS workspace (full schema inlined) — bridges the
  *     MCP discovery gap. See orgService.buildAccessPrompt.
+ *   v1.9.0 — 2026-06-08 — Two deterministic Mermaid charts (vendored renderer, lazy-loaded): an
+ *     organism Overview (members/agents/workspaces+structure/knowledge/federation-consent) at the
+ *     top of the workspace list, and the manifest-defined edit→publish→version flow as the first
+ *     item inside a workspace. Built from stable data — orgService.buildOrganismOverviewMermaid /
+ *     buildEditFlowMermaid.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -58,6 +63,7 @@ import { OpenRouterSettings } from './generator-settings.js';
 import { copyToClipboard } from '/js/utils.js';
 import { dt, fmtBytes } from '/js/format.js';
 import { Markdown, slugifyHeading } from '/components/Markdown.js';
+import { Mermaid } from '/components/Mermaid.js';
 
 export default function OrganismsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -486,9 +492,18 @@ function WorkspaceList({ org, showToast, onOpen, onBack }) {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [overview, setOverview] = useState('');           // organism dependency-overview chart (mermaid)
+  const [showOverview, setShowOverview] = useState(true);
 
   const load = useCallback(async () => { setList(await orgService.listWorkspaces(orgId)); }, [orgId]);
   useEffect(() => { load(); }, [load]);
+  // Rebuild the overview whenever the workspace set changes (deterministic — aggregates members,
+  // agents, workspaces + their structure, and knowledge packages).
+  useEffect(() => {
+    let cancelled = false;
+    orgService.buildOrganismOverviewMermaid(orgId).then(c => { if (!cancelled) setOverview(c); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [orgId, list]);
   useEffect(() => {
     const h = () => load();
     window.addEventListener('aimeat-live-update', h);
@@ -526,6 +541,15 @@ function WorkspaceList({ org, showToast, onOpen, onBack }) {
       <button class="btn-ghost btn-sm" onClick=${onBack}>${'← '}${t('organisms.allOrganisms') || 'All organisms'}</button>
       <div class="section-title">${escHtml(org.name || 'Organism')}</div>
       <div class="section-desc">${t('organisms.workspacesDesc') || 'Workspaces in this organism — each is an independent space with its own documents, records and history.'}</div>
+
+      ${overview ? html`
+        <div class="pj-chart">
+          <div class="pj-chart-head">
+            <span class="pj-chart-title">${'🔗 '}${t('organisms.overview') || 'Overview — who & what uses this organism'}</span>
+            <button class="btn-ghost btn-sm" onClick=${() => setShowOverview(s => !s)}>${showOverview ? (t('organisms.hide') || 'Hide') : (t('organisms.show') || 'Show')}</button>
+          </div>
+          ${showOverview ? html`<${Mermaid} chart=${overview} />` : null}
+        </div>` : null}
 
       <div class="pj-ws-bar">
         ${creating ? html`
@@ -594,6 +618,7 @@ function Workspace({ org, wsId, showToast, onBack }) {
   const [addingId, setAddingId] = useState(null);             // its id, preserved so save overwrites
   const [expandedRec, setExpandedRec] = useState({});         // { "type:id": true } — records expanded to view fields
   const [showSpaces, setShowSpaces] = useState(false);        // inline add-space form at the workspace top
+  const [showFlow, setShowFlow] = useState(true);             // the manifest-defined edit-flow chart (first item)
 
   const load = useCallback(async () => {
     const w = await orgService.getWorkspace(orgId, wsId).catch(() => null);
@@ -1162,6 +1187,15 @@ function Workspace({ org, wsId, showToast, onBack }) {
           `)}
         </div>
       `}
+
+      ${ws.manifest ? html`
+        <div class="pj-chart">
+          <div class="pj-chart-head">
+            <span class="pj-chart-title">${'🔄 '}${t('organisms.editFlow') || 'How editing works here'}</span>
+            <button class="btn-ghost btn-sm" onClick=${() => setShowFlow(s => !s)}>${showFlow ? (t('organisms.hide') || 'Hide') : (t('organisms.show') || 'Show')}</button>
+          </div>
+          ${showFlow ? html`<${Mermaid} chart=${orgService.buildEditFlowMermaid(ws.manifest, gateOn)} />` : null}
+        </div>` : null}
 
       ${types.map(ot => ot.mode === 'document' ? renderDocSpace(ot) : html`
         <div class="pj-section" key=${ot.name}>

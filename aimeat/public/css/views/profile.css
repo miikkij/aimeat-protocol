@@ -2053,6 +2053,13 @@
    distinct from the flat tree panel beside it. */
 .pj-doc-view { border: 1px solid var(--border); border-radius: 10px; padding: 0.8rem 1.1rem; margin: 0.4rem 0; background: var(--card); box-shadow: var(--shadow-sm); }
 .pj-doc-meta { margin: 0 0 0.5rem; }
+/* Deterministic Mermaid charts (organism overview, workspace edit-flow) */
+.pj-chart { border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.5rem 0.75rem; margin-bottom: 0.6rem; box-shadow: var(--shadow-sm); }
+.pj-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.3rem; }
+.pj-chart-title { font-weight: 600; font-size: 0.9rem; color: var(--text); }
+.mmd { overflow-x: auto; text-align: center; }
+.mmd svg { max-width: 100%; height: auto; }
+.mmd-fallback { font-size: 0.74rem; white-space: pre-wrap; color: var(--text-dim); background: var(--bg-dim); padding: 0.5rem; border-radius: 6px; overflow: auto; }
 /* Workspace list (an organism's many workspaces) */
 .pj-ws-bar { display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0 0.75rem; }
 .pj-ws-name-input { flex: 0 1 260px; }
