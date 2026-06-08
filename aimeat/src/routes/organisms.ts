@@ -12,6 +12,9 @@
  * @version-history
  *   v1.1.0 -- 2026-06-07 -- Phase 3: add the generic GET /:id/workspace read.
  *   v1.2.0 -- 2026-06-07 -- Phase 4: gate primitive (approvals) + draft/publish/versioning + publish-gate.
+ *   v1.3.0 -- 2026-06-08 -- Multi-workspace: one organism holds many workspaces under
+ *     organism.{id}.w.{ws}.*. Workspace read (?ws), publish (body.ws), and DELETE (?ws) are all
+ *     workspace-scoped; the registry lives at organism.{id}.meta.workspaces (client-managed).
  */
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -538,7 +541,10 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     }
 
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
-    const nsRoot = `organism.${id}.`;
+    // A workspace is scoped under organism.{id}.w.{ws}. — one organism holds many workspaces.
+    // (No ws → legacy organism-level root, kept only so an un-scoped call still reads something.)
+    const ws = typeof req.query.ws === 'string' ? req.query.ws : undefined;
+    const nsRoot = ws ? `organism.${id}.w.${ws}.` : `organism.${id}.`;
 
     // Enumerate the whole workspace by key prefix across all member identities, then
     // access-filter: own records pass directly; others go through the shared read guard.
@@ -687,9 +693,10 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   // Publish a draft: snapshot organism.{id}.{ns}.{instance}.draft → a new .version.N and .latest.
   // Schema-validated (the draft must be a valid object). Returns the new version number.
   const publishDraft = async (
-    organismId: string, namespace: string, instance: string, publisher: string,
+    organismId: string, ws: string | undefined, namespace: string, instance: string, publisher: string,
   ): Promise<{ ok: true; version: number } | { ok: false; code: 'NO_DRAFT' | 'INVALID'; violations?: unknown }> => {
-    const base = `organism.${organismId}.${namespace}.${instance}`;
+    const wsRoot = ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`;
+    const base = `${wsRoot}.${namespace}.${instance}`;
     const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000 });
     const draft = items.find(r => r.key === `${base}.draft`);
     if (!draft) return { ok: false, code: 'NO_DRAFT' };
@@ -741,7 +748,11 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can delete the workspace'));
       return;
     }
-    const prefix = `organism.${id}.`;
+    // Scope the wipe to one workspace (organism.{id}.w.{ws}.*) when ?ws= is given; without it, the
+    // legacy organism-level wipe. The registry entry (organism.{id}.meta.workspaces) is managed by
+    // the client, which removes the entry after this succeeds.
+    const ws = typeof req.query.ws === 'string' ? req.query.ws : undefined;
+    const prefix = ws ? `organism.${id}.w.${ws}.` : `organism.${id}.`;
     const { items } = await storage.listAllMemory({ prefix, limit: 100000 });
     let memoryKeys = 0;
     for (const r of items) { if (await storage.deleteMemory(r.ownerGaii, r.key)) memoryKeys++; }
@@ -836,7 +847,8 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
 
-    const { namespace, id: instance } = req.body ?? {};
+    const { namespace, id: instance, ws } = req.body ?? {};
+    const wsId = typeof ws === 'string' ? ws : undefined;
     if (!namespace || typeof namespace !== 'string' || !instance || typeof instance !== 'string') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'namespace and id (instance) are required'));
       return;
@@ -857,7 +869,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       const aid = uuidv4();
       const record: PendingApprovalRecord = {
         id: aid, organismId: id, actor: publisher, action: 'publish',
-        arguments: { namespace, instance }, risk: 'medium',
+        arguments: { namespace, instance, ws: wsId }, risk: 'medium',
         approverRole: approverRole as PendingApprovalRecord['approverRole'],
         prompt: `Publish ${namespace}.${instance}?`, status: 'pending', createdAt: now, updatedAt: now,
       };
@@ -870,7 +882,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
 
-    const result = await publishDraft(id, namespace, instance, publisher);
+    const result = await publishDraft(id, wsId, namespace, instance, publisher);
     if (!result.ok) {
       if (result.code === 'NO_DRAFT') {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft to publish at ${namespace}.${instance}`));
@@ -930,8 +942,9 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       const pargs = approval.arguments as Record<string, unknown> | undefined;
       const ns = typeof pargs?.namespace === 'string' ? pargs.namespace : undefined;
       const inst = typeof pargs?.instance === 'string' ? pargs.instance : undefined;
+      const pws = typeof pargs?.ws === 'string' ? pargs.ws : undefined;
       if (ns && inst) {
-        const pub = await publishDraft(id, ns, inst, decider);
+        const pub = await publishDraft(id, pws, ns, inst, decider);
         if (!pub.ok) {
           if (pub.code === 'NO_DRAFT') {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft to publish at ${ns}.${inst}`));

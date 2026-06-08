@@ -17,11 +17,16 @@
  *   await seedManifestSchema(storage, `system@${config.nodeId}`);
  * @version-history
  *   v1.0.0 -- 2026-06-07 -- Phase 3: validate the manifest envelope for every organism workspace.
+ *   v1.1.0 -- 2026-06-08 -- Also seed the workspace-scoped pattern organism.*.w.*.meta.manifest
+ *     (one organism holds many workspaces); the single-segment `*` matcher needs the explicit w.*.
  */
 import type { Storage } from '../storage/interface.js';
 
 /** Wildcard keyPattern (prefix mode) — matches `organism.{anyId}.meta.manifest` for every organism. */
 export const MANIFEST_SCHEMA_KEY = 'organism.*.meta.manifest';
+/** Same envelope for workspace-scoped manifests `organism.{anyId}.w.{anyWs}.meta.manifest`
+ *  (one organism holds many workspaces). The single-segment `*` matcher needs the explicit `w.*`. */
+export const MANIFEST_WS_SCHEMA_KEY = 'organism.*.w.*.meta.manifest';
 
 /**
  * The manifest envelope schema. Kept `open` (additionalProperties allowed) so the format can
@@ -88,18 +93,20 @@ export const MANIFEST_FORMAT_SCHEMA: Record<string, unknown> = {
  * @returns 1 if newly seeded, 0 if it already existed.
  */
 export async function seedManifestSchema(storage: Storage, lockedBy: string): Promise<number> {
-  const existing = await storage.getSchema(MANIFEST_SCHEMA_KEY, 'prefix');
-  if (existing) return 0;
-
   const now = new Date().toISOString();
-  await storage.setSchema({
-    keyPattern: MANIFEST_SCHEMA_KEY,
-    applyTo: 'prefix',
-    schemaJson: MANIFEST_FORMAT_SCHEMA,
-    schemaMode: 'open',
-    lockedBy,
-    setAt: now,
-    updatedAt: now,
-  });
-  return 1;
+  let seeded = 0;
+  for (const keyPattern of [MANIFEST_SCHEMA_KEY, MANIFEST_WS_SCHEMA_KEY]) {
+    if (await storage.getSchema(keyPattern, 'prefix')) continue;   // leave an operator-customized schema in place
+    await storage.setSchema({
+      keyPattern,
+      applyTo: 'prefix',
+      schemaJson: MANIFEST_FORMAT_SCHEMA,
+      schemaMode: 'open',
+      lockedBy,
+      setAt: now,
+      updatedAt: now,
+    });
+    seeded++;
+  }
+  return seeded;
 }

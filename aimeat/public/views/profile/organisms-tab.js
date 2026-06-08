@@ -28,6 +28,10 @@
  *     VisibilityPill + EmptyState + SearchBar + fmtBytes reused; "move…" dropdown dropped (drag-and-
  *     drop only); recognizable upload button; tree/detail/panels recolored (white cards on the gray
  *     section so a selected item's accent actually stands out); "File visibility" rename.
+ *   v1.6.0 — 2026-06-08 — Multi-workspace: an organism opens to a WorkspaceList (registry at
+ *     organism.{id}.meta.workspaces); each workspace is independent (data under …w.{wsId}.*), with
+ *     New/open/delete + F5 restore of openWs. wsId threaded through Workspace + SourcesPanel. Also:
+ *     split genBusy/applyBusy so Generate and Validate&apply spin independently.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -53,8 +57,10 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const [myOrganisms, setMyOrganisms] = useState(null);
   const [publicOrganisms, setPublicOrganisms] = useState([]);
   const [expanded, setExpanded] = useState(null);
-  // organism whose workspace is open — restored from sessionStorage so an F5 returns to it
+  // organism whose workspaces are open, then the specific workspace within it — both restored from
+  // sessionStorage so an F5 returns to where you were. openId set + openWs null = the workspace LIST.
   const [openId, setOpenId] = useState(() => { try { return sessionStorage.getItem('aimeat.ws.openId') || null; } catch (e) { return null; } });
+  const [openWs, setOpenWs] = useState(() => { try { return sessionStorage.getItem('aimeat.ws.openWs') || null; } catch (e) { return null; } });
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -93,12 +99,15 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     if (session) loadData();
   }, [session, loadData]);
 
-  // Persist the open workspace (F5 restore), and drop a restored id the user can no longer open.
+  // Persist the open organism + workspace (F5 restore), and drop a restored id the user can no longer open.
   useEffect(() => {
     try { if (openId) sessionStorage.setItem('aimeat.ws.openId', openId); else sessionStorage.removeItem('aimeat.ws.openId'); } catch (e) { /* noop */ }
   }, [openId]);
   useEffect(() => {
-    if (openId && myOrganisms && !myOrganisms.some(o => o.id === openId)) setOpenId(null);
+    try { if (openWs) sessionStorage.setItem('aimeat.ws.openWs', openWs); else sessionStorage.removeItem('aimeat.ws.openWs'); } catch (e) { /* noop */ }
+  }, [openWs]);
+  useEffect(() => {
+    if (openId && myOrganisms && !myOrganisms.some(o => o.id === openId)) { setOpenId(null); setOpenWs(null); }
   }, [openId, myOrganisms]);
 
   // Live update listener
@@ -335,7 +344,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
 
             <div class="card-actions">
               ${(isMine || isMember) ? html`
-                <button class="btn-primary btn-sm" onClick=${(e) => { e.stopPropagation(); setOpenId(org.id); }}>
+                <button class="btn-primary btn-sm" onClick=${(e) => { e.stopPropagation(); setOpenWs(null); setOpenId(org.id); }}>
                   ${t('organisms.openWorkspace') || 'Open workspace'}
                 </button>
               ` : null}
@@ -370,7 +379,13 @@ export default function OrganismsTab({ session, showToast, onStats }) {
 
   if (openId) {
     const org = [...(myOrganisms || []), ...publicOrganisms].find(o => o.id === openId) || { id: openId };
-    return html`<${Workspace} org=${org} session=${session} showToast=${showToast} onBack=${() => { setOpenId(null); loadData(); }} />`;
+    // openWs chosen → that workspace; otherwise the organism's workspace LIST.
+    if (openWs) {
+      return html`<${Workspace} org=${org} wsId=${openWs} session=${session} showToast=${showToast}
+        onBack=${() => { setOpenWs(null); }} />`;
+    }
+    return html`<${WorkspaceList} org=${org} showToast=${showToast}
+      onOpen=${(wsId) => setOpenWs(wsId)} onBack=${() => { setOpenId(null); loadData(); }} />`;
   }
 
   if (!myOrganisms) return html`<${Spinner} text=${t('organisms.loading') || 'Loading organisms...'} />`;
@@ -454,7 +469,83 @@ export default function OrganismsTab({ session, showToast, onStats }) {
 
 const PRIMARY_FIELD = { goal: 'title', plan: 'approach', deliverable: 'title', resource: 'label', decision: 'summary' };
 
-function Workspace({ org, showToast, onBack }) {
+/* Workspace list — an organism contains many workspaces (each an independent manifest + data set,
+ * namespaced under organism.{id}.w.{wsId}.*). Lists the registry (organism.{id}.meta.workspaces),
+ * lets the user create a new one (→ opens its setup/generate screen) or open/delete an existing one. */
+function WorkspaceList({ org, showToast, onOpen, onBack }) {
+  const orgId = org.id;
+  const { confirm, ConfirmUI } = useConfirm();
+  const [list, setList] = useState(null);   // null = loading
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => { setList(await orgService.listWorkspaces(orgId)); }, [orgId]);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const h = () => load();
+    window.addEventListener('aimeat-live-update', h);
+    return () => window.removeEventListener('aimeat-live-update', h);
+  }, [load]);
+
+  const create = async () => {
+    const name = newName.trim();
+    if (!name) return;
+    setBusy(true);
+    try {
+      const entry = await orgService.createWorkspace(orgId, name);
+      setNewName(''); setCreating(false);
+      onOpen(entry.id);   // open the new (empty) workspace → its setup / generate screen
+    } catch (e) { showToast((e && e.message) || 'Failed to create workspace'); }
+    finally { setBusy(false); }
+  };
+
+  const remove = (wsId, name) => {
+    confirm(
+      (t('organisms.deleteWorkspaceConfirm') || 'Delete the workspace “{name}” and all its content? This cannot be undone.').replace('{name}', name),
+      async () => {
+        setBusy(true);
+        try { await orgService.deleteWorkspace(orgId, wsId); await load(); showToast(t('organisms.workspaceDeleted') || 'Workspace deleted'); }
+        catch (e) { showToast((e && e.message) || 'Failed to delete'); }
+        finally { setBusy(false); }
+      },
+      { danger: true, title: t('organisms.deleteWorkspace') || 'Delete workspace' },
+    );
+  };
+
+  return html`
+    <div class="pj-ws">
+      <${ConfirmUI} />
+      <button class="btn-ghost btn-sm" onClick=${onBack}>${'← '}${t('organisms.allOrganisms') || 'All organisms'}</button>
+      <div class="section-title">${escHtml(org.name || 'Organism')}</div>
+      <div class="section-desc">${t('organisms.workspacesDesc') || 'Workspaces in this organism — each is an independent space with its own documents, records and history.'}</div>
+
+      <div class="pj-ws-bar">
+        ${creating ? html`
+          <input class="input-field input-sm pj-ws-name-input" autofocus placeholder=${t('organisms.workspaceName') || 'Workspace name'}
+            value=${newName} onInput=${e => setNewName(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter') create(); }} />
+          <button class="btn-primary btn-sm" onClick=${create} disabled=${busy || !newName.trim()}>${t('organisms.create') || 'Create'}</button>
+          <button class="btn-ghost btn-sm" onClick=${() => { setCreating(false); setNewName(''); }}>${t('organisms.cancel') || 'Cancel'}</button>
+        ` : html`
+          <button class="btn-primary btn-sm" onClick=${() => setCreating(true)}>${'+ '}${t('organisms.newWorkspace') || 'New workspace'}</button>`}
+      </div>
+
+      ${list === null ? html`<${Spinner} />`
+        : list.length === 0 ? html`<${EmptyState} icon="🗂️" text=${t('organisms.noWorkspaces') || 'No workspaces yet — create one to get started.'} />`
+        : html`<div class="pj-ws-list">
+          ${list.map(w => html`
+            <div class="pj-ws-card" key=${w.id}>
+              <button class="pj-ws-open" onClick=${() => onOpen(w.id)}>
+                <span class="pj-ws-card-name">${escHtml(w.name || w.id)}</span>
+                ${w.createdAt ? html`<span class="pj-ws-card-meta">${dt(w.createdAt)}</span>` : null}
+              </button>
+              <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => remove(w.id, w.name || w.id)}>✕</button>
+            </div>`)}
+        </div>`}
+    </div>`;
+}
+
+function Workspace({ org, wsId, showToast, onBack }) {
   const orgId = org.id;
   const { confirm, ConfirmUI } = useConfirm();
   const [ws, setWs] = useState(undefined); // undefined=loading, null=no manifest, object=workspace
@@ -468,7 +559,8 @@ function Workspace({ org, showToast, onBack }) {
   const [sSummary, setSSummary] = useState('');
   const [sAutonomy, setSAutonomy] = useState('L3');
   const [genDesc, setGenDesc] = useState('');
-  const [genBusy, setGenBusy] = useState(false);
+  const [genBusy, setGenBusy] = useState(false);     // AI "Generate" in flight
+  const [applyBusy, setApplyBusy] = useState(false); // "Validate & apply" (pasted JSON) in flight
   const [hasAiKey, setHasAiKey] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [genErrors, setGenErrors] = useState([]);   // validation errors (JSON present, fixable)
@@ -476,9 +568,10 @@ function Workspace({ org, showToast, onBack }) {
   // { type, mode:'view'|'edit', page } for document-mode types. Restored from sessionStorage on F5
   // so the user returns to the document they were on (only the id is kept; renderDocSpace re-resolves
   // it to the live entry once the workspace loads).
+  const docKey = 'aimeat.ws.' + orgId + '.' + wsId + '.activeDoc';
   const [activeDoc, setActiveDoc] = useState(() => {
     try {
-      const raw = sessionStorage.getItem('aimeat.ws.' + orgId + '.activeDoc');
+      const raw = sessionStorage.getItem(docKey);
       if (raw) { const v = JSON.parse(raw); if (v && v.type && v.id) return { type: v.type, mode: v.mode === 'edit' ? 'edit' : 'view', page: { id: v.id } }; }
     } catch (e) { /* noop */ }
     return null;
@@ -492,28 +585,27 @@ function Workspace({ org, showToast, onBack }) {
   const [newSpaceMode, setNewSpaceMode] = useState('document');
 
   const load = useCallback(async () => {
-    const w = await orgService.getWorkspace(orgId).catch(() => null);
+    const w = await orgService.getWorkspace(orgId, wsId).catch(() => null);
     if (w && w.manifest) {
       const [ap, cfg, secs] = await Promise.all([
         orgService.listApprovals(orgId, 'pending').catch(() => []),
         orgService.getConfig(orgId).catch(() => ({})),
-        orgService.getAllSections(orgId).catch(() => ({})),
+        orgService.getAllSections(orgId, wsId).catch(() => ({})),
       ]);
       setApprovals(ap); setGateOn(!!(cfg?.gates?.publish?.enabled)); setSectionsByType(secs);
     }
     setWs(w && w.manifest ? w : null);
-  }, [orgId]);
+  }, [orgId, wsId]);
 
   useEffect(() => { load(); }, [load]);
 
   // Persist the open document (id only) so an F5 returns to it. Skip unsaved new docs (no id yet).
   useEffect(() => {
     try {
-      const key = 'aimeat.ws.' + orgId + '.activeDoc';
-      if (activeDoc?.type && activeDoc.page?.id) sessionStorage.setItem(key, JSON.stringify({ type: activeDoc.type, id: activeDoc.page.id, mode: activeDoc.mode }));
-      else sessionStorage.removeItem(key);
+      if (activeDoc?.type && activeDoc.page?.id) sessionStorage.setItem(docKey, JSON.stringify({ type: activeDoc.type, id: activeDoc.page.id, mode: activeDoc.mode }));
+      else sessionStorage.removeItem(docKey);
     } catch (e) { /* noop */ }
-  }, [activeDoc, orgId]);
+  }, [activeDoc, docKey]);
 
   const liveRef = useRef(load); liveRef.current = load;
   useEffect(() => {
@@ -525,7 +617,7 @@ function Workspace({ org, showToast, onBack }) {
   const setup = useCallback(async () => {
     setBusy(true);
     try {
-      await orgService.applyProjectTemplate(orgId, org.name || 'Project', org.description || '');
+      await orgService.applyProjectTemplate(orgId, wsId, org.name || 'Project', org.description || '');
       showToast(t('organisms.workspaceReady') || 'Workspace ready');
       await load();
     } catch (e) { showToast((e && e.message) || (t('organisms.setupError') || 'Failed to set up workspace')); }
@@ -540,14 +632,16 @@ function Workspace({ org, showToast, onBack }) {
     catch (e) { setGenErrors([(e && e.message) || 'Invalid JSON']); return; }
     const errs = orgService.validateGenerated(generated);
     if (errs.length) { setGenErrors(errs); return; }
-    setGenBusy(true);
+    // The Generate flow owns genBusy; a direct paste-apply spins its own button only.
+    const setBusyFn = fromGenerator ? setGenBusy : setApplyBusy;
+    setBusyFn(true);
     try {
-      await orgService.applyGeneratedWorkspace(orgId, generated);
+      await orgService.applyGeneratedWorkspace(orgId, wsId, generated);
       showToast(t('organisms.workspaceReady') || 'Workspace ready');
       if (fromGenerator) setShowSettings(true);   // open settings so the user can tweak the generated workspace
       await load();
     } catch (e) { setGenErrors([(e && e.message) || (t('organisms.applyError') || 'Could not apply — check the JSON.')]); }
-    finally { setGenBusy(false); }
+    finally { setBusyFn(false); }
   }, [orgId, showToast, load]);
 
   const generate = useCallback(async () => {
@@ -582,7 +676,7 @@ function Workspace({ org, showToast, onBack }) {
 
   const startAdd = useCallback(async (ot) => {
     setAdding(ot.name); setAddingSchema(null);
-    const s = await orgService.getObjectSchema(orgId, ot.namespace);
+    const s = await orgService.getObjectSchema(orgId, wsId, ot.namespace);
     setAddingSchema(s || { properties: { id: { type: 'string' }, title: { type: 'string' } }, required: ['title'] });
   }, [orgId]);
 
@@ -590,7 +684,7 @@ function Workspace({ org, showToast, onBack }) {
     const id = (String(value.id || '').trim() || `${ot.name}-${Date.now().toString(36)}`).replace(/[^a-zA-Z0-9_-]/g, '-');
     setBusy(true);
     try {
-      const r = await orgService.writeDraft(orgId, ot.namespace, id, { ...value, id });
+      const r = await orgService.writeDraft(orgId, wsId, ot.namespace, id, { ...value, id });
       if (r?.ok === false) { showToast(r?.error?.message || 'Draft rejected'); }
       else { showToast(t('organisms.draftSaved') || 'Draft saved'); setAdding(null); setAddingSchema(null); await load(); }
     } catch (e) { showToast((e && e.message) || 'Failed to save draft'); }
@@ -603,13 +697,13 @@ function Workspace({ org, showToast, onBack }) {
     const id = (String(page.id || '').trim() || `doc-${Date.now().toString(36)}`).replace(/[^a-zA-Z0-9_-]/g, '-');
     setBusy(true);
     try {
-      const r = await orgService.writeDraft(orgId, ot.namespace, id, { id, title: page.title, markdown: page.markdown });
+      const r = await orgService.writeDraft(orgId, wsId, ot.namespace, id, { id, title: page.title, markdown: page.markdown });
       if (r?.ok === false) { showToast(r?.error?.message || 'Document rejected'); }
       else {
         if (sectionId) {
           const secs = (sectionsByType[ot.name] || []).map(s => s.id === sectionId
             ? { ...s, documents: [...(s.documents || []).filter(d => d !== id), id] } : s);
-          await orgService.saveSections(orgId, ot.name, secs).catch(() => {});
+          await orgService.saveSections(orgId, wsId, ot.name, secs).catch(() => {});
         }
         // Reload, then open the just-saved document (view mode). renderDocSpace re-resolves the id
         // to the fresh merged entry, so the new draft shows with its badge instead of the empty state.
@@ -622,7 +716,7 @@ function Workspace({ org, showToast, onBack }) {
   // ── Section index ops (persist organism.{id}.meta.sections.{typeName}) ──
   const updateSections = useCallback(async (typeName, sections) => {
     setSectionsByType(s => ({ ...s, [typeName]: sections }));
-    await orgService.saveSections(orgId, typeName, sections).catch(e => showToast((e && e.message) || 'Failed to save sections'));
+    await orgService.saveSections(orgId, wsId, typeName, sections).catch(e => showToast((e && e.message) || 'Failed to save sections'));
   }, [orgId, showToast]);
   const addSection = (typeName, parentId) => {
     const id = 'sec-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
@@ -647,12 +741,12 @@ function Workspace({ org, showToast, onBack }) {
   const sectionsRef = useRef(sectionsByType); sectionsRef.current = sectionsByType;
   const setSecName = (typeName, secId, name) =>
     setSectionsByType(s => ({ ...s, [typeName]: (s[typeName] || []).map(x => x.id === secId ? { ...x, name } : x) }));
-  const commitSecName = (typeName) => { setEditingSec(null); orgService.saveSections(orgId, typeName, sectionsRef.current[typeName] || []).catch(() => {}); };
+  const commitSecName = (typeName) => { setEditingSec(null); orgService.saveSections(orgId, wsId, typeName, sectionsRef.current[typeName] || []).catch(() => {}); };
 
   const publish = useCallback(async (ot, instanceId) => {
     setBusy(true);
     try {
-      const r = await orgService.publishDraft(orgId, ot.namespace, instanceId);
+      const r = await orgService.publishDraft(orgId, wsId, ot.namespace, instanceId);
       if (r?.data?.gated) showToast(t('organisms.publishGated') || 'Sent for review (publish gate is on)');
       else showToast((t('organisms.published') || 'Published') + (r?.data?.version ? ` v${r.data.version}` : ''));
       await load();
@@ -693,7 +787,7 @@ function Workspace({ org, showToast, onBack }) {
         policy: { ...(ws.manifest.policy || {}), agentAutonomy: sAutonomy },
         updatedAt: new Date().toISOString(),
       };
-      await orgService.saveManifest(orgId, m);
+      await orgService.saveManifest(orgId, wsId, m);
       showToast(t('organisms.settingsSaved') || 'Settings saved');
       setShowSettings(false);
       await load();
@@ -709,12 +803,12 @@ function Workspace({ org, showToast, onBack }) {
       async () => {
         setBusy(true);
         try {
-          const r = await orgService.deleteWorkspace(orgId);
+          const r = await orgService.deleteWorkspace(orgId, wsId);
           if (r?.ok === false) { showToast(r?.error?.message || 'Failed to delete'); }
           else {
             showToast(t('organisms.workspaceDeleted') || 'Workspace deleted');
             setShowSettings(false); setDelConfirm(''); setShowRegenerate(false);
-            await load();
+            onBack();   // the workspace is gone — return to the organism's workspace list
           }
         } catch (e) { showToast((e && e.message) || 'Failed to delete workspace'); }
         finally { setBusy(false); }
@@ -728,7 +822,7 @@ function Workspace({ org, showToast, onBack }) {
     if (!newSpaceName.trim() || !ws?.manifest) return;
     setBusy(true);
     try {
-      await orgService.addSpace(orgId, ws.manifest, newSpaceName.trim(), newSpaceMode);
+      await orgService.addSpace(orgId, wsId, ws.manifest, newSpaceName.trim(), newSpaceMode);
       showToast(t('organisms.spaceAdded') || 'Space added');
       setNewSpaceName('');
       await load();
@@ -742,7 +836,7 @@ function Workspace({ org, showToast, onBack }) {
       async () => {
         setBusy(true);
         try {
-          await orgService.removeSpace(orgId, ws.manifest, typeName);
+          await orgService.removeSpace(orgId, wsId, ws.manifest, typeName);
           showToast(t('organisms.spaceRemoved') || 'Space removed');
           await load();
         } catch (e) { showToast((e && e.message) || 'Failed to remove space'); }
@@ -799,14 +893,14 @@ function Workspace({ org, showToast, onBack }) {
       `}
 
       <div class="form-actions">
-        <button class="btn-primary btn-sm" onClick=${applyPasted} disabled=${genBusy || !pasteText.trim()}>
-          ${genBusy ? html`<span class="spinner"></span> ` : ''}${t('organisms.applyPasted') || 'Validate & apply'}
+        <button class="btn-primary btn-sm" onClick=${applyPasted} disabled=${applyBusy || !pasteText.trim()}>
+          ${applyBusy ? html`<span class="spinner"></span> ` : ''}${t('organisms.applyPasted') || 'Validate & apply'}
         </button>
       </div>
     </div>
   `;
 
-  const back = html`<div class="card-actions mb-half"><button class="btn-ghost btn-sm" onClick=${onBack}>${'← '}${t('organisms.backToList') || 'All organisms'}</button></div>`;
+  const back = html`<div class="card-actions mb-half"><button class="btn-ghost btn-sm" onClick=${onBack}>${'← '}${t('organisms.backToWorkspaces') || 'Workspaces'}</button></div>`;
 
   if (ws === undefined) return html`<div>${back}<${Spinner} text=${t('organisms.loading') || 'Loading...'} /></div>`;
 
@@ -1039,7 +1133,7 @@ function Workspace({ org, showToast, onBack }) {
         </div>
       `)}
 
-      <${SourcesPanel} orgId=${orgId} showToast=${showToast} />
+      <${SourcesPanel} orgId=${orgId} wsId=${wsId} showToast=${showToast} />
 
       ${(ws.decisions || []).length > 0 && html`
         <div class="pj-section">
@@ -1058,7 +1152,7 @@ function Workspace({ org, showToast, onBack }) {
  * data stays where it lives (organism.{id}.meta.sources holds just the pointers). Attach via a
  * picker with Memory / Storage / Knowledge tabs (Mine, or Discover for memory + knowledge). */
 const SRC_ICON = { memory: '🧠', storage: '📎', knowledge: '📚' };
-function SourcesPanel({ orgId, showToast }) {
+function SourcesPanel({ orgId, wsId, showToast }) {
   const [sources, setSources] = useState([]);
   const [picking, setPicking] = useState(false);
   const [tab, setTab] = useState('knowledge');   // memory | storage | knowledge
@@ -1068,7 +1162,7 @@ function SourcesPanel({ orgId, showToast }) {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async () => { setSources(await orgService.getWorkspaceSources(orgId)); }, [orgId]);
+  const load = useCallback(async () => { setSources(await orgService.getWorkspaceSources(orgId, wsId)); }, [orgId, wsId]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     const h = () => load();
@@ -1078,7 +1172,7 @@ function SourcesPanel({ orgId, showToast }) {
 
   const persist = async (next) => {
     setSources(next);
-    const r = await orgService.saveWorkspaceSources(orgId, next).catch(() => ({ ok: false }));
+    const r = await orgService.saveWorkspaceSources(orgId, wsId, next).catch(() => ({ ok: false }));
     if (r?.ok === false) showToast(t('organisms.sourcesSaveError') || 'Failed to save sources');
   };
 

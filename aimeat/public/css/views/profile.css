@@ -2048,6 +2048,15 @@
    distinct from the flat tree panel beside it. */
 .pj-doc-view { border: 1px solid var(--border); border-radius: 10px; padding: 0.8rem 1.1rem; margin: 0.4rem 0; background: var(--card); box-shadow: var(--shadow-sm); }
 .pj-doc-meta { margin: 0 0 0.5rem; }
+/* Workspace list (an organism's many workspaces) */
+.pj-ws-bar { display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0 0.75rem; }
+.pj-ws-name-input { flex: 0 1 260px; }
+.pj-ws-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.pj-ws-card { display: flex; align-items: center; gap: 0.5rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.1rem 0.5rem 0.1rem 0.1rem; box-shadow: var(--shadow-sm); }
+.pj-ws-open { flex: 1; display: flex; align-items: baseline; gap: 0.6rem; background: none; border: none; cursor: pointer; text-align: left; padding: 0.7rem 0.85rem; border-radius: 10px; }
+.pj-ws-open:hover { background: var(--bg-surface); }
+.pj-ws-card-name { font-weight: 600; font-size: 0.95rem; color: var(--text); }
+.pj-ws-card-meta { font-size: 0.74rem; color: var(--muted); }
 .pj-doc-editor { margin: 0.4rem 0; }
 .pj-doc-editor > input { margin-bottom: 0.4rem; }
 .pj-doc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }

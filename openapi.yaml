@@ -10888,6 +10888,16 @@ paths:
           schema:
             type: string
           description: Organism ID
+        - name: ws
+          in: query
+          required: false
+          schema:
+            type: string
+          description: >
+            Workspace id. An organism holds many workspaces, each scoped under
+            `organism.{id}.w.{ws}.*` (manifest at `organism.{id}.w.{ws}.meta.manifest`). The
+            workspace list lives at `organism.{id}.meta.workspaces`. Omitting `ws` reads the
+            legacy organism-level root.
       responses:
         '200':
           description: The aggregated workspace
@@ -10945,6 +10955,14 @@ paths:
           schema:
             type: string
           description: Organism ID
+        - name: ws
+          in: query
+          required: false
+          schema:
+            type: string
+          description: >
+            Workspace id — wipes only `organism.{id}.w.{ws}.*`. Omitted = legacy organism-level wipe.
+            The client also removes the entry from `organism.{id}.meta.workspaces`.
       responses:
         '200':
           description: Workspace deleted (counts of removed keys/schemas)
@@ -10994,6 +11012,7 @@ paths:
               properties:
                 namespace: { type: string, description: "Relative namespace, e.g. meta.goals or shared.deliverables" }
                 id: { type: string, description: The instance id whose .draft to publish }
+                ws: { type: string, description: "Workspace id — publishes the draft under organism.{id}.w.{ws}.* (omit for the legacy organism-level root)" }
       responses:
         '200': { description: Published (version returned) }
         '202': { description: Publish requires approval — a pending approval was created }

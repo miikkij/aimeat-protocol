@@ -246,8 +246,12 @@ export async function generateRaw(description, currentManifest) {
 
 /** Delete a workspace entirely — removes all organism.{id}.* memory + its schema locks. The
  *  organism stays (returns to "no workspace yet"). Deliberate typed-confirmation lives in the UI. */
-export async function deleteWorkspace(orgId) {
-  return apiDelete(`/v1/organisms/${encodeURIComponent(orgId)}/workspace`);
+export async function deleteWorkspace(orgId, wsId) {
+  const r = await apiDelete(`/v1/organisms/${encodeURIComponent(orgId)}/workspace?ws=${encodeURIComponent(wsId)}`);
+  // Drop the registry entry so the deleted workspace no longer lists.
+  const list = await listWorkspaces(orgId);
+  await saveWorkspaceRegistry(orgId, list.filter(w => w.id !== wsId)).catch(() => {});
+  return r;
 }
 
 /** Client-side validation of a parsed { manifest, schemas }. Returns an array of human-readable
@@ -293,13 +297,17 @@ ${jsonText}`;
 }
 
 /** Apply a generated (or any) workspace to an organism: register its schemas + write the manifest. */
-export async function applyGeneratedWorkspace(orgId, generated) {
+/** Key root for one workspace — an organism holds many workspaces under organism.{id}.w.{wsId}. */
+export function wsRoot(orgId, wsId) { return `organism.${orgId}.w.${wsId}`; }
+
+export async function applyGeneratedWorkspace(orgId, wsId, generated) {
+  const root = wsRoot(orgId, wsId);
   for (const [namespace, schema] of Object.entries(generated.schemas || {})) {
-    await apiPut(`/v1/memory/${encodeURIComponent(`organism.${orgId}.${namespace}`)}/schema`, { schema, apply_to: 'prefix', schema_mode: 'strict' });
+    await apiPut(`/v1/memory/${encodeURIComponent(`${root}.${namespace}`)}/schema`, { schema, apply_to: 'prefix', schema_mode: 'strict' });
   }
   const manifest = { ...generated.manifest, id: orgId, status: generated.manifest.status || 'active' };
-  await apiPost('/v1/memory', { key: `organism.${orgId}.meta.manifest`, value: manifest, visibility: 'private' });
-  await apiPost('/v1/memory', { key: `organism.${orgId}.meta.readme`, value: `# ${manifest.name || 'Workspace'}\n\n${manifest.summary || ''}`, visibility: 'private' });
+  await apiPost('/v1/memory', { key: `${root}.meta.manifest`, value: manifest, visibility: 'private' });
+  await apiPost('/v1/memory', { key: `${root}.meta.readme`, value: `# ${manifest.name || 'Workspace'}\n\n${manifest.summary || ''}`, visibility: 'private' });
   // Write any example instances as DRAFTS (clearly not-yet-published samples). Best-effort: a
   // sample that doesn't validate is skipped, not fatal.
   let n = 0;
@@ -308,29 +316,59 @@ export async function applyGeneratedWorkspace(orgId, generated) {
     for (const item of items.slice(0, 5)) {
       n++;
       const id = String((item && item.id) || `example-${n}`).replace(/[^a-zA-Z0-9_-]/g, '-');
-      await apiPost('/v1/memory', { key: `organism.${orgId}.${namespace}.${id}.draft`, value: { ...item, id }, visibility: 'private' }).catch(() => {});
+      await apiPost('/v1/memory', { key: `${root}.${namespace}.${id}.draft`, value: { ...item, id }, visibility: 'private' }).catch(() => {});
     }
   }
 }
 
-/** Apply the project template to an EXISTING organism (register schemas + write the manifest + readme). */
-export async function applyProjectTemplate(orgId, name, summary) {
+/** Apply the project template to a workspace (register schemas + write the manifest + readme). */
+export async function applyProjectTemplate(orgId, wsId, name, summary) {
+  const root = wsRoot(orgId, wsId);
   for (const [namespace, schema] of Object.entries(PROJECT_SCHEMAS)) {
-    await apiPut(`/v1/memory/${encodeURIComponent(`organism.${orgId}.${namespace}`)}/schema`, { schema, apply_to: 'prefix', schema_mode: 'strict' });
+    await apiPut(`/v1/memory/${encodeURIComponent(`${root}.${namespace}`)}/schema`, { schema, apply_to: 'prefix', schema_mode: 'strict' });
   }
-  await apiPost('/v1/memory', { key: `organism.${orgId}.meta.manifest`, value: projectManifest(orgId, name, summary), visibility: 'private' });
-  await apiPost('/v1/memory', { key: `organism.${orgId}.meta.readme`, value: `# ${name}\n\n${summary || ''}`, visibility: 'private' });
+  await apiPost('/v1/memory', { key: `${root}.meta.manifest`, value: projectManifest(orgId, name, summary), visibility: 'private' });
+  await apiPost('/v1/memory', { key: `${root}.meta.readme`, value: `# ${name}\n\n${summary || ''}`, visibility: 'private' });
 }
 
-/** Read the manifest-driven workspace. Returns null if the org has no workspace yet. */
-export async function getWorkspace(orgId) {
-  const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace`);
+/** Read the manifest-driven workspace. Returns null if the workspace has no manifest yet. */
+export async function getWorkspace(orgId, wsId) {
+  const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace?ws=${encodeURIComponent(wsId)}`);
   return resp?.data || null;
 }
 
-/** Overwrite the organism's manifest (e.g. edited name/summary/policy from Settings). */
-export async function saveManifest(orgId, manifest) {
-  return apiPost('/v1/memory', { key: `organism.${orgId}.meta.manifest`, value: manifest, visibility: 'private' });
+/** Overwrite a workspace's manifest (e.g. edited name/summary/policy from Settings). */
+export async function saveManifest(orgId, wsId, manifest) {
+  return apiPost('/v1/memory', { key: `${wsRoot(orgId, wsId)}.meta.manifest`, value: manifest, visibility: 'private' });
+}
+
+/* ── Workspace registry: one organism lists its workspaces at organism.{id}.meta.workspaces =
+ *    { workspaces: [{ id, name, createdAt }] }. A workspace appears here even before it has a
+ *    manifest (so a freshly-created, not-yet-generated workspace is openable). ── */
+
+/** List an organism's workspaces (registry order). */
+export async function listWorkspaces(orgId) {
+  const key = `organism.${orgId}.meta.workspaces`;
+  try {
+    const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(key)}`);
+    const item = (resp?.data?.items || []).find(i => i.key === key);
+    return Array.isArray(item?.value?.workspaces) ? item.value.workspaces : [];
+  } catch { return []; }
+}
+
+/** Persist the workspace registry. */
+export async function saveWorkspaceRegistry(orgId, workspaces) {
+  return apiPost('/v1/memory', { key: `organism.${orgId}.meta.workspaces`, value: { workspaces }, visibility: 'private' });
+}
+
+/** Create a new (empty) workspace: register it, return its { id, name }. The manifest is written
+ *  later by setup/generate. */
+export async function createWorkspace(orgId, name) {
+  const id = 'ws-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  const entry = { id, name: String(name || '').trim() || 'Workspace', createdAt: new Date().toISOString() };
+  const list = await listWorkspaces(orgId);
+  await saveWorkspaceRegistry(orgId, [...list, entry]);
+  return entry;
 }
 
 /** kebab-case a free-typed name into a safe namespace segment / type name. */
@@ -340,7 +378,7 @@ function slug(name) {
 
 /** Manually add an object type to the manifest (no AI). mode 'document' needs no schema;
  *  'records' gets a starter {id,title} schema that can be refined later via Restructure. */
-export async function addSpace(orgId, manifest, name, mode) {
+export async function addSpace(orgId, wsId, manifest, name, mode) {
   const base = slug(name);
   const plural = base.endsWith('s') ? base : base + 's';
   const existing = new Set((manifest.objectTypes || []).map(o => o.namespace));
@@ -348,38 +386,38 @@ export async function addSpace(orgId, manifest, name, mode) {
   for (let i = 2; existing.has(namespace); i++) namespace = `shared.${plural}-${i}`;
   const ot = { name: base, schemaRef: `schema:${base}@1`, namespace, backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode };
   if (mode === 'records') {
-    await apiPut(`/v1/memory/${encodeURIComponent(`organism.${orgId}.${namespace}`)}/schema`, {
+    await apiPut(`/v1/memory/${encodeURIComponent(`${wsRoot(orgId, wsId)}.${namespace}`)}/schema`, {
       schema: { type: 'object', required: ['id', 'title'], properties: { id: { type: 'string' }, title: { type: 'string' } } },
       apply_to: 'prefix', schema_mode: 'strict',
     });
   }
-  return saveManifest(orgId, { ...manifest, objectTypes: [...(manifest.objectTypes || []), ot] });
+  return saveManifest(orgId, wsId, { ...manifest, objectTypes: [...(manifest.objectTypes || []), ot] });
 }
 
 /** Remove an object type from the manifest by name. Its data is left in memory (orphaned, not
  *  deleted) — re-adding the type surfaces it again; a full wipe is the workspace-delete path. */
-export async function removeSpace(orgId, manifest, typeName) {
-  return saveManifest(orgId, { ...manifest, objectTypes: (manifest.objectTypes || []).filter(o => o.name !== typeName) });
+export async function removeSpace(orgId, wsId, manifest, typeName) {
+  return saveManifest(orgId, wsId, { ...manifest, objectTypes: (manifest.objectTypes || []).filter(o => o.name !== typeName) });
 }
 
 /** Fetch the JSON Schema registered for an object-type namespace (drives schema-aware forms).
  *  Probes a sub-key so the prefix schema resolves (a prefix schema doesn't self-match its own key). */
-export async function getObjectSchema(orgId, namespace) {
-  const key = `organism.${orgId}.${namespace}._form`;
+export async function getObjectSchema(orgId, wsId, namespace) {
+  const key = `${wsRoot(orgId, wsId)}.${namespace}._form`;
   try {
     const resp = await apiGet(`/v1/memory/${encodeURIComponent(key)}/schema`);
     return resp?.data?.has_schema ? resp.data.schema : null;
   } catch { return null; }
 }
 
-/** Write/overwrite an object's draft (`…{namespace}.{id}.draft`). */
-export async function writeDraft(orgId, namespace, instanceId, value) {
-  return apiPost('/v1/memory', { key: `organism.${orgId}.${namespace}.${instanceId}.draft`, value, visibility: 'private' });
+/** Write/overwrite an object's draft (`…w.{wsId}.{namespace}.{id}.draft`). */
+export async function writeDraft(orgId, wsId, namespace, instanceId, value) {
+  return apiPost('/v1/memory', { key: `${wsRoot(orgId, wsId)}.${namespace}.${instanceId}.draft`, value, visibility: 'private' });
 }
 
 /** Publish a draft → new version + latest (or a pending approval if the publish gate is on). */
-export async function publishDraft(orgId, namespace, instanceId) {
-  return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/publish`, { namespace, id: instanceId });
+export async function publishDraft(orgId, wsId, namespace, instanceId) {
+  return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/publish`, { ws: wsId, namespace, id: instanceId });
 }
 
 /** List pending approvals (the gate inbox). */
@@ -492,10 +530,10 @@ export function applyImageVisibilityUrls(markdown, visByKey, ghii) {
 
 /** Section indexes for every document-space, keyed by objectType name. A section is
  *  { id, name, parentId, documents:[docId] } — a flat array forming a tree via parentId. */
-export async function getAllSections(orgId) {
+export async function getAllSections(orgId, wsId) {
   const out = {};
   try {
-    const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(`organism.${orgId}.meta.sections.`)}`);
+    const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(`${wsRoot(orgId, wsId)}.meta.sections.`)}`);
     for (const it of (resp?.data?.items || [])) {
       const m = String(it.key || '').match(/\.meta\.sections\.(.+)$/);
       if (m) out[m[1]] = Array.isArray(it.value?.sections) ? it.value.sections : [];
@@ -504,9 +542,9 @@ export async function getAllSections(orgId) {
   return out;
 }
 
-/** Persist the section index for one document-space (organism.{id}.meta.sections.{typeName}). */
-export async function saveSections(orgId, typeName, sections) {
-  return apiPost('/v1/memory', { key: `organism.${orgId}.meta.sections.${typeName}`, value: { sections }, visibility: 'private' });
+/** Persist the section index for one document-space (…w.{wsId}.meta.sections.{typeName}). */
+export async function saveSections(orgId, wsId, typeName, sections) {
+  return apiPost('/v1/memory', { key: `${wsRoot(orgId, wsId)}.meta.sections.${typeName}`, value: { sections }, visibility: 'private' });
 }
 
 /* ── Sources: references the workspace draws on (memory / storage / knowledge). Pointers only —
@@ -514,8 +552,8 @@ export async function saveSections(orgId, typeName, sections) {
  *  organism.{id}.meta.sources = { sources: [{ id, type, label, key?, ownerGaii?, packageId?, external }] }. */
 
 /** Read the workspace's attached source references (empty array if none). */
-export async function getWorkspaceSources(orgId) {
-  const key = `organism.${orgId}.meta.sources`;
+export async function getWorkspaceSources(orgId, wsId) {
+  const key = `${wsRoot(orgId, wsId)}.meta.sources`;
   try {
     const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(key)}`);
     const item = (resp?.data?.items || []).find(i => i.key === key);
@@ -524,8 +562,8 @@ export async function getWorkspaceSources(orgId) {
 }
 
 /** Persist the workspace's source references. */
-export async function saveWorkspaceSources(orgId, sources) {
-  return apiPost('/v1/memory', { key: `organism.${orgId}.meta.sources`, value: { sources }, visibility: 'private' });
+export async function saveWorkspaceSources(orgId, wsId, sources) {
+  return apiPost('/v1/memory', { key: `${wsRoot(orgId, wsId)}.meta.sources`, value: { sources }, visibility: 'private' });
 }
 
 /** List the caller's own storage files (key, size, mime, visibility) — for the storage source picker. */
