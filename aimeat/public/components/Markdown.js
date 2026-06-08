@@ -23,8 +23,11 @@
  *   v1.0.0 -- 2026-05-31 -- Initial creation for the agent README tab
  *   v1.1.0 -- 2026-06-08 -- Image src sanitized separately, allowing blob: (auth'd object URLs)
  *     so callers can swap a private /v1/storage URL to a fetched blob in the markdown text.
+ *   v1.2.0 -- 2026-06-08 -- ```mermaid fenced blocks render as diagrams (lazy-loaded Mermaid),
+ *     so documents (and any Markdown view) can embed charts.
  */
 import { h } from 'preact';
+import { Mermaid } from './Mermaid.js';
 
 // Only these schemes may appear in a rendered link. Everything else (javascript:,
 // data:, vbscript:, file:, etc.) is dropped — the anchor renders without href.
@@ -191,7 +194,13 @@ function parseBlocks(src, onWikiLink) {
         i++;
       }
       i++; // consume closing fence (or EOF)
-      blocks.push(h('pre', { class: 'md-pre' }, h('code', { class: 'md-code' }, codeLines.join('\n'))));
+      const lang = (fence[2] || '').trim().toLowerCase();
+      if (lang === 'mermaid') {
+        // ```mermaid → render the diagram (Mermaid lazy-loads its 3MB renderer only when used).
+        blocks.push(h(Mermaid, { chart: codeLines.join('\n') }));
+      } else {
+        blocks.push(h('pre', { class: 'md-pre' }, h('code', { class: 'md-code' }, codeLines.join('\n'))));
+      }
       continue;
     }
 
