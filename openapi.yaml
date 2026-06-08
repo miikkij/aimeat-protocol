@@ -11075,6 +11075,58 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/organisms/{id}/workspace/export:
+    get:
+      operationId: exportWorkspace
+      summary: Download a full-fidelity ZIP backup of a workspace
+      description: |
+        Exports a workspace as a ZIP (`workspace.json` with the manifest, locked schemas, all object
+        versions/drafts, sections, sources + image metadata, and an `images/` folder of the real
+        binaries). Workspace creator or org admin. Add `?format=base64` to get a size-capped base64
+        JSON payload instead of the binary (for programmatic/MCP callers).
+      tags: [Organisms]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id to export }
+        - { name: format, in: query, required: false, schema: { type: string, enum: [base64] }, description: Return base64 JSON instead of the binary ZIP }
+      responses:
+        '200': { description: The workspace ZIP (application/zip) or base64 JSON }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { description: Too large for base64 mode }
+
+  /v1/organisms/{id}/workspace/import:
+    post:
+      operationId: importWorkspace
+      summary: Import a workspace ZIP as a new workspace
+      description: |
+        Restores a workspace export ZIP as a NEW workspace in this organism: remaps the
+        organism/workspace ids (record + document ids are preserved so links/references stay valid),
+        re-locks schemas, re-creates images (deduped if already present) and rewrites their URLs. The
+        importer becomes the new workspace's creator. Body is the raw ZIP (Content-Type:
+        application/zip) or JSON `{ zip_base64 }`. Member of the target organism.
+      tags: [Organisms]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+      requestBody:
+        required: true
+        content:
+          application/zip:
+            schema: { type: string, format: binary }
+          application/json:
+            schema:
+              type: object
+              required: [zip_base64]
+              properties:
+                zip_base64: { type: string, description: The workspace export ZIP, base64-encoded }
+      responses:
+        '201': { description: Imported — returns the new workspace id + counts }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/notifications:
     get:
       operationId: listNotifications

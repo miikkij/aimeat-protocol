@@ -1052,6 +1052,26 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_workspace_export',
+        description: 'Export a full-fidelity backup of a workspace (manifest, locked schemas, all object versions/drafts, sections, sources, and image binaries) as a base64 ZIP. For your own backup or to move a workspace. Size-capped for inline use — very large workspaces should be downloaded via the UI/REST. Workspace creator or org admin.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            ws: { type: 'string', required: true, description: 'Workspace id to export.' },
+        },
+    },
+    {
+        name: 'aimeat_workspace_import',
+        description: 'Import a workspace backup (base64 ZIP from aimeat_workspace_export) as a NEW workspace in an organism. Remaps ids (record/document ids are preserved so links + references stay valid), re-locks schemas, re-creates images (deduped if already present), and rewrites image URLs. You become the new workspace\'s creator. Member of the target organism.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Target organism to import into.' },
+            zip_base64: { type: 'string', required: true, description: 'The workspace export ZIP, base64-encoded (from aimeat_workspace_export).' },
+        },
+    },
+    {
         name: 'aimeat_wallet_transactions',
         description: 'View recent morsel transactions for your owner\'s wallet (id, type, amount, counterparty, tracking code, timestamp; default 20, max 200). Transactions are keyed to the owner GHII, shared across agents. For the current balance/escrow snapshot use aimeat_wallet_balance.',
         caller: 'agent',

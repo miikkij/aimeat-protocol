@@ -47,6 +47,8 @@
  *   v1.10.0 — 2026-06-08 — Per-workspace access control in WorkspaceList: discovers all org
  *     workspaces (not just own), shows access status, a "Request access" button for locked ones, and
  *     a request inbox (approve/deny/revoke) on workspaces you created.
+ *   v1.11.0 — 2026-06-09 — Workspace backup: Export (⬇ on each owned card, downloads a ZIP) + Import
+ *     (⬆ in the bar, uploads a ZIP → new workspace) buttons.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -559,9 +561,38 @@ function WorkspaceList({ org, showToast, onOpen, onBack }) {
     );
   };
 
+  // ── Export (download ZIP backup) + Import (upload a ZIP as a new workspace) ──
+  const jwt = () => { try { return window.AIMEAT?.auth?.getSession?.()?.jwt || ''; } catch { return ''; } };
+  const fileRef = useRef(null);
+  const doExport = async (w) => {
+    try {
+      const res = await fetch(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/export?ws=${encodeURIComponent(w.id)}`, { headers: { Authorization: 'Bearer ' + jwt() } });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `workspace-${String(w.name || w.id).replace(/[^a-z0-9_-]+/gi, '-').slice(0, 40)}.zip`;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    } catch (e) { showToast((e && e.message) || 'Export failed'); }
+  };
+  const doImport = async (file) => {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/import`, { method: 'POST', headers: { Authorization: 'Bearer ' + jwt(), 'Content-Type': 'application/zip' }, body: file });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.error?.message || 'Import failed');
+      showToast(t('organisms.imported') || 'Workspace imported');
+      await load();
+      if (body.data?.ws) onOpen(body.data.ws);
+    } catch (e) { showToast((e && e.message) || 'Import failed'); }
+    finally { setBusy(false); }
+  };
+
   return html`
     <div class="pj-ws">
       <${ConfirmUI} />
+      <input type="file" accept=".zip,application/zip" ref=${fileRef} style="display:none" onChange=${(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; doImport(f); }} />
       <button class="btn-ghost btn-sm" onClick=${onBack}>${'← '}${t('organisms.allOrganisms') || 'All organisms'}</button>
       <div class="section-title">${escHtml(org.name || 'Organism')}</div>
       <div class="section-desc">${t('organisms.workspacesDesc') || 'Workspaces in this organism — each is an independent space with its own documents, records and history.'}</div>
@@ -582,12 +613,15 @@ function WorkspaceList({ org, showToast, onOpen, onBack }) {
           <button class="btn-primary btn-sm" onClick=${create} disabled=${busy || !newName.trim()}>${t('organisms.create') || 'Create'}</button>
           <button class="btn-ghost btn-sm" onClick=${() => { setCreating(false); setNewName(''); }}>${t('organisms.cancel') || 'Cancel'}</button>
         ` : html`
-          <button class="btn-primary btn-sm" onClick=${() => setCreating(true)}>${'+ '}${t('organisms.newWorkspace') || 'New workspace'}</button>`}
+          <button class="btn-primary btn-sm" onClick=${() => setCreating(true)}>${'+ '}${t('organisms.newWorkspace') || 'New workspace'}</button>
+          <button class="btn-outline btn-sm" disabled=${busy} title=${t('organisms.importHint') || 'Restore a workspace from a .zip backup'} onClick=${() => fileRef.current && fileRef.current.click()}>${'⬆ '}${t('organisms.import') || 'Import'}</button>`}
       </div>
 
       ${list === null ? html`<${Spinner} />`
         : list.length === 0 ? html`<${EmptyState} icon="🗂️" text=${t('organisms.noWorkspaces') || 'No workspaces yet — create one to get started.'} />`
-        : html`<div class="pj-ws-list">
+        : html`
+          <div class="pj-ws-list-label">${t('organisms.currentWorkspaces') || 'Workspaces in this organism'}</div>
+          <div class="pj-ws-list">
           ${list.map(w => html`
             <div class="pj-ws-card" key=${w.id}>
               ${w.access === 'none' ? html`
@@ -603,6 +637,7 @@ function WorkspaceList({ org, showToast, onOpen, onBack }) {
                 </button>
                 ${w.access === 'owner' ? html`
                   <button class="pj-icon-btn" title=${t('organisms.requests') || 'Access requests'} onClick=${() => toggleInbox(w)}>👥</button>
+                  <button class="pj-icon-btn" title=${t('organisms.export') || 'Export backup (.zip)'} onClick=${() => doExport(w)}>⬇</button>
                   <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => remove(w.id, w.name || w.id)}>✕</button>
                 ` : null}
               `}

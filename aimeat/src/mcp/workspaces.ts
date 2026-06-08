@@ -21,6 +21,8 @@
  *   v1.2.0 -- 2026-06-08 -- Per-workspace access: _request_access / _list_requests / _approve_access
  *     (consent-backed, creator-controlled). _read now aggregates across member identities + the
  *     consent guard, so a granted member reads a shared workspace over MCP.
+ *   v1.3.0 -- 2026-06-09 -- _export / _import (full-fidelity ZIP backup/restore as base64; size-capped
+ *     inline). Reuses services/workspace-export + workspace-import.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { randomUUID } from 'node:crypto';
@@ -32,6 +34,8 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
 import { authorizeRead } from '../services/access-guard.js';
+import { exportWorkspace } from '../services/workspace-export.js';
+import { importWorkspace } from '../services/workspace-import.js';
 
 type ObjType = { name: string; namespace?: string; backing?: string; mode?: string };
 type Manifest = { objectTypes?: ObjType[] } & Record<string, unknown>;
@@ -379,5 +383,34 @@ export function registerWorkspaceTools(
             }
             await ensureConsent(ownerGhii, pattern, recipient, 'workspace-access');
             return ok({ status: 'approved', ws, requester });
+        });
+
+    // ── aimeat_workspace_export ──
+    mcp.tool('aimeat_workspace_export', descriptionFor('aimeat_workspace_export'),
+        { organism_id: z.string(), ws: z.string() },
+        annotationsFor('aimeat_workspace_export'),
+        async ({ organism_id, ws }): Promise<TextResult> => {
+            const deny = await denyReason(organism_id); if (deny) return fail(deny);
+            const entry = await findWsEntry(organism_id, ws);
+            if (!entry) return fail('Workspace not found');
+            const role = await roleOf(organism_id);
+            if (entry.createdBy !== ownerName && role !== 'creator' && role !== 'admin') return fail('Only the workspace creator or an org admin can export.');
+            const { buffer, filename } = await exportWorkspace(storage, config, { orgId: organism_id, ws, exporterGaii: ownerGhii, exportedAt: new Date().toISOString() });
+            if (buffer.length > 1_500_000) return fail(`Workspace too large for inline export (${buffer.length} bytes) — download it from the UI/REST instead.`);
+            return ok({ filename, size_bytes: buffer.length, zip_base64: buffer.toString('base64') });
+        });
+
+    // ── aimeat_workspace_import ──
+    mcp.tool('aimeat_workspace_import', descriptionFor('aimeat_workspace_import'),
+        { organism_id: z.string(), zip_base64: z.string() },
+        annotationsFor('aimeat_workspace_import'),
+        async ({ organism_id, zip_base64 }): Promise<TextResult> => {
+            const deny = await denyReason(organism_id); if (deny) return fail(deny);
+            const buf = Buffer.from(zip_base64, 'base64');
+            if (!buf.length) return fail('zip_base64 is empty or invalid.');
+            try {
+                const result = await importWorkspace(storage, config, { orgId: organism_id, importerGaii: ownerGhii, importerOwner: ownerName, zip: buf });
+                return ok(result);
+            } catch (e) { return fail((e as Error).message || 'Import failed'); }
         });
 }

@@ -21,8 +21,11 @@
  *     gated by the workspace creator; org membership only grants discovery.
  *   v1.5.0 -- 2026-06-08 -- Access request + approve/deny now drop an in-app notification (notify())
  *     to the creator / requester, so decisions surface in the header bell instead of being guesswork.
+ *   v1.6.0 -- 2026-06-09 -- Workspace backup/portability: GET /:id/workspace/export (full-fidelity
+ *     ZIP, ?format=base64) + POST /:id/workspace/import (restore as a new workspace, raw ZIP or
+ *     { zip_base64 }). See services/workspace-export.ts + workspace-import.ts.
  */
-import { Router } from 'express';
+import { Router, raw } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord, PendingApprovalRecord } from '../storage/interface.js';
@@ -35,6 +38,8 @@ import { shouldGate, gatePolicyFromManifest, type Risk } from '../services/gate-
 import { validateMemoryWrite } from '../services/schema-validator.js';
 import { expireOverdueApprovals, isOverdue } from '../services/gate-expiry.js';
 import { notify } from '../services/notify.js';
+import { exportWorkspace } from '../services/workspace-export.js';
+import { importWorkspace } from '../services/workspace-import.js';
 
 /** Whether a membership role satisfies an approval's required approverRole. */
 function roleSatisfies(approverRole: string, membershipRole: string): boolean {
@@ -914,6 +919,63 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       });
       emitChange('notifications');
       res.json(success(config.nodeId, { status: 'denied', ws, requester }));
+    }
+  });
+
+  /* ── GET /v1/organisms/:id/workspace/export?ws= — download a full-fidelity ZIP backup of a
+   * workspace (workspace.json + images/). The workspace creator (or an org admin) only. ── */
+  router.get('/v1/organisms/:id/workspace/export', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const ws = typeof req.query.ws === 'string' ? req.query.ws : undefined;
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    if (!ws) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws is required')); return; }
+    const role = await memberRole(req, organism, id);
+    if (!role) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    const entry = await findWsEntry(id, ws);
+    if (!entry) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Workspace not found')); return; }
+    const createdBy = entry.createdBy ?? bareOwner(entry.ownerGaii);
+    if (createdBy !== (req.auth!.owner as string) && role !== 'creator' && role !== 'admin') {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the workspace creator or an org admin can export')); return;
+    }
+    const { buffer, filename } = await exportWorkspace(storage, config, {
+      orgId: id, ws, exporterGaii: resolveIdentity(req.auth!, config.nodeId), exportedAt: new Date().toISOString(),
+    });
+    // Programmatic/MCP callers can request the ZIP as base64 JSON (size-capped to keep it out of an
+    // agent's context); the UI downloads the binary directly.
+    if (req.query.format === 'base64') {
+      if (buffer.length > 1_500_000) {
+        res.status(413).json(error(config.nodeId, 'TOO_LARGE', 'Workspace too large for inline (base64) export — use the UI/REST binary download.'));
+        return;
+      }
+      res.json(success(config.nodeId, { filename, size_bytes: buffer.length, zip_base64: buffer.toString('base64') }));
+      return;
+    }
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  });
+
+  /* ── POST /v1/organisms/:id/workspace/import — restore a workspace ZIP as a NEW workspace in this
+   * organism. Body is the raw ZIP (Content-Type application/zip). Member of the target org only;
+   * the importer becomes the new workspace's creator. ── */
+  router.post('/v1/organisms/:id/workspace/import', requireAuth(),
+    // Raw-parse the body EXCEPT application/json (which the global json parser handles → { zip_base64 }).
+    raw({ type: (r) => !/application\/json/i.test(r.headers['content-type'] || ''), limit: '64mb' }),
+    async (req, res) => {
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    if (!(await memberRole(req, organism, id))) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    const b64 = (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) ? (req.body as { zip_base64?: string }).zip_base64 : undefined;
+    const buf = Buffer.isBuffer(req.body) ? req.body : (typeof b64 === 'string' ? Buffer.from(b64, 'base64') : null);
+    if (!buf || buf.length === 0) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Send the workspace ZIP as the raw body (Content-Type: application/zip) or JSON { zip_base64 }')); return; }
+    try {
+      const result = await importWorkspace(storage, config, { orgId: id, importerGaii: resolveIdentity(req.auth!, config.nodeId), importerOwner: req.auth!.owner as string, zip: buf });
+      emitChange('organisms');
+      res.status(201).json(success(config.nodeId, result));
+    } catch (e) {
+      res.status(400).json(error(config.nodeId, 'IMPORT_FAILED', (e as Error).message || 'Could not import the workspace'));
     }
   });
 

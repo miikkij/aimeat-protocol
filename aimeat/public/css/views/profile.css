@@ -2063,6 +2063,7 @@
 /* Workspace list (an organism's many workspaces) */
 .pj-ws-bar { display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0 0.75rem; }
 .pj-ws-name-input { flex: 0 1 260px; }
+.pj-ws-list-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin: 0.5rem 0.1rem 0.35rem; }
 .pj-ws-list { display: flex; flex-direction: column; gap: 0.4rem; }
 .pj-ws-card { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.1rem 0.5rem 0.1rem 0.1rem; box-shadow: var(--shadow-sm); }
 .pj-ws-locked { cursor: default; }

@@ -209,4 +209,20 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace-access/decision`, { ws, requester, decision: decision === 'deny' ? 'deny' : 'approve' });
       return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
     });
+
+  mcp.tool('aimeat_workspace_export', descriptionFor('aimeat_workspace_export'),
+    { organism_id: z.string(), ws: z.string() },
+    annotationsFor('aimeat_workspace_export'),
+    async ({ organism_id, ws }) => {
+      const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace/export?ws=${encodeURIComponent(ws)}&format=base64`);
+      return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
+    });
+
+  mcp.tool('aimeat_workspace_import', descriptionFor('aimeat_workspace_import'),
+    { organism_id: z.string(), zip_base64: z.string().describe('Workspace export ZIP, base64-encoded') },
+    annotationsFor('aimeat_workspace_import'),
+    async ({ organism_id, zip_base64 }) => {
+      const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace/import`, { zip_base64 });
+      return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
+    });
 }

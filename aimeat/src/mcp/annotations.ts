@@ -101,6 +101,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_workspace_request_access: { title: 'Request Workspace Access', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_workspace_list_requests: { title: 'List Workspace Access Requests', readOnlyHint: true },
     aimeat_workspace_approve_access: { title: 'Approve Workspace Access', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_workspace_export: { title: 'Export Workspace', readOnlyHint: true },
+    aimeat_workspace_import: { title: 'Import Workspace', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_workspace_list: { title: 'List Workspaces', readOnlyHint: true },
     aimeat_workspace_read: { title: 'Read Workspace', readOnlyHint: true },
     aimeat_workspace_write_draft: { title: 'Write Workspace Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
