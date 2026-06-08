@@ -14,6 +14,8 @@
  *   v1.2.0 -- 2026-06-07 -- Access parity with memory: read paths go through shared authorizeRead()
  *     (threads file.groupId so visibility:'group' is membership-checked); presigned downloads now
  *     write an audit entry; /v1/pub authenticated-but-denied returns 403 (was 404).
+ *   v1.3.0 -- 2026-06-08 -- PATCH /v1/storage/:key/visibility (mirrors the memory-files route) so a
+ *     document can make its embedded images public for other viewers.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -250,6 +252,30 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             })),
             total: files.length,
         }));
+    });
+
+    // PATCH /v1/storage/:key/visibility — change a file's visibility (owner of the file only).
+    // Mirrors PATCH /v1/memory/files/:key/visibility. `:key` (single segment) matches the dotted,
+    // slash-free keys used for workspace images; registered before the wildcard {*key} routes.
+    // Lets a document make its embedded images public so other viewers can load them.
+    router.patch('/v1/storage/:key/visibility', requireAuth(), requireRole('agent'), async (req, res) => {
+        const gaii = resolve(req);
+        const key = req.params.key as string;
+        const { visibility } = req.body ?? {};
+
+        if (!visibility || !['private', 'owner', 'public'].includes(visibility)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility must be "private", "owner", or "public"'));
+            return;
+        }
+
+        const updated = await storage.updateFileVisibility(gaii, key, visibility);
+        if (!updated) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'File not found'));
+            return;
+        }
+
+        res.json(success(config.nodeId, { key: updated.key, visibility: updated.visibility }));
+        emitChange('memory');
     });
 
     // -----------------------------------------------

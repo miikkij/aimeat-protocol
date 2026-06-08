@@ -5729,6 +5729,55 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /v1/storage/{key}/visibility:
+    patch:
+      operationId: updateStorageFileVisibility
+      summary: Update storage file visibility
+      description: >
+        Change a storage file's visibility (file owner only). Used so a document can make its
+        embedded images public, letting other viewers load them. `key` is a single path segment
+        (the dotted, slash-free keys used for workspace images).
+      tags: [Storage]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [visibility]
+              properties:
+                visibility:
+                  $ref: '#/components/schemas/Visibility'
+      responses:
+        '200':
+          description: Visibility updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          key:
+                            type: string
+                          visibility:
+                            type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /v1/storage/{key}:
     get:
       operationId: downloadFile

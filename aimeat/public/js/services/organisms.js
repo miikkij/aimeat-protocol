@@ -4,7 +4,7 @@
  * (a "project" is just an organism with a meta.manifest): apply a template,
  * read the workspace, write/publish drafts, and resolve gate approvals.
  */
-import { api, apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
+import { api, apiGet, apiPost, apiPut, apiPatch, apiDelete } from '/js/api.js';
 
 /** List organisms. */
 export async function listOrganisms(opts = {}) {
@@ -440,6 +440,56 @@ export async function fetchStorageObjectUrl(url) {
   return URL.createObjectURL(await resp.blob());
 }
 
+/** List the caller's storage files → map of key → visibility (for showing per-image visibility). */
+export async function listStorageVisibilities() {
+  const resp = await apiGet('/v1/storage');
+  const out = {};
+  for (const f of (resp?.data?.files || [])) out[f.key] = f.visibility;
+  return out;
+}
+
+/** Change one stored image's visibility ('private' | 'owner' | 'public'). */
+export async function setImageVisibility(key, visibility) {
+  return apiPatch(`/v1/storage/${encodeURIComponent(key)}/visibility`, { visibility });
+}
+
+// Matches an embedded storage image in either URL form, capturing the bare object key in group 3:
+//   ![alt](/v1/storage/<key>)            — private, owner fetches with the session token
+//   ![alt](/v1/pub/<ownerGhii>/<key>)    — public, anyone loads it via a plain <img>
+const STORAGE_IMG_RE = /!\[([^\]]*)\]\(\/v1\/(?:storage|pub\/[^/)]+)\/([^\s)]+)\)/g;
+
+/** The current owner's GHII (`owner@node`) — used to build public /v1/pub image URLs. */
+export function currentGhii() {
+  return window.AIMEAT?.auth?.getSession?.()?.ghii || '';
+}
+
+/** Pull the storage object keys (+ alt text) embedded in a markdown document, in order (both forms). */
+export function extractStorageImages(markdown) {
+  const out = []; const seen = new Set();
+  STORAGE_IMG_RE.lastIndex = 0;
+  let m;
+  while ((m = STORAGE_IMG_RE.exec(String(markdown || ''))) !== null) {
+    const key = decodeURIComponent(m[2]);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ key, alt: m[1] || key.split('.').pop() });
+  }
+  return out;
+}
+
+/** Rewrite each embedded image's URL to match its visibility: public → /v1/pub/<ghii>/<key> (loads
+ *  for any viewer), otherwise → /v1/storage/<key> (owner-only, session-fetched). `visByKey` maps the
+ *  bare object key → 'public' | 'private' | 'owner'; keys not present default to private. */
+export function applyImageVisibilityUrls(markdown, visByKey, ghii) {
+  return String(markdown || '').replace(STORAGE_IMG_RE, (full, alt, rawKey) => {
+    const key = decodeURIComponent(rawKey);
+    const url = (visByKey[key] === 'public' && ghii)
+      ? `/v1/pub/${encodeURIComponent(ghii)}/${encodeURIComponent(key)}`
+      : `/v1/storage/${encodeURIComponent(key)}`;
+    return `![${alt}](${url})`;
+  });
+}
+
 /** Section indexes for every document-space, keyed by objectType name. A section is
  *  { id, name, parentId, documents:[docId] } — a flat array forming a tree via parentId. */
 export async function getAllSections(orgId) {
@@ -457,6 +507,31 @@ export async function getAllSections(orgId) {
 /** Persist the section index for one document-space (organism.{id}.meta.sections.{typeName}). */
 export async function saveSections(orgId, typeName, sections) {
   return apiPost('/v1/memory', { key: `organism.${orgId}.meta.sections.${typeName}`, value: { sections }, visibility: 'private' });
+}
+
+/* ── Sources: references the workspace draws on (memory / storage / knowledge). Pointers only —
+ *  the referenced data is never copied or moved, it stays where it lives. Stored at
+ *  organism.{id}.meta.sources = { sources: [{ id, type, label, key?, ownerGaii?, packageId?, external }] }. */
+
+/** Read the workspace's attached source references (empty array if none). */
+export async function getWorkspaceSources(orgId) {
+  const key = `organism.${orgId}.meta.sources`;
+  try {
+    const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(key)}`);
+    const item = (resp?.data?.items || []).find(i => i.key === key);
+    return Array.isArray(item?.value?.sources) ? item.value.sources : [];
+  } catch { return []; }
+}
+
+/** Persist the workspace's source references. */
+export async function saveWorkspaceSources(orgId, sources) {
+  return apiPost('/v1/memory', { key: `organism.${orgId}.meta.sources`, value: { sources }, visibility: 'private' });
+}
+
+/** List the caller's own storage files (key, size, mime, visibility) — for the storage source picker. */
+export async function listOwnStorageFiles() {
+  const resp = await apiGet('/v1/storage');
+  return resp?.data?.files || [];
 }
 
 /** Toggle the publish-review gate in the org's config. */

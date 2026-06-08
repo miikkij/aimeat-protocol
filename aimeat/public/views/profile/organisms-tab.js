@@ -18,6 +18,11 @@
  *   v1.2.0 — 2026-06-08 — DocumentView resolves storage images in the markdown text (re-render-safe,
  *     fixes broken image after toggling versions); saving a draft opens it (no more empty state);
  *     open workspace + document persist to sessionStorage so an F5 returns to where you were.
+ *   v1.3.0 — 2026-06-08 — Per-image visibility panel in the editor (badge + toggle + "make all
+ *     public"); save rewrites each image URL to match its visibility (public → /v1/pub/<ghii>/<key>
+ *     so other viewers can load it, private → /v1/storage/<key> owner-only).
+ *   v1.4.0 — 2026-06-08 — SourcesPanel: attach memory/storage/knowledge references (own or external/
+ *     discover) the workspace draws on; pointers only, stored at organism.{id}.meta.sources.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -28,6 +33,8 @@ import { escHtml } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as orgService from '/js/services/organisms.js';
+import * as memoryService from '/js/services/memory.js';
+import * as knowledgeService from '/js/services/knowledge.js';
 import { OpenRouterSettings } from './generator-settings.js';
 import { copyToClipboard } from '/js/utils.js';
 import { Markdown, slugifyHeading } from '/components/Markdown.js';
@@ -1028,6 +1035,8 @@ function Workspace({ org, showToast, onBack }) {
         </div>
       `)}
 
+      <${SourcesPanel} orgId=${orgId} showToast=${showToast} />
+
       ${(ws.decisions || []).length > 0 && html`
         <div class="pj-section">
           <div class="pj-section-title">${t('organisms.decisions') || 'Recent decisions'}</div>
@@ -1038,6 +1047,148 @@ function Workspace({ org, showToast, onBack }) {
       `}
     </div>
   `;
+}
+
+/* Sources: references the workspace draws on — memory entries, storage files, and knowledge
+ * packages (own, or external/read-only). Pointers ONLY: nothing is copied or moved; the referenced
+ * data stays where it lives (organism.{id}.meta.sources holds just the pointers). Attach via a
+ * picker with Memory / Storage / Knowledge tabs (Mine, or Discover for memory + knowledge). */
+const SRC_ICON = { memory: '🧠', storage: '📎', knowledge: '📚' };
+function SourcesPanel({ orgId, showToast }) {
+  const [sources, setSources] = useState([]);
+  const [picking, setPicking] = useState(false);
+  const [tab, setTab] = useState('knowledge');   // memory | storage | knowledge
+  const [scope, setScope] = useState('mine');     // mine | discover (storage has no discover)
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => { setSources(await orgService.getWorkspaceSources(orgId)); }, [orgId]);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const h = () => load();
+    window.addEventListener('aimeat-live-update', h);
+    return () => window.removeEventListener('aimeat-live-update', h);
+  }, [load]);
+
+  const persist = async (next) => {
+    setSources(next);
+    const r = await orgService.saveWorkspaceSources(orgId, next).catch(() => ({ ok: false }));
+    if (r?.ok === false) showToast(t('organisms.sourcesSaveError') || 'Failed to save sources');
+  };
+
+  const doSearch = async () => {
+    setLoading(true);
+    const ql = q.trim().toLowerCase();
+    try {
+      if (tab === 'memory') {
+        if (scope === 'mine') {
+          const items = await memoryService.listMemories();
+          setResults(items.filter(i => !ql || String(i.key).toLowerCase().includes(ql)).slice(0, 100));
+        } else {
+          const d = await memoryService.discoverPublicMemories({ q: q.trim(), limit: 50 });
+          setResults(d.items || []);
+        }
+      } else if (tab === 'storage') {
+        const files = await orgService.listOwnStorageFiles();
+        setResults(files.filter(f => !ql || String(f.key).toLowerCase().includes(ql)));
+      } else if (scope === 'mine') {
+        const pkgs = await knowledgeService.listMyPackages();
+        setResults(pkgs.filter(p => { const n = String(p.value?.name || p.key || ''); return !ql || n.toLowerCase().includes(ql); }));
+      } else {
+        const r = await knowledgeService.discoverPackages({ limit: 50, sort: 'recent' });
+        setResults((r?.data?.packages || []).filter(p => !ql || String(p.name || '').toLowerCase().includes(ql)));
+      }
+    } catch (e) { setResults([]); }
+    finally { setLoading(false); }
+  };
+  const searchRef = useRef(doSearch); searchRef.current = doSearch;
+  // Auto-search when the picker opens or the tab/scope changes — but NOT on every keystroke
+  // (typing only updates q; Enter or the Search button runs it).
+  useEffect(() => { if (picking) searchRef.current(); }, [picking, tab, scope]);
+  // storage has no cross-owner discovery — force 'mine' there
+  useEffect(() => { if (tab === 'storage' && scope !== 'mine') setScope('mine'); }, [tab, scope]);
+
+  const keyOf = (s) => `${s.type}:${s.packageId || (s.ownerGaii || '') + '|' + (s.key || '')}`;
+  const attach = async (item) => {
+    setBusy(true);
+    try {
+      const base = { id: 's-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), addedAt: new Date().toISOString() };
+      let src;
+      if (tab === 'memory') {
+        src = { ...base, type: 'memory', key: item.key, ownerGaii: item.owner_gaii || orgService.currentGhii(), label: item.key, external: scope === 'discover' };
+      } else if (tab === 'storage') {
+        src = { ...base, type: 'storage', key: item.key, ownerGaii: orgService.currentGhii(), label: item.key, mime: item.mime_type, external: false };
+      } else {
+        const pid = scope === 'mine' ? ((String(item.key).match(/packages\/([^/]+)\/manifest/) || [])[1] || item.key) : item.package_id;
+        const name = scope === 'mine' ? (item.value?.name || pid) : (item.name || pid);
+        src = { ...base, type: 'knowledge', packageId: pid, label: name, external: scope === 'discover' };
+      }
+      if (sources.some(s => keyOf(s) === keyOf(src))) { showToast(t('organisms.sourceExists') || 'Already added'); return; }
+      await persist([...sources, src]);
+      showToast(t('organisms.sourceAdded') || 'Source added');
+    } finally { setBusy(false); }
+  };
+  const removeSource = (id) => persist(sources.filter(s => s.id !== id));
+
+  const resultRow = (item, i) => {
+    let label, meta;
+    if (tab === 'memory') { label = item.key; meta = (scope === 'discover' ? (item.owner_gaii + ' · ') : '') + (item.visibility || ''); }
+    else if (tab === 'storage') { label = item.key; meta = (item.mime_type || '') + ' · ' + Math.round((item.size || 0) / 1024) + ' KB'; }
+    else { label = scope === 'mine' ? (item.value?.name || item.key) : (item.name || item.package_id); meta = (scope === 'mine' ? (item.value?.entries?.length || 0) : (item.entries_count || 0)) + ' ' + (t('organisms.entries') || 'entries'); }
+    return html`
+      <div class="pj-src-result" key=${'r' + i}>
+        <span class="pj-src-result-label" title=${String(label)}>${escHtml(String(label))}</span>
+        <span class="pj-src-result-meta">${escHtml(String(meta))}</span>
+        <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => attach(item)}>${t('organisms.attach') || 'Attach'}</button>
+      </div>`;
+  };
+
+  return html`
+    <div class="pj-section pj-sources">
+      <div class="pj-section-head">
+        <span class="pj-section-title">${t('organisms.sources') || 'Sources'}<span class="pj-doc-tag">${sources.length}</span></span>
+        <button class="btn-outline btn-sm" onClick=${() => setPicking(p => !p)}>
+          ${picking ? (t('organisms.close') || 'Close') : ('+ ' + (t('organisms.addSource') || 'Add source'))}
+        </button>
+      </div>
+      <div class="section-desc pj-sources-desc">${t('organisms.sourcesDesc') || 'References this workspace draws on — memory, files, and knowledge packages. Pointers only; the originals stay where they live.'}</div>
+
+      ${picking ? html`
+        <div class="pj-src-picker">
+          <div class="pj-ver-tabs" role="tablist">
+            ${['memory', 'storage', 'knowledge'].map(tk => html`<button class="pj-ver-tab ${tab === tk ? 'active' : ''}" key=${tk} onClick=${() => setTab(tk)}>${SRC_ICON[tk]} ${t('organisms.src_' + tk) || tk}</button>`)}
+          </div>
+          <div class="pj-src-controls">
+            ${tab !== 'storage' ? html`
+              <div class="pj-ver-tabs">
+                <button class="pj-ver-tab ${scope === 'mine' ? 'active' : ''}" onClick=${() => setScope('mine')}>${t('organisms.mine') || 'Mine'}</button>
+                <button class="pj-ver-tab ${scope === 'discover' ? 'active' : ''}" onClick=${() => setScope('discover')}>${t('organisms.discover') || 'Discover'}</button>
+              </div>` : null}
+            <input class="input-field input-sm pj-src-search" placeholder=${t('organisms.searchSources') || 'Search…'}
+              value=${q} onInput=${e => setQ(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter') doSearch(); }} />
+            <button class="btn-ghost btn-sm" onClick=${doSearch} disabled=${loading}>${t('organisms.search') || 'Search'}</button>
+          </div>
+          <div class="pj-src-results">
+            ${loading ? html`<div class="pj-empty">${t('organisms.loading') || 'Loading…'}</div>`
+              : results.length === 0 ? html`<div class="pj-empty">${t('organisms.noResults') || 'No results'}</div>`
+              : results.slice(0, 100).map(resultRow)}
+          </div>
+        </div>` : null}
+
+      ${sources.length === 0 ? html`<div class="pj-empty">${t('organisms.noSources') || 'No sources yet'}</div>`
+        : html`<div class="pj-src-list">
+          ${sources.map(s => html`
+            <div class="pj-src-item" key=${s.id}>
+              <span class="pj-src-icon">${SRC_ICON[s.type] || '•'}</span>
+              <span class="pj-src-label" title=${s.key || s.packageId || ''}>${escHtml(String(s.label || s.key || s.packageId || ''))}</span>
+              ${s.external ? html`<span class="badge badge-muted pj-mini">${t('organisms.external') || 'external'}</span>` : null}
+              <span class="badge badge-info pj-mini">${t('organisms.src_' + s.type) || s.type}</span>
+              <button class="pj-icon-btn" title=${t('organisms.remove') || 'Remove'} onClick=${() => removeSource(s.id)}>✕</button>
+            </div>`)}
+        </div>`}
+    </div>`;
 }
 
 /* A form rendered from a JSON Schema — typed inputs (enum→select, integer→number,
@@ -1192,6 +1343,39 @@ function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
   const displayMap = useRef({});                           // blob: URL (shown in editor) → /v1/storage URL (saved) — for already-stored images
   const pending = useRef([]);                              // in-flight image uploads — save() awaits these
   const [saving, setSaving] = useState(false);
+  const [images, setImages] = useState([]);                // embedded /v1/storage images: [{key, alt, visibility}]
+  const [imgBusy, setImgBusy] = useState(false);
+
+  // Load the visibility of the document's already-saved /v1/storage images, so the author can make
+  // them public (a private image won't load for other viewers of a shared/published document).
+  // Newly-pasted images appear here after the first save + reopen.
+  useEffect(() => {
+    let cancelled = false;
+    const embedded = orgService.extractStorageImages((page && page.markdown) || '');
+    if (!embedded.length) { setImages([]); return undefined; }
+    orgService.listStorageVisibilities().then((vis) => {
+      if (!cancelled) setImages(embedded.map(e => ({ ...e, visibility: vis[e.key] || 'private' })));
+    }).catch(() => { if (!cancelled) setImages(embedded.map(e => ({ ...e, visibility: 'private' }))); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const changeImageVisibility = async (key, visibility) => {
+    setImgBusy(true);
+    try {
+      const r = await orgService.setImageVisibility(key, visibility);
+      if (r?.ok === false) throw new Error(r?.error?.message || 'Failed');
+      setImages(imgs => imgs.map(i => i.key === key ? { ...i, visibility } : i));
+    } catch (e) { /* leave as-is; a failed toggle just doesn't change the pill */ }
+    finally { setImgBusy(false); }
+  };
+  const makeAllImagesPublic = async () => {
+    setImgBusy(true);
+    try {
+      const targets = images.filter(i => i.visibility !== 'public');
+      await Promise.all(targets.map(i => orgService.setImageVisibility(i.key, 'public').catch(() => {})));
+      setImages(imgs => imgs.map(i => ({ ...i, visibility: 'public' })));
+    } finally { setImgBusy(false); }
+  };
 
   // Show the image instantly via a data URL, upload to storage in the background, and remember the
   // mapping so save() rewrites the data URL to the storage URL. If the upload fails, the image stays
@@ -1273,6 +1457,10 @@ function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
       let markdown = (mode === 'rich' && editorRef.current) ? editorRef.current.getMarkdown() : md;
       for (const [dataUrl, storageUrl] of Object.entries(imageMap.current)) markdown = markdown.split(dataUrl).join(storageUrl);
       for (const [blobUrl, storageUrl] of Object.entries(displayMap.current)) markdown = markdown.split(blobUrl).join(storageUrl);
+      // Point each image at the URL form its visibility needs: public → /v1/pub/<ghii>/<key> (loads
+      // for any viewer), private → /v1/storage/<key> (owner-only). So a public document's images render.
+      const visByKey = {}; for (const im of images) visByKey[im.key] = im.visibility;
+      markdown = orgService.applyImageVisibilityUrls(markdown, visByKey, orgService.currentGhii());
       onSave({ ...page, title: title.trim(), markdown });
     } finally { setSaving(false); }
   };
@@ -1288,6 +1476,23 @@ function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
         </label>
         <span class="pj-imgbar-hint">${t('organisms.orPaste') || '…or paste / drag an image into the editor'}</span>
       </div>
+      ${images.length ? html`
+        <div class="pj-img-vis">
+          <div class="pj-img-vis-head">
+            <span class="pj-img-vis-title">${t('organisms.imageVisibility') || 'Image visibility'}</span>
+            <span class="pj-img-vis-note">${t('organisms.imageVisibilityNote') || 'Private images only load for you — make them public to share the document.'}</span>
+            ${images.some(i => i.visibility !== 'public') ? html`<button class="btn-ghost btn-sm" disabled=${imgBusy} onClick=${makeAllImagesPublic}>${t('organisms.makeAllPublic') || 'Make all public'}</button>` : null}
+          </div>
+          ${images.map(i => html`
+            <div class="pj-img-vis-row" key=${i.key}>
+              <span class="pj-img-vis-name" title=${i.key}>${escHtml(i.alt)}</span>
+              <button class="pj-vis-pill ${i.visibility === 'public' ? 'pub' : 'prv'}" disabled=${imgBusy}
+                title=${t('organisms.toggleVisibility') || 'Click to toggle public / private'}
+                onClick=${() => changeImageVisibility(i.key, i.visibility === 'public' ? 'private' : 'public')}>
+                ${i.visibility === 'public' ? (t('organisms.public') || 'Public') : (t('organisms.private') || 'Private')}
+              </button>
+            </div>`)}
+        </div>` : null}
       ${mode === 'rich'
         ? html`<div ref=${containerRef} class="pj-tui"></div>`
         : html`<div class="pj-doc-grid">
