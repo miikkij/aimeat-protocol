@@ -32,6 +32,10 @@
  *     organism.{id}.meta.workspaces); each workspace is independent (data under …w.{wsId}.*), with
  *     New/open/delete + F5 restore of openWs. wsId threaded through Workspace + SourcesPanel. Also:
  *     split genBusy/applyBusy so Generate and Validate&apply spin independently.
+ *   v1.7.0 — 2026-06-08 — Records are viewable/editable (not just publishable): a draft has Edit
+ *     (SchemaForm pre-filled, gated on schema load so it seeds) + click-to-expand field view
+ *     (KeyValueRow); published records expand too. "+ Space" surfaced in the workspace bar (was
+ *     Settings-only) with an inline document/records add form.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -583,6 +587,10 @@ function Workspace({ org, wsId, showToast, onBack }) {
   const [delConfirm, setDelConfirm] = useState('');   // typed-name confirmation for delete
   const [newSpaceName, setNewSpaceName] = useState('');
   const [newSpaceMode, setNewSpaceMode] = useState('document');
+  const [addingInitial, setAddingInitial] = useState(null);   // record being edited (null = new draft)
+  const [addingId, setAddingId] = useState(null);             // its id, preserved so save overwrites
+  const [expandedRec, setExpandedRec] = useState({});         // { "type:id": true } — records expanded to view fields
+  const [showSpaces, setShowSpaces] = useState(false);        // inline add-space form at the workspace top
 
   const load = useCallback(async () => {
     const w = await orgService.getWorkspace(orgId, wsId).catch(() => null);
@@ -675,10 +683,30 @@ function Workspace({ org, wsId, showToast, onBack }) {
   }, [pasteText, genErrors, showToast]);
 
   const startAdd = useCallback(async (ot) => {
+    setAddingInitial(null); setAddingId(null);
     setAdding(ot.name); setAddingSchema(null);
     const s = await orgService.getObjectSchema(orgId, wsId, ot.namespace);
     setAddingSchema(s || { properties: { id: { type: 'string' }, title: { type: 'string' } }, required: ['title'] });
-  }, [orgId]);
+  }, [orgId, wsId]);
+
+  // Open the same schema form pre-filled with an existing draft — so a record can be reviewed/edited
+  // (not just published blind). Saving overwrites the same draft id.
+  const startEdit = useCallback(async (ot, rec) => {
+    setAddingInitial(rec); setAddingId(rec.id);
+    setAdding(ot.name); setAddingSchema(null);
+    const s = await orgService.getObjectSchema(orgId, wsId, ot.namespace);
+    setAddingSchema(s || { properties: { id: { type: 'string' }, title: { type: 'string' } }, required: ['title'] });
+  }, [orgId, wsId]);
+  const cancelForm = () => { setAdding(null); setAddingSchema(null); setAddingInitial(null); setAddingId(null); };
+  const toggleExpand = (ot, id) => setExpandedRec(s => ({ ...s, [ot.name + ':' + id]: !s[ot.name + ':' + id] }));
+  // Read-only field view for a record (skips the underscore-prefixed metadata the read attaches).
+  const recordFields = (rec) => {
+    const rows = Object.entries(rec || {}).filter(([k, v]) =>
+      !k.startsWith('_') && v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0));
+    if (!rows.length) return html`<div class="pj-muted pj-rec-empty">${t('organisms.noFields') || 'No fields'}</div>`;
+    return rows.map(([k, v]) => html`<${KeyValueRow} key=${k} label=${k}
+      value=${Array.isArray(v) ? v.join(', ') : (typeof v === 'object' ? JSON.stringify(v) : String(v))} />`);
+  };
 
   const saveDraft = useCallback(async (ot, value) => {
     const id = (String(value.id || '').trim() || `${ot.name}-${Date.now().toString(36)}`).replace(/[^a-zA-Z0-9_-]/g, '-');
@@ -824,11 +852,11 @@ function Workspace({ org, wsId, showToast, onBack }) {
     try {
       await orgService.addSpace(orgId, wsId, ws.manifest, newSpaceName.trim(), newSpaceMode);
       showToast(t('organisms.spaceAdded') || 'Space added');
-      setNewSpaceName('');
+      setNewSpaceName(''); setShowSpaces(false);
       await load();
     } catch (e) { showToast((e && e.message) || 'Failed to add space'); }
     finally { setBusy(false); }
-  }, [newSpaceName, newSpaceMode, ws, orgId, showToast, load]);
+  }, [newSpaceName, newSpaceMode, ws, wsId, orgId, showToast, load]);
 
   const removeSpaceHandler = useCallback((typeName) => {
     confirm(
@@ -1029,11 +1057,27 @@ function Workspace({ org, wsId, showToast, onBack }) {
 
       <div class="pj-gate">
         <button class="btn-outline btn-sm" onClick=${() => setShowSettings(s => !s)}>${'⚙ '}${t('organisms.settings') || 'Settings'}</button>
+        <button class="btn-outline btn-sm" onClick=${() => setShowSpaces(s => !s)}>${'+ '}${t('organisms.addSpaceBtn') || 'Space'}</button>
         <label class="pj-gate-label">
           <input type="checkbox" checked=${gateOn} onChange=${toggleGate} disabled=${busy} />
           ${' '}${t('organisms.publishGate') || 'Require review before publishing'}
         </label>
       </div>
+
+      ${showSpaces && html`
+        <div class="pj-inbox pj-spaces-add">
+          <div class="card-h3">${t('organisms.addSpaceTitle') || 'Add a space'}</div>
+          <div class="section-desc">${t('organisms.addSpaceDesc') || 'A document space is a free-form wiki (sections + markdown pages). A record space is a schema-locked list (forms). You can remove spaces in Settings.'}</div>
+          <div class="pj-space-row">
+            <input type="text" class="input-field input-sm" placeholder=${t('organisms.spaceName') || 'New space name'} value=${newSpaceName} onInput=${e => setNewSpaceName(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter') addSpaceHandler(); }} />
+            <select class="input-field input-sm" value=${newSpaceMode} onChange=${e => setNewSpaceMode(e.target.value)}>
+              <option value="document">${t('organisms.modeDocument') || 'Document (wiki)'}</option>
+              <option value="records">${t('organisms.modeRecords') || 'Records (form)'}</option>
+            </select>
+            <button class="btn-primary btn-sm" onClick=${addSpaceHandler} disabled=${busy || !newSpaceName.trim()}>${t('organisms.addSpace') || '+ Add'}</button>
+            <button class="btn-ghost btn-sm" onClick=${() => setShowSpaces(false)}>${t('organisms.cancel') || 'Cancel'}</button>
+          </div>
+        </div>`}
 
       ${showSettings && html`
         <div class="pj-inbox">
@@ -1108,25 +1152,32 @@ function Workspace({ org, wsId, showToast, onBack }) {
             ${ot.append ? null : html`<button class="btn-outline btn-sm" onClick=${() => startAdd(ot)}>${'+ '}${t('organisms.addDraft') || 'Add draft'}</button>`}
           </div>
 
-          ${adding === ot.name && html`
-            <${SchemaForm} schema=${addingSchema} busy=${busy}
-              onSave=${(v) => saveDraft(ot, v)} onCancel=${() => { setAdding(null); setAddingSchema(null); }} />
-          `}
+          ${adding === ot.name && (addingSchema
+            ? html`<${SchemaForm} key=${'sf-' + (addingId || 'new')} schema=${addingSchema} busy=${busy} initial=${addingInitial}
+                onSave=${(v) => saveDraft(ot, addingId ? { ...v, id: addingId } : v)} onCancel=${cancelForm} />`
+            : html`<${Spinner} />`)}
 
           ${draftsFor(ot.name).map((d, i) => html`
-            <div class="pj-item pj-item-draft" key=${'d' + i}>
-              <span class="badge badge-warn">${t('organisms.draft') || 'draft'}</span>
-              <span class="pj-item-text">${escHtml(String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id || ''))}</span>
-              <button class="btn-primary btn-sm" onClick=${() => publish(ot, d.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>
+            <div class="pj-rec" key=${'d' + i}>
+              <div class="pj-item pj-item-draft">
+                <span class="badge badge-warn">${t('organisms.draft') || 'draft'}</span>
+                <button class="pj-rec-title" onClick=${() => toggleExpand(ot, d.id)}>${escHtml(String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id || ''))}</button>
+                <button class="btn-ghost btn-sm" onClick=${() => startEdit(ot, d)} disabled=${busy}>${t('organisms.edit') || 'Edit'}</button>
+                <button class="btn-primary btn-sm" onClick=${() => publish(ot, d.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>
+              </div>
+              ${expandedRec[ot.name + ':' + d.id] ? html`<div class="pj-rec-fields">${recordFields(d)}</div>` : null}
             </div>
           `)}
 
           ${objectsFor(ot.name).length === 0 && draftsFor(ot.name).length === 0
-            ? html`<div class="pj-empty">${t('organisms.noneYet') || 'none yet'}</div>`
+            ? html`<${EmptyState} text=${t('organisms.noneYet') || 'none yet'} />`
             : objectsFor(ot.name).map((o, i) => html`
-              <div class="pj-item" key=${'o' + i}>
-                <span class="pj-item-text">${escHtml(String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.summary || o.id || ''))}</span>
-                ${o.status ? html`<span class="badge badge-info">${escHtml(o.status)}</span>` : null}
+              <div class="pj-rec" key=${'o' + i}>
+                <div class="pj-item">
+                  <button class="pj-rec-title" onClick=${() => toggleExpand(ot, o.id)}>${escHtml(String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.summary || o.id || ''))}</button>
+                  ${o.status ? html`<span class="badge badge-info">${escHtml(o.status)}</span>` : null}
+                </div>
+                ${expandedRec[ot.name + ':' + o.id] ? html`<div class="pj-rec-fields">${recordFields(o)}</div>` : null}
               </div>
             `)
           }
@@ -1291,11 +1342,20 @@ function SourcesPanel({ orgId, wsId, showToast }) {
 /* A form rendered from a JSON Schema — typed inputs (enum→select, integer→number,
  * array→lines, boolean→checkbox, else text). Works for any objectType, including ones a
  * generated manifest declares. `id` is auto-generated when blank, so it's never required here. */
-function SchemaForm({ schema, busy, onSave, onCancel }) {
+function SchemaForm({ schema, busy, onSave, onCancel, initial }) {
   const props = (schema && schema.properties) || {};
   const required = new Set(((schema && schema.required) || []).filter(k => k !== 'id'));
   const fieldNames = Object.keys(props);
-  const [vals, setVals] = useState({});
+  // Seed from an existing record when editing (arrays → newline text for the textarea inputs).
+  const [vals, setVals] = useState(() => {
+    const out = {};
+    for (const [k, def] of Object.entries(props)) {
+      const v = initial && initial[k];
+      if (v === undefined || v === null) continue;
+      out[k] = Array.isArray(v) ? v.join('\n') : (def.type === 'boolean' ? !!v : String(v));
+    }
+    return out;
+  });
   const set = (k, v) => setVals(s => ({ ...s, [k]: v }));
 
   const buildValue = () => {

@@ -2032,6 +2032,11 @@
 .pj-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; }
 .pj-item-draft { border-left: 3px solid var(--border); padding-left: 0.5rem; }
 .pj-item-text { flex: 1; font-size: 0.9rem; }
+.pj-rec { border-radius: 6px; }
+.pj-rec-title { flex: 1; text-align: left; background: none; border: none; cursor: pointer; font-size: 0.9rem; color: var(--text); padding: 0; }
+.pj-rec-title:hover { color: var(--accent); }
+.pj-rec-fields { margin: 0.1rem 0 0.4rem 0.6rem; padding: 0.2rem 0.6rem; border-left: 2px solid var(--border); background: var(--bg-dim); border-radius: 0 6px 6px 0; }
+.pj-rec-empty { font-size: 0.82rem; padding: 0.2rem 0; }
 .pj-empty { color: var(--muted); font-size: 0.85rem; padding: 0.2rem 0; }
 .pj-decision { font-size: 0.85rem; color: var(--muted); }
 .pj-field { display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 0.35rem; }
@@ -2057,6 +2062,9 @@
 .pj-ws-open:hover { background: var(--bg-surface); }
 .pj-ws-card-name { font-weight: 600; font-size: 0.95rem; color: var(--text); }
 .pj-ws-card-meta { font-size: 0.74rem; color: var(--muted); }
+.pj-spaces-add { margin-bottom: 0.6rem; }
+.pj-space-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.4rem; }
+.pj-space-row .input-field { flex: 0 1 220px; }
 .pj-doc-editor { margin: 0.4rem 0; }
 .pj-doc-editor > input { margin-bottom: 0.4rem; }
 .pj-doc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
