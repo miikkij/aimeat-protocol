@@ -993,6 +993,32 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_organism_create',
+        description: 'Create a new ORGANISM (a shared, governed container for people + agents). You become its creator/admin/member, and it gets a discussion board. After creating, add workspaces with aimeat_workspace_create. Use this to bootstrap a collaboration space from scratch.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            name: { type: 'string', required: true, description: 'Organism name (min 2 chars).' },
+            description: { type: 'string', description: 'What this organism is for.' },
+            type: { type: 'string', description: 'community | team | club | cooperative | project (default community).' },
+            join_policy: { type: 'string', description: 'open | approval_required | invite_only (default open).' },
+            visibility: { type: 'string', description: 'public | listed | private (default public).' },
+        },
+    },
+    {
+        name: 'aimeat_workspace_create',
+        description: 'Create a new WORKSPACE inside an organism from a CUSTOM MANIFEST you supply — its objectTypes (each a records space with a JSON schema, or a document/wiki space) plus the per-namespace schemas. Registers it, locks the schemas, writes the manifest + readme. This is how an agent bootstraps a structured space; then fill it with aimeat_workspace_write_draft / _add_document and publish. Member-only.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism to create the workspace in.' },
+            name: { type: 'string', required: true, description: 'Workspace name.' },
+            manifest: { type: 'object', required: true, description: 'The manifest: { name, kind, status, objectTypes: [{ name, namespace, backing:"memory", writeRole, cardinality, versioned, mode:"records"|"document", schemaRef }], policy }.' },
+            schemas: { type: 'object', description: 'Map of namespace → JSON Schema for each records objectType, e.g. { "shared.tasks": { type:"object", required:["id","title"], properties:{...} } }.' },
+            readme: { type: 'string', description: 'Optional markdown intro (defaults to the manifest name + summary).' },
+        },
+    },
+    {
         name: 'aimeat_wallet_transactions',
         description: 'View recent morsel transactions for your owner\'s wallet (id, type, amount, counterparty, tracking code, timestamp; default 20, max 200). Transactions are keyed to the owner GHII, shared across agents. For the current balance/escrow snapshot use aimeat_wallet_balance.',
         caller: 'agent',

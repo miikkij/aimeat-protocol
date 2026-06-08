@@ -11,10 +11,13 @@
  *   deferred edge case. Publish honours the publish gate: if it's on, the tool refuses and tells the
  *   agent to leave the draft for human review (it does not create the approval here).
  * @structure registerWorkspaceTools(mcp, storage, config, getAgentGaii, emitU, emitL)
- *   - aimeat_workspace_list / _read / _write_draft / _publish / _add_document
+ *   - aimeat_workspace_list / _read / _write_draft / _publish / _add_document / _delete / _create
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
  *   v1.0.0 -- 2026-06-08 -- Initial: 5 workspace tools wrapping the manifest/draft/publish convention.
+ *   v1.1.0 -- 2026-06-08 -- write_draft coerces a JSON-stringified value (clients stringify untyped
+ *     object params); add _delete (retract an object) and _create (bootstrap a workspace from a
+ *     custom manifest + per-namespace schemas, locked under the owner GHII).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -52,6 +55,12 @@ export function registerWorkspaceTools(
         let v = value;
         if (typeof v === 'string') { try { const p = JSON.parse(v); if (p && typeof p === 'object') v = p; } catch { /* leave as string → schema rejects clearly */ } }
         return (v && typeof v === 'object' && !Array.isArray(v)) ? { ...(v as Record<string, unknown>), id } : v;
+    };
+
+    /** Parse a possibly-JSON-stringified object param (manifest / schemas) back to an object. */
+    const parseObj = (v: unknown): unknown => {
+        if (typeof v === 'string') { try { const p = JSON.parse(v); if (p && typeof p === 'object') return p; } catch { /* leave as-is */ } }
+        return v;
     };
 
     /** Membership gate — an organism agent, or the owner is an active member. Returns null if allowed. */
@@ -231,5 +240,48 @@ export function registerWorkspaceTools(
                 }
             }
             return ok({ deleted: base, keys: deleted });
+        });
+
+    // ── aimeat_workspace_create ──
+    mcp.tool('aimeat_workspace_create', descriptionFor('aimeat_workspace_create'),
+        {
+            organism_id: z.string(),
+            name: z.string().describe('Workspace name'),
+            manifest: z.any().describe('The workspace manifest (objectTypes + policy) as a JSON OBJECT, not a string.'),
+            schemas: z.any().optional().describe('Map of namespace → JSON Schema for records types, as a JSON OBJECT.'),
+            readme: z.string().optional().describe('Optional markdown intro'),
+        },
+        annotationsFor('aimeat_workspace_create'),
+        async ({ organism_id, name, manifest, schemas, readme }): Promise<TextResult> => {
+            const deny = await denyReason(organism_id); if (deny) return fail(deny);
+            const man = parseObj(manifest) as Manifest | undefined;
+            if (!man || typeof man !== 'object' || !Array.isArray(man.objectTypes)) {
+                return fail('manifest must be an object with an objectTypes array.');
+            }
+            const schemaMap = (parseObj(schemas) ?? {}) as Record<string, Record<string, unknown>>;
+            const wsId = 'ws-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+            const root = wsRoot(organism_id, wsId);
+            const now = new Date().toISOString();
+            // 1. Lock the records schemas under the owner GHII (direct storage — bypasses the route's
+            //    owner/operator gate, which an agent token would fail).
+            for (const [namespace, schema] of Object.entries(schemaMap)) {
+                if (!schema || typeof schema !== 'object') continue;
+                await storage.setSchema({ keyPattern: `${root}.${namespace}`, applyTo: 'prefix', schemaJson: schema, schemaMode: 'strict', lockedBy: ownerGhii, setAt: now, updatedAt: now });
+            }
+            // 2. Write the manifest (validated against the manifest meta-schema).
+            const manifestValue = { ...man, id: organism_id, status: man.status || 'active' };
+            const mkey = `${root}.meta.manifest`;
+            const valid = await validateMemoryWrite(mkey, manifestValue, storage);
+            if (!valid.valid) return fail('Manifest rejected by schema: ' + JSON.stringify(valid.errors));
+            await writeRecord(mkey, manifestValue, null);
+            // 3. Readme.
+            const summary = (man as Record<string, unknown>).summary;
+            await writeRecord(`${root}.meta.readme`, readme || `# ${String(man.name || name)}\n\n${typeof summary === 'string' ? summary : ''}`, null);
+            // 4. Register in the workspace registry.
+            const regKey = `organism.${organism_id}.meta.workspaces`;
+            const regRec = await storage.getMemory(ownerGhii, regKey);
+            const workspaces = ((regRec?.value as { workspaces?: unknown[] } | undefined)?.workspaces) ?? [];
+            await writeRecord(regKey, { workspaces: [...workspaces, { id: wsId, name: String(name || 'Workspace').trim() || 'Workspace', createdAt: now }] }, regRec);
+            return ok({ created: true, ws: wsId, types: man.objectTypes.map(o => o.name), schemas_locked: Object.keys(schemaMap) });
         });
 }

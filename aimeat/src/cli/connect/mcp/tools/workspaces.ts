@@ -29,6 +29,11 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
     if (typeof v === 'string') { try { const p = JSON.parse(v); if (p && typeof p === 'object') v = p; } catch { /* leave as string → schema rejects */ } }
     return (v && typeof v === 'object' && !Array.isArray(v)) ? { ...(v as Record<string, unknown>), id } : v;
   };
+  /** Parse a possibly-JSON-stringified object param (manifest / schemas) back to an object. */
+  const parseObj = (v: unknown): unknown => {
+    if (typeof v === 'string') { try { const p = JSON.parse(v); if (p && typeof p === 'object') return p; } catch { /* leave as-is */ } }
+    return v;
+  };
 
   mcp.tool('aimeat_workspace_list', descriptionFor('aimeat_workspace_list'),
     { organism_id: z.string().describe('Organism id') },
@@ -139,5 +144,43 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
         }
       }
       return text({ deleted: base, keys: deleted });
+    });
+
+  mcp.tool('aimeat_workspace_create', descriptionFor('aimeat_workspace_create'),
+    {
+      organism_id: z.string(),
+      name: z.string().describe('Workspace name'),
+      manifest: z.any().describe('The workspace manifest (objectTypes + policy) as a JSON OBJECT, not a string.'),
+      schemas: z.any().optional().describe('Map of namespace → JSON Schema for records types, as a JSON OBJECT.'),
+      readme: z.string().optional().describe('Optional markdown intro'),
+    },
+    annotationsFor('aimeat_workspace_create'),
+    async ({ organism_id, name, manifest, schemas, readme }) => {
+      const man = parseObj(manifest) as Record<string, unknown> | undefined;
+      if (!man || typeof man !== 'object' || !Array.isArray(man.objectTypes)) {
+        return text({ error: 'manifest must be an object with an objectTypes array.' }, true);
+      }
+      const schemaMap = (parseObj(schemas) ?? {}) as Record<string, Record<string, unknown>>;
+      const wsId = 'ws-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+      const base = root(organism_id, wsId);
+      const now = new Date().toISOString();
+      // Lock schemas (best-effort: an agent token may lack permission — PUT schema is owner/operator-only —
+      // so failures are reported, not fatal; the owner can lock them later).
+      const schemaResults: { namespace: string; locked: boolean; error?: string }[] = [];
+      for (const [namespace, schema] of Object.entries(schemaMap)) {
+        if (!schema || typeof schema !== 'object') continue;
+        const r = await client.put(`/v1/memory/${encodeURIComponent(`${base}.${namespace}`)}/schema`, { schema, apply_to: 'prefix', schema_mode: 'strict' });
+        schemaResults.push({ namespace, locked: r.ok !== false, error: r.ok === false ? r.error?.message : undefined });
+      }
+      const manifestValue = { ...man, id: organism_id, status: man.status || 'active' };
+      const mr = await client.post('/v1/memory', { key: `${base}.meta.manifest`, value: manifestValue, visibility: 'private' });
+      if (mr.ok === false) return text(mr.error ?? mr, true);
+      const summary = man.summary;
+      await client.post('/v1/memory', { key: `${base}.meta.readme`, value: readme || `# ${String(man.name || name)}\n\n${typeof summary === 'string' ? summary : ''}`, visibility: 'private' });
+      const regKey = `organism.${organism_id}.meta.workspaces`;
+      const regResp = await client.get(`/v1/memory?prefix=${encodeURIComponent(regKey)}`);
+      const workspaces = ((regResp.data as { items?: { key: string; value?: { workspaces?: unknown[] } }[] } | undefined)?.items?.find(i => i.key === regKey)?.value?.workspaces) ?? [];
+      await client.post('/v1/memory', { key: regKey, value: { workspaces: [...workspaces, { id: wsId, name: String(name || 'Workspace').trim() || 'Workspace', createdAt: now }] }, visibility: 'private' });
+      return text({ created: true, ws: wsId, types: (man.objectTypes as { name: string }[]).map(o => o.name), schemas: schemaResults });
     });
 }

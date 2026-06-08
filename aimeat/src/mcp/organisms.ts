@@ -13,6 +13,8 @@
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.3.0 -- 2026-06-08 -- Add aimeat_organism_create (mirrors POST /v1/organisms; membership keyed
+ *     by the bare owner name, matching the route + workspace gate).
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -350,6 +352,58 @@ export function registerOrganismsTools(
                         joined_at: m.joinedAt,
                         invited_by: m.invitedBy,
                     })), null, 2),
+                }],
+            };
+        },
+    );
+
+    // ── Tool 6: aimeat_organism_create ──
+    // Mirrors POST /v1/organisms. Membership is keyed by the BARE owner name (the canonical
+    // convention used by the route + the workspace tools' membership gate) — NOT the full GHII.
+    mcp.tool(
+        'aimeat_organism_create',
+        descriptionFor('aimeat_organism_create'),
+        {
+            name: z.string().describe('Organism name (min 2 chars)'),
+            description: z.string().optional(),
+            type: z.string().optional().describe('community | team | club | cooperative | project'),
+            join_policy: z.string().optional().describe('open | approval_required | invite_only'),
+            visibility: z.string().optional().describe('public | listed | private'),
+        },
+        annotationsFor('aimeat_organism_create'),
+        async ({ name, description, type, join_policy, visibility }) => {
+            if (!name || name.trim().length < 2) {
+                return { content: [{ type: 'text' as const, text: 'Name is required (min 2 characters)' }], isError: true };
+            }
+            const parsed = parseGAII(agentGaii);
+            const ownerName = parsed ? parsed.owner : agentGaii;
+            const ownerGhii = `${ownerName}@${config.nodeId}`;
+            const orgType = ['community', 'team', 'club', 'cooperative', 'project'].includes(type ?? '') ? (type as string) : 'community';
+            const policy = ['open', 'approval_required', 'invite_only'].includes(join_policy ?? '') ? (join_policy as string) : 'open';
+            const vis = ['public', 'listed', 'private'].includes(visibility ?? '') ? (visibility as string) : 'public';
+            const id = uuidv4();
+            const now = new Date().toISOString();
+            const boardId = `org-${id}`;
+            await storage.createBoard({
+                id: boardId, name: `${name.trim()} — Discussion`, description: `Discussion board for ${name.trim()}`,
+                visibility: vis === 'public' ? 'public' : 'shared', ownerGaii: ownerGhii, allowedGaiis: [], createdAt: now,
+            });
+            const record = await storage.createOrganism({
+                id, name: name.trim(), description: description || '', type: orgType as 'community' | 'team' | 'club' | 'cooperative' | 'project', location: {}, interests: [],
+                creatorGhii: ownerName, admins: [ownerName], members: [ownerName], agentGaiis: [],
+                boardId, joinPolicy: policy as 'open' | 'approval_required' | 'invite_only', maxMembers: 500, visibility: vis as 'public' | 'listed' | 'private',
+                moderationConfig: { flagsEnabled: true, autoHideThreshold: 3, appealsEnabled: true },
+                memoryNamespace: `organism.${id}`, createdAt: now, updatedAt: now,
+            });
+            await storage.createMembership({ id: uuidv4(), organismId: id, ghii: ownerName, role: 'creator', status: 'active', joinedAt: now });
+            emitResourceListChanged(agentGaii);
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                        created: true,
+                        organism: { id: record.id, name: record.name, board_id: record.boardId, visibility: record.visibility, join_policy: record.joinPolicy },
+                    }, null, 2),
                 }],
             };
         },

@@ -214,6 +214,46 @@ await test('10. unknown organism → not found', async () => {
     assert(b.result.isError === true, 'isError');
 });
 
+// ── Bootstrap path: organism_create + workspace_create (custom manifest + schemas) ──
+let bootOrgId = '';
+const bootWs = { id: '' };
+
+await test('11. organism_create makes a new organism', async () => {
+    const b = await A.client.call('aimeat_organism_create', { name: 'Bootstrapped Org', description: 'made by an agent', type: 'project' }, 111);
+    assert(b.result.isError !== true, `error: ${b.result.content?.[0]?.text}`);
+    bootOrgId = JSON.parse(b.result.content[0].text).organism.id;
+    assert(typeof bootOrgId === 'string' && bootOrgId.length > 0, 'returns organism id');
+});
+
+await test('12. workspace_create with a custom manifest + schema locks the schema', async () => {
+    const manifest = {
+        manifestVersion: '1.0', name: 'Bootstrapped', kind: 'project', status: 'active',
+        objectTypes: [
+            { name: 'item', schemaRef: 'schema:item@1', namespace: 'shared.items', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' },
+            { name: 'page', schemaRef: 'schema:page@1', namespace: 'shared.pages', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'document' },
+        ],
+    };
+    const schemas = { 'shared.items': { type: 'object', required: ['id', 'title'], properties: { id: { type: 'string' }, title: { type: 'string' } } } };
+    const b = await A.client.call('aimeat_workspace_create', { organism_id: bootOrgId, name: 'Bootstrapped', manifest, schemas }, 112);
+    assert(b.result.isError !== true, `error: ${b.result.content?.[0]?.text}`);
+    bootWs.id = JSON.parse(b.result.content[0].text).ws;
+    assert(typeof bootWs.id === 'string' && bootWs.id.startsWith('ws-'), 'returns ws id');
+});
+
+await test('13. created workspace is listed + readable', async () => {
+    const l = await A.client.call('aimeat_workspace_list', { organism_id: bootOrgId }, 113);
+    assert(JSON.parse(l.result.content[0].text).workspaces.some((w: any) => w.id === bootWs.id), 'in registry');
+    const r = await A.client.call('aimeat_workspace_read', { organism_id: bootOrgId, ws: bootWs.id }, 1131);
+    assert((JSON.parse(r.result.content[0].text).manifest.objectTypes || []).some((o: any) => o.name === 'item'), 'manifest has item type');
+});
+
+await test('14. the locked schema validates new drafts (valid passes, invalid rejected)', async () => {
+    const okDraft = await A.client.call('aimeat_workspace_write_draft', { organism_id: bootOrgId, ws: bootWs.id, namespace: 'shared.items', id: 'i1', value: { title: 'Hello' } }, 114);
+    assert(okDraft.result.isError !== true, `valid draft should pass: ${okDraft.result.content?.[0]?.text}`);
+    const badDraft = await A.client.call('aimeat_workspace_write_draft', { organism_id: bootOrgId, ws: bootWs.id, namespace: 'shared.items', id: 'bad', value: { nope: 1 } }, 1141);
+    assert(badDraft.result.isError === true, 'invalid draft rejected by the locked schema');
+});
+
 await test('Cleanup owner 1', async () => { const r = await json(`/v1/owners/${A.ownerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${A.ownerToken}` } }); assert(r.status === 200, `del ${r.status}`); });
 await test('Cleanup owner 2', async () => { const r = await json(`/v1/owners/${B.ownerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${B.ownerToken}` } }); assert(r.status === 200, `del ${r.status}`); });
 

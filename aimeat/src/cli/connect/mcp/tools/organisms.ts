@@ -59,4 +59,20 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/members${qs ? `?${qs}` : ''}`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
+
+  mcp.tool('aimeat_organism_create', descriptionFor('aimeat_organism_create'), {
+    name: z.string().describe('Organism name (min 2 chars)'),
+    description: z.string().optional().describe('What this organism is for'),
+    type: z.string().optional().describe('community | team | club | cooperative | project'),
+    join_policy: z.string().optional().describe('open | approval_required | invite_only'),
+    visibility: z.string().optional().describe('public | listed | private'),
+  }, annotationsFor('aimeat_organism_create'), async ({ name, description, type, join_policy, visibility }) => {
+    const body: Record<string, unknown> = { name };
+    if (description != null) body.description = description;
+    if (type != null) body.type = type;
+    if (join_policy != null) body.join_policy = join_policy;
+    if (visibility != null) body.visibility = visibility;
+    const resp = await client.post('/v1/organisms', body);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+  });
 }
