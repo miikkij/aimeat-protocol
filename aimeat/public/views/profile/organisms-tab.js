@@ -425,6 +425,7 @@ const PRIMARY_FIELD = { goal: 'title', plan: 'approach', deliverable: 'title', r
 
 function Workspace({ org, showToast, onBack }) {
   const orgId = org.id;
+  const { confirm, ConfirmUI } = useConfirm();
   const [ws, setWs] = useState(undefined); // undefined=loading, null=no manifest, object=workspace
   const [approvals, setApprovals] = useState([]);
   const [gateOn, setGateOn] = useState(false);
@@ -547,7 +548,7 @@ function Workspace({ org, showToast, onBack }) {
     try {
       const r = await orgService.writeDraft(orgId, ot.namespace, id, { id, title: page.title, markdown: page.markdown });
       if (r?.ok === false) { showToast(r?.error?.message || 'Page rejected'); }
-      else { showToast(t('organisms.pageSaved') || 'Page saved'); setActiveDoc(null); await load(); }
+      else { showToast(t('organisms.pageSaved') || 'Document saved'); setActiveDoc(null); await load(); }
     } catch (e) { showToast((e && e.message) || 'Failed to save page'); }
     finally { setBusy(false); }
   }, [orgId, showToast, load]);
@@ -605,19 +606,26 @@ function Workspace({ org, showToast, onBack }) {
   }, [ws, sName, sSummary, sAutonomy, orgId, showToast, load]);
 
   // Wipe the workspace entirely (all data + schemas). The organism stays → back to "no workspace".
-  const delWorkspace = useCallback(async () => {
-    setBusy(true);
-    try {
-      const r = await orgService.deleteWorkspace(orgId);
-      if (r?.ok === false) { showToast(r?.error?.message || 'Failed to delete'); }
-      else {
-        showToast(t('organisms.workspaceDeleted') || 'Workspace deleted');
-        setShowSettings(false); setDelConfirm(''); setShowRegenerate(false);
-        await load();
-      }
-    } catch (e) { showToast((e && e.message) || 'Failed to delete workspace'); }
-    finally { setBusy(false); }
-  }, [orgId, showToast, load]);
+  // The typed-name field already gates the button; this adds a final "are you sure?" dialog.
+  const delWorkspace = useCallback(() => {
+    confirm(
+      t('organisms.confirmDeleteWorkspace') || 'Are you sure you want to delete this workspace? All its documents, records and version history are permanently removed. This cannot be undone.',
+      async () => {
+        setBusy(true);
+        try {
+          const r = await orgService.deleteWorkspace(orgId);
+          if (r?.ok === false) { showToast(r?.error?.message || 'Failed to delete'); }
+          else {
+            showToast(t('organisms.workspaceDeleted') || 'Workspace deleted');
+            setShowSettings(false); setDelConfirm(''); setShowRegenerate(false);
+            await load();
+          }
+        } catch (e) { showToast((e && e.message) || 'Failed to delete workspace'); }
+        finally { setBusy(false); }
+      },
+      { danger: true, title: t('organisms.deleteWorkspace') || 'Delete workspace' },
+    );
+  }, [orgId, confirm, showToast, load]);
 
   // The AI / paste generator — reused for a fresh workspace AND for "restructure" (where, via
   // showRegenerate, generate/copyPrompt pass the current manifest so the AI EXTENDS it additively).
@@ -695,6 +703,7 @@ function Workspace({ org, showToast, onBack }) {
 
   return html`
     <div class="pj-ws">
+      <${ConfirmUI} />
       ${back}
       <div class="section-title">${escHtml(ws.manifest?.name || org.name || 'Workspace')}</div>
       <div class="section-desc">
@@ -763,7 +772,7 @@ function Workspace({ org, showToast, onBack }) {
         <div class="pj-section" key=${ot.name}>
           <div class="pj-section-head">
             <span class="pj-section-title">${escHtml(ot.name)}<span class="pj-doc-tag">${t('organisms.docs') || 'docs'}</span></span>
-            <button class="btn-outline btn-sm" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' } })}>${'+ '}${t('organisms.newPage') || 'New page'}</button>
+            <button class="btn-outline btn-sm" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' } })}>${'+ '}${t('organisms.newPage') || 'New document'}</button>
           </div>
 
           ${activeDoc && activeDoc.type === ot.name && activeDoc.mode === 'edit' && html`
@@ -917,7 +926,7 @@ function DocumentEditor({ page, busy, onSave, onCancel }) {
   const [md, setMd] = useState((page && page.markdown) || '');
   return html`
     <div class="pj-doc-editor">
-      <input type="text" class="input-field input-sm" placeholder=${t('organisms.pageTitle') || 'Page title'}
+      <input type="text" class="input-field input-sm" placeholder=${t('organisms.pageTitle') || 'Document title'}
         value=${title} onInput=${e => setTitle(e.target.value)} />
       <div class="pj-doc-grid">
         <textarea class="input-field pj-doc-md" rows="14" placeholder=${t('organisms.writeMarkdown') || 'Write markdown…'}
