@@ -11075,6 +11075,40 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/notifications:
+    get:
+      operationId: listNotifications
+      summary: The caller's in-app notification inbox
+      description: |
+        Lists the caller's notifications (newest first) plus the unread count, for the header bell.
+        Notifications are created server-side by events (e.g. a workspace access request/approval).
+        Owner-scoped — you only see your own owner's notifications.
+      tags: [Notifications]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: Notifications + unread count }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/notifications/read:
+    post:
+      operationId: markNotificationsRead
+      summary: Mark notifications read
+      tags: [Notifications]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids: { type: array, items: { type: string }, description: Notification ids to mark read }
+                all: { type: boolean, description: Mark all the caller's notifications read }
+      responses:
+        '200': { description: Count marked read }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
   /v1/organisms/{id}/publish:
     post:
       operationId: publishOrganismDraft

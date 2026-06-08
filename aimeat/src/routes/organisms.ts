@@ -19,6 +19,8 @@
  *     discovery + access status), POST /:id/workspace-access (request), GET (list requests), and
  *     POST /:id/workspace-access/decision (creator approves/denies → consent grant). Content stays
  *     gated by the workspace creator; org membership only grants discovery.
+ *   v1.5.0 -- 2026-06-08 -- Access request + approve/deny now drop an in-app notification (notify())
+ *     to the creator / requester, so decisions surface in the header bell instead of being guesswork.
  */
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -32,6 +34,7 @@ import { authorizeRead } from '../services/access-guard.js';
 import { shouldGate, gatePolicyFromManifest, type Risk } from '../services/gate-policy.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
 import { expireOverdueApprovals, isOverdue } from '../services/gate-expiry.js';
+import { notify } from '../services/notify.js';
 
 /** Whether a membership role satisfies an approval's required approverRole. */
 function roleSatisfies(approverRole: string, membershipRole: string): boolean {
@@ -829,6 +832,14 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     });
     // Share the requester's own future contributions with the organism (read).
     await ensureConsent(callerGaii, `organism.${id}.w.${ws}.**`, `organism.${id}`, 'workspace-contribution');
+    // Notify the workspace creator so the request doesn't go unnoticed.
+    await notify(storage, `${createdBy}@${config.nodeId}`, {
+      type: 'workspace_access_request',
+      title: `${ownerName} requested access to "${entry.name ?? ws}"`,
+      body: typeof message === 'string' ? message : '',
+      link: '/v1/profile#organisms',
+    });
+    emitChange('notifications');
     res.status(201).json(success(config.nodeId, { status: 'requested', ws, workspace_creator: createdBy }));
   });
 
@@ -886,10 +897,22 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const pattern = `organism.${id}.w.${ws}.**`;
     if (decision === 'approve') {
       await ensureConsent(creatorGhii, pattern, recipient, 'workspace-access');
+      await notify(storage, `${requester}@${config.nodeId}`, {
+        type: 'workspace_access_approved',
+        title: `Your access to "${entry.name ?? ws}" was approved`,
+        link: '/v1/profile#organisms',
+      });
+      emitChange('notifications');
       res.json(success(config.nodeId, { status: 'approved', ws, requester }));
     } else {
       const grants = (await storage.listConsents(creatorGhii, { status: 'active' })).filter(c => c.dataPattern === pattern && c.recipient === recipient && c.purpose === 'workspace-access');
       for (const g of grants) await storage.updateConsent(g.id, { status: 'revoked', revokedAt: new Date().toISOString() });
+      await notify(storage, `${requester}@${config.nodeId}`, {
+        type: 'workspace_access_denied',
+        title: `Your access request to "${entry.name ?? ws}" was declined`,
+        link: '/v1/profile#organisms',
+      });
+      emitChange('notifications');
       res.json(success(config.nodeId, { status: 'denied', ws, requester }));
     }
   });

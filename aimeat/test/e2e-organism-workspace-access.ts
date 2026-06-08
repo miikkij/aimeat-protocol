@@ -123,6 +123,22 @@ await test('8. A denies (revokes) → B loses read access', async () => {
     assert(read.body.data.manifest === null, 'manifest hidden again after deny');
 });
 
+await test('9. notifications: A got the request, B got the approval', async () => {
+    const an = await json('/v1/notifications', { headers: auth(A.token) });
+    assert(an.status === 200, `notif ${an.status}`);
+    assert((an.body.data.notifications || []).some((n: any) => n.type === 'workspace_access_request'), 'A has a request notification');
+    const bn = await json('/v1/notifications', { headers: auth(B.token) });
+    assert((bn.body.data.notifications || []).some((n: any) => n.type === 'workspace_access_approved'), 'B has an approval notification');
+    assert(bn.body.data.unread >= 1, 'B has unread');
+});
+
+await test('10. mark read clears the unread count', async () => {
+    const r = await json('/v1/notifications/read', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ all: true }) });
+    assert(r.status === 200, `read ${r.status}`);
+    const bn = await json('/v1/notifications', { headers: auth(B.token) });
+    assert(bn.body.data.unread === 0, `B unread should be 0, got ${bn.body.data.unread}`);
+});
+
 await test('Cleanup A + B', async () => {
     await json(`/v1/owners/${A.name}`, { method: 'DELETE', headers: auth(A.token) });
     await json(`/v1/owners/${B.name}`, { method: 'DELETE', headers: auth(B.token) });

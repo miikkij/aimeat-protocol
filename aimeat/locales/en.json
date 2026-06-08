@@ -111,6 +111,10 @@
     "copied": "✓ Copied",
     "error": "Error"
   },
+  "notif": {
+    "title": "Notifications",
+    "empty": "No notifications yet"
+  },
   "nav": {
     "try": "Try it",
     "devView": "For Developers",

@@ -111,6 +111,10 @@
     "copied": "✓ Kopioitu",
     "error": "Virhe"
   },
+  "notif": {
+    "title": "Ilmoitukset",
+    "empty": "Ei ilmoituksia vielä"
+  },
   "nav": {
     "try": "Kokeile",
     "devView": "Kehittäjille",
