@@ -402,6 +402,34 @@ export async function getConfig(orgId) {
   } catch { return {}; }
 }
 
+/** ── Document images (stored in /v1/storage, fetched with the session for display) ── */
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] || '');
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+
+/** Upload an image blob to the organism's private storage. Returns a /v1/storage/<key> URL to
+ *  embed in markdown; the document view resolves it with the session token (storage GET needs auth). */
+export async function uploadImage(orgId, blob, mime) {
+  const ext = (mime && mime.split('/')[1]) ? '.' + mime.split('/')[1].replace(/[^a-z0-9]/gi, '') : '';
+  const key = `organism.${orgId}.img.${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}${ext}`;
+  const resp = await apiPost('/v1/storage', { key, visibility: 'private', data: await blobToBase64(blob), mime_type: mime || 'application/octet-stream' });
+  if (resp?.ok === false) throw new Error(resp?.error?.message || 'Upload failed');
+  return `/v1/storage/${encodeURIComponent(resp?.data?.key || key)}`;
+}
+
+/** Fetch a /v1/storage file with the session token and return an object URL (for <img>). */
+export async function fetchStorageObjectUrl(url) {
+  const jwt = window.AIMEAT?.auth?.getSession?.()?.jwt;
+  const resp = await fetch(url, { headers: jwt ? { Authorization: 'Bearer ' + jwt } : {} });
+  if (!resp.ok) throw new Error('image fetch failed: ' + resp.status);
+  return URL.createObjectURL(await resp.blob());
+}
+
 /** Section indexes for every document-space, keyed by objectType name. A section is
  *  { id, name, parentId, documents:[docId] } — a flat array forming a tree via parentId. */
 export async function getAllSections(orgId) {

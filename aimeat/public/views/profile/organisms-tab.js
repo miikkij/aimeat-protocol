@@ -472,6 +472,22 @@ function Workspace({ org, showToast, onBack }) {
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, []);
 
+  // Storage images in a viewed document can't load via a plain <img> (GET /v1/storage needs auth),
+  // so fetch each with the session token and swap in an object URL.
+  useEffect(() => {
+    if (activeDoc?.mode !== 'view') return undefined;
+    let revoked = false; const created = [];
+    const id = setTimeout(() => {
+      document.querySelectorAll('.pj-doc-view img').forEach((img) => {
+        const src = img.getAttribute('src') || '';
+        if (!src.includes('/v1/storage/') || img.dataset.resolved) return;
+        img.dataset.resolved = '1';
+        orgService.fetchStorageObjectUrl(src).then((u) => { if (!revoked) { created.push(u); img.src = u; } }).catch(() => {});
+      });
+    }, 50);
+    return () => { revoked = true; clearTimeout(id); created.forEach(u => URL.revokeObjectURL(u)); };
+  }, [activeDoc]);
+
   const setup = useCallback(async () => {
     setBusy(true);
     try {
@@ -839,7 +855,7 @@ function Workspace({ org, showToast, onBack }) {
           </div>
           <div class="pj-doc-main">
             ${activeDoc?.type === ot.name && activeDoc.mode === 'edit' ? html`
-              <${DocumentEditor} key=${'ed-' + (activeDoc.page.id || 'new')} page=${activeDoc.page} busy=${busy} onSave=${(p) => savePage(ot, p, activeDoc.sectionId)} onCancel=${() => setActiveDoc(null)} />
+              <${DocumentEditor} key=${'ed-' + (activeDoc.page.id || 'new')} orgId=${orgId} page=${activeDoc.page} busy=${busy} onSave=${(p) => savePage(ot, p, activeDoc.sectionId)} onCancel=${() => setActiveDoc(null)} />
             ` : activeDoc?.type === ot.name && activeDoc.mode === 'view' ? html`
               <div class="pj-doc-toolbar">
                 <span class="pj-doc-vtitle">${escHtml(activeDoc.page.title || activeDoc.page.id)}</span>
@@ -1087,7 +1103,7 @@ function loadToastUI() {
 /* Document editor: a Toast UI Editor (WYSIWYG, with its own built-in Markdown⇄WYSIWYG toggle, so
  * non-technical users type like a document). Falls back to a plain markdown textarea + live preview
  * if the editor can't load. Title is a separate Preact-controlled field. */
-function DocumentEditor({ page, busy, onSave, onCancel }) {
+function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
   const [title, setTitle] = useState((page && page.title) || '');
   const [mode, setMode] = useState('rich');               // 'rich' = Toast UI; 'markdown' = fallback textarea
   const [md, setMd] = useState((page && page.markdown) || '');
@@ -1106,6 +1122,15 @@ function DocumentEditor({ page, busy, onSave, onCancel }) {
         previewStyle: 'tab',
         initialValue: (page && page.markdown) || '',
         usageStatistics: false,
+        hooks: {
+          // Drag/paste/insert an image → upload it to the organism's private storage and embed
+          // the /v1/storage URL. (It shows in the saved document VIEW, which fetches it with the
+          // session token; the editor preview can't auth, so it shows a placeholder until saved.)
+          addImageBlobHook: async (blob, callback) => {
+            try { callback(await orgService.uploadImage(orgId, blob, blob.type || 'image/png'), ''); }
+            catch (e) { callback('', (e && e.message) || 'upload failed'); }
+          },
+        },
       });
       editorRef.current = inst;
     }).catch(() => { if (!cancelled) setMode('markdown'); });
