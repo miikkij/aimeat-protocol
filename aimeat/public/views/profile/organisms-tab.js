@@ -445,6 +445,8 @@ function Workspace({ org, showToast, onBack }) {
   const [activeDoc, setActiveDoc] = useState(null);  // { type, mode:'view'|'edit', page } for document-mode types
   const [showRegenerate, setShowRegenerate] = useState(false);
   const [delConfirm, setDelConfirm] = useState('');   // typed-name confirmation for delete
+  const [newSpaceName, setNewSpaceName] = useState('');
+  const [newSpaceMode, setNewSpaceMode] = useState('document');
 
   const load = useCallback(async () => {
     const w = await orgService.getWorkspace(orgId).catch(() => null);
@@ -627,6 +629,35 @@ function Workspace({ org, showToast, onBack }) {
     );
   }, [orgId, confirm, showToast, load]);
 
+  // Manual add / remove of object spaces (also doable by agents via the memory API).
+  const addSpaceHandler = useCallback(async () => {
+    if (!newSpaceName.trim() || !ws?.manifest) return;
+    setBusy(true);
+    try {
+      await orgService.addSpace(orgId, ws.manifest, newSpaceName.trim(), newSpaceMode);
+      showToast(t('organisms.spaceAdded') || 'Space added');
+      setNewSpaceName('');
+      await load();
+    } catch (e) { showToast((e && e.message) || 'Failed to add space'); }
+    finally { setBusy(false); }
+  }, [newSpaceName, newSpaceMode, ws, orgId, showToast, load]);
+
+  const removeSpaceHandler = useCallback((typeName) => {
+    confirm(
+      (t('organisms.confirmRemoveSpace') || 'Remove "{name}" from this workspace? Its data is kept in memory (orphaned) but the section disappears.').replace('{name}', typeName),
+      async () => {
+        setBusy(true);
+        try {
+          await orgService.removeSpace(orgId, ws.manifest, typeName);
+          showToast(t('organisms.spaceRemoved') || 'Space removed');
+          await load();
+        } catch (e) { showToast((e && e.message) || 'Failed to remove space'); }
+        finally { setBusy(false); }
+      },
+      { danger: true, title: t('organisms.removeSpace') || 'Remove space' },
+    );
+  }, [ws, orgId, confirm, showToast, load]);
+
   // The AI / paste generator — reused for a fresh workspace AND for "restructure" (where, via
   // showRegenerate, generate/copyPrompt pass the current manifest so the AI EXTENDS it additively).
   const renderGenerator = () => html`
@@ -730,10 +761,27 @@ function Workspace({ org, showToast, onBack }) {
             <select class="input-field input-sm" value=${sAutonomy} onChange=${e => setSAutonomy(e.target.value)}>
               ${['L1', 'L2', 'L3', 'L4', 'L5'].map(l => html`<option value=${l} key=${l}>${l}</option>`)}
             </select></label>
-          <div class="pj-empty">${t('organisms.template') || 'Template'}: ${escHtml(ws.manifest?.kind || '')} — ${escHtml((ws.manifest?.objectTypes || []).map(o => o.name).join(', '))}</div>
+          <div class="pj-empty">${t('organisms.template') || 'Template'}: ${escHtml(ws.manifest?.kind || '')}</div>
           <div class="form-actions">
             <button class="btn-primary btn-sm" onClick=${saveSettings} disabled=${busy}>${t('organisms.save') || 'Save'}</button>
             <button class="btn-ghost btn-sm" onClick=${() => setShowSettings(false)}>${t('organisms.cancel') || 'Cancel'}</button>
+          </div>
+
+          <div class="pj-divider"></div>
+          <div class="card-h3">${t('organisms.spaces') || 'Spaces'}</div>
+          ${(ws.manifest?.objectTypes || []).map(ot => html`
+            <div class="pj-doc-row" key=${'sp' + ot.name}>
+              <span class="pj-space-name">${escHtml(ot.name)}<span class="pj-doc-tag">${ot.mode === 'document' ? (t('organisms.docs') || 'docs') : (t('organisms.recordsMode') || 'records')}</span></span>
+              <button class="btn-ghost btn-sm" onClick=${() => removeSpaceHandler(ot.name)} disabled=${busy}>${t('organisms.remove') || 'Remove'}</button>
+            </div>
+          `)}
+          <div class="form-actions">
+            <input type="text" class="input-field input-sm" placeholder=${t('organisms.spaceName') || 'New space name'} value=${newSpaceName} onInput=${e => setNewSpaceName(e.target.value)} />
+            <select class="input-field input-sm" value=${newSpaceMode} onChange=${e => setNewSpaceMode(e.target.value)}>
+              <option value="document">${t('organisms.docsSpace') || 'document space'}</option>
+              <option value="records">${t('organisms.recordsSpace') || 'records type'}</option>
+            </select>
+            <button class="btn-outline btn-sm" onClick=${addSpaceHandler} disabled=${busy || !newSpaceName.trim()}>${t('organisms.addSpace') || '+ Add'}</button>
           </div>
 
           <div class="pj-divider"></div>

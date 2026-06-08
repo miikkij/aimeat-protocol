@@ -333,6 +333,35 @@ export async function saveManifest(orgId, manifest) {
   return apiPost('/v1/memory', { key: `organism.${orgId}.meta.manifest`, value: manifest, visibility: 'private' });
 }
 
+/** kebab-case a free-typed name into a safe namespace segment / type name. */
+function slug(name) {
+  return String(name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'item';
+}
+
+/** Manually add an object type to the manifest (no AI). mode 'document' needs no schema;
+ *  'records' gets a starter {id,title} schema that can be refined later via Restructure. */
+export async function addSpace(orgId, manifest, name, mode) {
+  const base = slug(name);
+  const plural = base.endsWith('s') ? base : base + 's';
+  const existing = new Set((manifest.objectTypes || []).map(o => o.namespace));
+  let namespace = `shared.${plural}`;
+  for (let i = 2; existing.has(namespace); i++) namespace = `shared.${plural}-${i}`;
+  const ot = { name: base, schemaRef: `schema:${base}@1`, namespace, backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode };
+  if (mode === 'records') {
+    await apiPut(`/v1/memory/${encodeURIComponent(`organism.${orgId}.${namespace}`)}/schema`, {
+      schema: { type: 'object', required: ['id', 'title'], properties: { id: { type: 'string' }, title: { type: 'string' } } },
+      apply_to: 'prefix', schema_mode: 'strict',
+    });
+  }
+  return saveManifest(orgId, { ...manifest, objectTypes: [...(manifest.objectTypes || []), ot] });
+}
+
+/** Remove an object type from the manifest by name. Its data is left in memory (orphaned, not
+ *  deleted) — re-adding the type surfaces it again; a full wipe is the workspace-delete path. */
+export async function removeSpace(orgId, manifest, typeName) {
+  return saveManifest(orgId, { ...manifest, objectTypes: (manifest.objectTypes || []).filter(o => o.name !== typeName) });
+}
+
 /** Fetch the JSON Schema registered for an object-type namespace (drives schema-aware forms).
  *  Probes a sub-key so the prefix schema resolves (a prefix schema doesn't self-match its own key). */
 export async function getObjectSchema(orgId, namespace) {
