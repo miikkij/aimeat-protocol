@@ -131,22 +131,71 @@ export async function getManifestArchitectPrompt() {
   } catch { return ''; }
 }
 
-const GEN_FORMAT_INSTRUCTION = `
+/* Self-contained, positively-framed one-shot prompt for the workspace generator (and the
+ * copy-into-any-AI-chat path). Kept separate from the interactive `manifest-architect` prompt,
+ * whose interview + CSM-YAML output would contradict the single-JSON-object contract here. */
+const GENERATOR_PROMPT = `You are the AIMEAT Workspace Architect. Design a workspace from the user's request and respond with exactly one JSON object — your reply begins with { and ends with }.
 
-=== ONE-SHOT GENERATION MODE ===
-Do NOT interview. From the user's description, output ONLY a single JSON object:
+A workspace is a set of object types. Each type is one of two modes:
+- "records" — structured items with consistent fields, validated by a schema. Use this for trackable things: milestones, tasks, risks, contacts, decisions.
+- "document" — free-form markdown that grows organically, with no schema. Use this whenever the user asks for documents, a wiki, notes, guides, design docs, or an open / free-form format.
+
+Respond with this shape:
 {
-  "manifest": { a valid manifest — manifestVersion,id(""),name,kind,status:"active",objectTypes:[{name,schemaRef,namespace,cardinality,backing:"memory",writeRole,versioned}], policy:{agentAutonomy,alwaysGate} },
-  "schemas": { "<namespace>": <a JSON Schema {type:"object",required:[...],properties:{...}} for that objectType>, ... one per memory-backed objectType, keyed by its namespace },
-  "examples": { "<namespace>": [ 1-3 realistic sample instances that VALIDATE against that namespace's schema, each with id "example-1","example-2",... ], ... }
+  "manifest": {
+    "manifestVersion": "1.0",
+    "id": "",
+    "name": "<short workspace name>",
+    "kind": "<short-kebab-case kind, e.g. game-dev>",
+    "status": "active",
+    "objectTypes": [ <one entry per type> ],
+    "policy": { "agentAutonomy": "L3", "alwaysGate": [] }
+  },
+  "schemas": { <one JSON Schema per RECORDS type, keyed by that type's namespace> },
+  "examples": { <1-3 sample records per RECORDS type, keyed by that type's namespace> }
 }
-Namespaces: owner-controlled types use "meta.<plural>", collaborative use "shared.<plural>". Every memory-backed objectType needs a schema entry under its namespace, and an "id" string property. Use bounded enums for status-like fields, and "format":"date" (or "date-time") on any date field. Always include a few clearly-labelled example instances per type in "examples" (ids starting with "example-") so the user can see the shape.
-An objectType may instead be FREE-FORM DOCUMENTS: set "mode":"document" (no schema needed — omit it from "schemas" and "examples") for narrative/wiki content like design docs, lore, guides or notes — use this when the content is prose that should grow organically rather than fixed fields. Records-style types keep their schemas as above.
-No prose, no markdown fences.`;
 
-/** The system instructions for the generator (manifest-architect prompt + output format). */
+Give every objectType all of these fields:
+- "name": a short singular noun, e.g. "milestone" or "design-doc".
+- "schemaRef": a label string you choose, e.g. "schema:milestone@1". Include it for every type, documents included.
+- "namespace": exactly "shared.<plural>" for collaborative data, or "meta.<plural>" for owner-controlled data — e.g. "shared.milestones", "meta.decisions". The namespace is just that prefix plus the plural name; keep it to those two forms.
+- "backing": "memory".
+- "writeRole": "member" (any member writes), "admin", or "owner".
+- "cardinality": "many".
+- "versioned": true.
+- "mode": "records" or "document".
+
+For each RECORDS type, add a JSON Schema under "schemas" keyed by its namespace:
+{ "type": "object", "required": ["id", ...], "properties": { "id": { "type": "string" }, ... } }
+Give every record an "id" string property. Use "enum" for status-like fields and "format": "date" (or "date-time") for date fields.
+
+For each DOCUMENT type, the content is free markdown — keep it out of "schemas" and "examples" (a document needs neither).
+
+Under "examples", add 1-3 realistic sample records per RECORDS type, with ids like "example-1", each valid against that type's schema.
+
+Worked example — request "track game milestones plus free-form design docs":
+{
+  "manifest": {
+    "manifestVersion": "1.0", "id": "", "name": "Game Project", "kind": "game-dev", "status": "active",
+    "objectTypes": [
+      { "name": "milestone", "schemaRef": "schema:milestone@1", "namespace": "shared.milestones", "backing": "memory", "writeRole": "member", "cardinality": "many", "versioned": true, "mode": "records" },
+      { "name": "design-doc", "schemaRef": "schema:design-doc@1", "namespace": "shared.design-docs", "backing": "memory", "writeRole": "member", "cardinality": "many", "versioned": true, "mode": "document" }
+    ],
+    "policy": { "agentAutonomy": "L3", "alwaysGate": [] }
+  },
+  "schemas": {
+    "shared.milestones": { "type": "object", "required": ["id", "title", "status"], "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "status": { "type": "string", "enum": ["planned", "in-progress", "done"] }, "due_date": { "type": "string", "format": "date" } } }
+  },
+  "examples": {
+    "shared.milestones": [ { "id": "example-1", "title": "Vertical slice", "status": "planned", "due_date": "2026-09-01" } ]
+  }
+}
+
+Match the user's domain and language. Respond with the JSON object only.`;
+
+/** The system instructions for the one-shot generator + the copy-into-any-AI-chat path. */
 export async function generatorSystemPrompt() {
-  return (await getManifestArchitectPrompt()) + GEN_FORMAT_INSTRUCTION;
+  return GENERATOR_PROMPT;
 }
 
 /** Frame the request — when restructuring an existing workspace, give the AI the current manifest
@@ -218,7 +267,9 @@ export function validateGenerated(generated) {
   for (const ot of ots) {
     const n = (ot && ot.name) || '(unnamed)';
     if (!ot || !ot.name) errors.push('an objectType is missing "name"');
+    if (!ot || !ot.schemaRef) errors.push(`objectType "${n}" is missing "schemaRef" (any label string, e.g. "schema:${n}@1")`);
     if (!ot || !ot.namespace) errors.push(`objectType "${n}" is missing "namespace"`);
+    else if (!/^(meta|shared|member)\./.test(ot.namespace)) errors.push(`objectType "${n}" namespace must start with "meta." or "shared." (got "${ot.namespace}")`);
     if (!ot || !backings.includes(ot.backing)) errors.push(`objectType "${n}" backing must be one of: ${backings.join(', ')}`);
     if (!ot || !roles.includes(ot.writeRole)) errors.push(`objectType "${n}" writeRole must be one of: ${roles.join(', ')}`);
     if (ot && ot.cardinality && !['one', 'many'].includes(ot.cardinality)) errors.push(`objectType "${n}" cardinality must be "one" or "many"`);
