@@ -1111,13 +1111,18 @@ function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
   const editorRef = useRef(null);
   const fileRef = useRef(null);
   const imageMap = useRef({});                             // data: URL (shown in editor) → /v1/storage URL (saved)
+  const pending = useRef([]);                              // in-flight image uploads — save() awaits these
+  const [saving, setSaving] = useState(false);
 
   // Show the image instantly via a data URL, upload to storage in the background, and remember the
   // mapping so save() rewrites the data URL to the storage URL. If the upload fails, the image stays
   // inline (still renders + saves, just larger) — so an image NEVER silently disappears.
-  const uploadAndMap = async (blob, dataUrl) => {
-    try { imageMap.current[dataUrl] = await orgService.uploadImage(orgId, blob, blob.type || 'image/png'); }
-    catch (e) { /* keep the inline data URL */ }
+  const uploadAndMap = (blob, dataUrl) => {
+    pending.current.push(
+      orgService.uploadImage(orgId, blob, blob.type || 'image/png')
+        .then((url) => { imageMap.current[dataUrl] = url; })
+        .catch(() => { /* keep the inline data URL */ }),
+    );
   };
   const insertFromFile = async (file) => {
     if (!file) return;
@@ -1139,6 +1144,15 @@ function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
         previewStyle: 'tab',
         initialValue: (page && page.markdown) || '',
         usageStatistics: false,
+        // Drop Toast UI's own image button — its file popup is unreliable; the "📷 Insert image"
+        // button above is the image path (and paste/drag still work via the hook below).
+        toolbarItems: [
+          ['heading', 'bold', 'italic', 'strike'],
+          ['hr', 'quote'],
+          ['ul', 'ol', 'task', 'indent', 'outdent'],
+          ['table', 'link'],
+          ['code', 'codeblock'],
+        ],
         hooks: {
           // Paste/drag an image → insert it as a data URL (shows at once) + upload in the background.
           addImageBlobHook: async (blob, callback) => {
@@ -1153,10 +1167,14 @@ function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
     return () => { cancelled = true; if (inst) { try { inst.destroy(); } catch (e) { /* noop */ } } editorRef.current = null; };
   }, [mode]);
 
-  const save = () => {
-    let markdown = (mode === 'rich' && editorRef.current) ? editorRef.current.getMarkdown() : md;
-    for (const [dataUrl, storageUrl] of Object.entries(imageMap.current)) markdown = markdown.split(dataUrl).join(storageUrl);
-    onSave({ ...page, title: title.trim(), markdown });
+  const save = async () => {
+    setSaving(true);
+    try {
+      if (pending.current.length) { await Promise.all(pending.current); pending.current = []; }  // finish uploads first
+      let markdown = (mode === 'rich' && editorRef.current) ? editorRef.current.getMarkdown() : md;
+      for (const [dataUrl, storageUrl] of Object.entries(imageMap.current)) markdown = markdown.split(dataUrl).join(storageUrl);
+      onSave({ ...page, title: title.trim(), markdown });
+    } finally { setSaving(false); }
   };
 
   return html`
@@ -1175,7 +1193,9 @@ function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
             <div class="pj-doc-preview"><${Markdown} text=${md} /></div>
           </div>`}
       <div class="form-actions">
-        <button class="btn-primary btn-sm" onClick=${save} disabled=${busy || !title.trim()}>${t('organisms.saveDraft') || 'Save draft'}</button>
+        <button class="btn-primary btn-sm" onClick=${save} disabled=${busy || saving || !title.trim()}>
+          ${saving ? html`<span class="spinner"></span> ${t('organisms.saving') || 'Saving…'}` : (t('organisms.saveDraft') || 'Save draft')}
+        </button>
         <button class="btn-ghost btn-sm" onClick=${onCancel}>${t('organisms.cancel') || 'Cancel'}</button>
       </div>
     </div>
