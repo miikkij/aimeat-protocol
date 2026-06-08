@@ -1109,7 +1109,6 @@ function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
   const [md, setMd] = useState((page && page.markdown) || '');
   const containerRef = useRef(null);
   const editorRef = useRef(null);
-  const fileRef = useRef(null);
   const imageMap = useRef({});                             // data: URL (shown in editor) → /v1/storage URL (saved)
   const pending = useRef([]);                              // in-flight image uploads — save() awaits these
   const [saving, setSaving] = useState(false);
@@ -1182,8 +1181,11 @@ function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
       <input type="text" class="input-field input-sm" placeholder=${t('organisms.pageTitle') || 'Document title'}
         value=${title} onInput=${e => setTitle(e.target.value)} />
       <div class="pj-doc-imgbar">
-        <button class="btn-ghost btn-sm" onClick=${() => fileRef.current && fileRef.current.click()}>${t('organisms.insertImage') || '📷 Insert image'}</button>
-        <input type="file" accept="image/*" ref=${fileRef} hidden onChange=${e => { insertFromFile(e.target.files && e.target.files[0]); e.target.value = ''; }} />
+        <label class="btn-ghost btn-sm pj-file-btn">
+          ${t('organisms.insertImage') || '📷 Upload image from file'}
+          <input type="file" accept="image/*" hidden onChange=${e => { insertFromFile(e.target.files && e.target.files[0]); e.target.value = ''; }} />
+        </label>
+        <span class="pj-imgbar-hint">${t('organisms.orPaste') || '…or paste / drag an image into the editor'}</span>
       </div>
       ${mode === 'rich'
         ? html`<div ref=${containerRef} class="pj-tui"></div>`
