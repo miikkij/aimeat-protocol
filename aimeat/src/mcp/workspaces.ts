@@ -33,6 +33,9 @@
  *     records as the caller's own (isSameOwner), so a sub-agent uses its owner's workspace and the owner
  *     sees the sub-agent's writes. _write now enforces canWriteWs (creator or granted member) so the
  *     MCP-serve write path matches the REST workspaceAccessMiddleware gate (was looser — wrote ungated).
+ *   v1.5.0 -- 2026-06-09 -- Every mutating tool (_write/_publish/_update/_object_delete/_create/_access
+ *     request+decide/_transfer import) now emitChange('organisms') so an open workspace view live-updates
+ *     over SSE when an agent changes it (the REST org routes already emit; the MCP path was silent).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { randomUUID } from 'node:crypto';
@@ -49,6 +52,7 @@ import { importWorkspace } from '../services/workspace-import.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { updateWorkspaceMeta, WorkspaceMetaError } from '../services/workspace-meta.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
+import { emitChange } from '../services/event-bus.js';
 
 type ObjType = { name: string; namespace?: string; backing?: string; mode?: string };
 type Manifest = { objectTypes?: ObjType[] } & Record<string, unknown>;
@@ -266,6 +270,7 @@ export function registerWorkspaceTools(
                 const target = sections.find(s => s.id === section || s.name === section);
                 if (target) { target.documents = [...(target.documents ?? []).filter(d => d !== instanceId), instanceId]; await writeRecord(secKey, { sections }, secRec); }
             }
+            emitChange('organisms');
             return ok({ written: key, id: instanceId, space, mode: ot.mode ?? 'records', section: section ?? null });
         });
 
@@ -295,6 +300,7 @@ export function registerWorkspaceTools(
             const existingLatest = items.find(r => r.key === `${base}.latest`);
             await storage.setMemory({ key: `${base}.latest`, ownerGaii: ownerGhii, value: draft.value, visibility: draft.visibility, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
             await storage.deleteMemory(draft.ownerGaii, `${base}.draft`);
+            emitChange('organisms');
             return ok({ published: base, version: n });
         });
 
@@ -319,6 +325,7 @@ export function registerWorkspaceTools(
                     manifest: parseObj(manifest) as Record<string, unknown> | undefined,
                     schemas: parseObj(schemas) as Record<string, Record<string, unknown>> | undefined,
                 });
+                emitChange('organisms');
                 return ok(result);
             } catch (e) {
                 if (e instanceof WorkspaceMetaError) return fail(e.message);
@@ -360,6 +367,7 @@ export function registerWorkspaceTools(
                     if (changed) await writeRecord(secKey, { sections }, secRec);
                 }
             }
+            emitChange('organisms');
             return ok({ deleted: base, keys: deleted });
         });
 
@@ -403,6 +411,7 @@ export function registerWorkspaceTools(
             const regRec = await storage.getMemory(ownerGhii, regKey);
             const workspaces = ((regRec?.value as { workspaces?: unknown[] } | undefined)?.workspaces) ?? [];
             await writeRecord(regKey, { workspaces: [...workspaces, { id: wsId, name: String(name || 'Workspace').trim() || 'Workspace', createdAt: now, createdBy: ownerName }] }, regRec);
+            emitChange('organisms');
             return ok({ created: true, ws: wsId, types: man.objectTypes.map(o => o.name), schemas_locked: Object.keys(schemaMap) });
         });
 
@@ -426,6 +435,7 @@ export function registerWorkspaceTools(
                 if (entry.createdBy === ownerName) return fail('You created this workspace.');
                 await writeRecord(`organism.${organism_id}.w.${ws}.access.request.${ownerName}`, { ws, requester: ownerName, requester_gaii: ownerGhii, message: message ?? '', status: 'pending', createdAt: new Date().toISOString() }, null);
                 await ensureConsent(ownerGhii, `organism.${organism_id}.w.${ws}.**`, `organism.${organism_id}`, 'workspace-contribution');
+                emitChange('organisms');
                 return ok({ status: 'requested', ws, workspace_creator: entry.createdBy });
             }
             if (action === 'list') {
@@ -449,9 +459,11 @@ export function registerWorkspaceTools(
                 if (decision === 'deny') {
                     const grants = (await storage.listConsents(ownerGhii, { status: 'active' })).filter(c => c.dataPattern === pattern && c.recipient === recipient && c.purpose === 'workspace-access');
                     for (const g of grants) await storage.updateConsent(g.id, { status: 'revoked', revokedAt: new Date().toISOString() });
+                    emitChange('organisms');
                     return ok({ status: 'denied', ws, requester });
                 }
                 await ensureConsent(ownerGhii, pattern, recipient, 'workspace-access');
+                emitChange('organisms');
                 return ok({ status: 'approved', ws, requester });
             }
             return fail("action must be 'request', 'list' or 'decide'.");
@@ -484,6 +496,7 @@ export function registerWorkspaceTools(
                 if (!buf.length) return fail('zip_base64 is empty or invalid.');
                 try {
                     const result = await importWorkspace(storage, config, { orgId: organism_id, importerGaii: ownerGhii, importerOwner: ownerName, zip: buf });
+                    emitChange('organisms');
                     return ok(result);
                 } catch (e) {
                     if (e instanceof ZipSecurityError) {
