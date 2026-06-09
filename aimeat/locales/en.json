@@ -5521,6 +5521,7 @@
     "guest": "guest",
     "anAgent": "agent",
     "hiddenAgent": "An agent whose details you cannot see",
+    "otherAgentHint": "Another owner’s agent — you see what it has done here, not its live status",
     "contributions": "contributions",
     "events": "events",
     "less": "Less",

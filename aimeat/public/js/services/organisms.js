@@ -357,8 +357,9 @@ export function buildParticipantsMermaid(data) {
       out.push(`  ${nid} --> ${oid}`);
       (o.agents || []).forEach((a) => {
         const aid = 'A' + (ai++);
-        if (a.isOwn) { out.push(`  ${aid}["🤖 ${mlbl(a.name)} · ${a.contributions}"]`); out.push(`  ${oid} --> ${aid}`); }
-        else { out.push(`  ${aid}["🤖 agent"]`); out.push(`  ${oid} -. anon .-> ${aid}`); }
+        out.push(`  ${aid}["🤖 ${mlbl(a.name)} · ${a.contributions}"]`);
+        // Own agents get a solid edge; everyone else's a dashed edge (greyed — trace only, no live status).
+        out.push(a.isOwn ? `  ${oid} --> ${aid}` : `  ${oid} -.-> ${aid}`);
       });
     });
   });

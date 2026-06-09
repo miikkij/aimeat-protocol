@@ -847,9 +847,11 @@ function ParticipantsPanel({ orgId, wsId }) {
                 ${o.contributions ? html`<span class="pj-part-count" title=${t('organisms.contributions') || 'contributions'}>${o.contributions}</span>` : null}
               </div>
               ${(o.agents || []).length ? html`<div class="pj-part-agents">
-                ${o.agents.map((a, j) => a.isOwn
-                  ? html`<span class="pj-part-agent own" key=${j}>${'🤖 '}${escHtml(a.name)}<span class="pj-part-count">${a.contributions}</span></span>`
-                  : html`<span class="pj-part-agent ghost" key=${j} title=${t('organisms.hiddenAgent') || 'An agent whose details you cannot see'}>${'🤖 '}${t('organisms.anAgent') || 'agent'}</span>`)}
+                ${o.agents.map((a, j) => html`
+                  <span class="pj-part-agent ${a.isOwn ? 'own' : 'ghost'}" key=${j}
+                    title=${a.isOwn ? '' : (t('organisms.otherAgentHint') || 'Another owner’s agent — you see what it has done here, not its live status')}>
+                    ${'🤖 '}${escHtml(a.name)}<span class="pj-part-count">${a.contributions}</span>
+                  </span>`)}
               </div>` : null}
             </div>`)}
           </div>

@@ -1031,8 +1031,10 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
           isMember: memberSet.has(o.owner),
           isCreator: o.owner === creator,
           contributions: o.human,
-          // Reveal agent names only for the caller's own agents; anonymize everyone else's.
-          agents: [...o.agents.entries()].map(([name, count]) => ({ name: isSelf ? name : null, isOwn: isSelf, contributions: count })),
+          // Show every agent's identifier + what it has done (its trace count); `isOwn` only drives
+          // the visual emphasis. A non-own agent's LIVE status / current task is never exposed here —
+          // this endpoint only ever reports the historical trace, so others' agents stay greyed-out.
+          agents: [...o.agents.entries()].map(([name, count]) => ({ name, isOwn: isSelf, contributions: count })),
         };
       }),
     }));

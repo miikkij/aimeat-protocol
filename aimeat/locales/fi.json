@@ -5521,6 +5521,7 @@
     "guest": "vieras",
     "anAgent": "agentti",
     "hiddenAgent": "Agentti jonka tietoja et näe",
+    "otherAgentHint": "Toisen omistajan agentti — näet mitä se on tehnyt täällä, et sen nykytilaa",
     "contributions": "kontribuutiota",
     "events": "tapahtumaa",
     "less": "Vähemmän",
