@@ -2051,8 +2051,49 @@
 .pj-doc-link:hover { text-decoration: underline; }
 /* The detail / reading pane — a white, slightly elevated card so it reads as the focused content,
    distinct from the flat tree panel beside it. */
-.pj-doc-view { border: 1px solid var(--border); border-radius: 10px; padding: 0.8rem 1.1rem; margin: 0.4rem 0; background: var(--card); box-shadow: var(--shadow-sm); }
+.pj-doc-view { border: 1px solid var(--border); border-radius: 10px; padding: 1.4rem 1.8rem; margin: 0.4rem 0; background: var(--card); box-shadow: var(--shadow-sm); }
 .pj-doc-meta { margin: 0 0 0.5rem; }
+
+/* Document typography — make rendered markdown read like a real document.
+   Generous line-height, clear space above headings, comfortable list + code styling. */
+.pj-doc-view .md-body { font-size: 0.95rem; line-height: 1.7; color: var(--text); max-width: 78ch; overflow-wrap: break-word; }
+.pj-doc-view .md-body > :first-child { margin-top: 0; }
+.pj-doc-view .md-body > :last-child { margin-bottom: 0; }
+.pj-doc-view .md-body h1,
+.pj-doc-view .md-body h2,
+.pj-doc-view .md-body h3,
+.pj-doc-view .md-body h4,
+.pj-doc-view .md-body h5,
+.pj-doc-view .md-body h6 { font-weight: 700; line-height: 1.3; color: var(--text); margin: 1.8em 0 0.6em; }
+.pj-doc-view .md-body h1 { font-size: 1.7rem; letter-spacing: -0.01em; padding-bottom: 0.3em; border-bottom: 2px solid var(--border); margin-top: 0.2em; }
+.pj-doc-view .md-body h2 { font-size: 1.32rem; padding-bottom: 0.25em; border-bottom: 1px solid var(--border); }
+.pj-doc-view .md-body h3 { font-size: 1.13rem; }
+.pj-doc-view .md-body h4 { font-size: 1rem; }
+.pj-doc-view .md-body h5 { font-size: 0.9rem; }
+.pj-doc-view .md-body h6 { font-size: 0.85rem; color: var(--muted); }
+.pj-doc-view .md-body p { margin: 0.85em 0; }
+.pj-doc-view .md-body ul,
+.pj-doc-view .md-body ol { margin: 0.7em 0; padding-left: 1.7em; }
+.pj-doc-view .md-body ul { list-style: disc; }
+.pj-doc-view .md-body ol { list-style: decimal; }
+.pj-doc-view .md-body li { margin: 0.32em 0; padding-left: 0.2em; }
+.pj-doc-view .md-body li > ul,
+.pj-doc-view .md-body li > ol { margin: 0.32em 0; }
+.pj-doc-view .md-body a { color: var(--accent); text-decoration: none; }
+.pj-doc-view .md-body a:hover { text-decoration: underline; }
+.pj-doc-view .md-body strong { font-weight: 700; color: var(--text); }
+.pj-doc-view .md-body .md-code { font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace); font-size: 0.85em; background: var(--bg-dim); padding: 0.12em 0.42em; border-radius: 4px; border: 1px solid var(--border-subtle, var(--border)); }
+.pj-doc-view .md-body .md-pre { background: var(--bg-dim); border: 1px solid var(--border); border-radius: 8px; padding: 0.9em 1.1em; overflow-x: auto; margin: 1em 0; line-height: 1.5; }
+.pj-doc-view .md-body .md-pre .md-code { background: none; border: none; padding: 0; font-size: 0.84rem; }
+.pj-doc-view .md-body blockquote { margin: 1em 0; padding: 0.3em 1.1em; border-left: 3px solid var(--accent); background: var(--bg-dim); border-radius: 0 6px 6px 0; color: var(--muted); }
+.pj-doc-view .md-body blockquote p { margin: 0.4em 0; }
+.pj-doc-view .md-body table { border-collapse: collapse; margin: 1em 0; width: 100%; font-size: 0.9rem; }
+.pj-doc-view .md-body th,
+.pj-doc-view .md-body td { border: 1px solid var(--border); padding: 0.45em 0.75em; text-align: left; vertical-align: top; }
+.pj-doc-view .md-body th { background: var(--bg-dim); font-weight: 600; }
+.pj-doc-view .md-body tbody tr:nth-child(even) { background: var(--bg-dim); }
+.pj-doc-view .md-body .md-img { max-width: 100%; height: auto; border-radius: 6px; margin: 0.6em 0; }
+.pj-doc-view .md-body hr { border: none; border-top: 1px solid var(--border); margin: 1.6em 0; }
 /* Deterministic Mermaid charts (organism overview, workspace edit-flow) */
 .pj-chart { border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.5rem 0.75rem; margin-bottom: 0.6rem; box-shadow: var(--shadow-sm); }
 .pj-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.3rem; }

@@ -1264,7 +1264,7 @@ function Workspace({ org, wsId, showToast, onBack }) {
         onDragEnd=${() => { draggedDoc.current = null; }}>
         <span class="pj-grip" title=${t('organisms.dragHint') || 'Drag into a section'}>⠿</span>
         <button class="pj-doc-link" onClick=${() => setActiveDoc({ type: ot.name, mode: 'view', page: d })}>
-          ${d._draft ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span> ` : ''}${escHtml(d.title || d.id)}
+          ${d._draft ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span> ` : ''}${d.title || d.id}
         </button>
         <button class="pj-icon-btn pj-doc-del" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, d.id, d.title || d.id)}>🗑</button>
       </div>`;
@@ -1465,7 +1465,7 @@ function Workspace({ org, wsId, showToast, onBack }) {
             <div class="pj-rec" key=${'d' + i}>
               <div class="pj-item pj-item-draft">
                 <span class="badge badge-warn">${t('organisms.draft') || 'draft'}</span>
-                <button class="pj-rec-title" onClick=${() => toggleExpand(ot, d.id)}>${escHtml(String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id || ''))}</button>
+                <button class="pj-rec-title" onClick=${() => toggleExpand(ot, d.id)}>${String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id || '')}</button>
                 <button class="btn-ghost btn-sm" onClick=${() => startEdit(ot, d)} disabled=${busy}>${t('organisms.edit') || 'Edit'}</button>
                 <button class="btn-primary btn-sm" onClick=${() => publish(ot, d.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>
                 <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, d.id, String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id))}>🗑</button>
@@ -1479,7 +1479,7 @@ function Workspace({ org, wsId, showToast, onBack }) {
             : objectsFor(ot.name).map((o, i) => html`
               <div class="pj-rec" key=${'o' + i}>
                 <div class="pj-item">
-                  <button class="pj-rec-title" onClick=${() => toggleExpand(ot, o.id)}>${escHtml(String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.summary || o.id || ''))}</button>
+                  <button class="pj-rec-title" onClick=${() => toggleExpand(ot, o.id)}>${String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.summary || o.id || '')}</button>
                   ${o.status ? html`<span class="badge badge-info">${escHtml(o.status)}</span>` : null}
                   <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, o.id, String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.id))}>🗑</button>
                 </div>
@@ -1786,7 +1786,7 @@ function DocumentView({ page, busy, onEdit, onPublish, onWikiLink }) {
 
   return html`
     <div class="pj-doc-toolbar">
-      <span class="pj-doc-vtitle">${escHtml(shown.title || shown.id || page.id)}</span>
+      <span class="pj-doc-vtitle">${shown.title || shown.id || page.id}</span>
       ${hasBoth ? html`
         <div class="seg" role="tablist">
           <button class="seg-btn ${tab === 'draft' ? 'active' : ''}" onClick=${() => setTab('draft')}>${t('organisms.draftVersion') || 'Draft'}</button>

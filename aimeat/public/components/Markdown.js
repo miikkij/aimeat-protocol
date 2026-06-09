@@ -151,6 +151,22 @@ function parseInline(text, onWikiLink) {
       }
     }
 
+    // Italic _..._ (underscore) — only at word boundaries, so snake_case identifiers stay literal.
+    if (c === '_' && (i === 0 || !/\w/.test(text[i - 1])) && text[i + 1] && text[i + 1] !== ' ') {
+      let j = i + 1;
+      while ((j = text.indexOf('_', j)) >= 0) {
+        const after = text[j + 1];
+        if (text[j - 1] !== ' ' && (after === undefined || !/\w/.test(after))) break;
+        j++;
+      }
+      if (j >= 0) {
+        flush();
+        out.push(h('em', null, parseInline(text.slice(i + 1, j), onWikiLink)));
+        i = j + 1;
+        continue;
+      }
+    }
+
     buf += c;
     i++;
   }
