@@ -4,6 +4,8 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.20.2] - 2026-06-09
+
 ### Organism workspaces: creator-managed member roles (viewer / contributor)
 
 Workspace access was previously a single binary ("approved or not"). It now has two **roles** a creator
@@ -57,8 +59,14 @@ Built on the primitives already shipped (manifest `workspace_update`, roles, att
 #### Added
 
 - **`docs/agent-workspace-contracts.md`** — the authoring guide: the contract model, a machine-readable
-  contract template, the exact provision calls (read → union manifest → `workspace_update` → grant), the
-  processing loop, and the schema/manifest rules.
+  contract template, the exact provision calls (`add_spaces` → grant), the processing loop, and the
+  schema/manifest rules.
+- **Additive `add_spaces` on `aimeat_workspace_update`** — pass an ARRAY of objectTypes and the server
+  UNIONS them into the manifest, skips any whose name/namespace already exists, and fills the objectType
+  defaults (so a caller passes just `{ name, namespace, mode }` + a schema). A contract agent provisions
+  its spaces deterministically and idempotently without resending — and never corrupting — the whole
+  manifest; it can only add, never remove/rename (use a full `manifest` for that). Returns
+  `{ added, skipped }`. Wired through the MCP tool, the connector (serve + shell), and the REST PUT route.
 - **Discovery** so an agent finds it itself over MCP: a *Organism workspaces & agent contracts* section in
   the **appdev** handbook and a pointer in the **agent** handbook (both via `aimeat_handbook_get` /
   `GET /v1/agents/me/handbook/:role`), plus a reference in **`/llms.txt`**. (The agent handbook's

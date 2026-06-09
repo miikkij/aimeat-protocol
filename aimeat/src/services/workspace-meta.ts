@@ -11,6 +11,9 @@
  * @version-history
  *   v1.0.0 — 2026-06-09 — Initial: in-place name + readme update.
  *   v1.1.0 — 2026-06-09 — Manifest + schemas: one update path for structure (spaces/gate/settings).
+ *   v1.2.0 — 2026-06-09 — Additive `addObjectTypes`: the server UNIONS new spaces into the manifest
+ *     (skip-if-exists), filling sensible objectType defaults, so an agent provisions its contract's
+ *     spaces deterministically without sending (and risking) the whole manifest. Returns {added, skipped}.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -33,6 +36,11 @@ export interface UpdateWorkspaceOpts {
   /** Full replacement manifest (objectTypes + policy/gate + settings). Add/remove a space by
    *  including/excluding its objectType. Validated against the manifest meta-schema. */
   manifest?: Record<string, unknown>;
+  /** ADDITIVE: objectTypes to UNION into the existing manifest (skip any whose name/namespace already
+   *  exists). The server fills sensible defaults (mode/backing/writeRole/cardinality/versioned/schemaRef),
+   *  so a caller can pass just { name, namespace, mode } and provision deterministically — never sending
+   *  (or risking) the whole manifest. Cannot remove/rename — use `manifest` for that. */
+  addObjectTypes?: Array<Record<string, unknown>>;
   /** Map of namespace → JSON Schema, locked (strict) for that space's records. */
   schemas?: Record<string, Record<string, unknown>>;
 }
@@ -41,13 +49,14 @@ export async function updateWorkspaceMeta(
   storage: Storage,
   _config: AimeatConfig,
   opts: UpdateWorkspaceOpts,
-): Promise<{ updated: string[]; creator: string; name?: string }> {
+): Promise<{ updated: string[]; creator: string; name?: string; added?: string[]; skipped?: string[] }> {
   const { orgId, ws, callerOwner, isAdmin } = opts;
   const name = typeof opts.name === 'string' ? opts.name.trim() : undefined;
   const readme = typeof opts.readme === 'string' ? opts.readme : undefined;
   const manifest = (opts.manifest && typeof opts.manifest === 'object' && !Array.isArray(opts.manifest)) ? opts.manifest : undefined;
+  const addObjectTypes = (Array.isArray(opts.addObjectTypes) && opts.addObjectTypes.length) ? opts.addObjectTypes : undefined;
   const schemas = (opts.schemas && typeof opts.schemas === 'object') ? opts.schemas : undefined;
-  if (!name && readme === undefined && !manifest && !schemas) throw new WorkspaceMetaError('NOTHING_TO_UPDATE', 'Provide a new name, readme, manifest and/or schemas.');
+  if (!name && readme === undefined && !manifest && !addObjectTypes && !schemas) throw new WorkspaceMetaError('NOTHING_TO_UPDATE', 'Provide a new name, readme, manifest, add_spaces and/or schemas.');
 
   const root = `organism.${orgId}.w.${ws}`;
   // The workspace's registry entry lives in its creator's registry record — find it across members.
@@ -70,6 +79,8 @@ export async function updateWorkspaceMeta(
 
   const now = new Date().toISOString();
   const updated: string[] = [];
+  const added: string[] = [];
+  const skipped: string[] = [];
   const write = async (key: string, ownerGaii: string, value: unknown, prev: MemoryRecord | null) => {
     await storage.setMemory({
       key, ownerGaii, value,
@@ -103,6 +114,37 @@ export async function updateWorkspaceMeta(
     updated.push('manifest');
     const newName = typeof manifestValue.name === 'string' ? manifestValue.name : entry.name;
     if (newName) await syncRegistryName(newName);
+  } else if (addObjectTypes) {
+    // ADDITIVE: union the new objectTypes into the existing manifest. Skip any whose name OR namespace
+    // already exists (idempotent). Never touches existing spaces, can't remove/rename — the safe,
+    // deterministic path for an agent to provision its contract's spaces. Defaults are filled so a
+    // caller can pass just { name, namespace, mode (+ a schema) }.
+    const current = (manRec?.value && typeof manRec.value === 'object' && !Array.isArray(manRec.value)) ? { ...(manRec.value as Record<string, unknown>) } : null;
+    if (!current || !Array.isArray(current.objectTypes)) throw new WorkspaceMetaError('WS_NOT_FOUND', 'Workspace has no manifest to extend.');
+    const existing = (current.objectTypes as Array<Record<string, unknown>>).slice();
+    const haveName = new Set(existing.map(o => o.name));
+    const haveNs = new Set(existing.map(o => o.namespace));
+    for (const raw of addObjectTypes) {
+      if (!raw || typeof raw !== 'object' || !raw.name || !raw.namespace) throw new WorkspaceMetaError('INVALID_MANIFEST', 'Each add_spaces entry needs a name and a namespace.');
+      if (haveName.has(raw.name) || haveNs.has(raw.namespace)) { skipped.push(String(raw.name)); continue; }
+      const ot: Record<string, unknown> = {
+        mode: raw.mode || 'records', backing: raw.backing || 'memory', writeRole: raw.writeRole || 'member',
+        cardinality: raw.cardinality || 'many', versioned: raw.versioned !== undefined ? raw.versioned : true,
+        ...raw, schemaRef: raw.schemaRef || `schema:${String(raw.name)}@1`,
+      };
+      existing.push(ot); haveName.add(raw.name); haveNs.add(raw.namespace); added.push(String(raw.name));
+    }
+    if (added.length) {
+      const manifestValue: Record<string, unknown> = { ...current, objectTypes: existing, id: orgId, status: (current.status as string) || 'active' };
+      if (name) manifestValue.name = name;
+      const valid = await validateMemoryWrite(`${root}.meta.manifest`, manifestValue, storage);
+      if (!valid.valid) throw new WorkspaceMetaError('INVALID_MANIFEST', 'Manifest rejected by schema: ' + JSON.stringify(valid.errors));
+      await write(`${root}.meta.manifest`, manRec?.ownerGaii ?? creatorGhii, manifestValue, manRec);
+      updated.push('manifest');
+      if (name) await syncRegistryName(name);
+    } else if (name) {
+      await syncRegistryName(name);
+    }
   } else if (name) {
     // Name-only: patch the manifest's name + the registry, leaving structure untouched.
     if (manRec && manRec.value && typeof manRec.value === 'object') { await write(manRec.key, manRec.ownerGaii, { ...(manRec.value as object), name }, manRec); updated.push('manifest'); }
@@ -112,5 +154,5 @@ export async function updateWorkspaceMeta(
   // 3. Readme.
   if (readme !== undefined) { await write(`${root}.meta.readme`, readmeRec?.ownerGaii ?? creatorGhii, readme, readmeRec); updated.push('readme'); }
 
-  return { updated, creator: entry.createdBy ?? '', name };
+  return { updated, creator: entry.createdBy ?? '', name, ...(addObjectTypes ? { added, skipped } : {}) };
 }

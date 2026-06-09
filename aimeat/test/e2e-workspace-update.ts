@@ -84,6 +84,29 @@ await test('2b. manifest update ADDS a space (objectType) in place, id preserved
     assert(man2.id === orgId && man2.name === 'New Name', 'id + name preserved');
 });
 
+await test('2c. add_spaces UNIONS new spaces (defaults filled), skips existing, preserves the rest', async () => {
+    const before = (await json(`/v1/memory/${encodeURIComponent(`${root()}.meta.manifest`)}`, { headers: auth(creatorTok) })).body.data.value.objectTypes.length;
+    // Add one NEW records space with only { name, namespace, mode } (server fills schemaRef/writeRole/...)
+    // + re-send an EXISTING one ('task') which must be skipped. Lock the new space's schema in the same call.
+    const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { method: 'PUT', headers: auth(creatorTok), body: JSON.stringify({
+        add_spaces: [
+            { name: 'risk', namespace: 'shared.risks', mode: 'records' },
+            { name: 'task', namespace: 'shared.tasks', mode: 'records' },   // already exists → skipped
+        ],
+        schemas: { 'shared.risks': { type: 'object', required: ['id', 'title'], properties: { id: { type: 'string' }, title: { type: 'string' } } } },
+    }) });
+    assert(r.status === 200, `add_spaces ${r.status}: ${JSON.stringify(r.body)}`);
+    assert(r.body.data.added?.includes('risk') && r.body.data.skipped?.includes('task'), `added/skipped: ${JSON.stringify({ added: r.body.data.added, skipped: r.body.data.skipped })}`);
+    const man = (await json(`/v1/memory/${encodeURIComponent(`${root()}.meta.manifest`)}`, { headers: auth(creatorTok) })).body.data.value;
+    assert(man.objectTypes.length === before + 1, `exactly one space added (not the duplicate): ${man.objectTypes.map((o: any) => o.name).join(',')}`);
+    const risk = man.objectTypes.find((o: any) => o.name === 'risk');
+    assert(risk && risk.schemaRef === 'schema:risk@1' && risk.writeRole === 'member' && risk.backing === 'memory' && risk.versioned === true, `defaults filled: ${JSON.stringify(risk)}`);
+    assert(man.objectTypes.some((o: any) => o.name === 'task') && man.objectTypes.some((o: any) => o.name === 'note'), 'existing spaces preserved');
+    // re-running the same add is idempotent (everything skipped, nothing added)
+    const r2 = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { method: 'PUT', headers: auth(creatorTok), body: JSON.stringify({ add_spaces: [{ name: 'risk', namespace: 'shared.risks', mode: 'records' }] }) });
+    assert(r2.status === 200 && (r2.body.data.added || []).length === 0 && r2.body.data.skipped?.includes('risk'), `idempotent re-add: ${JSON.stringify(r2.body.data)}`);
+});
+
 await test('3. empty update (no name/readme) is rejected', async () => {
     const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { method: 'PUT', headers: auth(creatorTok), body: JSON.stringify({}) });
     assert(r.status === 400, `expected 400, got ${r.status}`);

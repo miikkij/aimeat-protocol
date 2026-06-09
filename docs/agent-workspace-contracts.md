@@ -89,19 +89,27 @@ Editing the manifest (`aimeat_workspace_update`) is **creator-only**. So:
 
 ## 4. Provision flow — exact calls
 
-Run as the creator (or the creator's own agent). Read first, then a single full-manifest update (never
-drop existing spaces — union them), then grant.
+Run as the creator (or the creator's own agent). Add your spaces with **`add_spaces`** — the server
+UNIONS them into the manifest, **skips any that already exist**, and fills the objectType defaults, so
+you never resend (or risk corrupting) the whole manifest. Deterministic + safe.
 
 ```text
-# 1. Read the current manifest
+# 1. (optional) Read the workspace to see what's already there
 aimeat_workspace_read({ organism_id, ws })            → manifest.objectTypes (existing spaces)
 
-# 2. Union the existing objectTypes with the contract's spaces (add only the missing ones),
-#    then send the FULL manifest back. The id is preserved; schemas lock the records spaces.
+# 2. ADD the contract's spaces. Pass just { name, namespace, mode } per space — defaults
+#    (schemaRef/writeRole/cardinality/backing/versioned) are filled. Lock record schemas in the same
+#    call. Idempotent: re-running it just skips what's already there. Returns { added, skipped }.
 aimeat_workspace_update({
   organism_id, ws,
-  manifest: { ...existing, objectTypes: [ ...existing.objectTypes, ...missingFromContract ] },
-  schemas: { "shared.research-requests": <schema>, "shared.research-results": <schema> }
+  add_spaces: [
+    { name: "research-request", namespace: "shared.research-requests", mode: "records" },
+    { name: "research-result",  namespace: "shared.research-results",  mode: "records" }
+  ],
+  schemas: {
+    "shared.research-requests": <jsonSchema>,
+    "shared.research-results":  <jsonSchema>
+  }
 })
 
 # 3. Authorize the agent to write (skip for a same-owner agent — it already can):
@@ -109,8 +117,10 @@ POST /v1/organisms/:id/workspace-access/grant   { ws, grantee: "<agent-owner | a
 #    (or, if the agent requested access, approve it as contributor via aimeat_workspace_access decide)
 ```
 
-Each objectType in the manifest needs: `name`, `namespace`, `mode` (`records`|`document`), `schemaRef`,
-`writeRole` (`member`), `cardinality` (`many`), `backing` (`memory`), `versioned` (`true`).
+> `add_spaces` is the safe path — it can only ADD (never remove/rename), and a contract agent only ever
+> needs to add. To rename/remove a space or change the publish gate, send a full replacement `manifest`.
+> Each objectType resolves to: `name`, `namespace`, `mode` (`records`|`document`), `schemaRef`,
+> `writeRole` (`member`), `cardinality` (`many`), `backing` (`memory`), `versioned` (`true`).
 
 ## 5. The processing loop (what the agent runs)
 
@@ -135,8 +145,9 @@ records are schema-validated (rejected if invalid), documents auto-generate an i
 
 - **records** need a locked JSON Schema (at least `id` + required fields); a non-matching write is
   rejected. **documents** are `{ title, markdown }`, no schema.
-- When provisioning, **union** spaces — never drop or rename an existing objectType (it would orphan
-  records).
+- When provisioning, use **`add_spaces`** — the server unions safely (skip-if-exists) and never drops or
+  renames an existing objectType. Only reach for a full `manifest` replace when you genuinely need to
+  rename/remove a space or change the publish gate.
 - Only the **creator** (or a **same-owner** agent) may edit the manifest. A cross-owner **contributor**
   can write records/documents but NOT change the structure.
 - Drafts are not live until **published**; if the space is publish-gated, a publish is held for human

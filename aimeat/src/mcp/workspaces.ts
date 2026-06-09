@@ -360,17 +360,20 @@ export function registerWorkspaceTools(
             ws: z.string(),
             name: z.string().optional().describe('New workspace name (synced to the manifest + the registry)'),
             readme: z.string().optional().describe('New markdown readme/intro (replaces the current one)'),
-            manifest: z.any().optional().describe('FULL replacement manifest (objectTypes + policy/gate + settings) as a JSON OBJECT. Read the workspace first, then add/remove an objectType to add/remove a space, or change policy.alwaysGate for the publish gate. The id is preserved.'),
+            add_spaces: z.any().optional().describe('ADDITIVE (safe): an ARRAY of objectTypes to UNION into the manifest — the server keeps everything else and skips any whose name/namespace already exists. Pass just { name, namespace, mode } (+ a schema in `schemas`); defaults are filled. Use this to provision spaces instead of sending the whole manifest. Cannot remove/rename — use `manifest` for that.'),
+            manifest: z.any().optional().describe('FULL replacement manifest (objectTypes + policy/gate + settings) as a JSON OBJECT. For genuine restructuring (rename/remove a space, change policy.alwaysGate). Read the workspace first; the id is preserved. To only ADD spaces, prefer `add_spaces`.'),
             schemas: z.any().optional().describe('Map of namespace → JSON Schema (object) to lock (strict) for a records space.'),
         },
         annotationsFor('aimeat_workspace_update'),
-        async ({ organism_id, ws, name, readme, manifest, schemas }): Promise<TextResult> => {
+        async ({ organism_id, ws, name, readme, add_spaces, manifest, schemas }): Promise<TextResult> => {
             const role = await roleOf(organism_id);
             if (!role) return fail('You are not a member of this organism.');
             try {
+                const addParsed = parseObj(add_spaces);
                 const result = await updateWorkspaceMeta(storage, config, {
                     orgId: organism_id, ws, callerOwner: ownerName,
                     isAdmin: role === 'admin' || role === 'creator', name, readme,
+                    addObjectTypes: Array.isArray(addParsed) ? addParsed as Array<Record<string, unknown>> : undefined,
                     manifest: parseObj(manifest) as Record<string, unknown> | undefined,
                     schemas: parseObj(schemas) as Record<string, Record<string, unknown>> | undefined,
                 });

@@ -51,8 +51,9 @@ the structure — add/remove a space, set the publish gate) · \`aimeat_workspac
 
 **Building a workspace-PROCESSING agent (one that reads requests + writes results)?** It owns a
 **contract**: the spaces it READS (inputs) + WRITES (outputs) + the status lifecycle. Attaching it =
-**provision** the contract's spaces into the workspace (read → union the manifest → \`workspace_update\`;
-manifest edits are creator-only, so a *same-owner* agent self-provisions, otherwise the creator does it)
+**provision** the contract's spaces with \`aimeat_workspace_update\` **\`add_spaces\`** (the server UNIONS
+them into the manifest, skips any that already exist, fills defaults — no need to resend the whole
+manifest; creator-only, so a *same-owner* agent self-provisions, otherwise the creator does it)
 + **grant** the agent the \`contributor\` role. Writes are attributed to the agent (it appears in
 "Who works here" + the activity heatmap) and are visible to the whole workspace. Full guide — machine-
 readable contract template, exact provision calls, the processing loop, schema rules:

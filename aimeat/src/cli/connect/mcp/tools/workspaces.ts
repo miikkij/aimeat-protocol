@@ -101,17 +101,19 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       organism_id: z.string(), ws: z.string(),
       name: z.string().optional().describe('New workspace name (synced to manifest + registry)'),
       readme: z.string().optional().describe('New markdown readme/intro (replaces the current one)'),
-      manifest: z.any().optional().describe('FULL replacement manifest (objectTypes + policy/gate + settings) as a JSON OBJECT. Read the workspace first, then add/remove an objectType to add/remove a space, or set policy.alwaysGate for the publish gate. The id is preserved.'),
+      add_spaces: z.any().optional().describe('ADDITIVE (safe): an ARRAY of objectTypes to UNION into the manifest — the server keeps everything else and skips any whose name/namespace already exists. Pass just { name, namespace, mode } (+ a schema in `schemas`); defaults are filled. Prefer this over `manifest` to add spaces. Cannot remove/rename.'),
+      manifest: z.any().optional().describe('FULL replacement manifest (objectTypes + policy/gate + settings) as a JSON OBJECT. For genuine restructuring (rename/remove a space, change policy.alwaysGate). Read the workspace first; the id is preserved.'),
       schemas: z.any().optional().describe('Map of namespace → JSON Schema (object) to lock (strict) for a records space.'),
     },
     annotationsFor('aimeat_workspace_update'),
-    async ({ organism_id, ws, name, readme, manifest, schemas }) => {
-      const body: { name?: string; readme?: string; manifest?: unknown; schemas?: unknown } = {};
+    async ({ organism_id, ws, name, readme, add_spaces, manifest, schemas }) => {
+      const body: { name?: string; readme?: string; add_spaces?: unknown; manifest?: unknown; schemas?: unknown } = {};
       if (typeof name === 'string') body.name = name;
       if (typeof readme === 'string') body.readme = readme;
+      const add = parseObj(add_spaces); if (Array.isArray(add)) body.add_spaces = add;
       const man = parseObj(manifest); if (man !== undefined) body.manifest = man;
       const sch = parseObj(schemas); if (sch !== undefined) body.schemas = sch;
-      if (body.name === undefined && body.readme === undefined && body.manifest === undefined && body.schemas === undefined) return text({ error: 'Provide a name, readme, manifest and/or schemas.' }, true);
+      if (body.name === undefined && body.readme === undefined && body.add_spaces === undefined && body.manifest === undefined && body.schemas === undefined) return text({ error: 'Provide a name, readme, add_spaces, manifest and/or schemas.' }, true);
       const r = await client.put(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace?ws=${encodeURIComponent(ws)}`, body);
       if (r.ok === false) return text({ error: (r.error as { message?: string } | undefined)?.message || 'Update failed' }, true);
       return text(r.data);

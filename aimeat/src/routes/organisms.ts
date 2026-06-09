@@ -1240,6 +1240,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
         orgId: id, ws, callerOwner: req.auth!.owner as string,
         isAdmin: role === 'admin' || role === 'creator',
         name: req.body?.name, readme: req.body?.readme,
+        addObjectTypes: Array.isArray(req.body?.add_object_types) ? req.body.add_object_types : (Array.isArray(req.body?.add_spaces) ? req.body.add_spaces : undefined),
         manifest: req.body?.manifest, schemas: req.body?.schemas,
       });
       emitChange('organisms');

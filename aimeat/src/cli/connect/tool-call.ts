@@ -826,9 +826,10 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
             const body: JsonObject = {};
             if (typeof input.name === 'string') body.name = input.name;
             if (typeof input.readme === 'string') body.readme = input.readme;
+            const add = coerceObject(input.add_spaces); if (Array.isArray(add)) body.add_spaces = add;
             if (input.manifest !== undefined) body.manifest = coerceObject(input.manifest);
             if (input.schemas !== undefined) body.schemas = coerceObject(input.schemas);
-            if (Object.keys(body).length === 0) throw new Error('Provide a name, readme, manifest and/or schemas.');
+            if (Object.keys(body).length === 0) throw new Error('Provide a name, readme, add_spaces, manifest and/or schemas.');
             return client.put(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspace${query({ ws: requiredString(input, 'ws') })}`, body);
         },
     },

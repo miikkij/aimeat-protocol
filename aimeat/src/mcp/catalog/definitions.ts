@@ -981,7 +981,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_workspace_update',
-        description: "Update a workspace IN PLACE — its name, readme, and/or its whole STRUCTURE — without changing its id (so nothing referencing it gets orphaned). Editing structure is editing the manifest: pass a full replacement `manifest` to add/remove a space (an objectType), toggle the publish gate (policy.alwaysGate), or change settings; pass `schemas` to lock a records space's JSON Schema. Read the workspace first, change what you need, send it back. Name stays synced across manifest + registry. Creator-only (or an org admin). This is the single tool for evolving a workspace's shape — there is no separate add-space/remove-space/set-gate tool.",
+        description: "Update a workspace IN PLACE — its name, readme, and/or its STRUCTURE — without changing its id (so nothing referencing it gets orphaned). To ADD spaces, pass `add_spaces` (an ARRAY of objectTypes): the server UNIONS them into the manifest, skips any whose name/namespace already exists, and fills sensible defaults — the safe, deterministic way to provision (no need to resend the whole manifest). To rename/remove a space, toggle the publish gate (policy.alwaysGate), or change settings, pass a full replacement `manifest`. Pass `schemas` to lock a records space's JSON Schema. Creator-only (or an org admin). The single tool for evolving a workspace's shape — no separate add-space/remove-space/set-gate tool.",
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -989,7 +989,8 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
             ws: { type: 'string', required: true, description: 'Workspace id.' },
             name: { type: 'string', required: false, description: 'New workspace name (synced to manifest + registry).' },
             readme: { type: 'string', required: false, description: 'New markdown readme/intro (replaces the current one).' },
-            manifest: { type: 'object', required: false, description: 'Full replacement manifest (objectTypes + policy/gate + settings). Add/remove a space by including/excluding its objectType. The id is preserved and the manifest is schema-validated.' },
+            add_spaces: { type: 'array', required: false, description: 'ADDITIVE: objectTypes to UNION into the manifest (skip-if-exists). Pass just { name, namespace, mode } (+ a schema in `schemas`); defaults are filled. Preferred over `manifest` for adding spaces. Returns { added, skipped }. Cannot remove/rename.' },
+            manifest: { type: 'object', required: false, description: 'Full replacement manifest (objectTypes + policy/gate + settings) — for restructuring (rename/remove a space, change the gate). The id is preserved and the manifest is schema-validated. To only ADD spaces, prefer add_spaces.' },
             schemas: { type: 'object', required: false, description: 'Map of namespace → JSON Schema (object) to lock (strict) for a records space.' },
         },
     },
