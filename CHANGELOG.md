@@ -4,6 +4,62 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.20.4] - 2026-06-09
+
+### Organisms: membership lifecycle — invitations, ownership transfer, blocking, agent attachment
+
+Closes the gaps that made `invite_only` organisms a dead end and gave creators no way to manage who
+belongs. Membership is still keyed by the bare owner name; no DB migration (reuses the existing
+`OrganismMembershipRecord.status` + `invitedBy`).
+
+#### Added
+
+- **Invitations** — `POST /v1/organisms/:id/invitations` (creator/admin invites an owner by name →
+  `status:'invited'` + notification), `GET …/invitations` (outstanding), `GET
+  /v1/organisms/invitations/mine` (the caller's pending invites), and `…/invitations/{accept,decline}`.
+  An `invite_only` organism can finally be populated; the invitee is notified and the inviter is
+  notified on acceptance.
+- **Ownership transfer** — `POST /v1/organisms/:id/transfer` (creator → promotes an active member to
+  creator, demotes self to admin; new creator notified).
+- **Blocking** — `DELETE /v1/organisms/:id/members/:ghii?ban=1` removes *and* blocks (re-join /
+  re-invite refused), `POST …/members/:ghii/unban` lifts it. Plain remove (no `ban`) still just
+  removes. The removed/blocked member is notified.
+- **Agent attachment** — `POST /v1/organisms/:id/agents` / `DELETE …/agents/:gaii` let an owner attach
+  their own agent so it passes the workspace membership gate in its own right (populates the
+  previously-unmanaged `agentGaiis`).
+- **Join request notifications** — a join request to an `approval_required` organism now notifies the
+  creator/admins, and the requester is notified of the decision (previously silent).
+- **UI** — a creator/admin member manager (invite, approve/reject join requests, remove/block, lift
+  blocks, transfer, attach agents), a member-visible roster, and a "You're invited" banner with
+  accept/decline.
+- **MCP** — `aimeat_organism_invite`, `aimeat_organism_invitations`,
+  `aimeat_organism_invitation_respond` (server + connector) so agents can invite and respond.
+
+### Organisms: content search across workspaces
+
+- **Added** `GET /v1/organisms/:id/search?q=&ws=` — case-insensitive substring search over the records
+  + documents of every workspace the caller may read (namespace-aware, member-gated, capped with a
+  `truncated` flag). Plus an MCP tool `aimeat_organism_search` (server + connector) and a search box in
+  the organism UI.
+
+### Organisms: comments / threads on workspace objects
+
+- **Added** comments on workspace **records and documents**: `POST/GET /v1/organisms/:id/comments` +
+  `DELETE …/comments/:commentId`. A comment can be anchored to part of a document (`anchor.quote` /
+  `anchor.section`) or left general, and can reply to another comment (`parent_id`) to thread. Memory-
+  backed under the workspace `meta.comments.` namespace (excluded from the workspace read + search).
+  Any member or organism **agent** can comment; author or creator/admin can delete.
+- **MCP** — `aimeat_workspace_comment` / `aimeat_workspace_comments` (server + connector). **UI** — a
+  comment thread rendered under an open document and under expanded records.
+
+### Connector: surface parity
+
+- **Fixed** the connector (`aimeat connect serve` / `aimeat connect call`) now registers the agent
+  **schedule** tools (`aimeat_schedule_create/list/update/delete/report_internal`) — they were in the
+  agent surface but had never been wired into the connector. `report_internal` writes the
+  `agents.<name>.scheduler` mirror via `/v1/memory` (it has no dedicated REST route). All new organism
+  tools above are likewise registered on both connector surfaces.
+
 ## [1.20.3] - 2026-06-09
 
 ### Agent modes: add `workstation` — a node-visiting agent in the user's own environment

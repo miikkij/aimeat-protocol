@@ -22,12 +22,6 @@ import { CONNECT_CLI_TOOLS } from '../../src/cli/connect/tool-call.js';
 const KNOWN_MISSING_CLI_HANDLERS = [
   // No agent-facing REST route — the server MCP reads storage directly (storage.listMessages).
   'aimeat_message_history',
-  // schedule_* are server-MCP-only today; wrapping /v1/schedules in the shell surface is a follow-up.
-  'aimeat_schedule_create',
-  'aimeat_schedule_delete',
-  'aimeat_schedule_list',
-  'aimeat_schedule_report_internal',
-  'aimeat_schedule_update',
 ].sort();
 
 const WORKSPACE_AND_ORGANISM_SHELL_TOOLS = [

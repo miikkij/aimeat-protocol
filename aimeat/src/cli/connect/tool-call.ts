@@ -27,6 +27,7 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { CLI_FALLBACK_TOOL_DEFINITIONS, getAimeatToolDefinition, type ToolInputField } from '../../mcp/catalog/definitions.js';
 import type { AimeatClient, ApiResponse } from './api-client.js';
 import { AimeatClient as Client } from './api-client.js';
@@ -802,6 +803,43 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_workspace_comments',
         handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/comments${query({ ws: requiredString(input, 'ws'), space: requiredString(input, 'space'), instance_id: requiredString(input, 'instance_id') })}`),
+    },
+    // ── Agent SCHEDULES (parity with the agent MCP surface; routes enforce ownership). create/list/
+    //    update/delete wrap /v1/schedules; report_internal is a structured memory write (no REST route). ──
+    {
+        name: 'aimeat_schedule_create',
+        handler: ({ client }, input) => client.post('/v1/schedules', input),
+    },
+    {
+        name: 'aimeat_schedule_list',
+        handler: ({ client }) => client.get('/v1/schedules'),
+    },
+    {
+        name: 'aimeat_schedule_update',
+        handler: ({ client }, input) => {
+            const id = requiredString(input, 'schedule_id');
+            const { schedule_id: _omit, ...rest } = input;
+            void _omit;
+            return client.patch(`/v1/schedules/${encodeURIComponent(id)}`, rest);
+        },
+    },
+    {
+        name: 'aimeat_schedule_delete',
+        handler: ({ client }, input) => client.delete(`/v1/schedules/${encodeURIComponent(requiredString(input, 'schedule_id'))}`),
+    },
+    {
+        name: 'aimeat_schedule_report_internal',
+        handler: ({ client, agentPath }, input) => {
+            const entries = requiredArray(input, 'entries').map((e) => {
+                const obj = (e && typeof e === 'object' && !Array.isArray(e)) ? e as JsonObject : {};
+                return { id: typeof obj.id === 'string' ? obj.id : randomUUID(), ...obj };
+            });
+            return client.post('/v1/memory', {
+                key: `agents.${agentPath}.scheduler`,
+                value: { version: 1, updatedAt: new Date().toISOString(), entries },
+                visibility: 'owner', tags: ['scheduler', 'internal'],
+            });
+        },
     },
     // ── Organism WORKSPACES (parity with the appdev MCP surface; the routes enforce membership,
     //    schema validation, the creator-gate, and the publish gate — so authz is unchanged here) ──
