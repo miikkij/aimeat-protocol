@@ -65,13 +65,12 @@ pub fn connect_ai_service(service: AIService) -> Result<(), String> {
     Ok(())
 }
 
-/// Log in to the local node as an owner and return the JWT.
-/// POST /v1/ghii/login { username, password } -> success envelope { data: { token } }.
-#[tauri::command]
-pub async fn node_login(port: u16, username: String, password: String) -> Result<String, String> {
-    let url = format!("http://localhost:{}/v1/ghii/login", port);
+/// Log in to a node (by base URL) as an owner and return the owner JWT.
+/// POST {base}/v1/ghii/login { username, password } -> { data: { token } }.
+pub async fn login_at(base_url: &str, username: &str, password: &str) -> Result<String, String> {
+    let url = format!("{}/v1/ghii/login", base_url.trim_end_matches('/'));
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(15))
+        .timeout(std::time::Duration::from_secs(20))
         .build()
         .map_err(|e| e.to_string())?;
 
@@ -80,7 +79,7 @@ pub async fn node_login(port: u16, username: String, password: String) -> Result
         .json(&serde_json::json!({ "username": username, "password": password }))
         .send()
         .await
-        .map_err(|e| format!("Cannot reach node on port {}: {}", port, e))?;
+        .map_err(|e| format!("Cannot reach {}: {}", base_url, e))?;
 
     let status = resp.status();
     let body: serde_json::Value = resp
@@ -96,13 +95,24 @@ pub async fn node_login(port: u16, username: String, password: String) -> Result
         return Err(msg.to_string());
     }
 
-    // Owner JWT lives at data.token. Absent token usually means TOTP/backup code is required.
     body.pointer("/data/token")
         .and_then(|t| t.as_str())
         .map(|t| t.to_string())
         .ok_or_else(|| {
             "Login succeeded but no token was returned (this account may require a TOTP code).".to_string()
         })
+}
+
+/// Owner login against the local node by port (AI Setup tab).
+#[tauri::command]
+pub async fn node_login(port: u16, username: String, password: String) -> Result<String, String> {
+    login_at(&format!("http://localhost:{}", port), &username, &password).await
+}
+
+/// Owner login against any node by base URL (Chat tab: localhost or https://aimeat.io).
+#[tauri::command]
+pub async fn node_login_at(base_url: String, username: String, password: String) -> Result<String, String> {
+    login_at(&base_url, &username, &password).await
 }
 
 /// The AI settings currently stored for the signed-in owner (for display).

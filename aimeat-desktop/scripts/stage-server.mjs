@@ -65,6 +65,13 @@ if (existsSync(csmExamples)) {
   cpSync(csmExamples, join(serverDir, 'docs', 'csm-examples'), { recursive: true });
 }
 
+// 3b. Copy the Ollama Chat "liaison" bridge next to node_modules so its
+//     `@modelcontextprotocol/sdk` imports resolve from the bundled deps.
+const bridgeSrc = join(desktopRoot, 'bridge', 'agent-bridge.mjs');
+if (existsSync(bridgeSrc)) {
+  copyFileSync(bridgeSrc, join(serverDir, 'agent-bridge.mjs'));
+}
+
 // 4. Write the staging package.json (carries "type":"module" + pnpm.onlyBuiltDependencies),
 //    but with optionalDependencies stripped. The ONLY optional dep is @prisma/client,
 //    which the SQLite bundle never imports and whose engines are large. We must NOT use

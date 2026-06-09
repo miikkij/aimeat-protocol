@@ -362,6 +362,74 @@
     }
     .code-box code { color: #d8b4fe; flex: 1; word-break: break-all; }
 
+    /* ── Chat ────────────────────────────────────────────────── */
+    .chat-log {
+      min-height: 280px;
+      max-height: 460px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 8px 4px;
+      margin-bottom: 12px;
+    }
+    .chat-msg {
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      max-width: 85%;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .chat-msg.user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, rgba(167,139,250,0.25), rgba(244,114,182,0.25));
+      border: 1px solid rgba(167,139,250,0.3);
+    }
+    .chat-msg.assistant {
+      align-self: flex-start;
+      background: rgba(30, 20, 50, 0.6);
+      border: 1px solid rgba(167,139,250,0.15);
+    }
+    .chat-msg.system { align-self: center; color: rgba(167,139,250,0.6); font-size: 0.78rem; background: none; }
+    .chat-tool {
+      align-self: flex-start;
+      max-width: 85%;
+      font-size: 0.78rem;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      background: rgba(10,10,20,0.85);
+      border: 1px solid rgba(167,139,250,0.12);
+      border-radius: 10px;
+      padding: 8px 12px;
+      color: #b4a9c9;
+    }
+    .chat-tool .tname { color: #a78bfa; }
+    .chat-tool.write { border-color: rgba(244,114,182,0.35); }
+    .chat-approve {
+      align-self: flex-start;
+      max-width: 85%;
+      background: rgba(244,114,182,0.08);
+      border: 1px solid rgba(244,114,182,0.35);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 0.82rem;
+    }
+    .chat-approve .row { display: flex; gap: 8px; margin-top: 8px; }
+    .chat-input { display: flex; gap: 8px; }
+    .chat-input input {
+      flex: 1;
+      padding: 10px 14px;
+      background: rgba(15, 15, 30, 0.8);
+      border: 1px solid rgba(167, 139, 250, 0.25);
+      border-radius: 10px;
+      color: #e0d4f5;
+      font-size: 0.9rem;
+      font-family: inherit;
+      outline: none;
+    }
+    .chat-input input:focus { border-color: rgba(167, 139, 250, 0.6); }
+
     /* ── Empty State ────────────────────────────────────────── */
     .empty-state {
       text-align: center;
@@ -387,6 +455,7 @@
       <a href="#" class="active" data-page="dashboard">Dashboard</a>
       <a href="#" data-page="connections">Connections</a>
       <a href="#" data-page="ai-setup">AI Setup</a>
+      <a href="#" data-page="chat">Chat</a>
       <a href="#" data-page="settings">Settings</a>
       <a href="#" data-page="logs">Logs</a>
     </nav>
@@ -578,6 +647,79 @@
       </div>
 
       <!-- ═══════════════════════════════════════════════════════
+           CHAT PAGE
+           ═══════════════════════════════════════════════════════ -->
+      <div class="page" id="page-chat">
+        <h1>Chat</h1>
+
+        <div class="card" id="chatSetup">
+          <h2>Connect your AI chat</h2>
+          <p class="form-hint" style="margin-bottom: 16px;">
+            A local Ollama model talks to your AIMEAT node <strong>as your own registered agent</strong>. It can read
+            and manage your organisms, workspaces, knowledge, and see which agents are active.
+          </p>
+
+          <div id="chatOllamaStatus" style="margin-bottom: 14px;">Checking Ollama…</div>
+          <div id="chatOllamaHelp" style="display: none; margin-bottom: 18px;">
+            <p class="form-hint" style="margin-bottom: 10px;">
+              Ollama runs the local AI model on your machine (free). Install it, pull a model, then re-scan.
+            </p>
+            <ol class="steps" style="margin-bottom: 10px;">
+              <li><strong>Download &amp; install Ollama</strong>
+                <button class="btn secondary" onclick="openExternal('https://ollama.com/download')">Get Ollama</button></li>
+              <li><strong>Pull a model</strong> — open a terminal (PowerShell) and run:
+                <div class="code-box">
+                  <code>ollama pull qwen2.5:7b</code>
+                  <button class="btn secondary" onclick="copyText('ollama pull qwen2.5:7b')" style="padding: 4px 10px; font-size: 0.72rem;">Copy</button>
+                </div>
+              </li>
+              <li><strong>Make sure Ollama is running</strong>, then re-scan.</li>
+            </ol>
+            <button class="btn secondary" onclick="chatOpened()">Re-scan for Ollama</button>
+          </div>
+
+          <div class="form-group">
+            <label for="chatTarget">Node</label>
+            <select id="chatTarget" class="ai-model-select" style="max-width: none; width: 100%;">
+              <option value="local">This node (localhost)</option>
+              <option value="aimeat">aimeat.io</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="chatUser">Owner username</label>
+            <input type="text" id="chatUser" placeholder="e.g. alice" autocomplete="off" />
+            <div class="form-hint">Only needed the first time, to register the chat agent.</div>
+          </div>
+          <div class="form-group">
+            <label for="chatPass">Password</label>
+            <input type="password" id="chatPass" placeholder="Your password" autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label for="chatModel">Ollama model</label>
+            <select id="chatModel" class="ai-model-select" style="max-width: none; width: 100%;"></select>
+          </div>
+          <button class="btn" id="chatConnectBtn" onclick="chatConnect()">Register &amp; Start Chat</button>
+          <p id="chatSetupStatus" class="form-hint" style="margin-top: 12px;"></p>
+        </div>
+
+        <div class="card" id="chatPanel" style="display: none;">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+            <span class="status-indicator online"><span class="dot"></span><span id="chatAgentLabel">agent</span></span>
+            <label style="font-size: 0.8rem; color: #a78bfa; display: flex; align-items: center; gap: 6px; cursor: pointer; margin-left: auto;">
+              <input type="checkbox" id="chatAutoApprove" onchange="chatToggleAuto()" /> Auto-approve writes
+            </label>
+            <button class="btn secondary" onclick="chatStop()" style="padding: 6px 14px; font-size: 0.8rem;">Disconnect</button>
+          </div>
+          <div id="chatLog" class="chat-log"></div>
+          <div class="chat-input">
+            <input type="text" id="chatInput" placeholder="Ask about your organisms, workspaces, knowledge…"
+              onkeydown="if(event.key==='Enter')chatSend()" disabled />
+            <button class="btn" id="chatSendBtn" onclick="chatSend()" disabled>Send</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════════════════════════════════════════
            SETTINGS PAGE
            ═══════════════════════════════════════════════════════ -->
       <div class="page" id="page-settings">
@@ -717,6 +859,7 @@
       if (pageName === 'connections') loadConnections();
       if (pageName === 'settings') loadSettings();
       if (pageName === 'ai-setup') aiSetupOpened();
+      if (pageName === 'chat') chatOpened();
       if (pageName === 'logs') refreshLogs();
     }
 
@@ -1155,6 +1298,182 @@
       } catch (e) {
         showToast('Copy failed — select the text manually', 'error');
       }
+    }
+
+    // ── Chat (Ollama agent over MCP) ────────────────────────────
+    let chatStarted = false;
+    let chatBusy = false;
+    let chatEventBound = false;
+
+    function chatBaseUrl() {
+      const target = document.getElementById('chatTarget').value;
+      return target === 'aimeat' ? 'https://aimeat.io' : ('http://localhost:' + currentPort);
+    }
+
+    function bindChatEvents() {
+      if (chatEventBound) return;
+      if (window.__TAURI__ && window.__TAURI__.event && window.__TAURI__.event.listen) {
+        window.__TAURI__.event.listen('chat-event', (e) => handleChatEvent(e.payload));
+        chatEventBound = true;
+      }
+    }
+
+    async function chatOpened() {
+      bindChatEvents();
+      const sel = document.getElementById('chatModel');
+      const statusEl = document.getElementById('chatOllamaStatus');
+      const helpEl = document.getElementById('chatOllamaHelp');
+      const connectBtn = document.getElementById('chatConnectBtn');
+      statusEl.textContent = 'Checking Ollama…';
+      let ollama = null;
+      try {
+        const services = await invoke('detect_ai_services');
+        ollama = services.find(s => s.service_type === 'ollama' && s.status === 'available');
+      } catch (e) { /* treat as not running */ }
+
+      const offline = (label) => {
+        statusEl.innerHTML = '<span class="status-indicator offline"><span class="dot"></span>' + label + '</span>';
+        helpEl.style.display = 'block';
+        sel.disabled = true;
+        connectBtn.disabled = true;
+      };
+
+      if (ollama && ollama.models && ollama.models.length) {
+        statusEl.innerHTML = '<span class="status-indicator online"><span class="dot"></span>Ollama ready · ' +
+          ollama.models.length + ' model(s)</span>';
+        helpEl.style.display = 'none';
+        sel.innerHTML = ollama.models.map(m => '<option value="' + escapeHtml(m) + '">' + escapeHtml(m) + '</option>').join('');
+        sel.disabled = false;
+        connectBtn.disabled = false;
+      } else if (ollama) {
+        // Running, but no model pulled yet.
+        offline('Ollama is running but has no models');
+        sel.innerHTML = '<option value="">Pull a model first (steps below)</option>';
+      } else {
+        // Not reachable.
+        offline('Ollama is not running');
+        sel.innerHTML = '<option value="">Install &amp; start Ollama first</option>';
+      }
+    }
+
+    async function chatConnect() {
+      const base = chatBaseUrl();
+      const user = document.getElementById('chatUser').value.trim();
+      const pass = document.getElementById('chatPass').value;
+      const model = document.getElementById('chatModel').value;
+      const status = (t) => { document.getElementById('chatSetupStatus').textContent = t; };
+      if (!model) { status('Pick an Ollama model first.'); return; }
+      const btn = document.getElementById('chatConnectBtn');
+      btn.disabled = true;
+      try {
+        let agent = await invoke('get_chat_agent', { baseUrl: base });
+        if (!agent) {
+          if (!user || !pass) { status('Sign in to register the chat agent (first time only).'); btn.disabled = false; return; }
+          status('Signing in…');
+          const ownerToken = await invoke('node_login_at', { baseUrl: base, username: user, password: pass });
+          status('Registering chat agent (approve happens automatically)…');
+          agent = await invoke('register_chat_agent', { baseUrl: base, owner: user, ownerToken, agentName: 'ollama-desktop' });
+        }
+        status('Starting chat…');
+        await invoke('chat_start', { baseUrl: base, surface: 'agent', model });
+        chatStarted = true;
+        document.getElementById('chatAgentLabel').textContent = agent.gaii || 'agent';
+        document.getElementById('chatSetup').style.display = 'none';
+        document.getElementById('chatPanel').style.display = 'block';
+        document.getElementById('chatLog').innerHTML = '';
+        document.getElementById('chatPass').value = '';
+        document.getElementById('chatAutoApprove').checked = false;
+        chatAddSystem('Connecting to ' + base + '…');
+      } catch (err) {
+        status('Failed: ' + err);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function chatAddSystem(text) { return chatAppend('system', text); }
+    function chatAppend(cls, text) {
+      const log = document.getElementById('chatLog');
+      const div = document.createElement('div');
+      div.className = 'chat-msg ' + cls;
+      div.textContent = text;
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+      return div;
+    }
+    function chatSetInputEnabled(on) {
+      document.getElementById('chatInput').disabled = !on;
+      document.getElementById('chatSendBtn').disabled = !on;
+    }
+
+    async function chatSend() {
+      if (!chatStarted || chatBusy) return;
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+      chatAppend('user', text);
+      chatBusy = true;
+      chatSetInputEnabled(false);
+      try { await invoke('chat_send', { text }); }
+      catch (err) { chatAddSystem('Error: ' + err); chatBusy = false; chatSetInputEnabled(true); }
+    }
+
+    function handleChatEvent(ev) {
+      const log = document.getElementById('chatLog');
+      if (!ev || !ev.type) return;
+      if (ev.type === 'ready') {
+        chatAddSystem('Connected · ' + ev.tool_count + ' tools · ' + ev.model + ' · ' + ev.surface);
+        chatSetInputEnabled(true);
+      } else if (ev.type === 'tool_call') {
+        const d = document.createElement('div');
+        d.className = 'chat-tool' + (ev.write ? ' write' : '');
+        d.innerHTML = (ev.write ? '✎ ' : '↳ ') + '<span class="tname">' + escapeHtml(ev.name) + '</span> ' + escapeHtml(JSON.stringify(ev.args || {}).slice(0, 200));
+        log.appendChild(d); log.scrollTop = log.scrollHeight;
+      } else if (ev.type === 'approval_request') {
+        const d = document.createElement('div');
+        d.className = 'chat-approve';
+        d.innerHTML = '<div><strong>Approve write?</strong> <span class="tname" style="color:#a78bfa;">' + escapeHtml(ev.name) + '</span><br>' +
+          '<code style="word-break:break-all;">' + escapeHtml(JSON.stringify(ev.args || {})) + '</code></div>' +
+          '<div class="row"><button class="btn" style="padding:5px 14px;font-size:0.78rem;">Approve</button>' +
+          '<button class="btn secondary" style="padding:5px 14px;font-size:0.78rem;">Deny</button></div>';
+        const btns = d.querySelectorAll('button');
+        btns[0].onclick = () => { invoke('chat_approve', { id: ev.id, approved: true }); d.querySelector('.row').textContent = '✓ Approved.'; };
+        btns[1].onclick = () => { invoke('chat_approve', { id: ev.id, approved: false }); d.querySelector('.row').textContent = '✗ Denied.'; };
+        log.appendChild(d); log.scrollTop = log.scrollHeight;
+      } else if (ev.type === 'tool_result') {
+        const d = document.createElement('div');
+        d.className = 'chat-tool';
+        d.textContent = '⤷ ' + (ev.result || '').slice(0, 600);
+        log.appendChild(d); log.scrollTop = log.scrollHeight;
+      } else if (ev.type === 'assistant') {
+        chatAppend('assistant', ev.text || '');
+      } else if (ev.type === 'done') {
+        chatBusy = false; chatSetInputEnabled(true);
+        document.getElementById('chatInput').focus();
+      } else if (ev.type === 'error') {
+        let m = ev.message || 'unknown error';
+        if (/fetch failed|ECONNREFUSED|11434|ollama/i.test(m)) {
+          m = "Can't reach Ollama — is it still running? (" + m + ")";
+        }
+        chatAddSystem('Error: ' + m); chatBusy = false; chatSetInputEnabled(true);
+      } else if (ev.type === 'closed') {
+        chatAddSystem('Bridge disconnected.'); chatBusy = false; chatSetInputEnabled(false);
+      }
+    }
+
+    async function chatStop() {
+      try { await invoke('chat_stop'); } catch (e) {}
+      chatStarted = false; chatBusy = false;
+      document.getElementById('chatPanel').style.display = 'none';
+      document.getElementById('chatSetup').style.display = 'block';
+      document.getElementById('chatSetupStatus').textContent = '';
+    }
+
+    async function chatToggleAuto() {
+      const v = document.getElementById('chatAutoApprove').checked;
+      try { await invoke('chat_set_auto_approve', { value: v }); }
+      catch (err) { showToast('Failed: ' + err, 'error'); }
     }
 
     // ── Init ────────────────────────────────────────────────────

@@ -360,60 +360,54 @@ export function registerWorkspaceTools(
         });
 
     // ── aimeat_workspace_request_access ──
-    mcp.tool('aimeat_workspace_request_access', descriptionFor('aimeat_workspace_request_access'),
-        { organism_id: z.string(), ws: z.string(), message: z.string().optional() },
-        annotationsFor('aimeat_workspace_request_access'),
-        async ({ organism_id, ws, message }): Promise<TextResult> => {
+    mcp.tool('aimeat_workspace_access', descriptionFor('aimeat_workspace_access'),
+        {
+            organism_id: z.string(), ws: z.string(),
+            action: z.enum(['request', 'list', 'decide']).describe("'request' = ask the creator for access · 'list' = (creator/admin) see pending requests · 'decide' = (creator/admin) approve/deny one"),
+            message: z.string().optional().describe("action='request': a note to the creator"),
+            requester: z.string().optional().describe("action='decide': the requester's owner name"),
+            decision: z.string().optional().describe("action='decide': 'approve' (default) or 'deny'"),
+        },
+        annotationsFor('aimeat_workspace_access'),
+        async ({ organism_id, ws, action, message, requester, decision }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const entry = await findWsEntry(organism_id, ws);
             if (!entry) return fail('Workspace not found');
-            if (entry.createdBy === ownerName) return fail('You created this workspace.');
-            await writeRecord(`organism.${organism_id}.w.${ws}.access.request.${ownerName}`, { ws, requester: ownerName, requester_gaii: ownerGhii, message: message ?? '', status: 'pending', createdAt: new Date().toISOString() }, null);
-            await ensureConsent(ownerGhii, `organism.${organism_id}.w.${ws}.**`, `organism.${organism_id}`, 'workspace-contribution');
-            return ok({ status: 'requested', ws, workspace_creator: entry.createdBy });
-        });
+            const isManager = async () => { const role = await roleOf(organism_id); return entry.createdBy === ownerName || role === 'creator' || role === 'admin'; };
 
-    // ── aimeat_workspace_list_requests ──
-    mcp.tool('aimeat_workspace_list_requests', descriptionFor('aimeat_workspace_list_requests'),
-        { organism_id: z.string(), ws: z.string() },
-        annotationsFor('aimeat_workspace_list_requests'),
-        async ({ organism_id, ws }): Promise<TextResult> => {
-            const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            const entry = await findWsEntry(organism_id, ws);
-            if (!entry) return fail('Workspace not found');
-            const role = await roleOf(organism_id);
-            if (entry.createdBy !== ownerName && role !== 'creator' && role !== 'admin') return fail('Only the workspace creator or an org admin can see access requests.');
-            const creatorGhii = `${entry.createdBy}@${config.nodeId}`;
-            const grants = (await storage.listConsents(creatorGhii, { status: 'active' })).filter(c => c.dataPattern === `organism.${organism_id}.w.${ws}.**` && c.purpose === 'workspace-access');
-            const approved = new Set(grants.map(c => c.recipient));
-            const { items } = await storage.listAllMemory({ prefix: `organism.${organism_id}.w.${ws}.access.request.`, limit: 1000 });
-            const requests = items.map(r => {
-                const v = r.value as { requester?: string; message?: string; createdAt?: string };
-                const requester = v.requester ?? bareOwner(r.ownerGaii);
-                return { requester, message: v.message ?? '', created_at: v.createdAt, status: approved.has(`ghii:${requester}@${config.nodeId}`) ? 'approved' : 'pending' };
-            });
-            return ok({ ws, requests });
-        });
-
-    // ── aimeat_workspace_approve_access ──
-    mcp.tool('aimeat_workspace_approve_access', descriptionFor('aimeat_workspace_approve_access'),
-        { organism_id: z.string(), ws: z.string(), requester: z.string(), decision: z.string().optional() },
-        annotationsFor('aimeat_workspace_approve_access'),
-        async ({ organism_id, ws, requester, decision }): Promise<TextResult> => {
-            const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            const entry = await findWsEntry(organism_id, ws);
-            if (!entry) return fail('Workspace not found');
-            const role = await roleOf(organism_id);
-            if (entry.createdBy !== ownerName && role !== 'creator' && role !== 'admin') return fail('Only the workspace creator or an org admin can decide access.');
-            const recipient = `ghii:${requester}@${config.nodeId}`;
-            const pattern = `organism.${organism_id}.w.${ws}.**`;
-            if (decision === 'deny') {
-                const grants = (await storage.listConsents(ownerGhii, { status: 'active' })).filter(c => c.dataPattern === pattern && c.recipient === recipient && c.purpose === 'workspace-access');
-                for (const g of grants) await storage.updateConsent(g.id, { status: 'revoked', revokedAt: new Date().toISOString() });
-                return ok({ status: 'denied', ws, requester });
+            if (action === 'request') {
+                if (entry.createdBy === ownerName) return fail('You created this workspace.');
+                await writeRecord(`organism.${organism_id}.w.${ws}.access.request.${ownerName}`, { ws, requester: ownerName, requester_gaii: ownerGhii, message: message ?? '', status: 'pending', createdAt: new Date().toISOString() }, null);
+                await ensureConsent(ownerGhii, `organism.${organism_id}.w.${ws}.**`, `organism.${organism_id}`, 'workspace-contribution');
+                return ok({ status: 'requested', ws, workspace_creator: entry.createdBy });
             }
-            await ensureConsent(ownerGhii, pattern, recipient, 'workspace-access');
-            return ok({ status: 'approved', ws, requester });
+            if (action === 'list') {
+                if (!(await isManager())) return fail('Only the workspace creator or an org admin can see access requests.');
+                const creatorGhii = `${entry.createdBy}@${config.nodeId}`;
+                const grants = (await storage.listConsents(creatorGhii, { status: 'active' })).filter(c => c.dataPattern === `organism.${organism_id}.w.${ws}.**` && c.purpose === 'workspace-access');
+                const approved = new Set(grants.map(c => c.recipient));
+                const { items } = await storage.listAllMemory({ prefix: `organism.${organism_id}.w.${ws}.access.request.`, limit: 1000 });
+                const requests = items.map(r => {
+                    const v = r.value as { requester?: string; message?: string; createdAt?: string };
+                    const req = v.requester ?? bareOwner(r.ownerGaii);
+                    return { requester: req, message: v.message ?? '', created_at: v.createdAt, status: approved.has(`ghii:${req}@${config.nodeId}`) ? 'approved' : 'pending' };
+                });
+                return ok({ ws, requests });
+            }
+            if (action === 'decide') {
+                if (!requester) return fail("action='decide' needs a requester.");
+                if (!(await isManager())) return fail('Only the workspace creator or an org admin can decide access.');
+                const recipient = `ghii:${requester}@${config.nodeId}`;
+                const pattern = `organism.${organism_id}.w.${ws}.**`;
+                if (decision === 'deny') {
+                    const grants = (await storage.listConsents(ownerGhii, { status: 'active' })).filter(c => c.dataPattern === pattern && c.recipient === recipient && c.purpose === 'workspace-access');
+                    for (const g of grants) await storage.updateConsent(g.id, { status: 'revoked', revokedAt: new Date().toISOString() });
+                    return ok({ status: 'denied', ws, requester });
+                }
+                await ensureConsent(ownerGhii, pattern, recipient, 'workspace-access');
+                return ok({ status: 'approved', ws, requester });
+            }
+            return fail("action must be 'request', 'list' or 'decide'.");
         });
 
     // ── aimeat_workspace_export ──

@@ -84,7 +84,7 @@ fn node_exe_name() -> &'static str {
 /// fails with `EISDIR: illegal operation on a directory, lstat 'C:'`, so the node
 /// crashes before loading a single module. UNC verbatim (`\\?\UNC\srv\share`)
 /// maps back to `\\srv\share`. No-op on non-verbatim paths and on non-Windows.
-fn strip_verbatim(p: PathBuf) -> PathBuf {
+pub fn strip_verbatim(p: PathBuf) -> PathBuf {
     let s = p.to_string_lossy();
     if let Some(rest) = s.strip_prefix(r"\\?\UNC\") {
         PathBuf::from(format!(r"\\{rest}"))

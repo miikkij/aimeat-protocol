@@ -205,29 +205,30 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       return text({ created: true, ws: wsId, types: (man.objectTypes as { name: string }[]).map(o => o.name), schemas: schemaResults });
     });
 
-  mcp.tool('aimeat_workspace_request_access', descriptionFor('aimeat_workspace_request_access'),
-    { organism_id: z.string(), ws: z.string(), message: z.string().optional() },
-    annotationsFor('aimeat_workspace_request_access'),
-    async ({ organism_id, ws, message }) => {
-      const body: Record<string, unknown> = { ws };
-      if (message != null) body.message = message;
-      const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace-access`, body);
-      return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
-    });
-
-  mcp.tool('aimeat_workspace_list_requests', descriptionFor('aimeat_workspace_list_requests'),
-    { organism_id: z.string(), ws: z.string() },
-    annotationsFor('aimeat_workspace_list_requests'),
-    async ({ organism_id, ws }) => {
-      const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace-access?ws=${encodeURIComponent(ws)}`);
-      return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
-    });
-
-  mcp.tool('aimeat_workspace_approve_access', descriptionFor('aimeat_workspace_approve_access'),
-    { organism_id: z.string(), ws: z.string(), requester: z.string(), decision: z.string().optional() },
-    annotationsFor('aimeat_workspace_approve_access'),
-    async ({ organism_id, ws, requester, decision }) => {
-      const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace-access/decision`, { ws, requester, decision: decision === 'deny' ? 'deny' : 'approve' });
+  mcp.tool('aimeat_workspace_access', descriptionFor('aimeat_workspace_access'),
+    {
+      organism_id: z.string(), ws: z.string(),
+      action: z.enum(['request', 'list', 'decide']).describe("'request' = ask the creator for access · 'list' = (creator/admin) see pending requests · 'decide' = (creator/admin) approve/deny one"),
+      message: z.string().optional().describe("action='request': a note to the creator"),
+      requester: z.string().optional().describe("action='decide': the requester's owner name"),
+      decision: z.string().optional().describe("action='decide': 'approve' (default) or 'deny'"),
+    },
+    annotationsFor('aimeat_workspace_access'),
+    async ({ organism_id, ws, action, message, requester, decision }) => {
+      const orgPath = `/v1/organisms/${encodeURIComponent(organism_id)}/workspace-access`;
+      let resp;
+      if (action === 'list') {
+        resp = await client.get(`${orgPath}?ws=${encodeURIComponent(ws)}`);
+      } else if (action === 'decide') {
+        if (!requester) return text({ error: "action='decide' needs a requester." }, true);
+        resp = await client.post(`${orgPath}/decision`, { ws, requester, decision: decision === 'deny' ? 'deny' : 'approve' });
+      } else if (action === 'request') {
+        const body: Record<string, unknown> = { ws };
+        if (message != null) body.message = message;
+        resp = await client.post(orgPath, body);
+      } else {
+        return text({ error: "action must be 'request', 'list' or 'decide'." }, true);
+      }
       return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
     });
 

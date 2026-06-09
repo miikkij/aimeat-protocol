@@ -4,6 +4,80 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+### Apps: one canonical record per owner across every identity form
+
+An owner's apps no longer fragment by how they authenticate. Publishing the same app via the
+**dashboard** (owner claim = bare name `happydude500001`) versus via **MCP / a Personal Access
+Token** (owner claim = full GHII `happydude500001@aimeat-finland-001-genesis`) previously created
+**two separate records** for the same filename, each with its own version counter — so an agent
+acting for the owner could not update the owner's canonical app. Apps are now keyed on a single
+canonical owner bucket regardless of identity form, and a startup migration merges pre-existing forks.
+
+#### Fixed
+
+- **App publish/patch/delete now canonicalise the owner before computing the storage bucket**
+  (`src/routes/apps.ts`). A new `canonicalOwner()` helper strips any `@node` suffix from the
+  authenticated `owner` claim to a single bare name, then resolves it to the owner's canonical GHII via
+  `resolveGhii` — the **same `ghiis.ghii` key the migration consolidates onto**, so the route and the
+  migration can never diverge. Every identity form of an owner (dashboard bare name, MCP/PAT full GHII,
+  agent `agent#owner@node`) now maps to one `<owner>@<node>` bucket with a shared version counter, and
+  `/v1/apps/<owner>/<filename>` resolves to a single record. The owner stays derived from the
+  authenticated identity (never a client param), and the delete handler's `ownerName !== owner`
+  defence-in-depth guard is retained, so an agent of owner A still cannot reach into owner B's namespace.
+- **Presigned app uploads derive a bare owner name** (`src/routes/upload.ts`). `handleAppUpload` was
+  using the GHII token subject verbatim as `ownerName` (`parseGAII` returns null for a GHII, which has
+  no `#`), forking the presigned path off into a second bucket; it now strips the `@node` suffix so
+  inline and presigned publishes land in the same canonical record.
+
+#### Added
+
+- **`storage.mergeForkedAppBuckets()`** (interface `src/storage/repositories/app.repository.ts`; SQLite
+  + MongoDB providers) — a one-off, idempotent data-hygiene migration that consolidates app buckets an
+  owner forked across identity forms. A plain re-key was impossible because the two forks share version
+  numbers `1..N` and the primary key is `(ownerGaii, filename, versionNumber)`, so each stray bucket is
+  folded into the owner's canonical GHII bucket with its versions **renumbered after the canonical
+  max** — no collision, no history lost, newest content stays the served latest. The app's screenshot
+  is moved and download counters are summed into the canonical row. Owners without a GHII record are
+  left untouched. Wired to run at startup right after `normalizeAppOwnerNames()`
+  (`src/server-bootstrap/service-init.ts`); logs `Merged N forked app bucket row(s)…` when it acts.
+- **Tests** — `test/unit/app-owner-normalization.test.ts` extended with `mergeForkedAppBuckets()`
+  coverage (fork renumbering, pure re-key on an empty canonical bucket, screenshot/download folding,
+  unknown-owner skip, idempotency); `test/e2e-apps.ts` gains a cross-owner isolation phase; and
+  `test/integration/app-bucket-merge-mongo.ts` exercises the Prisma data path against a live MongoDB
+  (updating the compound-unique `ownerGaii`/`versionNumber`). All pass on SQLite and MongoDB.
+
+### Profile Agents tab: custom groups, inline tag editing — and per-tab section memory
+
+Three quality-of-life improvements for owners running many agents. The Agents tab gains a
+**Custom groups** organising mode (drag agents into your own named sections), tags become
+**editable inline** on the agent card instead of being buried in a sub-tab, and the profile's
+"remember where I was on F5" now works **per browser tab** instead of globally.
+
+#### Added
+
+- **Custom agent groups** (`public/views/profile/agents-tab.js`, `public/js/services/agents.js`) — a
+  new "Custom groups" option in the Agents tab "Group by" selector. Create named sections and **drag an
+  agent by its grip handle onto a group** to file it there (mirrors the organism document-space section
+  pattern); unassigned agents fall into an "Ungrouped" section that is also a drop target. Group
+  **definitions are stored server-side** in the owner's memory (`agents.groups` via new
+  `getAgentGroups`/`saveAgentGroups`), so the grouping follows the owner across devices, while the
+  **collapse/expand state is per-browser** (localStorage, keyed by owner). The "Group by" selector is now
+  always shown (it was hidden when an owner had no tags, which would have blocked access to custom groups).
+  New EN/FI i18n keys (`profile.agents.filter.groupByCustom`, `profile.agents.groups.*`).
+- **Inline agent tag editing** (`public/views/profile/agents/agent-card.js`) — the expanded card's tag
+  strip is now editable: add via a "+ tag" input and remove per-chip with ×, writing through the existing
+  `PATCH /v1/agents/:name/tags` route. Always rendered (even for an untagged agent, so the first tag can be
+  added) and kept in sync with the list's tag filter / "Group by: Tag" via the live-update refresh. Reuses
+  the existing Data Access tab's tag i18n keys.
+
+#### Fixed
+
+- **Profile section is now remembered per browser tab.** The landing page restores the last-opened section
+  on F5 from the `aimeat-profile-tab` key, but it lived in `localStorage` — shared across all open tabs, so
+  with several profile tabs open a refresh would jump to whatever section another tab last opened. The key
+  moved to `sessionStorage` in both consumers (`landing-page.js`, `profile.js`), so each tab restores its
+  own view and a fresh tab starts at home.
+
 ### PostgreSQL storage backend + per-backend Docker Compose
 
 AIMEAT now supports **PostgreSQL** as a third first-class persistent backend, alongside SQLite and MongoDB.
@@ -28,8 +102,9 @@ generated client. Each backend also gets its own Docker Compose file.
   `db:push:postgres`, and `test:e2e:postgresql` scripts; PostgreSQL added to `test:e2e:all-backends`.
 - **Docker Compose per backend** — `docker-compose.postgres.yml` (adds a `postgres:16` service) and
   `docker-compose.sqlite.yml` (no external DB), alongside the existing MongoDB `docker-compose.yml`.
-- **E2E** — `run-e2e-ci.ts` gained a PostgreSQL branch (server `--db-url` + `prisma db push --force-reset`
-  resets); `.env.test.postgres.example` template added.
+- **E2E** — `run-e2e-ci.ts` gained a PostgreSQL branch (server `--db-url` + per-suite table-truncate
+  resets); `.env.test.postgres.example` template added. The full E2E suite (1822/1823 — only the SMTP
+  `email/test` fails, identically on all three backends) passes on PostgreSQL.
 
 #### Fixed
 

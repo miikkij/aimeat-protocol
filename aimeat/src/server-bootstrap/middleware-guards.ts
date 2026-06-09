@@ -106,8 +106,10 @@ export function setupGuards(
   const originalInvalidate = invalidateHasOwnersCache;
   const wrappedInvalidate = () => { hasOwners = true; originalInvalidate(); };
   app.use(async (req, res, next) => {
-    // Skip for API routes, static assets, and wizard page
-    if (req.path.startsWith('/v1/') || req.path.includes('.') || req.path === '/wizard.html') {
+    // Skip for API routes (any /vN/ version — not just /v1/), static assets, and the
+    // wizard page itself. Without matching /v2/ (and beyond) the first-run gate wrongly
+    // served the wizard HTML for /v2/mcp/* and other versioned API routes.
+    if (/^\/v\d+\//.test(req.path) || req.path.includes('.') || req.path === '/wizard.html') {
       next();
       return;
     }

@@ -8,6 +8,7 @@
 
 mod node_manager;
 mod ai_connector;
+mod chat;
 mod tray;
 
 fn main() {
@@ -25,8 +26,16 @@ fn main() {
             ai_connector::detect_ai_services,
             ai_connector::connect_ai_service,
             ai_connector::node_login,
+            ai_connector::node_login_at,
             ai_connector::save_ai_endpoint,
             ai_connector::get_ai_settings,
+            chat::get_chat_agent,
+            chat::register_chat_agent,
+            chat::chat_start,
+            chat::chat_send,
+            chat::chat_approve,
+            chat::chat_set_auto_approve,
+            chat::chat_stop,
         ])
         .setup(|app| {
             // Initialize system tray
