@@ -145,6 +145,23 @@ reaching its handler — breaking the v2 scoped MCP surfaces on not-yet-set-up n
   check changed from `req.path.startsWith('/v1/')` to the regex `^/v\d+/`, so `/v2/mcp/<role>` and any future API
   version are never served the wizard while owners are still being created.
 
+### MCP: workspace list now shows workspaces created by other members
+
+`aimeat_workspace_list` read only the **calling owner's own** registry record, so in a multi-member organism a
+member who did not create a given workspace got an **empty list** — even though they are a member, the REST
+`/v1/organisms/:id/workspaces` route already aggregated it, and `aimeat_workspace_read` would find it. This
+surfaced in the desktop Ollama Chat: a member's agent asked "list workspaces in X" and got back `[]` while the
+workspace existed under the **creator's** identity.
+
+#### Fixed
+
+- **`aimeat_workspace_list` aggregates the workspace registry across all member identities**
+  (`src/mcp/workspaces.ts`). It now reads every `organism.{id}.meta.workspaces` record via `listAllMemory`
+  (deduped by workspace id) instead of a single `getMemory(ownerGhii, …)`, matching `findWsEntry` and
+  `aimeat_workspace_read`. Membership still gates the call and per-workspace `read` still enforces consent — only
+  **discovery** is fixed. Regression test added (`test/e2e-mcp-workspaces.ts` 15b: a member who didn't create the
+  workspace can discover it via the MCP list; it fails on the old single-owner read).
+
 ### Profile: full-bleed dashboard layout
 
 The profile pages already had an admin-style grouped left sidebar plus a content column, but the

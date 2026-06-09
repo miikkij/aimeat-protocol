@@ -23,6 +23,9 @@
  *     consent guard, so a granted member reads a shared workspace over MCP.
  *   v1.3.0 -- 2026-06-09 -- _export / _import (full-fidelity ZIP backup/restore as base64; size-capped
  *     inline). Reuses services/workspace-export + workspace-import.
+ *   v1.3.1 -- 2026-06-09 -- _list aggregates the workspace registry across ALL member identities (was
+ *     reading only the caller's own GHII record), so a member who didn't create a workspace no longer
+ *     sees an empty list. Matches findWsEntry / _read.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { randomUUID } from 'node:crypto';
@@ -125,8 +128,26 @@ export function registerWorkspaceTools(
         annotationsFor('aimeat_workspace_list'),
         async ({ organism_id }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            const rec = await storage.getMemory(ownerGhii, `organism.${organism_id}.meta.workspaces`);
-            const workspaces = (rec?.value as { workspaces?: unknown[] } | undefined)?.workspaces ?? [];
+            // Each workspace is registered under its CREATOR's own GHII registry record, so a member who
+            // didn't create a given workspace would see an empty list if we only read our own registry.
+            // Aggregate every member's `organism.{id}.meta.workspaces` record (consistent with
+            // findWsEntry / workspace_read, which already aggregate across member identities).
+            const regKey = `organism.${organism_id}.meta.workspaces`;
+            const { items } = await storage.listAllMemory({ prefix: regKey, limit: 1000 });
+            const seen = new Set<string>();
+            const workspaces: unknown[] = [];
+            for (const rec of items) {
+                if (rec.key !== regKey) continue;
+                const list = (rec.value as { workspaces?: Array<{ id?: string }> } | null)?.workspaces ?? [];
+                for (const w of list) {
+                    const id = w?.id;
+                    if (typeof id === 'string') {
+                        if (seen.has(id)) continue;
+                        seen.add(id);
+                    }
+                    workspaces.push(w);
+                }
+            }
             return ok({ organism_id, workspaces });
         });
 

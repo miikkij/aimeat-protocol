@@ -6,6 +6,8 @@
  *   membership gate with a second owner's organism.
  * @version-history
  *   v1.0.0 — 2026-06-08 — Initial creation (5 workspace tools).
+ *   v1.1.0 — 2026-06-09 — Add test 15b: a member who didn't create a workspace can DISCOVER it via the
+ *     MCP list (cross-member registry aggregation regression).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-workspaces
 
@@ -259,6 +261,16 @@ await test('14. the locked schema validates new drafts (valid passes, invalid re
 await test('15. owner 2 joins owner 1\'s bootstrapped org', async () => {
     const j = await json(`/v1/organisms/${bootOrgId}/join`, { method: 'POST', headers: { Authorization: `Bearer ${B.ownerToken}` }, body: '{}' });
     assert(j.status === 200 || j.status === 201, `join ${j.status}: ${JSON.stringify(j.body.error)}`);
+});
+
+await test('15b. B can DISCOVER A\'s workspace via MCP list (cross-member registry aggregation)', async () => {
+    // Regression: workspace_list used to read only the caller's own registry record, so a member who
+    // did NOT create the workspace saw an empty list even though the workspace exists (and read would
+    // find it). It must aggregate every member's registry — like workspace_read / the REST list.
+    const l = await B.client.call('aimeat_workspace_list', { organism_id: bootOrgId }, 1151);
+    const data = JSON.parse(l.result.content[0].text);
+    assert(Array.isArray(data.workspaces) && data.workspaces.some((w: any) => w.id === bootWs.id),
+        `B (member, not creator) must see A's workspace in the list: ${JSON.stringify(data.workspaces)}`);
 });
 
 await test('16. B cannot read the workspace before approval', async () => {
