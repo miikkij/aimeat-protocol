@@ -994,7 +994,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_workspace_update',
-        description: "Update a workspace's name and/or readme IN PLACE — without changing its id, objectTypes, schemas, sections or content (so nothing referencing it gets orphaned). The name is kept in sync across the manifest and the workspace registry. Use this to rename a workspace or rewrite/translate its readme. Creator-only (or an org admin). To change the structure instead, that is a manifest edit, not this tool.",
+        description: "Update a workspace IN PLACE — its name, readme, and/or its whole STRUCTURE — without changing its id (so nothing referencing it gets orphaned). Editing structure is editing the manifest: pass a full replacement `manifest` to add/remove a space (an objectType), toggle the publish gate (policy.alwaysGate), or change settings; pass `schemas` to lock a records space's JSON Schema. Read the workspace first, change what you need, send it back. Name stays synced across manifest + registry. Creator-only (or an org admin). This is the single tool for evolving a workspace's shape — there is no separate add-space/remove-space/set-gate tool.",
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -1002,6 +1002,8 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
             ws: { type: 'string', required: true, description: 'Workspace id.' },
             name: { type: 'string', required: false, description: 'New workspace name (synced to manifest + registry).' },
             readme: { type: 'string', required: false, description: 'New markdown readme/intro (replaces the current one).' },
+            manifest: { type: 'object', required: false, description: 'Full replacement manifest (objectTypes + policy/gate + settings). Add/remove a space by including/excluding its objectType. The id is preserved and the manifest is schema-validated.' },
+            schemas: { type: 'object', required: false, description: 'Map of namespace → JSON Schema (object) to lock (strict) for a records space.' },
         },
     },
     {

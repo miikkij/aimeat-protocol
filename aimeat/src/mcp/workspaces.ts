@@ -228,15 +228,19 @@ export function registerWorkspaceTools(
             ws: z.string(),
             name: z.string().optional().describe('New workspace name (synced to the manifest + the registry)'),
             readme: z.string().optional().describe('New markdown readme/intro (replaces the current one)'),
+            manifest: z.any().optional().describe('FULL replacement manifest (objectTypes + policy/gate + settings) as a JSON OBJECT. Read the workspace first, then add/remove an objectType to add/remove a space, or change policy.alwaysGate for the publish gate. The id is preserved.'),
+            schemas: z.any().optional().describe('Map of namespace → JSON Schema (object) to lock (strict) for a records space.'),
         },
         annotationsFor('aimeat_workspace_update'),
-        async ({ organism_id, ws, name, readme }): Promise<TextResult> => {
+        async ({ organism_id, ws, name, readme, manifest, schemas }): Promise<TextResult> => {
             const role = await roleOf(organism_id);
             if (!role) return fail('You are not a member of this organism.');
             try {
                 const result = await updateWorkspaceMeta(storage, config, {
                     orgId: organism_id, ws, callerOwner: ownerName,
                     isAdmin: role === 'admin' || role === 'creator', name, readme,
+                    manifest: parseObj(manifest) as Record<string, unknown> | undefined,
+                    schemas: parseObj(schemas) as Record<string, Record<string, unknown>> | undefined,
                 });
                 return ok(result);
             } catch (e) {

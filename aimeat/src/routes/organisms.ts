@@ -1060,6 +1060,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
         orgId: id, ws, callerOwner: req.auth!.owner as string,
         isAdmin: role === 'admin' || role === 'creator',
         name: req.body?.name, readme: req.body?.readme,
+        manifest: req.body?.manifest, schemas: req.body?.schemas,
       });
       emitChange('organisms');
       res.json(success(config.nodeId, result));

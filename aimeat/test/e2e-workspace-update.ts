@@ -73,6 +73,17 @@ await test('2. readme-only update leaves the name alone', async () => {
     assert(man.name === 'New Name', 'name unchanged after readme-only update');
 });
 
+await test('2b. manifest update ADDS a space (objectType) in place, id preserved', async () => {
+    const man = (await json(`/v1/memory/${encodeURIComponent(`${root()}.meta.manifest`)}`, { headers: auth(creatorTok) })).body.data.value;
+    const before = man.objectTypes.length;
+    const newManifest = { ...man, objectTypes: [...man.objectTypes, { name: 'note', schemaRef: 'schema:note@1', namespace: 'shared.notes', mode: 'document', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true }] };
+    const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { method: 'PUT', headers: auth(creatorTok), body: JSON.stringify({ manifest: newManifest }) });
+    assert(r.status === 200 && r.body.data.updated.includes('manifest'), `update ${r.status}: ${JSON.stringify(r.body)}`);
+    const man2 = (await json(`/v1/memory/${encodeURIComponent(`${root()}.meta.manifest`)}`, { headers: auth(creatorTok) })).body.data.value;
+    assert(man2.objectTypes.length === before + 1 && man2.objectTypes.some((o: any) => o.name === 'note'), `space added: ${man2.objectTypes.map((o: any) => o.name).join(',')}`);
+    assert(man2.id === orgId && man2.name === 'New Name', 'id + name preserved');
+});
+
 await test('3. empty update (no name/readme) is rejected', async () => {
     const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { method: 'PUT', headers: auth(creatorTok), body: JSON.stringify({}) });
     assert(r.status === 400, `expected 400, got ${r.status}`);

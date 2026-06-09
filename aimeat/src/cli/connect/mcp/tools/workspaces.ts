@@ -115,13 +115,17 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       organism_id: z.string(), ws: z.string(),
       name: z.string().optional().describe('New workspace name (synced to manifest + registry)'),
       readme: z.string().optional().describe('New markdown readme/intro (replaces the current one)'),
+      manifest: z.any().optional().describe('FULL replacement manifest (objectTypes + policy/gate + settings) as a JSON OBJECT. Read the workspace first, then add/remove an objectType to add/remove a space, or set policy.alwaysGate for the publish gate. The id is preserved.'),
+      schemas: z.any().optional().describe('Map of namespace → JSON Schema (object) to lock (strict) for a records space.'),
     },
     annotationsFor('aimeat_workspace_update'),
-    async ({ organism_id, ws, name, readme }) => {
-      const body: { name?: string; readme?: string } = {};
+    async ({ organism_id, ws, name, readme, manifest, schemas }) => {
+      const body: { name?: string; readme?: string; manifest?: unknown; schemas?: unknown } = {};
       if (typeof name === 'string') body.name = name;
       if (typeof readme === 'string') body.readme = readme;
-      if (body.name === undefined && body.readme === undefined) return text({ error: 'Provide a new name and/or readme.' }, true);
+      const man = parseObj(manifest); if (man !== undefined) body.manifest = man;
+      const sch = parseObj(schemas); if (sch !== undefined) body.schemas = sch;
+      if (body.name === undefined && body.readme === undefined && body.manifest === undefined && body.schemas === undefined) return text({ error: 'Provide a name, readme, manifest and/or schemas.' }, true);
       const r = await client.put(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace?ws=${encodeURIComponent(ws)}`, body);
       if (r.ok === false) return text({ error: (r.error as { message?: string } | undefined)?.message || 'Update failed' }, true);
       return text(r.data);
