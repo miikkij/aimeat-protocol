@@ -173,25 +173,40 @@ export function registerWorkspaceTools(
         });
 
     // ── aimeat_workspace_write_draft ──
-    mcp.tool('aimeat_workspace_write_draft', descriptionFor('aimeat_workspace_write_draft'),
+    mcp.tool('aimeat_workspace_write', descriptionFor('aimeat_workspace_write'),
         {
             organism_id: z.string(), ws: z.string(),
-            namespace: z.string().describe("The objectType's namespace, e.g. shared.deliverables"),
-            id: z.string().describe('Instance id (new or existing to overwrite)'),
-            // Some clients JSON-stringify an untyped object param — the handler's coerceValue parses
-            // a string back to an object so records still validate and documents aren't stored corrupt.
-            // (Kept as z.any() — a z.record/union here broke the MCP SDK's schema conversion.)
-            value: z.any().describe('The record/document as a JSON OBJECT (not a string). Records must match the manifest schema; documents are { id, title, markdown }.'),
+            space: z.string().describe("The objectType (space) NAME — e.g. 'feature' or 'notes'. The tool resolves whether it is a records or document space."),
+            // z.any(): some clients JSON-stringify an object param — coerceValue parses it back so records
+            // validate and documents aren't stored corrupt. (A z.record/union here breaks the MCP SDK.)
+            value: z.any().describe('The content as a JSON OBJECT (not a string). For a records space, the record (matching its schema). For a document space, { title, markdown }.'),
+            id: z.string().optional().describe('Instance id. Required for a records space (or include id in value); auto-generated for a document.'),
+            section: z.string().optional().describe('Document spaces only: section id/name to file the document under.'),
         },
-        annotationsFor('aimeat_workspace_write_draft'),
-        async ({ organism_id, ws, namespace, id, value }): Promise<TextResult> => {
+        annotationsFor('aimeat_workspace_write'),
+        async ({ organism_id, ws, space, value, id, section }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            const key = `${wsRoot(organism_id, ws)}.${namespace}.${id}.draft`;
-            const v = coerceValue(value, id);
+            const root = wsRoot(organism_id, ws);
+            const man = await storage.getMemory(ownerGhii, `${root}.meta.manifest`);
+            const ot = ((man?.value as Manifest | undefined)?.objectTypes ?? []).find(o => o.name === space);
+            if (!ot || !ot.namespace) return fail(`No space named "${space}" in this workspace. Read the workspace to see its spaces.`);
+            const isDoc = ot.mode === 'document';
+            let instanceId = (id && String(id).trim()) || (value && typeof value === 'object' && !Array.isArray(value) ? String((value as Record<string, unknown>).id ?? '').trim() : '');
+            if (!instanceId && isDoc) instanceId = 'doc-' + Math.random().toString(36).slice(2, 9);
+            if (!instanceId) return fail('A records write needs an id (pass `id`, or include `id` in `value`).');
+            const key = `${root}.${ot.namespace}.${instanceId}.draft`;
+            const v = coerceValue(value, instanceId);
             const valid = await validateMemoryWrite(key, v, storage);
             if (!valid.valid) return fail('Draft rejected by schema: ' + JSON.stringify(valid.errors));
             await writeRecord(key, v, await storage.getMemory(ownerGhii, key));
-            return ok({ written: key });
+            if (isDoc && section) {
+                const secKey = `${root}.meta.sections.${ot.name}`;
+                const secRec = await storage.getMemory(ownerGhii, secKey);
+                const sections = ((secRec?.value as { sections?: { id: string; name?: string; documents?: string[] }[] } | undefined)?.sections) ?? [];
+                const target = sections.find(s => s.id === section || s.name === section);
+                if (target) { target.documents = [...(target.documents ?? []).filter(d => d !== instanceId), instanceId]; await writeRecord(secKey, { sections }, secRec); }
+            }
+            return ok({ written: key, id: instanceId, space, mode: ot.mode ?? 'records', section: section ?? null });
         });
 
     // ── aimeat_workspace_publish ──
@@ -247,37 +262,6 @@ export function registerWorkspaceTools(
                 if (e instanceof WorkspaceMetaError) return fail(e.message);
                 return fail((e as Error).message || 'Update failed');
             }
-        });
-
-    // ── aimeat_workspace_add_document ──
-    mcp.tool('aimeat_workspace_add_document', descriptionFor('aimeat_workspace_add_document'),
-        {
-            organism_id: z.string(), ws: z.string(),
-            type: z.string().describe('Name of a document-mode objectType (a wiki space)'),
-            title: z.string(), markdown: z.string(),
-            section: z.string().optional().describe('Optional section id/name to file the document under'),
-        },
-        annotationsFor('aimeat_workspace_add_document'),
-        async ({ organism_id, ws, type, title, markdown, section }): Promise<TextResult> => {
-            const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            const root = wsRoot(organism_id, ws);
-            const man = await storage.getMemory(ownerGhii, `${root}.meta.manifest`);
-            const ot = ((man?.value as Manifest | undefined)?.objectTypes ?? []).find(o => o.name === type && o.mode === 'document');
-            if (!ot || !ot.namespace) return fail(`No document space named "${type}" in this workspace.`);
-            const docId = 'doc-' + Math.random().toString(36).slice(2, 9);
-            const key = `${root}.${ot.namespace}.${docId}.draft`;
-            await writeRecord(key, { id: docId, title, markdown }, null);
-            if (section) {
-                const secKey = `${root}.meta.sections.${type}`;
-                const secRec = await storage.getMemory(ownerGhii, secKey);
-                const sections = ((secRec?.value as { sections?: { id: string; name?: string; documents?: string[] }[] } | undefined)?.sections) ?? [];
-                const target = sections.find(s => s.id === section || s.name === section);
-                if (target) {
-                    target.documents = [...(target.documents ?? []).filter(d => d !== docId), docId];
-                    await writeRecord(secKey, { sections }, secRec);
-                }
-            }
-            return ok({ written: key, doc_id: docId, type, section: section ?? null });
         });
 
     // ── aimeat_workspace_object_delete ──

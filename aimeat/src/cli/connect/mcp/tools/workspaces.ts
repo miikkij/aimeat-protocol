@@ -54,21 +54,37 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
     });
 
-  mcp.tool('aimeat_workspace_write_draft', descriptionFor('aimeat_workspace_write_draft'),
+  mcp.tool('aimeat_workspace_write', descriptionFor('aimeat_workspace_write'),
     {
       organism_id: z.string(), ws: z.string(),
-      namespace: z.string().describe("The objectType's namespace, e.g. shared.deliverables"),
-      id: z.string().describe('Instance id (new or existing to overwrite)'),
-      // coerceValue parses a JSON-stringified object so records still validate + documents store
-      // correctly. (Kept as z.any() — a z.record/union here broke the MCP SDK's schema conversion.)
-      value: z.any().describe('The record/document as a JSON OBJECT (not a string). Records must match the schema; documents are { id, title, markdown }.'),
+      space: z.string().describe("The objectType (space) NAME — e.g. 'feature' or 'notes'. The tool resolves records vs document."),
+      // z.any() so a JSON-stringified object param is parsed back (a z.record/union breaks the MCP SDK).
+      value: z.any().describe('The content as a JSON OBJECT (not a string). Records: the record (matching its schema). Documents: { title, markdown }.'),
+      id: z.string().optional().describe('Instance id. Required for records (or include id in value); auto-generated for documents.'),
+      section: z.string().optional().describe('Document spaces only: section id/name to file the document under.'),
     },
-    annotationsFor('aimeat_workspace_write_draft'),
-    async ({ organism_id, ws, namespace, id, value }) => {
-      const v = coerceValue(value, id);
-      const key = `${root(organism_id, ws)}.${namespace}.${id}.draft`;
-      const resp = await client.post('/v1/memory', { key, value: v, visibility: 'private' });
-      return text(resp.ok === false ? (resp.error ?? resp) : { written: key }, resp.ok === false);
+    annotationsFor('aimeat_workspace_write'),
+    async ({ organism_id, ws, space, value, id, section }) => {
+      const wsResp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace?ws=${encodeURIComponent(ws)}`);
+      const ot = ((wsResp.data as { manifest?: { objectTypes?: { name: string; namespace?: string; mode?: string }[] } } | undefined)?.manifest?.objectTypes ?? []).find(o => o.name === space);
+      if (!ot || !ot.namespace) return text({ error: `No space named "${space}" in this workspace.` }, true);
+      const isDoc = ot.mode === 'document';
+      const v0 = parseObj(value);
+      let instanceId = (id && String(id).trim()) || (v0 && typeof v0 === 'object' && !Array.isArray(v0) ? String((v0 as Record<string, unknown>).id ?? '').trim() : '');
+      if (!instanceId && isDoc) instanceId = 'doc-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      if (!instanceId) return text({ error: 'A records write needs an id (pass id, or include id in value).' }, true);
+      const v = coerceValue(v0, instanceId);
+      const key = `${root(organism_id, ws)}.${ot.namespace}.${instanceId}.draft`;
+      const wr = await client.post('/v1/memory', { key, value: v, visibility: 'private' });
+      if (wr.ok === false) return text(wr.error ?? wr, true);
+      if (isDoc && section) {
+        const secKey = `${root(organism_id, ws)}.meta.sections.${ot.name}`;
+        const secResp = await client.get(`/v1/memory?prefix=${encodeURIComponent(secKey)}`);
+        const sections = (secResp.data as { items?: { key: string; value?: { sections?: { id: string; name?: string; documents?: string[] }[] } }[] } | undefined)?.items?.find(i => i.key === secKey)?.value?.sections ?? [];
+        const target = sections.find(s => s.id === section || s.name === section);
+        if (target) { target.documents = [...(target.documents ?? []).filter(d => d !== instanceId), instanceId]; await client.post('/v1/memory', { key: secKey, value: { sections }, visibility: 'private' }); }
+      }
+      return text({ written: key, id: instanceId, space, mode: ot.mode ?? 'records', section: section ?? null });
     });
 
   mcp.tool('aimeat_workspace_publish', descriptionFor('aimeat_workspace_publish'),
@@ -77,37 +93,6 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
     async ({ organism_id, ws, namespace, id }) => {
       const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/publish`, { ws, namespace, id });
       return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
-    });
-
-  mcp.tool('aimeat_workspace_add_document', descriptionFor('aimeat_workspace_add_document'),
-    {
-      organism_id: z.string(), ws: z.string(),
-      type: z.string().describe('Name of a document-mode objectType (a wiki space)'),
-      title: z.string(), markdown: z.string(),
-      section: z.string().optional().describe('Optional section id/name to file the document under'),
-    },
-    annotationsFor('aimeat_workspace_add_document'),
-    async ({ organism_id, ws, type, title, markdown, section }) => {
-      const wsResp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace?ws=${encodeURIComponent(ws)}`);
-      const manifest = (wsResp.data as { manifest?: { objectTypes?: { name: string; namespace?: string; mode?: string }[] } } | undefined)?.manifest;
-      const ot = (manifest?.objectTypes ?? []).find(o => o.name === type && o.mode === 'document');
-      if (!ot || !ot.namespace) return text({ error: `No document space named "${type}" in this workspace.` }, true);
-      const docId = 'doc-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-      const key = `${root(organism_id, ws)}.${ot.namespace}.${docId}.draft`;
-      const wr = await client.post('/v1/memory', { key, value: { id: docId, title, markdown }, visibility: 'private' });
-      if (wr.ok === false) return text(wr.error ?? wr, true);
-      if (section) {
-        const secKey = `${root(organism_id, ws)}.meta.sections.${type}`;
-        const secResp = await client.get(`/v1/memory?prefix=${encodeURIComponent(secKey)}`);
-        const secItems = (secResp.data as { items?: { key: string; value?: { sections?: { id: string; name?: string; documents?: string[] }[] } }[] } | undefined)?.items ?? [];
-        const sections = secItems.find(i => i.key === secKey)?.value?.sections ?? [];
-        const target = sections.find(s => s.id === section || s.name === section);
-        if (target) {
-          target.documents = [...(target.documents ?? []).filter(d => d !== docId), docId];
-          await client.post('/v1/memory', { key: secKey, value: { sections }, visibility: 'private' });
-        }
-      }
-      return text({ written: key, doc_id: docId, type, section: section ?? null });
     });
 
   mcp.tool('aimeat_workspace_update', descriptionFor('aimeat_workspace_update'),

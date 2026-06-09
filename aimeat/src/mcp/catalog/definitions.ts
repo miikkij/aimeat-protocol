@@ -942,16 +942,17 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
-        name: 'aimeat_workspace_write_draft',
-        description: 'Create or overwrite a DRAFT item in a workspace (a record or a document). The draft is a working copy the owner can review; it is NOT live until published (aimeat_workspace_publish). Records are validated against the manifest schema for that namespace and rejected if invalid. Use the namespace from the manifest (aimeat_workspace_read). Documents use value { id, title, markdown }. Member-only.',
+        name: 'aimeat_workspace_write',
+        description: "Create or overwrite a DRAFT item in a workspace — a record OR a document — in one tool. Give the space NAME (the objectType, e.g. 'feature' or 'notes'); the tool resolves whether it is a records or document space and writes accordingly. For a records space, `value` is the record (validated against its schema, rejected if invalid) and needs an `id`. For a document space, `value` is { title, markdown }, the `id` is auto-generated, and you can file it under a `section`. Drafts are NOT live until published (aimeat_workspace_publish). Embed images with aimeat_storage_upload then ![alt](/v1/storage/<key>). Member-only.",
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
             ws: { type: 'string', required: true, description: 'Workspace id.' },
-            namespace: { type: 'string', required: true, description: "The objectType's namespace from the manifest, e.g. shared.deliverables." },
-            id: { type: 'string', required: true, description: 'Instance id — new, or an existing id to overwrite.' },
-            value: { type: 'object', required: true, description: 'The record/document object. Records must match the schema; documents are { id, title, markdown }.' },
+            space: { type: 'string', required: true, description: "The objectType (space) NAME from the manifest, e.g. 'feature' or 'notes'." },
+            value: { type: 'object', required: true, description: 'The content object. Records: the record (matching its schema). Documents: { title, markdown }.' },
+            id: { type: 'string', description: 'Instance id. Required for a records space (or include id in value); auto-generated for a document.' },
+            section: { type: 'string', description: 'Document spaces only: section id/name to file the document under.' },
         },
     },
     {
@@ -964,20 +965,6 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
             ws: { type: 'string', required: true, description: 'Workspace id.' },
             namespace: { type: 'string', required: true, description: 'The instance namespace.' },
             id: { type: 'string', required: true, description: 'The instance id whose .draft to publish.' },
-        },
-    },
-    {
-        name: 'aimeat_workspace_add_document',
-        description: 'Add a new markdown DOCUMENT (as a draft) to a document-mode space in a workspace — e.g. a status page, a spec, or notes. Optionally file it under a named section of that space\'s tree. Embed images with aimeat_storage_upload then ![alt](/v1/storage/<key>) in the markdown. Publish it with aimeat_workspace_publish. Member-only.',
-        caller: 'agent',
-        visibility: agentEverywhere,
-        input: {
-            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
-            ws: { type: 'string', required: true, description: 'Workspace id.' },
-            type: { type: 'string', required: true, description: 'Name of a document-mode objectType (a wiki space).' },
-            title: { type: 'string', required: true, description: 'Document title.' },
-            markdown: { type: 'string', required: true, description: 'Document body (markdown).' },
-            section: { type: 'string', description: 'Optional section id or name to file the document under.' },
         },
     },
     {

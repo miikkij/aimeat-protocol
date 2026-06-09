@@ -105,7 +105,7 @@ const root = () => `organism.${orgId}.w.${WS}`;
 await test('Tools appear in tools/list', async () => {
     const { body } = await A.client.rpc('tools/list', {}, 100);
     const names = body.result.tools.map((t: any) => t.name);
-    for (const n of ['aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_write_draft', 'aimeat_workspace_publish', 'aimeat_workspace_add_document'])
+    for (const n of ['aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_write', 'aimeat_workspace_publish', 'aimeat_workspace_object_delete'])
         assert(names.includes(n), `has ${n}`);
 });
 
@@ -145,7 +145,7 @@ await test('2. workspace_read returns the manifest + objectTypes', async () => {
 });
 
 await test('3. write_draft creates a records draft (object value)', async () => {
-    const b = await A.client.call('aimeat_workspace_write_draft', { organism_id: orgId, ws: WS, namespace: 'shared.notes', id: 'n1', value: { title: 'Hello', body: 'first note' } }, 103);
+    const b = await A.client.call('aimeat_workspace_write', { organism_id: orgId, ws: WS, space: 'note', id: 'n1', value: { title: 'Hello', body: 'first note' } }, 103);
     assert(b.result.isError !== true, `error: ${b.result.content?.[0]?.text}`);
     assert(JSON.parse(b.result.content[0].text).written.endsWith('shared.notes.n1.draft'), 'wrote draft key');
 });
@@ -153,7 +153,7 @@ await test('3. write_draft creates a records draft (object value)', async () => 
 await test('3b. write_draft accepts a JSON-STRINGIFIED value (client coercion)', async () => {
     // Regression: an untyped value made some clients stringify object params → records failed
     // schema ("must be object") and documents stored the raw string. The tool must coerce it.
-    const b = await A.client.call('aimeat_workspace_write_draft', { organism_id: orgId, ws: WS, namespace: 'shared.notes', id: 'n2', value: JSON.stringify({ title: 'From string', body: 'coerced' }) }, 1031);
+    const b = await A.client.call('aimeat_workspace_write', { organism_id: orgId, ws: WS, space: 'note', id: 'n2', value: JSON.stringify({ title: 'From string', body: 'coerced' }) }, 1031);
     assert(b.result.isError !== true, `stringified value should be coerced, not rejected: ${b.result.content?.[0]?.text}`);
     const rd = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS }, 1032);
     const note = (JSON.parse(rd.result.content[0].text).drafts?.note || []).find((d: any) => d.id === 'n2');
@@ -161,7 +161,7 @@ await test('3b. write_draft accepts a JSON-STRINGIFIED value (client coercion)',
 });
 
 await test('4. write_draft rejects a schema-invalid record', async () => {
-    const b = await A.client.call('aimeat_workspace_write_draft', { organism_id: orgId, ws: WS, namespace: 'shared.notes', id: 'bad', value: { body: 'no title' } }, 104);
+    const b = await A.client.call('aimeat_workspace_write', { organism_id: orgId, ws: WS, space: 'note', id: 'bad', value: { body: 'no title' } }, 104);
     assert(b.result.isError === true, 'rejected (missing required title)');
 });
 
@@ -184,10 +184,11 @@ await test('7. after publish: object present, draft gone', async () => {
     assert(!(data.drafts?.note || []).some((d: any) => d.id === 'n1'), 'draft consumed');
 });
 
-await test('8. add_document creates a markdown page draft', async () => {
-    const b = await A.client.call('aimeat_workspace_add_document', { organism_id: orgId, ws: WS, type: 'page', title: 'Status', markdown: '# Status\nAll good.' }, 108);
+await test('8. workspace_write creates a markdown document draft (document space, auto id)', async () => {
+    const b = await A.client.call('aimeat_workspace_write', { organism_id: orgId, ws: WS, space: 'page', value: { title: 'Status', markdown: '# Status\nAll good.' } }, 108);
     assert(b.result.isError !== true, `error: ${b.result.content?.[0]?.text}`);
-    assert(typeof JSON.parse(b.result.content[0].text).doc_id === 'string', 'returns doc_id');
+    const out = JSON.parse(b.result.content[0].text);
+    assert(typeof out.id === 'string' && out.id.startsWith('doc-') && out.mode === 'document', `returns doc id + mode: ${JSON.stringify(out)}`);
 });
 
 await test('8b. delete removes a published object (draft + latest + versions)', async () => {
@@ -248,9 +249,9 @@ await test('13. created workspace is listed + readable', async () => {
 });
 
 await test('14. the locked schema validates new drafts (valid passes, invalid rejected)', async () => {
-    const okDraft = await A.client.call('aimeat_workspace_write_draft', { organism_id: bootOrgId, ws: bootWs.id, namespace: 'shared.items', id: 'i1', value: { title: 'Hello' } }, 114);
+    const okDraft = await A.client.call('aimeat_workspace_write', { organism_id: bootOrgId, ws: bootWs.id, space: 'item', id: 'i1', value: { title: 'Hello' } }, 114);
     assert(okDraft.result.isError !== true, `valid draft should pass: ${okDraft.result.content?.[0]?.text}`);
-    const badDraft = await A.client.call('aimeat_workspace_write_draft', { organism_id: bootOrgId, ws: bootWs.id, namespace: 'shared.items', id: 'bad', value: { nope: 1 } }, 1141);
+    const badDraft = await A.client.call('aimeat_workspace_write', { organism_id: bootOrgId, ws: bootWs.id, space: 'item', id: 'bad', value: { nope: 1 } }, 1141);
     assert(badDraft.result.isError === true, 'invalid draft rejected by the locked schema');
 });
 
