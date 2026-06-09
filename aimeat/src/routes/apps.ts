@@ -25,6 +25,12 @@
  *     screenshots live in the owner's GHII bucket, so both 404'd for every app
  *     published under the current scheme. Now resolve the row via
  *     getAppByOwnerName() and read that bucket directly.
+ *   v1.3.0 -- 2026-06-09 -- Canonicalize the owner before computing the storage
+ *     bucket in publish/patch/delete (canonicalOwner): strip any @node suffix
+ *     and resolve to the owner's GHII. The raw `owner` claim varies by identity
+ *     form (dashboard bare name vs MCP/PAT full GHII), which forked the same
+ *     owner's app into two buckets with independent version counters. The
+ *     startup mergeForkedAppBuckets() migration consolidates pre-existing forks.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -35,11 +41,27 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { resolveGhii } from '../utils/ghii-resolver.js';
 import { randomBytes } from 'node:crypto';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { decodeStrictBase64 } from '../utils/base64.js';
 export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
+
+    // Apps are OWNER-scoped. The same owner can authenticate under different
+    // identity forms: the dashboard presents the bare owner name as the `owner`
+    // claim, while MCP / a Personal Access Token presents the full GHII
+    // (`owner@node`). Left unnormalized, those forks the owner into two app
+    // buckets with independent version counters. Strip any `@node` suffix to a
+    // single bare owner name, then resolve to the owner's canonical GHII via the
+    // identity table — the SAME key the startup `mergeForkedAppBuckets()`
+    // migration consolidates onto, so route and migration never diverge.
+    const canonicalOwner = async (req: Express.Request): Promise<{ owner: string; ownerGhii: string }> => {
+        const rawOwner = req.auth!.owner;
+        const owner = rawOwner.includes('@') ? rawOwner.split('@')[0] : rawOwner;
+        const ownerGhii = await resolveGhii(storage, owner, `${owner}@${config.nodeId}`);
+        return { owner, ownerGhii };
+    };
 
     // GET /v1/apps — Catalogue listing with search/filter/pagination
     router.get('/v1/apps', async (req, res) => {
@@ -268,8 +290,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
         // version counter is shared (not two parallel buckets that shadow
         // each other). The caller's GAII is preserved in audit logs only.
         const callerGaii = resolveIdentity(req.auth!, config.nodeId);
-        const owner = req.auth!.owner;
-        const ownerGhii = `${owner}@${config.nodeId}`;
+        const { owner, ownerGhii } = await canonicalOwner(req);
         const {
             filename, content, mime_type, access_code,
             screenshot, screenshot_mime_type,
@@ -456,8 +477,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     // PATCH /v1/apps/:filename — Update access code on an app you own (requires auth)
     router.patch('/v1/apps/:filename', requireAuth(), async (req, res) => {
         const callerGaii = resolveIdentity(req.auth!, config.nodeId);
-        const owner = req.auth!.owner;
-        const ownerGhii = `${owner}@${config.nodeId}`;
+        const { owner, ownerGhii } = await canonicalOwner(req);
         const filename = req.params.filename as string;
 
         // Same lookup order as DELETE: canonical owner-GHII bucket first,
@@ -511,8 +531,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     // versions in one bucket while removing a stray version from another).
     router.delete('/v1/apps/:filename', requireAuth(), async (req, res) => {
         const callerGaii = resolveIdentity(req.auth!, config.nodeId);
-        const owner = req.auth!.owner;
-        const ownerGhii = `${owner}@${config.nodeId}`;
+        const { owner, ownerGhii } = await canonicalOwner(req);
         const filename = req.params.filename as string;
         const versionParam = req.query.version as string | undefined;
         const version = versionParam ? parseInt(versionParam, 10) : undefined;

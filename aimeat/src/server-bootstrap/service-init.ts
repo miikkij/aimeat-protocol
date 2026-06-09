@@ -12,6 +12,8 @@
  *   v1.0.0 — pre-2026-06 — Initial service bootstrap extraction
  *   v1.1.0 — 2026-06-05 — Run storage.normalizeAppOwnerNames() at startup to
  *     reunite agent-published apps with the owner's "Published Apps".
+ *   v1.2.0 — 2026-06-09 — Chain storage.mergeForkedAppBuckets() after the
+ *     ownerName normalization to consolidate forked ownerGaii app buckets.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MaintenanceState } from '../storage/interface.js';
@@ -121,7 +123,12 @@ export async function initializeServices(
   // unmanageable "community" apps. Normalize them to the bare owner name (idempotent).
   storage.normalizeAppOwnerNames()
     .then(count => { if (count > 0) logger.info(`Normalized ${count} legacy app ownerName row(s) to bare owner names`); })
-    .catch(err => logger.error('Failed to normalize app ownerName rows', { error: String(err) }));
+    // After ownerName is bare, fold any ownerGaii buckets the same owner forked
+    // across identity forms (dashboard bare name vs MCP/PAT full GHII) into one
+    // canonical record so publishes from any identity update the same app.
+    .then(() => storage.mergeForkedAppBuckets())
+    .then(count => { if (count && count > 0) logger.info(`Merged ${count} forked app bucket row(s) into canonical owner buckets`); })
+    .catch(err => logger.error('Failed to normalize/merge app owner buckets', { error: String(err) }));
 
   // Directory service — Phase 1.4 (indexes GHII profiles for local + thematic search)
   const directoryService = new DirectoryService(config, storage);

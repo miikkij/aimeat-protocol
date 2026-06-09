@@ -14,6 +14,9 @@
  *   app.use(uploadRouter(config, storage));
  * @version-history
  *   v1.0.0 — 2026-05-02 — Initial implementation
+ *   v1.1.0 — 2026-06-09 — handleAppUpload derives a BARE ownerName (never the
+ *     @node-suffixed GHII) so presigned publishes land in the same canonical app
+ *     bucket as inline publishes (see canonicalOwner in routes/apps.ts).
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -108,9 +111,14 @@ async function handleAppUpload(
     res: Response, config: AimeatConfig, storage: Storage,
     sub: string, meta: Record<string, unknown>, data: Buffer,
 ): Promise<void> {
+    // `sub` is the presigned token subject: a full GAII (agent#owner@node) for
+    // agent uploads, or the owner's GHII (owner@node) for owner uploads. Either
+    // way the canonical app bucket is the owner GHII and the display/URL name is
+    // the BARE owner — never the @node-suffixed form, which would fork the app
+    // into a second bucket (see canonicalOwner() in routes/apps.ts).
     const parsed = parseGAII(sub);
+    const ownerName = parsed ? parsed.owner : (sub.includes('@') ? sub.split('@')[0] : sub);
     const ownerGaii = parsed ? `${parsed.owner}@${parsed.node}` : sub;
-    const ownerName = parsed?.owner ?? sub;
     const filename = meta.filename as string;
 
     const existingVersion = await storage.getLatestVersionNumber(ownerGaii, filename);

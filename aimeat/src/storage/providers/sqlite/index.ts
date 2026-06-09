@@ -10,6 +10,8 @@
  *   v1.0.0 — pre-2026-06 — Initial SQLite storage implementation
  *   v1.1.0 — 2026-06-05 — Add normalizeAppOwnerNames() to strip the legacy
  *     `@node` suffix from app ownerName values (bare-name normalization).
+ *   v1.2.0 — 2026-06-09 — Add mergeForkedAppBuckets() to consolidate ownerGaii
+ *     buckets forked across an owner's identity forms into one canonical bucket.
  */
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
@@ -4284,6 +4286,89 @@ export class SqliteStorage implements Storage {
        WHERE ownerName LIKE '%@%'`
     ).run();
     return result.changes;
+  }
+
+  async mergeForkedAppBuckets(): Promise<number> {
+    // Consolidate ownerGaii buckets forked across an owner's identity forms into
+    // the owner's canonical GHII bucket. Run AFTER normalizeAppOwnerNames() so
+    // grouping by the bare ownerName is reliable. See the AppRepository contract
+    // for the full rationale. Wrapped in a transaction — partial merges would
+    // leave inconsistent version lines.
+    let reKeyed = 0;
+    const tx = this.db.transaction(() => {
+      // Owners we can canonicalize: those with a GHII record. Map bare
+      // ownerName -> canonical GHII bucket key.
+      const owners = this.db.prepare(
+        `SELECT DISTINCT a.ownerName AS ownerName, g.ghii AS ghii
+           FROM apps a JOIN ghiis g ON g.ownerName = a.ownerName`
+      ).all() as { ownerName: string; ghii: string }[];
+
+      const updRow = this.db.prepare('UPDATE apps SET ownerGaii = ?, versionNumber = ? WHERE rowid = ?');
+
+      for (const { ownerName, ghii } of owners) {
+        // Filenames that have at least one row OUTSIDE the canonical bucket.
+        const filenames = this.db.prepare(
+          'SELECT DISTINCT filename FROM apps WHERE ownerName = ? AND ownerGaii != ?'
+        ).all(ownerName, ghii) as { filename: string }[];
+
+        for (const { filename } of filenames) {
+          // Stray rows ordered oldest-first so the newest stray gets the highest
+          // new version number and therefore becomes the served "latest".
+          const strays = this.db.prepare(
+            `SELECT rowid AS rid, ownerGaii FROM apps
+              WHERE ownerName = ? AND filename = ? AND ownerGaii != ?
+              ORDER BY createdAt ASC, versionNumber ASC`
+          ).all(ownerName, filename, ghii) as { rid: number; ownerGaii: string }[];
+          if (strays.length === 0) continue;
+
+          let maxV = (this.db.prepare(
+            'SELECT COALESCE(MAX(versionNumber), 0) AS m FROM apps WHERE ownerGaii = ? AND filename = ?'
+          ).get(ghii, filename) as { m: number }).m;
+
+          for (const s of strays) {
+            maxV += 1;
+            updRow.run(ghii, maxV, s.rid);
+            reKeyed += 1;
+          }
+
+          const strayBuckets = [...new Set(strays.map(s => s.ownerGaii))];
+          const ssKey = `apps/screenshots/${filename}`;
+
+          // Move one stray screenshot into the canonical bucket if it has none,
+          // then drop any remaining stray screenshots for this app.
+          const canonHasSs = this.db.prepare(
+            'SELECT 1 FROM storage_files WHERE ownerGaii = ? AND key = ?'
+          ).get(ghii, ssKey);
+          if (!canonHasSs) {
+            for (const b of strayBuckets) {
+              const moved = this.db.prepare(
+                'UPDATE storage_files SET ownerGaii = ? WHERE ownerGaii = ? AND key = ?'
+              ).run(ghii, b, ssKey);
+              if (moved.changes > 0) break;
+            }
+          }
+          for (const b of strayBuckets) {
+            this.db.prepare('DELETE FROM storage_files WHERE ownerGaii = ? AND key = ?').run(b, ssKey);
+          }
+
+          // Fold stray download counters into the canonical row, then remove them.
+          for (const b of strayBuckets) {
+            const d = this.db.prepare(
+              'SELECT downloads FROM app_downloads WHERE ownerGaii = ? AND filename = ?'
+            ).get(b, filename) as { downloads: number } | undefined;
+            if (d && d.downloads > 0) {
+              this.db.prepare(
+                `INSERT INTO app_downloads (ownerGaii, filename, downloads) VALUES (?, ?, ?)
+                 ON CONFLICT(ownerGaii, filename) DO UPDATE SET downloads = downloads + excluded.downloads`
+              ).run(ghii, filename, d.downloads);
+            }
+            this.db.prepare('DELETE FROM app_downloads WHERE ownerGaii = ? AND filename = ?').run(b, filename);
+          }
+        }
+      }
+    });
+    tx();
+    return reKeyed;
   }
 
   private deserializeApp(row: Record<string, unknown>): AppRecord {

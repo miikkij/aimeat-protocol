@@ -28,6 +28,9 @@
  *                          base (schemaFileName/prismaClientSpecifier hooks) so the
  *                          PostgreSQL backend can reuse the same query logic;
  *                          MongoStorage kept as a thin back-compat subclass.
+ *   v1.4.0 — 2026-06-09 — Add mergeForkedAppBuckets() to consolidate ownerGaii
+ *                          buckets forked across an owner's identity forms into one
+ *                          canonical bucket with a unified version line.
  */
 
 import { execSync } from 'node:child_process';
@@ -3845,6 +3848,104 @@ export class PrismaStorage implements Storage {
             count++;
         }
         return count;
+    }
+
+    async mergeForkedAppBuckets(): Promise<number> {
+        this.ensureReady();
+        // Consolidate ownerGaii buckets forked across an owner's identity forms
+        // into the owner's canonical GHII bucket. Run AFTER normalizeAppOwnerNames()
+        // so grouping by the bare ownerName is reliable. See the AppRepository
+        // contract for the full rationale.
+        let reKeyed = 0;
+
+        // Canonical map: bare ownerName -> GHII bucket key.
+        const ghiis = await this.prisma.ghii.findMany({ select: { ownerName: true, ghii: true } });
+        const canonByOwner = new Map<string, string>();
+        for (const g of ghiis) if (g.ownerName && g.ghii) canonByOwner.set(g.ownerName, g.ghii);
+        if (canonByOwner.size === 0) return 0;
+
+        type AppKeyRow = { ownerGaii: string; ownerName: string; filename: string; versionNumber: number; createdAt: Date };
+        const rows = await this.prisma.app.findMany({
+            select: { ownerGaii: true, ownerName: true, filename: true, versionNumber: true, createdAt: true },
+        }) as AppKeyRow[];
+
+        // Group by ownerName + filename (only owners we can canonicalize).
+        const groups = new Map<string, AppKeyRow[]>();
+        for (const r of rows) {
+            if (!canonByOwner.has(r.ownerName)) continue;
+            const key = `${r.ownerName} ${r.filename}`;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key)!.push(r);
+        }
+
+        for (const [key, groupRows] of groups) {
+            const sep = key.indexOf(' ');
+            const ownerName = key.slice(0, sep);
+            const filename = key.slice(sep + 1);
+            const ghii = canonByOwner.get(ownerName)!;
+
+            const strays = groupRows
+                .filter(r => r.ownerGaii !== ghii)
+                .sort((a, b) => {
+                    const t = a.createdAt.getTime() - b.createdAt.getTime();
+                    return t !== 0 ? t : a.versionNumber - b.versionNumber;
+                });
+            if (strays.length === 0) continue;
+
+            let maxV = groupRows
+                .filter(r => r.ownerGaii === ghii)
+                .reduce((m, r) => Math.max(m, r.versionNumber), 0);
+
+            for (const s of strays) {
+                maxV += 1;
+                await this.prisma.app.update({
+                    where: { ownerGaii_filename_versionNumber: { ownerGaii: s.ownerGaii, filename, versionNumber: s.versionNumber } },
+                    data: { ownerGaii: ghii, versionNumber: maxV },
+                });
+                reKeyed += 1;
+            }
+
+            const strayBuckets = [...new Set(strays.map(s => s.ownerGaii))];
+            const ssKey = `apps/screenshots/${filename}`;
+
+            // Move one stray screenshot into the canonical bucket if it lacks one,
+            // then drop any remaining stray screenshots for this app.
+            const canonSs = await this.prisma.storageFile.findUnique({
+                where: { ownerGaii_key: { ownerGaii: ghii, key: ssKey } }, select: { ownerGaii: true },
+            });
+            if (!canonSs) {
+                for (const b of strayBuckets) {
+                    const existing = await this.prisma.storageFile.findUnique({
+                        where: { ownerGaii_key: { ownerGaii: b, key: ssKey } }, select: { ownerGaii: true },
+                    });
+                    if (existing) {
+                        await this.prisma.storageFile.update({
+                            where: { ownerGaii_key: { ownerGaii: b, key: ssKey } }, data: { ownerGaii: ghii },
+                        });
+                        break;
+                    }
+                }
+            }
+            for (const b of strayBuckets) {
+                await this.prisma.storageFile.deleteMany({ where: { ownerGaii: b, key: ssKey } });
+            }
+
+            // Fold stray download counters into the canonical row, then remove them.
+            for (const b of strayBuckets) {
+                const d = await this.prisma.appDownload.findUnique({
+                    where: { ownerGaii_filename: { ownerGaii: b, filename } }, select: { count: true },
+                });
+                if (d && d.count > 0) {
+                    await this.prisma.appDownload.upsert({
+                        where: { ownerGaii_filename: { ownerGaii: ghii, filename } },
+                        update: { count: { increment: d.count } },
+                        create: { ownerGaii: ghii, filename, count: d.count },
+                    });
+                }
+                await this.prisma.appDownload.deleteMany({ where: { ownerGaii: b, filename } });
+            }
+        }
+        return reKeyed;
     }
 
     // ── App Marketplace (Prisma-persisted purchase receipts) ──

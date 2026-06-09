@@ -4,13 +4,17 @@
  *   agent-publishes-into-owner-bucket, version history, fetch a specific version,
  *   "restore" (re-publish an older version as the new latest), "fork" (copy a
  *   version into a new app), the backward-compat full-GHII owner download
- *   fallback, and the missing-version failure mode. These back the catalog UI's
- *   Versions / Restore / Fork controls, which compose only these endpoints.
+ *   fallback, the missing-version failure mode, and cross-owner isolation (one
+ *   owner cannot publish/delete inside another owner's app namespace). These back
+ *   the catalog UI's Versions / Restore / Fork controls, which compose only these
+ *   endpoints.
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-apps
  * @version-history
  *   v1.0.0 — 2026-06-05 — initial: versions, restore, fork, GHII fallback, 404
+ *   v1.1.0 — 2026-06-09 — add Phase 5 cross-owner isolation: a second owner
+ *     cannot delete into / overwrite the first owner's app namespace.
  */
 
 import * as ed from '@noble/ed25519';
@@ -224,6 +228,60 @@ await test('GET a non-existent version returns 404', async () => {
 await test('GET unknown owner returns 404', async () => {
     const { status } = await json(`/v1/apps/nobody-here/${FILENAME}`);
     assert(status === 404, `expected 404, got ${status}`);
+});
+
+// ── Phase 5: cross-owner isolation ──
+// Apps are owner-scoped and the owner is derived from the authenticated identity
+// (never a client param). A different owner must not be able to reach into the
+// first owner's app namespace — publish keys on the caller's own owner, and the
+// delete sweep keys on the caller's own owner name.
+console.log('\nPhase 5: Cross-owner isolation');
+
+const ownerBName = `appsother${Date.now() % 100000}`;
+let ownerBToken = '';
+
+await test('Register a second owner and get a token', async () => {
+    const reg = await json('/v1/owners', {
+        method: 'POST',
+        body: JSON.stringify({ name: ownerBName, public_key: 'placeholder' }),
+    });
+    assert(reg.status === 201, `register status ${reg.status}: ${JSON.stringify(reg.body)}`);
+    const bPriv = reg.body.data.private_key;
+    const timestamp = new Date().toISOString();
+    const signature = await signMsg(bPriv, ownerBName + NODE_ID + timestamp);
+    const tok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: ownerBName, timestamp, signature }),
+    });
+    assert(tok.body.ok === true, `token: ${JSON.stringify(tok.body.error)}`);
+    ownerBToken = tok.body.data?.token;
+    assert(typeof ownerBToken === 'string', 'got owner B token');
+});
+
+function bAuthed(opts: RequestInit = {}): RequestInit {
+    return { ...opts, headers: { ...((opts.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${ownerBToken}` } };
+}
+
+await test("Owner B cannot delete owner A's app (404, not authorized into A's namespace)", async () => {
+    const { status } = await json(`/v1/apps/${FILENAME}`, bAuthed({ method: 'DELETE' }));
+    assert(status === 404, `delete in another owner's namespace must 404, got ${status}`);
+    // A's app must still resolve untouched.
+    const res = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}`);
+    assert(res.status === 200, `owner A's app still present, got ${res.status}`);
+});
+
+await test("Owner B publishing the same filename creates B's OWN record, not a write into A's", async () => {
+    const { status, body } = await json('/v1/apps', bAuthed({
+        method: 'POST',
+        body: JSON.stringify({ filename: FILENAME, content: b64('<h1>owner B</h1>'), name: 'B copy', category: 'utility', tags: [] }),
+    }));
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.version_number === 1, `B's first publish is v1 in B's own bucket, got ${body.data.version_number}`);
+    // A's record keeps its own (higher) version history — unaffected by B.
+    const aVersions = await json(`/v1/apps/${ownerName}/${FILENAME}/versions`);
+    assert((aVersions.body.data?.versions ?? []).length === 3, `owner A's version history intact (3), got ${(aVersions.body.data?.versions ?? []).length}`);
+    const bDownload = await fetch(`${BASE}/v1/apps/${ownerBName}/${FILENAME}`);
+    assert((await bDownload.text()) === '<h1>owner B</h1>', "B's namespace serves B's content");
 });
 
 // ── Summary ──
