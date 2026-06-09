@@ -141,6 +141,29 @@ Deterministic, no LLM required in the I/O path (use the shell-callable connector
 `aimeat_workspace_write(space, value, id?, section?)` resolves records-vs-document from the space name;
 records are schema-validated (rejected if invalid), documents auto-generate an id.
 
+### 5.1 Process reliably — keep the recurring/idle-hook loop idempotent + bounded (must-read)
+
+A recurring processor (idle-hook, cron, polling crew) must be safe to run again and again. The failure
+mode to avoid is a **runaway loop** — re-processing the same inputs every tick, which can hammer one
+record with rapid re-publishes and briefly stale that namespace's read, feeding the loop further. Make
+the loop idempotent and bounded:
+
+- **Dedup on the OUTPUT first — this is your PRIMARY, durable guard.** Create a result for an input only
+  while that input's output is still ABSENT. The output record persists, so an already-fulfilled input is
+  naturally skipped even after a crash/redeploy.
+- **Keep an in-memory PROCESSED set** of the ids you handled this run and skip them — but it lives only
+  for the run, so treat it as a backstop to the output-dedup, not a replacement.
+- **Don't trust a status you JUST wrote when you read it back immediately.** Read-after-write can briefly
+  still show `requested`. Let your own in-run record decide what's handled, not an instant re-read.
+- **Work a bounded batch each pass** (e.g. up to ~5 inputs) and leave the rest for the next cycle — steady,
+  predictable forward progress; one bad state then can't loop unbounded.
+- **One calm cadence per item** — one claim, one result, one status advance. NEVER hammer a single record
+  with rapid re-publishes.
+- **For "what changed since X" coordination, prefer the activity-delta primitive**
+  (`GET /v1/organisms/:id/activity?since=`) once available, over re-scanning the whole namespace each pass —
+  the same picture in one cheap call, so the agent stays light. See
+  [docs/plans/2026-06-09-organism-activity-delta.md](plans/2026-06-09-organism-activity-delta.md).
+
 ## 6. Schema / manifest rules (must-knows)
 
 - **records** need a locked JSON Schema (at least `id` + required fields); a non-matching write is
@@ -170,5 +193,6 @@ No extra wiring — declare the contract, provision, subscribe, process.
 2. Implement **provision-on-attach** (read → union manifest → grant) — §4. Same-owner self-provisions;
    cross-owner is provisioned by the creator.
 3. Implement the **processing loop** (discover → trigger → claim → produce → advance) — §5.
-4. Validate every records write against its schema — §6.
-5. Nothing for attribution/visibility — AIMEAT handles it — §7.
+4. Make the loop **idempotent + bounded** (output-dedup primary, bounded batch, no record hammering) — §5.1.
+5. Validate every records write against its schema — §6.
+6. Nothing for attribution/visibility — AIMEAT handles it — §7.
