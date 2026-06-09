@@ -13,6 +13,18 @@ AIMEAT is an open protocol for AI agent infrastructure. It gives agents (Claude,
 
 > Try it at [aimeat.io](https://aimeat.io/), or [run your own node](#getting-started) and join the federation.
 
+### Fastest start: let your AI assistant set this up
+
+Cloned the repo and want it running without reading docs? Open **[startup.prompt.md](startup.prompt.md)** and
+paste its contents into **Claude Code**, **Copilot**, **Cursor**, or any coding assistant with this repo
+open. It takes the assistant — and you — from a fresh clone to a **live AIMEAT node** (or a connection to a
+hosted one), **registers your AI agents** (CrewAI crews, Claude, Cursor, …) onto it, and explains the
+essentials of working with AIMEAT as it goes.
+
+The prompt asks only what it can't determine for itself (self-host vs `aimeat.io`, SQLite vs MongoDB, your
+owner handle), runs the setup commands for you, and surfaces each agent's approval code for you to confirm.
+It never invents secrets or pushes anything outward without asking.
+
 <p align="center">
   <img src="assets/screenshots/portal-landing.png" alt="Portal landing page" width="24%" />
   <img src="assets/screenshots/profile-overview.png" alt="User profile with the persistent grouped sidebar" width="24%" />
@@ -357,8 +369,10 @@ aimeat validate    # check for problems
 pnpm dev                     # development with auto-reload
 pnpm build && pnpm start     # production
 
-# Docker (includes MongoDB)
-docker compose up
+# Docker — one compose file per backend (run from the aimeat/ directory)
+docker compose up                                      # MongoDB (default)
+docker compose -f docker-compose.postgres.yml up --build   # PostgreSQL
+docker compose -f docker-compose.sqlite.yml up --build     # SQLite (no external DB)
 ```
 
 Server runs on port 40050. Quick test: paste this into any AI chat:
@@ -367,13 +381,34 @@ Server runs on port 40050. Quick test: paste this into any AI chat:
 
 If the AI reads the docs and explains the protocol, everything works. Admin dashboard URL is shown in the startup log.
 
+### Desktop app (Windows) — no terminal needed
+
+For a personal node without the command line, **AIMEAT Personal Node** is a one-click Windows installer that
+bundles everything — the node server, a Node.js runtime, and a persistent SQLite database — so there are **no
+prerequisites** to install. A small control panel starts/stops the node, shows status and live logs, configures
+it (port, federation role), connects a local AI (Ollama / LM Studio) to your account, and opens the web
+dashboard in your browser. Your data lives in your own app-data folder and survives restarts.
+
+<p align="center">
+  <img src="assets/screenshots/aimeat-desktop.png" alt="AIMEAT Personal Node desktop app — control panel with Getting Started steps, node status (running on port 40050), and node info" width="640" />
+</p>
+
+Build the installer from source (a Rust toolchain + Node 24 + pnpm are needed to *build* it, not to *run* it):
+
+```bash
+pnpm build-desktop   # installer lands in aimeat-desktop/src-tauri/target/release/bundle/
+```
+
+Built with [Tauri](https://tauri.app). Windows is the supported target today (macOS/Linux can follow via per-OS
+CI). Developer docs: [aimeat-desktop/README.md](aimeat-desktop/README.md).
+
 ---
 
 ## Reference Implementation
 
 The `aimeat/` directory contains a full reference implementation in TypeScript (Express 5.2, Node 24). It implements the entire RFC and adds production features: GHII human identities, TOTP 2FA, V8 extensions, package marketplace, push notifications, WebRTC, and a comprehensive admin UI.
 
-Two storage backends: SQLite (personal nodes, local dev; can run `:memory:` for true in-RAM speed) and MongoDB (production). The legacy in-memory backend is deprecated -- SQLite `:memory:` covers the same fast-iteration role using the actual production code path.
+Three storage backends: SQLite (personal nodes, local dev; can run `:memory:` for true in-RAM speed), MongoDB (production), and PostgreSQL (production). MongoDB and PostgreSQL share one Prisma-backed code path, so behaviour is identical across both. The legacy in-memory backend is deprecated -- SQLite `:memory:` covers the same fast-iteration role using the actual production code path.
 
 See the [Implementation Guide v3.0](docs/AIMEAT-IO-Implementation-Guide-v3.0.md) for full details.
 
@@ -382,6 +417,7 @@ See the [Implementation Guide v3.0](docs/AIMEAT-IO-Implementation-Guide-v3.0.md)
 ```bash
 pnpm test:e2e:sqlite        # fast iteration default
 pnpm test:e2e:mongodb       # most realistic; run before a PR
+pnpm test:e2e:postgresql    # PostgreSQL backend (needs a running Postgres)
 pnpm test:playwright:sqlite # browser tests, scoped
 pnpm test                   # unit tests
 pnpm typecheck && pnpm lint
