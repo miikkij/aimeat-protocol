@@ -2105,6 +2105,17 @@
 .mmd { overflow-x: auto; text-align: center; }
 .mmd svg { max-width: 100%; height: auto; }
 .mmd-fallback { font-size: 0.74rem; white-space: pre-wrap; color: var(--text-dim); background: var(--bg-dim); padding: 0.5rem; border-radius: 6px; overflow: auto; }
+/* Participants panel — node → owner → agents listing */
+.pj-parts { padding: 0.1rem; }
+.pj-parts-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.7rem; }
+.pj-part-owner { border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.7rem; background: var(--card); }
+.pj-part-human { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.88rem; }
+.pj-part-node { font-size: 0.74rem; color: var(--muted); }
+.pj-part-count { font-size: 0.72rem; color: var(--muted); background: var(--bg-dim); border-radius: 10px; padding: 0.05rem 0.45rem; }
+.pj-part-agents { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.45rem; padding-left: 1.4rem; }
+.pj-part-agent { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; border: 1px solid var(--border); border-radius: 6px; padding: 0.12rem 0.5rem; }
+.pj-part-agent.own { border-color: var(--success); }
+.pj-part-agent.ghost { color: var(--muted); border-style: dashed; opacity: 0.65; }
 /* Activity panel — GitHub-style contribution heatmap + audit-log feed */
 .pj-act { padding: 0.1rem; }
 .pj-act-count { font-size: 0.72rem; font-weight: 500; color: var(--muted); margin-left: 0.5rem; }

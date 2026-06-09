@@ -34,7 +34,7 @@ import type { Storage, MemoryRecord, PendingApprovalRecord } from '../storage/in
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { emitChange } from '../services/event-bus.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, parseGaiiLoose } from '../utils/gaii.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { shouldGate, gatePolicyFromManifest, type Risk } from '../services/gate-policy.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
@@ -972,6 +972,71 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     }
     events.sort((a, b) => (b.at || '').localeCompare(a.at || ''));
     res.json(success(config.nodeId, { ws, events: events.slice(0, 300), total: events.length }));
+  });
+
+  /* ── GET /v1/organisms/:id/workspace/participants?ws= — who takes part in this workspace, derived
+   * from the records' ownerGaii traces (humans + their agents leave their identity on what they write)
+   * plus organism membership. Builds a node → owner → agents hierarchy. Agent NAMES are revealed only
+   * for the CALLER's own agents; every other owner's agents come back anonymized (name: null), so the
+   * caller sees their own agents named and everyone else's only as ghost boxes + counts. ── */
+  router.get('/v1/organisms/:id/workspace/participants', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const ws = typeof req.query.ws === 'string' ? req.query.ws : undefined;
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    if (!(await memberRole(req, organism, id))) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    if (!ws) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws is required')); return; }
+    const viewerOwner = req.auth!.owner as string;
+    const root = `organism.${id}.w.${ws}`;
+    const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 10000 });
+
+    interface OwnerAgg { owner: string; node: string; human: number; agents: Map<string, number> }
+    const byKey = new Map<string, OwnerAgg>();
+    const ensure = (owner: string, node: string) => {
+      const k = `${owner}@${node}`;
+      let a = byKey.get(k);
+      if (!a) { a = { owner, node, human: 0, agents: new Map() }; byKey.set(k, a); }
+      return a;
+    };
+    for (const r of items) {
+      const rel = r.key.slice(root.length + 1);
+      if (rel.startsWith('access.')) continue;            // access requests are plumbing, not participation
+      const p = parseGaiiLoose(r.ownerGaii);
+      if (!p.owner || !p.node) continue;
+      const agg = ensure(p.owner, p.node);
+      if (p.agent) agg.agents.set(p.agent, (agg.agents.get(p.agent) || 0) + 1);
+      else agg.human++;
+    }
+    // Organism members are humans with access — include them even if they have not written anything yet.
+    for (const m of (organism.members || [])) ensure(m, config.nodeId);
+
+    const wsEntry = await findWsEntry(id, ws);
+    const creator = wsEntry?.createdBy;
+    const memberSet = new Set(organism.members || []);
+
+    const nodesMap = new Map<string, OwnerAgg[]>();
+    for (const agg of byKey.values()) {
+      const list = nodesMap.get(agg.node) ?? [];
+      list.push(agg);
+      nodesMap.set(agg.node, list);
+    }
+    const nodes = [...nodesMap.entries()].map(([node, owners]) => ({
+      id: node,
+      isLocal: node === config.nodeId,
+      owners: owners.map(o => {
+        const isSelf = o.owner === viewerOwner && o.node === config.nodeId;
+        return {
+          owner: o.owner,
+          isSelf,
+          isMember: memberSet.has(o.owner),
+          isCreator: o.owner === creator,
+          contributions: o.human,
+          // Reveal agent names only for the caller's own agents; anonymize everyone else's.
+          agents: [...o.agents.entries()].map(([name, count]) => ({ name: isSelf ? name : null, isOwn: isSelf, contributions: count })),
+        };
+      }),
+    }));
+    res.json(success(config.nodeId, { ws, viewerOwner, nodes }));
   });
 
   /* ── GET /v1/organisms/:id/workspace/export?ws= — download a full-fidelity ZIP backup of a

@@ -811,6 +811,52 @@ function ActivityPanel({ orgId, wsId }) {
     </div>`;
 }
 
+/* Participants panel — who takes part in this workspace, as a node → owner → agents chart plus a
+ * listing. Built from the records' identity traces (humans + their agents) + organism membership.
+ * The viewer's own agents are named; everyone else's appear as anonymous ghost boxes. */
+function ParticipantsPanel({ orgId, wsId }) {
+  const [data, setData] = useState(null);
+  const [show, setShow] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    const fetchIt = () => orgService.getWorkspaceParticipants(orgId, wsId).then(d => { if (!cancelled) setData(d); }).catch(() => {});
+    fetchIt();
+    window.addEventListener('aimeat-live-update', fetchIt);
+    return () => { cancelled = true; window.removeEventListener('aimeat-live-update', fetchIt); };
+  }, [orgId, wsId]);
+  if (!data || !(data.nodes || []).length) return null;
+  const owners = [];
+  for (const n of data.nodes) for (const o of (n.owners || [])) owners.push({ ...o, node: n.id, isLocalNode: n.isLocal });
+  return html`
+    <div class="pj-chart">
+      <div class="pj-chart-head">
+        <span class="pj-chart-title">${'👥 '}${t('organisms.participants') || 'Who works here'}</span>
+        <button class="btn-ghost btn-sm" onClick=${() => setShow(s => !s)}>${show ? (t('organisms.hide') || 'Hide') : (t('organisms.show') || 'Show')}</button>
+      </div>
+      ${show ? html`
+        <div class="pj-parts">
+          <${Mermaid} chart=${orgService.buildParticipantsMermaid(data)} />
+          <div class="pj-parts-list">
+            ${owners.map((o, i) => html`<div class="pj-part-owner" key=${i}>
+              <div class="pj-part-human">
+                <span>${'👤 '}<strong>${escHtml(o.owner)}</strong></span>
+                ${o.isSelf ? html`<span class="badge badge-info pj-mini">${t('organisms.you') || 'you'}</span>` : null}
+                ${o.isCreator ? html`<span class="badge badge-success pj-mini">${t('organisms.creatorTag') || 'creator'}</span>` : null}
+                ${!o.isMember && !o.isSelf ? html`<span class="badge badge-warn pj-mini">${t('organisms.guest') || 'guest'}</span>` : null}
+                ${!o.isLocalNode ? html`<span class="pj-part-node">${'🌐 '}${escHtml(o.node)}</span>` : null}
+                ${o.contributions ? html`<span class="pj-part-count" title=${t('organisms.contributions') || 'contributions'}>${o.contributions}</span>` : null}
+              </div>
+              ${(o.agents || []).length ? html`<div class="pj-part-agents">
+                ${o.agents.map((a, j) => a.isOwn
+                  ? html`<span class="pj-part-agent own" key=${j}>${'🤖 '}${escHtml(a.name)}<span class="pj-part-count">${a.contributions}</span></span>`
+                  : html`<span class="pj-part-agent ghost" key=${j} title=${t('organisms.hiddenAgent') || 'An agent whose details you cannot see'}>${'🤖 '}${t('organisms.anAgent') || 'agent'}</span>`)}
+              </div>` : null}
+            </div>`)}
+          </div>
+        </div>` : null}
+    </div>`;
+}
+
 function Workspace({ org, wsId, showToast, onBack }) {
   const orgId = org.id;
   // Pop a document out into its own window (served by doc-solo.js) so several can sit side by side,
@@ -1444,6 +1490,8 @@ function Workspace({ org, wsId, showToast, onBack }) {
           `)}
         </div>
       `}
+
+      <${ParticipantsPanel} orgId=${orgId} wsId=${wsId} />
 
       ${ws.manifest ? html`
         <div class="pj-chart">

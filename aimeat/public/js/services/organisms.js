@@ -331,6 +331,40 @@ export async function applyProjectTemplate(orgId, wsId, name, summary) {
   await apiPost('/v1/memory', { key: `${root}.meta.readme`, value: `# ${name}\n\n${summary || ''}`, visibility: 'private' });
 }
 
+/** Participants of a workspace — node → owner → agents, derived from record traces + membership.
+ *  Agent names are revealed only for the caller's own agents (others come back anonymized). */
+export async function getWorkspaceParticipants(orgId, wsId) {
+  try {
+    const r = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/participants?ws=${encodeURIComponent(wsId)}`);
+    return r?.data || { nodes: [], viewerOwner: '' };
+  } catch { return { nodes: [], viewerOwner: '' }; }
+}
+
+/** Build the participants chart: which node each identity comes from, who is human, and whose agent
+ *  each agent is. The caller's own agents are named; everyone else's are ghost "agent" boxes. */
+export function buildParticipantsMermaid(data) {
+  const nodes = (data && data.nodes) || [];
+  if (!nodes.length) return '';
+  const out = ['graph TD'];
+  let oi = 0, ai = 0;
+  nodes.forEach((n, ni) => {
+    const nid = 'N' + ni;
+    out.push(`  ${nid}["🖥 ${mlbl(n.id)}${n.isLocal ? '' : ' · 🌐'}"]`);
+    (n.owners || []).forEach((o) => {
+      const oid = 'O' + (oi++);
+      const tag = o.isSelf ? ' · you' : (o.isCreator ? ' · creator' : (o.isMember ? '' : ' · guest'));
+      out.push(`  ${oid}(["👤 ${mlbl(o.owner)}${tag}"])`);
+      out.push(`  ${nid} --> ${oid}`);
+      (o.agents || []).forEach((a) => {
+        const aid = 'A' + (ai++);
+        if (a.isOwn) { out.push(`  ${aid}["🤖 ${mlbl(a.name)} · ${a.contributions}"]`); out.push(`  ${oid} --> ${aid}`); }
+        else { out.push(`  ${aid}["🤖 agent"]`); out.push(`  ${oid} -. anon .-> ${aid}`); }
+      });
+    });
+  });
+  return out.join('\n');
+}
+
 /** Activity feed for a workspace (who did what / where / draft-edit vs publish / when). */
 export async function getWorkspaceActivity(orgId, wsId) {
   try {
