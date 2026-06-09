@@ -453,6 +453,32 @@ export async function revokeWorkspaceRole(orgId, ws, grantee) {
   return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access/revoke`, { ws, grantee });
 }
 
+/* ── Public document-space sharing (meta.share) ──
+ * Independent of the access roles above: this controls what PUBLISHED document-space pages are
+ * readable by ANYONE with the public viewer link (no login). Creator/admin manages it. ── */
+
+/** Current public-sharing state: { public, spaces: {name:bool}, docs: {"type/id":bool} }. */
+export async function getWorkspaceShare(orgId, ws) {
+  try {
+    const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/share?ws=${encodeURIComponent(ws)}`);
+    const s = resp?.data?.share || {};
+    return { public: !!s.public, spaces: s.spaces || {}, docs: s.docs || {} };
+  } catch { return { public: false, spaces: {}, docs: {} }; }
+}
+
+/** Merge a patch ({ public?, spaces?, docs? }) into the workspace's public-sharing state. */
+export async function setWorkspaceShare(orgId, ws, patch) {
+  const resp = await apiPut(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/share?ws=${encodeURIComponent(ws)}`, patch);
+  const s = resp?.data?.share || {};
+  return { public: !!s.public, spaces: s.spaces || {}, docs: s.docs || {} };
+}
+
+/** The public, no-login viewer URL for a workspace (whole space) or a single document. */
+export function publicViewerUrl(orgId, ws, doc) {
+  const base = `/v1/publicworkspaceviewer?org=${encodeURIComponent(orgId)}&ws=${encodeURIComponent(ws)}`;
+  return doc ? `${base}&type=${encodeURIComponent(doc.type)}&id=${encodeURIComponent(doc.id)}` : base;
+}
+
 /** Create a new (empty) workspace: register it, return its { id, name }. The manifest is written
  *  later by setup/generate. */
 export async function createWorkspace(orgId, name) {

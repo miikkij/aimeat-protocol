@@ -92,6 +92,10 @@
   padding: 0.2rem 0.7rem;
 }
 
+/* Card fill + shadow so the print button stands out against the page (matches the in-app toolbar). */
+.pwv-print { background: var(--card); box-shadow: var(--shadow-sm); }
+.pwv-print:hover { background: var(--bg-surface); border-color: var(--text-muted); }
+
 .pwv-doc {
   background: var(--card);
   border: 1px solid var(--border);

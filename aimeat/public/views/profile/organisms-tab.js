@@ -964,6 +964,9 @@ function Workspace({ org, wsId, showToast, onBack }) {
   const [expandedRec, setExpandedRec] = useState({});         // { "type:id": true } — records expanded to view fields
   const [showSpaces, setShowSpaces] = useState(false);        // inline add-space form at the workspace top
   const [showFlow, setShowFlow] = useState(true);             // the manifest-defined edit-flow chart (first item)
+  const [showShare, setShowShare] = useState(false);          // public-sharing panel
+  const [share, setShare] = useState(null);                   // { public, spaces, docs } — lazy-loaded when the panel opens
+  const [shareBusy, setShareBusy] = useState(false);
 
   const load = useCallback(async () => {
     const w = await orgService.getWorkspace(orgId, wsId).catch(() => null);
@@ -1358,6 +1361,34 @@ function Workspace({ org, wsId, showToast, onBack }) {
   const draftsFor = (name) => (ws.drafts && ws.drafts[name]) || [];
   const objectsFor = (name) => (ws.objects && ws.objects[name]) || [];
 
+  // ── Public sharing (meta.share) — what published document-space pages anyone can read via the
+  // no-login viewer. Independent of the access roles. Lazy-loaded the first time the panel opens. ──
+  const docTypes = types.filter(ot => ot.mode === 'document');
+  const loadShare = async () => {
+    setShareBusy(true);
+    try { setShare(await orgService.getWorkspaceShare(orgId, wsId)); } finally { setShareBusy(false); }
+  };
+  const patchShare = async (patch) => {
+    setShareBusy(true);
+    try { setShare(await orgService.setWorkspaceShare(orgId, wsId, patch)); }
+    catch (e) { showToast((e && e.message) || (t('organisms.shareFailed') || 'Failed to update sharing')); }
+    finally { setShareBusy(false); }
+  };
+  // Effective public state of one doc — mirrors the backend: doc override → space flag → workspace flag.
+  const isDocPublic = (typeName, id) => {
+    if (!share) return false;
+    const dk = `${typeName}/${id}`;
+    if (Object.prototype.hasOwnProperty.call(share.docs || {}, dk)) return !!share.docs[dk];
+    if (Object.prototype.hasOwnProperty.call(share.spaces || {}, typeName)) return !!share.spaces[typeName];
+    return !!share.public;
+  };
+  const anythingPublic = () => !!share && (!!share.public
+    || Object.values(share.spaces || {}).some(Boolean) || Object.values(share.docs || {}).some(Boolean));
+  const copyShareLink = async (url) => {
+    try { await navigator.clipboard.writeText(window.location.origin + url); showToast(t('organisms.linkCopied') || 'Link copied'); }
+    catch { showToast(t('organisms.copyFailed') || 'Copy failed'); }
+  };
+
   // A document-space: left index (section tree + documents, with an Unsorted group) + a main
   // area showing the active document (view/edit). Sections nest via parentId; documents are
   // tied to a section's documents[] (or unsorted). Edits to the tree persist immediately.
@@ -1472,6 +1503,7 @@ function Workspace({ org, wsId, showToast, onBack }) {
       <div class="pj-toolbar">
         <button class="btn-ghost btn-sm" onClick=${() => setShowSettings(s => !s)}>${'⚙ '}${t('organisms.settings') || 'Settings'}</button>
         <button class="btn-ghost btn-sm" onClick=${() => setShowSpaces(s => !s)}>${'+ '}${t('organisms.addSpaceBtn') || 'Document space'}</button>
+        ${docTypes.length > 0 ? html`<button class="btn-ghost btn-sm" title=${t('organisms.shareHint') || 'Publish document pages to a public, no-login link'} onClick=${() => { const n = !showShare; setShowShare(n); if (n && share === null) loadShare(); }}>${'🌐 '}${t('organisms.share') || 'Share'}</button>` : null}
         <span class="pj-toolbar-sep"></span>
         <span class="pj-ai-prompt">
           <span class="pj-ai-prompt-label">${'🤖 '}${t('organisms.aiPrompt') || 'AI access prompt:'}</span>
@@ -1499,6 +1531,45 @@ function Workspace({ org, wsId, showToast, onBack }) {
             <button class="btn-primary btn-sm" onClick=${addSpaceHandler} disabled=${busy || !newSpaceName.trim()}>${t('organisms.addSpace') || '+ Add'}</button>
             <button class="btn-ghost btn-sm" onClick=${() => setShowSpaces(false)}>${t('organisms.cancel') || 'Cancel'}</button>
           </div>
+        </div>`}
+
+      ${showShare && html`
+        <div class="pj-inbox">
+          <div class="card-h3">${'🌐 '}${t('organisms.sharePublicTitle') || 'Public sharing'}</div>
+          <div class="section-desc">${t('organisms.sharePublicDesc') || 'Make published document-space pages readable by anyone with the link — no login required. Drafts are never shared.'}</div>
+          ${!share && shareBusy ? html`<div class="pj-empty">${t('organisms.loading') || 'Loading…'}</div>` : null}
+          ${share && docTypes.length === 0 ? html`<div class="pj-empty">${t('organisms.noDocSpaces') || 'This workspace has no document spaces to share.'}</div>` : null}
+          ${share ? docTypes.map(ot => {
+            const docs = objectsFor(ot.name);
+            const spaceOn = !!(share.spaces && share.spaces[ot.name]);
+            return html`
+              <div class="pj-share-space" key=${'sh' + ot.name}>
+                <label class="pj-share-row">
+                  <input type="checkbox" checked=${spaceOn} disabled=${shareBusy} onChange=${e => patchShare({ spaces: { [ot.name]: e.target.checked } })} />
+                  <span class="pj-space-name">${escHtml(ot.name)}</span>
+                  <span class="pj-doc-tag">${docs.length} ${t('organisms.docs') || 'docs'}</span>
+                </label>
+                ${docs.length === 0
+                  ? html`<div class="pj-empty pj-share-empty">${t('organisms.noPublishedDocs') || 'No published documents yet — publish a page to share it.'}</div>`
+                  : html`<div class="pj-share-docs">
+                      ${docs.map(d => {
+                        const on = isDocPublic(ot.name, d.id);
+                        return html`
+                          <label class="pj-share-doc" key=${'shd' + d.id}>
+                            <input type="checkbox" checked=${on} disabled=${shareBusy} onChange=${e => patchShare({ docs: { [`${ot.name}/${d.id}`]: e.target.checked } })} />
+                            <span class="pj-share-doc-title">${escHtml(d.title || d.id)}</span>
+                            ${on ? html`<a class="pj-share-link" href=${orgService.publicViewerUrl(orgId, wsId, { type: ot.name, id: d.id })} target="_blank" rel="noopener">${t('organisms.openLink') || 'open ↗'}</a>` : null}
+                          </label>`;
+                      })}
+                    </div>`}
+              </div>`;
+          }) : null}
+          ${anythingPublic() ? html`
+            <div class="pj-divider"></div>
+            <div class="pj-share-actions">
+              <a class="btn-outline btn-sm" href=${orgService.publicViewerUrl(orgId, wsId)} target="_blank" rel="noopener">${'🔗 '}${t('organisms.openPublicViewer') || 'Open public viewer'}</a>
+              <button class="btn-ghost btn-sm" onClick=${() => copyShareLink(orgService.publicViewerUrl(orgId, wsId))}>${t('organisms.copyLink') || 'Copy link'}</button>
+            </div>` : null}
         </div>`}
 
       ${showSettings && html`

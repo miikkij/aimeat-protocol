@@ -2098,6 +2098,22 @@
 .pj-doc-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
 .pj-doc-link { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.9rem; text-align: left; flex: 1; padding: 0; }
 .pj-doc-link:hover { text-decoration: underline; }
+
+/* Public-sharing panel: per-space and per-doc public toggles + the viewer link. */
+.pj-share-space { padding: 0.35rem 0; border-bottom: 1px solid var(--border); }
+.pj-share-space:last-of-type { border-bottom: none; }
+.pj-share-row { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 600; }
+.pj-share-row input, .pj-share-doc input { cursor: pointer; }
+.pj-share-docs { display: flex; flex-direction: column; gap: 0.2rem; margin: 0.3rem 0 0.4rem 1.6rem; }
+.pj-share-doc { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem; color: var(--text); }
+.pj-share-doc-title { flex: 1; }
+.pj-share-link { color: var(--accent); font-size: 0.82rem; text-decoration: none; }
+.pj-share-link:hover { text-decoration: underline; }
+.pj-share-empty { margin: 0.2rem 0 0.4rem 1.6rem; }
+.pj-share-actions { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+/* Card fill + shadow so the action buttons stop blending into the tinted panel — matches .pj-toolbar. */
+.pj-share-actions .btn-outline, .pj-share-actions .btn-ghost { background: var(--card); box-shadow: var(--shadow-sm); }
+.pj-share-actions .btn-outline:hover, .pj-share-actions .btn-ghost:hover { background: var(--bg-surface); border-color: var(--text-muted); }
 /* The detail / reading pane — a white, slightly elevated card so it reads as the focused content,
    distinct from the flat tree panel beside it. */
 .pj-doc-view { border: 1px solid var(--border); border-radius: 10px; padding: 1.4rem 1.8rem; margin: 0.4rem 0; background: var(--card); box-shadow: var(--shadow-sm); }

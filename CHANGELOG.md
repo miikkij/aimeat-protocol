@@ -4,6 +4,69 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+### Organism workspaces: creator-managed member roles (viewer / contributor)
+
+Workspace access was previously a single binary ("approved or not"). It now has two **roles** a creator
+(or org admin) manages per member: **viewer** (read only) and **contributor** (read + write). Roles are
+creator-owned consents, so the creator stays in control and **revocation is effective** (it no longer
+relies on the member's own request-time consent, which the creator couldn't revoke).
+
+#### Added
+
+- **Grant / revoke / role routes** — `POST /v1/organisms/:id/workspace-access/grant` (`{ ws, grantee,
+  role }`) directly adds a member with a role (no prior request needed; `grantee` may be an owner name,
+  GHII, or GAII — applies to that owner so their agents inherit it) and `…/revoke` removes them. The
+  approve `…/decision` now assigns a role (default contributor; `viewer` on request), and
+  `GET …/workspace-access` returns the current `members` + their roles alongside pending `requests`.
+- **"Manage who can work here"** in the workspace **Who works here** panel (creator-only): add a member
+  by name with a role, switch a member's role, remove them, and approve/deny pending requests inline.
+
+#### Changed
+
+- **Workspace write requires the `contributor` role only** (revocable) — `canWriteWs` (MCP-serve) and
+  `workspaceAccessMiddleware` (REST) check the creator's contributor grant; a `viewer` grant gives read
+  only. Same model on every path (REST, connector, MCP-serve). The publish-gate toggle moved into a
+  bordered chip in the workspace toolbar (was a checkbox floating alone on its own row).
+
+### Organism workspaces: an agent's work is attributed to the agent
+
+The MCP-serve write path wrote workspace content under the **owner's** GHII, so every action an agent
+took over MCP showed up as the owner in the activity feed + participants chart. Content (records,
+documents, and published versions) is now authored under the **calling agent's GAII**, so an agent's
+work is attributed to it (it shows as itself in *Who works here* and the activity heatmap). Workspace
+META (manifest / registry / schemas / sections) stays under the creator; a write reuses an existing
+record's owner to avoid forking a duplicate (memory is keyed by `(ownerGaii, key)`).
+
+### Organism workspaces: a workspace is SHARED — every member sees all of it
+
+The workspace read (`GET /v1/organisms/:id/workspace` + MCP-serve `aimeat_workspace_read`) now authorizes
+**once at the workspace level** (on the manifest: creator / same-owner / a viewer|contributor grant) and
+then returns **all** of the workspace's content — not per record. So a contributor's writes are visible
+to the creator and every member of the workspace, regardless of who wrote them. Org membership alone is
+still discovery-only.
+
+### Agent workspace contracts: build an agent that processes a workspace
+
+A new convention + guidance for building an agent that **processes** an organism workspace — reads
+requests, does work, writes results back. The contract (the spaces an agent reads/writes + the status
+lifecycle) belongs to the **agent**; the workspace is the socket. Same-owner agents self-provision their
+spaces; cross-owner agents are provisioned by the workspace creator and granted the contributor role.
+Built on the primitives already shipped (manifest `workspace_update`, roles, attribution, shared read) —
+**no new tool**.
+
+#### Added
+
+- **`docs/agent-workspace-contracts.md`** — the authoring guide: the contract model, a machine-readable
+  contract template, the exact provision calls (read → union manifest → `workspace_update` → grant), the
+  processing loop, and the schema/manifest rules.
+- **Discovery** so an agent finds it itself over MCP: a *Organism workspaces & agent contracts* section in
+  the **appdev** handbook and a pointer in the **agent** handbook (both via `aimeat_handbook_get` /
+  `GET /v1/agents/me/handbook/:role`), plus a reference in **`/llms.txt`**. (The agent handbook's
+  workspace tool list was also refreshed to the consolidated set.)
+- **"Create contract agent"** button in the workspace toolbar (next to the AI-access prompts) — copies a
+  ready-made, workspace-specific prompt (`buildContractAgentPrompt`) that teaches an AI / coding agent how
+  to build a contract agent for THIS workspace, with its ids + existing spaces inlined.
+
 ## [1.20.1] - 2026-06-09
 
 ### Organism workspaces: the MCP-serve write path enforces the same per-workspace gate as REST
