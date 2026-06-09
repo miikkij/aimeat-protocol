@@ -813,6 +813,12 @@ function ActivityPanel({ orgId, wsId }) {
 
 function Workspace({ org, wsId, showToast, onBack }) {
   const orgId = org.id;
+  // Pop a document out into its own window (served by doc-solo.js) so several can sit side by side,
+  // each independent. The window name is unique per document, so re-clicking focuses the open one.
+  const popOut = (typeName, docId) => {
+    const u = '/v1/profile?doc=' + encodeURIComponent(`${orgId}:${wsId}:${typeName}:${docId}`);
+    window.open(u, 'aimeatdoc_' + orgId + '_' + wsId + '_' + docId, 'width=940,height=1040,menubar=no,toolbar=no,location=no,status=no');
+  };
   const { confirm, ConfirmUI } = useConfirm();
   const [ws, setWs] = useState(undefined); // undefined=loading, null=no manifest, object=workspace
   const [approvals, setApprovals] = useState([]);
@@ -1317,6 +1323,7 @@ function Workspace({ org, wsId, showToast, onBack }) {
                 <${DocumentView} key=${'view-' + livePage.id} page=${livePage} busy=${busy}
                   onEdit=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: livePage })}
                   onPublish=${() => publish(ot, livePage.id)}
+                  onPopOut=${() => popOut(ot.name, livePage.id)}
                   onWikiLink=${(content) => {
                     const [titlePart, headingPart] = String(content).split('#');
                     const title = titlePart.trim();
@@ -1752,7 +1759,7 @@ function loadToastUI() {
  * draft and a published version — offers a Draft/Published toggle so the two can be compared. The
  * parent passes the merged `page` (the draft, carrying the published copy on `page._pub`). Remounted
  * per document via `key`, so the toggle resets to "Draft" each time a document is opened. */
-function DocumentView({ page, busy, onEdit, onPublish, onWikiLink }) {
+export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopOut }) {
   const hasBoth = page._draft && page._pub;
   const [tab, setTab] = useState('draft');
   const shown = (hasBoth && tab === 'published') ? page._pub : page;
@@ -1794,6 +1801,7 @@ function DocumentView({ page, busy, onEdit, onPublish, onWikiLink }) {
         </div>` : null}
       <button class="btn-ghost btn-sm" onClick=${onEdit}>${t('organisms.edit') || 'Edit'}</button>
       ${page._draft ? html`<button class="btn-primary btn-sm" onClick=${onPublish} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>` : null}
+      ${onPopOut ? html`<button class="btn-ghost btn-sm pj-doc-popout" title=${t('organisms.popOut') || 'Open in its own window'} onClick=${onPopOut}>${'⧉'}</button>` : null}
     </div>
     ${(created || savedAt || publishedAt) ? html`
       <div class="pj-doc-meta">
@@ -1807,7 +1815,7 @@ function DocumentView({ page, busy, onEdit, onPublish, onWikiLink }) {
 /* Document editor: a Toast UI Editor (WYSIWYG, with its own built-in Markdown⇄WYSIWYG toggle, so
  * non-technical users type like a document). Falls back to a plain markdown textarea + live preview
  * if the editor can't load. Title is a separate Preact-controlled field. */
-function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
+export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
   const [title, setTitle] = useState((page && page.title) || '');
   const [mode, setMode] = useState('rich');               // 'rich' = Toast UI; 'markdown' = fallback textarea
   const [md, setMd] = useState((page && page.markdown) || '');

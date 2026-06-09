@@ -2053,6 +2053,10 @@
    distinct from the flat tree panel beside it. */
 .pj-doc-view { border: 1px solid var(--border); border-radius: 10px; padding: 1.4rem 1.8rem; margin: 0.4rem 0; background: var(--card); box-shadow: var(--shadow-sm); }
 .pj-doc-meta { margin: 0 0 0.5rem; }
+/* Popped-out single-document window (doc-solo.js) */
+.pj-doc-solo { max-width: 920px; margin: 0 auto; padding: 1rem 1.2rem 3rem; }
+.pj-doc-solo-empty { color: var(--muted); text-align: center; padding: 3rem 1rem; }
+.pj-doc-solo-toast { position: fixed; bottom: 1.1rem; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--card); padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.85rem; box-shadow: var(--shadow-md); z-index: 50; }
 
 /* Document typography — make rendered markdown read like a real document.
    Generous line-height, clear space above headings, comfortable list + code styling. */
