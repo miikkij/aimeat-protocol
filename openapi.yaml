@@ -14740,6 +14740,40 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/organisms/{id}/members/{ghii}:
+    delete:
+      operationId: removeOrganismMember
+      summary: Remove (revoke) an organism member
+      description: |
+        Creator/admin revokes another member's organism access entirely: deletes the
+        membership and drops them from members[] (and admins[] if applicable). The creator
+        cannot be removed (delete the organism instead); an admin can only be removed by the
+        creator. The removed member is notified. To leave voluntarily, use POST .../leave.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: ghii
+          in: path
+          required: true
+          description: URL-encoded bare owner name of the member to remove
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   # ── Public Storage ──────────────────────────────────────────
   /v1/pub/{gaii}/{key}:
     get:

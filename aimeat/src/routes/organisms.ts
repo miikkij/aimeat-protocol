@@ -37,6 +37,9 @@
  *   v1.10.0 -- 2026-06-09 -- Workspace-level read: GET /:id/workspace authorizes once on the manifest
  *     (creator / same-owner / a viewer|contributor grant) and then returns ALL content, not per record —
  *     so a contributor's writes are visible to the creator + every member of a shared workspace.
+ *   v1.11.0 -- 2026-06-09 -- Organism-level member management: a join request now notifies the
+ *     creator/admins (and the requester on review decision); new DELETE /:id/members/:ghii lets a
+ *     creator/admin revoke a member's access (notifies the removed member).
  */
 import { Router, raw, type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -309,6 +312,19 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
         createdAt: now,
       });
 
+      // Notify the creator + admins so the request doesn't go unnoticed (mirrors the
+      // workspace-access request path). admins includes the creator, so dedupe.
+      const approvers = [...new Set([organism.creatorGhii, ...organism.admins])];
+      for (const approver of approvers) {
+        await notify(storage, `${approver}@${config.nodeId}`, {
+          type: 'organism_join_request',
+          title: `${ghii} requested to join "${organism.name}"`,
+          body: typeof message === 'string' ? message : '',
+          link: '/v1/profile#organisms',
+        });
+      }
+      emitChange('notifications');
+
       res.status(202).json(success(config.nodeId, { join_request: request, status: 'pending' }));
       emitChange('organisms');
     } else {
@@ -451,6 +467,16 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       });
     }
 
+    // Notify the requester of the decision so it surfaces in their bell.
+    await notify(storage, `${request.ghii}@${config.nodeId}`, {
+      type: decision === 'approved' ? 'organism_join_approved' : 'organism_join_rejected',
+      title: decision === 'approved'
+        ? `You were approved to join "${organism.name}"`
+        : `Your request to join "${organism.name}" was declined`,
+      link: '/v1/profile#organisms',
+    });
+    emitChange('notifications');
+
     res.json(success(config.nodeId, { decision, request_id: requestId }));
     emitChange('organisms');
   });
@@ -533,6 +559,65 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     });
 
     res.json(success(config.nodeId, { demoted: targetGhii, role: 'member' }));
+    emitChange('organisms');
+  });
+
+  /* ── DELETE /v1/organisms/:id/members/:ghii — Remove (revoke) a member ──
+   * Creator/admin removes another member's organism access entirely: deletes the
+   * membership and drops them from members[] (+ admins[] if applicable). The creator
+   * cannot be removed (they must delete the organism); an admin can only be removed by
+   * the creator. The removed member is notified. To leave voluntarily, use /leave. */
+  router.delete('/v1/organisms/:id/members/:ghii', requireAuth(), requireRole('agent'), async (req, res) => {
+    const callerGhii = req.auth!.owner as string;
+    const id = req.params.id as string;
+    const targetGhii = decodeURIComponent(req.params.ghii as string);
+
+    const organism = await storage.getOrganism(id);
+    if (!organism) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      return;
+    }
+
+    const callerIsCreator = organism.creatorGhii === callerGhii;
+    const callerIsAdmin = callerIsCreator || organism.admins.includes(callerGhii);
+    if (!callerIsAdmin) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can remove members'));
+      return;
+    }
+
+    if (targetGhii === organism.creatorGhii) {
+      res.status(400).json(error(config.nodeId, 'CANNOT_REMOVE_CREATOR', 'The creator cannot be removed. Delete the organism instead.'));
+      return;
+    }
+
+    // Only the creator can remove an admin.
+    if (organism.admins.includes(targetGhii) && !callerIsCreator) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator can remove an admin'));
+      return;
+    }
+
+    const membership = await storage.getMembership(id, targetGhii);
+    if (!membership || membership.status !== 'active') {
+      res.status(404).json(error(config.nodeId, 'NOT_MEMBER', 'Target is not an active member'));
+      return;
+    }
+
+    await storage.deleteMembership(membership.id);
+    await storage.updateOrganism(id, {
+      members: organism.members.filter(m => m !== targetGhii),
+      admins: organism.admins.filter(a => a !== targetGhii),
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Let the removed member know their access was revoked.
+    await notify(storage, `${targetGhii}@${config.nodeId}`, {
+      type: 'organism_member_removed',
+      title: `Your access to "${organism.name}" was revoked`,
+      link: '/v1/profile#organisms',
+    });
+    emitChange('notifications');
+
+    res.json(success(config.nodeId, { removed: targetGhii }));
     emitChange('organisms');
   });
 

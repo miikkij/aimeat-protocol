@@ -81,6 +81,97 @@ import { dt, fmtBytes } from '/js/format.js';
 import { Markdown, slugifyHeading } from '/components/Markdown.js';
 import { Mermaid } from '/components/Mermaid.js';
 
+/**
+ * Organism-level member management (creator/admin only). Approve/reject pending join
+ * requests and revoke (remove) existing members. Backend: GET /:id/join-requests,
+ * POST /:id/join-requests/:rid/review, DELETE /:id/members/:ghii. Renders only inside an
+ * expanded org card for users who can edit; refreshes the parent list via onChanged.
+ */
+function OrgMemberManager({ orgId, ghii, showToast, confirm, onChanged }) {
+  const [requests, setRequests] = useState(null);
+  const [members, setMembers] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    const [rq, mb] = await Promise.all([
+      orgService.listJoinRequests(orgId).catch(() => null),
+      orgService.listMembers(orgId).catch(() => null),
+    ]);
+    setRequests(rq?.data?.join_requests || []);
+    setMembers(mb?.data?.members || []);
+  }, [orgId]);
+
+  useEffect(() => { load(); }, [load]);
+  const liveRef = useRef(load); liveRef.current = load;
+  useEffect(() => {
+    const handler = () => liveRef.current();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, []);
+
+  const review = async (rid, decision) => {
+    setBusy(true);
+    try {
+      const r = await orgService.reviewJoinRequest(orgId, rid, decision);
+      if (r?.ok === false) showToast(r?.error?.message || (t('organisms.reviewFailed') || 'Review failed'));
+      else showToast(decision === 'approved' ? (t('organisms.joinApproved') || 'Request approved') : (t('organisms.joinRejected') || 'Request declined'));
+      await load(); onChanged?.();
+    } catch (e) { showToast((e && e.message) || (t('organisms.reviewFailed') || 'Review failed')); }
+    finally { setBusy(false); }
+  };
+
+  const remove = (memberGhii) => {
+    confirm(
+      (t('organisms.confirmRemoveMember') || 'Revoke {member}’s access to this organism?').replace('{member}', memberGhii),
+      async () => {
+        setBusy(true);
+        try {
+          const r = await orgService.removeMember(orgId, memberGhii);
+          if (r?.ok === false) showToast(r?.error?.message || (t('organisms.removeFailed') || 'Remove failed'));
+          else showToast(t('organisms.memberRemoved') || 'Member removed');
+          await load(); onChanged?.();
+        } catch (e) { showToast((e && e.message) || (t('organisms.removeFailed') || 'Remove failed')); }
+        finally { setBusy(false); }
+      },
+      { danger: true },
+    );
+  };
+
+  const pending = (requests || []).filter(r => r.status === 'pending');
+
+  return html`
+    <div class="card-detail">
+      <div class="section-title">${t('organisms.manageMembers') || 'Manage members'}</div>
+      <div class="section-desc">${t('organisms.manageMembersDesc') || 'Approve join requests and revoke member access.'}</div>
+
+      <div class="detail-label">${t('organisms.pendingRequests') || 'Pending join requests'}</div>
+      ${requests === null
+        ? html`<div class="section-desc">…</div>`
+        : pending.length === 0
+          ? html`<div class="section-desc">${t('organisms.noPendingRequests') || 'No pending requests.'}</div>`
+          : pending.map(r => html`
+            <div class="pj-access-row" key=${r.id}>
+              <span>${escHtml(r.ghii)}${r.message ? html` <span class="pj-mini">— ${escHtml(r.message)}</span>` : null}</span>
+              <span class="flex-row-wrap">
+                <button class="btn-success btn-sm" disabled=${busy} onClick=${() => review(r.id, 'approved')}>${t('organisms.approve') || 'Approve'}</button>
+                <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => review(r.id, 'rejected')}>${t('organisms.reject') || 'Reject'}</button>
+              </span>
+            </div>
+          `)}
+
+      <div class="detail-label">${t('organisms.members') || 'Members'}</div>
+      ${(members || []).map(m => html`
+        <div class="pj-access-row" key=${m.ghii}>
+          <span>${escHtml(m.ghii)} <span class="badge ${m.role === 'creator' ? 'badge-success' : 'badge-info'} pj-mini">${escHtml(m.role || 'member')}</span></span>
+          ${(m.role !== 'creator' && m.ghii !== ghii)
+            ? html`<button class="btn-danger btn-sm" disabled=${busy} onClick=${() => remove(m.ghii)}>${t('organisms.remove') || 'Remove'}</button>`
+            : null}
+        </div>
+      `)}
+    </div>
+  `;
+}
+
 export default function OrganismsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
   const [myOrganisms, setMyOrganisms] = useState(null);
@@ -416,6 +507,13 @@ export default function OrganismsTab({ session, showToast, onStats }) {
                 </button>
               ` : null}
             </div>
+
+            ${canEdit ? html`<${OrgMemberManager}
+              orgId=${org.id}
+              ghii=${ghii}
+              showToast=${showToast}
+              confirm=${confirm}
+              onChanged=${loadData} />` : null}
           </div>
         `}
 

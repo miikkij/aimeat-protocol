@@ -65,6 +65,11 @@ export async function reviewJoinRequest(organismId, requestId, decision) {
   return apiPost(`/v1/organisms/${encodeURIComponent(organismId)}/join-requests/${encodeURIComponent(requestId)}/review`, { decision });
 }
 
+/** Remove (revoke) a member's organism access. Creator/admin only. */
+export async function removeMember(id, memberGhii) {
+  return apiDelete(`/v1/organisms/${encodeURIComponent(id)}/members/${encodeURIComponent(memberGhii)}`);
+}
+
 /** Add admin. */
 export async function addAdmin(id, targetGhii) {
   return apiPost(`/v1/organisms/${encodeURIComponent(id)}/admins`, { target_ghii: targetGhii });
