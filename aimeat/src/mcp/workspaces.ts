@@ -29,6 +29,10 @@
  *   v1.3.2 -- 2026-06-09 -- _write / _object_delete read the manifest via a new readManifest() that
  *     aggregates across members (was caller-GHII only → "No space named X" for non-creator members),
  *     and _write accepts the objectType NAME or its NAMESPACE (small models often pass the namespace).
+ *   v1.4.0 -- 2026-06-09 -- Same-owner workspace access: _read/_publish/_object_delete treat same-owner
+ *     records as the caller's own (isSameOwner), so a sub-agent uses its owner's workspace and the owner
+ *     sees the sub-agent's writes. _write now enforces canWriteWs (creator or granted member) so the
+ *     MCP-serve write path matches the REST workspaceAccessMiddleware gate (was looser — wrote ungated).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { randomUUID } from 'node:crypto';
@@ -124,6 +128,20 @@ export function registerWorkspaceTools(
     const roleOf = async (orgId: string): Promise<string | null> => {
         const m = await storage.getMembership(orgId, ownerName);
         return m && m.status === 'active' ? m.role : null;
+    };
+    /** May the caller WRITE this workspace's content? The creator's own owner (incl. its agents) always
+     *  can; another member needs a granted workspace-contribution consent. Mirrors workspaceAccessMiddleware
+     *  so the MCP-serve write path enforces the SAME per-workspace gate as the REST path (no looser side). */
+    const canWriteWs = async (orgId: string, ws: string): Promise<boolean> => {
+        const entry = await findWsEntry(orgId, ws);
+        if (!entry) return true;                              // no registry yet (bootstrap) — membership already checked
+        if (entry.createdBy === ownerName) return true;      // the workspace's own creator (or its agent)
+        const accessors = [ownerGhii, ...(await storage.getAgentsByOwner(ownerName)).map(a => a.gaii)];
+        const probeKey = `organism.${orgId}.w.${ws}.x`;      // matches a contribution consent's organism.{id}.w.{ws}.** pattern
+        for (const acc of accessors) {
+            if ((await storage.findMatchingConsents(acc, probeKey, `organism.${orgId}`)).length > 0) return true;
+        }
+        return false;
     };
     /** Create a consent grant if no equivalent active one exists (idempotent). */
     const ensureConsent = async (owner: string, dataPattern: string, recipient: string, purpose: string): Promise<void> => {
@@ -221,6 +239,7 @@ export function registerWorkspaceTools(
         annotationsFor('aimeat_workspace_write'),
         async ({ organism_id, ws, space, value, id, section }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
+            if (!(await canWriteWs(organism_id, ws))) return fail('You are not approved to write to this workspace. Request access with aimeat_workspace_access(action:"request") and wait for the creator to approve.');
             const root = wsRoot(organism_id, ws);
             // Aggregate the manifest across members so a member who didn't create the workspace can write,
             // and accept either the space NAME or its namespace (small models often pass the namespace).

@@ -279,16 +279,13 @@ await test('15b. B can DISCOVER A\'s workspace via MCP list (cross-member regist
         `B (member, not creator) must see A's workspace in the list: ${JSON.stringify(data.workspaces)}`);
 });
 
-await test('15c. B (member) can write a record to A\'s workspace — by space name AND by namespace', async () => {
-    // Regression: workspace_write read the manifest under the CALLER's own GHII, so a member who didn't
-    // create the workspace got "No space named …" for every space. It must aggregate the manifest, and
-    // accept the namespace too (small models often pass 'shared.items' instead of the name 'item').
+await test('15c. B (member, NOT yet approved) is DENIED write over MCP-serve too (gate parity with REST)', async () => {
+    // The MCP-serve write path used to write ungated — looser than the REST path, so a non-approved
+    // member could write before approval. Now MCP-serve enforces canWriteWs, so content stays
+    // creator-gated regardless of path. (Approved-member write + name/namespace resolution → test 18b.)
     const byName = await B.client.call('aimeat_workspace_write',
         { organism_id: bootOrgId, ws: bootWs.id, space: 'item', id: 'b-item-1', value: { title: 'B by name' } }, 1152);
-    assert(byName.result.isError !== true, `member write by name failed: ${byName.result.content?.[0]?.text}`);
-    const byNs = await B.client.call('aimeat_workspace_write',
-        { organism_id: bootOrgId, ws: bootWs.id, space: 'shared.items', id: 'b-item-2', value: { title: 'B by namespace' } }, 1153);
-    assert(byNs.result.isError !== true, `member write by namespace failed: ${byNs.result.content?.[0]?.text}`);
+    assert(byName.result.isError === true, 'a non-approved member must be denied write');
 });
 
 await test('16. B cannot read the workspace before approval', async () => {
@@ -309,6 +306,17 @@ await test('18. B can now read the shared workspace over MCP', async () => {
     const b = await B.client.call('aimeat_workspace_read', { organism_id: bootOrgId, ws: bootWs.id }, 118);
     assert(b.result.isError !== true, `read after approval: ${b.result.content?.[0]?.text}`);
     assert(JSON.parse(b.result.content[0].text).manifest?.name === 'Bootstrapped', 'manifest readable after approval');
+});
+
+await test('18b. approved B writes a record — by space NAME and by NAMESPACE (manifest resolution)', async () => {
+    // An approved member can write (gate passes), and write resolves the space by either the objectType
+    // NAME ('item') or its namespace ('shared.items') — small models often pass the namespace.
+    const byName = await B.client.call('aimeat_workspace_write',
+        { organism_id: bootOrgId, ws: bootWs.id, space: 'item', id: 'b-item-1', value: { title: 'B by name' } }, 1181);
+    assert(byName.result.isError !== true, `approved member write by name: ${byName.result.content?.[0]?.text}`);
+    const byNs = await B.client.call('aimeat_workspace_write',
+        { organism_id: bootOrgId, ws: bootWs.id, space: 'shared.items', id: 'b-item-2', value: { title: 'B by namespace' } }, 1182);
+    assert(byNs.result.isError !== true, `approved member write by namespace: ${byNs.result.content?.[0]?.text}`);
 });
 
 await test("19. A's OWN agent (same owner) reads + writes A's workspace via the REST route (sub-agent access)", async () => {

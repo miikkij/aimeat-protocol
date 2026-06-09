@@ -4,6 +4,28 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.20.1] - 2026-06-09
+
+### Organism workspaces: the MCP-serve write path enforces the same per-workspace gate as REST
+
+The REST/connector write path gates workspace content by the creator's approval (`workspaceAccessMiddleware`),
+but the MCP-serve `aimeat_workspace_write` tool wrote straight to storage — so a member could write to a
+workspace they had not been approved into over MCP-serve, while the same write was correctly denied over
+REST. The two paths now gate identically.
+
+#### Fixed
+
+- **`aimeat_workspace_write` (MCP-serve) now enforces `canWriteWs`** — the workspace creator (and its own
+  agents) can always write; any other member needs a granted `workspace-contribution` consent, else the
+  tool returns "request access first." This closes the path-dependent looseness where a non-approved
+  member could write over MCP-serve but not over REST. E2E: a non-approved member is now denied write over
+  MCP-serve, and an approved member writes by space name or namespace (`test/e2e-mcp-workspaces.ts` #15c, #18b).
+- **`aimeat connect call aimeat_workspace_list` now returns a sub-agent's workspaces** (connector
+  distribution). The list shell handler was fixed in 1.20.0's same-owner work to use the membership-gated
+  `/v1/organisms/:id/workspaces` route instead of a caller-scoped `/v1/memory` prefix read, but the
+  published 1.20.0 connector predated it — so a sub-agent still saw `[]` for discovery (read/write already
+  worked, since they take explicit org/ws ids). This connector release distributes that fix.
+
 ## [1.20.0] - 2026-06-09
 
 ### Connector: organism workspace + create/backup tools are now shell-callable
