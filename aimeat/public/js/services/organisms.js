@@ -693,6 +693,82 @@ export async function buildAccessPrompt(orgId, orgName, wsId, ws, variant = 'hum
   ].join('\n');
 }
 
+/** Build a prompt to paste into an AI / coding agent: how to build a CONTRACT AGENT that processes THIS
+ *  workspace. The agent owns a contract (inputs/outputs/lifecycle), provisions its spaces, and runs the
+ *  request→result loop. Mirrors docs/agent-workspace-contracts.md with this workspace's concrete ids. */
+export async function buildContractAgentPrompt(orgId, orgName, wsId, ws) {
+  const nodeUrl = window.location.origin;
+  const m = ws?.manifest || {};
+  const wsName = m.name || wsId;
+  const types = (m.objectTypes || []).filter(ot => ot.backing === 'memory');
+  const described = [];
+  for (const ot of types) {
+    const schema = ot.mode !== 'document' ? await getObjectSchema(orgId, wsId, ot.namespace).catch(() => null) : null;
+    described.push(describeType(ot, schema));
+  }
+  const structure = described.join('\n') || '(no spaces declared yet)';
+  return [
+    `TASK: build an AIMEAT "contract agent" that PROCESSES this workspace — it reads requests, does the`,
+    `work, and writes results back. The agent OWNS a contract: the spaces it READS (inputs), the spaces`,
+    `it WRITES (outputs), and the status lifecycle. Follow the convention exactly so it appears and works`,
+    `smoothly. Full reference: ${nodeUrl}/v1/agents/me/handbook/appdev (the "Workspace contracts" section)`,
+    `and docs/agent-workspace-contracts.md.`,
+    ``,
+    `CONNECTION`,
+    `- Node: ${nodeUrl}`,
+    `- Organism: "${orgName || orgId}"  id: ${orgId}`,
+    `- Workspace: "${wsName}"  ws: ${wsId}`,
+    `- Use the AIMEAT MCP tools (aimeat_workspace_*, aimeat_organism_*) or the shell-callable connector`,
+    `  (aimeat connect call ...) — no LLM is needed in the I/O path. If AIMEAT tools are unavailable, STOP.`,
+    ``,
+    `EXISTING SPACES (don't drop or rename these — UNION them with your contract's spaces):`,
+    structure,
+    ``,
+    `1) DEFINE THE CONTRACT (embed it in the agent):`,
+    `   contract:`,
+    `     id: <capability>                 # e.g. research`,
+    `     inputs:                          # what the agent reads + reacts to`,
+    `       - space: <name>                # objectType NAME, e.g. research-request`,
+    `         mode: records                # records (schema-locked) | document`,
+    `         schema: { id, ..., status: requested|in-progress|done|failed, requested_by, result_ref? }`,
+    `         trigger: status == 'requested'`,
+    `     outputs:                         # what the agent writes`,
+    `       - space: <name>                # e.g. research-result`,
+    `         mode: records`,
+    `         schema: { id, request_ref, ... }`,
+    `     lifecycle: requested → in-progress → done (+ result_ref) | failed`,
+    ``,
+    `2) PROVISION the contract's spaces into THIS workspace (manifest edits are CREATOR-ONLY: a`,
+    `   same-owner agent does this itself; for a cross-owner agent the creator does it):`,
+    `   - aimeat_workspace_read { organism_id:"${orgId}", ws:"${wsId}" }      # current objectTypes`,
+    `   - UNION existing + your spaces, then send the FULL manifest back:`,
+    `       aimeat_workspace_update { organism_id:"${orgId}", ws:"${wsId}",`,
+    `         manifest: { ...existing, objectTypes:[ ...existing, ...yourMissingSpaces ] },`,
+    `         schemas: { "<namespace>": <jsonSchema>, ... } }`,
+    `     Each objectType: { name, namespace, mode, schemaRef, writeRole:"member", cardinality:"many",`,
+    `       backing:"memory", versioned:true }.`,
+    ``,
+    `3) AUTHORIZE the agent to write (skip for a same-owner agent — it already can):`,
+    `   POST ${nodeUrl}/v1/organisms/${orgId}/workspace-access/grant`,
+    `     body { "ws":"${wsId}", "grantee":"<agent-owner | agent#owner@node>", "role":"contributor" }`,
+    `   (viewer = read only; contributor = read + write. The creator manages this in "Who works here".)`,
+    ``,
+    `4) RUN THE PROCESSING LOOP (deterministic, repeatable):`,
+    `   discover member workspaces (aimeat_organism_list → aimeat_workspace_list) → for each that has your`,
+    `   input space: aimeat_workspace_read → find inputs where the trigger holds → CLAIM it`,
+    `   (aimeat_workspace_write status:"in-progress" + publish) → do the work → WRITE the output space`,
+    `   (aimeat_workspace_write + publish) → ADVANCE the input (status:"done", result_ref:<outId> + publish).`,
+    `   On error: set the input status:"failed" with an error field.`,
+    ``,
+    `RULES: validate every RECORDS write against its schema (a bad write is rejected). NEVER drop/rename an`,
+    `existing space. Only the creator/same-owner edits the manifest; a contributor writes records only.`,
+    `Writes are attributed to the agent automatically — it appears in "Who works here" + the activity`,
+    `heatmap, and its results are visible to everyone who can read the workspace.`,
+    ``,
+    `Start: read the workspace, decide your input/output spaces, provision them, grant access, run the loop.`,
+  ].join('\n');
+}
+
 /** Manually add an object type to the manifest (no AI). mode 'document' needs no schema;
  *  'records' gets a starter {id,title} schema that can be refined later via Restructure. */
 export async function addSpace(orgId, wsId, manifest, name, mode) {

@@ -56,6 +56,10 @@
  *     became a tinted .pj-toolbar (consistent buttons + vertical separators, review-gate pushed
  *     apart); "+ Space" relabelled "+ Document space"; horizontal dividers split header / charts /
  *     manifest panels; section-head add-actions sit next to their title and lift off the panel.
+ *   v1.14.0 — 2026-06-09 — ParticipantsPanel "Manage who can work here" (creator-only): add a member by
+ *     name with a role (viewer/contributor), switch roles, remove; approve/deny pending requests. New
+ *     "Create contract agent" AI-prompt button (orgService.buildContractAgentPrompt) copies a full
+ *     contract-agent build prompt for THIS workspace. See docs/agent-workspace-contracts.md.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -1267,6 +1271,14 @@ function Workspace({ org, wsId, showToast, onBack }) {
     } catch (e) { showToast((e && e.message) || 'Failed to build prompt'); }
   }, [orgId, org, wsId, ws, showToast]);
 
+  const copyContractPrompt = useCallback(async () => {
+    try {
+      const text = await orgService.buildContractAgentPrompt(orgId, org.name, wsId, ws);
+      await copyToClipboard(text);
+      showToast(t('organisms.contractPromptCopied') || 'Contract-agent prompt copied — paste it to your AI / coding agent.');
+    } catch (e) { showToast((e && e.message) || 'Failed to build prompt'); }
+  }, [orgId, org, wsId, ws, showToast]);
+
   // The AI / paste generator — reused for a fresh workspace AND for "restructure" (where, via
   // showRegenerate, generate/copyPrompt pass the current manifest so the AI EXTENDS it additively).
   const renderGenerator = () => html`
@@ -1465,10 +1477,12 @@ function Workspace({ org, wsId, showToast, onBack }) {
           <span class="pj-ai-prompt-label">${'🤖 '}${t('organisms.aiPrompt') || 'AI access prompt:'}</span>
           <button class="btn-ghost btn-sm" onClick=${() => copyAccessPrompt('human')}>${t('organisms.aiPromptHuman') || 'For chat'}</button>
           <button class="btn-ghost btn-sm" onClick=${() => copyAccessPrompt('agent')}>${t('organisms.aiPromptAgent') || 'For coding agent'}</button>
+          <button class="btn-ghost btn-sm" title=${t('organisms.contractPromptHint') || 'Copy a prompt to build an agent that processes this workspace (reads requests → writes results)'} onClick=${copyContractPrompt}>${'⚙️ '}${t('organisms.contractPrompt') || 'Create contract agent'}</button>
         </span>
-        <label class="pj-gate-label pj-toolbar-gate">
+        <span class="pj-toolbar-sep"></span>
+        <label class="pj-gate-label pj-toolbar-gate" title=${t('organisms.publishGateHint') || 'When on, an agent’s publish is held for your review instead of going live'}>
           <input type="checkbox" checked=${gateOn} onChange=${toggleGate} disabled=${busy} />
-          ${' '}${t('organisms.publishGate') || 'Require review before publishing'}
+          ${'🔒 '}${t('organisms.publishGate') || 'Require review before publishing'}
         </label>
       </div>
 
