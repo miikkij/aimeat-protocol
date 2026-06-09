@@ -5597,6 +5597,7 @@
     "sourcesSaveError": "Lähteiden tallennus epäonnistui",
     "publishGated": "Lähetetty tarkistettavaksi (julkaisuportti päällä)",
     "publishGate": "Vaadi tarkistus ennen julkaisua",
+    "publishGateHint": "Päällä ollessaan agentin julkaisu jää tarkistettavaksesi sen sijaan että menisi suoraan liveksi",
     "gateToggled": "Julkaisuportti päivitetty",
     "needsDecision": "Vaatii päätöksesi",
     "approve": "Hyväksy",
