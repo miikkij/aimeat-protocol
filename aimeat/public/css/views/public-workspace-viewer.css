@@ -6,6 +6,8 @@
  *   All colors/spacing come from theme.css variables (no dark-only rgba, no hardcoded hex).
  * @version-history
  *   v1.0.0 — 2026-06-09 — Initial: slice 2 of the workspace public-sharing plan.
+ *   v1.1.0 — 2026-06-09 — Continuous stacked-page layout (scroll-margin + per-page spacing so every
+ *     shared page prints in one go); action-button group for "Copy AI link" + "Print".
  */
 
 .pwv-container {
@@ -92,16 +94,28 @@
   padding: 0.2rem 0.7rem;
 }
 
-/* Card fill + shadow so the print button stands out against the page (matches the in-app toolbar). */
-.pwv-print { background: var(--card); box-shadow: var(--shadow-sm); }
-.pwv-print:hover { background: var(--bg-surface); border-color: var(--text-muted); }
+.pwv-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Card fill + shadow so the action buttons stand out against the page (matches the in-app toolbar). */
+.pwv-action { background: var(--card); box-shadow: var(--shadow-sm); }
+.pwv-action:hover { background: var(--bg-surface); border-color: var(--text-muted); }
 
 .pwv-doc {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 1.75rem 2rem;
+  /* Offset for the sticky-free window scroll so a scrolled-to page isn't hidden under the top nav. */
+  scroll-margin-top: 1.5rem;
 }
+
+/* Stacked pages in the continuous whole-space view: space them out so the seam between pages reads. */
+.pwv-doc + .pwv-doc { margin-top: 1.5rem; }
 
 /* ── Markdown typography (scoped to the viewer; mirrors the in-app document view) ── */
 .pwv-doc .md-body { font-size: 0.95rem; line-height: 1.7; color: var(--text); max-width: 78ch; overflow-wrap: break-word; }
@@ -203,4 +217,10 @@
     padding: 0;
   }
   body.pwv-active .pwv-doc .md-body { max-width: none; }
+  /* Continuous whole-space print: start each shared page on a fresh sheet, and don't split a page's
+   * heading off from its body across a sheet boundary. */
+  body.pwv-active .pwv-doc + .pwv-doc { margin-top: 0; padding-top: 0; break-before: page; }
+  body.pwv-active .pwv-doc .md-body h1,
+  body.pwv-active .pwv-doc .md-body h2,
+  body.pwv-active .pwv-doc .md-body h3 { break-after: avoid; }
 }

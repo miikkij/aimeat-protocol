@@ -643,7 +643,13 @@ export interface OrganismMembershipRecord {
   organismId: string;
   ghii: string;
   role: 'creator' | 'admin' | 'member';
-  status: 'active' | 'pending' | 'banned';
+  /**
+   * - `active`  : a full member
+   * - `pending` : legacy/reserved (join requests are tracked separately as JoinRequestRecord)
+   * - `invited` : creator/admin invited this owner; awaiting their accept/decline (invite_only flow)
+   * - `banned`  : removed-and-blocked; cannot re-join or be re-invited until the ban is lifted
+   */
+  status: 'active' | 'pending' | 'invited' | 'banned';
   joinedAt: string;
   invitedBy?: string;
 }

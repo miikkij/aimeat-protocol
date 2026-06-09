@@ -264,12 +264,20 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
 
     // Check if already a member
     const existing = await storage.getMembership(id, ghii);
+    if (existing && existing.status === 'banned') {
+      res.status(403).json(error(config.nodeId, 'BANNED', 'You have been blocked from this organism'));
+      return;
+    }
     if (existing && existing.status === 'active') {
       res.status(409).json(error(config.nodeId, 'ALREADY_MEMBER', 'You are already a member'));
       return;
     }
     if (existing && existing.status === 'pending') {
       res.status(409).json(error(config.nodeId, 'ALREADY_PENDING', 'You already have a pending join request'));
+      return;
+    }
+    if (existing && existing.status === 'invited') {
+      res.status(409).json(error(config.nodeId, 'ALREADY_INVITED', 'You have a pending invitation — accept it instead of requesting to join'));
       return;
     }
 
@@ -602,22 +610,309 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
 
-    await storage.deleteMembership(membership.id);
+    // `?ban=1` (or body { ban: true }) blocks the member from re-joining / being re-invited:
+    // keep the membership row but flip it to `banned` instead of deleting it. Plain remove just
+    // deletes the row (they can request to join again).
+    const ban = req.query.ban === '1' || req.query.ban === 'true' || req.body?.ban === true;
+    const now = new Date().toISOString();
+    if (ban) {
+      await storage.updateMembership(membership.id, { status: 'banned', role: 'member' });
+    } else {
+      await storage.deleteMembership(membership.id);
+    }
     await storage.updateOrganism(id, {
       members: organism.members.filter(m => m !== targetGhii),
       admins: organism.admins.filter(a => a !== targetGhii),
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
     });
 
     // Let the removed member know their access was revoked.
     await notify(storage, `${targetGhii}@${config.nodeId}`, {
-      type: 'organism_member_removed',
-      title: `Your access to "${organism.name}" was revoked`,
+      type: ban ? 'organism_member_banned' : 'organism_member_removed',
+      title: ban
+        ? `You were blocked from "${organism.name}"`
+        : `Your access to "${organism.name}" was revoked`,
       link: '/v1/profile#organisms',
     });
     emitChange('notifications');
 
-    res.json(success(config.nodeId, { removed: targetGhii }));
+    res.json(success(config.nodeId, { removed: targetGhii, banned: ban }));
+    emitChange('organisms');
+  });
+
+  /* ── POST /v1/organisms/:id/members/:ghii/unban — Lift a ban ──
+   * Creator/admin removes the block on a previously-banned owner by deleting the banned
+   * membership row, so they can request to join (or be invited) again. */
+  router.post('/v1/organisms/:id/members/:ghii/unban', requireAuth(), requireRole('agent'), async (req, res) => {
+    const callerGhii = req.auth!.owner as string;
+    const id = req.params.id as string;
+    const targetGhii = decodeURIComponent(req.params.ghii as string);
+
+    const organism = await storage.getOrganism(id);
+    if (!organism) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      return;
+    }
+    if (organism.creatorGhii !== callerGhii && !organism.admins.includes(callerGhii)) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can lift a block'));
+      return;
+    }
+    const membership = await storage.getMembership(id, targetGhii);
+    if (!membership || membership.status !== 'banned') {
+      res.status(404).json(error(config.nodeId, 'NOT_BANNED', 'Target is not blocked'));
+      return;
+    }
+    await storage.deleteMembership(membership.id);
+    res.json(success(config.nodeId, { unbanned: targetGhii }));
+    emitChange('organisms');
+  });
+
+  /* ── POST /v1/organisms/:id/transfer — Transfer ownership ──
+   * The creator hands the organism to an existing active member: the target becomes `creator`,
+   * the previous creator is demoted to `admin` (kept as a member). Only the current creator may
+   * call this. The new creator is notified. */
+  router.post('/v1/organisms/:id/transfer', requireAuth(), requireRole('agent'), async (req, res) => {
+    const callerGhii = req.auth!.owner as string;
+    const id = req.params.id as string;
+    const { to } = req.body ?? {};
+    if (!to || typeof to !== 'string') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Body field "to" (an active member) is required'));
+      return;
+    }
+
+    const organism = await storage.getOrganism(id);
+    if (!organism) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      return;
+    }
+    if (organism.creatorGhii !== callerGhii) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the current creator can transfer ownership'));
+      return;
+    }
+    if (to === callerGhii) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'You are already the creator'));
+      return;
+    }
+    const targetMembership = await storage.getMembership(id, to);
+    if (!targetMembership || targetMembership.status !== 'active') {
+      res.status(404).json(error(config.nodeId, 'NOT_MEMBER', 'Target must be an active member of this organism'));
+      return;
+    }
+
+    const callerMembership = await storage.getMembership(id, callerGhii);
+    const now = new Date().toISOString();
+    // Promote the new creator, demote the old one to admin.
+    await storage.updateMembership(targetMembership.id, { role: 'creator' });
+    if (callerMembership) await storage.updateMembership(callerMembership.id, { role: 'admin' });
+    const admins = [...new Set([...organism.admins.filter(a => a !== to), callerGhii])];
+    await storage.updateOrganism(id, { creatorGhii: to, admins, updatedAt: now });
+
+    await notify(storage, `${to}@${config.nodeId}`, {
+      type: 'organism_ownership_transferred',
+      title: `You are now the creator of "${organism.name}"`,
+      link: '/v1/profile#organisms',
+    });
+    emitChange('notifications');
+
+    res.json(success(config.nodeId, { creator: to, previousCreator: callerGhii }));
+    emitChange('organisms');
+  });
+
+  /* ── Invitations (invite_only flow; works for any policy) ──
+   * A creator/admin invites an owner by bare name. The invite is a membership row with
+   * status `invited` + `invitedBy`. The invitee is notified and accepts/declines. */
+
+  /* POST /v1/organisms/:id/invitations — invite an owner */
+  router.post('/v1/organisms/:id/invitations', requireAuth(), requireRole('agent'), async (req, res) => {
+    const callerGhii = req.auth!.owner as string;
+    const id = req.params.id as string;
+    const { invitee } = req.body ?? {};
+    if (!invitee || typeof invitee !== 'string') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Body field "invitee" (an owner name) is required'));
+      return;
+    }
+
+    const organism = await storage.getOrganism(id);
+    if (!organism) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      return;
+    }
+    if (organism.creatorGhii !== callerGhii && !organism.admins.includes(callerGhii)) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can invite members'));
+      return;
+    }
+
+    const existing = await storage.getMembership(id, invitee);
+    if (existing && existing.status === 'active') {
+      res.status(409).json(error(config.nodeId, 'ALREADY_MEMBER', 'That owner is already a member'));
+      return;
+    }
+    if (existing && existing.status === 'invited') {
+      res.status(409).json(error(config.nodeId, 'ALREADY_INVITED', 'That owner already has a pending invitation'));
+      return;
+    }
+    if (existing && existing.status === 'banned') {
+      res.status(409).json(error(config.nodeId, 'BANNED', 'That owner is blocked — lift the block before inviting'));
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const membership = await storage.createMembership({
+      id: uuidv4(),
+      organismId: id,
+      ghii: invitee,
+      role: 'member',
+      status: 'invited',
+      invitedBy: callerGhii,
+      joinedAt: now,
+    });
+    await notify(storage, `${invitee}@${config.nodeId}`, {
+      type: 'organism_invitation',
+      title: `${callerGhii} invited you to join "${organism.name}"`,
+      link: '/v1/profile#organisms',
+    });
+    emitChange('notifications');
+
+    res.status(201).json(success(config.nodeId, { invitation: membership, status: 'invited' }));
+    emitChange('organisms');
+  });
+
+  /* GET /v1/organisms/:id/invitations — list outstanding invitations (creator/admin) */
+  router.get('/v1/organisms/:id/invitations', requireAuth(), requireRole('agent'), async (req, res) => {
+    const callerGhii = req.auth!.owner as string;
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      return;
+    }
+    if (organism.creatorGhii !== callerGhii && !organism.admins.includes(callerGhii)) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can view invitations'));
+      return;
+    }
+    const invitations = await storage.listMembers(id, { status: 'invited' });
+    res.json(success(config.nodeId, { invitations, total: invitations.length }));
+  });
+
+  /* GET /v1/organisms/invitations/mine — the caller's own pending invitations (across organisms) */
+  router.get('/v1/organisms/invitations/mine', requireAuth(), requireRole('agent'), async (req, res) => {
+    const callerGhii = req.auth!.owner as string;
+    const memberships = (await storage.listMembershipsByGhii(callerGhii)).filter(m => m.status === 'invited');
+    const invitations = [];
+    for (const m of memberships) {
+      const org = await storage.getOrganism(m.organismId);
+      if (org) invitations.push({ membership: m, organism: { id: org.id, name: org.name, description: org.description, type: org.type, visibility: org.visibility } });
+    }
+    res.json(success(config.nodeId, { invitations, total: invitations.length }));
+  });
+
+  /* POST /v1/organisms/:id/invitations/accept — the invitee accepts */
+  router.post('/v1/organisms/:id/invitations/accept', requireAuth(), requireRole('agent'), async (req, res) => {
+    const callerGhii = req.auth!.owner as string;
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      return;
+    }
+    const membership = await storage.getMembership(id, callerGhii);
+    if (!membership || membership.status !== 'invited') {
+      res.status(404).json(error(config.nodeId, 'NO_INVITATION', 'You have no pending invitation to this organism'));
+      return;
+    }
+    const now = new Date().toISOString();
+    await storage.updateMembership(membership.id, { status: 'active', joinedAt: now });
+    await storage.updateOrganism(id, { members: [...new Set([...organism.members, callerGhii])], updatedAt: now });
+    // Notify the inviter that the invitation was accepted.
+    if (membership.invitedBy) {
+      await notify(storage, `${membership.invitedBy}@${config.nodeId}`, {
+        type: 'organism_invitation_accepted',
+        title: `${callerGhii} accepted your invitation to "${organism.name}"`,
+        link: '/v1/profile#organisms',
+      });
+      emitChange('notifications');
+    }
+    res.json(success(config.nodeId, { status: 'joined' }));
+    emitChange('organisms');
+  });
+
+  /* POST /v1/organisms/:id/invitations/decline — the invitee declines */
+  router.post('/v1/organisms/:id/invitations/decline', requireAuth(), requireRole('agent'), async (req, res) => {
+    const callerGhii = req.auth!.owner as string;
+    const id = req.params.id as string;
+    const membership = await storage.getMembership(id, callerGhii);
+    if (!membership || membership.status !== 'invited') {
+      res.status(404).json(error(config.nodeId, 'NO_INVITATION', 'You have no pending invitation to this organism'));
+      return;
+    }
+    await storage.deleteMembership(membership.id);
+    res.json(success(config.nodeId, { status: 'declined' }));
+    emitChange('organisms');
+  });
+
+  /* ── Agent attachment (manage organism.agentGaiis) ──
+   * An owner attaches one of their OWN agents to an organism they belong to, so the agent shows
+   * as an organism participant and passes the workspace membership gate in its own right. */
+
+  /* POST /v1/organisms/:id/agents — attach an agent GAII (caller must own it + be a member) */
+  router.post('/v1/organisms/:id/agents', requireAuth(), requireRole('agent'), async (req, res) => {
+    const callerGhii = req.auth!.owner as string;
+    const id = req.params.id as string;
+    const { agent_gaii } = req.body ?? {};
+    if (!agent_gaii || typeof agent_gaii !== 'string') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Body field "agent_gaii" is required'));
+      return;
+    }
+    const parsed = parseGaiiLoose(agent_gaii);
+    if (!parsed.agent || parsed.owner !== callerGhii) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only attach your own agents'));
+      return;
+    }
+
+    const organism = await storage.getOrganism(id);
+    if (!organism) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      return;
+    }
+    const membership = await storage.getMembership(id, callerGhii);
+    const isMember = !!membership && membership.status === 'active';
+    if (!isMember && organism.creatorGhii !== callerGhii) {
+      res.status(403).json(error(config.nodeId, 'NOT_MEMBER', 'You must be a member to attach an agent'));
+      return;
+    }
+    if (organism.agentGaiis.includes(agent_gaii)) {
+      res.status(409).json(error(config.nodeId, 'ALREADY_ATTACHED', 'That agent is already attached'));
+      return;
+    }
+    await storage.updateOrganism(id, { agentGaiis: [...organism.agentGaiis, agent_gaii], updatedAt: new Date().toISOString() });
+    res.status(201).json(success(config.nodeId, { attached: agent_gaii }));
+    emitChange('organisms');
+  });
+
+  /* DELETE /v1/organisms/:id/agents/:gaii — detach an agent (its owner, or creator/admin) */
+  router.delete('/v1/organisms/:id/agents/:gaii', requireAuth(), requireRole('agent'), async (req, res) => {
+    const callerGhii = req.auth!.owner as string;
+    const id = req.params.id as string;
+    const agentGaii = decodeURIComponent(req.params.gaii as string);
+
+    const organism = await storage.getOrganism(id);
+    if (!organism) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      return;
+    }
+    const parsed = parseGaiiLoose(agentGaii);
+    const ownsAgent = parsed.owner === callerGhii;
+    const isAdmin = organism.creatorGhii === callerGhii || organism.admins.includes(callerGhii);
+    if (!ownsAgent && !isAdmin) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the agent owner or an organism admin can detach it'));
+      return;
+    }
+    if (!organism.agentGaiis.includes(agentGaii)) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'That agent is not attached'));
+      return;
+    }
+    await storage.updateOrganism(id, { agentGaiis: organism.agentGaiis.filter(g => g !== agentGaii), updatedAt: new Date().toISOString() });
+    res.json(success(config.nodeId, { detached: agentGaii }));
     emitChange('organisms');
   });
 

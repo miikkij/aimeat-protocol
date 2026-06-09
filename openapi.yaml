@@ -14764,6 +14764,12 @@ paths:
           description: URL-encoded bare owner name of the member to remove
           schema:
             type: string
+        - name: ban
+          in: query
+          required: false
+          description: When '1'/'true', block the member from re-joining (sets membership status to banned) instead of just deleting it.
+          schema:
+            type: string
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -14773,6 +14779,165 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /v1/organisms/{id}/members/{ghii}/unban:
+    post:
+      operationId: unbanOrganismMember
+      summary: Lift a member block
+      description: Creator/admin deletes a banned membership row so the owner can request to join or be invited again.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: ghii, in: path, required: true, description: URL-encoded bare owner name, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/transfer:
+    post:
+      operationId: transferOrganismOwnership
+      summary: Transfer organism ownership
+      description: The current creator hands the organism to an existing active member; the target becomes creator and the previous creator is demoted to admin. Creator only.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [to]
+              properties:
+                to: { type: string, description: Bare owner name of the active member to promote to creator }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/invitations:
+    post:
+      operationId: inviteOrganismMember
+      summary: Invite an owner to an organism
+      description: Creator/admin invites an owner by bare name. Creates a membership with status 'invited' + invitedBy, and notifies the invitee. Works for any join policy (the path to populate invite_only organisms).
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [invitee]
+              properties:
+                invitee: { type: string, description: Bare owner name to invite }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    get:
+      operationId: listOrganismInvitations
+      summary: List outstanding invitations
+      description: Creator/admin lists pending (status 'invited') memberships for the organism.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/invitations/mine:
+    get:
+      operationId: listMyOrganismInvitations
+      summary: List the caller's pending invitations
+      description: Returns the caller's pending organism invitations across all organisms, each with a brief organism summary.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+
+  /v1/organisms/{id}/invitations/accept:
+    post:
+      operationId: acceptOrganismInvitation
+      summary: Accept an organism invitation
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/invitations/decline:
+    post:
+      operationId: declineOrganismInvitation
+      summary: Decline an organism invitation
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/agents:
+    post:
+      operationId: attachOrganismAgent
+      summary: Attach an agent to an organism
+      description: A member attaches one of their own agents (GAII) to the organism, adding it to agentGaiis so it passes the workspace membership gate in its own right.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agent_gaii]
+              properties:
+                agent_gaii: { type: string, description: Full GAII (agent#owner@node) owned by the caller }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/organisms/{id}/agents/{gaii}:
+    delete:
+      operationId: detachOrganismAgent
+      summary: Detach an agent from an organism
+      description: The agent's owner, or a creator/admin, removes the agent GAII from agentGaiis.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: gaii, in: path, required: true, description: URL-encoded agent GAII, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   # ── Public Storage ──────────────────────────────────────────
   /v1/pub/{gaii}/{key}:

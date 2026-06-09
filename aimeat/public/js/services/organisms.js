@@ -50,9 +50,10 @@ export async function leaveOrganism(id) {
   return apiPost(`/v1/organisms/${encodeURIComponent(id)}/leave`, {});
 }
 
-/** List members. */
-export async function listMembers(id) {
-  return apiGet(`/v1/organisms/${encodeURIComponent(id)}/members`);
+/** List members. Optional status filter ('active' | 'banned' | 'invited' | 'pending'). */
+export async function listMembers(id, status) {
+  const q = status ? `?status=${encodeURIComponent(status)}` : '';
+  return apiGet(`/v1/organisms/${encodeURIComponent(id)}/members${q}`);
 }
 
 /** List join requests (admin only). */
@@ -65,9 +66,55 @@ export async function reviewJoinRequest(organismId, requestId, decision) {
   return apiPost(`/v1/organisms/${encodeURIComponent(organismId)}/join-requests/${encodeURIComponent(requestId)}/review`, { decision });
 }
 
-/** Remove (revoke) a member's organism access. Creator/admin only. */
-export async function removeMember(id, memberGhii) {
-  return apiDelete(`/v1/organisms/${encodeURIComponent(id)}/members/${encodeURIComponent(memberGhii)}`);
+/** Remove (revoke) a member's organism access. Creator/admin only. Pass ban=true to block re-join. */
+export async function removeMember(id, memberGhii, ban = false) {
+  const suffix = ban ? '?ban=1' : '';
+  return apiDelete(`/v1/organisms/${encodeURIComponent(id)}/members/${encodeURIComponent(memberGhii)}${suffix}`);
+}
+
+/** Lift a ban on a previously-blocked owner. Creator/admin only. */
+export async function unbanMember(id, memberGhii) {
+  return apiPost(`/v1/organisms/${encodeURIComponent(id)}/members/${encodeURIComponent(memberGhii)}/unban`, {});
+}
+
+/** Transfer ownership to an existing active member. Creator only. */
+export async function transferOwnership(id, toGhii) {
+  return apiPost(`/v1/organisms/${encodeURIComponent(id)}/transfer`, { to: toGhii });
+}
+
+/** Invite an owner by bare name. Creator/admin only. */
+export async function inviteMember(id, invitee) {
+  return apiPost(`/v1/organisms/${encodeURIComponent(id)}/invitations`, { invitee });
+}
+
+/** List outstanding (pending) invitations for an organism. Creator/admin only. */
+export async function listInvitations(id) {
+  return apiGet(`/v1/organisms/${encodeURIComponent(id)}/invitations`);
+}
+
+/** The caller's own pending invitations across all organisms. */
+export async function listMyInvitations() {
+  return apiGet('/v1/organisms/invitations/mine');
+}
+
+/** Accept an invitation to an organism. */
+export async function acceptInvitation(id) {
+  return apiPost(`/v1/organisms/${encodeURIComponent(id)}/invitations/accept`, {});
+}
+
+/** Decline an invitation to an organism. */
+export async function declineInvitation(id) {
+  return apiPost(`/v1/organisms/${encodeURIComponent(id)}/invitations/decline`, {});
+}
+
+/** Attach one of your own agents (GAII) to an organism you belong to. */
+export async function attachAgent(id, agentGaii) {
+  return apiPost(`/v1/organisms/${encodeURIComponent(id)}/agents`, { agent_gaii: agentGaii });
+}
+
+/** Detach an agent from an organism. Agent owner or organism admin. */
+export async function detachAgent(id, agentGaii) {
+  return apiDelete(`/v1/organisms/${encodeURIComponent(id)}/agents/${encodeURIComponent(agentGaii)}`);
 }
 
 /** Add admin. */
