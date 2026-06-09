@@ -2066,24 +2066,31 @@
 .pj-act-dot { width: 9px; height: 9px; border-radius: 3px; display: inline-block; flex-shrink: 0; }
 .pj-act-dot.draft { background: var(--orange); }
 .pj-act-dot.publish { background: var(--success); }
-/* Heatmap */
-.pj-hm { overflow-x: auto; padding-bottom: 0.3rem; margin-bottom: 0.7rem; }
-.pj-hm-monthrow { display: flex; padding-left: 26px; }
-.pj-hm-month { flex: 0 0 13px; font-size: 0.62rem; color: var(--muted); white-space: nowrap; overflow: visible; }
+/* Heatmap — bigger cells, each split 2×2 (docs draft/pub · records draft/pub) */
+.pj-hm { overflow-x: auto; padding-bottom: 0.2rem; }
+.pj-hm-monthrow { display: flex; padding-left: 30px; }
+.pj-hm-month { flex: 0 0 23px; font-size: 0.66rem; color: var(--muted); white-space: nowrap; overflow: visible; }
 .pj-hm-body { display: flex; }
-.pj-hm-daycol { display: flex; flex-direction: column; gap: 2px; width: 26px; flex-shrink: 0; }
-.pj-hm-daycol span { height: 11px; line-height: 11px; font-size: 0.6rem; color: var(--muted); }
-.pj-hm-cols { display: flex; gap: 2px; }
-.pj-hm-col { display: flex; flex-direction: column; gap: 2px; }
-.pj-hm-cell { width: 11px; height: 11px; border-radius: 2px; flex-shrink: 0; }
-.pj-hm-cell.empty { background: transparent; }
-.pj-hm-cell.lvl0 { background: var(--bg-dim); }
-.pj-hm-cell.lvl1 { background: color-mix(in srgb, var(--success) 30%, var(--bg-dim)); }
-.pj-hm-cell.lvl2 { background: color-mix(in srgb, var(--success) 55%, var(--bg-dim)); }
-.pj-hm-cell.lvl3 { background: color-mix(in srgb, var(--success) 78%, var(--bg-dim)); }
-.pj-hm-cell.lvl4 { background: var(--success); }
-.pj-hm-legend { display: flex; align-items: center; gap: 3px; justify-content: flex-end; margin-top: 0.35rem; font-size: 0.68rem; color: var(--muted); }
-.pj-hm-legend .pj-hm-cell { width: 10px; height: 10px; }
+.pj-hm-daycol { display: flex; flex-direction: column; gap: 3px; width: 30px; flex-shrink: 0; }
+.pj-hm-daycol span { height: 20px; line-height: 20px; font-size: 0.64rem; color: var(--muted); }
+.pj-hm-cols { display: flex; gap: 3px; }
+.pj-hm-col { display: flex; flex-direction: column; gap: 3px; }
+.pj-hm-cell { width: 20px; height: 20px; border-radius: 3px; flex-shrink: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 1px; overflow: hidden; }
+.pj-hm-cell.future { background: transparent; }
+.pj-hm-cell .q { width: 100%; height: 100%; border-radius: 1px; }
+.q { display: inline-block; }
+.q.lvl0 { background: var(--bg-dim); }
+.q.lvl1 { background: color-mix(in srgb, var(--success) 32%, var(--bg-dim)); }
+.q.lvl2 { background: color-mix(in srgb, var(--success) 56%, var(--bg-dim)); }
+.q.lvl3 { background: color-mix(in srgb, var(--success) 80%, var(--bg-dim)); }
+.q.lvl4 { background: var(--success); }
+/* Legend — a 2×2 key explaining the quadrants + the Less→More intensity ramp */
+.pj-hm-legend { display: flex; align-items: center; justify-content: space-between; gap: 1.2rem; flex-wrap: wrap; margin: 0.55rem 0 0.7rem; font-size: 0.72rem; color: var(--muted); }
+.pj-hm-quadkey { display: flex; align-items: center; gap: 0.55rem; }
+.pj-hm-quadkey .pj-hm-cell { width: 28px; height: 28px; gap: 2px; }
+.pj-hm-quadlabels { display: grid; grid-template-columns: auto auto; gap: 0.12rem 0.9rem; }
+.pj-hm-intensity { display: flex; align-items: center; gap: 3px; }
+.pj-hm-intensity .q { width: 13px; height: 13px; border-radius: 2px; }
 .pj-act-list { display: flex; flex-direction: column; gap: 0.25rem; }
 .pj-act-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; }
 .pj-act-time { color: var(--muted); font-size: 0.72rem; min-width: 130px; }

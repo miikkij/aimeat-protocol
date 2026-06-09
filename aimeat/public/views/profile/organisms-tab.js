@@ -695,15 +695,16 @@ function WorkspaceList({ org, showToast, onOpen, onBack }) {
     </div>`;
 }
 
-/* Build a GitHub-style contribution calendar from activity events: a grid of weeks (columns) × days
- * (rows), cell intensity = how many events that day. Returns { cols, monthLabels } where each col is
- * 7 cells (Sun→Sat); a null cell is a future day past today. Deterministic from the event timestamps. */
+/* Build a GitHub-style contribution calendar from activity events. Each day holds FOUR counters —
+ * documents draft/published and records (schema'd) draft/published — so a cell can be drawn as a 2×2
+ * quadrant. Returns { cols, monthLabels }: each col is 7 day-slots (Sun→Sat); a future slot is null.
+ * Deterministic from the event timestamps. */
 function buildHeatmap(byDay, today) {
   const iso = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   const dayKeys = [...byDay.keys()].sort();
   const earliest = dayKeys.length ? new Date(dayKeys[0] + 'T00:00:00') : new Date(today);
   let weeks = Math.ceil((today - earliest) / (7 * 86400000)) + 1;
-  weeks = Math.max(18, Math.min(53, weeks));               // at least a few months, at most a year
+  weeks = Math.max(14, Math.min(53, weeks));               // a few months minimum, a year maximum
   const start = new Date(today);
   start.setDate(start.getDate() - (weeks * 7 - 1));
   start.setDate(start.getDate() - start.getDay());          // align to the start of a week (Sunday)
@@ -715,7 +716,7 @@ function buildHeatmap(byDay, today) {
     const col = [];
     for (let dow = 0; dow < 7; dow++) {
       if (cur > today) { col.push(null); }
-      else { const b = byDay.get(iso(cur)); col.push({ date: iso(cur), count: b ? b.total : 0, b }); }
+      else { col.push({ date: iso(cur), b: byDay.get(iso(cur)) || null }); }
       cur = new Date(cur); cur.setDate(cur.getDate() + 1);
     }
     cols.push(col);
@@ -723,10 +724,25 @@ function buildHeatmap(byDay, today) {
   return { cols, monthLabels };
 }
 const hmLevel = (n) => (n === 0 ? 0 : n <= 1 ? 1 : n <= 3 ? 2 : n <= 6 ? 3 : 4);
+const ZERO_DAY = { dd: 0, dp: 0, rd: 0, rp: 0, total: 0 };
 
-/* Activity panel — a GitHub-style contribution heatmap of the workspace's history (intensity = events
- * per day) + the recent activity log (who did what, in which space, draft-edit vs publish, when) —
- * which doubles as an audit trail. Built from GET …/workspace/activity (derived from version history). */
+/* One heatmap day = a 2×2 grid: ↖ docs draft, ↗ docs published, ↙ records draft, ↘ records published.
+ * Each quadrant's shade is its own count's intensity. */
+function hmCell(date, b, key) {
+  const c = b || ZERO_DAY;
+  const tip = b
+    ? `${date} — docs: ${c.dd} draft / ${c.dp} published · records: ${c.rd} draft / ${c.rp} published`
+    : `${date} — no activity`;
+  return html`<span class="pj-hm-cell" key=${key} title=${tip}>
+    <i class="q lvl${hmLevel(c.dd)}"></i><i class="q lvl${hmLevel(c.dp)}"></i>
+    <i class="q lvl${hmLevel(c.rd)}"></i><i class="q lvl${hmLevel(c.rp)}"></i>
+  </span>`;
+}
+
+/* Activity panel — a GitHub-style contribution heatmap of the workspace's history, where every day is
+ * split 2×2 into documents vs records × draft vs published (quadrant shade = intensity) — plus the
+ * recent activity log (who did what, where, when), which doubles as an audit trail. Built from
+ * GET …/workspace/activity (derived from version history). */
 function ActivityPanel({ orgId, wsId }) {
   const [data, setData] = useState(null);
   const [show, setShow] = useState(true);
@@ -740,7 +756,13 @@ function ActivityPanel({ orgId, wsId }) {
   if (!data || !(data.events || []).length) return null;
   const events = data.events;
   const byDay = new Map();
-  for (const e of events) { const day = (e.at || '').slice(0, 10); if (!day) continue; const b = byDay.get(day) || { draft: 0, publish: 0, total: 0 }; b[e.action] = (b[e.action] || 0) + 1; b.total++; byDay.set(day, b); }
+  for (const e of events) {
+    const day = (e.at || '').slice(0, 10); if (!day) continue;
+    const b = byDay.get(day) || { dd: 0, dp: 0, rd: 0, rp: 0, total: 0 };
+    const doc = e.mode === 'document';
+    if (e.action === 'draft') { if (doc) b.dd++; else b.rd++; } else if (doc) b.dp++; else b.rp++;
+    b.total++; byDay.set(day, b);
+  }
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const { cols, monthLabels } = buildHeatmap(byDay, today);
 
@@ -759,15 +781,23 @@ function ActivityPanel({ orgId, wsId }) {
               <div class="pj-hm-cols">
                 ${cols.map((col, ci) => html`<div class="pj-hm-col" key=${ci}>
                   ${col.map((cell, ri) => cell === null
-                    ? html`<span class="pj-hm-cell empty" key=${ri}></span>`
-                    : html`<span class="pj-hm-cell lvl${hmLevel(cell.count)}" key=${ri}
-                        title=${cell.date + (cell.count ? ` — ${cell.b.publish} published, ${cell.b.draft} edited` : ' — no activity')}></span>`)}
+                    ? html`<span class="pj-hm-cell future" key=${ri}></span>`
+                    : hmCell(cell.date, cell.b, ri))}
                 </div>`)}
               </div>
             </div>
-            <div class="pj-hm-legend">
+          </div>
+          <div class="pj-hm-legend">
+            <div class="pj-hm-quadkey">
+              <span class="pj-hm-cell"><i class="q lvl1"></i><i class="q lvl3"></i><i class="q lvl2"></i><i class="q lvl4"></i></span>
+              <div class="pj-hm-quadlabels">
+                <span>${'↖ '}${t('organisms.docsDraft') || 'Docs draft'}</span><span>${'↗ '}${t('organisms.docsPublished') || 'Docs published'}</span>
+                <span>${'↙ '}${t('organisms.recordsDraft') || 'Records draft'}</span><span>${'↘ '}${t('organisms.recordsPublished') || 'Records published'}</span>
+              </div>
+            </div>
+            <div class="pj-hm-intensity">
               <span>${t('organisms.less') || 'Less'}</span>
-              <span class="pj-hm-cell lvl0"></span><span class="pj-hm-cell lvl1"></span><span class="pj-hm-cell lvl2"></span><span class="pj-hm-cell lvl3"></span><span class="pj-hm-cell lvl4"></span>
+              <i class="q lvl0"></i><i class="q lvl1"></i><i class="q lvl2"></i><i class="q lvl3"></i><i class="q lvl4"></i>
               <span>${t('organisms.more') || 'More'}</span>
             </div>
           </div>
@@ -777,7 +807,7 @@ function ActivityPanel({ orgId, wsId }) {
               <span class="pj-act-time">${dt(e.at)}</span>
               <span class="pj-act-who">${escHtml(e.actor)}</span>
               <span class="pj-act-act">${e.action === 'publish' ? (t('organisms.publishedVerb') || 'published') : (t('organisms.editedVerb') || 'edited')}</span>
-              <span class="pj-act-what">${escHtml(e.type)}${' / '}${escHtml(e.instance)}</span>
+              <span class="pj-act-what">${escHtml(e.mode === 'document' ? '📄' : '🗂')} ${escHtml(e.type)}${' / '}${escHtml(e.instance)}</span>
             </div>`)}
           </div>
         </div>` : null}

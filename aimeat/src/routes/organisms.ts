@@ -942,12 +942,14 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const root = `organism.${id}.w.${ws}`;
     const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 10000 });
 
-    // namespace → objectType name, from the manifest (best-effort, for friendly labels).
+    // namespace → objectType name + mode, from the manifest (best-effort, for friendly labels + the
+    // document/records split shown in the heatmap quadrants).
     const manRec = items.find(r => r.key === `${root}.meta.manifest`);
-    const types = ((manRec?.value as { objectTypes?: Array<{ name?: string; namespace?: string }> } | undefined)?.objectTypes) ?? [];
+    const types = ((manRec?.value as { objectTypes?: Array<{ name?: string; namespace?: string; mode?: string }> } | undefined)?.objectTypes) ?? [];
     const typeByNs = new Map(types.filter(o => o.namespace && o.name).map(o => [o.namespace as string, o.name as string]));
+    const modeByNs = new Map(types.filter(o => o.namespace).map(o => [o.namespace as string, o.mode === 'document' ? 'document' : 'records']));
 
-    const events: Array<{ at: string; actor: string; namespace: string; type: string; instance: string; action: 'publish' | 'draft' }> = [];
+    const events: Array<{ at: string; actor: string; namespace: string; type: string; mode: string; instance: string; action: 'publish' | 'draft' }> = [];
     for (const r of items) {
       if (r.ownerGaii !== callerGaii) {
         const d = await authorizeRead(storage, config, { ownerGaii: r.ownerGaii, accessorGaii: callerGaii, resourceKey: r.key, visibility: r.visibility, groupId: r.groupId, action: 'read' });
@@ -966,7 +968,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       const instance = core[core.length - 1];
       const namespace = core.slice(0, -1).join('.');
       if (!instance || !namespace) continue;
-      events.push({ at: action === 'draft' ? r.updatedAt : r.createdAt, actor: bareOwner(r.ownerGaii), namespace, type: typeByNs.get(namespace) || namespace, instance, action });
+      events.push({ at: action === 'draft' ? r.updatedAt : r.createdAt, actor: bareOwner(r.ownerGaii), namespace, type: typeByNs.get(namespace) || namespace, mode: modeByNs.get(namespace) || 'records', instance, action });
     }
     events.sort((a, b) => (b.at || '').localeCompare(a.at || ''));
     res.json(success(config.nodeId, { ws, events: events.slice(0, 300), total: events.length }));
