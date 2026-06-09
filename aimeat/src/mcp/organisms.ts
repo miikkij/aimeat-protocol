@@ -40,19 +40,19 @@ export function registerOrganismsTools(
 ): void {
     const agentGaii = getAgentGaii();
 
-    /** Resolve the owner's GHII (owner@nodeId) from the agent's GAII. */
-    function getOwnerGhii(): string {
+    /** The owner's BARE name. Membership records, organism.members[], creatorGhii and admins are all
+     *  keyed by the bare owner name (see aimeat_organism_create), NOT the full GHII — so visibility,
+     *  list-by-member, and join/leave checks must compare against the bare name. */
+    function getOwnerName(): string {
         const parsed = parseGAII(agentGaii);
-        if (parsed) return `${parsed.owner}@${config.nodeId}`;
-        // Fallback: treat agentGaii as an owner name
-        return `${agentGaii}@${config.nodeId}`;
+        return parsed ? parsed.owner : agentGaii;
     }
 
     /** Check if an organism is visible to the current agent. */
     async function canSeeOrganism(organism: { visibility: string; members: string[] }): Promise<boolean> {
         if (organism.visibility === 'public' || organism.visibility === 'listed') return true;
-        const ownerGhii = getOwnerGhii();
-        return organism.members.includes(ownerGhii);
+        const ownerName = getOwnerName();
+        return organism.members.includes(ownerName);
     }
 
     // ── Resource: organism details ──
@@ -118,11 +118,11 @@ export function registerOrganismsTools(
         {},
         annotationsFor('aimeat_organism_list'),
         async () => {
-            const ownerGhii = getOwnerGhii();
+            const ownerName = getOwnerName();
             // Get public organisms
             const publicOrgs = await storage.listOrganisms({ visibility: 'public' });
             // Get organisms the owner is a member of (may include private ones)
-            const memberOrgs = await storage.listOrganisms({ member: ownerGhii });
+            const memberOrgs = await storage.listOrganisms({ member: ownerName });
             // Merge, deduplicate by id
             const seen = new Set<string>();
             const all = [...publicOrgs, ...memberOrgs].filter(o => {
@@ -214,10 +214,10 @@ export function registerOrganismsTools(
                 return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
             }
 
-            const ownerGhii = getOwnerGhii();
+            const ownerName = getOwnerName();
 
             // Check if already a member
-            const existing = await storage.getMembership(organism_id, ownerGhii);
+            const existing = await storage.getMembership(organism_id, ownerName);
             if (existing && existing.status === 'active') {
                 return { content: [{ type: 'text' as const, text: 'Already a member of this organism' }], isError: true };
             }
@@ -241,13 +241,13 @@ export function registerOrganismsTools(
                 await storage.createMembership({
                     id: uuidv4(),
                     organismId: organism_id,
-                    ghii: ownerGhii,
+                    ghii: ownerName,
                     role: 'member',
                     status: 'active',
                     joinedAt: now,
                 });
                 await storage.updateOrganism(organism_id, {
-                    members: [...organism.members, ownerGhii],
+                    members: [...organism.members, ownerName],
                     updatedAt: now,
                 });
 
@@ -264,7 +264,7 @@ export function registerOrganismsTools(
                 await storage.createJoinRequest({
                     id: uuidv4(),
                     organismId: organism_id,
-                    ghii: ownerGhii,
+                    ghii: ownerName,
                     message: message || undefined,
                     status: 'pending',
                     createdAt: now,
@@ -292,13 +292,13 @@ export function registerOrganismsTools(
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
 
-            const ownerGhii = getOwnerGhii();
+            const ownerName = getOwnerName();
 
-            if (organism.creatorGhii === ownerGhii) {
+            if (organism.creatorGhii === ownerName) {
                 return { content: [{ type: 'text' as const, text: 'Creator cannot leave. Delete the organism instead.' }], isError: true };
             }
 
-            const membership = await storage.getMembership(organism_id, ownerGhii);
+            const membership = await storage.getMembership(organism_id, ownerName);
             if (!membership || membership.status !== 'active') {
                 return { content: [{ type: 'text' as const, text: 'Not a member of this organism' }], isError: true };
             }
@@ -306,11 +306,11 @@ export function registerOrganismsTools(
             await storage.deleteMembership(membership.id);
 
             const updates: Record<string, unknown> = {
-                members: organism.members.filter(m => m !== ownerGhii),
+                members: organism.members.filter(m => m !== ownerName),
                 updatedAt: new Date().toISOString(),
             };
-            if (organism.admins.includes(ownerGhii)) {
-                updates.admins = organism.admins.filter(a => a !== ownerGhii);
+            if (organism.admins.includes(ownerName)) {
+                updates.admins = organism.admins.filter(a => a !== ownerName);
             }
             await storage.updateOrganism(organism_id, updates);
 
@@ -380,8 +380,8 @@ export function registerOrganismsTools(
                 return { content: [{ type: 'text' as const, text: 'Name is required (min 2 characters)' }], isError: true };
             }
             const parsed = parseGAII(agentGaii);
-            const ownerName = parsed ? parsed.owner : agentGaii;
-            const ownerGhii = `${ownerName}@${config.nodeId}`;
+            const ownerName = parsed ? parsed.owner : agentGaii;          // bare — membership/members/creator
+            const ownerGhiiFull = `${ownerName}@${config.nodeId}`;        // full GHII — board owner
             const orgType = ['community', 'team', 'club', 'cooperative', 'project'].includes(type ?? '') ? (type as string) : 'community';
             const policy = ['open', 'approval_required', 'invite_only'].includes(join_policy ?? '') ? (join_policy as string) : 'open';
             const vis = ['public', 'listed', 'private'].includes(visibility ?? '') ? (visibility as string) : 'public';
@@ -390,7 +390,7 @@ export function registerOrganismsTools(
             const boardId = `org-${id}`;
             await storage.createBoard({
                 id: boardId, name: `${name.trim()} — Discussion`, description: `Discussion board for ${name.trim()}`,
-                visibility: vis === 'public' ? 'public' : 'shared', ownerGaii: ownerGhii, allowedGaiis: [], createdAt: now,
+                visibility: vis === 'public' ? 'public' : 'shared', ownerGaii: ownerGhiiFull, allowedGaiis: [], createdAt: now,
             });
             const record = await storage.createOrganism({
                 id, name: name.trim(), description: description || '', type: orgType as 'community' | 'team' | 'club' | 'cooperative' | 'project', location: {}, interests: [],

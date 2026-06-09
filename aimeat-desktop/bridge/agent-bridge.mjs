@@ -19,6 +19,11 @@
  *   resources/server/ next to node_modules).
  * @version-history
  *   v0.1.0 — 2026-06-07 — Initial bridge: MCP-as-agent + Ollama tool loop + write approvals.
+ *   v0.2.0 — 2026-06-09 — Recover tool calls that small models (qwen2.5:7b) leak into the assistant
+ *     content as `<tool_call>{…}</tool_call>` / bare JSON instead of the structured tool_calls field,
+ *     so the loop still executes them (only for known tool names).
+ *   v0.3.0 — 2026-06-09 — Stream the completion (stream:true) and assemble the deltas, so big/slow local
+ *     models no longer trip Node's 300s headers timeout ("fetch failed") while thinking.
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -59,6 +64,37 @@ function isWrite(name, tool) {
   return /_(create|update|delete|write|publish|add|set|approve|import|join|leave|remove|send|invoke|contribute|draft|vouch|report|mint)\b/.test(name);
 }
 
+// ── Leaked tool-call recovery ───────────────────────────────────────
+// Small local models (e.g. qwen2.5:7b on Ollama) often emit a tool call as TEXT in the
+// assistant content — `<tool_call>{"name":...,"arguments":...}</tool_call>` (Hermes format)
+// or a bare {"name","arguments"} JSON — instead of the structured `tool_calls` field, and
+// Ollama doesn't always parse it. Without recovery the loop sees no tool call and just prints
+// the raw markup. We detect and execute those so the chat keeps working.
+let leakSeq = 0;
+function tryParseCall(s) {
+  if (!s) return null;
+  let t = String(s).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const start = t.indexOf('{'), end = t.lastIndexOf('}');
+  if (start === -1 || end <= start) return null;
+  try {
+    const o = JSON.parse(t.slice(start, end + 1));
+    const name = o?.name ?? o?.tool ?? o?.function;
+    const args = o?.arguments ?? o?.parameters ?? o?.args ?? {};
+    if (typeof name !== 'string') return null;
+    return { id: `leaked_${++leakSeq}`, type: 'function', function: { name, arguments: typeof args === 'string' ? args : JSON.stringify(args) } };
+  } catch { return null; }
+}
+function extractLeakedToolCalls(content) {
+  if (!content || typeof content !== 'string') return { calls: [], cleaned: content || '' };
+  const calls = [];
+  const tagRe = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/gi;
+  let m;
+  while ((m = tagRe.exec(content)) !== null) { const c = tryParseCall(m[1]); if (c) calls.push(c); }
+  let cleaned = content.replace(tagRe, '').replace(/<\/?tool_call>/gi, '').trim();
+  if (calls.length === 0) { const c = tryParseCall(content); if (c) { calls.push(c); cleaned = ''; } }
+  return { calls, cleaned };
+}
+
 function mcpToolsToOpenAI(tools) {
   return tools.map((t) => ({
     type: 'function',
@@ -70,17 +106,53 @@ function mcpToolsToOpenAI(tools) {
   }));
 }
 
+// We STREAM the completion (stream:true). Beyond responsiveness, this is essential for big/slow
+// local models: in non-stream mode Ollama only sends response headers once generation is fully done,
+// so a model that takes minutes trips Node's 300s headers timeout → "fetch failed". Streaming sends
+// headers immediately, so the request never times out while the model thinks. We assemble the OpenAI
+// delta chunks (content + tool_calls) back into a single message with the same shape as before.
 async function ollamaChat(messages, tools) {
   const resp = await fetch(cfg.ollamaUrl + '/v1/chat/completions', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ model: cfg.model, messages, tools, stream: false }),
+    body: JSON.stringify({ model: cfg.model, messages, tools, stream: true }),
   });
-  if (!resp.ok) {
-    throw new Error(`Ollama ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
+  if (!resp.ok || !resp.body) {
+    throw new Error(`Ollama ${resp.status}: ${(await resp.text().catch(() => '')).slice(0, 200)}`);
   }
-  const data = await resp.json();
-  return data.choices?.[0]?.message ?? { role: 'assistant', content: '' };
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  const msg = { role: 'assistant', content: '' };
+  const toolAcc = [];
+  let buf = '', finished = false;
+  while (!finished) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let nl;
+    while ((nl = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (!line.startsWith('data:')) continue;
+      const data = line.slice(5).trim();
+      if (data === '[DONE]') { finished = true; break; }
+      let json;
+      try { json = JSON.parse(data); } catch { continue; }
+      const choice = json.choices?.[0];
+      const delta = choice?.delta || choice?.message || {};
+      if (typeof delta.content === 'string') msg.content += delta.content;
+      for (const tc of delta.tool_calls || []) {
+        const i = tc.index ?? 0;
+        toolAcc[i] = toolAcc[i] || { id: tc.id || `call_${i}`, type: 'function', function: { name: '', arguments: '' } };
+        if (tc.id) toolAcc[i].id = tc.id;
+        if (tc.function?.name) toolAcc[i].function.name += tc.function.name;
+        if (tc.function?.arguments) toolAcc[i].function.arguments += tc.function.arguments;
+      }
+    }
+  }
+  const calls = toolAcc.filter(Boolean);
+  if (calls.length) msg.tool_calls = calls;
+  return msg;
 }
 
 // ── Approval coordination (stdio mode) ──────────────────────────────
@@ -99,9 +171,21 @@ function requestApproval(name, args) {
 async function runTurn(ctx, messages, { autoApprove }) {
   for (let step = 0; step < 8; step++) {
     const msg = await ollamaChat(messages, ctx.openaiTools);
+
+    let calls = msg.tool_calls || [];
+    // Recover tool calls the model leaked into content as text, but only for KNOWN tools
+    // (so we never mis-fire on ordinary JSON the model happens to mention).
+    if (calls.length === 0 && msg.content) {
+      const { calls: leaked, cleaned } = extractLeakedToolCalls(msg.content);
+      const known = leaked.filter((c) => ctx.toolByName.has(c.function.name));
+      if (known.length) {
+        calls = known;
+        msg.content = cleaned;        // drop the raw <tool_call> markup
+        msg.tool_calls = known;       // keep the conversation well-formed for the next turn
+      }
+    }
     messages.push(msg);
 
-    const calls = msg.tool_calls || [];
     if (calls.length === 0) {
       return msg.content || '';
     }

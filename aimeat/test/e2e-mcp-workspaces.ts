@@ -8,6 +8,8 @@
  *   v1.0.0 — 2026-06-08 — Initial creation (5 workspace tools).
  *   v1.1.0 — 2026-06-09 — Add test 15b: a member who didn't create a workspace can DISCOVER it via the
  *     MCP list (cross-member registry aggregation regression).
+ *   v1.2.0 — 2026-06-09 — Test 15 now joins via MCP aimeat_organism_join (was REST), so 15–18 also cover
+ *     the membership-identity fix (join must store the bare owner name the workspace gate checks).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-workspaces
 
@@ -258,9 +260,13 @@ await test('14. the locked schema validates new drafts (valid passes, invalid re
 });
 
 // ── Cross-member access over MCP: B discovers → requests → A approves → B reads ──
-await test('15. owner 2 joins owner 1\'s bootstrapped org', async () => {
-    const j = await json(`/v1/organisms/${bootOrgId}/join`, { method: 'POST', headers: { Authorization: `Bearer ${B.ownerToken}` }, body: '{}' });
-    assert(j.status === 200 || j.status === 201, `join ${j.status}: ${JSON.stringify(j.body.error)}`);
+await test('15. owner 2 joins owner 1\'s bootstrapped org (via MCP aimeat_organism_join)', async () => {
+    // Use the MCP join tool (not REST) so this also covers the membership-identity fix: join must store
+    // the BARE owner name (like organism_create), or the workspace membership gate — which checks the
+    // bare name — would reject B in an org it just joined. With the old full-GHII join, 15b/16/17/18 fail.
+    const j = await B.client.call('aimeat_organism_join', { organism_id: bootOrgId }, 115);
+    assert(j.result.isError !== true, `join: ${j.result.content?.[0]?.text}`);
+    assert(JSON.parse(j.result.content[0].text).status === 'joined', 'joined (open policy)');
 });
 
 await test('15b. B can DISCOVER A\'s workspace via MCP list (cross-member registry aggregation)', async () => {

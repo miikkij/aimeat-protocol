@@ -363,9 +363,13 @@
     .code-box code { color: #d8b4fe; flex: 1; word-break: break-all; }
 
     /* ── Chat ────────────────────────────────────────────────── */
+    /* Wider main + fill the window when the Chat tab is active. */
+    body.chat-page main { max-width: 1400px; }
+    #page-chat #chatPanel { flex-direction: column; }
     .chat-log {
-      min-height: 280px;
-      max-height: 460px;
+      flex: 1 1 auto;
+      min-height: 240px;
+      height: calc(100vh - 330px);   /* responsive to window height */
       overflow-y: auto;
       display: flex;
       flex-direction: column;
@@ -389,10 +393,37 @@
     }
     .chat-msg.assistant {
       align-self: flex-start;
+      max-width: 92%;
       background: rgba(30, 20, 50, 0.6);
       border: 1px solid rgba(167,139,250,0.15);
+      white-space: normal;   /* rendered markdown controls its own spacing */
     }
     .chat-msg.system { align-self: center; color: rgba(167,139,250,0.6); font-size: 0.78rem; background: none; }
+
+    /* Rendered markdown inside assistant messages */
+    .chat-msg.assistant .cm-p { margin: 0 0 8px; line-height: 1.55; }
+    .chat-msg.assistant > .cm-p:last-child { margin-bottom: 0; }
+    .chat-msg.assistant .cm-h { font-weight: 700; color: #f0abfc; margin: 12px 0 6px; line-height: 1.3; }
+    .chat-msg.assistant .cm-h:first-child { margin-top: 0; }
+    .chat-msg.assistant .cm-h1 { font-size: 1.18rem; }
+    .chat-msg.assistant .cm-h2 { font-size: 1.06rem; }
+    .chat-msg.assistant .cm-h3 { font-size: 0.98rem; color: #d8b4fe; }
+    .chat-msg.assistant .cm-h4, .chat-msg.assistant .cm-h5, .chat-msg.assistant .cm-h6 { font-size: 0.92rem; color: #c4b5fd; }
+    .chat-msg.assistant .cm-list { margin: 4px 0 8px; padding-left: 22px; }
+    .chat-msg.assistant .cm-list li { margin: 3px 0; line-height: 1.5; }
+    .chat-msg.assistant .cm-list .cm-list { margin: 3px 0 3px; }
+    .chat-msg.assistant .cm-code {
+      background: rgba(10,10,20,0.7); border: 1px solid rgba(167,139,250,0.18); border-radius: 5px;
+      padding: 1px 5px; font-family: 'Cascadia Code','Fira Code',monospace; font-size: 0.85em; color: #f9a8d4;
+    }
+    .chat-msg.assistant .cm-pre {
+      background: rgba(10,10,20,0.85); border: 1px solid rgba(167,139,250,0.18); border-radius: 8px;
+      padding: 10px 12px; overflow-x: auto; margin: 8px 0;
+    }
+    .chat-msg.assistant .cm-pre code { font-family: 'Cascadia Code','Fira Code',monospace; font-size: 0.82rem; color: #d8b4fe; white-space: pre; }
+    .chat-msg.assistant strong { color: #f3d4ff; font-weight: 700; }
+    .chat-msg.assistant em { font-style: italic; color: #e8d4f5; }
+    .chat-msg.assistant .cm-link { color: #a78bfa; text-decoration: underline; cursor: pointer; }
     .chat-tool {
       align-self: flex-start;
       max-width: 85%;
@@ -688,7 +719,7 @@
           <div class="form-group">
             <label for="chatUser">Owner username</label>
             <input type="text" id="chatUser" placeholder="e.g. alice" autocomplete="off" />
-            <div class="form-hint">Only needed the first time, to register the chat agent.</div>
+            <div class="form-hint">Required — you sign in to your owner account before each connection.</div>
           </div>
           <div class="form-group">
             <label for="chatPass">Password</label>
@@ -861,6 +892,7 @@
       if (pageName === 'ai-setup') aiSetupOpened();
       if (pageName === 'chat') chatOpened();
       if (pageName === 'logs') refreshLogs();
+      document.body.classList.toggle('chat-page', pageName === 'chat');
     }
 
     navLinks.forEach(link => {
@@ -1368,14 +1400,23 @@
       const model = document.getElementById('chatModel').value;
       const status = (t) => { document.getElementById('chatSetupStatus').textContent = t; };
       if (!model) { status('Pick an Ollama model first.'); return; }
+      if (!user || !pass) { status('Enter your owner username and password to connect.'); return; }
       const btn = document.getElementById('chatConnectBtn');
       btn.disabled = true;
       try {
+        // Always verify the owner before opening a connection — sign in every session.
+        status('Signing in…');
+        let ownerToken;
+        try {
+          ownerToken = await invoke('node_login_at', { baseUrl: base, username: user, password: pass });
+        } catch (e) {
+          status('Sign-in failed: ' + e);
+          btn.disabled = false;
+          return;
+        }
+        // Register the chat agent the first time; reuse the stored agent token afterwards.
         let agent = await invoke('get_chat_agent', { baseUrl: base });
         if (!agent) {
-          if (!user || !pass) { status('Sign in to register the chat agent (first time only).'); btn.disabled = false; return; }
-          status('Signing in…');
-          const ownerToken = await invoke('node_login_at', { baseUrl: base, username: user, password: pass });
           status('Registering chat agent (approve happens automatically)…');
           agent = await invoke('register_chat_agent', { baseUrl: base, owner: user, ownerToken, agentName: 'ollama-desktop' });
         }
@@ -1384,7 +1425,7 @@
         chatStarted = true;
         document.getElementById('chatAgentLabel').textContent = agent.gaii || 'agent';
         document.getElementById('chatSetup').style.display = 'none';
-        document.getElementById('chatPanel').style.display = 'block';
+        document.getElementById('chatPanel').style.display = 'flex';
         document.getElementById('chatLog').innerHTML = '';
         document.getElementById('chatPass').value = '';
         document.getElementById('chatAutoApprove').checked = false;
@@ -1401,10 +1442,54 @@
       const log = document.getElementById('chatLog');
       const div = document.createElement('div');
       div.className = 'chat-msg ' + cls;
-      div.textContent = text;
+      if (cls === 'assistant') div.innerHTML = renderMarkdown(text);
+      else div.textContent = text;
       log.appendChild(div);
       log.scrollTop = log.scrollHeight;
       return div;
+    }
+
+    // Minimal, SAFE markdown → HTML (escape first, then transform). Handles headings, bold, italic,
+    // inline code, fenced code, ordered/unordered (nested) lists, links, and paragraphs.
+    function renderMarkdown(src) {
+      if (!src) return '';
+      let s = escapeHtml(String(src));
+      const fences = [];
+      s = s.replace(/```[^\n]*\n?([\s\S]*?)```/g, (m, code) => {
+        fences.push('<pre class="cm-pre"><code>' + code.replace(/\n+$/, '') + '</code></pre>');
+        return '@@FENCE' + (fences.length - 1) + '@@';
+      });
+      const inline = (t) => t
+        .replace(/`([^`]+)`/g, '<code class="cm-code">$1</code>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g, '$1<em>$2</em>')
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+          '<a class="cm-link" data-href="$2" onclick="openExternal(this.dataset.href);return false;">$1</a>');
+      const out = [];
+      const stack = []; // { type, indent }
+      const closeAll = () => { while (stack.length) out.push('</' + stack.pop().type + '>'); };
+      for (const raw of s.split('\n')) {
+        const fence = raw.trim().match(/^@@FENCE(\d+)@@$/);
+        if (fence) { closeAll(); out.push(fences[+fence[1]]); continue; }
+        const h = raw.match(/^(#{1,6})\s+(.*)$/);
+        if (h) { closeAll(); out.push(`<div class="cm-h cm-h${h[1].length}">${inline(h[2])}</div>`); continue; }
+        const li = raw.match(/^(\s*)([-*]|\d+\.)\s+(.*)$/);
+        if (li) {
+          const indent = li[1].replace(/\t/g, '    ').length;
+          const type = /^\d/.test(li[2]) ? 'ol' : 'ul';
+          while (stack.length && stack[stack.length - 1].indent > indent) out.push('</' + stack.pop().type + '>');
+          const top = stack[stack.length - 1];
+          if (!top || top.indent < indent) { out.push('<' + type + ' class="cm-list">'); stack.push({ type, indent }); }
+          else if (top.indent === indent && top.type !== type) { out.push('</' + stack.pop().type + '>'); out.push('<' + type + ' class="cm-list">'); stack.push({ type, indent }); }
+          out.push('<li>' + inline(li[3]) + '</li>');
+          continue;
+        }
+        if (raw.trim() === '') { closeAll(); continue; }
+        closeAll();
+        out.push('<p class="cm-p">' + inline(raw) + '</p>');
+      }
+      closeAll();
+      return out.join('');
     }
     function chatSetInputEnabled(on) {
       document.getElementById('chatInput').disabled = !on;

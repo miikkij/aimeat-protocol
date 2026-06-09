@@ -125,6 +125,10 @@ that handles all AIMEAT communication so the model just decides which tool to ca
 - **Ollama guidance in the Chat tab** — detects whether Ollama is running and, if not (or if no model is pulled),
   shows inline setup steps (download link + copyable `ollama pull qwen2.5:7b` + re-scan) and blocks starting until
   a model is available.
+- **Responsive chat + rendered markdown** — the transcript now fills the window height (`calc(100vh …)`) and the
+  Chat tab widens to 1400px, so long answers get real space. Assistant replies render **markdown as styled HTML**
+  (headings, **bold**, *italic*, `inline code`, fenced code, nested lists, links that open externally) via a small
+  escape-first (XSS-safe) renderer — no raw `###`/`**`/backticks any more. User/tool/system lines stay plain.
 
 #### Fixed
 
@@ -132,6 +136,13 @@ that handles all AIMEAT communication so the model just decides which tool to ca
   receive backend events (the Chat tab's `chat-event` stream); without it the chat connected but the UI never
   updated. Spawned `node.exe` processes now use `CREATE_NO_WINDOW` (no stray console window on Windows), and
   devtools are enabled (right-click → Inspect) for troubleshooting.
+- **Leaked tool-call recovery** (`agent-bridge.mjs`) — small local models (qwen2.5:7b) often emit a tool call as
+  TEXT in the assistant content (`<tool_call>{…}</tool_call>` / bare JSON) instead of the structured `tool_calls`
+  field, and Ollama doesn't parse it — so the chat printed the raw markup and did nothing. The bridge now detects
+  and executes those (only for known tool names), so the loop keeps working.
+- **Sign-in required before connecting** (Chat tab). The chat now verifies the owner (`node_login_at`) on **every**
+  connection instead of silently reusing the stored agent token, so account + password must be entered before any
+  connection to the node is opened. The stored token still avoids re-registration; it no longer bypasses sign-in.
 
 ### MCP: first-run wizard gate no longer intercepts versioned API routes
 
@@ -161,6 +172,23 @@ workspace existed under the **creator's** identity.
   `aimeat_workspace_read`. Membership still gates the call and per-workspace `read` still enforces consent — only
   **discovery** is fixed. Regression test added (`test/e2e-mcp-workspaces.ts` 15b: a member who didn't create the
   workspace can discover it via the MCP list; it fails on the old single-owner read).
+
+### MCP: organism membership now uses the bare owner name consistently
+
+Membership records, `organism.members[]`, `creatorGhii` and `admins` are all keyed by the **bare owner name**
+(e.g. `alice`), as `aimeat_organism_create` writes them. But `aimeat_organism_join` / `_leave` and the
+visibility / list-by-member checks resolved the caller to the **full GHII** (`alice@node`) via a helper, so they
+compared against the wrong key. An agent that **joined an organism over MCP** got a malformed membership, after
+which the workspace tools (which check the bare name) treated it as a non-member — it could not use workspaces in
+an org it had just joined; private member-orgs also never appeared in `aimeat_organism_list`.
+
+#### Fixed
+
+- **`organism_join` / `_leave` / `_list` / `canSeeOrganism` compare against the bare owner name**
+  (`src/mcp/organisms.ts`). The `getOwnerGhii()` helper (returned `owner@node`) became `getOwnerName()` (bare),
+  matching `aimeat_organism_create`, the REST routes, and the workspace membership gate. Regression covered in
+  `test/e2e-mcp-workspaces.ts` (test 15 now joins via MCP `aimeat_organism_join`, so 15–18 fail unless the join
+  stores the bare name the workspace gate checks).
 
 ### Profile: full-bleed dashboard layout
 
