@@ -266,11 +266,11 @@ await test('16. B cannot read the workspace before approval', async () => {
 });
 
 await test('17. B requests access; A sees it and approves (all over MCP)', async () => {
-    const rq = await B.client.call('aimeat_workspace_request_access', { organism_id: bootOrgId, ws: bootWs.id, message: 'let me help' }, 117);
+    const rq = await B.client.call('aimeat_workspace_access', { organism_id: bootOrgId, ws: bootWs.id, action: 'request', message: 'let me help' }, 117);
     assert(rq.result.isError !== true, `request: ${rq.result.content?.[0]?.text}`);
-    const ls = await A.client.call('aimeat_workspace_list_requests', { organism_id: bootOrgId, ws: bootWs.id }, 1171);
+    const ls = await A.client.call('aimeat_workspace_access', { organism_id: bootOrgId, ws: bootWs.id, action: 'list' }, 1171);
     assert((JSON.parse(ls.result.content[0].text).requests || []).some((r: any) => r.requester === B.ownerName && r.status === 'pending'), 'A sees B pending');
-    const ap = await A.client.call('aimeat_workspace_approve_access', { organism_id: bootOrgId, ws: bootWs.id, requester: B.ownerName, decision: 'approve' }, 1172);
+    const ap = await A.client.call('aimeat_workspace_access', { organism_id: bootOrgId, ws: bootWs.id, action: 'decide', requester: B.ownerName, decision: 'approve' }, 1172);
     assert(JSON.parse(ap.result.content[0].text).status === 'approved', 'approved');
 });
 
