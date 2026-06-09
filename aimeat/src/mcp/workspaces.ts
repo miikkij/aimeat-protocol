@@ -43,6 +43,8 @@
  *   v1.7.0 -- 2026-06-09 -- Member roles: _access decide grants a creator-owned viewer|contributor role
  *     (setWsRole/revokeWsRole), and canWriteWs requires the 'contributor' role only (revocable) instead
  *     of the requester's own contribution consent. _access list now returns members + their roles.
+ *   v1.8.0 -- 2026-06-09 -- _read is workspace-level: authorize once on the manifest, then return ALL
+ *     content (not per record), so every member of a shared workspace sees each other's contributions.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { randomUUID } from 'node:crypto';
@@ -233,20 +235,22 @@ export function registerWorkspaceTools(
         async ({ organism_id, ws }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const root = wsRoot(organism_id, ws);
-            // Aggregate across all member identities, then access-filter: own records pass; others go
-            // through the consent guard (so a member who was granted access reads the shared workspace).
+            // A workspace is SHARED: authorization is at the workspace level, not per record. If the caller
+            // can read the manifest (creator / same-owner agent / a viewer|contributor grant), they see ALL
+            // of the workspace's content whoever wrote it — so a contributor's writes are visible to the
+            // creator + other members. Otherwise nothing (org membership alone is discovery-only).
             const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 5000 });
-            const mine: MemoryRecord[] = [];
-            for (const r of items) {
-                // Own records + SAME-OWNER records (the owner's other agents' workspace writes) pass
-                // directly — an agent is its owner's tool, so it reads the owner's workspace and the
-                // owner reads its agents' writes. Cross-owner records still need the consent guard.
-                if (r.ownerGaii === ownerGhii || isSameOwner(r.ownerGaii, ownerGhii)) { mine.push(r); continue; }
-                const d = await authorizeRead(storage, config, { ownerGaii: r.ownerGaii, accessorGaii: ownerGhii, resourceKey: r.key, visibility: r.visibility, groupId: r.groupId, action: 'read' });
-                if (d.allowed) mine.push(r);
+            const manRec = items.find(r => r.key === `${root}.meta.manifest`);
+            let canRead = false;
+            if (manRec) {
+                canRead = manRec.ownerGaii === ownerGhii || isSameOwner(manRec.ownerGaii, ownerGhii);
+                if (!canRead) {
+                    const d = await authorizeRead(storage, config, { ownerGaii: manRec.ownerGaii, accessorGaii: ownerGhii, resourceKey: manRec.key, visibility: manRec.visibility, groupId: manRec.groupId, action: 'read' });
+                    canRead = d.allowed;
+                }
             }
-            const manRec = mine.find(r => r.key === `${root}.meta.manifest`);
-            if (!manRec) return fail(`No manifest at ${root}.meta.manifest — empty workspace, wrong ws id, or no access (request access with aimeat_workspace_request_access).`);
+            if (!manRec || !canRead) return fail(`No manifest at ${root}.meta.manifest — empty workspace, wrong ws id, or no access (request access with aimeat_workspace_access).`);
+            const mine: MemoryRecord[] = items;   // workspace-level read: a reader sees ALL content
             const manifest = manRec.value as Manifest;
             const objects: Record<string, unknown[]> = {};
             const drafts: Record<string, unknown[]> = {};

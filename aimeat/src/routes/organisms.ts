@@ -34,6 +34,9 @@
  *     (read+write), as creator-owned consents. POST /:id/workspace-access/grant + /revoke; decide now
  *     assigns a role; GET /:id/workspace-access returns members + roles. Write requires the contributor
  *     role (revocable), so a creator can manage who writes.
+ *   v1.10.0 -- 2026-06-09 -- Workspace-level read: GET /:id/workspace authorizes once on the manifest
+ *     (creator / same-owner / a viewer|contributor grant) and then returns ALL content, not per record —
+ *     so a contributor's writes are visible to the creator + every member of a shared workspace.
  */
 import { Router, raw, type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -573,26 +576,25 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const ws = typeof req.query.ws === 'string' ? req.query.ws : undefined;
     const nsRoot = ws ? `organism.${id}.w.${ws}.` : `organism.${id}.`;
 
-    // Enumerate the whole workspace by key prefix across all member identities, then
-    // access-filter: own records pass directly; others go through the shared read guard.
+    // A workspace is SHARED: authorization is at the workspace level, not per record. If the caller can
+    // read the manifest (they created it, are a same-owner agent, or hold a viewer/contributor grant —
+    // see authorizeRead/the workspace-role consents), they see ALL of the workspace's content, whoever
+    // wrote it — so a contributor's writes are visible to the creator + other members. If not, they see
+    // nothing (org membership alone is discovery-only). The manifest is the single gate record.
     const { items } = await storage.listAllMemory({ prefix: nsRoot, limit: 5000 });
-    const readable: MemoryRecord[] = [];
-    for (const rec of items) {
-      // Own records pass directly. A SAME-OWNER record (the workspace was created by this caller's
-      // owner, or by a sibling agent of the same owner) also passes: an agent is its owner's tool, so
-      // it sees the owner's workspace exactly as the owner does — and the owner sees its agents' writes.
-      // Cross-owner records still go through the shared read guard (creator-gated content).
-      if (rec.ownerGaii === callerGaii || isSameOwner(rec.ownerGaii, callerGaii)) { readable.push(rec); continue; }
-      const decision = await authorizeRead(storage, config, {
-        ownerGaii: rec.ownerGaii,
-        accessorGaii: callerGaii,
-        resourceKey: rec.key,
-        visibility: rec.visibility,
-        groupId: rec.groupId,
-        action: 'read',
-      });
-      if (decision.allowed) readable.push(rec);
+    const manRec = items.find(r => r.key === `${nsRoot}meta.manifest`);
+    let canReadWorkspace = false;
+    if (manRec) {
+      canReadWorkspace = manRec.ownerGaii === callerGaii || isSameOwner(manRec.ownerGaii, callerGaii);
+      if (!canReadWorkspace) {
+        const decision = await authorizeRead(storage, config, {
+          ownerGaii: manRec.ownerGaii, accessorGaii: callerGaii, resourceKey: manRec.key,
+          visibility: manRec.visibility, groupId: manRec.groupId, action: 'read',
+        });
+        canReadWorkspace = decision.allowed;
+      }
     }
+    const readable: MemoryRecord[] = canReadWorkspace ? items : [];
     const byKey = new Map(readable.map(r => [r.key, r]));
 
     const manifestRec = byKey.get(`${nsRoot}meta.manifest`);

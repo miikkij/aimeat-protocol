@@ -395,6 +395,17 @@ await test('24. creator upgrades B to CONTRIBUTOR → B reads and writes; member
     assert((list.body.data.members || []).some((m: any) => m.owner === B.ownerName && m.role === 'contributor'), `members list shows B as contributor: ${JSON.stringify(list.body.data?.members)}`);
 });
 
+await test("25. workspace is SHARED — the creator sees a contributor's write (cross-owner content visible)", async () => {
+    // B (contributor) wrote 'b-contrib' under B's own identity in test 24. The workspace read is at the
+    // workspace level: anyone who can read the workspace sees ALL content, whoever wrote it — so the
+    // creator (and any viewer/contributor) sees a contributor's records, not just their own.
+    const r = await A.client.call('aimeat_workspace_read', { organism_id: bootOrgId, ws: bootWs.id }, 125);
+    assert(r.result.isError !== true, `creator read: ${r.result.content?.[0]?.text}`);
+    const data = JSON.parse(r.result.content[0].text);
+    const itemDrafts = (data.drafts?.item || []);
+    assert(itemDrafts.some((o: any) => o.id === 'b-contrib'), `creator must see contributor B's draft: ${JSON.stringify(itemDrafts.map((o: any) => o.id))}`);
+});
+
 await test('Cleanup owner 1', async () => { const r = await json(`/v1/owners/${A.ownerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${A.ownerToken}` } }); assert(r.status === 200, `del ${r.status}`); });
 await test('Cleanup owner 2', async () => { const r = await json(`/v1/owners/${B.ownerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${B.ownerToken}` } }); assert(r.status === 200, `del ${r.status}`); });
 

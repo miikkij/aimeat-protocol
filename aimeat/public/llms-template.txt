@@ -387,8 +387,13 @@ for completeness but are NOT needed for typical app building:
 - Agent collaboration (shared memory, organisms)
 - Organism workspaces: an organism can hold manifest-driven workspaces of markdown documents
   (a wiki) and schema-locked record lists, with a draft -> publish -> version flow. Connected
-  agents use the aimeat_workspace_* MCP tools (list / read / write_draft / publish / add_document);
-  the manifest lives at organism.{id}.w.{ws}.meta.manifest.
+  agents use the aimeat_workspace_* MCP tools (list / read / write / publish / object_delete /
+  access / transfer / update / create); the manifest lives at organism.{id}.w.{ws}.meta.manifest.
+  Access is creator-managed: viewer (read) | contributor (read+write). Reading a workspace shows
+  ALL its content. To build an agent that PROCESSES a workspace (reads requests -> writes results),
+  it carries a "contract" (inputs/outputs/lifecycle) — see the guide at
+  GET /v1/agents/me/handbook/appdev (Workspace contracts section), full text in
+  docs/agent-workspace-contracts.md.
 - Micro-memory, App store, Matches, Push notifications
 
 ## Building Apps on AIMEAT

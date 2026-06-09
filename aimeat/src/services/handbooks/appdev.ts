@@ -4,6 +4,8 @@
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
  *   v1.0.0 -- 2026-05-30 -- Initial appdev-surface handbook
+ *   v1.1.0 -- 2026-06-09 -- Add the Organism workspaces & agent-contracts section (points to
+ *     docs/agent-workspace-contracts.md) so workspace-processing agents are built to the convention.
  */
 
 export const APPDEV_HANDBOOK = `# AIMEAT — App-Dev Surface Handbook
@@ -39,6 +41,22 @@ manifest.yaml + libs/) · \`aimeat_cortex_activate\` · \`aimeat_cortex_deactiva
 2. Install/publish via the matching tool (prefer presigned upload — keeps bytes out of context).
 3. Activate (extensions/cortex) and verify with the \`_list\`/\`_get\` tool.
 4. Iterate; bump versions on apps.
+
+## Organism workspaces & agent contracts
+You also create + provision organism **workspaces** on this surface: \`aimeat_organism_create\` (the
+container) · \`aimeat_workspace_create\` (manifest + locked schemas) · \`aimeat_workspace_update\` (evolve
+the structure — add/remove a space, set the publish gate) · \`aimeat_workspace_read\`/\`_list\`/\`_write\`/
+\`_publish\`/\`_object_delete\` · \`aimeat_workspace_access\` (manage **viewer**/**contributor** roles) ·
+\`aimeat_workspace_transfer\` (export/import).
+
+**Building a workspace-PROCESSING agent (one that reads requests + writes results)?** It owns a
+**contract**: the spaces it READS (inputs) + WRITES (outputs) + the status lifecycle. Attaching it =
+**provision** the contract's spaces into the workspace (read → union the manifest → \`workspace_update\`;
+manifest edits are creator-only, so a *same-owner* agent self-provisions, otherwise the creator does it)
++ **grant** the agent the \`contributor\` role. Writes are attributed to the agent (it appears in
+"Who works here" + the activity heatmap) and are visible to the whole workspace. Full guide — machine-
+readable contract template, exact provision calls, the processing loop, schema rules:
+**\`docs/agent-workspace-contracts.md\`**. Read it before building such an agent.
 
 ## Layer rules (critical — see the appdev/mcp handbook modules)
 - Extensions own \`ext:{name}\` memory; read owner data via \`ctx.memory.getPublic(ctx.caller.gaii, key)\`.
