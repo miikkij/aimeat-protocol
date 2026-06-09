@@ -12,6 +12,9 @@
  *   v1.1.0 -- 2026-06-07 -- Key the membership lookup by bare owner name (was full GHII → 403'd members).
  *   v1.2.0 -- 2026-06-09 -- A same-owner agent (the workspace creator's own agent) bypasses the consent
  *     check, like the human owner session — so a CrewAI sub-agent can write to its owner's workspace.
+ *   v1.3.0 -- 2026-06-09 -- Workspace CONTENT writes require the creator's 'contributor' role grant only
+ *     (revocable); 'viewer' is read-only. Flat organism namespaces still use the writer's own contribution
+ *     consent. Splits the consent check by workspace key vs flat key.
  */
 import type { RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -111,18 +114,19 @@ export function workspaceAccessMiddleware(
     // could not write to its owner's organism workspace at all. Cross-owner member agents still need a
     // granted 'workspace-contribution' consent. Scoped to workspace keys (organism.{id}.w.{ws}.*).
     let isOwnWorkspaceAgent = false;
+    let wsCreator: string | null = null;
     const wsMatch = key.match(/^organism\.[^.]+\.w\.([^.]+)\./);
-    if (wsMatch && !isHumanOwnerSession) {
-      const ws = wsMatch[1];
+    const wsId = wsMatch ? wsMatch[1] : null;
+    if (wsId && !isHumanOwnerSession) {
       const regKey = `organism.${organismId}.meta.workspaces`;
       const { items } = await storage.listAllMemory({ prefix: regKey, limit: 1000 });
       for (const rec of items) {
         if (rec.key !== regKey) continue;
         const list = (rec.value as { workspaces?: Array<{ id: string; createdBy?: string }> } | null)?.workspaces ?? [];
-        const entry = list.find(w => w.id === ws);
+        const entry = list.find(w => w.id === wsId);
         if (entry) {
-          const createdBy = entry.createdBy ?? (rec.ownerGaii.includes('#') ? rec.ownerGaii.split('#')[1] : rec.ownerGaii).split('@')[0];
-          if (createdBy === ownerName) isOwnWorkspaceAgent = true;
+          wsCreator = entry.createdBy ?? (rec.ownerGaii.includes('#') ? rec.ownerGaii.split('#')[1] : rec.ownerGaii).split('@')[0];
+          if (wsCreator === ownerName) isOwnWorkspaceAgent = true;
           break;
         }
       }
@@ -133,24 +137,29 @@ export function workspaceAccessMiddleware(
     const needsConsent = !isOwnMemberNamespace && !isHumanOwnerSession && !isOwnWorkspaceAgent;
 
     if (needsConsent) {
-      // The workspace-contribution consent (created when the member requested access) is owned by the
-      // identity that made the request: the member's OWNER GHII (owner/MCP-serve session) OR one of
-      // their agents (agent/connector path). Check BOTH, so an approved member writes through any path —
-      // otherwise an approved member could read but not write via their agent (the consent was under the
-      // owner GHII). Membership is by bare owner name, so this stays per-owner.
-      const ownerGhii = `${ownerName}@${config.nodeId}`;
-      const agents = await storage.getAgentsByOwner(ownerName);
-      const accessors = [ownerGhii, ...agents.map(a => a.gaii)];
-
-      // Check if the owner (or ANY of their agents) holds a matching active consent.
-      const accessorPattern = `organism.${organismId}`;
       let hasConsent = false;
 
-      for (const accessor of accessors) {
-        const matching = await storage.findMatchingConsents(accessor, key, accessorPattern);
-        if (matching.length > 0) {
-          hasConsent = true;
-          break;
+      if (wsId) {
+        // Workspace CONTENT (organism.{id}.w.{ws}.*): write requires the creator's 'contributor' ROLE
+        // grant — and only that, so the creator can revoke write by removing the grant. A 'viewer' grant
+        // gives read only (not matched here). The role is granted to the OWNER (recipient ghii:owner@node),
+        // so all the owner's agents inherit it. (Unlike the writer's own request-time consent, a
+        // creator-owned grant is revocable by the creator.)
+        if (wsCreator) {
+          const creatorGhii = `${wsCreator}@${config.nodeId}`;
+          const recipient = `ghii:${ownerName}@${config.nodeId}`;
+          const pattern = `organism.${organismId}.w.${wsId}.**`;
+          const grants = await storage.listConsents(creatorGhii, { status: 'active' });
+          hasConsent = grants.some(c => c.purpose === 'workspace-contributor' && c.dataPattern === pattern && c.recipient === recipient);
+        }
+      } else {
+        // Flat organism namespace (organism.{id}.shared.* etc.): the writer's own contribution consent,
+        // owned by the member's OWNER GHII or one of their agents (whichever made the grant).
+        const ownerGhii = `${ownerName}@${config.nodeId}`;
+        const agents = await storage.getAgentsByOwner(ownerName);
+        const accessorPattern = `organism.${organismId}`;
+        for (const accessor of [ownerGhii, ...agents.map(a => a.gaii)]) {
+          if ((await storage.findMatchingConsents(accessor, key, accessorPattern)).length > 0) { hasConsent = true; break; }
         }
       }
 

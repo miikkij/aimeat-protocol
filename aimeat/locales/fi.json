@@ -6194,5 +6194,14 @@
     "exportJson": "Vie JSON",
     "copyMarkdown": "Kopioi Markdownina",
     "copied": "Kopioitu!"
+  },
+  "pwv": {
+    "loading": "Ladataan…",
+    "sharedDocuments": "Jaetut dokumentit",
+    "publicBadge": "Julkinen dokumentti",
+    "print": "Tulosta / Tallenna PDF:nä",
+    "selectDocument": "Valitse dokumentti.",
+    "unavailableTitle": "Ei näytettävää",
+    "unavailableDesc": "Tällä työtilalla ei ole julkisesti jaettuja dokumentteja, tai linkki on puutteellinen."
   }
 }

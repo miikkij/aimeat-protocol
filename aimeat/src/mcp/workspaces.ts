@@ -36,6 +36,13 @@
  *   v1.5.0 -- 2026-06-09 -- Every mutating tool (_write/_publish/_update/_object_delete/_create/_access
  *     request+decide/_transfer import) now emitChange('organisms') so an open workspace view live-updates
  *     over SSE when an agent changes it (the REST org routes already emit; the MCP path was silent).
+ *   v1.6.0 -- 2026-06-09 -- Attribution: content drafts + published versions are authored under the
+ *     calling AGENT's GAII (writerGaii), not ownerGhii — so the activity feed + participants attribute
+ *     an agent's work to the agent. Meta (manifest/registry/schemas/sections) stays under ownerGhii;
+ *     writes reuse an existing record's owner (findByKey) to avoid a duplicate under a second identity.
+ *   v1.7.0 -- 2026-06-09 -- Member roles: _access decide grants a creator-owned viewer|contributor role
+ *     (setWsRole/revokeWsRole), and canWriteWs requires the 'contributor' role only (revocable) instead
+ *     of the requester's own contribution consent. _access list now returns members + their roles.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { randomUUID } from 'node:crypto';
@@ -70,6 +77,11 @@ export function registerWorkspaceTools(
     const parsed = parseGAII(agentGaii);
     const ownerName = parsed ? parsed.owner : agentGaii;
     const ownerGhii = `${ownerName}@${config.nodeId}`;
+    // The identity that AUTHORS content: an agent's own GAII when an agent is calling (so the activity
+    // feed + participants attribute the work to the AGENT, not its owner — the MCP-serve path used to
+    // write everything under ownerGhii, collapsing every agent action onto the owner), else the owner
+    // GHII. Workspace META (manifest / registry / schemas / sections) stays under ownerGhii.
+    const writerGaii = parsed ? agentGaii : ownerGhii;
     const wsRoot = (orgId: string, ws: string) => `organism.${orgId}.w.${ws}`;
 
     const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
@@ -98,10 +110,20 @@ export function registerWorkspaceTools(
         return m && m.status === 'active' ? null : 'Not an active member of this organism';
     }
 
-    const writeRecord = async (key: string, value: unknown, prev: MemoryRecord | null): Promise<void> => {
+    /** Find an existing record at an EXACT key regardless of which same-owner identity owns it. Memory
+     *  is keyed by (ownerGaii, key), so rewriting under a different identity would create a DUPLICATE;
+     *  the writer reuses the existing record's owner instead. */
+    const findByKey = async (key: string): Promise<MemoryRecord | null> => {
+        const { items } = await storage.listAllMemory({ prefix: key, limit: 5 });
+        return items.find(r => r.key === key) ?? null;
+    };
+    /** Write content. A NEW record is authored by `owner` (defaults to the calling agent — attribution);
+     *  a rewrite preserves the existing record's owner so it doesn't fork into a duplicate. Pass
+     *  `owner: ownerGhii` for workspace META that should stay owned by the creator. */
+    const writeRecord = async (key: string, value: unknown, prev: MemoryRecord | null, owner: string = writerGaii): Promise<void> => {
         const now = new Date().toISOString();
         await storage.setMemory({
-            key, ownerGaii: ownerGhii, value, visibility: 'private', tags: [], ttlHours: null,
+            key, ownerGaii: prev?.ownerGaii ?? owner, value, visibility: prev?.visibility ?? 'private', tags: prev?.tags ?? [], ttlHours: null,
             version: prev ? prev.version + 1 : 1, createdAt: prev?.createdAt ?? now, updatedAt: now,
         });
     };
@@ -140,12 +162,14 @@ export function registerWorkspaceTools(
         const entry = await findWsEntry(orgId, ws);
         if (!entry) return true;                              // no registry yet (bootstrap) — membership already checked
         if (entry.createdBy === ownerName) return true;      // the workspace's own creator (or its agent)
-        const accessors = [ownerGhii, ...(await storage.getAgentsByOwner(ownerName)).map(a => a.gaii)];
-        const probeKey = `organism.${orgId}.w.${ws}.x`;      // matches a contribution consent's organism.{id}.w.{ws}.** pattern
-        for (const acc of accessors) {
-            if ((await storage.findMatchingConsents(acc, probeKey, `organism.${orgId}`)).length > 0) return true;
-        }
-        return false;
+        // Write requires the creator's 'contributor' role grant — and ONLY that, so the creator can
+        // revoke write by removing the grant. A 'viewer' grant gives read only (not matched here). The
+        // role is granted to the OWNER (recipient ghii:owner@node), so all the owner's agents inherit it.
+        const creatorGhii = `${entry.createdBy}@${config.nodeId}`;
+        const myRecipient = `ghii:${ownerName}@${config.nodeId}`;
+        const pattern = `organism.${orgId}.w.${ws}.**`;
+        const grants = await storage.listConsents(creatorGhii, { status: 'active' });
+        return grants.some(c => c.purpose === 'workspace-contributor' && c.dataPattern === pattern && c.recipient === myRecipient);
     };
     /** Create a consent grant if no equivalent active one exists (idempotent). */
     const ensureConsent = async (owner: string, dataPattern: string, recipient: string, purpose: string): Promise<void> => {
@@ -153,6 +177,24 @@ export function registerWorkspaceTools(
         if (existing.some(c => c.dataPattern === dataPattern && c.recipient === recipient)) return;
         const now = new Date().toISOString();
         await storage.createConsent({ id: randomUUID(), ownerGaii: owner, dataPattern, recipient, purpose, scope: 'private', expires: null, status: 'active', grantedAt: now, revokedAt: null });
+    };
+    // ── Workspace member roles (mirrors the REST routes): viewer = read, contributor = read+write,
+    //    as a consent the workspace CREATOR owns on organism.{id}.w.{ws}.**. See the routes for the model. ──
+    const WS_ROLE_PURPOSES = ['workspace-viewer', 'workspace-contributor', 'workspace-access'];
+    const setWsRole = async (creatorGhii: string, orgId: string, ws: string, granteeOwner: string, role: 'viewer' | 'contributor'): Promise<void> => {
+        const recipient = `ghii:${granteeOwner}@${config.nodeId}`;
+        const pattern = `organism.${orgId}.w.${ws}.**`;
+        const now = new Date().toISOString();
+        const prior = (await storage.listConsents(creatorGhii, { status: 'active' })).filter(c => c.dataPattern === pattern && c.recipient === recipient && WS_ROLE_PURPOSES.includes(c.purpose));
+        for (const g of prior) await storage.updateConsent(g.id, { status: 'revoked', revokedAt: now });
+        await storage.createConsent({ id: randomUUID(), ownerGaii: creatorGhii, dataPattern: pattern, recipient, purpose: role === 'contributor' ? 'workspace-contributor' : 'workspace-viewer', scope: 'private', expires: null, status: 'active', grantedAt: now, revokedAt: null });
+    };
+    const revokeWsRole = async (creatorGhii: string, orgId: string, ws: string, granteeOwner: string): Promise<void> => {
+        const recipient = `ghii:${granteeOwner}@${config.nodeId}`;
+        const pattern = `organism.${orgId}.w.${ws}.**`;
+        const now = new Date().toISOString();
+        const grants = (await storage.listConsents(creatorGhii, { status: 'active' })).filter(c => c.dataPattern === pattern && c.recipient === recipient && WS_ROLE_PURPOSES.includes(c.purpose));
+        for (const g of grants) await storage.updateConsent(g.id, { status: 'revoked', revokedAt: now });
     };
 
     // ── aimeat_workspace_list ──
@@ -262,13 +304,13 @@ export function registerWorkspaceTools(
             const v = coerceValue(value, instanceId);
             const valid = await validateMemoryWrite(key, v, storage);
             if (!valid.valid) return fail('Draft rejected by schema: ' + JSON.stringify(valid.errors));
-            await writeRecord(key, v, await storage.getMemory(ownerGhii, key));
+            await writeRecord(key, v, await findByKey(key));   // content → authored by the calling agent
             if (isDoc && section) {
                 const secKey = `${root}.meta.sections.${ot.name}`;
-                const secRec = await storage.getMemory(ownerGhii, secKey);
+                const secRec = await findByKey(secKey);
                 const sections = ((secRec?.value as { sections?: { id: string; name?: string; documents?: string[] }[] } | undefined)?.sections) ?? [];
                 const target = sections.find(s => s.id === section || s.name === section);
-                if (target) { target.documents = [...(target.documents ?? []).filter(d => d !== instanceId), instanceId]; await writeRecord(secKey, { sections }, secRec); }
+                if (target) { target.documents = [...(target.documents ?? []).filter(d => d !== instanceId), instanceId]; await writeRecord(secKey, { sections }, secRec, ownerGhii); }  // section tree = creator meta
             }
             emitChange('organisms');
             return ok({ written: key, id: instanceId, space, mode: ot.mode ?? 'records', section: section ?? null });
@@ -296,9 +338,12 @@ export function registerWorkspaceTools(
             const n = maxN + 1;
             const now = new Date().toISOString();
             const tags = draft.tags ?? [];
-            await storage.setMemory({ key: `${base}.version.${n}`, ownerGaii: ownerGhii, value: draft.value, visibility: draft.visibility, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
+            // The published version is attributed to the PUBLISHER (writerGaii). The .latest pointer
+            // preserves any existing record's owner so it doesn't fork into a duplicate (memory is keyed
+            // by (ownerGaii, key)); the per-publish author lives in the immutable .version.N records.
+            await storage.setMemory({ key: `${base}.version.${n}`, ownerGaii: writerGaii, value: draft.value, visibility: draft.visibility, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
             const existingLatest = items.find(r => r.key === `${base}.latest`);
-            await storage.setMemory({ key: `${base}.latest`, ownerGaii: ownerGhii, value: draft.value, visibility: draft.visibility, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
+            await storage.setMemory({ key: `${base}.latest`, ownerGaii: existingLatest?.ownerGaii ?? writerGaii, value: draft.value, visibility: draft.visibility, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
             await storage.deleteMemory(draft.ownerGaii, `${base}.draft`);
             emitChange('organisms');
             return ok({ published: base, version: n });
@@ -364,7 +409,7 @@ export function registerWorkspaceTools(
                     for (const s of sections) {
                         if ((s.documents ?? []).includes(id)) { s.documents = (s.documents ?? []).filter(d => d !== id); changed = true; }
                     }
-                    if (changed) await writeRecord(secKey, { sections }, secRec);
+                    if (changed) await writeRecord(secKey, { sections }, secRec, ownerGhii);  // section tree = creator meta
                 }
             }
             emitChange('organisms');
@@ -402,15 +447,15 @@ export function registerWorkspaceTools(
             const mkey = `${root}.meta.manifest`;
             const valid = await validateMemoryWrite(mkey, manifestValue, storage);
             if (!valid.valid) return fail('Manifest rejected by schema: ' + JSON.stringify(valid.errors));
-            await writeRecord(mkey, manifestValue, null);
+            await writeRecord(mkey, manifestValue, null, ownerGhii);          // manifest = creator meta
             // 3. Readme.
             const summary = (man as Record<string, unknown>).summary;
-            await writeRecord(`${root}.meta.readme`, readme || `# ${String(man.name || name)}\n\n${typeof summary === 'string' ? summary : ''}`, null);
+            await writeRecord(`${root}.meta.readme`, readme || `# ${String(man.name || name)}\n\n${typeof summary === 'string' ? summary : ''}`, null, ownerGhii);
             // 4. Register in the workspace registry.
             const regKey = `organism.${organism_id}.meta.workspaces`;
             const regRec = await storage.getMemory(ownerGhii, regKey);
             const workspaces = ((regRec?.value as { workspaces?: unknown[] } | undefined)?.workspaces) ?? [];
-            await writeRecord(regKey, { workspaces: [...workspaces, { id: wsId, name: String(name || 'Workspace').trim() || 'Workspace', createdAt: now, createdBy: ownerName }] }, regRec);
+            await writeRecord(regKey, { workspaces: [...workspaces, { id: wsId, name: String(name || 'Workspace').trim() || 'Workspace', createdAt: now, createdBy: ownerName }] }, regRec, ownerGhii);
             emitChange('organisms');
             return ok({ created: true, ws: wsId, types: man.objectTypes.map(o => o.name), schemas_locked: Object.keys(schemaMap) });
         });
@@ -433,7 +478,7 @@ export function registerWorkspaceTools(
 
             if (action === 'request') {
                 if (entry.createdBy === ownerName) return fail('You created this workspace.');
-                await writeRecord(`organism.${organism_id}.w.${ws}.access.request.${ownerName}`, { ws, requester: ownerName, requester_gaii: ownerGhii, message: message ?? '', status: 'pending', createdAt: new Date().toISOString() }, null);
+                await writeRecord(`organism.${organism_id}.w.${ws}.access.request.${ownerName}`, { ws, requester: ownerName, requester_gaii: ownerGhii, message: message ?? '', status: 'pending', createdAt: new Date().toISOString() }, null, ownerGhii);
                 await ensureConsent(ownerGhii, `organism.${organism_id}.w.${ws}.**`, `organism.${organism_id}`, 'workspace-contribution');
                 emitChange('organisms');
                 return ok({ status: 'requested', ws, workspace_creator: entry.createdBy });
@@ -441,30 +486,36 @@ export function registerWorkspaceTools(
             if (action === 'list') {
                 if (!(await isManager())) return fail('Only the workspace creator or an org admin can see access requests.');
                 const creatorGhii = `${entry.createdBy}@${config.nodeId}`;
-                const grants = (await storage.listConsents(creatorGhii, { status: 'active' })).filter(c => c.dataPattern === `organism.${organism_id}.w.${ws}.**` && c.purpose === 'workspace-access');
-                const approved = new Set(grants.map(c => c.recipient));
+                const roleByOwner = new Map<string, 'viewer' | 'contributor'>();
+                for (const c of await storage.listConsents(creatorGhii, { status: 'active' })) {
+                    if (c.dataPattern !== `organism.${organism_id}.w.${ws}.**` || !WS_ROLE_PURPOSES.includes(c.purpose)) continue;
+                    const o = c.recipient.replace(/^ghii:/, '').split('@')[0];
+                    if (c.purpose === 'workspace-contributor') roleByOwner.set(o, 'contributor');
+                    else if (!roleByOwner.has(o)) roleByOwner.set(o, 'viewer');
+                }
                 const { items } = await storage.listAllMemory({ prefix: `organism.${organism_id}.w.${ws}.access.request.`, limit: 1000 });
                 const requests = items.map(r => {
                     const v = r.value as { requester?: string; message?: string; createdAt?: string };
                     const req = v.requester ?? bareOwner(r.ownerGaii);
-                    return { requester: req, message: v.message ?? '', created_at: v.createdAt, status: approved.has(`ghii:${req}@${config.nodeId}`) ? 'approved' : 'pending' };
+                    return { requester: req, message: v.message ?? '', created_at: v.createdAt, status: roleByOwner.has(req) ? 'approved' : 'pending', role: roleByOwner.get(req) ?? null };
                 });
-                return ok({ ws, requests });
+                const members = [...roleByOwner.entries()].map(([owner, role]) => ({ owner, role }));
+                return ok({ ws, requests, members });
             }
             if (action === 'decide') {
                 if (!requester) return fail("action='decide' needs a requester.");
                 if (!(await isManager())) return fail('Only the workspace creator or an org admin can decide access.');
-                const recipient = `ghii:${requester}@${config.nodeId}`;
-                const pattern = `organism.${organism_id}.w.${ws}.**`;
+                // Grants are owned by the workspace CREATOR (so reads resolve via the content owner).
+                const creatorGhii = `${entry.createdBy}@${config.nodeId}`;
                 if (decision === 'deny') {
-                    const grants = (await storage.listConsents(ownerGhii, { status: 'active' })).filter(c => c.dataPattern === pattern && c.recipient === recipient && c.purpose === 'workspace-access');
-                    for (const g of grants) await storage.updateConsent(g.id, { status: 'revoked', revokedAt: new Date().toISOString() });
+                    await revokeWsRole(creatorGhii, organism_id, ws, requester);
                     emitChange('organisms');
                     return ok({ status: 'denied', ws, requester });
                 }
-                await ensureConsent(ownerGhii, pattern, recipient, 'workspace-access');
+                const role = decision === 'viewer' ? 'viewer' : 'contributor';   // approve|contributor → contributor
+                await setWsRole(creatorGhii, organism_id, ws, requester, role);
                 emitChange('organisms');
-                return ok({ status: 'approved', ws, requester });
+                return ok({ status: 'approved', ws, requester, role });
             }
             return fail("action must be 'request', 'list' or 'decide'.");
         });

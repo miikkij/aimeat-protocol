@@ -26,8 +26,16 @@
  *     { zip_base64 }). See services/workspace-export.ts + workspace-import.ts.
  *   v1.7.0 -- 2026-06-09 -- Organism-level bundle: GET /:id/export (whole organism + all workspaces)
  *     + POST /organisms/import (restore as a NEW organism). See services/organism-export+import.ts.
+ *   v1.8.0 -- 2026-06-09 -- Document-space public sharing: meta.share record + GET/PUT
+ *     /:id/workspace/share (member reads, creator/admin writes) and NO-AUTH GET
+ *     /:id/workspace/public/documents + /public/document (?format=md), serving only PUBLISHED docs
+ *     the share meta marks public. Backs the public HTML markdown viewer.
+ *   v1.9.0 -- 2026-06-09 -- Creator-managed workspace member roles: viewer (read) | contributor
+ *     (read+write), as creator-owned consents. POST /:id/workspace-access/grant + /revoke; decide now
+ *     assigns a role; GET /:id/workspace-access returns members + roles. Write requires the contributor
+ *     role (revocable), so a creator can manage who writes.
  */
-import { Router, raw } from 'express';
+import { Router, raw, type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord, PendingApprovalRecord } from '../storage/interface.js';
@@ -798,6 +806,121 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     await storage.createConsent({ id: uuidv4(), ownerGaii, dataPattern, recipient, purpose, scope: 'private', expires: null, status: 'active', grantedAt: now, revokedAt: null });
   };
 
+  /* ══ Workspace member roles (creator-managed) ══
+   * A workspace creator grants approved members one of two roles, as a consent the creator OWNS on
+   * organism.{id}.w.{ws}.** (so reads resolve via the creator + revoking is clean):
+   *   - viewer       → read only          (purpose 'workspace-viewer')
+   *   - contributor  → read + write       (purpose 'workspace-contributor')
+   * Reads honor ANY grant (viewer/contributor + the legacy 'workspace-access'); writes honor contributor
+   * (the write gate also accepts the legacy requester-owned 'workspace-contribution'). Members are an
+   * OWNER (+ their agents): the recipient is `ghii:owner@node`, so all the owner's agents inherit. */
+  const WS_ROLE_PURPOSES = ['workspace-viewer', 'workspace-contributor', 'workspace-access'];
+  const wsPattern = (id: string, ws: string) => `organism.${id}.w.${ws}.**`;
+  const recipientOf = (grantee: string) => `ghii:${parseGaiiLoose(grantee).owner || grantee}@${config.nodeId}`;
+  /** Set a member's role: revoke any prior workspace-role consent for them, then grant the new one. */
+  const setWorkspaceRole = async (creatorGhii: string, id: string, ws: string, grantee: string, role: 'viewer' | 'contributor'): Promise<string> => {
+    const recipient = recipientOf(grantee);
+    const pattern = wsPattern(id, ws);
+    const now = new Date().toISOString();
+    const prior = (await storage.listConsents(creatorGhii, { status: 'active' })).filter(c => c.dataPattern === pattern && c.recipient === recipient && WS_ROLE_PURPOSES.includes(c.purpose));
+    for (const g of prior) await storage.updateConsent(g.id, { status: 'revoked', revokedAt: now });
+    await storage.createConsent({ id: uuidv4(), ownerGaii: creatorGhii, dataPattern: pattern, recipient, purpose: role === 'contributor' ? 'workspace-contributor' : 'workspace-viewer', scope: 'private', expires: null, status: 'active', grantedAt: now, revokedAt: null });
+    return recipient;
+  };
+  const revokeWorkspaceRole = async (creatorGhii: string, id: string, ws: string, grantee: string): Promise<number> => {
+    const recipient = recipientOf(grantee);
+    const pattern = wsPattern(id, ws);
+    const now = new Date().toISOString();
+    const grants = (await storage.listConsents(creatorGhii, { status: 'active' })).filter(c => c.dataPattern === pattern && c.recipient === recipient && WS_ROLE_PURPOSES.includes(c.purpose));
+    for (const g of grants) await storage.updateConsent(g.id, { status: 'revoked', revokedAt: now });
+    return grants.length;
+  };
+  /** Map the creator's active grants → each member's current role for a workspace. */
+  const memberRolesForWs = async (creatorGhii: string, id: string, ws: string): Promise<Map<string, 'viewer' | 'contributor'>> => {
+    const pattern = wsPattern(id, ws);
+    const byOwner = new Map<string, 'viewer' | 'contributor'>();
+    for (const c of await storage.listConsents(creatorGhii, { status: 'active' })) {
+      if (c.dataPattern !== pattern || !WS_ROLE_PURPOSES.includes(c.purpose)) continue;
+      const owner = c.recipient.replace(/^ghii:/, '').split('@')[0];
+      if (c.purpose === 'workspace-contributor') byOwner.set(owner, 'contributor');
+      else if (!byOwner.has(owner)) byOwner.set(owner, 'viewer');
+    }
+    return byOwner;
+  };
+
+  /* ══ Document-space public sharing (meta.share) ══
+   * A workspace's document-space content can be shared read-only without login. The single source of
+   * truth is one record per workspace, organism.{id}.w.{ws}.meta.share, with shape
+   *   { public?: boolean, spaces?: { [typeName]: boolean }, docs?: { [`${typeName}/${id}`]: boolean } }.
+   * Resolution for "is doc D in space S public?": docs[`${S}/${D}`] if set, else spaces[S] if set,
+   * else public. Only PUBLISHED (.latest) docs are ever served publicly — drafts never leak. */
+  type ShareMeta = { public?: boolean; spaces?: Record<string, boolean>; docs?: Record<string, boolean> };
+
+  const readShareMeta = async (id: string, ws: string): Promise<Required<ShareMeta>> => {
+    const key = `organism.${id}.w.${ws}.meta.share`;
+    const { items } = await storage.listAllMemory({ prefix: key, limit: 10 });
+    const v = (items.find(r => r.key === key)?.value as ShareMeta | undefined) ?? {};
+    return { public: !!v.public, spaces: v.spaces ?? {}, docs: v.docs ?? {} };
+  };
+
+  const isDocPublic = (share: Required<ShareMeta>, typeName: string, docId: string): boolean => {
+    const docKey = `${typeName}/${docId}`;
+    if (docKey in share.docs) return !!share.docs[docKey];
+    if (typeName in share.spaces) return !!share.spaces[typeName];
+    return !!share.public;
+  };
+
+  /** Read a workspace's manifest value regardless of which member owns it (public path — no auth). */
+  const readWsManifestValue = async (id: string, ws: string): Promise<Record<string, unknown> | null> => {
+    const key = `organism.${id}.w.${ws}.meta.manifest`;
+    const { items } = await storage.listAllMemory({ prefix: key, limit: 10 });
+    return (items.find(r => r.key === key)?.value as Record<string, unknown> | undefined) ?? null;
+  };
+
+  type PublicDoc = { type: string; id: string; title: string; markdown: string };
+  /** Collect the PUBLISHED (.latest) document-space pages that the share meta marks public. An optional
+   *  filter narrows to one {type,id}. Drafts/versions are never included. */
+  const collectPublicDocs = async (
+    id: string, ws: string, share: Required<ShareMeta>, filter?: { type: string; id: string },
+  ): Promise<PublicDoc[]> => {
+    const manifest = await readWsManifestValue(id, ws);
+    if (!manifest) return [];
+    const objectTypes = (manifest.objectTypes as Array<Record<string, unknown>> | undefined) ?? [];
+    const root = `organism.${id}.w.${ws}`;
+    const out: PublicDoc[] = [];
+    for (const ot of objectTypes) {
+      const name = typeof ot.name === 'string' ? ot.name : undefined;
+      const namespace = typeof ot.namespace === 'string' ? ot.namespace : undefined;
+      if (!name || !namespace || ot.mode !== 'document') continue;
+      if (filter && filter.type !== name) continue;
+      const nsPrefix = `${root}.${namespace}.`;
+      const { items } = await storage.listAllMemory({ prefix: nsPrefix, limit: 5000 });
+      for (const r of items) {
+        if (!r.key.startsWith(nsPrefix)) continue;
+        const parts = r.key.slice(nsPrefix.length).split('.');
+        const docId = parts[0];
+        if (parts.slice(1).join('.') !== 'latest') continue;   // only published
+        if (filter && filter.id !== docId) continue;
+        if (!isDocPublic(share, name, docId)) continue;
+        const v = r.value as Record<string, unknown> | null;
+        out.push({
+          type: name, id: docId,
+          title: (v && typeof v.title === 'string') ? v.title : docId,
+          markdown: (v && typeof v.markdown === 'string') ? v.markdown : '',
+        });
+      }
+    }
+    return out;
+  };
+
+  /** Render a list of public docs as a single markdown document (for ?format=md). */
+  const docsToMarkdown = (wsName: string | undefined, docs: PublicDoc[]): string => {
+    const parts: string[] = [];
+    if (wsName) parts.push(`# ${wsName}\n`);
+    for (const d of docs) { parts.push(`## ${d.title}\n`); parts.push(d.markdown.trim()); parts.push('\n---\n'); }
+    return parts.join('\n');
+  };
+
   /* ── GET /v1/organisms/:id/workspaces — discover every workspace in the org (membership-gated,
    * names + creator + your access status). Discovery is open to members; content stays gated. ── */
   router.get('/v1/organisms/:id/workspaces', requireAuth(), async (req, res) => {
@@ -877,15 +1000,15 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the workspace creator or an org admin can see access requests')); return;
     }
     const creatorGhii = `${createdBy}@${config.nodeId}`;
-    const grants = (await storage.listConsents(creatorGhii, { status: 'active' })).filter(c => c.dataPattern === `organism.${id}.w.${ws}.**` && c.purpose === 'workspace-access');
-    const approved = new Set(grants.map(c => c.recipient));
+    const roles = await memberRolesForWs(creatorGhii, id, ws);   // owner → 'viewer' | 'contributor'
     const { items } = await storage.listAllMemory({ prefix: `organism.${id}.w.${ws}.access.request.`, limit: 1000 });
     const requests = items.map(r => {
       const v = r.value as { requester?: string; message?: string; createdAt?: string };
       const requester = v.requester ?? bareOwner(r.ownerGaii);
-      return { requester, message: v.message ?? '', created_at: v.createdAt, status: approved.has(`ghii:${requester}@${config.nodeId}`) ? 'approved' : 'pending' };
+      return { requester, message: v.message ?? '', created_at: v.createdAt, status: roles.has(requester) ? 'approved' : 'pending', role: roles.get(requester) ?? null };
     });
-    res.json(success(config.nodeId, { ws, requests }));
+    const members = [...roles.entries()].map(([owner, role]) => ({ owner, role }));
+    res.json(success(config.nodeId, { ws, requests, members }));
   });
 
   /* ── POST /v1/organisms/:id/workspace-access/decision — the workspace creator approves or denies a
@@ -908,21 +1031,22 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     if (createdBy !== ownerName && role !== 'creator' && role !== 'admin') {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the workspace creator or an org admin can decide access')); return;
     }
-    const creatorGhii = resolveIdentity(req.auth!, config.nodeId);
-    const recipient = `ghii:${requester}@${config.nodeId}`;
-    const pattern = `organism.${id}.w.${ws}.**`;
+    // Grants are owned by the WORKSPACE CREATOR (not the deciding admin), so reads resolve via the
+    // creator who owns the content. Approve assigns a role (default contributor; the body may ask for
+    // 'viewer'); deny revokes every workspace-role grant for the requester.
+    const wsCreatorGhii = `${createdBy}@${config.nodeId}`;
     if (decision === 'approve') {
-      await ensureConsent(creatorGhii, pattern, recipient, 'workspace-access');
+      const role = (req.body?.role === 'viewer' ? 'viewer' : 'contributor') as 'viewer' | 'contributor';
+      await setWorkspaceRole(wsCreatorGhii, id, ws, requester, role);
       await notify(storage, `${requester}@${config.nodeId}`, {
         type: 'workspace_access_approved',
-        title: `Your access to "${entry.name ?? ws}" was approved`,
+        title: `Your access to "${entry.name ?? ws}" was approved (${role})`,
         link: '/v1/profile#organisms',
       });
       emitChange('notifications');
-      res.json(success(config.nodeId, { status: 'approved', ws, requester }));
+      res.json(success(config.nodeId, { status: 'approved', ws, requester, role }));
     } else {
-      const grants = (await storage.listConsents(creatorGhii, { status: 'active' })).filter(c => c.dataPattern === pattern && c.recipient === recipient && c.purpose === 'workspace-access');
-      for (const g of grants) await storage.updateConsent(g.id, { status: 'revoked', revokedAt: new Date().toISOString() });
+      await revokeWorkspaceRole(wsCreatorGhii, id, ws, requester);
       await notify(storage, `${requester}@${config.nodeId}`, {
         type: 'workspace_access_denied',
         title: `Your access request to "${entry.name ?? ws}" was declined`,
@@ -931,6 +1055,56 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       emitChange('notifications');
       res.json(success(config.nodeId, { status: 'denied', ws, requester }));
     }
+  });
+
+  /** Shared gate for the grant/revoke routes — returns the workspace creator's name, or sends the
+   *  error response and returns null. Only the workspace creator or an org admin may manage access. */
+  const requireWsManager = async (req: Request, res: Response, id: string, ws: unknown): Promise<string | null> => {
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return null; }
+    const callerRole = await memberRole(req, organism, id);
+    if (!callerRole) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return null; }
+    if (!ws || typeof ws !== 'string') { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws is required')); return null; }
+    const entry = await findWsEntry(id, ws);
+    if (!entry) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Workspace not found')); return null; }
+    const createdBy = entry.createdBy ?? bareOwner(entry.ownerGaii);
+    if (createdBy !== req.auth!.owner && callerRole !== 'creator' && callerRole !== 'admin') {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the workspace creator or an org admin can manage access')); return null;
+    }
+    return createdBy;
+  };
+
+  /* ── POST /v1/organisms/:id/workspace-access/grant — creator/admin DIRECTLY adds a member with a role
+   * (no prior request). Body: { ws, grantee, role: 'viewer' | 'contributor' }. grantee may be an owner
+   * name, GHII, or GAII — the grant applies to that OWNER (so all their agents inherit it). ── */
+  router.post('/v1/organisms/:id/workspace-access/grant', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const { ws, grantee, role } = req.body ?? {};
+    if (!grantee || typeof grantee !== 'string' || (role !== 'viewer' && role !== 'contributor')) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', "grantee and role ('viewer' | 'contributor') are required")); return;
+    }
+    const createdBy = await requireWsManager(req, res, id, ws);
+    if (!createdBy) return;
+    const granteeOwner = parseGaiiLoose(grantee).owner || grantee;
+    if (granteeOwner === createdBy) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'The creator already has full access to their workspace')); return; }
+    await setWorkspaceRole(`${createdBy}@${config.nodeId}`, id, ws as string, grantee, role);
+    await notify(storage, `${granteeOwner}@${config.nodeId}`, {
+      type: 'workspace_access_granted', title: `You were added to "${ws}" as ${role}`, link: '/v1/profile#organisms',
+    });
+    emitChange('notifications');
+    res.json(success(config.nodeId, { ws, grantee: granteeOwner, role }));
+  });
+
+  /* ── POST /v1/organisms/:id/workspace-access/revoke — creator/admin removes a member's access.
+   * Body: { ws, grantee }. ── */
+  router.post('/v1/organisms/:id/workspace-access/revoke', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const { ws, grantee } = req.body ?? {};
+    if (!grantee || typeof grantee !== 'string') { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'grantee is required')); return; }
+    const createdBy = await requireWsManager(req, res, id, ws);
+    if (!createdBy) return;
+    const revoked = await revokeWorkspaceRole(`${createdBy}@${config.nodeId}`, id, ws as string, grantee);
+    res.json(success(config.nodeId, { ws, grantee: parseGaiiLoose(grantee).owner || grantee, revoked }));
   });
 
   /* ── GET /v1/organisms/:id/workspace/activity?ws= — deterministic activity feed for a workspace,
@@ -1076,6 +1250,99 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       }
       res.status(500).json(error(config.nodeId, 'UPDATE_FAILED', (e as Error).message || 'Could not update the workspace'));
     }
+  });
+
+  /* ── GET /v1/organisms/:id/workspace/public/documents?ws=&space=&format= — NO AUTH. The published
+   * document-space pages a workspace has marked public (via meta.share). ?space= limits to one space;
+   * ?format=md returns a single concatenated markdown document. 404 (no disclosure) if nothing public. ── */
+  router.get('/v1/organisms/:id/workspace/public/documents', async (req, res) => {
+    const id = req.params.id as string;
+    const ws = typeof req.query.ws === 'string' ? req.query.ws : '';
+    const space = typeof req.query.space === 'string' ? req.query.space : undefined;
+    const organism = await storage.getOrganism(id);
+    if (!organism || !ws) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return; }
+    const share = await readShareMeta(id, ws);
+    let docs = await collectPublicDocs(id, ws, share);
+    if (space) docs = docs.filter(d => d.type === space);
+    if (docs.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public documents')); return; }
+    if (req.query.format === 'md') {
+      const entry = await findWsEntry(id, ws);
+      res.type('text/markdown; charset=utf-8').send(docsToMarkdown(entry?.name, docs));
+      return;
+    }
+    res.json(success(config.nodeId, { organism_id: id, ws, documents: docs }));
+  });
+
+  /* ── GET /v1/organisms/:id/workspace/public/document?ws=&type=&id=&format= — NO AUTH. A single
+   * published+public document-space page. ?format=md returns its raw markdown. 404 otherwise. ── */
+  router.get('/v1/organisms/:id/workspace/public/document', async (req, res) => {
+    const id = req.params.id as string;
+    const ws = typeof req.query.ws === 'string' ? req.query.ws : '';
+    const type = typeof req.query.type === 'string' ? req.query.type : '';
+    const docId = typeof req.query.id === 'string' ? req.query.id : '';
+    const organism = await storage.getOrganism(id);
+    if (!organism || !ws || !type || !docId) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return; }
+    const share = await readShareMeta(id, ws);
+    const docs = await collectPublicDocs(id, ws, share, { type, id: docId });
+    if (docs.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Document not found or not public')); return; }
+    const doc = docs[0];
+    if (req.query.format === 'md') {
+      res.type('text/markdown; charset=utf-8').send(`# ${doc.title}\n\n${doc.markdown.trim()}\n`);
+      return;
+    }
+    res.json(success(config.nodeId, { organism_id: id, ws, document: doc }));
+  });
+
+  /* ── GET /v1/organisms/:id/workspace/share?ws= — the current share state (for the UI toggles).
+   * Any active member may read it. ── */
+  router.get('/v1/organisms/:id/workspace/share', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const ws = typeof req.query.ws === 'string' ? req.query.ws : '';
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    if (!ws) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws is required')); return; }
+    const role = await memberRole(req, organism, id);
+    if (!role) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    res.json(success(config.nodeId, { organism_id: id, ws, share: await readShareMeta(id, ws) }));
+  });
+
+  /* ── PUT /v1/organisms/:id/workspace/share?ws= — set the share state. Body { public?, spaces?, docs? }
+   * is MERGED into the existing meta.share. The workspace creator or an org admin only. The record is
+   * stored under the workspace creator's GHII so there is exactly one canonical share record. ── */
+  router.put('/v1/organisms/:id/workspace/share', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const ws = typeof req.query.ws === 'string' ? req.query.ws : '';
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    if (!ws) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws is required')); return; }
+    const role = await memberRole(req, organism, id);
+    if (!role) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    const entry = await findWsEntry(id, ws);
+    if (!entry) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Workspace not found')); return; }
+    const createdBy = entry.createdBy ?? bareOwner(entry.ownerGaii);
+    if (createdBy !== (req.auth!.owner as string) && role !== 'creator' && role !== 'admin') {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the workspace creator or an org admin can change sharing')); return;
+    }
+    const body = (req.body ?? {}) as ShareMeta;
+    const isBoolMap = (m: unknown): m is Record<string, boolean> =>
+      !!m && typeof m === 'object' && !Array.isArray(m) && Object.values(m).every(v => typeof v === 'boolean');
+    if (body.spaces !== undefined && !isBoolMap(body.spaces)) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'spaces must be a map of name → boolean')); return; }
+    if (body.docs !== undefined && !isBoolMap(body.docs)) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'docs must be a map of key → boolean')); return; }
+    const prev = await readShareMeta(id, ws);
+    const next: Required<ShareMeta> = {
+      public: typeof body.public === 'boolean' ? body.public : prev.public,
+      spaces: { ...prev.spaces, ...(body.spaces ?? {}) },
+      docs: { ...prev.docs, ...(body.docs ?? {}) },
+    };
+    const key = `organism.${id}.w.${ws}.meta.share`;
+    const existing = (await storage.listAllMemory({ prefix: key, limit: 10 })).items.find(r => r.key === key);
+    const now = new Date().toISOString();
+    await storage.setMemory({
+      key, ownerGaii: entry.ownerGaii, value: next, visibility: 'private', tags: ['share'], ttlHours: null,
+      version: existing ? existing.version + 1 : 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
+    });
+    emitChange('organisms');
+    res.json(success(config.nodeId, { organism_id: id, ws, share: next }));
   });
 
   /* ── GET /v1/organisms/:id/workspace/export?ws= — download a full-fidelity ZIP backup of a

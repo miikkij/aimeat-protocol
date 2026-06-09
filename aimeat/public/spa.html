@@ -85,6 +85,7 @@
   <link rel="stylesheet" href="/css/views/admin.css">
   <link rel="stylesheet" href="/css/views/admin-agent-integration.css">
   <link rel="stylesheet" href="/css/views/public-knowledge-viewer.css">
+  <link rel="stylesheet" href="/css/views/public-workspace-viewer.css">
   <script type="importmap">
   {
     "imports": {
@@ -266,6 +267,7 @@
       '/v1/admin':       () => import('/views/admin.js' + B),
       '/v1/help':        () => import('/views/help.js' + B),
       '/v1/publicknowledgeviewer': () => import('/views/public-knowledge-viewer.js' + B),
+      '/v1/publicworkspaceviewer': () => import('/views/public-workspace-viewer.js' + B),
     };
 
     // Match route, handling query params for special views

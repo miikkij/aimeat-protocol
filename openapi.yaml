@@ -11180,6 +11180,98 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/organisms/{id}/workspace/share:
+    get:
+      operationId: getWorkspaceShare
+      summary: Read a workspace's document-space public-sharing state
+      description: |
+        Returns the `meta.share` record for a workspace —
+        `{ public, spaces: { [typeName]: boolean }, docs: { [`${typeName}/${id}`]: boolean } }` —
+        which controls what document-space content is served by the no-auth public endpoints. Any
+        active member may read it. Absent record → the empty default (nothing public).
+      tags: [Organisms]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+      responses:
+        '200': { description: The share state }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      operationId: setWorkspaceShare
+      summary: Set a workspace's document-space public-sharing state
+      description: |
+        Merges `{ public?, spaces?, docs? }` into the workspace's `meta.share` record. Resolution for
+        "is doc D in space S public?": `docs["S/D"]` if set, else `spaces[S]` if set, else `public`.
+        Only the workspace creator or an org admin may write. The record is stored under the workspace
+        creator's GHII so there is exactly one canonical share record per workspace.
+      tags: [Organisms]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                public: { type: boolean, description: Whole document portion public? }
+                spaces:
+                  type: object
+                  additionalProperties: { type: boolean }
+                  description: Per document-space (objectType name) → public
+                docs:
+                  type: object
+                  additionalProperties: { type: boolean }
+                  description: Per-doc override, key is `${typeName}/${id}`
+      responses:
+        '200': { description: The merged share state }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/workspace/public/documents:
+    get:
+      operationId: getPublicWorkspaceDocuments
+      summary: Read a workspace's public document-space pages (NO AUTH)
+      description: |
+        Returns the PUBLISHED (`.latest`) document-space pages a workspace has marked public via
+        `meta.share`. No authentication. Drafts are never served. `?space=` limits to one document
+        space; `?format=md` returns a single concatenated markdown document (text/markdown) instead of
+        JSON. Returns 404 (no disclosure) when nothing is public.
+      tags: [Organisms]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+        - { name: space, in: query, required: false, schema: { type: string }, description: Limit to one document-space (objectType name) }
+        - { name: format, in: query, required: false, schema: { type: string, enum: [md] }, description: Return concatenated markdown instead of JSON }
+      responses:
+        '200': { description: The public documents (JSON) or concatenated markdown }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/workspace/public/document:
+    get:
+      operationId: getPublicWorkspaceDocument
+      summary: Read a single public document-space page (NO AUTH)
+      description: |
+        Returns one PUBLISHED + public document-space page. No authentication. `?format=md` returns its
+        raw markdown (text/markdown) instead of JSON. Returns 404 if the page is missing, a draft only,
+        or not marked public.
+      tags: [Organisms]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+        - { name: type, in: query, required: true, schema: { type: string }, description: Document-space (objectType) name }
+        - { name: id, in: query, required: true, schema: { type: string }, description: Document id }
+        - { name: format, in: query, required: false, schema: { type: string, enum: [md] }, description: Return raw markdown instead of JSON }
+      responses:
+        '200': { description: The document (JSON) or its markdown }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/organisms/{id}/export:
     get:
       operationId: exportOrganism

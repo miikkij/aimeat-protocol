@@ -352,6 +352,49 @@ await test('20. B (cross-owner, APPROVED) can read + write A\'s workspace via th
     assert(wr.status === 200 || wr.status === 201, `approved cross-owner write ${wr.status}: ${JSON.stringify(wr.body)}`);
 });
 
+await test("21. an agent's MCP-serve write is attributed to its GAII (not collapsed onto the owner)", async () => {
+    // i1 / b-item-* were written by AGENTS over MCP-serve. The activity must attribute them to the
+    // agent — the MCP-serve path used to write content under ownerGhii, so every agent action showed
+    // as the owner. Now content is authored under writerGaii (the agent's own GAII).
+    const agentName = A.agentGaii.split('#')[0];
+    const a = await json(`/v1/organisms/${bootOrgId}/workspace/activity?ws=${bootWs.id}`, { headers: { Authorization: `Bearer ${A.ownerToken}` } });
+    assert(a.status === 200, `activity ${a.status}: ${JSON.stringify(a.body)}`);
+    const events = a.body.data.events ?? [];
+    assert(events.some((e: any) => e.agent === agentName), `expected an event attributed to agent "${agentName}", got agents: ${JSON.stringify([...new Set(events.map((e: any) => e.agent))])}`);
+});
+
+// ── Creator-managed workspace roles: viewer (read) vs contributor (read+write), grant/revoke ──
+const aOwner = () => ({ Authorization: `Bearer ${A.ownerToken}` });
+const bAgent = () => ({ Authorization: `Bearer ${B.agentToken}` });
+const bWrite = (id: string) => json('/v1/memory', { method: 'POST', headers: bAgent(), body: JSON.stringify({ key: `organism.${bootOrgId}.w.${bootWs.id}.shared.items.${id}.draft`, value: { id, title: 'x' }, visibility: 'private' }) });
+const bReadManifest = async () => (await json(`/v1/organisms/${bootOrgId}/workspace?ws=${bootWs.id}`, { headers: bAgent() })).body.data.manifest;
+
+await test('22. creator REVOKES B → B can no longer read or write (revoke is effective)', async () => {
+    const rv = await json(`/v1/organisms/${bootOrgId}/workspace-access/revoke`, { method: 'POST', headers: aOwner(), body: JSON.stringify({ ws: bootWs.id, grantee: B.ownerName }) });
+    assert(rv.status === 200, `revoke ${rv.status}: ${JSON.stringify(rv.body)}`);
+    assert((await bReadManifest()) === null, 'B read is empty after revoke');
+    const wr = await bWrite('b-after-revoke');
+    assert(wr.status === 403, `B write must be denied after revoke, got ${wr.status}: ${JSON.stringify(wr.body)}`);
+});
+
+await test('23. creator grants B the VIEWER role → B reads but cannot write', async () => {
+    const g = await json(`/v1/organisms/${bootOrgId}/workspace-access/grant`, { method: 'POST', headers: aOwner(), body: JSON.stringify({ ws: bootWs.id, grantee: B.ownerName, role: 'viewer' }) });
+    assert(g.status === 200 && g.body.data.role === 'viewer', `grant viewer ${g.status}: ${JSON.stringify(g.body)}`);
+    assert((await bReadManifest())?.name === 'Bootstrapped', 'viewer B can read the manifest');
+    const wr = await bWrite('b-viewer');
+    assert(wr.status === 403, `viewer B write must be denied, got ${wr.status}: ${JSON.stringify(wr.body)}`);
+});
+
+await test('24. creator upgrades B to CONTRIBUTOR → B reads and writes; members list shows the role', async () => {
+    const g = await json(`/v1/organisms/${bootOrgId}/workspace-access/grant`, { method: 'POST', headers: aOwner(), body: JSON.stringify({ ws: bootWs.id, grantee: B.ownerName, role: 'contributor' }) });
+    assert(g.status === 200 && g.body.data.role === 'contributor', `grant contributor ${g.status}: ${JSON.stringify(g.body)}`);
+    assert((await bReadManifest())?.name === 'Bootstrapped', 'contributor B can read');
+    const wr = await bWrite('b-contrib');
+    assert(wr.status === 200 || wr.status === 201, `contributor B write ${wr.status}: ${JSON.stringify(wr.body)}`);
+    const list = await json(`/v1/organisms/${bootOrgId}/workspace-access?ws=${bootWs.id}`, { headers: aOwner() });
+    assert((list.body.data.members || []).some((m: any) => m.owner === B.ownerName && m.role === 'contributor'), `members list shows B as contributor: ${JSON.stringify(list.body.data?.members)}`);
+});
+
 await test('Cleanup owner 1', async () => { const r = await json(`/v1/owners/${A.ownerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${A.ownerToken}` } }); assert(r.status === 200, `del ${r.status}`); });
 await test('Cleanup owner 2', async () => { const r = await json(`/v1/owners/${B.ownerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${B.ownerToken}` } }); assert(r.status === 200, `del ${r.status}`); });
 

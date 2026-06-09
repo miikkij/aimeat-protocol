@@ -6192,5 +6192,14 @@
     "exportJson": "Export JSON",
     "copyMarkdown": "Copy as Markdown",
     "copied": "Copied!"
+  },
+  "pwv": {
+    "loading": "Loading…",
+    "sharedDocuments": "Shared documents",
+    "publicBadge": "Public document",
+    "print": "Print / Save as PDF",
+    "selectDocument": "Select a document.",
+    "unavailableTitle": "Nothing to show here",
+    "unavailableDesc": "This workspace has no publicly shared documents, or the link is incomplete."
   }
 }

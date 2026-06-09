@@ -1,0 +1,202 @@
+/**
+ * @file public-workspace-viewer.css
+ * @description Styles for the public (no-login) workspace document viewer. A two-column layout —
+ *   table-of-contents sidebar + rendered markdown — that collapses to a single column on narrow
+ *   screens, plus a print stylesheet so "Print / Save as PDF" produces a clean content-only page.
+ *   All colors/spacing come from theme.css variables (no dark-only rgba, no hardcoded hex).
+ * @version-history
+ *   v1.0.0 — 2026-06-09 — Initial: slice 2 of the workspace public-sharing plan.
+ */
+
+.pwv-container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 1.5rem;
+  align-items: start;
+  min-height: 60vh;
+}
+
+/* ── Table of contents ── */
+.pwv-toc {
+  position: sticky;
+  top: 1.5rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem;
+}
+
+.pwv-toc-head {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  padding: 0.25rem 0.5rem 0.5rem;
+}
+
+.pwv-toc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.pwv-toc-item {
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.pwv-toc-item:hover {
+  background: var(--bg-dim);
+}
+
+.pwv-toc-item.pwv-active {
+  background: var(--bg-dim);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ── Main content ── */
+.pwv-main {
+  min-width: 0;
+}
+
+.pwv-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.pwv-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  background: var(--bg-dim);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.2rem 0.7rem;
+}
+
+.pwv-doc {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.75rem 2rem;
+}
+
+/* ── Markdown typography (scoped to the viewer; mirrors the in-app document view) ── */
+.pwv-doc .md-body { font-size: 0.95rem; line-height: 1.7; color: var(--text); max-width: 78ch; overflow-wrap: break-word; }
+.pwv-doc .md-body > :first-child { margin-top: 0; }
+.pwv-doc .md-body > :last-child { margin-bottom: 0; }
+.pwv-doc .md-body h1,
+.pwv-doc .md-body h2,
+.pwv-doc .md-body h3,
+.pwv-doc .md-body h4,
+.pwv-doc .md-body h5,
+.pwv-doc .md-body h6 { font-weight: 700; line-height: 1.3; color: var(--text); margin: 1.8em 0 0.6em; }
+.pwv-doc .md-body h1 { font-size: 1.7rem; letter-spacing: -0.01em; padding-bottom: 0.3em; border-bottom: 2px solid var(--border); margin-top: 0.2em; }
+.pwv-doc .md-body h2 { font-size: 1.32rem; padding-bottom: 0.25em; border-bottom: 1px solid var(--border); }
+.pwv-doc .md-body h3 { font-size: 1.13rem; }
+.pwv-doc .md-body h4 { font-size: 1rem; }
+.pwv-doc .md-body h5 { font-size: 0.9rem; }
+.pwv-doc .md-body h6 { font-size: 0.85rem; color: var(--muted); }
+.pwv-doc .md-body p { margin: 0.85em 0; }
+.pwv-doc .md-body ul,
+.pwv-doc .md-body ol { margin: 0.7em 0; padding-left: 1.7em; }
+.pwv-doc .md-body ul { list-style: disc; }
+.pwv-doc .md-body ol { list-style: decimal; }
+.pwv-doc .md-body li { margin: 0.32em 0; padding-left: 0.2em; }
+.pwv-doc .md-body li > ul,
+.pwv-doc .md-body li > ol { margin: 0.32em 0; }
+.pwv-doc .md-body a { color: var(--accent); text-decoration: none; }
+.pwv-doc .md-body a:hover { text-decoration: underline; }
+.pwv-doc .md-body strong { font-weight: 700; color: var(--text); }
+.pwv-doc .md-body em { font-style: italic; }
+.pwv-doc .md-body .md-code { font-family: var(--font-mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace); font-size: 0.85em; background: var(--bg-dim); padding: 0.12em 0.42em; border-radius: 4px; border: 1px solid var(--border); }
+.pwv-doc .md-body .md-pre { background: var(--bg-dim); border: 1px solid var(--border); border-radius: 8px; padding: 0.9em 1.1em; overflow-x: auto; margin: 1em 0; line-height: 1.5; }
+.pwv-doc .md-body .md-pre .md-code { background: none; border: none; padding: 0; font-size: 0.84rem; }
+.pwv-doc .md-body blockquote { margin: 1em 0; padding: 0.3em 1.1em; border-left: 3px solid var(--accent); background: var(--bg-dim); border-radius: 0 6px 6px 0; color: var(--muted); }
+.pwv-doc .md-body blockquote p { margin: 0.4em 0; }
+.pwv-doc .md-body table { border-collapse: collapse; margin: 1em 0; width: 100%; font-size: 0.9rem; }
+.pwv-doc .md-body th,
+.pwv-doc .md-body td { border: 1px solid var(--border); padding: 0.45em 0.75em; text-align: left; vertical-align: top; }
+.pwv-doc .md-body th { background: var(--bg-dim); font-weight: 600; }
+.pwv-doc .md-body tbody tr:nth-child(even) { background: var(--bg-dim); }
+.pwv-doc .md-body .md-img { max-width: 100%; height: auto; border-radius: 6px; margin: 0.6em 0; }
+.pwv-doc .md-body hr { border: none; border-top: 1px solid var(--border); margin: 1.6em 0; }
+
+/* ── States ── */
+.pwv-state {
+  color: var(--muted);
+  padding: 2rem 0;
+  text-align: center;
+}
+
+.pwv-error {
+  color: var(--danger, #E8564A);
+}
+
+.pwv-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 4rem 1.5rem;
+  color: var(--muted);
+}
+
+.pwv-empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.pwv-empty h2 {
+  color: var(--text);
+  font-size: 1.25rem;
+  margin: 0 0 0.5rem;
+}
+
+/* ── Responsive: stack the TOC above the content on narrow screens ── */
+@media (max-width: 720px) {
+  .pwv-container {
+    grid-template-columns: 1fr;
+  }
+  .pwv-toc {
+    position: static;
+  }
+}
+
+/* ── Print: content only — hide the global site nav, the TOC, the action bar, and the card chrome.
+ * The nav lives in the SPA shell (outside this view); `:has(.pwv-container)` scopes the rule so it
+ * only hides the nav on the public viewer's own page, never on other views' print output. ── */
+@media print {
+  body:has(.pwv-container) .topnav { display: none !important; }
+  .pwv-container {
+    display: block;
+    max-width: none;
+    padding: 0;
+  }
+  .pwv-toc,
+  .pwv-bar {
+    display: none;
+  }
+  .pwv-doc {
+    border: none;
+    border-radius: 0;
+    padding: 0;
+  }
+  .pwv-doc .md-body { max-width: none; }
+}
