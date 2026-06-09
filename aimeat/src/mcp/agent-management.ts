@@ -28,7 +28,7 @@ import { emitChange } from '../services/event-bus.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 
-const VALID_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator'] as const;
+const VALID_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'] as const;
 const TAG_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 const MAX_TAGS = 20;
 
@@ -109,8 +109,9 @@ export function registerAgentManagementTools(
     );
 
     // ── Tool: aimeat_agent_mode_set ──
-    // Owner sets a same-owner agent's operational mode. The mode affects
-    // Hello Integration step set: task-runner gets a reduced 5-step flow.
+    // Owner sets a same-owner agent's operational mode. The mode affects the
+    // Hello Integration step set: task-runner gets a reduced 7-step flow,
+    // workstation the narrowest 4-step flow; others get the full 13 steps.
     mcp.tool(
         'aimeat_agent_mode_set',
         descriptionFor('aimeat_agent_mode_set'),

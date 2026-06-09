@@ -91,7 +91,7 @@ export interface AimeatPerAgentConfig {
    * configures the local connector to actually spawn a subprocess. Both are
    * needed for a working task-runner agent.
    */
-  mode?: 'autonomous' | 'interactive' | 'task-runner' | 'coordinator';
+  mode?: 'autonomous' | 'interactive' | 'task-runner' | 'coordinator' | 'workstation';
   /** Optional: poll interval in seconds (default: 30). */
   poll_interval?: number;
   /** Optional: per-agent wake adapter (overrides global). See SECURITY note. */

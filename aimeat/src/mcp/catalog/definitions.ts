@@ -167,12 +167,12 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_agent_mode_set',
-        description: "Owner-only. Set an agent's operational mode. Modes: 'autonomous' (runs continuously, full Hello Integration), 'interactive' (user-facing, full Hello Integration), 'task-runner' (triggered/ephemeral, reduced 5-step Hello Integration — no commands, messages, or test task), 'coordinator' (orchestrates other agents, full Hello Integration).",
+        description: "Owner-only. Set an agent's operational mode. Modes: 'autonomous' (runs continuously, full Hello Integration), 'interactive' (user-facing, full Hello Integration), 'task-runner' (triggered/ephemeral, reduced 7-step Hello Integration — no commands or messages), 'coordinator' (orchestrates other agents, full Hello Integration), 'workstation' (node-visiting agent in the user's own env like VSCode or Claude Desktop, uses MCP directly; not node-resident, so narrowest 4-step Hello Integration — auth, platform, capabilities, directives).",
         caller: 'owner',
         visibility: agentEverywhere,
         input: {
             target_agent_name: { type: 'string', required: true, description: 'Agent whose mode to update (must be owned by the calling owner).' },
-            mode: { type: 'string', required: true, enum: ['autonomous', 'interactive', 'task-runner', 'coordinator'], description: 'New mode.' },
+            mode: { type: 'string', required: true, enum: ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'], description: 'New mode.' },
         },
     },
     {

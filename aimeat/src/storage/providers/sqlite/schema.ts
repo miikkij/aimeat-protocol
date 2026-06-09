@@ -1497,7 +1497,7 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('agents', 'platformDetectedBy', 'TEXT');
   safeAddColumn('agents', 'tags', 'TEXT');
 
-  // Agent operational mode (autonomous | interactive | task-runner | coordinator)
+  // Agent operational mode (autonomous | interactive | task-runner | coordinator | workstation)
   // Default 'interactive' = backward-compatible: all existing agents went through
   // the full 13-step Hello Integration which matches interactive semantics.
   safeAddColumn('agents', 'mode', "TEXT DEFAULT 'interactive'");

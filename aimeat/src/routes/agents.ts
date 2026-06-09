@@ -38,7 +38,7 @@ import { detectPlatform } from '../services/platform-detector.js';
 /** Device authorization code expires after 30 minutes */
 const DEVICE_AUTH_EXPIRY_MS = 1_800_000;
 
-const VALID_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator'] as const;
+const VALID_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'] as const;
 
 export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -922,8 +922,9 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // PATCH /v1/agents/:name/mode — owner sets agent operational mode
-  // (autonomous | interactive | task-runner | coordinator). Affects Hello
-  // Integration step set: task-runner gets a reduced 5-step flow.
+  // (autonomous | interactive | task-runner | coordinator | workstation). Affects
+  // Hello Integration step set: task-runner gets a reduced 7-step flow, workstation
+  // the narrowest 4-step flow.
   router.patch('/v1/agents/:name/mode', requireAuth(), requireRole('owner'), async (req, res) => {
     const identifier = decodeURIComponent(req.params.name as string);
     const gaii = identifier.includes('#') ? identifier : buildGAII(identifier, req.auth!.owner, config.nodeId);

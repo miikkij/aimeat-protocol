@@ -42,7 +42,7 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
     {
       agent_name: agentNameSchema,
       target_agent_name: z.string().describe('Agent whose mode to update (must be owned by the calling owner).'),
-      mode: z.enum(['autonomous', 'interactive', 'task-runner', 'coordinator']).describe('New mode.'),
+      mode: z.enum(['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation']).describe('New mode.'),
     },
     async ({ agent_name, target_agent_name, mode }) => {
       const { client } = pickAgent(registry, agent_name);

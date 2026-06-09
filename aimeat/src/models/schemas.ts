@@ -36,7 +36,7 @@ export const AgentRegistrationSchema = z.object({
     description: z.string().max(1024).optional(),
     capabilities: z.array(z.string()).optional(),
     scopes: z.array(z.string().max(64)).max(50).optional(),
-    mode: z.enum(['autonomous', 'interactive', 'task-runner', 'coordinator']).optional(),
+    mode: z.enum(['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation']).optional(),
 });
 
 // ── Auth ────────────────────────────────────────────────────

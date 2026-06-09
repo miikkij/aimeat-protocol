@@ -85,7 +85,11 @@ export async function runServe(flags: Record<string, string>): Promise<void> {
   await mcp.connect(transport);
 
   const summary = registry.list().map(a => {
-    const mode = isRunner(a) ? 'task-runner' : 'interactive';
+    // Prefer the explicit per-agent mode (autonomous | interactive | task-runner |
+    // coordinator | workstation); fall back to runner detection for legacy configs
+    // that predate the mode field. The node record is authoritative -- this is only
+    // a local display label.
+    const mode = a.config.mode ?? (isRunner(a) ? 'task-runner' : 'interactive');
     return `${a.agent}@${a.owner} [${mode}]`;
   }).join(', ');
   const surfaceNote = role === 'all' ? 'full surface' : `surface '${role}' (${toolsForSurface(role).size} tools)`;

@@ -60,10 +60,13 @@ export interface AgentRecord {
    * Agent operational mode. Affects how Hello Integration is gated:
    * - `autonomous`  : runs continuously, full 13-step Hello Integration
    * - `interactive` : responds to user requests, full 13-step Hello Integration (default)
-   * - `task-runner` : triggered/ephemeral, reduced 5-step flow (no commands, no messages, no test task)
+   * - `task-runner` : triggered/ephemeral, reduced 7-step flow (no commands, no messages; keeps test task)
    * - `coordinator`: orchestrates other agents, treated like `interactive` for onboarding
+   * - `workstation`: node-visiting agent in the user's own env (VSCode, Claude Desktop), uses MCP
+   *                  directly; not node-resident, so narrowest 4-step flow (auth + platform +
+   *                  capabilities + directives)
    */
-  mode?: 'autonomous' | 'interactive' | 'task-runner' | 'coordinator';
+  mode?: 'autonomous' | 'interactive' | 'task-runner' | 'coordinator' | 'workstation';
   /**
    * How many tasks the agent's runner may process concurrently. Default 1 =
    * serial (the current behaviour, safe for any engine). >1 requires an engine
@@ -214,7 +217,7 @@ export interface DeviceAuthorizationRecord {
   pollInterval: number;
   approvedBy?: string;
   /** Optional agent mode the requesting agent declared at device-authorize time. */
-  mode?: 'autonomous' | 'interactive' | 'task-runner' | 'coordinator';
+  mode?: 'autonomous' | 'interactive' | 'task-runner' | 'coordinator' | 'workstation';
   agentCredentials?: {
     gaii: string;
     privateKey: string;

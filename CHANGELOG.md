@@ -4,6 +4,41 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.20.3] - 2026-06-09
+
+### Agent modes: add `workstation` — a node-visiting agent in the user's own environment
+
+A fifth agent mode for agents that live in the **user's own environment** (VSCode, Claude Desktop) and
+reach the node through MCP as one tool among many — they are **not node-resident**. Unlike `interactive`
+(which assumes the agent can drive the full flow cold: publish runtime config, slash commands, telemetry),
+a workstation agent has no runtime config, no command surface, no delivery channel or telemetry it can
+report, and never sits on the node task queue. So it gets the **narrowest Hello Integration**: a 4-step
+flow proving only who it is and what it can do.
+
+#### Added
+
+- **`workstation` mode** on `AgentRecord.mode` (`autonomous | interactive | task-runner | coordinator |
+  workstation`). Settable at registration (`POST /v1/agents/device-authorize`, body `mode`), by the owner
+  (`PATCH /v1/agents/:name/mode`), via MCP `aimeat_agent_mode_set`, or `aimeat connect add --mode
+  workstation`.
+- **4-step Hello Integration** for workstation agents: `authenticate`, `identify_platform`,
+  `report_capabilities`, `read_directives`. Everything that assumes a node-resident runtime
+  (`install_skill`, `publish_commands`, `publish_config`, `report_telemetry`, `configure_delivery`,
+  `send_test_message`, the `accept_test_task`/`complete_test_task` pair, `declare_services`) is omitted —
+  not pending, not skipped, just absent. The MCP round-trip the agent already made to authenticate +
+  report capabilities is its built-in smoke test, so no test task is created.
+- **Workstation mode badge** in the profile Agents tab (teal text chip) + i18n labels (`Workstation` /
+  `Työasema`), and the `mode` group-by ordering now includes it.
+
+#### Changed
+
+- **`aimeat connect serve` summary label** reads the explicit per-agent mode instead of only
+  `task-runner`/`interactive`, so a workstation (or coordinator/autonomous) agent is labelled correctly in
+  `connect list` / serve output. The node record remains authoritative.
+- Docs corrected while here: the task-runner flow is **7 steps** (the `accept_test_task` /
+  `complete_test_task` pair is kept as the runner's smoke test), not 5 as previously documented in
+  `README.md` and `docs/coding-guidelines/agent-tags.md`.
+
 ## [1.20.2] - 2026-06-09
 
 ### Organism workspaces: creator-managed member roles (viewer / contributor)

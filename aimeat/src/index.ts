@@ -193,7 +193,7 @@ USAGE
       multiple agents (e.g. one Claude Code interactive agent plus several
       CrewAI task-runner agents) from one local MCP server.
 
-      --mode <mode>   one of: autonomous | interactive | task-runner | coordinator
+      --mode <mode>   one of: autonomous | interactive | task-runner | coordinator | workstation
                       Default: interactive. Use task-runner for CrewAI crews
                       / triggered workers -- the agent gets the reduced
                       5-step Hello Integration (no commands, no test task,

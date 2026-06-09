@@ -261,10 +261,10 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_agent_mode_set',
-        description: "Owner-only. Set an agent's operational mode. Modes: 'autonomous', 'interactive', 'task-runner' (reduced 5-step Hello Integration), 'coordinator'.",
+        description: "Owner-only. Set an agent's operational mode. Modes: 'autonomous', 'interactive', 'task-runner' (reduced 7-step Hello Integration), 'coordinator', 'workstation' (node-visiting MCP agent, narrowest 4-step Hello Integration).",
         input: {
             target_agent_name: { type: 'string', description: 'Agent whose mode to update.' },
-            mode: { type: 'string', enum: ['autonomous', 'interactive', 'task-runner', 'coordinator'], description: 'New mode.' },
+            mode: { type: 'string', enum: ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'], description: 'New mode.' },
         },
         handler: ({ client }, input) => {
             const target = optionalString(input, 'target_agent_name');

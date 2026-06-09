@@ -966,6 +966,105 @@ await test('41. Task-runner non-test-task steps pass; test-task pair stays pendi
     assert(ob.status === 'in_progress', `expected in_progress (test-task pair not finished), got ${ob.status}`);
 });
 
+// ─── Workstation mode: narrowest 4-step Hello Integration (node-visiting MCP agent) ───
+const wsName = 'onboard-workstation';
+let wsGaii = '';
+let wsToken = '';
+let wsPrivKey = '';
+
+await test('42. Create workstation agent with mode=workstation', async () => {
+    const { status, body } = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            name: wsName,
+            owner: ownerName,
+            capabilities: ['memory'],
+            mode: 'workstation',
+        }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    wsGaii = body.data.agent.gaii;
+    wsPrivKey = body.data.private_key;
+    wsToken = await getToken(wsGaii, wsPrivKey, true);
+});
+
+await test('43. Workstation mode is persisted across reads', async () => {
+    const { status, body } = await json('/v1/agents', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const ws = body.data.agents.find((a: any) => a.name === wsName);
+    assert(ws, 'workstation agent missing from list');
+    assert(ws.mode === 'workstation', `expected mode=workstation, got ${ws.mode}`);
+});
+
+await test('44. Workstation onboarding has exactly 4 steps (node-resident steps omitted)', async () => {
+    const { status, body } = await json(`/v1/agents/${wsName}/onboarding/start`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const steps = body.data.onboarding.steps;
+    assert(steps.length === 4, `expected 4 steps, got ${steps.length} (${steps.map((s: any) => s.id).join(',')})`);
+
+    const expectedIds = ['authenticate', 'identify_platform', 'report_capabilities', 'read_directives'];
+    for (const id of expectedIds) {
+        assert(steps.find((s: any) => s.id === id), `missing expected step: ${id}`);
+    }
+    // Everything that assumes a node-resident runtime is omitted: no command surface,
+    // no runtime config, no delivery/telemetry, no node task queue, no skill install.
+    const omitted = ['install_skill', 'send_test_message', 'configure_delivery', 'report_telemetry',
+        'accept_test_task', 'complete_test_task', 'publish_commands', 'publish_config', 'declare_services'];
+    for (const id of omitted) {
+        assert(!steps.find((s: any) => s.id === id), `workstation should not have step: ${id}`);
+    }
+});
+
+await test('45. Workstation onboarding stays in_progress until capabilities reported (gating)', async () => {
+    // Confirm identify_platform (api_call). read_directives auto-passes on GET.
+    const { status: pStatus } = await json(`/v1/agents/${wsName}/onboarding/step/identify_platform`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${wsToken}` },
+        body: JSON.stringify({ platform: 'vscode', platform_version: '1.0' }),
+    });
+    assert(pStatus === 200, `identify_platform step failed: ${pStatus}`);
+
+    // No capabilities yet → report_capabilities gate keeps onboarding incomplete.
+    const { status, body } = await json(`/v1/agents/${wsName}/onboarding`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `GET onboarding status ${status}: ${JSON.stringify(body)}`);
+    const ob = body.data.onboarding;
+    assert(ob.status === 'in_progress', `expected in_progress before capabilities, got ${ob.status}`);
+    const capStep = ob.steps.find((s: any) => s.id === 'report_capabilities');
+    assert(capStep?.status === 'pending', `report_capabilities should be pending, got ${capStep?.status}`);
+});
+
+await test('46. Workstation onboarding completes once all 4 steps pass (happy path)', async () => {
+    // report_capabilities auto-validates once capabilities exist.
+    const { status: capStatus } = await json(`/v1/agents/${wsName}/capabilities`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${wsToken}` },
+        body: JSON.stringify({
+            technical: [{ name: 'code_edit', type: 'tool' }],
+            domain: ['software-development'],
+        }),
+    });
+    assert(capStatus === 200, `PUT capabilities failed: ${capStatus}`);
+
+    const { status, body } = await json(`/v1/agents/${wsName}/onboarding`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `GET onboarding status ${status}: ${JSON.stringify(body)}`);
+    const ob = body.data.onboarding;
+    const passedIds = new Set<string>(ob.steps.filter((s: any) => s.status === 'passed').map((s: any) => s.id));
+    for (const id of ['authenticate', 'identify_platform', 'report_capabilities', 'read_directives']) {
+        assert(passedIds.has(id), `expected ${id} to be passed; status was ${ob.steps.find((s: any) => s.id === id)?.status}`);
+    }
+    assert(ob.status === 'completed', `expected completed (all 4 steps passed), got ${ob.status}`);
+});
+
 // ─── Summary ───
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
 if (failed > 0) process.exit(1);

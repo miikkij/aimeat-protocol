@@ -1015,7 +1015,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
   `;
 }
 
-const AGENT_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator'];
+const AGENT_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'];
 
 function collectTags(agents) {
   const set = new Set();

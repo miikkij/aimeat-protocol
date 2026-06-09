@@ -483,6 +483,7 @@
         "interactive": "Interactive",
         "task-runner": "Task runner",
         "coordinator": "Coordinator",
+        "workstation": "Workstation",
         "tooltip": "Operational mode — affects how the agent is onboarded and how it consumes work."
       },
       "taskRunner": {

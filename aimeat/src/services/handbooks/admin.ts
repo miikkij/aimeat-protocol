@@ -31,7 +31,7 @@ for what purpose, with TTL) · \`aimeat_consent_list\` · \`aimeat_consent_revok
 what the server enforces on cross-agent reads — this is the access-control layer, not just metadata.
 
 **Owner-managed agent classification.** \`aimeat_agent_mode_set\` (autonomous/interactive/task-runner/
-coordinator) · \`aimeat_agent_tags_set\` (crew:/role:/project: tags, max 20).
+coordinator/workstation) · \`aimeat_agent_tags_set\` (crew:/role:/project: tags, max 20).
 
 ## Typical uses
 - Audit the node: \`aimeat_admin_stats\` / \`aimeat_admin_agents\` / \`aimeat_admin_config\`.

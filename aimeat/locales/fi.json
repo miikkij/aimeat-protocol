@@ -483,6 +483,7 @@
         "interactive": "Interaktiivinen",
         "task-runner": "Tehtäväajuri",
         "coordinator": "Koordinaattori",
+        "workstation": "Työasema",
         "tooltip": "Toimintatila — vaikuttaa siihen, miten agentti läpäisee Hello Integrationin ja kuluttaa työtä."
       },
       "taskRunner": {

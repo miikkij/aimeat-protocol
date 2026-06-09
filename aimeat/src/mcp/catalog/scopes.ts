@@ -97,8 +97,9 @@ export function scopeAllowsTool(scopes: string[], toolName: string): boolean {
  * Role-based scope bundles for provisioning agents (e.g. at device-auth approval). Maps the
  * existing AgentRecord.mode values to sensible defaults drawn from the scope vocabulary the node
  * actually enforces today (memory / social / wallet / work / consent). As new scope domains are
- * added (e.g. task:*, app:*), extend these bundles. 'interactive'/'autonomous' are broad because
- * they front owner-attached, human-in-the-loop use (e.g. Claude Desktop); 'task-runner' is minimal.
+ * added (e.g. task:*, app:*), extend these bundles. 'interactive'/'autonomous'/'workstation' are
+ * broad because they front owner-attached, human-in-the-loop use (e.g. Claude Desktop, VSCode);
+ * 'task-runner' is minimal.
  */
 export const MCP_SCOPE_PROFILES: Record<string, string[]> = {
     'task-runner': ['memory:read', 'memory:write', 'work:read', 'work:accept'],
@@ -107,6 +108,7 @@ export const MCP_SCOPE_PROFILES: Record<string, string[]> = {
     'organism-knowledge': ['memory:read', 'memory:write', 'social:read'],
     interactive: ['*'],
     autonomous: ['*'],
+    workstation: ['*'],
 };
 
 /** Scope bundle for an agent mode/profile; falls back to a conservative read+write memory set. */

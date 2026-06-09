@@ -18,6 +18,12 @@
  *                            capabilities + config) -- they have no interactive
  *                            command surface, never send messages, and don't run
  *                            test tasks. Other modes keep the full 13-step list.
+ *   v1.3.0 -- 2026-06-09 -- Add 'workstation' mode: a node-visiting agent that
+ *                            lives in the user's own environment (VSCode, Claude
+ *                            Desktop) and uses MCP directly. It is not node-resident
+ *                            -- no runtime config, slash commands, telemetry, or
+ *                            task queue -- so it gets the narrowest 4-step flow
+ *                            (auth + platform + capabilities + directives).
  */
 
 import { z } from 'zod';
@@ -106,13 +112,33 @@ const TASK_RUNNER_STEP_IDS: ReadonlyArray<OnboardingStepId> = [
   'publish_config',
 ];
 
-export type AgentMode = 'autonomous' | 'interactive' | 'task-runner' | 'coordinator';
+/**
+ * Steps included when a workstation agent is onboarded. A workstation agent
+ * (VSCode, Claude Desktop) lives in the user's own environment and visits the
+ * node through MCP as one tool among many -- it is NOT node-resident. It has no
+ * runtime config to publish, no slash-command surface, no delivery channel or
+ * telemetry it can report, and never sits on the node task queue. So everything
+ * that assumes a node-resident runtime is dropped, leaving only the proof of
+ * who it is and what it can do: authenticate, identify the platform, report
+ * capabilities, and confirm it read the node directives. The MCP round-trip the
+ * agent already made to authenticate + report capabilities IS its smoke test --
+ * no separate test task is created (unlike task-runner).
+ */
+const WORKSTATION_STEP_IDS: ReadonlyArray<OnboardingStepId> = [
+  'authenticate',
+  'identify_platform',
+  'report_capabilities',
+  'read_directives',
+];
+
+export type AgentMode = 'autonomous' | 'interactive' | 'task-runner' | 'coordinator' | 'workstation';
 
 /**
  * Build the Hello Integration step list for a new onboarding record. The
  * `mode` parameter selects which subset of STEP_DEFINITIONS applies:
  *
  *   - 'task-runner'                       -> TASK_RUNNER_STEP_IDS (7 steps)
+ *   - 'workstation'                       -> WORKSTATION_STEP_IDS (4 steps)
  *   - 'autonomous' / 'interactive' /
  *     'coordinator' / undefined (default) -> full 13-step list
  *
@@ -120,7 +146,9 @@ export type AgentMode = 'autonomous' | 'interactive' | 'task-runner' | 'coordina
  * progression label even when steps are filtered out.
  */
 export function createDefaultSteps(mode?: AgentMode): AgentOnboardingStep[] {
-  const allowed = mode === 'task-runner' ? new Set<OnboardingStepId>(TASK_RUNNER_STEP_IDS) : null;
+  let allowed: Set<OnboardingStepId> | null = null;
+  if (mode === 'task-runner') allowed = new Set<OnboardingStepId>(TASK_RUNNER_STEP_IDS);
+  else if (mode === 'workstation') allowed = new Set<OnboardingStepId>(WORKSTATION_STEP_IDS);
   return STEP_DEFINITIONS
     .filter(def => !allowed || allowed.has(def.id))
     .map(def => ({

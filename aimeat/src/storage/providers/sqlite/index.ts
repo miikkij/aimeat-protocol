@@ -486,7 +486,7 @@ export class SqliteStorage implements Storage {
     if (row.platformVersion) record.platformVersion = row.platformVersion as string;
     if (row.platformDetectedBy) record.platformDetectedBy = row.platformDetectedBy as 'auto' | 'self_report' | 'message_reply';
     if (row.tags) record.tags = JSON.parse(row.tags as string);
-    if (row.mode) record.mode = row.mode as 'autonomous' | 'interactive' | 'task-runner' | 'coordinator';
+    if (row.mode) record.mode = row.mode as 'autonomous' | 'interactive' | 'task-runner' | 'coordinator' | 'workstation';
     if (row.maxConcurrentTasks != null) record.maxConcurrentTasks = row.maxConcurrentTasks as number;
     if (row.dailySpendLimit != null) record.dailySpendLimit = row.dailySpendLimit as number;
     if (row.scheduleConstraintDefaults) record.scheduleConstraintDefaults = JSON.parse(row.scheduleConstraintDefaults as string);
