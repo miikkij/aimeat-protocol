@@ -932,16 +932,20 @@ export async function publishDraft(orgId, wsId, namespace, instanceId) {
   return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/publish`, { ws: wsId, namespace, id: instanceId });
 }
 
-/** Delete one workspace object (record or document) — its draft, published .latest and all
- *  .version.N history. Returns the number of keys removed. */
+/** Delete one workspace object (record or document) — the bare record key, its draft, published
+ *  .latest and all .version.N history. Returns the number of keys removed. Prefix `${base}` (no
+ *  trailing dot) catches the bare un-suffixed key (which the workspace read surfaces as current);
+ *  the per-row guard excludes sibling ids. limit=200 is the REST cap — re-run for a huge version
+ *  history (idempotent). */
 export async function deleteWorkspaceObject(orgId, wsId, namespace, id) {
   const base = `${wsRoot(orgId, wsId)}.${namespace}.${id}`;
-  const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(base + '.')}`);
+  const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(base)}&limit=200`);
   const items = (resp?.data?.items) || [];
   let deleted = 0;
   for (const it of items) {
-    const role = it.key.slice(base.length + 1);
-    if (role === 'draft' || role === 'latest' || /^version\.\d+$/.test(role)) {
+    if (it.key !== base && !it.key.startsWith(base + '.')) continue;  // exclude sibling ids
+    const role = it.key === base ? '' : it.key.slice(base.length + 1);
+    if (role === '' || role === 'draft' || role === 'latest' || /^version\.\d+$/.test(role)) {
       try { await apiDelete(`/v1/memory/${encodeURIComponent(it.key)}`); deleted++; } catch { /* skip */ }
     }
   }

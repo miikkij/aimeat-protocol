@@ -128,17 +128,22 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
     annotationsFor('aimeat_workspace_object_delete'),
     async ({ organism_id, ws, namespace, id }) => {
       const base = `${root(organism_id, ws)}.${namespace}.${id}`;
-      const listed = await client.get(`/v1/memory?prefix=${encodeURIComponent(base + '.')}`);
+      // Prefix `${base}` (no trailing dot) catches the bare un-suffixed key too — workspace_read
+      // surfaces it as the current value, so it must be deletable. The per-row guard excludes
+      // sibling ids (`${base}0`). limit=200 is the REST cap; for an instance with a very large
+      // version history (e.g. after a runaway), re-run — the tool is idempotent.
+      const listed = await client.get(`/v1/memory?prefix=${encodeURIComponent(base)}&limit=200`);
       const items = (listed.data as { items?: { key: string }[] } | undefined)?.items ?? [];
       let deleted = 0;
       for (const it of items) {
-        const role = it.key.slice(base.length + 1);
-        if (role === 'draft' || role === 'latest' || /^version\.\d+$/.test(role)) {
+        if (it.key !== base && !it.key.startsWith(base + '.')) continue;  // exclude sibling ids
+        const role = it.key === base ? '' : it.key.slice(base.length + 1);
+        if (role === '' || role === 'draft' || role === 'latest' || /^version\.\d+$/.test(role)) {
           const dr = await client.delete(`/v1/memory/${encodeURIComponent(it.key)}`);
           if (dr.ok !== false) deleted++;
         }
       }
-      if (deleted === 0) return text({ error: `Nothing to delete at ${base} (no draft/latest/version).` }, true);
+      if (deleted === 0) return text({ error: `Nothing to delete at ${base} (no record/draft/latest/version).` }, true);
       // Best-effort: unfile the id from the document section tree (find the type by namespace).
       const wsResp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace?ws=${encodeURIComponent(ws)}`);
       const ot = ((wsResp.data as { manifest?: { objectTypes?: { name: string; namespace?: string }[] } } | undefined)?.manifest?.objectTypes ?? []).find(o => o.namespace === namespace);

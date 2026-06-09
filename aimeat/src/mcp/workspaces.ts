@@ -393,17 +393,24 @@ export function registerWorkspaceTools(
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const root = wsRoot(organism_id, ws);
             const base = `${root}.${namespace}.${id}`;
-            const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000 });
+            // List the WHOLE instance: the bare key `${base}` (an un-suffixed write — which
+            // workspace_read surfaces as the current value) AND every role-suffixed key
+            // (`.latest` / `.draft` / `.version.N`). Prefix `${base}` (no trailing dot) catches the
+            // bare key too; the per-row guard then excludes sibling instances like `${base}0` /
+            // `${base}-x` so we only ever touch this exact id. (Earlier this listed `${base}.` only,
+            // so a bare-key object survived delete yet kept showing in workspace_read.)
+            const { items } = await storage.listAllMemory({ prefix: base, limit: 5000 });
             let deleted = 0;
             for (const r of items) {
+                if (r.key !== base && !r.key.startsWith(`${base}.`)) continue;  // exclude sibling ids
                 // Own + same-owner records (a sibling agent's writes) are deletable; cross-owner are not.
                 if (r.ownerGaii !== ownerGhii && !isSameOwner(r.ownerGaii, ownerGhii)) continue;
-                const role = r.key.slice(base.length + 1);   // after `${base}.`
-                if (role === 'draft' || role === 'latest' || /^version\.\d+$/.test(role)) {
+                const role = r.key === base ? '' : r.key.slice(base.length + 1);   // '' = bare
+                if (role === '' || role === 'draft' || role === 'latest' || /^version\.\d+$/.test(role)) {
                     if (await storage.deleteMemory(r.ownerGaii, r.key)) deleted++;
                 }
             }
-            if (deleted === 0) return fail(`Nothing to delete at ${base} (no draft/latest/version).`);
+            if (deleted === 0) return fail(`Nothing to delete at ${base} (no record/draft/latest/version).`);
             // Best-effort: unfile the id from the document section tree (find the type by namespace).
             const man = await readManifest(organism_id, ws);
             const ot = (man?.objectTypes ?? []).find(o => o.namespace === namespace);

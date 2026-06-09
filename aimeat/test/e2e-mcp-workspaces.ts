@@ -209,6 +209,22 @@ await test('8c. delete of a missing object errors', async () => {
     assert(b.result.isError === true, 'isError (nothing to delete)');
 });
 
+await test('8d. delete also removes a BARE record key (no .latest) — regression', async () => {
+    // A record stored as a bare, un-suffixed key — workspace_read surfaces it as the current value.
+    // Earlier the delete only matched `${base}.{latest,draft,version.N}`, so the bare key survived
+    // (delete said "deleted"/"nothing to delete" while the object kept showing). It must be removed.
+    const key = `${root()}.shared.notes.bare1`;
+    const w = await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${A.ownerToken}` }, body: JSON.stringify({ key, value: { id: 'bare1', title: 'Bare note' }, visibility: 'private' }) });
+    assert(w.status === 201 || w.status === 200, `bare write ${w.status}: ${JSON.stringify(w.body.error)}`);
+    const rd1 = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS }, 1084);
+    assert((JSON.parse(rd1.result.content[0].text).objects?.note || []).some((o: any) => o.id === 'bare1'), 'bare record visible before delete');
+    const del = await A.client.call('aimeat_workspace_object_delete', { organism_id: orgId, ws: WS, namespace: 'shared.notes', id: 'bare1' }, 1085);
+    assert(del.result.isError !== true, `delete error: ${del.result.content?.[0]?.text}`);
+    assert(JSON.parse(del.result.content[0].text).keys >= 1, 'deleted the bare key');
+    const rd2 = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS }, 1086);
+    assert(!(JSON.parse(rd2.result.content[0].text).objects?.note || []).some((o: any) => o.id === 'bare1'), 'bare record gone after delete');
+});
+
 await test('9. membership gate: owner 1 agent cannot read owner 2 organism', async () => {
     const b = await A.client.call('aimeat_workspace_read', { organism_id: otherOrgId, ws: WS }, 109);
     assert(b.result.isError === true, 'denied (not a member)');
