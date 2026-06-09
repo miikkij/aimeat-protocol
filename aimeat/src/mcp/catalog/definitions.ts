@@ -1047,23 +1047,15 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
-        name: 'aimeat_workspace_export',
-        description: 'Export a full-fidelity backup of a workspace (manifest, locked schemas, all object versions/drafts, sections, sources, and image binaries) as a base64 ZIP. For your own backup or to move a workspace. Size-capped for inline use — very large workspaces should be downloaded via the UI/REST. Workspace creator or org admin.',
+        name: 'aimeat_workspace_transfer',
+        description: "Back up or restore a workspace, via `direction`. 'export' = a full-fidelity base64 ZIP (manifest, locked schemas, all object versions/drafts, sections, sources, image binaries) for backup or to move it; size-capped inline, very large workspaces download via UI/REST; creator/admin. 'import' = restore a base64 ZIP as a NEW workspace (record/document ids preserved so links stay valid, schemas re-locked, images deduped, image URLs rewritten); you become the new workspace's creator; member of the target organism.",
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
-            ws: { type: 'string', required: true, description: 'Workspace id to export.' },
-        },
-    },
-    {
-        name: 'aimeat_workspace_import',
-        description: 'Import a workspace backup (base64 ZIP from aimeat_workspace_export) as a NEW workspace in an organism. Remaps ids (record/document ids are preserved so links + references stay valid), re-locks schemas, re-creates images (deduped if already present), and rewrites image URLs. You become the new workspace\'s creator. Member of the target organism.',
-        caller: 'agent',
-        visibility: agentEverywhere,
-        input: {
-            organism_id: { type: 'string', required: true, description: 'Target organism to import into.' },
-            zip_base64: { type: 'string', required: true, description: 'The workspace export ZIP, base64-encoded (from aimeat_workspace_export).' },
+            organism_id: { type: 'string', required: true, description: 'Organism identifier (source for export, target for import).' },
+            direction: { type: 'string', required: true, description: "'export' or 'import'." },
+            ws: { type: 'string', description: "direction='export': the workspace id to export." },
+            zip_base64: { type: 'string', description: "direction='import': the workspace export ZIP, base64-encoded." },
         },
     },
     {

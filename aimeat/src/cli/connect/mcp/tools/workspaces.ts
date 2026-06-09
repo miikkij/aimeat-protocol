@@ -232,19 +232,25 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
     });
 
-  mcp.tool('aimeat_workspace_export', descriptionFor('aimeat_workspace_export'),
-    { organism_id: z.string(), ws: z.string() },
-    annotationsFor('aimeat_workspace_export'),
-    async ({ organism_id, ws }) => {
-      const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace/export?ws=${encodeURIComponent(ws)}&format=base64`);
-      return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
-    });
-
-  mcp.tool('aimeat_workspace_import', descriptionFor('aimeat_workspace_import'),
-    { organism_id: z.string(), zip_base64: z.string().describe('Workspace export ZIP, base64-encoded') },
-    annotationsFor('aimeat_workspace_import'),
-    async ({ organism_id, zip_base64 }) => {
-      const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace/import`, { zip_base64 });
+  mcp.tool('aimeat_workspace_transfer', descriptionFor('aimeat_workspace_transfer'),
+    {
+      organism_id: z.string(),
+      direction: z.enum(['export', 'import']).describe("'export' a workspace to a base64 ZIP, or 'import' a base64 ZIP as a NEW workspace"),
+      ws: z.string().optional().describe("direction='export': the workspace id to export"),
+      zip_base64: z.string().optional().describe("direction='import': the base64 ZIP from a prior export"),
+    },
+    annotationsFor('aimeat_workspace_transfer'),
+    async ({ organism_id, direction, ws, zip_base64 }) => {
+      let resp;
+      if (direction === 'export') {
+        if (!ws) return text({ error: "direction='export' needs a ws." }, true);
+        resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace/export?ws=${encodeURIComponent(ws)}&format=base64`);
+      } else if (direction === 'import') {
+        if (!zip_base64) return text({ error: "direction='import' needs zip_base64." }, true);
+        resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace/import`, { zip_base64 });
+      } else {
+        return text({ error: "direction must be 'export' or 'import'." }, true);
+      }
       return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
     });
 }

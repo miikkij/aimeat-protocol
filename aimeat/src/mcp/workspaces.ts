@@ -411,37 +411,41 @@ export function registerWorkspaceTools(
         });
 
     // ── aimeat_workspace_export ──
-    mcp.tool('aimeat_workspace_export', descriptionFor('aimeat_workspace_export'),
-        { organism_id: z.string(), ws: z.string() },
-        annotationsFor('aimeat_workspace_export'),
-        async ({ organism_id, ws }): Promise<TextResult> => {
+    mcp.tool('aimeat_workspace_transfer', descriptionFor('aimeat_workspace_transfer'),
+        {
+            organism_id: z.string(),
+            direction: z.enum(['export', 'import']).describe("'export' a workspace to a base64 ZIP, or 'import' a base64 ZIP as a NEW workspace"),
+            ws: z.string().optional().describe("direction='export': the workspace id to export"),
+            zip_base64: z.string().optional().describe("direction='import': the base64 ZIP from a prior export"),
+        },
+        annotationsFor('aimeat_workspace_transfer'),
+        async ({ organism_id, direction, ws, zip_base64 }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            const entry = await findWsEntry(organism_id, ws);
-            if (!entry) return fail('Workspace not found');
-            const role = await roleOf(organism_id);
-            if (entry.createdBy !== ownerName && role !== 'creator' && role !== 'admin') return fail('Only the workspace creator or an org admin can export.');
-            const { buffer, filename } = await exportWorkspace(storage, config, { orgId: organism_id, ws, exporterGaii: ownerGhii, exportedAt: new Date().toISOString() });
-            if (buffer.length > 1_500_000) return fail(`Workspace too large for inline export (${buffer.length} bytes) — download it from the UI/REST instead.`);
-            return ok({ filename, size_bytes: buffer.length, zip_base64: buffer.toString('base64') });
-        });
-
-    // ── aimeat_workspace_import ──
-    mcp.tool('aimeat_workspace_import', descriptionFor('aimeat_workspace_import'),
-        { organism_id: z.string(), zip_base64: z.string() },
-        annotationsFor('aimeat_workspace_import'),
-        async ({ organism_id, zip_base64 }): Promise<TextResult> => {
-            const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            const buf = Buffer.from(zip_base64, 'base64');
-            if (!buf.length) return fail('zip_base64 is empty or invalid.');
-            try {
-                const result = await importWorkspace(storage, config, { orgId: organism_id, importerGaii: ownerGhii, importerOwner: ownerName, zip: buf });
-                return ok(result);
-            } catch (e) {
-                if (e instanceof ZipSecurityError) {
-                    const inc = await recordSecurityIncident(storage, config, { type: 'zip_import', code: e.code, actorGhii: ownerGhii, actorName: ownerName, detail: e.message, source: 'workspace_import_mcp', blob: buf });
-                    return fail(`Upload rejected by safety checks (${e.code}) and quarantined for review (incident ${inc.id}).`);
-                }
-                return fail((e as Error).message || 'Import failed');
+            if (direction === 'export') {
+                if (!ws) return fail("direction='export' needs a ws.");
+                const entry = await findWsEntry(organism_id, ws);
+                if (!entry) return fail('Workspace not found');
+                const role = await roleOf(organism_id);
+                if (entry.createdBy !== ownerName && role !== 'creator' && role !== 'admin') return fail('Only the workspace creator or an org admin can export.');
+                const { buffer, filename } = await exportWorkspace(storage, config, { orgId: organism_id, ws, exporterGaii: ownerGhii, exportedAt: new Date().toISOString() });
+                if (buffer.length > 1_500_000) return fail(`Workspace too large for inline export (${buffer.length} bytes) — download it from the UI/REST instead.`);
+                return ok({ filename, size_bytes: buffer.length, zip_base64: buffer.toString('base64') });
             }
+            if (direction === 'import') {
+                if (!zip_base64) return fail("direction='import' needs zip_base64.");
+                const buf = Buffer.from(zip_base64, 'base64');
+                if (!buf.length) return fail('zip_base64 is empty or invalid.');
+                try {
+                    const result = await importWorkspace(storage, config, { orgId: organism_id, importerGaii: ownerGhii, importerOwner: ownerName, zip: buf });
+                    return ok(result);
+                } catch (e) {
+                    if (e instanceof ZipSecurityError) {
+                        const inc = await recordSecurityIncident(storage, config, { type: 'zip_import', code: e.code, actorGhii: ownerGhii, actorName: ownerName, detail: e.message, source: 'workspace_transfer_mcp', blob: buf });
+                        return fail(`Upload rejected by safety checks (${e.code}) and quarantined for review (incident ${inc.id}).`);
+                    }
+                    return fail((e as Error).message || 'Import failed');
+                }
+            }
+            return fail("direction must be 'export' or 'import'.");
         });
 }
