@@ -701,10 +701,7 @@ function WorkspaceList({ org, showToast, onOpen, onBack }) {
  * Deterministic from the event timestamps. */
 function buildHeatmap(byDay, today) {
   const iso = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-  const dayKeys = [...byDay.keys()].sort();
-  const earliest = dayKeys.length ? new Date(dayKeys[0] + 'T00:00:00') : new Date(today);
-  let weeks = Math.ceil((today - earliest) / (7 * 86400000)) + 1;
-  weeks = Math.max(14, Math.min(53, weeks));               // a few months minimum, a year maximum
+  const weeks = 53;                                         // always a full year ending today, GitHub-style
   const start = new Date(today);
   start.setDate(start.getDate() - (weeks * 7 - 1));
   start.setDate(start.getDate() - start.getDay());          // align to the start of a week (Sunday)

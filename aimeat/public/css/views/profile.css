@@ -2068,14 +2068,14 @@
 .pj-act-dot.publish { background: var(--success); }
 /* Heatmap — bigger cells, each split 2×2 (docs draft/pub · records draft/pub) */
 .pj-hm { overflow-x: auto; padding-bottom: 0.2rem; }
-.pj-hm-monthrow { display: flex; padding-left: 30px; }
-.pj-hm-month { flex: 0 0 23px; font-size: 0.66rem; color: var(--muted); white-space: nowrap; overflow: visible; }
+.pj-hm-monthrow { display: flex; padding-left: 28px; }
+.pj-hm-month { flex: 0 0 16px; font-size: 0.64rem; color: var(--muted); white-space: nowrap; overflow: visible; }
 .pj-hm-body { display: flex; }
-.pj-hm-daycol { display: flex; flex-direction: column; gap: 3px; width: 30px; flex-shrink: 0; }
-.pj-hm-daycol span { height: 20px; line-height: 20px; font-size: 0.64rem; color: var(--muted); }
-.pj-hm-cols { display: flex; gap: 3px; }
-.pj-hm-col { display: flex; flex-direction: column; gap: 3px; }
-.pj-hm-cell { width: 20px; height: 20px; border-radius: 3px; flex-shrink: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 1px; overflow: hidden; }
+.pj-hm-daycol { display: flex; flex-direction: column; gap: 2px; width: 28px; flex-shrink: 0; }
+.pj-hm-daycol span { height: 14px; line-height: 14px; font-size: 0.62rem; color: var(--muted); }
+.pj-hm-cols { display: flex; gap: 2px; }
+.pj-hm-col { display: flex; flex-direction: column; gap: 2px; }
+.pj-hm-cell { width: 14px; height: 14px; border-radius: 2px; flex-shrink: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 1px; overflow: hidden; }
 .pj-hm-cell.future { background: transparent; }
 .pj-hm-cell .q { width: 100%; height: 100%; border-radius: 1px; }
 .q { display: inline-block; }
