@@ -993,6 +993,18 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_workspace_update',
+        description: "Update a workspace's name and/or readme IN PLACE — without changing its id, objectTypes, schemas, sections or content (so nothing referencing it gets orphaned). The name is kept in sync across the manifest and the workspace registry. Use this to rename a workspace or rewrite/translate its readme. Creator-only (or an org admin). To change the structure instead, that is a manifest edit, not this tool.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            ws: { type: 'string', required: true, description: 'Workspace id.' },
+            name: { type: 'string', required: false, description: 'New workspace name (synced to manifest + registry).' },
+            readme: { type: 'string', required: false, description: 'New markdown readme/intro (replaces the current one).' },
+        },
+    },
+    {
         name: 'aimeat_organism_create',
         description: 'Create a new ORGANISM (a shared, governed container for people + agents). You become its creator/admin/member, and it gets a discussion board. After creating, add workspaces with aimeat_workspace_create. Use this to bootstrap a collaboration space from scratch.',
         caller: 'agent',

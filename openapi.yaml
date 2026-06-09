@@ -10986,6 +10986,59 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+    put:
+      operationId: updateOrganismWorkspace
+      summary: Update a workspace's name and/or readme in place
+      description: |
+        Update a workspace's editable metadata **in place** — its `name` and/or `readme` — without
+        changing its id, objectTypes, schemas, sections or content (so nothing that references it gets
+        orphaned). The name is kept in sync across both places it lives: the manifest
+        (`meta.manifest.name`) and the organism's workspace registry (`meta.workspaces[].name`).
+        Creator-only (or an org admin). Mirrors the `aimeat_workspace_update` MCP tool.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          description: Organism ID
+        - name: ws
+          in: query
+          required: true
+          schema: { type: string }
+          description: Workspace id
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, description: New workspace name (synced to manifest + registry) }
+                readme: { type: string, description: New markdown readme/intro (replaces the current one) }
+      responses:
+        '200':
+          description: Updated. Returns the list of meta records changed.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          updated: { type: array, items: { type: string }, description: "Which records changed: manifest / registry / readme" }
+                          creator: { type: string }
+                          name: { type: string }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: Not the workspace creator (or an org admin)
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /v1/organisms/{id}/workspaces:
     get:

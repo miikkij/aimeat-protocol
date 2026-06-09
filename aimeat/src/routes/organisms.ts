@@ -46,6 +46,7 @@ import { exportOrganism } from '../services/organism-export.js';
 import { importOrganism } from '../services/organism-import.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
+import { updateWorkspaceMeta, WorkspaceMetaError } from '../services/workspace-meta.js';
 
 /** Whether a membership role satisfies an approval's required approverRole. */
 function roleSatisfies(approverRole: string, membershipRole: string): boolean {
@@ -1041,6 +1042,35 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       }),
     }));
     res.json(success(config.nodeId, { ws, viewerOwner, nodes }));
+  });
+
+  /* ── PUT /v1/organisms/:id/workspace?ws= — update a workspace's name and/or readme IN PLACE (no new
+   * id, no touch to objectTypes/schemas/content), keeping the name synced across manifest + registry.
+   * Creator-only (or an org admin). ── */
+  router.put('/v1/organisms/:id/workspace', requireAuth(), requireRole('agent'), async (req, res) => {
+    const id = req.params.id as string;
+    const ws = typeof req.query.ws === 'string' ? req.query.ws : (req.body?.ws as string | undefined);
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const role = await memberRole(req, organism, id);
+    if (!role) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+    if (!ws) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws is required')); return; }
+    try {
+      const result = await updateWorkspaceMeta(storage, config, {
+        orgId: id, ws, callerOwner: req.auth!.owner as string,
+        isAdmin: role === 'admin' || role === 'creator',
+        name: req.body?.name, readme: req.body?.readme,
+      });
+      emitChange('organisms');
+      res.json(success(config.nodeId, result));
+    } catch (e) {
+      if (e instanceof WorkspaceMetaError) {
+        const status = e.code === 'WS_NOT_FOUND' ? 404 : e.code === 'NOT_CREATOR' ? 403 : 400;
+        res.status(status).json(error(config.nodeId, e.code, e.message));
+        return;
+      }
+      res.status(500).json(error(config.nodeId, 'UPDATE_FAILED', (e as Error).message || 'Could not update the workspace'));
+    }
   });
 
   /* ── GET /v1/organisms/:id/workspace/export?ws= — download a full-fidelity ZIP backup of a

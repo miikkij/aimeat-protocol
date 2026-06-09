@@ -37,6 +37,7 @@ import { authorizeRead } from '../services/access-guard.js';
 import { exportWorkspace } from '../services/workspace-export.js';
 import { importWorkspace } from '../services/workspace-import.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
+import { updateWorkspaceMeta, WorkspaceMetaError } from '../services/workspace-meta.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
 
 type ObjType = { name: string; namespace?: string; backing?: string; mode?: string };
@@ -218,6 +219,30 @@ export function registerWorkspaceTools(
             await storage.setMemory({ key: `${base}.latest`, ownerGaii: ownerGhii, value: draft.value, visibility: draft.visibility, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
             await storage.deleteMemory(ownerGhii, `${base}.draft`);
             return ok({ published: base, version: n });
+        });
+
+    // ── aimeat_workspace_update ──
+    mcp.tool('aimeat_workspace_update', descriptionFor('aimeat_workspace_update'),
+        {
+            organism_id: z.string(),
+            ws: z.string(),
+            name: z.string().optional().describe('New workspace name (synced to the manifest + the registry)'),
+            readme: z.string().optional().describe('New markdown readme/intro (replaces the current one)'),
+        },
+        annotationsFor('aimeat_workspace_update'),
+        async ({ organism_id, ws, name, readme }): Promise<TextResult> => {
+            const role = await roleOf(organism_id);
+            if (!role) return fail('You are not a member of this organism.');
+            try {
+                const result = await updateWorkspaceMeta(storage, config, {
+                    orgId: organism_id, ws, callerOwner: ownerName,
+                    isAdmin: role === 'admin' || role === 'creator', name, readme,
+                });
+                return ok(result);
+            } catch (e) {
+                if (e instanceof WorkspaceMetaError) return fail(e.message);
+                return fail((e as Error).message || 'Update failed');
+            }
         });
 
     // ── aimeat_workspace_add_document ──

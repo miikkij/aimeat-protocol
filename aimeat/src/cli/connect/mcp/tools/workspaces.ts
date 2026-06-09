@@ -110,6 +110,23 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       return text({ written: key, doc_id: docId, type, section: section ?? null });
     });
 
+  mcp.tool('aimeat_workspace_update', descriptionFor('aimeat_workspace_update'),
+    {
+      organism_id: z.string(), ws: z.string(),
+      name: z.string().optional().describe('New workspace name (synced to manifest + registry)'),
+      readme: z.string().optional().describe('New markdown readme/intro (replaces the current one)'),
+    },
+    annotationsFor('aimeat_workspace_update'),
+    async ({ organism_id, ws, name, readme }) => {
+      const body: { name?: string; readme?: string } = {};
+      if (typeof name === 'string') body.name = name;
+      if (typeof readme === 'string') body.readme = readme;
+      if (body.name === undefined && body.readme === undefined) return text({ error: 'Provide a new name and/or readme.' }, true);
+      const r = await client.put(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace?ws=${encodeURIComponent(ws)}`, body);
+      if (r.ok === false) return text({ error: (r.error as { message?: string } | undefined)?.message || 'Update failed' }, true);
+      return text(r.data);
+    });
+
   mcp.tool('aimeat_workspace_delete', descriptionFor('aimeat_workspace_delete'),
     {
       organism_id: z.string(), ws: z.string(),
