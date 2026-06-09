@@ -131,13 +131,13 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       return text(r.data);
     });
 
-  mcp.tool('aimeat_workspace_delete', descriptionFor('aimeat_workspace_delete'),
+  mcp.tool('aimeat_workspace_object_delete', descriptionFor('aimeat_workspace_object_delete'),
     {
       organism_id: z.string(), ws: z.string(),
       namespace: z.string().describe("The objectType's namespace, e.g. shared.deliverables"),
       id: z.string().describe('The instance id to delete (draft + latest + all versions)'),
     },
-    annotationsFor('aimeat_workspace_delete'),
+    annotationsFor('aimeat_workspace_object_delete'),
     async ({ organism_id, ws, namespace, id }) => {
       const base = `${root(organism_id, ws)}.${namespace}.${id}`;
       const listed = await client.get(`/v1/memory?prefix=${encodeURIComponent(base + '.')}`);

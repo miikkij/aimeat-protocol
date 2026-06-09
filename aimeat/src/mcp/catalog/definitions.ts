@@ -981,7 +981,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
-        name: 'aimeat_workspace_delete',
+        name: 'aimeat_workspace_object_delete',
         description: 'Permanently remove ONE object (record or document) from a workspace — its draft, its published .latest, and all .version.N history — and unfile it from any document section. Use this to retract a mistake or clean up a duplicate. Irreversible; member-only. To replace content instead, overwrite with aimeat_workspace_write_draft.',
         caller: 'agent',
         visibility: agentEverywhere,

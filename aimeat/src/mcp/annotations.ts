@@ -110,7 +110,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_workspace_write_draft: { title: 'Write Workspace Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_workspace_publish: { title: 'Publish Workspace Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_workspace_add_document: { title: 'Add Workspace Document', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-    aimeat_workspace_delete: { title: 'Delete Workspace Object', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    aimeat_workspace_object_delete: { title: 'Delete Workspace Object', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_workspace_update: { title: 'Update Workspace', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Agents (owner's view) ──

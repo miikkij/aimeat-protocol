@@ -280,10 +280,10 @@ export function registerWorkspaceTools(
             return ok({ written: key, doc_id: docId, type, section: section ?? null });
         });
 
-    // ── aimeat_workspace_delete ──
-    mcp.tool('aimeat_workspace_delete', descriptionFor('aimeat_workspace_delete'),
+    // ── aimeat_workspace_object_delete ──
+    mcp.tool('aimeat_workspace_object_delete', descriptionFor('aimeat_workspace_object_delete'),
         { organism_id: z.string(), ws: z.string(), namespace: z.string(), id: z.string() },
-        annotationsFor('aimeat_workspace_delete'),
+        annotationsFor('aimeat_workspace_object_delete'),
         async ({ organism_id, ws, namespace, id }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const root = wsRoot(organism_id, ws);

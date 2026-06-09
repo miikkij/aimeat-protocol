@@ -191,7 +191,7 @@ await test('8. add_document creates a markdown page draft', async () => {
 });
 
 await test('8b. delete removes a published object (draft + latest + versions)', async () => {
-    const b = await A.client.call('aimeat_workspace_delete', { organism_id: orgId, ws: WS, namespace: 'shared.notes', id: 'n1' }, 1081);
+    const b = await A.client.call('aimeat_workspace_object_delete', { organism_id: orgId, ws: WS, namespace: 'shared.notes', id: 'n1' }, 1081);
     assert(b.result.isError !== true, `error: ${b.result.content?.[0]?.text}`);
     assert(JSON.parse(b.result.content[0].text).keys >= 2, 'deleted .latest + .version.1');
     const rd = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS }, 1082);
@@ -200,7 +200,7 @@ await test('8b. delete removes a published object (draft + latest + versions)', 
 });
 
 await test('8c. delete of a missing object errors', async () => {
-    const b = await A.client.call('aimeat_workspace_delete', { organism_id: orgId, ws: WS, namespace: 'shared.notes', id: 'never-existed' }, 1083);
+    const b = await A.client.call('aimeat_workspace_object_delete', { organism_id: orgId, ws: WS, namespace: 'shared.notes', id: 'never-existed' }, 1083);
     assert(b.result.isError === true, 'isError (nothing to delete)');
 });
 
