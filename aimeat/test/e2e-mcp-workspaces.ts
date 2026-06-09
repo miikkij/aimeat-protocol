@@ -279,6 +279,18 @@ await test('15b. B can DISCOVER A\'s workspace via MCP list (cross-member regist
         `B (member, not creator) must see A's workspace in the list: ${JSON.stringify(data.workspaces)}`);
 });
 
+await test('15c. B (member) can write a record to A\'s workspace — by space name AND by namespace', async () => {
+    // Regression: workspace_write read the manifest under the CALLER's own GHII, so a member who didn't
+    // create the workspace got "No space named …" for every space. It must aggregate the manifest, and
+    // accept the namespace too (small models often pass 'shared.items' instead of the name 'item').
+    const byName = await B.client.call('aimeat_workspace_write',
+        { organism_id: bootOrgId, ws: bootWs.id, space: 'item', id: 'b-item-1', value: { title: 'B by name' } }, 1152);
+    assert(byName.result.isError !== true, `member write by name failed: ${byName.result.content?.[0]?.text}`);
+    const byNs = await B.client.call('aimeat_workspace_write',
+        { organism_id: bootOrgId, ws: bootWs.id, space: 'shared.items', id: 'b-item-2', value: { title: 'B by namespace' } }, 1153);
+    assert(byNs.result.isError !== true, `member write by namespace failed: ${byNs.result.content?.[0]?.text}`);
+});
+
 await test('16. B cannot read the workspace before approval', async () => {
     const b = await B.client.call('aimeat_workspace_read', { organism_id: bootOrgId, ws: bootWs.id }, 116);
     assert(b.result.isError === true, 'denied before access is granted');

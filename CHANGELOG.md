@@ -220,6 +220,12 @@ workspace existed under the **creator's** identity.
   `aimeat_workspace_read`. Membership still gates the call and per-workspace `read` still enforces consent — only
   **discovery** is fixed. Regression test added (`test/e2e-mcp-workspaces.ts` 15b: a member who didn't create the
   workspace can discover it via the MCP list; it fails on the old single-owner read).
+- **`aimeat_workspace_write` / `_object_delete` read the manifest across members** (`src/mcp/workspaces.ts`). They
+  read it under the caller's own GHII, so a member who didn't create the workspace got **`No space named "X"`** for
+  *every* space (the creator's manifest was invisible) — and couldn't contribute at all. A new `readManifest()`
+  aggregates the manifest like `_read` does. `_write` also now accepts the objectType **name OR its namespace**
+  (small models often pass `shared.feedback` instead of `feedback`) and lists the available spaces in the error.
+  Regression test added (`15c`: a member writes a record to another member's workspace, by name and by namespace).
 
 ### MCP: organism membership now uses the bare owner name consistently
 

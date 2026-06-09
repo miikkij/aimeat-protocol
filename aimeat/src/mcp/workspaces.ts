@@ -26,6 +26,9 @@
  *   v1.3.1 -- 2026-06-09 -- _list aggregates the workspace registry across ALL member identities (was
  *     reading only the caller's own GHII record), so a member who didn't create a workspace no longer
  *     sees an empty list. Matches findWsEntry / _read.
+ *   v1.3.2 -- 2026-06-09 -- _write / _object_delete read the manifest via a new readManifest() that
+ *     aggregates across members (was caller-GHII only → "No space named X" for non-creator members),
+ *     and _write accepts the objectType NAME or its NAMESPACE (small models often pass the namespace).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { randomUUID } from 'node:crypto';
@@ -108,6 +111,14 @@ export function registerWorkspaceTools(
             if (entry) return { createdBy: entry.createdBy ?? bareOwner(rec.ownerGaii), ownerGaii: rec.ownerGaii };
         }
         return null;
+    };
+    /** Read a workspace's manifest from whichever member created it (aggregates across registries), so a
+     *  member who didn't create the workspace can still resolve its spaces to write/delete records. */
+    const readManifest = async (orgId: string, ws: string): Promise<Manifest | null> => {
+        const key = `${wsRoot(orgId, ws)}.meta.manifest`;
+        const { items } = await storage.listAllMemory({ prefix: key, limit: 100 });
+        const rec = items.find(r => r.key === key);
+        return rec ? (rec.value as Manifest) : null;
     };
     /** Active membership role of the agent's owner in an org, or null. */
     const roleOf = async (orgId: string): Promise<string | null> => {
@@ -197,7 +208,7 @@ export function registerWorkspaceTools(
     mcp.tool('aimeat_workspace_write', descriptionFor('aimeat_workspace_write'),
         {
             organism_id: z.string(), ws: z.string(),
-            space: z.string().describe("The objectType (space) NAME — e.g. 'feature' or 'notes'. The tool resolves whether it is a records or document space."),
+            space: z.string().describe("The objectType (space) NAME — e.g. 'feedback' or 'task' (the manifest's objectTypes[].name, NOT its namespace like 'shared.feedback'). The tool resolves whether it is a records or document space."),
             // z.any(): some clients JSON-stringify an object param — coerceValue parses it back so records
             // validate and documents aren't stored corrupt. (A z.record/union here breaks the MCP SDK.)
             value: z.any().describe('The content as a JSON OBJECT (not a string). For a records space, the record (matching its schema). For a document space, { title, markdown }.'),
@@ -208,9 +219,15 @@ export function registerWorkspaceTools(
         async ({ organism_id, ws, space, value, id, section }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const root = wsRoot(organism_id, ws);
-            const man = await storage.getMemory(ownerGhii, `${root}.meta.manifest`);
-            const ot = ((man?.value as Manifest | undefined)?.objectTypes ?? []).find(o => o.name === space);
-            if (!ot || !ot.namespace) return fail(`No space named "${space}" in this workspace. Read the workspace to see its spaces.`);
+            // Aggregate the manifest across members so a member who didn't create the workspace can write,
+            // and accept either the space NAME or its namespace (small models often pass the namespace).
+            const man = await readManifest(organism_id, ws);
+            const types = (man?.objectTypes ?? []);
+            const ot = types.find(o => o.name === space || o.namespace === space);
+            if (!ot || !ot.namespace) {
+                const names = types.map(o => o.name).filter(Boolean).join(', ');
+                return fail(`No space named "${space}" in this workspace. Available spaces: ${names || '(none)'}. Pass the space NAME, not its namespace.`);
+            }
             const isDoc = ot.mode === 'document';
             let instanceId = (id && String(id).trim()) || (value && typeof value === 'object' && !Array.isArray(value) ? String((value as Record<string, unknown>).id ?? '').trim() : '');
             if (!instanceId && isDoc) instanceId = 'doc-' + Math.random().toString(36).slice(2, 9);
@@ -304,8 +321,8 @@ export function registerWorkspaceTools(
             }
             if (deleted === 0) return fail(`Nothing to delete at ${base} (no draft/latest/version).`);
             // Best-effort: unfile the id from the document section tree (find the type by namespace).
-            const man = await storage.getMemory(ownerGhii, `${root}.meta.manifest`);
-            const ot = ((man?.value as Manifest | undefined)?.objectTypes ?? []).find(o => o.namespace === namespace);
+            const man = await readManifest(organism_id, ws);
+            const ot = (man?.objectTypes ?? []).find(o => o.namespace === namespace);
             if (ot) {
                 const secKey = `${root}.meta.sections.${ot.name}`;
                 const secRec = await storage.getMemory(ownerGhii, secKey);
