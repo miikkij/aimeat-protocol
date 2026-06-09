@@ -765,6 +765,44 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
         name: 'aimeat_organism_import',
         handler: ({ client }, input) => client.post('/v1/organisms/import', { zip_base64: requiredString(input, 'zip_base64') }),
     },
+    {
+        name: 'aimeat_organism_invite',
+        handler: ({ client }, input) => client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/invitations`, { invitee: requiredString(input, 'invitee') }),
+    },
+    {
+        name: 'aimeat_organism_invitations',
+        handler: ({ client }) => client.get('/v1/organisms/invitations/mine'),
+    },
+    {
+        name: 'aimeat_organism_invitation_respond',
+        handler: ({ client }, input) => {
+            const decision = requiredString(input, 'decision') === 'accept' ? 'accept' : 'decline';
+            return client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/invitations/${decision}`, {});
+        },
+    },
+    {
+        name: 'aimeat_organism_search',
+        handler: ({ client }, input) => {
+            const ws = optionalString(input, 'ws');
+            return client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/search${query({ q: requiredString(input, 'q'), ...(ws ? { ws } : {}) })}`);
+        },
+    },
+    {
+        name: 'aimeat_workspace_comment',
+        handler: ({ client }, input) => {
+            const body: JsonObject = {
+                ws: requiredString(input, 'ws'), space: requiredString(input, 'space'),
+                instance_id: requiredString(input, 'instance_id'), body: requiredString(input, 'body'),
+            };
+            if (input && typeof input === 'object' && 'anchor' in input && input.anchor != null) body.anchor = (input as JsonObject).anchor;
+            const parentId = optionalString(input, 'parent_id'); if (parentId) body.parent_id = parentId;
+            return client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/comments`, body);
+        },
+    },
+    {
+        name: 'aimeat_workspace_comments',
+        handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/comments${query({ ws: requiredString(input, 'ws'), space: requiredString(input, 'space'), instance_id: requiredString(input, 'instance_id') })}`),
+    },
     // ── Organism WORKSPACES (parity with the appdev MCP surface; the routes enforce membership,
     //    schema validation, the creator-gate, and the publish gate — so authz is unchanged here) ──
     {

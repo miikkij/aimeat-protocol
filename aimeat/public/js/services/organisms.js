@@ -66,6 +66,30 @@ export async function reviewJoinRequest(organismId, requestId, decision) {
   return apiPost(`/v1/organisms/${encodeURIComponent(organismId)}/join-requests/${encodeURIComponent(requestId)}/review`, { decision });
 }
 
+/** List the comment thread on a workspace object (record or document). */
+export async function listComments(orgId, ws, space, instanceId) {
+  const params = new URLSearchParams({ ws, space, instance_id: instanceId });
+  return apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/comments?${params.toString()}`);
+}
+
+/** Add a comment to a workspace object. anchor: { section?|quote? }; parentId for a threaded reply. */
+export async function addComment(orgId, { ws, space, instanceId, body, anchor, parentId }) {
+  return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/comments`, { ws, space, instance_id: instanceId, body, anchor, parent_id: parentId });
+}
+
+/** Delete a comment (author or creator/admin). */
+export async function deleteComment(orgId, commentId, ws, space, instanceId) {
+  const params = new URLSearchParams({ ws, space, instance_id: instanceId });
+  return apiDelete(`/v1/organisms/${encodeURIComponent(orgId)}/comments/${encodeURIComponent(commentId)}?${params.toString()}`);
+}
+
+/** Search records + documents across the organism's readable workspaces. Optional ws filter. */
+export async function searchOrganism(id, q, ws) {
+  const params = new URLSearchParams({ q });
+  if (ws) params.set('ws', ws);
+  return apiGet(`/v1/organisms/${encodeURIComponent(id)}/search?${params.toString()}`);
+}
+
 /** Remove (revoke) a member's organism access. Creator/admin only. Pass ban=true to block re-join. */
 export async function removeMember(id, memberGhii, ban = false) {
   const suffix = ban ? '?ban=1' : '';

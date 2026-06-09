@@ -2079,6 +2079,15 @@
 .pj-rec-title { flex: 1; text-align: left; background: none; border: none; cursor: pointer; font-size: 0.9rem; color: var(--text); padding: 0; }
 .pj-rec-title:hover { color: var(--accent); }
 .pj-rec-fields { margin: 0.1rem 0 0.4rem 0.6rem; padding: 0.2rem 0.6rem; border-left: 2px solid var(--border); background: var(--bg-dim); border-radius: 0 6px 6px 0; }
+/* Comment thread on a workspace object (record/document) */
+.pj-comments { margin: 0.5rem 0 0.25rem; padding-top: 0.5rem; border-top: 1px solid var(--border); }
+.pj-comment { padding: 0.4rem 0.5rem; margin: 0.3rem 0; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+.pj-comment-reply { margin-left: 1.2rem; border-left: 2px solid var(--accent, var(--border)); }
+.pj-comment-head { font-size: 0.85rem; color: var(--muted); }
+.pj-comment-body { white-space: pre-wrap; margin: 0.2rem 0; }
+.pj-comment-actions { display: flex; gap: 0.3rem; }
+.pj-comment-compose { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.5rem; }
+.pj-comment-compose textarea { resize: vertical; }
 /* Dotted leader between each field label and its value — ties the two ends of a
    long row together so you can follow which value belongs to which key. */
 .pj-rec-fields .kv-row { align-items: baseline; gap: 0; }

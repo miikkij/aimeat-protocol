@@ -14939,6 +14939,105 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/organisms/{id}/search:
+    get:
+      operationId: searchOrganismContent
+      summary: Search organism / workspace content
+      description: |
+        Case-insensitive substring search across the records + documents of every workspace the
+        caller may read (or one workspace via `ws`). Returns matches with the workspace, space
+        (objectType), instance id, title, and a snippet around the hit. Honours the same
+        workspace-level read authorization as the workspace read; the caller must be an active
+        member (or organism agent). Results are capped (`truncated` flags when the cap is hit).
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: q, in: query, required: true, description: Search text (min 2 characters), schema: { type: string } }
+        - { name: ws, in: query, required: false, description: Limit the search to a single workspace id, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/comments:
+    post:
+      operationId: addOrganismComment
+      summary: Comment on a workspace object
+      description: |
+        Add a comment to a workspace record or document, targeted by ws + space (objectType) +
+        instance_id. Optionally anchored to part of a document (`anchor` = { section } or { quote }),
+        general (no anchor), or a threaded reply (`parent_id`). Comments are memory-backed under the
+        workspace meta namespace (excluded from workspace read + content search). Any active member
+        or organism agent may comment.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ws, space, instance_id, body]
+              properties:
+                ws: { type: string }
+                space: { type: string, description: The objectType (space) name }
+                instance_id: { type: string, description: The record/document id }
+                body: { type: string }
+                anchor:
+                  type: object
+                  description: Optional anchor to part of a document
+                  properties:
+                    section: { type: string }
+                    quote: { type: string }
+                parent_id: { type: string, description: Optional id of the comment this replies to }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    get:
+      operationId: listOrganismComments
+      summary: List a workspace object's comment thread
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: ws, in: query, required: true, schema: { type: string } }
+        - { name: space, in: query, required: true, schema: { type: string } }
+        - { name: instance_id, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/comments/{commentId}:
+    delete:
+      operationId: deleteOrganismComment
+      summary: Delete a workspace comment
+      description: The comment's author, or a creator/admin, deletes it. Locate it with the ws/space/instance_id query params.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: commentId, in: path, required: true, schema: { type: string } }
+        - { name: ws, in: query, required: true, schema: { type: string } }
+        - { name: space, in: query, required: true, schema: { type: string } }
+        - { name: instance_id, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   # ── Public Storage ──────────────────────────────────────────
   /v1/pub/{gaii}/{key}:
     get:

@@ -44,7 +44,7 @@
 import { Router, raw, type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, MemoryRecord, PendingApprovalRecord } from '../storage/interface.js';
+import type { Storage, MemoryRecord, PendingApprovalRecord, OrganismRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { emitChange } from '../services/event-bus.js';
@@ -58,6 +58,8 @@ import { exportWorkspace } from '../services/workspace-export.js';
 import { importWorkspace } from '../services/workspace-import.js';
 import { exportOrganism } from '../services/organism-export.js';
 import { importOrganism } from '../services/organism-import.js';
+import { searchOrganismContent } from '../services/organism-search.js';
+import { canAccessWorkspaceComments, addComment, listComments, commentPrefix } from '../services/organism-comments.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
 import { updateWorkspaceMeta, WorkspaceMetaError } from '../services/workspace-meta.js';
@@ -1053,6 +1055,121 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       { description: 'Write a draft record', method: 'POST', url: '/v1/memory' },
       { description: 'Publish a draft', method: 'POST', url: `/v1/organisms/${id}/publish` },
     ]));
+  });
+
+  /* ── GET /v1/organisms/:id/search — Search organism / workspace content ──
+   * Full-text-ish (case-insensitive substring) search across the records + documents of every
+   * workspace the caller can read (or one workspace if ?ws=). Returns matches with the workspace,
+   * space (objectType), instance id, a title, and a snippet around the hit. Honours the same
+   * workspace-level read authorization as GET /:id/workspace (manifest gate) — a member only
+   * searches workspaces they may read; drafts, version history and meta records are skipped. */
+  router.get('/v1/organisms/:id/search', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const q = (typeof req.query.q === 'string' ? req.query.q : '').trim();
+    const onlyWs = typeof req.query.ws === 'string' ? req.query.ws : undefined;
+    if (q.length < 2) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Query "q" must be at least 2 characters'));
+      return;
+    }
+
+    const organism = await storage.getOrganism(id);
+    if (!organism) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      return;
+    }
+
+    // Membership gate (same as workspace read): an org agent or an active member.
+    const callerSub = req.auth!.sub;
+    const ownerName = req.auth!.owner;
+    let isMember = !!callerSub && organism.agentGaiis.includes(callerSub);
+    if (!isMember && ownerName) {
+      const m = await storage.getMembership(id, ownerName);
+      isMember = !!m && m.status === 'active';
+    }
+    if (!isMember) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism'));
+      return;
+    }
+    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+    const { results, truncated } = await searchOrganismContent(storage, config, organism, callerGaii, q, onlyWs);
+    res.json(success(config.nodeId, { query: q, results, total: results.length, truncated }));
+  });
+
+  /* ── Comments / threads on workspace records + documents ──
+   * A comment targets one workspace object (record or document) by (ws, space, instance_id), can be
+   * anchored to a part of a document (anchor.section or anchor.quote) or left general (no anchor),
+   * and can reply to another comment (parent_id) to form threads. Comments are memory-backed under
+   * `organism.{id}.w.{ws}.meta.comments.{space}~{instance}.{commentId}` — the meta.* prefix keeps
+   * them OUT of the workspace read + content search. Authoring is open to any member or organism
+   * agent (so agents can comment); read requires the same workspace-read authorization as the
+   * content; a comment can be deleted by its author or a creator/admin. */
+
+  /* POST /v1/organisms/:id/comments — add a comment */
+  router.post('/v1/organisms/:id/comments', requireAuth(), requireRole('agent'), async (req, res) => {
+    const id = req.params.id as string;
+    const { ws, space, instance_id, body, anchor, parent_id } = req.body ?? {};
+    if (!ws || !space || !instance_id || typeof body !== 'string' || !body.trim()) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws, space, instance_id and a non-empty body are required'));
+      return;
+    }
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+    if (!(await canAccessWorkspaceComments(storage, config, organism, req.auth!.sub, req.auth!.owner, callerGaii, ws))) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You cannot comment in this workspace')); return;
+    }
+    const comment = await addComment(storage, id, callerGaii, { ws, space, instanceId: instance_id, body, anchor, parentId: parent_id });
+    emitChange('organisms');
+    res.status(201).json(success(config.nodeId, { comment }));
+  });
+
+  /* GET /v1/organisms/:id/comments?ws=&space=&instance_id= — list a target's thread */
+  router.get('/v1/organisms/:id/comments', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const ws = req.query.ws as string;
+    const space = req.query.space as string;
+    const instanceId = req.query.instance_id as string;
+    if (!ws || !space || !instanceId) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws, space and instance_id query params are required'));
+      return;
+    }
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+    if (!(await canAccessWorkspaceComments(storage, config, organism, req.auth!.sub, req.auth!.owner, callerGaii, ws))) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You cannot read this workspace')); return;
+    }
+    const comments = await listComments(storage, id, ws, space, instanceId);
+    res.json(success(config.nodeId, { comments, total: comments.length }));
+  });
+
+  /* DELETE /v1/organisms/:id/comments/:commentId?ws=&space=&instance_id= — delete (author or creator/admin) */
+  router.delete('/v1/organisms/:id/comments/:commentId', requireAuth(), requireRole('agent'), async (req, res) => {
+    const id = req.params.id as string;
+    const commentId = req.params.commentId as string;
+    const ws = req.query.ws as string;
+    const space = req.query.space as string;
+    const instanceId = req.query.instance_id as string;
+    if (!ws || !space || !instanceId) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws, space and instance_id query params are required'));
+      return;
+    }
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+    const callerOwner = req.auth!.owner as string;
+    const key = `${commentPrefix(id, ws, space, instanceId)}${commentId}`;
+    const scan = await storage.listAllMemory({ prefix: key, limit: 5 });
+    const rec = scan.items.find(r => r.key === key);
+    if (!rec) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Comment not found')); return; }
+    const isAuthor = rec.ownerGaii === callerGaii;
+    const isAdmin = organism.creatorGhii === callerOwner || organism.admins.includes(callerOwner);
+    if (!isAuthor && !isAdmin) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the comment author or an organism admin can delete it')); return;
+    }
+    await storage.deleteMemory(rec.ownerGaii, key);
+    emitChange('organisms');
+    res.json(success(config.nodeId, { deleted: commentId }));
   });
 
   /* ── Gate primitive (Phase 4) — PendingApproval ──

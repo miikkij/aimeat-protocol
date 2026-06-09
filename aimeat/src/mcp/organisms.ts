@@ -27,6 +27,9 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { exportOrganism } from '../services/organism-export.js';
 import { importOrganism } from '../services/organism-import.js';
+import { notify } from '../services/notify.js';
+import { searchOrganismContent } from '../services/organism-search.js';
+import { canAccessWorkspaceComments, addComment, listComments } from '../services/organism-comments.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
 
@@ -218,11 +221,17 @@ export function registerOrganismsTools(
 
             // Check if already a member
             const existing = await storage.getMembership(organism_id, ownerName);
+            if (existing && existing.status === 'banned') {
+                return { content: [{ type: 'text' as const, text: 'You have been blocked from this organism' }], isError: true };
+            }
             if (existing && existing.status === 'active') {
                 return { content: [{ type: 'text' as const, text: 'Already a member of this organism' }], isError: true };
             }
             if (existing && existing.status === 'pending') {
                 return { content: [{ type: 'text' as const, text: 'Already have a pending join request' }], isError: true };
+            }
+            if (existing && existing.status === 'invited') {
+                return { content: [{ type: 'text' as const, text: 'You have a pending invitation — accept it with aimeat_organism_invitation_respond instead' }], isError: true };
             }
 
             // Check capacity
@@ -358,6 +367,173 @@ export function registerOrganismsTools(
                     })), null, 2),
                 }],
             };
+        },
+    );
+
+    // ── Tool: aimeat_organism_invite ──
+    // Mirrors POST /v1/organisms/:id/invitations. Creator/admin invites an owner by bare name;
+    // creates a membership row with status 'invited' + invitedBy and notifies the invitee.
+    mcp.tool(
+        'aimeat_organism_invite',
+        descriptionFor('aimeat_organism_invite'),
+        {
+            organism_id: z.string().describe('The organism ID'),
+            invitee: z.string().describe('Bare owner name to invite'),
+        },
+        annotationsFor('aimeat_organism_invite'),
+        async ({ organism_id, invitee }) => {
+            const organism = await storage.getOrganism(organism_id);
+            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
+            const ownerName = getOwnerName();
+            if (organism.creatorGhii !== ownerName && !organism.admins.includes(ownerName)) {
+                return { content: [{ type: 'text' as const, text: 'Only the creator or an admin can invite members' }], isError: true };
+            }
+            const existing = await storage.getMembership(organism_id, invitee);
+            if (existing && existing.status === 'active') return { content: [{ type: 'text' as const, text: 'That owner is already a member' }], isError: true };
+            if (existing && existing.status === 'invited') return { content: [{ type: 'text' as const, text: 'That owner already has a pending invitation' }], isError: true };
+            if (existing && existing.status === 'banned') return { content: [{ type: 'text' as const, text: 'That owner is blocked — lift the block before inviting' }], isError: true };
+
+            const now = new Date().toISOString();
+            await storage.createMembership({ id: uuidv4(), organismId: organism_id, ghii: invitee, role: 'member', status: 'invited', invitedBy: ownerName, joinedAt: now });
+            await notify(storage, `${invitee}@${config.nodeId}`, {
+                type: 'organism_invitation',
+                title: `${ownerName} invited you to join "${organism.name}"`,
+                link: '/v1/profile#organisms',
+            });
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'invited', organism_id, invitee }, null, 2) }] };
+        },
+    );
+
+    // ── Tool: aimeat_organism_invitations ── (your own pending invitations across organisms)
+    mcp.tool(
+        'aimeat_organism_invitations',
+        descriptionFor('aimeat_organism_invitations'),
+        {},
+        annotationsFor('aimeat_organism_invitations'),
+        async () => {
+            const ownerName = getOwnerName();
+            const memberships = (await storage.listMembershipsByGhii(ownerName)).filter(m => m.status === 'invited');
+            const out = [];
+            for (const m of memberships) {
+                const org = await storage.getOrganism(m.organismId);
+                if (org) out.push({ organism_id: org.id, name: org.name, type: org.type, invited_by: m.invitedBy });
+            }
+            return { content: [{ type: 'text' as const, text: JSON.stringify(out, null, 2) }] };
+        },
+    );
+
+    // ── Tool: aimeat_organism_invitation_respond ── (accept | decline your invitation)
+    mcp.tool(
+        'aimeat_organism_invitation_respond',
+        descriptionFor('aimeat_organism_invitation_respond'),
+        {
+            organism_id: z.string().describe('The organism ID you were invited to'),
+            decision: z.enum(['accept', 'decline']).describe('accept or decline'),
+        },
+        annotationsFor('aimeat_organism_invitation_respond'),
+        async ({ organism_id, decision }) => {
+            const organism = await storage.getOrganism(organism_id);
+            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
+            const ownerName = getOwnerName();
+            const membership = await storage.getMembership(organism_id, ownerName);
+            if (!membership || membership.status !== 'invited') {
+                return { content: [{ type: 'text' as const, text: 'You have no pending invitation to this organism' }], isError: true };
+            }
+            const now = new Date().toISOString();
+            if (decision === 'decline') {
+                await storage.deleteMembership(membership.id);
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'declined', organism_id }, null, 2) }] };
+            }
+            await storage.updateMembership(membership.id, { status: 'active', joinedAt: now });
+            await storage.updateOrganism(organism_id, { members: [...new Set([...organism.members, ownerName])], updatedAt: now });
+            if (membership.invitedBy) {
+                await notify(storage, `${membership.invitedBy}@${config.nodeId}`, {
+                    type: 'organism_invitation_accepted',
+                    title: `${ownerName} accepted your invitation to "${organism.name}"`,
+                    link: '/v1/profile#organisms',
+                });
+            }
+            emitResourceUpdated(agentGaii, `aimeat://organisms/${encodeURIComponent(organism_id)}`);
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'joined', organism_id }, null, 2) }] };
+        },
+    );
+
+    // ── Tool: aimeat_organism_search ── (content search across readable workspaces)
+    mcp.tool(
+        'aimeat_organism_search',
+        descriptionFor('aimeat_organism_search'),
+        {
+            organism_id: z.string().describe('The organism ID'),
+            q: z.string().describe('Search text (min 2 characters)'),
+            ws: z.string().optional().describe('Optional: limit to a single workspace id'),
+        },
+        annotationsFor('aimeat_organism_search'),
+        async ({ organism_id, q, ws }) => {
+            const query = (q ?? '').trim();
+            if (query.length < 2) return { content: [{ type: 'text' as const, text: 'Query must be at least 2 characters' }], isError: true };
+            const organism = await storage.getOrganism(organism_id);
+            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
+            const ownerName = getOwnerName();
+            // Membership gate: an org agent or an active member.
+            let isMember = organism.agentGaiis.includes(agentGaii);
+            if (!isMember) {
+                const m = await storage.getMembership(organism_id, ownerName);
+                isMember = !!m && m.status === 'active';
+            }
+            if (!isMember) return { content: [{ type: 'text' as const, text: 'Not an active member of this organism' }], isError: true };
+            // Caller identity for the workspace read gate: the full GAII (agent) resolves via same-owner.
+            const { results, truncated } = await searchOrganismContent(storage, config, organism, agentGaii, query, ws);
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ query, results, total: results.length, truncated }, null, 2) }] };
+        },
+    );
+
+    // ── Tool: aimeat_workspace_comment ── (add a comment/thread reply to a record or document)
+    mcp.tool(
+        'aimeat_workspace_comment',
+        descriptionFor('aimeat_workspace_comment'),
+        {
+            organism_id: z.string().describe('The organism ID'),
+            ws: z.string().describe('Workspace id'),
+            space: z.string().describe('The objectType (space) name the target lives in'),
+            instance_id: z.string().describe('The record/document id being commented on'),
+            body: z.string().describe('The comment text'),
+            anchor: z.object({ section: z.string().optional(), quote: z.string().optional() }).optional().describe('Optional anchor to part of a document'),
+            parent_id: z.string().optional().describe('Optional id of the comment this replies to'),
+        },
+        annotationsFor('aimeat_workspace_comment'),
+        async ({ organism_id, ws, space, instance_id, body, anchor, parent_id }) => {
+            if (typeof body !== 'string' || !body.trim()) return { content: [{ type: 'text' as const, text: 'A non-empty body is required' }], isError: true };
+            const organism = await storage.getOrganism(organism_id);
+            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
+            const ownerName = getOwnerName();
+            if (!(await canAccessWorkspaceComments(storage, config, organism, agentGaii, ownerName, agentGaii, ws))) {
+                return { content: [{ type: 'text' as const, text: 'You cannot comment in this workspace' }], isError: true };
+            }
+            const comment = await addComment(storage, organism_id, agentGaii, { ws, space, instanceId: instance_id, body, anchor, parentId: parent_id });
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ comment }, null, 2) }] };
+        },
+    );
+
+    // ── Tool: aimeat_workspace_comments ── (list a target's thread)
+    mcp.tool(
+        'aimeat_workspace_comments',
+        descriptionFor('aimeat_workspace_comments'),
+        {
+            organism_id: z.string().describe('The organism ID'),
+            ws: z.string().describe('Workspace id'),
+            space: z.string().describe('The objectType (space) name'),
+            instance_id: z.string().describe('The record/document id'),
+        },
+        annotationsFor('aimeat_workspace_comments'),
+        async ({ organism_id, ws, space, instance_id }) => {
+            const organism = await storage.getOrganism(organism_id);
+            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
+            const ownerName = getOwnerName();
+            if (!(await canAccessWorkspaceComments(storage, config, organism, agentGaii, ownerName, agentGaii, ws))) {
+                return { content: [{ type: 'text' as const, text: 'You cannot read this workspace' }], isError: true };
+            }
+            const comments = await listComments(storage, organism_id, ws, space, instance_id);
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ comments, total: comments.length }, null, 2) }] };
         },
     );
 

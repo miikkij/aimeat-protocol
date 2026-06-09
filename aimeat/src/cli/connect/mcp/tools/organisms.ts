@@ -89,4 +89,64 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     const resp = await client.post('/v1/organisms/import', { zip_base64 });
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
+
+  mcp.tool('aimeat_organism_invite', descriptionFor('aimeat_organism_invite'), {
+    organism_id: z.string().describe('Organism identifier'),
+    invitee: z.string().describe('Bare owner name to invite'),
+  }, annotationsFor('aimeat_organism_invite'), async ({ organism_id, invitee }) => {
+    const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/invitations`, { invitee });
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
+  });
+
+  mcp.tool('aimeat_organism_invitations', descriptionFor('aimeat_organism_invitations'), {}, annotationsFor('aimeat_organism_invitations'), async () => {
+    const resp = await client.get('/v1/organisms/invitations/mine');
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+  });
+
+  mcp.tool('aimeat_organism_invitation_respond', descriptionFor('aimeat_organism_invitation_respond'), {
+    organism_id: z.string().describe('Organism identifier you were invited to'),
+    decision: z.enum(['accept', 'decline']).describe('accept or decline'),
+  }, annotationsFor('aimeat_organism_invitation_respond'), async ({ organism_id, decision }) => {
+    const path = decision === 'accept' ? 'accept' : 'decline';
+    const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/invitations/${path}`, {});
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
+  });
+
+  mcp.tool('aimeat_organism_search', descriptionFor('aimeat_organism_search'), {
+    organism_id: z.string().describe('Organism identifier'),
+    q: z.string().describe('Search text (min 2 characters)'),
+    ws: z.string().optional().describe('Optional: limit to a single workspace id'),
+  }, annotationsFor('aimeat_organism_search'), async ({ organism_id, q, ws }) => {
+    const params = new URLSearchParams({ q });
+    if (ws) params.set('ws', ws);
+    const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/search?${params.toString()}`);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
+  });
+
+  mcp.tool('aimeat_workspace_comment', descriptionFor('aimeat_workspace_comment'), {
+    organism_id: z.string().describe('Organism identifier'),
+    ws: z.string().describe('Workspace id'),
+    space: z.string().describe('The objectType (space) name'),
+    instance_id: z.string().describe('The record/document id'),
+    body: z.string().describe('The comment text'),
+    anchor: z.object({ section: z.string().optional(), quote: z.string().optional() }).optional().describe('Optional anchor to part of a document'),
+    parent_id: z.string().optional().describe('Optional id of the comment this replies to'),
+  }, annotationsFor('aimeat_workspace_comment'), async ({ organism_id, ws, space, instance_id, body, anchor, parent_id }) => {
+    const payload: Record<string, unknown> = { ws, space, instance_id, body };
+    if (anchor != null) payload.anchor = anchor;
+    if (parent_id != null) payload.parent_id = parent_id;
+    const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/comments`, payload);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
+  });
+
+  mcp.tool('aimeat_workspace_comments', descriptionFor('aimeat_workspace_comments'), {
+    organism_id: z.string().describe('Organism identifier'),
+    ws: z.string().describe('Workspace id'),
+    space: z.string().describe('The objectType (space) name'),
+    instance_id: z.string().describe('The record/document id'),
+  }, annotationsFor('aimeat_workspace_comments'), async ({ organism_id, ws, space, instance_id }) => {
+    const params = new URLSearchParams({ ws, space, instance_id });
+    const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/comments?${params.toString()}`);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+  });
 }

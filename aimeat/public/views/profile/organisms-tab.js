@@ -82,6 +82,49 @@ import { Markdown, slugifyHeading } from '/components/Markdown.js';
 import { Mermaid } from '/components/Mermaid.js';
 
 /**
+ * Content search inside an organism — case-insensitive substring over the records + documents of
+ * every workspace the member can read. Backend: GET /v1/organisms/:id/search. Rendered in the
+ * expanded card for members; opening a hit takes the user to that workspace.
+ */
+function OrgSearch({ orgId, onOpenWorkspace }) {
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const doSearch = async () => {
+    const query = q.trim();
+    if (query.length < 2) return;
+    setBusy(true);
+    try {
+      const r = await orgService.searchOrganism(orgId, query);
+      setResults(r?.data?.results || []);
+    } catch { setResults([]); }
+    finally { setBusy(false); }
+  };
+
+  return html`
+    <div class="card-detail">
+      <div class="section-title">${t('organisms.searchContent') || 'Search content'}</div>
+      <div class="flex-row-wrap">
+        <input class="input-field input-sm" placeholder=${t('organisms.searchPlaceholder') || 'Find records & documents…'} value=${q}
+          onInput=${(e) => setQ(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') doSearch(); }} />
+        <button class="btn-outline btn-sm" disabled=${busy || q.trim().length < 2} onClick=${doSearch}>${t('organisms.search') || 'Search'}</button>
+      </div>
+      ${results !== null && results.length === 0 ? html`<div class="section-desc">${t('organisms.searchNoResults') || 'No matches.'}</div>` : null}
+      ${(results || []).map(r => html`
+        <div class="pj-access-row card-clickable" key=${r.ws + '/' + r.space + '/' + r.id} role="button" onClick=${() => onOpenWorkspace?.(r.ws)}>
+          <span>
+            <b>${escHtml(r.title)}</b>
+            <span class="pj-mini"> — ${escHtml(r.wsName || r.ws)} · ${escHtml(r.space)}</span>
+            <div class="pj-mini">${escHtml(r.snippet)}</div>
+          </span>
+        </div>
+      `)}
+    </div>
+  `;
+}
+
+/**
  * Banner listing the caller's pending organism invitations (status `invited`) across all
  * organisms, with Accept / Decline. Invited organisms are not in the member's active list, so
  * this is how an invitee discovers them. Backend: GET /v1/organisms/invitations/mine.
@@ -627,6 +670,10 @@ export default function OrganismsTab({ session, showToast, onStats }) {
               ` : null}
             </div>
 
+            ${(canEdit || isMember) ? html`<${OrgSearch}
+              orgId=${org.id}
+              onOpenWorkspace=${(ws) => { setOpenWs(ws); setOpenId(org.id); }} />` : null}
+
             ${(canEdit || isMember) ? html`<${OrgMemberManager}
               org=${org}
               ghii=${ghii}
@@ -1135,6 +1182,88 @@ function ParticipantsPanel({ orgId, wsId }) {
             </div>` : null}
         </div>` : null}
     </div>`;
+}
+
+/**
+ * Comment thread on one workspace object (record or document). Targeted by orgId+ws+space+instanceId.
+ * Members read + add comments; an author (or org admin) deletes. Supports an optional quote anchor
+ * (comment on a specific passage) and threaded replies (parentId). Backend: /v1/organisms/:id/comments.
+ * Agents use the same endpoints via aimeat_workspace_comment(s).
+ */
+function WorkspaceComments({ orgId, ws, space, instanceId, showToast }) {
+  const [comments, setComments] = useState(null);
+  const [body, setBody] = useState('');
+  const [anchorQuote, setAnchorQuote] = useState('');
+  const [replyTo, setReplyTo] = useState(null);   // { id, body } of the comment being replied to
+  const [busy, setBusy] = useState(false);
+  const me = (() => { try { return window.AIMEAT?.auth?.getSession?.() || {}; } catch { return {}; } })();
+  const mine = (author) => author && (author === me.gaii || author === me.ghii);
+
+  const load = useCallback(async () => {
+    if (!ws || !space || !instanceId) return;
+    const r = await orgService.listComments(orgId, ws, space, instanceId).catch(() => null);
+    setComments(r?.data?.comments || []);
+  }, [orgId, ws, space, instanceId]);
+  useEffect(() => { load(); }, [load]);
+  const liveRef = useRef(load); liveRef.current = load;
+  useEffect(() => {
+    const h = () => liveRef.current();
+    window.addEventListener('aimeat-live-update', h);
+    return () => window.removeEventListener('aimeat-live-update', h);
+  }, []);
+
+  const submit = async () => {
+    const text = body.trim();
+    if (!text) return;
+    setBusy(true);
+    try {
+      const anchor = anchorQuote.trim() ? { quote: anchorQuote.trim() } : undefined;
+      const r = await orgService.addComment(orgId, { ws, space, instanceId, body: text, anchor, parentId: replyTo?.id });
+      if (r?.ok === false) showToast(r?.error?.message || (t('organisms.commentFailed') || 'Could not post comment'));
+      else { setBody(''); setAnchorQuote(''); setReplyTo(null); await load(); }
+    } catch (e) { showToast((e && e.message) || (t('organisms.commentFailed') || 'Could not post comment')); }
+    finally { setBusy(false); }
+  };
+  const remove = async (c) => {
+    setBusy(true);
+    try {
+      const r = await orgService.deleteComment(orgId, c.id, ws, space, instanceId);
+      if (r?.ok === false) showToast(r?.error?.message || (t('organisms.commentDeleteFailed') || 'Could not delete'));
+      else await load();
+    } catch (e) { showToast((e && e.message) || (t('organisms.commentDeleteFailed') || 'Could not delete')); }
+    finally { setBusy(false); }
+  };
+
+  const list = comments || [];
+  return html`
+    <div class="pj-comments">
+      <div class="detail-label">${(t('organisms.commentsHeading') || 'Comments') + (list.length ? ` (${list.length})` : '')}</div>
+      ${comments === null ? html`<div class="section-desc">…</div>` : null}
+      ${comments !== null && list.length === 0 ? html`<div class="section-desc">${t('organisms.noComments') || 'No comments yet.'}</div>` : null}
+      ${list.map(c => html`
+        <div class="pj-comment ${c.parentId ? 'pj-comment-reply' : ''}" key=${c.id}>
+          <div class="pj-comment-head">
+            <b>${escHtml(c.author || '?')}</b>
+            ${c.parentId ? html`<span class="pj-mini"> · ${t('organisms.inReply') || 'reply'}</span>` : null}
+            ${c.anchor?.quote ? html`<span class="pj-mini"> · “${escHtml(String(c.anchor.quote).slice(0, 80))}”</span>` : null}
+            ${c.anchor?.section ? html`<span class="pj-mini"> · §${escHtml(c.anchor.section)}</span>` : null}
+            <span class="pj-mini"> · ${c.createdAt ? dt(c.createdAt) : ''}</span>
+          </div>
+          <div class="pj-comment-body">${escHtml(c.body || '')}</div>
+          <div class="pj-comment-actions">
+            <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => setReplyTo({ id: c.id, body: c.body })}>${t('organisms.reply') || 'Reply'}</button>
+            ${mine(c.author) ? html`<button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => remove(c)}>${t('organisms.delete') || 'Delete'}</button>` : null}
+          </div>
+        </div>
+      `)}
+      <div class="pj-comment-compose">
+        ${replyTo ? html`<div class="pj-mini">${t('organisms.replyingTo') || 'Replying to'}: “${escHtml(String(replyTo.body || '').slice(0, 60))}” <button class="btn-ghost btn-sm" onClick=${() => setReplyTo(null)}>${t('organisms.cancel') || 'Cancel'}</button></div>` : null}
+        <input class="input-field input-sm" placeholder=${t('organisms.anchorQuotePlaceholder') || 'Optional: quote a passage to anchor the comment'} value=${anchorQuote} onInput=${(e) => setAnchorQuote(e.target.value)} />
+        <textarea class="input-field input-sm" rows="2" placeholder=${t('organisms.commentPlaceholder') || 'Add a comment…'} value=${body} onInput=${(e) => setBody(e.target.value)}></textarea>
+        <button class="btn-primary btn-sm" disabled=${busy || !body.trim()} onClick=${submit}>${t('organisms.postComment') || 'Comment'}</button>
+      </div>
+    </div>
+  `;
 }
 
 function Workspace({ org, wsId, showToast, onBack }) {
@@ -1703,7 +1832,8 @@ function Workspace({ org, wsId, showToast, onBack }) {
                     const target = docs.find(d => (d.title || '').toLowerCase() === title.toLowerCase());
                     if (target) { setActiveDoc({ type: ot.name, mode: 'view', page: target }); scrollToAnchor(); }
                     else showToast((t('organisms.docNotFound') || 'No document titled “{title}”').replace('{title}', title));
-                  }} />`;
+                  }} />
+                <${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${livePage.id} showToast=${showToast} />`;
             })()}
           </div>
         </div>
@@ -1898,7 +2028,7 @@ function Workspace({ org, wsId, showToast, onBack }) {
                 <button class="btn-primary btn-sm" onClick=${() => publish(ot, d.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>
                 <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, d.id, String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id))}>🗑</button>
               </div>
-              ${expandedRec[ot.name + ':' + d.id] ? html`<div class="pj-rec-fields">${recordFields(d)}</div>` : null}
+              ${expandedRec[ot.name + ':' + d.id] ? html`<div class="pj-rec-fields">${recordFields(d)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${d.id} showToast=${showToast} />` : null}
             </div>
           `)}
 
@@ -1911,7 +2041,7 @@ function Workspace({ org, wsId, showToast, onBack }) {
                   ${o.status ? html`<span class="badge badge-info">${escHtml(o.status)}</span>` : null}
                   <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, o.id, String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.id))}>🗑</button>
                 </div>
-                ${expandedRec[ot.name + ':' + o.id] ? html`<div class="pj-rec-fields">${recordFields(o)}</div>` : null}
+                ${expandedRec[ot.name + ':' + o.id] ? html`<div class="pj-rec-fields">${recordFields(o)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${o.id} showToast=${showToast} />` : null}
               </div>
             `)
           }

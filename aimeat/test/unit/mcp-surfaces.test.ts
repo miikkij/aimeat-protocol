@@ -78,9 +78,12 @@ describe('v2 MCP surfaces', () => {
     });
 
     it('surface sizes are in the expected ballpark', () => {
-        expect(MCP_SURFACES.appdev.length).toBe(20);
-        expect(MCP_SURFACES.agent.length).toBe(50); // +5 schedule tools (create/list/update/delete/report_internal)
-        expect(MCP_SURFACES.service.length).toBe(52);
+        // Ballpark guard (was stale at 20/50/52 — drifted as workspace + other tools were added;
+        // brought current 2026-06-09: +3 organism invitation tools, +1 organism search, +2 workspace
+        // comment tools per surface).
+        expect(MCP_SURFACES.appdev.length).toBe(43);
+        expect(MCP_SURFACES.agent.length).toBe(68);
+        expect(MCP_SURFACES.service.length).toBe(70);
         expect(MCP_SURFACES.admin.length).toBe(15);
     });
 });
