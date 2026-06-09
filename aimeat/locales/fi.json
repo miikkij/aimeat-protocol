@@ -2894,6 +2894,7 @@
     "useCaseCustomDesc": "Siirry suoraan kaikkiin asetuksiin",
     "nodeId": "Solmun tunnus",
     "nodeIdHint": "Uniikki nimi tälle solmulle verkossa",
+    "nodeIdInvalid": "Solmun tunnuksen täytyy olla muotoa: aimeat-{alue}-{numero}-{nimi} (esim. aimeat-fi-001-home)",
     "port": "Portti",
     "portHint": "HTTP-portti jota palvelin kuuntelee",
     "portInvalid": "Portin pitää olla välillä 1–65535",

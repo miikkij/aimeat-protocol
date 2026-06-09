@@ -2894,6 +2894,7 @@
     "useCaseCustomDesc": "Skip to full configuration",
     "nodeId": "Node ID",
     "nodeIdHint": "Unique name for this node on the network",
+    "nodeIdInvalid": "Node ID must match format: aimeat-{region}-{number}-{name} (e.g. aimeat-fi-001-home)",
     "port": "Port",
     "portHint": "HTTP port the server listens on",
     "portInvalid": "Port must be between 1 and 65535",

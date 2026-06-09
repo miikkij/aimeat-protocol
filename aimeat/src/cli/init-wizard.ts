@@ -12,6 +12,7 @@ import ini from 'ini';
 import { createT, type Locale, type TFunction } from '../i18n.js';
 import type { AimeatConfig } from '../config.js';
 import { ENV_TO_DOT_PATH } from '../services/config-schema.js';
+import { validateNodeId } from '../utils/gaii.js';
 
 // Package root: from dist/src/cli/init-wizard.js -> go up 3 levels to aimeat/
 const __pkgRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -34,7 +35,7 @@ interface Preset {
 function buildPresets(cfg: AimeatConfig): Record<Exclude<UseCase, 'custom'>, Preset> {
   return {
     public: {
-      nodeId: cfg.nodeId !== 'aimeat-local-001-dev' ? cfg.nodeId : 'my-node-001',
+      nodeId: cfg.nodeId !== 'aimeat-local-001-dev' ? cfg.nodeId : 'aimeat-fi-001-genesis',
       port: cfg.port,
       baseUrl: cfg.baseUrl.startsWith('http://localhost') ? '' : cfg.baseUrl,
       dbUrl: cfg.dbUrl ?? '',
@@ -44,7 +45,7 @@ function buildPresets(cfg: AimeatConfig): Record<Exclude<UseCase, 'custom'>, Pre
       extendedFeatures: cfg.extendedFeaturesEnabled,
     },
     personal: {
-      nodeId: cfg.nodeId !== 'aimeat-local-001-dev' ? cfg.nodeId : 'personal-home',
+      nodeId: cfg.nodeId !== 'aimeat-local-001-dev' ? cfg.nodeId : 'aimeat-fi-001-home',
       port: cfg.port,
       baseUrl: `http://localhost:${cfg.port}`,
       dbUrl: cfg.dbUrl ?? '',
@@ -54,7 +55,7 @@ function buildPresets(cfg: AimeatConfig): Record<Exclude<UseCase, 'custom'>, Pre
       extendedFeatures: cfg.extendedFeaturesEnabled,
     },
     dev: {
-      nodeId: cfg.nodeId !== 'aimeat-local-001-dev' ? cfg.nodeId : 'dev-local',
+      nodeId: cfg.nodeId !== 'aimeat-local-001-dev' ? cfg.nodeId : 'aimeat-local-001-dev',
       port: cfg.port,
       baseUrl: `http://localhost:${cfg.port}`,
       dbUrl: cfg.dbUrl ?? '',
@@ -223,6 +224,11 @@ function validatePort(val: string | undefined, t: TFunction): string | undefined
   if (!val) return;  // empty = will use defaultValue
   const n = parseInt(val, 10);
   if (isNaN(n) || n < 1 || n > 65535) return t('init.portInvalid');
+}
+
+function validateNodeIdInput(val: string | undefined, t: TFunction): string | undefined {
+  if (!val) return;  // empty = will use defaultValue
+  if (validateNodeId(val) !== null) return t('init.nodeIdInvalid');
 }
 
 function validateUrl(val: string | undefined, t: TFunction): string | undefined {
@@ -563,6 +569,7 @@ async function askCoreSettings(
       message: t('init.nodeId'),
       placeholder: nodeIdDefault,
       defaultValue: nodeIdDefault,
+      validate: val => validateNodeIdInput(val, t),
     }),
     t,
   );
