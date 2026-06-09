@@ -461,6 +461,70 @@
     }
     .chat-input input:focus { border-color: rgba(167, 139, 250, 0.6); }
 
+    /* Model chip in the panel header */
+    .chat-model-chip {
+      font-size: 0.72rem;
+      color: #d8b4fe;
+      background: rgba(167,139,250,0.12);
+      border: 1px solid rgba(167,139,250,0.25);
+      border-radius: 999px;
+      padding: 2px 10px;
+      font-family: 'Cascadia Code','Fira Code',monospace;
+    }
+    .chat-model-chip:empty { display: none; }
+
+    /* Processing spinner + "thinking" indicator */
+    .cm-spinner {
+      display: inline-block;
+      width: 13px; height: 13px;
+      border: 2px solid rgba(255,255,255,0.25);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: cmspin 0.7s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes cmspin { to { transform: rotate(360deg); } }
+    .chat-thinking {
+      align-self: flex-start;
+      display: flex; align-items: center; gap: 8px;
+      color: #a78bfa;
+      font-size: 0.82rem;
+      padding: 4px 2px;
+    }
+    .chat-thinking .cm-spinner { border-color: rgba(167,139,250,0.3); border-top-color: #a78bfa; }
+    #chatSendBtn .cm-spinner { border-color: rgba(255,255,255,0.4); border-top-color: #fff; }
+
+    /* Saved-chats modal + rows */
+    .chat-modal {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.6);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .chat-modal-card {
+      background: #14122a;
+      border: 1px solid rgba(167,139,250,0.25);
+      border-radius: 16px;
+      padding: 24px;
+      width: 100%; max-width: 720px;
+      max-height: 80vh; overflow-y: auto;
+    }
+    .chat-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .chat-mem-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px; margin-bottom: 8px;
+      background: rgba(30,20,50,0.6);
+      border: 1px solid rgba(167,139,250,0.15);
+      border-radius: 12px;
+    }
+    .chat-mem-info { flex: 1; min-width: 0; }
+    .chat-mem-title { color: #d8b4fe; font-weight: 600; font-size: 0.9rem; }
+    .chat-mem-sub { color: #a78bfa; font-size: 0.76rem; margin-top: 2px; word-break: break-all; }
+    .chat-mem-prev {
+      color: #b4a9c9; font-size: 0.8rem; margin-top: 6px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
     /* ── Empty State ────────────────────────────────────────── */
     .empty-state {
       text-align: center;
@@ -729,16 +793,21 @@
             <label for="chatModel">Ollama model</label>
             <select id="chatModel" class="ai-model-select" style="max-width: none; width: 100%;"></select>
           </div>
-          <button class="btn" id="chatConnectBtn" onclick="chatConnect()">Register &amp; Start Chat</button>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button class="btn" id="chatConnectBtn" onclick="chatConnect()">Register &amp; Start Chat</button>
+            <button class="btn secondary" onclick="openChatMemory()" style="padding: 8px 16px;">Saved chats</button>
+          </div>
           <p id="chatSetupStatus" class="form-hint" style="margin-top: 12px;"></p>
         </div>
 
         <div class="card" id="chatPanel" style="display: none;">
           <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
             <span class="status-indicator online"><span class="dot"></span><span id="chatAgentLabel">agent</span></span>
+            <span id="chatModelLabel" class="chat-model-chip"></span>
             <label style="font-size: 0.8rem; color: #a78bfa; display: flex; align-items: center; gap: 6px; cursor: pointer; margin-left: auto;">
               <input type="checkbox" id="chatAutoApprove" onchange="chatToggleAuto()" /> Auto-approve writes
             </label>
+            <button class="btn secondary" onclick="chatClearCurrent()" style="padding: 6px 14px; font-size: 0.8rem;">Clear</button>
             <button class="btn secondary" onclick="chatStop()" style="padding: 6px 14px; font-size: 0.8rem;">Disconnect</button>
           </div>
           <div id="chatLog" class="chat-log"></div>
@@ -746,6 +815,21 @@
             <input type="text" id="chatInput" placeholder="Ask about your organisms, workspaces, knowledge…"
               onkeydown="if(event.key==='Enter')chatSend()" disabled />
             <button class="btn" id="chatSendBtn" onclick="chatSend()" disabled>Send</button>
+          </div>
+        </div>
+
+        <!-- Saved-chats (memory) manager -->
+        <div id="chatMemoryModal" class="chat-modal" style="display: none;">
+          <div class="chat-modal-card">
+            <div class="chat-modal-head">
+              <h2 style="margin: 0;">Saved chats</h2>
+              <button class="btn secondary" onclick="closeChatMemory()" style="padding: 4px 14px;">Close</button>
+            </div>
+            <p class="form-hint" style="margin: 8px 0 14px;">
+              Each saved conversation is tied to a host + owner + model and lives only on this machine. The AI
+              re-reads live data every turn, so resuming a chat never shows stale information.
+            </p>
+            <div id="chatMemoryList"></div>
           </div>
         </div>
       </div>
@@ -1336,6 +1420,10 @@
     let chatStarted = false;
     let chatBusy = false;
     let chatEventBound = false;
+    let chatCurrentModel = '';
+    let chatThinkingStart = 0;
+    let chatThinkingTimer = null;
+    let chatPending = null;
 
     function chatBaseUrl() {
       const target = document.getElementById('chatTarget').value;
@@ -1420,20 +1508,65 @@
           status('Registering chat agent (approve happens automatically)…');
           agent = await invoke('register_chat_agent', { baseUrl: base, owner: user, ownerToken, agentName: 'ollama-desktop' });
         }
-        status('Starting chat…');
-        await invoke('chat_start', { baseUrl: base, surface: 'agent', model });
-        chatStarted = true;
-        document.getElementById('chatAgentLabel').textContent = agent.gaii || 'agent';
-        document.getElementById('chatSetup').style.display = 'none';
-        document.getElementById('chatPanel').style.display = 'flex';
-        document.getElementById('chatLog').innerHTML = '';
         document.getElementById('chatPass').value = '';
-        document.getElementById('chatAutoApprove').checked = false;
-        chatAddSystem('Connecting to ' + base + '…');
+        chatPending = { base, owner: user, model, agent };
+        // Offer to resume a saved conversation for this host + owner + model, else start fresh.
+        let count = 0, updatedAt = '';
+        try {
+          const session = await invoke('get_chat_session', { baseUrl: base, owner: user, model });
+          if (session && Array.isArray(session.messages)) {
+            count = session.messages.filter(m => m.role === 'user' || m.role === 'assistant').length;
+            updatedAt = session.updated_at || '';
+          }
+        } catch (e) { /* no saved session */ }
+        if (count > 0) {
+          document.getElementById('chatSetupStatus').innerHTML =
+            'Found a saved chat (' + count + ' messages' + (updatedAt ? ', ' + new Date(updatedAt).toLocaleString() : '') + '). ' +
+            '<button class="btn" style="padding:4px 12px;font-size:0.78rem;margin-left:6px;" onclick="chatBegin(true)">Resume</button> ' +
+            '<button class="btn secondary" style="padding:4px 12px;font-size:0.78rem;" onclick="chatBegin(false)">Start fresh</button>';
+        } else {
+          await chatBegin(false);
+        }
       } catch (err) {
         status('Failed: ' + err);
       } finally {
         btn.disabled = false;
+      }
+    }
+
+    async function chatBegin(resume) {
+      if (!chatPending) return;
+      const { base, owner, model, agent } = chatPending;
+      const status = (t) => { document.getElementById('chatSetupStatus').textContent = t; };
+      status('Starting chat…');
+      try {
+        await invoke('chat_start', { baseUrl: base, owner, surface: 'agent', model, resume });
+      } catch (e) { status('Failed: ' + e); return; }
+      chatStarted = true;
+      chatCurrentModel = model;
+      document.getElementById('chatAgentLabel').textContent = agent.gaii || 'agent';
+      document.getElementById('chatModelLabel').textContent = model;
+      document.getElementById('chatSetup').style.display = 'none';
+      document.getElementById('chatPanel').style.display = 'flex';
+      document.getElementById('chatLog').innerHTML = '';
+      document.getElementById('chatAutoApprove').checked = false;
+      document.getElementById('chatSetupStatus').textContent = '';
+      if (resume) {
+        try {
+          const session = await invoke('get_chat_session', { baseUrl: base, owner, model });
+          if (session && Array.isArray(session.messages)) chatRenderHistory(session.messages);
+        } catch (e) { /* ignore */ }
+        chatAddSystem('Resumed conversation · ' + base);
+      } else {
+        chatAddSystem('Connecting to ' + base + '…');
+      }
+    }
+
+    // Replay a saved transcript: just the conversation (user + assistant). Tool steps were transient.
+    function chatRenderHistory(messages) {
+      for (const m of messages) {
+        if (m.role === 'user') chatAppend('user', m.content || '');
+        else if (m.role === 'assistant' && m.content) chatAppend('assistant', m.content);
       }
     }
 
@@ -1493,7 +1626,41 @@
     }
     function chatSetInputEnabled(on) {
       document.getElementById('chatInput').disabled = !on;
-      document.getElementById('chatSendBtn').disabled = !on;
+      const b = document.getElementById('chatSendBtn');
+      b.disabled = !on;
+      b.innerHTML = on ? 'Send' : '<span class="cm-spinner"></span>';
+    }
+
+    // A "<model> is thinking…" row kept at the BOTTOM of the log while the model works (local models
+    // can take a while), so it never looks frozen. Moved down on each event, removed when the answer lands.
+    function chatShowThinking() {
+      const log = document.getElementById('chatLog');
+      let t = document.getElementById('chatThinking');
+      if (!t) {
+        t = document.createElement('div');
+        t.id = 'chatThinking';
+        t.className = 'chat-thinking';
+        t.innerHTML = '<span class="cm-spinner"></span> <span id="chatThinkingText"></span>';
+      }
+      log.appendChild(t); // append() moves an existing node to the end
+      if (!chatThinkingTimer) {
+        chatThinkingStart = Date.now();
+        chatUpdateThinking();
+        chatThinkingTimer = setInterval(chatUpdateThinking, 1000);
+      }
+      log.scrollTop = log.scrollHeight;
+    }
+    function chatUpdateThinking() {
+      const el = document.getElementById('chatThinkingText');
+      if (!el) return;
+      const secs = Math.floor((Date.now() - chatThinkingStart) / 1000);
+      const elapsed = secs >= 60 ? Math.floor(secs / 60) + 'm ' + (secs % 60) + 's' : secs + 's';
+      el.textContent = (chatCurrentModel || 'model') + ' is thinking… ' + elapsed;
+    }
+    function chatHideThinking() {
+      if (chatThinkingTimer) { clearInterval(chatThinkingTimer); chatThinkingTimer = null; }
+      const t = document.getElementById('chatThinking');
+      if (t) t.remove();
     }
 
     async function chatSend() {
@@ -1505,8 +1672,9 @@
       chatAppend('user', text);
       chatBusy = true;
       chatSetInputEnabled(false);
+      chatShowThinking();
       try { await invoke('chat_send', { text }); }
-      catch (err) { chatAddSystem('Error: ' + err); chatBusy = false; chatSetInputEnabled(true); }
+      catch (err) { chatHideThinking(); chatAddSystem('Error: ' + err); chatBusy = false; chatSetInputEnabled(true); }
     }
 
     function handleChatEvent(ev) {
@@ -1520,7 +1688,7 @@
         const d = document.createElement('div');
         d.className = 'chat-tool' + (ev.write ? ' write' : '');
         d.innerHTML = (ev.write ? '✎ ' : '↳ ') + '<span class="tname">' + escapeHtml(ev.name) + '</span> ' + escapeHtml(JSON.stringify(ev.args || {}).slice(0, 200));
-        log.appendChild(d); log.scrollTop = log.scrollHeight;
+        log.appendChild(d); chatShowThinking();
       } else if (ev.type === 'approval_request') {
         const d = document.createElement('div');
         d.className = 'chat-approve';
@@ -1536,19 +1704,23 @@
         const d = document.createElement('div');
         d.className = 'chat-tool';
         d.textContent = '⤷ ' + (ev.result || '').slice(0, 600);
-        log.appendChild(d); log.scrollTop = log.scrollHeight;
+        log.appendChild(d); chatShowThinking();
       } else if (ev.type === 'assistant') {
+        chatHideThinking();
         chatAppend('assistant', ev.text || '');
       } else if (ev.type === 'done') {
+        chatHideThinking();
         chatBusy = false; chatSetInputEnabled(true);
         document.getElementById('chatInput').focus();
       } else if (ev.type === 'error') {
+        chatHideThinking();
         let m = ev.message || 'unknown error';
         if (/fetch failed|ECONNREFUSED|11434|ollama/i.test(m)) {
           m = "Can't reach Ollama — is it still running? (" + m + ")";
         }
         chatAddSystem('Error: ' + m); chatBusy = false; chatSetInputEnabled(true);
       } else if (ev.type === 'closed') {
+        chatHideThinking();
         chatAddSystem('Bridge disconnected.'); chatBusy = false; chatSetInputEnabled(false);
       }
     }
@@ -1565,6 +1737,45 @@
       const v = document.getElementById('chatAutoApprove').checked;
       try { await invoke('chat_set_auto_approve', { value: v }); }
       catch (err) { showToast('Failed: ' + err, 'error'); }
+    }
+
+    async function chatClearCurrent() {
+      try { await invoke('chat_clear'); } catch (e) {}
+      document.getElementById('chatLog').innerHTML = '';
+      chatAddSystem('Conversation cleared.');
+    }
+
+    // ── Saved-chats (memory) manager ────────────────────────────
+    async function openChatMemory() {
+      document.getElementById('chatMemoryModal').style.display = 'flex';
+      await refreshChatMemory();
+    }
+    function closeChatMemory() { document.getElementById('chatMemoryModal').style.display = 'none'; }
+    async function refreshChatMemory() {
+      const list = document.getElementById('chatMemoryList');
+      list.textContent = 'Loading…';
+      let sessions = [];
+      try { sessions = await invoke('list_chat_sessions'); }
+      catch (e) { list.textContent = 'Failed: ' + e; return; }
+      if (!sessions.length) { list.innerHTML = '<p class="form-hint">No saved chats yet.</p>'; return; }
+      list.innerHTML = '';
+      for (const s of sessions) {
+        const row = document.createElement('div');
+        row.className = 'chat-mem-row';
+        row.innerHTML =
+          '<div class="chat-mem-info">' +
+            '<div class="chat-mem-title">' + escapeHtml(s.model || '?') + ' · ' + escapeHtml(s.owner || '?') + '</div>' +
+            '<div class="chat-mem-sub">' + escapeHtml(s.base_url || '') + ' · ' + s.message_count + ' msgs' +
+              (s.updated_at ? ' · ' + new Date(s.updated_at).toLocaleString() : '') + '</div>' +
+            (s.preview ? '<div class="chat-mem-prev">' + escapeHtml(s.preview) + '</div>' : '') +
+          '</div>' +
+          '<button class="btn danger" style="padding:4px 12px;font-size:0.76rem;white-space:nowrap;">Delete</button>';
+        row.querySelector('button').onclick = async () => {
+          try { await invoke('delete_chat_session', { key: s.key }); await refreshChatMemory(); }
+          catch (e) { showToast('Failed: ' + e, 'error'); }
+        };
+        list.appendChild(row);
+      }
     }
 
     // ── Init ────────────────────────────────────────────────────

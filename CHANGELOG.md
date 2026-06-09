@@ -4,6 +4,42 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-06-09
+
+### Connector: organism workspace + create/backup tools are now shell-callable
+
+The `aimeat` connector exposes tools two ways: a **shell-callable** path (`aimeat connect call <tool>
+--stdin`) for runtimes without an MCP client — used by deterministic CrewAI crews that do all AIMEAT I/O
+through `aimeat connect call` with no LLM in the loop — and the **MCP serve** surface for LLM runtimes.
+The workspace + organism-create/backup tools existed only on the MCP surface, so a deterministic crew
+could write MEMORY but could not read or write an organism WORKSPACE — blocking the crew→workspace
+dogfood (e.g. a listener crew writing `opportunity` records into a shared workspace). They were also
+advertised as cli-callable by the shared catalog yet had no shell handler, so `aimeat connect call
+aimeat_workspace_read` failed with "Unknown CLI-callable tool".
+
+#### Added
+
+- **Shell handlers for the organism workspace + create/backup tools** (`src/cli/connect/tool-call.ts`):
+  `aimeat_workspace_list / read / write / publish / update / create / object_delete / access / transfer`
+  and `aimeat_organism_create / export / import`. They are thin REST wrappers over the same routes the
+  MCP tools use, so **all server-side authz is unchanged** (member-only writes, creator-gated workspace
+  content + access, schema validation of `value`, the publish gate). `aimeat connect call
+  aimeat_workspace_write --agent <member> --stdin` now creates a draft and `aimeat connect call
+  aimeat_workspace_publish …` publishes it; `aimeat connect schema <tool>` prints each tool's input.
+  Input names match the MCP schemas (`organism_id`, `ws`, `space`, `value`, `id`, `namespace`) so a crew
+  reuses one payload on both paths.
+- **A connector shell-callable parity test** (`test/unit/connector-cli-parity.test.ts`) — every tool the
+  catalog advertises as cli-callable (`visibility.cliFallback`) must have a `CONNECT_CLI_TOOLS` handler,
+  in both directions. This catches the "listed by `aimeat connect tools` but rejected by `aimeat connect
+  call`" inconsistency that hid this gap. A small documented set (`aimeat_message_history`,
+  `aimeat_schedule_*`) stays a known connector gap (no agent-facing REST route yet) and is tracked
+  explicitly in the test rather than silently.
+
+#### Fixed
+
+- **`aimeat connect call aimeat_workspace_*` no longer fails with "Unknown CLI-callable tool".** The
+  workspace + organism create/backup tools were advertised as cli-callable but had no shell handler.
+
 ### Organism workspaces: lean, agent-complete MCP surface + in-place structure editing
 
 Agents can now manage a workspace's whole lifecycle over MCP without a tool per operation. A workspace
@@ -129,6 +165,14 @@ that handles all AIMEAT communication so the model just decides which tool to ca
   Chat tab widens to 1400px, so long answers get real space. Assistant replies render **markdown as styled HTML**
   (headings, **bold**, *italic*, `inline code`, fenced code, nested lists, links that open externally) via a small
   escape-first (XSS-safe) renderer — no raw `###`/`**`/backticks any more. User/tool/system lines stay plain.
+- **Progress feedback** — the Send button shows a spinner while the model works, a "`<model>` is thinking… `<elapsed>`"
+  row (with a live seconds/minutes counter) stays pinned at the bottom of the transcript between tool calls (local
+  models can take a while; it never looks frozen), and the **active model** is shown as a chip in the panel header.
+- **Persistent conversations** — each chat is saved locally per **host + owner + model** and survives app restarts.
+  On connect, if a saved chat exists you're offered **Resume** (the transcript is replayed and the model regains
+  context) or **Start fresh**. A **Saved chats** manager lists every saved combination with a preview and lets you
+  delete them; **Clear** wipes the current one. Only the *conversation* is stored — the model re-reads live data via
+  MCP every turn, so a resumed chat can never serve stale info (we deliberately do **not** cache entity state).
 
 #### Fixed
 
@@ -143,6 +187,10 @@ that handles all AIMEAT communication so the model just decides which tool to ca
 - **Sign-in required before connecting** (Chat tab). The chat now verifies the owner (`node_login_at`) on **every**
   connection instead of silently reusing the stored agent token, so account + password must be entered before any
   connection to the node is opened. The stored token still avoids re-registration; it no longer bypasses sign-in.
+- **Big/slow local models no longer time out** (`agent-bridge.mjs`). The bridge now **streams** the completion
+  (`stream: true`) and assembles the deltas, so response headers arrive immediately. In non-stream mode Ollama
+  only sends headers when generation is fully done, so a model that takes minutes (e.g. a 22 GB qwen3) tripped
+  Node's 300 s headers timeout → "fetch failed"; streaming keeps the request alive while the model thinks.
 
 ### MCP: first-run wizard gate no longer intercepts versioned API routes
 

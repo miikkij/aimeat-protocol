@@ -31,10 +31,14 @@ fn main() {
             ai_connector::get_ai_settings,
             chat::get_chat_agent,
             chat::register_chat_agent,
+            chat::get_chat_session,
+            chat::list_chat_sessions,
+            chat::delete_chat_session,
             chat::chat_start,
             chat::chat_send,
             chat::chat_approve,
             chat::chat_set_auto_approve,
+            chat::chat_clear,
             chat::chat_stop,
         ])
         .setup(|app| {

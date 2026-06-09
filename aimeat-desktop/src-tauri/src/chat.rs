@@ -7,7 +7,7 @@
 // webview via Tauri events ("chat-event") and forwards UI commands to its stdin.
 
 use serde::{Deserialize, Serialize};
-use std::fs::{create_dir_all, read_to_string, write};
+use std::fs::{create_dir_all, read_dir, read_to_string, remove_file, write};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
@@ -49,6 +49,97 @@ pub fn get_chat_agent(app: AppHandle, base_url: String) -> Result<Option<ChatAge
     }
     let content = read_to_string(&f).map_err(|e| e.to_string())?;
     serde_json::from_str(&content).map(Some).map_err(|e| e.to_string())
+}
+
+// ── Persisted chat sessions (one transcript per host + owner + model) ────────────────
+// The bridge writes the transcript file ({base_url, owner, model, updated_at, messages}) after each
+// turn; these commands let the UI list, resume, and delete them. We persist only the CONVERSATION —
+// the model still re-reads live data via MCP, so nothing here can go stale and mislead an answer.
+
+#[derive(Serialize)]
+pub struct ChatSessionMeta {
+    pub key: String, // file stem — stable handle for open/delete
+    pub base_url: String,
+    pub owner: String,
+    pub model: String,
+    pub updated_at: String,
+    pub message_count: usize,
+    pub preview: String,
+}
+
+fn sessions_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = strip_verbatim(app.path().app_data_dir().map_err(|e| e.to_string())?).join("chat-sessions");
+    create_dir_all(&dir).map_err(|e| format!("Failed to create chat-sessions dir: {}", e))?;
+    Ok(dir)
+}
+fn session_key(base: &str, owner: &str, model: &str) -> String {
+    format!("{}__{}__{}", sanitize(base.trim_end_matches('/')), sanitize(owner), sanitize(model))
+}
+fn session_path(app: &AppHandle, base: &str, owner: &str, model: &str) -> Result<PathBuf, String> {
+    Ok(sessions_dir(app)?.join(format!("{}.json", session_key(base, owner, model))))
+}
+
+/// The persisted transcript for a (host, owner, model), or null. Full JSON incl. `messages`.
+#[tauri::command]
+pub fn get_chat_session(app: AppHandle, base_url: String, owner: String, model: String) -> Result<Option<serde_json::Value>, String> {
+    let f = session_path(&app, &base_url, &owner, &model)?;
+    if !f.exists() {
+        return Ok(None);
+    }
+    let content = read_to_string(&f).map_err(|e| e.to_string())?;
+    serde_json::from_str(&content).map(Some).map_err(|e| e.to_string())
+}
+
+/// Every saved session across all host/owner/model combinations, newest first, with a short preview.
+#[tauri::command]
+pub fn list_chat_sessions(app: AppHandle) -> Result<Vec<ChatSessionMeta>, String> {
+    let dir = sessions_dir(&app)?;
+    let mut out: Vec<ChatSessionMeta> = Vec::new();
+    for entry in read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        let Ok(content) = read_to_string(&path) else { continue };
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(&content) else { continue };
+        let messages = v.get("messages").and_then(|m| m.as_array()).cloned().unwrap_or_default();
+        let count = messages
+            .iter()
+            .filter(|m| matches!(m.get("role").and_then(|r| r.as_str()), Some("user") | Some("assistant")))
+            .count();
+        let preview = messages
+            .iter()
+            .find(|m| m.get("role").and_then(|r| r.as_str()) == Some("user"))
+            .and_then(|m| m.get("content").and_then(|c| c.as_str()))
+            .unwrap_or("")
+            .chars()
+            .take(80)
+            .collect::<String>();
+        out.push(ChatSessionMeta {
+            key: path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string(),
+            base_url: v.get("base_url").and_then(|x| x.as_str()).unwrap_or("").to_string(),
+            owner: v.get("owner").and_then(|x| x.as_str()).unwrap_or("").to_string(),
+            model: v.get("model").and_then(|x| x.as_str()).unwrap_or("").to_string(),
+            updated_at: v.get("updated_at").and_then(|x| x.as_str()).unwrap_or("").to_string(),
+            message_count: count,
+            preview,
+        });
+    }
+    out.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    Ok(out)
+}
+
+/// Delete one saved session by its key (file stem from list_chat_sessions).
+#[tauri::command]
+pub fn delete_chat_session(app: AppHandle, key: String) -> Result<(), String> {
+    if key.contains('/') || key.contains('\\') || key.contains("..") {
+        return Err("Invalid session key".into());
+    }
+    let f = sessions_dir(&app)?.join(format!("{}.json", key));
+    if f.exists() {
+        remove_file(&f).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 /// Register the desktop chat as the owner's own agent via device-auth, then store its token.
@@ -174,8 +265,10 @@ fn resolve_bridge(app: &AppHandle) -> Result<(PathBuf, PathBuf, PathBuf), String
 pub fn chat_start(
     app: AppHandle,
     base_url: String,
+    owner: String,
     surface: String,
     model: String,
+    resume: bool,
     ollama_url: Option<String>,
 ) -> Result<(), String> {
     let _ = chat_stop(app.clone()); // single instance
@@ -184,6 +277,13 @@ pub fn chat_start(
         .ok_or_else(|| "No chat agent registered for this node yet.".to_string())?;
     let (node_bin, entry, cwd) = resolve_bridge(&app)?;
 
+    // Per (host, owner, model) transcript file. The bridge loads it if present and rewrites it after
+    // each turn; "start fresh" deletes it first so the bridge begins with an empty conversation.
+    let session = session_path(&app, &base_url, &owner, &model)?;
+    if !resume {
+        let _ = remove_file(&session);
+    }
+
     let mut cmd = Command::new(&node_bin);
     cmd.arg(&entry)
         .current_dir(&cwd)
@@ -191,6 +291,8 @@ pub fn chat_start(
         .env("AIMEAT_AGENT_TOKEN", &agent.token)
         .env("AIMEAT_MCP_PATH", format!("/v2/mcp/{}", surface))
         .env("OLLAMA_MODEL", &model)
+        .env("AIMEAT_OWNER", &owner)
+        .env("AIMEAT_SESSION_FILE", session.to_string_lossy().to_string())
         .env("OLLAMA_URL", ollama_url.unwrap_or_else(|| "http://localhost:11434".to_string()))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -264,6 +366,12 @@ pub fn chat_approve(id: String, approved: bool) -> Result<(), String> {
 #[tauri::command]
 pub fn chat_set_auto_approve(value: bool) -> Result<(), String> {
     send_cmd(serde_json::json!({ "type": "set_auto_approve", "value": value }))
+}
+
+/// Clear the running conversation (and its persisted transcript) without disconnecting.
+#[tauri::command]
+pub fn chat_clear() -> Result<(), String> {
+    send_cmd(serde_json::json!({ "type": "clear" }))
 }
 
 #[tauri::command]

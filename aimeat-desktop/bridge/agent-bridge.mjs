@@ -29,6 +29,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createInterface } from 'node:readline';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
 const cfg = {
   base: (process.env.AIMEAT_BASE || '').replace(/\/+$/, ''),
@@ -36,7 +37,31 @@ const cfg = {
   token: process.env.AIMEAT_AGENT_TOKEN || '',
   ollamaUrl: (process.env.OLLAMA_URL || 'http://localhost:11434').replace(/\/+$/, ''),
   model: process.env.OLLAMA_MODEL || 'qwen2.5:7b',
+  owner: process.env.AIMEAT_OWNER || '',
+  sessionFile: process.env.AIMEAT_SESSION_FILE || '',
 };
+
+// Persisted transcript (one file per host+owner+model). We store ONLY the conversation; the model
+// re-reads live data via MCP every turn, so a resumed session can never serve stale answers.
+function loadSession() {
+  const base = [{ role: 'system', content: SYSTEM_PROMPT }];
+  if (!cfg.sessionFile || !existsSync(cfg.sessionFile)) return base;
+  try {
+    const data = JSON.parse(readFileSync(cfg.sessionFile, 'utf8'));
+    const msgs = Array.isArray(data.messages) ? data.messages : [];
+    if (!msgs.length) return base;
+    return msgs[0]?.role === 'system' ? msgs : [...base, ...msgs.filter((m) => m.role !== 'system')];
+  } catch { return base; }
+}
+function saveSession(messages) {
+  if (!cfg.sessionFile) return;
+  try {
+    writeFileSync(cfg.sessionFile, JSON.stringify({
+      base_url: cfg.base, owner: cfg.owner, model: cfg.model,
+      updated_at: new Date().toISOString(), messages,
+    }));
+  } catch { /* persistence is best-effort */ }
+}
 
 const SYSTEM_PROMPT =
   'You are the AIMEAT assistant running inside the user\'s desktop app, connected to their AIMEAT node ' +
@@ -262,7 +287,7 @@ async function main() {
   }
 
   // stdio mode: persistent conversation; commands arrive as JSON lines on stdin.
-  const messages = [{ role: 'system', content: SYSTEM_PROMPT }];
+  let messages = loadSession();
   let autoApprove = false;
   let busy = false;
   const rl = createInterface({ input: process.stdin });
@@ -275,6 +300,12 @@ async function main() {
       return;
     }
     if (cmd.type === 'set_auto_approve') { autoApprove = !!cmd.value; return; }
+    if (cmd.type === 'clear') {
+      messages = [{ role: 'system', content: SYSTEM_PROMPT }];
+      saveSession(messages);
+      emit({ type: 'cleared' });
+      return;
+    }
     if (cmd.type === 'user') {
       if (busy) { emit({ type: 'error', message: 'Still working on the previous message.' }); return; }
       busy = true;
@@ -285,6 +316,7 @@ async function main() {
       } catch (e) {
         emit({ type: 'error', message: e.message });
       } finally {
+        saveSession(messages);
         emit({ type: 'done' });
         busy = false;
       }

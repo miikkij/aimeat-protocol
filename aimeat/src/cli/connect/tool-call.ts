@@ -19,6 +19,11 @@
  *   v1.3.0 -- 2026-05-28 -- Add core memory, work, wallet, board, storage, and admin handlers
  *   v1.4.0 -- 2026-05-28 -- Add remaining connector MCP handlers to CLI fallback
  *   v1.5.0 -- 2026-05-28 -- Add memory tags and owner-scope listing support
+ *   v1.6.0 -- 2026-06-09 -- Add organism WORKSPACE + organism create/backup shell handlers
+ *     (workspace_list/read/write/publish/update/create/object_delete/access/transfer +
+ *     organism_create/export/import), so no-LLM CrewAI crews can read/write organism workspaces via
+ *     `aimeat connect call`. Thin REST wrappers, server-side authz unchanged. Guarded by
+ *     test/unit/connector-cli-parity.test.ts.
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -112,6 +117,25 @@ function query(params: Record<string, string | number | boolean | undefined>): s
     }
     const serialized = search.toString();
     return serialized ? `?${serialized}` : '';
+}
+
+// ── Workspace helpers (shared with the workspace_* shell handlers below) ──
+const wsRoot = (orgId: string, ws: string) => `organism.${orgId}.w.${ws}`;
+/** Parse a possibly-JSON-stringified object param (value/manifest/schemas) back to an object. */
+function coerceObject(value: unknown): unknown {
+    if (typeof value === 'string') { try { const p = JSON.parse(value) as unknown; if (p && typeof p === 'object') return p; } catch { /* leave as-is */ } }
+    return value;
+}
+/** A draft value should be an object; tolerate a JSON-string, then stamp the instance id. */
+function stampValue(value: unknown, id: string): unknown {
+    const v = coerceObject(value);
+    return (v && typeof v === 'object' && !Array.isArray(v)) ? { ...(v as JsonObject), id } : v;
+}
+function genDocId(): string {
+    return 'doc-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+function genWsId(): string {
+    return 'ws-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 }
 
 function taskTodoPayload(input: JsonObject): JsonObject {
@@ -720,6 +744,191 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_organism_members',
         handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'id'))}/members`),
+    },
+    // ── Organism create / backup (parity with the appdev MCP surface; thin REST wrappers, authz server-side) ──
+    {
+        name: 'aimeat_organism_create',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { name: requiredString(input, 'name') };
+            const description = optionalString(input, 'description'); if (description) body.description = description;
+            const type = optionalString(input, 'type'); if (type) body.type = type;
+            const joinPolicy = optionalString(input, 'join_policy'); if (joinPolicy) body.join_policy = joinPolicy;
+            const visibility = optionalString(input, 'visibility'); if (visibility) body.visibility = visibility;
+            return client.post('/v1/organisms', body);
+        },
+    },
+    {
+        name: 'aimeat_organism_export',
+        handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/export${query({ format: 'base64' })}`),
+    },
+    {
+        name: 'aimeat_organism_import',
+        handler: ({ client }, input) => client.post('/v1/organisms/import', { zip_base64: requiredString(input, 'zip_base64') }),
+    },
+    // ── Organism WORKSPACES (parity with the appdev MCP surface; the routes enforce membership,
+    //    schema validation, the creator-gate, and the publish gate — so authz is unchanged here) ──
+    {
+        name: 'aimeat_workspace_list',
+        handler: async ({ client }, input) => {
+            const orgId = requiredString(input, 'organism_id');
+            const key = `organism.${orgId}.meta.workspaces`;
+            const resp = await client.get(`/v1/memory${query({ prefix: key })}`);
+            if (!resp.ok) return resp;
+            const items = (resp.data as { items?: { key: string; value?: { workspaces?: unknown[] } }[] } | undefined)?.items ?? [];
+            const reg = items.find(i => i.key === key);
+            return { ok: true, data: { organism_id: orgId, workspaces: reg?.value?.workspaces ?? [] } };
+        },
+    },
+    {
+        name: 'aimeat_workspace_read',
+        handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspace${query({ ws: requiredString(input, 'ws') })}`),
+    },
+    {
+        name: 'aimeat_workspace_write',
+        handler: async ({ client }, input) => {
+            const orgId = requiredString(input, 'organism_id');
+            const ws = requiredString(input, 'ws');
+            const space = requiredString(input, 'space');
+            const wsResp = await client.get(`/v1/organisms/${encodeURIComponent(orgId)}/workspace${query({ ws })}`);
+            if (!wsResp.ok) return wsResp;
+            const ot = ((wsResp.data as { manifest?: { objectTypes?: { name: string; namespace?: string; mode?: string }[] } } | undefined)?.manifest?.objectTypes ?? []).find(o => o.name === space);
+            if (!ot || !ot.namespace) return { ok: false, error: { code: 'NO_SPACE', message: `No space named "${space}" in this workspace.` } };
+            const isDoc = ot.mode === 'document';
+            const v0 = coerceObject(requiredValue(input, 'value'));
+            let instanceId = optionalString(input, 'id') ?? (v0 && typeof v0 === 'object' && !Array.isArray(v0) ? String((v0 as JsonObject).id ?? '').trim() : '');
+            if (!instanceId && isDoc) instanceId = genDocId();
+            if (!instanceId) return { ok: false, error: { code: 'NO_ID', message: 'A records write needs an id (pass id, or include id in value).' } };
+            const v = stampValue(v0, instanceId);
+            const key = `${wsRoot(orgId, ws)}.${ot.namespace}.${instanceId}.draft`;
+            const wr = await client.post('/v1/memory', { key, value: v, visibility: 'private' });
+            if (!wr.ok) return wr;
+            const section = optionalString(input, 'section');
+            if (isDoc && section) {
+                const secKey = `${wsRoot(orgId, ws)}.meta.sections.${ot.name}`;
+                const secResp = await client.get(`/v1/memory${query({ prefix: secKey })}`);
+                const sections = (secResp.data as { items?: { key: string; value?: { sections?: { id: string; name?: string; documents?: string[] }[] } }[] } | undefined)?.items?.find(i => i.key === secKey)?.value?.sections ?? [];
+                const targetSec = sections.find(s => s.id === section || s.name === section);
+                if (targetSec) { targetSec.documents = [...(targetSec.documents ?? []).filter(d => d !== instanceId), instanceId]; await client.post('/v1/memory', { key: secKey, value: { sections }, visibility: 'private' }); }
+            }
+            return { ok: true, data: { written: key, id: instanceId, space, mode: ot.mode ?? 'records', section: section ?? null } };
+        },
+    },
+    {
+        name: 'aimeat_workspace_publish',
+        handler: ({ client }, input) => client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/publish`, {
+            ws: requiredString(input, 'ws'), namespace: requiredString(input, 'namespace'), id: requiredString(input, 'id'),
+        }),
+    },
+    {
+        name: 'aimeat_workspace_update',
+        handler: ({ client }, input) => {
+            const body: JsonObject = {};
+            if (typeof input.name === 'string') body.name = input.name;
+            if (typeof input.readme === 'string') body.readme = input.readme;
+            if (input.manifest !== undefined) body.manifest = coerceObject(input.manifest);
+            if (input.schemas !== undefined) body.schemas = coerceObject(input.schemas);
+            if (Object.keys(body).length === 0) throw new Error('Provide a name, readme, manifest and/or schemas.');
+            return client.put(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspace${query({ ws: requiredString(input, 'ws') })}`, body);
+        },
+    },
+    {
+        name: 'aimeat_workspace_create',
+        handler: async ({ client }, input) => {
+            const orgId = requiredString(input, 'organism_id');
+            const name = requiredString(input, 'name');
+            const man = coerceObject(input.manifest) as JsonObject | undefined;
+            if (!man || typeof man !== 'object' || !Array.isArray(man.objectTypes)) return { ok: false, error: { code: 'INVALID_MANIFEST', message: 'manifest must be an object with an objectTypes array.' } };
+            const schemaMap = (coerceObject(input.schemas) ?? {}) as Record<string, Record<string, unknown>>;
+            const wsId = genWsId();
+            const base = wsRoot(orgId, wsId);
+            const now = new Date().toISOString();
+            // PUT schema is owner/operator-only — an agent token may lack permission, so failures are
+            // reported (not fatal); the owner can lock schemas later, matching the appdev MCP behavior.
+            const schemaResults: { namespace: string; locked: boolean; error?: string }[] = [];
+            for (const [namespace, schema] of Object.entries(schemaMap)) {
+                if (!schema || typeof schema !== 'object') continue;
+                const r = await client.put(`/v1/memory/${encodeURIComponent(`${base}.${namespace}`)}/schema`, { schema, apply_to: 'prefix', schema_mode: 'strict' });
+                schemaResults.push({ namespace, locked: r.ok, ...(r.ok ? {} : { error: r.error?.message }) });
+            }
+            const manifestValue = { ...man, id: orgId, status: man.status || 'active' };
+            const mr = await client.post('/v1/memory', { key: `${base}.meta.manifest`, value: manifestValue, visibility: 'private' });
+            if (!mr.ok) return mr;
+            const summary = man.summary;
+            const readme = optionalString(input, 'readme');
+            await client.post('/v1/memory', { key: `${base}.meta.readme`, value: readme || `# ${String(man.name || name)}\n\n${typeof summary === 'string' ? summary : ''}`, visibility: 'private' });
+            const regKey = `organism.${orgId}.meta.workspaces`;
+            const regResp = await client.get(`/v1/memory${query({ prefix: regKey })}`);
+            const workspaces = ((regResp.data as { items?: { key: string; value?: { workspaces?: unknown[] } }[] } | undefined)?.items?.find(i => i.key === regKey)?.value?.workspaces) ?? [];
+            await client.post('/v1/memory', { key: regKey, value: { workspaces: [...workspaces, { id: wsId, name: String(name || 'Workspace').trim() || 'Workspace', createdAt: now }] }, visibility: 'private' });
+            return { ok: true, data: { created: true, ws: wsId, types: (man.objectTypes as { name: string }[]).map(o => o.name), schemas: schemaResults } };
+        },
+    },
+    {
+        name: 'aimeat_workspace_object_delete',
+        handler: async ({ client }, input) => {
+            const orgId = requiredString(input, 'organism_id');
+            const ws = requiredString(input, 'ws');
+            const namespace = requiredString(input, 'namespace');
+            const id = requiredString(input, 'id');
+            const base = `${wsRoot(orgId, ws)}.${namespace}.${id}`;
+            const listed = await client.get(`/v1/memory${query({ prefix: base + '.' })}`);
+            if (!listed.ok) return listed;
+            const items = (listed.data as { items?: { key: string }[] } | undefined)?.items ?? [];
+            let deleted = 0;
+            for (const it of items) {
+                const role = it.key.slice(base.length + 1);
+                if (role === 'draft' || role === 'latest' || /^version\.\d+$/.test(role)) {
+                    const dr = await client.delete(`/v1/memory/${encodeURIComponent(it.key)}`);
+                    if (dr.ok) deleted++;
+                }
+            }
+            if (deleted === 0) return { ok: false, error: { code: 'NOT_FOUND', message: `Nothing to delete at ${base} (no draft/latest/version).` } };
+            // Best-effort: unfile the id from the document section tree (find the type by namespace).
+            const wsResp = await client.get(`/v1/organisms/${encodeURIComponent(orgId)}/workspace${query({ ws })}`);
+            const ot = ((wsResp.data as { manifest?: { objectTypes?: { name: string; namespace?: string }[] } } | undefined)?.manifest?.objectTypes ?? []).find(o => o.namespace === namespace);
+            if (ot) {
+                const secKey = `${wsRoot(orgId, ws)}.meta.sections.${ot.name}`;
+                const secResp = await client.get(`/v1/memory${query({ prefix: secKey })}`);
+                const sections = (secResp.data as { items?: { key: string; value?: { sections?: { documents?: string[] }[] } }[] } | undefined)?.items?.find(i => i.key === secKey)?.value?.sections;
+                if (sections) {
+                    let changed = false;
+                    for (const s of sections) { if ((s.documents ?? []).includes(id)) { s.documents = (s.documents ?? []).filter(d => d !== id); changed = true; } }
+                    if (changed) await client.post('/v1/memory', { key: secKey, value: { sections }, visibility: 'private' });
+                }
+            }
+            return { ok: true, data: { deleted: base, keys: deleted } };
+        },
+    },
+    {
+        name: 'aimeat_workspace_access',
+        handler: ({ client }, input) => {
+            const orgId = requiredString(input, 'organism_id');
+            const ws = requiredString(input, 'ws');
+            const action = requiredString(input, 'action');
+            const orgPath = `/v1/organisms/${encodeURIComponent(orgId)}/workspace-access`;
+            if (action === 'list') return client.get(`${orgPath}${query({ ws })}`);
+            if (action === 'decide') {
+                const requester = optionalString(input, 'requester');
+                if (!requester) throw new Error("action='decide' needs a requester.");
+                return client.post(`${orgPath}/decision`, { ws, requester, decision: optionalString(input, 'decision') === 'deny' ? 'deny' : 'approve' });
+            }
+            if (action === 'request') {
+                const body: JsonObject = { ws };
+                const message = optionalString(input, 'message'); if (message != null) body.message = message;
+                return client.post(orgPath, body);
+            }
+            throw new Error("action must be 'request', 'list' or 'decide'.");
+        },
+    },
+    {
+        name: 'aimeat_workspace_transfer',
+        handler: ({ client }, input) => {
+            const orgId = requiredString(input, 'organism_id');
+            const direction = requiredString(input, 'direction');
+            if (direction === 'export') return client.get(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/export${query({ ws: requiredString(input, 'ws'), format: 'base64' })}`);
+            if (direction === 'import') return client.post(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/import`, { zip_base64: requiredString(input, 'zip_base64') });
+            throw new Error("direction must be 'export' or 'import'.");
+        },
     },
     {
         name: 'aimeat_wallet_transactions',

@@ -185,6 +185,38 @@ This pattern is used because it is (1) **free** — users use their own AI chats
 
 **When adding features to the generator pipeline**, the work happens in the prompt text — not in UI buttons or backend logic. The app's job is to compose prompts, show them for copying, accept and validate responses, and thread relevant parts of previous responses into subsequent prompts.
 
+## AIMEAT Development Organism (dogfood) — session rituals
+
+AIMEAT's own development is tracked in an **AIMEAT organism** on aimeat.io
+(id `fbb51de5-56d5-4143-9871-b998a1187655`), reachable via the **appdev MCP**
+(`mcp__claude_ai_AIMEAT_APPDEV__*`). It is the source of truth for **coordination + working context**;
+the repo stays source of truth for **code + spec**. Full design: `docs/internal/aimeat-dev-organism-plan.md`.
+
+**These rituals apply ONLY when the appdev AIMEAT MCP is connected.** If it isn't, skip them silently —
+do not try to install or invoke it.
+
+Workspaces: **Development** (`ws-mq664uyfz21`) — `goal`/`roadmap-item`/`feature`/`bug`/`decision`(gate)/`known-gap`(gate)
++ `context`/`notes` docs · **Handbook** (`ws-mq6653ry24h`) — `handbook` pages + `invariant`(gate) ·
+**Protocol** (`ws-mq665ahqc6b`) — `rfc` pages + `spec-decision`(gate).
+
+1. **Session start — read the standup (cheap, bounded).** Read the `context` doc **`main-context`** in
+   Development + the last few `decision`s + the activity feed delta. That's it — do NOT ingest the whole
+   organism. main-context lists the open contexts and where each thread is.
+2. **Planning a task — read just-in-time, scoped.** When you pick work on area X, read X's Handbook
+   page(s) + the open `feature`/`bug` records in that area + the relevant `decision`/`invariant`. Read
+   when you pick the task, not upfront.
+3. **Finishing significant work — log it back.** Update the `feature`/`bug`; log a `decision` (a choice)
+   or `known-gap` (a deferral) — both **gated** (the publish is held for human approval); update the
+   `handbook` page if a subsystem changed; update the relevant **sub-context** `context` doc's current-state.
+4. **Milestones (the gate).** A sub-context's **draft** is the live current-state — edit it freely. A
+   **publish** is a **milestone** (a working state). **Publish a milestone ONLY after the developer's
+   explicit go-ahead in this session.** The agent performs the publish; never auto-publish a milestone.
+   The `.version.N` history is the milestone log.
+5. **Sync.** Keep `docs/known_gaps.md` + the roadmap in two-way sync with the organism
+   (`pnpm organism:sync`, once it exists).
+
+Rule 8 still holds: never add a `known-gap` on your own — developer-approved only.
+
 ## Architecture
 
 - **Runtime:** Node.js 24.x, ESM (`"type": "module"`)
