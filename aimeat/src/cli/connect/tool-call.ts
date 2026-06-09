@@ -769,14 +769,15 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     //    schema validation, the creator-gate, and the publish gate — so authz is unchanged here) ──
     {
         name: 'aimeat_workspace_list',
+        // The membership-gated discovery route aggregates the registry across ALL member identities and
+        // resolves access by owner — a raw /v1/memory prefix read is caller-scoped, so a sub-agent (whose
+        // identity ≠ the owner that wrote the registry) would see an empty list.
         handler: async ({ client }, input) => {
             const orgId = requiredString(input, 'organism_id');
-            const key = `organism.${orgId}.meta.workspaces`;
-            const resp = await client.get(`/v1/memory${query({ prefix: key })}`);
+            const resp = await client.get(`/v1/organisms/${encodeURIComponent(orgId)}/workspaces`);
             if (!resp.ok) return resp;
-            const items = (resp.data as { items?: { key: string; value?: { workspaces?: unknown[] } }[] } | undefined)?.items ?? [];
-            const reg = items.find(i => i.key === key);
-            return { ok: true, data: { organism_id: orgId, workspaces: reg?.value?.workspaces ?? [] } };
+            const workspaces = (resp.data as { workspaces?: unknown[] } | undefined)?.workspaces ?? [];
+            return { ok: true, data: { organism_id: orgId, workspaces } };
         },
     },
     {

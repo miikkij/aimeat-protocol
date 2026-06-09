@@ -40,6 +40,37 @@ aimeat_workspace_read` failed with "Unknown CLI-callable tool".
 - **`aimeat connect call aimeat_workspace_*` no longer fails with "Unknown CLI-callable tool".** The
   workspace + organism create/backup tools were advertised as cli-callable but had no shell handler.
 
+### Organism workspaces: a same-owner agent can use its owner's workspaces
+
+A registered agent under the owner who created a workspace (e.g. a deterministic CrewAI crew) could not
+see, read, or write that workspace through the connector/REST path — `workspace_list` returned `[]`,
+`workspace_read` returned `manifest: null`, and a write was rejected (`NO_SPACE` / `CONSENT_REQUIRED`) —
+while the owner's own session saw everything. Workspace content is written `visibility: private`, whose
+consent rule has no same-owner allowance, and the REST path resolves an agent to its GAII (the data lives
+under the owner GHII), so a same-owner sub-agent fell through every gate. An agent is its owner's tool and
+should use its owner's workspace exactly as the owner does — this blocked the deterministic crew→workspace
+dogfood (a crew writing `opportunity` records into a shared workspace).
+
+#### Fixed
+
+- **Same-owner agents read/write their owner's workspace.** The workspace read guards
+  (`GET /v1/organisms/:id/workspace`, `canReadWs`, and the MCP-serve `workspace_read` / `publish` /
+  `object_delete`) now treat a SAME-OWNER record as the caller's own (`isSameOwner`), so a sub-agent sees
+  the owner's workspace AND the owner sees the sub-agent's writes. Cross-owner records still pass through
+  the creator-gated consent guard.
+- **The workspace write gate exempts the creator's own agent.** `workspaceAccessMiddleware` now lets an
+  agent of the workspace's creator write without a separate consent grant (like the human owner session);
+  other members' agents still need a granted `workspace-contribution` consent.
+- **An approved cross-owner member writes through any path.** `workspaceAccessMiddleware` now checks the
+  member's `workspace-contribution` consent under BOTH their owner GHII and their agents — the consent is
+  owned by whichever identity requested access (owner/MCP-serve vs agent/connector), so an approved member
+  could previously read but not write via their agent. Non-approved members are still blocked (the
+  creator-gating is intact).
+- **`aimeat_workspace_list` (connector) uses the membership-gated discovery route**
+  (`GET /v1/organisms/:id/workspaces`) instead of a caller-scoped `/v1/memory` prefix read, which returned
+  an empty list for any sub-agent. E2E: a same-owner agent now lists, reads, writes, and the owner reads
+  the agent's write (`test/e2e-mcp-workspaces.ts` #19).
+
 ### Organism workspaces: lean, agent-complete MCP surface + in-place structure editing
 
 Agents can now manage a workspace's whole lifecycle over MCP without a tool per operation. A workspace
@@ -191,6 +222,12 @@ that handles all AIMEAT communication so the model just decides which tool to ca
   (`stream: true`) and assembles the deltas, so response headers arrive immediately. In non-stream mode Ollama
   only sends headers when generation is fully done, so a model that takes minutes (e.g. a 22 GB qwen3) tripped
   Node's 300 s headers timeout → "fetch failed"; streaming keeps the request alive while the model thinks.
+- **The chat agent knows its own identity** (`agent-bridge.mjs`). Its GAII, agent name, and owner are now in the
+  system prompt, so it no longer invents a "target agent" / owner when a tool needs one (it would guess names like
+  "dev agent from VSCode" and fail). The desktop passes `AIMEAT_AGENT_GAII` to the bridge.
+- **A turn stops after 3 consecutive tool failures** instead of looping (`agent-bridge.mjs`), and reports the last
+  error — so a model flailing against a failing tool no longer burns the whole step budget looking stuck. The
+  webview also falls back to plain text if markdown rendering ever throws, so a finished answer can't vanish.
 
 ### MCP: first-run wizard gate no longer intercepts versioned API routes
 

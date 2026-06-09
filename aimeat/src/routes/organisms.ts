@@ -570,7 +570,11 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const { items } = await storage.listAllMemory({ prefix: nsRoot, limit: 5000 });
     const readable: MemoryRecord[] = [];
     for (const rec of items) {
-      if (rec.ownerGaii === callerGaii) { readable.push(rec); continue; }
+      // Own records pass directly. A SAME-OWNER record (the workspace was created by this caller's
+      // owner, or by a sibling agent of the same owner) also passes: an agent is its owner's tool, so
+      // it sees the owner's workspace exactly as the owner does — and the owner sees its agents' writes.
+      // Cross-owner records still go through the shared read guard (creator-gated content).
+      if (rec.ownerGaii === callerGaii || isSameOwner(rec.ownerGaii, callerGaii)) { readable.push(rec); continue; }
       const decision = await authorizeRead(storage, config, {
         ownerGaii: rec.ownerGaii,
         accessorGaii: callerGaii,
@@ -781,7 +785,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const { items } = await storage.listAllMemory({ prefix: mkey, limit: 10 });
     const man = items.find(r => r.key === mkey);
     if (!man) return false;
-    if (man.ownerGaii === callerGaii) return true;
+    if (man.ownerGaii === callerGaii || isSameOwner(man.ownerGaii, callerGaii)) return true;
     const d = await authorizeRead(storage, config, { ownerGaii: man.ownerGaii, accessorGaii: callerGaii, resourceKey: man.key, visibility: man.visibility, groupId: man.groupId, action: 'read' });
     return d.allowed;
   };

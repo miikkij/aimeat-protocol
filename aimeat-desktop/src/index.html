@@ -1575,8 +1575,10 @@
       const log = document.getElementById('chatLog');
       const div = document.createElement('div');
       div.className = 'chat-msg ' + cls;
-      if (cls === 'assistant') div.innerHTML = renderMarkdown(text);
-      else div.textContent = text;
+      if (cls === 'assistant') {
+        try { div.innerHTML = renderMarkdown(text); }
+        catch (e) { div.textContent = text; console.error('[chat] markdown render failed', e); }
+      } else div.textContent = text;
       log.appendChild(div);
       log.scrollTop = log.scrollHeight;
       return div;

@@ -24,6 +24,9 @@
  *     so the loop still executes them (only for known tool names).
  *   v0.3.0 — 2026-06-09 — Stream the completion (stream:true) and assemble the deltas, so big/slow local
  *     models no longer trip Node's 300s headers timeout ("fetch failed") while thinking.
+ *   v0.4.0 — 2026-06-09 — Persist the transcript (load/save per host+owner+model). Put the agent's own
+ *     identity (GAII/owner) in the system prompt so it stops inventing target agents/owners; stop a turn
+ *     after 3 consecutive tool failures instead of looping.
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -38,6 +41,7 @@ const cfg = {
   ollamaUrl: (process.env.OLLAMA_URL || 'http://localhost:11434').replace(/\/+$/, ''),
   model: process.env.OLLAMA_MODEL || 'qwen2.5:7b',
   owner: process.env.AIMEAT_OWNER || '',
+  gaii: process.env.AIMEAT_AGENT_GAII || '',
   sessionFile: process.env.AIMEAT_SESSION_FILE || '',
 };
 
@@ -63,11 +67,20 @@ function saveSession(messages) {
   } catch { /* persistence is best-effort */ }
 }
 
+const AGENT_NAME = cfg.gaii ? cfg.gaii.split('#')[0] : '';
 const SYSTEM_PROMPT =
   'You are the AIMEAT assistant running inside the user\'s desktop app, connected to their AIMEAT node ' +
-  'as their own registered agent. Use the provided tools to read and manage the user\'s organisms, ' +
-  'workspaces, knowledge packages, and agents. Always READ (list/get/members/read) to gather context before ' +
-  'you WRITE (create/update/add/publish/delete). Be concise. If a tool returns an error, explain it plainly.';
+  'as their own registered agent. ' +
+  (cfg.gaii
+    ? `YOUR identity: GAII "${cfg.gaii}" — agent name "${AGENT_NAME}", owner "${cfg.owner}". When a tool asks ` +
+      'for an "owner", a "target agent", or who is performing an action and it means YOU, use exactly this ' +
+      'identity — NEVER invent agent names, owners, ids, or spaces. '
+    : '') +
+  'Use the provided tools to read and manage your owner\'s organisms, workspaces, knowledge, and agents. ' +
+  'Always READ (list/get/members/read) to learn the exact ids, names, and space names BEFORE you WRITE ' +
+  '(create/update/add/publish/delete), and pass values exactly as the tools return them. ' +
+  'If a tool returns an error, read it carefully and correct your next call; if it keeps failing, STOP and ' +
+  'explain the error plainly instead of guessing or inventing values. Be concise.';
 
 function emit(obj) {
   process.stdout.write(JSON.stringify(obj) + '\n');
@@ -194,6 +207,7 @@ function requestApproval(name, args) {
  * autoApprove: skip the approval gate (used by --once tests and the UI's auto mode).
  */
 async function runTurn(ctx, messages, { autoApprove }) {
+  let consecutiveErrors = 0, lastError = '';
   for (let step = 0; step < 8; step++) {
     const msg = await ollamaChat(messages, ctx.openaiTools);
 
@@ -230,6 +244,7 @@ async function runTurn(ctx, messages, { autoApprove }) {
           resultText = 'DENIED: the user declined this action.';
           emit({ type: 'tool_result', name, result: resultText });
           messages.push({ role: 'tool', tool_call_id: call.id, content: resultText });
+          consecutiveErrors++; lastError = resultText;
           continue;
         }
       }
@@ -245,6 +260,11 @@ async function runTurn(ctx, messages, { autoApprove }) {
       }
       emit({ type: 'tool_result', name, result: resultText.slice(0, 2000) });
       messages.push({ role: 'tool', tool_call_id: call.id, content: resultText });
+      if (/^(ERROR|DENIED)/.test(resultText)) { consecutiveErrors++; lastError = resultText; }
+      else consecutiveErrors = 0;
+    }
+    if (consecutiveErrors >= 3) {
+      return `I stopped after ${consecutiveErrors} tool calls failed in a row, to avoid looping. The last error was:\n\n${lastError}`;
     }
   }
   return '(stopped: too many tool steps without a final answer)';

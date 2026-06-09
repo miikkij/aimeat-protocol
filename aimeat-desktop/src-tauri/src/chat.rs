@@ -292,6 +292,7 @@ pub fn chat_start(
         .env("AIMEAT_MCP_PATH", format!("/v2/mcp/{}", surface))
         .env("OLLAMA_MODEL", &model)
         .env("AIMEAT_OWNER", &owner)
+        .env("AIMEAT_AGENT_GAII", &agent.gaii)
         .env("AIMEAT_SESSION_FILE", session.to_string_lossy().to_string())
         .env("OLLAMA_URL", ollama_url.unwrap_or_else(|| "http://localhost:11434".to_string()))
         .stdin(Stdio::piped())

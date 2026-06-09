@@ -10,6 +10,8 @@
  * @version-history
  *   v1.0.0 -- 2026-02 -- Phase 2.3 organism workspace access control.
  *   v1.1.0 -- 2026-06-07 -- Key the membership lookup by bare owner name (was full GHII → 403'd members).
+ *   v1.2.0 -- 2026-06-09 -- A same-owner agent (the workspace creator's own agent) bypasses the consent
+ *     check, like the human owner session — so a CrewAI sub-agent can write to its owner's workspace.
  */
 import type { RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -104,24 +106,48 @@ export function workspaceAccessMiddleware(
     // their own project workspace from the UI without provisioning an agent-owned consent.
     const isHumanOwnerSession = (req.auth?.roles ?? []).includes('owner') && !(req.auth?.roles ?? []).includes('agent');
 
-    // Consent needed unless writing your own member namespace, or you're the human owner-principal.
-    const needsConsent = !isOwnMemberNamespace && !isHumanOwnerSession;
+    // An AGENT of the workspace's OWN creator (same owner) is the creator's tool — like the human owner
+    // session, it does not consent to itself. Without this, a same-owner sub-agent (e.g. a CrewAI crew)
+    // could not write to its owner's organism workspace at all. Cross-owner member agents still need a
+    // granted 'workspace-contribution' consent. Scoped to workspace keys (organism.{id}.w.{ws}.*).
+    let isOwnWorkspaceAgent = false;
+    const wsMatch = key.match(/^organism\.[^.]+\.w\.([^.]+)\./);
+    if (wsMatch && !isHumanOwnerSession) {
+      const ws = wsMatch[1];
+      const regKey = `organism.${organismId}.meta.workspaces`;
+      const { items } = await storage.listAllMemory({ prefix: regKey, limit: 1000 });
+      for (const rec of items) {
+        if (rec.key !== regKey) continue;
+        const list = (rec.value as { workspaces?: Array<{ id: string; createdBy?: string }> } | null)?.workspaces ?? [];
+        const entry = list.find(w => w.id === ws);
+        if (entry) {
+          const createdBy = entry.createdBy ?? (rec.ownerGaii.includes('#') ? rec.ownerGaii.split('#')[1] : rec.ownerGaii).split('@')[0];
+          if (createdBy === ownerName) isOwnWorkspaceAgent = true;
+          break;
+        }
+      }
+    }
+
+    // Consent needed unless writing your own member namespace, you're the human owner-principal, or
+    // you're an agent of the workspace's own creator.
+    const needsConsent = !isOwnMemberNamespace && !isHumanOwnerSession && !isOwnWorkspaceAgent;
 
     if (needsConsent) {
-      // Look up all agents for this owner
+      // The workspace-contribution consent (created when the member requested access) is owned by the
+      // identity that made the request: the member's OWNER GHII (owner/MCP-serve session) OR one of
+      // their agents (agent/connector path). Check BOTH, so an approved member writes through any path —
+      // otherwise an approved member could read but not write via their agent (the consent was under the
+      // owner GHII). Membership is by bare owner name, so this stays per-owner.
+      const ownerGhii = `${ownerName}@${config.nodeId}`;
       const agents = await storage.getAgentsByOwner(ownerName);
+      const accessors = [ownerGhii, ...agents.map(a => a.gaii)];
 
-      if (agents.length === 0) {
-        res.status(403).json(error(config.nodeId, 'CONSENT_REQUIRED', 'No agent found — consent cannot be verified'));
-        return;
-      }
-
-      // Check if ANY of the owner's agents have a matching active consent
+      // Check if the owner (or ANY of their agents) holds a matching active consent.
       const accessorPattern = `organism.${organismId}`;
       let hasConsent = false;
 
-      for (const agent of agents) {
-        const matching = await storage.findMatchingConsents(agent.gaii, key, accessorPattern);
+      for (const accessor of accessors) {
+        const matching = await storage.findMatchingConsents(accessor, key, accessorPattern);
         if (matching.length > 0) {
           hasConsent = true;
           break;

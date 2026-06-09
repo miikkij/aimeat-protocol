@@ -39,11 +39,12 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
     { organism_id: z.string().describe('Organism id') },
     annotationsFor('aimeat_workspace_list'),
     async ({ organism_id }) => {
-      const key = `organism.${organism_id}.meta.workspaces`;
-      const resp = await client.get(`/v1/memory?prefix=${encodeURIComponent(key)}`);
-      const items = (resp.data as { items?: { key: string; value?: { workspaces?: unknown[] } }[] } | undefined)?.items ?? [];
-      const reg = items.find(i => i.key === key);
-      return text({ organism_id, workspaces: reg?.value?.workspaces ?? [] });
+      // Membership-gated discovery route (aggregates the registry across all members + resolves access
+      // by owner). A raw /v1/memory prefix read is caller-scoped → a sub-agent would see an empty list.
+      const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspaces`);
+      if (resp.ok === false) return text(resp.error ?? resp, true);
+      const workspaces = (resp.data as { workspaces?: unknown[] } | undefined)?.workspaces ?? [];
+      return text({ organism_id, workspaces });
     });
 
   mcp.tool('aimeat_workspace_read', descriptionFor('aimeat_workspace_read'),

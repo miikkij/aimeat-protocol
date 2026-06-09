@@ -93,7 +93,7 @@ async function setupAgent(label: string) {
     const tk = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: cl.body.client_id, client_secret: cl.body.client_secret }) });
     const client = mcpClient(); client.setToken(tk.body.access_token);
     await client.rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'WS MCP', version: '1.0.0' } });
-    return { ownerName, ownerToken, client };
+    return { ownerName, ownerToken, client, agentToken: tk.body.access_token as string, agentGaii };
 }
 
 console.log('\n=== AIMEAT MCP Workspaces E2E Test ===\n');
@@ -309,6 +309,39 @@ await test('18. B can now read the shared workspace over MCP', async () => {
     const b = await B.client.call('aimeat_workspace_read', { organism_id: bootOrgId, ws: bootWs.id }, 118);
     assert(b.result.isError !== true, `read after approval: ${b.result.content?.[0]?.text}`);
     assert(JSON.parse(b.result.content[0].text).manifest?.name === 'Bootstrapped', 'manifest readable after approval');
+});
+
+await test("19. A's OWN agent (same owner) reads + writes A's workspace via the REST route (sub-agent access)", async () => {
+    // Bug: the REST workspace route resolved the caller to its GAII and gated content as `private`, so a
+    // SAME-OWNER sub-agent saw list:[] / manifest:null / NO_SPACE for its own owner's workspace, and the
+    // owner could not see the sub-agent's writes. Fix: same-owner records pass the read guard both ways.
+    const ah = { Authorization: `Bearer ${A.agentToken}` };
+    // list — the membership-gated discovery route shows the workspace (a raw memory prefix read was empty)
+    const list = await json(`/v1/organisms/${bootOrgId}/workspaces`, { headers: ah });
+    assert(list.status === 200 && (list.body.data.workspaces || []).some((w: any) => w.id === bootWs.id), `sub-agent list: ${JSON.stringify(list.body)}`);
+    // read — the manifest is visible to the same-owner sub-agent (was null)
+    const read = await json(`/v1/organisms/${bootOrgId}/workspace?ws=${bootWs.id}`, { headers: ah });
+    assert(read.status === 200 && read.body.data.manifest?.name === 'Bootstrapped', `sub-agent manifest: ${JSON.stringify(read.body.data?.manifest)}`);
+    // write a record UNDER THE AGENT'S OWN GAII (attribution), then read it back as the agent
+    const wkey = `organism.${bootOrgId}.w.${bootWs.id}.shared.items.agent-rec-1.draft`;
+    const wr = await json('/v1/memory', { method: 'POST', headers: ah, body: JSON.stringify({ key: wkey, value: { id: 'agent-rec-1', title: 'from A agent' }, visibility: 'private' }) });
+    assert(wr.status === 200 || wr.status === 201, `sub-agent write ${wr.status}: ${JSON.stringify(wr.body)}`);
+    const read2 = await json(`/v1/organisms/${bootOrgId}/workspace?ws=${bootWs.id}`, { headers: ah });
+    assert((read2.body.data.drafts?.item || []).some((o: any) => o.id === 'agent-rec-1'), `agent sees its own draft: ${JSON.stringify(read2.body.data.drafts)}`);
+    // the OWNER session sees the sub-agent's write (same-owner aggregation, the other direction)
+    const ownerRead = await json(`/v1/organisms/${bootOrgId}/workspace?ws=${bootWs.id}`, { headers: { Authorization: `Bearer ${A.ownerToken}` } });
+    assert((ownerRead.body.data.drafts?.item || []).some((o: any) => o.id === 'agent-rec-1'), `owner sees agent draft: ${JSON.stringify(ownerRead.body.data.drafts)}`);
+});
+
+await test('20. B (cross-owner, APPROVED) can read + write A\'s workspace via the REST/connector path', async () => {
+    // The collaboration case: a DIFFERENT owner, a member of the org, APPROVED into the workspace (17/18),
+    // must be able to read + write through the connector/REST path (agent token), not just over MCP-serve.
+    const bh = { Authorization: `Bearer ${B.agentToken}` };
+    const read = await json(`/v1/organisms/${bootOrgId}/workspace?ws=${bootWs.id}`, { headers: bh });
+    assert(read.status === 200 && read.body.data.manifest?.name === 'Bootstrapped', `approved cross-owner read: ${JSON.stringify(read.body.data?.manifest ?? read.body)}`);
+    const wkey = `organism.${bootOrgId}.w.${bootWs.id}.shared.items.b-rest-1.draft`;
+    const wr = await json('/v1/memory', { method: 'POST', headers: bh, body: JSON.stringify({ key: wkey, value: { id: 'b-rest-1', title: 'B via REST' }, visibility: 'private' }) });
+    assert(wr.status === 200 || wr.status === 201, `approved cross-owner write ${wr.status}: ${JSON.stringify(wr.body)}`);
 });
 
 await test('Cleanup owner 1', async () => { const r = await json(`/v1/owners/${A.ownerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${A.ownerToken}` } }); assert(r.status === 200, `del ${r.status}`); });

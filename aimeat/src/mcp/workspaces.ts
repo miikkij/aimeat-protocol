@@ -35,7 +35,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import { parseGAII, isSameOwner } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
@@ -174,7 +174,10 @@ export function registerWorkspaceTools(
             const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 5000 });
             const mine: MemoryRecord[] = [];
             for (const r of items) {
-                if (r.ownerGaii === ownerGhii) { mine.push(r); continue; }
+                // Own records + SAME-OWNER records (the owner's other agents' workspace writes) pass
+                // directly — an agent is its owner's tool, so it reads the owner's workspace and the
+                // owner reads its agents' writes. Cross-owner records still need the consent guard.
+                if (r.ownerGaii === ownerGhii || isSameOwner(r.ownerGaii, ownerGhii)) { mine.push(r); continue; }
                 const d = await authorizeRead(storage, config, { ownerGaii: r.ownerGaii, accessorGaii: ownerGhii, resourceKey: r.key, visibility: r.visibility, groupId: r.groupId, action: 'read' });
                 if (d.allowed) mine.push(r);
             }
@@ -258,7 +261,9 @@ export function registerWorkspaceTools(
             if (gate) return fail('Publishing requires human approval (the publish gate is on). Leave it as a draft for the owner to review and publish.');
             const base = `${wsRoot(organism_id, ws)}.${namespace}.${id}`;
             const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000 });
-            const draft = items.find(r => r.key === `${base}.draft` && r.ownerGaii === ownerGhii);
+            // The draft may have been written by a sibling agent of the same owner (shell/REST path
+            // stores under the agent's own GAII), so accept any same-owner draft, not just ownerGhii's.
+            const draft = items.find(r => r.key === `${base}.draft` && (r.ownerGaii === ownerGhii || isSameOwner(r.ownerGaii, ownerGhii)));
             if (!draft) return fail(`No draft at ${base}.draft`);
             const valid = await validateMemoryWrite(`${base}.latest`, draft.value, storage);
             if (!valid.valid) return fail('Draft does not match the schema: ' + JSON.stringify(valid.errors));
@@ -270,7 +275,7 @@ export function registerWorkspaceTools(
             await storage.setMemory({ key: `${base}.version.${n}`, ownerGaii: ownerGhii, value: draft.value, visibility: draft.visibility, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
             const existingLatest = items.find(r => r.key === `${base}.latest`);
             await storage.setMemory({ key: `${base}.latest`, ownerGaii: ownerGhii, value: draft.value, visibility: draft.visibility, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
-            await storage.deleteMemory(ownerGhii, `${base}.draft`);
+            await storage.deleteMemory(draft.ownerGaii, `${base}.draft`);
             return ok({ published: base, version: n });
         });
 
@@ -313,10 +318,11 @@ export function registerWorkspaceTools(
             const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000 });
             let deleted = 0;
             for (const r of items) {
-                if (r.ownerGaii !== ownerGhii) continue;
+                // Own + same-owner records (a sibling agent's writes) are deletable; cross-owner are not.
+                if (r.ownerGaii !== ownerGhii && !isSameOwner(r.ownerGaii, ownerGhii)) continue;
                 const role = r.key.slice(base.length + 1);   // after `${base}.`
                 if (role === 'draft' || role === 'latest' || /^version\.\d+$/.test(role)) {
-                    if (await storage.deleteMemory(ownerGhii, r.key)) deleted++;
+                    if (await storage.deleteMemory(r.ownerGaii, r.key)) deleted++;
                 }
             }
             if (deleted === 0) return fail(`Nothing to delete at ${base} (no draft/latest/version).`);
