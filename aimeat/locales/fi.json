@@ -5522,6 +5522,7 @@
     "anAgent": "agentti",
     "hiddenAgent": "Agentti jonka tietoja et näe",
     "otherAgentHint": "Toisen omistajan agentti — näet mitä se on tehnyt täällä, et sen nykytilaa",
+    "viaAgent": "tehty tämän agentin kautta",
     "contributions": "kontribuutiota",
     "events": "tapahtumaa",
     "less": "Vähemmän",

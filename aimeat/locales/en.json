@@ -5522,6 +5522,7 @@
     "anAgent": "agent",
     "hiddenAgent": "An agent whose details you cannot see",
     "otherAgentHint": "Another owner’s agent — you see what it has done here, not its live status",
+    "viaAgent": "done via this agent",
     "contributions": "contributions",
     "events": "events",
     "less": "Less",

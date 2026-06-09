@@ -803,6 +803,7 @@ function ActivityPanel({ orgId, wsId }) {
               <span class="pj-act-dot ${e.action}"></span>
               <span class="pj-act-time">${dt(e.at)}</span>
               <span class="pj-act-who">${escHtml(e.actor)}</span>
+              ${e.agent ? html`<span class="pj-act-agent" title=${t('organisms.viaAgent') || 'via this agent'}>${'🤖 '}${escHtml(e.agent)}</span>` : null}
               <span class="pj-act-act">${e.action === 'publish' ? (t('organisms.publishedVerb') || 'published') : (t('organisms.editedVerb') || 'edited')}</span>
               <span class="pj-act-what">${escHtml(e.mode === 'document' ? '📄' : '🗂')} ${escHtml(e.type)}${' / '}${escHtml(e.instance)}</span>
             </div>`)}

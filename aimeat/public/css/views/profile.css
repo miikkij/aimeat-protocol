@@ -2151,6 +2151,7 @@
 .pj-act-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; }
 .pj-act-time { color: var(--muted); font-size: 0.72rem; min-width: 130px; }
 .pj-act-who { font-weight: 600; color: var(--text); }
+.pj-act-agent { font-size: 0.73rem; color: var(--accent); background: var(--bg-dim); border-radius: 5px; padding: 0.02rem 0.35rem; white-space: nowrap; }
 .pj-act-act { color: var(--muted); }
 .pj-act-what { color: var(--text); }
 /* Workspace list (an organism's many workspaces) */

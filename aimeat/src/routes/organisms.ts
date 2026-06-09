@@ -34,7 +34,7 @@ import type { Storage, MemoryRecord, PendingApprovalRecord } from '../storage/in
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { emitChange } from '../services/event-bus.js';
-import { resolveIdentity, parseGaiiLoose } from '../utils/gaii.js';
+import { resolveIdentity, parseGaiiLoose, isSameOwner } from '../utils/gaii.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { shouldGate, gatePolicyFromManifest, type Risk } from '../services/gate-policy.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
@@ -949,9 +949,11 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     const typeByNs = new Map(types.filter(o => o.namespace && o.name).map(o => [o.namespace as string, o.name as string]));
     const modeByNs = new Map(types.filter(o => o.namespace).map(o => [o.namespace as string, o.mode === 'document' ? 'document' : 'records']));
 
-    const events: Array<{ at: string; actor: string; namespace: string; type: string; mode: string; instance: string; action: 'publish' | 'draft' }> = [];
+    const events: Array<{ at: string; actor: string; agent: string | null; namespace: string; type: string; mode: string; instance: string; action: 'publish' | 'draft' }> = [];
     for (const r of items) {
-      if (r.ownerGaii !== callerGaii) {
+      // The caller's own records AND their own agents' records (same owner, different GAII) are always
+      // theirs to see; only genuinely other-owner records go through the consent check.
+      if (r.ownerGaii !== callerGaii && !isSameOwner(r.ownerGaii, callerGaii)) {
         const d = await authorizeRead(storage, config, { ownerGaii: r.ownerGaii, accessorGaii: callerGaii, resourceKey: r.key, visibility: r.visibility, groupId: r.groupId, action: 'read' });
         if (!d.allowed) continue;
       }
@@ -968,7 +970,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       const instance = core[core.length - 1];
       const namespace = core.slice(0, -1).join('.');
       if (!instance || !namespace) continue;
-      events.push({ at: action === 'draft' ? r.updatedAt : r.createdAt, actor: bareOwner(r.ownerGaii), namespace, type: typeByNs.get(namespace) || namespace, mode: modeByNs.get(namespace) || 'records', instance, action });
+      events.push({ at: action === 'draft' ? r.updatedAt : r.createdAt, actor: bareOwner(r.ownerGaii), agent: parseGaiiLoose(r.ownerGaii).agent || null, namespace, type: typeByNs.get(namespace) || namespace, mode: modeByNs.get(namespace) || 'records', instance, action });
     }
     events.sort((a, b) => (b.at || '').localeCompare(a.at || ''));
     res.json(success(config.nodeId, { ws, events: events.slice(0, 300), total: events.length }));
