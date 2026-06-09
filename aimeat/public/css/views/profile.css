@@ -53,6 +53,13 @@
  *     var(--success,#22c55e)/var(--danger,#ef4444). Appearance unchanged (values
  *     resolve identically; swatches deliberately do not flip in dark). Shared shape
  *     was already factored onto .badge-label — kept as-is.
+ *   v1.12.0 — 2026-06-09 — Workspace header restyle (pj-): breadcrumb (.pj-ws-crumbs)
+ *     keeps the parent organism visible; inline title+badge (.pj-ws-titlerow); the
+ *     action row became a tinted .pj-toolbar with consistent buttons (card fill +
+ *     shadow so they stop blending into the page), .pj-toolbar-sep separators, and the
+ *     review gate pushed apart (margin-left:auto). .pj-section-head no longer
+ *     space-betweens — add-actions cluster next to their title and lift off the panel;
+ *     the .pj-doc-tag kind chip got an accent-tinted fill so it stops blending in.
  */
 .pf-hero{background:var(--pf-hero-gradient);border-bottom:1px solid var(--border,#E5E7EB)}
 .pf-hero-inner{max-width:1000px;margin:0 auto;padding:2rem 1.5rem 0}
@@ -2018,15 +2025,38 @@
 
 /* ── Projects tab (pj-) ── */
 .pj-ws { display: flex; flex-direction: column; gap: 0.5rem; }
-.pj-gate { margin: 0.25rem 0 0.5rem; }
+
+/* Workspace breadcrumb — keeps the parent organism visible so you always know
+   which organism this workspace belongs to. */
+.pj-ws-crumbs { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.2rem; }
+.pj-crumb-sep { color: var(--muted); font-size: 0.85rem; }
+.pj-crumb-org { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+
+/* Title row — workspace name + status badge sit on one line. */
+.pj-ws-titlerow { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.pj-ws-title { margin: 0; }
+
+/* Workspace action toolbar — a tinted bar so the (otherwise transparent) buttons
+   read as real buttons rather than blending into the page. Consistent gap +
+   vertical separators group the Settings/Add, AI-prompt, and review-gate controls. */
+.pj-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; padding: 0.45rem 0.55rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 10px; margin: 0.1rem 0 0.4rem; }
+.pj-toolbar .btn-ghost, .pj-toolbar .btn-outline { background: var(--card); box-shadow: var(--shadow-sm); }
+.pj-toolbar .btn-ghost:hover, .pj-toolbar .btn-outline:hover { background: var(--bg-surface); border-color: var(--text-muted); }
+.pj-toolbar-sep { width: 1px; align-self: stretch; min-height: 1.4rem; background: var(--border); margin: 0 0.15rem; }
+.pj-toolbar-gate { margin-left: auto; }
 .pj-gate-label { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--muted); cursor: pointer; }
 .pj-inbox { border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem; background: var(--bg-dim); margin-bottom: 0.5rem; }
 .pj-approval { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.4rem 0; border-top: 1px solid var(--border); }
 .pj-approval:first-of-type { border-top: none; }
 .pj-approval-text { flex: 1; font-size: 0.88rem; }
 .pj-section { border: 1px solid var(--border); border-radius: 10px; padding: 0.6rem 0.75rem; background: var(--surface); }
-.pj-section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem; }
-.pj-section-title { font-weight: 600; text-transform: capitalize; }
+/* Action buttons sit right after the title (not pushed to the far edge) so they
+   stay visually tied to the panel they act on. */
+.pj-section-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.4rem; }
+.pj-section-title { font-weight: 600; text-transform: capitalize; margin-right: 0.25rem; }
+/* Lift the add-actions off the panel background so they read as buttons. */
+.pj-section-head .btn-outline, .pj-section-head .btn-ghost { background: var(--card); box-shadow: var(--shadow-sm); }
+.pj-section-head .btn-outline:hover, .pj-section-head .btn-ghost:hover { background: var(--bg-surface); border-color: var(--text-muted); }
 .pj-draft-form { margin: 0.4rem 0; }
 .pj-drafts { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.3rem; }
 .pj-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; }
@@ -2045,7 +2075,7 @@
 .pj-errors { border: 1px solid var(--danger); border-radius: 10px; padding: 0.6rem 0.75rem; margin: 0.5rem 0; background: var(--bg-dim); }
 .pj-errors-title { font-weight: 600; margin-bottom: 0.3rem; color: var(--danger); }
 .pj-error-line { font-size: 0.82rem; color: var(--text); padding: 0.1rem 0; }
-.pj-doc-tag { font-size: 0.68rem; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 0 0.3rem; margin-left: 0.4rem; vertical-align: middle; }
+.pj-doc-tag { font-size: 0.68rem; font-weight: 600; color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg-dim)); border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); border-radius: 6px; padding: 0.05rem 0.4rem; margin-left: 0.4rem; vertical-align: middle; }
 .pj-doc-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
 .pj-doc-link { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.9rem; text-align: left; flex: 1; padding: 0; }
 .pj-doc-link:hover { text-decoration: underline; }
@@ -2116,6 +2146,17 @@
 .pj-part-agent { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; border: 1px solid var(--border); border-radius: 6px; padding: 0.12rem 0.5rem; }
 .pj-part-agent.own { border-color: var(--success); }
 .pj-part-agent.ghost { color: var(--muted); border-style: dashed; opacity: 0.65; }
+/* Manage access — creator adds/roles/removes members in the participants panel */
+.pj-access { margin-top: 0.8rem; padding-top: 0.7rem; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: 0.45rem; }
+.pj-access-title { font-size: 0.82rem; font-weight: 600; color: var(--muted); }
+.pj-access-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 8px; padding: 0.4rem 0.6rem; background: var(--card); }
+.pj-access-who { display: flex; align-items: center; gap: 0.4rem; font-size: 0.86rem; }
+.pj-access-note { font-size: 0.78rem; color: var(--muted); }
+.pj-access-actions { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+.pj-access-add { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.2rem; }
+.pj-access-input { flex: 1 1 14rem; min-width: 10rem; border: 1px solid var(--border); border-radius: 7px; padding: 0.4rem 0.6rem; background: var(--surface); color: var(--text); font-size: 0.86rem; }
+.pj-access-role { border: 1px solid var(--border); border-radius: 7px; padding: 0.4rem 0.5rem; background: var(--surface); color: var(--text); font-size: 0.84rem; }
+.pj-access-hint { font-size: 0.76rem; color: var(--muted); }
 /* Activity panel — GitHub-style contribution heatmap + audit-log feed */
 .pj-act { padding: 0.1rem; }
 .pj-act-count { font-size: 0.72rem; font-weight: 500; color: var(--muted); margin-left: 0.5rem; }

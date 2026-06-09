@@ -180,23 +180,23 @@
 }
 
 /* ── Print: content only — hide the global site nav, the TOC, the action bar, and the card chrome.
- * The nav lives in the SPA shell (outside this view); `:has(.pwv-container)` scopes the rule so it
- * only hides the nav on the public viewer's own page, never on other views' print output. ── */
+ * `body.pwv-active` is added by the view while it is mounted (see public-workspace-viewer.js), so the
+ * nav-hiding rule applies only on this page and only the document content reaches paper. ── */
 @media print {
-  body:has(.pwv-container) .topnav { display: none !important; }
-  .pwv-container {
-    display: block;
+  /* Physical page margins so the text isn't flush against the paper edges. */
+  @page { margin: 1.8cm; }
+  body.pwv-active .topnav,
+  body.pwv-active .pwv-toc,
+  body.pwv-active .pwv-bar { display: none !important; }
+  body.pwv-active .pwv-container {
+    display: block !important;
     max-width: none;
     padding: 0;
   }
-  .pwv-toc,
-  .pwv-bar {
-    display: none;
-  }
-  .pwv-doc {
+  body.pwv-active .pwv-doc {
     border: none;
     border-radius: 0;
     padding: 0;
   }
-  .pwv-doc .md-body { max-width: none; }
+  body.pwv-active .pwv-doc .md-body { max-width: none; }
 }

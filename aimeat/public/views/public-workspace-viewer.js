@@ -57,6 +57,13 @@ export default function PublicWorkspaceViewer() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Mark the body while this view is mounted so the print stylesheet can hide the SPA shell chrome
+  // (the global nav lives outside this component) without a `:has()` dependency.
+  useEffect(() => {
+    document.body.classList.add('pwv-active');
+    return () => document.body.classList.remove('pwv-active');
+  }, []);
+
   const current = Array.isArray(docs) ? docs.find(d => docKey(d) === selected) : null;
   useEffect(() => {
     if (current?.title) document.title = `${current.title} — AIMEAT`;

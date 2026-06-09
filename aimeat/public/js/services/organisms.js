@@ -429,9 +429,28 @@ export async function listWorkspaceRequests(orgId, ws) {
   } catch { return []; }
 }
 
-/** Approve or deny a member's access request to your workspace. */
+/** Approve or deny a member's access request to your workspace. decision: 'approve'|'deny'|'viewer'|'contributor'. */
 export async function decideWorkspaceAccess(orgId, ws, requester, decision) {
   return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access/decision`, { ws, requester, decision });
+}
+
+/** Full access state for a workspace you manage: pending requests + current members with their roles. */
+export async function getWorkspaceAccess(orgId, ws) {
+  try {
+    const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access?ws=${encodeURIComponent(ws)}`);
+    return { requests: Array.isArray(resp?.data?.requests) ? resp.data.requests : [], members: Array.isArray(resp?.data?.members) ? resp.data.members : [] };
+  } catch { return { requests: [], members: [] }; }
+}
+
+/** Directly add (or re-role) a member: role 'viewer' (read) | 'contributor' (read+write). grantee = an
+ *  owner name, GHII, or GAII — the grant applies to that owner (so all their agents inherit it). */
+export async function grantWorkspaceRole(orgId, ws, grantee, role) {
+  return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access/grant`, { ws, grantee, role });
+}
+
+/** Remove a member's access to a workspace you manage. */
+export async function revokeWorkspaceRole(orgId, ws, grantee) {
+  return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access/revoke`, { ws, grantee });
 }
 
 /** Create a new (empty) workspace: register it, return its { id, name }. The manifest is written

@@ -51,6 +51,11 @@
  *     (⬆ in the bar, uploads a ZIP → new workspace) buttons.
  *   v1.12.0 — 2026-06-09 — Organism-level backup: "Export organism" (whole org ZIP) in the org view +
  *     "Import organism" (→ new org) in the My Organisms header.
+ *   v1.13.0 — 2026-06-09 — Workspace header restyle: parent-organism breadcrumb so you always see
+ *     which organism the workspace is in; status badge moved inline with the name; the action row
+ *     became a tinted .pj-toolbar (consistent buttons + vertical separators, review-gate pushed
+ *     apart); "+ Space" relabelled "+ Document space"; horizontal dividers split header / charts /
+ *     manifest panels; section-head add-actions sit next to their title and lift off the panel.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -818,6 +823,10 @@ function ActivityPanel({ orgId, wsId }) {
 function ParticipantsPanel({ orgId, wsId }) {
   const [data, setData] = useState(null);
   const [show, setShow] = useState(true);
+  const [access, setAccess] = useState(null);     // { requests, members } — only for the workspace creator
+  const [grantee, setGrantee] = useState('');
+  const [role, setRole] = useState('contributor');
+  const [busy, setBusy] = useState(false);
   useEffect(() => {
     let cancelled = false;
     const fetchIt = () => orgService.getWorkspaceParticipants(orgId, wsId).then(d => { if (!cancelled) setData(d); }).catch(() => {});
@@ -825,9 +834,20 @@ function ParticipantsPanel({ orgId, wsId }) {
     window.addEventListener('aimeat-live-update', fetchIt);
     return () => { cancelled = true; window.removeEventListener('aimeat-live-update', fetchIt); };
   }, [orgId, wsId]);
+  const isManager = !!(data && (data.nodes || []).some(n => (n.owners || []).some(o => o.isSelf && o.isCreator)));
+  const loadAccess = () => orgService.getWorkspaceAccess(orgId, wsId).then(setAccess).catch(() => {});
+  useEffect(() => { if (isManager) loadAccess(); }, [isManager, orgId, wsId, data]);   // eslint-disable-line react-hooks/exhaustive-deps
   if (!data || !(data.nodes || []).length) return null;
   const owners = [];
   for (const n of data.nodes) for (const o of (n.owners || [])) owners.push({ ...o, node: n.id, isLocalNode: n.isLocal });
+
+  const after = async (p) => { setBusy(true); try { await p; await loadAccess(); } catch (e) { /* the row stays so the user can retry */ } finally { setBusy(false); } };
+  const doGrant = (g, r) => { const name = (g || '').trim(); if (name) { after(orgService.grantWorkspaceRole(orgId, wsId, name, r)); setGrantee(''); } };
+  const doRevoke = (g) => after(orgService.revokeWorkspaceRole(orgId, wsId, g));
+  const doDecide = (requester, decision) => after(orgService.decideWorkspaceAccess(orgId, wsId, requester, decision));
+  const pending = (access?.requests || []).filter(r => r.status === 'pending');
+  const members = access?.members || [];
+
   return html`
     <div class="pj-chart">
       <div class="pj-chart-head">
@@ -856,6 +876,37 @@ function ParticipantsPanel({ orgId, wsId }) {
               </div>` : null}
             </div>`)}
           </div>
+          ${isManager ? html`
+            <div class="pj-access">
+              <div class="pj-access-title">${t('organisms.manageAccess') || 'Manage who can work here'}</div>
+              ${pending.map(r => html`<div class="pj-access-row" key=${'req-' + r.requester}>
+                <span class="pj-access-who">${'🙋 '}<strong>${escHtml(r.requester)}</strong> <span class="pj-access-note">${t('organisms.requestedAccess') || 'requested access'}</span></span>
+                <span class="pj-access-actions">
+                  <button class="btn-success btn-sm" disabled=${busy} onClick=${() => doDecide(r.requester, 'contributor')}>${t('organisms.addAsContributor') || 'Add as contributor'}</button>
+                  <button class="btn-outline btn-sm" disabled=${busy} onClick=${() => doDecide(r.requester, 'viewer')}>${t('organisms.addAsViewer') || 'as viewer'}</button>
+                  <button class="btn-danger btn-sm" disabled=${busy} onClick=${() => doDecide(r.requester, 'deny')}>${t('organisms.deny') || 'Deny'}</button>
+                </span>
+              </div>`)}
+              ${members.map(m => html`<div class="pj-access-row" key=${'mem-' + m.owner}>
+                <span class="pj-access-who">${'👤 '}<strong>${escHtml(m.owner)}</strong> <span class="badge ${m.role === 'contributor' ? 'badge-success' : 'badge-info'} pj-mini">${m.role === 'contributor' ? (t('organisms.roleContributorShort') || 'contributor') : (t('organisms.roleViewerShort') || 'viewer')}</span></span>
+                <span class="pj-access-actions">
+                  ${m.role === 'viewer'
+                    ? html`<button class="btn-outline btn-sm" disabled=${busy} onClick=${() => doGrant(m.owner, 'contributor')}>${t('organisms.makeContributor') || '→ can write'}</button>`
+                    : html`<button class="btn-outline btn-sm" disabled=${busy} onClick=${() => doGrant(m.owner, 'viewer')}>${t('organisms.makeViewer') || '→ read only'}</button>`}
+                  <button class="btn-danger btn-sm" disabled=${busy} onClick=${() => doRevoke(m.owner)}>${t('organisms.remove') || 'Remove'}</button>
+                </span>
+              </div>`)}
+              <div class="pj-access-add">
+                <input class="pj-access-input" placeholder=${t('organisms.addMemberPlaceholder') || 'owner name (or owner@node / agent#owner@node)'} value=${grantee}
+                  onInput=${e => setGrantee(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter') doGrant(grantee, role); }} />
+                <select class="pj-access-role" value=${role} onChange=${e => setRole(e.target.value)}>
+                  <option value="contributor">${t('organisms.roleContributor') || 'contributor (read + write)'}</option>
+                  <option value="viewer">${t('organisms.roleViewer') || 'viewer (read only)'}</option>
+                </select>
+                <button class="btn-primary btn-sm" disabled=${busy || !grantee.trim()} onClick=${() => doGrant(grantee, role)}>${'+ '}${t('organisms.addMember') || 'Add'}</button>
+              </div>
+              <div class="pj-access-hint">${t('organisms.accessHint') || 'Members can be a different account; their agents inherit the role. Viewers read; contributors read + write.'}</div>
+            </div>` : null}
         </div>` : null}
     </div>`;
 }
@@ -1270,7 +1321,12 @@ function Workspace({ org, wsId, showToast, onBack }) {
     </div>
   `;
 
-  const back = html`<div class="card-actions mb-half"><button class="btn-ghost btn-sm" onClick=${onBack}>${'← '}${t('organisms.backToWorkspaces') || 'Workspaces'}</button></div>`;
+  const back = html`
+    <div class="pj-ws-crumbs">
+      <button class="btn-ghost btn-sm" onClick=${onBack}>${'← '}${t('organisms.backToWorkspaces') || 'Workspaces'}</button>
+      <span class="pj-crumb-sep">/</span>
+      <span class="pj-crumb-org" title=${t('organisms.workspaceOrganism') || 'Organism'}>${'🧬 '}${escHtml(org.name || '')}</span>
+    </div>`;
 
   if (ws === undefined) return html`<div>${back}<${Spinner} text=${t('organisms.loading') || 'Loading...'} /></div>`;
 
@@ -1393,21 +1449,24 @@ function Workspace({ org, wsId, showToast, onBack }) {
     <div class="pj-ws">
       <${ConfirmUI} />
       ${back}
-      <div class="section-title">${escHtml(ws.manifest?.name || org.name || 'Workspace')}</div>
-      <div class="section-desc">
+      <div class="pj-ws-titlerow">
+        <span class="section-title pj-ws-title">${escHtml(ws.manifest?.name || org.name || 'Workspace')}</span>
         <span class="badge badge-success">${escHtml(ws.manifest?.status || 'active')}</span>
-        ${ws.manifest?.summary ? html` ${escHtml(ws.manifest.summary)}` : null}
       </div>
+      ${ws.manifest?.summary ? html`<div class="section-desc">${escHtml(ws.manifest.summary)}</div>` : null}
 
-      <div class="pj-gate">
-        <button class="btn-outline btn-sm" onClick=${() => setShowSettings(s => !s)}>${'⚙ '}${t('organisms.settings') || 'Settings'}</button>
-        <button class="btn-outline btn-sm" onClick=${() => setShowSpaces(s => !s)}>${'+ '}${t('organisms.addSpaceBtn') || 'Space'}</button>
+      <div class="pj-divider"></div>
+
+      <div class="pj-toolbar">
+        <button class="btn-ghost btn-sm" onClick=${() => setShowSettings(s => !s)}>${'⚙ '}${t('organisms.settings') || 'Settings'}</button>
+        <button class="btn-ghost btn-sm" onClick=${() => setShowSpaces(s => !s)}>${'+ '}${t('organisms.addSpaceBtn') || 'Document space'}</button>
+        <span class="pj-toolbar-sep"></span>
         <span class="pj-ai-prompt">
           <span class="pj-ai-prompt-label">${'🤖 '}${t('organisms.aiPrompt') || 'AI access prompt:'}</span>
           <button class="btn-ghost btn-sm" onClick=${() => copyAccessPrompt('human')}>${t('organisms.aiPromptHuman') || 'For chat'}</button>
           <button class="btn-ghost btn-sm" onClick=${() => copyAccessPrompt('agent')}>${t('organisms.aiPromptAgent') || 'For coding agent'}</button>
         </span>
-        <label class="pj-gate-label">
+        <label class="pj-gate-label pj-toolbar-gate">
           <input type="checkbox" checked=${gateOn} onChange=${toggleGate} disabled=${busy} />
           ${' '}${t('organisms.publishGate') || 'Require review before publishing'}
         </label>
@@ -1494,6 +1553,8 @@ function Workspace({ org, wsId, showToast, onBack }) {
         </div>
       `}
 
+      <div class="pj-divider"></div>
+
       <${ParticipantsPanel} orgId=${orgId} wsId=${wsId} />
 
       ${ws.manifest ? html`
@@ -1506,6 +1567,8 @@ function Workspace({ org, wsId, showToast, onBack }) {
         </div>` : null}
 
       <${ActivityPanel} orgId=${orgId} wsId=${wsId} />
+
+      ${types.length > 0 ? html`<div class="pj-divider"></div>` : null}
 
       ${types.map(ot => ot.mode === 'document' ? renderDocSpace(ot) : html`
         <div class="pj-section" key=${ot.name}>
