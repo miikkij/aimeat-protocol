@@ -4,6 +4,147 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+### Organism workspaces: lean, agent-complete MCP surface + in-place structure editing
+
+Agents can now manage a workspace's whole lifecycle over MCP without a tool per operation. A workspace
+IS its manifest, so editing structure (add/remove a space, the publish gate, settings) is just editing
+the manifest — folded into the one `aimeat_workspace_update` tool instead of one tool each. Several tools
+were also merged so the surface stays small enough that small models don't drown in it.
+
+#### Added
+
+- **`aimeat_workspace_update` edits the whole workspace definition** — name, readme, and now a full
+  replacement `manifest` (add/remove an objectType to add/remove a space, set `policy.alwaysGate` for the
+  publish gate, change settings) and `schemas` (lock a records space's JSON Schema). Read → edit → send
+  back; the id is preserved, the name stays synced across manifest + registry, the manifest is
+  schema-validated. Creator/admin only. A shared `services/workspace-meta.ts` (`updateWorkspaceMeta`) backs
+  both the tool and `PUT /v1/organisms/:id/workspace`. There is deliberately **no** whole-workspace or
+  organism delete tool (too destructive).
+
+#### Changed
+
+- **Workspace MCP surface 13 → 9 tools, with more capability.**
+  - `request_access` + `list_requests` + `approve_access` → one **`aimeat_workspace_access(action)`**
+    (`request` / `list` / `decide`).
+  - `export` + `import` → one **`aimeat_workspace_transfer(direction)`**.
+  - `write_draft` + `add_document` → one **`aimeat_workspace_write(space, value, id?, section?)`** — give the
+    space NAME; the tool resolves records-vs-document from the manifest and writes accordingly (records are
+    schema-validated and need an id; documents auto-generate an id and can be filed under a section).
+  - `aimeat_workspace_delete` **renamed `aimeat_workspace_object_delete`** — it removes ONE object
+    (record/document), not the workspace; the old name was a footgun.
+
+### Organism workspaces: "who works here" + activity that names the agent
+
+Each workspace now opens with a participants view and a GitHub-style activity calendar, so you can see — at
+a glance and across sessions — who and what is working in it. Grounded in a real fact about the model:
+agents write under their own GAII (`agent#owner@node`), so they already leave an identity trail.
+
+#### Added
+
+- **Participants panel + chart** (`GET /v1/organisms/:id/workspace/participants`). A node → owner → agents
+  hierarchy derived from the records' identity traces plus organism membership: which node each identity
+  comes from, who is human, and whose agent each agent is. Privacy-scoped — the viewer's own agents are
+  named (with contribution counts); every other owner's agents show their identifier + what they have done
+  but render greyed-out, and their live status is never exposed (the endpoint only reports the historical
+  trace).
+- **Activity heatmap** (`GET /v1/organisms/:id/workspace/activity`) — a full 12-month, GitHub-style
+  contribution calendar; each day cell is split **2×2** (documents draft/published × records
+  draft/published), each quadrant shaded by intensity. Below it, an audit-log feed of who did what, where,
+  and when.
+
+#### Fixed
+
+- **Activity attributes work to the agent, not just the owner** — the feed no longer collapses an agent's
+  action onto its owner; each event carries the agent name and renders "owner · 🤖 agent · published …".
+  Also: the feed's consent check excluded the caller's OWN agents' records (same owner, different GAII);
+  those are now treated as the caller's own, while genuinely other-owner records still require read consent.
+
+### Organism workspaces: documents — pop-out windows, readable typography, delete
+
+#### Added
+
+- **Pop a document out into its own window** (⧉) — served by `views/doc-solo.js` at
+  `/v1/profile?doc=<org>:<ws>:<type>:<id>`, where it can be viewed, edited, published and compared
+  (Draft/Published) on its own. The window name is unique per document, so different documents open side by
+  side as independent windows (one never closes another). Mirrors the agent pop-out (`?solo=`) pattern and
+  shares the session via localStorage.
+- **Delete a record or document** (🗑) — on drafts, published items, and documents — removes the object's
+  draft, its published `.latest`, and all `.version.N` history, always through the shared confirm dialog so
+  nothing is removed by accident.
+
+#### Fixed
+
+- **Document titles no longer show a literal `&amp;`** — they were escaped by `escHtml` and then again by
+  Preact as a text child (double-encoding); the redundant escape is dropped.
+- **Rendered markdown now reads like a real document** — the workspace document view had no typography and
+  fell back to cramped browser defaults. Added spaced/underlined headings (no longer stuck to the previous
+  text), proper bullet/number lists, styled inline code, code blocks, blockquotes, tables, and comfortable
+  line-height; `_italic_` (underscore emphasis) is parsed at word boundaries so `snake_case` stays literal.
+
+### Security: ZIP-import hardening + incident quarantine + admin Security tab
+
+Workspace/organism ZIP import is now hardened against hostile archives, and rejections are recorded for an
+operator to review.
+
+#### Added
+
+- **Hardened ZIP extraction** (`services/safe-zip.ts`) — caps on file count, per-file and total decompressed
+  size, and compression ratio (zip-bomb defence), plus a path-traversal guard and a per-archive format
+  allowlist; anything off-format is rejected (`ZipSecurityError`) and never processed.
+- **Security incidents + quarantine** (`services/security-incident.ts`) — a rejected upload is logged (type,
+  machine code, on whose behalf, when) and its bytes are quarantined for inspection; the import routes/tools
+  return `422 ZIP_REJECTED`.
+- **Admin Security tab** (`public/views/admin/security-tab.js`, `GET /v1/admin/security/incidents`) —
+  operators list incidents, download the quarantined payload for inspection, mark one resolved, or delete it
+  (with its quarantined blob).
+
+### Desktop: Ollama Chat — a local AI that acts as your own AIMEAT agent
+
+The AIMEAT Personal Node desktop app gains a **Chat** tab. A local **Ollama** model is the "brain"; an
+**MCP connection** is the "hands". You ask in plain language ("list my organisms", "create a workspace in X",
+"which agents are active") and the model reads and manages your organisms, workspaces, knowledge, and sees
+agent activity on the chosen node — your own localhost node **or aimeat.io**. Crucially the chat is **its own
+registered agent** (its own GAII identity and scopes), not the owner: the owner signs in once only to authorise
+registration, then the chat makes every MCP call as itself, so its actions are attributed to it and it appears
+in the owner's **Agents** tab. This mirrors the `aimeat-crewai` **liaison** pattern — the desktop is the liaison
+that handles all AIMEAT communication so the model just decides which tool to call.
+
+#### Added
+
+- **Chat tab** (`aimeat-desktop/`). On first use it **registers itself as the owner's agent** via device
+  authorization (RFC 8628): the desktop calls `/v1/agents/device-authorize`, auto-approves with the signed-in
+  owner's JWT (`/v1/agents/verify`), polls `/v1/agents/device-token` for the agent's OAuth `access_token`, and
+  stores it locally (one-time per node). From then on it connects to MCP with its **own Bearer token** on the
+  scoped **`/v2/mcp/agent`** surface (organisms, workspaces, knowledge, agent activity) — not the full tool
+  surface, which keeps tool-selection reliable for small local models and bounds what the chat can touch.
+- **Liaison bridge** (`aimeat-desktop/bridge/agent-bridge.mjs`) — runs on the bundled Node runtime + bundled
+  `@modelcontextprotocol/sdk` (Streamable HTTP client). It lists the surface's tools, hands them to Ollama as
+  OpenAI tool schemas, runs the tool-calling loop (model → `tools/call` → result → answer), and streams events
+  to the UI. **Writes** (create/update/delete/publish/add) require **per-action approval** by default, with an
+  **auto-approve** toggle once trusted — a second safety layer on top of the agent's own scope limits.
+- **Ollama guidance in the Chat tab** — detects whether Ollama is running and, if not (or if no model is pulled),
+  shows inline setup steps (download link + copyable `ollama pull qwen2.5:7b` + re-scan) and blocks starting until
+  a model is available.
+
+#### Fixed
+
+- **Desktop event delivery** — added a Tauri **capabilities** manifest (`core:event` etc.) so the webview can
+  receive backend events (the Chat tab's `chat-event` stream); without it the chat connected but the UI never
+  updated. Spawned `node.exe` processes now use `CREATE_NO_WINDOW` (no stray console window on Windows), and
+  devtools are enabled (right-click → Inspect) for troubleshooting.
+
+### MCP: first-run wizard gate no longer intercepts versioned API routes
+
+On a fresh node with no owners yet, the first-run wizard redirect only allowlisted `/v1/` paths. A POST to
+`/v2/mcp/*` (and any other `/vN/` API route) was therefore answered with the **setup-wizard HTML** instead of
+reaching its handler — breaking the v2 scoped MCP surfaces on not-yet-set-up nodes.
+
+#### Fixed
+
+- **First-run gate allowlists all versioned API routes** (`src/server-bootstrap/middleware-guards.ts`). The skip
+  check changed from `req.path.startsWith('/v1/')` to the regex `^/v\d+/`, so `/v2/mcp/<role>` and any future API
+  version are never served the wizard while owners are still being created.
+
 ### Profile: full-bleed dashboard layout
 
 The profile pages already had an admin-style grouped left sidebar plus a content column, but the
