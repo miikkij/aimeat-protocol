@@ -949,18 +949,22 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
             const namespace = requiredString(input, 'namespace');
             const id = requiredString(input, 'id');
             const base = `${wsRoot(orgId, ws)}.${namespace}.${id}`;
-            const listed = await client.get(`/v1/memory${query({ prefix: base + '.' })}`);
+            // Prefix `${base}` (no trailing dot) catches the bare un-suffixed key too — workspace_read
+            // surfaces it as the current value, so it must be deletable. Per-row guard excludes sibling
+            // ids (`${base}0`). limit=200 is the REST cap; for a huge version history, re-run (idempotent).
+            const listed = await client.get(`/v1/memory${query({ prefix: base, limit: 200 })}`);
             if (!listed.ok) return listed;
             const items = (listed.data as { items?: { key: string }[] } | undefined)?.items ?? [];
             let deleted = 0;
             for (const it of items) {
-                const role = it.key.slice(base.length + 1);
-                if (role === 'draft' || role === 'latest' || /^version\.\d+$/.test(role)) {
+                if (it.key !== base && !it.key.startsWith(base + '.')) continue;  // exclude sibling ids
+                const role = it.key === base ? '' : it.key.slice(base.length + 1);
+                if (role === '' || role === 'draft' || role === 'latest' || /^version\.\d+$/.test(role)) {
                     const dr = await client.delete(`/v1/memory/${encodeURIComponent(it.key)}`);
                     if (dr.ok) deleted++;
                 }
             }
-            if (deleted === 0) return { ok: false, error: { code: 'NOT_FOUND', message: `Nothing to delete at ${base} (no draft/latest/version).` } };
+            if (deleted === 0) return { ok: false, error: { code: 'NOT_FOUND', message: `Nothing to delete at ${base} (no record/draft/latest/version).` } };
             // Best-effort: unfile the id from the document section tree (find the type by namespace).
             const wsResp = await client.get(`/v1/organisms/${encodeURIComponent(orgId)}/workspace${query({ ws })}`);
             const ot = ((wsResp.data as { manifest?: { objectTypes?: { name: string; namespace?: string }[] } } | undefined)?.manifest?.objectTypes ?? []).find(o => o.namespace === namespace);
