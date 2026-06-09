@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Core permissions for the AIMEAT Personal Node desktop app. core:default grants the standard core plugin permissions (app, event, window, webview, path) so the webview can listen for backend events (e.g. the Chat tab's `chat-event` stream) and the window APIs work.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:window:default",
+    "core:webview:default"
+  ]
+}

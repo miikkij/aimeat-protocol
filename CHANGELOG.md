@@ -4,6 +4,42 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+### Profile: full-bleed dashboard layout
+
+The profile pages already had an admin-style grouped left sidebar plus a content column, but the
+whole shell was capped at `1000px` and centered — so with the 240px sidebar, every tab's content
+only got ~760px. Wide tabs like **Organisms** (two side-by-side document panels plus an editor)
+felt cramped. The shell now fills the viewport like the admin dashboard, with the sidebar
+left-anchored and the content capped for readability on ultra-wide displays.
+
+#### Changed
+
+- **Profile shell is now full-bleed** (`public/css/views/profile.css`). Dropped the `max-width:1000px`
+  cap on the `.pf` wrapper so the sidebar + content flex to fill the width, mirroring the admin
+  dashboard's uncapped `.adm` / `.adm-main`. `.pf-content` caps at `1360px` (≈1600px total usable
+  width) so line lengths stay readable on ultra-wide monitors, with the sidebar flush to the screen's
+  left edge and any extra space falling to the right. The not-logged-in login prompt keeps its
+  centered 1000px column. No markup or component changes — purely the outer width constraints.
+
+### Sign-in modal: self-contained EN/FI language switcher
+
+The sign-in/register modal can be shown standalone — e.g. embedded in a custom portal page —
+where the canonical site header, and its language switcher, is not present. In that case the
+modal could render in the wrong language with no way to change it. It now owns its own EN/FI
+switcher and loads its own translations.
+
+#### Added
+
+- **EN/FI switcher in the sign-in modal** (`src/routes/libs.ts`, served as
+  `/v1/libs/aimeat-auth.js` → `showLoginModal`). Buttons sit in the modal header's top-right.
+  The modal now loads its own translations from the node (`/locales/en.json` +
+  `/locales/<lang>.json`) and uses the **same `aimeat-lang` localStorage key + cookie as the
+  header**, so the choice stays in sync with the SPA. On open it auto-corrects to the
+  stored/preferred language even when the host page passed `opts.i18n` in another language, and
+  switching re-renders the modal **in place** (no full page reload) while preserving any typed
+  username/password/display-name. Existing `mountLoginButton` callers are unaffected —
+  `opts.i18n` remains a synchronous fallback. No new i18n keys (reuses the `modal.*` strings).
+
 ### Apps: one canonical record per owner across every identity form
 
 An owner's apps no longer fragment by how they authenticate. Publishing the same app via the

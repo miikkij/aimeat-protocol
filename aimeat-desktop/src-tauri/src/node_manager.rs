@@ -289,22 +289,23 @@ pub fn start_node(app: AppHandle) -> Result<u32, String> {
         .map_err(|e| format!("Failed to clone log file handle: {}", e))?;
 
     // Spawn:  node --env-file <env> <entry> start    (cwd = writable data dir)
-    let child = Command::new(&rt.node_bin)
-        .arg("--env-file")
+    let mut cmd = Command::new(&rt.node_bin);
+    cmd.arg("--env-file")
         .arg(&rt.env_file)
         .arg(&rt.server_entry)
         .arg("start")
         .current_dir(&rt.data_dir)
         .stdout(Stdio::from(log_stdout))
-        .stderr(Stdio::from(log_stderr))
-        .spawn()
-        .map_err(|e| {
-            format!(
-                "Failed to start node ({}): {}",
-                rt.node_bin.display(),
-                e
-            )
-        })?;
+        .stderr(Stdio::from(log_stderr));
+    // Windows: suppress the spawned node.exe console window (CREATE_NO_WINDOW).
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000);
+    }
+    let child = cmd.spawn().map_err(|e| {
+        format!("Failed to start node ({}): {}", rt.node_bin.display(), e)
+    })?;
 
     let pid = child.id();
     *process = Some(child);

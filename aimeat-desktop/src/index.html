@@ -1312,9 +1312,14 @@
 
     function bindChatEvents() {
       if (chatEventBound) return;
-      if (window.__TAURI__ && window.__TAURI__.event && window.__TAURI__.event.listen) {
-        window.__TAURI__.event.listen('chat-event', (e) => handleChatEvent(e.payload));
-        chatEventBound = true;
+      const ev = window.__TAURI__ && window.__TAURI__.event;
+      if (ev && ev.listen) {
+        chatEventBound = true; // optimistic: avoid double-binding while the promise resolves
+        ev.listen('chat-event', (e) => handleChatEvent(e.payload))
+          .then(() => console.log('[chat] chat-event listener bound'))
+          .catch((err) => { chatEventBound = false; console.error('[chat] failed to bind chat-event:', err); });
+      } else {
+        console.error('[chat] window.__TAURI__.event is not available — cannot receive chat events');
       }
     }
 
@@ -1420,6 +1425,7 @@
     }
 
     function handleChatEvent(ev) {
+      console.log('[chat] event', ev);
       const log = document.getElementById('chatLog');
       if (!ev || !ev.type) return;
       if (ev.type === 'ready') {
@@ -1477,6 +1483,7 @@
     }
 
     // ── Init ────────────────────────────────────────────────────
+    bindChatEvents();
     checkStatus();
     loadDashboardConfig();
     setInterval(checkStatus, 5000);

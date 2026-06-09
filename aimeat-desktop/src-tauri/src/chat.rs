@@ -184,8 +184,8 @@ pub fn chat_start(
         .ok_or_else(|| "No chat agent registered for this node yet.".to_string())?;
     let (node_bin, entry, cwd) = resolve_bridge(&app)?;
 
-    let mut child = Command::new(&node_bin)
-        .arg(&entry)
+    let mut cmd = Command::new(&node_bin);
+    cmd.arg(&entry)
         .current_dir(&cwd)
         .env("AIMEAT_BASE", base_url.trim_end_matches('/'))
         .env("AIMEAT_AGENT_TOKEN", &agent.token)
@@ -194,7 +194,14 @@ pub fn chat_start(
         .env("OLLAMA_URL", ollama_url.unwrap_or_else(|| "http://localhost:11434".to_string()))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    // Windows: don't pop a console window for the spawned node.exe (CREATE_NO_WINDOW).
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000);
+    }
+    let mut child = cmd
         .spawn()
         .map_err(|e| format!("Failed to start chat bridge ({}): {}", node_bin.display(), e))?;
 
