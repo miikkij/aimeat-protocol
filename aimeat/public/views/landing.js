@@ -108,10 +108,12 @@ function Gallery({ onApps }) {
 }
 
 export default function Landing({ navigate }) {
-  // Logged-in users go straight to the Home dashboard — the landing is for visitors.
-  // Read the session from localStorage directly: the auth lib loads async and is not
-  // guaranteed to exist at mount time. Also react to a login happening on this page.
+  // Logged-in users arriving DIRECTLY (bookmark, external link, address bar) go straight
+  // to the Home dashboard. But a deliberate in-app navigation here (brand link, footer)
+  // shows the landing — otherwise a logged-in user could never see this page at all.
+  // The in-app flag is set by spa.html's handleNav (sessionStorage, per browser tab).
   useEffect(() => {
+    try { if (sessionStorage.getItem('aimeat.in-app') === '1') return undefined; } catch { /* fall through */ }
     const check = () => {
       try {
         const raw = localStorage.getItem('aimeat_session');

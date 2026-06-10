@@ -53,10 +53,10 @@ export default function Business({ navigate }) {
 
   return html`
     <div class="ld ld-business">
-      <!-- Hero. Drop the night-shift image at /img/business-hero.jpg — the text
+      <!-- Hero: the night-shift image (assets/yovuoro_freepartylights.png) — the text
            column sits in the image's empty right side as HTML, never baked in. -->
       <section class="ld-bhero">
-        <img class="ld-bhero-img" src="/img/business-hero.jpg" alt=""
+        <img class="ld-bhero-img" src="/img/business-hero.png" alt=""
           onError=${(e) => { e.target.style.display = 'none'; e.target.closest('.ld-bhero')?.classList.add('ld-bhero--noimg'); }} />
         <div class="ld-bhero-text">
           <h1 class="ld-h1">${tr('biz.heroTitle', 'A digital employee that never sleeps')}</h1>

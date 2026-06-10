@@ -447,6 +447,10 @@
 
       const handleNav = (e, path) => {
         e.preventDefault();
+        // Mark in-app navigation: the landing redirects logged-in users to their Home
+        // ONLY on direct arrival (bookmark/external link), never when they deliberately
+        // navigated here from inside the app (e.g. the brand link).
+        try { sessionStorage.setItem('aimeat.in-app', '1'); } catch {}
         navigate(path);
       };
 
@@ -467,6 +471,7 @@
             <div class="topnav-menu ${menuOpen ? 'open' : ''}">
               <a href="/v1/classic" onClick=${(e) => { handleNav(e, '/v1/classic'); setMenuOpen(false); }} class="${currentPath === '/v1/classic' ? 'active' : ''}">${t('nav.try')}</a>
               <a href="/v1/how-it-works" onClick=${(e) => { handleNav(e, '/v1/how-it-works'); setMenuOpen(false); }} class="${currentPath === '/v1/how-it-works' ? 'active' : ''}">${t('nav.howItWorks') || 'How it works'}</a>
+              <a href="/v1/business" onClick=${(e) => { handleNav(e, '/v1/business'); setMenuOpen(false); }} class="${currentPath === '/v1/business' ? 'active' : ''}">${t('nav.business') || 'For your business'}</a>
               <a href="/v1/portal?view=dev" onClick=${(e) => { handleNav(e, '/v1/portal?view=dev'); setMenuOpen(false); }}>${t('nav.devView')}</a>
               <a href="/v1/help" onClick=${(e) => { handleNav(e, '/v1/help'); setMenuOpen(false); }} class="${currentPath === '/v1/help' ? 'active' : ''}">${t('nav.help')}</a>
               ${session && html`

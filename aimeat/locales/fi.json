@@ -127,7 +127,8 @@
     "admin": "Hallinta",
     "themeToDark": "Vaihda tummaan tilaan",
     "themeToLight": "Vaihda vaaleaan tilaan",
-    "howItWorks": "Miten se toimii"
+    "howItWorks": "Miten se toimii",
+    "business": "Yrityksellesi"
   },
   "hero": {
     "title": "Tietosi on sinun. AI:si työskentelee puolestasi.",

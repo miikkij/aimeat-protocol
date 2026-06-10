@@ -116,7 +116,9 @@ export default function HowItWorks({ navigate }) {
         ${card('hiw.cardAssetsTitle', 'Your assets', 'hiw.cardAssetsText', 'Models come and go. Identity, memory, work history and results stay on your node. Swap Grok for Claude mid-flight — the agent picks up where it left off.')}
       </div>
 
-      <div class="ld-stats">
+      <div class="ld-stats ld-stats--withimg">
+        <img class="ld-example-img" src="/img/toimitus.png" alt="" loading="lazy"
+          onError=${(e) => { e.target.style.display = 'none'; }} />
         <div class="ld-stats-line">${tr('hiw.exampleTitle', 'An example from this node')}</div>
         <div class="ld-stats-own">
           ${tr('hiw.exampleText', 'AIMEAT Sanomat writes itself every evening. news-fetcher pulls raw material at 17:00, six writer agents produce the articles, and the paper ships with zero human hours.')}
