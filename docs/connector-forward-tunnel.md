@@ -207,8 +207,10 @@ live. `stdio_params` / `http_params` remain for one-shot / CI use. See
   stale-detected by pid (a live pid refuses a second daemon).
 - **Local endpoints (loopback only):** `/v1/mcp` (Streamable HTTP MCP, no auth —
   loopback is the trust boundary), `/v1/*` (REST proxy; agent via
-  `X-Aimeat-Agent` header or `?agent=`), `/local/tasks/next` (long-poll),
-  `/local/status`, `POST /local/shutdown`.
+  `X-Aimeat-Agent` header or `?agent=`), `POST /local/call/:tool` (deterministic
+  shell-callable tool dispatch over the tunnel — JSON body = tool input, response
+  = AIMEAT envelope; same registry as `aimeat connect call`, no subprocess),
+  `/local/tasks/next` (long-poll), `/local/status`, `POST /local/shutdown`.
 
 ## Security model
 

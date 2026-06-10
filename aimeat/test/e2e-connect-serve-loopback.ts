@@ -186,6 +186,29 @@ await test('Scope/auth context — proxy uses the pinned agent identity (404 for
   assert(r.status === 404, `status ${r.status} (expected 404 — an auth failure would be 401)`);
 });
 
+// ─── Deterministic tool-call dispatch over the tunnel ───
+console.log('\nPhase 1b — Tool-call dispatch (/local/call/:tool, no subprocess)');
+
+await test('POST /local/call/:tool — write then read a memory key via the tunnel-backed dispatch', async () => {
+  const w = await json(loopbackBase, '/local/call/aimeat_memory_write', {
+    method: 'POST',
+    body: JSON.stringify({ key: 'loopback.toolcall', value: { hello: 'tunnel' }, visibility: 'private' }),
+  });
+  assert(w.status === 200 && w.body.ok === true, `write: ${w.status} ${JSON.stringify(w.body)}`);
+  const r = await json(loopbackBase, '/local/call/aimeat_memory_read', {
+    method: 'POST',
+    body: JSON.stringify({ key: 'loopback.toolcall' }),
+  });
+  assert(r.status === 200 && r.body.ok === true, `read: ${r.status} ${JSON.stringify(r.body)}`);
+  assert(JSON.stringify(r.body.data ?? {}).includes('"hello":"tunnel"'), `value did not round-trip: ${JSON.stringify(r.body.data)}`);
+});
+
+await test('POST /local/call/:tool — unknown tool returns 404 UNKNOWN_TOOL', async () => {
+  const r = await json(loopbackBase, '/local/call/not_a_real_tool', { method: 'POST', body: '{}' });
+  assert(r.status === 404, `status ${r.status}`);
+  assert(r.body.error?.code === 'UNKNOWN_TOOL', `code ${r.body.error?.code}`);
+});
+
 // ─── Local MCP ───
 console.log('\nPhase 2 — Local Streamable-HTTP MCP');
 

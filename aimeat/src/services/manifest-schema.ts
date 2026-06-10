@@ -22,9 +22,12 @@
  *   v1.2.0 -- 2026-06-10 -- backing enum narrowed to memory|tasks. 'storage'/'knowledge' were dead
  *     weight: no write/read/UI path existed for them, but the enum invited agents to pick them ("a
  *     document space sounds like knowledge") and the space silently vanished from every surface.
- *     Files/knowledge attach via workspace Sources or embedded document images instead. NOTE: the
- *     seed is idempotent, so already-seeded nodes keep the old enum — the authoritative gate is
- *     normalizeObjectTypes() in workspace-meta.ts, enforced on every create/update code path.
+ *     Files/knowledge attach via workspace Sources or embedded document images instead.
+ *   v1.3.0 -- 2026-06-10 -- Version-aware seed: the schema carries a `$comment: aimeat-seed-vN`
+ *     marker, and seedManifestSchema() UPGRADES a stale system-seeded record in place at startup
+ *     (so old connectors' raw manifest writes hit the new enum on existing nodes too, no manual
+ *     migration). An operator-customized schema (lockedBy ≠ the system identity) is left alone —
+ *     the same guarantee as before.
  */
 import type { Storage } from '../storage/interface.js';
 
@@ -44,7 +47,14 @@ export const MANIFEST_WS_SCHEMA_KEY = 'organism.*.w.*.meta.manifest';
  * is open and declared per-manifest in `objectTypes`. A Finnish `kind:'tutkimus'` manifest using
  * `tavoite`/`hypoteesi` validates identically to an English `kind:'project'` one.
  */
+/** Bump when the seeded schema changes in a way existing nodes must pick up (e.g. the backing
+ *  enum). seedManifestSchema() upgrades any system-seeded record carrying an older version. */
+export const MANIFEST_SEED_VERSION = 2;
+
 export const MANIFEST_FORMAT_SCHEMA: Record<string, unknown> = {
+  // Standard JSON Schema annotation (safe under ajv strict mode) doubling as the seed-version
+  // marker — seededVersionOf() parses it to decide whether a stored record needs the upgrade.
+  $comment: `aimeat-seed-v${MANIFEST_SEED_VERSION}`,
   type: 'object',
   required: ['manifestVersion', 'id', 'name', 'kind', 'status', 'objectTypes'],
   properties: {
@@ -91,18 +101,35 @@ export const MANIFEST_FORMAT_SCHEMA: Record<string, unknown> = {
   },
 };
 
+/** Seed version of a stored schema record: parsed from the `$comment: aimeat-seed-vN` marker.
+ *  Records seeded before versioning existed (no marker) count as v1. */
+export function seededVersionOf(schemaJson: Record<string, unknown> | undefined | null): number {
+  const c = schemaJson?.$comment;
+  const m = typeof c === 'string' ? /^aimeat-seed-v(\d+)$/.exec(c) : null;
+  return m ? parseInt(m[1], 10) : 1;
+}
+
 /**
- * Register the manifest-format schema once. Idempotent — leaves an operator-customized schema
- * in place. Mirrors `seedProfileSchemas` (a global `*`-wildcard prefix schema resolved by
- * `findApplicableSchema`'s wildcard pass).
+ * Register the manifest-format schema at startup — and UPGRADE it in place when this build ships
+ * a newer seed version (so e.g. the backing-enum narrowing reaches existing nodes' DBs without a
+ * manual migration). An operator-customized record (lockedBy ≠ the system identity this is called
+ * with) is left alone, the same guarantee the create-only seed gave. Mirrors `seedProfileSchemas`
+ * (a global `*`-wildcard prefix schema resolved by `findApplicableSchema`'s wildcard pass).
  *
- * @returns 1 if newly seeded, 0 if it already existed.
+ * @returns the number of records written (newly seeded + upgraded).
  */
 export async function seedManifestSchema(storage: Storage, lockedBy: string): Promise<number> {
   const now = new Date().toISOString();
   let seeded = 0;
   for (const keyPattern of [MANIFEST_SCHEMA_KEY, MANIFEST_WS_SCHEMA_KEY]) {
-    if (await storage.getSchema(keyPattern, 'prefix')) continue;   // leave an operator-customized schema in place
+    const existing = await storage.getSchema(keyPattern, 'prefix');
+    if (existing) {
+      if (existing.lockedBy !== lockedBy) continue;                             // operator-customized — hands off
+      if (seededVersionOf(existing.schemaJson) >= MANIFEST_SEED_VERSION) continue;  // already current
+      await storage.setSchema({ ...existing, schemaJson: MANIFEST_FORMAT_SCHEMA, schemaMode: 'open', updatedAt: now });
+      seeded++;
+      continue;
+    }
     await storage.setSchema({
       keyPattern,
       applyTo: 'prefix',

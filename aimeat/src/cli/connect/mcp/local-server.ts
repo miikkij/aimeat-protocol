@@ -13,6 +13,9 @@
  *     - `GET /local/tasks/next?wait=ms[&agent=name]` — long-poll fed by the
  *       tunnel's `deliver`/`backlog` frames: realtime task delivery for
  *       synchronous clients, no upstream polling.
+ *     - `POST /local/call/:tool` — deterministic shell-callable tool dispatch
+ *       (same registry as `aimeat connect call`) routed over the agent's
+ *       tunnel-backed client; one loopback POST, no subprocess / fresh TLS.
  *     - `GET /local/status`, `POST /local/shutdown` — introspection + clean stop.
  *   Writes the discovery file `<AIMEAT_HOME>/serve.json` (schema_version, port,
  *   pid, agents, started_at) atomically on start, removes it on clean exit, and
@@ -33,6 +36,9 @@
  * @version-history
  *   v1.0.0 — 2026-06-10 — Phase 4: initial loopback daemon (local MCP + REST
  *     proxy + long-poll push surface + discovery file + degraded fallback).
+ *   v1.1.0 — 2026-06-10 — Add `POST /local/call/:tool` — deterministic
+ *     shell-callable tool dispatch over the tunnel (kills `connect call`
+ *     subprocess + per-call TLS churn for plain-Python crews).
  */
 import express, { type Request, type Response } from 'express';
 import type { Server } from 'node:http';
@@ -49,6 +55,7 @@ import type { AgentRegistry, RegisteredAgent } from '../agent-registry.js';
 import { wakeAgent } from './wakeup.js';
 import { startPollerForAgent, legacyWakeAdapter } from './poller.js';
 import { launchTaskRunner, isRunner } from '../task-runner.js';
+import { CONNECT_CLI_TOOLS } from '../tool-call.js';
 
 export const SERVE_DISCOVERY_SCHEMA_VERSION = 1;
 
@@ -312,6 +319,40 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     });
   });
 
+  // ── Tool-call surface: deterministic shell-callable tool dispatch over the
+  // tunnel. Same handler registry as `aimeat connect call`, but routed through
+  // the agent's tunnel-backed client — one loopback POST, no per-call subprocess
+  // and no fresh TLS per call. Body = the tool's JSON input (as `connect call
+  // --json`); response = the AIMEAT envelope (callers check `ok`). Agent picked
+  // by `X-Aimeat-Agent` / `?agent=` (defaults to the registry primary).
+  app.post('/local/call/:tool', async (req: Request, res: Response) => {
+    let entry: RegisteredAgent;
+    try { entry = resolveAgent(req); }
+    catch (err) {
+      res.status(400).json({ ok: false, error: { code: 'UNKNOWN_AGENT', message: (err as Error).message } });
+      return;
+    }
+    const toolName = req.params.tool as string;
+    const tool = CONNECT_CLI_TOOLS.find(t => t.name === toolName);
+    if (!tool) {
+      res.status(404).json({ ok: false, error: { code: 'UNKNOWN_TOOL', message: `Unknown shell-callable tool: ${toolName}` } });
+      return;
+    }
+    const input = (req.body && typeof req.body === 'object' && !Array.isArray(req.body))
+      ? req.body as Record<string, unknown>
+      : {};
+    try {
+      const response = await tool.handler({
+        client: entry.client, // tunnel-backed in tunnel mode, direct fetch when degraded
+        config: { node_url: entry.config.node_url, agent: entry.agent, owner: entry.owner },
+        agentPath: encodeURIComponent(entry.agent),
+      }, input);
+      res.status(response.ok ? 200 : 400).json(response);
+    } catch (err) {
+      res.status(400).json({ ok: false, error: { code: 'TOOL_CALL_ERROR', message: (err as Error).message } });
+    }
+  });
+
   app.get('/local/status', (_req: Request, res: Response) => {
     res.json({
       ok: true,
@@ -424,7 +465,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   const summary = registry.list()
     .map(e => `${e.agent}@${e.owner} [${channels.get(e.agent)!.transportMode}]`)
     .join(', ');
-  console.error(`AIMEAT serve daemon listening on http://127.0.0.1:${port} (MCP: /v1/mcp, proxy: /v1/*, push: /local/tasks/next)`);
+  console.error(`AIMEAT serve daemon listening on http://127.0.0.1:${port} (MCP: /v1/mcp, proxy: /v1/*, tool-call: /local/call/:tool, push: /local/tasks/next)`);
   console.error(`[serve] discovery: ${discoveryFile}`);
   console.error(`[serve] ${registry.size()} agent(s): ${summary} — ${tunnelCount} over tunnel`);
 }

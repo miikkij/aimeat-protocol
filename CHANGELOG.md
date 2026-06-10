@@ -4,6 +4,75 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## 1.23.0 - 2026-06-10
+
+**Workspace backing gate — fixes the invisible-documents bug.** A document space
+created with `backing: "knowledge"` accepted writes and publishes while **every
+read surface silently skipped the space**: MCP `workspace_read` returned
+`objects: {}`, the workspace UI didn't render the space at all, and only
+full-text search / the activity log proved the content existed. Root cause: the
+manifest schema offered four `backing` values while only `memory` was
+implemented end-to-end, the write path never checked backing, and three
+hand-rolled read filters (MCP / REST / UI) disagreed about which values to show.
+The invariant now enforced — and regression-tested — is: **every backing value
+either works end to end or is rejected loudly at the gate; no "accepted but
+invisible" middle state.**
+
+### Fixed
+
+- **Published workspace content can no longer go invisible.** All read surfaces
+  (MCP `aimeat_workspace_read`, `GET /v1/organisms/:id/workspace`, the workspace
+  UI) share ONE predicate (`isMemoryBackedSpace`, missing backing = memory)
+  instead of three divergent filters.
+- **`kind: "document"` without `mode` no longer falls into records mode.** The
+  open manifest envelope swallowed the old-client `kind` field silently; mode is
+  now inferred as `document` at create/update, and the write tools honour it as
+  a fallback (server MCP + connector CLI).
+- The connector CLI's `aimeat_workspace_write` response now reports the
+  *resolved* mode instead of echoing the manifest's raw `mode` field.
+
+### Added
+
+- **Creation/update gate** (`normalizeObjectTypes` in `workspace-meta.ts`):
+  `backing: "storage"` / `"knowledge"` are rejected with an instructive error on
+  every path — REST `PUT /workspace` (full manifest + `add_spaces`), server MCP
+  `workspace_create`/`workspace_update`, and the connector CLI's
+  `workspace_create`. Files and knowledge packages attach via workspace
+  **Sources** or embedded document images — never as a backed space.
+- **Write guard**: `aimeat_workspace_write` (server MCP + connector CLI) refuses
+  to write into a non-memory space instead of storing records no read path
+  lists. `backing: "tasks"` writes are redirected to the task tools.
+- **UI: no space silently vanishes.** A declared non-memory space renders as a
+  notice card (name + backing badge + how to fix / where the data lives) instead
+  of being filtered out. New `organisms.spaceTasksBacked` /
+  `organisms.spaceBackingUnsupported` i18n keys (en + fi).
+- **Regression suite** `test/e2e-workspace-backing-gate.ts` (10 tests): every
+  enum value works end to end (declare → write → publish → visible in MCP AND
+  REST reads) or is gated; includes the exact incident shape (`kind:
+  "document"`, no `mode`, old-client manifest).
+
+### Changed
+
+- Manifest schema `backing` enum narrowed to `memory | tasks` (was
+  `memory | tasks | storage | knowledge`).
+- **Version-aware schema seed (automatic migration on startup).** The seeded
+  manifest schema now carries a `$comment: aimeat-seed-vN` marker, and
+  `seedManifestSchema()` upgrades a stale **system-seeded** record in place at
+  node startup — so on existing nodes the narrowed enum reaches the DB without
+  any manual migration, and even an OLD connector's raw manifest write
+  (`POST /v1/memory`) gets a 422 instead of creating an invisible space. An
+  operator-customized schema (`lockedBy` ≠ the system identity) is left
+  untouched, the same guarantee the create-only seed gave.
+- `aimeat_workspace_create` MCP tool description now explains the backing model
+  (memory spaces; tasks = pointer; files/knowledge via Sources).
+
+### Repairing affected workspaces
+
+A legacy space with `backing: "knowledge"`/`"storage"` now shows as a notice
+card in the UI. One `aimeat_workspace_update` (full manifest with the space's
+`backing` set to `"memory"`) restores all its published content instantly — no
+rewrite or re-publish needed; the stored records were intact all along.
+
 ## 1.22.0 - 2026-06-10
 
 **Connector Forward Tunnel.** `aimeat connect serve` can now hold **one persistent
@@ -26,6 +95,12 @@ this to local clients (CrewAI crews, MCP runtimes) over `127.0.0.1`. Pairs with
   `<AIMEAT_HOME>/serve.json` discovery file. Degrades transparently to direct
   HTTP + polling against tunnel-disabled / older nodes. Default stdio mode
   unchanged for one-shot and CI/serverless use.
+- **`POST /local/call/:tool`** on the loopback daemon — deterministic
+  shell-callable tool dispatch (same registry as `aimeat connect call`) routed
+  over the agent's tunnel-backed client. Lets plain-Python crews invoke a tool
+  with one loopback POST (JSON in → AIMEAT envelope out) instead of spawning an
+  `aimeat connect call` subprocess + a fresh TLS connection per call. Agent
+  picked by the `X-Aimeat-Agent` header / `?agent=` (defaults to the primary).
 - Node tunnel client (`tunnel-client.ts`) — reconnect (backoff+jitter), heartbeat
   with dead-socket detection, forward-call correlation, deliver→auto-ack, and
   proactive pre-expiry token reconnect; plus an `AimeatClient` transport seam so

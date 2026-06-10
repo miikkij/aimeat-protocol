@@ -206,6 +206,40 @@ await test('8. REST add_spaces with backing:"knowledge" → 400; with kind:"docu
     assert(spec?.mode === 'document' && spec?.backing === 'memory', `inferred document space with memory backing: ${JSON.stringify(spec)}`);
 });
 
+// ── Seed upgrade: existing nodes' stale system-seeded schema is replaced at startup (in-process,
+// against a throwaway SQLite :memory: storage — no server restart needed to exercise the path) ──
+
+await test('9. version-aware seed: a stale system-seeded schema is upgraded, an operator-customized one is not', async () => {
+    const { SqliteStorage } = await import('../src/storage/providers/sqlite/index.js');
+    const { seedManifestSchema, seededVersionOf, MANIFEST_SCHEMA_KEY, MANIFEST_WS_SCHEMA_KEY, MANIFEST_SEED_VERSION } = await import('../src/services/manifest-schema.js');
+    const storage = new SqliteStorage(':memory:');
+    const system = 'system@test-node';
+    const now = new Date().toISOString();
+    // The pre-versioning (v1) schema exactly as old nodes have it: no $comment marker, wide enum.
+    const oldSchema = {
+        type: 'object', required: ['manifestVersion', 'id', 'name', 'kind', 'status', 'objectTypes'],
+        properties: { objectTypes: { type: 'array', items: { type: 'object', properties: { backing: { enum: ['memory', 'tasks', 'storage', 'knowledge'] } } } } },
+    };
+    await storage.setSchema({ keyPattern: MANIFEST_SCHEMA_KEY, applyTo: 'prefix', schemaJson: oldSchema, schemaMode: 'open', lockedBy: system, setAt: now, updatedAt: now });
+    // The ws-scoped pattern simulates an OPERATOR customization — must survive the upgrade untouched.
+    await storage.setSchema({ keyPattern: MANIFEST_WS_SCHEMA_KEY, applyTo: 'prefix', schemaJson: oldSchema, schemaMode: 'open', lockedBy: 'operator@test-node', setAt: now, updatedAt: now });
+
+    const written = await seedManifestSchema(storage, system);
+    assert(written === 1, `exactly the stale system record is rewritten, got ${written}`);
+
+    const upgraded = await storage.getSchema(MANIFEST_SCHEMA_KEY, 'prefix');
+    assert(seededVersionOf(upgraded!.schemaJson) === MANIFEST_SEED_VERSION, `marker present after upgrade: ${JSON.stringify(upgraded!.schemaJson.$comment)}`);
+    const backing = (upgraded!.schemaJson as any).properties.objectTypes.items.properties.backing.enum;
+    assert(JSON.stringify(backing) === JSON.stringify(['memory', 'tasks']), `enum narrowed: ${JSON.stringify(backing)}`);
+
+    const custom = await storage.getSchema(MANIFEST_WS_SCHEMA_KEY, 'prefix');
+    assert(custom!.lockedBy === 'operator@test-node' && seededVersionOf(custom!.schemaJson) === 1, 'operator-customized record left alone');
+
+    // Re-run is a no-op (idempotent at the current version).
+    assert(await seedManifestSchema(storage, system) === 0, 'second run writes nothing');
+    storage.close();
+});
+
 await test('Cleanup', async () => {
     await json(`/v1/owners/${A.ownerName}`, { method: 'DELETE', headers: authH() });
 });
