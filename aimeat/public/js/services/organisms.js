@@ -6,6 +6,16 @@
  */
 import { api, apiGet, apiPost, apiPut, apiPatch, apiDelete } from '/js/api.js';
 
+/** Does this space's data live in workspace memory keys (records/documents the workspace view can
+ *  show)? Missing backing counts as memory. Mirrors the server's isMemoryBackedSpace — THE one
+ *  frontend predicate; hand-rolled per-view variants of this check are how published content once
+ *  went invisible. backing:'tasks' points at the task system; other values are legacy/unsupported. */
+export const isMemorySpace = (ot) => !ot?.backing || ot.backing === 'memory';
+
+/** Is this space a document space? Old manifests declared kind:'document' without a mode — honour
+ *  the intent (mirrors the server's normalizeObjectTypes inference). */
+export const isDocSpace = (ot) => ot?.mode === 'document' || (!ot?.mode && ot?.kind === 'document');
+
 /** List organisms. */
 export async function listOrganisms(opts = {}) {
   const params = new URLSearchParams();
@@ -342,7 +352,9 @@ export function validateGenerated(generated) {
   if (!['active', 'paused', 'done', 'archived'].includes(m.status)) errors.push('manifest.status must be one of: active, paused, done, archived');
   const ots = Array.isArray(m.objectTypes) ? m.objectTypes : [];
   if (ots.length === 0) errors.push('manifest.objectTypes must have at least one entry');
-  const backings = ['memory', 'tasks', 'storage', 'knowledge'];
+  // 'storage'/'knowledge' are NOT valid backings: files and knowledge packages attach via workspace
+  // Sources or document images, never as a backed space (the server gate rejects them too).
+  const backings = ['memory', 'tasks'];
   const roles = ['owner', 'admin', 'member'];
   for (const ot of ots) {
     const n = (ot && ot.name) || '(unnamed)';
@@ -595,8 +607,8 @@ export async function buildOrganismOverviewMermaid(orgId) {
   for (const w of wsList) {
     const ws = await getWorkspace(orgId, w.id).catch(() => null);
     const sources = await getWorkspaceSources(orgId, w.id).catch(() => []);
-    const types = (ws?.manifest?.objectTypes || []).filter(o => o.backing === 'memory')
-      .map(o => `${o.name} (${o.mode === 'document' ? 'doc' : 'rec'})`);
+    const types = (ws?.manifest?.objectTypes || []).filter(isMemorySpace)
+      .map(o => `${o.name} (${isDocSpace(o) ? 'doc' : 'rec'})`);
     const knowledge = sources.filter(s => s.type === 'knowledge').map(s => s.label || s.packageId);
     wsData.push({ name: w.name || w.id, types, knowledge });
   }
@@ -653,9 +665,9 @@ export async function buildOrganismOverviewMermaid(orgId) {
 /** Chart 2 — the edit→publish lifecycle this workspace's manifest defines (deterministic). Records
  *  are schema-validated; the publish gate + the manifest's policy.alwaysGate add a review step. */
 export function buildEditFlowMermaid(manifest, gateOn) {
-  const types = (manifest?.objectTypes || []).filter(o => o.backing === 'memory');
-  const recTypes = types.filter(o => o.mode !== 'document').map(o => o.name);
-  const docTypes = types.filter(o => o.mode === 'document').map(o => o.name);
+  const types = (manifest?.objectTypes || []).filter(isMemorySpace);
+  const recTypes = types.filter(o => !isDocSpace(o)).map(o => o.name);
+  const docTypes = types.filter(isDocSpace).map(o => o.name);
   const alwaysGate = (manifest?.policy && manifest.policy.alwaysGate) || [];
 
   const L = ['flowchart LR'];
@@ -684,7 +696,7 @@ export function buildEditFlowMermaid(manifest, gateOn) {
 
 /** Format one objectType's full schema for the prompt's STRUCTURE block. */
 function describeType(ot, schema) {
-  if (ot.mode === 'document') {
+  if (isDocSpace(ot)) {
     return `• ${ot.name} (document) — namespace "${ot.namespace}". Free-form markdown pages { id, title, markdown }, organised into sections (read organism.{id}.w.{ws}.meta.sections.${ot.name}).`;
   }
   const props = (schema && schema.properties) || {};
@@ -705,11 +717,11 @@ export async function buildAccessPrompt(orgId, orgName, wsId, ws, variant = 'hum
   const nodeUrl = window.location.origin;
   const m = ws?.manifest || {};
   const wsName = m.name || wsId;
-  const types = (m.objectTypes || []).filter(ot => ot.backing === 'memory');
+  const types = (m.objectTypes || []).filter(isMemorySpace);
   const described = [];
   for (const ot of types) {
     // records is the default mode (mode may be undefined) — fetch the schema unless it's a document.
-    const schema = ot.mode !== 'document' ? await getObjectSchema(orgId, wsId, ot.namespace).catch(() => null) : null;
+    const schema = !isDocSpace(ot) ? await getObjectSchema(orgId, wsId, ot.namespace).catch(() => null) : null;
     described.push(describeType(ot, schema));
   }
   const structure = described.join('\n') || '(no spaces declared yet)';
@@ -802,10 +814,10 @@ export async function buildContractAgentPrompt(orgId, orgName, wsId, ws) {
   const nodeUrl = window.location.origin;
   const m = ws?.manifest || {};
   const wsName = m.name || wsId;
-  const types = (m.objectTypes || []).filter(ot => ot.backing === 'memory');
+  const types = (m.objectTypes || []).filter(isMemorySpace);
   const described = [];
   for (const ot of types) {
-    const schema = ot.mode !== 'document' ? await getObjectSchema(orgId, wsId, ot.namespace).catch(() => null) : null;
+    const schema = !isDocSpace(ot) ? await getObjectSchema(orgId, wsId, ot.namespace).catch(() => null) : null;
     described.push(describeType(ot, schema));
   }
   const structure = described.join('\n') || '(no spaces declared yet)';

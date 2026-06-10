@@ -19,6 +19,12 @@
  *   v1.0.0 -- 2026-06-07 -- Phase 3: validate the manifest envelope for every organism workspace.
  *   v1.1.0 -- 2026-06-08 -- Also seed the workspace-scoped pattern organism.*.w.*.meta.manifest
  *     (one organism holds many workspaces); the single-segment `*` matcher needs the explicit w.*.
+ *   v1.2.0 -- 2026-06-10 -- backing enum narrowed to memory|tasks. 'storage'/'knowledge' were dead
+ *     weight: no write/read/UI path existed for them, but the enum invited agents to pick them ("a
+ *     document space sounds like knowledge") and the space silently vanished from every surface.
+ *     Files/knowledge attach via workspace Sources or embedded document images instead. NOTE: the
+ *     seed is idempotent, so already-seeded nodes keep the old enum — the authoritative gate is
+ *     normalizeObjectTypes() in workspace-meta.ts, enforced on every create/update code path.
  */
 import type { Storage } from '../storage/interface.js';
 
@@ -71,7 +77,7 @@ export const MANIFEST_FORMAT_SCHEMA: Record<string, unknown> = {
           schemaRef: { type: 'string' },
           namespace: { type: 'string' },
           cardinality: { enum: ['one', 'many'] },
-          backing: { enum: ['memory', 'tasks', 'storage', 'knowledge'] },
+          backing: { enum: ['memory', 'tasks'] },  // spaces are memory-backed; 'tasks' = pointer to the task system. Files/knowledge attach via Sources or document images — never as a backed space.
           writeRole: { enum: ['owner', 'admin', 'member'] },
           mode: { enum: ['records', 'document'] },  // 'records' (schema-locked form, default) | 'document' (free-form markdown pages)
           append: { type: 'boolean' },

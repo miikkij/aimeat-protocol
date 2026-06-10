@@ -14,6 +14,11 @@
  *   v1.2.0 — 2026-06-09 — Additive `addObjectTypes`: the server UNIONS new spaces into the manifest
  *     (skip-if-exists), filling sensible objectType defaults, so an agent provisions its contract's
  *     spaces deterministically without sending (and risking) the whole manifest. Returns {added, skipped}.
+ *   v1.3.0 — 2026-06-10 — Backing gate + shared read predicate. normalizeObjectTypes() rejects
+ *     backing:'storage'/'knowledge' loudly (they were accepted silently while every read surface
+ *     skipped the space — published content became invisible) and infers mode:'document' from a
+ *     kind:'document' objectType (old clients used `kind`; the open envelope swallowed it and the
+ *     space fell into records mode). isMemoryBackedSpace() is THE predicate every read path shares.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -24,6 +29,36 @@ export class WorkspaceMetaError extends Error {
     super(message);
     this.name = 'WorkspaceMetaError';
   }
+}
+
+/** Backings the workspace tooling actually implements. 'memory' spaces hold records/documents as
+ *  workspace memory keys; 'tasks' is a declarative POINTER to the task system (no workspace records).
+ *  'storage'/'knowledge' are intentionally NOT here: files and knowledge packages attach to a
+ *  workspace via Sources or embedded document images, never as a backed space. */
+export const SUPPORTED_BACKINGS = new Set(['memory', 'tasks']);
+
+/** Does this space's data live in workspace memory keys (so reads must list them)? A missing
+ *  backing counts as memory — the write path stores memory keys regardless. This is THE shared
+ *  predicate for every read surface (MCP workspace_read, REST GET /workspace, the UI via the REST
+ *  response); three hand-rolled variants of this check is how published content once went invisible. */
+export function isMemoryBackedSpace(ot: { backing?: unknown }): boolean {
+  return !ot.backing || ot.backing === 'memory';
+}
+
+/** Gate + normalize a manifest's objectTypes before any manifest write (create, full replace,
+ *  additive). Rejects unsupported backings with an instructive error instead of accepting a space
+ *  no read path will ever show, and infers mode:'document' when an objectType declares
+ *  kind:'document' without a mode. Returns a new array; throws WorkspaceMetaError. */
+export function normalizeObjectTypes(objectTypes: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+  return objectTypes.map(ot => {
+    const backing = ot?.backing;
+    if (typeof backing === 'string' && backing && !SUPPORTED_BACKINGS.has(backing)) {
+      throw new WorkspaceMetaError('INVALID_MANIFEST',
+        `objectType "${String(ot.name ?? '?')}": backing '${backing}' is not supported. Workspace spaces are memory-backed — use backing:'memory' (records or documents). Files and knowledge packages attach via workspace Sources or embedded document images, not as a backed space; the task system is referenced with backing:'tasks'.`);
+    }
+    if (!ot.mode && ot.kind === 'document') return { ...ot, mode: 'document' };
+    return ot;
+  });
 }
 
 export interface UpdateWorkspaceOpts {
@@ -106,7 +141,8 @@ export async function updateWorkspaceMeta(
   // 2. Manifest = the structure. A full replace covers add/remove space, policy/gate and settings.
   if (manifest) {
     if (!Array.isArray((manifest as { objectTypes?: unknown }).objectTypes)) throw new WorkspaceMetaError('INVALID_MANIFEST', 'manifest must have an objectTypes array.');
-    const manifestValue: Record<string, unknown> = { ...manifest, id: orgId, status: (manifest.status as string) || 'active' };
+    const normalizedTypes = normalizeObjectTypes(manifest.objectTypes as Array<Record<string, unknown>>);
+    const manifestValue: Record<string, unknown> = { ...manifest, objectTypes: normalizedTypes, id: orgId, status: (manifest.status as string) || 'active' };
     if (name) manifestValue.name = name;
     const valid = await validateMemoryWrite(`${root}.meta.manifest`, manifestValue, storage);
     if (!valid.valid) throw new WorkspaceMetaError('INVALID_MANIFEST', 'Manifest rejected by schema: ' + JSON.stringify(valid.errors));
@@ -127,11 +163,11 @@ export async function updateWorkspaceMeta(
     for (const raw of addObjectTypes) {
       if (!raw || typeof raw !== 'object' || !raw.name || !raw.namespace) throw new WorkspaceMetaError('INVALID_MANIFEST', 'Each add_spaces entry needs a name and a namespace.');
       if (haveName.has(raw.name) || haveNs.has(raw.namespace)) { skipped.push(String(raw.name)); continue; }
-      const ot: Record<string, unknown> = {
-        mode: raw.mode || 'records', backing: raw.backing || 'memory', writeRole: raw.writeRole || 'member',
+      const ot: Record<string, unknown> = normalizeObjectTypes([{
+        mode: raw.mode || (raw.kind === 'document' ? 'document' : 'records'), backing: raw.backing || 'memory', writeRole: raw.writeRole || 'member',
         cardinality: raw.cardinality || 'many', versioned: raw.versioned !== undefined ? raw.versioned : true,
         ...raw, schemaRef: raw.schemaRef || `schema:${String(raw.name)}@1`,
-      };
+      }])[0];
       existing.push(ot); haveName.add(raw.name); haveNs.add(raw.namespace); added.push(String(raw.name));
     }
     if (added.length) {

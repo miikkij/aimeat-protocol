@@ -2066,6 +2066,9 @@
 /* Lift the add-actions off the panel background so they read as buttons. */
 .pj-section-head .btn-outline, .pj-section-head .btn-ghost { background: var(--card); box-shadow: var(--shadow-sm); }
 .pj-section-head .btn-outline:hover, .pj-section-head .btn-ghost:hover { background: var(--bg-surface); border-color: var(--text-muted); }
+/* A declared space whose data does not live in workspace records (backing 'tasks', or a legacy
+   unsupported backing) — shown as a notice instead of silently dropped from the view. */
+.pj-space-notice { font-size: 0.88rem; color: var(--muted); padding: 0.2rem 0 0.3rem; }
 .pj-draft-form { margin: 0.4rem 0; }
 .pj-drafts { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.3rem; }
 .pj-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; }

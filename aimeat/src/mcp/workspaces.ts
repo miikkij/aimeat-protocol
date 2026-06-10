@@ -45,6 +45,10 @@
  *     of the requester's own contribution consent. _access list now returns members + their roles.
  *   v1.8.0 -- 2026-06-09 -- _read is workspace-level: authorize once on the manifest, then return ALL
  *     content (not per record), so every member of a shared workspace sees each other's contributions.
+ *   v1.9.0 -- 2026-06-10 -- Backing gate (the invisible-documents bug): _create normalizes objectTypes
+ *     (rejects backing 'storage'/'knowledge', infers mode:'document' from kind:'document'); _write
+ *     refuses non-memory spaces instead of silently writing records no read path lists; _read uses
+ *     the shared isMemoryBackedSpace() predicate (missing backing = memory) instead of its own filter.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { randomUUID } from 'node:crypto';
@@ -59,11 +63,11 @@ import { authorizeRead } from '../services/access-guard.js';
 import { exportWorkspace } from '../services/workspace-export.js';
 import { importWorkspace } from '../services/workspace-import.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
-import { updateWorkspaceMeta, WorkspaceMetaError } from '../services/workspace-meta.js';
+import { updateWorkspaceMeta, WorkspaceMetaError, normalizeObjectTypes, isMemoryBackedSpace } from '../services/workspace-meta.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
 import { emitChange } from '../services/event-bus.js';
 
-type ObjType = { name: string; namespace?: string; backing?: string; mode?: string };
+type ObjType = { name: string; namespace?: string; backing?: string; mode?: string; kind?: string };
 type Manifest = { objectTypes?: ObjType[] } & Record<string, unknown>;
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -255,7 +259,7 @@ export function registerWorkspaceTools(
             const objects: Record<string, unknown[]> = {};
             const drafts: Record<string, unknown[]> = {};
             for (const ot of manifest.objectTypes ?? []) {
-                if (!ot.namespace || ot.backing !== 'memory') continue;
+                if (!ot.namespace || !isMemoryBackedSpace(ot)) continue;
                 const nsPrefix = `${root}.${ot.namespace}.`;
                 const inst = new Map<string, { latest?: unknown; draft?: unknown }>();
                 for (const r of mine) {
@@ -300,7 +304,17 @@ export function registerWorkspaceTools(
                 const names = types.map(o => o.name).filter(Boolean).join(', ');
                 return fail(`No space named "${space}" in this workspace. Available spaces: ${names || '(none)'}. Pass the space NAME, not its namespace.`);
             }
-            const isDoc = ot.mode === 'document';
+            // A non-memory space's data does NOT live in workspace records — writing it here would
+            // store memory keys that no read surface (workspace_read / REST / the UI) ever lists.
+            // That silent black hole is exactly how 16 published documents once went invisible.
+            if (!isMemoryBackedSpace(ot)) {
+                return fail(ot.backing === 'tasks'
+                    ? `Space "${ot.name}" is backed by the task system (backing:'tasks') — create tasks with the task tools (aimeat_task_create), not workspace writes.`
+                    : `Space "${ot.name}" has backing '${ot.backing}', which workspace writes do not support. Update the space to backing:'memory' (aimeat_workspace_update); files and knowledge packages attach via workspace Sources or embedded document images.`);
+            }
+            // Old manifests declared documents as kind:'document' without a mode (the open envelope
+            // swallowed the unknown field) — honour the intent instead of falling into records mode.
+            const isDoc = ot.mode === 'document' || (!ot.mode && ot.kind === 'document');
             let instanceId = (id && String(id).trim()) || (value && typeof value === 'object' && !Array.isArray(value) ? String((value as Record<string, unknown>).id ?? '').trim() : '');
             if (!instanceId && isDoc) instanceId = 'doc-' + Math.random().toString(36).slice(2, 9);
             if (!instanceId) return fail('A records write needs an id (pass `id`, or include `id` in `value`).');
@@ -317,7 +331,7 @@ export function registerWorkspaceTools(
                 if (target) { target.documents = [...(target.documents ?? []).filter(d => d !== instanceId), instanceId]; await writeRecord(secKey, { sections }, secRec, ownerGhii); }  // section tree = creator meta
             }
             emitChange('organisms');
-            return ok({ written: key, id: instanceId, space, mode: ot.mode ?? 'records', section: section ?? null });
+            return ok({ written: key, id: instanceId, space, mode: isDoc ? 'document' : 'records', section: section ?? null });
         });
 
     // ── aimeat_workspace_publish ──
@@ -445,6 +459,14 @@ export function registerWorkspaceTools(
             const man = parseObj(manifest) as Manifest | undefined;
             if (!man || typeof man !== 'object' || !Array.isArray(man.objectTypes)) {
                 return fail('manifest must be an object with an objectTypes array.');
+            }
+            // Gate: reject unsupported backings + infer mode from kind BEFORE anything is written,
+            // so a misdeclared space fails the very first call instead of becoming invisible data.
+            try {
+                man.objectTypes = normalizeObjectTypes(man.objectTypes as Array<Record<string, unknown>>) as ObjType[];
+            } catch (e) {
+                if (e instanceof WorkspaceMetaError) return fail(e.message);
+                throw e;
             }
             const schemaMap = (parseObj(schemas) ?? {}) as Record<string, Record<string, unknown>>;
             const wsId = 'ws-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);

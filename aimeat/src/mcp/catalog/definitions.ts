@@ -1080,7 +1080,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism to create the workspace in.' },
             name: { type: 'string', required: true, description: 'Workspace name.' },
-            manifest: { type: 'object', required: true, description: 'The manifest: { name, kind, status, objectTypes: [{ name, namespace, backing:"memory", writeRole, cardinality, versioned, mode:"records"|"document", schemaRef }], policy }.' },
+            manifest: { type: 'object', required: true, description: 'The manifest: { name, kind, status, objectTypes: [{ name, namespace, backing:"memory", writeRole, cardinality, versioned, mode:"records"|"document", schemaRef }], policy }. backing is "memory" for EVERY records/document space ("tasks" only declares a pointer to the task system) — "storage"/"knowledge" are rejected: files and knowledge packages attach via workspace Sources or embedded document images, never as a backed space.' },
             schemas: { type: 'object', description: 'Map of namespace → JSON Schema for each records objectType, e.g. { "shared.tasks": { type:"object", required:["id","title"], properties:{...} } }.' },
             readme: { type: 'string', description: 'Optional markdown intro (defaults to the manifest name + summary).' },
         },

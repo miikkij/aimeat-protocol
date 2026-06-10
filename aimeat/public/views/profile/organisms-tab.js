@@ -69,6 +69,10 @@
  *     Nothing removed: every former card action has a new home (list "…" menu, home header, or a tab).
  *   v1.16.0 — 2026-06-10 — Row button "Open workspace" → "Open"; new 📁 workspace-count stat next to
  *     the members counter (lazy discoverWorkspaces per own org) so empty organisms are obvious.
+ *   v1.17.0 — 2026-06-10 — No space silently vanishes: non-memory-backed spaces (backing 'tasks', or
+ *     a legacy unsupported value like 'knowledge') render as a notice card instead of being filtered
+ *     out — published content disappearing without a trace is how the invisible-documents bug hid for
+ *     a month. Missing backing counts as memory; kind:'document' without mode renders as a doc space.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
@@ -1944,13 +1948,20 @@ function Workspace({ org, wsId, showToast, onBack }) {
     `;
   }
 
-  const types = (ws.manifest?.objectTypes || []).filter(ot => ot.backing === 'memory');
+  // Memory-backed spaces render normally (missing backing counts as memory — the shared service
+  // predicate mirrors the server's). Every OTHER declared space still renders, as a notice card — a
+  // space the manifest declares must never silently vanish from the view (that's how published
+  // documents once became unfindable: writes succeeded, every list surface skipped the space).
+  const allTypes = ws.manifest?.objectTypes || [];
+  const types = allTypes.filter(orgService.isMemorySpace);
+  const otherTypes = allTypes.filter(ot => !orgService.isMemorySpace(ot));
+  const isDocSpace = orgService.isDocSpace;
   const draftsFor = (name) => (ws.drafts && ws.drafts[name]) || [];
   const objectsFor = (name) => (ws.objects && ws.objects[name]) || [];
 
   // ── Public sharing (meta.share) — what published document-space pages anyone can read via the
   // no-login viewer. Independent of the access roles. Lazy-loaded the first time the panel opens. ──
-  const docTypes = types.filter(ot => ot.mode === 'document');
+  const docTypes = types.filter(isDocSpace);
   const loadShare = async () => {
     setShareBusy(true);
     try { setShare(await orgService.getWorkspaceShare(orgId, wsId)); } finally { setShareBusy(false); }
@@ -2181,7 +2192,7 @@ function Workspace({ org, wsId, showToast, onBack }) {
           <div class="card-h3">${t('organisms.spaces') || 'Spaces'}</div>
           ${(ws.manifest?.objectTypes || []).map(ot => html`
             <div class="pj-doc-row" key=${'sp' + ot.name}>
-              <span class="pj-space-name">${escHtml(ot.name)}<span class="pj-doc-tag">${ot.mode === 'document' ? (t('organisms.docs') || 'docs') : (t('organisms.recordsMode') || 'records')}</span></span>
+              <span class="pj-space-name">${escHtml(ot.name)}<span class="pj-doc-tag">${isDocSpace(ot) ? (t('organisms.docs') || 'docs') : (t('organisms.recordsMode') || 'records')}</span></span>
               <button class="btn-ghost btn-sm" onClick=${() => removeSpaceHandler(ot.name)} disabled=${busy}>${t('organisms.remove') || 'Remove'}</button>
             </div>
           `)}
@@ -2243,7 +2254,7 @@ function Workspace({ org, wsId, showToast, onBack }) {
 
       ${types.length > 0 ? html`<div class="pj-divider"></div>` : null}
 
-      ${types.map(ot => ot.mode === 'document' ? renderDocSpace(ot) : html`
+      ${types.map(ot => isDocSpace(ot) ? renderDocSpace(ot) : html`
         <div class="pj-section" key=${ot.name}>
           <div class="pj-section-head">
             <span class="pj-section-title">${escHtml(ot.name)}</span>
@@ -2281,6 +2292,18 @@ function Workspace({ org, wsId, showToast, onBack }) {
               </div>
             `)
           }
+        </div>
+      `)}
+
+      ${otherTypes.map(ot => html`
+        <div class="pj-section" key=${ot.name}>
+          <div class="pj-section-head">
+            <span class="pj-section-title">${escHtml(ot.name)}</span>
+            <span class="badge badge-warn">${escHtml(String(ot.backing))}</span>
+          </div>
+          <div class="pj-space-notice">${ot.backing === 'tasks'
+            ? (t('organisms.spaceTasksBacked') || 'This space points at the task system — its items are tasks, not workspace records. Manage them in the Tasks views.')
+            : (t('organisms.spaceBackingUnsupported') || 'This space’s backing is not supported, so its content is not shown here. Edit the workspace (manifest) and set this space’s backing to "memory" to restore it — files and knowledge packages attach via Sources or document images instead.')}</div>
         </div>
       `)}
 

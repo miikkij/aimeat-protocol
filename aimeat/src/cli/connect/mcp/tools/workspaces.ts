@@ -8,12 +8,17 @@
  *   the server and the v2 surface allowlists (appdev/agent/service).
  * @version-history
  *   v1.0.0 -- 2026-06-08 -- Initial: 5 workspace tools as REST wrappers for the connector.
+ *   v1.1.0 -- 2026-06-10 -- Backing gate (the invisible-documents bug happened through THIS path):
+ *     _create normalizes objectTypes (rejects backing 'storage'/'knowledge', infers mode:'document'
+ *     from kind:'document'); _write refuses non-memory spaces and honours kind:'document' on old
+ *     manifests instead of silently falling into records mode.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { normalizeObjectTypes, isMemoryBackedSpace, WorkspaceMetaError } from '../../../../services/workspace-meta.js';
 
 export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
@@ -67,9 +72,17 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
     annotationsFor('aimeat_workspace_write'),
     async ({ organism_id, ws, space, value, id, section }) => {
       const wsResp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace?ws=${encodeURIComponent(ws)}`);
-      const ot = ((wsResp.data as { manifest?: { objectTypes?: { name: string; namespace?: string; mode?: string }[] } } | undefined)?.manifest?.objectTypes ?? []).find(o => o.name === space);
+      const ot = ((wsResp.data as { manifest?: { objectTypes?: { name: string; namespace?: string; mode?: string; backing?: string; kind?: string }[] } } | undefined)?.manifest?.objectTypes ?? []).find(o => o.name === space || o.namespace === space);
       if (!ot || !ot.namespace) return text({ error: `No space named "${space}" in this workspace.` }, true);
-      const isDoc = ot.mode === 'document';
+      // A non-memory space's data does not live in workspace records — writing here would store
+      // memory keys no read surface ever lists (the invisible-documents bug). Refuse loudly.
+      if (!isMemoryBackedSpace(ot)) {
+        return text({ error: ot.backing === 'tasks'
+          ? `Space "${ot.name}" is backed by the task system (backing:'tasks') — create tasks with the task tools, not workspace writes.`
+          : `Space "${ot.name}" has backing '${ot.backing}', which workspace writes do not support. Update the space to backing:'memory' (aimeat_workspace_update); files and knowledge packages attach via workspace Sources or embedded document images.` }, true);
+      }
+      // Old manifests declared documents as kind:'document' without a mode — honour the intent.
+      const isDoc = ot.mode === 'document' || (!ot.mode && ot.kind === 'document');
       const v0 = parseObj(value);
       let instanceId = (id && String(id).trim()) || (v0 && typeof v0 === 'object' && !Array.isArray(v0) ? String((v0 as Record<string, unknown>).id ?? '').trim() : '');
       if (!instanceId && isDoc) instanceId = 'doc-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -85,7 +98,7 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
         const target = sections.find(s => s.id === section || s.name === section);
         if (target) { target.documents = [...(target.documents ?? []).filter(d => d !== instanceId), instanceId]; await client.post('/v1/memory', { key: secKey, value: { sections }, visibility: 'private' }); }
       }
-      return text({ written: key, id: instanceId, space, mode: ot.mode ?? 'records', section: section ?? null });
+      return text({ written: key, id: instanceId, space, mode: isDoc ? 'document' : 'records', section: section ?? null });
     });
 
   mcp.tool('aimeat_workspace_publish', descriptionFor('aimeat_workspace_publish'),
@@ -173,6 +186,14 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       const man = parseObj(manifest) as Record<string, unknown> | undefined;
       if (!man || typeof man !== 'object' || !Array.isArray(man.objectTypes)) {
         return text({ error: 'manifest must be an object with an objectTypes array.' }, true);
+      }
+      // Gate: reject unsupported backings + infer mode from kind BEFORE anything is written, so a
+      // misdeclared space fails the very first call instead of becoming invisible data.
+      try {
+        man.objectTypes = normalizeObjectTypes(man.objectTypes as Array<Record<string, unknown>>);
+      } catch (e) {
+        if (e instanceof WorkspaceMetaError) return text({ error: e.message }, true);
+        throw e;
       }
       const schemaMap = (parseObj(schemas) ?? {}) as Record<string, Record<string, unknown>>;
       const wsId = 'ws-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);

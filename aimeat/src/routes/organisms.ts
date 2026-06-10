@@ -40,6 +40,10 @@
  *   v1.11.0 -- 2026-06-09 -- Organism-level member management: a join request now notifies the
  *     creator/admins (and the requester on review decision); new DELETE /:id/members/:ghii lets a
  *     creator/admin revoke a member's access (notifies the removed member).
+ *   v1.12.0 -- 2026-06-10 -- Workspace read uses the shared isMemoryBackedSpace() predicate (was a
+ *     local {memory,knowledge,storage} set — one of three divergent backing filters that let
+ *     published content go invisible). Non-memory spaces are creation-gated now; legacy ones render
+ *     as a placeholder in the UI until their manifest is repaired to backing:'memory'.
  */
 import { Router, raw, type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -55,6 +59,7 @@ import { validateMemoryWrite } from '../services/schema-validator.js';
 import { expireOverdueApprovals, isOverdue } from '../services/gate-expiry.js';
 import { notify } from '../services/notify.js';
 import { exportWorkspace } from '../services/workspace-export.js';
+import { isMemoryBackedSpace } from '../services/workspace-meta.js';
 import { importWorkspace } from '../services/workspace-import.js';
 import { exportOrganism } from '../services/organism-export.js';
 import { importOrganism } from '../services/organism-import.js';
@@ -989,13 +994,12 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     // (falling back to a bare unsuffixed write); drafts are surfaced separately; versions are
     // history (hidden here — list `…{instance}.version.*` via the memory API to read them).
     const objectTypes = (manifest?.objectTypes as Array<Record<string, unknown>> | undefined) ?? [];
-    const memoryBackings = new Set(['memory', 'knowledge', 'storage']);
     const objects: Record<string, unknown[]> = {};
     const drafts: Record<string, unknown[]> = {};
     for (const ot of objectTypes) {
       const name = typeof ot.name === 'string' ? ot.name : undefined;
       const namespace = typeof ot.namespace === 'string' ? ot.namespace : undefined;
-      if (!name || !namespace || !memoryBackings.has(ot.backing as string)) continue;
+      if (!name || !namespace || !isMemoryBackedSpace(ot)) continue;
       const nsPrefix = `${nsRoot}${namespace}.`;
       const instances = new Map<string, { bare?: MemoryRecord; latest?: MemoryRecord; draft?: MemoryRecord }>();
       for (const r of readable) {

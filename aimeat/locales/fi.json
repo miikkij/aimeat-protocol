@@ -5673,6 +5673,8 @@
     "rejected": "Hylätty",
     "decisions": "Viimeisimmät päätökset",
     "noneYet": "ei vielä mitään",
+    "spaceTasksBacked": "Tämä tila osoittaa tehtäväjärjestelmään — sen sisältö on tehtäviä, ei työtilan tietueita. Hallitse niitä Tehtävät-näkymissä.",
+    "spaceBackingUnsupported": "Tämän tilan backing-arvoa ei tueta, joten sen sisältöä ei näytetä tässä. Muokkaa työtilaa (manifestia) ja vaihda tilan backing-arvoksi \"memory\" palauttaaksesi sen — tiedostot ja tietopaketit liitetään Lähteiden tai dokumenttien kuvien kautta.",
     "onePerLine": "yksi per rivi",
     "docs": "dokumentit",
     "newPage": "Uusi dokumentti",

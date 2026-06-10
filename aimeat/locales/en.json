@@ -5673,6 +5673,8 @@
     "rejected": "Rejected",
     "decisions": "Recent decisions",
     "noneYet": "none yet",
+    "spaceTasksBacked": "This space points at the task system — its items are tasks, not workspace records. Manage them in the Tasks views.",
+    "spaceBackingUnsupported": "This space's backing is not supported, so its content is not shown here. Edit the workspace (manifest) and set this space's backing to \"memory\" to restore it — files and knowledge packages attach via Sources or document images instead.",
     "onePerLine": "one per line",
     "docs": "docs",
     "newPage": "New document",
