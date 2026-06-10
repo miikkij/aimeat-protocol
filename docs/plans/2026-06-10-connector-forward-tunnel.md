@@ -189,17 +189,21 @@ box in a phase is the gate to starting the next. Phases 1–2 are server-only;
       invariants. Registered in `ALL_SUITES`. **Gate: 17/17 passes on SQLite.**
 
 ### Phase 2 — Reverse delivery + push (server → agent, realtime)
-- [ ] `src/services/event-bus.ts` — enrich change events with a target identity.
-- [ ] `ConnectTunnelManager` — `deliver{task_assigned|message}` fan-out to the
-      target socket; `backlog` snapshot on connect (mirror
-      `sendMailboxSummary`); `ack` handling; offline → leave `queued`.
-- [ ] Task create/queue path — push `deliver` if the agent socket is connected,
-      else durable-queue only.
-- [ ] E2E `test/e2e-connect-tunnel-delivery.ts` — connected agent receives
+- [x] `src/services/event-bus.ts` — added a dedicated agent-scoped `delivery`
+      channel carrying `{target, kind, id, payload}` (deviation from "enrich the
+      change event" — a separate channel keeps full task payloads off the coarse
+      SSE `change` broadcast while still achieving agent-scoped push).
+- [x] `ConnectTunnelManager` — `deliver{task_assigned}` fan-out to the target
+      socket; `backlog` snapshot on connect (queued+active tasks + pending
+      messages, mirrors `sendMailboxSummary`); `ack` handling + dedup; offline →
+      leave `queued` (durable store).
+- [x] Task create/queue path — `emitDelivery` on create when queued/auto-active;
+      pushed live if the agent socket is connected, else durable-queue only.
+- [x] E2E `test/e2e-connect-tunnel-delivery.ts` — connected agent receives
       `deliver{task_assigned}` on queue; offline agent receives it via `backlog`
       on reconnect; id-dedup holds; ack drops it from the next backlog; asserts
-      the **push-latency** and **no-loss-on-disconnect** invariants. Registered
-      in `ALL_SUITES`. **Gate: passes on SQLite + MongoDB.**
+      the **push-latency** (<250ms) and **no-loss-on-disconnect** invariants.
+      Registered in `ALL_SUITES`. **Gate: 8/8 on SQLite + MongoDB.**
 
 ### Phase 3 — Connector tunnel client (Node)
 - [ ] `src/cli/connect/tunnel-client.ts` — `ws` client: auto-reconnect

@@ -122,25 +122,32 @@ export class TunnelClient {
   /** Send an ack for a delivered item. */
   ack(id: string): void { this.ws.send(JSON.stringify({ type: 'ack', id })); }
 
-  /** Wait until at least one deliver frame is buffered (or timeout). */
+  // Per-buffer read cursors so each frame is consumed exactly once — independent
+  // of whether it arrived before or after the corresponding wait call (the frame
+  // can land during an awaited request/connect).
+  private deliverCursor = 0;
+  private backlogCursor = 0;
+  private errorCursor = 0;
+
+  /** Return the next unconsumed deliver frame, waiting up to timeoutMs for one. */
   async waitForDeliver(timeoutMs = 1000): Promise<TunnelFrame | null> {
-    return this.waitForBuffer(this.delivers, timeoutMs);
+    return this.nextFrame(this.delivers, () => this.deliverCursor, (n) => { this.deliverCursor = n; }, timeoutMs);
   }
   async waitForError(timeoutMs = 1000): Promise<TunnelFrame | null> {
-    return this.waitForBuffer(this.errors, timeoutMs);
+    return this.nextFrame(this.errors, () => this.errorCursor, (n) => { this.errorCursor = n; }, timeoutMs);
   }
   async waitForBacklog(timeoutMs = 1500): Promise<TunnelFrame | null> {
-    return this.waitForBuffer(this.backlogs, timeoutMs);
+    return this.nextFrame(this.backlogs, () => this.backlogCursor, (n) => { this.backlogCursor = n; }, timeoutMs);
   }
 
-  private async waitForBuffer(buf: TunnelFrame[], timeoutMs: number): Promise<TunnelFrame | null> {
+  private async nextFrame(buf: TunnelFrame[], getCursor: () => number, setCursor: (n: number) => void, timeoutMs: number): Promise<TunnelFrame | null> {
     const start = Date.now();
-    const startLen = buf.length;
-    while (Date.now() - start < timeoutMs) {
-      if (buf.length > startLen) return buf[buf.length - 1];
-      await new Promise(r => setTimeout(r, 15));
+    for (;;) {
+      const cursor = getCursor();
+      if (cursor < buf.length) { setCursor(cursor + 1); return buf[cursor]; }
+      if (Date.now() - start >= timeoutMs) return null;
+      await new Promise(r => setTimeout(r, 10));
     }
-    return buf.length > startLen ? buf[buf.length - 1] : null;
   }
 
   /** Abruptly terminate the socket (simulate a network drop, no close frame). */

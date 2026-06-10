@@ -22,6 +22,9 @@
  * @version-history
  *   v1.0.0 — 2026-06-10 — Phase 1: forward tunnel (agent→server) + welcome +
  *     heartbeat + malformed-frame rejection + single-socket registry + stats.
+ *   v1.1.0 — 2026-06-10 — Phase 2: realtime reverse delivery — `deliver` fan-out
+ *     from the event-bus delivery channel, `backlog` snapshot on connect
+ *     (queued+active tasks + pending messages), `ack` handling + dedup.
  */
 import { WebSocket } from 'ws';
 import { randomUUID } from 'node:crypto';
@@ -29,6 +32,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { VerifiedToken } from '../auth/jwt.js';
 import { logger } from '../utils/logger.js';
+import { onDeliveryEvent, offDeliveryEvent, type DeliveryEvent } from './event-bus.js';
 
 export const CONNECT_TUNNEL_PROTOCOL_VERSION = '1.0';
 export const CONNECT_TUNNEL_PATH = '/v1/connect/tunnel';
@@ -96,6 +100,9 @@ export class ConnectTunnelManager {
   private connections = new Map<string, ConnectConnection>();
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private readonly loopbackBase: string;
+  /** Per-agent set of deliver ids the agent has acked — excluded from later backlogs. */
+  private ackedDeliveries = new Map<string, Set<string>>();
+  private readonly deliveryHandler: (evt: DeliveryEvent) => void;
   private stats: ConnectTunnelStats = {
     activeConnections: 0,
     connectionsTotal: 0,
@@ -114,6 +121,20 @@ export class ConnectTunnelManager {
     // through the real Express stack. NOT the public base URL — that would add a
     // public-internet hop, which is exactly what the tunnel eliminates.
     this.loopbackBase = `http://127.0.0.1:${config.port}`;
+
+    // Realtime reverse delivery: fan a targeted delivery event out to the
+    // matching agent's socket if connected. If offline, the durable store
+    // (tasks stay `queued`, messages stay pending) covers it via backlog-on-connect.
+    this.deliveryHandler = (evt: DeliveryEvent) => this.onDelivery(evt);
+    onDeliveryEvent(this.deliveryHandler);
+  }
+
+  private onDelivery(evt: DeliveryEvent): void {
+    const conn = this.connections.get(evt.target);
+    if (!conn || conn.ws.readyState !== WebSocket.OPEN) return;          // offline → backlog handles it
+    if (this.ackedDeliveries.get(evt.target)?.has(evt.id)) return;       // already acked — skip
+    this.stats.deliveriesTotal++;
+    this.send(conn.ws, { type: 'deliver', id: evt.id, kind: evt.kind, payload: evt.payload });
   }
 
   /**
@@ -277,11 +298,54 @@ export class ConnectTunnelManager {
     }
   }
 
-  // ── Phase 2 hooks (filled in Phase 2) ──────────────────────────────────────
-  /* eslint-disable @typescript-eslint/no-unused-vars */
-  private handleAck(_gaii: string, _frame: ConnectFrame): void { /* Phase 2 */ }
-  private async sendBacklog(_conn: ConnectConnection): Promise<void> { /* Phase 2 */ }
-  /* eslint-enable @typescript-eslint/no-unused-vars */
+  /**
+   * Agent acknowledges a delivered item. Marks it delivered so it is dropped
+   * from the next backlog snapshot (the durable store stays source of truth
+   * until then). Dedup by id.
+   */
+  private handleAck(gaii: string, frame: ConnectFrame): void {
+    if (!frame.id) return;
+    let set = this.ackedDeliveries.get(gaii);
+    if (!set) { set = new Set(); this.ackedDeliveries.set(gaii, set); }
+    set.add(frame.id);
+    this.stats.acksTotal++;
+  }
+
+  /**
+   * On connect, send a snapshot of everything queued for this agent while it was
+   * away — queued + active tasks and pending messages — so nothing is lost
+   * across a disconnect (mirrors TunnelManager.sendMailboxSummary). Acked ids
+   * are excluded. After this the manager live-pushes via `deliver`.
+   */
+  private async sendBacklog(conn: ConnectConnection): Promise<void> {
+    try {
+      const gaii = conn.gaii;
+      const acked = this.ackedDeliveries.get(gaii);
+      const [queued, active, pendingMessages] = await Promise.all([
+        this.storage.listAgentTasks(gaii, { status: 'queued' }),
+        this.storage.listAgentTasks(gaii, { status: 'active' }),
+        this.storage.listPendingMessages(gaii).catch(() => []),
+      ]);
+      // Dedup tasks by id (a task can't be both, but guard anyway) and drop acked.
+      const taskById = new Map<string, unknown>();
+      for (const t of [...queued.tasks, ...active.tasks]) {
+        if (acked?.has(t.id)) continue;
+        taskById.set(t.id, t);
+      }
+      const tasks = [...taskById.values()];
+      const messages = pendingMessages.filter(m => !acked?.has(m.id));
+
+      if (conn.ws.readyState !== WebSocket.OPEN) return;
+      this.send(conn.ws, {
+        type: 'backlog',
+        id: randomUUID(),
+        payload: { tasks, messages },
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      logger.error('Connect tunnel backlog failed', { event: 'connect_tunnel.error', gaii: conn.gaii, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
 
   /** True if the agent currently holds an open tunnel socket. */
   isOnline(gaii: string): boolean {
@@ -319,6 +383,7 @@ export class ConnectTunnelManager {
   }
 
   async shutdown(): Promise<void> {
+    offDeliveryEvent(this.deliveryHandler);
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;

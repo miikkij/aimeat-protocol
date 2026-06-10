@@ -67,6 +67,7 @@ const ALL_SUITES = [
     'test/e2e-micro-memory.ts',
     'test/e2e-personal-node.ts',
     'test/e2e-connect-tunnel.ts',
+    'test/e2e-connect-tunnel-delivery.ts',
     'test/e2e-phase0.ts',
     'test/e2e-projects.ts',
     'test/e2e-portal.ts',

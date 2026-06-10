@@ -39,7 +39,7 @@ import { RATING_CONTEXTS_REQUIRING_GROUNDING } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope, agentNotFoundResponse } from '../auth/middleware.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
-import { emitChange } from '../services/event-bus.js';
+import { emitChange, emitDelivery } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { recordTaskStarted, recordTaskCompleted, recordTaskFailed } from '../services/activity-recorder.js';
 import { recomputeAndCacheStatistics } from '../services/agent-statistics.js';
@@ -242,6 +242,11 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
         });
       }
       try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/tasks`); } catch { /* MCP not connected */ }
+      // Connector forward tunnel: realtime reverse delivery. If the agent holds
+      // an open tunnel, the ConnectTunnelManager pushes the full task down the
+      // socket immediately (zero round-trip); if offline, the task stays in the
+      // store and is replayed via backlog-on-connect. No-op when no tunnel.
+      emitDelivery({ target: agentGaii, kind: 'task_assigned', id: record.id, payload: created });
     }
 
     res.status(201).json(success(config.nodeId, { task: created }, [
