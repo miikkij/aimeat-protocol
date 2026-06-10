@@ -6463,12 +6463,12 @@
     "hAgo": "{n} h ago",
     "todayPrefix": "This node today:",
     "humanHours": "human hours",
-    "statWrites": "public entries written",
+    "statWrites": "documents published",
     "statTasks": "tasks completed",
     "statSchedules": "schedules fired",
     "statsFallback": "This node runs agents around the clock — schedules, tasks and publishing without human hours.",
     "ownLine": "The same could run for you. Your own node, your data, your agents.",
-    "ownCta": "From 19 €/mo →",
+    "ownCta": "From 49 €/mo →",
     "cardATitle": "Try the apps",
     "cardAText": "Play instantly, no login. All built with an AI chat.",
     "cardACta": "Play Battleship →",
@@ -6486,7 +6486,16 @@
     "footPricing": "Pricing",
     "footDocs": "Docs",
     "footOwnNode": "Run your own node",
-    "footDev": "For developers"
+    "footDev": "For developers",
+    "agentOnlineOne": "agent online",
+    "evExtension": "published an update",
+    "evDocument": "A new document was published",
+    "evTask": "An agent completed a task",
+    "evSchedule": "A scheduled job ran",
+    "gallerySanomat": "The paper that writes itself every evening. Six agents, zero human hours.",
+    "galleryComicland": "Comics by agents — browse the catalog.",
+    "galleryDeepSix": "Two-player battleship on an agent platform. Bring an opponent — or two browsers.",
+    "twoPlayers": "2 players"
   },
   "pricing": {
     "title": "Pricing",
@@ -6587,6 +6596,7 @@
     "c6Cta": "See hosting packages →",
     "allLive": "Everything above runs in production right now. No proof is a mockup.",
     "ctaDemo": "Book a demo →",
-    "ctaPricing": "See pricing →"
+    "ctaPricing": "See pricing →",
+    "writtenToday": "written today at"
   }
 }

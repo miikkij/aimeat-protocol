@@ -39,13 +39,31 @@ function Ticker() {
     return () => { alive = false; clearInterval(iv); };
   }, []);
 
-  const item = data?.items?.[0];
+  // Event → human sentence WHITELIST. Raw key names never reach the visitor;
+  // unknown event shapes are dropped entirely (no fallback to raw data).
+  const humanize = (item) => {
+    const actor = item.actor || '';
+    const key = item.key || '';
+    if (/statistics|last-init|timestamp|config|cache|readme|\.ui$/i.test(key)) return null;
+    if (actor.startsWith('ext:')) {
+      const name = actor.slice(4).replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      return `${name} ${tr('landing.evExtension', 'published an update')}`;
+    }
+    if (/news|article|sanomat|notes|\bdoc|d-/i.test(key)) return tr('landing.evDocument', 'A new document was published');
+    if (/task/i.test(key)) return tr('landing.evTask', 'An agent completed a task');
+    if (/schedule|cron|daily/i.test(key)) return tr('landing.evSchedule', 'A scheduled job ran');
+    return null;
+  };
+  const hit = (data?.items || []).map(i => ({ i, txt: humanize(i) })).find(x => x.txt);
+  const agentsBit = data?.agents_online > 0
+    ? ` · ${data.agents_online} ${data.agents_online === 1 ? tr('landing.agentOnlineOne', 'agent online') : tr('landing.agentsOnline', 'agents online')}`
+    : '';
   return html`
     <div class="ld-ticker" title=${tr('landing.tickerTitle', 'Live activity on this node')}>
       <span class="ld-ticker-dot">●</span>
-      ${item
-        ? html`<span class="ld-ticker-text">${escHtml(item.actor)} ${tr('landing.published', 'published')} ${escHtml(item.key)} · ${relMin(item.at)}${data.agents_online > 0 ? ` · ${data.agents_online} ${tr('landing.agentsOnline', 'agents online')}` : ''}</span>`
-        : html`<span class="ld-ticker-text">${tr('landing.tickerFallback', 'Agents on this node write, schedule and publish around the clock.')}</span>`}
+      ${hit
+        ? html`<span class="ld-ticker-text">${escHtml(hit.txt)} · ${relMin(hit.i.at)}${agentsBit}</span>`
+        : html`<span class="ld-ticker-text">${tr('landing.tickerFallback', 'Agents on this node write, schedule and publish around the clock.')}${agentsBit}</span>`}
     </div>
   `;
 }
@@ -74,31 +92,58 @@ function StatsPanel({ navigate }) {
       <div class="ld-stats-own">
         ${tr('landing.ownLine', 'The same could run for you. Your own node, your data, your agents.')}
         <a class="ld-stats-cta" href="/v1/pricing" onClick=${(e) => { e.preventDefault(); navigate('/v1/pricing'); }}>
-          ${tr('landing.ownCta', 'From 19 €/mo →')}
+          ${tr('landing.ownCta', 'From 49 €/mo →')}
         </a>
       </div>
     </div>
   `;
 }
 
-/* ── Proof gallery: real public apps, playable without login. Proof, not a shop. ── */
+/* ── Proof gallery: curated. Three fixed flagship cards first (Sanomat and Comicland
+   lead because they work solo, instantly; Deep Six needs two players), then deduped
+   local catalog apps up to 6 total. Proof, not a shop. ── */
 function Gallery({ onApps }) {
   const [apps, setApps] = useState([]);
   useEffect(() => {
-    fetch('/v1/apps?sort=popular&limit=6').then(r => r.json())
+    fetch('/v1/apps?sort=popular&limit=50').then(r => r.json())
       .then(j => { const list = j?.data?.apps || []; setApps(list); onApps?.(list); })
-      .catch(() => { /* gallery hidden */ });
+      .catch(() => { /* featured cards still render */ });
   }, []);
-  if (apps.length === 0) return null;
+
+  const featured = [
+    { name: 'AIMEAT Sanomat', desc: tr('landing.gallerySanomat', 'The paper that writes itself every evening. Six agents, zero human hours.'),
+      href: 'https://aimeat.io/v1/apps/happydude500001/laimeat-sanomat.html?mode=inline' },
+    { name: 'Comicland', desc: tr('landing.galleryComicland', 'Comics by agents — browse the catalog.'),
+      href: 'https://aimeat.io/v1/apps/happydude500001/comicland-v2-app.html?mode=inline#/catalog' },
+    { name: 'Battleship (Deep Six)', desc: tr('landing.galleryDeepSix', 'Two-player battleship on an agent platform. Bring an opponent — or two browsers.'),
+      href: 'https://aimeat.io/v1/apps/anonymous/deep-six.html?mode=inline', badge: tr('landing.twoPlayers', '2 players') },
+  ];
+
+  // Curate the rest: drop near-duplicates (name-prefix matches an already shown card)
+  // and known clones; one full first sentence as the description, never a mid-word cut.
+  const shownNames = featured.map(f => f.name.toLowerCase());
+  const rest = [];
+  for (const a of apps) {
+    const name = (a.name || a.manifest?.name || String(a.filename).replace(/\.html?$/i, '')).trim();
+    const lower = name.toLowerCase();
+    if (/admin panel/i.test(name)) continue;
+    if (/sanomat|comicland|deep.?six|battleship/i.test(lower)) continue;
+    if (shownNames.some(s => lower.startsWith(s) || s.startsWith(lower))) continue;
+    shownNames.push(lower);
+    const desc = String(a.manifest?.description || '').split(/(?<=[.!?])\s/)[0].slice(0, 120);
+    rest.push({ name, desc, href: `/v1/apps/${encodeURIComponent(a.owner)}/${encodeURIComponent(a.filename)}?mode=inline` });
+    if (featured.length + rest.length >= 6) break;
+  }
+  const cards = [...featured, ...rest];
+
   return html`
     <div class="ld-section">
       <h2 class="ld-h2">${tr('landing.galleryTitle', 'Built with this loop — real apps, try them')}</h2>
       <div class="ld-gallery">
-        ${apps.map(a => html`
-          <a key=${a.owner + '/' + a.filename} class="ld-app-card"
-            href=${`/v1/apps/${encodeURIComponent(a.owner)}/${encodeURIComponent(a.filename)}?mode=inline`} target="_blank">
-            <div class="ld-app-name">${escHtml(a.name || a.manifest?.name || String(a.filename).replace(/\.html?$/i, ''))}</div>
-            ${a.manifest?.description && html`<div class="ld-app-desc">${escHtml(String(a.manifest.description).slice(0, 90))}</div>`}
+        ${cards.map(c => html`
+          <a key=${c.href} class="ld-app-card" href=${c.href} target="_blank" rel="noopener">
+            <div class="ld-app-name">${escHtml(c.name)}${c.badge && html` <span class="ld-app-badge">${c.badge}</span>`}</div>
+            ${c.desc && html`<div class="ld-app-desc">${escHtml(c.desc)}</div>`}
             <div class="ld-app-meta">${tr('landing.builtInChat', 'built in an AI chat session')}</div>
           </a>
         `)}
@@ -132,7 +177,7 @@ export default function Landing({ navigate }) {
   const battleship = apps.find(a => /battleship|deep.?six|laivanupotus/i.test((a.filename || '') + ' ' + (a.name || '')));
   const tryHref = battleship
     ? `/v1/apps/${encodeURIComponent(battleship.owner)}/${encodeURIComponent(battleship.filename)}?mode=inline`
-    : '/app-catalog.html';
+    : 'https://aimeat.io/v1/apps/anonymous/deep-six.html?mode=inline';
 
   return html`
     <div class="ld">

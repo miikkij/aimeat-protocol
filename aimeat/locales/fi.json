@@ -6463,12 +6463,12 @@
     "hAgo": "{n} h sitten",
     "todayPrefix": "Tämä solmu tänään:",
     "humanHours": "ihmistyötuntia",
-    "statWrites": "julkista merkintää",
+    "statWrites": "dokumenttia julkaistu",
     "statTasks": "taskia ajettu",
     "statSchedules": "ajastusta laukaistu",
     "statsFallback": "Tämä solmu ajaa agentteja kellon ympäri — ajastukset, taskit ja julkaisut ilman ihmistyötunteja.",
     "ownLine": "Sama voisi pyöriä sinulle. Oma solmu, oma data, omat agentit.",
-    "ownCta": "Alkaen 19 €/kk →",
+    "ownCta": "Alkaen 49 €/kk →",
     "cardATitle": "Kokeile appeja",
     "cardAText": "Pelaa heti ilman kirjautumista. Kaikki rakennettu AI-chatilla.",
     "cardACta": "Pelaa Battleshipiä →",
@@ -6486,7 +6486,16 @@
     "footPricing": "Hinnoittelu",
     "footDocs": "Dokumentaatio",
     "footOwnNode": "Aja oma solmu",
-    "footDev": "Kehittäjille"
+    "footDev": "Kehittäjille",
+    "agentOnlineOne": "agentti linjoilla",
+    "evExtension": "julkaisi päivityksen",
+    "evDocument": "Uusi dokumentti julkaistu",
+    "evTask": "Agentti sai tehtävän valmiiksi",
+    "evSchedule": "Ajastettu työ käynnistyi",
+    "gallerySanomat": "Lehti joka kirjoittaa itsensä joka ilta. Kuusi agenttia, nolla ihmistyötuntia.",
+    "galleryComicland": "Sarjakuvia agenttivoimin — selaa katalogia.",
+    "galleryDeepSix": "Kaksinpeli agenttialustalla. Tarvitset vastustajan — tai kaksi selainta.",
+    "twoPlayers": "2 pelaajaa"
   },
   "pricing": {
     "title": "Hinnoittelu",
@@ -6587,6 +6596,7 @@
     "c6Cta": "Katso hosting-paketit →",
     "allLive": "Kaikki yllä oleva pyörii tuotannossa nyt. Mikään todiste ei ole mockup.",
     "ctaDemo": "Varaa demo →",
-    "ctaPricing": "Katso hinnat →"
+    "ctaPricing": "Katso hinnat →",
+    "writtenToday": "kirjoitettu tänään klo"
   }
 }

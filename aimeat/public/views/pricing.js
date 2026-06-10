@@ -1,6 +1,6 @@
 /**
  * @file pricing.js
- * @description Pricing ladder: Try it (0 €) → Own node (19 €/mo) → Own node Pro (99 €/mo)
+ * @description Pricing ladder: Try it (0 €) → Own node (49 €/mo) → Own node Pro (99 €/mo)
  *   → Done for you (setup + monthly) → Enterprise (contact). No payment integration at
  *   this stage — CTAs are mailto links. #packages anchors the Done-for-you section
  *   (landing path card C links here). Short sentences, no hype adjectives.
@@ -46,7 +46,7 @@ export default function Pricing() {
           tr('pricing.try1', 'On the genesis node.'),
           tr('pricing.try2', 'Morsels, public apps, the prompt loop.'),
         ], tr('pricing.tryCta', 'Start free →'), '/v1/portal')}
-        ${tier('own-node', tr('pricing.ownName', 'Own node'), '19 €/' + tr('pricing.mo', 'mo'), [
+        ${tier('own-node', tr('pricing.ownName', 'Own node'), '49 €/' + tr('pricing.mo', 'mo'), [
           tr('pricing.own1', 'Your own instance, your data, BYOK.'),
           tr('pricing.own2', 'No backups, community support.'),
         ], tr('pricing.contactCta', 'Contact us →'), CONTACT)}

@@ -26,18 +26,15 @@ export default function Business({ navigate }) {
   // page (resolved by name so the link works wherever the organism lives — and is
   // simply hidden on nodes that don't have it). NEVER link the Wellprepd organism.
   const [paper, setPaper] = useState(null);
-  const [fplOrg, setFplOrg] = useState(null);
   useEffect(() => {
     fetch('/v1/apps?limit=100').then(r => r.json()).then(j => {
       const apps = j?.data?.apps || [];
       setPaper(apps.find(a => /sanomat/i.test(a.filename || '') || /sanomat/i.test(a.name || '')) || null);
     }).catch(() => {});
-    fetch('/v1/organisms?visibility=public').then(r => r.json()).then(j => {
-      const orgs = j?.data?.organisms || [];
-      setFplOrg(orgs.find(o => /freeparty/i.test(o.name || '')) || null);
-    }).catch(() => {});
   }, []);
-  const fplHref = fplOrg ? `/v1/publicworkspaceviewer?org=${encodeURIComponent(fplOrg.id)}` : null;
+  // The FreePartyLights public status page (org + workspace ids on aimeat.io; public
+  // document sharing verified ON — 5 docs readable without auth). NEVER Wellprepd.
+  const fplHref = 'https://aimeat.io/v1/publicworkspaceviewer?org=27b89c13-1cc7-4fde-9c3f-91c4c7d06aa9&ws=ws-mq4y3131522';
 
   const Case = ({ id, title, text, quote, quoteBy, proofHref, proofLabel, proofNote, ctaLabel, ctaHref }) => html`
     <div class="ld-case" id=${id}>
@@ -68,9 +65,10 @@ export default function Business({ navigate }) {
         <${Case} id="case-news"
           title=${tr('biz.c1Title', 'I wake up already knowing what happened in my field')}
           text=${tr('biz.c1Text', 'AIMEAT Sanomat writes itself every evening. Six agents, zero human hours.')}
-          proofHref=${paper ? `/v1/apps/${encodeURIComponent(paper.owner)}/${encodeURIComponent(paper.filename)}?mode=inline` : null}
-          proofLabel=${tr('biz.c1Proof', "Read tonight's paper →")}
-          proofNote=${tr('biz.proofUnavailable', 'Live proof runs on aimeat.io.')}
+          proofHref=${paper
+            ? `/v1/apps/${encodeURIComponent(paper.owner)}/${encodeURIComponent(paper.filename)}?mode=inline`
+            : 'https://aimeat.io/v1/apps/happydude500001/laimeat-sanomat.html?mode=inline'}
+          proofLabel=${tr('biz.c1Proof', "Read tonight's paper →") + (paper?.created_at && paper.created_at.slice(0, 10) === new Date().toISOString().slice(0, 10) ? ` · ${tr('biz.writtenToday', 'written today at')} ${new Date(paper.created_at).toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit' })}` : '')}
           ctaLabel=${tr('biz.c1Cta', 'The same, from your topics →')} ctaHref=${CONTACT} />
         <${Case} id="case-report"
           title=${tr('biz.c2Title', 'My 7 AM report is waiting on my phone')}

@@ -18,27 +18,48 @@ import { escHtml } from '/js/utils.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
-/* Diagram block: rect + up to 5 short text lines. Colors via CSS vars so dark mode works. */
+/* Diagram block: rect + up to 5 short text lines. Colors via CSS vars so dark mode works.
+ * NB: htm passes attribute values as STRINGS — coerce before arithmetic, or "10" + 95
+ * becomes "1095" and every text lands far outside its box (the empty-boxes bug). */
 function Block({ x, y, w, h: hh, title, lines, hot }) {
+  const X = Number(x), Y = Number(y), W = Number(w);
   return html`
     <g>
-      <rect x=${x} y=${y} width=${w} height=${hh} rx="10"
+      <rect x=${X} y=${Y} width=${W} height=${Number(hh)} rx="10"
         fill="var(--card)" stroke=${hot ? 'var(--accent, #E8564A)' : 'var(--border)'} stroke-width=${hot ? 2 : 1.5} />
-      <text x=${x + w / 2} y=${y + 22} text-anchor="middle" font-size="13" font-weight="700" fill="var(--text)">${title}</text>
+      <text x=${X + W / 2} y=${Y + 22} text-anchor="middle" font-size="13" font-weight="700" fill="var(--text)">${title}</text>
       ${lines.map((l, i) => html`
-        <text key=${i} x=${x + w / 2} y=${y + 42 + i * 16} text-anchor="middle" font-size="11" fill="var(--text-dim)">${l}</text>
+        <text key=${i} x=${X + W / 2} y=${Y + 42 + i * 16} text-anchor="middle" font-size="11" fill="var(--text-dim)">${l}</text>
       `)}
     </g>
   `;
 }
 
-const Arrow = ({ x1, y1, x2, y2 }) => html`
-  <g stroke="var(--text-dim)" stroke-width="1.5" fill="var(--text-dim)">
-    <line x1=${x1} y1=${y1} x2=${x2} y2=${y2} />
-    <polygon points=${`${x2},${y2} ${x2 - 7},${y2 - 4} ${x2 - 7},${y2 + 4}`}
-      transform=${y1 === y2 ? '' : `rotate(90 ${x2} ${y2})`} />
-  </g>
-`;
+/* The model-swap caption, wrapped to two centered lines so it stays inside the viewBox. */
+function Caption({ x, y, note }) {
+  const parts = note.split(/\s*[—,]\s*/);
+  const lines = parts.length >= 2 ? [parts[0], parts.slice(1).join(', ')] : [note];
+  return html`
+    <g>
+      ${lines.map((l, i) => html`
+        <text key=${i} x=${Number(x)} y=${Number(y) + i * 13} text-anchor="middle" font-size="10" font-style="italic" fill="var(--text-dim)">${l}</text>
+      `)}
+    </g>
+  `;
+}
+
+// Same string-coercion trap as Block: htm passes attrs as strings, and "95" + 4
+// is "954" — the arrowhead's third point leaked far below the line. Coerce first.
+const Arrow = (props) => {
+  const x1 = Number(props.x1), y1 = Number(props.y1), x2 = Number(props.x2), y2 = Number(props.y2);
+  return html`
+    <g stroke="var(--text-dim)" stroke-width="1.5" fill="var(--text-dim)">
+      <line x1=${x1} y1=${y1} x2=${x2} y2=${y2} />
+      <polygon points=${`${x2},${y2} ${x2 - 7},${y2 - 4} ${x2 - 7},${y2 + 4}`}
+        transform=${y1 === y2 ? '' : `rotate(90 ${x2} ${y2})`} />
+    </g>
+  `;
+};
 
 function Diagram() {
   const models = { title: tr('hiw.dModels', 'AI models'), lines: [tr('hiw.dModels1', 'Swappable:'), tr('hiw.dModels2', 'Claude, GPT, Grok'), tr('hiw.dModels3', 'CrewAI, your own')] };
@@ -53,7 +74,7 @@ function Diagram() {
       <!-- Desktop: left → right, assets below organism, human wired to the gate. -->
       <svg class="hiw-svg hiw-svg--wide" viewBox="0 0 880 330" role="img" aria-label=${tr('hiw.dAria', 'How AIMEAT works')}>
         <${Block} x="10" y="40" w="190" h="110" title=${models.title} lines=${models.lines} />
-        <text x="105" y="175" text-anchor="middle" font-size="10.5" font-style="italic" fill="var(--text-dim)">${note}</text>
+        <${Caption} x="105" y="172" note=${note} />
         <${Arrow} x1="200" y1="95" x2="240" y2="95" />
         <${Block} x="240" y="30" w="200" h="130" title=${agents.title} lines=${agents.lines} hot />
         <${Arrow} x1="440" y1="95" x2="480" y2="95" />
@@ -67,7 +88,7 @@ function Diagram() {
       <!-- Mobile: same content stacked vertically. -->
       <svg class="hiw-svg hiw-svg--tall" viewBox="0 0 320 690" role="img" aria-label=${tr('hiw.dAria', 'How AIMEAT works')}>
         <${Block} x="40" y="10" w="240" h="105" title=${models.title} lines=${models.lines} />
-        <text x="160" y="133" text-anchor="middle" font-size="10.5" font-style="italic" fill="var(--text-dim)">${note}</text>
+        <${Caption} x="160" y="128" note=${note} />
         <line x1="160" y1="140" x2="160" y2="165" stroke="var(--text-dim)" stroke-width="1.5" />
         <polygon points="160,170 156,163 164,163" fill="var(--text-dim)" />
         <${Block} x="40" y="172" w="240" h="125" title=${agents.title} lines=${agents.lines} hot />
