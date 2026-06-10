@@ -101,6 +101,12 @@
  *     stub (F5 before the list loaded) — the form now re-syncs whenever fresher org data arrives, as
  *     long as the user hasn't touched the fields. Workspace rows gain a clickable 👥 participants
  *     counter that expands an inline people list (like the access-request inbox).
+ *   v1.21.0 — 2026-06-10 — Workspace settings adopts the organism-settings form pattern: meta line
+ *     (template/last-saved), Identity + Agent policy groups, an autonomy hint, dirty-gated "Save
+ *     changes" (no longer closes the panel) + reset-Cancel + discard guard on the ⚙ toggle (the
+ *     populate effect only re-seeds untouched fields, so live updates never clobber typing). Spaces/
+ *     Public-sharing headings restyled to group labels. Workspace-row counts get real singular/
+ *     plural forms ("1 tietue", "{n} tietuetta").
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
@@ -117,6 +123,7 @@ import * as orgService from '/js/services/organisms.js';
 import * as memoryService from '/js/services/memory.js';
 import * as knowledgeService from '/js/services/knowledge.js';
 import { listAgents } from '/js/services/agents.js';
+import { getGhii } from '/js/services/auth.js';
 import { listPosts, createPost } from '/js/services/boards.js';
 import { OpenRouterSettings } from './generator-settings.js';
 import { copyToClipboard } from '/js/utils.js';
@@ -1512,8 +1519,8 @@ function WorkspaceList({ org, showToast, onOpen, onCount }) {
     if (!s) return w.access === 'owner' ? (t('organisms.yours') || 'yours') : (t('organisms.byCreator') || 'by {creator}').replace('{creator}', w.created_by || '?');
     if (!s.hasManifest) return t('organisms.wsNotSetUp') || 'new — set up when opened';
     const parts = [
-      `${s.recs} ${t('organisms.recordsMode') || 'records'}`,
-      `${s.docs} ${t('organisms.docs') || 'docs'}`,
+      s.recs === 1 ? (t('organisms.recOne') || '1 record') : (t('organisms.recMany') || '{n} records').replace('{n}', String(s.recs)),
+      s.docs === 1 ? (t('organisms.docOne') || '1 document') : (t('organisms.docMany') || '{n} documents').replace('{n}', String(s.docs)),
     ];
     if (s.lastEv) {
       const verb = s.lastEv.action === 'publish' ? (t('organisms.publishedVerb') || 'published') : (t('organisms.editedVerb') || 'edited');
@@ -2081,11 +2088,20 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
   const cancelForm = () => { setAdding(null); setAddingSchema(null); setAddingInitial(null); setAddingId(null); };
   const toggleExpand = (ot, id) => setExpandedRec(s => ({ ...s, [ot.name + ':' + id]: !s[ot.name + ':' + id] }));
   // Read-only field view for a record (skips the underscore-prefixed metadata the read attaches).
-  const recordFields = (rec) => {
+  // Manifest-carried workspace translations (generated workspaces): field labels at
+  // "{namespace}.{field}", hints at "{namespace}.{field}.hint", space labels at "type.{name}".
+  // Resolution: active locale → en → '' (callers fall back to the raw key/name).
+  const wsT = useCallback((key) => {
+    const m = ws?.manifest?.i18n;
+    if (!m || typeof m !== 'object') return '';
+    const lang = getLocale();
+    return (m[lang] && m[lang][key]) || (m.en && m.en[key]) || '';
+  }, [ws]);
+  const recordFields = (ot, rec) => {
     const rows = Object.entries(rec || {}).filter(([k, v]) =>
       !k.startsWith('_') && v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0));
     if (!rows.length) return html`<div class="pj-muted pj-rec-empty">${t('organisms.noFields') || 'No fields'}</div>`;
-    return rows.map(([k, v]) => html`<${KeyValueRow} key=${k} label=${k}
+    return rows.map(([k, v]) => html`<${KeyValueRow} key=${k} label=${wsT(`${ot.namespace}.${k}`) || k}
       value=${Array.isArray(v) ? v.join(', ') : (typeof v === 'object' ? JSON.stringify(v) : String(v))} />`);
   };
 
@@ -2191,16 +2207,36 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
     finally { setBusy(false); }
   }, [orgId, gateOn, showToast]);
 
-  // Populate the settings fields from the manifest whenever the panel opens (incl. after generation).
-  // Public sharing now lives inside Settings, so its lazy load fires on open too (doc spaces only).
+  // Populate the settings fields from the manifest when the panel opens (incl. after generation) or
+  // fresher data arrives — but only while the user hasn't touched the fields (seededRef compare), so
+  // a live-update reload never clobbers typing. Public sharing's lazy load fires on open too.
+  const seededRef = useRef(null);   // { name, summary, autonomy } last written into the fields
   useEffect(() => {
-    if (showSettings && ws?.manifest) {
-      setSName(ws.manifest.name || '');
-      setSSummary(ws.manifest.summary || '');
-      setSAutonomy(ws.manifest.policy?.agentAutonomy || 'L3');
-      if (share === null && (ws.manifest.objectTypes || []).some(orgService.isDocSpace)) loadShare();
+    if (!showSettings || !ws?.manifest) return;
+    const sv = seededRef.current;
+    const untouched = !sv || (sName === sv.name && sSummary === sv.summary && sAutonomy === sv.autonomy);
+    if (untouched) {
+      const next = { name: ws.manifest.name || '', summary: ws.manifest.summary || '', autonomy: ws.manifest.policy?.agentAutonomy || 'L3' };
+      setSName(next.name); setSSummary(next.summary); setSAutonomy(next.autonomy);
+      seededRef.current = next;
     }
-  }, [showSettings, ws]);
+    if (share === null && (ws.manifest.objectTypes || []).some(orgService.isDocSpace)) loadShare();
+  }, [showSettings, ws]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Dirty-check against the manifest: Save enables only on real changes (doubles as the
+  // unsaved-changes indicator), Cancel resets the fields, and closing a dirty panel asks first.
+  const wsDirty = !!ws?.manifest && (sName !== (ws.manifest.name || '')
+    || sSummary !== (ws.manifest.summary || '')
+    || sAutonomy !== (ws.manifest.policy?.agentAutonomy || 'L3'));
+  const resetSettingsForm = () => {
+    const next = { name: ws?.manifest?.name || '', summary: ws?.manifest?.summary || '', autonomy: ws?.manifest?.policy?.agentAutonomy || 'L3' };
+    setSName(next.name); setSSummary(next.summary); setSAutonomy(next.autonomy);
+    seededRef.current = next;
+  };
+  const guardWsDirty = (fn) => {
+    if (showSettings && wsDirty) confirm(t('organisms.discardChanges') || 'Discard unsaved changes?', () => { resetSettingsForm(); fn(); }, { danger: true });
+    else fn();
+  };
 
   const saveSettings = useCallback(async () => {
     setBusy(true);
@@ -2214,7 +2250,6 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
       };
       await orgService.saveManifest(orgId, wsId, m);
       showToast(t('organisms.settingsSaved') || 'Settings saved');
-      setShowSettings(false);
       await load();
     } catch (e) { showToast((e && e.message) || 'Failed to save settings'); }
     finally { setBusy(false); }
@@ -2510,12 +2545,13 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
   const renderRecordSpace = (ot) => html`
     <div class="pj-section" key=${ot.name}>
       <div class="pj-section-head">
-        <span class="pj-section-title">${escHtml(ot.name)}</span>
+        <span class="pj-section-title">${escHtml(wsT('type.' + ot.name) || ot.name)}</span>
         ${ot.append ? null : html`<button class="btn-outline btn-sm" onClick=${() => startAdd(ot)}>${'+ '}${t('organisms.addDraft') || 'Add draft'}</button>`}
       </div>
 
       ${adding === ot.name && (addingSchema
         ? html`<${SchemaForm} key=${'sf-' + (addingId || 'new')} schema=${addingSchema} busy=${busy} initial=${addingInitial}
+            idPrefix=${ot.name} namespace=${ot.namespace} wsT=${wsT}
             onSave=${(v) => saveDraft(ot, addingId ? { ...v, id: addingId } : v)} onCancel=${cancelForm} />`
         : html`<${Spinner} />`)}
 
@@ -2528,7 +2564,7 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
             <button class="btn-primary btn-sm" onClick=${() => publish(ot, d.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>
             <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, d.id, String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id))}>🗑</button>
           </div>
-          ${expandedRec[ot.name + ':' + d.id] ? html`<div class="pj-rec-fields">${recordFields(d)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${d.id} showToast=${showToast} />` : null}
+          ${expandedRec[ot.name + ':' + d.id] ? html`<div class="pj-rec-fields">${recordFields(ot, d)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${d.id} showToast=${showToast} />` : null}
         </div>
       `)}
 
@@ -2591,7 +2627,7 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
         <span class="pj-ws-head-actions">
           <${KebabMenu} label=${t('organisms.forAgentsHint') || 'Copy a ready prompt that teaches an AI to use this workspace'}
             btnClass="btn-outline btn-sm" trigger=${'🤖 ' + (t('organisms.forAgents') || 'For agents') + ' ▾'} items=${agentMenuItems} />
-          <button class="btn-outline btn-sm ${showSettings ? 'pj-org-btn-active' : ''}" onClick=${() => setShowSettings(s => !s)}>${'⚙ '}${t('organisms.settings') || 'Settings'}</button>
+          <button class="btn-outline btn-sm ${showSettings ? 'pj-org-btn-active' : ''}" onClick=${() => guardWsDirty(() => setShowSettings(s => !s))}>${'⚙ '}${t('organisms.settings') || 'Settings'}</button>
         </span>
       </div>
       ${ws.manifest?.summary ? html`<div class="section-desc">${escHtml(ws.manifest.summary)}</div>` : null}
@@ -2631,23 +2667,31 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
 
       ${showSettings && html`
         <div class="pj-inbox">
-          <div class="card-h3">${t('organisms.settings') || 'Workspace settings'}</div>
+          <div class="pj-meta-line">
+            <span>${t('organisms.template') || 'Template'} ${escHtml(ws.manifest?.kind || '-')}</span>
+            ${ws.manifest?.updatedAt ? html`<span>${t('organisms.lastSaved') || 'Last saved'} ${fmtDate(ws.manifest.updatedAt)}</span>` : null}
+          </div>
+
+          <div class="pj-form-group">${t('organisms.formIdentity') || 'Identity'}</div>
           <label class="pj-field"><span>${t('organisms.wsName') || 'Name'}</span>
             <input type="text" class="input-field input-sm" value=${sName} onInput=${e => setSName(e.target.value)} /></label>
           <label class="pj-field"><span>${t('organisms.wsSummary') || 'Summary'}</span>
             <textarea class="input-field input-sm" rows="2" value=${sSummary} onInput=${e => setSSummary(e.target.value)}></textarea></label>
+
+          <div class="pj-form-group">${t('organisms.formAgentPolicy') || 'Agent policy'}</div>
           <label class="pj-field"><span>${t('organisms.autonomy') || 'AI autonomy (L1 cautious → L5 free)'}</span>
             <select class="input-field input-sm" value=${sAutonomy} onChange=${e => setSAutonomy(e.target.value)}>
               ${['L1', 'L2', 'L3', 'L4', 'L5'].map(l => html`<option value=${l} key=${l}>${l}</option>`)}
             </select></label>
-          <div class="pj-empty">${t('organisms.template') || 'Template'}: ${escHtml(ws.manifest?.kind || '')}</div>
+          <div class="pj-form-hint">${t('organisms.autonomyHint') || 'Guidance for agents working here — L1 asks before nearly everything, L5 acts freely. The publish gate (Review tab) still applies regardless.'}</div>
+
           <div class="form-actions">
-            <button class="btn-primary btn-sm" onClick=${saveSettings} disabled=${busy}>${t('organisms.save') || 'Save'}</button>
-            <button class="btn-ghost btn-sm" onClick=${() => setShowSettings(false)}>${t('organisms.cancel') || 'Cancel'}</button>
+            <button class="btn-primary btn-sm" onClick=${saveSettings} disabled=${busy || !wsDirty}>${t('organisms.saveChanges') || 'Save changes'}</button>
+            <button class="btn-ghost btn-sm" disabled=${!wsDirty} onClick=${resetSettingsForm}>${t('organisms.cancel') || 'Cancel'}</button>
           </div>
 
           <div class="pj-divider"></div>
-          <div class="card-h3">${t('organisms.spaces') || 'Spaces'}</div>
+          <div class="pj-form-group">${t('organisms.spaces') || 'Spaces'}</div>
           ${(ws.manifest?.objectTypes || []).map(ot => html`
             <div class="pj-doc-row" key=${'sp' + ot.name}>
               <span class="pj-space-name">${escHtml(ot.name)}<span class="pj-doc-tag">${isDocSpace(ot) ? (t('organisms.docs') || 'docs') : (t('organisms.recordsMode') || 'records')}</span></span>
@@ -2665,7 +2709,7 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
 
           ${docTypes.length > 0 ? html`
             <div class="pj-divider"></div>
-            <div class="card-h3">${'🌐 '}${t('organisms.sharePublicTitle') || 'Public sharing'}</div>
+            <div class="pj-form-group">${'🌐 '}${t('organisms.sharePublicTitle') || 'Public sharing'}</div>
             <div class="section-desc">${t('organisms.sharePublicDesc') || 'Make published document-space pages readable by anyone with the link — no login required. Drafts are never shared.'}</div>
             ${!share && shareBusy ? html`<div class="pj-empty">${t('organisms.loading') || 'Loading…'}</div>` : null}
             ${share ? docTypes.map(ot => {

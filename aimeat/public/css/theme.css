@@ -10,6 +10,11 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.19.0 — 2026-06-10 — Controls get their own surface: new --control-bg/--control-border tokens
+       (light: white + gray-300; dark: raised #262934 + #4A4E5A). .btn-outline/.btn-ghost drop
+       background:transparent (they melted into the page as "framed text") and .input-field drops
+       background:var(--bg) (fields were LITERALLY the page color) — all three now use the control
+       tokens, buttons additionally get --shadow-sm so they read as pressable.
      v1.18.0 — 2026-06-02 — Component unification (#10 third toast pathway): tokenize the shared .toast color literals. Added a theme-invariant --toast-success-bg (green-500 #22C55E @ .95, the legacy toast green — deliberately NOT --success emerald, which would shift the hue), --toast-danger-bg (= --danger #EF4444 @ .95) and --toast-fg (white), same rationale as the badge palette. The base .toast and the .toast.error/.toast-error/.toast-success modifiers now reference these tokens instead of raw rgba()/#fff. Appearance-preserving: identical resolved values; solid saturated pills intentionally do not flip in dark mode. profile.js keeps its own showToast pathway (distinct .pf.toast-container wrapper + .toast.error markup) — left as a convergence candidate, NOT migrated, to avoid changing DOM/behavior.
      v1.17.0 — 2026-06-02 — Component unification (#26 recipient badge): add a theme-invariant --badge-*-bg palette (wildcard→danger, ghii→purple, organism→success, gaii→blue; domain #F97316 / node #6B7280 kept as own invariant swatches as they have no palette match) + --badge-fg white, so the profile .badge-* recipient classifier can drop its hardcoded hex (#8b5cf6/#f97316/#6b7280/#3b82f6) and dead light-only fallbacks (var(--success,#22c55e)/var(--danger,#ef4444)). Appearance-preserving: values resolve identically and these solid swatches intentionally do not flip in dark mode.
      v1.16.0 — 2026-06-02 — Component unification (#25 pill base): add a canonical token-only .pill shape primitive (inline-flex chip, --radius-full, compact padding, small bold text, pointer + opacity hover) — shape only, no colors; tints come from caller classes. Mirrors the shape the profile .vis-pill already used. The scoped .pf .vis-pill keeps its own shape declaration (the (0,2,0)-beats-bare-.pill specificity trap) but its radius was retokenized to the same --radius-full so the two stay in lockstep.
@@ -140,6 +145,12 @@
   --bg-input: var(--bg);
   --bg-input-focus: #FFFFFF;
 
+  /* Controls (outline/ghost buttons, input fields) — a surface DISTINCT from both the page bg and
+     white cards: white fill + a clearly visible border, so controls read as controls instead of
+     "framed text" that melts into the background. */
+  --control-bg: #FFFFFF;
+  --control-border: #D1D5DB;
+
   /* Code */
   --code-bg: #F3F4F6;
 
@@ -237,6 +248,10 @@
   /* Input */
   --bg-input: #1C1E26;
   --bg-input-focus: #23262F;
+
+  /* Controls — slightly lighter than the card surface so they read as raised, with a visible border */
+  --control-bg: #262934;
+  --control-border: #4A4E5A;
 
   /* Code */
   --code-bg: #0E0F13;
@@ -603,8 +618,8 @@ a { color: inherit; text-decoration: none; }
 
 .btn-outline {
   padding: 0.65rem 1.5rem;
-  background: transparent;
-  border: 1px solid var(--border);
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
   border-radius: var(--radius-sm);
   color: var(--text-dim);
   font-size: 0.84rem;
@@ -613,15 +628,15 @@ a { color: inherit; text-decoration: none; }
   cursor: pointer;
   transition: all 0.15s;
   letter-spacing: 0;
-  box-shadow: none;
+  box-shadow: var(--shadow-sm);
   animation: none;
 }
 
 .btn-outline:hover {
   border-color: var(--text-muted);
   color: var(--text);
-  background: transparent;
-  box-shadow: none;
+  background: var(--control-bg);
+  box-shadow: var(--shadow-sm);
   transform: none;
 }
 
@@ -680,8 +695,8 @@ a { color: inherit; text-decoration: none; }
   gap: 0.35rem;
   padding: 7px 16px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: transparent;
+  border: 1px solid var(--control-border);
+  background: var(--control-bg);
   color: var(--text-dim);
   text-decoration: none;
   font-size: 0.81rem;
@@ -692,7 +707,7 @@ a { color: inherit; text-decoration: none; }
 .btn-ghost:hover {
   border-color: var(--text-muted);
   color: var(--text);
-  background: transparent;
+  background: var(--control-bg);
 }
 
 /* ── Cards ── */
@@ -1040,8 +1055,8 @@ a { color: inherit; text-decoration: none; }
 .input-field {
   width: 100%;
   padding: 11px 14px;
-  background: var(--bg);
-  border: 1.5px solid var(--border);
+  background: var(--control-bg);
+  border: 1.5px solid var(--control-border);
   border-radius: var(--radius-sm);
   color: var(--text);
   font-family: var(--font);

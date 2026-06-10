@@ -2416,7 +2416,7 @@
 .pj-form-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
 .pj-form-row > .pj-field { flex: 1; min-width: 160px; }
 .pj-form-hint { font-size: 0.76rem; color: var(--muted); margin: 0.1rem 0 0.5rem; }
-.pj-taginput { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); padding: 0.3rem 0.45rem; }
+.pj-taginput { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; border: 1.5px solid var(--control-border); border-radius: var(--radius); background: var(--control-bg); padding: 0.3rem 0.45rem; }
 .pj-tag { display: inline-flex; align-items: center; gap: 0.25rem; }
 .pj-tag-x { background: none; border: none; cursor: pointer; color: var(--muted); font-size: 0.85rem; padding: 0 0.1rem; line-height: 1; }
 .pj-tag-x:hover { color: var(--danger); }
