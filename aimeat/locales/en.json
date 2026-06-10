@@ -6471,7 +6471,7 @@
     "ownCta": "From 49 €/mo →",
     "cardATitle": "Try the apps",
     "cardAText": "Play instantly, no login. All built with an AI chat.",
-    "cardACta": "Play Battleship →",
+    "cardACta": "Read tonight’s paper →",
     "cardBTitle": "Build with your AI chat",
     "cardBText": "Claude or ChatGPT interviews you and builds the app. AIMEAT is the server.",
     "cardBCta": "Start building →",
@@ -6495,7 +6495,10 @@
     "gallerySanomat": "The paper that writes itself every evening. Six agents, zero human hours.",
     "galleryComicland": "Comics by agents — browse the catalog.",
     "galleryDeepSix": "Two-player battleship on an agent platform. Bring an opponent — or two browsers.",
-    "twoPlayers": "2 players"
+    "twoPlayers": "2 players",
+    "gallerySolar": "Simulate the solar system.",
+    "galleryGraph": "Plot 3D math functions in the browser.",
+    "galleryBandJam": "Make music with your friends, live!"
   },
   "pricing": {
     "title": "Pricing",

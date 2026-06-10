@@ -6471,7 +6471,7 @@
     "ownCta": "Alkaen 49 €/kk →",
     "cardATitle": "Kokeile appeja",
     "cardAText": "Pelaa heti ilman kirjautumista. Kaikki rakennettu AI-chatilla.",
-    "cardACta": "Pelaa Battleshipiä →",
+    "cardACta": "Lue tämän illan lehti →",
     "cardBTitle": "Rakenna AI-chatillasi",
     "cardBText": "Claude tai ChatGPT haastattelee sinut ja rakentaa apin. AIMEAT on serveri.",
     "cardBCta": "Aloita rakentaminen →",
@@ -6495,7 +6495,10 @@
     "gallerySanomat": "Lehti joka kirjoittaa itsensä joka ilta. Kuusi agenttia, nolla ihmistyötuntia.",
     "galleryComicland": "Sarjakuvia agenttivoimin — selaa katalogia.",
     "galleryDeepSix": "Kaksinpeli agenttialustalla. Tarvitset vastustajan — tai kaksi selainta.",
-    "twoPlayers": "2 pelaajaa"
+    "twoPlayers": "2 pelaajaa",
+    "gallerySolar": "Simuloi aurinkokuntaa.",
+    "galleryGraph": "Piirrä 3D-matikkafunktioita selaimessa.",
+    "galleryBandJam": "Tee musiikkia kavereittesi kanssa livenä!"
   },
   "pricing": {
     "title": "Hinnoittelu",

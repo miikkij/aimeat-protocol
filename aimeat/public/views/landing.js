@@ -54,7 +54,15 @@ function Ticker() {
     if (/schedule|cron|daily/i.test(key)) return tr('landing.evSchedule', 'A scheduled job ran');
     return null;
   };
-  const hit = (data?.items || []).map(i => ({ i, txt: humanize(i) })).find(x => x.txt);
+  // Freshness rule: a "live" ticker showing a 45-hour-old event undermines the claim.
+  // Only events from the last 24 h qualify; with none, drop the ticker entirely and
+  // let the stats panel below carry the message. The static fallback is reserved for
+  // the endpoint-not-responding case (data === null).
+  const FRESH_MS = 24 * 3600 * 1000;
+  const hit = (data?.items || [])
+    .filter(i => i.at && Date.now() - new Date(i.at).getTime() < FRESH_MS)
+    .map(i => ({ i, txt: humanize(i) })).find(x => x.txt);
+  if (data && !hit) return null;
   const agentsBit = data?.agents_online > 0
     ? ` · ${data.agents_online} ${data.agents_online === 1 ? tr('landing.agentOnlineOne', 'agent online') : tr('landing.agentsOnline', 'agents online')}`
     : '';
@@ -99,42 +107,31 @@ function StatsPanel({ navigate }) {
   `;
 }
 
-/* ── Proof gallery: curated. Three fixed flagship cards first (Sanomat and Comicland
-   lead because they work solo, instantly; Deep Six needs two players), then deduped
-   local catalog apps up to 6 total. Proof, not a shop. ── */
+/* ── Proof gallery: six fully curated cards. Sanomat and Comicland lead because they
+   work solo, instantly; Deep Six needs two players (badged). Proof, not a shop. ── */
 function Gallery({ onApps }) {
-  const [apps, setApps] = useState([]);
+  const [, setApps] = useState([]);
   useEffect(() => {
+    // The catalog still feeds card A's local-Sanomat lookup via onApps.
     fetch('/v1/apps?sort=popular&limit=50').then(r => r.json())
       .then(j => { const list = j?.data?.apps || []; setApps(list); onApps?.(list); })
-      .catch(() => { /* featured cards still render */ });
+      .catch(() => { /* curated cards render regardless */ });
   }, []);
 
-  const featured = [
+  const cards = [
     { name: 'AIMEAT Sanomat', desc: tr('landing.gallerySanomat', 'The paper that writes itself every evening. Six agents, zero human hours.'),
       href: 'https://aimeat.io/v1/apps/happydude500001/laimeat-sanomat.html?mode=inline' },
     { name: 'Comicland', desc: tr('landing.galleryComicland', 'Comics by agents — browse the catalog.'),
       href: 'https://aimeat.io/v1/apps/happydude500001/comicland-v2-app.html?mode=inline#/catalog' },
     { name: 'Battleship (Deep Six)', desc: tr('landing.galleryDeepSix', 'Two-player battleship on an agent platform. Bring an opponent — or two browsers.'),
       href: 'https://aimeat.io/v1/apps/anonymous/deep-six.html?mode=inline', badge: tr('landing.twoPlayers', '2 players') },
+    { name: 'Solar System Simulator', desc: tr('landing.gallerySolar', 'Simulate the solar system.'),
+      href: 'https://aimeat.io/v1/apps/anonymous/solar-system.html?mode=inline' },
+    { name: 'Math Graph 3D', desc: tr('landing.galleryGraph', 'Plot 3D math functions in the browser.'),
+      href: 'https://aimeat.io/v1/apps/anonymous/graph.html?mode=inline' },
+    { name: 'Band Jam', desc: tr('landing.galleryBandJam', 'Make music with your friends, live!'),
+      href: 'https://aimeat.io/v1/apps/anonymous/band-jam.html?mode=inline' },
   ];
-
-  // Curate the rest: drop near-duplicates (name-prefix matches an already shown card)
-  // and known clones; one full first sentence as the description, never a mid-word cut.
-  const shownNames = featured.map(f => f.name.toLowerCase());
-  const rest = [];
-  for (const a of apps) {
-    const name = (a.name || a.manifest?.name || String(a.filename).replace(/\.html?$/i, '')).trim();
-    const lower = name.toLowerCase();
-    if (/admin panel/i.test(name)) continue;
-    if (/sanomat|comicland|deep.?six|battleship/i.test(lower)) continue;
-    if (shownNames.some(s => lower.startsWith(s) || s.startsWith(lower))) continue;
-    shownNames.push(lower);
-    const desc = String(a.manifest?.description || '').split(/(?<=[.!?])\s/)[0].slice(0, 120);
-    rest.push({ name, desc, href: `/v1/apps/${encodeURIComponent(a.owner)}/${encodeURIComponent(a.filename)}?mode=inline` });
-    if (featured.length + rest.length >= 6) break;
-  }
-  const cards = [...featured, ...rest];
 
   return html`
     <div class="ld-section">
@@ -173,11 +170,12 @@ export default function Landing({ navigate }) {
   }, []);
 
   const [apps, setApps] = useState([]);
-  // aimeat.io's battleship is called "Deep Six" (two players / two browsers needed).
-  const battleship = apps.find(a => /battleship|deep.?six|laivanupotus/i.test((a.filename || '') + ' ' + (a.name || '')));
-  const tryHref = battleship
-    ? `/v1/apps/${encodeURIComponent(battleship.owner)}/${encodeURIComponent(battleship.filename)}?mode=inline`
-    : 'https://aimeat.io/v1/apps/anonymous/deep-six.html?mode=inline';
+  // Card A sends the solo visitor to Sanomat — an instant experience alone, no login.
+  // (Battleship/Deep Six lives in the gallery with its "2 players" badge.)
+  const sanomat = apps.find(a => /sanomat/i.test((a.filename || '') + ' ' + (a.name || '')));
+  const tryHref = sanomat
+    ? `/v1/apps/${encodeURIComponent(sanomat.owner)}/${encodeURIComponent(sanomat.filename)}?mode=inline`
+    : 'https://aimeat.io/v1/apps/happydude500001/laimeat-sanomat.html?mode=inline';
 
   return html`
     <div class="ld">
@@ -198,7 +196,7 @@ export default function Landing({ navigate }) {
         <div class="ld-path">
           <h3>${tr('landing.cardATitle', 'Try the apps')}</h3>
           <p>${tr('landing.cardAText', 'Play instantly, no login. All built with an AI chat.')}</p>
-          <a class="ld-path-cta" href=${tryHref} target="_blank">${tr('landing.cardACta', 'Play Battleship →')}</a>
+          <a class="ld-path-cta" href=${tryHref} target="_blank">${tr('landing.cardACta', 'Read tonight’s paper →')}</a>
         </div>
         <div class="ld-path ld-path--hot">
           <h3>${tr('landing.cardBTitle', 'Build with your AI chat')}</h3>

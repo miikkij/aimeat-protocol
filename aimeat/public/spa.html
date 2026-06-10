@@ -469,7 +469,10 @@
             <button class="topnav-burger" aria-label="Menu" aria-expanded=${menuOpen ? 'true' : 'false'}
               onClick=${() => setMenuOpen(o => !o)}>☰</button>
             <div class="topnav-menu ${menuOpen ? 'open' : ''}">
-              <a href="/v1/classic" onClick=${(e) => { handleNav(e, '/v1/classic'); setMenuOpen(false); }} class="${currentPath === '/v1/classic' ? 'active' : ''}">${t('nav.try')}</a>
+              <!-- "Try it" leads to the landing's path cards + app gallery — an empty
+                   Welcome Board on /v1/classic was the weakest possible first experience.
+                   Classic stays reachable deeper (landing card B "Start building"). -->
+              <a href="/v1/portal" onClick=${(e) => { handleNav(e, '/v1/portal'); setMenuOpen(false); }} class="${currentPath === '/v1/portal' ? 'active' : ''}">${t('nav.try')}</a>
               <a href="/v1/how-it-works" onClick=${(e) => { handleNav(e, '/v1/how-it-works'); setMenuOpen(false); }} class="${currentPath === '/v1/how-it-works' ? 'active' : ''}">${t('nav.howItWorks') || 'How it works'}</a>
               <a href="/v1/business" onClick=${(e) => { handleNav(e, '/v1/business'); setMenuOpen(false); }} class="${currentPath === '/v1/business' ? 'active' : ''}">${t('nav.business') || 'For your business'}</a>
               <a href="/v1/portal?view=dev" onClick=${(e) => { handleNav(e, '/v1/portal?view=dev'); setMenuOpen(false); }}>${t('nav.devView')}</a>
