@@ -131,6 +131,10 @@
  *     ("L3 — balanced"). "For agents" menu → "Agent access" with verb items ("Copy chat prompt",
  *     "Copy coding agent prompt") and a divider before "Create contract agent" (KebabMenu supports
  *     { divider: true }). Space tab labels capitalized to match the fixed tabs.
+ *   v1.25.1 — 2026-06-10 — Manual space adding is DOCUMENT-ONLY (the "+" tab panel and the Settings
+ *     add form lost their document/records selects): a hand-added record type would have no usable
+ *     schema — record types are designed with AI via Settings → Process (restructure). The panel
+ *     text says so.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
@@ -2009,7 +2013,6 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
   const [showRegenerate, setShowRegenerate] = useState(false);
   const [delConfirm, setDelConfirm] = useState('');   // typed-name confirmation for delete
   const [newSpaceName, setNewSpaceName] = useState('');
-  const [newSpaceMode, setNewSpaceMode] = useState('document');
   const [addingInitial, setAddingInitial] = useState(null);   // record being edited (null = new draft)
   const [addingId, setAddingId] = useState(null);             // its id, preserved so save overwrites
   const [expandedRec, setExpandedRec] = useState({});         // { "type:id": true } — records expanded to view fields
@@ -2324,13 +2327,15 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
     if (!newSpaceName.trim() || !ws?.manifest) return;
     setBusy(true);
     try {
-      await orgService.addSpace(orgId, wsId, ws.manifest, newSpaceName.trim(), newSpaceMode);
+      // Manual adds are document spaces ONLY — a record type needs a schema the user can't author
+      // by hand; those are designed with AI via Settings → Process (restructure).
+      await orgService.addSpace(orgId, wsId, ws.manifest, newSpaceName.trim(), 'document');
       showToast(t('organisms.spaceAdded') || 'Space added');
       setNewSpaceName(''); setShowSpaces(false);
       await load();
     } catch (e) { showToast((e && e.message) || 'Failed to add space'); }
     finally { setBusy(false); }
-  }, [newSpaceName, newSpaceMode, ws, wsId, orgId, showToast, load]);
+  }, [newSpaceName, ws, wsId, orgId, showToast, load]);
 
   const removeSpaceHandler = useCallback((typeName) => {
     confirm(
@@ -2703,19 +2708,15 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
             onClick=${() => pickTab(tb.id)}>
             ${(tb.label)}${tb.count !== null && tb.count !== undefined ? html`<span class="pj-org-tab-count">${tb.count}</span>` : null}
           </button>`)}
-        <button class="pj-org-tab pj-ws-tab-add" title=${t('organisms.addSpaceTitle') || 'Add a space'} onClick=${() => guardWsDirty(() => { setShowSettings(false); setShowSpaces(s => !s); })}>+</button>
+        <button class="pj-org-tab pj-ws-tab-add" title=${t('organisms.addDocSpaceTitle') || 'Add a document space'} onClick=${() => guardWsDirty(() => { setShowSettings(false); setShowSpaces(s => !s); })}>+</button>
       </div>
 
       ${showSpaces && html`
         <div class="pj-inbox pj-spaces-add">
-          <div class="card-h3">${t('organisms.addSpaceTitle') || 'Add a space'}</div>
-          <div class="section-desc">${t('organisms.addSpaceDesc') || 'A document space is a free-form wiki (sections + markdown pages). A record space is a schema-locked list (forms). You can remove spaces in Settings.'}</div>
+          <div class="card-h3">${t('organisms.addDocSpaceTitle') || 'Add a document space'}</div>
+          <div class="section-desc">${t('organisms.addDocSpaceDesc') || 'A document space is a free-form wiki (sections + markdown pages). Record types need a schema, so they are designed with AI in Settings → Process (restructure).'}</div>
           <div class="pj-space-row">
             <input type="text" class="input-field input-sm" placeholder=${t('organisms.spaceName') || 'New space name'} value=${newSpaceName} onInput=${e => setNewSpaceName(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter') addSpaceHandler(); }} />
-            <select class="input-field input-sm" value=${newSpaceMode} onChange=${e => setNewSpaceMode(e.target.value)}>
-              <option value="document">${t('organisms.modeDocument') || 'Document (wiki)'}</option>
-              <option value="records">${t('organisms.modeRecords') || 'Records (form)'}</option>
-            </select>
             <button class="btn-primary btn-sm" onClick=${addSpaceHandler} disabled=${busy || !newSpaceName.trim()}>${t('organisms.addSpace') || '+ Add'}</button>
             <button class="btn-ghost btn-sm" onClick=${() => setShowSpaces(false)}>${t('organisms.cancel') || 'Cancel'}</button>
           </div>
@@ -2758,11 +2759,7 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
             </div>
           `)}
           <div class="form-actions">
-            <input type="text" class="input-field input-sm" placeholder=${t('organisms.spaceName') || 'New space name'} value=${newSpaceName} onInput=${e => setNewSpaceName(e.target.value)} />
-            <select class="input-field input-sm" value=${newSpaceMode} onChange=${e => setNewSpaceMode(e.target.value)}>
-              <option value="document">${t('organisms.docsSpace') || 'document space'}</option>
-              <option value="records">${t('organisms.recordsSpace') || 'records type'}</option>
-            </select>
+            <input type="text" class="input-field input-sm" placeholder=${t('organisms.docSpaceNamePlaceholder') || 'New document space name'} value=${newSpaceName} onInput=${e => setNewSpaceName(e.target.value)} />
             <button class="btn-outline btn-sm" onClick=${addSpaceHandler} disabled=${busy || !newSpaceName.trim()}>${t('organisms.addSpace') || '+ Add'}</button>
           </div>
 

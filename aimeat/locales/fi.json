@@ -5583,10 +5583,6 @@
     "contractPrompt": "Luo contract-agentti",
     "contractPromptCopied": "Contract-agentti-kehote kopioitu — liitä se tekoälyllesi / koodausagentille.",
     "promptCopied": "Kehote kopioitu — liitä se mihin tahansa AI-keskusteluun ja liitä sen palauttama JSON alle.",
-    "addSpaceTitle": "Lisää tila",
-    "addSpaceDesc": "Dokumenttitila on vapaamuotoinen wiki (osiot + markdown-sivut). Tietuetila on skeemalukittu lista (lomakkeet). Voit poistaa tiloja asetuksissa.",
-    "modeDocument": "Dokumentti (wiki)",
-    "modeRecords": "Tietueet (lomake)",
     "noFields": "Ei kenttiä",
     "createdAt": "Luotu",
     "lastSaved": "Viimeksi tallennettu",
@@ -5667,8 +5663,6 @@
     "spaces": "Tilat",
     "recordsMode": "tietueet",
     "spaceName": "Uuden tilan nimi",
-    "docsSpace": "dokumenttitila",
-    "recordsSpace": "tietuetyyppi",
     "addSpace": "+ Lisää",
     "spaceAdded": "Tila lisätty",
     "spaceRemoved": "Tila poistettu",
@@ -5844,7 +5838,10 @@
       "L3": "tasapainoinen",
       "L4": "itsenäinen",
       "L5": "vapaa"
-    }
+    },
+    "addDocSpaceTitle": "Lisää dokumenttitila",
+    "addDocSpaceDesc": "Dokumenttitila on vapaamuotoinen wiki (osiot + markdown-sivut). Tietuetyypit tarvitsevat skeeman, joten ne suunnitellaan tekoälyllä kohdassa Asetukset → Prosessi (restructure).",
+    "docSpaceNamePlaceholder": "Uuden dokumenttitilan nimi"
   },
   "tags": {
     "clear": "Tyhjennä",

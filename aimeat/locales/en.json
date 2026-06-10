@@ -5583,10 +5583,6 @@
     "contractPrompt": "Create contract agent",
     "contractPromptCopied": "Contract-agent prompt copied — paste it to your AI / coding agent.",
     "promptCopied": "Prompt copied — paste it into any AI chat, then paste the JSON it returns below.",
-    "addSpaceTitle": "Add a space",
-    "addSpaceDesc": "A document space is a free-form wiki (sections + markdown pages). A record space is a schema-locked list (forms). You can remove spaces in Settings.",
-    "modeDocument": "Document (wiki)",
-    "modeRecords": "Records (form)",
     "noFields": "No fields",
     "createdAt": "Created",
     "lastSaved": "Last saved",
@@ -5667,8 +5663,6 @@
     "spaces": "Spaces",
     "recordsMode": "records",
     "spaceName": "New space name",
-    "docsSpace": "document space",
-    "recordsSpace": "records type",
     "addSpace": "+ Add",
     "spaceAdded": "Space added",
     "spaceRemoved": "Space removed",
@@ -5844,7 +5838,10 @@
       "L3": "balanced",
       "L4": "independent",
       "L5": "free"
-    }
+    },
+    "addDocSpaceTitle": "Add a document space",
+    "addDocSpaceDesc": "A document space is a free-form wiki (sections + markdown pages). Record types need a schema, so they are designed with AI in Settings → Process (restructure).",
+    "docSpaceNamePlaceholder": "New document space name"
   },
   "tags": {
     "clear": "Clear",
