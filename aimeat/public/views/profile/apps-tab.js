@@ -15,6 +15,7 @@ import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { listApps, uploadApp, deleteApp, patchApp } from '/js/services/apps.js';
 import { getNodeUrl } from '/js/services/auth.js';
+import { recordRecent } from '/js/recents.js';
 
 export default function AppsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -131,7 +132,12 @@ export default function AppsTab({ session, showToast, onStats }) {
             ${a.downloads ? ' \u2022 ' + a.downloads + ' \u{2B07}' : ''}
           </div>
           <div class="flex-row-wrap mb-half">
-            <button class="btn-primary btn-sm" onClick=${() => window.open(`/v1/apps/${encodeURIComponent(a.owner || session.owner)}/${encodeURIComponent(a.filename || a.name)}?mode=inline`, '_blank')}>${t('profile.apps.launch') || 'Launch'}</button>
+            <button class="btn-primary btn-sm" onClick=${() => {
+              recordRecent({ type: 'app', id: `${a.owner || session.owner}/${a.filename || a.name}`,
+                label: a.manifest?.name || String(a.filename || a.name).replace(/\.html?$/i, ''),
+                data: { owner: a.owner || session.owner, filename: a.filename || a.name } });
+              window.open(`/v1/apps/${encodeURIComponent(a.owner || session.owner)}/${encodeURIComponent(a.filename || a.name)}?mode=inline`, '_blank');
+            }}>${t('profile.apps.launch') || 'Launch'}</button>
             <button class="btn-sm" onClick=${() => startEdit(a)}>${t('profile.apps.editAccess') || 'Edit Access Code'}</button>
             <button class="btn-danger-solid btn-sm" onClick=${() => handleDelete(a.filename || a.name)}>${t('profile.apps.deleteBtn') || 'Delete'}</button>
           </div>

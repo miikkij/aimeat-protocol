@@ -2446,3 +2446,44 @@
 .pj-menu-sep { height: 1px; background: var(--border); margin: 0.25rem 0.3rem; }
 .pj-form-card { border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.75rem 0.9rem 0.6rem; margin-bottom: 0.25rem; }
 .pj-form-card .pj-form-group:first-child { margin-top: 0; }
+
+/* ── Home dashboard: waiting-for-you box, continue/agents cards, clickable stats, promo dismiss ── */
+.pf-waiting { border: 1px solid var(--warn-border, var(--border)); border-left: 3px solid var(--warn, var(--accent)); border-radius: 12px; background: var(--card); padding: 0.8rem 1rem; margin: 1rem 0; }
+.pf-waiting-title { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--warn-fg, var(--text-dim)); margin-bottom: 0.5rem; }
+.pf-waiting-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.35rem 0; }
+.pf-waiting-row + .pf-waiting-row { border-top: 1px solid var(--border-subtle, var(--border)); }
+.pf-waiting-text { flex: 1; font-size: 0.9rem; color: var(--text); }
+.pf-waiting-where { color: var(--muted); }
+.pf-home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+@media (max-width: 760px) { .pf-home-grid { grid-template-columns: 1fr; } }
+.pf-home-card { border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 0.8rem 1rem; }
+.pf-home-card-title { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.5rem; background: none; border: none; padding: 0; text-align: left; }
+.pf-home-card-link { cursor: pointer; }
+.pf-home-card-link:hover { color: var(--text); }
+.pf-home-card-note { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--muted); }
+.pf-home-row { display: flex; align-items: center; gap: 0.55rem; width: 100%; background: none; border: none; padding: 0.32rem 0.2rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem; color: var(--text); text-align: left; }
+.pf-home-row:hover { background: var(--bg-surface); }
+.pf-home-row-static { cursor: default; }
+.pf-home-row-static:hover { background: none; }
+.pf-home-row-ico { flex: none; }
+.pf-home-row-label { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-home-row-meta { flex: none; font-size: 0.78rem; color: var(--muted); }
+.pf-home-row-meta.pf-ok { color: var(--success-fg, var(--text)); }
+.pf-lp-stat-link { background: none; border: none; padding: 0.15rem 0.35rem; border-radius: 8px; cursor: pointer; font: inherit; color: inherit; }
+.pf-lp-stat-link:hover { background: var(--bg-surface); }
+.pf-lp-profile-btn { margin-left: auto; align-self: flex-start; }
+.pf-promo-dismiss { float: right; background: none; border: none; cursor: pointer; color: var(--muted); font-size: 0.85rem; padding: 0 0.2rem; }
+.pf-promo-dismiss:hover { color: var(--text); }
+/* Edit profile / password dialogs */
+.pf-avatar-row { display: flex; align-items: center; gap: 0.6rem; }
+.pf-avatar-preview { width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg-dim); display: inline-flex; align-items: center; justify-content: center; font-size: 1.3rem; flex: none; }
+.pf-edit-link { font-size: 0.82rem; color: var(--accent); cursor: pointer; text-decoration: none; }
+.pf-edit-link:hover { text-decoration: underline; }
+.pf-edit-footer-left { margin-right: auto; }
+.pf-pw-wrap { position: relative; }
+.pf-pw-wrap .pf-edit-input { padding-right: 4.2rem; }
+.pf-pw-eye { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--muted); font-size: 0.76rem; padding: 0.15rem 0.3rem; }
+.pf-pw-eye:hover { color: var(--text); }
+.pf-pw-rules { list-style: none; margin: 0.1rem 0 0.5rem; padding: 0; font-size: 0.78rem; color: var(--muted); }
+.pf-pw-rules li { padding: 0.08rem 0; }
+.pf-pw-rules li.ok { color: var(--success-fg, var(--text)); }

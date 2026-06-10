@@ -15,6 +15,16 @@
  *     AppStrip — home/section sub-components
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.0.0 — 2026-06-10 — Home is a DASHBOARD ("what happened, what waits for me"): new
+ *     WaitingForYou box (pending publish approvals per org/workspace + join requests + incoming
+ *     invitations, with Review/View buttons that prime the organisms tab), Continue card (cross-type
+ *     recents from /js/recents.js with real display names — replaces the AppStrip file listing) and
+ *     Agents card (active today / last seen + next scheduled run). Extensions promo shows only while
+ *     apps < 3 and is dismissable (localStorage). ProfileCard stats are navigation (click → section);
+ *     profile editing moved behind a Profile button / avatar click. Edit-profile modal: avatar live
+ *     preview, locale hint, real "Change in the Email tab" link, Change-password link in the footer.
+ *     Change-password modal: live requirement checklist, inline mismatch, neutral Show/Hide toggles,
+ *     button verb "Change password". Sidebar agents count badge removed (badges = action only).
  *   v2.3.0 — 2026-06-10 — Drop the "← Home" button from the content header (visual noise,
  *     duplicated the sidebar's 🏠 Home item); the header keeps the current-tab label.
  *   v2.2.0 — 2026-06-10 — Listen for the `aimeat-open-tab` CustomEvent so tab components can
@@ -33,12 +43,67 @@ import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { getNodeUrl, getProfile, updateProfile, changePassword } from '/js/services/auth.js';
 import { listApps } from '/js/services/apps.js';
+import { listAgents } from '/js/services/agents.js';
+import { listAllSchedules } from '/js/services/schedules.js';
+import * as orgService from '/js/services/organisms.js';
+import { listRecents } from '/js/recents.js';
 import { Spinner } from './shared.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
+
+/* ───── Small time helpers (reuse the organisms rel-time keys) ───── */
+
+function fmtDateLocal(s) {
+  return new Date(s).toLocaleDateString(getLocale() === 'fi' ? 'fi-FI' : undefined);
+}
+function relTime(s) {
+  const ts = new Date(s).getTime();
+  if (!Number.isFinite(ts)) return '';
+  const mins = Math.max(0, Math.round((Date.now() - ts) / 60000));
+  if (mins < 60) return (t('organisms.relMin') || '{n} min ago').replace('{n}', String(mins));
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return (t('organisms.relHours') || '{n} h ago').replace('{n}', String(hours));
+  const days = Math.round(hours / 24);
+  if (days <= 7) return (t('organisms.relDays') || '{n} d ago').replace('{n}', String(days));
+  return fmtDateLocal(s);
+}
+function fmtClock(s) {
+  const d = new Date(s);
+  if (!Number.isFinite(d.getTime())) return '';
+  const loc = getLocale() === 'fi' ? 'fi-FI' : undefined;
+  return d.toDateString() === new Date().toDateString()
+    ? d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleString(loc, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+/* ───── Home-card navigation: prime the organisms tab's sessionStorage, then open it ───── */
+
+function openProfileTab(tabId) {
+  window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
+}
+function gotoWorkspace(orgId, wsId, wsTab) {
+  try {
+    sessionStorage.setItem('aimeat.ws.openId', orgId);
+    sessionStorage.setItem('aimeat.ws.openWs', wsId);
+    if (wsTab) sessionStorage.setItem(`aimeat.ws.${orgId}.${wsId}.tab`, wsTab);
+  } catch { /* noop */ }
+  openProfileTab('organisms');
+}
+function gotoOrganism(orgId, homeTab) {
+  try {
+    sessionStorage.setItem('aimeat.ws.openId', orgId);
+    sessionStorage.removeItem('aimeat.ws.openWs');
+    if (homeTab) sessionStorage.setItem('aimeat.org.tab', homeTab);
+  } catch { /* noop */ }
+  openProfileTab('organisms');
+}
+function gotoOrganismsList() {
+  try { sessionStorage.removeItem('aimeat.ws.openId'); sessionStorage.removeItem('aimeat.ws.openWs'); } catch { /* noop */ }
+  openProfileTab('organisms');
+}
 
 /* ───── Tier heuristic ───── */
 
@@ -72,7 +137,7 @@ export function tierLevel(tier) {
 
 /* ───── Edit Profile Modal ───── */
 
-function EditProfileModal({ session, onClose, onSaved }) {
+function EditProfileModal({ session, onClose, onSaved, onChangePassword }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fields, setFields] = useState({ display_name: '', bio: '', avatar: '', locale: 'en' });
@@ -149,10 +214,13 @@ function EditProfileModal({ session, onClose, onSaved }) {
             </label>
             <label class="pf-edit-label">
               ${t('profile.landing.editAvatar')}
-              <input type="text" class="pf-edit-input" value=${fields.avatar}
-                placeholder=${t('profile.landing.editAvatarPlaceholder')}
-                maxlength="50"
-                onInput=${(e) => set('avatar', e.target.value)} />
+              <div class="pf-avatar-row">
+                <input type="text" class="pf-edit-input" value=${fields.avatar}
+                  placeholder=${t('profile.landing.editAvatarPlaceholder')}
+                  maxlength="50"
+                  onInput=${(e) => set('avatar', e.target.value)} />
+                <span class="pf-avatar-preview" aria-hidden="true">${fields.avatar || '🙂'}</span>
+              </div>
             </label>
             <label class="pf-edit-label">
               ${t('profile.landing.editLocale')}
@@ -161,14 +229,18 @@ function EditProfileModal({ session, onClose, onSaved }) {
                 <option value="en">English</option>
                 <option value="fi">Suomi</option>
               </select>
+              <div class="pf-edit-hint">${t('profile.landing.editLocaleHint') || 'Your preferred language — used for the portal UI; agents can read it from your profile to answer in it.'}</div>
             </label>
             <div class="pf-edit-label">
               ${t('profile.landing.editEmail')}
               <div class="pf-edit-readonly">${currentEmail || t('profile.landing.editEmailNone')}</div>
-              <div class="pf-edit-hint">${t('profile.landing.editEmailHint')}</div>
+              <a href="#" class="pf-edit-link" onClick=${(e) => { e.preventDefault(); onClose(); window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'email' } })); }}>
+                ${t('profile.landing.editEmailLink') || 'Change in the Email tab →'}</a>
             </div>
           </div>
           <div class="pf-edit-footer">
+            <a href="#" class="pf-edit-link pf-edit-footer-left" onClick=${(e) => { e.preventDefault(); onChangePassword?.(); }}>
+              ${t('profile.landing.changePassword')}…</a>
             <button class="btn-outline" onClick=${onClose} disabled=${saving}>
               ${t('profile.landing.editCancel')}
             </button>
@@ -184,12 +256,34 @@ function EditProfileModal({ session, onClose, onSaved }) {
 
 /* ───── Change Password Modal ───── */
 
+/* Password input with a neutral show/hide toggle (text-presentation eye, gray — red would read
+ * as an error). */
+function PwInput({ value, onInput }) {
+  const [show, setShow] = useState(false);
+  return html`
+    <div class="pf-pw-wrap">
+      <input type=${show ? 'text' : 'password'} class="pf-edit-input" value=${value} onInput=${onInput} />
+      <button type="button" class="pf-pw-eye"
+        onClick=${() => setShow(s => !s)}>${show ? (t('profile.landing.hidePassword') || 'Hide') : (t('profile.landing.showPassword') || 'Show')}</button>
+    </div>`;
+}
+
 function ChangePasswordModal({ onClose, onChanged }) {
   const [current, setCurrent] = useState('');
   const [newPw, setNewPw] = useState('');
   const [confirm, setConfirm] = useState('');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+
+  // Live checklist — the requirements line becomes useful when it ticks green while typing.
+  const rules = [
+    { ok: newPw.length >= 8, label: t('profile.landing.pwMin') || 'At least 8 characters' },
+    { ok: /[A-Z]/.test(newPw), label: t('profile.landing.pwUpper') || 'An uppercase letter' },
+    { ok: /[a-z]/.test(newPw), label: t('profile.landing.pwLower') || 'A lowercase letter' },
+    { ok: /\d/.test(newPw), label: t('profile.landing.pwDigit') || 'A number' },
+  ];
+  const rulesOk = rules.every(r => r.ok);
+  const mismatch = confirm.length > 0 && newPw !== confirm;
 
   const save = async () => {
     setErr('');
@@ -225,28 +319,28 @@ function ChangePasswordModal({ onClose, onChanged }) {
         <div class="pf-edit-body">
           <label class="pf-edit-label">
             ${t('profile.landing.currentPassword')}
-            <input type="password" class="pf-edit-input" value=${current}
-              onInput=${(e) => setCurrent(e.target.value)} />
+            <${PwInput} value=${current} onInput=${(e) => setCurrent(e.target.value)} />
           </label>
           <label class="pf-edit-label">
             ${t('profile.landing.newPassword')}
-            <input type="password" class="pf-edit-input" value=${newPw}
-              onInput=${(e) => setNewPw(e.target.value)} />
+            <${PwInput} value=${newPw} onInput=${(e) => setNewPw(e.target.value)} />
           </label>
+          <ul class="pf-pw-rules">
+            ${rules.map(r => html`<li class=${r.ok ? 'ok' : ''} key=${r.label}>${r.ok ? '✓' : '○'} ${r.label}</li>`)}
+          </ul>
           <label class="pf-edit-label">
             ${t('profile.landing.confirmPassword')}
-            <input type="password" class="pf-edit-input" value=${confirm}
-              onInput=${(e) => setConfirm(e.target.value)} />
+            <${PwInput} value=${confirm} onInput=${(e) => setConfirm(e.target.value)} />
           </label>
-          <div class="pf-edit-hint">${t('profile.landing.passwordRequirements')}</div>
+          ${mismatch ? html`<div class="pf-edit-error">${t('profile.landing.passwordMismatch')}</div>` : null}
           ${err && html`<div class="pf-edit-error">${err}</div>`}
         </div>
         <div class="pf-edit-footer">
           <button class="btn-outline" onClick=${onClose} disabled=${saving}>
             ${t('profile.landing.editCancel')}
           </button>
-          <button class="btn-primary" onClick=${save} disabled=${saving || !current || !newPw || !confirm}>
-            ${saving ? t('profile.landing.passwordChanging') : t('profile.landing.editSave')}
+          <button class="btn-primary" onClick=${save} disabled=${saving || !current || !rulesOk || !confirm || mismatch}>
+            ${saving ? t('profile.landing.passwordChanging') : (t('profile.landing.changePasswordBtn') || 'Change password')}
           </button>
         </div>
       </div>
@@ -254,27 +348,180 @@ function ChangePasswordModal({ onClose, onChanged }) {
   `;
 }
 
+/* ───── Home dashboard cards ───── */
+
+/* "Waiting for you" — everything that needs the user's decision, aggregated across organisms:
+ * pending publish approvals (per workspace), pending join requests (orgs they manage), and
+ * incoming organism invitations. Renders nothing when there is nothing to do. */
+function WaitingForYou({ owner }) {
+  const [items, setItems] = useState(null);
+  const load = useCallback(async () => {
+    try {
+      const out = [];
+      const orgsResp = await orgService.listOrganisms({ member: owner }).catch(() => null);
+      const orgs = orgsResp?.data?.organisms || [];
+      await Promise.all(orgs.map(async (org) => {
+        const canManage = org.creatorGhii === owner || (org.admins || []).includes(owner);
+        const [aps, reqs] = await Promise.all([
+          orgService.listApprovals(org.id, 'pending').catch(() => []),
+          canManage ? orgService.listJoinRequests(org.id).catch(() => null) : Promise.resolve(null),
+        ]);
+        if ((aps || []).length > 0) {
+          const byWs = {};
+          for (const a of aps) { const w = a.arguments?.ws || ''; byWs[w] = (byWs[w] || 0) + 1; }
+          let names = {};
+          try { names = Object.fromEntries((await orgService.listWorkspaces(org.id)).map(w => [w.id, w.name])); } catch { /* ids will do */ }
+          for (const [wsId, n] of Object.entries(byWs)) {
+            out.push({ kind: 'review', n, orgId: org.id, orgName: org.name, wsId, wsName: names[wsId] || wsId });
+          }
+        }
+        const pend = ((reqs?.data?.join_requests) || []).filter(r => r.status === 'pending').length;
+        if (pend > 0) out.push({ kind: 'join', n: pend, orgId: org.id, orgName: org.name });
+      }));
+      const inv = await orgService.listMyInvitations().catch(() => null);
+      for (const e of (inv?.data?.invitations || [])) out.push({ kind: 'invite', orgName: e?.organism?.name || '' });
+      setItems(out);
+    } catch { setItems([]); }
+  }, [owner]);
+  useEffect(() => { load(); }, [load]);
+  const liveRef = useRef(load); liveRef.current = load;
+  useEffect(() => {
+    const h = () => liveRef.current();
+    window.addEventListener('aimeat-live-update', h);
+    return () => window.removeEventListener('aimeat-live-update', h);
+  }, []);
+
+  if (!items || items.length === 0) return null;
+  return html`
+    <div class="pf-waiting">
+      <div class="pf-waiting-title">${'📨 '}${t('profile.landing.waitingTitle') || 'Waiting for you'}</div>
+      ${items.map((it, i) => html`
+        <div class="pf-waiting-row" key=${i}>
+          <span class="pf-waiting-text">
+            ${it.kind === 'review' ? html`
+              <b>${(t('profile.landing.draftsToReview') || '{n} drafts to review').replace('{n}', String(it.n))}</b>
+              <span class="pf-waiting-where"> · ${escHtml(it.orgName)} / ${escHtml(it.wsName)}</span>` : null}
+            ${it.kind === 'join' ? html`
+              <b>${it.n === 1 ? (t('profile.landing.joinReqOne') || '1 join request') : (t('profile.landing.joinReqMany') || '{n} join requests').replace('{n}', String(it.n))}</b>
+              <span class="pf-waiting-where"> · ${escHtml(it.orgName)}</span>` : null}
+            ${it.kind === 'invite' ? html`
+              <b>${t('profile.landing.inviteWaiting') || 'You’re invited'}</b>
+              <span class="pf-waiting-where"> · ${escHtml(it.orgName)}</span>` : null}
+          </span>
+          ${it.kind === 'review' ? html`
+            <button class="btn-outline btn-sm" onClick=${() => (it.wsId ? gotoWorkspace(it.orgId, it.wsId, 'review') : gotoOrganism(it.orgId))}>${t('profile.landing.reviewBtn') || 'Review'}</button>` : null}
+          ${it.kind === 'join' ? html`
+            <button class="btn-outline btn-sm" onClick=${() => gotoOrganism(it.orgId, 'members')}>${t('profile.landing.viewBtn') || 'View'}</button>` : null}
+          ${it.kind === 'invite' ? html`
+            <button class="btn-outline btn-sm" onClick=${() => gotoOrganismsList()}>${t('profile.landing.viewBtn') || 'View'}</button>` : null}
+        </div>
+      `)}
+    </div>
+  `;
+}
+
+/* "Continue" — the last opened things across types (workspace / app / organism), with real
+ * display names. Backed by /js/recents.js (device-local). Renders nothing when empty. */
+const RECENT_ICONS = { workspace: '🗂', app: '▦', organism: '🏢', board: '📋' };
+function ContinueCard() {
+  const [items] = useState(() => listRecents(5));
+  if (!items.length) return null;
+  const openItem = (it) => {
+    if (it.type === 'workspace' && it.data?.orgId) gotoWorkspace(it.data.orgId, it.data.wsId);
+    else if (it.type === 'organism' && it.data?.orgId) gotoOrganism(it.data.orgId);
+    else if (it.type === 'app' && it.data?.filename) window.open(`/v1/apps/${encodeURIComponent(it.data.owner)}/${encodeURIComponent(it.data.filename)}?mode=inline`, '_blank');
+  };
+  return html`
+    <div class="pf-home-card">
+      <div class="pf-home-card-title">${t('profile.landing.continueTitle') || 'Continue'}</div>
+      ${items.map(it => html`
+        <button class="pf-home-row" key=${it.type + it.id} onClick=${() => openItem(it)}>
+          <span class="pf-home-row-ico">${RECENT_ICONS[it.type] || '•'}</span>
+          <span class="pf-home-row-label">${escHtml(it.label)}</span>
+          <span class="pf-home-row-meta">${relTime(it.at)}</span>
+        </button>
+      `)}
+    </div>
+  `;
+}
+
+/* "Agents" — who has been active today, who is idle, and the next scheduled run. */
+function AgentsCard({ owner }) {
+  const [agents, setAgents] = useState(null);
+  const [nextJob, setNextJob] = useState(null);
+  const load = useCallback(async () => {
+    try {
+      const list = (await listAgents(owner)).filter(a => !String(a.name || '').startsWith('session-'));
+      list.sort((a, b) => String(b.last_seen || '').localeCompare(String(a.last_seen || '')));
+      setAgents(list);
+    } catch { setAgents([]); }
+    try {
+      const r = await listAllSchedules();
+      const all = [...(r?.data?.managed || []), ...(r?.data?.extensions || []), ...(r?.data?.agentInternal || [])]
+        .filter(s => s.enabled !== false && s.nextRunAt && new Date(s.nextRunAt).getTime() > Date.now())
+        .sort((a, b) => String(a.nextRunAt).localeCompare(String(b.nextRunAt)));
+      setNextJob(all[0] || null);
+    } catch { /* scheduler row is optional */ }
+  }, [owner]);
+  useEffect(() => { load(); }, [load]);
+  const liveRef = useRef(load); liveRef.current = load;
+  useEffect(() => {
+    const h = () => liveRef.current();
+    window.addEventListener('aimeat-live-update', h);
+    return () => window.removeEventListener('aimeat-live-update', h);
+  }, []);
+
+  if (!agents || (agents.length === 0 && !nextJob)) return null;
+  const todayStr = new Date().toDateString();
+  const isToday = (s) => s && new Date(s).toDateString() === todayStr;
+  const activeToday = agents.filter(a => isToday(a.last_seen)).length;
+  return html`
+    <div class="pf-home-card">
+      <button class="pf-home-card-title pf-home-card-link" onClick=${() => openProfileTab('agents')}>
+        ${t('profile.landing.agentsTitle') || 'Agents'}
+        ${activeToday > 0 ? html`<span class="pf-home-card-note"> · ${(t('profile.landing.activeTodayCount') || '{n} active today').replace('{n}', String(activeToday))}</span>` : null}
+      </button>
+      ${agents.slice(0, 3).map(a => html`
+        <div class="pf-home-row pf-home-row-static" key=${a.gaii || a.name}>
+          <span class="pf-home-row-ico">${'🤖'}</span>
+          <span class="pf-home-row-label">${escHtml(a.display_name || a.name)}</span>
+          <span class="pf-home-row-meta ${isToday(a.last_seen) ? 'pf-ok' : ''}">
+            ${a.last_seen ? (isToday(a.last_seen) ? (t('profile.landing.agentActiveToday') || 'active today') : relTime(a.last_seen)) : '—'}
+          </span>
+        </div>
+      `)}
+      ${nextJob ? html`
+        <div class="pf-home-row pf-home-row-static" key="nextjob">
+          <span class="pf-home-row-ico">⏰</span>
+          <span class="pf-home-row-label">${escHtml(nextJob.name || nextJob.id || '')}</span>
+          <span class="pf-home-row-meta">${(t('profile.landing.nextRunAt') || 'next run {time}').replace('{time}', fmtClock(nextJob.nextRunAt))}</span>
+        </div>` : null}
+    </div>
+  `;
+}
+
 /* ───── Sub-components ───── */
 
-function ProfileCard({ tier, stats, session, onEditProfile, onChangePassword }) {
+function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) {
   const NODE_URL = getNodeUrl();
   const isNew = tier === 'new';
   const isExperienced = tier === 'experienced';
   const avatarSvg = minidenticon(session.owner || 'user');
 
+  // Stats are NAVIGATION, not decoration \u2014 each one opens its own section.
+  const stat = (icon, val, labelKey, tabId, green) => html`
+    <button class="pf-lp-stat pf-lp-stat-link" onClick=${() => switchTab?.(tabId)}>
+      ${icon} <span class="pf-lp-stat-val${green ? ' pf-lp-stat-green' : ''}">${val}</span> ${t(labelKey)}
+    </button>`;
+
   return html`
     <div class="pf-lp-card">
       <div class="pf-lp-card-header">
-        <div class="pf-lp-avatar" dangerouslySetInnerHTML=${{ __html: avatarSvg }}></div>
+        <div class="pf-lp-avatar" role="button" tabindex="0" title=${t('profile.landing.editProfile')}
+          onClick=${() => onEditProfile?.()} dangerouslySetInnerHTML=${{ __html: avatarSvg }}></div>
         <div class="pf-lp-info">
           <div class="pf-lp-name-row">
             <span class="pf-lp-name">${escHtml(session.displayName || session.owner)}</span>
-            <a href="#" class="pf-lp-edit" onClick=${(e) => { e.preventDefault(); onEditProfile?.(); }}>
-              ${t('profile.landing.editProfile')} \u2192
-            </a>
-            <a href="#" class="pf-lp-edit" onClick=${(e) => { e.preventDefault(); onChangePassword?.(); }}>
-              ${t('profile.landing.changePassword')} \u2192
-            </a>
           </div>
           <div class="pf-lp-ghii">${escHtml(session.ghii || '')}</div>
           <div class="pf-lp-node">${t('profile.node')}: ${escHtml(NODE_URL)}</div>
@@ -288,27 +535,21 @@ function ProfileCard({ tier, stats, session, onEditProfile, onChangePassword }) 
               </div>`
           }
         </div>
+        <button class="btn-outline btn-sm pf-lp-profile-btn" onClick=${() => onEditProfile?.()}>
+          ${t('profile.landing.profileBtn') || 'Profile'}</button>
       </div>
       <div class="pf-lp-stats">
         ${isNew ? html`
-          ${stats.memory > 0 && html`
-            <div class="pf-lp-stat">\u{1F9E0} <span class="pf-lp-stat-val">${stats.memory}</span> ${t('profile.stats.memories')}</div>
-          `}
-          ${(stats.balance != null && stats.balance !== '-' && stats.balance > 0) && html`
-            <div class="pf-lp-stat">
-              \u{1F48E} <span class="pf-lp-stat-val pf-lp-stat-green">${stats.balance}</span> ${t('profile.stats.morsels')}
-            </div>
-          `}
+          ${stats.memory > 0 && stat('\u{1F9E0}', stats.memory, 'profile.stats.memories', 'memory')}
+          ${(stats.balance != null && stats.balance !== '-' && stats.balance > 0)
+            && stat('\u{1F48E}', stats.balance, 'profile.stats.morsels', 'wallet', true)}
         ` : html`
-          ${stats.apps > 0 && html`<div class="pf-lp-stat">\u{1F4F1} <span class="pf-lp-stat-val">${stats.apps}</span> ${t('profile.stats.apps')}</div>`}
-          ${stats.memory > 0 && html`<div class="pf-lp-stat">\u{1F9E0} <span class="pf-lp-stat-val">${stats.memory}</span> ${t('profile.stats.memories')}</div>`}
-          ${(stats.balance != null && stats.balance !== '-' && stats.balance > 0) && html`
-            <div class="pf-lp-stat">\u{1F48E} <span class="pf-lp-stat-val pf-lp-stat-green">${stats.balance}</span> ${t('profile.stats.morsels')}</div>
-          `}
-          ${stats.services > 0 && html`<div class="pf-lp-stat">\u{1F50C} <span class="pf-lp-stat-val">${stats.services}</span> ${t('profile.stats.services')}</div>`}
-          ${isExperienced && stats.agents > 0 && html`
-            <div class="pf-lp-stat">\u{1F916} <span class="pf-lp-stat-val">${stats.agents}</span> ${t('profile.stats.agents')}</div>
-          `}
+          ${stats.apps > 0 && stat('\u{1F4F1}', stats.apps, 'profile.stats.apps', 'apps')}
+          ${stats.memory > 0 && stat('\u{1F9E0}', stats.memory, 'profile.stats.memories', 'memory')}
+          ${(stats.balance != null && stats.balance !== '-' && stats.balance > 0)
+            && stat('\u{1F48E}', stats.balance, 'profile.stats.morsels', 'wallet', true)}
+          ${stats.services > 0 && stat('\u{1F50C}', stats.services, 'profile.stats.services', 'actions')}
+          ${isExperienced && stats.agents > 0 && stat('\u{1F916}', stats.agents, 'profile.stats.agents', 'agents')}
         `}
       </div>
     </div>
@@ -404,10 +645,15 @@ function GhostTiles({ switchTab }) {
   `;
 }
 
-function CortexSection({ switchTab }) {
+/* Onboarding promo — shown only while the user has fewer than 3 apps, and dismissable for good.
+ * After that the same content lives on the Extensions page; for a seasoned user it was dead space. */
+function CortexSection({ switchTab, onDismiss }) {
   return html`
-    <div class="pf-landing-section">
-      <div class="pf-menu-title">${t('profile.landing.cortexSectionTitle')}</div>
+    <div class="pf-landing-section pf-promo">
+      <div class="pf-menu-title">${t('profile.landing.cortexSectionTitle')}
+        <button class="pf-promo-dismiss" title=${t('profile.landing.promoDismiss') || 'Hide'}
+          onClick=${(e) => { e.stopPropagation(); onDismiss?.(); }}>✕</button>
+      </div>
       <div class="pf-cortex-grid">
         <div class="pf-cortex-card" onClick=${() => switchTab('extensions')}>
           <div class="pf-cortex-header">
@@ -426,48 +672,8 @@ function CortexSection({ switchTab }) {
   `;
 }
 
-function AppStrip({ apps, switchTab }) {
-  const [expandedApp, setExpandedApp] = useState(null);
-
-  const toggleApp = (filename) => {
-    setExpandedApp(prev => prev === filename ? null : filename);
-  };
-
-  const launchApp = (e, app) => {
-    e.stopPropagation();
-    window.open(`/v1/apps/${app.owner}/${app.filename}?mode=inline`, '_blank');
-  };
-
-  return html`
-    <div class="pf-app-strip">
-      <div class="pf-app-strip-header">
-        <div class="pf-menu-title">${t('profile.landing.myApps')}</div>
-        <a href="#" class="pf-app-strip-link" onClick=${(e) => { e.preventDefault(); switchTab('apps'); }}>
-          ${t('profile.landing.allApps')} \u2192
-        </a>
-      </div>
-      <div class="pf-app-row">
-        ${apps.length > 0 ? apps.map(app => html`
-          <div class="pf-app-chip ${expandedApp === app.filename ? 'pf-app-chip-expanded' : ''}"
-               key=${app.filename || app.name}
-               onClick=${() => toggleApp(app.filename)}>
-            <span class="pf-chip-icon">\u{1F4F1}</span>
-            ${escHtml(app.name || app.filename || 'App')}
-            ${expandedApp === app.filename && html`
-              <button class="pf-chip-launch" onClick=${(e) => launchApp(e, app)}
-                title=${t('profile.landing.openApp')} aria-label=${t('profile.landing.openApp')}>\u{1F517}</button>
-            `}
-          </div>
-        `) : html`
-          <div class="pf-app-chip pf-app-chip-ghost" onClick=${() => switchTab('packages')}>
-            <span class="pf-chip-icon">+</span>
-            ${t('profile.landing.installFirst')} \u2192
-          </div>
-        `}
-      </div>
-    </div>
-  `;
-}
+/* (AppStrip removed \u2014 the cross-type "Continue" card replaced it: raw filenames in a horizontal
+ * scroller duplicated the Apps tab and read as a file listing.) */
 
 /* ───── Generic layout components ───── */
 
@@ -523,7 +729,9 @@ function InlineView({ tabId, label, onClose, renderTab }) {
  * Group titles reuse existing i18n keys; tab labels reuse profile.tabs.* / *.tabLabel. */
 const SIDEBAR_GROUPS = [
   { titleKey: 'profile.landing.menuDaily', items: [
-    { id: 'agents', icon: '\u{1F916}', labelKey: 'profile.tabs.agents', badgeStat: 'agents' },
+    /* No count badge here: badge space is reserved for things that NEED action (pending reviews,
+     * new notifications) — a static total teaches the user to ignore badges. */
+    { id: 'agents', icon: '\u{1F916}', labelKey: 'profile.tabs.agents' },
     { id: 'scheduler', icon: '⏰', labelKey: 'profile.tabs.scheduler' },
     { id: 'memory', icon: '\u{1F9E0}', labelKey: 'profile.tabs.memory' },
     { id: 'boards', icon: '\u{1F4CB}', labelKey: 'profile.tabs.boards' },
@@ -583,6 +791,9 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
   });
   const [expanded, setExpanded] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Extensions promo: onboarding-only (apps < 3) and dismissable for good.
+  const [showPromo, setShowPromo] = useState(() => { try { return localStorage.getItem('aimeat.cortexPromoDismissed') !== '1'; } catch { return true; } });
+  const dismissPromo = () => { setShowPromo(false); try { localStorage.setItem('aimeat.cortexPromoDismissed', '1'); } catch { /* noop */ } };
 
   const owner = session.owner;
 
@@ -659,6 +870,7 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
         session=${session}
         onClose=${() => setEditOpen(false)}
         onSaved=${() => { setEditOpen(false); showToast?.(t('profile.landing.editSaved')); }}
+        onChangePassword=${() => { setEditOpen(false); setPwOpen(true); }}
       />`}
 
       ${pwOpen && html`<${ChangePasswordModal}
@@ -705,12 +917,17 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
         ` : html`
           <${ProfileCard} tier=${tier} stats=${stats} session=${session}
             onEditProfile=${() => setEditOpen(true)}
-            onChangePassword=${() => setPwOpen(true)} />
+            switchTab=${(id) => open(id, 'main')} />
           ${isNew ? html`<${HeroOnboarding} switchTab=${(id) => open(id, 'main')} />` : null}
           ${(isNew || isActive) ? html`<${KnowledgeCallout} switchTab=${() => open('knowledge', 'main')} />` : null}
           ${isNew ? html`<${GhostTiles} switchTab=${() => open('packages', 'main')} />` : null}
-          <${CortexSection} switchTab=${() => open('extensions', 'main')} />
-          <${AppStrip} apps=${apps} switchTab=${(id) => open(id, 'main')} />
+          <${WaitingForYou} owner=${owner} />
+          <div class="pf-home-grid">
+            <${ContinueCard} />
+            <${AgentsCard} owner=${owner} />
+          </div>
+          ${(showPromo && apps.length < 3) ? html`
+            <${CortexSection} switchTab=${() => open('extensions', 'main')} onDismiss=${dismissPromo} />` : null}
         `}
       </main>
     </div>

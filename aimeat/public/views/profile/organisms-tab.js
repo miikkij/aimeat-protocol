@@ -158,6 +158,7 @@ import { listPosts, createPost } from '/js/services/boards.js';
 import { OpenRouterSettings } from './generator-settings.js';
 import { copyToClipboard } from '/js/utils.js';
 import { dt, fmtBytes } from '/js/format.js';
+import { recordRecent } from '/js/recents.js';
 import { Markdown, slugifyHeading } from '/components/Markdown.js';
 import { Mermaid } from '/components/Mermaid.js';
 
@@ -1167,6 +1168,11 @@ function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack,
     return () => { cancelled = true; window.removeEventListener('aimeat-live-update', fetchIt); };
   }, [org.id, canEdit]);
 
+  // Feed the home page's "Continue" list (only once the real name is known, not the {id} stub).
+  useEffect(() => {
+    if (org.name) recordRecent({ type: 'organism', id: org.id, label: org.name, data: { orgId: org.id } });
+  }, [org.id, org.name]);
+
   /* ── Settings: labelled + grouped form (Identity / Access) with live dirty-check, a one-line
    * read-only metadata row, per-choice access hints, and a clearly separated danger zone whose
    * delete needs the organism's name typed and states exactly what gets removed. ── */
@@ -1967,9 +1973,15 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
   const [wsName, setWsName] = useState('');
   useEffect(() => {
     let cancelled = false;
-    orgService.listWorkspaces(orgId).then(list => { if (!cancelled) setWsName((list.find(w => w.id === wsId)?.name) || ''); }).catch(() => {});
+    orgService.listWorkspaces(orgId).then(list => {
+      if (cancelled) return;
+      const name = (list.find(w => w.id === wsId)?.name) || '';
+      setWsName(name);
+      // Feed the home page's "Continue" list with a real display name.
+      recordRecent({ type: 'workspace', id: `${orgId}/${wsId}`, label: name || wsId, sub: org.name || '', data: { orgId, wsId } });
+    }).catch(() => {});
     return () => { cancelled = true; };
-  }, [orgId, wsId]);
+  }, [orgId, wsId]);   // eslint-disable-line react-hooks/exhaustive-deps
   // Pop a document out into its own window (served by doc-solo.js) so several can sit side by side,
   // each independent. The window name is unique per document, so re-clicking focuses the open one.
   const popOut = (typeName, docId) => {
