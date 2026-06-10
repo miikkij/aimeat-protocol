@@ -25,6 +25,10 @@
  *     structuredContent (via structuredResult), keeping text content for back-compat.
  *   v1.7.0 -- 2026-05-30 -- F10 drift reconciliation: aimeat_memory_write gains ttl_hours (was hardcoded
  *     null) so both surfaces support group_id + ttl_hours.
+ *   v1.8.0 -- 2026-06-10 -- aimeat_memory_write enforces schema locks (validateMemoryWrite) like the
+ *     REST POST /v1/memory path — the MCP tool was a validation bypass: any agent could write past
+ *     strict record schemas and the manifest-format schema (found while verifying the workspace
+ *     backing gate: a knowledge-backed manifest sailed through MCP while REST returned 422).
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -40,6 +44,7 @@ import type { ResourceChangeEvent } from './index.js';
 import { resourceEvents } from './index.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema, structuredResult } from './catalog/shape.js';
+import { validateMemoryWrite } from '../services/schema-validator.js';
 import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, genericListOutput, agentsListOutput, agentProfileOutput } from './catalog/output-schemas.js';
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
@@ -258,6 +263,25 @@ export function registerCoreTools(
         },
         annotationsFor('aimeat_memory_write'),
         async ({ key, value, visibility, group_id, tags, ttl_hours }) => {
+            // Schema locks apply on EVERY write surface. This tool used to call setMemory directly,
+            // making MCP a bypass around strict record schemas + the manifest-format schema (REST
+            // returned 422 while the same write sailed through here). Mirror the REST behaviour.
+            const validation = await validateMemoryWrite(key, value, storage);
+            if (!validation.valid) {
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: JSON.stringify({
+                            error: 'SCHEMA_VALIDATION_FAILED',
+                            message: 'Value does not match the schema for this key',
+                            key,
+                            violations: validation.errors,
+                            schema_url: `/v1/memory/${encodeURIComponent(validation.schemaKey!)}/schema`,
+                        }, null, 2),
+                    }],
+                    isError: true,
+                };
+            }
             const existing = await storage.getMemory(agentGaii, key);
             const record = await storage.setMemory({
                 key,

@@ -4,6 +4,22 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## 1.23.1 - 2026-06-10
+
+### Security / Fixed
+
+- **MCP `aimeat_memory_write` no longer bypasses schema locks.** The tool called
+  `storage.setMemory()` directly, so any MCP-connected agent could write past
+  strict record schemas and the manifest-format schema — REST `POST /v1/memory`
+  returned 422 while the identical write sailed through MCP. Found while
+  verifying the 1.23.0 backing gate on production. The tool now runs the same
+  `validateMemoryWrite()` as the REST path and returns a
+  `SCHEMA_VALIDATION_FAILED` error (with violations + `schema_url`) instead of
+  writing. Audited the other direct `setMemory` call sites in the MCP layer
+  (`agent-schedules`, `extensions` sandbox `ctx.memory.set`, `knowledge`) —
+  those write tool-owned fixed keys / the extension's sovereign `ext:`
+  namespace, not user-controlled keys, and intentionally stay as-is.
+
 ## 1.23.0 - 2026-06-10
 
 **Workspace backing gate — fixes the invisible-documents bug.** A document space

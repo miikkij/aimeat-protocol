@@ -206,6 +206,21 @@ await test('8. REST add_spaces with backing:"knowledge" → 400; with kind:"docu
     assert(spec?.mode === 'document' && spec?.backing === 'memory', `inferred document space with memory backing: ${JSON.stringify(spec)}`);
 });
 
+// ── MCP memory_write must enforce schema locks (it used to call setMemory directly — a bypass
+// around the manifest schema and every strict record schema; found verifying this fix on prod) ──
+
+await test('8b. MCP aimeat_memory_write of a knowledge-backing manifest → rejected by the schema (no bypass)', async () => {
+    const b = await A.client.call('aimeat_memory_write', {
+        key: `organism.${orgId}.w.ws-bypass.meta.manifest`,
+        value: { manifestVersion: '1', id: orgId, name: 'Bypass', kind: 'workspace', status: 'active', objectTypes: [{ name: 'd', schemaRef: 'd', namespace: 'd.d', backing: 'knowledge', writeRole: 'member' }] },
+        visibility: 'private',
+    }, 209);
+    assert(mcpErr(b) && /SCHEMA_VALIDATION_FAILED/.test(mcpText(b)), `MCP write must hit the schema like REST does: ${mcpText(b)}`);
+    // A valid write through the same tool still works (the guard rejects, it doesn't break the tool).
+    const ok2 = await A.client.call('aimeat_memory_write', { key: 'bypass-check.note', value: { hello: 'world' }, visibility: 'private' }, 210);
+    assert(!mcpErr(ok2), `plain write still works: ${mcpText(ok2)}`);
+});
+
 // ── Seed upgrade: existing nodes' stale system-seeded schema is replaced at startup (in-process,
 // against a throwaway SQLite :memory: storage — no server restart needed to exercise the path) ──
 
