@@ -2697,13 +2697,10 @@
       "cortexChartsDesc": "Kaaviot datallesi — pylväs, viiva, piirakka. Touch + hiiri.",
       "cortexCanvas": "Piirtoalusta",
       "cortexCanvasDesc": "Piirrä ja tallenna storageen. Undo, export, kynä & muodot.",
-      "menuDaily": "Päivittäinen",
       "menuBuildShare": "Rakenna & jaa",
       "menuManagement": "Hallinta",
       "menuInfra": "Infrastruktuuri",
       "menuInfraAnnotation": "vain node-operaattoreille",
-      "menuTechnical": "Tekniset",
-      "menuPersonal": "Henkilökohtaiset",
       "expandAll": "Näytä kaikki asetukset",
       "expandMore": "Näytä kaikki",
       "myApps": "Omat sovellukset",
@@ -2763,7 +2760,15 @@
       "pwDigit": "Numero",
       "changePasswordBtn": "Vaihda salasana",
       "showPassword": "Näytä",
-      "hidePassword": "Piilota"
+      "hidePassword": "Piilota",
+      "menuInformation": "Tieto",
+      "menuAutomation": "Automaatio",
+      "menuActivity": "Tapahtumat",
+      "menuAccount": "Tili",
+      "menuPinned": "Kiinnitetyt",
+      "pinAdd": "Kiinnitä",
+      "pinRemove": "Irrota",
+      "pinLimit": "Enintään 5 kiinnitettyä"
     }
   },
   "dev": {

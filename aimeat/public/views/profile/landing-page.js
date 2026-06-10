@@ -15,6 +15,14 @@
  *     AppStrip — home/section sub-components
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.2.0 — 2026-06-10 — Sidebar reorg: groups follow the information-refinement pipeline
+ *     (Information / Automation / Activity / Build & Share / Account / Infrastructure) —
+ *     Daily/Personal/Technical are gone. Pinned section under Home (pin-on-hover 📌, max 5,
+ *     defaults organisms/agents/memory/scheduler, persisted in user memory `sidebar.pins`);
+ *     groups collapse/expand with localStorage memory; Infrastructure renders AND opens only
+ *     for operators (open() refuses infra ids; APIs operator-gated server-side); Node Stats
+ *     left the menu (now a sub-tab on the Nodes page); "work" parked at Build & Share bottom
+ *     pending placement decision.
  *   v3.1.0 — 2026-06-10 — Sidebar identity shows the generated identicon (same seed as the profile
  *     card) instead of a plain accent ball; home-card list rows lightened (weight 500, dim color) so
  *     card titles read as headers again. Agents-card rows deep-link to the agent (primes
@@ -55,6 +63,7 @@ import { listAgents } from '/js/services/agents.js';
 import { listAllSchedules } from '/js/services/schedules.js';
 import * as orgService from '/js/services/organisms.js';
 import { listRecents } from '/js/recents.js';
+import { getMemory, createMemory } from '/js/services/memory.js';
 import { Spinner } from './shared.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
 
@@ -732,48 +741,60 @@ function InlineView({ tabId, label, onClose, renderTab }) {
  * Every tab is always present and grouped into stable sections — no activity-based
  * hiding, so humans and agentic developers can predict where each tab lives.
  * Group titles reuse existing i18n keys; tab labels reuse profile.tabs.* / *.tabLabel. */
+/* Grouping follows the information-refinement pipeline and usage frequency, not an
+ * abstract taxonomy (the old Daily/Personal/Technical groups are gone). Badges remain
+ * reserved for action-required counts only — never static totals. */
 const SIDEBAR_GROUPS = [
-  { titleKey: 'profile.landing.menuDaily', items: [
-    /* No count badge here: badge space is reserved for things that NEED action (pending reviews,
-     * new notifications) — a static total teaches the user to ignore badges. */
+  { titleKey: 'profile.landing.menuInformation', items: [   // raw → curated → governed
+    { id: 'organisms', icon: '\u{1F3E2}', labelKey: 'profile.tabs.organisms' },
+    { id: 'memory', icon: '\u{1F9E0}', labelKey: 'profile.tabs.memory' },
+    { id: 'knowledge', icon: '\u{1F4DA}', labelKey: 'knowledge.tabLabel' },
+    { id: 'boards', icon: '\u{1F4CB}', labelKey: 'profile.tabs.boards' },
+  ] },
+  { titleKey: 'profile.landing.menuAutomation', items: [    // agents + their infrastructure
     { id: 'agents', icon: '\u{1F916}', labelKey: 'profile.tabs.agents' },
     { id: 'scheduler', icon: '⏰', labelKey: 'profile.tabs.scheduler' },
-    { id: 'memory', icon: '\u{1F9E0}', labelKey: 'profile.tabs.memory' },
-    { id: 'boards', icon: '\u{1F4CB}', labelKey: 'profile.tabs.boards' },
-    { id: 'knowledge', icon: '\u{1F4DA}', labelKey: 'knowledge.tabLabel' },
+    { id: 'actions', icon: '\u{1F6E0}️', labelKey: 'profile.tabs.services' },
+    { id: 'mcp', icon: '\u{1F517}', labelKey: 'profile.tabs.mcp' },
+  ] },
+  { titleKey: 'profile.landing.menuActivity', items: [      // communication + events
     { id: 'notifications', icon: '\u{1F514}', labelKey: 'profile.tabs.notifications' },
-    { id: 'apps', icon: '⚙️', labelKey: 'profile.tabs.apps' },
+    { id: 'email', icon: '\u{1F4E7}', labelKey: 'profile.tabs.email' },
+    { id: 'chatsessions', icon: '\u{1F4AC}', labelKey: 'profile.tabs.chatSessions' },
   ] },
   { titleKey: 'profile.landing.menuBuildShare', items: [
+    { id: 'apps', icon: '⚙️', labelKey: 'profile.tabs.apps' },
     { id: 'generator', icon: '\u{1F534}', labelKey: 'profile.generator.tabLabel' },
     /* foundry removed from the menu 2026-06-10 (owner: not in use). The tab module and
      * its route id still exist — restore by re-adding this item. */
-    { id: 'calibrator', icon: '\u{1F3AF}', labelKey: 'profile.calibrator.tabLabel' },
     { id: 'extensions', icon: '\u{1F50C}', labelKey: 'profile.tabs.extensions' },
     { id: 'capabilities', icon: '⚡', labelKey: 'capabilities.tabLabel' },
-    { id: 'portfolio', icon: '\u{1F3A8}', labelKey: 'portfolio.tabLabel' },
     { id: 'packages', icon: '\u{1F4E6}', labelKey: 'profile.tabs.packages' },
-  ] },
-  { titleKey: 'profile.landing.menuTechnical', items: [
-    { id: 'actions', icon: '\u{1F6E0}️', labelKey: 'profile.tabs.services' },
+    { id: 'portfolio', icon: '\u{1F3A8}', labelKey: 'portfolio.tabLabel' },
+    { id: 'calibrator', icon: '\u{1F3AF}', labelKey: 'profile.calibrator.tabLabel' },
+    /* TODO(owner 2026-06-10): "work" placement is undecided — parked at the bottom of
+     * Build & Share until re-evaluated. */
     { id: 'work', icon: '\u{1F4CB}', labelKey: 'profile.tabs.work' },
-    { id: 'mcp', icon: '\u{1F517}', labelKey: 'profile.tabs.mcp' },
-    { id: 'chatsessions', icon: '\u{1F4AC}', labelKey: 'profile.tabs.chatSessions' },
   ] },
-  { titleKey: 'profile.landing.menuPersonal', items: [
+  { titleKey: 'profile.landing.menuAccount', items: [
     { id: 'wallet', icon: '\u{1F48E}', labelKey: 'profile.tabs.wallet' },
-    { id: 'email', icon: '\u{1F4E7}', labelKey: 'profile.tabs.email' },
-    { id: 'access', icon: '\u{1F510}', labelKey: 'profile.tabs.access' },
-    { id: 'organisms', icon: '\u{1F3E2}', labelKey: 'profile.tabs.organisms' },
     { id: 'dataWallet', icon: '\u{1F512}', labelKey: 'profile.tabs.dataWallet' },
+    { id: 'access', icon: '\u{1F510}', labelKey: 'profile.tabs.access' },
   ] },
-  { titleKey: 'profile.landing.menuInfra', items: [
+  /* Operator-only: the group AND its routes are gated on the operator role (open()
+   * refuses these ids for non-operators; the underlying APIs enforce server-side).
+   * nodeStats left the menu — it lives as a tab on the Nodes page now. */
+  { titleKey: 'profile.landing.menuInfra', adminOnly: true, items: [
     { id: 'federation', icon: '\u{1F310}', labelKey: 'profile.tabs.federation' },
     { id: 'nodes', icon: '\u{1F5A5}️', labelKey: 'profile.tabs.nodes' },
-    { id: 'nodeStats', icon: '\u{1F4CA}', labelKey: 'profile.tabs.nodeStats' },
     { id: 'security', icon: '\u{1F6E1}️', labelKey: 'profile.tabs.security' },
   ] },
 ];
+
+// Flat item lookup (pinned section renders items by id).
+const SIDEBAR_ITEM_BY_ID = Object.fromEntries(SIDEBAR_GROUPS.flatMap(g => g.items.map(it => [it.id, it])));
+const INFRA_TAB_IDS = new Set(['federation', 'nodes', 'nodeStats', 'security']);
+const DEFAULT_PINS = ['organisms', 'agents', 'memory', 'scheduler'];
 
 /* ───── Main landing page ───── */
 
@@ -823,7 +844,13 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
   }, []);
 
   /* Open a tab inline below a specific slot. Toggle if same tab clicked again. */
+  const isOperator = (session?.roles || []).includes('operator');
+
   const open = useCallback((tabId, slot) => {
+    // Infrastructure tabs are operator-only — refuse them here too so deep links
+    // (sessionStorage restore, aimeat-open-tab events) can't open the views.
+    // The underlying APIs enforce the role server-side regardless.
+    if (INFRA_TAB_IDS.has(tabId) && !isOperator) return;
     setOpenView(prev => {
       const next = (prev?.tabId === tabId) ? null : { tabId, slot };
       if (next) {
@@ -833,7 +860,39 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
       }
       return next;
     });
+  }, [isOperator]);
+
+  /* ── Pinned items: 3–5 favourites under Home, persisted per user (memory key
+     `sidebar.pins`, same pattern as organisms.ui). Defaults for new users. ── */
+  const [pins, setPins] = useState(DEFAULT_PINS);
+  useEffect(() => {
+    getMemory('sidebar.pins')
+      .then(r => { const v = r?.data?.value; if (Array.isArray(v) && v.length) setPins(v.filter(id => SIDEBAR_ITEM_BY_ID[id])); })
+      .catch(() => { /* defaults stand */ });
   }, []);
+  const togglePin = (id) => {
+    setPins(prev => {
+      let next;
+      if (prev.includes(id)) next = prev.filter(x => x !== id);
+      else if (prev.length >= 5) { showToast?.(t('profile.landing.pinLimit') || 'Max 5 pinned items'); return prev; }
+      else next = [...prev, id];
+      createMemory('sidebar.pins', next, 'private').catch(() => {});
+      return next;
+    });
+  };
+
+  /* ── Group collapse/expand, remembered per browser. ── */
+  const [collapsedGroups, setCollapsedGroups] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('aimeat.sidebar.collapsed') || '[]')); } catch { return new Set(); }
+  });
+  const toggleGroup = (key) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      try { localStorage.setItem('aimeat.sidebar.collapsed', JSON.stringify([...next])); } catch { /* noop */ }
+      return next;
+    });
+  };
 
   const close = useCallback(() => {
     sessionStorage.removeItem('aimeat-profile-tab');
@@ -898,20 +957,41 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
           <span class="pf-side-ico">\u{1F3E0}</span><span class="pf-side-label">${t('profile.landing.home')}</span>
         </button>
 
-        ${SIDEBAR_GROUPS.map(g => html`
-          <div class="pf-side-group">
-            <div class="pf-side-group-title">${t(g.titleKey)}</div>
-            ${g.items.map(it => html`
-              <button class="pf-side-item${isOpen(it.id) ? ' pf-side-item--active' : ''}"
-                onClick=${() => { open(it.id, 'main'); setDrawerOpen(false); }}>
-                <span class="pf-side-ico">${it.icon}</span>
-                <span class="pf-side-label">${t(it.labelKey)}</span>
-                ${it.badgeStat && typeof stats?.[it.badgeStat] === 'number' && stats[it.badgeStat] > 0
-                  ? html`<span class="pf-side-badge">${stats[it.badgeStat]}</span>` : null}
-              </button>
-            `)}
-          </div>
-        `)}
+        ${(() => {
+          const renderItem = (it, pinned) => html`
+            <button class="pf-side-item${isOpen(it.id) ? ' pf-side-item--active' : ''}" key=${(pinned ? 'pin-' : '') + it.id}
+              onClick=${() => { open(it.id, 'main'); setDrawerOpen(false); }}>
+              <span class="pf-side-ico">${it.icon}</span>
+              <span class="pf-side-label">${t(it.labelKey)}</span>
+              ${it.badgeStat && typeof stats?.[it.badgeStat] === 'number' && stats[it.badgeStat] > 0
+                ? html`<span class="pf-side-badge">${stats[it.badgeStat]}</span>` : null}
+              <span class="pf-side-pin${pins.includes(it.id) ? ' pf-side-pin--on' : ''}"
+                role="button" tabindex="-1"
+                title=${pins.includes(it.id) ? (t('profile.landing.pinRemove') || 'Unpin') : (t('profile.landing.pinAdd') || 'Pin')}
+                onClick=${(e) => { e.stopPropagation(); togglePin(it.id); }}>📌</span>
+            </button>`;
+          const pinnedItems = pins.map(id => SIDEBAR_ITEM_BY_ID[id]).filter(Boolean)
+            .filter(it => !(INFRA_TAB_IDS.has(it.id) && !isOperator));
+          return html`
+            ${pinnedItems.length > 0 && html`
+              <div class="pf-side-group">
+                <div class="pf-side-group-title">${t('profile.landing.menuPinned') || 'Pinned'}</div>
+                ${pinnedItems.map(it => renderItem(it, true))}
+              </div>
+            `}
+            ${SIDEBAR_GROUPS.filter(g => !g.adminOnly || isOperator).map(g => {
+              const collapsed = collapsedGroups.has(g.titleKey);
+              return html`
+                <div class="pf-side-group" key=${g.titleKey}>
+                  <button class="pf-side-group-title pf-side-group-toggle" onClick=${() => toggleGroup(g.titleKey)}>
+                    <span class="pf-chevron ${collapsed ? '' : 'pf-chevron-open'}">▼</span> ${t(g.titleKey)}
+                  </button>
+                  ${!collapsed && g.items.map(it => renderItem(it, false))}
+                </div>
+              `;
+            })}
+          `;
+        })()}
       </aside>
 
       <main class="pf-content">

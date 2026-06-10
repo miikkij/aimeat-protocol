@@ -2697,13 +2697,10 @@
       "cortexChartsDesc": "Charts for your data — bar, line, pie. Touch + mouse.",
       "cortexCanvas": "Canvas",
       "cortexCanvasDesc": "Draw and save to storage. Undo, export, pen & shapes.",
-      "menuDaily": "Daily",
       "menuBuildShare": "Build & share",
       "menuManagement": "Management",
       "menuInfra": "Infrastructure",
       "menuInfraAnnotation": "node operators only",
-      "menuTechnical": "Technical",
-      "menuPersonal": "Personal",
       "expandAll": "Show all settings",
       "expandMore": "Show all",
       "myApps": "My apps",
@@ -2763,7 +2760,15 @@
       "pwDigit": "A number",
       "changePasswordBtn": "Change password",
       "showPassword": "Show",
-      "hidePassword": "Hide"
+      "hidePassword": "Hide",
+      "menuInformation": "Information",
+      "menuAutomation": "Automation",
+      "menuActivity": "Activity",
+      "menuAccount": "Account",
+      "menuPinned": "Pinned",
+      "pinAdd": "Pin",
+      "pinRemove": "Unpin",
+      "pinLimit": "Max 5 pinned items"
     }
   },
   "dev": {

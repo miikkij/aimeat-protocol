@@ -213,6 +213,13 @@
 .pf .access-fed-warn-caption{font-size:.78rem;color:var(--warn-fg,#B45309);margin:.25rem 0 .1rem 1.6rem}
 .pf .access-fed-list--inactive{opacity:.45;pointer-events:none}
 .pf .access-copy-val{display:inline-flex;align-items:center;gap:.25rem;min-width:0;overflow-wrap:anywhere}
+/* ── Sidebar reorg (2026-06-10): collapsible groups + pin-on-hover ── */
+.pf .pf-side-group-toggle{display:flex;align-items:center;gap:.35rem;width:100%;background:none;border:none;cursor:pointer;font:inherit;text-align:left;padding:0}
+.pf .pf-side-group-toggle .pf-chevron{font-size:.55rem;color:var(--muted)}
+.pf .pf-side-pin{display:none;margin-left:auto;font-size:.72rem;opacity:.55;cursor:pointer;filter:grayscale(1)}
+.pf .pf-side-item:hover .pf-side-pin{display:inline}
+.pf .pf-side-pin:hover{opacity:1}
+.pf .pf-side-pin--on{display:inline;opacity:.9;filter:none}
 .pf .mem-time{font-size:.7rem;color:var(--text-dim,#6B7280);white-space:nowrap;flex-shrink:0}
 .pf .mem-sort-bar{display:flex;align-items:center;gap:.35rem}
 .pf .mem-sort-select{font-size:.75rem;padding:2px 6px;min-width:auto;width:auto}

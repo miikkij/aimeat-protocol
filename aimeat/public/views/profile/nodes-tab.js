@@ -23,8 +23,11 @@ import { StatusDot } from '/components/StatusDot.js';
 import { useConfirm } from '/components/Modal.js';
 import * as nodesService from '/js/services/nodes.js';
 import { getNodeUrl } from '/js/services/auth.js';
+import NodeStatsTab from './node-stats-tab.js';
 
-export default function NodesTab({ session, showToast, onStats }) {
+/* Default export below wraps the node list and Node stats into one page with
+ * sub-tabs — Node stats left the sidebar menu (2026-06-10 sidebar reorg). */
+function NodesList({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
   const NODE_URL = getNodeUrl();
   const tunnelUrl = NODE_URL.replace(/^http/, 'ws') + '/v1/personal/tunnel';
@@ -102,7 +105,7 @@ export default function NodesTab({ session, showToast, onStats }) {
             <div class="pn-card">
               <div class="pn-header" onClick=${() => {
                 const s = new Set(expandedNodes);
-                s.has(idx) ? s.delete(idx) : s.add(idx);
+                if (s.has(idx)) s.delete(idx); else s.add(idx);
                 setExpandedNodes(s);
               }}>
                 <div class="pn-header-left">
@@ -151,7 +154,7 @@ export default function NodesTab({ session, showToast, onStats }) {
                   <div class="flex-actions">
                     <button class="expand-btn btn-sm" onClick=${() => {
                       const s = new Set(expandedSetups);
-                      s.has(idx) ? s.delete(idx) : s.add(idx);
+                      if (s.has(idx)) s.delete(idx); else s.add(idx);
                       setExpandedSetups(s);
                     }}>${t('profile.nodes.setupTitle')} <span class="pn-setup-arrow ${setupOpen ? 'open' : ''}">\u25BC</span></button>
                     ${setupOpen && html`
@@ -199,4 +202,16 @@ function NodeForm({ onRegister, onCancel }) {
         <button class="btn-outline" onClick=${onCancel}>${t('profile.nodes.cancelBtn')}</button>
       </div>
     </div>`;
+}
+
+/* ── Page wrapper: Nodes | Node stats sub-tabs (Node stats merged here from the menu) ── */
+export default function NodesTab(props) {
+  const [sub, setSub] = useState('nodes');
+  return html`
+    <div class="sub-tabs">
+      <button class="sub-tab ${sub === 'nodes' ? 'active' : ''}" onClick=${() => setSub('nodes')}>${t('profile.tabs.nodes')}</button>
+      <button class="sub-tab ${sub === 'stats' ? 'active' : ''}" onClick=${() => setSub('stats')}>${t('profile.tabs.nodeStats')}</button>
+    </div>
+    ${sub === 'nodes' ? html`<${NodesList} ...${props} />` : html`<${NodeStatsTab} ...${props} />`}
+  `;
 }
