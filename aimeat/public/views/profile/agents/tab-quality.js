@@ -10,6 +10,9 @@
  * @structure default export TabQuality({ agentName })
  * @usage rendered by agent-card.js renderTabContent() for the 'quality' tab
  * @version-history
+ *   v1.3.0 -- 2026-06-10 -- Deliverable rows show date+time (identical titles must be
+ *     tellable apart) and unrated rows rate via INLINE stars (click submits immediately);
+ *     the modal remains for re-rates (context/comment).
  *   v1.2.0 -- 2026-06-01 -- Stop the empty flash on refresh: only show the loading
  *     state on first load; live-update refetches swap data in place (and keep the
  *     last good data on a transient error) instead of blanking the tab.
@@ -45,6 +48,29 @@ function fmtSeconds(secs) {
   return `${Number(secs || 0).toLocaleString()}${t('profile.agents.detail.quality.seconds')}`;
 }
 
+/** Date + time for a deliverable row — four identical "Iltakirjoitus" rows must be tellable apart. */
+function fmtWhen(s) {
+  if (!s) return '';
+  const d = new Date(s);
+  if (!Number.isFinite(d.getTime())) return '';
+  return d.toLocaleString(undefined, { day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+/** Inline 1–5 star picker — hovering previews, clicking submits right in the row (no modal hop).
+ *  The full modal stays available for re-rates (context/comment edits). */
+function InlineStars({ onPick, disabled }) {
+  const [hover, setHover] = useState(0);
+  return html`
+    <span class="pf-agd-inline-stars" role="radiogroup" onMouseLeave=${() => setHover(0)}>
+      ${[1, 2, 3, 4, 5].map(n => html`
+        <button key=${n} class="pf-agd-inline-star ${n <= hover ? 'pf-agd-inline-star--hot' : ''}"
+          disabled=${disabled} aria-label=${String(n)}
+          onMouseEnter=${() => setHover(n)}
+          onClick=${() => onPick(n)}>★</button>
+      `)}
+    </span>`;
+}
+
 export default function TabQuality({ agentName, showToast }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -75,6 +101,20 @@ export default function TabQuality({ agentName, showToast }) {
       await rateTask(agentName, rateTarget.id, body);
       showToast?.(t('profile.agents.tasks.rate.success'));
       setRateTarget(null);
+      await loadData();
+    } catch (err) {
+      showToast?.(err.message || t('profile.agents.tasks.rate.error'), true);
+    }
+    setSendingRate(false);
+  }
+
+  // Inline star click — submit immediately with the task's context (or 'other'); the modal
+  // remains the path for context/comment edits via re-rate.
+  async function handleInlineRate(task, stars) {
+    setSendingRate(true);
+    try {
+      await rateTask(agentName, task.id, { stars, context: task.context || 'other', source_grounded: false });
+      showToast?.(t('profile.agents.tasks.rate.success'));
       await loadData();
     } catch (err) {
       showToast?.(err.message || t('profile.agents.tasks.rate.error'), true);
@@ -180,12 +220,12 @@ export default function TabQuality({ agentName, showToast }) {
             ${[...doneTasks].sort((a, b) => (a.rating ? 1 : 0) - (b.rating ? 1 : 0)).map(task => html`
               <div key=${task.id} class="pf-agd-quality-pending-row">
                 <span class="pf-agd-quality-pending-title">${task.title || task.id}</span>
+                <span class="pf-agd-quality-pending-when" title=${task.completedAt || ''}>${fmtWhen(task.completedAt || task.updatedAt)}</span>
                 ${task.rating
-                  ? html`<span class="pf-agd-quality-pending-rated">${starGlyphs(task.rating.stars)} ${ctxLabel(task.rating.context)}</span>`
-                  : html`<span class="pf-agd-quality-pending-unrated">${t('profile.agents.detail.quality.unrated')}</span>`}
-                <button class="btn-outline btn-sm" onClick=${() => setRateTarget(task)}>
-                  ${task.rating ? t('profile.agents.tasks.rate.rerate') : t('profile.agents.tasks.rate.button')}
-                </button>
+                  ? html`
+                    <span class="pf-agd-quality-pending-rated">${starGlyphs(task.rating.stars)} ${ctxLabel(task.rating.context)}</span>
+                    <button class="btn-ghost btn-sm" onClick=${() => setRateTarget(task)}>${t('profile.agents.tasks.rate.rerate')}</button>`
+                  : html`<${InlineStars} onPick=${(n) => handleInlineRate(task, n)} disabled=${sendingRate} />`}
               </div>
             `)}
           </div>

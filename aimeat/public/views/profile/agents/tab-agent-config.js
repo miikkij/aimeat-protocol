@@ -9,6 +9,8 @@
  *   v1.2.0 -- 2026-06-02 -- Component unification: route handleCopy through the shared
  *     copyToClipboard (/js/utils.js) instead of raw navigator.clipboard.writeText, so the
  *     insecure-context fallback applies; toast preserved (TIER 3, stays a handler)
+ *   v1.3.0 -- 2026-06-10 -- AgentDangerZone at the tab bottom: typed-agent-name gate +
+ *     the shared confirm — replaces the Delete button that sat on every tab's footer.
  */
 
 import { h } from 'preact';
@@ -67,7 +69,33 @@ function ScheduleBudgetSection({ agent, agentName, showToast }) {
     </div>`;
 }
 
-export default function TabAgentConfig({ agent, agentName, session, showToast }) {
+/** Danger zone — deleting the agent lives HERE (not on every tab's footer): a red-bordered box
+ *  whose Delete needs the agent's name typed first; the final confirm dialog still applies. */
+function AgentDangerZone({ agent, agentName, onDeleteClick }) {
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState('');
+  if (!onDeleteClick) return null;
+  return html`
+    <div class="pj-danger pj-danger-box">
+      <div class="pj-danger-row">
+        <div class="pj-danger-text">
+          <div class="pj-danger-title">${t('profile.agents.detail.agent_config.deleteTitle') || 'Delete this agent'}</div>
+          <div class="pj-danger-sub">${t('profile.agents.detail.agent_config.deleteDesc') || 'Removes the agent, its credentials and its task history. This cannot be undone.'}</div>
+        </div>
+        <button class="btn-danger btn-sm" onClick=${() => { setOpen(o => !o); setTyped(''); }}>${t('profile.agents.deleteAgent')}…</button>
+      </div>
+      ${open && html`
+        <div class="pj-danger-confirm">
+          <label class="pj-field"><span>${(t('profile.agents.detail.agent_config.deleteConfirmLabel') || 'Type the agent’s name to confirm') + ': ' + agentName}</span>
+            <input type="text" class="input-field input-sm" value=${typed} onInput=${(e) => setTyped(e.target.value)} placeholder=${agentName} /></label>
+          <button class="btn-danger btn-sm" disabled=${typed.trim() !== agentName}
+            onClick=${() => onDeleteClick(agent.name)}>${t('profile.agents.deleteAgent')}</button>
+        </div>
+      `}
+    </div>`;
+}
+
+export default function TabAgentConfig({ agent, agentName, session, showToast, onDeleteClick }) {
   const [files, setFiles] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
   const [preview, setPreview] = useState('');
@@ -197,6 +225,7 @@ export default function TabAgentConfig({ agent, agentName, session, showToast })
           <input ref=${fileInputRef} type="file" accept=".md,.yaml,.yml,.json" class="pf-agd-hidden-input" onChange=${handleFileUpload} />
         </div>
         <div class="pf-agd-empty">${t('profile.agents.detail.empty.agent_config')}</div>
+        <${AgentDangerZone} agent=${agent} agentName=${agentName} onDeleteClick=${onDeleteClick} />
       </div>
     `;
   }
@@ -248,6 +277,7 @@ export default function TabAgentConfig({ agent, agentName, session, showToast })
           `}
         </div>
       `}
+      <${AgentDangerZone} agent=${agent} agentName=${agentName} onDeleteClick=${onDeleteClick} />
     </div>
   `;
 }

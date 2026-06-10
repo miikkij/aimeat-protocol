@@ -969,7 +969,8 @@
           "promptCopied": "Prompt copied",
           "copyInstallCommand": "Copy install command",
           "installCommandCopied": "Install command copied",
-          "noDeliveries": "No deliveries recorded yet."
+          "noDeliveries": "No deliveries recorded yet.",
+          "setupWebhook": "Set up webhook"
         },
         "messages": {
           "commands": {
@@ -1043,7 +1044,8 @@
           "sortUpdated": "Last updated",
           "sortCreated": "Created",
           "sortNewestFirst": "Newest first",
-          "sortOldestFirst": "Oldest first"
+          "sortOldestFirst": "Oldest first",
+          "noneInline": "none"
         },
         "agent_config": {
           "copy": "Copy",
@@ -1056,7 +1058,10 @@
           "saveError": "Failed to save config file",
           "uploaded": "Config file uploaded",
           "uploadError": "Failed to upload config file",
-          "viewing": "Viewing"
+          "viewing": "Viewing",
+          "deleteTitle": "Delete this agent",
+          "deleteDesc": "Removes the agent, its credentials and its task history. This cannot be undone.",
+          "deleteConfirmLabel": "Type the agent’s name to confirm"
         },
         "activity": {
           "filterAll": "All",
@@ -1078,7 +1083,9 @@
             "connected": "Connected",
             "notConfigured": "Not configured",
             "mcpLabel": "MCP"
-          }
+          },
+          "notReported": "not reported",
+          "deliveryPollingLine": "Delivery: polling"
         },
         "directives": {
           "footer": "Directives are included in every skill bundle update. The agent receives these as behavioral constraints.",
@@ -1109,7 +1116,24 @@
           "agent_config": "No configuration files. The agent will push its config files after the skill bundle is installed.",
           "activity": "No activity recorded yet. Events will appear here once the agent starts working.",
           "services": "No services declared. The agent can declare services during Hello Integration Step 11."
-        }
+        },
+        "capTools": "tools",
+        "capSkills": "skills",
+        "capLangs": "languages",
+        "readinessTooltip": "Readiness score 0–100 from onboarding checks. Levels: none → basic → standard → advanced → full.",
+        "federationLabel": "Federation",
+        "federationOn": "on",
+        "federationOff": "off",
+        "federationOnHint": "Shared via federation — click to make local only",
+        "federationOffHint": "Local only — click to share via federation"
+      },
+      "board": {
+        "online": "online",
+        "quiet": "quiet",
+        "onboarding": "onboarding",
+        "issue": "issue",
+        "newShort": "new",
+        "issueShort": "issue"
       }
     },
     "scopes": {

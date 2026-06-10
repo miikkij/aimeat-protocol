@@ -3,6 +3,12 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v1.15.0 -- 2026-06-10 -- Glance round: collapsed bar drops the repeated mode/platform/
+ *     readiness badges (detail-only now); capabilities collapse to a "N tools · N skills"
+ *     summary (CapabilitiesSummary); tab badges only on Tasks/Messages, neutral gray with
+ *     red reserved for unseen failed tasks; footer Delete removed (Agent Config danger zone
+ *     owns it, onDeleteClick threaded there); federation button shows its state
+ *     ("Federation: on/off"); readiness badge gets an explanatory tooltip.
  *   v1.14.0 -- 2026-06-09 -- Tag strip in the expanded header is now editable
  *     (inline add via "+ tag" input + per-chip remove ×), writing through
  *     PATCH /v1/agents/:name/tags. Lets the owner manage the tags that drive the
@@ -111,14 +117,15 @@ async function fetchReadme(agent) {
   }
 }
 
-// Maps a tab id to its change-count key in the `changes` prop. Only these three
-// tabs carry unseen-change badges (Tasks, Messages, Memory/data-access).
-const TAB_CHANGE_KEY = { tasks: 'tasks', messages: 'messages', 'data-access': 'memory' };
+// Maps a tab id to its change-count key in the `changes` prop. Badges live ONLY on
+// Tasks and Messages — they are the action-bearing tabs. (Memory churn is not a
+// to-do; its badge taught users to ignore badges.)
+const TAB_CHANGE_KEY = { tasks: 'tasks', messages: 'messages' };
 
-// Total unseen changes across the three tracked tabs (collapsed mini-badge).
+// Total unseen changes across the tracked tabs (collapsed mini-badge).
 function totalChanges(changes) {
   if (!changes) return 0;
-  return (changes.tasks || 0) + (changes.messages || 0) + (changes.memory || 0);
+  return (changes.tasks || 0) + (changes.messages || 0);
 }
 
 export default function AgentCard({ agent, onboarding, expanded, onToggle, session, showToast, allAgents, changes, onTabSeen, onScopesClick, onDeleteClick, onFederateToggle, onPopOut, soloMode = false, preSelectedTab = null, openTaskId = null, openTaskNonce = 0 }) {
@@ -195,10 +202,9 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
             <span class="pf-agd-collapsed-icon">🤖</span>
             <span class="pf-agd-collapsed-name">${agent.display_name || agent.name}</span>
             ${renderChangeBadge(changes)}
+            <!-- Mode/platform/readiness badges live in the expanded detail only — repeated
+                 identically on every row they were noise, not information. -->
             <div class="pf-agd-collapsed-badges">
-              ${renderModeBadge(agent)}
-              ${renderPlatformBadge(onboarding)}
-              ${renderReadinessBadge(state, onboarding)}
               ${agent.federate && html`<span class="pf-agd-badge pf-agd-badge--federation">${t('profile.federated')}</span>`}
             </div>
             ${renderPopOut(onPopOut, agent)}
@@ -237,20 +243,9 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
         <!-- Tags (editable) -->
         <${TagStrip} agent=${agent} showToast=${showToast} />
 
-        <!-- Capabilities -->
-        ${(agent.technical_capabilities?.length > 0 || agent.domain_capabilities?.length > 0 || agent.languages?.length > 0) && html`
-          <div class="pf-agd-capabilities">
-            ${(agent.technical_capabilities || []).map(c => html`
-              <span key=${c.name || c} class="pf-agd-cap-badge pf-agd-cap-badge--tech">${c.name || c}</span>
-            `)}
-            ${(agent.domain_capabilities || []).filter(c => !String(c).startsWith('Language: ')).map(c => html`
-              <span key=${c} class="pf-agd-cap-badge pf-agd-cap-badge--domain">${c}</span>
-            `)}
-            ${(agent.languages || []).map(l => html`
-              <span key=${'lang-' + l} class="pf-agd-cap-badge pf-agd-cap-badge--domain">${'Language: ' + l}</span>
-            `)}
-          </div>
-        `}
+        <!-- Capabilities — collapsed to a one-line summary ("14 tools · 5 skills"); the full
+             pill wall took a third of the screen before the tabs. Click to expand. -->
+        <${CapabilitiesSummary} agent=${agent} />
 
         <!-- Zone 2: Status -->
         ${renderZone2(state, agent, onboarding, setActiveTab, showToast)}
@@ -263,6 +258,8 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
             // The tab you're currently viewing never shows a badge — you're
             // looking at it (and the effect above keeps it marked-seen).
             const count = (changeKey && activeTab !== tab.id) ? (changes?.[changeKey] || 0) : 0;
+            // Neutral gray badge; red ONLY when there are unseen FAILED tasks.
+            const failed = tab.id === 'tasks' && (changes?.tasksFailed || 0) > 0;
             return html`
               <button key=${tab.id}
                       class="pf-agd-tab ${activeTab === tab.id ? 'pf-agd-tab--active' : ''}"
@@ -274,7 +271,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
                         if (changeKey && onTabSeen) onTabSeen(agent.name, changeKey);
                       }}>
                 ${label !== tab.key ? label : tab.id.charAt(0).toUpperCase() + tab.id.slice(1)}
-                ${count > 0 ? html`<span class="pf-agd-tab-badge">${count > 99 ? '99+' : count}</span>` : ''}
+                ${count > 0 ? html`<span class="pf-agd-tab-badge ${failed ? 'pf-agd-tab-badge--failed' : ''}">${count > 99 ? '99+' : count}</span>` : ''}
               </button>
             `;
           })}
@@ -282,10 +279,11 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
 
         <!-- Tab Content -->
         <div class="pf-agd-tab-content" onClick=${(e) => e.stopPropagation()}>
-          ${renderTabContent(activeTab, agent, onboarding, session, showToast, allAgents, readme, openTaskId, openTaskNonce)}
+          ${renderTabContent(activeTab, agent, onboarding, session, showToast, allAgents, readme, openTaskId, openTaskNonce, onDeleteClick)}
         </div>
 
-        <!-- Card Footer: Scopes + Delete -->
+        <!-- Card Footer: Scopes + federation toggle. Delete lives in the Agent Config tab's
+             danger zone (typed-name confirm) — not on every tab's footer. -->
         <div class="pf-agd-card-footer">
           <div class="pf-agd-card-actions">
             ${renderPopOut(onPopOut, agent)}
@@ -295,18 +293,49 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
               </button>
             `}
             ${onFederateToggle && html`
-              <button class="btn-ghost btn-sm" onClick=${(e) => { e.stopPropagation(); onFederateToggle(agent); }}>
-                ${agent.federate ? t('profile.federated') : t('profile.notFederated')}
+              <button class="btn-ghost btn-sm"
+                title=${agent.federate ? (t('profile.agents.detail.federationOnHint') || 'Click to make local only') : (t('profile.agents.detail.federationOffHint') || 'Click to share via federation')}
+                onClick=${(e) => { e.stopPropagation(); onFederateToggle(agent); }}>
+                ${(t('profile.agents.detail.federationLabel') || 'Federation')}: ${agent.federate ? (t('profile.agents.detail.federationOn') || 'on') : (t('profile.agents.detail.federationOff') || 'off')}
               </button>
             `}
           </div>
-          ${onDeleteClick && html`
-            <button class="btn-danger btn-sm" onClick=${(e) => { e.stopPropagation(); onDeleteClick(agent.name); }}>
-              ${t('profile.agents.deleteAgent')}
-            </button>
-          `}
         </div>
       </div>
+    </div>
+  `;
+}
+
+// Capabilities summary — "14 tools · 5 skills · 2 languages" on one line, expanding to the
+// full pill list on click. Headers should identify, not enumerate.
+function CapabilitiesSummary({ agent }) {
+  const [open, setOpen] = useState(false);
+  const tools = agent.technical_capabilities || [];
+  const skills = (agent.domain_capabilities || []).filter(c => !String(c).startsWith('Language: '));
+  const langs = agent.languages || [];
+  if (tools.length === 0 && skills.length === 0 && langs.length === 0) return null;
+  const parts = [];
+  if (tools.length) parts.push(`${tools.length} ${t('profile.agents.detail.capTools') || 'tools'}`);
+  if (skills.length) parts.push(`${skills.length} ${t('profile.agents.detail.capSkills') || 'skills'}`);
+  if (langs.length) parts.push(`${langs.length} ${t('profile.agents.detail.capLangs') || 'languages'}`);
+  return html`
+    <div class="pf-agd-capwrap">
+      <button class="pf-agd-cap-summary" onClick=${(e) => { e.stopPropagation(); setOpen(o => !o); }}>
+        ${parts.join(' · ')} <span class="pf-chevron ${open ? 'pf-chevron-open' : ''}">▼</span>
+      </button>
+      ${open && html`
+        <div class="pf-agd-capabilities">
+          ${tools.map(c => html`
+            <span key=${c.name || c} class="pf-agd-cap-badge pf-agd-cap-badge--tech">${c.name || c}</span>
+          `)}
+          ${skills.map(c => html`
+            <span key=${c} class="pf-agd-cap-badge pf-agd-cap-badge--domain">${c}</span>
+          `)}
+          ${langs.map(l => html`
+            <span key=${'lang-' + l} class="pf-agd-cap-badge pf-agd-cap-badge--domain">${'Language: ' + l}</span>
+          `)}
+        </div>
+      `}
     </div>
   `;
 }
@@ -330,9 +359,10 @@ function renderChangeBadge(changes) {
   const parts = [];
   if (changes.tasks) parts.push(`${t('profile.agents.detail.tabs.tasks')}: ${changes.tasks}`);
   if (changes.messages) parts.push(`${t('profile.agents.detail.tabs.messages')}: ${changes.messages}`);
-  if (changes.memory) parts.push(`${t('profile.agents.detail.tabs.data_access')}: ${changes.memory}`);
   const title = `${t('profile.agents.detail.changes.title')} — ${parts.join(', ')}`;
-  return html`<span class="pf-agd-change-badge" title=${title}>${total > 99 ? '99+' : total}</span>`;
+  // Neutral gray; red is reserved for unseen FAILED tasks.
+  const failed = (changes.tasksFailed || 0) > 0;
+  return html`<span class="pf-agd-change-badge ${failed ? 'pf-agd-change-badge--failed' : ''}" title=${title}>${total > 99 ? '99+' : total}</span>`;
 }
 
 function renderDeliveryIndicator(agent) {
@@ -386,7 +416,8 @@ function renderReadinessBadge(state, onboarding) {
   const score = onboarding?.readinessScore;
   if (!score && score !== 0) return html`<span class="pf-agd-badge pf-agd-badge--readiness-none">--</span>`;
   const label = t(`agentOnboarding.readiness.${level}`);
-  return html`<span class="pf-agd-badge pf-agd-badge--readiness-${level}">${label} (${score})</span>`;
+  return html`<span class="pf-agd-badge pf-agd-badge--readiness-${level}"
+    title=${t('profile.agents.detail.readinessTooltip') || 'Readiness score 0–100 from onboarding checks. Levels: none → basic → standard → advanced → full.'}>${label} (${score})</span>`;
 }
 
 function renderCollapsedStats(state, agent, onboarding) {
@@ -629,7 +660,7 @@ function ProblemZone2({ agent, setActiveTab, showToast }) {
   `;
 }
 
-function renderTabContent(activeTab, agent, onboarding, session, showToast, allAgents, readme, openTaskId, openTaskNonce) {
+function renderTabContent(activeTab, agent, onboarding, session, showToast, allAgents, readme, openTaskId, openTaskNonce, onDeleteClick) {
   const props = { agent, onboarding, session, showToast, agentName: agent.name, allAgents };
   switch (activeTab) {
     case 'readme': return html`<${TabReadme} readme=${readme} />`;
@@ -638,7 +669,7 @@ function renderTabContent(activeTab, agent, onboarding, session, showToast, allA
     case 'messages': return html`<${TabMessages} ...${props} />`;
     case 'data-access': return html`<${TabDataAccess} ...${props} />`;
     case 'directives': return html`<${TabDirectives} ...${props} />`;
-    case 'agent-config': return html`<${TabAgentConfig} ...${props} />`;
+    case 'agent-config': return html`<${TabAgentConfig} ...${props} onDeleteClick=${onDeleteClick} />`;
     case 'activity': return html`<${TabActivity} ...${props} />`;
     case 'schedules': return html`<${TabSchedules} ...${props} />`;
     case 'quality': return html`<${TabQuality} ...${props} />`;

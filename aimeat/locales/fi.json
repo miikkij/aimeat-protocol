@@ -969,7 +969,8 @@
           "promptCopied": "Ohje kopioitu",
           "copyInstallCommand": "Kopioi asennuskomento",
           "installCommandCopied": "Asennuskomento kopioitu",
-          "noDeliveries": "Ei toimituksia vielä."
+          "noDeliveries": "Ei toimituksia vielä.",
+          "setupWebhook": "Ota webhook käyttöön"
         },
         "messages": {
           "commands": {
@@ -1043,7 +1044,8 @@
           "sortUpdated": "Viimeksi päivitetty",
           "sortCreated": "Luotu",
           "sortNewestFirst": "Uusin ensin",
-          "sortOldestFirst": "Vanhin ensin"
+          "sortOldestFirst": "Vanhin ensin",
+          "noneInline": "ei yhtään"
         },
         "agent_config": {
           "copy": "Kopioi",
@@ -1056,7 +1058,10 @@
           "saveError": "Asetustiedoston tallennus epäonnistui",
           "uploaded": "Asetustiedosto ladattu",
           "uploadError": "Asetustiedoston lataus epäonnistui",
-          "viewing": "Katsellaan"
+          "viewing": "Katsellaan",
+          "deleteTitle": "Poista tämä agentti",
+          "deleteDesc": "Poistaa agentin, sen tunnukset ja tehtävähistorian. Ei voi perua.",
+          "deleteConfirmLabel": "Vahvista kirjoittamalla agentin nimi"
         },
         "activity": {
           "filterAll": "Kaikki",
@@ -1078,7 +1083,9 @@
             "connected": "Yhdistetty",
             "mcpLabel": "MCP",
             "notConfigured": "Ei määritetty"
-          }
+          },
+          "notReported": "ei raportoitu",
+          "deliveryPollingLine": "Toimitus: polling"
         },
         "directives": {
           "footer": "Direktiivit sisältyvät jokaiseen taitopaketin päivitykseen. Agentti vastaanottaa nämä käyttäytymisrajoituksina.",
@@ -1109,7 +1116,24 @@
           "agent_config": "Ei asetustiedostoja. Agentti lähettää asetustiedostot taitopaketin asennuksen jälkeen.",
           "activity": "Ei tallennettua toimintaa. Tapahtumat ilmestyvät tähän kun agentti aloittaa työskentelyn.",
           "services": "Ei ilmoitettuja palveluja. Agentti voi ilmoittaa palvelut Hello-integraation vaiheessa 11."
-        }
+        },
+        "capTools": "työkalua",
+        "capSkills": "taitoa",
+        "capLangs": "kieltä",
+        "readinessTooltip": "Valmiuspisteet 0–100 käyttöönoton tarkistuksista. Tasot: none → basic → standard → advanced → full.",
+        "federationLabel": "Federaatio",
+        "federationOn": "päällä",
+        "federationOff": "pois",
+        "federationOnHint": "Jaettu federaation kautta — klikkaa muuttaaksesi vain paikalliseksi",
+        "federationOffHint": "Vain paikallinen — klikkaa jakaaksesi federaation kautta"
+      },
+      "board": {
+        "online": "aktiivinen",
+        "quiet": "hiljainen",
+        "onboarding": "käyttöönotossa",
+        "issue": "ongelma",
+        "newShort": "uusi",
+        "issueShort": "ongelma"
       }
     },
     "scopes": {

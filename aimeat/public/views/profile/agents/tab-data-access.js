@@ -9,6 +9,8 @@
  *   v1.3.0 -- 2026-05-31 -- Make Stored Memory Keys editable (inline textarea + Save) and deletable; make Memory Areas editable (key prefix / description / access) and deletable. Stored-key list now carries `version` for optimistic-lock PUTs. Delete confirmations use the shared useConfirm dialog.
  *   v1.4.0 -- 2026-05-31 -- Add "+ Add key" button + create form to Stored Memory Keys. New entries are created under the AGENT's GAII (createMemory passes agent.gaii), not the owner's GHII, so they belong to the agent being viewed.
  *   v1.5.0 -- 2026-05-31 -- Stored Memory Keys: show per-key created + last-updated timestamps (relative, full date on hover) and add a sort control (by updated or created, newest/oldest toggle). List now carries createdAt.
+ *   v1.6.0 -- 2026-06-10 -- Empty sections compact to one row (title + "none" + Add button on the
+ *     same line) — section order unchanged; a section grows when content arrives.
  */
 
 import { h } from 'preact';
@@ -365,6 +367,7 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
       <div class="pf-agd-data-section">
         <div class="pf-agd-section-header">
           <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.sharedTagsTitle')}</span>
+          ${tags.length === 0 && !addingTag && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
           <button class="btn-outline btn-sm" onClick=${() => setAddingTag(!addingTag)}>+ ${t('profile.agents.detail.data_access.addTag')}</button>
         </div>
         ${addingTag && html`
@@ -390,16 +393,14 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
             </div>
           `;
         })}
-        ${tags.length === 0 && !addingTag && html`
-          <div class="pf-agd-empty">${t('profile.agents.detail.data_access.noTags')}</div>
-        `}
-        <div class="pf-agd-help-text">${t('profile.agents.detail.data_access.tagsHelp')}</div>
+        ${(tags.length > 0 || addingTag) && html`<div class="pf-agd-help-text">${t('profile.agents.detail.data_access.tagsHelp')}</div>`}
       </div>
 
       <!-- MEMORY AREAS -->
       <div class="pf-agd-data-section">
         <div class="pf-agd-section-header">
           <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.memoryAreasTitle')}</span>
+          ${!hasAreas && !addingArea && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
           <button class="btn-outline btn-sm" onClick=${() => setAddingArea(!addingArea)}>+ ${t('profile.agents.detail.data_access.addArea')}</button>
         </div>
         ${addingArea && html`
@@ -443,15 +444,14 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
               </span>
             </div>
           `
-        )) : !addingArea && html`
-          <div class="pf-agd-empty">${t('profile.agents.detail.data_access.noAreas')}</div>
-        `}
+        )) : null}
       </div>
 
       <!-- KNOWLEDGE PACKAGES -->
       <div class="pf-agd-data-section">
         <div class="pf-agd-section-header">
           <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.knowledgeTitle')}</span>
+          ${!hasResources && !addingPackage && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
           <button class="btn-outline btn-sm" onClick=${() => setAddingPackage(!addingPackage)}>+ ${t('profile.agents.detail.data_access.linkPackage')}</button>
         </div>
         ${addingPackage && html`
@@ -470,15 +470,14 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
             <span class="pf-agd-area-desc">${res.description || ''}</span>
             ${(res.documentCount || res.count) ? html`<span class="pf-agd-package-count">${res.documentCount || res.count} ${t('profile.agents.detail.data_access.docCount')}</span>` : ''}
           </div>
-        `) : !addingPackage && html`
-          <div class="pf-agd-empty">${t('profile.agents.detail.data_access.noPackages')}</div>
-        `}
+        `) : null}
       </div>
 
       <!-- STORED MEMORY KEYS -->
       <div class="pf-agd-data-section">
           <div class="pf-agd-section-header">
             <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.storedKeysTitle')}</span>
+            ${!hasKeys && !addingKey && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
             <div class="pf-agd-keys-controls">
               ${hasKeys && html`
                 <label class="pf-agd-sort-label">${t('profile.agents.detail.data_access.sortBy')}</label>
@@ -514,9 +513,6 @@ export default function TabDataAccess({ agent, agentName, session, showToast, al
                 <button class="btn-outline btn-sm" disabled=${creatingKey} onClick=${() => setAddingKey(false)}>${t('common.cancel')}</button>
               </div>
             </div>
-          `}
-          ${memoryKeys.length === 0 && !addingKey && html`
-            <div class="pf-agd-empty">${t('profile.agents.detail.data_access.noKeys')}</div>
           `}
           ${sortedKeys.map(mk => html`
             <div key=${mk.key}>

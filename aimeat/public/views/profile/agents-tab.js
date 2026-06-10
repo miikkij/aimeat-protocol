@@ -37,6 +37,11 @@
  *     (connect command, MCP onboarding, manual agent prompt, task-runner prompt) with the
  *     canonical <CopyButton> (className="copy-prompt-btn" preserves appearance); removed the
  *     now-dead copiedAction state + markCopied helper.
+ *   v3.8.0 -- 2026-06-10 -- "Group by: Tag" becomes the default once any agent carries tags
+ *     (never overrides a user-picked grouping); unseen-change tracking drops memory churn and
+ *     adds a failed-tasks query so the badge can go red ONLY for unseen failures (tasksFailed);
+ *     marking the Tasks tab seen also acknowledges failures. External deep-link entry
+ *     (aimeat.agents.open) from the home dashboard retained from earlier same-day round.
  *   v3.7.0 -- 2026-06-09 -- Custom agent groups: new "Custom groups" group-by mode with
  *     user-created, drag-to-assign sections (definitions in AIMEAT memory via
  *     getAgentGroups/saveAgentGroups) and per-browser collapse/expand state
@@ -493,6 +498,11 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [changesMap, setChangesMap] = useState({});
   const [tagFilter, setTagFilter] = useState(new Set());
   const [groupBy, setGroupBy] = useState('none'); // 'none' | 'tag' | 'mode' | 'custom'
+  // "Group by: Tag" becomes the default once the user actually uses tags — but never
+  // override a grouping the user picked themselves (or re-apply after they change it).
+  const userPickedGroupBy = useRef(false);
+  const groupByDefaultApplied = useRef(false);
+  const pickGroupBy = (v) => { userPickedGroupBy.current = true; setGroupBy(v); };
   // Per-browser drag-to-reorder of the agent bars (localStorage-backed).
   const [agentOrder, setAgentOrder] = useState(() => loadAgentOrder(session?.owner));
   const [draggingName, setDraggingName] = useState(null);
@@ -605,7 +615,9 @@ export default function AgentsTab({ session, showToast, onStats }) {
     setChangesMap(prev => {
       const cur = prev[agentName];
       if (!cur || !cur[tab]) return prev;
-      return { ...prev, [agentName]: { ...cur, [tab]: 0 } };
+      const next = { ...cur, [tab]: 0 };
+      if (tab === 'tasks') next.tasksFailed = 0;   // seen = acknowledged, incl. failures
+      return { ...prev, [agentName]: next };
     });
   };
 
@@ -633,6 +645,10 @@ export default function AgentsTab({ session, showToast, onStats }) {
       const list = await listAgents(session.owner);
       setAgents(list);
       onStats?.({ agents: list.length });
+      if (!groupByDefaultApplied.current && !userPickedGroupBy.current && list.some(a => (a.tags ?? []).length > 0)) {
+        groupByDefaultApplied.current = true;
+        setGroupBy('tag');
+      }
       const obMap = {};
       await Promise.all(list.map(async (a) => {
         try {
@@ -648,11 +664,11 @@ export default function AgentsTab({ session, showToast, onStats }) {
       const chMap = {};
       await Promise.all(list.map(async (a) => {
         try {
-          const [doneResp, activeResp, msgResp, memResp] = await Promise.all([
+          const [doneResp, activeResp, msgResp, failedResp] = await Promise.all([
             listTasks(a.name, { status: 'done', per_page: 100 }),
             listTasks(a.name, { status: 'active', per_page: 100 }),
             listMessages(a.name, { perPage: 100 }).catch(() => null),
-            apiGet(`/v1/memory?prefix=&per_page=100&agent=${encodeURIComponent(a.gaii || a.name)}`).catch(() => null),
+            listTasks(a.name, { status: 'failed', per_page: 50 }).catch(() => null),
           ]);
           const today = new Date().toISOString().slice(0, 10);
           const doneTasks = doneResp?.data?.tasks || [];
@@ -667,16 +683,19 @@ export default function AgentsTab({ session, showToast, onStats }) {
           const agentSeen = seen[a.name] || (seen[a.name] = {});
           const nowIso = new Date().toISOString();
           const ch = {};
+          const failedTasks = failedResp?.data?.tasks || [];
           for (const [tab, items, fields] of [
-            ['tasks', [...doneTasks, ...activeTasks], ['updatedAt', 'completedAt', 'createdAt']],
+            // Tasks badge counts new completions + new failures (the "needs a look" set).
+            ['tasks', [...doneTasks, ...activeTasks, ...failedTasks], ['updatedAt', 'completedAt', 'createdAt']],
             // Only count agent→owner messages as unread; the owner's own
             // inbound messages are not "new" to them.
             ['messages', (msgResp?.data?.messages || []).filter(m => m.direction !== 'inbound'), ['createdAt', 'created_at']],
-            ['memory', (memResp?.data?.items || memResp?.data || []), ['updated_at', 'updatedAt', 'created_at', 'createdAt']],
           ]) {
             if (agentSeen[tab] === undefined) { agentSeen[tab] = nowIso; seenSeeded = true; ch[tab] = 0; }
             else ch[tab] = countNewer(items, agentSeen[tab], fields);
           }
+          // Red badge is reserved for unseen FAILED tasks; everything else stays neutral.
+          ch.tasksFailed = agentSeen.tasks === nowIso ? 0 : countNewer(failedTasks, agentSeen.tasks, ['updatedAt', 'completedAt', 'createdAt']);
           chMap[a.name] = ch;
         } catch { tsMap[a.name] = null; chMap[a.name] = null; atsMap[a.name] = []; }
       }));
@@ -989,7 +1008,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
           agents=${agents}
           onOpen=${openAgentTask}
         />
-        ${renderFilterBar(agents, tagFilter, setTagFilter, groupBy, setGroupBy)}
+        ${renderFilterBar(agents, tagFilter, setTagFilter, groupBy, pickGroupBy)}
         ${renderAgentGroups({
           agents,
           tagFilter,

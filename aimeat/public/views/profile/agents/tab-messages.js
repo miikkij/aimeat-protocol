@@ -3,6 +3,8 @@
  * @description Messages tab with command palette, "/" autocomplete, and chat area.
  *   Wraps the existing messages subtab and adds command discovery.
  * @version-history
+ *   v1.6.0 -- 2026-06-10 -- Empty command palette is one quiet line ("Agent commands — none
+ *     registered"), not an expandable empty box.
  *   v1.5.0 -- 2026-06-06 -- Thread buttons: fix field-name mismatch (use threadId/lastMessage from the
  *     API, not the non-existent id/title/preview) so selecting a thread actually filters and each
  *     button shows a real label. Label task-based threads by their task title, snippet others; collapse
@@ -46,18 +48,11 @@ function CommandPalette({ commands, onSend }) {
   const [expanded, setExpanded] = useState(false);
 
   if (!commands || commands.length === 0) {
+    // No registered commands → one quiet line, not an expandable empty box.
     return html`
-      <div class="pf-agd-commands">
-        <div class="pf-agd-commands-header" onClick=${() => setExpanded(!expanded)}>
-          <span>${t('profile.agents.detail.messages.commands.title')} (0)</span>
-          <span>${expanded ? '▼' : '▶'}</span>
-        </div>
-        ${expanded && html`
-          <div class="pf-agd-commands-body">
-            <div class="pf-agd-empty">${t('profile.agents.detail.messages.commands.noCommands')}</div>
-            <div class="pf-agd-empty-hint">${t('profile.agents.detail.messages.commands.noCommandsHint')}</div>
-          </div>
-        `}
+      <div class="pf-agd-commands pf-agd-commands--empty" title=${t('profile.agents.detail.messages.commands.noCommandsHint')}>
+        <span>${t('profile.agents.detail.messages.commands.title')}</span>
+        <span class="pf-agd-none-inline">${t('profile.agents.detail.messages.commands.noCommands')}</span>
       </div>
     `;
   }

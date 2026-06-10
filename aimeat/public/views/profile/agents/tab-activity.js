@@ -3,6 +3,10 @@
  * @description Enhanced Activity tab with governance filter and category badges.
  *   Wraps the existing activity subtab with additional filter pills.
  * @version-history
+ *   v1.6.0 -- 2026-06-10 -- Event log strictly newest-first (pages interleaved lifecycle events);
+ *     "Tokens used (30d)" shows "—/not reported" when telemetry isn't wired (0 claimed no usage);
+ *     delivery health shows a neutral "Delivery: polling" line when neither MCP nor webhook is
+ *     configured (polling is a working method, not two missing ones).
  *   v1.5.0 -- 2026-05-28 -- Fix governance card: telemetry response field is `events` (not `entries`), and per-event tokens live in e.data.tokens_used / e.data.tokens_in+out
  *   v1.4.0 -- 2026-05-24 -- Audit fix: two-line event layout with secondary detail row
  *   v1.3.0 -- 2026-05-24 -- Wire up MCP status in delivery health from agent data
@@ -135,7 +139,12 @@ export default function TabActivity({ agent, agentName, session, showToast }) {
     return html`<div class="pf-agd-empty">${t('profile.loading')}</div>`;
   }
 
-  const filtered = filter === 'all' ? events : events.filter(ev => eventCategory(ev) === filter);
+  // Strict newest-first ordering — the backend pages can interleave lifecycle events
+  // (completed before progress, timestamps jumping 05:25 → 05:28 → 05:25 otherwise).
+  const sorted = [...events].sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
+  const filtered = filter === 'all' ? sorted : sorted.filter(ev => eventCategory(ev) === filter);
+  // Telemetry not wired ≠ zero consumption — don't let "0" claim there was none.
+  const telemetryConnected = (governance?.telemetryCount || 0) > 0 || (stats?.tokensUsed30d || 0) > 0;
 
   return html`
     <div>
@@ -147,8 +156,8 @@ export default function TabActivity({ agent, agentName, session, showToast }) {
             <div class="stat-card-label">${t('profile.agents.activity.tasksCompleted')}</div>
           </div>
           <div class="stat-card">
-            <div class="stat-card-value">${stats.tokensUsed30d ?? 0}</div>
-            <div class="stat-card-label">${t('profile.agents.activity.tokensUsed')}</div>
+            <div class="stat-card-value">${telemetryConnected ? (stats.tokensUsed30d ?? 0) : '—'}</div>
+            <div class="stat-card-label">${t('profile.agents.activity.tokensUsed')}${telemetryConnected ? '' : ` (${t('profile.agents.detail.activity.notReported') || 'not reported'})`}</div>
           </div>
           <div class="stat-card">
             <div class="stat-card-value">${stats.successRate != null ? `${Math.round(stats.successRate)}%` : '-'}</div>
@@ -184,15 +193,18 @@ export default function TabActivity({ agent, agentName, session, showToast }) {
           <div class="pf-agd-governance-delivery">
             <span class="pf-agd-governance-label">${t('profile.agents.detail.activity.governance.deliveryHealth')}</span>
             <span class="pf-agd-governance-value">
-              ${governance.mcpActive
-                ? html`<span class="pf-agd-status-dot pf-agd-status-dot--active"></span> ${t('profile.agents.detail.activity.governance.mcpLabel')}: ${t('profile.agents.detail.activity.governance.connected')}`
-                : html`<span class="pf-agd-status-dot pf-agd-status-dot--inactive"></span> ${t('profile.agents.detail.activity.governance.mcpLabel')}: ${t('profile.agents.detail.activity.governance.notConfigured')}`
-              }
-              ${' | '}
-              ${governance.webhookEnabled
-                ? `${t('profile.agents.webhook.title')}: ${governance.webhookSuccessCount}/${governance.webhookTotalCount}`
-                : t('profile.agents.detail.integration.webhookNotConfigured')
-              }
+              ${(!governance.mcpActive && !governance.webhookEnabled)
+                ? html`<span class="pf-agd-status-dot ${agent?.last_seen && (Date.now() - new Date(agent.last_seen).getTime() < 24 * 3600 * 1000) ? 'pf-agd-status-dot--active' : 'pf-agd-status-dot--inactive'}"></span> ${t('profile.agents.detail.activity.deliveryPollingLine') || 'Delivery: polling'}`
+                : html`
+                  ${governance.mcpActive
+                    ? html`<span class="pf-agd-status-dot pf-agd-status-dot--active"></span> ${t('profile.agents.detail.activity.governance.mcpLabel')}: ${t('profile.agents.detail.activity.governance.connected')}`
+                    : html`<span class="pf-agd-status-dot pf-agd-status-dot--inactive"></span> ${t('profile.agents.detail.activity.governance.mcpLabel')}: ${t('profile.agents.detail.activity.governance.notConfigured')}`
+                  }
+                  ${' | '}
+                  ${governance.webhookEnabled
+                    ? `${t('profile.agents.webhook.title')}: ${governance.webhookSuccessCount}/${governance.webhookTotalCount}`
+                    : t('profile.agents.detail.integration.webhookNotConfigured')
+                  }`}
             </span>
           </div>
         </div>

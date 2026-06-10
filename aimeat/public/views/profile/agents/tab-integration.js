@@ -4,6 +4,8 @@
  *   during onboarding or production status (connection, platform, readiness,
  *   identity, delivery log) after completion.
  * @version-history
+ *   v1.7.0 -- 2026-06-10 -- Webhook fields (URL, fail count, Test/Edit) hidden while delivery
+ *     is polling; a "+ Set up webhook" reveal opens the URL form for switching methods.
  *   v1.6.0 -- 2026-06-02 -- Component unification (#1): the 3 copy buttons (agent prompt,
  *     install command, curl) now use the canonical <CopyButton> with precomputed text
  *     payloads -- dropped 3 copied-state useState hooks, 3 hand-rolled handlers, the
@@ -302,7 +304,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
             ${(webhook && webhook.url) ? t('profile.agents.detail.deliveryWebhook') : t('profile.agents.detail.deliveryPolling')}
           </span>
         </div>
-        ${webhook ? html`
+        ${(webhook && webhook.url) ? html`
           <div class="pf-agd-info-row">
             <span class="pf-agd-info-label">${t('profile.agents.webhook.url')}</span>
             <span class="pf-agd-info-value">${webhook.url || '--'}</span>
@@ -341,10 +343,34 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
             </div>
           `}
         ` : html`
+          <!-- Polling is the active method: webhook plumbing stays hidden until the owner
+               chooses to switch (the "+ Set up webhook" reveal). -->
           <div class="pf-agd-info-row">
             <span class="pf-agd-info-label">${t('profile.agents.detail.integration.pollingInterval')}</span>
             <span class="pf-agd-info-value">${agent.pollingInterval || agent.polling_interval || '60s'}</span>
           </div>
+          ${editingWebhook ? html`
+            <div class="pf-agd-webhook-form">
+              <input
+                type="url"
+                value=${webhookDraft}
+                onInput=${e => setWebhookDraft(e.target.value)}
+                placeholder="https://..."
+              />
+              <button class="btn-primary btn-sm" onClick=${handleSaveWebhook} disabled=${savingWebhook}>
+                ${savingWebhook ? '...' : t('common.save')}
+              </button>
+              <button class="btn-outline btn-sm" onClick=${handleCancelWebhook}>
+                ${t('common.cancel')}
+              </button>
+            </div>
+          ` : html`
+            <div class="pf-agd-form-actions">
+              <button class="btn-ghost btn-sm" onClick=${handleEditWebhook}>
+                + ${t('profile.agents.detail.integration.setupWebhook') || 'Set up webhook'}
+              </button>
+            </div>
+          `}
         `}
         <div class="pf-agd-info-row">
           <span class="pf-agd-info-label">${t('profile.agents.detail.lastSeen')}</span>

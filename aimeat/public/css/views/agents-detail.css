@@ -1925,9 +1925,9 @@
 }
 
 /* ── Unseen-change badges ──
-   Collapsed-card mini-badge (total new across Tasks/Messages/Memory) + per-tab
-   number badges. Both use the accent colour so "something changed" reads at a
-   glance. Counts come from the localStorage last-seen baseline (agents-tab.js). */
+   Collapsed-card mini-badge + per-tab number badges (Tasks/Messages only). Neutral
+   gray by default — red is reserved for unseen FAILED tasks, so a real alarm never
+   drowns in routine counts. Counts come from the localStorage last-seen baseline. */
 .pf .pf-agd-change-badge {
   display: inline-flex;
   align-items: center;
@@ -1937,12 +1937,18 @@
   padding: 0 5px;
   margin-left: 6px;
   border-radius: 9px;
-  background: var(--accent, #E8564A);
-  color: #fff;
+  background: var(--bg-dim, #F3F4F6);
+  color: var(--text-dim, #4B5563);
+  border: 1px solid var(--border, #E5E7EB);
   font-size: 0.68rem;
   font-weight: 700;
   line-height: 1;
   flex-shrink: 0;
+}
+.pf .pf-agd-change-badge--failed {
+  background: var(--danger-bg, #FEE2E2);
+  color: var(--danger-fg, #DC2626);
+  border-color: var(--danger-border, #FECACA);
 }
 .pf .pf-agd-tab {
   /* allow the inline count badge to sit beside the label */
@@ -1958,12 +1964,34 @@
   height: 16px;
   padding: 0 4px;
   border-radius: 8px;
-  background: var(--accent, #E8564A);
-  color: #fff;
+  background: var(--bg-dim, #F3F4F6);
+  color: var(--text-dim, #4B5563);
+  border: 1px solid var(--border, #E5E7EB);
   font-size: 0.62rem;
   font-weight: 700;
   line-height: 1;
 }
+.pf .pf-agd-tab-badge--failed {
+  background: var(--danger-bg, #FEE2E2);
+  color: var(--danger-fg, #DC2626);
+  border-color: var(--danger-border, #FECACA);
+}
+
+/* ── Board legend (filter pills), capability summary, inline misc (2026-06-10 round) ── */
+.pf .pf-agd-board-legend { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.pf .pf-agd-legend-pill { display: inline-flex; align-items: center; gap: 0.35rem; background: var(--control-bg, var(--card)); border: 1px solid var(--control-border, var(--border)); border-radius: 999px; padding: 0.2rem 0.6rem; font-size: 0.76rem; color: var(--text-dim); cursor: pointer; }
+.pf .pf-agd-legend-pill:disabled { opacity: 0.45; cursor: default; }
+.pf .pf-agd-legend-pill--active { border-color: var(--accent); color: var(--text); }
+.pf .pf-agd-legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.pf .pf-agd-legend-count { color: var(--muted); }
+.pf .pf-agd-cap-summary { background: none; border: none; padding: 0.15rem 0; font-size: 0.78rem; color: var(--text-dim); cursor: pointer; }
+.pf .pf-agd-cap-summary:hover { color: var(--text); }
+.pf .pf-agd-none-inline { font-size: 0.78rem; color: var(--muted); margin: 0 auto 0 0.5rem; }
+.pf .pf-agd-inline-stars { display: inline-flex; gap: 1px; }
+.pf .pf-agd-inline-star { background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--border); padding: 0 1px; line-height: 1; }
+.pf .pf-agd-inline-star--hot, .pf .pf-agd-inline-star:hover { color: var(--warn, #F59E0B); }
+.pf .pf-agd-quality-pending-when { font-size: 0.74rem; color: var(--muted); white-space: nowrap; }
+.pf .pf-agd-commands--empty { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.6rem; font-size: 0.82rem; color: var(--text-dim); }
 
 /* ── README tab (rendered from agents.<name>.readme markdown) ── */
 .pf .pf-agd-readme {
