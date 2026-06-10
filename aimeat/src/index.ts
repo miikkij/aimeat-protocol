@@ -81,9 +81,11 @@ USAGE
   aimeat connect add [opts]      Add another agent to the connector pool
   aimeat connect list            Show all connected agents
   aimeat connect remove <name>   Remove a connected agent
-  aimeat connect serve [--surface <role>]
-                                 Start MCP server. --surface appdev|agent|service|admin
-                                 exposes only that purpose-scoped tool set (see "aimeat connect")
+  aimeat connect serve [--surface <role>] [--http]
+                                 Start MCP server (stdio). --surface appdev|agent|service|admin
+                                 exposes only that purpose-scoped tool set (see "aimeat connect").
+                                 --http runs a long-lived loopback daemon instead (one WS per agent
+                                 + local /v1/mcp, REST proxy, push) -- for crews / many calls.
   aimeat connect status          Show agent connection status
   aimeat connect inbox           Check message inbox
   aimeat connect tasks           List assigned tasks
@@ -148,12 +150,22 @@ USAGE
   aimeat connect --url <node-url> --owner <owner> [--agent <name>]
       Authenticate an AI agent with OAuth device authorization.
 
-  aimeat connect serve [--surface <appdev|agent|service|admin>]
+  aimeat connect serve [--surface <appdev|agent|service|admin>] [--http]
       Start the local MCP server for the connected agent. Configure your AI
       runtime to launch this command so it can see AIMEAT tools.
       --surface restricts the exposed tools to one purpose-scoped set (focuses
       the agent, fewer tools = less confusion). Omit for the full toolset.
       e.g. aimeat connect serve --surface agent
+
+      --http (a.k.a. --daemon) runs a long-lived loopback daemon on 127.0.0.1
+      instead of the default stdio transport. It holds ONE persistent WebSocket
+      per agent to the node (forward API calls + realtime task delivery, no
+      polling) and exposes a local Streamable-HTTP MCP endpoint (/v1/mcp), a
+      REST proxy (/v1/*), and a long-poll push surface (/local/tasks/next),
+      advertised via the discovery file <AIMEAT_HOME>/serve.json. Prefer this
+      for CrewAI crews / clients that make many calls; the default stdio mode
+      stays for one-shot and CI/serverless use.
+      e.g. aimeat connect serve --http
 
   aimeat connect status
       Show the connected agent, owner, node, and token status.

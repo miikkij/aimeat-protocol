@@ -1,0 +1,68 @@
+name: aimeat-crewai (Python)
+
+# Tests the Python CrewAI integration. Path-gated so the heavier Node+CrewAI
+# setup only runs when the package or the connector it talks to changes.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'python/aimeat-crewai/**'
+      - 'aimeat/src/cli/connect/**'
+      - '.github/workflows/python-aimeat-crewai.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'python/aimeat-crewai/**'
+      - 'aimeat/src/cli/connect/**'
+      - '.github/workflows/python-aimeat-crewai.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The integration suite (test_serve_loopback.py) spawns a REAL AIMEAT node
+      # and the loopback serve daemon via `node --import tsx aimeat/src/index.ts`,
+      # so Node + the connector's deps must be installed for it to run (otherwise
+      # those tests skip themselves).
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: 'pnpm'
+          cache-dependency-path: aimeat/pnpm-lock.yaml
+
+      - name: Install Node deps
+        working-directory: aimeat
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        working-directory: aimeat
+        run: npx prisma generate
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: python/aimeat-crewai/pyproject.toml
+
+      - name: Install package + dev deps
+        working-directory: python/aimeat-crewai
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Ruff
+        working-directory: python/aimeat-crewai
+        run: ruff check .
+
+      # Unit + smoke tests + the loopback integration suite (spawns node + serve
+      # daemon, exercises serve_params/REST proxy/long-poll over one upstream WS).
+      - name: Pytest
+        working-directory: python/aimeat-crewai
+        run: python -m pytest tests -q

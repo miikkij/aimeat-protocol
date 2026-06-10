@@ -274,10 +274,15 @@ def test_serve_params_unknown_agent_fails_fast(env: Env) -> None:
 def test_mcp_tool_call_over_loopback(env: Env) -> None:
     """A liaison-style MCP tool call works over the loopback /v1/mcp."""
     from mcp import ClientSession
-    from mcp.client.streamable_http import streamablehttp_client
+    # mcp renamed streamablehttp_client -> streamable_http_client; use the new
+    # (non-deprecated) name when present, fall back to the old one on older mcp.
+    try:
+        from mcp.client.streamable_http import streamable_http_client
+    except ImportError:  # pragma: no cover -- older mcp
+        from mcp.client.streamable_http import streamablehttp_client as streamable_http_client
 
     async def run() -> None:
-        async with streamablehttp_client(f"{env.loopback_base}/v1/mcp") as (read, write, _):
+        async with streamable_http_client(f"{env.loopback_base}/v1/mcp") as (read, write, _):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 tools = await session.list_tools()

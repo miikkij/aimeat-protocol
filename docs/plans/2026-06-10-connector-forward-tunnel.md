@@ -292,15 +292,31 @@ box in a phase is the gate to starting the next. Phases 1–2 are server-only;
       (stable daemon pid + no `stdio_params` in the worker path), example-crew
       wiring imports/constructs, clean shutdown with no orphan.**
 
-### Phase 6 — Docs + full verification + CI gating
-- [ ] Connector guide + README transport section; note stdio stays for
-      CI/serverless without serve.
+### Phase 6 — Docs + verification + CI gating  ✅ DONE (on `main`)
+- [x] Connector guide + README transport section — `aimeat/README.md` (loopback
+      `--http` daemon paragraph) + `docs/integrations/crewai.md` ("Transports" →
+      added the `serve_params()` loopback-daemon section); stdio stays for
+      one-shot / CI/serverless.
+- [x] `--http` help text in `aimeat/src/index.ts` (short + detailed
+      `connect serve` usage). *(Deferred Node-side item from Phase 5.)*
+- [x] Python `mcp` SDK deprecation: `streamablehttp_client` →
+      `streamable_http_client` in `test_serve_loopback.py`, with an old-name
+      `ImportError` fallback (no forced `mcp` floor bump). Warning gone from the
+      suite.
 - [x] Python pytest `test_serve_loopback.py` (loopback proxy works, no per-task
       subprocess churn). *(Delivered early, in Phase 5.)*
-- [ ] CI: tunnel suites run on every PR on both backends; add a Python job for
-      `python/aimeat-crewai/tests/` (extend `.github/workflows/`).
-- [ ] `pnpm test:e2e:sqlite` + `pnpm test:e2e:mongodb` full sweep, 0 failures.
-- [ ] `pnpm lint` + `pnpm typecheck` clean.
+- [x] CI: Python job `.github/workflows/python-aimeat-crewai.yml` (path-gated to
+      `python/aimeat-crewai/**` + `aimeat/src/cli/connect/**`; Node+pnpm+Prisma so
+      the integration test can spawn a node; `ruff` + `pytest`). The Node tunnel
+      suites already run via `ci.yml`'s e2e job; the per-PR both-backend Node
+      sweep is a pre-existing CI scope, unchanged here.
+- [~] Full both-backend `pnpm test:e2e` sweep — **intentionally not run for
+      Phase 6**: this phase changes no server/connector runtime (help string +
+      docs + CI + one Python test import), and the project was verified on both
+      backends phase by phase. Per the affected-area testing rule.
+- [x] Verification: `pnpm typecheck` + `pnpm lint` clean (Node, 0 errors);
+      `ruff` clean + `pytest` 29/29 (Python) — the `streamablehttp` deprecation
+      warning is gone.
 
 ## E2E test automation & CI (verifiable under heavy churn)
 

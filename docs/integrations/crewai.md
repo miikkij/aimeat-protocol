@@ -99,7 +99,30 @@ That's it. The liaison automatically:
 
 You don't write any of this code. The liaison's [persona](https://github.com/miikkij/aimeat-protocol/blob/main/python/aimeat-crewai/src/aimeat_crewai/liaison.py) tells the LLM exactly which AIMEAT tool to call when, and the AIMEAT skill bundle downloaded by `aimeat connect add` provides the operational reference.
 
-## Two transports
+## Transports
+
+### Loopback serve daemon (recommended for crews / many calls)
+
+`serve_params(agent_name=...)` attaches to a long-lived **loopback serve daemon**
+(`aimeat connect serve --http`) on `127.0.0.1` instead of spawning a connector
+subprocess per crew. The daemon holds **one persistent WebSocket per agent** to
+the node, so every liaison MCP call and every daemon REST call funnels over that
+single upstream connection -- no per-call TLS handshakes, no subprocess churn,
+and tasks arrive in realtime (push) rather than by polling. `serve_params`
+auto-starts the daemon via its discovery file (`<AIMEAT_HOME>/serve.json`) if one
+isn't already running, and reuses it across crews.
+
+```python
+from aimeat_crewai import serve_params
+params = serve_params(agent_name="marketing-crew")
+# For a repo checkout (no global `aimeat` on PATH):
+# serve_params(agent_name="...", aimeat_command=["node", "--import", "tsx", "src/index.ts"], spawn_cwd="aimeat")
+```
+
+Use this when a crew (especially a concurrent `run_crew_daemon`) makes many calls
+or runs continuously. Falls back transparently to direct HTTP + polling when the
+node has the tunnel disabled. For one-shot runs or environments without the
+daemon, use `stdio_params` / `http_params` below.
 
 ### stdio (recommended for local development)
 
