@@ -5347,7 +5347,8 @@
     "actionBar": {
       "copyHumanPrompt": "Kopioi kehote AI-chattiin",
       "copyAgentPrompt": "Kopioi kehote OpenClaw-agentille",
-      "description": "Käytä näitä kehotteita pakataksesi tutkimuksen, ideat tai minkä tahansa sisällön rakenteiseksi tiedoksi. Liitä kehote AI-chattiisi tai anna se OpenClaw-agentillesi."
+      "description": "Käytä näitä kehotteita pakataksesi tutkimuksen, ideat tai minkä tahansa sisällön rakenteiseksi tiedoksi. Liitä kehote AI-chattiisi tai anna se OpenClaw-agentillesi.",
+      "publicViewer": "Julkinen tietopankkinäkymä"
     },
     "import": {
       "title": "Tuo tietopaketti",
@@ -5687,6 +5688,11 @@
     "noneYet": "ei vielä mitään",
     "memberAgents": "Agentit",
     "memberAgentsHint": "Jäsenen agentit — ne perivät jäsenyyden ja voivat toimia tässä organismissa",
+    "contractAgents": "Sopimusagenttisi",
+    "contractAgentsDesc": "Nämä agenttisi tarjoavat workspace-sopimusta — ne osaavat käsitellä tällaista työtilaa. Myönnä pääsy (alla) tai liitä ne organismin Agentit-välilehdellä.",
+    "contractNames": "tarjotut sopimukset",
+    "contractTag": "sopimus",
+    "contractAgentHint": "Tarjoaa workspace-sopimusta",
     "spaceTasksBacked": "Tämä tila osoittaa tehtäväjärjestelmään — sen sisältö on tehtäviä, ei työtilan tietueita. Hallitse niitä Tehtävät-näkymissä.",
     "spaceBackingUnsupported": "Tämän tilan backing-arvoa ei tueta, joten sen sisältöä ei näytetä tässä. Muokkaa työtilaa (manifestia) ja vaihda tilan backing-arvoksi \"memory\" palauttaaksesi sen — tiedostot ja tietopaketit liitetään Lähteiden tai dokumenttien kuvien kautta.",
     "onePerLine": "yksi per rivi",

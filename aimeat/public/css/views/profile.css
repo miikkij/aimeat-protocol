@@ -2091,6 +2091,9 @@
 /* A declared space whose data does not live in workspace records (backing 'tasks', or a legacy
    unsupported backing) — shown as a notice instead of silently dropped from the view. */
 .pj-space-notice { font-size: 0.88rem; color: var(--muted); padding: 0.2rem 0 0.3rem; }
+/* The viewer's own contract-advertising agents (tag 'workspace-contract'), surfaced in the
+   workspace People panel so the user sees which of their agents can serve this workspace. */
+.pj-contract-agents { border: 1px solid var(--border); border-radius: 10px; padding: 0.5rem 0.75rem; margin-bottom: 0.6rem; background: var(--card); }
 .pj-draft-form { margin: 0.4rem 0; }
 .pj-drafts { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.3rem; }
 .pj-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; }

@@ -198,7 +198,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
 
     try {
       let jsonStr = text;
-      const codeBlockMatch = text.match(/\`\`\`(?:json)?\s*\n?([\s\S]*?)\n?\`\`\`/);
+      const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
       if (codeBlockMatch) jsonStr = codeBlockMatch[1];
 
       const parsed = JSON.parse(jsonStr.trim());
@@ -501,6 +501,9 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
           </button>
           <button class="btn-outline" onClick=${() => copyPrompt('agent')}>
             ${t('knowledge.actionBar.copyAgentPrompt')}
+          </button>
+          <button class="btn-outline" onClick=${() => window.open('/v1/publicknowledgeviewer', '_blank')}>
+            ${t('knowledge.actionBar.publicViewer')} ↗
           </button>
         </div>
         <p class="kpkg-action-desc">${t('knowledge.actionBar.description')}</p>

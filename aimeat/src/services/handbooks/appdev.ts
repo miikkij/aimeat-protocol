@@ -55,8 +55,11 @@ the structure — add/remove a space, set the publish gate) · \`aimeat_workspac
 them into the manifest, skips any that already exist, fills defaults — no need to resend the whole
 manifest; creator-only, so a *same-owner* agent self-provisions, otherwise the creator does it)
 + **grant** the agent the \`contributor\` role. Writes are attributed to the agent (it appears in
-"Who works here" + the activity heatmap) and are visible to the whole workspace. Full guide — machine-
-readable contract template, exact provision calls, the processing loop, schema rules:
+"Who works here" + the activity heatmap) and are visible to the whole workspace. **Advertise the
+contract** with owner-managed tags via \`aimeat_agent_tags_set\`: \`workspace-contract\` (the discovery
+marker — the workspace UI surfaces such agents to their owner) + \`contract.<id>\` per contract served
+(dots, NOT colons — tags are \`[a-z0-9._-]\`). Full guide — machine-readable contract template, exact
+provision calls, the processing loop, schema rules, discovery tags:
 **\`docs/agent-workspace-contracts.md\`**. Read it before building such an agent.
 
 ## Layer rules (critical — see the appdev/mcp handbook modules)

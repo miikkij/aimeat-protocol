@@ -187,6 +187,27 @@ Workspace writes are stored under the **agent's own GAII**, so the agent is auto
 
 No extra wiring — declare the contract, provision, subscribe, process.
 
+## 7b. Advertising the contract — discovery tags
+
+So the OWNER can *find* their contract agents (the workspace UI shows them in the People panel, and
+the agent picker badges them 📜), the agent advertises its contract via **owner-managed agent tags**:
+
+| Tag | Meaning |
+|-----|---------|
+| `workspace-contract` | This agent offers a workspace contract (the discovery marker — exact string). |
+| `contract.<id>` | Names a contract it serves, e.g. `contract.research` (repeatable; `<id>` = the contract's `id` from §2). |
+
+Set them once after the agent registers (replaces the whole list — include any other tags you keep):
+
+```text
+aimeat_agent_tags_set { target_agent_name: "web-researcher",
+                        tags: ["workspace-contract", "contract.research"] }
+# or REST (owner): PATCH /v1/agents/web-researcher/tags { "tags": [...] }
+```
+
+> Tags are lowercase `[a-z0-9._-]` — **colons are not allowed** (use `contract.research`, not
+> `contract:research`). Max 20 tags per agent.
+
 ## 8. Checklist for building a workspace-processing agent
 
 1. Define the **contract** (inputs/outputs/schemas/lifecycle) — §2.
@@ -196,3 +217,4 @@ No extra wiring — declare the contract, provision, subscribe, process.
 4. Make the loop **idempotent + bounded** (output-dedup primary, bounded batch, no record hammering) — §5.1.
 5. Validate every records write against its schema — §6.
 6. Nothing for attribution/visibility — AIMEAT handles it — §7.
+7. **Advertise the contract** with the `workspace-contract` + `contract.<id>` tags — §7b.

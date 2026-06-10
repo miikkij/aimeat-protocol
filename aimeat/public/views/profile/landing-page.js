@@ -746,7 +746,8 @@ const SIDEBAR_GROUPS = [
   ] },
   { titleKey: 'profile.landing.menuBuildShare', items: [
     { id: 'generator', icon: '\u{1F534}', labelKey: 'profile.generator.tabLabel' },
-    { id: 'foundry', icon: '\u{1F3ED}', labelKey: 'profile.foundry.tabLabel' },
+    /* foundry removed from the menu 2026-06-10 (owner: not in use). The tab module and
+     * its route id still exist — restore by re-adding this item. */
     { id: 'calibrator', icon: '\u{1F3AF}', labelKey: 'profile.calibrator.tabLabel' },
     { id: 'extensions', icon: '\u{1F50C}', labelKey: 'profile.tabs.extensions' },
     { id: 'capabilities', icon: '⚡', labelKey: 'capabilities.tabLabel' },

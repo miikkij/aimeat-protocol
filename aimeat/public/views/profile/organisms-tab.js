@@ -138,6 +138,10 @@
  *   v1.25.2 — 2026-06-10 — Settings Cancel works again: it discards changes AND closes the panel
  *     (both organism + workspace settings) — the dirty-only reset variant did nothing visible on a
  *     clean form, which read as a dead button.
+ *   v1.26.0 — 2026-06-10 — Contract-agent discovery: agents tagged 'workspace-contract' (+ optional
+ *     'contract.<id>' names) surface to their OWNER — a 📜 block in the workspace People panel and a
+ *     📜 badge/marker in the organism Agents tab picker + rows. Tag convention: docs/agent-workspace-
+ *     contracts.md §7b; helpers offersWorkspaceContract/contractNamesOf in /js/services/agents.js.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
@@ -152,7 +156,7 @@ import { SearchBar } from '/components/SearchBar.js';
 import * as orgService from '/js/services/organisms.js';
 import * as memoryService from '/js/services/memory.js';
 import * as knowledgeService from '/js/services/knowledge.js';
-import { listAgents } from '/js/services/agents.js';
+import { listAgents, offersWorkspaceContract, contractNamesOf } from '/js/services/agents.js';
 import { getGhii } from '/js/services/auth.js';
 import { listPosts, createPost } from '/js/services/boards.js';
 import { OpenRouterSettings } from './generator-settings.js';
@@ -423,7 +427,7 @@ function OrgAgentsPanel({ org, ghii, canManage, showToast, onChanged }) {
             <div class="flex-row-wrap">
               <select class="input-field input-sm" value=${pick} onChange=${e => setPick(e.target.value)}>
                 <option value="">${t('organisms.pickAgent') || 'Choose one of your agents…'}</option>
-                ${pickable.map(a => html`<option value=${a.gaii} key=${a.gaii}>${a.display_name || a.name}</option>`)}
+                ${pickable.map(a => html`<option value=${a.gaii} key=${a.gaii}>${(a.display_name || a.name) + (offersWorkspaceContract(a) ? ` · 📜 ${t('organisms.contractTag') || 'contract'}` : '')}</option>`)}
               </select>
               <button class="btn-outline btn-sm" disabled=${busy || !pick} onClick=${() => attach(pick)}>${t('organisms.attach') || 'Attach'}</button>
             </div>` : html`
@@ -449,6 +453,7 @@ function OrgAgentsPanel({ org, ghii, canManage, showToast, onChanged }) {
               <div class="pj-org-titlerow">
                 <span class="pj-org-name">${(own?.display_name || p.name)}</span>
                 ${p.node ? html`<span class="badge badge-info">${(p.node)}</span>` : null}
+                ${own && offersWorkspaceContract(own) ? html`<span class="badge badge-success" title=${(t('organisms.contractAgentHint') || 'Advertises a workspace contract') + (contractNamesOf(own).length ? `: ${contractNamesOf(own).join(', ')}` : '')}>${'📜 '}${t('organisms.contractTag') || 'contract'}</span>` : null}
               </div>
               <div class="pj-org-desc" title=${g}>
                 <span class="mono">${(p.owner ? `${p.name}#${p.owner}` : g)}</span>
@@ -1801,6 +1806,13 @@ function ParticipantsPanel({ orgId, wsId }) {
   const [grantee, setGrantee] = useState('');
   const [role, setRole] = useState('contributor');
   const [busy, setBusy] = useState(false);
+  // The viewer's own agents advertising a workspace contract (tag 'workspace-contract' +
+  // optional 'contract.<name>' tags) — surfaced here so a user looking at a workspace sees
+  // straight away which of their agents can serve it.
+  const [contractAgents, setContractAgents] = useState([]);
+  useEffect(() => {
+    listAgents().then(a => setContractAgents((a || []).filter(offersWorkspaceContract))).catch(() => {});
+  }, []);
   useEffect(() => {
     let cancelled = false;
     const fetchIt = () => orgService.getWorkspaceParticipants(orgId, wsId).then(d => { if (!cancelled) setData(d); }).catch(() => {});
@@ -1830,6 +1842,17 @@ function ParticipantsPanel({ orgId, wsId }) {
       </div>
       ${show ? html`
         <div class="pj-parts">
+          ${contractAgents.length ? html`
+            <div class="pj-contract-agents">
+              <div class="pj-access-title">${'📜 '}${t('organisms.contractAgents') || 'Your contract agents'}</div>
+              <div class="section-desc">${t('organisms.contractAgentsDesc') || 'These agents of yours advertise a workspace contract — they can process a workspace like this one. Grant access (below) or attach them in the organism Agents tab.'}</div>
+              <div class="pj-part-agents">
+                ${contractAgents.map(a => html`
+                  <span class="pj-part-agent own" key=${a.gaii} title=${a.gaii}>
+                    ${'📜 '}${a.display_name || a.name}${contractNamesOf(a).length ? html`<span class="pj-part-count" title=${t('organisms.contractNames') || 'contracts offered'}>${contractNamesOf(a).join(', ')}</span>` : null}
+                  </span>`)}
+              </div>
+            </div>` : null}
           <${Mermaid} chart=${orgService.buildParticipantsMermaid(data)} />
           <div class="pj-parts-list">
             ${owners.map((o, i) => html`<div class="pj-part-owner" key=${i}>

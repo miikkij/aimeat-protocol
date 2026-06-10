@@ -5347,7 +5347,8 @@
     "actionBar": {
       "copyHumanPrompt": "Copy Prompt for AI Chat",
       "copyAgentPrompt": "Copy Prompt for OpenClaw",
-      "description": "Use these prompts to package research, ideas, or any content into structured knowledge. Paste the prompt into your AI Chat or give it to your OpenClaw agent."
+      "description": "Use these prompts to package research, ideas, or any content into structured knowledge. Paste the prompt into your AI Chat or give it to your OpenClaw agent.",
+      "publicViewer": "Public knowledge viewer"
     },
     "import": {
       "title": "Import Knowledge Package",
@@ -5687,6 +5688,11 @@
     "noneYet": "none yet",
     "memberAgents": "Agents",
     "memberAgentsHint": "This member's agents — they inherit the membership and can act in this organism",
+    "contractAgents": "Your contract agents",
+    "contractAgentsDesc": "These agents of yours advertise a workspace contract — they can process a workspace like this one. Grant access (below) or attach them in the organism Agents tab.",
+    "contractNames": "contracts offered",
+    "contractTag": "contract",
+    "contractAgentHint": "Advertises a workspace contract",
     "spaceTasksBacked": "This space points at the task system — its items are tasks, not workspace records. Manage them in the Tasks views.",
     "spaceBackingUnsupported": "This space's backing is not supported, so its content is not shown here. Edit the workspace (manifest) and set this space's backing to \"memory\" to restore it — files and knowledge packages attach via Sources or document images instead.",
     "onePerLine": "one per line",
