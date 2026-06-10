@@ -4,6 +4,46 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## 1.22.0 - 2026-06-10
+
+**Connector Forward Tunnel.** `aimeat connect serve` can now hold **one persistent
+WebSocket per agent** to the node instead of polling — carrying forward API calls
+(agent→server, multiplexed and id-correlated) and **realtime task delivery**
+(server→agent push). A new `aimeat connect serve --http` loopback daemon exposes
+this to local clients (CrewAI crews, MCP runtimes) over `127.0.0.1`. Pairs with
+`aimeat-crewai` 0.4.0. Full architecture + diagrams: `docs/connector-forward-tunnel.md`.
+
+### Added
+
+- **`GET /v1/connect/tunnel`** WebSocket endpoint (`ConnectTunnelManager`) —
+  agent-JWT auth at upgrade; id-correlated `request`/`response` forwarding through
+  the real Express stack (so `requireAuth`/`requireScope` still apply); realtime
+  `deliver`/`ack`/`backlog` reverse delivery. Opt-in via
+  `AIMEAT_CONNECT_TUNNEL_ENABLED` (default **off**).
+- **`aimeat connect serve --http`** (a.k.a. `--daemon`) — long-lived loopback
+  daemon: one tunnel WS per agent, local Streamable-HTTP MCP (`/v1/mcp`), REST
+  proxy (`/v1/*`), push long-poll (`/local/tasks/next`), and a
+  `<AIMEAT_HOME>/serve.json` discovery file. Degrades transparently to direct
+  HTTP + polling against tunnel-disabled / older nodes. Default stdio mode
+  unchanged for one-shot and CI/serverless use.
+- Node tunnel client (`tunnel-client.ts`) — reconnect (backoff+jitter), heartbeat
+  with dead-socket detection, forward-call correlation, deliver→auto-ack, and
+  proactive pre-expiry token reconnect; plus an `AimeatClient` transport seam so
+  every MCP tool routes over the tunnel with no per-tool changes.
+- Realtime task push: tasks created/queued for an agent are delivered down its
+  socket immediately; nothing is lost while offline (backlog-on-reconnect is
+  computed from storage truth, never suppressed by an ack).
+- New docs: `docs/connector-forward-tunnel.md` (architecture + mermaid diagrams),
+  `docs/integrations/crewai-upgrade-to-serve.md` (crew migration guide), and a
+  loopback-transport section in `docs/integrations/crewai.md` + `aimeat/README.md`.
+
+### Security
+
+- Forward dispatch pins the resolved request origin to loopback (SSRF guard) with
+  an HTTP-method allowlist and a request-header allowlist (`Authorization`/`Cookie`/
+  `Host` stripped — the pinned agent JWT is the sole credential); the tunnel WS
+  frame size is capped; the local serve surface binds `127.0.0.1` only.
+
 ## aimeat-crewai 0.4.0 - 2026-06-10
 
 **Loopback serve transport (Connector Forward Tunnel, Phase 5).** The CrewAI
