@@ -15,6 +15,10 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
+
+// t() echoes the key when a translation is missing (e.g. a server still serving
+// pre-update locales) — fall back to readable English instead of raw keys.
+const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 import { apiGet, apiPut } from '/js/api.js';
 import { Spinner } from './shared.js';
 import { CopyButton } from '/components/CopyButton.js';
@@ -31,9 +35,14 @@ export default function PortfolioTab({ session, navigate, showToast }) {
   useEffect(() => { load(); }, []);
 
   // No published portfolio → the builder IS the page. Forward instead of showing
-  // two buttons on 90% whitespace.
+  // two buttons on 90% whitespace. CRITICAL: clear the profile's remembered-open-tab
+  // first — otherwise every later /v1/profile visit restores this tab, which forwards
+  // again, and the user can never reach the profile home (bounce loop).
   useEffect(() => {
-    if (cfg !== undefined && !cfg?.enabled) navigate('/v1/portfolio');
+    if (cfg !== undefined && !cfg?.enabled) {
+      try { sessionStorage.removeItem('aimeat-profile-tab'); } catch { /* noop */ }
+      navigate('/v1/portfolio');
+    }
   }, [cfg]);
 
   if (cfg === undefined) return html`<${Spinner} text=${t('loading') || 'Loading…'} />`;
@@ -42,10 +51,10 @@ export default function PortfolioTab({ session, navigate, showToast }) {
   const url = `${window.location.origin}/v1/portfolio/${encodeURIComponent(session.owner)}`;
 
   const handleUnpublish = () => {
-    confirm(t('portfolio.builder.unpublishConfirm') || 'Unpublish your portfolio? The public page stops working until you publish again.', async () => {
+    confirm(tr('portfolio.builder.unpublishConfirm', 'Unpublish your portfolio? The public page stops working until you publish again.'), async () => {
       try {
         await apiPut('/v1/portfolio/config', { ...cfg, enabled: false, tags: ['portfolio'] });
-        showToast?.(t('portfolio.builder.unpublished') || 'Portfolio unpublished');
+        showToast?.(tr('portfolio.builder.unpublished', 'Portfolio unpublished'));
         navigate('/v1/portfolio');
       } catch (e) { showToast?.(e.message || 'Failed', true); }
     }, { danger: true });
@@ -58,7 +67,7 @@ export default function PortfolioTab({ session, navigate, showToast }) {
 
       <div class="card">
         <div class="mem-item">
-          <span class="mem-key">${t('portfolio.builder.publicUrl') || 'Public URL'}</span>
+          <span class="mem-key">${tr('portfolio.builder.publicUrl', 'Public URL')}</span>
           <span class="access-copy-val">
             <a href=${url} target="_blank">${url}</a>
             <${CopyButton} text=${url} className="btn-ghost btn-sm" label="📋"
@@ -67,20 +76,20 @@ export default function PortfolioTab({ session, navigate, showToast }) {
         </div>
         ${cfg.publishedAt && html`
           <div class="mem-item">
-            <span class="mem-key">${t('portfolio.builder.lastUpdated') || 'Last updated'}</span>
+            <span class="mem-key">${tr('portfolio.builder.lastUpdated', 'Last updated')}</span>
             <span>${new Date(cfg.publishedAt).toLocaleString(getLocale() === 'fi' ? 'fi-FI' : undefined)}</span>
           </div>
         `}
         ${cfg.htmlSizeKb && html`
           <div class="mem-item">
-            <span class="mem-key">${t('portfolio.builder.sizeLabel') || 'Size'}</span>
+            <span class="mem-key">${tr('portfolio.builder.sizeLabel', 'Size')}</span>
             <span>${cfg.htmlSizeKb} KB</span>
           </div>
         `}
         <div class="card-actions">
-          <a class="btn-outline btn-sm" href=${url} target="_blank">${t('portfolio.builder.visitBtn') || 'Visit'}</a>
-          <button class="btn-outline btn-sm" onClick=${() => navigate('/v1/portfolio')}>${t('portfolio.builder.editBtn') || 'Edit in builder'}</button>
-          <button class="btn-danger btn-sm" onClick=${handleUnpublish}>${t('portfolio.builder.unpublish') || 'Unpublish'}</button>
+          <a class="btn-outline btn-sm" href=${url} target="_blank">${tr('portfolio.builder.visitBtn', 'Visit')}</a>
+          <button class="btn-outline btn-sm" onClick=${() => navigate('/v1/portfolio')}>${tr('portfolio.builder.editBtn', 'Edit in builder')}</button>
+          <button class="btn-danger btn-sm" onClick=${handleUnpublish}>${tr('portfolio.builder.unpublish', 'Unpublish')}</button>
         </div>
       </div>
       <${ConfirmUI} />

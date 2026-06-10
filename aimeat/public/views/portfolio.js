@@ -17,6 +17,10 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, handleImgError } from '/js/utils.js';
+
+// t() echoes the key when a translation is missing (e.g. a server still serving
+// pre-update locales) — fall back to readable English instead of raw keys.
+const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 import { apiGet, apiPut } from '/js/api.js';
 import TagCloud from '/js/components/tag-cloud.js';
 import { CopyButton } from '/components/CopyButton.js';
@@ -301,14 +305,14 @@ function PortfolioBuilder({ session, navigate }) {
     return html`
       <summary>
         <input type="checkbox" class="portfolio-group-checkall" checked=${all}
-          title=${t('portfolio.builder.selectAll') || 'Select all'}
+          title=${tr('portfolio.builder.selectAll', 'Select all')}
           onClick=${(e) => e.stopPropagation()}
           onChange=${() => setter(prev => {
             const next = new Set(prev);
             if (all) ids.forEach(i => next.delete(i)); else ids.forEach(i => next.add(i));
             return next;
           })} />
-        ${label} — ${(t('portfolio.builder.selectedOf') || '{sel}/{total} selected').replace('{sel}', String(selCount)).replace('{total}', String(ids.length))}
+        ${label} — ${tr('portfolio.builder.selectedOf', '{sel}/{total} selected').replace('{sel}', String(selCount)).replace('{total}', String(ids.length))}
       </summary>`;
   };
 
@@ -370,7 +374,7 @@ function PortfolioBuilder({ session, navigate }) {
   const handlePublishPaste = async () => {
     const text = pastedHtml.trim();
     if (!text) {
-      setUploadStatus({ ok: false, msg: t('portfolio.builder.pasteEmpty') || 'Paste HTML content first' });
+      setUploadStatus({ ok: false, msg: tr('portfolio.builder.pasteEmpty', 'Paste HTML content first') });
       return;
     }
     await publishHtml(text);
@@ -423,7 +427,7 @@ function PortfolioBuilder({ session, navigate }) {
     try {
       await apiPut('/v1/portfolio/config', { ...(existingConfig || {}), enabled: false, tags: ['portfolio'] });
       setExistingConfig({ ...(existingConfig || {}), enabled: false });
-      setUploadStatus({ ok: true, msg: t('portfolio.builder.unpublished') || 'Portfolio unpublished' });
+      setUploadStatus({ ok: true, msg: tr('portfolio.builder.unpublished', 'Portfolio unpublished') });
     } catch (err) {
       setUploadStatus({ ok: false, msg: err.message || 'Failed' });
     }
@@ -465,11 +469,11 @@ function PortfolioBuilder({ session, navigate }) {
       <!-- The loop is the whole point: AIMEAT composes a prompt, YOUR AI chat builds the
            HTML, you paste it back. Without this banner step 1 gives no hint of steps 4-5. -->
       <div class="portfolio-flow">
-        <span class="portfolio-flow-step"><span class="portfolio-flow-num">①</span> ${t('portfolio.builder.flow1')}</span>
+        <span class="portfolio-flow-step"><span class="portfolio-flow-num">①</span> ${tr('portfolio.builder.flow1', 'Select your content and style')}</span>
         <span class="portfolio-flow-arrow">→</span>
-        <span class="portfolio-flow-step"><span class="portfolio-flow-num">②</span> ${t('portfolio.builder.flow2')}</span>
+        <span class="portfolio-flow-step"><span class="portfolio-flow-num">②</span> ${tr('portfolio.builder.flow2', 'Generate a prompt and run it in your AI chat (Claude, ChatGPT, …)')}</span>
         <span class="portfolio-flow-arrow">→</span>
-        <span class="portfolio-flow-step"><span class="portfolio-flow-num">③</span> ${t('portfolio.builder.flow3')}</span>
+        <span class="portfolio-flow-step"><span class="portfolio-flow-num">③</span> ${tr('portfolio.builder.flow3', 'Paste the resulting HTML back here and publish')}</span>
       </div>
 
       ${existingConfig?.enabled && html`
@@ -478,7 +482,7 @@ function PortfolioBuilder({ session, navigate }) {
           <span>${t('portfolio.builder.enabled')}</span>
           <a href=${publicUrl} target="_blank" class="portfolio-published-link">${t('portfolio.builder.viewPublic')}</a>
           <button class="btn btn-ghost btn-sm" disabled=${uploading} onClick=${handleUnpublish}>
-            ${t('portfolio.builder.unpublish')}
+            ${tr('portfolio.builder.unpublish', 'Unpublish')}
           </button>
         </div>
       `}
@@ -639,7 +643,7 @@ function PortfolioBuilder({ session, navigate }) {
           </div>
           ${portfolioType === 'custom' && html`
             <textarea class="portfolio-custom-desc" rows="3"
-              placeholder=${t('portfolio.builder.customTypePlaceholder') || 'Describe what kind of portfolio you want…'}
+              placeholder=${tr('portfolio.builder.customTypePlaceholder', 'Describe what kind of portfolio you want…')}
               value=${customTypeDesc} onInput=${(e) => setCustomTypeDesc(e.target.value)}></textarea>
           `}
 
@@ -670,7 +674,7 @@ function PortfolioBuilder({ session, navigate }) {
           </div>
           ${authGates.has('custom') && html`
             <textarea class="portfolio-custom-desc" rows="2"
-              placeholder=${t('portfolio.builder.customGatePlaceholder') || 'Describe the custom auth-gated sections…'}
+              placeholder=${tr('portfolio.builder.customGatePlaceholder', 'Describe the custom auth-gated sections…')}
               value=${customGateDesc} onInput=${(e) => setCustomGateDesc(e.target.value)}></textarea>
           `}
         </div>
@@ -684,13 +688,13 @@ function PortfolioBuilder({ session, navigate }) {
               ${t('portfolio.builder.generateBtn')}
             </button>
             ${totalSelected === 0 && html`
-              <span class="portfolio-generate-hint">${t('portfolio.builder.generateDisabledHint') || 'Select at least one item in step 1'}</span>
+              <span class="portfolio-generate-hint">${tr('portfolio.builder.generateDisabledHint', 'Select at least one item in step 1')}</span>
             `}
           </div>
 
           ${generatedPrompt && html`
             <div class="portfolio-prompt-output">${generatedPrompt}</div>
-            <div class="portfolio-prompt-meta">${(t('portfolio.builder.charCount') || '{n} characters').replace('{n}', generatedPrompt.length.toLocaleString())}</div>
+            <div class="portfolio-prompt-meta">${tr('portfolio.builder.charCount', '{n} characters').replace('{n}', generatedPrompt.length.toLocaleString())}</div>
             <div class="portfolio-prompt-actions">
               <${CopyButton} text=${generatedPrompt} className="btn-primary"
                 label=${t('portfolio.builder.copyPrompt')} copiedLabel=${t('portfolio.builder.promptCopied')} />
@@ -716,7 +720,7 @@ function PortfolioBuilder({ session, navigate }) {
           <h3><span class="portfolio-step-number">5</span> ${t('portfolio.builder.step5Title')}</h3>
 
           <div class="portfolio-publish-target">
-            ${t('portfolio.builder.publishTarget') || 'Will be published at:'}
+            ${tr('portfolio.builder.publishTarget', 'Will be published at:')}
             <a href=${publicUrl} target="_blank" class="portfolio-publish-url">${publicUrl}</a>
           </div>
 
@@ -734,12 +738,12 @@ function PortfolioBuilder({ session, navigate }) {
 
           <div style="display:flex; align-items:center; gap:0.75rem; margin:1rem 0; color:var(--text-dim); font-size:0.9rem;">
             <hr style="flex:1; border:none; border-top:1px solid var(--border-dim);" />
-            <span>${t('portfolio.builder.orPaste') || 'or paste HTML directly'}</span>
+            <span>${tr('portfolio.builder.orPaste', 'or paste HTML directly')}</span>
             <hr style="flex:1; border:none; border-top:1px solid var(--border-dim);" />
           </div>
 
           <textarea class="portfolio-paste-area"
-            placeholder=${t('portfolio.builder.pasteHint') || 'Paste your portfolio HTML here from AI chat...'}
+            placeholder=${tr('portfolio.builder.pasteHint', 'Paste your portfolio HTML here from AI chat...')}
             value=${pastedHtml}
             onInput=${(e) => setPastedHtml(e.target.value)}
             rows="6"
@@ -748,10 +752,10 @@ function PortfolioBuilder({ session, navigate }) {
             <div class="portfolio-paste-actions">
               <button class="btn btn-primary"
                 onClick=${handlePublishPaste} disabled=${uploading}>
-                ${uploading ? '...' : (t('portfolio.builder.publishPaste') || 'Publish pasted HTML')}
+                ${uploading ? '...' : tr('portfolio.builder.publishPaste', 'Publish pasted HTML')}
               </button>
               <button class="btn btn-ghost" onClick=${() => setShowPreview(p => !p)}>
-                ${showPreview ? (t('portfolio.builder.closePreview') || 'Close preview') : (t('portfolio.builder.previewBtn') || 'Preview')}
+                ${showPreview ? tr('portfolio.builder.closePreview', 'Close preview') : tr('portfolio.builder.previewBtn', 'Preview')}
               </button>
             </div>
           `}
@@ -775,7 +779,7 @@ function PortfolioBuilder({ session, navigate }) {
 
       <div style="margin-top:2rem;">
         <button class="btn btn-ghost" onClick=${() => navigate('/v1/profile')}>
-          ← ${t('portfolio.builder.backToProfile') || 'Profile'}
+          ← ${tr('portfolio.builder.backToProfile', 'Profile')}
         </button>
       </div>
     </div>

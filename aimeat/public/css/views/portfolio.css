@@ -329,7 +329,7 @@
 .portfolio-published-bar { margin-bottom: 1.5rem; padding: .75rem 1rem; background: rgba(80,200,120,.08); border: 1px solid rgba(80,200,120,.25); border-radius: 8px; display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
 .portfolio-published-dot { color: var(--success-fg, #2E9E5B); }
 .portfolio-published-link { margin-left: auto; }
-.portfolio-group-checkall { margin-right: .4rem; cursor: pointer; }
+.portfolio-group-checkall { margin-right: .65rem; cursor: pointer; accent-color: var(--accent, #E8564A); width: 15px; height: 15px; }
 .portfolio-custom-desc { width: 100%; margin-top: .6rem; background: var(--control-bg, var(--card)); border: 1px solid var(--control-border, var(--border)); border-radius: 8px; padding: .5rem .65rem; color: var(--text); font: inherit; font-size: .88rem; resize: vertical; }
 .portfolio-generate-row { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem; }
 .portfolio-generate-hint { font-size: .82rem; color: var(--text-dim); }
