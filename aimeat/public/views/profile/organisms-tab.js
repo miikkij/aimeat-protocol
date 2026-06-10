@@ -80,6 +80,27 @@
  *     (the 3 AI prompts) and Settings absorbs share / sources / edit-flow chart alongside the
  *     manifest form, spaces, restructure and danger zone. Old toolbar removed; nothing hidden —
  *     every former panel lives in a tab, the header menu, or Settings.
+ *   v1.19.0 — 2026-06-10 — Organism-home tab contents redesigned (user feedback round): Agents tab
+ *     gets OrgAgentsPanel — picker of own agents (free-text GAII behind "Advanced"), activity
+ *     context per row. Workspaces tab: list first (map behind a 🗺 toggle), enriched rows
+ *     (record/doc counts, last event, review pill), delete moved into the "…" menu, compact content
+ *     search above the list. Members tab flipped: roster rows first (role badge, access line,
+ *     joined date, "…" menu), "+ Invite" toggle, pending requests only when present + tab pill.
+ *     Board tab: embedded preview (latest posts + composer) instead of a bare UUID + link. Red
+ *     intra-tab titles dropped (the tab IS the title).
+ *   v1.20.0 — 2026-06-10 — Organism Settings form redesigned: every field has a persistent label,
+ *     grouped Identity / Access (with per-choice gray hints for join policy + visibility), interests
+ *     as a TagInput (chips), read-only metadata collapsed to one line (Created · Creator · Board+copy;
+ *     members/max moved to the Members tab), Save disabled until dirty (doubles as the unsaved
+ *     indicator) + discard guard on settings-close/breadcrumb. Danger zone is its own red box with
+ *     typed-name confirmation that states exactly what gets deleted (counted workspaces/records/docs).
+ *   v1.20.1 — 2026-06-10 — Workspace breadcrumb unified with the organism home's: Organisms / {org} /
+ *     {workspace} (registry name), both ancestors clickable — the list is one click away from inside
+ *     a workspace (new onBackToList). Old "← Workspaces / 🧬 org" button row removed.
+ *   v1.20.2 — 2026-06-10 — Fix: settings form opened EMPTY when the home mounted from an {id}-only
+ *     stub (F5 before the list loaded) — the form now re-syncs whenever fresher org data arrives, as
+ *     long as the user hasn't touched the fields. Workspace rows gain a clickable 👥 participants
+ *     counter that expands an inline people list (like the access-request inbox).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
@@ -95,6 +116,8 @@ import { SearchBar } from '/components/SearchBar.js';
 import * as orgService from '/js/services/organisms.js';
 import * as memoryService from '/js/services/memory.js';
 import * as knowledgeService from '/js/services/knowledge.js';
+import { listAgents } from '/js/services/agents.js';
+import { listPosts, createPost } from '/js/services/boards.js';
 import { OpenRouterSettings } from './generator-settings.js';
 import { copyToClipboard } from '/js/utils.js';
 import { dt, fmtBytes } from '/js/format.js';
@@ -104,6 +127,19 @@ import { Mermaid } from '/components/Mermaid.js';
 /** Date-only, formatted in the APP locale (browser locale may differ — fi must show 10.6.2026, not 6/10/2026). */
 function fmtDate(s) {
   return new Date(s).toLocaleDateString(getLocale() === 'fi' ? 'fi-FI' : undefined);
+}
+
+/** Relative time for list metadata ("2 h ago" / "2 h sitten"); falls back to a locale date past 7 days. */
+function relTime(s) {
+  const ts = new Date(s).getTime();
+  if (!Number.isFinite(ts)) return '';
+  const mins = Math.max(0, Math.round((Date.now() - ts) / 60000));
+  if (mins < 60) return (t('organisms.relMin') || '{n} min ago').replace('{n}', String(mins));
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return (t('organisms.relHours') || '{n} h ago').replace('{n}', String(hours));
+  const days = Math.round(hours / 24);
+  if (days <= 7) return (t('organisms.relDays') || '{n} d ago').replace('{n}', String(days));
+  return fmtDate(s);
 }
 
 /** Two-letter monogram for the list/home avatar (initials of the first two words, else first two chars). */
@@ -137,6 +173,26 @@ function KebabMenu({ items, label, trigger, btnClass }) {
             <button class="pj-menu-item ${it.danger ? 'pj-menu-item-danger' : ''}" role="menuitem" key=${it.label}
               onClick=${() => { setOpen(false); it.onClick?.(); }}>${it.icon ? `${it.icon} ` : ''}${it.label}</button>`)}
         </div>` : null}
+    </div>`;
+}
+
+/** Tag chips + inline input — Enter/comma adds, × or Backspace-on-empty removes, blur commits.
+ *  Shows immediately how the value parses (vs. a raw "comma separated" text field). */
+function TagInput({ tags, onChange, placeholder }) {
+  const [val, setVal] = useState('');
+  const add = () => { const v = val.trim().replace(/,+$/, ''); if (v && !tags.includes(v)) onChange([...tags, v]); setVal(''); };
+  const onKey = (e) => {
+    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); add(); }
+    else if (e.key === 'Backspace' && !val && tags.length) onChange(tags.slice(0, -1));
+  };
+  return html`
+    <div class="pj-taginput">
+      ${tags.map(tag => html`
+        <span class="file-tag pj-tag" key=${tag}>${escHtml(tag)}
+          <button class="pj-tag-x" title="×" onClick=${() => onChange(tags.filter(x => x !== tag))}>×</button>
+        </span>`)}
+      <input class="pj-taginput-field" value=${val} placeholder=${placeholder || 'Add…'}
+        onInput=${(e) => setVal(e.target.value)} onKeyDown=${onKey} onBlur=${add} />
     </div>`;
 }
 
@@ -176,10 +232,9 @@ function OrgSearch({ orgId, onOpenWorkspace }) {
   };
 
   return html`
-    <div class="card-detail">
-      <div class="section-title">${t('organisms.searchContent') || 'Search content'}</div>
+    <div class="pj-orgsearch">
       <div class="flex-row-wrap">
-        <input class="input-field input-sm" placeholder=${t('organisms.searchPlaceholder') || 'Find records & documents…'} value=${q}
+        <input class="input-field input-sm pj-orgsearch-input" placeholder=${t('organisms.searchPlaceholder') || 'Find records & documents…'} value=${q}
           onInput=${(e) => setQ(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') doSearch(); }} />
         <button class="btn-outline btn-sm" disabled=${busy || q.trim().length < 2} onClick=${doSearch}>${t('organisms.search') || 'Search'}</button>
       </div>
@@ -251,8 +306,128 @@ function IncomingInvitations({ showToast, onChanged }) {
  * parent list via onChanged so member counts stay current.
  */
 /**
- * Member + agent management. `show` limits the rendered sections: 'members' (invite, pending
- * requests, roster, blocked) or 'agents' (attached agents); omitted = both (legacy layout).
+ * Agents tab — attached agents listed first; "+ Attach agent" opens a picker of the user's OWN
+ * agents (the node knows them — no GAII syntax needed), with free-text attach-by-ID behind an
+ * "Advanced" link for cross-node agents. Each row shows where the agent has acted (aggregated
+ * from the accessible workspaces' activity feeds) or, for own agents, when it was last active.
+ */
+function OrgAgentsPanel({ org, ghii, canManage, showToast, onChanged }) {
+  const orgId = org.id;
+  const attached = org.agentGaiis || [];
+  const [mine, setMine] = useState(null);            // own agents (picker) — null = loading
+  const [pick, setPick] = useState('');
+  const [showAttach, setShowAttach] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [agentId, setAgentId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [acted, setActed] = useState({});            // agent name → { count, lastAt, ws: Set }
+
+  useEffect(() => {
+    listAgents(ghii).then(a => setMine((a || []).filter(x => !String(x.name || '').startsWith('session-')))).catch(() => setMine([]));
+  }, [ghii]);
+
+  // Best-effort activity context: which workspaces each agent has touched, and when last.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const wss = (await orgService.discoverWorkspaces(orgId)).filter(w => w.access !== 'none');
+        const map = {};
+        await Promise.all(wss.map(async (w) => {
+          const a = await orgService.getWorkspaceActivity(orgId, w.id);
+          for (const e of (a.events || [])) {
+            if (!e.agent) continue;
+            const m = map[e.agent] || (map[e.agent] = { count: 0, lastAt: '', ws: new Set() });
+            m.count++; m.ws.add(w.name || w.id);
+            if (!m.lastAt || e.at > m.lastAt) m.lastAt = e.at;
+          }
+        }));
+        if (!cancelled) setActed(map);
+      } catch { /* context is optional */ }
+    })();
+    return () => { cancelled = true; };
+  }, [orgId, attached.length]);
+
+  const run = async (fn, okMsg) => {
+    setBusy(true);
+    try {
+      const r = await fn();
+      if (r?.ok === false) showToast(r?.error?.message || (t('organisms.agentFailed') || 'Failed'));
+      else { if (okMsg) showToast(okMsg); onChanged?.(); }
+    } catch (e) { showToast((e && e.message) || (t('organisms.agentFailed') || 'Failed')); }
+    finally { setBusy(false); }
+  };
+  const attach = (g) => {
+    const id = (g || '').trim();
+    if (!id) return;
+    setPick(''); setAgentId(''); setShowAttach(false);
+    run(() => orgService.attachAgent(orgId, id), t('organisms.agentAttached') || 'Agent attached');
+  };
+  const detach = (g) => run(() => orgService.detachAgent(orgId, g), t('organisms.agentDetached') || 'Agent detached');
+
+  const attachedSet = new Set(attached);
+  const pickable = (mine || []).filter(a => a.gaii && !attachedSet.has(a.gaii));
+  const parseGaii = (g) => { const m = /^([^#]+)#([^@]+)@(.+)$/.exec(g) || []; return { name: m[1] || g, owner: m[2] || '', node: m[3] || '' }; };
+  const ownByGaii = new Map((mine || []).map(a => [a.gaii, a]));
+
+  return html`
+    <div class="card-detail">
+      <div class="pj-tabhead">
+        <div class="section-desc pj-tabhead-desc">${t('organisms.agentsDesc') || 'An attached agent works in this organism with its owner’s member rights — it shows up in workspace participants and activity.'}</div>
+        <button class="btn-primary btn-sm" onClick=${() => setShowAttach(s => !s)}>${'+ '}${t('organisms.attachAgent') || 'Attach agent'}</button>
+      </div>
+
+      ${showAttach ? html`
+        <div class="pj-attach">
+          ${mine === null ? html`<${Spinner} />` : (pickable.length > 0 ? html`
+            <div class="flex-row-wrap">
+              <select class="input-field input-sm" value=${pick} onChange=${e => setPick(e.target.value)}>
+                <option value="">${t('organisms.pickAgent') || 'Choose one of your agents…'}</option>
+                ${pickable.map(a => html`<option value=${a.gaii} key=${a.gaii}>${a.display_name || a.name}</option>`)}
+              </select>
+              <button class="btn-outline btn-sm" disabled=${busy || !pick} onClick=${() => attach(pick)}>${t('organisms.attach') || 'Attach'}</button>
+            </div>` : html`
+            <div class="section-desc">${t('organisms.noOwnAgentsLeft') || 'All your agents are already attached (or you have none yet).'}</div>`)}
+          <button class="pj-linklike" onClick=${() => setShowAdvanced(s => !s)}>${t('organisms.advancedAttach') || 'Advanced: attach by ID'}</button>
+          ${showAdvanced ? html`
+            <div class="flex-row-wrap">
+              <input class="input-field input-sm" placeholder=${t('organisms.agentGaiiPlaceholder') || 'agent#owner@node'} value=${agentId}
+                onInput=${(e) => setAgentId(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') attach(agentId); }} />
+              <button class="btn-outline btn-sm" disabled=${busy || !agentId.trim()} onClick=${() => attach(agentId)}>${t('organisms.attach') || 'Attach'}</button>
+            </div>` : null}
+        </div>` : null}
+
+      ${attached.length === 0 ? html`<${EmptyState} icon="🤖" text=${t('organisms.noAgents') || 'No agents attached.'} />` : null}
+      ${attached.map(g => {
+        const p = parseGaii(g);
+        const own = ownByGaii.get(g);
+        const act = acted[p.name];
+        return html`
+          <div class="pj-org-row" key=${'ag-' + g}>
+            <div class="pj-org-avatar" aria-hidden="true">${'🤖'}</div>
+            <div class="pj-org-main pj-org-main-static">
+              <div class="pj-org-titlerow">
+                <span class="pj-org-name">${escHtml(own?.display_name || p.name)}</span>
+                ${p.node ? html`<span class="badge badge-info">${escHtml(p.node)}</span>` : null}
+              </div>
+              <div class="pj-org-desc" title=${g}>
+                <span class="mono">${escHtml(p.owner ? `${p.name}#${p.owner}` : g)}</span>
+                ${act ? html` · ${t('organisms.agentActedIn') || 'active in'} ${escHtml([...act.ws].join(', '))} (${act.count}) · ${relTime(act.lastAt)}`
+                  : (own?.last_seen ? html` · ${t('organisms.lastActive') || 'last active'} ${relTime(own.last_seen)}` : null)}
+              </div>
+            </div>
+            ${(canManage || g.includes('#' + ghii + '@'))
+              ? html`<button class="btn-outline btn-sm" disabled=${busy} onClick=${() => detach(g)}>${t('organisms.detach') || 'Detach'}</button>`
+              : null}
+          </div>`;
+      })}
+    </div>`;
+}
+
+/**
+ * Members tab — roster first (avatar rows with role badge, per-workspace access line, joined date,
+ * "…" menu for make-creator/remove/block), "+ Invite" toggles a compact invite row, and pending
+ * join requests render as highlighted rows only when there are any. Agents live in OrgAgentsPanel.
  */
 function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, confirm, onChanged, show }) {
   const orgId = org.id;
@@ -261,8 +436,9 @@ function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, confirm,
   const [banned, setBanned] = useState([]);
   const [invitations, setInvitations] = useState([]);
   const [inviteName, setInviteName] = useState('');
-  const [agentName, setAgentName] = useState('');
+  const [showInvite, setShowInvite] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [wsAccess, setWsAccess] = useState(null);   // bare owner name → [{ ws, role }] (best effort)
 
   const load = useCallback(async () => {
     const tasks = [orgService.listMembers(orgId).catch(() => null)];
@@ -289,6 +465,32 @@ function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, confirm,
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, []);
+
+  // Per-member workspace access (best effort): workspace creators from discovery + access lists of
+  // the workspaces the viewer created. Keyed by bare owner name (memberships use bare names too).
+  useEffect(() => {
+    if (show !== 'members') return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const wss = await orgService.discoverWorkspaces(orgId);
+        const map = {};
+        const add = (who, wsName, role) => {
+          const bare = String(who || '').split('@')[0];
+          if (!bare) return;
+          const list = map[bare] || (map[bare] = []);
+          if (!list.some(x => x.ws === wsName)) list.push({ ws: wsName, role });
+        };
+        for (const w of wss) if (w.created_by) add(w.created_by, w.name || w.id, 'owner');
+        await Promise.all(wss.filter(w => w.access === 'owner').map(async (w) => {
+          const acc = await orgService.getWorkspaceAccess(orgId, w.id).catch(() => null);
+          for (const m of (acc?.members || [])) add(m.owner, w.name || w.id, m.role);
+        }));
+        if (!cancelled) setWsAccess(map);
+      } catch { /* the access line is optional */ }
+    })();
+    return () => { cancelled = true; };
+  }, [orgId, show]);
 
   const run = async (fn, okMsg, failKey) => {
     setBusy(true);
@@ -325,66 +527,78 @@ function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, confirm,
     () => run(() => orgService.transferOwnership(orgId, toGhii), (t('organisms.ownershipTransferred') || 'Ownership transferred'), 'organisms.transferFailed'),
     { danger: true });
 
-  const attachAgent = () => {
-    const g = agentName.trim();
-    if (!g) return;
-    setAgentName('');
-    run(() => orgService.attachAgent(orgId, g), (t('organisms.agentAttached') || 'Agent attached'), 'organisms.agentFailed');
-  };
-  const detachAgent = (g) => run(() => orgService.detachAgent(orgId, g), (t('organisms.agentDetached') || 'Agent detached'), 'organisms.agentFailed');
-
   const pending = (requests || []).filter(r => r.status === 'pending');
-  const agents = org.agentGaiis || [];
-
   const showMembers = show !== 'agents';
-  const showAgents = show !== 'members';
+
+  // "Access: Marketing (contributor)" line — creator shows "all workspaces" (mirrors reality:
+  // the organism creator governs every workspace it owns; per-ws data may be partial for others).
+  const accessLine = (m) => {
+    if (m.role === 'creator') return t('organisms.accessAll') || 'all workspaces';
+    const list = wsAccess?.[String(m.ghii || '').split('@')[0]] || [];
+    if (!list.length) return '';
+    return list.map(x => `${x.ws} (${x.role})`).join(', ');
+  };
 
   return html`
     <div class="card-detail">
       ${showMembers ? html`
-      <div class="section-title">${canManage ? (t('organisms.manageMembers') || 'Manage members') : (t('organisms.membersRoster') || 'Members')}</div>
-      ${canManage ? html`<div class="section-desc">${t('organisms.manageMembersDesc') || 'Invite, approve, block and revoke member access.'}</div>` : null}
+      <div class="pj-tabhead">
+        <div class="section-desc pj-tabhead-desc">${t('organisms.membersDesc') || 'Members can join workspaces; their agents inherit the role.'}
+          ${' '}<span class="pj-members-cap">${(members || []).length}/${org.maxMembers || 500}</span></div>
+        ${canManage ? html`<button class="btn-primary btn-sm" onClick=${() => setShowInvite(s => !s)}>${'+ '}${t('organisms.invite') || 'Invite'}</button>` : null}
+      </div>
 
-      ${canManage ? html`
-        <div class="detail-label">${t('organisms.inviteMember') || 'Invite a member'}</div>
-        <div class="flex-row-wrap">
-          <input class="input-field input-sm" placeholder=${t('organisms.inviteePlaceholder') || 'owner name'} value=${inviteName}
+      ${canManage && showInvite ? html`
+        <div class="flex-row-wrap pj-invite-row">
+          <input class="input-field input-sm" autofocus placeholder=${t('organisms.inviteePlaceholder') || 'owner name'} value=${inviteName}
             onInput=${(e) => setInviteName(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') invite(); }} />
-          <button class="btn-primary btn-sm" disabled=${busy || !inviteName.trim()} onClick=${invite}>${t('organisms.invite') || 'Invite'}</button>
-        </div>
-        ${invitations.length > 0 ? html`
-          <div class="section-desc">${t('organisms.outstandingInvites') || 'Awaiting acceptance'}: ${invitations.map(m => escHtml(m.ghii)).join(', ')}</div>
-        ` : null}
-
-        <div class="detail-label">${t('organisms.pendingRequests') || 'Pending join requests'}</div>
-        ${requests === null
-          ? html`<div class="section-desc">…</div>`
-          : pending.length === 0
-            ? html`<div class="section-desc">${t('organisms.noPendingRequests') || 'No pending requests.'}</div>`
-            : pending.map(r => html`
-              <div class="pj-access-row" key=${r.id}>
-                <span>${escHtml(r.ghii)}${r.message ? html` <span class="pj-mini">— ${escHtml(r.message)}</span>` : null}</span>
-                <span class="flex-row-wrap">
-                  <button class="btn-success btn-sm" disabled=${busy} onClick=${() => review(r.id, 'approved')}>${t('organisms.approve') || 'Approve'}</button>
-                  <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => review(r.id, 'rejected')}>${t('organisms.reject') || 'Reject'}</button>
-                </span>
-              </div>
-            `)}
+          <button class="btn-outline btn-sm" disabled=${busy || !inviteName.trim()} onClick=${invite}>${t('organisms.invite') || 'Invite'}</button>
+          <button class="btn-ghost btn-sm" onClick=${() => setShowInvite(false)}>${t('organisms.cancel') || 'Cancel'}</button>
+        </div>` : null}
+      ${canManage && invitations.length > 0 ? html`
+        <div class="section-desc">${t('organisms.outstandingInvites') || 'Awaiting acceptance'}: ${invitations.map(m => escHtml(m.ghii)).join(', ')}</div>
       ` : null}
 
-      <div class="detail-label">${t('organisms.members') || 'Members'}</div>
-      ${(members || []).map(m => html`
-        <div class="pj-access-row" key=${m.ghii}>
-          <span>${escHtml(m.ghii)} <span class="badge ${m.role === 'creator' ? 'badge-success' : 'badge-info'} pj-mini">${escHtml(m.role || 'member')}</span></span>
-          ${canManage && m.role !== 'creator' && m.ghii !== ghii ? html`
-            <span class="flex-row-wrap">
-              ${isCreator ? html`<button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => transfer(m.ghii)}>${t('organisms.makeCreator') || 'Make creator'}</button>` : null}
-              <button class="btn-outline btn-sm" disabled=${busy} onClick=${() => remove(m.ghii, false)}>${t('organisms.remove') || 'Remove'}</button>
-              <button class="btn-danger btn-sm" disabled=${busy} onClick=${() => remove(m.ghii, true)}>${t('organisms.block') || 'Block'}</button>
-            </span>
-          ` : null}
+      ${canManage && pending.length > 0 ? pending.map(r => html`
+        <div class="pj-org-row pj-req-row" key=${r.id}>
+          <div class="pj-org-avatar" aria-hidden="true">${'🙋'}</div>
+          <div class="pj-org-main pj-org-main-static">
+            <div class="pj-org-titlerow">
+              <span class="pj-org-name">${escHtml(r.ghii)}</span>
+              <span class="pj-org-desc">${t('organisms.wantsToJoin') || 'wants to join'}${r.createdAt ? ` · ${relTime(r.createdAt)}` : ''}</span>
+            </div>
+            ${r.message ? html`<div class="pj-org-desc">${escHtml(r.message)}</div>` : null}
+          </div>
+          <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => review(r.id, 'rejected')}>${t('organisms.decline') || 'Decline'}</button>
+          <button class="btn-success btn-sm" disabled=${busy} onClick=${() => review(r.id, 'approved')}>${t('organisms.approve') || 'Approve'}</button>
         </div>
-      `)}
+      `) : null}
+
+      <div class="pj-org-list">
+        ${(members || []).map(m => {
+          const acc = accessLine(m);
+          const menuItems = (canManage && m.role !== 'creator' && m.ghii !== ghii) ? [
+            isCreator && { label: t('organisms.makeCreator') || 'Make creator', icon: '👑', onClick: () => transfer(m.ghii) },
+            { label: t('organisms.remove') || 'Remove', danger: true, onClick: () => remove(m.ghii, false) },
+            { label: t('organisms.block') || 'Block', danger: true, onClick: () => remove(m.ghii, true) },
+          ] : [];
+          return html`
+            <div class="pj-org-row" key=${m.ghii}>
+              <div class="pj-org-avatar" aria-hidden="true">${orgInitials(m.ghii)}</div>
+              <div class="pj-org-main pj-org-main-static">
+                <div class="pj-org-titlerow">
+                  <span class="pj-org-name">${escHtml(m.ghii)}</span>
+                  <span class="badge ${m.role === 'creator' ? 'badge-success' : 'badge-info'}">${escHtml(m.role || 'member')}</span>
+                </div>
+                ${(acc || m.joinedAt) ? html`
+                  <div class="pj-org-desc">
+                    ${acc ? `${t('organisms.accessLabel') || 'Access'}: ${acc}` : ''}${acc && m.joinedAt ? ' · ' : ''}${m.joinedAt ? (t('organisms.joinedDate') || 'joined {date}').replace('{date}', fmtDate(m.joinedAt)) : ''}
+                  </div>` : null}
+              </div>
+              ${menuItems.length ? html`<${KebabMenu} label=${t('organisms.moreActions') || 'More actions'} items=${menuItems} />` : null}
+            </div>`;
+        })}
+      </div>
 
       ${canManage && banned.length > 0 ? html`
         <div class="detail-label">${t('organisms.blockedMembers') || 'Blocked'}</div>
@@ -395,24 +609,6 @@ function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, confirm,
           </div>
         `)}
       ` : null}
-      ` : null}
-
-      ${showAgents ? html`
-      <div class="detail-label">${t('organisms.attachedAgents') || 'Attached agents'}</div>
-      ${agents.length === 0 ? html`<div class="section-desc">${t('organisms.noAgents') || 'No agents attached.'}</div>` : null}
-      ${agents.map(g => html`
-        <div class="pj-access-row" key=${'ag-' + g}>
-          <span class="mono">${escHtml(g)}</span>
-          ${(canManage || g.includes('#' + ghii + '@'))
-            ? html`<button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => detachAgent(g)}>${t('organisms.detach') || 'Detach'}</button>`
-            : null}
-        </div>
-      `)}
-      <div class="flex-row-wrap">
-        <input class="input-field input-sm" placeholder=${t('organisms.agentGaiiPlaceholder') || 'agent#you@node'} value=${agentName}
-          onInput=${(e) => setAgentName(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') attachAgent(); }} />
-        <button class="btn-outline btn-sm" disabled=${busy || !agentName.trim()} onClick=${attachAgent}>${t('organisms.attachAgent') || 'Attach agent'}</button>
-      </div>
       ` : null}
     </div>
   `;
@@ -731,7 +927,8 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     // openWs chosen → that workspace; otherwise the organism's HOME page (tabs incl. workspaces).
     if (openWs) {
       return html`<${Workspace} org=${org} wsId=${openWs} session=${session} showToast=${showToast}
-        onBack=${() => { setOpenWs(null); }} />`;
+        onBack=${() => { setOpenWs(null); }}
+        onBackToList=${() => { setOpenWs(null); setOpenId(null); setOpenSettings(false); loadData(); }} />`;
     }
     return html`
       <${OrganismHome} org=${org} ghii=${ghii} showToast=${showToast}
@@ -739,8 +936,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         onOpenWs=${(wsId) => setOpenWs(wsId)}
         onBack=${() => { setOpenId(null); setOpenSettings(false); loadData(); }}
         onChanged=${loadData}
-        onLeave=${() => handleLeave(org.id, org.name)}
-        onDelete=${() => handleDelete(org.id, org.name)} />
+        onLeave=${() => handleLeave(org.id, org.name)} />
       <${ConfirmUI} />`;
   }
 
@@ -834,17 +1030,81 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   `;
 }
 
+/* Board tab — embedded preview of the organism's discussion board: latest posts + a composer,
+ * with "Open in Boards" for the full view. The raw board UUID hides behind a copy icon. */
+function BoardPreview({ boardId, showToast }) {
+  const [posts, setPosts] = useState(null);   // null = loading
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => {
+    listPosts(boardId).then(p => setPosts(Array.isArray(p) ? p : [])).catch(() => setPosts([]));
+  }, [boardId]);
+  useEffect(() => { load(); }, [load]);
+  const liveRef = useRef(load); liveRef.current = load;
+  useEffect(() => {
+    const h = () => liveRef.current();
+    window.addEventListener('aimeat-live-update', h);
+    return () => window.removeEventListener('aimeat-live-update', h);
+  }, []);
+
+  const send = async () => {
+    const body = text.trim();
+    if (!body) return;
+    setBusy(true);
+    try {
+      const r = await createPost(boardId, body);
+      if (r?.ok === false) showToast(r?.error?.message || 'Failed to post');
+      else { setText(''); load(); }
+    } catch (e) { showToast((e && e.message) || 'Failed to post'); }
+    finally { setBusy(false); }
+  };
+  const copyId = async () => {
+    const ok = await copyToClipboard(boardId);
+    showToast(ok ? (t('organisms.copied') || 'Copied') : (t('organisms.copyFailed') || 'Could not copy'));
+  };
+
+  const ts = (p) => p.created_at || p.createdAt || p.at || '';
+  const latest = [...(posts || [])].sort((a, b) => String(ts(b)).localeCompare(String(ts(a)))).slice(0, 5);
+
+  return html`
+    <div class="card-detail">
+      <div class="pj-tabhead">
+        <div class="section-desc pj-tabhead-desc">${t('organisms.boardPreviewDesc') || 'Latest messages on this organism’s board.'}</div>
+        <button class="pj-icon-btn" title=${(t('organisms.copyId') || 'Copy ID') + ': ' + boardId} onClick=${copyId}>${'📋'}</button>
+        <button class="btn-outline btn-sm" onClick=${() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'boards' } }))}>
+          ${t('organisms.openBoardsTab') || 'Open in Boards'}</button>
+      </div>
+      ${posts === null ? html`<${Spinner} />`
+        : latest.length === 0 ? html`<${EmptyState} icon="💬" text=${t('organisms.boardEmpty') || 'No messages yet — write the first one.'} />`
+        : latest.map(p => html`
+          <div class="pj-board-post" key=${p.id || ts(p)}>
+            <div class="pj-board-post-head">
+              <span class="pj-board-author">${escHtml(p.author_gaii || p.author || '?')}</span>
+              ${ts(p) ? html`<span class="pj-board-time">${relTime(ts(p))}</span>` : null}
+            </div>
+            <div class="pj-board-body">${escHtml(String(p.body || p.content || '').slice(0, 400))}</div>
+          </div>`)}
+      <div class="flex-row-wrap pj-board-composer">
+        <input class="input-field input-sm pj-board-input" placeholder=${t('organisms.writePost') || 'Write a message…'} value=${text}
+          onInput=${(e) => setText(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') send(); }} />
+        <button class="btn-outline btn-sm" disabled=${busy || !text.trim()} onClick=${send}>${t('organisms.send') || 'Send'}</button>
+      </div>
+    </div>`;
+}
+
 /* ───────────────── Organism home page ─────────────────
  * One home per organism: breadcrumb header (avatar, name, badges, description,
  * Export + Settings) and tabs — Workspaces (the workspace list + content search),
  * Members (invite/approve/roster/blocked), Agents (attach/detach), Board (link to
  * the Boards tab). The Settings panel hosts the edit form, the metadata that used
  * to live in the expanded list card, and the danger zone (leave / delete). */
-function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack, onChanged, onLeave, onDelete }) {
+function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack, onChanged, onLeave }) {
   const { confirm, ConfirmUI } = useConfirm();
   const [tab, setTab] = useState(() => { try { return sessionStorage.getItem('aimeat.org.tab') || 'workspaces'; } catch { return 'workspaces'; } });
   const [showSettings, setShowSettings] = useState(!!initialSettings);
   const [wsCount, setWsCount] = useState(null);
+  const [pendingJoin, setPendingJoin] = useState(0);   // Members tab pill — visible without opening the tab
   useEffect(() => { try { sessionStorage.setItem('aimeat.org.tab', tab); } catch { /* noop */ } }, [tab]);
 
   const isCreator = org.creatorGhii === ghii;
@@ -853,28 +1113,61 @@ function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack,
   const canEdit = isCreator || isAdmin;
   const typeLabel = t(`organisms.types.${org.type}`) || org.type;
 
-  /* ── Settings: edit form (admins), metadata, danger zone ── */
-  const [editForm, setEditForm] = useState(null);
+  useEffect(() => {
+    if (!canEdit) return undefined;
+    let cancelled = false;
+    const fetchIt = () => orgService.listJoinRequests(org.id)
+      .then(r => { if (!cancelled) setPendingJoin(((r?.data?.join_requests) || []).filter(x => x.status === 'pending').length); })
+      .catch(() => {});
+    fetchIt();
+    window.addEventListener('aimeat-live-update', fetchIt);
+    return () => { cancelled = true; window.removeEventListener('aimeat-live-update', fetchIt); };
+  }, [org.id, canEdit]);
+
+  /* ── Settings: labelled + grouped form (Identity / Access) with live dirty-check, a one-line
+   * read-only metadata row, per-choice access hints, and a clearly separated danger zone whose
+   * delete needs the organism's name typed and states exactly what gets removed. ── */
+  const baseline = useMemo(() => ({
+    name: org.name || '', description: org.description || '', type: org.type || 'community',
+    join_policy: org.joinPolicy || 'open', visibility: org.visibility || 'public',
+    interests: [...(org.interests || [])],
+  }), [org]);
+  const [form, setForm] = useState(baseline);
   const [saving, setSaving] = useState(false);
-  // Re-seed the form when another organism is opened (org.id), not on every reload of the same org.
-  useEffect(() => { setEditForm(null); }, [org.id]);
-  const seedForm = () => ({
-    name: org.name || '', description: org.description || '', type: org.type,
-    join_policy: org.joinPolicy, visibility: org.visibility, interests: (org.interests || []).join(', '),
-  });
+  // Sync the form whenever fresher org data arrives (e.g. the home mounted from an F5 with only a
+  // {id} stub before the list loaded) — but ONLY while the user hasn't touched the fields, so a
+  // live-update reload never clobbers typing.
+  const prevBaselineRef = useRef(baseline);
+  useEffect(() => {
+    const prev = prevBaselineRef.current;
+    const untouched = form.name === prev.name && form.description === prev.description
+      && form.type === prev.type && form.join_policy === prev.join_policy
+      && form.visibility === prev.visibility && form.interests.join(' ') === prev.interests.join(' ');
+    if (untouched) setForm(baseline);
+    prevBaselineRef.current = baseline;
+  }, [baseline]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const dirty = form.name !== baseline.name || form.description !== baseline.description
+    || form.type !== baseline.type || form.join_policy !== baseline.join_policy
+    || form.visibility !== baseline.visibility
+    || form.interests.join(' ') !== baseline.interests.join(' ');
+  // Save doubles as the unsaved-changes indicator: enabled ⇔ something actually changed.
   const saveEdit = async () => {
-    if (!editForm?.name?.trim()) { showToast(t('organisms.nameRequired') || 'Name is required'); return; }
+    if (!form.name.trim()) { showToast(t('organisms.nameRequired') || 'Name is required'); return; }
     setSaving(true);
     try {
-      const interests = editForm.interests.split(',').map(s => s.trim()).filter(Boolean);
       const result = await orgService.updateOrganism(org.id, {
-        name: editForm.name.trim(), description: editForm.description.trim(),
-        type: editForm.type, join_policy: editForm.join_policy, visibility: editForm.visibility, interests,
+        name: form.name.trim(), description: form.description.trim(),
+        type: form.type, join_policy: form.join_policy, visibility: form.visibility, interests: form.interests,
       });
-      if (result?.ok !== false) { showToast(t('organisms.updated') || 'Organism updated'); setEditForm(null); onChanged?.(); }
+      if (result?.ok !== false) { showToast(t('organisms.updated') || 'Organism updated'); onChanged?.(); }
       else showToast(result?.error?.message || (t('organisms.updateError') || 'Failed to update'));
     } catch { showToast(t('organisms.updateError') || 'Failed to update'); }
     finally { setSaving(false); }
+  };
+  // Leaving a dirty form (closing settings / breadcrumb back) asks before dropping the changes.
+  const guardDirty = (fn) => {
+    if (showSettings && dirty) confirm(t('organisms.discardChanges') || 'Discard unsaved changes?', () => { setForm(baseline); fn(); }, { danger: true });
+    else fn();
   };
 
   const boardIdShort = org.boardId && org.boardId.length > 20
@@ -884,90 +1177,135 @@ function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack,
     showToast(ok ? (t('organisms.copied') || 'Copied') : (t('organisms.copyFailed') || 'Could not copy'));
   };
 
+  // What a delete actually removes (counted from the accessible workspaces when settings opens).
+  const [delStats, setDelStats] = useState(null);   // { ws, recs, docs }
+  const [delOpen, setDelOpen] = useState(false);
+  const [delName, setDelName] = useState('');
+  useEffect(() => {
+    if (!showSettings || !isCreator) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const wss = (await orgService.discoverWorkspaces(org.id)).filter(w => w.access !== 'none');
+        let recs = 0, docs = 0;
+        await Promise.all(wss.map(async (w) => {
+          const wsData = await orgService.getWorkspace(org.id, w.id).catch(() => null);
+          for (const ot of (wsData?.manifest?.objectTypes || []).filter(orgService.isMemorySpace)) {
+            const n = new Set([...(wsData.drafts?.[ot.name] || []), ...(wsData.objects?.[ot.name] || [])].map(d => d.id)).size;
+            if (orgService.isDocSpace(ot)) docs += n; else recs += n;
+          }
+        }));
+        if (!cancelled) setDelStats({ ws: wss.length, recs, docs });
+      } catch { /* the counts are a courtesy — the generic warning still shows */ }
+    })();
+    return () => { cancelled = true; };
+  }, [org.id, showSettings, isCreator]);
+  const delStatsText = delStats
+    ? (t('organisms.deleteOrganismStats') || 'Deletes {w} workspaces, {r} records and {d} documents. This cannot be undone.')
+        .replace('{w}', String(delStats.ws)).replace('{r}', String(delStats.recs)).replace('{d}', String(delStats.docs))
+    : (t('organisms.deleteWarnGeneric') || 'Deletes the organism with all its workspaces and content. This cannot be undone.');
+  const doDelete = () => {
+    confirm(`${(t('organisms.confirmDeleteName') || 'Delete “{name}”?').replace('{name}', org.name || org.id)} ${delStatsText}`, async () => {
+      try {
+        await orgService.deleteOrganism(org.id);
+        showToast(t('organisms.deleted') || 'Organism deleted');
+        onBack(); onChanged?.();
+      } catch { showToast(t('organisms.deleteError') || 'Failed to delete'); }
+    }, { danger: true, title: t('organisms.deleteOrganismTitle') || 'Delete this organism' });
+  };
+
+  const extraAdmins = (org.admins || []).filter(a => a !== org.creatorGhii);
+  const visHint = t(`organisms.visHint.${form.visibility}`);
+  const policyHint = t(`organisms.policyHint.${form.join_policy}`);
+  const hintText = [visHint, policyHint].filter(h => h && !h.startsWith('organisms.')).join(' ');
+
   const renderSettings = () => html`
     <div class="card-detail pj-org-settings">
-      <div class="detail-grid">
-        <div class="detail-item">
-          <span class="detail-label">${t('organisms.creator') || 'Creator'}</span>
-          <span class="detail-value">${escHtml(org.creatorGhii || '-')}</span>
-        </div>
-        <div class="detail-item">
-          <span class="detail-label">${t('organisms.admins') || 'Admins'}</span>
-          <span class="detail-value">${(org.admins || []).join(', ') || '-'}</span>
-        </div>
-        <div class="detail-item">
-          <span class="detail-label">${t('organisms.memberCount') || 'Members'}</span>
-          <span class="detail-value">${(org.members || []).length} / ${org.maxMembers || 500}</span>
-        </div>
-        ${org.createdAt ? html`
-          <div class="detail-item">
-            <span class="detail-label">${t('organisms.createdAt') || 'Created'}</span>
-            <span class="detail-value">${fmtDate(org.createdAt)}</span>
-          </div>` : null}
+      <div class="pj-meta-line">
+        ${org.createdAt ? html`<span>${t('organisms.createdAt') || 'Created'} ${fmtDate(org.createdAt)}</span>` : null}
+        <span>${t('organisms.creator') || 'Creator'} ${escHtml(org.creatorGhii || '-')}</span>
+        ${extraAdmins.length > 0 ? html`<span>${t('organisms.admins') || 'Admins'} ${escHtml(extraAdmins.join(', '))}</span>` : null}
         ${org.boardId ? html`
-          <div class="detail-item">
-            <span class="detail-label">${t('organisms.board') || 'Board'}</span>
-            <span class="detail-value mono" title=${escHtml(org.boardId)}>${escHtml(boardIdShort)}
-              <button class="pj-icon-btn" title=${t('organisms.copyId') || 'Copy ID'} onClick=${copyBoardId}>${'📋'}</button>
-            </span>
-          </div>` : null}
+          <span>${t('organisms.board') || 'Board'} <span class="mono" title=${escHtml(org.boardId)}>${escHtml(boardIdShort)}</span>
+            <button class="pj-icon-btn" title=${t('organisms.copyId') || 'Copy ID'} onClick=${copyBoardId}>${'📋'}</button>
+          </span>` : null}
       </div>
-      ${(org.interests || []).length > 0 ? html`
-        <div class="flex-row-wrap">
-          ${org.interests.map(tag => html`<span class="file-tag" key=${tag}>${escHtml(tag)}</span>`)}
-        </div>` : null}
 
-      ${canEdit ? (editForm ? html`
-        <div class="flex-col">
-          <input type="text" value=${editForm.name} onInput=${(e) => setEditForm(f => ({ ...f, name: e.target.value }))}
-            placeholder=${t('organisms.namePlaceholder') || 'Name'} class="input-field input-sm" />
-          <textarea value=${editForm.description} onInput=${(e) => setEditForm(f => ({ ...f, description: e.target.value }))} rows="2"
-            placeholder=${t('organisms.descPlaceholder') || 'Description'} class="input-field input-sm" />
-          <input type="text" value=${editForm.interests} onInput=${(e) => setEditForm(f => ({ ...f, interests: e.target.value }))}
-            placeholder=${t('organisms.interestsPlaceholder') || 'Interests (comma separated)'} class="input-field input-sm" />
-          <div class="flex-row-wrap">
-            <select value=${editForm.type} onChange=${(e) => setEditForm(f => ({ ...f, type: e.target.value }))} class="input-field input-sm">
+      ${canEdit ? html`
+        <div class="pj-form-group">${t('organisms.formIdentity') || 'Identity'}</div>
+        <label class="pj-field"><span>${t('organisms.fieldName') || 'Name'}</span>
+          <input type="text" class="input-field input-sm" value=${form.name} onInput=${(e) => setForm(f => ({ ...f, name: e.target.value }))} /></label>
+        <label class="pj-field"><span>${t('organisms.fieldDescription') || 'Description'}</span>
+          <textarea class="input-field input-sm" rows="2" value=${form.description} onInput=${(e) => setForm(f => ({ ...f, description: e.target.value }))}></textarea></label>
+        <div class="pj-field"><span>${t('organisms.fieldInterests') || 'Interests'}</span>
+          <${TagInput} tags=${form.interests} onChange=${(tags) => setForm(f => ({ ...f, interests: tags }))} placeholder=${t('organisms.addTag') || 'Add…'} /></div>
+
+        <div class="pj-form-group">${t('organisms.formAccess') || 'Access'}</div>
+        <div class="pj-form-row">
+          <label class="pj-field"><span>${t('organisms.fieldType') || 'Type'}</span>
+            <select class="input-field input-sm" value=${form.type} onChange=${(e) => setForm(f => ({ ...f, type: e.target.value }))}>
               <option value="community">${t('organisms.types.community') || 'Community'}</option>
               <option value="team">${t('organisms.types.team') || 'Team'}</option>
               <option value="club">${t('organisms.types.club') || 'Club'}</option>
               <option value="cooperative">${t('organisms.types.cooperative') || 'Cooperative'}</option>
               <option value="project">${t('organisms.types.project') || 'Project'}</option>
-            </select>
-            <select value=${editForm.join_policy} onChange=${(e) => setEditForm(f => ({ ...f, join_policy: e.target.value }))} class="input-field input-sm">
+            </select></label>
+          <label class="pj-field"><span>${t('organisms.policyLabel') || 'Join policy'}</span>
+            <select class="input-field input-sm" value=${form.join_policy} onChange=${(e) => setForm(f => ({ ...f, join_policy: e.target.value }))}>
               <option value="open">${t('organisms.policyOpen') || 'Open (anyone can join)'}</option>
               <option value="approval_required">${t('organisms.policyApproval') || 'Approval required'}</option>
               <option value="invite_only">${t('organisms.policyInvite') || 'Invite only'}</option>
-            </select>
-            <select value=${editForm.visibility} onChange=${(e) => setEditForm(f => ({ ...f, visibility: e.target.value }))} class="input-field input-sm">
+            </select></label>
+          <label class="pj-field"><span>${t('organisms.fieldVisibility') || 'Visibility'}</span>
+            <select class="input-field input-sm" value=${form.visibility} onChange=${(e) => setForm(f => ({ ...f, visibility: e.target.value }))}>
               <option value="public">${t('organisms.visPublic') || 'Public'}</option>
               <option value="listed">${t('organisms.visListed') || 'Listed'}</option>
               <option value="private">${t('organisms.visPrivate') || 'Private'}</option>
-            </select>
-          </div>
-          <div class="flex-row-wrap">
-            <button class="btn-primary btn-sm" onClick=${saveEdit} disabled=${saving}>${saving ? '...' : (t('organisms.save') || 'Save')}</button>
-            <button class="btn-ghost btn-sm" onClick=${() => setEditForm(null)}>${t('organisms.cancel') || 'Cancel'}</button>
-          </div>
+            </select></label>
         </div>
-      ` : html`
-        <div class="flex-row-wrap">
-          <button class="btn-outline btn-sm" onClick=${() => setEditForm(seedForm())}>${t('organisms.edit') || 'Edit'}</button>
+        ${hintText ? html`<div class="pj-form-hint">${hintText}</div>` : null}
+
+        <div class="form-actions">
+          <button class="btn-primary btn-sm" onClick=${saveEdit} disabled=${saving || !dirty || !form.name.trim()}>
+            ${saving ? '...' : (t('organisms.saveChanges') || 'Save changes')}</button>
+          <button class="btn-ghost btn-sm" disabled=${!dirty} onClick=${() => setForm(baseline)}>${t('organisms.cancel') || 'Cancel'}</button>
         </div>
-      `) : null}
+      ` : null}
+    </div>
 
-      ${(isCreator || isMember) ? html`
-        <div class="detail-label">${t('organisms.dangerZone') || 'Danger zone'}</div>
-        <div class="flex-row-wrap">
-          ${isMember && !isCreator ? html`
-            <button class="btn-danger btn-sm" onClick=${onLeave}>${t('organisms.leave') || 'Leave'}</button>` : null}
-          ${isCreator ? html`
-            <button class="btn-danger btn-sm" onClick=${onDelete}>${t('organisms.delete') || 'Delete'}</button>` : null}
-        </div>` : null}
-    </div>`;
+    ${(isCreator || isMember) ? html`
+      <div class="pj-danger pj-danger-box">
+        ${isCreator ? html`
+          <div class="pj-danger-row">
+            <div class="pj-danger-text">
+              <div class="pj-danger-title">${t('organisms.deleteOrganismTitle') || 'Delete this organism'}</div>
+              <div class="pj-danger-sub">${delStatsText}</div>
+            </div>
+            <button class="btn-danger btn-sm" onClick=${() => { setDelOpen(o => !o); setDelName(''); }}>${t('organisms.deleteDots') || 'Delete…'}</button>
+          </div>
+          ${delOpen ? html`
+            <div class="pj-danger-confirm">
+              <label class="pj-field"><span>${(t('organisms.confirmTypeName') || 'Type the organism’s name to confirm') + ': ' + (org.name || '')}</span>
+                <input type="text" class="input-field input-sm" value=${delName} onInput=${(e) => setDelName(e.target.value)} placeholder=${org.name || ''} /></label>
+              <button class="btn-danger btn-sm" disabled=${delName.trim() !== (org.name || '').trim()} onClick=${doDelete}>${t('organisms.delete') || 'Delete'}</button>
+            </div>` : null}
+        ` : null}
+        ${isMember && !isCreator ? html`
+          <div class="pj-danger-row">
+            <div class="pj-danger-text">
+              <div class="pj-danger-title">${t('organisms.leave') || 'Leave'}</div>
+            </div>
+            <button class="btn-danger btn-sm" onClick=${onLeave}>${t('organisms.leave') || 'Leave'}</button>
+          </div>` : null}
+      </div>` : null}
+  `;
 
+  const reqPill = pendingJoin > 0
+    ? (pendingJoin === 1 ? (t('organisms.reqOne') || '1 request') : (t('organisms.reqMany') || '{n} requests').replace('{n}', String(pendingJoin)))
+    : null;
   const tabs = [
     { id: 'workspaces', label: t('organisms.tabWorkspaces') || 'Workspaces', count: wsCount },
-    { id: 'members', label: t('organisms.tabMembers') || 'Members', count: (org.members || []).length },
+    { id: 'members', label: t('organisms.tabMembers') || 'Members', count: (org.members || []).length, pill: reqPill },
     { id: 'agents', label: t('organisms.tabAgents') || 'Agents', count: (org.agentGaiis || []).length },
     { id: 'board', label: t('organisms.tabBoard') || 'Board', count: null },
   ];
@@ -975,7 +1313,7 @@ function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack,
   return html`
     <div class="pj-ws">
       <div class="pj-org-breadcrumb">
-        <button class="pj-org-crumb-link" onClick=${onBack}>${t('organisms.title') || 'Organisms'}</button>
+        <button class="pj-org-crumb-link" onClick=${() => guardDirty(onBack)}>${t('organisms.title') || 'Organisms'}</button>
         <span class="pj-org-crumb-sep">/</span>
         <span>${escHtml(org.name || org.id)}</span>
       </div>
@@ -993,7 +1331,7 @@ function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack,
         <div class="pj-org-home-actions">
           <button class="btn-outline btn-sm" title=${t('organisms.exportOrgHint') || 'Download a ZIP backup of the whole organism (all workspaces)'}
             onClick=${() => exportOrganismZip(org, showToast)}>${'⬇ '}${t('organisms.exportOrg') || 'Export'}</button>
-          <button class="btn-outline btn-sm ${showSettings ? 'pj-org-btn-active' : ''}" onClick=${() => setShowSettings(s => !s)}>${'⚙ '}${t('organisms.settings') || 'Settings'}</button>
+          <button class="btn-outline btn-sm ${showSettings ? 'pj-org-btn-active' : ''}" onClick=${() => guardDirty(() => setShowSettings(s => !s))}>${'⚙ '}${t('organisms.settings') || 'Settings'}</button>
         </div>
       </div>
 
@@ -1004,12 +1342,12 @@ function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack,
           <button class="pj-org-tab ${tab === tb.id ? 'active' : ''}" role="tab" aria-selected=${tab === tb.id} key=${tb.id}
             onClick=${() => setTab(tb.id)}>
             ${tb.label}${tb.count !== null && tb.count !== undefined ? html`<span class="pj-org-tab-count">${tb.count}</span>` : null}
+            ${tb.pill ? html`<span class="pj-tab-pill">${tb.pill}</span>` : null}
           </button>`)}
       </div>
 
       ${tab === 'workspaces' ? html`
         <${WorkspaceList} org=${org} showToast=${showToast} onOpen=${onOpenWs} onCount=${setWsCount} />
-        <${OrgSearch} orgId=${org.id} onOpenWorkspace=${(ws) => onOpenWs(ws)} />
       ` : null}
 
       ${tab === 'members' ? html`
@@ -1017,24 +1355,11 @@ function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack,
           showToast=${showToast} confirm=${confirm} onChanged=${onChanged} show="members" />` : null}
 
       ${tab === 'agents' ? html`
-        <${OrgMemberManager} org=${org} ghii=${ghii} canManage=${canEdit} isCreator=${isCreator}
-          showToast=${showToast} confirm=${confirm} onChanged=${onChanged} show="agents" />` : null}
+        <${OrgAgentsPanel} org=${org} ghii=${ghii} canManage=${canEdit} showToast=${showToast} onChanged=${onChanged} />` : null}
 
-      ${tab === 'board' ? html`
-        <div class="card-detail">
-          <div class="section-title">${t('organisms.tabBoard') || 'Board'}</div>
-          ${org.boardId ? html`
-            <div class="section-desc">${t('organisms.boardDesc') || 'This organism has a discussion board. Open it in the Boards view.'}</div>
-            <div class="pj-org-boardrow">
-              <span class="mono" title=${escHtml(org.boardId)}>${escHtml(boardIdShort)}</span>
-              <button class="pj-icon-btn" title=${t('organisms.copyId') || 'Copy ID'} onClick=${copyBoardId}>${'📋'}</button>
-              <button class="btn-outline btn-sm" onClick=${() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'boards' } }))}>
-                ${t('organisms.openBoardsTab') || 'Open in Boards'}</button>
-            </div>
-          ` : html`
-            <div class="section-desc">${t('organisms.noBoard') || 'This organism has no board.'}</div>
-          `}
-        </div>` : null}
+      ${tab === 'board' ? (org.boardId
+        ? html`<${BoardPreview} boardId=${org.boardId} showToast=${showToast} />`
+        : html`<div class="card-detail"><div class="section-desc">${t('organisms.noBoard') || 'This organism has no board.'}</div></div>`) : null}
 
       <${ConfirmUI} />
     </div>`;
@@ -1061,16 +1386,42 @@ function WorkspaceList({ org, showToast, onOpen, onCount }) {
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
   const [overview, setOverview] = useState('');           // organism dependency-overview chart (mermaid)
-  const [showOverview, setShowOverview] = useState(true);
+  const [showOverview, setShowOverview] = useState(false); // map hidden by default — the list is the content
   const [openReqWs, setOpenReqWs] = useState(null);       // which owned workspace's request-inbox is open
   const [reqInbox, setReqInbox] = useState([]);           // access requests for openReqWs
+  const [openPeopleWs, setOpenPeopleWs] = useState(null); // which workspace's inline participants list is open
+  const [wsStats, setWsStats] = useState({});             // wsId → { recs, docs, lastEv, hasManifest }
+  const [apprByWs, setApprByWs] = useState({});           // wsId → pending review count
 
   // Discovery: every workspace in the org (membership-gated) with this user's access status. A member
-  // sees workspaces they can't yet read (access:'none') so they can request access.
+  // sees workspaces they can't yet read (access:'none') so they can request access. Row enrichment
+  // (record/doc counts, last event, review counter) loads per workspace afterwards, best effort.
   const load = useCallback(async () => {
     const l = await orgService.discoverWorkspaces(orgId);
     setList(l);
     onCount?.(Array.isArray(l) ? l.length : 0);
+    orgService.listApprovals(orgId, 'pending').then(aps => {
+      const by = {};
+      for (const a of (aps || [])) { const w = a.arguments?.ws; if (w) by[w] = (by[w] || 0) + 1; }
+      setApprByWs(by);
+    }).catch(() => {});
+    for (const w of (l || []).filter(x => x.access !== 'none')) {
+      Promise.all([
+        orgService.getWorkspace(orgId, w.id).catch(() => null),
+        orgService.getWorkspaceActivity(orgId, w.id),
+        orgService.getWorkspaceParticipants(orgId, w.id).catch(() => null),
+      ]).then(([wsData, act, parts]) => {
+        let recs = 0, docs = 0;
+        for (const ot of (wsData?.manifest?.objectTypes || []).filter(orgService.isMemorySpace)) {
+          const n = new Set([...(wsData.drafts?.[ot.name] || []), ...(wsData.objects?.[ot.name] || [])].map(d => d.id)).size;
+          if (orgService.isDocSpace(ot)) docs += n; else recs += n;
+        }
+        const lastEv = (act?.events || []).reduce((b, e) => (!b || (e.at || '') > (b.at || '') ? e : b), null);
+        const owners = [];
+        for (const n of (parts?.nodes || [])) for (const o of (n.owners || [])) owners.push({ ...o, node: n.id, isLocalNode: n.isLocal });
+        setWsStats(s => ({ ...s, [w.id]: { recs, docs, lastEv, hasManifest: !!wsData?.manifest, owners } }));
+      }).catch(() => {});
+    }
   }, [orgId, onCount]);
   useEffect(() => { load(); }, [load]);
 
@@ -1155,20 +1506,27 @@ function WorkspaceList({ org, showToast, onOpen, onCount }) {
     } catch (e) { showToast((e && e.message) || 'Import failed'); }
     finally { setBusy(false); }
   };
+  // One enriched meta line per row: "{n} records · {n} docs · last: goal/x published 2 h ago".
+  const metaLine = (w) => {
+    const s = wsStats[w.id];
+    if (!s) return w.access === 'owner' ? (t('organisms.yours') || 'yours') : (t('organisms.byCreator') || 'by {creator}').replace('{creator}', w.created_by || '?');
+    if (!s.hasManifest) return t('organisms.wsNotSetUp') || 'new — set up when opened';
+    const parts = [
+      `${s.recs} ${t('organisms.recordsMode') || 'records'}`,
+      `${s.docs} ${t('organisms.docs') || 'docs'}`,
+    ];
+    if (s.lastEv) {
+      const verb = s.lastEv.action === 'publish' ? (t('organisms.publishedVerb') || 'published') : (t('organisms.editedVerb') || 'edited');
+      parts.push(`${t('organisms.lastLabel') || 'last:'} ${s.lastEv.type}/${s.lastEv.instance} ${verb} ${relTime(s.lastEv.at)}`);
+    } else parts.push(t('organisms.noActivityYet') || 'no activity yet');
+    return parts.join(' · ');
+  };
+
   return html`
     <div class="pj-ws-embedded">
       <${ConfirmUI} />
       <input type="file" accept=".zip,application/zip" ref=${fileRef} style="display:none" onChange=${(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; doImport(f); }} />
       <div class="section-desc">${t('organisms.workspacesDesc') || 'Workspaces in this organism — each is an independent space with its own documents, records and history.'}</div>
-
-      ${overview ? html`
-        <div class="pj-chart">
-          <div class="pj-chart-head">
-            <span class="pj-chart-title">${'🔗 '}${t('organisms.overview') || 'Overview — who & what uses this organism'}</span>
-            <button class="btn-ghost btn-sm" onClick=${() => setShowOverview(s => !s)}>${showOverview ? (t('organisms.hide') || 'Hide') : (t('organisms.show') || 'Show')}</button>
-          </div>
-          ${showOverview ? html`<${Mermaid} chart=${overview} />` : null}
-        </div>` : null}
 
       <div class="pj-ws-bar">
         ${creating ? html`
@@ -1178,35 +1536,62 @@ function WorkspaceList({ org, showToast, onOpen, onCount }) {
           <button class="btn-ghost btn-sm" onClick=${() => { setCreating(false); setNewName(''); }}>${t('organisms.cancel') || 'Cancel'}</button>
         ` : html`
           <button class="btn-primary btn-sm" onClick=${() => setCreating(true)}>${'+ '}${t('organisms.newWorkspace') || 'New workspace'}</button>
-          <button class="btn-outline btn-sm" disabled=${busy} title=${t('organisms.importHint') || 'Restore a workspace from a .zip backup'} onClick=${() => fileRef.current && fileRef.current.click()}>${'⬆ '}${t('organisms.import') || 'Import'}</button>`}
+          <button class="btn-outline btn-sm" disabled=${busy} title=${t('organisms.importHint') || 'Restore a workspace from a .zip backup'} onClick=${() => fileRef.current && fileRef.current.click()}>${'⬆ '}${t('organisms.import') || 'Import'}</button>
+          ${overview ? html`<button class="btn-outline btn-sm ${showOverview ? 'pj-org-btn-active' : ''}" onClick=${() => setShowOverview(s => !s)}>${'🗺 '}${t('organisms.showMap') || 'Map'}</button>` : null}`}
       </div>
+
+      <${OrgSearch} orgId=${orgId} onOpenWorkspace=${(ws) => onOpen(ws)} />
 
       ${list === null ? html`<${Spinner} />`
         : list.length === 0 ? html`<${EmptyState} icon="🗂️" text=${t('organisms.noWorkspaces') || 'No workspaces yet — create one to get started.'} />`
         : html`
-          <div class="pj-ws-list-label">${t('organisms.currentWorkspaces') || 'Workspaces in this organism'}</div>
-          <div class="pj-ws-list">
-          ${list.map(w => html`
-            <div class="pj-ws-card" key=${w.id}>
-              ${w.access === 'none' ? html`
-                <div class="pj-ws-open pj-ws-locked">
-                  <span class="pj-ws-card-name">${'🔒 '}${escHtml(w.name || w.id)}</span>
-                  <span class="pj-ws-card-meta">${(t('organisms.byCreator') || 'by {creator}').replace('{creator}', w.created_by || '?')}</span>
+          <div class="pj-org-list">
+          ${list.map(w => {
+            const locked = w.access === 'none';
+            const reviews = apprByWs[w.id] || 0;
+            const menuItems = w.access === 'owner' ? [
+              { label: t('organisms.requests') || 'Access requests', icon: '👥', onClick: () => toggleInbox(w) },
+              { label: t('organisms.export') || 'Export backup (.zip)', icon: '⬇', onClick: () => doExport(w) },
+              { label: t('organisms.delete') || 'Delete', danger: true, onClick: () => remove(w.id, w.name || w.id) },
+            ] : [];
+            return html`
+            <div class="pj-org-row" key=${w.id}>
+              <div class="pj-org-avatar" aria-hidden="true">${'🗂'}</div>
+              <div class="pj-org-main ${locked ? 'pj-org-main-static' : ''}" role=${locked ? undefined : 'button'} tabindex=${locked ? undefined : '0'}
+                onClick=${locked ? undefined : (() => onOpen(w.id))}
+                onKeyDown=${locked ? undefined : ((e) => { if (e.key === 'Enter') onOpen(w.id); })}>
+                <div class="pj-org-titlerow">
+                  ${locked ? html`<span class="pj-org-lock">${'🔒'}</span>` : null}
+                  <span class="pj-org-name">${escHtml(w.name || w.id)}</span>
+                  ${reviews > 0 ? html`<span class="pj-tab-pill">${'📨 '}${(t('organisms.toReview') || '{n} to review').replace('{n}', String(reviews))}</span>` : null}
                 </div>
-                <button class="btn-outline btn-sm" disabled=${busy} onClick=${() => requestAccess(w)}>${t('organisms.requestAccess') || 'Request access'}</button>
-              ` : html`
-                <button class="pj-ws-open" onClick=${() => onOpen(w.id)}>
-                  <span class="pj-ws-card-name">${escHtml(w.name || w.id)}</span>
-                  <span class="pj-ws-card-meta">${w.access === 'owner' ? (t('organisms.yours') || 'yours') : (t('organisms.byCreator') || 'by {creator}').replace('{creator}', w.created_by || '?')}${w.created_at ? ' · ' + dt(w.created_at) : ''}</span>
-                </button>
-                ${w.access === 'owner' ? html`
-                  <button class="pj-icon-btn" title=${t('organisms.requests') || 'Access requests'} onClick=${() => toggleInbox(w)}>👥</button>
-                  <button class="pj-icon-btn" title=${t('organisms.export') || 'Export backup (.zip)'} onClick=${() => doExport(w)}>⬇</button>
-                  <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => remove(w.id, w.name || w.id)}>✕</button>
-                ` : null}
-              `}
+                <div class="pj-org-desc">${locked
+                  ? (t('organisms.byCreator') || 'by {creator}').replace('{creator}', w.created_by || '?')
+                  : metaLine(w)}</div>
+              </div>
+              <div class="pj-org-stats">
+                ${(wsStats[w.id]?.owners || []).length > 0 ? html`
+                  <button class="pj-org-stat pj-stat-btn ${openPeopleWs === w.id ? 'active' : ''}" title=${t('organisms.participants') || 'Who works here'}
+                    onClick=${(e) => { e.stopPropagation(); setOpenPeopleWs(p => (p === w.id ? null : w.id)); }}>${'👥'} ${wsStats[w.id].owners.length}</button>` : null}
+                ${w.created_at ? html`<span class="pj-org-stat pj-org-date" title=${t('organisms.createdAt') || 'Created'}>${fmtDate(w.created_at)}</span>` : null}
+              </div>
+              ${locked
+                ? html`<button class="btn-outline btn-sm pj-org-openbtn" disabled=${busy} onClick=${() => requestAccess(w)}>${t('organisms.requestAccess') || 'Request access'}</button>`
+                : html`<button class="btn-outline btn-sm pj-org-openbtn" onClick=${() => onOpen(w.id)}>${t('organisms.open') || 'Open'}</button>`}
+              ${menuItems.length ? html`<${KebabMenu} label=${t('organisms.moreActions') || 'More actions'} items=${menuItems} />` : null}
+              ${openPeopleWs === w.id ? html`
+                <div class="pj-org-detail">
+                  ${(wsStats[w.id]?.owners || []).map(o => html`
+                    <div class="pj-ws-person" key=${'p-' + o.owner}>
+                      <span>${'👤 '}<strong>${escHtml(o.owner)}</strong></span>
+                      ${o.isCreator ? html`<span class="badge badge-success pj-mini">${t('organisms.creatorTag') || 'creator'}</span>` : null}
+                      ${o.isSelf ? html`<span class="badge badge-info pj-mini">${t('organisms.you') || 'you'}</span>` : null}
+                      ${!o.isLocalNode ? html`<span class="pj-mini">${'🌐 '}${escHtml(o.node)}</span>` : null}
+                      ${(o.agents || []).length > 0 ? html`<span class="pj-ws-person-agents">${'🤖'} ${(o.agents || []).length}</span>` : null}
+                    </div>`)}
+                </div>` : null}
               ${openReqWs === w.id ? html`
-                <div class="pj-ws-inbox">
+                <div class="pj-org-detail">
                   ${reqInbox.length === 0 ? html`<div class="pj-ws-inbox-empty">${t('organisms.noRequests') || 'No access requests.'}</div>`
                     : reqInbox.map(r => html`
                       <div class="pj-ws-req" key=${r.requester}>
@@ -1216,8 +1601,18 @@ function WorkspaceList({ org, showToast, onOpen, onCount }) {
                           : html`<button class="btn-success btn-sm" disabled=${busy} onClick=${() => decide(w, r.requester, 'approve')}>${t('organisms.approve') || 'Approve'}</button><button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.deny') || 'Deny'}</button>`}
                       </div>`)}
                 </div>` : null}
-            </div>`)}
+            </div>`;
+          })}
         </div>`}
+
+      ${overview && showOverview ? html`
+        <div class="pj-chart">
+          <div class="pj-chart-head">
+            <span class="pj-chart-title">${'🔗 '}${t('organisms.overview') || 'Overview — who & what uses this organism'}</span>
+            <button class="btn-ghost btn-sm" onClick=${() => setShowOverview(false)}>${t('organisms.hide') || 'Hide'}</button>
+          </div>
+          <${Mermaid} chart=${overview} />
+        </div>` : null}
     </div>`;
 }
 
@@ -1514,8 +1909,15 @@ function WorkspaceComments({ orgId, ws, space, instanceId, showToast }) {
   `;
 }
 
-function Workspace({ org, wsId, showToast, onBack }) {
+function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
   const orgId = org.id;
+  // Registry name for the breadcrumb (the manifest's name can differ from the workspace's name).
+  const [wsName, setWsName] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    orgService.listWorkspaces(orgId).then(list => { if (!cancelled) setWsName((list.find(w => w.id === wsId)?.name) || ''); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [orgId, wsId]);
   // Pop a document out into its own window (served by doc-solo.js) so several can sit side by side,
   // each independent. The window name is unique per document, so re-clicking focuses the open one.
   const popOut = (typeName, docId) => {
@@ -1941,11 +2343,15 @@ function Workspace({ org, wsId, showToast, onBack }) {
     </div>
   `;
 
+  // Same breadcrumb pattern as the organism home: Organisms / {org} / {workspace} — both ancestors
+  // are links, so the list is one click away from inside a workspace too.
   const back = html`
-    <div class="pj-ws-crumbs">
-      <button class="btn-ghost btn-sm" onClick=${onBack}>${'← '}${t('organisms.backToWorkspaces') || 'Workspaces'}</button>
-      <span class="pj-crumb-sep">/</span>
-      <span class="pj-crumb-org" title=${t('organisms.workspaceOrganism') || 'Organism'}>${'🧬 '}${escHtml(org.name || '')}</span>
+    <div class="pj-org-breadcrumb">
+      <button class="pj-org-crumb-link" onClick=${onBackToList || onBack}>${t('organisms.title') || 'Organisms'}</button>
+      <span class="pj-org-crumb-sep">/</span>
+      <button class="pj-org-crumb-link" onClick=${onBack}>${escHtml(org.name || org.id || '')}</button>
+      <span class="pj-org-crumb-sep">/</span>
+      <span>${escHtml(wsName || ws?.manifest?.name || '…')}</span>
     </div>`;
 
   if (ws === undefined) return html`<div>${back}<${Spinner} text=${t('organisms.loading') || 'Loading...'} /></div>`;
