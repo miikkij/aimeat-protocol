@@ -135,6 +135,9 @@
  *     add form lost their document/records selects): a hand-added record type would have no usable
  *     schema — record types are designed with AI via Settings → Process (restructure). The panel
  *     text says so.
+ *   v1.25.2 — 2026-06-10 — Settings Cancel works again: it discards changes AND closes the panel
+ *     (both organism + workspace settings) — the dirty-only reset variant did nothing visible on a
+ *     clean form, which read as a dead button.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
@@ -1308,7 +1311,7 @@ function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack,
         <div class="form-actions">
           <button class="btn-primary btn-sm" onClick=${saveEdit} disabled=${saving || !dirty || !form.name.trim()}>
             ${saving ? '...' : (t('organisms.saveChanges') || 'Save changes')}</button>
-          <button class="btn-ghost btn-sm" disabled=${!dirty} onClick=${() => setForm(baseline)}>${t('organisms.cancel') || 'Cancel'}</button>
+          <button class="btn-ghost btn-sm" onClick=${() => { setForm(baseline); setShowSettings(false); }}>${t('organisms.cancel') || 'Cancel'}</button>
         </div>
       ` : null}
     </div>
@@ -2745,7 +2748,7 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
 
             <div class="form-actions">
               <button class="btn-primary btn-sm" onClick=${saveSettings} disabled=${busy || !wsDirty}>${t('organisms.saveChanges') || 'Save changes'}</button>
-              <button class="btn-ghost btn-sm" disabled=${!wsDirty} onClick=${resetSettingsForm}>${t('organisms.cancel') || 'Cancel'}</button>
+              <button class="btn-ghost btn-sm" onClick=${() => { resetSettingsForm(); setShowSettings(false); }}>${t('organisms.cancel') || 'Cancel'}</button>
             </div>
           </div>
 
