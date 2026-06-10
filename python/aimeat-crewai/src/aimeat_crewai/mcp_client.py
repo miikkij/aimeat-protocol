@@ -18,16 +18,30 @@ AIMEAT exposes the same tool surface through two MCP transports:
 3. **SSE** -- legacy MCP transport using Server-Sent Events. Same auth as
    HTTP. Use only if your runtime requires it; Streamable HTTP is preferred.
 
-This module returns dictionaries (for HTTP/SSE) or `StdioServerParameters`
-objects (for stdio) that the caller passes to `MCPServerAdapter` from
-`crewai_tools` -- either directly or via `create_liaison_agent()`.
+4. **serve (loopback HTTP)** -- attach to the long-lived `aimeat connect serve
+   --http` daemon on 127.0.0.1 via its discovery file (`serve.json`),
+   auto-starting it if needed. The daemon holds ONE persistent WS tunnel per
+   agent to the node, so every local MCP/REST call rides that socket instead
+   of opening fresh TLS connections. This is the preferred local transport
+   since 0.4.0; use `serve_params()`.
+
+This module returns dictionaries (for HTTP/SSE/serve) or
+`StdioServerParameters` objects (for stdio) that the caller passes to
+`MCPServerAdapter` from `crewai_tools` -- either directly or via
+`create_liaison_agent()`.
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
+import subprocess
 import sys
-from typing import Any
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+from typing import Any, Sequence
 
 try:
     from mcp import StdioServerParameters
@@ -184,3 +198,280 @@ def sse_params(
         "transport": "sse",
         "headers": {"Authorization": f"Bearer {agent_token}"},
     }
+
+
+# ---------------------------------------------------------------------------
+# Loopback serve daemon (aimeat connect serve --http) -- 0.4.0+
+# ---------------------------------------------------------------------------
+
+class AimeatServeError(RuntimeError):
+    """Raised when the local `aimeat connect serve --http` daemon cannot be
+    discovered or auto-started. Deliberately NOT AimeatLiaisonError so this
+    module stays importable without CrewAI installed."""
+
+
+def _aimeat_home() -> Path:
+    """Connector home dir -- same precedence the connector uses (AIMEAT_HOME
+    env var wins, else ~/.aimeat)."""
+    return Path(os.environ.get("AIMEAT_HOME") or (Path.home() / ".aimeat"))
+
+
+def serve_discovery_path() -> Path:
+    """Path of the serve daemon's discovery file (`<AIMEAT_HOME>/serve.json`)."""
+    return _aimeat_home() / "serve.json"
+
+
+def _pid_alive(pid: int) -> bool:
+    """Is the process with this pid alive? Cross-platform, no extra deps.
+
+    On Windows, `os.kill(pid, 0)` would TERMINATE the target process (Python
+    maps non-CTRL signals to TerminateProcess), so we must go through
+    OpenProcess instead.
+    """
+    if pid <= 0:
+        return False
+    if sys.platform == "win32":
+        import ctypes
+        import ctypes.wintypes
+
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        STILL_ACTIVE = 259
+        ERROR_ACCESS_DENIED = 5
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if not handle:
+            # Access denied means the pid exists but belongs to another user.
+            return ctypes.get_last_error() == ERROR_ACCESS_DENIED
+        try:
+            code = ctypes.wintypes.DWORD()
+            if kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return code.value == STILL_ACTIVE
+            return True  # handle opened -- assume alive
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # exists, owned by someone else
+    except OSError:
+        return False
+
+
+def _read_discovery(path: Path) -> dict[str, Any] | None:
+    """Parse serve.json; None if absent/corrupt (corrupt == mid-write or stale)."""
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(doc, dict) or not isinstance(doc.get("port"), int):
+        return None
+    return doc
+
+
+def _probe_serve(port: int, expected_pid: int | None, timeout: float = 2.0) -> bool:
+    """GET /local/status on the loopback daemon; True when it answers ok (and,
+    when given, with the pid the discovery file promised -- guards against an
+    unrelated process having taken over the port)."""
+    try:
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/local/status", timeout=timeout
+        ) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, OSError, ValueError):
+        return False
+    if not isinstance(body, dict) or body.get("ok") is not True:
+        return False
+    if expected_pid is not None:
+        return body.get("data", {}).get("pid") == expected_pid
+    return True
+
+
+def _spawn_serve_daemon(
+    aimeat_command: str | Sequence[str],
+    extra_args: Sequence[str] | None,
+    env: dict[str, str] | None,
+    cwd: str | None,
+) -> subprocess.Popen:
+    """Launch `aimeat connect serve --http` fully detached so it outlives this
+    Python process (it is a SHARED local daemon, not a per-crew child). Its
+    output goes to `<AIMEAT_HOME>/serve.log` for debugging."""
+    if isinstance(aimeat_command, str):
+        resolved, prefix = _resolve_windows_command(aimeat_command)
+        argv = [resolved, *prefix]
+    else:
+        argv = list(aimeat_command)
+    argv += ["connect", "serve", "--http"]
+    if extra_args:
+        argv += list(extra_args)
+
+    home = _aimeat_home()
+    home.mkdir(parents=True, exist_ok=True)
+    popen_kwargs: dict[str, Any] = {}
+    if sys.platform == "win32":
+        popen_kwargs["creationflags"] = (
+            subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+        )
+    else:
+        popen_kwargs["start_new_session"] = True
+
+    log = open(home / "serve.log", "ab")
+    try:
+        return subprocess.Popen(
+            argv,
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=log,
+            env={**os.environ, **(env or {})},
+            cwd=cwd,
+            **popen_kwargs,
+        )
+    finally:
+        log.close()  # the child holds its own inherited handle
+
+
+def ensure_serve(
+    *,
+    aimeat_command: str | Sequence[str] = "aimeat",
+    extra_args: Sequence[str] | None = None,
+    env: dict[str, str] | None = None,
+    spawn_cwd: str | None = None,
+    auto_start: bool = True,
+    start_timeout: float = 60.0,
+) -> dict[str, Any]:
+    """
+    Make sure a live `aimeat connect serve --http` loopback daemon exists and
+    return its discovery document (`{schema_version, port, pid, agents:
+    [{agent, owner, node_url, transport}], started_at}`).
+
+    Discovery: reads `<AIMEAT_HOME or ~/.aimeat>/serve.json`. The file is
+    trusted only if its recorded pid is alive AND `GET /local/status` on the
+    recorded port answers with that pid -- anything else counts as stale.
+    When stale/absent and `auto_start` is True, the daemon is spawned detached
+    (it is a shared, long-lived process -- one per machine, reused by every
+    crew) and we wait up to `start_timeout` seconds for a live discovery file.
+
+    Args:
+        aimeat_command: The AIMEAT CLI -- a command name/path, or a full argv
+            prefix (e.g. `["node", "--import", "tsx", "src/index.ts"]` for a
+            repo checkout, paired with `spawn_cwd`).
+        extra_args: Appended after `connect serve --http`.
+        env: Extra environment variables for the spawned daemon.
+        spawn_cwd: Working directory for the spawn.
+        auto_start: If False, only discover -- never spawn.
+        start_timeout: Seconds to wait for the daemon to come up after spawn.
+
+    Raises:
+        AimeatServeError: No live daemon and it could not be (auto-)started.
+    """
+    path = serve_discovery_path()
+
+    doc = _read_discovery(path)
+    if doc is not None:
+        pid = doc.get("pid") or 0
+        if _pid_alive(pid):
+            if _probe_serve(doc["port"], pid):
+                return doc
+            # Pid alive but the daemon does not answer -- we must not spawn a
+            # second one (it would refuse on the discovery-file lock anyway).
+            raise AimeatServeError(
+                f"A serve daemon is recorded in {path} (pid {pid}, port {doc['port']}) "
+                f"and the pid is alive, but http://127.0.0.1:{doc['port']}/local/status "
+                f"does not answer. Stop that process or delete the file if it is stale."
+            )
+        # dead pid -> stale file; fall through to auto-start
+
+    if not auto_start:
+        raise AimeatServeError(
+            f"No live serve daemon found via {path} and auto_start=False. "
+            f"Run: aimeat connect serve --http"
+        )
+
+    child = _spawn_serve_daemon(aimeat_command, extra_args, env, spawn_cwd)
+    deadline = time.monotonic() + start_timeout
+    while time.monotonic() < deadline:
+        doc = _read_discovery(path)
+        if doc is not None and doc.get("pid") and _pid_alive(doc["pid"]) \
+                and _probe_serve(doc["port"], doc["pid"], timeout=1.0):
+            return doc
+        if child.poll() is not None:
+            break  # spawned daemon exited -- report instead of spinning
+        time.sleep(0.25)
+
+    log_path = _aimeat_home() / "serve.log"
+    tail = ""
+    try:
+        tail = log_path.read_text(encoding="utf-8", errors="replace")[-2000:]
+    except OSError:
+        pass
+    raise AimeatServeError(
+        f"`aimeat connect serve --http` did not produce a live {path} within "
+        f"{start_timeout:.0f}s"
+        + (f" (daemon exited with code {child.returncode})" if child.poll() is not None else "")
+        + (f".\n--- {log_path} (tail) ---\n{tail}" if tail else ".")
+    )
+
+
+def serve_params(
+    *,
+    agent_name: str | None = None,
+    aimeat_command: str | Sequence[str] = "aimeat",
+    extra_args: Sequence[str] | None = None,
+    env: dict[str, str] | None = None,
+    spawn_cwd: str | None = None,
+    auto_start: bool = True,
+    start_timeout: float = 60.0,
+) -> dict[str, Any]:
+    """
+    Build Streamable-HTTP MCP params that target the LOCAL loopback serve
+    daemon (`aimeat connect serve --http`) instead of spawning a per-crew
+    stdio subprocess or hitting the node directly.
+
+    Discovers the daemon via `<AIMEAT_HOME>/serve.json` and auto-starts it if
+    absent (see `ensure_serve()`). The daemon holds one persistent WS tunnel
+    per agent to the node; every MCP call from this crew rides that socket.
+    Loopback HTTP is naturally concurrent, so multiple liaisons / parallel
+    kickoffs can share the one daemon -- the "shared stdio can't be parallel"
+    constraint of `stdio_params()` does not apply.
+
+    Auth: the loopback bind IS the trust boundary -- the daemon ignores
+    Authorization and holds the real agent tokens itself. The Bearer value
+    returned here is a documented placeholder, never validated.
+
+    Agent selection: the usual MCP `agent_name` tool parameter (the liaison
+    persona passes it); when omitted the daemon uses its primary agent. Pass
+    `agent_name` here to fail fast if that agent is not registered with the
+    local connector.
+
+    Keep using `stdio_params()` / `http_params()` for environments without a
+    local connector install (CI, serverless) -- they are unchanged.
+
+    Returns:
+        Dict suitable for `MCPServerAdapter` (same shape as `http_params()`).
+
+    Raises:
+        AimeatServeError: No live daemon and it could not be (auto-)started,
+            or `agent_name` is not registered with the daemon.
+    """
+    doc = ensure_serve(
+        aimeat_command=aimeat_command,
+        extra_args=extra_args,
+        env=env,
+        spawn_cwd=spawn_cwd,
+        auto_start=auto_start,
+        start_timeout=start_timeout,
+    )
+    if agent_name is not None:
+        known = [a.get("agent") for a in doc.get("agents", [])]
+        if agent_name not in known:
+            raise AimeatServeError(
+                f"Agent '{agent_name}' is not registered with the local serve "
+                f"daemon (it serves: {', '.join(map(str, known)) or 'none'}). "
+                f"Run: aimeat connect add --agent {agent_name} ..."
+            )
+    return http_params(
+        node_url=f"http://127.0.0.1:{doc['port']}",
+        agent_token="loopback-trusted",  # placeholder -- loopback MCP has no auth
+    )

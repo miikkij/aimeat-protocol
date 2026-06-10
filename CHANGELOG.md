@@ -4,6 +4,52 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## aimeat-crewai 0.4.0 - 2026-06-10
+
+**Loopback serve transport (Connector Forward Tunnel, Phase 5).** The CrewAI
+integration now rides the long-lived `aimeat connect serve --http` daemon
+instead of spawning connector subprocesses and opening a fresh TLS connection
+per REST call. Pairs with AIMEAT node 1.21.0 (tunnel enabled); degrades
+transparently to the serve daemon's direct-HTTP fallback against older /
+tunnel-disabled nodes.
+
+### Added
+
+- **`serve_params()`** (exported, `mcp_client.py`) — Streamable-HTTP MCP params
+  targeting the local loopback serve daemon. Discovers it via
+  `<AIMEAT_HOME or ~/.aimeat>/serve.json` (pid-alive + `/local/status` probe),
+  auto-starts `aimeat connect serve --http` detached when absent/stale, and
+  fails fast if a requested `agent_name` is not registered locally. The
+  loopback MCP needs no auth (loopback bind is the trust boundary) — the
+  Bearer value is a documented placeholder.
+- **`ensure_serve()`** + **`AimeatServeError`** (exported) — the underlying
+  discover/auto-start helper returning the discovery document; importable
+  without CrewAI installed.
+- **`run_crew_daemon(serve_options=...)`** — passthrough for non-PATH CLI
+  installs (custom `aimeat_command` argv prefix, `spawn_cwd`, `start_timeout`).
+
+### Changed
+
+- **`run_crew_daemon` REST helpers go through one shared `requests.Session`**
+  bound to the loopback serve proxy with the `X-Aimeat-Agent` header — the
+  serve daemon holds the bearer token and the single upstream WS per agent, so
+  the 30s poll cycle is loopback keep-alive instead of a per-call TLS storm.
+- **Concurrent EXECUTE workers no longer spawn a connector subprocess each.**
+  Loopback HTTP is naturally concurrent, so every per-worker liaison shares
+  the one serve daemon (the "shared stdio MCP can't be driven by parallel
+  kickoffs" constraint is gone). The shared liaison likewise targets the
+  loopback `/v1/mcp` via `serve_params()`.
+- **Push-driven idle wait.** When the agent's serve transport is `tunnel`,
+  the daemon parks on the serve long-poll (`GET /local/tasks/next`) between
+  cycles and wakes the instant a task is delivered (true push, signal-safe
+  ≤5s chunks); the handout is only a wake signal — dispatch still re-lists
+  from the store. Degraded transports keep the classic interval sleep.
+
+### Unchanged
+
+- `stdio_params()` / `http_params()` / `sse_params()` keep working as before
+  for environments without a local connector install (CI, serverless).
+
 ## [1.21.0] - 2026-06-10
 
 ### Connector Forward Tunnel — one persistent WS per agent, realtime delivery, loopback serve daemon

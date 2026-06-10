@@ -14,6 +14,23 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.4.0 -- Loopback serve rewiring (Connector Forward Tunnel, Phase 5). The
+    daemon now talks to the long-lived `aimeat connect serve --http` loopback
+    daemon (auto-started via the serve.json discovery file) instead of the node
+    directly: every REST helper goes through ONE shared `requests.Session`
+    against `http://127.0.0.1:<port>` with the `X-Aimeat-Agent` header (the
+    serve daemon holds the bearer token and one persistent WS tunnel per agent
+    to the node -- loopback keep-alive is effectively free, and there is no
+    per-call TLS handshake). The liaison's MCP likewise targets the loopback
+    `/v1/mcp` via `serve_params()`. Concurrent EXECUTE workers NO LONGER spawn
+    an `aimeat connect serve` stdio subprocess each -- loopback HTTP is
+    naturally concurrent, so every per-worker liaison shares the one daemon
+    (zero subprocess churn). When the agent's transport is 'tunnel', the idle
+    wait between cycles parks on the serve long-poll (`/local/tasks/next`)
+    and wakes the instant a task is delivered -- true push instead of a fixed
+    poll interval. Degraded mode (node tunnel off/too old) is transparent:
+    the serve daemon falls back to direct HTTP itself and the daemon keeps
+    the classic interval sleep (the long-poll would always time out).
   0.3.8 -- `max_concurrent_tasks` (#16). run_crew_daemon gained a
     `max_concurrent_tasks` arg: `None` (default) reads the owner-configured value
     from the AIMEAT integration kit (`watchdog_spec.max_concurrent_tasks`, set in
@@ -43,7 +60,7 @@ Changelog:
 
 Usage:
 
-    from aimeat_crewai import run_crew_daemon, stdio_params
+    from aimeat_crewai import run_crew_daemon
     from crewai import Agent, Crew, Task
 
     def build_crew_for_task(task, liaison):
@@ -84,7 +101,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from .liaison import create_liaison_agent, AimeatLiaisonError
-from .mcp_client import stdio_params
+from .mcp_client import ensure_serve, serve_params
 
 try:
     import requests
@@ -92,6 +109,37 @@ except ImportError as exc:  # pragma: no cover
     raise ImportError(
         "The `requests` package is required for the daemon. Install: pip install requests"
     ) from exc
+
+
+class _Api:
+    """Shared HTTP context for the daemon's REST helpers (0.4.0+).
+
+    `base_url` is the LOOPBACK serve daemon (`http://127.0.0.1:<port>`), not
+    the node: the serve daemon proxies any `/v1/...` path over its persistent
+    WS tunnel (or direct HTTP when degraded) and holds the agent's bearer
+    token itself, so no Authorization header is needed here. The
+    `X-Aimeat-Agent` header picks which registered agent the call runs as.
+    One `requests.Session` is shared by every helper -- loopback keep-alive
+    makes the 30s poll cycle effectively free.
+    """
+
+    def __init__(self, base_url: str, agent_name: str, session: Any = None) -> None:
+        self.base_url = base_url.rstrip("/")
+        self.agent_name = agent_name
+        self.session = session or requests.Session()
+        self.session.headers.update({"X-Aimeat-Agent": agent_name})
+
+    def get(self, path: str, **kwargs: Any) -> Any:
+        kwargs.setdefault("timeout", 15)
+        return self.session.get(f"{self.base_url}{path}", **kwargs)
+
+    def post(self, path: str, **kwargs: Any) -> Any:
+        kwargs.setdefault("timeout", 15)
+        return self.session.post(f"{self.base_url}{path}", **kwargs)
+
+    def patch(self, path: str, **kwargs: Any) -> Any:
+        kwargs.setdefault("timeout", 15)
+        return self.session.patch(f"{self.base_url}{path}", **kwargs)
 
 
 def _read_token(agent_name: str, owner: str | None = None) -> tuple[str, str]:
@@ -160,16 +208,10 @@ def _read_token(agent_name: str, owner: str | None = None) -> tuple[str, str]:
     return token, node_url
 
 
-def _poll_tasks(token: str, node_url: str, agent_name: str, status: str = "queued") -> list[dict[str, Any]]:
+def _poll_tasks(api: _Api, status: str = "queued") -> list[dict[str, Any]]:
     """Return list of tasks for the agent in the given status, or [] on error."""
     try:
-        url = f"{node_url.rstrip('/')}/v1/agents/{agent_name}/tasks"
-        r = requests.get(
-            url,
-            headers={"Authorization": f"Bearer {token}"},
-            params={"status": status},
-            timeout=15,
-        )
+        r = api.get(f"/v1/agents/{api.agent_name}/tasks", params={"status": status})
         if r.status_code != 200:
             return []
         body = r.json()
@@ -178,7 +220,7 @@ def _poll_tasks(token: str, node_url: str, agent_name: str, status: str = "queue
         return []
 
 
-def _fetch_max_concurrent(token: str, node_url: str, agent_name: str) -> int:
+def _fetch_max_concurrent(api: _Api) -> int:
     """Read the owner-configured concurrency from the AIMEAT integration kit.
 
     AIMEAT (>= 1.16.2) exposes the per-agent runner config at
@@ -187,11 +229,7 @@ def _fetch_max_concurrent(token: str, node_url: str, agent_name: str) -> int:
     profile Tasks tab. Default 1 (serial) on any error or if the node is older.
     """
     try:
-        r = requests.get(
-            f"{node_url.rstrip('/')}/v1/agents/{agent_name}/integration-kit",
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=15,
-        )
+        r = api.get(f"/v1/agents/{api.agent_name}/integration-kit")
         if r.status_code == 200:
             v = (
                 r.json()
@@ -207,7 +245,7 @@ def _fetch_max_concurrent(token: str, node_url: str, agent_name: str) -> int:
     return 1
 
 
-def _is_cancelled(token: str, node_url: str, agent_name: str, task_id: str) -> bool:
+def _is_cancelled(api: _Api, task_id: str) -> bool:
     """Cooperative cancellation check, run just before a (blocking) kickoff.
 
     A subtask counts as cancelled when EITHER:
@@ -222,11 +260,9 @@ def _is_cancelled(token: str, node_url: str, agent_name: str, task_id: str) -> b
 
     On a transient read error we return False (don't drop a task on a hiccup).
     """
-    base = node_url.rstrip("/")
-    hdr = {"Authorization": f"Bearer {token}"}
     # 1) status re-check (catches owner-side pause/delete)
     try:
-        r = requests.get(f"{base}/v1/agents/{agent_name}/tasks/{task_id}", headers=hdr, timeout=15)
+        r = api.get(f"/v1/agents/{api.agent_name}/tasks/{task_id}")
         if r.status_code == 200:
             status = (r.json().get("data", {}).get("task", {}) or {}).get("status")
             if status not in ("active", "stalled"):
@@ -235,11 +271,9 @@ def _is_cancelled(token: str, node_url: str, agent_name: str, task_id: str) -> b
         pass
     # 2) cancel markers (owner-scope), covers coordinator-written cancellations
     try:
-        r = requests.get(
-            f"{base}/v1/memory",
-            headers=hdr,
+        r = api.get(
+            "/v1/memory",
             params={"owner_scope": "true", "prefix": "agents.cancel.", "per_page": "100"},
-            timeout=15,
         )
         if r.status_code == 200:
             for item in r.json().get("data", {}).get("items", []) or []:
@@ -253,12 +287,11 @@ def _is_cancelled(token: str, node_url: str, agent_name: str, task_id: str) -> b
     return False
 
 
-def _fail_cancelled(token: str, node_url: str, agent_name: str, task_id: str) -> None:
+def _fail_cancelled(api: _Api, task_id: str) -> None:
     """Mark a not-yet-started, cancelled subtask failed so it leaves the queue."""
     try:
-        requests.post(
-            f"{node_url.rstrip('/')}/v1/agents/{agent_name}/tasks/{task_id}/fail",
-            headers={"Authorization": f"Bearer {token}"},
+        api.post(
+            f"/v1/agents/{api.agent_name}/tasks/{task_id}/fail",
             json={"message": "Cancelled before start (cancel marker or status change)"},
             timeout=10,
         )
@@ -266,9 +299,7 @@ def _fail_cancelled(token: str, node_url: str, agent_name: str, task_id: str) ->
         pass
 
 
-def _fetch_message_content(
-    token: str, node_url: str, agent_name: str, thread_id: str, msg_id: str
-) -> str:
+def _fetch_message_content(api: _Api, thread_id: str, msg_id: str) -> str:
     """Return the full body of a single message, or "" on error.
 
     The /inbox endpoint only returns a ~100-char preview, so we fetch the full
@@ -277,12 +308,9 @@ def _fetch_message_content(
     including the `content` field.
     """
     try:
-        url = f"{node_url.rstrip('/')}/v1/agents/{agent_name}/messages"
-        r = requests.get(
-            url,
-            headers={"Authorization": f"Bearer {token}"},
+        r = api.get(
+            f"/v1/agents/{api.agent_name}/messages",
             params={"thread_id": thread_id, "per_page": 100},
-            timeout=15,
         )
         if r.status_code != 200:
             return ""
@@ -295,7 +323,7 @@ def _fetch_message_content(
         return ""
 
 
-def _mark_message_delivered(token: str, node_url: str, agent_name: str, msg_id: str) -> bool:
+def _mark_message_delivered(api: _Api, msg_id: str) -> bool:
     """Mark an inbox message delivered so it stops being re-dispatched.
 
     listPendingMessages only returns status=='pending' inbound messages, so
@@ -303,31 +331,23 @@ def _mark_message_delivered(token: str, node_url: str, agent_name: str, msg_id: 
     poll cycle. Returns True on success.
     """
     try:
-        url = f"{node_url.rstrip('/')}/v1/agents/{agent_name}/messages/{msg_id}"
-        r = requests.patch(
-            url,
-            headers={"Authorization": f"Bearer {token}"},
+        r = api.patch(
+            f"/v1/agents/{api.agent_name}/messages/{msg_id}",
             json={"status": "delivered"},
-            timeout=15,
         )
         return r.status_code == 200
     except Exception:
         return False
 
 
-def _poll_messages(token: str, node_url: str, agent_name: str) -> list[dict[str, Any]]:
+def _poll_messages(api: _Api) -> list[dict[str, Any]]:
     """Return list of pending inbox messages for the agent, or [] on error.
 
     Each entry has its full `content` resolved (the /inbox endpoint only carries
     a truncated preview, so we fetch the body per message).
     """
     try:
-        url = f"{node_url.rstrip('/')}/v1/agents/{agent_name}/inbox"
-        r = requests.get(
-            url,
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=15,
-        )
+        r = api.get(f"/v1/agents/{api.agent_name}/inbox")
         if r.status_code != 200:
             return []
         data = r.json().get("data", {})
@@ -340,7 +360,7 @@ def _poll_messages(token: str, node_url: str, agent_name: str) -> list[dict[str,
             thread_id = s.get("thread_id")
             content = ""
             if msg_id and thread_id:
-                content = _fetch_message_content(token, node_url, agent_name, thread_id, msg_id)
+                content = _fetch_message_content(api, thread_id, msg_id)
             out.append({
                 "id": msg_id,
                 "thread_id": thread_id,
@@ -352,6 +372,45 @@ def _poll_messages(token: str, node_url: str, agent_name: str) -> list[dict[str,
         return out
     except Exception:
         return []
+
+
+def _wait_for_work(api: _Api, use_push: bool, seconds: float, stop: dict[str, Any]) -> None:
+    """Idle wait between poll cycles.
+
+    With `use_push` (the agent's serve transport is 'tunnel'), this long-polls
+    the serve daemon's push surface (`GET /local/tasks/next`) in <=5s chunks:
+    a task queued on the node answers the long-poll the instant the tunnel
+    delivers it, so the next cycle starts immediately (true push, zero
+    upstream traffic) while SIGINT/SIGTERM handlers still get a look-in every
+    few seconds. The handed-out item is ONLY a wake signal -- the cycle that
+    follows re-lists tasks from the store via `_poll_tasks` (storage is the
+    source of truth; serve hands each pushed task out once per daemon
+    lifetime, which is fine for a wake-up).
+
+    Without push (transport 'direct'/'auth_failed' -- node tunnel off or too
+    old), the serve long-poll would always time out, so this falls back to the
+    classic 1s-incremental sleep.
+    """
+    deadline = time.monotonic() + seconds
+    while not stop["flag"]:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return
+        if use_push:
+            wait_ms = int(min(remaining, 5.0) * 1000)
+            try:
+                r = api.get(
+                    "/local/tasks/next",
+                    params={"wait": wait_ms, "agent": api.agent_name},
+                    timeout=wait_ms / 1000 + 10,
+                )
+                if r.status_code == 200:
+                    return  # push wake -- new work arrived, start the next cycle now
+            except Exception:
+                # serve hiccup: degrade to a plain sleep slice for this round
+                time.sleep(min(1.0, max(remaining, 0.1)))
+        else:
+            time.sleep(min(1.0, remaining))
 
 
 # Type alias: function the caller provides to build a Crew for one task.
@@ -475,10 +534,19 @@ def run_crew_daemon(
     on_idle: Callable[[], None] | None = None,
     on_error: Callable[[Exception], None] | None = None,
     one_shot: bool = False,
+    serve_options: dict[str, Any] | None = None,
 ) -> None:
     """
     Run a long-lived daemon that polls AIMEAT for work and dispatches it to
     a crew built fresh per task.
+
+    Since 0.4.0 all AIMEAT traffic goes through the LOCAL loopback serve
+    daemon (`aimeat connect serve --http`, auto-started on demand): the
+    liaison's MCP targets the loopback `/v1/mcp` and every REST helper rides
+    one shared `requests.Session` against the loopback proxy. The serve
+    daemon holds a single persistent WS tunnel per agent to the node, so the
+    poll cycle below is loopback-cheap and there is no per-call TLS storm and
+    no per-worker connector subprocess.
 
     The daemon runs the AIMEAT task lifecycle in two phases per poll cycle:
 
@@ -552,12 +620,36 @@ def run_crew_daemon(
         one_shot: If True, return after the first dispatched task (or
             after one idle cycle if no work). Useful for testing the
             wiring without a long-running process.
+        serve_options: Extra kwargs forwarded to `ensure_serve()` /
+            `serve_params()` (e.g. `aimeat_command` / `spawn_cwd` for a repo
+            checkout of the AIMEAT CLI, or `start_timeout`). Usually omitted.
 
     The daemon traps SIGINT and SIGTERM cleanly so Ctrl+C and `kill`
     shut it down with the liaison's MCP connection properly closed.
     """
-    token, node_url = _read_token(agent_name, owner=owner)
+    # Fail fast with the connector's own guidance if the agent was never
+    # registered locally -- the serve daemon needs the same home dir. The
+    # node_url is informational only; actual calls go through the loopback.
+    _token, node_url = _read_token(agent_name, owner=owner)
     listen_set = set(listen_for)
+    serve_opts = dict(serve_options or {})
+
+    # Discover (or auto-start) the shared loopback serve daemon, then bind the
+    # shared Session to it. The daemon proxies /v1/* over its tunnel and holds
+    # the bearer token itself; X-Aimeat-Agent routes to the right identity.
+    discovery = ensure_serve(**serve_opts)
+    loopback_base = f"http://127.0.0.1:{discovery['port']}"
+    api = _Api(loopback_base, agent_name)
+
+    # Push-driven idle wait when the serve daemon holds a live tunnel for this
+    # agent: instead of sleeping a full poll interval, the daemon parks on the
+    # serve long-poll and wakes the moment a task is delivered. Degraded
+    # transports keep the classic sleep (the long-poll would always 204).
+    agent_transport = next(
+        (a.get("transport") for a in discovery.get("agents", []) if a.get("agent") == agent_name),
+        "direct",
+    )
+    push_wake = agent_transport == "tunnel"
 
     stop = {"flag": False}
 
@@ -569,7 +661,12 @@ def run_crew_daemon(
     if hasattr(signal, "SIGTERM"):
         signal.signal(signal.SIGTERM, _handle_signal)
 
-    print(f"[daemon:{agent_name}] starting against {node_url}, polling every {poll_interval_seconds}s, listening for {sorted(listen_set)}")
+    print(
+        f"[daemon:{agent_name}] starting against {node_url} via loopback serve "
+        f"{loopback_base} (transport: {agent_transport}"
+        f"{', push-wake long-poll' if push_wake else ', interval polling'}), "
+        f"cycle {poll_interval_seconds}s, listening for {sorted(listen_set)}"
+    )
 
     # Resolve tool_filter:
     #   sentinel (default) -> DAEMON_DEFAULT_TOOL_FILTER (curated ~25 tools)
@@ -594,7 +691,7 @@ def run_crew_daemon(
     # Resolve concurrency: explicit override, else the owner-configured value
     # from the integration kit (default 1 = serial). Read once at startup.
     if max_concurrent_tasks is None:
-        effective_max = _fetch_max_concurrent(token, node_url, agent_name)
+        effective_max = _fetch_max_concurrent(api)
     else:
         effective_max = max(1, int(max_concurrent_tasks))
     if effective_max > 1:
@@ -643,9 +740,8 @@ def run_crew_daemon(
             # will retry. Marking it failed would close it off prematurely.
             if phase_label == "EXECUTE":
                 try:
-                    requests.post(
-                        f"{node_url.rstrip('/')}/v1/agents/{agent_name}/tasks/{task_id}/fail",
-                        headers={"Authorization": f"Bearer {token}"},
+                    api.post(
+                        f"/v1/agents/{agent_name}/tasks/{task_id}/fail",
                         json={"message": f"Crew crashed: {inner}"},
                         timeout=10,
                     )
@@ -656,10 +752,12 @@ def run_crew_daemon(
     def _execute_worker(task: dict[str, Any]) -> tuple[str, str]:
         """Run one EXECUTE task in its OWN liaison (for the concurrent path).
 
-        Each worker spawns a fresh liaison + MCP connection (its own connector
-        subprocess) because a shared stdio MCP can't be driven by parallel
-        kickoffs. Cooperative cancellation is re-checked just before kickoff.
-        On crash the task is marked failed server-side. Returns (task_id, status)
+        Each worker gets a fresh liaison whose MCP session targets the SAME
+        loopback serve daemon -- loopback HTTP is naturally concurrent, so no
+        per-worker connector subprocess is spawned (the pre-0.4.0 "shared
+        stdio MCP can't be driven by parallel kickoffs" constraint is gone).
+        Cooperative cancellation is re-checked just before kickoff. On crash
+        the task is marked failed server-side. Returns (task_id, status)
         where status is "ok" | "cancelled" | "error".
         """
         task_id = task.get("id", "(unknown id)")
@@ -667,14 +765,14 @@ def run_crew_daemon(
         print(f"[daemon:{agent_name}] EXECUTE(worker) task {task_id}: {title}")
         try:
             with create_liaison_agent(
-                mcp_server_params=stdio_params(agent_name=agent_name),
+                mcp_server_params=serve_params(agent_name=agent_name, **serve_opts),
                 agent_name=agent_name,
                 tool_filter=resolved_tool_filter,
                 llm=llm,
             ) as worker_liaison:
-                if _is_cancelled(token, node_url, agent_name, task_id):
+                if _is_cancelled(api, task_id):
                     print(f"[daemon:{agent_name}] EXECUTE task {task_id} cancelled before start -- skipping")
-                    _fail_cancelled(token, node_url, agent_name, task_id)
+                    _fail_cancelled(api, task_id)
                     return (task_id, "cancelled")
                 crew = build_crew(task, worker_liaison)
                 result = crew.kickoff()
@@ -688,9 +786,8 @@ def run_crew_daemon(
                 except Exception:
                     pass
             try:
-                requests.post(
-                    f"{node_url.rstrip('/')}/v1/agents/{agent_name}/tasks/{task_id}/fail",
-                    headers={"Authorization": f"Bearer {token}"},
+                api.post(
+                    f"/v1/agents/{agent_name}/tasks/{task_id}/fail",
                     json={"message": f"Crew crashed: {inner}"},
                     timeout=10,
                 )
@@ -724,10 +821,11 @@ def run_crew_daemon(
         if effective_max > 1 else None
     )
 
-    # The liaison's MCP connection stays open for the whole daemon's lifetime.
-    # Each crew.kickoff() reuses the same liaison instance.
+    # The liaison's MCP connection (loopback Streamable HTTP -> serve daemon)
+    # stays open for the whole daemon's lifetime. Each crew.kickoff() reuses
+    # the same liaison instance.
     with create_liaison_agent(
-        mcp_server_params=stdio_params(agent_name=agent_name),
+        mcp_server_params=serve_params(agent_name=agent_name, **serve_opts),
         agent_name=agent_name,
         tool_filter=resolved_tool_filter,
         llm=llm,
@@ -743,7 +841,7 @@ def run_crew_daemon(
                     # Owner-created tasks land in 'queued'; the daemon proposes a
                     # plan and waits for owner approval (or for task-runner mode's
                     # auto-active route to flip the task to 'active' directly).
-                    for task in _poll_tasks(token, node_url, agent_name, status="queued"):
+                    for task in _poll_tasks(api, status="queued"):
                         if stop["flag"]:
                             break
                         task_id = task.get("id")
@@ -766,7 +864,7 @@ def run_crew_daemon(
                     # parallel kickoffs).
                     if effective_max <= 1:
                         for task_status in ("active", "stalled"):
-                            for task in _poll_tasks(token, node_url, agent_name, status=task_status):
+                            for task in _poll_tasks(api, status=task_status):
                                 if stop["flag"]:
                                     break
                                 task_id = task.get("id")
@@ -780,9 +878,9 @@ def run_crew_daemon(
                                 # still in that list. This guard stops abandoned work
                                 # from ever starting -- circuit breaker for the
                                 # "coordinator over-delegated to one crew" case.
-                                if _is_cancelled(token, node_url, agent_name, task_id):
+                                if _is_cancelled(api, task_id):
                                     print(f"[daemon:{agent_name}] EXECUTE task {task_id} cancelled before start -- skipping")
-                                    _fail_cancelled(token, node_url, agent_name, task_id)
+                                    _fail_cancelled(api, task_id)
                                     done_ids.add(task_id)
                                     dispatched_this_cycle = True
                                     continue
@@ -795,19 +893,19 @@ def run_crew_daemon(
                         for task_status in ("active", "stalled"):
                             if len(in_flight) >= effective_max:
                                 break
-                            for task in _poll_tasks(token, node_url, agent_name, status=task_status):
+                            for task in _poll_tasks(api, status=task_status):
                                 if stop["flag"] or len(in_flight) >= effective_max:
                                     break
                                 task_id = task.get("id")
                                 if not task_id or task_id in done_ids or task_id in in_flight:
                                     continue
                                 # Pre-submit cancellation check -- cheap, and avoids
-                                # spawning a per-task liaison subprocess for work
+                                # building a per-task liaison + MCP session for work
                                 # that's already been cancelled. The worker re-checks
                                 # again just before its kickoff (authoritative).
-                                if _is_cancelled(token, node_url, agent_name, task_id):
+                                if _is_cancelled(api, task_id):
                                     print(f"[daemon:{agent_name}] EXECUTE task {task_id} cancelled before start -- skipping")
-                                    _fail_cancelled(token, node_url, agent_name, task_id)
+                                    _fail_cancelled(api, task_id)
                                     done_ids.add(task_id)
                                     dispatched_this_cycle = True
                                     continue
@@ -817,7 +915,7 @@ def run_crew_daemon(
                                 dispatched_this_cycle = True
 
                 if "messages" in listen_set:
-                    messages = _poll_messages(token, node_url, agent_name)
+                    messages = _poll_messages(api)
                     for msg in messages:
                         if stop["flag"]:
                             break
@@ -851,7 +949,7 @@ def run_crew_daemon(
                         # only after a successful kickoff so a crash leaves it for
                         # retry. Track locally regardless to avoid tight re-loops.
                         if kickoff_ok:
-                            _mark_message_delivered(token, node_url, agent_name, msg_id)
+                            _mark_message_delivered(api, msg_id)
                             done_ids.add(msg_id)
                         dispatched_this_cycle = True
 
@@ -875,14 +973,13 @@ def run_crew_daemon(
                 print(f"[daemon:{agent_name}] one_shot=True, exiting after one cycle")
                 break
 
-            # Sleep in small increments so signal handlers can interrupt. While
-            # concurrent EXECUTE work is in flight, poll back sooner (<=5s) so
-            # freed pool slots get refilled without waiting a full poll interval.
+            # Idle wait, interruptible by signals. While concurrent EXECUTE work
+            # is in flight, come back sooner (<=5s) so freed pool slots refill
+            # without waiting a full poll interval. With a live tunnel this
+            # parks on the serve long-poll and wakes instantly on a delivered
+            # task (push); otherwise it is the classic incremental sleep.
             cycle_sleep = min(poll_interval_seconds, 5) if in_flight else poll_interval_seconds
-            slept = 0
-            while slept < cycle_sleep and not stop["flag"]:
-                time.sleep(min(1, cycle_sleep - slept))
-                slept += 1
+            _wait_for_work(api, push_wake, cycle_sleep, stop)
 
         print(f"[daemon:{agent_name}] poll loop ended, releasing liaison")
 

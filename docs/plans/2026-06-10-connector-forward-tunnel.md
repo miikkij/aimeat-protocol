@@ -268,22 +268,35 @@ box in a phase is the gate to starting the next. Phases 1–2 are server-only;
       poller; push answers the long-poll).**
 
 ### Phase 5 — Python CrewAI integration (Option A)
-- [ ] `mcp_client.py` — `serve_params()`: read `~/.aimeat/serve.json`
-      (auto-start serve if absent), return
-      `http_params(node_url=http://127.0.0.1:PORT)`.
-- [ ] `daemon.py` — shared `requests.Session` against local serve for all
-      helpers; drop the per-worker `aimeat connect serve` subprocess spawn
-      (loopback HTTP is concurrent — the shared-stdio constraint disappears).
-- [ ] Optional: daemon consumes serve's loopback long-poll/SSE instead of its
-      own poll loop (true push-driven crew).
-- [ ] Version bump + README/CHANGELOG. **Gate: example crew runs end-to-end via
-      serve with zero subprocess churn.**
+- [x] `mcp_client.py` — `serve_params()`: reads `<AIMEAT_HOME>/serve.json`,
+      validates liveness (pid-alive + `/local/status` probe pinning the pid),
+      auto-starts `aimeat connect serve --http` detached when absent/stale,
+      returns `http_params(node_url=http://127.0.0.1:PORT)` (placeholder
+      Bearer — loopback MCP has no auth). Plus `ensure_serve()` +
+      `AimeatServeError` (exported; importable without CrewAI). `stdio_params`
+      / `http_params` / `sse_params` unchanged for the no-serve path.
+- [x] `daemon.py` — one shared `requests.Session` (`_Api`) against the local
+      serve for ALL helpers (`X-Aimeat-Agent` header; serve holds the bearer);
+      per-worker `aimeat connect serve` subprocess spawn dropped —
+      `_execute_worker` liaisons attach to the same loopback daemon via
+      `serve_params()` (zero references to `stdio_params` remain in daemon.py).
+- [x] Optional: push-driven idle wait — when the agent's transport is
+      `tunnel`, the daemon parks on `GET /local/tasks/next` (signal-safe ≤5s
+      chunks) between cycles and wakes the instant a task is delivered; the
+      handout is a wake signal only (dispatch re-lists from the store).
+      Degraded transports keep the interval sleep (long-poll would 204).
+- [x] Version bump (0.4.0) + README/CHANGELOG. **Gate met via
+      `tests/test_serve_loopback.py` (9 integration tests, 29/29 suite total):
+      auto-start + reuse (same pid), loopback MCP tool call, REST helper
+      envelope + task visibility, push wake latency, zero subprocess churn
+      (stable daemon pid + no `stdio_params` in the worker path), example-crew
+      wiring imports/constructs, clean shutdown with no orphan.**
 
 ### Phase 6 — Docs + full verification + CI gating
 - [ ] Connector guide + README transport section; note stdio stays for
       CI/serverless without serve.
-- [ ] Python pytest `test_serve_loopback.py` (loopback proxy works, no per-task
-      subprocess churn).
+- [x] Python pytest `test_serve_loopback.py` (loopback proxy works, no per-task
+      subprocess churn). *(Delivered early, in Phase 5.)*
 - [ ] CI: tunnel suites run on every PR on both backends; add a Python job for
       `python/aimeat-crewai/tests/` (extend `.github/workflows/`).
 - [ ] `pnpm test:e2e:sqlite` + `pnpm test:e2e:mongodb` full sweep, 0 failures.

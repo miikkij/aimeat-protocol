@@ -34,6 +34,9 @@ from .mcp_client import (
     stdio_params,
     http_params,
     sse_params,
+    serve_params,
+    ensure_serve,
+    AimeatServeError,
 )
 from .daemon import (
     run_crew_daemon,
@@ -41,16 +44,19 @@ from .daemon import (
     DAEMON_DEFAULT_TOOL_FILTER,
 )
 
-__version__ = "0.3.8"
+__version__ = "0.4.0"
 
 __all__ = [
     "__version__",
     "create_liaison_agent",
     "liaison_tools",
     "AimeatLiaisonError",
+    "AimeatServeError",
     "stdio_params",
     "http_params",
     "sse_params",
+    "serve_params",
+    "ensure_serve",
     "run_crew_daemon",
     "BuildCrewCallback",
     "DAEMON_DEFAULT_TOOL_FILTER",

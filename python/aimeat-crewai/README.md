@@ -54,9 +54,32 @@ Requires Python 3.10+ and CrewAI 0.80+. Depends on `crewai-tools[mcp]` and `mcp`
 
 3. **Use `aimeat_crewai` in your crew code.** See `examples/basic_crew.py` for a full runnable example.
 
-## Two transports
+## Three transports
 
-### stdio (recommended for local / self-hosted)
+### serve loopback (recommended for local / self-hosted, 0.4.0+)
+
+Attach to the long-lived `aimeat connect serve --http` daemon on `127.0.0.1`.
+`serve_params()` discovers it via `~/.aimeat/serve.json` and **auto-starts it
+if it isn't running**. The daemon holds ONE persistent WebSocket tunnel per
+agent to the node, so every MCP call from your crew rides that socket — no
+per-call TLS handshakes, no per-crew connector subprocess, and parallel
+kickoffs can all share it (loopback HTTP is naturally concurrent, unlike a
+shared stdio subprocess). No auth handling needed: the loopback bind is the
+trust boundary and the daemon holds the agent tokens itself.
+
+```python
+from aimeat_crewai import create_liaison_agent, serve_params
+
+params = serve_params(agent_name="company-crew")  # fails fast if not registered
+with create_liaison_agent(mcp_server_params=params, agent_name="company-crew") as liaison:
+    ...
+```
+
+Requires AIMEAT node 1.21.0+ with `AIMEAT_CONNECT_TUNNEL_ENABLED=true` for the
+tunnel; against older / tunnel-disabled nodes the serve daemon transparently
+degrades to direct HTTP — your code doesn't change.
+
+### stdio (works everywhere with a local connector)
 
 Spawn `aimeat connect serve` as a child process. The connector reads the agent's stored token from `~/.aimeat/` -- no need to handle auth yourself.
 
@@ -194,7 +217,10 @@ run_crew_daemon(
 )
 ```
 
-The daemon:
+The daemon (0.4.0+: all traffic rides the loopback serve daemon — one shared
+`requests.Session` against the local proxy, one upstream WS per agent, no
+per-worker connector subprocesses; with a live tunnel it wakes on task push
+instead of waiting out the poll interval):
 - Keeps the liaison's MCP connection open for its entire lifetime
 - Polls AIMEAT every `poll_interval_seconds` for queued tasks
 - For each, calls `build_crew(task, liaison)` and runs the resulting Crew
@@ -216,6 +242,7 @@ See [`examples/crew_daemon.py`](examples/crew_daemon.py) for a runnable starter.
 | 0.1.x | 1.13.0+ | 0.80+ |
 | 0.2.x | 1.13.5+ | 1.14+ (Skills); 0.80+ if `skill_path=None` |
 | 0.3.x | 1.14.0+ (for `aimeat_task_create`) | 0.80+ |
+| 0.4.x | 1.21.0+ with `AIMEAT_CONNECT_TUNNEL_ENABLED=true` for the tunnel (degrades to direct HTTP on older nodes) | 0.80+ |
 
 ## License
 

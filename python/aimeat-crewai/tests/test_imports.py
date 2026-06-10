@@ -14,9 +14,12 @@ def test_top_level_imports() -> None:
         "create_liaison_agent",
         "liaison_tools",
         "AimeatLiaisonError",
+        "AimeatServeError",
         "stdio_params",
         "http_params",
         "sse_params",
+        "serve_params",
+        "ensure_serve",
     }
     assert expected <= set(dir(aimeat_crewai)), (
         f"Missing from package surface: {expected - set(dir(aimeat_crewai))}"
@@ -31,11 +34,19 @@ def test_version_is_string() -> None:
 
 
 def test_stdio_params_builds_with_defaults() -> None:
-    """stdio_params should be callable with no args (uses primary agent)."""
+    """stdio_params should be callable with no args (uses primary agent).
+
+    On Windows hosts where `aimeat` is installed as an npm .cmd/.bat shim,
+    `_resolve_windows_command` wraps it as `cmd.exe /c aimeat` (the stdio MCP
+    client cannot CreateProcess a shim directly) -- accept both forms.
+    """
     from aimeat_crewai import stdio_params
 
     p = stdio_params()
-    assert p.command == "aimeat"
+    if p.command == "cmd.exe":
+        assert p.args[:2] == ["/c", "aimeat"]
+    else:
+        assert p.command == "aimeat"
     assert "connect" in p.args and "serve" in p.args
     # No --agent flag when none given
     assert "--agent" not in p.args
@@ -222,6 +233,24 @@ def test_daemon_default_tool_filter_exported_and_curated() -> None:
     must_not_have = {"aimeat_admin_mint", "aimeat_admin_config", "aimeat_wallet_balance"}
     overlap = must_not_have & set(names)
     assert not overlap, f"default filter includes tools that should be excluded: {overlap}"
+
+
+def test_ensure_serve_no_daemon_no_autostart_raises(tmp_path, monkeypatch) -> None:
+    """0.4.0: with no discovery file and auto_start=False, ensure_serve must
+    fail fast with guidance instead of spawning anything."""
+    from aimeat_crewai import ensure_serve, AimeatServeError
+    import pytest
+
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+    with pytest.raises(AimeatServeError, match="aimeat connect serve --http"):
+        ensure_serve(auto_start=False)
+
+
+def test_serve_discovery_honors_aimeat_home(tmp_path, monkeypatch) -> None:
+    from aimeat_crewai.mcp_client import serve_discovery_path
+
+    monkeypatch.setenv("AIMEAT_HOME", str(tmp_path))
+    assert serve_discovery_path() == tmp_path / "serve.json"
 
 
 def test_slim_vs_full_backstory_templates_exist() -> None:
