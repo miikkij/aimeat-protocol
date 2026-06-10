@@ -1,6 +1,8 @@
 /**
- * AIMEAT Memory Service
- * Key-value memory CRUD, search, file management.
+ * @file memory.js
+ * @description AIMEAT Memory Service — key-value memory CRUD, search, file management.
+ * @version-history
+ *   v1.1.0 — 2026-06-10 — Add getMemory(key) single-entry read (GET /v1/memory/:key).
  */
 import { api, apiGet, apiPost, apiDelete } from '/js/api.js';
 
@@ -10,6 +12,11 @@ export async function listMemories(agentGaii) {
   const data = await apiGet(url);
   const list = data?.data?.items || data?.data?.entries || [];
   return Array.isArray(list) ? list : [];
+}
+
+/** Read a single memory entry. Returns the envelope ({ data: { key, value, version, ... } }); throws/404s if missing. */
+export async function getMemory(key) {
+  return apiGet(`/v1/memory/${encodeURIComponent(key)}`);
 }
 
 /** Search memory by query string. Returns array. Optional agentGaii. */

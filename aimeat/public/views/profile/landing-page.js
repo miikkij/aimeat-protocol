@@ -15,6 +15,8 @@
  *     AppStrip — home/section sub-components
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v2.2.0 — 2026-06-10 — Listen for the `aimeat-open-tab` CustomEvent so tab components can
+ *     navigate to another profile tab (first user: organism home's Board tab → Boards view).
  *   v2.1.0 — 2026-06-09 — Remembered open view (openView) now persists in
  *     sessionStorage instead of localStorage, so it is per browser TAB: with
  *     multiple profile tabs open, an F5 restores that tab's own view rather than
@@ -618,6 +620,18 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
     sessionStorage.removeItem('aimeat-profile-tab');
     setOpenView(null);
   }, []);
+
+  /* Cross-tab navigation: any tab component can dispatch
+   * `new CustomEvent('aimeat-open-tab', { detail: { tabId } })` to open another
+   * profile tab inline (e.g. an organism's Board tab → the Boards view). */
+  useEffect(() => {
+    const handler = (e) => {
+      const tabId = e.detail?.tabId;
+      if (tabId) open(tabId, e.detail?.slot || 'main');
+    };
+    window.addEventListener('aimeat-open-tab', handler);
+    return () => window.removeEventListener('aimeat-open-tab', handler);
+  }, [open]);
 
   /* Render inline view if it matches the given slot */
   const viewAt = (slot) => {

@@ -60,12 +60,19 @@
  *     name with a role (viewer/contributor), switch roles, remove; approve/deny pending requests. New
  *     "Create contract agent" AI-prompt button (orgService.buildContractAgentPrompt) copies a full
  *     contract-agent build prompt for THIS workspace. See docs/agent-workspace-contracts.md.
+ *   v1.15.0 — 2026-06-10 — Organisms list renew, phase 1: compact one-line rows (avatar, name, type,
+ *     members/agents/date) with drag-and-drop manual ordering + a sort menu (My order / Name / Newest,
+ *     persisted to user memory key organisms.ui); management actions move into a "…" kebab menu. New
+ *     OrganismHome page (breadcrumb header + Export/Settings + Workspaces/Members/Agents/Board tabs)
+ *     between the list and a workspace — Members/Agents tabs host the former in-card OrgMemberManager
+ *     sections, Settings hosts the edit form + metadata + danger zone, Board links to the Boards tab.
+ *     Nothing removed: every former card action has a new home (list "…" menu, home header, or a tab).
  */
 import { h } from 'preact';
-import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Spinner, VisibilityPill } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
@@ -80,6 +87,58 @@ import { copyToClipboard } from '/js/utils.js';
 import { dt, fmtBytes } from '/js/format.js';
 import { Markdown, slugifyHeading } from '/components/Markdown.js';
 import { Mermaid } from '/components/Mermaid.js';
+
+/** Date-only, formatted in the APP locale (browser locale may differ — fi must show 10.6.2026, not 6/10/2026). */
+function fmtDate(s) {
+  return new Date(s).toLocaleDateString(getLocale() === 'fi' ? 'fi-FI' : undefined);
+}
+
+/** Two-letter monogram for the list/home avatar (initials of the first two words, else first two chars). */
+function orgInitials(name) {
+  const s = String(name || '?').trim();
+  const words = s.split(/\s+/).filter(Boolean);
+  const ini = words.length >= 2 ? words[0][0] + words[1][0] : s.slice(0, 2);
+  return ini.charAt(0).toUpperCase() + (ini.charAt(1) || '').toLowerCase();
+}
+
+/** "…" actions menu — items: { label, icon?, danger?, onClick } (falsy items are skipped). Closes on outside click. */
+function KebabMenu({ items, label }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [open]);
+  const visible = (items || []).filter(Boolean);
+  if (visible.length === 0) return null;
+  return html`
+    <div class="pj-menu" ref=${ref}>
+      <button class="pj-icon-btn pj-menu-btn" title=${label} aria-haspopup="menu" aria-expanded=${open}
+        onClick=${(e) => { e.stopPropagation(); setOpen(o => !o); }}>${'⋮'}</button>
+      ${open ? html`
+        <div class="pj-menu-pop" role="menu" onClick=${(e) => e.stopPropagation()}>
+          ${visible.map(it => html`
+            <button class="pj-menu-item ${it.danger ? 'pj-menu-item-danger' : ''}" role="menuitem" key=${it.label}
+              onClick=${() => { setOpen(false); it.onClick?.(); }}>${it.icon ? `${it.icon} ` : ''}${it.label}</button>`)}
+        </div>` : null}
+    </div>`;
+}
+
+/** Download a whole-organism ZIP backup (used from the list "…" menu and the home header). */
+async function exportOrganismZip(org, showToast) {
+  try {
+    const jwt = window.AIMEAT?.auth?.getSession?.()?.jwt || '';
+    const res = await fetch(`/v1/organisms/${encodeURIComponent(org.id)}/export`, { headers: { Authorization: 'Bearer ' + jwt } });
+    if (!res.ok) throw new Error('Export failed');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `organism-${String(org.name || org.id).replace(/[^a-z0-9_-]+/gi, '-').slice(0, 40)}.zip`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  } catch (e) { showToast((e && e.message) || 'Export failed'); }
+}
 
 /**
  * Content search inside an organism — case-insensitive substring over the records + documents of
@@ -177,7 +236,11 @@ function IncomingInvitations({ showToast, onChanged }) {
  * list (#6). Backend: /:id/{join-requests,invitations,members,transfer,agents}. Refreshes the
  * parent list via onChanged so member counts stay current.
  */
-function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, confirm, onChanged }) {
+/**
+ * Member + agent management. `show` limits the rendered sections: 'members' (invite, pending
+ * requests, roster, blocked) or 'agents' (attached agents); omitted = both (legacy layout).
+ */
+function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, confirm, onChanged, show }) {
   const orgId = org.id;
   const [requests, setRequests] = useState(null);
   const [members, setMembers] = useState(null);
@@ -259,8 +322,12 @@ function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, confirm,
   const pending = (requests || []).filter(r => r.status === 'pending');
   const agents = org.agentGaiis || [];
 
+  const showMembers = show !== 'agents';
+  const showAgents = show !== 'members';
+
   return html`
     <div class="card-detail">
+      ${showMembers ? html`
       <div class="section-title">${canManage ? (t('organisms.manageMembers') || 'Manage members') : (t('organisms.membersRoster') || 'Members')}</div>
       ${canManage ? html`<div class="section-desc">${t('organisms.manageMembersDesc') || 'Invite, approve, block and revoke member access.'}</div>` : null}
 
@@ -314,7 +381,9 @@ function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, confirm,
           </div>
         `)}
       ` : null}
+      ` : null}
 
+      ${showAgents ? html`
       <div class="detail-label">${t('organisms.attachedAgents') || 'Attached agents'}</div>
       ${agents.length === 0 ? html`<div class="section-desc">${t('organisms.noAgents') || 'No agents attached.'}</div>` : null}
       ${agents.map(g => html`
@@ -330,6 +399,7 @@ function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, confirm,
           onInput=${(e) => setAgentName(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') attachAgent(); }} />
         <button class="btn-outline btn-sm" disabled=${busy || !agentName.trim()} onClick=${attachAgent}>${t('organisms.attachAgent') || 'Attach agent'}</button>
       </div>
+      ` : null}
     </div>
   `;
 }
@@ -345,9 +415,13 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const [openWs, setOpenWs] = useState(() => { try { return sessionStorage.getItem('aimeat.ws.openWs') || null; } catch (e) { return null; } });
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [editForm, setEditForm] = useState({});
+  // List ordering: 'custom' (drag-and-drop, persisted) | 'name' | 'newest'. Persisted together with
+  // the manual order in the user-memory key `organisms.ui` so it follows the user across devices.
+  const [sortMode, setSortMode] = useState('custom');
+  const [customOrder, setCustomOrder] = useState([]);
+  const [openSettings, setOpenSettings] = useState(false); // open OrganismHome with the Settings panel showing
+  const dragIdRef = useRef(null);
+  const [dragOverId, setDragOverId] = useState(null);
 
   /* ── Create form state ── */
   const [formName, setFormName] = useState('');
@@ -380,6 +454,53 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   useEffect(() => {
     if (session) loadData();
   }, [session, loadData]);
+
+  // ── List-order preferences (user memory key `organisms.ui`: { order: [ids], sort: mode }) ──
+  const UI_PREFS_KEY = 'organisms.ui';
+  useEffect(() => {
+    if (!session) return;
+    (async () => {
+      try {
+        const r = await memoryService.getMemory(UI_PREFS_KEY);
+        const v = r?.data?.value;
+        if (v && typeof v === 'object') {
+          if (Array.isArray(v.order)) setCustomOrder(v.order.filter(x => typeof x === 'string'));
+          if (['custom', 'name', 'newest'].includes(v.sort)) setSortMode(v.sort);
+        }
+      } catch { /* no saved prefs yet */ }
+    })();
+  }, [session]);
+  const savePrefs = useCallback((order, sort) => {
+    memoryService.createMemory(UI_PREFS_KEY, { order, sort }, 'private').catch(() => {});
+  }, []);
+
+  // Stable sort keeps server order for ids missing from the saved manual order (appended at the end).
+  const sortedMine = useMemo(() => {
+    const arr = [...(myOrganisms || [])];
+    if (sortMode === 'name') arr.sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }));
+    else if (sortMode === 'newest') arr.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    else if (customOrder.length) {
+      const pos = new Map(customOrder.map((id, i) => [id, i]));
+      arr.sort((a, b) => (pos.has(a.id) ? pos.get(a.id) : Infinity) - (pos.has(b.id) ? pos.get(b.id) : Infinity));
+    }
+    return arr;
+  }, [myOrganisms, sortMode, customOrder]);
+
+  // Drop on a row: move the dragged row to the target's position; switches to manual order and saves.
+  const onDropRow = (targetId) => {
+    const fromId = dragIdRef.current;
+    dragIdRef.current = null;
+    setDragOverId(null);
+    if (!fromId || fromId === targetId) return;
+    const ids = sortedMine.map(o => o.id);
+    const from = ids.indexOf(fromId);
+    const to = ids.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    setCustomOrder(ids);
+    setSortMode('custom');
+    savePrefs(ids, 'custom');
+  };
 
   // Import a whole organism from a ZIP backup → creates a new organism + opens it.
   const orgFileRef = useRef(null);
@@ -469,6 +590,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       try {
         await orgService.leaveOrganism(id);
         showToast(t('organisms.left') || 'Left organism');
+        setOpenId(null); setOpenWs(null);
         loadData();
       } catch {
         showToast(t('organisms.leaveError') || 'Failed to leave');
@@ -482,6 +604,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         await orgService.deleteOrganism(id);
         showToast(t('organisms.deleted') || 'Organism deleted');
         setExpanded(null);
+        setOpenId(null); setOpenWs(null);
         loadData();
       } catch {
         showToast(t('organisms.deleteError') || 'Failed to delete');
@@ -493,212 +616,111 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     setExpanded(prev => prev === id ? null : id);
   }, []);
 
-  const startEdit = useCallback((org) => {
-    setEditing(org.id);
-    setEditForm({
-      name: org.name,
-      description: org.description || '',
-      type: org.type,
-      join_policy: org.joinPolicy,
-      visibility: org.visibility,
-      interests: (org.interests || []).join(', '),
-    });
-  }, []);
-
-  const cancelEdit = useCallback(() => {
-    setEditing(null);
-    setEditForm({});
-  }, []);
-
-  const handleUpdate = useCallback(async (id) => {
-    if (!editForm.name?.trim()) {
-      showToast(t('organisms.nameRequired') || 'Name is required');
-      return;
-    }
-    setSaving(true);
-    try {
-      const interests = editForm.interests.split(',').map(s => s.trim()).filter(Boolean);
-      const result = await orgService.updateOrganism(id, {
-        name: editForm.name.trim(),
-        description: editForm.description.trim(),
-        type: editForm.type,
-        join_policy: editForm.join_policy,
-        visibility: editForm.visibility,
-        interests,
-      });
-      if (result?.ok !== false) {
-        showToast(t('organisms.updated') || 'Organism updated');
-        setEditing(null);
-        setEditForm({});
-        loadData();
-      } else {
-        showToast(result?.error?.message || (t('organisms.updateError') || 'Failed to update'));
-      }
-    } catch {
-      showToast(t('organisms.updateError') || 'Failed to update');
-    } finally { setSaving(false); }
-  }, [editForm, showToast, loadData]);
-
-  const renderEditForm = (org) => html`
-    <div class="card-detail" onClick=${(e) => e.stopPropagation()}>
-      <div class="flex-col">
-        <input type="text" value=${editForm.name} onInput=${(e) => setEditForm(f => ({ ...f, name: e.target.value }))}
-          placeholder=${t('organisms.namePlaceholder') || 'Name'} class="input-field input-sm" />
-        <textarea value=${editForm.description} onInput=${(e) => setEditForm(f => ({ ...f, description: e.target.value }))} rows="2"
-          placeholder=${t('organisms.descPlaceholder') || 'Description'} class="input-field input-sm" />
-        <input type="text" value=${editForm.interests} onInput=${(e) => setEditForm(f => ({ ...f, interests: e.target.value }))}
-          placeholder=${t('organisms.interestsPlaceholder') || 'Interests (comma separated)'} class="input-field input-sm" />
-        <div class="flex-row-wrap">
-          <select value=${editForm.type} onChange=${(e) => setEditForm(f => ({ ...f, type: e.target.value }))} class="input-field input-sm">
-            <option value="community">${t('organisms.types.community') || 'Community'}</option>
-            <option value="team">${t('organisms.types.team') || 'Team'}</option>
-            <option value="club">${t('organisms.types.club') || 'Club'}</option>
-            <option value="cooperative">${t('organisms.types.cooperative') || 'Cooperative'}</option>
-            <option value="project">${t('organisms.types.project') || 'Project'}</option>
-          </select>
-          <select value=${editForm.join_policy} onChange=${(e) => setEditForm(f => ({ ...f, join_policy: e.target.value }))} class="input-field input-sm">
-            <option value="open">${t('organisms.policyOpen') || 'Open (anyone can join)'}</option>
-            <option value="approval_required">${t('organisms.policyApproval') || 'Approval required'}</option>
-            <option value="invite_only">${t('organisms.policyInvite') || 'Invite only'}</option>
-          </select>
-          <select value=${editForm.visibility} onChange=${(e) => setEditForm(f => ({ ...f, visibility: e.target.value }))} class="input-field input-sm">
-            <option value="public">${t('organisms.visPublic') || 'Public'}</option>
-            <option value="listed">${t('organisms.visListed') || 'Listed'}</option>
-            <option value="private">${t('organisms.visPrivate') || 'Private'}</option>
-          </select>
-        </div>
-        <div class="flex-row-wrap">
-          <button class="btn-primary btn-sm" onClick=${() => handleUpdate(org.id)} disabled=${saving}>
-            ${saving ? '...' : (t('organisms.save') || 'Save')}
-          </button>
-          <button class="btn-ghost btn-sm" onClick=${cancelEdit}>
-            ${t('organisms.cancel') || 'Cancel'}
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-
-  const renderOrgCard = (org, isMine) => {
-    const isExpanded = expanded === org.id;
-    const isEditing = editing === org.id;
-    const isCreator = org.creatorGhii === ghii;
-    const isAdmin = org.admins?.includes(ghii);
-    const isMember = org.members?.includes(ghii);
-    const canEdit = isCreator || isAdmin;
+  // Discover rows expand in place (non-members can't open the home page, so the detail
+  // grid + interests they could previously see in the expanded card stay reachable here).
+  const renderDiscoverDetail = (org) => {
     const policyLabel = {
       open: t('organisms.policyOpen') || 'Open',
       approval_required: t('organisms.policyApproval') || 'Approval',
       invite_only: t('organisms.policyInvite') || 'Invite Only',
     }[org.joinPolicy] || org.joinPolicy;
+    return html`
+      <div class="pj-org-detail" onClick=${(e) => e.stopPropagation()}>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">${t('organisms.creator') || 'Creator'}</span>
+            <span class="detail-value">${escHtml(org.creatorGhii)}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">${t('organisms.memberCount') || 'Members'}</span>
+            <span class="detail-value">${(org.members || []).length} / ${org.maxMembers || 500}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">${t('organisms.policyLabel') || 'Join policy'}</span>
+            <span class="detail-value">${policyLabel}</span>
+          </div>
+          ${org.createdAt ? html`
+            <div class="detail-item">
+              <span class="detail-label">${t('organisms.createdAt') || 'Created'}</span>
+              <span class="detail-value">${fmtDate(org.createdAt)}</span>
+            </div>
+          ` : null}
+        </div>
+        ${(org.interests || []).length > 0 ? html`
+          <div class="flex-row-wrap">
+            ${org.interests.map(tag => html`<span class="file-tag" key=${tag}>${escHtml(tag)}</span>`)}
+          </div>` : null}
+      </div>`;
+  };
+
+  // Compact one-line row: avatar \u00B7 name + type + lock \u00B7 description \u00B7 members/agents/date \u00B7
+  // primary action \u00B7 "\u2026" menu. Management (settings, leave, delete) lives in the menu / home page.
+  const renderOrgRow = (org, isMine) => {
+    const isCreator = org.creatorGhii === ghii;
+    const isAdmin = org.admins?.includes(ghii);
+    const isMember = org.members?.includes(ghii);
+    const canEdit = isCreator || isAdmin;
     const typeLabel = t(`organisms.types.${org.type}`) || org.type;
+    const isExpanded = !isMine && expanded === org.id;
+    const visLabel = org.visibility === 'private' ? (t('organisms.visPrivate') || 'Private') : (t('organisms.visListed') || 'Listed');
+    const openHome = (withSettings) => { setOpenSettings(!!withSettings); setOpenWs(null); setOpenId(org.id); };
+    const activate = () => (isMine || isMember) ? openHome(false) : toggleExpand(org.id);
+
+    const menuItems = isMine ? [
+      canEdit && { label: t('organisms.settings') || 'Settings', icon: '\u2699', onClick: () => openHome(true) },
+      { label: t('organisms.exportOrg') || 'Export organism', icon: '\u2B07', onClick: () => exportOrganismZip(org, showToast) },
+      !isCreator && { label: t('organisms.leave') || 'Leave', danger: true, onClick: () => handleLeave(org.id, org.name) },
+      isCreator && { label: t('organisms.delete') || 'Delete', danger: true, onClick: () => handleDelete(org.id, org.name) },
+    ] : [];
 
     return html`
-      <div class="card ${isExpanded ? 'card-expanded' : ''}" key=${org.id}>
-        <div class="card-header card-clickable" onClick=${() => toggleExpand(org.id)}>
-          <span class="expand-icon">${isExpanded ? '\u25BC' : '\u25B6'}</span>
-          <div class="card-title">${escHtml(org.name)}</div>
-          <span class="badge badge-info">${typeLabel}</span>
-          <span class="badge ${org.visibility === 'public' ? 'badge-success' : 'badge-warn'}">${org.visibility}</span>
-        </div>
-        <div class="card-subtitle">
-          ${org.description ? escHtml(org.description.slice(0, 100)) : ''}
-          ${' \u2014 '}${(org.members || []).length} ${t('organisms.members') || 'members'}
-          ${' \u2014 '}${policyLabel}
-        </div>
-
-        ${(org.interests || []).length > 0 && html`
-          <div class="flex-row-wrap" >
-            ${org.interests.map(tag => html`<span class="file-tag" key=${tag}>${escHtml(tag)}</span>`)}
+      <div class="pj-org-row ${dragOverId === org.id ? 'pj-org-drag-over' : ''}" key=${org.id}
+        draggable=${isMine}
+        onDragStart=${isMine ? ((e) => { dragIdRef.current = org.id; e.dataTransfer.effectAllowed = 'move'; }) : undefined}
+        onDragOver=${isMine ? ((e) => { e.preventDefault(); setDragOverId(org.id); }) : undefined}
+        onDragLeave=${isMine ? (() => setDragOverId(d => (d === org.id ? null : d))) : undefined}
+        onDrop=${isMine ? (() => onDropRow(org.id)) : undefined}
+        onDragEnd=${isMine ? (() => { dragIdRef.current = null; setDragOverId(null); }) : undefined}>
+        <div class="pj-org-avatar" aria-hidden="true">${orgInitials(org.name)}</div>
+        <div class="pj-org-main" role="button" tabindex="0" onClick=${activate}
+          onKeyDown=${(e) => { if (e.key === 'Enter') activate(); }}>
+          <div class="pj-org-titlerow">
+            <span class="pj-org-name">${escHtml(org.name)}</span>
+            <span class="badge badge-info">${typeLabel}</span>
+            ${org.visibility !== 'public' ? html`<span class="pj-org-lock" title=${visLabel}>${'\uD83D\uDD12'}</span>` : null}
           </div>
-        `}
-
-        ${isExpanded && !isEditing && html`
-          <div class="card-detail">
-            <div class="detail-grid">
-              <div class="detail-item">
-                <span class="detail-label">${t('organisms.creator') || 'Creator'}</span>
-                <span class="detail-value">${escHtml(org.creatorGhii)}</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">${t('organisms.admins') || 'Admins'}</span>
-                <span class="detail-value">${(org.admins || []).join(', ') || '-'}</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">${t('organisms.memberCount') || 'Members'}</span>
-                <span class="detail-value">${(org.members || []).length} / ${org.maxMembers || 500}</span>
-              </div>
-              ${org.boardId ? html`
-                <div class="detail-item">
-                  <span class="detail-label">${t('organisms.board') || 'Board'}</span>
-                  <span class="detail-value mono">${escHtml(org.boardId)}</span>
-                </div>
-              ` : null}
-              ${org.createdAt ? html`
-                <div class="detail-item">
-                  <span class="detail-label">${t('organisms.createdAt') || 'Created'}</span>
-                  <span class="detail-value">${new Date(org.createdAt).toLocaleDateString()}</span>
-                </div>
-              ` : null}
-            </div>
-
-            <div class="card-actions">
-              ${(isMine || isMember) ? html`
-                <button class="btn-primary btn-sm" onClick=${(e) => { e.stopPropagation(); setOpenWs(null); setOpenId(org.id); }}>
-                  ${t('organisms.openWorkspace') || 'Open workspace'}
-                </button>
-              ` : null}
-              ${canEdit ? html`
-                <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); startEdit(org); }}>
-                  ${t('organisms.edit') || 'Edit'}
-                </button>
-              ` : null}
-              ${isMine && !isCreator ? html`
-                <button class="btn-danger-solid btn-sm" onClick=${(e) => { e.stopPropagation(); handleLeave(org.id, org.name); }}>
-                  ${t('organisms.leave') || 'Leave'}
-                </button>
-              ` : null}
-              ${isCreator ? html`
-                <button class="btn-danger-solid btn-sm" onClick=${(e) => { e.stopPropagation(); handleDelete(org.id, org.name); }}>
-                  ${t('organisms.delete') || 'Delete'}
-                </button>
-              ` : null}
-              ${!isMember ? html`
-                <button class="btn-primary btn-sm" onClick=${(e) => { e.stopPropagation(); handleJoin(org.id); }}>
-                  ${t('organisms.join') || 'Join'}
-                </button>
-              ` : null}
-            </div>
-
-            ${(canEdit || isMember) ? html`<${OrgSearch}
-              orgId=${org.id}
-              onOpenWorkspace=${(ws) => { setOpenWs(ws); setOpenId(org.id); }} />` : null}
-
-            ${(canEdit || isMember) ? html`<${OrgMemberManager}
-              org=${org}
-              ghii=${ghii}
-              canManage=${canEdit}
-              isCreator=${isCreator}
-              showToast=${showToast}
-              confirm=${confirm}
-              onChanged=${loadData} />` : null}
-          </div>
-        `}
-
-        ${isExpanded && isEditing && renderEditForm(org)}
+          ${org.description ? html`<div class="pj-org-desc">${escHtml(org.description)}</div>` : null}
+        </div>
+        <div class="pj-org-stats">
+          <span class="pj-org-stat" title=${t('organisms.members') || 'Members'}>${'\uD83D\uDC65'} ${(org.members || []).length}</span>
+          <span class="pj-org-stat" title=${t('organisms.attachedAgents') || 'Attached agents'}>${'\uD83E\uDD16'} ${(org.agentGaiis || []).length}</span>
+          ${org.createdAt ? html`<span class="pj-org-stat pj-org-date" title=${t('organisms.createdAt') || 'Created'}>${fmtDate(org.createdAt)}</span>` : null}
+        </div>
+        ${(isMine || isMember)
+          ? html`<button class="btn-outline btn-sm pj-org-openbtn" onClick=${() => openHome(false)}>${t('organisms.openWorkspace') || 'Open workspace'}</button>`
+          : html`<button class="btn-outline btn-sm pj-org-openbtn" onClick=${() => handleJoin(org.id)}>${t('organisms.join') || 'Join'}</button>`}
+        ${isMine ? html`<${KebabMenu} label=${t('organisms.moreActions') || 'More actions'} items=${menuItems} />` : null}
+        ${isExpanded ? renderDiscoverDetail(org) : null}
       </div>
     `;
   };
 
   if (openId) {
     const org = [...(myOrganisms || []), ...publicOrganisms].find(o => o.id === openId) || { id: openId };
-    // openWs chosen → that workspace; otherwise the organism's workspace LIST.
+    // openWs chosen → that workspace; otherwise the organism's HOME page (tabs incl. workspaces).
     if (openWs) {
       return html`<${Workspace} org=${org} wsId=${openWs} session=${session} showToast=${showToast}
         onBack=${() => { setOpenWs(null); }} />`;
     }
-    return html`<${WorkspaceList} org=${org} showToast=${showToast}
-      onOpen=${(wsId) => setOpenWs(wsId)} onBack=${() => { setOpenId(null); loadData(); }} />`;
+    return html`
+      <${OrganismHome} org=${org} ghii=${ghii} showToast=${showToast}
+        initialSettings=${openSettings}
+        onOpenWs=${(wsId) => setOpenWs(wsId)}
+        onBack=${() => { setOpenId(null); setOpenSettings(false); loadData(); }}
+        onChanged=${loadData}
+        onLeave=${() => handleLeave(org.id, org.name)}
+        onDelete=${() => handleDelete(org.id, org.name)} />
+      <${ConfirmUI} />`;
   }
 
   if (!myOrganisms) return html`<${Spinner} text=${t('organisms.loading') || 'Loading organisms...'} />`;
@@ -707,13 +729,9 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     <div class="section-title">${t('organisms.title') || 'Organisms'}</div>
     <div class="section-desc">${t('organisms.desc') || 'Organisms are groups — communities, teams, clubs, or projects. Create one or join existing ones to share knowledge, coordinate work, and build together.'}</div>
 
-    <!-- Create button / form -->
+    <!-- Create form (opened from the topbar button) -->
     <div class="mb-1">
-      ${!showCreate ? html`
-        <button class="btn-primary" onClick=${() => setShowCreate(true)}>
-          ${t('organisms.createNew') || 'Create Organism'}
-        </button>
-      ` : html`
+      ${!showCreate ? null : html`
         <div class="create-form">
           <h4 class="card-h3 mb-half">${t('organisms.createTitle') || 'Create New Organism'}</h4>
           <div class="flex-col">
@@ -765,20 +783,240 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     <input type="file" accept=".zip,application/zip" ref=${orgFileRef} style="display:none" onChange=${(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; doImportOrg(f); }} />
     <div class="pj-ws-topbar">
       <div class="section-title">${t('organisms.myOrganisms') || 'My Organisms'}</div>
-      <button class="btn-outline btn-sm" disabled=${importingOrg} title=${t('organisms.importOrgHint') || 'Restore an organism from a .zip backup'} onClick=${() => orgFileRef.current && orgFileRef.current.click()}>${'⬆ '}${t('organisms.importOrg') || 'Import organism'}</button>
+      <div class="pj-org-topbar-actions">
+        ${myOrganisms.length > 1 ? html`
+          <select class="input-field input-sm pj-org-sort" title=${t('organisms.sortTitle') || 'Sort'} value=${sortMode}
+            onChange=${(e) => { const m = e.target.value; setSortMode(m); savePrefs(customOrder, m); }}>
+            <option value="custom">${t('organisms.sortCustom') || 'My order'}</option>
+            <option value="name">${t('organisms.sortName') || 'Name A–Z'}</option>
+            <option value="newest">${t('organisms.sortNewest') || 'Newest first'}</option>
+          </select>` : null}
+        <button class="btn-outline btn-sm" disabled=${importingOrg} title=${t('organisms.importOrgHint') || 'Restore an organism from a .zip backup'} onClick=${() => orgFileRef.current && orgFileRef.current.click()}>${'⬆ '}${t('organisms.importOrg') || 'Import'}</button>
+        <button class="btn-primary btn-sm" onClick=${() => setShowCreate(true)}>${'+ '}${t('organisms.createNew') || 'Create Organism'}</button>
+      </div>
     </div>
     ${myOrganisms.length === 0
       ? html`<div class="empty">${t('organisms.empty') || 'You are not part of any organisms yet.'}</div>`
-      : myOrganisms.map(org => renderOrgCard(org, true))
+      : html`
+        <div class="pj-org-list">${sortedMine.map(org => renderOrgRow(org, true))}</div>
+        ${sortMode === 'custom' && sortedMine.length > 1 ? html`
+          <div class="pj-org-hint">${t('organisms.reorderHint') || 'Drag rows to reorder — the order is saved to your profile.'}</div>` : null}
+      `
     }
 
     <!-- Discover -->
     ${publicOrganisms.length > 0 && html`
       <div class="section-title section-title-spaced">${t('organisms.discover') || 'Discover'}</div>
-      ${publicOrganisms.map(org => renderOrgCard(org, false))}
+      <div class="pj-org-list">${publicOrganisms.map(org => renderOrgRow(org, false))}</div>
     `}
     <${ConfirmUI} />
   `;
+}
+
+/* ───────────────── Organism home page ─────────────────
+ * One home per organism: breadcrumb header (avatar, name, badges, description,
+ * Export + Settings) and tabs — Workspaces (the workspace list + content search),
+ * Members (invite/approve/roster/blocked), Agents (attach/detach), Board (link to
+ * the Boards tab). The Settings panel hosts the edit form, the metadata that used
+ * to live in the expanded list card, and the danger zone (leave / delete). */
+function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack, onChanged, onLeave, onDelete }) {
+  const { confirm, ConfirmUI } = useConfirm();
+  const [tab, setTab] = useState(() => { try { return sessionStorage.getItem('aimeat.org.tab') || 'workspaces'; } catch { return 'workspaces'; } });
+  const [showSettings, setShowSettings] = useState(!!initialSettings);
+  const [wsCount, setWsCount] = useState(null);
+  useEffect(() => { try { sessionStorage.setItem('aimeat.org.tab', tab); } catch { /* noop */ } }, [tab]);
+
+  const isCreator = org.creatorGhii === ghii;
+  const isAdmin = org.admins?.includes(ghii);
+  const isMember = org.members?.includes(ghii);
+  const canEdit = isCreator || isAdmin;
+  const typeLabel = t(`organisms.types.${org.type}`) || org.type;
+
+  /* ── Settings: edit form (admins), metadata, danger zone ── */
+  const [editForm, setEditForm] = useState(null);
+  const [saving, setSaving] = useState(false);
+  // Re-seed the form when another organism is opened (org.id), not on every reload of the same org.
+  useEffect(() => { setEditForm(null); }, [org.id]);
+  const seedForm = () => ({
+    name: org.name || '', description: org.description || '', type: org.type,
+    join_policy: org.joinPolicy, visibility: org.visibility, interests: (org.interests || []).join(', '),
+  });
+  const saveEdit = async () => {
+    if (!editForm?.name?.trim()) { showToast(t('organisms.nameRequired') || 'Name is required'); return; }
+    setSaving(true);
+    try {
+      const interests = editForm.interests.split(',').map(s => s.trim()).filter(Boolean);
+      const result = await orgService.updateOrganism(org.id, {
+        name: editForm.name.trim(), description: editForm.description.trim(),
+        type: editForm.type, join_policy: editForm.join_policy, visibility: editForm.visibility, interests,
+      });
+      if (result?.ok !== false) { showToast(t('organisms.updated') || 'Organism updated'); setEditForm(null); onChanged?.(); }
+      else showToast(result?.error?.message || (t('organisms.updateError') || 'Failed to update'));
+    } catch { showToast(t('organisms.updateError') || 'Failed to update'); }
+    finally { setSaving(false); }
+  };
+
+  const boardIdShort = org.boardId && org.boardId.length > 20
+    ? `${org.boardId.slice(0, 12)}…${org.boardId.slice(-6)}` : (org.boardId || '');
+  const copyBoardId = async () => {
+    const ok = await copyToClipboard(org.boardId);
+    showToast(ok ? (t('organisms.copied') || 'Copied') : (t('organisms.copyFailed') || 'Could not copy'));
+  };
+
+  const renderSettings = () => html`
+    <div class="card-detail pj-org-settings">
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">${t('organisms.creator') || 'Creator'}</span>
+          <span class="detail-value">${escHtml(org.creatorGhii || '-')}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">${t('organisms.admins') || 'Admins'}</span>
+          <span class="detail-value">${(org.admins || []).join(', ') || '-'}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">${t('organisms.memberCount') || 'Members'}</span>
+          <span class="detail-value">${(org.members || []).length} / ${org.maxMembers || 500}</span>
+        </div>
+        ${org.createdAt ? html`
+          <div class="detail-item">
+            <span class="detail-label">${t('organisms.createdAt') || 'Created'}</span>
+            <span class="detail-value">${fmtDate(org.createdAt)}</span>
+          </div>` : null}
+        ${org.boardId ? html`
+          <div class="detail-item">
+            <span class="detail-label">${t('organisms.board') || 'Board'}</span>
+            <span class="detail-value mono" title=${escHtml(org.boardId)}>${escHtml(boardIdShort)}
+              <button class="pj-icon-btn" title=${t('organisms.copyId') || 'Copy ID'} onClick=${copyBoardId}>${'📋'}</button>
+            </span>
+          </div>` : null}
+      </div>
+      ${(org.interests || []).length > 0 ? html`
+        <div class="flex-row-wrap">
+          ${org.interests.map(tag => html`<span class="file-tag" key=${tag}>${escHtml(tag)}</span>`)}
+        </div>` : null}
+
+      ${canEdit ? (editForm ? html`
+        <div class="flex-col">
+          <input type="text" value=${editForm.name} onInput=${(e) => setEditForm(f => ({ ...f, name: e.target.value }))}
+            placeholder=${t('organisms.namePlaceholder') || 'Name'} class="input-field input-sm" />
+          <textarea value=${editForm.description} onInput=${(e) => setEditForm(f => ({ ...f, description: e.target.value }))} rows="2"
+            placeholder=${t('organisms.descPlaceholder') || 'Description'} class="input-field input-sm" />
+          <input type="text" value=${editForm.interests} onInput=${(e) => setEditForm(f => ({ ...f, interests: e.target.value }))}
+            placeholder=${t('organisms.interestsPlaceholder') || 'Interests (comma separated)'} class="input-field input-sm" />
+          <div class="flex-row-wrap">
+            <select value=${editForm.type} onChange=${(e) => setEditForm(f => ({ ...f, type: e.target.value }))} class="input-field input-sm">
+              <option value="community">${t('organisms.types.community') || 'Community'}</option>
+              <option value="team">${t('organisms.types.team') || 'Team'}</option>
+              <option value="club">${t('organisms.types.club') || 'Club'}</option>
+              <option value="cooperative">${t('organisms.types.cooperative') || 'Cooperative'}</option>
+              <option value="project">${t('organisms.types.project') || 'Project'}</option>
+            </select>
+            <select value=${editForm.join_policy} onChange=${(e) => setEditForm(f => ({ ...f, join_policy: e.target.value }))} class="input-field input-sm">
+              <option value="open">${t('organisms.policyOpen') || 'Open (anyone can join)'}</option>
+              <option value="approval_required">${t('organisms.policyApproval') || 'Approval required'}</option>
+              <option value="invite_only">${t('organisms.policyInvite') || 'Invite only'}</option>
+            </select>
+            <select value=${editForm.visibility} onChange=${(e) => setEditForm(f => ({ ...f, visibility: e.target.value }))} class="input-field input-sm">
+              <option value="public">${t('organisms.visPublic') || 'Public'}</option>
+              <option value="listed">${t('organisms.visListed') || 'Listed'}</option>
+              <option value="private">${t('organisms.visPrivate') || 'Private'}</option>
+            </select>
+          </div>
+          <div class="flex-row-wrap">
+            <button class="btn-primary btn-sm" onClick=${saveEdit} disabled=${saving}>${saving ? '...' : (t('organisms.save') || 'Save')}</button>
+            <button class="btn-ghost btn-sm" onClick=${() => setEditForm(null)}>${t('organisms.cancel') || 'Cancel'}</button>
+          </div>
+        </div>
+      ` : html`
+        <div class="flex-row-wrap">
+          <button class="btn-outline btn-sm" onClick=${() => setEditForm(seedForm())}>${t('organisms.edit') || 'Edit'}</button>
+        </div>
+      `) : null}
+
+      ${(isCreator || isMember) ? html`
+        <div class="detail-label">${t('organisms.dangerZone') || 'Danger zone'}</div>
+        <div class="flex-row-wrap">
+          ${isMember && !isCreator ? html`
+            <button class="btn-danger btn-sm" onClick=${onLeave}>${t('organisms.leave') || 'Leave'}</button>` : null}
+          ${isCreator ? html`
+            <button class="btn-danger btn-sm" onClick=${onDelete}>${t('organisms.delete') || 'Delete'}</button>` : null}
+        </div>` : null}
+    </div>`;
+
+  const tabs = [
+    { id: 'workspaces', label: t('organisms.tabWorkspaces') || 'Workspaces', count: wsCount },
+    { id: 'members', label: t('organisms.tabMembers') || 'Members', count: (org.members || []).length },
+    { id: 'agents', label: t('organisms.tabAgents') || 'Agents', count: (org.agentGaiis || []).length },
+    { id: 'board', label: t('organisms.tabBoard') || 'Board', count: null },
+  ];
+
+  return html`
+    <div class="pj-ws">
+      <div class="pj-org-breadcrumb">
+        <button class="pj-org-crumb-link" onClick=${onBack}>${t('organisms.title') || 'Organisms'}</button>
+        <span class="pj-org-crumb-sep">/</span>
+        <span>${escHtml(org.name || org.id)}</span>
+      </div>
+
+      <div class="pj-org-home-head">
+        <div class="pj-org-avatar pj-org-avatar-lg" aria-hidden="true">${orgInitials(org.name)}</div>
+        <div class="pj-org-home-title">
+          <div class="pj-org-titlerow">
+            <span class="pj-org-home-name">${escHtml(org.name || org.id)}</span>
+            <span class="badge badge-info">${typeLabel}</span>
+            <span class="badge ${org.visibility === 'public' ? 'badge-success' : 'badge-warn'}">${org.visibility || ''}</span>
+          </div>
+          ${org.description ? html`<div class="section-desc pj-org-home-desc">${escHtml(org.description)}</div>` : null}
+        </div>
+        <div class="pj-org-home-actions">
+          <button class="btn-outline btn-sm" title=${t('organisms.exportOrgHint') || 'Download a ZIP backup of the whole organism (all workspaces)'}
+            onClick=${() => exportOrganismZip(org, showToast)}>${'⬇ '}${t('organisms.exportOrg') || 'Export'}</button>
+          <button class="btn-outline btn-sm ${showSettings ? 'pj-org-btn-active' : ''}" onClick=${() => setShowSettings(s => !s)}>${'⚙ '}${t('organisms.settings') || 'Settings'}</button>
+        </div>
+      </div>
+
+      ${showSettings ? renderSettings() : null}
+
+      <div class="pj-org-tabs" role="tablist">
+        ${tabs.map(tb => html`
+          <button class="pj-org-tab ${tab === tb.id ? 'active' : ''}" role="tab" aria-selected=${tab === tb.id} key=${tb.id}
+            onClick=${() => setTab(tb.id)}>
+            ${tb.label}${tb.count !== null && tb.count !== undefined ? html`<span class="pj-org-tab-count">${tb.count}</span>` : null}
+          </button>`)}
+      </div>
+
+      ${tab === 'workspaces' ? html`
+        <${WorkspaceList} org=${org} showToast=${showToast} onOpen=${onOpenWs} onCount=${setWsCount} />
+        <${OrgSearch} orgId=${org.id} onOpenWorkspace=${(ws) => onOpenWs(ws)} />
+      ` : null}
+
+      ${tab === 'members' ? html`
+        <${OrgMemberManager} org=${org} ghii=${ghii} canManage=${canEdit} isCreator=${isCreator}
+          showToast=${showToast} confirm=${confirm} onChanged=${onChanged} show="members" />` : null}
+
+      ${tab === 'agents' ? html`
+        <${OrgMemberManager} org=${org} ghii=${ghii} canManage=${canEdit} isCreator=${isCreator}
+          showToast=${showToast} confirm=${confirm} onChanged=${onChanged} show="agents" />` : null}
+
+      ${tab === 'board' ? html`
+        <div class="card-detail">
+          <div class="section-title">${t('organisms.tabBoard') || 'Board'}</div>
+          ${org.boardId ? html`
+            <div class="section-desc">${t('organisms.boardDesc') || 'This organism has a discussion board. Open it in the Boards view.'}</div>
+            <div class="pj-org-boardrow">
+              <span class="mono" title=${escHtml(org.boardId)}>${escHtml(boardIdShort)}</span>
+              <button class="pj-icon-btn" title=${t('organisms.copyId') || 'Copy ID'} onClick=${copyBoardId}>${'📋'}</button>
+              <button class="btn-outline btn-sm" onClick=${() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'boards' } }))}>
+                ${t('organisms.openBoardsTab') || 'Open in Boards'}</button>
+            </div>
+          ` : html`
+            <div class="section-desc">${t('organisms.noBoard') || 'This organism has no board.'}</div>
+          `}
+        </div>` : null}
+
+      <${ConfirmUI} />
+    </div>`;
 }
 
 /* ───────────────── Organism workspace (manifest-driven) ─────────────────
@@ -792,7 +1030,9 @@ const PRIMARY_FIELD = { goal: 'title', plan: 'approach', deliverable: 'title', r
 /* Workspace list — an organism contains many workspaces (each an independent manifest + data set,
  * namespaced under organism.{id}.w.{wsId}.*). Lists the registry (organism.{id}.meta.workspaces),
  * lets the user create a new one (→ opens its setup/generate screen) or open/delete an existing one. */
-function WorkspaceList({ org, showToast, onOpen, onBack }) {
+/* Rendered embedded in OrganismHome's Workspaces tab (the back/export topbar + organism title
+ * moved to the home header). onCount reports the discovered workspace count for the tab badge. */
+function WorkspaceList({ org, showToast, onOpen, onCount }) {
   const orgId = org.id;
   const { confirm, ConfirmUI } = useConfirm();
   const [list, setList] = useState(null);   // null = loading
@@ -806,7 +1046,11 @@ function WorkspaceList({ org, showToast, onOpen, onBack }) {
 
   // Discovery: every workspace in the org (membership-gated) with this user's access status. A member
   // sees workspaces they can't yet read (access:'none') so they can request access.
-  const load = useCallback(async () => { setList(await orgService.discoverWorkspaces(orgId)); }, [orgId]);
+  const load = useCallback(async () => {
+    const l = await orgService.discoverWorkspaces(orgId);
+    setList(l);
+    onCount?.(Array.isArray(l) ? l.length : 0);
+  }, [orgId, onCount]);
   useEffect(() => { load(); }, [load]);
 
   const requestAccess = async (w) => {
@@ -890,27 +1134,10 @@ function WorkspaceList({ org, showToast, onOpen, onBack }) {
     } catch (e) { showToast((e && e.message) || 'Import failed'); }
     finally { setBusy(false); }
   };
-  const doExportOrg = async () => {
-    try {
-      const res = await fetch(`/v1/organisms/${encodeURIComponent(orgId)}/export`, { headers: { Authorization: 'Bearer ' + jwt() } });
-      if (!res.ok) throw new Error('Export failed');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = `organism-${String(org.name || orgId).replace(/[^a-z0-9_-]+/gi, '-').slice(0, 40)}.zip`;
-      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    } catch (e) { showToast((e && e.message) || 'Export failed'); }
-  };
-
   return html`
-    <div class="pj-ws">
+    <div class="pj-ws-embedded">
       <${ConfirmUI} />
       <input type="file" accept=".zip,application/zip" ref=${fileRef} style="display:none" onChange=${(e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; doImport(f); }} />
-      <div class="pj-ws-topbar">
-        <button class="btn-ghost btn-sm" onClick=${onBack}>${'← '}${t('organisms.allOrganisms') || 'All organisms'}</button>
-        <button class="btn-ghost btn-sm" title=${t('organisms.exportOrgHint') || 'Download a ZIP backup of the whole organism (all workspaces)'} onClick=${doExportOrg}>${'⬇ '}${t('organisms.exportOrg') || 'Export organism'}</button>
-      </div>
-      <div class="section-title">${escHtml(org.name || 'Organism')}</div>
       <div class="section-desc">${t('organisms.workspacesDesc') || 'Workspaces in this organism — each is an independent space with its own documents, records and history.'}</div>
 
       ${overview ? html`

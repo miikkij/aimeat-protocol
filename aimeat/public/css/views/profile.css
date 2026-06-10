@@ -4,6 +4,9 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v1.12.0 — 2026-06-10 — Organisms list renew, phase 1: compact .pj-org-row list
+ *     (avatar, one-line meta, kebab menu, drag-over state), .pj-menu dropdown,
+ *     organism home page (.pj-org-home-head, underline .pj-org-tabs, breadcrumb).
  *   v1.11.0 — 2026-06-08 — Full-bleed dashboard shell: drop the 1000px cap on the
  *     .pf wrapper so the sidebar+content fill the viewport like the admin dashboard
  *     (tab content was squeezed to ~760px). Sidebar stays left-anchored; .pf-content
@@ -2324,3 +2327,55 @@
 .md-wikilink:hover { border-bottom-style: solid; }
 .md-img { max-width: 100%; height: auto; border-radius: 6px; }
 @media (max-width: 640px) { .pj-docspace { flex-direction: column; } .pj-doc-index { flex: none; width: 100%; } }
+
+/* ───────────────── Organisms list renew (phase 1) ─────────────────
+ * Compact list rows + kebab menu + organism home page. All colors via theme tokens. */
+
+/* Topbar action cluster (sort select + Import + Create) */
+.pj-org-topbar-actions { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.pj-org-sort { width: auto; }
+
+/* Compact rows */
+.pj-org-list { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.75rem; }
+.pj-org-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.65rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.5rem 0.65rem; box-shadow: var(--shadow-sm); }
+.pj-org-row[draggable="true"] { cursor: grab; }
+.pj-org-row.pj-org-drag-over { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.pj-org-avatar { width: 36px; height: 36px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; background: var(--bg-dim); color: var(--text-dim); border: 1px solid var(--border); flex: none; user-select: none; }
+.pj-org-avatar-lg { width: 46px; height: 46px; font-size: 1.05rem; border-radius: 11px; }
+.pj-org-main { flex: 1; min-width: 220px; cursor: pointer; }
+.pj-org-titlerow { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; min-width: 0; }
+.pj-org-name { font-weight: 600; font-size: 0.95rem; color: var(--text); }
+.pj-org-lock { font-size: 0.75rem; }
+.pj-org-desc { font-size: 0.78rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 48ch; }
+.pj-org-stats { display: flex; align-items: center; gap: 0.8rem; font-size: 0.78rem; color: var(--muted); flex: none; }
+.pj-org-stat { display: inline-flex; align-items: center; gap: 0.25rem; white-space: nowrap; }
+.pj-org-openbtn { flex: none; white-space: nowrap; }
+.pj-org-detail { flex-basis: 100%; border-top: 1px solid var(--border); margin-top: 0.35rem; padding-top: 0.5rem; cursor: default; }
+.pj-org-hint { font-size: 0.74rem; color: var(--muted); margin: -0.35rem 0 0.75rem; }
+
+/* Kebab ("…") menu */
+.pj-menu { position: relative; flex: none; }
+.pj-menu-btn { font-size: 1.05rem; padding: 0.2rem 0.35rem; border-radius: 6px; }
+.pj-menu-btn:hover { background: var(--bg-surface); }
+.pj-menu-pop { position: absolute; right: 0; top: calc(100% + 4px); background: var(--card); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-md); display: flex; flex-direction: column; min-width: 170px; z-index: 30; padding: 0.25rem; }
+.pj-menu-item { text-align: left; background: none; border: none; padding: 0.45rem 0.6rem; font-size: 0.83rem; color: var(--text); cursor: pointer; border-radius: 6px; white-space: nowrap; }
+.pj-menu-item:hover { background: var(--bg-surface); }
+.pj-menu-item-danger { color: var(--danger-fg); }
+
+/* Organism home page */
+.pj-org-breadcrumb { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.35rem; }
+.pj-org-crumb-link { background: none; border: none; padding: 0; font-size: inherit; color: var(--accent); cursor: pointer; }
+.pj-org-crumb-link:hover { text-decoration: underline; }
+.pj-org-home-head { display: flex; align-items: flex-start; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.pj-org-home-title { flex: 1; min-width: 220px; }
+.pj-org-home-name { font-weight: 700; font-size: 1.25rem; color: var(--text); }
+.pj-org-home-desc { margin-top: 0.15rem; }
+.pj-org-home-actions { display: flex; gap: 0.4rem; flex: none; align-items: flex-start; }
+.pj-org-btn-active { border-color: var(--accent); color: var(--accent); }
+.pj-org-settings { margin-bottom: 0.75rem; }
+.pj-org-tabs { display: flex; gap: 1.1rem; border-bottom: 1px solid var(--border); margin: 0.6rem 0 1rem; flex-wrap: wrap; }
+.pj-org-tab { background: none; border: none; padding: 0.45rem 0.1rem; font-size: 0.88rem; color: var(--text-dim); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.pj-org-tab:hover { color: var(--text); }
+.pj-org-tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+.pj-org-tab-count { color: var(--muted); font-size: 0.75rem; margin-left: 0.3rem; }
+.pj-org-boardrow { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
