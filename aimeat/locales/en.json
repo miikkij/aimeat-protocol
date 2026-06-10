@@ -5463,7 +5463,6 @@
   },
   "organisms": {
     "title": "Organisms",
-    "openWorkspace": "Open workspace",
     "backToList": "All organisms",
     "noWorkspace": "This organism has no workspace yet. Set one up to track goals, plans, deliverables and decisions — versioned on publish.",
     "setupWorkspace": "Set up workspace",
@@ -5712,6 +5711,7 @@
     "restructure": "✨ Restructure / add types with AI",
     "restructureTitle": "Restructure / add types with AI",
     "restructureDesc": "Describe what to add or change. Existing types and their data are kept — the AI extends the current structure. (To start completely fresh, delete the workspace below first.)",
+    "open": "Open",
     "sortTitle": "Sort",
     "sortCustom": "My order",
     "sortName": "Name A–Z",

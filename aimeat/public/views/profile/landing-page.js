@@ -15,6 +15,8 @@
  *     AppStrip — home/section sub-components
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v2.3.0 — 2026-06-10 — Drop the "← Home" button from the content header (visual noise,
+ *     duplicated the sidebar's 🏠 Home item); the header keeps the current-tab label.
  *   v2.2.0 — 2026-06-10 — Listen for the `aimeat-open-tab` CustomEvent so tab components can
  *     navigate to another profile tab (first user: organism home's Board tab → Boards view).
  *   v2.1.0 — 2026-06-09 — Remembered open view (openView) now persists in
@@ -697,7 +699,6 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
       <main class="pf-content">
         ${openView ? html`
           <div class="pf-content-head">
-            <button class="pf-back-btn" onClick=${close}>← ${t('profile.landing.home')}</button>
             <span class="pf-back-current">${getTabLabel(openView.tabId)}</span>
           </div>
           <div class="pf-content-body">${renderTab(openView.tabId)}</div>

@@ -5463,7 +5463,6 @@
   },
   "organisms": {
     "title": "Organismit",
-    "openWorkspace": "Avaa työtila",
     "backToList": "Kaikki organismit",
     "noWorkspace": "Tällä organismilla ei ole vielä työtilaa. Luo sellainen seurataksesi tavoitteita, suunnitelmia, tuotoksia ja päätöksiä — versioituna julkaistaessa.",
     "setupWorkspace": "Luo työtila",
@@ -5712,6 +5711,7 @@
     "restructure": "✨ Muokkaa rakennetta / lisää tyyppejä tekoälyllä",
     "restructureTitle": "Muokkaa rakennetta / lisää tyyppejä tekoälyllä",
     "restructureDesc": "Kuvaile mitä lisätä tai muuttaa. Olemassa olevat tyypit ja niiden data säilyvät — tekoäly laajentaa nykyistä rakennetta. (Aloita kokonaan alusta poistamalla työtila ensin alta.)",
+    "open": "Avaa",
     "sortTitle": "Järjestä",
     "sortCustom": "Oma järjestys",
     "sortName": "Nimi A–Ö",

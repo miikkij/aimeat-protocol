@@ -67,6 +67,8 @@
  *     between the list and a workspace — Members/Agents tabs host the former in-card OrgMemberManager
  *     sections, Settings hosts the edit form + metadata + danger zone, Board links to the Boards tab.
  *     Nothing removed: every former card action has a new home (list "…" menu, home header, or a tab).
+ *   v1.16.0 — 2026-06-10 — Row button "Open workspace" → "Open"; new 📁 workspace-count stat next to
+ *     the members counter (lazy discoverWorkspaces per own org) so empty organisms are obvious.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
@@ -432,6 +434,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const [formInterests, setFormInterests] = useState('');
 
   const ghii = session?.owner || '';
+  const [wsCounts, setWsCounts] = useState({});   // orgId → workspace count (own orgs)
 
   const loadData = useCallback(async () => {
     try {
@@ -445,6 +448,10 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       setMyOrganisms(mine);
       setPublicOrganisms(discover);
       onStats?.({ organisms: mine.length });
+      // Workspace counts for the 📁 row stat (member-gated endpoint, so own orgs only).
+      Promise.all(mine.map(async (o) => [o.id, (await orgService.discoverWorkspaces(o.id)).length]))
+        .then(entries => setWsCounts(Object.fromEntries(entries)))
+        .catch(() => {});
     } catch {
       setMyOrganisms([]);
       setPublicOrganisms([]);
@@ -692,12 +699,14 @@ export default function OrganismsTab({ session, showToast, onStats }) {
           ${org.description ? html`<div class="pj-org-desc">${escHtml(org.description)}</div>` : null}
         </div>
         <div class="pj-org-stats">
+          ${isMine && wsCounts[org.id] !== undefined ? html`
+            <span class="pj-org-stat" title=${t('organisms.tabWorkspaces') || 'Workspaces'}>${'\uD83D\uDCC1'} ${wsCounts[org.id]}</span>` : null}
           <span class="pj-org-stat" title=${t('organisms.members') || 'Members'}>${'\uD83D\uDC65'} ${(org.members || []).length}</span>
           <span class="pj-org-stat" title=${t('organisms.attachedAgents') || 'Attached agents'}>${'\uD83E\uDD16'} ${(org.agentGaiis || []).length}</span>
           ${org.createdAt ? html`<span class="pj-org-stat pj-org-date" title=${t('organisms.createdAt') || 'Created'}>${fmtDate(org.createdAt)}</span>` : null}
         </div>
         ${(isMine || isMember)
-          ? html`<button class="btn-outline btn-sm pj-org-openbtn" onClick=${() => openHome(false)}>${t('organisms.openWorkspace') || 'Open workspace'}</button>`
+          ? html`<button class="btn-outline btn-sm pj-org-openbtn" onClick=${() => openHome(false)}>${t('organisms.open') || 'Open'}</button>`
           : html`<button class="btn-outline btn-sm pj-org-openbtn" onClick=${() => handleJoin(org.id)}>${t('organisms.join') || 'Join'}</button>`}
         ${isMine ? html`<${KebabMenu} label=${t('organisms.moreActions') || 'More actions'} items=${menuItems} />` : null}
         ${isExpanded ? renderDiscoverDetail(org) : null}
