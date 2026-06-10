@@ -4,6 +4,103 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## aimeat-crewai 0.4.0 - 2026-06-10
+
+**Loopback serve transport (Connector Forward Tunnel, Phase 5).** The CrewAI
+integration now rides the long-lived `aimeat connect serve --http` daemon
+instead of spawning connector subprocesses and opening a fresh TLS connection
+per REST call. Pairs with AIMEAT node 1.21.0 (tunnel enabled); degrades
+transparently to the serve daemon's direct-HTTP fallback against older /
+tunnel-disabled nodes.
+
+### Added
+
+- **`serve_params()`** (exported, `mcp_client.py`) — Streamable-HTTP MCP params
+  targeting the local loopback serve daemon. Discovers it via
+  `<AIMEAT_HOME or ~/.aimeat>/serve.json` (pid-alive + `/local/status` probe),
+  auto-starts `aimeat connect serve --http` detached when absent/stale, and
+  fails fast if a requested `agent_name` is not registered locally. The
+  loopback MCP needs no auth (loopback bind is the trust boundary) — the
+  Bearer value is a documented placeholder.
+- **`ensure_serve()`** + **`AimeatServeError`** (exported) — the underlying
+  discover/auto-start helper returning the discovery document; importable
+  without CrewAI installed.
+- **`run_crew_daemon(serve_options=...)`** — passthrough for non-PATH CLI
+  installs (custom `aimeat_command` argv prefix, `spawn_cwd`, `start_timeout`).
+
+### Changed
+
+- **`run_crew_daemon` REST helpers go through one shared `requests.Session`**
+  bound to the loopback serve proxy with the `X-Aimeat-Agent` header — the
+  serve daemon holds the bearer token and the single upstream WS per agent, so
+  the 30s poll cycle is loopback keep-alive instead of a per-call TLS storm.
+- **Concurrent EXECUTE workers no longer spawn a connector subprocess each.**
+  Loopback HTTP is naturally concurrent, so every per-worker liaison shares
+  the one serve daemon (the "shared stdio MCP can't be driven by parallel
+  kickoffs" constraint is gone). The shared liaison likewise targets the
+  loopback `/v1/mcp` via `serve_params()`.
+- **Push-driven idle wait.** When the agent's serve transport is `tunnel`,
+  the daemon parks on the serve long-poll (`GET /local/tasks/next`) between
+  cycles and wakes the instant a task is delivered (true push, signal-safe
+  ≤5s chunks); the handout is only a wake signal — dispatch still re-lists
+  from the store. Degraded transports keep the classic interval sleep.
+
+### Unchanged
+
+- `stdio_params()` / `http_params()` / `sse_params()` keep working as before
+  for environments without a local connector install (CI, serverless).
+
+## [1.21.0] - 2026-06-10
+
+### Connector Forward Tunnel — one persistent WS per agent, realtime delivery, loopback serve daemon
+
+Replaces the connector's per-call TLS storm (every poll/tool call was a fresh
+`Connection: close` request) with a single persistent WebSocket per agent, and
+adds a local daemon surface crews attach to over loopback. Server endpoint
+`GET /v1/connect/tunnel` (agent JWT at upgrade) is **opt-in** via
+`AIMEAT_CONNECT_TUNNEL_ENABLED=true`.
+
+#### Added
+
+- **Server (Phases 1–2)** — `ConnectTunnelManager`: id-correlated forward
+  dispatch through the real Express stack (loopback self-fetch, pinned agent
+  bearer — scope enforcement + envelope hold by construction), realtime
+  `deliver{task_assigned}` push, `backlog` snapshot on connect (storage truth;
+  `ack` is in-session dedup only), heartbeat reaping, SSRF/method/payload
+  hardening, `GET /v1/connect/tunnel/stats` (operator).
+- **Connector tunnel client (Phase 3)** — `src/cli/connect/tunnel-client.ts`:
+  auto-reconnect (exponential backoff + jitter from the server `welcome` hint),
+  heartbeat with 3×-interval dead-socket detection, `forward()` correlation
+  with synthetic 504 on timeout, `deliver`→ack + `backlog` emit, proactive
+  pre-expiry token reconnect (`token_expires_at`), auth-failure stop with
+  "Run: aimeat connect" guidance (no hot-loop).
+- **Loopback serve daemon (Phase 4)** — `aimeat connect serve --http` (alias
+  `--daemon`): Express bound to `127.0.0.1:<ephemeral>` with a local
+  Streamable-HTTP MCP endpoint at `/v1/mcp`, a REST proxy (`ALL /v1/*`,
+  `X-Aimeat-Agent` header or `?agent=` picks the agent), and a push surface
+  `GET /local/tasks/next?wait=ms` (long-poll fed by tunnel `deliver`/`backlog`
+  — realtime tasks with zero upstream polling) + `GET /local/status` +
+  `POST /local/shutdown`. Writes the discovery file `~/.aimeat/serve.json`
+  (`schema_version, port, pid, agents, started_at`) atomically, removes it on
+  clean exit, stale-detects by pid. `AIMEAT_HOME` env now overrides the
+  connector home directory.
+- **Transport seam** — `AimeatClient` accepts a pluggable `Transport`; in the
+  daemon every MCP tool call routes over the tunnel with zero per-tool changes.
+  One-shot CLI keeps direct `fetch` + `Connection: close`.
+- **Tests** — `test/unit/connect-tunnel-client.test.ts` (16 tests, mock ws
+  server) and E2E suites `e2e-connect-tunnel`, `e2e-connect-tunnel-delivery`,
+  `e2e-connect-serve-loopback` (forward-proxy parity, push latency, no-loss
+  backlog, single-socket invariant, discovery lifecycle, degraded fallback) on
+  SQLite + MongoDB.
+
+#### Changed
+
+- **Poller is now the degraded-mode fallback in the daemon** — when an agent's
+  tunnel is online, `deliver`/`backlog` frames drive the same wake adapter +
+  task-runner hook and no upstream poll loop runs. If the node has the tunnel
+  disabled or is too old, the daemon logs the downgrade and falls back to
+  direct HTTP + the legacy poll loop. Stdio serve (CI/serverless) is unchanged.
+
 ## [1.20.4] - 2026-06-09
 
 ### Organisms: membership lifecycle — invitations, ownership transfer, blocking, agent attachment

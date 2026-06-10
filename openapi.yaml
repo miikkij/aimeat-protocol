@@ -136,6 +136,8 @@ tags:
     description: Hello Integration onboarding flow for new agents
   - name: Sharing Groups
     description: Named groups for sharing memory and files with specific users and agents
+  - name: Connector Tunnel
+    description: Persistent agent⇄server WebSocket tunnel (forward API calls + realtime reverse delivery)
 
 components:
   securitySchemes:
@@ -3071,6 +3073,83 @@ components:
 # ============================================================
 
 paths:
+  # ── Connector Forward Tunnel ───────────────────────────────
+  /v1/connect/tunnel:
+    get:
+      operationId: connectTunnel
+      summary: Open the connector forward tunnel (WebSocket upgrade)
+      description: |
+        **WebSocket endpoint** (HTTP `101 Switching Protocols`), not a normal
+        REST call. A connector opens **one** persistent WS per agent identity and
+        multiplexes id-correlated forward API calls (agent→server) over it while
+        receiving realtime reverse delivery (server→agent push) on the same
+        socket — so the connector never polls.
+
+        Authenticate by passing the agent JWT (roles must include `agent`) as
+        `?token=<jwt>` or an `Authorization: Bearer <jwt>` header at upgrade.
+        Non-agent or invalid tokens are rejected (`401`/`403`) before the upgrade.
+        The verified identity is pinned to the socket and reused as the bearer for
+        every forwarded request, so existing scope enforcement applies unchanged.
+
+        Frames are JSON objects with a `type`: `welcome` (S→C handshake),
+        `heartbeat`/`heartbeat_ack`, `request` (C→S: `{id, method, path, query?,
+        headers?, body?}`), `response` (S→C: `{id, status, body}` — AIMEAT
+        envelope), `deliver` (S→C: `{id, kind, payload}` full object),
+        `ack` (C→S: `{id}`), `backlog` (S→C on-connect snapshot of queued tasks +
+        pending messages), `disconnect`, and `error`.
+      tags: [Connector Tunnel]
+      parameters:
+        - name: token
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Agent JWT (alternative to the Authorization header) used at WS upgrade.
+      responses:
+        '101':
+          description: Switching Protocols — WebSocket tunnel established.
+        '401':
+          description: Missing or invalid token.
+        '403':
+          description: Token is valid but not an agent identity.
+  /v1/connect/tunnel/stats:
+    get:
+      operationId: connectTunnelStats
+      summary: Connector tunnel metrics (operator)
+      description: |
+        Read-only live metrics for the connector forward tunnel: active
+        connection count and lifetime forward/deliver/ack counters. Operator only.
+      tags: [Connector Tunnel]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Tunnel statistics.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          stats:
+                            type: object
+                            properties:
+                              activeConnections: { type: integer }
+                              connectionsTotal: { type: integer }
+                              forwardRequestsTotal: { type: integer }
+                              forwardErrorsTotal: { type: integer }
+                              deliveriesTotal: { type: integer }
+                              acksTotal: { type: integer }
+                              malformedFramesTotal: { type: integer }
+        '403':
+          description: Operator role required.
+        '503':
+          description: Connector forward tunnel is not enabled on this node.
+
   # ── Bootstrap ──────────────────────────────────────────────
   /:
     get:

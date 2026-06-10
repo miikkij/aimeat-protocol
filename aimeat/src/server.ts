@@ -11,6 +11,7 @@ import { requestIdMiddleware } from './middleware/request-id.js';
 import { agentMeAliasMiddleware } from './middleware/agent-me-alias.js';
 import { logger } from './utils/logger.js';
 import { TunnelManager } from './services/personal-tunnel.js';
+import { ConnectTunnelManager } from './services/connect-tunnel.js';
 import { RealtimeManager } from './services/realtime-manager.js';
 import { Scheduler } from './services/scheduler.js';
 
@@ -24,6 +25,7 @@ import { mountRoutes } from './server-bootstrap/routes-loader.js';
 export interface ServerResult {
   app: express.Express;
   tunnelManager: TunnelManager | null;
+  connectTunnelManager: ConnectTunnelManager | null;
   realtimeManager: RealtimeManager | null;
   scheduler: Scheduler;
   storage: Storage;
@@ -199,6 +201,7 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   return {
     app,
     tunnelManager: services.tunnelManager,
+    connectTunnelManager: services.connectTunnelManager,
     realtimeManager,
     scheduler: services.scheduler,
     storage,

@@ -24,6 +24,7 @@ import { enableAnonymousAuth } from '../auth/middleware.js';
 import { startHeartbeatJob, setOnPeerRecovery } from '../services/federation.js';
 import { performKeyExchange } from '../routes/federation.js';
 import { TunnelManager } from '../services/personal-tunnel.js';
+import { ConnectTunnelManager, setActiveConnectTunnelManager } from '../services/connect-tunnel.js';
 import { seedProfileSchemas } from '../services/profile-schemas.js';
 import { seedCsmTemplates } from '../services/csm-seed.js';
 import { seedManifestSchema } from '../services/manifest-schema.js';
@@ -49,6 +50,7 @@ export interface ServiceInitResult {
   networkDirectory: Map<string, ServiceSummary>;
   realtimeManager: RealtimeManager | null;
   tunnelManager: TunnelManager | null;
+  connectTunnelManager: ConnectTunnelManager | null;
   mailboxNotificationService: MailboxNotificationService | null;
   scheduler: Scheduler;
 }
@@ -210,6 +212,16 @@ export async function initializeServices(
     logger.info('Personal node support enabled', { maxSlots: config.personalNodeMaxSlots });
   }
 
+  // Connector Forward Tunnel manager — one persistent WS per agent identity for
+  // forward API calls + realtime reverse delivery. Decoupled from personal nodes.
+  let connectTunnelManager: ConnectTunnelManager | null = null;
+  if (config.connectTunnelEnabled) {
+    connectTunnelManager = new ConnectTunnelManager(config, storage);
+    connectTunnelManager.startHeartbeatMonitor();
+    setActiveConnectTunnelManager(connectTunnelManager);
+    logger.info('Connector forward tunnel enabled');
+  }
+
   // Mailbox push notification service (REQ-007)
   let mailboxNotificationService: MailboxNotificationService | null = null;
   if (config.personalNodesEnabled && config.pushEnabled && config.vapidPublicKey && config.vapidPrivateKey) {
@@ -230,6 +242,7 @@ export async function initializeServices(
     networkDirectory,
     realtimeManager,
     tunnelManager,
+    connectTunnelManager,
     mailboxNotificationService,
     scheduler,
   };

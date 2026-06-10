@@ -1,9 +1,15 @@
 /**
  * @file api-client.ts
  * @description HTTP client for AIMEAT node API with automatic auth header injection.
- * @structure Wraps fetch, response-envelope handling, and stored-token based client construction.
+ * @structure Wraps fetch, response-envelope handling, and stored-token based client
+ *   construction. `Transport` is the pluggable seam: the default transport does a
+ *   direct `fetch` with `Connection: close` (one-shot CLI behavior); the serve
+ *   daemon swaps in a tunnel transport (`ConnectTunnelClient.forward`) so every
+ *   MCP tool call flows over the single persistent WS without per-tool changes.
  * @usage Imported by `aimeat connect` subcommands and MCP tools.
- * @version-history v1.9.4 — 2026-05-28 — Update connector guidance and close one-shot CLI HTTP connections.
+ * @version-history
+ *   v1.9.4 — 2026-05-28 — Update connector guidance and close one-shot CLI HTTP connections.
+ *   v2.0.0 — 2026-06-10 — Phase 4: Transport seam (direct fetch default, tunnel override).
  */
 import { getToken } from './keychain.js';
 import { loadConfig } from './config.js';
@@ -14,9 +20,19 @@ export interface ApiResponse {
   error?: { code: string; message: string };
 }
 
+/**
+ * Pluggable request transport. `path` is always node-relative (`/v1/...`);
+ * absolute URLs never reach a transport (they go direct — see `send()`).
+ * Returns the HTTP status and the parsed (envelope) body.
+ */
+export interface Transport {
+  request(method: string, path: string, opts?: { body?: unknown; query?: Record<string, string> }): Promise<{ status: number; body: unknown }>;
+}
+
 export class AimeatClient {
   private baseUrl: string;
   private token: string | null = null;
+  private transport: Transport | null = null;
 
   constructor(baseUrl: string, token?: string) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
@@ -31,53 +47,40 @@ export class AimeatClient {
     return new AimeatClient(config.node_url, token);
   }
 
+  /** Route subsequent requests through `t` (e.g. the tunnel). `null` restores direct fetch. */
+  setTransport(t: Transport | null): void { this.transport = t; }
+  hasTransport(): boolean { return this.transport !== null; }
+
   private headers(): Record<string, string> {
     const h: Record<string, string> = { 'Content-Type': 'application/json', Connection: 'close' };
     if (this.token) h['Authorization'] = `Bearer ${this.token}`;
     return h;
   }
 
-  async get(path: string): Promise<ApiResponse> {
-    const url = path.startsWith('http') ? path : `${this.baseUrl}${path}`;
-    const res = await fetch(url, { headers: this.headers() });
-    return res.json() as Promise<ApiResponse>;
-  }
-
-  async post(path: string, body?: unknown): Promise<ApiResponse> {
+  /**
+   * Single dispatch point for every verb. Node-relative paths go through the
+   * transport when one is set; absolute URLs (presigned uploads etc.) and the
+   * default case use direct fetch with `Connection: close`.
+   */
+  private async send(method: string, path: string, body?: unknown): Promise<ApiResponse> {
+    if (this.transport && !path.startsWith('http')) {
+      const r = await this.transport.request(method, path, { body });
+      return r.body as ApiResponse;
+    }
     const url = path.startsWith('http') ? path : `${this.baseUrl}${path}`;
     const res = await fetch(url, {
-      method: 'POST',
+      method,
       headers: this.headers(),
-      body: body ? JSON.stringify(body) : undefined,
+      body: body !== undefined && body !== null ? JSON.stringify(body) : undefined,
     });
     return res.json() as Promise<ApiResponse>;
   }
 
-  async put(path: string, body?: unknown): Promise<ApiResponse> {
-    const url = path.startsWith('http') ? path : `${this.baseUrl}${path}`;
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: this.headers(),
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    return res.json() as Promise<ApiResponse>;
-  }
-
-  async patch(path: string, body?: unknown): Promise<ApiResponse> {
-    const url = path.startsWith('http') ? path : `${this.baseUrl}${path}`;
-    const res = await fetch(url, {
-      method: 'PATCH',
-      headers: this.headers(),
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    return res.json() as Promise<ApiResponse>;
-  }
-
-  async delete(path: string): Promise<ApiResponse> {
-    const url = path.startsWith('http') ? path : `${this.baseUrl}${path}`;
-    const res = await fetch(url, { method: 'DELETE', headers: this.headers() });
-    return res.json() as Promise<ApiResponse>;
-  }
+  async get(path: string): Promise<ApiResponse> { return this.send('GET', path); }
+  async post(path: string, body?: unknown): Promise<ApiResponse> { return this.send('POST', path, body); }
+  async put(path: string, body?: unknown): Promise<ApiResponse> { return this.send('PUT', path, body); }
+  async patch(path: string, body?: unknown): Promise<ApiResponse> { return this.send('PATCH', path, body); }
+  async delete(path: string): Promise<ApiResponse> { return this.send('DELETE', path); }
 
   getBaseUrl(): string { return this.baseUrl; }
   getTokenValue(): string | null { return this.token; }
