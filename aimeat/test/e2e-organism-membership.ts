@@ -237,5 +237,41 @@ await test('23. Cannot attach an agent you do not own', async () => {
     assert(r.status === 403, `expected 403 (not owner), got ${r.status}`);
 });
 
+// ── ?member= privacy + implicit-agent enumeration (the "agent can't find its home" report) ──
+
+let org3 = '';
+await test('24. ?member= lists private organisms ONLY for the member themself', async () => {
+    const o = await json('/v1/organisms', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ name: 'B Private Home', type: 'project', join_policy: 'invite_only', visibility: 'private' }) });
+    assert(o.status === 201, `org ${o.status}`);
+    org3 = o.body.data.organism.id;
+    // The member themself (their agents authenticate as the same owner) sees it:
+    const self = await json(`/v1/organisms?member=${B.name}`, { headers: auth(B.token) });
+    assert((self.body.data.organisms || []).some((x: any) => x.id === org3), 'self sees own private organism');
+    // Unauthenticated and a DIFFERENT owner must not be able to enumerate B's private memberships:
+    const anon = await json(`/v1/organisms?member=${B.name}`);
+    assert(!(anon.body.data.organisms || []).some((x: any) => x.id === org3), 'anonymous must not see B\'s private organism');
+    const other = await json(`/v1/organisms?member=${B.name}`, { headers: auth(C.token) });   // C = plain owner
+    assert(!(other.body.data.organisms || []).some((x: any) => x.id === org3), 'another owner must not see B\'s private organism');
+    // A is this node's FIRST registered owner → an operator, and operators MAY enumerate memberships:
+    const op = await json(`/v1/organisms?member=${B.name}`, { headers: auth(A.token) });
+    assert((op.body.data.organisms || []).some((x: any) => x.id === org3), 'an operator may enumerate memberships');
+});
+
+await test('25. members route lists each member\'s agents for an ACTIVE member (implicit access enumerable)', async () => {
+    const ag = await json('/v1/agents', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ name: 'homefinder', owner: B.name, capabilities: ['social'], model: 'gpt-4o' }) });
+    assert(ag.status === 201, `agent ${ag.status}: ${JSON.stringify(ag.body.error)}`);
+    const gaii = ag.body.data.agent.gaii as string;
+    const r = await json(`/v1/organisms/${org3}/members`, { headers: auth(B.token) });
+    assert(r.status === 200 && r.body.data.agents_included === true, `agents_included: ${JSON.stringify(r.body.data)}`);
+    const me = (r.body.data.members || []).find((m: any) => String(m.ghii).split('@')[0] === B.name);
+    assert(me && Array.isArray(me.agents) && me.agents.some((a: any) => a.gaii === gaii), `member row carries the owner's agents: ${JSON.stringify(me?.agents)}`);
+});
+
+await test('26. agent rosters are NOT exposed to non-members', async () => {
+    const r = await json(`/v1/organisms/${org2}/members`, { headers: auth(C.token) });   // C is not a member of org2
+    assert(r.status === 200, `members ${r.status}`);
+    assert(r.body.data.agents_included !== true && (r.body.data.members || []).every((m: any) => m.agents === undefined), 'non-member sees the legacy shape without agents');
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
 if (failed > 0) process.exit(1);

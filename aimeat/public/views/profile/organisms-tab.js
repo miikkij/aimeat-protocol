@@ -107,13 +107,36 @@
  *     populate effect only re-seeds untouched fields, so live updates never clobber typing). Spaces/
  *     Public-sharing headings restyled to group labels. Workspace-row counts get real singular/
  *     plural forms ("1 tietue", "{n} tietuetta").
+ *   v1.22.0 — 2026-06-10 — SchemaForm usability: new records pre-fill `id` (editable, hinted) and
+ *     requester-style fields (x-default:"currentUser" or requested_by/created_by/author names) with
+ *     the signed-in GHII; Save draft is always clickable and a failed attempt outlines the still-empty
+ *     required fields + lists them; readOnly (agent-filled) properties are hidden from the form and
+ *     excluded from required; per-field hints from manifest i18n / schema description. Generated
+ *     manifests can carry translations at manifest.i18n.{lang} ("{ns}.{field}", "{ns}.{field}.hint",
+ *     "type.{name}") — used for form labels, record read-view labels, space tab + section titles.
+ *   v1.23.0 — 2026-06-10 — Sources and Share are fixed workspace TABS (every workspace has them) —
+ *     both had sunk into Settings, which read as "dropped entirely". Share lazy-loads on first tab
+ *     open; Settings keeps form/spaces/chart/restructure/danger only. Fixed double-escaping: htm/
+ *     preact already escapes text nodes, so every ${'${'}escHtml(...)} printed literal &amp; — all 75
+ *     wrappers removed (titles like "Design & Architecture" now render correctly).
+ *   v1.24.0 — 2026-06-10 — Members tab lists each member's agents (🤖 line, from the enriched members
+ *     route) — same-owner agents inherit the membership implicitly, so "who can act here" is now
+ *     visible instead of an unlisted-access audit gap.
+ *   v1.25.0 — 2026-06-10 — Settings no longer lies about the tab state: it REPLACES the tab content
+ *     (no tab highlighted while open; clicking a tab closes it via the dirty guard; breadcrumb gains
+ *     "/ Settings") in BOTH the workspace and the organism home. Workspace settings reordered:
+ *     savable form bounded in its own card (Identity + Agent policy + Save), Spaces gets an
+ *     immediate-actions hint, Process group title for the edit-flow chart + restructure, dividers
+ *     between groups, danger zone last with nothing after it. Autonomy options show meanings
+ *     ("L3 — balanced"). "For agents" menu → "Agent access" with verb items ("Copy chat prompt",
+ *     "Copy coding agent prompt") and a divider before "Create contract agent" (KebabMenu supports
+ *     { divider: true }). Space tab labels capitalized to match the fixed tabs.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { Spinner, VisibilityPill } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { EmptyState } from '/components/EmptyState.js';
@@ -176,7 +199,9 @@ function KebabMenu({ items, label, trigger, btnClass }) {
         onClick=${(e) => { e.stopPropagation(); setOpen(o => !o); }}>${trigger || '⋮'}</button>
       ${open ? html`
         <div class="pj-menu-pop" role="menu" onClick=${(e) => e.stopPropagation()}>
-          ${visible.map(it => html`
+          ${visible.map((it, i) => it.divider
+            ? html`<div class="pj-menu-sep" key=${'sep' + i}></div>`
+            : html`
             <button class="pj-menu-item ${it.danger ? 'pj-menu-item-danger' : ''}" role="menuitem" key=${it.label}
               onClick=${() => { setOpen(false); it.onClick?.(); }}>${it.icon ? `${it.icon} ` : ''}${it.label}</button>`)}
         </div>` : null}
@@ -195,7 +220,7 @@ function TagInput({ tags, onChange, placeholder }) {
   return html`
     <div class="pj-taginput">
       ${tags.map(tag => html`
-        <span class="file-tag pj-tag" key=${tag}>${escHtml(tag)}
+        <span class="file-tag pj-tag" key=${tag}>${(tag)}
           <button class="pj-tag-x" title="×" onClick=${() => onChange(tags.filter(x => x !== tag))}>×</button>
         </span>`)}
       <input class="pj-taginput-field" value=${val} placeholder=${placeholder || 'Add…'}
@@ -249,9 +274,9 @@ function OrgSearch({ orgId, onOpenWorkspace }) {
       ${(results || []).map(r => html`
         <div class="pj-access-row card-clickable" key=${r.ws + '/' + r.space + '/' + r.id} role="button" onClick=${() => onOpenWorkspace?.(r.ws)}>
           <span>
-            <b>${escHtml(r.title)}</b>
-            <span class="pj-mini"> — ${escHtml(r.wsName || r.ws)} · ${escHtml(r.space)}</span>
-            <div class="pj-mini">${escHtml(r.snippet)}</div>
+            <b>${(r.title)}</b>
+            <span class="pj-mini"> — ${(r.wsName || r.ws)} · ${(r.space)}</span>
+            <div class="pj-mini">${(r.snippet)}</div>
           </span>
         </div>
       `)}
@@ -294,7 +319,7 @@ function IncomingInvitations({ showToast, onChanged }) {
       <div class="section-title">${t('organisms.youAreInvited') || 'You’re invited'}</div>
       ${invites.map(({ membership, organism }) => html`
         <div class="pj-access-row" key=${organism.id}>
-          <span><b>${escHtml(organism.name)}</b>${membership.invitedBy ? html` <span class="pj-mini">— ${(t('organisms.invitedByLabel') || 'invited by {who}').replace('{who}', escHtml(membership.invitedBy))}</span>` : null}</span>
+          <span><b>${(organism.name)}</b>${membership.invitedBy ? html` <span class="pj-mini">— ${(t('organisms.invitedByLabel') || 'invited by {who}').replace('{who}', (membership.invitedBy))}</span>` : null}</span>
           <span class="flex-row-wrap">
             <button class="btn-success btn-sm" disabled=${busy} onClick=${() => act(organism.id, true)}>${t('organisms.acceptInvite') || 'Accept'}</button>
             <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => act(organism.id, false)}>${t('organisms.declineInvite') || 'Decline'}</button>
@@ -414,12 +439,12 @@ function OrgAgentsPanel({ org, ghii, canManage, showToast, onChanged }) {
             <div class="pj-org-avatar" aria-hidden="true">${'🤖'}</div>
             <div class="pj-org-main pj-org-main-static">
               <div class="pj-org-titlerow">
-                <span class="pj-org-name">${escHtml(own?.display_name || p.name)}</span>
-                ${p.node ? html`<span class="badge badge-info">${escHtml(p.node)}</span>` : null}
+                <span class="pj-org-name">${(own?.display_name || p.name)}</span>
+                ${p.node ? html`<span class="badge badge-info">${(p.node)}</span>` : null}
               </div>
               <div class="pj-org-desc" title=${g}>
-                <span class="mono">${escHtml(p.owner ? `${p.name}#${p.owner}` : g)}</span>
-                ${act ? html` · ${t('organisms.agentActedIn') || 'active in'} ${escHtml([...act.ws].join(', '))} (${act.count}) · ${relTime(act.lastAt)}`
+                <span class="mono">${(p.owner ? `${p.name}#${p.owner}` : g)}</span>
+                ${act ? html` · ${t('organisms.agentActedIn') || 'active in'} ${([...act.ws].join(', '))} (${act.count}) · ${relTime(act.lastAt)}`
                   : (own?.last_seen ? html` · ${t('organisms.lastActive') || 'last active'} ${relTime(own.last_seen)}` : null)}
               </div>
             </div>
@@ -563,7 +588,7 @@ function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, confirm,
           <button class="btn-ghost btn-sm" onClick=${() => setShowInvite(false)}>${t('organisms.cancel') || 'Cancel'}</button>
         </div>` : null}
       ${canManage && invitations.length > 0 ? html`
-        <div class="section-desc">${t('organisms.outstandingInvites') || 'Awaiting acceptance'}: ${invitations.map(m => escHtml(m.ghii)).join(', ')}</div>
+        <div class="section-desc">${t('organisms.outstandingInvites') || 'Awaiting acceptance'}: ${invitations.map(m => (m.ghii)).join(', ')}</div>
       ` : null}
 
       ${canManage && pending.length > 0 ? pending.map(r => html`
@@ -571,10 +596,10 @@ function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, confirm,
           <div class="pj-org-avatar" aria-hidden="true">${'🙋'}</div>
           <div class="pj-org-main pj-org-main-static">
             <div class="pj-org-titlerow">
-              <span class="pj-org-name">${escHtml(r.ghii)}</span>
+              <span class="pj-org-name">${(r.ghii)}</span>
               <span class="pj-org-desc">${t('organisms.wantsToJoin') || 'wants to join'}${r.createdAt ? ` · ${relTime(r.createdAt)}` : ''}</span>
             </div>
-            ${r.message ? html`<div class="pj-org-desc">${escHtml(r.message)}</div>` : null}
+            ${r.message ? html`<div class="pj-org-desc">${(r.message)}</div>` : null}
           </div>
           <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => review(r.id, 'rejected')}>${t('organisms.decline') || 'Decline'}</button>
           <button class="btn-success btn-sm" disabled=${busy} onClick=${() => review(r.id, 'approved')}>${t('organisms.approve') || 'Approve'}</button>
@@ -594,12 +619,16 @@ function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, confirm,
               <div class="pj-org-avatar" aria-hidden="true">${orgInitials(m.ghii)}</div>
               <div class="pj-org-main pj-org-main-static">
                 <div class="pj-org-titlerow">
-                  <span class="pj-org-name">${escHtml(m.ghii)}</span>
-                  <span class="badge ${m.role === 'creator' ? 'badge-success' : 'badge-info'}">${escHtml(m.role || 'member')}</span>
+                  <span class="pj-org-name">${(m.ghii)}</span>
+                  <span class="badge ${m.role === 'creator' ? 'badge-success' : 'badge-info'}">${(m.role || 'member')}</span>
                 </div>
                 ${(acc || m.joinedAt) ? html`
                   <div class="pj-org-desc">
                     ${acc ? `${t('organisms.accessLabel') || 'Access'}: ${acc}` : ''}${acc && m.joinedAt ? ' · ' : ''}${m.joinedAt ? (t('organisms.joinedDate') || 'joined {date}').replace('{date}', fmtDate(m.joinedAt)) : ''}
+                  </div>` : null}
+                ${(m.agents || []).length ? html`
+                  <div class="pj-org-desc" title=${t('organisms.memberAgentsHint') || "This member's agents — they inherit the membership and can act in this organism"}>
+                    ${'🤖 '}${t('organisms.memberAgents') || 'Agents'}: ${m.agents.map(a => a.name || a.gaii).join(', ')}
                   </div>` : null}
               </div>
               ${menuItems.length ? html`<${KebabMenu} label=${t('organisms.moreActions') || 'More actions'} items=${menuItems} />` : null}
@@ -611,7 +640,7 @@ function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, confirm,
         <div class="detail-label">${t('organisms.blockedMembers') || 'Blocked'}</div>
         ${banned.map(m => html`
           <div class="pj-access-row" key=${'ban-' + m.ghii}>
-            <span>${escHtml(m.ghii)}</span>
+            <span>${(m.ghii)}</span>
             <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => unban(m.ghii)}>${t('organisms.unblock') || 'Unblock'}</button>
           </div>
         `)}
@@ -851,7 +880,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         <div class="detail-grid">
           <div class="detail-item">
             <span class="detail-label">${t('organisms.creator') || 'Creator'}</span>
-            <span class="detail-value">${escHtml(org.creatorGhii)}</span>
+            <span class="detail-value">${(org.creatorGhii)}</span>
           </div>
           <div class="detail-item">
             <span class="detail-label">${t('organisms.memberCount') || 'Members'}</span>
@@ -870,7 +899,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         </div>
         ${(org.interests || []).length > 0 ? html`
           <div class="flex-row-wrap">
-            ${org.interests.map(tag => html`<span class="file-tag" key=${tag}>${escHtml(tag)}</span>`)}
+            ${org.interests.map(tag => html`<span class="file-tag" key=${tag}>${(tag)}</span>`)}
           </div>` : null}
       </div>`;
   };
@@ -907,11 +936,11 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         <div class="pj-org-main" role="button" tabindex="0" onClick=${activate}
           onKeyDown=${(e) => { if (e.key === 'Enter') activate(); }}>
           <div class="pj-org-titlerow">
-            <span class="pj-org-name">${escHtml(org.name)}</span>
+            <span class="pj-org-name">${(org.name)}</span>
             <span class="badge badge-info">${typeLabel}</span>
             ${org.visibility !== 'public' ? html`<span class="pj-org-lock" title=${visLabel}>${'\uD83D\uDD12'}</span>` : null}
           </div>
-          ${org.description ? html`<div class="pj-org-desc">${escHtml(org.description)}</div>` : null}
+          ${org.description ? html`<div class="pj-org-desc">${(org.description)}</div>` : null}
         </div>
         <div class="pj-org-stats">
           ${isMine && wsCounts[org.id] !== undefined ? html`
@@ -1087,10 +1116,10 @@ function BoardPreview({ boardId, showToast }) {
         : latest.map(p => html`
           <div class="pj-board-post" key=${p.id || ts(p)}>
             <div class="pj-board-post-head">
-              <span class="pj-board-author">${escHtml(p.author_gaii || p.author || '?')}</span>
+              <span class="pj-board-author">${(p.author_gaii || p.author || '?')}</span>
               ${ts(p) ? html`<span class="pj-board-time">${relTime(ts(p))}</span>` : null}
             </div>
-            <div class="pj-board-body">${escHtml(String(p.body || p.content || '').slice(0, 400))}</div>
+            <div class="pj-board-body">${(String(p.body || p.content || '').slice(0, 400))}</div>
           </div>`)}
       <div class="flex-row-wrap pj-board-composer">
         <input class="input-field input-sm pj-board-input" placeholder=${t('organisms.writePost') || 'Write a message…'} value=${text}
@@ -1230,10 +1259,10 @@ function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack,
     <div class="card-detail pj-org-settings">
       <div class="pj-meta-line">
         ${org.createdAt ? html`<span>${t('organisms.createdAt') || 'Created'} ${fmtDate(org.createdAt)}</span>` : null}
-        <span>${t('organisms.creator') || 'Creator'} ${escHtml(org.creatorGhii || '-')}</span>
-        ${extraAdmins.length > 0 ? html`<span>${t('organisms.admins') || 'Admins'} ${escHtml(extraAdmins.join(', '))}</span>` : null}
+        <span>${t('organisms.creator') || 'Creator'} ${(org.creatorGhii || '-')}</span>
+        ${extraAdmins.length > 0 ? html`<span>${t('organisms.admins') || 'Admins'} ${(extraAdmins.join(', '))}</span>` : null}
         ${org.boardId ? html`
-          <span>${t('organisms.board') || 'Board'} <span class="mono" title=${escHtml(org.boardId)}>${escHtml(boardIdShort)}</span>
+          <span>${t('organisms.board') || 'Board'} <span class="mono" title=${(org.boardId)}>${(boardIdShort)}</span>
             <button class="pj-icon-btn" title=${t('organisms.copyId') || 'Copy ID'} onClick=${copyBoardId}>${'📋'}</button>
           </span>` : null}
       </div>
@@ -1317,23 +1346,32 @@ function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack,
     { id: 'board', label: t('organisms.tabBoard') || 'Board', count: null },
   ];
 
+  // Settings REPLACES the tab content — while it is open no tab is highlighted (a lit tab above
+  // settings content lies about what the user is looking at), and the breadcrumb says so.
+  const activeHomeTab = showSettings ? '' : tab;
+  const pickHomeTab = (id) => guardDirty(() => { setShowSettings(false); setTab(id); });
+
   return html`
     <div class="pj-ws">
       <div class="pj-org-breadcrumb">
         <button class="pj-org-crumb-link" onClick=${() => guardDirty(onBack)}>${t('organisms.title') || 'Organisms'}</button>
         <span class="pj-org-crumb-sep">/</span>
-        <span>${escHtml(org.name || org.id)}</span>
+        ${showSettings ? html`
+          <button class="pj-org-crumb-link" onClick=${() => guardDirty(() => setShowSettings(false))}>${(org.name || org.id)}</button>
+          <span class="pj-org-crumb-sep">/</span>
+          <span>${t('organisms.settings') || 'Settings'}</span>
+        ` : html`<span>${(org.name || org.id)}</span>`}
       </div>
 
       <div class="pj-org-home-head">
         <div class="pj-org-avatar pj-org-avatar-lg" aria-hidden="true">${orgInitials(org.name)}</div>
         <div class="pj-org-home-title">
           <div class="pj-org-titlerow">
-            <span class="pj-org-home-name">${escHtml(org.name || org.id)}</span>
+            <span class="pj-org-home-name">${(org.name || org.id)}</span>
             <span class="badge badge-info">${typeLabel}</span>
             <span class="badge ${org.visibility === 'public' ? 'badge-success' : 'badge-warn'}">${org.visibility || ''}</span>
           </div>
-          ${org.description ? html`<div class="section-desc pj-org-home-desc">${escHtml(org.description)}</div>` : null}
+          ${org.description ? html`<div class="section-desc pj-org-home-desc">${(org.description)}</div>` : null}
         </div>
         <div class="pj-org-home-actions">
           <button class="btn-outline btn-sm" title=${t('organisms.exportOrgHint') || 'Download a ZIP backup of the whole organism (all workspaces)'}
@@ -1342,29 +1380,29 @@ function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack,
         </div>
       </div>
 
-      ${showSettings ? renderSettings() : null}
-
       <div class="pj-org-tabs" role="tablist">
         ${tabs.map(tb => html`
-          <button class="pj-org-tab ${tab === tb.id ? 'active' : ''}" role="tab" aria-selected=${tab === tb.id} key=${tb.id}
-            onClick=${() => setTab(tb.id)}>
+          <button class="pj-org-tab ${activeHomeTab === tb.id ? 'active' : ''}" role="tab" aria-selected=${activeHomeTab === tb.id} key=${tb.id}
+            onClick=${() => pickHomeTab(tb.id)}>
             ${tb.label}${tb.count !== null && tb.count !== undefined ? html`<span class="pj-org-tab-count">${tb.count}</span>` : null}
             ${tb.pill ? html`<span class="pj-tab-pill">${tb.pill}</span>` : null}
           </button>`)}
       </div>
 
-      ${tab === 'workspaces' ? html`
+      ${showSettings ? renderSettings() : null}
+
+      ${activeHomeTab === 'workspaces' ? html`
         <${WorkspaceList} org=${org} showToast=${showToast} onOpen=${onOpenWs} onCount=${setWsCount} />
       ` : null}
 
-      ${tab === 'members' ? html`
+      ${activeHomeTab === 'members' ? html`
         <${OrgMemberManager} org=${org} ghii=${ghii} canManage=${canEdit} isCreator=${isCreator}
           showToast=${showToast} confirm=${confirm} onChanged=${onChanged} show="members" />` : null}
 
-      ${tab === 'agents' ? html`
+      ${activeHomeTab === 'agents' ? html`
         <${OrgAgentsPanel} org=${org} ghii=${ghii} canManage=${canEdit} showToast=${showToast} onChanged=${onChanged} />` : null}
 
-      ${tab === 'board' ? (org.boardId
+      ${activeHomeTab === 'board' ? (org.boardId
         ? html`<${BoardPreview} boardId=${org.boardId} showToast=${showToast} />`
         : html`<div class="card-detail"><div class="section-desc">${t('organisms.noBoard') || 'This organism has no board.'}</div></div>`) : null}
 
@@ -1569,7 +1607,7 @@ function WorkspaceList({ org, showToast, onOpen, onCount }) {
                 onKeyDown=${locked ? undefined : ((e) => { if (e.key === 'Enter') onOpen(w.id); })}>
                 <div class="pj-org-titlerow">
                   ${locked ? html`<span class="pj-org-lock">${'🔒'}</span>` : null}
-                  <span class="pj-org-name">${escHtml(w.name || w.id)}</span>
+                  <span class="pj-org-name">${(w.name || w.id)}</span>
                   ${reviews > 0 ? html`<span class="pj-tab-pill">${'📨 '}${(t('organisms.toReview') || '{n} to review').replace('{n}', String(reviews))}</span>` : null}
                 </div>
                 <div class="pj-org-desc">${locked
@@ -1590,10 +1628,10 @@ function WorkspaceList({ org, showToast, onOpen, onCount }) {
                 <div class="pj-org-detail">
                   ${(wsStats[w.id]?.owners || []).map(o => html`
                     <div class="pj-ws-person" key=${'p-' + o.owner}>
-                      <span>${'👤 '}<strong>${escHtml(o.owner)}</strong></span>
+                      <span>${'👤 '}<strong>${(o.owner)}</strong></span>
                       ${o.isCreator ? html`<span class="badge badge-success pj-mini">${t('organisms.creatorTag') || 'creator'}</span>` : null}
                       ${o.isSelf ? html`<span class="badge badge-info pj-mini">${t('organisms.you') || 'you'}</span>` : null}
-                      ${!o.isLocalNode ? html`<span class="pj-mini">${'🌐 '}${escHtml(o.node)}</span>` : null}
+                      ${!o.isLocalNode ? html`<span class="pj-mini">${'🌐 '}${(o.node)}</span>` : null}
                       ${(o.agents || []).length > 0 ? html`<span class="pj-ws-person-agents">${'🤖'} ${(o.agents || []).length}</span>` : null}
                     </div>`)}
                 </div>` : null}
@@ -1602,7 +1640,7 @@ function WorkspaceList({ org, showToast, onOpen, onCount }) {
                   ${reqInbox.length === 0 ? html`<div class="pj-ws-inbox-empty">${t('organisms.noRequests') || 'No access requests.'}</div>`
                     : reqInbox.map(r => html`
                       <div class="pj-ws-req" key=${r.requester}>
-                        <span class="pj-ws-req-who">${escHtml(r.requester)}${r.message ? html` <span class="pj-ws-req-msg">— ${escHtml(r.message)}</span>` : null}</span>
+                        <span class="pj-ws-req-who">${(r.requester)}${r.message ? html` <span class="pj-ws-req-msg">— ${(r.message)}</span>` : null}</span>
                         ${r.status === 'approved'
                           ? html`<span class="pj-ws-req-ok">✓ ${t('organisms.approved') || 'approved'}</span><button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.revoke') || 'Revoke'}</button>`
                           : html`<button class="btn-success btn-sm" disabled=${busy} onClick=${() => decide(w, r.requester, 'approve')}>${t('organisms.approve') || 'Approve'}</button><button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.deny') || 'Deny'}</button>`}
@@ -1730,10 +1768,10 @@ function ActivityPanel({ orgId, wsId }) {
             ${events.slice(0, 20).map((e, i) => html`<div class="pj-act-item" key=${i}>
               <span class="pj-act-dot ${e.action}"></span>
               <span class="pj-act-time">${dt(e.at)}</span>
-              <span class="pj-act-who">${escHtml(e.actor)}</span>
-              ${e.agent ? html`<span class="pj-act-agent" title=${t('organisms.viaAgent') || 'via this agent'}>${'🤖 '}${escHtml(e.agent)}</span>` : null}
+              <span class="pj-act-who">${(e.actor)}</span>
+              ${e.agent ? html`<span class="pj-act-agent" title=${t('organisms.viaAgent') || 'via this agent'}>${'🤖 '}${(e.agent)}</span>` : null}
               <span class="pj-act-act">${e.action === 'publish' ? (t('organisms.publishedVerb') || 'published') : (t('organisms.editedVerb') || 'edited')}</span>
-              <span class="pj-act-what">${escHtml(e.mode === 'document' ? '📄' : '🗂')} ${escHtml(e.type)}${' / '}${escHtml(e.instance)}</span>
+              <span class="pj-act-what">${(e.mode === 'document' ? '📄' : '🗂')} ${(e.type)}${' / '}${(e.instance)}</span>
             </div>`)}
           </div>
         </div>` : null}
@@ -1783,18 +1821,18 @@ function ParticipantsPanel({ orgId, wsId }) {
           <div class="pj-parts-list">
             ${owners.map((o, i) => html`<div class="pj-part-owner" key=${i}>
               <div class="pj-part-human">
-                <span>${'👤 '}<strong>${escHtml(o.owner)}</strong></span>
+                <span>${'👤 '}<strong>${(o.owner)}</strong></span>
                 ${o.isSelf ? html`<span class="badge badge-info pj-mini">${t('organisms.you') || 'you'}</span>` : null}
                 ${o.isCreator ? html`<span class="badge badge-success pj-mini">${t('organisms.creatorTag') || 'creator'}</span>` : null}
                 ${!o.isMember && !o.isSelf ? html`<span class="badge badge-warn pj-mini">${t('organisms.guest') || 'guest'}</span>` : null}
-                ${!o.isLocalNode ? html`<span class="pj-part-node">${'🌐 '}${escHtml(o.node)}</span>` : null}
+                ${!o.isLocalNode ? html`<span class="pj-part-node">${'🌐 '}${(o.node)}</span>` : null}
                 ${o.contributions ? html`<span class="pj-part-count" title=${t('organisms.contributions') || 'contributions'}>${o.contributions}</span>` : null}
               </div>
               ${(o.agents || []).length ? html`<div class="pj-part-agents">
                 ${o.agents.map((a, j) => html`
                   <span class="pj-part-agent ${a.isOwn ? 'own' : 'ghost'}" key=${j}
                     title=${a.isOwn ? '' : (t('organisms.otherAgentHint') || 'Another owner’s agent — you see what it has done here, not its live status')}>
-                    ${'🤖 '}${escHtml(a.name)}<span class="pj-part-count">${a.contributions}</span>
+                    ${'🤖 '}${(a.name)}<span class="pj-part-count">${a.contributions}</span>
                   </span>`)}
               </div>` : null}
             </div>`)}
@@ -1803,7 +1841,7 @@ function ParticipantsPanel({ orgId, wsId }) {
             <div class="pj-access">
               <div class="pj-access-title">${t('organisms.manageAccess') || 'Manage who can work here'}</div>
               ${pending.map(r => html`<div class="pj-access-row" key=${'req-' + r.requester}>
-                <span class="pj-access-who">${'🙋 '}<strong>${escHtml(r.requester)}</strong> <span class="pj-access-note">${t('organisms.requestedAccess') || 'requested access'}</span></span>
+                <span class="pj-access-who">${'🙋 '}<strong>${(r.requester)}</strong> <span class="pj-access-note">${t('organisms.requestedAccess') || 'requested access'}</span></span>
                 <span class="pj-access-actions">
                   <button class="btn-success btn-sm" disabled=${busy} onClick=${() => doDecide(r.requester, 'contributor')}>${t('organisms.addAsContributor') || 'Add as contributor'}</button>
                   <button class="btn-outline btn-sm" disabled=${busy} onClick=${() => doDecide(r.requester, 'viewer')}>${t('organisms.addAsViewer') || 'as viewer'}</button>
@@ -1811,7 +1849,7 @@ function ParticipantsPanel({ orgId, wsId }) {
                 </span>
               </div>`)}
               ${members.map(m => html`<div class="pj-access-row" key=${'mem-' + m.owner}>
-                <span class="pj-access-who">${'👤 '}<strong>${escHtml(m.owner)}</strong> <span class="badge ${m.role === 'contributor' ? 'badge-success' : 'badge-info'} pj-mini">${m.role === 'contributor' ? (t('organisms.roleContributorShort') || 'contributor') : (t('organisms.roleViewerShort') || 'viewer')}</span></span>
+                <span class="pj-access-who">${'👤 '}<strong>${(m.owner)}</strong> <span class="badge ${m.role === 'contributor' ? 'badge-success' : 'badge-info'} pj-mini">${m.role === 'contributor' ? (t('organisms.roleContributorShort') || 'contributor') : (t('organisms.roleViewerShort') || 'viewer')}</span></span>
                 <span class="pj-access-actions">
                   ${m.role === 'viewer'
                     ? html`<button class="btn-outline btn-sm" disabled=${busy} onClick=${() => doGrant(m.owner, 'contributor')}>${t('organisms.makeContributor') || '→ can write'}</button>`
@@ -1893,13 +1931,13 @@ function WorkspaceComments({ orgId, ws, space, instanceId, showToast }) {
       ${list.map(c => html`
         <div class="pj-comment ${c.parentId ? 'pj-comment-reply' : ''}" key=${c.id}>
           <div class="pj-comment-head">
-            <b>${escHtml(c.author || '?')}</b>
+            <b>${(c.author || '?')}</b>
             ${c.parentId ? html`<span class="pj-mini"> · ${t('organisms.inReply') || 'reply'}</span>` : null}
-            ${c.anchor?.quote ? html`<span class="pj-mini"> · “${escHtml(String(c.anchor.quote).slice(0, 80))}”</span>` : null}
-            ${c.anchor?.section ? html`<span class="pj-mini"> · §${escHtml(c.anchor.section)}</span>` : null}
+            ${c.anchor?.quote ? html`<span class="pj-mini"> · “${(String(c.anchor.quote).slice(0, 80))}”</span>` : null}
+            ${c.anchor?.section ? html`<span class="pj-mini"> · §${(c.anchor.section)}</span>` : null}
             <span class="pj-mini"> · ${c.createdAt ? dt(c.createdAt) : ''}</span>
           </div>
-          <div class="pj-comment-body">${escHtml(c.body || '')}</div>
+          <div class="pj-comment-body">${(c.body || '')}</div>
           <div class="pj-comment-actions">
             <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => setReplyTo({ id: c.id, body: c.body })}>${t('organisms.reply') || 'Reply'}</button>
             ${mine(c.author) ? html`<button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => remove(c)}>${t('organisms.delete') || 'Delete'}</button>` : null}
@@ -1907,7 +1945,7 @@ function WorkspaceComments({ orgId, ws, space, instanceId, showToast }) {
         </div>
       `)}
       <div class="pj-comment-compose">
-        ${replyTo ? html`<div class="pj-mini">${t('organisms.replyingTo') || 'Replying to'}: “${escHtml(String(replyTo.body || '').slice(0, 60))}” <button class="btn-ghost btn-sm" onClick=${() => setReplyTo(null)}>${t('organisms.cancel') || 'Cancel'}</button></div>` : null}
+        ${replyTo ? html`<div class="pj-mini">${t('organisms.replyingTo') || 'Replying to'}: “${(String(replyTo.body || '').slice(0, 60))}” <button class="btn-ghost btn-sm" onClick=${() => setReplyTo(null)}>${t('organisms.cancel') || 'Cancel'}</button></div>` : null}
         <input class="input-field input-sm" placeholder=${t('organisms.anchorQuotePlaceholder') || 'Optional: quote a passage to anchor the comment'} value=${anchorQuote} onInput=${(e) => setAnchorQuote(e.target.value)} />
         <textarea class="input-field input-sm" rows="2" placeholder=${t('organisms.commentPlaceholder') || 'Add a comment…'} value=${body} onInput=${(e) => setBody(e.target.value)}></textarea>
         <button class="btn-primary btn-sm" disabled=${busy || !body.trim()} onClick=${submit}>${t('organisms.postComment') || 'Comment'}</button>
@@ -2209,7 +2247,7 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
 
   // Populate the settings fields from the manifest when the panel opens (incl. after generation) or
   // fresher data arrives — but only while the user hasn't touched the fields (seededRef compare), so
-  // a live-update reload never clobbers typing. Public sharing's lazy load fires on open too.
+  // a live-update reload never clobbers typing.
   const seededRef = useRef(null);   // { name, summary, autonomy } last written into the fields
   useEffect(() => {
     if (!showSettings || !ws?.manifest) return;
@@ -2220,8 +2258,12 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
       setSName(next.name); setSSummary(next.summary); setSAutonomy(next.autonomy);
       seededRef.current = next;
     }
-    if (share === null && (ws.manifest.objectTypes || []).some(orgService.isDocSpace)) loadShare();
   }, [showSettings, ws]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Public sharing lives in its own tab — lazy-load the share state the first time it opens.
+  useEffect(() => {
+    if (tab === 'share' && share === null && ws?.manifest) loadShare();
+  }, [tab, ws]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Dirty-check against the manifest: Save enables only on real changes (doubles as the
   // unsaved-changes indicator), Cancel resets the fields, and closing a dirty panel asks first.
@@ -2356,14 +2398,14 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
       ${genFail && html`
         <div class="pj-errors">
           <div class="pj-errors-title">${t('organisms.genFailed') || 'Generation failed — try again'}</div>
-          <div class="pj-error-line">${escHtml(genFail)}</div>
+          <div class="pj-error-line">${(genFail)}</div>
         </div>
       `}
 
       ${genErrors.length > 0 && html`
         <div class="pj-errors">
           <div class="pj-errors-title">${t('organisms.fixNeeded') || 'This needs fixing before it can be saved:'}</div>
-          ${genErrors.map((e, i) => html`<div class="pj-error-line" key=${i}>${escHtml(e)}</div>`)}
+          ${genErrors.map((e, i) => html`<div class="pj-error-line" key=${i}>${(e)}</div>`)}
           <div class="form-actions">
             <button class="btn-outline btn-sm" onClick=${copyFixPrompt}>${t('organisms.copyFixPrompt') || 'Copy fix prompt for the AI'}</button>
           </div>
@@ -2384,9 +2426,13 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
     <div class="pj-org-breadcrumb">
       <button class="pj-org-crumb-link" onClick=${onBackToList || onBack}>${t('organisms.title') || 'Organisms'}</button>
       <span class="pj-org-crumb-sep">/</span>
-      <button class="pj-org-crumb-link" onClick=${onBack}>${escHtml(org.name || org.id || '')}</button>
+      <button class="pj-org-crumb-link" onClick=${onBack}>${(org.name || org.id || '')}</button>
       <span class="pj-org-crumb-sep">/</span>
-      <span>${escHtml(wsName || ws?.manifest?.name || '…')}</span>
+      ${showSettings ? html`
+        <button class="pj-org-crumb-link" onClick=${() => guardWsDirty(() => setShowSettings(false))}>${(wsName || ws?.manifest?.name || '…')}</button>
+        <span class="pj-org-crumb-sep">/</span>
+        <span>${t('organisms.settings') || 'Settings'}</span>
+      ` : html`<span>${(wsName || ws?.manifest?.name || '…')}</span>`}
     </div>`;
 
   if (ws === undefined) return html`<div>${back}<${Spinner} text=${t('organisms.loading') || 'Loading...'} /></div>`;
@@ -2395,7 +2441,7 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
     return html`
       <div class="pj-ws">
         ${back}
-        <div class="section-title">${escHtml(org.name || 'Organism')}</div>
+        <div class="section-title">${(org.name || 'Organism')}</div>
         <div class="section-desc">${t('organisms.noWorkspace') || 'This organism has no workspace yet. Set one up to track goals, plans, deliverables and decisions — versioned on publish.'}</div>
         <button class="btn-primary" onClick=${setup} disabled=${busy || genBusy}>${busy ? '...' : (t('organisms.setupWorkspace') || 'Set up workspace (project template)')}</button>
         ${renderGenerator()}
@@ -2486,7 +2532,7 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
             ? html`<input class="input-field input-xs pj-sec-name" autofocus placeholder=${t('organisms.sectionName') || 'Section name'}
                 value=${sec.name} onInput=${e => setSecName(ot.name, sec.id, e.target.value)}
                 onBlur=${() => commitSecName(ot.name)} onKeyDown=${e => { if (e.key === 'Enter') e.target.blur(); }} />`
-            : html`<span class="pj-sec-name-text" onDblClick=${() => setEditingSec(sec.id)}>${escHtml(sec.name || t('organisms.unnamed') || '(unnamed)')}</span>`}
+            : html`<span class="pj-sec-name-text" onDblClick=${() => setEditingSec(sec.id)}>${(sec.name || t('organisms.unnamed') || '(unnamed)')}</span>`}
           <button class="pj-icon-btn" title=${t('organisms.rename') || 'Rename'} onClick=${() => setEditingSec(sec.id)}>✎</button>
           <button class="pj-icon-btn" title=${t('organisms.newDocHere') || 'New document here'} onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' }, sectionId: sec.id })}>+</button>
           <button class="pj-icon-btn" title=${t('organisms.addSubsection') || 'Sub-section'} onClick=${() => addSection(ot.name, sec.id)}>⊕</button>
@@ -2499,7 +2545,7 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
     return html`
       <div class="pj-section" key=${ot.name}>
         <div class="pj-section-head">
-          <span class="pj-section-title">${escHtml(ot.name)}<span class="pj-doc-tag">${t('organisms.docs') || 'docs'}</span></span>
+          <span class="pj-section-title">${(ot.name)}<span class="pj-doc-tag">${t('organisms.docs') || 'docs'}</span></span>
           <button class="btn-outline btn-sm" onClick=${() => addSection(ot.name, null)}>${'+ '}${t('organisms.section') || 'Section'}</button>
           <button class="btn-outline btn-sm" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' } })}>${'+ '}${t('organisms.newPage') || 'New document'}</button>
         </div>
@@ -2545,7 +2591,7 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
   const renderRecordSpace = (ot) => html`
     <div class="pj-section" key=${ot.name}>
       <div class="pj-section-head">
-        <span class="pj-section-title">${escHtml(wsT('type.' + ot.name) || ot.name)}</span>
+        <span class="pj-section-title">${(wsT('type.' + ot.name) || ot.name)}</span>
         ${ot.append ? null : html`<button class="btn-outline btn-sm" onClick=${() => startAdd(ot)}>${'+ '}${t('organisms.addDraft') || 'Add draft'}</button>`}
       </div>
 
@@ -2574,10 +2620,10 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
           <div class="pj-rec" key=${'o' + i}>
             <div class="pj-item">
               <button class="pj-rec-title" onClick=${() => toggleExpand(ot, o.id)}>${String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.summary || o.id || '')}</button>
-              ${o.status ? html`<span class="badge badge-info">${escHtml(o.status)}</span>` : null}
+              ${o.status ? html`<span class="badge badge-info">${(o.status)}</span>` : null}
               <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, o.id, String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.id))}>🗑</button>
             </div>
-            ${expandedRec[ot.name + ':' + o.id] ? html`<div class="pj-rec-fields">${recordFields(o)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${o.id} showToast=${showToast} />` : null}
+            ${expandedRec[ot.name + ':' + o.id] ? html`<div class="pj-rec-fields">${recordFields(ot, o)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${o.id} showToast=${showToast} />` : null}
           </div>
         `)
       }
@@ -2587,33 +2633,43 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
   const renderSpaceNotice = (ot) => html`
     <div class="pj-section" key=${ot.name}>
       <div class="pj-section-head">
-        <span class="pj-section-title">${escHtml(ot.name)}</span>
-        <span class="badge badge-warn">${escHtml(String(ot.backing))}</span>
+        <span class="pj-section-title">${(ot.name)}</span>
+        <span class="badge badge-warn">${(String(ot.backing))}</span>
       </div>
       <div class="pj-space-notice">${ot.backing === 'tasks'
         ? (t('organisms.spaceTasksBacked') || 'This space points at the task system — its items are tasks, not workspace records. Manage them in the Tasks views.')
         : (t('organisms.spaceBackingUnsupported') || 'This space’s backing is not supported, so its content is not shown here. Edit the workspace (manifest) and set this space’s backing to "memory" to restore it — files and knowledge packages attach via Sources or document images instead.')}</div>
     </div>`;
 
-  // ── Tabs: one per declared manifest space (memory-backed or not), then Review / Activity / People.
+  // ── Tabs: one per declared manifest space (memory-backed or not), then the fixed tabs.
   // The "+" pseudo-tab opens the add-space form, so adding spaces stays one click away.
+  // Space labels are capitalized so the row reads uniformly next to the fixed tabs.
+  const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
   const spaceCount = (name) => new Set([...draftsFor(name), ...objectsFor(name)].map(d => d.id)).size;
   const spaceTabs = allTypes.map(ot => ({
-    id: 'space:' + ot.name, ot, label: ot.name,
+    id: 'space:' + ot.name, ot, label: cap(wsT('type.' + ot.name) || ot.name),
     count: orgService.isMemorySpace(ot) ? spaceCount(ot.name) : null,
   }));
   const fixedTabs = [
+    { id: 'sources', label: t('organisms.sources') || 'Sources', count: null },
+    { id: 'share', label: t('organisms.share') || 'Share', count: null },
     { id: 'review', label: t('organisms.tabReview') || 'Review', count: approvals.length || null },
     { id: 'activity', label: t('organisms.activity') || 'Activity', count: null },
     { id: 'people', label: t('organisms.tabPeople') || 'People', count: null },
   ];
   const wsTabs = [...spaceTabs, ...fixedTabs];
-  const activeTab = wsTabs.some(tb => tb.id === tab) ? tab : (spaceTabs[0]?.id || 'review');
+  // Settings REPLACES the tab content: while it is open no tab is active (the previous state — a
+  // highlighted tab above settings content — lied about what the user was looking at).
+  const activeTab = showSettings ? '' : (wsTabs.some(tb => tb.id === tab) ? tab : (spaceTabs[0]?.id || 'review'));
   const activeSpace = activeTab.startsWith('space:') ? allTypes.find(ot => ot.name === activeTab.slice(6)) : null;
+  const pickTab = (id) => guardWsDirty(() => { setShowSettings(false); setTab(id); });
 
+  // Menu items are VERBS (a click copies to the clipboard; the toast confirms). The contract-agent
+  // builder is a different category from the two copy actions, so a divider separates it.
   const agentMenuItems = [
-    { label: t('organisms.aiPromptHuman') || 'For chat', icon: '💬', onClick: () => copyAccessPrompt('human') },
-    { label: t('organisms.aiPromptAgent') || 'For coding agent', icon: '⌨', onClick: () => copyAccessPrompt('agent') },
+    { label: t('organisms.copyChatPrompt') || 'Copy chat prompt', icon: '💬', onClick: () => copyAccessPrompt('human') },
+    { label: t('organisms.copyCodingPrompt') || 'Copy coding agent prompt', icon: '⌨', onClick: () => copyAccessPrompt('agent') },
+    { divider: true },
     { label: t('organisms.contractPrompt') || 'Create contract agent', icon: '⚙️', onClick: copyContractPrompt },
   ];
 
@@ -2622,15 +2678,15 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
       <${ConfirmUI} />
       ${back}
       <div class="pj-ws-titlerow">
-        <span class="section-title pj-ws-title">${escHtml(ws.manifest?.name || org.name || 'Workspace')}</span>
-        <span class="badge badge-success">${escHtml(ws.manifest?.status || 'active')}</span>
+        <span class="section-title pj-ws-title">${(ws.manifest?.name || org.name || 'Workspace')}</span>
+        <span class="badge badge-success">${(ws.manifest?.status || 'active')}</span>
         <span class="pj-ws-head-actions">
           <${KebabMenu} label=${t('organisms.forAgentsHint') || 'Copy a ready prompt that teaches an AI to use this workspace'}
-            btnClass="btn-outline btn-sm" trigger=${'🤖 ' + (t('organisms.forAgents') || 'For agents') + ' ▾'} items=${agentMenuItems} />
+            btnClass="btn-outline btn-sm" trigger=${'🤖 ' + (t('organisms.agentAccess') || 'Agent access') + ' ▾'} items=${agentMenuItems} />
           <button class="btn-outline btn-sm ${showSettings ? 'pj-org-btn-active' : ''}" onClick=${() => guardWsDirty(() => setShowSettings(s => !s))}>${'⚙ '}${t('organisms.settings') || 'Settings'}</button>
         </span>
       </div>
-      ${ws.manifest?.summary ? html`<div class="section-desc">${escHtml(ws.manifest.summary)}</div>` : null}
+      ${ws.manifest?.summary ? html`<div class="section-desc">${(ws.manifest.summary)}</div>` : null}
 
       ${approvals.length > 0 && activeTab !== 'review' ? html`
         <div class="pj-ws-banner" role="status">
@@ -2644,10 +2700,10 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
       <div class="pj-org-tabs" role="tablist">
         ${wsTabs.map(tb => html`
           <button class="pj-org-tab ${activeTab === tb.id ? 'active' : ''}" role="tab" aria-selected=${activeTab === tb.id} key=${tb.id}
-            onClick=${() => setTab(tb.id)}>
-            ${escHtml(tb.label)}${tb.count !== null && tb.count !== undefined ? html`<span class="pj-org-tab-count">${tb.count}</span>` : null}
+            onClick=${() => pickTab(tb.id)}>
+            ${(tb.label)}${tb.count !== null && tb.count !== undefined ? html`<span class="pj-org-tab-count">${tb.count}</span>` : null}
           </button>`)}
-        <button class="pj-org-tab pj-ws-tab-add" title=${t('organisms.addSpaceTitle') || 'Add a space'} onClick=${() => setShowSpaces(s => !s)}>+</button>
+        <button class="pj-org-tab pj-ws-tab-add" title=${t('organisms.addSpaceTitle') || 'Add a space'} onClick=${() => guardWsDirty(() => { setShowSettings(false); setShowSpaces(s => !s); })}>+</button>
       </div>
 
       ${showSpaces && html`
@@ -2668,33 +2724,36 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
       ${showSettings && html`
         <div class="pj-inbox">
           <div class="pj-meta-line">
-            <span>${t('organisms.template') || 'Template'} ${escHtml(ws.manifest?.kind || '-')}</span>
+            <span>${t('organisms.template') || 'Template'} ${(ws.manifest?.kind || '-')}</span>
             ${ws.manifest?.updatedAt ? html`<span>${t('organisms.lastSaved') || 'Last saved'} ${fmtDate(ws.manifest.updatedAt)}</span>` : null}
           </div>
 
-          <div class="pj-form-group">${t('organisms.formIdentity') || 'Identity'}</div>
-          <label class="pj-field"><span>${t('organisms.wsName') || 'Name'}</span>
-            <input type="text" class="input-field input-sm" value=${sName} onInput=${e => setSName(e.target.value)} /></label>
-          <label class="pj-field"><span>${t('organisms.wsSummary') || 'Summary'}</span>
-            <textarea class="input-field input-sm" rows="2" value=${sSummary} onInput=${e => setSSummary(e.target.value)}></textarea></label>
+          <div class="pj-form-card">
+            <div class="pj-form-group">${t('organisms.formIdentity') || 'Identity'}</div>
+            <label class="pj-field"><span>${t('organisms.wsName') || 'Name'}</span>
+              <input type="text" class="input-field input-sm" value=${sName} onInput=${e => setSName(e.target.value)} /></label>
+            <label class="pj-field"><span>${t('organisms.wsSummary') || 'Summary'}</span>
+              <textarea class="input-field input-sm" rows="2" value=${sSummary} onInput=${e => setSSummary(e.target.value)}></textarea></label>
 
-          <div class="pj-form-group">${t('organisms.formAgentPolicy') || 'Agent policy'}</div>
-          <label class="pj-field"><span>${t('organisms.autonomy') || 'AI autonomy (L1 cautious → L5 free)'}</span>
-            <select class="input-field input-sm" value=${sAutonomy} onChange=${e => setSAutonomy(e.target.value)}>
-              ${['L1', 'L2', 'L3', 'L4', 'L5'].map(l => html`<option value=${l} key=${l}>${l}</option>`)}
-            </select></label>
-          <div class="pj-form-hint">${t('organisms.autonomyHint') || 'Guidance for agents working here — L1 asks before nearly everything, L5 acts freely. The publish gate (Review tab) still applies regardless.'}</div>
+            <div class="pj-form-group">${t('organisms.formAgentPolicy') || 'Agent policy'}</div>
+            <label class="pj-field"><span>${t('organisms.autonomy') || 'AI autonomy (L1 cautious → L5 free)'}</span>
+              <select class="input-field input-sm" value=${sAutonomy} onChange=${e => setSAutonomy(e.target.value)}>
+                ${['L1', 'L2', 'L3', 'L4', 'L5'].map(l => html`<option value=${l} key=${l}>${l} — ${t(`organisms.autonomyLevels.${l}`) || ''}</option>`)}
+              </select></label>
+            <div class="pj-form-hint">${t('organisms.autonomyHint') || 'Guidance for agents working here — L1 asks before nearly everything, L5 acts freely. The publish gate (Review tab) still applies regardless.'}</div>
 
-          <div class="form-actions">
-            <button class="btn-primary btn-sm" onClick=${saveSettings} disabled=${busy || !wsDirty}>${t('organisms.saveChanges') || 'Save changes'}</button>
-            <button class="btn-ghost btn-sm" disabled=${!wsDirty} onClick=${resetSettingsForm}>${t('organisms.cancel') || 'Cancel'}</button>
+            <div class="form-actions">
+              <button class="btn-primary btn-sm" onClick=${saveSettings} disabled=${busy || !wsDirty}>${t('organisms.saveChanges') || 'Save changes'}</button>
+              <button class="btn-ghost btn-sm" disabled=${!wsDirty} onClick=${resetSettingsForm}>${t('organisms.cancel') || 'Cancel'}</button>
+            </div>
           </div>
 
           <div class="pj-divider"></div>
           <div class="pj-form-group">${t('organisms.spaces') || 'Spaces'}</div>
+          <div class="pj-form-hint">${t('organisms.spacesRemoveHint') || 'These actions apply immediately. Removing a space hides its section — the data stays in memory and comes back if a space with the same name is added again.'}</div>
           ${(ws.manifest?.objectTypes || []).map(ot => html`
             <div class="pj-doc-row" key=${'sp' + ot.name}>
-              <span class="pj-space-name">${escHtml(ot.name)}<span class="pj-doc-tag">${isDocSpace(ot) ? (t('organisms.docs') || 'docs') : (t('organisms.recordsMode') || 'records')}</span></span>
+              <span class="pj-space-name">${(ot.name)}<span class="pj-doc-tag">${isDocSpace(ot) ? (t('organisms.docs') || 'docs') : (t('organisms.recordsMode') || 'records')}</span></span>
               <button class="btn-ghost btn-sm" onClick=${() => removeSpaceHandler(ot.name)} disabled=${busy}>${t('organisms.remove') || 'Remove'}</button>
             </div>
           `)}
@@ -2707,46 +2766,8 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
             <button class="btn-outline btn-sm" onClick=${addSpaceHandler} disabled=${busy || !newSpaceName.trim()}>${t('organisms.addSpace') || '+ Add'}</button>
           </div>
 
-          ${docTypes.length > 0 ? html`
-            <div class="pj-divider"></div>
-            <div class="pj-form-group">${'🌐 '}${t('organisms.sharePublicTitle') || 'Public sharing'}</div>
-            <div class="section-desc">${t('organisms.sharePublicDesc') || 'Make published document-space pages readable by anyone with the link — no login required. Drafts are never shared.'}</div>
-            ${!share && shareBusy ? html`<div class="pj-empty">${t('organisms.loading') || 'Loading…'}</div>` : null}
-            ${share ? docTypes.map(ot => {
-              const docs = objectsFor(ot.name);
-              const spaceOn = !!(share.spaces && share.spaces[ot.name]);
-              return html`
-                <div class="pj-share-space" key=${'sh' + ot.name}>
-                  <label class="pj-share-row">
-                    <input type="checkbox" checked=${spaceOn} disabled=${shareBusy} onChange=${e => patchShare({ spaces: { [ot.name]: e.target.checked } })} />
-                    <span class="pj-space-name">${escHtml(ot.name)}</span>
-                    <span class="pj-doc-tag">${docs.length} ${t('organisms.docs') || 'docs'}</span>
-                  </label>
-                  ${docs.length === 0
-                    ? html`<div class="pj-empty pj-share-empty">${t('organisms.noPublishedDocs') || 'No published documents yet — publish a page to share it.'}</div>`
-                    : html`<div class="pj-share-docs">
-                        ${docs.map(d => {
-                          const on = isDocPublic(ot.name, d.id);
-                          return html`
-                            <label class="pj-share-doc" key=${'shd' + d.id}>
-                              <input type="checkbox" checked=${on} disabled=${shareBusy} onChange=${e => patchShare({ docs: { [`${ot.name}/${d.id}`]: e.target.checked } })} />
-                              <span class="pj-share-doc-title">${escHtml(d.title || d.id)}</span>
-                              ${on ? html`<a class="pj-share-link" href=${orgService.publicViewerUrl(orgId, wsId, { type: ot.name, id: d.id })} target="_blank" rel="noopener">${t('organisms.openLink') || 'open ↗'}</a>` : null}
-                            </label>`;
-                        })}
-                      </div>`}
-                </div>`;
-            }) : null}
-            ${anythingPublic() ? html`
-              <div class="pj-share-actions">
-                <a class="btn-outline btn-sm" href=${orgService.publicViewerUrl(orgId, wsId)} target="_blank" rel="noopener">${'🔗 '}${t('organisms.openPublicViewer') || 'Open public viewer'}</a>
-                <button class="btn-ghost btn-sm" onClick=${() => copyShareLink(orgService.publicViewerUrl(orgId, wsId))}>${t('organisms.copyLink') || 'Copy link'}</button>
-              </div>` : null}
-          ` : null}
-
           <div class="pj-divider"></div>
-          <${SourcesPanel} orgId=${orgId} wsId=${wsId} showToast=${showToast} />
-
+          <div class="pj-form-group">${t('organisms.formProcess') || 'Process'}</div>
           ${ws.manifest ? html`
             <div class="pj-chart">
               <div class="pj-chart-head">
@@ -2755,13 +2776,12 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
               </div>
               ${showFlow ? html`<${Mermaid} chart=${orgService.buildEditFlowMermaid(ws.manifest, gateOn)} />` : null}
             </div>` : null}
-
-          <div class="pj-divider"></div>
           <button class="btn-outline btn-sm" onClick=${() => setShowRegenerate(s => !s)}>
             ${showRegenerate ? (t('organisms.cancel') || 'Cancel') : (t('organisms.restructure') || '✨ Restructure / add types with AI')}
           </button>
           ${showRegenerate && renderGenerator()}
 
+          <div class="pj-divider"></div>
           <div class="pj-danger">
             <div class="pj-danger-title">${t('organisms.dangerZone') || 'Danger zone'}</div>
             <div class="section-desc">${t('organisms.deleteWarn') || 'Deleting the workspace removes the manifest and ALL its data — drafts, published records, version history — and its schemas. The organism stays. This cannot be undone.'}</div>
@@ -2779,6 +2799,46 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
           : (isDocSpace(activeSpace) ? renderDocSpace(activeSpace) : renderRecordSpace(activeSpace)))
         : null}
 
+      ${activeTab === 'sources' ? html`<${SourcesPanel} orgId=${orgId} wsId=${wsId} showToast=${showToast} />` : null}
+
+      ${activeTab === 'share' ? html`
+        <div class="pj-section">
+          <div class="section-desc">${t('organisms.sharePublicDesc') || 'Make published document-space pages readable by anyone with the link — no login required. Drafts are never shared.'}</div>
+          ${docTypes.length === 0 ? html`<${EmptyState} icon="🌐" text=${t('organisms.noDocSpaces') || 'This workspace has no document spaces to share.'} />` : html`
+            ${!share && shareBusy ? html`<div class="pj-empty">${t('organisms.loading') || 'Loading…'}</div>` : null}
+            ${share ? docTypes.map(ot => {
+              const docs = objectsFor(ot.name);
+              const spaceOn = !!(share.spaces && share.spaces[ot.name]);
+              return html`
+                <div class="pj-share-space" key=${'sh' + ot.name}>
+                  <label class="pj-share-row">
+                    <input type="checkbox" checked=${spaceOn} disabled=${shareBusy} onChange=${e => patchShare({ spaces: { [ot.name]: e.target.checked } })} />
+                    <span class="pj-space-name">${wsT('type.' + ot.name) || ot.name}</span>
+                    <span class="pj-doc-tag">${docs.length} ${t('organisms.docs') || 'docs'}</span>
+                  </label>
+                  ${docs.length === 0
+                    ? html`<div class="pj-empty pj-share-empty">${t('organisms.noPublishedDocs') || 'No published documents yet — publish a page to share it.'}</div>`
+                    : html`<div class="pj-share-docs">
+                        ${docs.map(d => {
+                          const on = isDocPublic(ot.name, d.id);
+                          return html`
+                            <label class="pj-share-doc" key=${'shd' + d.id}>
+                              <input type="checkbox" checked=${on} disabled=${shareBusy} onChange=${e => patchShare({ docs: { [`${ot.name}/${d.id}`]: e.target.checked } })} />
+                              <span class="pj-share-doc-title">${d.title || d.id}</span>
+                              ${on ? html`<a class="pj-share-link" href=${orgService.publicViewerUrl(orgId, wsId, { type: ot.name, id: d.id })} target="_blank" rel="noopener">${t('organisms.openLink') || 'open ↗'}</a>` : null}
+                            </label>`;
+                        })}
+                      </div>`}
+                </div>`;
+            }) : null}
+            ${anythingPublic() ? html`
+              <div class="pj-share-actions">
+                <a class="btn-outline btn-sm" href=${orgService.publicViewerUrl(orgId, wsId)} target="_blank" rel="noopener">${'🔗 '}${t('organisms.openPublicViewer') || 'Open public viewer'}</a>
+                <button class="btn-ghost btn-sm" onClick=${() => copyShareLink(orgService.publicViewerUrl(orgId, wsId))}>${t('organisms.copyLink') || 'Copy link'}</button>
+              </div>` : null}
+          `}
+        </div>` : null}
+
       ${activeTab === 'review' ? html`
         <div class="pj-section">
           <label class="pj-gate-label" title=${t('organisms.publishGateHint') || 'When on, an agent’s publish is held for your review instead of going live'}>
@@ -2791,7 +2851,7 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
               <div class="card-h3">${t('organisms.needsDecision') || 'Needs your decision'} (${approvals.length})</div>
               ${approvals.map(a => html`
                 <div class="pj-approval" key=${a.id}>
-                  <div class="pj-approval-text">${escHtml(a.prompt || a.action)}</div>
+                  <div class="pj-approval-text">${(a.prompt || a.action)}</div>
                   <div class="card-actions">
                     <button class="btn-success btn-sm" onClick=${() => resolve(a.id, 'approve')} disabled=${busy}>${t('organisms.approve') || 'Approve'}</button>
                     <button class="btn-danger btn-sm" onClick=${() => resolve(a.id, 'reject')} disabled=${busy}>${t('organisms.reject') || 'Reject'}</button>
@@ -2806,7 +2866,7 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
           <div class="pj-section">
             <div class="pj-section-title">${t('organisms.decisions') || 'Recent decisions'}</div>
             ${ws.decisions.slice(-8).reverse().map((d, i) => html`
-              <div class="pj-item pj-decision" key=${'dec' + i}><span class="pj-item-text">${escHtml(String(d.summary || ''))}</span></div>
+              <div class="pj-item pj-decision" key=${'dec' + i}><span class="pj-item-text">${(String(d.summary || ''))}</span></div>
             `)}
           </div>` : null}` : null}
 
@@ -2905,8 +2965,8 @@ function SourcesPanel({ orgId, wsId, showToast }) {
     else { label = scope === 'mine' ? (item.value?.name || item.key) : (item.name || item.package_id); meta = (scope === 'mine' ? (item.value?.entries?.length || 0) : (item.entries_count || 0)) + ' ' + (t('organisms.entries') || 'entries'); }
     return html`
       <div class="pj-src-result" key=${'r' + i}>
-        <span class="pj-src-result-label" title=${String(label)}>${escHtml(String(label))}</span>
-        <span class="pj-src-result-meta">${escHtml(String(meta))}</span>
+        <span class="pj-src-result-label" title=${String(label)}>${(String(label))}</span>
+        <span class="pj-src-result-meta">${(String(meta))}</span>
         <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => attach(item)}>${t('organisms.attach') || 'Attach'}</button>
       </div>`;
   };
@@ -2947,7 +3007,7 @@ function SourcesPanel({ orgId, wsId, showToast }) {
           ${sources.map(s => html`
             <div class="pj-src-item" key=${s.id}>
               <span class="pj-src-icon">${SRC_ICON[s.type] || '•'}</span>
-              <span class="pj-src-label" title=${s.key || s.packageId || ''}>${escHtml(String(s.label || s.key || s.packageId || ''))}</span>
+              <span class="pj-src-label" title=${s.key || s.packageId || ''}>${(String(s.label || s.key || s.packageId || ''))}</span>
               ${s.external ? html`<span class="badge badge-muted pj-mini">${t('organisms.external') || 'external'}</span>` : null}
               <span class="badge badge-info pj-mini">${t('organisms.src_' + s.type) || s.type}</span>
               <button class="pj-icon-btn" title=${t('organisms.remove') || 'Remove'} onClick=${() => removeSource(s.id)}>✕</button>
@@ -2958,11 +3018,17 @@ function SourcesPanel({ orgId, wsId, showToast }) {
 
 /* A form rendered from a JSON Schema — typed inputs (enum→select, integer→number,
  * array→lines, boolean→checkbox, else text). Works for any objectType, including ones a
- * generated manifest declares. `id` is auto-generated when blank, so it's never required here. */
-function SchemaForm({ schema, busy, onSave, onCancel, initial }) {
+ * generated manifest declares. New records pre-fill `id` (editable) and requester-style
+ * fields ("x-default": "currentUser", or a requested_by/created_by-shaped name) with the
+ * signed-in GHII. readOnly properties are agent-filled results — hidden here, shown only in
+ * the record view. Labels/hints resolve manifest i18n (wsT) → schema description → raw key.
+ * Save is always clickable: a failed attempt outlines the still-empty required fields. */
+function SchemaForm({ schema, busy, onSave, onCancel, initial, idPrefix, namespace, wsT }) {
   const props = (schema && schema.properties) || {};
-  const required = new Set(((schema && schema.required) || []).filter(k => k !== 'id'));
-  const fieldNames = Object.keys(props);
+  const editable = Object.entries(props).filter(([, def]) => !(def && def.readOnly));
+  const required = new Set(((schema && schema.required) || []).filter(k => k !== 'id' && !(props[k] && props[k].readOnly)));
+  const fieldNames = editable.map(([k]) => k);
+  const [missing, setMissing] = useState(null); // required keys empty at the last save attempt
   // Seed from an existing record when editing (arrays → newline text for the textarea inputs).
   const [vals, setVals] = useState(() => {
     const out = {};
@@ -2970,6 +3036,14 @@ function SchemaForm({ schema, busy, onSave, onCancel, initial }) {
       const v = initial && initial[k];
       if (v === undefined || v === null) continue;
       out[k] = Array.isArray(v) ? v.join('\n') : (def.type === 'boolean' ? !!v : String(v));
+    }
+    if (!initial) {
+      if (props.id && out.id === undefined) out.id = `${idPrefix || 'rec'}-${Date.now().toString(36)}`;
+      const me = getGhii() || '';
+      for (const [k, def] of editable) {
+        if (out[k] !== undefined || def.type !== 'string' || def.enum) continue;
+        if (def['x-default'] === 'currentUser' || /^(requested_by|created_by|requester|author)$/i.test(k)) out[k] = me;
+      }
     }
     return out;
   });
@@ -2988,38 +3062,52 @@ function SchemaForm({ schema, busy, onSave, onCancel, initial }) {
     return out;
   };
 
-  const canSave = [...required].every(k => vals[k] !== undefined && String(vals[k]).trim() !== '');
+  const isEmpty = (k) => vals[k] === undefined || String(vals[k]).trim() === '';
+  // Of the fields flagged at the last attempt, only the ones STILL empty stay outlined.
+  const stillMissing = (missing || []).filter(isEmpty);
+  const trySave = () => {
+    const miss = [...required].filter(isEmpty);
+    setMissing(miss.length ? miss : null);
+    if (!miss.length) onSave(buildValue());
+  };
 
-  const field = (k, def) => {
-    const label = k + (required.has(k) ? ' *' : '');
+  const labelOf = (k) => (wsT && wsT(`${namespace}.${k}`)) || k;
+  const hintOf = (k, def) => (wsT && wsT(`${namespace}.${k}.hint`)) || def.description
+    || (k === 'id' && !initial ? (t('organisms.autoIdHint') || 'Pre-filled automatically — change it if you want a memorable id.') : '');
+
+  const control = (k, def) => {
     if (def.type === 'string' && Array.isArray(def.enum)) {
-      return html`<label class="pj-field" key=${k}><span>${label}</span>
-        <select class="input-field input-sm" value=${vals[k] ?? ''} onChange=${e => set(k, e.target.value)}>
+      return html`<select class="input-field input-sm" value=${vals[k] ?? ''} onChange=${e => set(k, e.target.value)}>
           <option value="">—</option>${def.enum.map(o => html`<option value=${o} key=${o}>${o}</option>`)}
-        </select></label>`;
+        </select>`;
     }
     // Date / datetime fields → native pickers (by schema format, or a name ending in _date).
     if (def.format === 'date-time') {
-      return html`<label class="pj-field" key=${k}><span>${label}</span>
-        <input type="datetime-local" class="input-field input-sm" value=${vals[k] ?? ''} onInput=${e => set(k, e.target.value)} /></label>`;
+      return html`<input type="datetime-local" class="input-field input-sm" value=${vals[k] ?? ''} onInput=${e => set(k, e.target.value)} />`;
     }
     if (def.format === 'date' || (def.type === 'string' && !def.enum && /(_date$|^date$)/i.test(k))) {
-      return html`<label class="pj-field" key=${k}><span>${label}</span>
-        <input type="date" class="input-field input-sm" value=${vals[k] ?? ''} onInput=${e => set(k, e.target.value)} /></label>`;
+      return html`<input type="date" class="input-field input-sm" value=${vals[k] ?? ''} onInput=${e => set(k, e.target.value)} />`;
     }
     if (def.type === 'integer' || def.type === 'number') {
-      return html`<label class="pj-field" key=${k}><span>${label}</span>
-        <input type="number" class="input-field input-sm" value=${vals[k] ?? ''} onInput=${e => set(k, e.target.value)} /></label>`;
+      return html`<input type="number" class="input-field input-sm" value=${vals[k] ?? ''} onInput=${e => set(k, e.target.value)} />`;
     }
+    if (def.type === 'array') {
+      return html`<textarea class="input-field input-sm" rows="2" value=${vals[k] ?? ''} onInput=${e => set(k, e.target.value)}></textarea>`;
+    }
+    return html`<input type="text" class="input-field input-sm" value=${vals[k] ?? ''} onInput=${e => set(k, e.target.value)} />`;
+  };
+
+  const field = (k, def) => {
+    const label = labelOf(k) + (required.has(k) ? ' *' : '');
     if (def.type === 'boolean') {
       return html`<label class="pj-field pj-field-inline" key=${k}><input type="checkbox" checked=${!!vals[k]} onChange=${e => set(k, e.target.checked)} /><span>${label}</span></label>`;
     }
-    if (def.type === 'array') {
-      return html`<label class="pj-field" key=${k}><span>${label} ${'(' + (t('organisms.onePerLine') || 'one per line') + ')'}</span>
-        <textarea class="input-field input-sm" rows="2" value=${vals[k] ?? ''} onInput=${e => set(k, e.target.value)}></textarea></label>`;
-    }
-    return html`<label class="pj-field" key=${k}><span>${label}</span>
-      <input type="text" class="input-field input-sm" value=${vals[k] ?? ''} onInput=${e => set(k, e.target.value)} /></label>`;
+    const hint = hintOf(k, def);
+    const suffix = def.type === 'array' ? ' (' + (t('organisms.onePerLine') || 'one per line') + ')' : '';
+    return html`<label class="pj-field ${stillMissing.includes(k) ? 'pj-field-invalid' : ''}" key=${k}>
+      <span>${label}${suffix}</span>
+      ${hint ? html`<span class="pj-field-hint">${hint}</span>` : null}
+      ${control(k, def)}</label>`;
   };
 
   return html`
@@ -3028,8 +3116,10 @@ function SchemaForm({ schema, busy, onSave, onCancel, initial }) {
         ${fieldNames.length === 0
           ? html`<div class="pj-empty">${t('organisms.loading') || 'Loading...'}</div>`
           : fieldNames.map(k => field(k, props[k]))}
+        ${stillMissing.length ? html`<div class="pj-form-error">${(t('organisms.fillRequired') || 'Please fill in the required fields: {fields}')
+            .replace('{fields}', stillMissing.map(labelOf).join(', '))}</div>` : null}
         <div class="form-actions">
-          <button class="btn-primary btn-sm" onClick=${() => onSave(buildValue())} disabled=${busy || !canSave}>${t('organisms.saveDraft') || 'Save draft'}</button>
+          <button class="btn-primary btn-sm" onClick=${trySave} disabled=${busy}>${t('organisms.saveDraft') || 'Save draft'}</button>
           <button class="btn-ghost btn-sm" onClick=${onCancel}>${t('organisms.cancel') || 'Cancel'}</button>
         </div>
       </div>
@@ -3271,7 +3361,7 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
           </div>
           ${images.map(i => html`
             <div class="pj-img-vis-row" key=${i.key}>
-              <span class="pj-img-vis-name" title=${i.key}>${escHtml(i.alt)}</span>
+              <span class="pj-img-vis-name" title=${i.key}>${(i.alt)}</span>
               <${VisibilityPill} visibility=${i.visibility} onClick=${() => { if (!imgBusy) changeImageVisibility(i.key, i.visibility === 'public' ? 'private' : 'public'); }} />
             </div>`)}
         </div>` : null}

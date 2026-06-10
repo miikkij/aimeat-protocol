@@ -1,3 +1,12 @@
+/**
+ * @file schema-validator.ts
+ * @description Schema-lock validation service — compiles JSON Schemas (Ajv, cached) and
+ *   validates memory writes against the applicable lock. Also validates schemas themselves
+ *   before they are registered (validateSchemaItself).
+ * @version-history
+ *   v1.1.0 — 2026-06-10 — Register "x-default" as a no-op annotation keyword (UI pre-fill
+ *     hint, e.g. "currentUser") so strict-mode schema locks accept generated schemas.
+ */
 import { createRequire } from 'node:module';
 import type { ValidateFunction } from 'ajv';
 import type { Storage } from '../storage/interface.js';
@@ -14,8 +23,14 @@ const AjvClass = ajvPkg.default ?? ajvPkg;
 const addFormats = formatsPkg.default ?? formatsPkg;
 
  
-const ajv = new AjvClass({ allErrors: true, verbose: true }) as { compile: (schema: object) => ValidateFunction };
+const ajv = new AjvClass({ allErrors: true, verbose: true }) as {
+  compile: (schema: object) => ValidateFunction;
+  addKeyword: (def: { keyword: string }) => void;
+};
 addFormats(ajv);
+// "x-default" is a UI annotation (e.g. "currentUser" pre-fills the signed-in identity in
+// workspace record forms). Register it as a no-op keyword so strict-mode compile accepts it.
+ajv.addKeyword({ keyword: 'x-default' });
 
 // Compiled validator cache — key = JSON.stringify(schema)
 const validatorCache = new Map<string, ValidateFunction>();

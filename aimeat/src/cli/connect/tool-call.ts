@@ -728,7 +728,24 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_organism_list',
-        handler: ({ client }) => client.get('/v1/organisms'),
+        // Public discovery + the agent's own (possibly private) organisms. A bare GET /v1/organisms
+        // is public-only, so an agent could not list an organism it is already a member of (join
+        // answered ALREADY_MEMBER while this list omitted it). Mirrors the server-MCP tool.
+        handler: async ({ client, config }) => {
+            const [pub, mine] = await Promise.all([
+                client.get('/v1/organisms'),
+                client.get(`/v1/organisms?member=${encodeURIComponent(config.owner)}`),
+            ]);
+            if (pub.ok === false && mine.ok === false) return pub;
+            const mineList = ((mine.data as { organisms?: { id: string }[] } | undefined)?.organisms) ?? [];
+            const pubList = ((pub.data as { organisms?: { id: string }[] } | undefined)?.organisms) ?? [];
+            const memberIds = new Set(mineList.map(o => o.id));
+            const seen = new Set<string>();
+            const organisms = [...mineList, ...pubList]
+                .filter(o => { if (seen.has(o.id)) return false; seen.add(o.id); return true; })
+                .map(o => ({ ...o, is_member: memberIds.has(o.id) }));
+            return { ...(pub.ok !== false ? pub : mine), data: { organisms, total: organisms.length } };
+        },
     },
     {
         name: 'aimeat_organism_get',

@@ -10603,6 +10603,11 @@ paths:
         List public organisms with optional filtering by type, interest,
         and location. No authentication required for public organisms.
         Supports pagination.
+
+        `?member=<owner>` lists that owner's organisms. Private memberships are
+        enumerable only by the member themself (authenticated as that owner or
+        one of their agents) or an operator — for anyone else the member filter
+        degrades to public organisms only (no private-membership disclosure).
       tags: [Organisms]
       parameters:
         - name: type
@@ -10611,6 +10616,14 @@ paths:
             type: string
             enum: [club, team, community, project]
           description: Filter by organism type
+        - name: member
+          in: query
+          schema:
+            type: string
+          description: >-
+            Filter to organisms this owner is a member of (bare owner name; a
+            GHII/GAII is normalized). Includes private organisms only when the
+            caller IS that owner (or an operator); otherwise public-only.
         - name: interest
           in: query
           schema:
@@ -10904,6 +10917,13 @@ paths:
         List all members of an organism. Public organisms show members
         to anyone. Private organisms require membership to view.
         Supports pagination.
+
+        When the caller is an ACTIVE member of the organism (or an operator),
+        each member row additionally carries `agents: [{gaii, name}]` — the
+        member's same-owner agents, which inherit the membership implicitly
+        (their join answers ALREADY_MEMBER). This makes "who can act in this
+        organism" enumerable; the response then includes `agents_included: true`.
+        Non-member callers get the legacy shape without agent rosters.
       tags: [Organisms]
       parameters:
         - name: id

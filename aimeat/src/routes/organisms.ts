@@ -50,7 +50,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord, PendingApprovalRecord, OrganismRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, optionalAuth } from '../auth/middleware.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveIdentity, parseGaiiLoose, isSameOwner } from '../utils/gaii.js';
 import { authorizeRead } from '../services/access-guard.js';
@@ -153,14 +153,20 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   });
 
   /* ── GET /v1/organisms — List organisms ── */
-  router.get('/v1/organisms', async (req, res) => {
+  router.get('/v1/organisms', optionalAuth(), async (req, res) => {
     const { type, city, interest, visibility, member, page, per_page } = req.query;
+    // ?member=<owner> lists that owner's organisms INCLUDING private ones — which must only be
+    // enumerable by the member themself (their agents share the bare owner name) or an operator.
+    // Anyone else asking about someone's memberships degrades to public-only instead of leaking
+    // private organisms. Memberships are keyed by the BARE owner name, so normalize GHII/GAII.
+    const memberBare = member ? ((member as string).includes('#') ? (member as string).split('#')[1] : (member as string)).split('@')[0] : undefined;
+    const selfOrOperator = !!req.auth && (req.auth.owner === memberBare || req.auth.roles.includes('operator'));
     const organisms = await storage.listOrganisms({
       type: type as string,
       city: city as string,
       interest: interest as string,
-      member: member as string,
-      visibility: member ? (visibility as string) : ((visibility as string) || 'public'),
+      member: memberBare,
+      visibility: member ? (selfOrOperator ? (visibility as string) : 'public') : ((visibility as string) || 'public'),
       page: page ? Number(page) : 1,
       perPage: per_page ? Number(per_page) : 20,
     });
@@ -387,7 +393,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   });
 
   /* ── GET /v1/organisms/:id/members — List members ── */
-  router.get('/v1/organisms/:id/members', async (req, res) => {
+  router.get('/v1/organisms/:id/members', optionalAuth(), async (req, res) => {
     const id = req.params.id as string;
     const { role, status } = req.query;
 
@@ -401,6 +407,23 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       role: role as string,
       status: (status as string) || 'active',
     });
+
+    // A member's agents inherit access implicitly (same-owner: join answers ALREADY_MEMBER), so
+    // "who can touch this organism" must be enumerable — an unlisted actor with access is an
+    // audit gap. Each member row carries its owner's agents for ACTIVE members (or an operator)
+    // only; outsiders/public callers get the legacy shape (agent rosters are not public data).
+    const callerOwner = req.auth?.owner;
+    const callerMembership = callerOwner ? await storage.getMembership(id, callerOwner) : null;
+    const canSeeAgents = (callerMembership?.status === 'active') || !!req.auth?.roles.includes('operator');
+    if (canSeeAgents) {
+      const enriched = await Promise.all(members.map(async m => {
+        const ownerName = (m.ghii.includes('#') ? m.ghii.split('#')[1] : m.ghii).split('@')[0];
+        const agents = await storage.getAgentsByOwner(ownerName);
+        return { ...m, agents: agents.map(a => ({ gaii: a.gaii, name: a.name })) };
+      }));
+      res.json(success(config.nodeId, { members: enriched, total: enriched.length, agents_included: true }));
+      return;
+    }
 
     res.json(success(config.nodeId, { members, total: members.length }));
   });

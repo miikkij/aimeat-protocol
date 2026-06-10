@@ -15,6 +15,9 @@
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  *   v1.3.0 -- 2026-06-08 -- Add aimeat_organism_create (mirrors POST /v1/organisms; membership keyed
  *     by the bare owner name, matching the route + workspace gate).
+ *   v1.4.0 -- 2026-06-10 -- organism_members lists each member's agents (implicit same-owner access
+ *     made enumerable — audit gap: join answered ALREADY_MEMBER but no surface showed which agents
+ *     can act in the organism). Active-member callers only; matches the REST members route.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -354,6 +357,21 @@ export function registerOrganismsTools(
                 status: status || 'active',
             });
 
+            // Same-owner agents inherit a member's access implicitly — list them per member so
+            // "who can touch this organism" is enumerable (matches the REST members route). Only
+            // an ACTIVE member's agent sees the agent rosters; public visibility alone does not.
+            const callerMembership = await storage.getMembership(organism_id, getOwnerName());
+            const canSeeAgents = callerMembership?.status === 'active';
+            const agentsByOwner = new Map<string, { gaii: string; name: string }[]>();
+            if (canSeeAgents) {
+                for (const m of members) {
+                    const ownerName = (m.ghii.includes('#') ? m.ghii.split('#')[1] : m.ghii).split('@')[0];
+                    if (!agentsByOwner.has(ownerName)) {
+                        agentsByOwner.set(ownerName, (await storage.getAgentsByOwner(ownerName)).map(a => ({ gaii: a.gaii, name: a.name })));
+                    }
+                }
+            }
+
             return {
                 content: [{
                     type: 'text' as const,
@@ -364,6 +382,7 @@ export function registerOrganismsTools(
                         status: m.status,
                         joined_at: m.joinedAt,
                         invited_by: m.invitedBy,
+                        ...(canSeeAgents ? { agents: agentsByOwner.get((m.ghii.includes('#') ? m.ghii.split('#')[1] : m.ghii).split('@')[0]) ?? [] } : {}),
                     })), null, 2),
                 }],
             };

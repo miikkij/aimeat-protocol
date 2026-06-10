@@ -1,8 +1,15 @@
 /**
- * AIMEAT Organisms Service
- * Organism CRUD, membership, join requests, and the manifest-driven workspace
- * (a "project" is just an organism with a meta.manifest): apply a template,
- * read the workspace, write/publish drafts, and resolve gate approvals.
+ * @file organisms.js
+ * @description AIMEAT Organisms Service — organism CRUD, membership, join requests, and the
+ *   manifest-driven workspace (a "project" is just an organism with a meta.manifest): apply a
+ *   template, generate a workspace with AI, read the workspace, write/publish drafts, and
+ *   resolve gate approvals.
+ * @usage import * as orgService from '/js/services/organisms.js';
+ * @version-history
+ *   v1.1.0 — 2026-06-10 — Generator prompt: per-property "description", "readOnly": true for
+ *     agent-filled result fields (never required), "x-default": "currentUser" for requester
+ *     fields, and a manifest "i18n" block (en + request language) with flat "{ns}.{field}",
+ *     "{ns}.{field}.hint" and "type.{name}" labels the workspace UI renders.
  */
 import { api, apiGet, apiPost, apiPut, apiPatch, apiDelete } from '/js/api.js';
 
@@ -235,6 +242,7 @@ Respond with this shape:
     "kind": "<short-kebab-case kind, e.g. game-dev>",
     "status": "active",
     "objectTypes": [ <one entry per type> ],
+    "i18n": { <UI labels per language — see below> },
     "policy": { "agentAutonomy": "L3", "alwaysGate": [] }
   },
   "schemas": { <one JSON Schema per RECORDS type, keyed by that type's namespace> },
@@ -254,6 +262,17 @@ Give every objectType all of these fields:
 For each RECORDS type, add a JSON Schema under "schemas" keyed by its namespace:
 { "type": "object", "required": ["id", ...], "properties": { "id": { "type": "string" }, ... } }
 Give every record an "id" string property. Use "enum" for status-like fields and "format": "date" (or "date-time") for date fields.
+Also, for each property:
+- Give every property except "id" a short English "description" telling a human what to fill in.
+- Result fields that an agent or automation fills later (e.g. result_ref, output links, error details) get "readOnly": true — the form hides them from humans. Never list a readOnly field in "required".
+- Fields that should default to the acting user's identity (e.g. requested_by, created_by, author) get "x-default": "currentUser".
+
+Inside "manifest", add an "i18n" object with UI labels: one entry per language — always "en", plus the language of the user's request if different. Keys are flat strings:
+- "<namespace>.<field>": a short human label for that field
+- "<namespace>.<field>.hint": one short sentence telling the user what to enter
+- "type.<objectType name>": a short plural label for that type's tab
+Example: "i18n": { "en": { "shared.milestones.title": "Title", "shared.milestones.title.hint": "A short name for the milestone", "type.milestone": "Milestones" }, "fi": { "shared.milestones.title": "Otsikko", "shared.milestones.title.hint": "Lyhyt nimi virstanpylväälle", "type.milestone": "Virstanpylväät" } }
+Cover every field of every RECORDS type (labels + hints) and every objectType (type.<name>) in every language you include.
 
 For each DOCUMENT type, the content is free markdown — keep it out of "schemas" and "examples" (a document needs neither).
 
@@ -267,10 +286,14 @@ Worked example — request "track game milestones plus free-form design docs":
       { "name": "milestone", "schemaRef": "schema:milestone@1", "namespace": "shared.milestones", "backing": "memory", "writeRole": "member", "cardinality": "many", "versioned": true, "mode": "records" },
       { "name": "design-doc", "schemaRef": "schema:design-doc@1", "namespace": "shared.design-docs", "backing": "memory", "writeRole": "member", "cardinality": "many", "versioned": true, "mode": "document" }
     ],
+    "i18n": {
+      "en": { "type.milestone": "Milestones", "type.design-doc": "Design docs", "shared.milestones.title": "Title", "shared.milestones.title.hint": "A short name for the milestone", "shared.milestones.status": "Status", "shared.milestones.status.hint": "Where this milestone stands", "shared.milestones.due_date": "Due date", "shared.milestones.due_date.hint": "When this should be done" },
+      "fi": { "type.milestone": "Virstanpylväät", "type.design-doc": "Suunnitteludokumentit", "shared.milestones.title": "Otsikko", "shared.milestones.title.hint": "Lyhyt nimi virstanpylväälle", "shared.milestones.status": "Tila", "shared.milestones.status.hint": "Missä vaiheessa tämä on", "shared.milestones.due_date": "Määräpäivä", "shared.milestones.due_date.hint": "Milloin tämän pitäisi olla valmis" }
+    },
     "policy": { "agentAutonomy": "L3", "alwaysGate": [] }
   },
   "schemas": {
-    "shared.milestones": { "type": "object", "required": ["id", "title", "status"], "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "status": { "type": "string", "enum": ["planned", "in-progress", "done"] }, "due_date": { "type": "string", "format": "date" } } }
+    "shared.milestones": { "type": "object", "required": ["id", "title", "status"], "properties": { "id": { "type": "string" }, "title": { "type": "string", "description": "A short name for the milestone" }, "status": { "type": "string", "enum": ["planned", "in-progress", "done"], "description": "Where this milestone stands" }, "due_date": { "type": "string", "format": "date", "description": "When this should be done" } } }
   },
   "examples": {
     "shared.milestones": [ { "id": "example-1", "title": "Vertical slice", "status": "planned", "due_date": "2026-09-01" } ]

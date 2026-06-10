@@ -4,6 +4,8 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v1.14.0 — 2026-06-10 — SchemaForm usability: .pj-field-hint (per-field hint),
+ *     .pj-field-invalid (missing-required outline) + .pj-form-error message.
  *   v1.13.0 — 2026-06-10 — Workspace renew, phase 2: .pj-ws-head-actions, review
  *     .pj-ws-banner, .pj-ws-tab-add (+ reuses .pj-org-tabs underline tabs).
  *   v1.12.0 — 2026-06-10 — Organisms list renew, phase 1: compact .pj-org-row list
@@ -2105,6 +2107,11 @@
 .pj-field { display: flex; flex-direction: column; gap: 0.2rem; margin-bottom: 0.35rem; }
 .pj-field > span { font-size: 0.75rem; color: var(--muted); }
 .pj-field-inline { flex-direction: row; align-items: center; gap: 0.4rem; }
+/* SchemaForm: per-field hint text + missing-required highlight after a Save attempt. */
+.pj-field-hint { font-size: 0.72rem; color: var(--muted); margin-top: -0.1rem; }
+.pj-field-invalid > span:first-child { color: var(--danger); }
+.pj-field-invalid .input-field { border-color: var(--danger); }
+.pj-form-error { font-size: 0.82rem; color: var(--danger); padding: 0.3rem 0; }
 .pj-errors { border: 1px solid var(--danger); border-radius: 10px; padding: 0.6rem 0.75rem; margin: 0.5rem 0; background: var(--bg-dim); }
 .pj-errors-title { font-weight: 600; margin-bottom: 0.3rem; color: var(--danger); }
 .pj-error-line { font-size: 0.82rem; color: var(--text); padding: 0.1rem 0; }
@@ -2434,3 +2441,8 @@
 .pj-stat-btn.active { background: var(--bg-dim); color: var(--text); }
 .pj-ws-person { display: flex; align-items: center; gap: 0.4rem; padding: 0.2rem 0; font-size: 0.83rem; color: var(--text); }
 .pj-ws-person-agents { font-size: 0.76rem; color: var(--muted); }
+
+/* ── Settings polish: menu divider, bounded form card ── */
+.pj-menu-sep { height: 1px; background: var(--border); margin: 0.25rem 0.3rem; }
+.pj-form-card { border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.75rem 0.9rem 0.6rem; margin-bottom: 0.25rem; }
+.pj-form-card .pj-form-group:first-child { margin-top: 0; }

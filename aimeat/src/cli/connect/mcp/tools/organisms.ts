@@ -8,6 +8,9 @@
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  *   v1.2.0 -- 2026-05-30 -- MCP drift reconciliation: id -> organism_id across get/join/leave/members;
  *     add message (join) and role/status filters (members) to match server MCP + REST.
+ *   v1.3.0 -- 2026-06-10 -- organism_list also fetches ?member={owner} and merges (was public-only:
+ *     an agent's join answered ALREADY_MEMBER while the list omitted its own private organisms — the
+ *     agent could not find its home). Mirrors the server-MCP tool; rows carry is_member.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -16,11 +19,26 @@ import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 
 export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry): void {
-  const { client } = registry.resolve();
+  const { client, owner } = registry.resolve();
 
   mcp.tool('aimeat_organism_list', descriptionFor('aimeat_organism_list'), {}, annotationsFor('aimeat_organism_list'), async () => {
-    const resp = await client.get('/v1/organisms');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    // Public discovery PLUS the agent's own organisms (?member={owner} — owner-keyed memberships,
+    // including private ones). A bare GET /v1/organisms is public-only, so an agent could not find
+    // its own home: join answered ALREADY_MEMBER while this list omitted the organism. Mirrors the
+    // server-MCP tool; is_member tells the agent which organisms it belongs to.
+    const [pub, mine] = await Promise.all([
+      client.get('/v1/organisms'),
+      client.get(`/v1/organisms?member=${encodeURIComponent(owner)}`),
+    ]);
+    if (pub.ok === false && mine.ok === false) return { content: [{ type: 'text' as const, text: JSON.stringify(pub.error ?? pub, null, 2) }], isError: true };
+    const mineList = ((mine.data as { organisms?: { id: string }[] } | undefined)?.organisms) ?? [];
+    const pubList = ((pub.data as { organisms?: { id: string }[] } | undefined)?.organisms) ?? [];
+    const memberIds = new Set(mineList.map(o => o.id));
+    const seen = new Set<string>();
+    const organisms = [...mineList, ...pubList]
+      .filter(o => { if (seen.has(o.id)) return false; seen.add(o.id); return true; })
+      .map(o => ({ ...o, is_member: memberIds.has(o.id) }));
+    return { content: [{ type: 'text' as const, text: JSON.stringify({ organisms, total: organisms.length }, null, 2) }] };
   });
 
   mcp.tool('aimeat_organism_get', descriptionFor('aimeat_organism_get'), {

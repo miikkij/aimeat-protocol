@@ -399,7 +399,17 @@
       "roles": "Roles",
       "created": "Created",
       "publicKey": "Public Key",
-      "capabilities": "Capabilities",
+      "capabilities": {
+        "technical": "Technical Skills",
+        "domain": "Domain Knowledge",
+        "actionQueue": "Action Queue Support",
+        "verified": "verified",
+        "selfReported": "self-reported",
+        "empty": "No capabilities reported yet",
+        "canAccept": "Can accept work",
+        "canDeliver": "Can deliver work",
+        "languages": "Languages"
+      },
       "description": "Description",
       "deleteAgent": "Delete agent",
       "deleteConfirm": "Delete agent",
@@ -566,7 +576,12 @@
           "toggle": "Search",
           "placeholder": "Search tasks…",
           "noResults": "No tasks match your search.",
-          "time": { "all": "All", "today": "Today", "7d": "7d", "30d": "30d" }
+          "time": {
+            "all": "All",
+            "today": "Today",
+            "7d": "7d",
+            "30d": "30d"
+          }
         },
         "triage": {
           "keep": "Keep",
@@ -636,7 +651,6 @@
           "success": "Rating saved",
           "error": "Failed to save rating"
         },
-        "cancel": "Cancel",
         "cancelConfirm": "Cancel this task? Work that hasn't started will be skipped",
         "cancelled": "Task cancelled",
         "cancelError": "Failed to cancel task",
@@ -717,17 +731,6 @@
         "agentRules": "Agent Rules",
         "saving": "Saving...",
         "resetDefaults": "Reset to Defaults"
-      },
-      "capabilities": {
-        "technical": "Technical Skills",
-        "domain": "Domain Knowledge",
-        "actionQueue": "Action Queue Support",
-        "verified": "verified",
-        "selfReported": "self-reported",
-        "empty": "No capabilities reported yet",
-        "canAccept": "Can accept work",
-        "canDeliver": "Can deliver work",
-        "languages": "Languages"
       },
       "activity": {
         "tasksCompleted": "Tasks Completed",
@@ -1195,10 +1198,10 @@
       "visShared": "Shared",
       "visPublic": "Public",
       "createSaveBtn": "Create",
-      "membersTitle": "Board Members",
-      "autoAccessInfo": "All your agents have automatic access to shared boards.",
+      "membersTitle": "External Members",
+      "autoAccessInfo": "All your agents have automatic access to shared boards",
       "addMember": "Add",
-      "addMemberPlaceholder": "Enter GAII (e.g. agent#owner@node)",
+      "addMemberPlaceholder": "agent#owner@node",
       "memberAdded": "Member added",
       "memberRemoved": "Member removed",
       "memberError": "Failed to update members",
@@ -1207,13 +1210,8 @@
       "newPost": "New Post",
       "postsLoading": "Loading posts...",
       "postsError": "Could not load posts.",
-      "membersTitle": "External Members",
-      "autoAccessInfo": "All your agents have automatic access to shared boards",
-      "addMemberPlaceholder": "agent#owner@node",
       "addMemberBtn": "Add",
-      "removeMemberConfirm": "Remove this member?",
-      "memberAdded": "Member added",
-      "memberRemoved": "Member removed"
+      "removeMemberConfirm": "Remove this member?"
     },
     "wallet": {
       "title": "Wallet",
@@ -1922,13 +1920,16 @@
         "installBtn": "Install",
         "installing": "Installing..."
       },
-      "status": { "active": "Active", "inactive": "Inactive" },
+      "status": {
+        "active": "Active",
+        "inactive": "Inactive"
+      },
       "activate": "Activate",
       "deactivate": "Deactivate",
       "uninstall": "Uninstall",
       "uninstallConfirm": "Are you sure? Seed data will be removed.",
       "detail": {
-        "back": "\u2190 Back",
+        "back": "← Back",
         "whatsIncluded": "What's included",
         "copyPrompt": "Copy prompt",
         "copyApi": "Copy API",
@@ -3466,7 +3467,7 @@
     "servicesActionsCount": "Actions",
     "servicesInstancesCount": "Instances",
     "servicesManage": "Manage",
-    "servicesBack": "\u2190 Back to Extensions",
+    "servicesBack": "← Back to Extensions",
     "servicesCreateInstance": "Create Instance",
     "servicesInstanceId": "Instance ID",
     "servicesInstanceConfig": "Config (JSON, optional)",
@@ -3860,7 +3861,6 @@
     "chatMessagePlaceholder": "Type a message...",
     "chatBack": "Back to channels",
     "chatNoMessages": "No messages yet. Be the first to post!",
-
     "emailDisabledExplain": "Email is not enabled. Configure SMTP settings in the Configuration tab to enable transactional emails.",
     "host": "Host",
     "secure": "Secure (TLS)",
@@ -3915,7 +3915,6 @@
     "emailGroupBody": "Message body",
     "emailGroupSend": "Send to Group",
     "emailGroupSent": "Sent to {sent}/{total} recipients",
-
     "pushNotConfigured": "Push notifications are not configured.",
     "pushExplain": "Web Push notifications allow sending real-time alerts to users who have subscribed via their browser. Requires VAPID keys configuration.",
     "pushHelpTitle": "How to configure Push",
@@ -3928,17 +3927,17 @@
     "pushWebPushTitle": "Web Push: Browser Notification",
     "pushWebPushUsed": "Sent to subscribed browsers when a personal node has pending mailbox messages while offline.",
     "pushWebPushTitleTpl": "AIMEAT: Pending messages",
-    "pushWebPushBodyTpl": "{count} message(s) waiting \u2014 {type}",
+    "pushWebPushBodyTpl": "{count} message(s) waiting — {type}",
     "pushEmailTitle": "Email: Mailbox Alert",
     "pushEmailUsed": "Sent to the user's configured email when their personal node has pending messages and email notifications are enabled.",
     "pushEmailSubjectTpl": "AIMEAT: {count} pending message(s) for your node",
     "pushEmailBodyTpl": "Your personal node \"{nodeId}\" has {count} pending message(s).\n\nHighest priority: {type}\nOldest message: {age} minutes ago\n\nPlease reconnect your personal node to retrieve these messages.",
     "pushNotifyTypesTitle": "Notification Triggers",
     "pushNotifyTypesExplain": "Push notifications are sent when these mailbox event types occur. Configured via AIMEAT_PUSH_NOTIFY_TYPES.",
-    "pushTypeWorkAssignment": "work_assignment \u2014 A work task has been assigned to the user's agent",
-    "pushTypeActionRequest": "action_request \u2014 Another agent has requested an action from the user's agent",
-    "pushTypeBoardNotification": "board_notification \u2014 New activity on a board the user subscribes to",
-    "pushTypeFederationSync": "federation_sync \u2014 A federated peer node has synced data that needs attention",
+    "pushTypeWorkAssignment": "work_assignment — A work task has been assigned to the user's agent",
+    "pushTypeActionRequest": "action_request — Another agent has requested an action from the user's agent",
+    "pushTypeBoardNotification": "board_notification — New activity on a board the user subscribes to",
+    "pushTypeFederationSync": "federation_sync — A federated peer node has synced data that needs attention",
     "pushTemplate": "Template",
     "pushUsedIn": "Used in",
     "pushTestBtn": "Send Test Push",
@@ -3960,7 +3959,6 @@
     "pushSubscribed": "Subscribed!",
     "pushUnsubscribeBtn": "Unsubscribe",
     "pushNoBrowserSupport": "This browser does not support push notifications",
-
     "blocked": "Blocked",
     "blockedCooldown": "Cooldown",
     "blockedDisabled": "Disabled",
@@ -4017,7 +4015,6 @@
       "test": "Test",
       "work": "Work"
     },
-
     "totalEntries": "Total Entries",
     "cities": "Cities",
     "categories": "Categories",
@@ -4026,7 +4023,6 @@
     "directoryExplain": "The directory indexes owner profiles by city, category, and interests, enabling discovery and search. Profiles are automatically indexed when owners update their public information.",
     "directoryHelpTitle": "How the directory works",
     "directoryHelpDetail": "Owners register profiles with city, categories, and interests via the API. The directory builds search indexes for fast lookups. You can rebuild indexes if data becomes inconsistent.",
-
     "totalProfiles": "Total Profiles",
     "activeMatches": "Active Matches",
     "lastRun": "Last Run",
@@ -4034,7 +4030,6 @@
     "matchingExplain": "The matching engine finds compatible profiles based on shared interests, location proximity, and preference criteria. Matches are computed periodically or can be triggered manually.",
     "matchingHelpTitle": "How matching works",
     "matchingHelpDetail": "The engine compares all active profiles, scoring compatibility based on shared interests, geographic proximity, and stated preferences. Matches above a threshold are surfaced to users. Run the engine manually to update matches immediately.",
-
     "marketplaceEmpty": "No marketplace configured",
     "activeListings": "Active Listings",
     "totalTransactions": "Total Transactions",
@@ -4048,7 +4043,6 @@
     "marketplaceNodeLevel": "Node Level",
     "marketplaceFederationLevel": "Federation Level",
     "marketplaceCreateConfirm": "Marketplace created successfully",
-
     "csmExplain": "CSM (Contextual Service Model) defines the data schema and rules for services running on the node. Each CSM template specifies what data a service collects, how it's validated, and what consent rules apply.",
     "csmHelpTitle": "What is a CSM?",
     "csmHelpDetail": "A CSM is a JSON document that defines a service's data model. It includes field definitions (name, type, required), validation rules, consent requirements, and display hints. Services like hobbies directory, marketplace, or dating use CSMs to describe their data shape. The node validates all data against the CSM before storing it.",
@@ -4078,7 +4072,6 @@
     "csmAiStep2": "Paste it into a new AI chat conversation",
     "csmAiStep3": "Describe the service you want to create — the AI will guide you",
     "csmAiStep4": "Copy the generated YAML back here and click \"Create CSM\"",
-
     "msmHelpTitle": "What is an MSM?",
     "msmHelpDetail": "An MSM is a configuration that connects the node to external services. It defines the endpoint URL, authentication method, data format, retry policy, and scheduling. MSMs can be used for webhook delivery, API integrations, data synchronization, and event-driven workflows. Node-level MSMs apply to this node only; federation-level MSMs are shared across the cluster.",
     "msmAddNew": "Add MSM Integration",
@@ -4100,7 +4093,6 @@
     "msmSelectTemplate": "— Select a template —",
     "msmCreateFromTemplate": "Start from template",
     "msmDefinition": "MSM Definition",
-
     "federationNotAvailable": "Federation is not configured",
     "clusterName": "Cluster Name",
     "role": "Role",
@@ -4113,7 +4105,6 @@
     "federationJoinExplain": "To join an existing federation, you need the genesis node's endpoint URL and a valid invitation token.",
     "federationLeave": "Leave Federation",
     "federationLeaveConfirm": "Are you sure you want to leave this federation?",
-
     "fedHowBusTitle": "What is the Federation Bus?",
     "fedHowBusDetail": "The federation bus is the communication layer between nodes. It handles heartbeats (health checks every 5 minutes), data replication, catalogue synchronization, cross-node work routing, morsel settlements, and trust advisories. All messages are cryptographically signed with Ed25519 keys to prevent tampering.",
     "fedHowJoinTitle": "How does a new node join?",
@@ -4124,12 +4115,10 @@
     "fedHowSettlementsDetail": "When an agent on Node A uses a service on Node B, the morsel payment needs to be settled across nodes. Node B sends a signed settlement to Node A with the amount, tracking code, and proof. The receiving node verifies the signature, checks for replay attacks, and credits the agent's balance. Operators can also initiate outbound settlements manually.",
     "fedHowRoutingTitle": "How does cross-node routing work?",
     "fedHowRoutingDetail": "If you need to reach an agent on a remote node, the federation router (POST /v1/federation/route) forwards the request. It supports multi-hop relay — if the target isn't a direct peer, the request is relayed through intermediate nodes. Loop detection prevents infinite routing, and each hop costs 1 morsel as a routing fee. Max hops is configurable.",
-
     "fedActivePeers": "Active Peers",
     "fedDegradedPeers": "Degraded",
     "fedOfflinePeers": "Offline",
     "fedPendingRequests": "Pending Requests",
-
     "fedPendingRequestsTitle": "Pending Peering Requests",
     "fedPendingRequestsExplain": "These nodes want to join your federation. Review each request and approve or reject.",
     "fedPendingHelpTitle": "What should I check before approving?",
@@ -4143,7 +4132,6 @@
     "fedRejectPeerConfirm": "Reject this peering request?",
     "fedPeerApproved": "Peering request approved successfully",
     "fedPeerRejected": "Peering request rejected",
-
     "fedLivePeersTitle": "Live Peers",
     "fedLivePeersExplain": "Currently registered peers and their real-time health status. The heartbeat monitor pings each peer every 5 minutes.",
     "fedLivePeersHelpTitle": "Understanding peer statuses",
@@ -4159,11 +4147,9 @@
     "fedPeerActivated": "Peer activated successfully",
     "fedPeerRemoved": "Peer set to depeering status (grace period active)",
     "fedPeerEmergencyRemoved": "Peer immediately disconnected. All in-flight work cancelled.",
-
     "fedRequestHistoryTitle": "Peering Request History",
     "fedDeleteRequestConfirm": "Delete this peering request from history?",
     "fedRequestDeleted": "Peering request deleted",
-
     "fedJoinTitle": "Join Genesis Network",
     "fedJoinExplain": "Connect this node to an existing AIMEAT genesis network. Enter the genesis node URL and select your role. The genesis operator will review and approve your request.",
     "fedJoinHelpTitle": "How does joining work?",
@@ -4177,7 +4163,6 @@
     "fedJoinTargetNode": "Target Node",
     "fedJoinStatus": "Status",
     "fedJoinRequestId": "Request ID",
-
     "fedAddPeerTitle": "Add Peer Directly",
     "fedAddPeerExplain": "Manually add a peer node without going through the introduction flow. Useful for bootstrapping federations or adding trusted nodes.",
     "fedAddPeerHelpTitle": "When should I add peers directly?",
@@ -4188,7 +4173,6 @@
     "fedAddPeerBtn": "Add Peer",
     "fedAddPeerMissing": "Node ID and URL are required",
     "fedPeerAdded": "Peer added successfully (status: pending)",
-
     "fedTestTitle": "Test Federation Readiness",
     "fedTestExplain": "Check if a remote node is reachable and running the AIMEAT protocol before peering.",
     "fedTestHelpTitle": "What does the test check?",
@@ -4197,44 +4181,31 @@
     "fedTestTarget": "Target",
     "fedTestReady": "Ready",
     "fedTestTime": "Tested at",
-
     "fedBusTitle": "Federation Bus — Features",
     "fedBusExplain": "The federation bus provides all the communication channels between nodes. Each feature is described below with how it works and what API endpoints are involved.",
-
     "fedBusHeartbeatTitle": "Heartbeat & Health Monitoring",
     "fedBusHeartbeatDetail": "Every 5 minutes, your node pings all active peers via POST /v1/federation/ping. If a peer fails 3 consecutive heartbeats, it's marked 'degraded'. After 10 failures, it goes 'offline'. Peers in 'depeering' state have their grace period checked — once expired, they're purged. The heartbeat also accepts signed POST /v1/federation/heartbeat messages from peers with optional stats data.",
-
     "fedBusReplicateTitle": "Memory Replication",
     "fedBusReplicateDetail": "Nodes can replicate memory entries to peers via POST /v1/federation/replicate. The request must include the source node, agent GAII, key, value, visibility, version, and a cryptographic signature. The receiving node verifies the signature against the peer's stored public key, then stores the data with a 'replica:source_node:key' prefix. This enables cross-node data sharing while maintaining clear ownership.",
-
     "fedBusCatalogueTitle": "Catalogue Synchronization",
     "fedBusCatalogueDetail": "Action catalogues are synced via POST /v1/federation/catalogue-sync. This supports incremental sync — if 'since_timestamp' is provided, only newer actions are expected. Existing federated actions are updated (upsert by federated ID). Each synced action is tagged with 'federated:source_node' and its display name is prefixed with the source node ID for clarity. A catalogue_hash is included for integrity verification.",
-
     "fedBusRoutingTitle": "Cross-Node Request Routing",
     "fedBusRoutingDetail": "POST /v1/federation/route forwards requests to remote nodes. If the target is a direct peer, the request goes straight. Otherwise, it tries multi-hop relay through other active peers. Features: loop detection (via X-Relay-Path header), configurable max hops, 1 morsel routing fee per hop. GET /v1/federation/resolve/:gaii resolves which node hosts an agent — checks local first, then parses GAII hints, then broadcasts to peers.",
-
     "fedBusSettlementTitle": "Morsel Settlements",
     "fedBusSettlementDetail": "Cross-node morsel transfers use POST /v1/federation/settle (inbound) and POST /v1/federation/settle/outbound (outbound, operator only). Each settlement is cryptographically signed, verified against the peer's public key, and checked for replay attacks via tracking codes. Settlements credit or debit agent balances and are recorded as 'federation_settlement' transactions.",
-
     "fedBusTrustTitle": "Trust Advisories",
     "fedBusTrustDetail": "Operators can issue trust advisories about nodes via POST /v1/federation/trust-advisory. Advisory types: 'warning' (informational), 'suspend' (recommend suspension), 'ban' (auto-de-peers the target node immediately). Trust advisories are shared across the federation when emergency de-peering with network notification enabled.",
-
     "fedBusKeyExchangeTitle": "Key Exchange",
     "fedBusKeyExchangeDetail": "POST /v1/federation/key-exchange allows peers to exchange Ed25519 public keys. This is a prerequisite for signed heartbeats, replication, and settlements. If the peer was recently approved via a peering request, the key exchange also promotes it from 'approved' to active peer status. Each node returns its own public key and capabilities.",
-
     "fedBusCrossWorkTitle": "Cross-Node Work Requests",
     "fedBusCrossWorkDetail": "Agents can submit work to services on remote nodes via POST /v1/federation/cross-node/work. The request is signed by the originating node's private key and forwarded to the target peer. A 1 morsel routing fee is charged. The remote node processes the work request as if it were local, and results are returned in the response.",
-
     "fedBusResolveTitle": "GAII Resolution",
     "fedBusResolveDetail": "GET /v1/federation/resolve/:gaii finds which node hosts an agent. Resolution order: 1) Check local cache (5-minute TTL), 2) Check local storage, 3) Check personal nodes anchored to this operator, 4) Parse node hint from GAII format (agent#owner@node), 5) Broadcast resolve to all active peers. Results are cached to reduce network traffic.",
-
     "fedApiRefTitle": "API Reference",
     "fedApiRefHelpTitle": "All Federation Endpoints",
-
     "fedDepeeringTitle": "Peers Being Removed",
     "fedDepeeringExplain": "These peers are in the grace period before permanent removal. In-flight work can still complete.",
     "fedDepeeringGrace": "Grace ends",
-
     "fedShareCatalogue": "Share Catalogue",
     "fedReplicateMemory": "Replicate Memory",
     "fedAllowRouting": "Allow Routing",
@@ -4250,7 +4221,6 @@
     "fedPeerModePrivate": "Private P2P",
     "fedPolicyUpdated": "Peer policy updated",
     "fedPolicySectionTitle": "Policy",
-
     "fedNetworkDirectoryTitle": "Network Directory",
     "fedNetworkDirectoryDesc": "Services and data available across the federation network.",
     "fedNetworkDirType": "Type",
@@ -4260,7 +4230,6 @@
     "fedNetworkDirPrice": "Price",
     "fedNetworkDirEmpty": "No federated services discovered yet. Services appear when peers share their catalogue.",
     "fedNetworkDirSearch": "Search services...",
-
     "genesisExplain": "Genesis peers are the founding nodes of a federation cluster. The genesis node is the first node that creates the federation, and it manages peer approvals, key exchange, and cluster policies.",
     "genesisHelpTitle": "What are genesis peers?",
     "genesisHelpDetail": "When you create a new federation, your node becomes the genesis (origin) node. Other nodes request to join, and you approve or reject them here. Genesis peers have special privileges: they can set cluster-wide policies, approve new members, and suspend misbehaving nodes. Approved peers can exchange data according to federation rules.",
@@ -4268,7 +4237,6 @@
     "confirmAction": "Are you sure?",
     "approveConfirm": "Approve this peer?",
     "suspendConfirm": "Suspend this peer?",
-
     "configuration": "Configuration",
     "schema": "Schema",
     "fields": "Fields",
@@ -4276,7 +4244,6 @@
     "type": "Type",
     "version": "Version",
     "back": "Back",
-
     "cfgGroup_node": "Node",
     "cfgGroup_storage": "Storage",
     "cfgGroup_morsel_policy": "Morsel Policy",
@@ -4310,7 +4277,6 @@
     "cfgGroup_personal_nodes": "Personal Nodes",
     "cfgGroup_match_notifications": "Match Notifications",
     "cfgGroup_consul": "Consul",
-
     "cfgHelp_extensions": "The extension system runs custom JavaScript code in sandboxed V8 isolates. Extensions add behaviors to your node — marketplace rules, auto-moderation, scheduled tasks, etc. Install bundled extensions from the Services tab, or create your own. Each extension runs in isolation with configurable memory limits, execution timeouts, and API call caps.",
     "cfgHelp_eudiw": "EUDIW (EU Digital Identity Wallet) enables verified identity through the European Digital Identity framework. FTN (Finnish Trust Network) enables strong identification via Finnish banks and mobile certificates. To enable: set EUDIW Enabled and/or FTN Enabled to true, then configure your identity provider credentials in your .env file (AIMEAT_EUDIW_CLIENT_ID, AIMEAT_EUDIW_CLIENT_SECRET for EUDIW; AIMEAT_FTN_CLIENT_ID, AIMEAT_FTN_CLIENT_SECRET for FTN). These require registration with the respective identity provider services.",
     "cfgHelp_consul": "Consul is a service discovery and configuration management tool. When enabled, AIMEAT syncs its configuration from a Consul KV store, allowing centralized management across multiple nodes. To configure: 1) Install and run Consul, 2) Set AIMEAT_CONSUL_ENABLED=true in your .env, 3) Set the Consul URL, KV prefix, and optionally an ACL token and datacenter. These settings are immutable and must be set before startup.",
@@ -4318,7 +4284,6 @@
     "cfgHelp_matching": "The AI matching engine automatically connects users based on shared interests, location, and profile data. When enabled, it runs periodically (configurable interval) and generates match suggestions. Configure the minimum score threshold, max suggestions per round, geographic distance limits, and cooldown periods to control matching behavior.",
     "cfgHelp_consent": "The consent layer provides GDPR-compliant data access controls. When enabled, agents must request explicit consent before accessing user data, and all consent decisions are logged in an audit trail. Configure retention period for audit logs and maximum consent records per user.",
     "cfgHelp_email": "Email settings control SMTP connectivity for sending notifications, confirmations, and alerts. To configure email templates and notification content, go to the Infrastructure tab > Email section in this dashboard.",
-
     "cfg_node_id": "Node ID",
     "cfg_node_port": "Port",
     "cfg_node_type": "Node Type",
@@ -4409,7 +4374,7 @@
     "cfg_consul_datacenter": "Datacenter",
     "cortexTab": "Cortex Extensions",
     "cortex": {
-      "back": "\u2190 Back",
+      "back": "← Back",
       "total": "Total",
       "active": "Active",
       "inactive": "Inactive",
@@ -4721,8 +4686,12 @@
     "instanceSelector": "Choose a Marketplace",
     "instanceSelectorSubtitle": "Select a marketplace to browse or sell items",
     "noInstances": "No marketplaces available",
-    "visibility": { "public": "Public", "password": "Password Protected", "invite": "Invite Only" },
-    "backToMarketplaces": "\u2190 All Marketplaces",
+    "visibility": {
+      "public": "Public",
+      "password": "Password Protected",
+      "invite": "Invite Only"
+    },
+    "backToMarketplaces": "← All Marketplaces",
     "nav": {
       "search": "Search",
       "sell": "Sell",
@@ -4890,7 +4859,18 @@
         "Today someone's idea changes someone's mind.",
         "Love what actually matters to you."
       ],
-      "weights": [3, 3, 2, 2, 2, 2, 2, 1, 1, 1],
+      "weights": [
+        3,
+        3,
+        2,
+        2,
+        2,
+        2,
+        2,
+        1,
+        1,
+        1
+      ],
       "line1": "Opinions are like assholes. Everyone's got one. Here are a few:",
       "cta": "Make yours heard by copying the prompt below into any AI chat, tell it what you want, and in under a minute your opinion shows up here live."
     },
@@ -5501,7 +5481,7 @@
     "noRequests": "No access requests.",
     "approve": "Approve",
     "deny": "Deny",
-    "approved": "approved",
+    "approved": "Approved",
     "revoke": "Revoke",
     "confirmRemoveMember": "Revoke {member}’s access to this organism?",
     "memberRemoved": "Member removed",
@@ -5576,7 +5556,6 @@
     "requestedAccess": "requested access",
     "addAsContributor": "Add as contributor",
     "addAsViewer": "as viewer",
-    "deny": "Deny",
     "roleContributorShort": "contributor",
     "roleViewerShort": "viewer",
     "makeContributor": "→ can write",
@@ -5601,11 +5580,9 @@
     "overview": "Overview — who & what uses this organism",
     "hide": "Hide",
     "show": "Show",
-    "aiPromptHuman": "For chat",
-    "aiPromptAgent": "For coding agent",
     "contractPrompt": "Create contract agent",
     "contractPromptCopied": "Contract-agent prompt copied — paste it to your AI / coding agent.",
-    "promptCopied": "Access prompt copied — paste it to your AI.",
+    "promptCopied": "Prompt copied — paste it into any AI chat, then paste the JSON it returns below.",
     "addSpaceTitle": "Add a space",
     "addSpaceDesc": "A document space is a free-form wiki (sections + markdown pages). A record space is a schema-locked list (forms). You can remove spaces in Settings.",
     "modeDocument": "Document (wiki)",
@@ -5629,7 +5606,6 @@
     "src_knowledge": "Knowledge",
     "mine": "Mine",
     "searchSources": "Search…",
-    "search": "Search",
     "noResults": "No results",
     "entries": "entries",
     "attach": "Attach",
@@ -5654,15 +5630,17 @@
     "copyFailed": "Copy failed",
     "shareFailed": "Failed to update sharing",
     "needsDecision": "Needs your decision",
-    "approve": "Approve",
     "reject": "Reject",
-    "approved": "Approved",
     "rejected": "Rejected",
     "decisions": "Recent decisions",
     "noneYet": "none yet",
+    "memberAgents": "Agents",
+    "memberAgentsHint": "This member's agents — they inherit the membership and can act in this organism",
     "spaceTasksBacked": "This space points at the task system — its items are tasks, not workspace records. Manage them in the Tasks views.",
     "spaceBackingUnsupported": "This space's backing is not supported, so its content is not shown here. Edit the workspace (manifest) and set this space's backing to \"memory\" to restore it — files and knowledge packages attach via Sources or document images instead.",
     "onePerLine": "one per line",
+    "autoIdHint": "Pre-filled automatically — change it if you want a memorable id.",
+    "fillRequired": "Please fill in the required fields: {fields}",
     "docs": "docs",
     "newPage": "New document",
     "edit": "Edit",
@@ -5688,7 +5666,6 @@
     "confirmDeleteWorkspace": "Are you sure you want to delete this workspace? All its documents, records and version history are permanently removed. This cannot be undone.",
     "spaces": "Spaces",
     "recordsMode": "records",
-    "remove": "Remove",
     "spaceName": "New space name",
     "docsSpace": "document space",
     "recordsSpace": "records type",
@@ -5714,7 +5691,6 @@
     "tabBoard": "Board",
     "tabReview": "Review",
     "tabPeople": "People",
-    "forAgents": "For agents",
     "forAgentsHint": "Copy a ready prompt that teaches an AI to use this workspace",
     "reviewBanner": "{n} waiting for review",
     "reviewBannerSub": "Publishes are gated and need a human decision.",
@@ -5725,7 +5701,6 @@
     "relDays": "{n} d ago",
     "agentsDesc": "An attached agent works in this organism with its owner’s member rights — it shows up in workspace participants and activity.",
     "pickAgent": "Choose one of your agents…",
-    "attach": "Attach",
     "noOwnAgentsLeft": "All your agents are already attached (or you have none yet).",
     "advancedAttach": "Advanced: attach by ID",
     "agentActedIn": "active in",
@@ -5802,7 +5777,6 @@
     "generateError": "Generation failed",
     "noAiKey": "Set up your OpenRouter key above, or copy the prompt to your own AI chat.",
     "copyPrompt": "Copy prompt",
-    "promptCopied": "Prompt copied — paste it into any AI chat, then paste the JSON it returns below.",
     "pasteHelp": "No key? Copy the prompt above into any AI chat, then paste the JSON it returns here:",
     "pastePlaceholder": "Paste the AI JSON response here",
     "applyPasted": "Validate & apply",
@@ -5841,10 +5815,8 @@
     "members": "members",
     "memberCount": "Members",
     "board": "Board",
-    "createdAt": "Created",
     "cancel": "Cancel",
     "create": "Create",
-    "edit": "Edit",
     "save": "Save",
     "updated": "Organism updated",
     "updateError": "Failed to update",
@@ -5860,6 +5832,18 @@
       "club": "Club",
       "cooperative": "Cooperative",
       "project": "Project"
+    },
+    "copyChatPrompt": "Copy chat prompt",
+    "copyCodingPrompt": "Copy coding agent prompt",
+    "agentAccess": "Agent access",
+    "formProcess": "Process",
+    "spacesRemoveHint": "These actions apply immediately. Removing a space hides its section — the data stays in memory and comes back if a space with the same name is added again.",
+    "autonomyLevels": {
+      "L1": "most cautious",
+      "L2": "cautious",
+      "L3": "balanced",
+      "L4": "independent",
+      "L5": "free"
     }
   },
   "tags": {

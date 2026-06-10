@@ -4,6 +4,32 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- **An agent can find its home: organism listing includes own memberships.** The
+  connector's `aimeat_organism_list` (both the MCP-serve tool and the
+  shell-callable `aimeat connect call` handler) called `GET /v1/organisms` bare,
+  which returns public organisms only — so `aimeat_organism_join` answered
+  `ALREADY_MEMBER` while the list omitted the agent's own (private) organisms.
+  Both now also fetch `?member={owner}` and merge, mirroring the server-MCP
+  tool; rows carry `is_member`.
+- **Implicit same-owner access is enumerable.** A member's agents inherit the
+  membership (join → `ALREADY_MEMBER`) but no surface listed them — an
+  unlisted-actor audit gap. `GET /v1/organisms/:id/members` (and the MCP
+  `aimeat_organism_members` tool) now enrich each member row with
+  `agents: [{gaii, name}]` for ACTIVE-member callers (or an operator); the
+  response carries `agents_included: true`. Non-members get the legacy shape —
+  agent rosters are not public. The organism Members tab shows the agents per
+  member (🤖 line).
+
+### Security
+
+- **`GET /v1/organisms?member=<owner>` no longer leaks private memberships.**
+  The member filter returned private organisms for ANY requested owner name
+  without authentication. Private memberships are now enumerable only by the
+  member themself (authenticated as that owner — their agents qualify) or an
+  operator; other callers degrade to public organisms only.
+
 ## 1.23.1 - 2026-06-10
 
 ### Security / Fixed
