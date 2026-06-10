@@ -15,6 +15,10 @@
  *     AppStrip — home/section sub-components
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.1.0 — 2026-06-10 — Sidebar identity shows the generated identicon (same seed as the profile
+ *     card) instead of a plain accent ball; home-card list rows lightened (weight 500, dim color) so
+ *     card titles read as headers again. Agents-card rows deep-link to the agent (primes
+ *     aimeat.agents.open → agents tab expands + scrolls to it); the next-run row opens the Scheduler.
  *   v3.0.0 — 2026-06-10 — Home is a DASHBOARD ("what happened, what waits for me"): new
  *     WaitingForYou box (pending publish approvals per org/workspace + join requests + incoming
  *     invitations, with Review/View buttons that prime the organisms tab), Continue card (cross-type
@@ -482,20 +486,21 @@ function AgentsCard({ owner }) {
         ${activeToday > 0 ? html`<span class="pf-home-card-note"> · ${(t('profile.landing.activeTodayCount') || '{n} active today').replace('{n}', String(activeToday))}</span>` : null}
       </button>
       ${agents.slice(0, 3).map(a => html`
-        <div class="pf-home-row pf-home-row-static" key=${a.gaii || a.name}>
+        <button class="pf-home-row" key=${a.gaii || a.name}
+          onClick=${() => { try { sessionStorage.setItem('aimeat.agents.open', a.name); } catch { /* noop */ } openProfileTab('agents'); }}>
           <span class="pf-home-row-ico">${'🤖'}</span>
           <span class="pf-home-row-label">${escHtml(a.display_name || a.name)}</span>
           <span class="pf-home-row-meta ${isToday(a.last_seen) ? 'pf-ok' : ''}">
             ${a.last_seen ? (isToday(a.last_seen) ? (t('profile.landing.agentActiveToday') || 'active today') : relTime(a.last_seen)) : '—'}
           </span>
-        </div>
+        </button>
       `)}
       ${nextJob ? html`
-        <div class="pf-home-row pf-home-row-static" key="nextjob">
+        <button class="pf-home-row" key="nextjob" onClick=${() => openProfileTab('scheduler')}>
           <span class="pf-home-row-ico">⏰</span>
           <span class="pf-home-row-label">${escHtml(nextJob.name || nextJob.id || '')}</span>
           <span class="pf-home-row-meta">${(t('profile.landing.nextRunAt') || 'next run {time}').replace('{time}', fmtClock(nextJob.nextRunAt))}</span>
-        </div>` : null}
+        </button>` : null}
     </div>
   `;
 }
@@ -883,7 +888,7 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
 
       <aside class="pf-sidebar">
         <div class="pf-side-identity">
-          <div class="pf-side-avatar"></div>
+          <div class="pf-side-avatar" dangerouslySetInnerHTML=${{ __html: minidenticon(owner || 'user') }}></div>
           <div class="pf-side-id-name">${session.displayName || owner}</div>
         </div>
 

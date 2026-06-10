@@ -1981,7 +1981,8 @@
   border-right: 1px solid var(--border);
 }
 .pf-side-identity { display: flex; align-items: center; gap: 0.6rem; padding: 0.4rem 0.6rem 0.8rem; }
-.pf-side-avatar { width: 34px; height: 34px; border-radius: var(--radius-full, 999px); flex: 0 0 auto; background: linear-gradient(135deg, var(--accent), var(--accent-deep, var(--accent))); }
+.pf-side-avatar { width: 34px; height: 34px; border-radius: var(--radius-full, 999px); flex: 0 0 auto; background: var(--card); border: 1.5px solid var(--border); overflow: hidden; }
+.pf-side-avatar svg { width: 100%; height: 100%; }
 .pf-side-id-name { font-weight: 700; font-size: 0.95rem; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .pf-side-group { margin-top: 0.4rem; }
@@ -2452,7 +2453,8 @@
 .pf-waiting-title { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--warn-fg, var(--text-dim)); margin-bottom: 0.5rem; }
 .pf-waiting-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.35rem 0; }
 .pf-waiting-row + .pf-waiting-row { border-top: 1px solid var(--border-subtle, var(--border)); }
-.pf-waiting-text { flex: 1; font-size: 0.9rem; color: var(--text); }
+.pf-waiting-text { flex: 1; font-size: 0.88rem; color: var(--text-dim); }
+.pf-waiting-text b { font-weight: 600; color: var(--text); }
 .pf-waiting-where { color: var(--muted); }
 .pf-home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
 @media (max-width: 760px) { .pf-home-grid { grid-template-columns: 1fr; } }
@@ -2461,12 +2463,12 @@
 .pf-home-card-link { cursor: pointer; }
 .pf-home-card-link:hover { color: var(--text); }
 .pf-home-card-note { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--muted); }
-.pf-home-row { display: flex; align-items: center; gap: 0.55rem; width: 100%; background: none; border: none; padding: 0.32rem 0.2rem; border-radius: 8px; cursor: pointer; font-size: 0.9rem; color: var(--text); text-align: left; }
-.pf-home-row:hover { background: var(--bg-surface); }
+.pf-home-row { display: flex; align-items: center; gap: 0.55rem; width: 100%; background: none; border: none; padding: 0.32rem 0.2rem; border-radius: 8px; cursor: pointer; font-size: 0.88rem; color: var(--text-dim); text-align: left; }
+.pf-home-row:hover { background: var(--bg-surface); color: var(--text); }
 .pf-home-row-static { cursor: default; }
-.pf-home-row-static:hover { background: none; }
+.pf-home-row-static:hover { background: none; color: var(--text-dim); }
 .pf-home-row-ico { flex: none; }
-.pf-home-row-label { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-home-row-label { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pf-home-row-meta { flex: none; font-size: 0.78rem; color: var(--muted); }
 .pf-home-row-meta.pf-ok { color: var(--success-fg, var(--text)); }
 .pf-lp-stat-link { background: none; border: none; padding: 0.15rem 0.35rem; border-radius: 8px; cursor: pointer; font: inherit; color: inherit; }

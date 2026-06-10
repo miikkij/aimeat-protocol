@@ -8,6 +8,8 @@
  *   v1.1.0 -- 2026-03-18 -- Rewrite agent prompt to use device-auth flow; remove connectivity key UI
  *   v1.2.0 -- 2026-03-19 -- Replace profile-initiated device auth with inline pending request approval
  *   v1.3.0 -- 2026-05-21 -- Shorten agent prompt to delegate to tier1; add Download/Copy Instructions buttons
+ *   v1.x — 2026-06-10 — External deep-link entry: sessionStorage `aimeat.agents.open` (set by the
+ *     home dashboard's Agents card) expands that agent's card on mount and scrolls it into view.
  *   v1.4.0 -- 2026-05-21 -- Add sub-tab navigation (Tasks, Directives) in expanded agent detail view
  *   v1.5.0 -- 2026-05-22 -- Add Capabilities sub-tab with technical/domain skill display
  *   v1.6.0 -- 2026-06-02 -- Component unification (#2): scope modal uses the canonical
@@ -712,6 +714,20 @@ export default function AgentsTab({ session, showToast, onStats }) {
   function toggleAgent(name) {
     setExpandedAgent(prev => prev === name ? null : name);
   }
+
+  // External deep-link: the home dashboard's Agents card primes `aimeat.agents.open` with an
+  // agent name before opening this tab — expand that agent and scroll its card into view.
+  useEffect(() => {
+    try {
+      const name = sessionStorage.getItem('aimeat.agents.open');
+      if (!name) return;
+      sessionStorage.removeItem('aimeat.agents.open');
+      setExpandedAgent(name);
+      setTimeout(() => {
+        document.querySelector(`[data-agent-name="${name}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 500);
+    } catch { /* noop */ }
+  }, []);
 
   // Running-now panel → open a specific agent's Tasks tab on a specific task.
   // Expand the agent, record the deep-link (nonce bump re-fires repeat clicks),
