@@ -1188,6 +1188,7 @@ function EditMemoryModal({ memKey, initialValue, initialVisibility, initialVersi
                 <div class="text-meta-sm mb-xs">${t('profile.memory.noGroups')}</div>
                 <button class="btn-outline btn-sm" onClick=${() => {
                   onCancel();
+                  try { sessionStorage.setItem('aimeat.access.focus', 'groups'); } catch { /* noop */ }
                   window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'access' } }));
                 }}>${t('profile.memory.createGroupBtn')}</button>`
               : html`

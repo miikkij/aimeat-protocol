@@ -1723,7 +1723,12 @@
       "adCancel": "Cancel",
       "adInvalidBudget": "Token budget must be a non-negative number",
       "adSaved": "Agent defaults saved",
-      "adSaveError": "Failed to save defaults"
+      "adSaveError": "Failed to save defaults",
+      "copied": "Copied",
+      "validUntil": "Valid until {time} ({h} h)",
+      "noKeypair": "No keypair is stored for this account. Keys are generated at registration; older accounts may not have one.",
+      "fedAllowAllCaption": "Any federation node can verify your identity. Uncheck to restrict to the list below.",
+      "adRuleExample": "Example: “Always answer in Finnish” or “Never spend morsels without asking”."
     },
     "nodes": {
       "title": "Personal Nodes",

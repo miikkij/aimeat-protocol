@@ -197,6 +197,13 @@
 .pf .tag-pill.tag-removable{background:var(--control-bg,var(--card));color:var(--text);border:1px solid var(--control-border,var(--border))}
 .pf .tag-pill.tag-removable .tag-x{color:var(--muted);margin-left:2px}
 .pf .tag-pill.tag-removable:hover .tag-x{color:var(--text)}
+/* ── Access tab polish (2026-06-10): neutral headers, compact empties, fed coupling ── */
+.pf .card-h3.access-h3{color:var(--text)}
+.pf .access-empty-row{display:flex;align-items:center;gap:.75rem;padding:.4rem 0;margin-bottom:1rem}
+.pf .access-fed-allowall{padding:.4rem 0;border-bottom:1px solid var(--border-subtle,var(--border))}
+.pf .access-fed-warn-caption{font-size:.78rem;color:var(--warn-fg,#B45309);margin:.25rem 0 .1rem 1.6rem}
+.pf .access-fed-list--inactive{opacity:.45;pointer-events:none}
+.pf .access-copy-val{display:inline-flex;align-items:center;gap:.25rem;min-width:0;overflow-wrap:anywhere}
 .pf .mem-time{font-size:.7rem;color:var(--text-dim,#6B7280);white-space:nowrap;flex-shrink:0}
 .pf .mem-sort-bar{display:flex;align-items:center;gap:.35rem}
 .pf .mem-sort-select{font-size:.75rem;padding:2px 6px;min-width:auto;width:auto}

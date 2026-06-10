@@ -1494,6 +1494,10 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
             notification_email: ghiiRecord.notificationEmail ?? null,
             verification_level: ghiiRecord.verificationLevel,
             email_verified_at: ghiiRecord.emailVerifiedAt ?? null,
+            // The Ed25519 PUBLIC key generated at registration (stored on the owner
+            // record) — the Access tab shows it. The private key is never retrievable;
+            // it was returned once at creation.
+            public_key: (await storage.getOwner(ownerName))?.publicKey ?? null,
         }));
     });
 

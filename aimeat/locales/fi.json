@@ -1723,7 +1723,12 @@
       "adCancel": "Peruuta",
       "adInvalidBudget": "Token-budjetin täytyy olla ei-negatiivinen luku",
       "adSaved": "Agenttien oletukset tallennettu",
-      "adSaveError": "Oletusten tallennus epäonnistui"
+      "adSaveError": "Oletusten tallennus epäonnistui",
+      "copied": "Kopioitu",
+      "validUntil": "Voimassa {time} asti ({h} h)",
+      "noKeypair": "Tilille ei ole tallennettu avainparia. Avaimet luodaan rekisteröityessä; vanhoilta tileiltä se voi puuttua.",
+      "fedAllowAllCaption": "Mikä tahansa federaatiosolmu voi verifioida identiteettisi. Rajaa alla olevaan listaan poistamalla valinta.",
+      "adRuleExample": "Esim. ”Vastaa aina suomeksi” tai ”Älä koskaan käytä murusia kysymättä”."
     },
     "nodes": {
       "title": "Henkilökohtaiset solmut",

@@ -12,12 +12,20 @@
  *   v1.1.0 -- 2026-03-17 -- Replace inline styles with CSS classes
  *   v1.2.0 -- 2026-05-21 -- Add Federation Access section for auth consent management
  *   v1.3.0 -- 2026-05-21 -- Add Sharing Groups and Agent Defaults sections
+ *   v1.4.0 -- 2026-06-10 -- Security-page clarity round: federation allow-all warning is a
+ *     caption under the checkbox and the allowlist dims/disables while allow-all is on;
+ *     Public Key reads the real key from GET /v1/ghii/me (+ explanatory text when absent);
+ *     JWT row shows "Valid until HH:MM (h)" decoded from the token; copy buttons on
+ *     GHII/Node/MCP endpoint; empty token/group states are one-line rows; section headers
+ *     neutral (access-h3, emojis dropped) and Add Node / New Token / New Group de-accented;
+ *     Token Budget value is click-to-edit and the empty-rules state shows an example rule;
+ *     sharing-groups section accepts the Memory tab's deep link (aimeat.access.focus).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { escHtml, copyToClipboard } from '/js/utils.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { apiGet, apiPost, apiDelete } from '/js/api.js';
@@ -66,6 +74,17 @@ function SharingGroupsSection({ showToast }) {
   }, []);
 
   useEffect(() => { loadGroups(); }, [loadGroups]);
+
+  // Deep link from the Memory tab's "Create a group →": scroll here and open the form.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('aimeat.access.focus') === 'groups') {
+        sessionStorage.removeItem('aimeat.access.focus');
+        setShowCreate(true);
+        setTimeout(() => document.getElementById('access-sharing-groups')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400);
+      }
+    } catch { /* noop */ }
+  }, []);
 
   // Live update listener
   const liveRef = useRef(loadGroups);
@@ -332,23 +351,27 @@ function SharingGroupsSection({ showToast }) {
   };
 
   return html`
-    <h3 class="card-h3 mt-section">\u{1F465} ${t('profile.access.sgTitle') || 'Sharing Groups'}</h3>
+    <h3 class="card-h3 access-h3 mt-section" id="access-sharing-groups">${t('profile.access.sgTitle') || 'Sharing Groups'}</h3>
     <div class="section-desc">${t('profile.access.sgDesc') || 'Define groups of identities to share memory entries with. Assign a sharing group to memory keys to control who can read or write.'}</div>
 
     ${groups === null
       ? html`<div class="empty">${t('profile.access.sgLoading') || 'Loading...'}</div>`
       : groups.length === 0
-        ? html`<div class="empty">${t('profile.access.sgEmpty') || 'No sharing groups yet.'}</div>`
+        ? (!showCreate && html`
+            <div class="access-empty-row">
+              <span class="text-meta-sm">${t('profile.access.sgEmpty') || 'No sharing groups yet.'}</span>
+              <button class="btn-outline btn-sm" onClick=${() => setShowCreate(true)}>${t('profile.access.sgCreate') || 'New Group'}</button>
+            </div>`)
         : groups.map(renderGroupCard)
     }
 
-    ${!showCreate ? html`
+    ${!showCreate ? ((groups?.length || 0) > 0 && html`
       <div class="mb-1">
-        <button class="btn-primary" onClick=${() => setShowCreate(true)}>
+        <button class="btn-outline" onClick=${() => setShowCreate(true)}>
           ${t('profile.access.sgCreate') || 'New Group'}
         </button>
       </div>
-    ` : html`
+    `) : html`
       <div class="create-form">
         <h4 class="card-h3 mb-half">${t('profile.access.sgCreateTitle') || 'Create Sharing Group'}</h4>
         <div class="flex-col">
@@ -461,7 +484,7 @@ function AgentDefaultsSection({ showToast }) {
   const budget = defaults?.default_token_budget;
 
   return html`
-    <h3 class="card-h3 mt-section">\u{1F916} ${t('profile.access.adTitle') || 'Agent Defaults'}</h3>
+    <h3 class="card-h3 access-h3 mt-section">${t('profile.access.adTitle') || 'Agent Defaults'}</h3>
     <div class="section-desc">${t('profile.access.adDesc') || 'Owner-level defaults that apply to all your agents unless overridden by per-agent directives.'}</div>
 
     ${!editing ? html`
@@ -474,7 +497,7 @@ function AgentDefaultsSection({ showToast }) {
         </div>
 
         ${rules.length === 0
-          ? html`<div class="empty">${t('profile.access.adNoRules') || 'No default rules set.'}</div>`
+          ? html`<div class="text-meta-sm mb-half">${t('profile.access.adNoRules') || 'No default rules set.'} ${t('profile.access.adRuleExample') || 'Example: "Always answer in Finnish" or "Never spend morsels without asking".'}</div>`
           : rules.map((rule, i) => html`
               <div class="mem-item" key=${i}>
                 <span class="mem-key">${escHtml(rule)}</span>
@@ -484,7 +507,9 @@ function AgentDefaultsSection({ showToast }) {
 
         <div class="mem-item">
           <span class="mem-key">${t('profile.access.adTokenBudget') || 'Token Budget'}</span>
-          <span>${budget != null ? budget.toLocaleString() : (t('profile.access.adUnlimited') || 'Unlimited')}</span>
+          <button class="pj-linklike" title=${t('profile.access.adEdit') || 'Edit'} onClick=${startEdit}>
+            ${budget != null ? budget.toLocaleString() : (t('profile.access.adUnlimited') || 'Unlimited')} ✎
+          </button>
         </div>
       </div>
     ` : html`
@@ -650,7 +675,7 @@ function AccessTokensSection({ session, showToast }) {
   };
 
   return html`
-    <h3 class="card-h3 mt-section">\u{1F511} ${t('profile.access.patTitle') || 'Agent Access Tokens'}</h3>
+    <h3 class="card-h3 access-h3 mt-section">${t('profile.access.patTitle') || 'Agent Access Tokens'}</h3>
     <div class="section-desc">${t('profile.access.patDesc') || 'Create a revocable token an agent can use (as a Bearer header) to log in and test your apps. One token can be shared across all your agents.'}</div>
 
     ${created && html`
@@ -676,7 +701,11 @@ function AccessTokensSection({ session, showToast }) {
     ${tokens === null
       ? html`<div class="empty">${t('profile.access.patLoading') || 'Loading...'}</div>`
       : tokens.length === 0
-        ? html`<div class="empty">${t('profile.access.patEmpty') || 'No access tokens yet.'}</div>`
+        ? (!showCreate && html`
+            <div class="access-empty-row">
+              <span class="text-meta-sm">${t('profile.access.patEmpty') || 'No access tokens yet.'}</span>
+              <button class="btn-outline btn-sm" onClick=${() => setShowCreate(true)}>${t('profile.access.patCreate') || 'New Token'}</button>
+            </div>`)
         : tokens.map(tok => html`
             <div class="card" key=${tok.id}>
               <div class="flex-between">
@@ -700,9 +729,9 @@ function AccessTokensSection({ session, showToast }) {
           `)
     }
 
-    ${!showCreate ? html`
-      <div class="mb-1"><button class="btn-primary" onClick=${() => setShowCreate(true)}>${t('profile.access.patCreate') || 'New Token'}</button></div>
-    ` : html`
+    ${!showCreate ? (tokens?.length > 0 && html`
+      <div class="mb-1"><button class="btn-outline" onClick=${() => setShowCreate(true)}>${t('profile.access.patCreate') || 'New Token'}</button></div>
+    `) : html`
       <div class="create-form">
         <h4 class="card-h3 mb-half">${t('profile.access.patCreateTitle') || 'Create Access Token'}</h4>
         <div class="flex-col">
@@ -778,6 +807,16 @@ function AccessTokensSection({ session, showToast }) {
    Main Access Tab
    ═══════════════════════════════════════════════════════════════════ */
 
+/** Decode the JWT's exp claim → { until: Date, hoursLeft } or null. Display-only. */
+function jwtExpiry(jwt) {
+  try {
+    const payload = JSON.parse(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    if (!payload.exp) return null;
+    const until = new Date(payload.exp * 1000);
+    return { until, hoursLeft: Math.max(0, (until.getTime() - Date.now()) / 3600000) };
+  } catch { return null; }
+}
+
 export default function AccessTab({ session, showToast }) {
   const NODE_URL = getNodeUrl();
   const ownerKey = typeof localStorage !== 'undefined' ? localStorage.getItem('aimeat_owner_key') : null;
@@ -785,13 +824,16 @@ export default function AccessTab({ session, showToast }) {
   const [authConsents, setAuthConsents] = useState([]);
   const [newNodeId, setNewNodeId] = useState('');
   const [fedLoading, setFedLoading] = useState(false);
+  // undefined = loading, null = no keypair stored, string = the key
+  const [pubKey, setPubKey] = useState(undefined);
 
-  // Load auth consents on mount
+  // Load auth consents + own GHII profile (public key) on mount
   useEffect(() => {
     apiGet('/v1/consent').then(data => {
       const all = data.data?.consents || [];
       setAuthConsents(all.filter(c => c.scope === 'auth' && c.status === 'active'));
     }).catch(() => {});
+    apiGet('/v1/ghii/me').then(r => setPubKey(r?.data?.public_key ?? null)).catch(() => setPubKey(null));
   }, []);
 
   async function addAuthNode() {
@@ -845,24 +887,45 @@ export default function AccessTab({ session, showToast }) {
     }
   }
 
+  const exp = session.jwt ? jwtExpiry(session.jwt) : null;
+  const copyRow = (label, value) => html`
+    <div class="mem-item"><span class="mem-key">${label}</span>
+      <span class="access-copy-val">${escHtml(value || '-')}
+        ${value && html`<${CopyButton} text=${value} className="btn-ghost btn-sm" label="📋" onCopied=${() => showToast(t('profile.access.copied') || 'Copied')} />`}
+      </span>
+    </div>`;
+
   return html`
     <div class="section-title">${t('profile.access.title')}</div>
     <div class="section-desc">${t('profile.access.desc')}</div>
 
-    <h3 class="card-h3">\u{1F4BB} ${t('profile.access.session')}</h3>
+    <h3 class="card-h3 access-h3">${t('profile.access.session')}</h3>
     <div class="card">
       <div class="mem-item"><span class="mem-key">${t('profile.access.owner')}</span><span>${escHtml(session.owner || '-')}</span></div>
-      <div class="mem-item"><span class="mem-key">${t('profile.access.ghii')}</span><span>${escHtml(session.ghii || '-')}</span></div>
-      <div class="mem-item"><span class="mem-key">${t('profile.access.agentGaii')}</span><span>${escHtml(session.gaii || '-')}</span></div>
-      <div class="mem-item"><span class="mem-key">${t('profile.access.node')}</span><span>${escHtml(NODE_URL)}</span></div>
-      <div class="mem-item"><span class="mem-key">${t('profile.access.jwtValid')}</span><span>${session.valid ? html`<span class="badge badge-success">${t('profile.access.yes')}</span>` : html`<span class="badge badge-danger">${t('profile.access.expired')}</span>`}</span></div>
+      ${copyRow(t('profile.access.ghii'), session.ghii)}
+      ${session.gaii && copyRow(t('profile.access.agentGaii'), session.gaii)}
+      ${copyRow(t('profile.access.node'), NODE_URL)}
+      <div class="mem-item"><span class="mem-key">${t('profile.access.jwtValid')}</span><span>
+        ${session.valid
+          ? (exp
+              ? html`<span class="badge badge-success">${(t('profile.access.validUntil') || 'Valid until {time} ({h} h)').replace('{time}', exp.until.toLocaleTimeString(getLocale() === 'fi' ? 'fi-FI' : undefined, { hour: '2-digit', minute: '2-digit' })).replace('{h}', exp.hoursLeft < 1 ? '<1' : String(Math.round(exp.hoursLeft)))}</span>`
+              : html`<span class="badge badge-success">${t('profile.access.yes')}</span>`)
+          : html`<span class="badge badge-danger">${t('profile.access.expired')}</span>`}
+      </span></div>
     </div>
 
-    <h3 class="card-h3 mt-section">\u{1F510} ${t('profile.access.publicKey')}</h3>
-    <div class="card"><div class="access-mono">${escHtml(session.publicKey || 'N/A')}</div></div>
+    <h3 class="card-h3 access-h3 mt-section">${t('profile.access.publicKey')}</h3>
+    <div class="card">
+      ${pubKey === undefined
+        ? html`<div class="access-mono">…</div>`
+        : pubKey
+          ? html`<div class="flex-between"><div class="access-mono">${escHtml(pubKey)}</div>
+              <${CopyButton} text=${pubKey} className="btn-ghost btn-sm" label="📋" onCopied=${() => showToast(t('profile.access.copied') || 'Copied')} /></div>`
+          : html`<div class="text-meta-sm">${t('profile.access.noKeypair') || 'No keypair is stored for this account. Keys are generated at registration; older accounts may not have one.'}</div>`}
+    </div>
 
     ${ownerKey && html`
-      <h3 class="card-h3 mt-section">\u{1F5DD}️ ${t('profile.access.ownerKey')}</h3>
+      <h3 class="card-h3 access-h3 mt-section">${t('profile.access.ownerKey')}</h3>
       <div class="card access-card-warn" onClick=${() => copyToClipboard(ownerKey).then(() => showToast(t('profile.access.keyCopied')))}>
         <div class="flex-between">
           <div class="access-mono ${keyBlurred ? 'access-key-blur' : 'access-key-blur revealed'}"
@@ -881,50 +944,60 @@ export default function AccessTab({ session, showToast }) {
       </div>
     `}
 
-    <h3 class="card-h3 mt-section">\u{1F517} ${t('profile.access.mcpEndpoint')}</h3>
+    <h3 class="card-h3 access-h3 mt-section">${t('profile.access.mcpEndpoint')}</h3>
     <div class="card">
-      <div class="access-mcp-url">${escHtml(NODE_URL + '/v1/mcp')}</div>
+      <div class="flex-between">
+        <div class="access-mcp-url">${escHtml(NODE_URL + '/v1/mcp')}</div>
+        <${CopyButton} text=${NODE_URL + '/v1/mcp'} className="btn-ghost btn-sm" label="📋" onCopied=${() => showToast(t('profile.access.copied') || 'Copied')} />
+      </div>
       <div class="access-mcp-desc">${t('profile.access.mcpDesc')}</div>
     </div>
 
-    <h3 class="card-h3 mt-section">\u{1F310} ${t('profile.access.fedTitle')}</h3>
+    <h3 class="card-h3 access-h3 mt-section">${t('profile.access.fedTitle')}</h3>
     <div class="section-desc">${t('profile.access.fedDesc')}</div>
 
+    ${(() => {
+      const allowAll = authConsents.some(c => c.recipient === '*');
+      return html`
     <div class="card">
-      <div class="mem-item">
+      <div class="access-fed-allowall">
         <label class="flex-row">
-          <input type="checkbox"
-            checked=${authConsents.some(c => c.recipient === '*')}
-            onChange=${toggleAllowAll} />
+          <input type="checkbox" checked=${allowAll} onChange=${toggleAllowAll} />
           ${t('profile.access.fedAllowAll')}
         </label>
-        ${authConsents.some(c => c.recipient === '*') && html`
-          <span class="badge badge-warn">${t('profile.access.fedAllowAllWarn')}</span>
+        ${allowAll && html`
+          <div class="access-fed-warn-caption">⚠ ${t('profile.access.fedAllowAllCaption') || 'Any federation node can verify your identity. Uncheck to restrict to the list below.'}</div>
         `}
       </div>
 
-      ${authConsents.filter(c => c.recipient !== '*').length === 0 && !authConsents.some(c => c.recipient === '*') && html`
-        <p class="adm-text-dim">${t('profile.access.fedNoConsents')}</p>
-      `}
-      ${authConsents.filter(c => c.recipient !== '*').map(c => html`
-        <div class="mem-item">
-          <span class="mem-key">${escHtml(c.recipient.replace('node:', ''))}</span>
-          <span class="adm-text-dim" style="font-size:.85em">${c.granted_at ? new Date(c.granted_at).toLocaleDateString() : ''}</span>
-          <button class="btn-ghost btn-danger" onClick=${() => removeAuthConsent(c.id)}>
-            ${t('profile.access.fedRemove')}
+      <!-- The allowlist is meaningless while allow-all is on — dim it so it cannot
+           masquerade as the active control. -->
+      <div class=${allowAll ? 'access-fed-list access-fed-list--inactive' : 'access-fed-list'}>
+        ${authConsents.filter(c => c.recipient !== '*').length === 0 && !allowAll && html`
+          <p class="adm-text-dim">${t('profile.access.fedNoConsents')}</p>
+        `}
+        ${authConsents.filter(c => c.recipient !== '*').map(c => html`
+          <div class="mem-item">
+            <span class="mem-key">${escHtml(c.recipient.replace('node:', ''))}</span>
+            <span class="adm-text-dim" style="font-size:.85em">${c.granted_at ? new Date(c.granted_at).toLocaleDateString() : ''}</span>
+            <button class="btn-ghost btn-danger" disabled=${allowAll} onClick=${() => removeAuthConsent(c.id)}>
+              ${t('profile.access.fedRemove')}
+            </button>
+          </div>
+        `)}
+
+        <div class="mem-item access-fed-add">
+          <input type="text" class="input-field input-sm" placeholder=${t('profile.access.fedNodeId')}
+            disabled=${allowAll}
+            value=${newNodeId} onInput=${e => setNewNodeId(e.target.value)}
+            onKeyDown=${e => e.key === 'Enter' && addAuthNode()} />
+          <button class="btn-outline" onClick=${addAuthNode} disabled=${fedLoading || allowAll}>
+            ${t('profile.access.fedAddNode')}
           </button>
         </div>
-      `)}
-
-      <div class="mem-item access-fed-add">
-        <input type="text" class="input-field input-sm" placeholder=${t('profile.access.fedNodeId')}
-          value=${newNodeId} onInput=${e => setNewNodeId(e.target.value)}
-          onKeyDown=${e => e.key === 'Enter' && addAuthNode()} />
-        <button class="btn-primary" onClick=${addAuthNode} disabled=${fedLoading}>
-          ${t('profile.access.fedAddNode')}
-        </button>
       </div>
-    </div>
+    </div>`;
+    })()}
 
     <${AccessTokensSection} session=${session} showToast=${showToast} />
     <${SharingGroupsSection} showToast=${showToast} />

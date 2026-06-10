@@ -9672,6 +9672,61 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /v1/ghii/me:
+    get:
+      operationId: ghiiMe
+      summary: Get the authenticated owner's own GHII profile
+      description: |
+        Returns the caller's own GHII profile, including fields not exposed on the
+        public profile route (notification email, email verification timestamp, and
+        the Ed25519 public key generated at registration).
+      tags: [GHII]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Own GHII profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      ghii:
+                        type: string
+                      display_name:
+                        type: string
+                        nullable: true
+                      bio:
+                        type: string
+                        nullable: true
+                      avatar:
+                        type: string
+                        nullable: true
+                      locale:
+                        type: string
+                        nullable: true
+                      notification_email:
+                        type: string
+                        nullable: true
+                      verification_level:
+                        type: integer
+                      email_verified_at:
+                        type: string
+                        nullable: true
+                      public_key:
+                        type: string
+                        nullable: true
+                        description: The owner's Ed25519 public key (base64), generated at registration
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   # --- Phase 0.5: TOTP Two-Factor Authentication ---
 
   /v1/ghii/totp/setup:
