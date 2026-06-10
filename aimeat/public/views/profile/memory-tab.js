@@ -25,6 +25,11 @@
  *     stored parsed, not as a string); (8) "no sharing groups" dead end now offers a
  *     "Create a group →" jump to the Access tab; Delete separated to the row's far right;
  *     discover/pull copy buttons neutralized.
+ *   v2.1.0 — 2026-06-10 — Visibility one-click-away again, deliberately: clicking the row's
+ *     badge opens a small popover with all options INCLUDING the sharing groups (the Access
+ *     group-share brought into Memory; "Create a group →" when none exist). Plus bulk edit:
+ *     per-row checkboxes + a bulk bar (change visibility incl. group / delete with confirm /
+ *     clear). The detail-row select and edit-modal select remain as alternate paths.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -333,6 +338,56 @@ export default function MemoryTab({ session, showToast, onStats }) {
     loadMemories();
   }
 
+  // Badge-click popover: pick a visibility (incl. a sharing group) right in the row.
+  // Deliberate two clicks — open, then choose — so a stray click can't publish anything.
+  const [visPopoverFor, setVisPopoverFor] = useState(null);
+  async function applyVis(m, newVis, groupId) {
+    setVisPopoverFor(null);
+    if (newVis === (m.visibility || 'private') && !groupId) return;
+    const resp = await memoryService.updateMemoryVisibility(m.key, newVis, m.version, groupId);
+    if (resp.ok === false) showToast(resp.error?.message || t('profile.error'), true);
+    loadMemories();
+  }
+
+  // Bulk edit: checkbox-select rows, then change visibility (or delete) for all at once.
+  const [selectedKeys, setSelectedKeys] = useState(new Set());
+  const [bulkVis, setBulkVis] = useState('private');
+  const toggleSelected = (key) => setSelectedKeys(prev => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+
+  async function applyBulkVis() {
+    const targets = (memories || []).filter(m => selectedKeys.has(m.key));
+    const groupId = bulkVis.startsWith('group:') ? bulkVis.slice(6) : undefined;
+    const vis = groupId ? 'group' : bulkVis;
+    let ok = 0, fail = 0;
+    for (const m of targets) {
+      try {
+        const resp = await memoryService.updateMemoryVisibility(m.key, vis, m.version, groupId);
+        if (resp.ok === false) fail++; else ok++;
+      } catch { fail++; }
+    }
+    showToast((t('profile.memory.bulkDone') || '{n} updated').replace('{n}', String(ok)) + (fail ? ` · ${fail} ${t('profile.error') || 'failed'}` : ''), fail > 0);
+    setSelectedKeys(new Set());
+    loadMemories();
+  }
+
+  function bulkDelete() {
+    const n = selectedKeys.size;
+    confirm((t('profile.memory.bulkDeleteConfirm') || 'Delete {n} memory entries? This cannot be undone.').replace('{n}', String(n)), async () => {
+      let ok = 0;
+      for (const key of selectedKeys) {
+        try { const r = await memoryService.deleteMemory(key); if (r.ok !== false) ok++; } catch { /* count below */ }
+      }
+      showToast((t('profile.memory.bulkDeleted') || '{n} deleted').replace('{n}', String(ok)));
+      setSelectedKeys(new Set());
+      setExpandedMem(null);
+      loadMemories();
+    }, { danger: true });
+  }
+
   async function handleUpdateMemoryTags(key, tags, version) {
     const resp = await memoryService.updateMemoryTags(key, tags, version);
     if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
@@ -461,14 +516,34 @@ export default function MemoryTab({ session, showToast, onStats }) {
     const renderRow = (m, g) => html`
       <div key=${m.key}>
         <div class="mem-item mem-item--grouped" onClick=${() => setExpandedMem(expandedMem === m.key ? null : m.key)}>
+          <input type="checkbox" class="mem-row-check" checked=${selectedKeys.has(m.key)}
+            onClick=${(e) => e.stopPropagation()} onChange=${() => toggleSelected(m.key)} />
           <span class="mem-key" title=${m.key}>${escHtml(displayRemainder(m.key, g))}</span>
           <span class="mem-time" title="${m.created_at ? new Date(m.created_at).toLocaleString() : ''} / ${m.updated_at ? new Date(m.updated_at).toLocaleString() : ''}">
             ${formatRelativeTime(m.updated_at || m.created_at)}
           </span>
-          <${VisibilityPill} visibility=${m.visibility || 'private'} />
+          <${VisibilityPill} visibility=${m.visibility || 'private'}
+            onClick=${(e) => { e.stopPropagation(); setVisPopoverFor(visPopoverFor === m.key ? null : m.key); }} />
           ${keyHasRules(m.key) && html`<span class="shield-icon" title=${t('permissions.sharingRules')} onClick=${(e) => { e.stopPropagation(); loadKeyPerms(m.key); }}>\u{1F6E1}️</span>`}
           ${fedConsents[m.key] && html`<span class="badge badge-success pf-fed-badge">${t('profile.memory.syncedToFederation')}</span>`}
         </div>
+        ${visPopoverFor === m.key && html`
+          <div class="mem-vis-pop" onClick=${(e) => e.stopPropagation()}>
+            ${VIS_OPTIONS.filter(v => v !== 'group').map(v => html`
+              <button key=${v} class="mem-vis-opt ${(m.visibility || 'private') === v ? 'mem-vis-opt--current' : ''}"
+                onClick=${() => applyVis(m, v)}>${t('knowledge.visibility.' + v)}</button>
+            `)}
+            ${groups.length > 0
+              ? groups.map(grp => html`
+                  <button key=${grp.id} class="mem-vis-opt ${m.visibility === 'group' && m.group_id === grp.id ? 'mem-vis-opt--current' : ''}"
+                    onClick=${() => applyVis(m, 'group', grp.id)}>${t('knowledge.visibility.group')}: ${escHtml(grp.name)}</button>
+                `)
+              : html`<button class="mem-vis-opt mem-vis-opt--dim" onClick=${() => {
+                  try { sessionStorage.setItem('aimeat.access.focus', 'groups'); } catch { /* noop */ }
+                  window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'access' } }));
+                }}>${t('profile.memory.createGroupBtn')}</button>`}
+          </div>
+        `}
         ${expandedMem === m.key && html`
           <div class="mem-detail">
             <div class="mem-detail-key" title=${m.key}>${escHtml(m.key)}</div>
@@ -559,6 +634,18 @@ export default function MemoryTab({ session, showToast, onStats }) {
       </div>
       <${TagCloud} tags=${tagsByFreq} selected=${memTagFilter} onToggle=${toggleMemTag} onClear=${() => setMemTagFilter(new Set())} limit=${10} />
       ${showMemForm && html`<${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} groups=${groups} />`}
+      ${selectedKeys.size > 0 && html`
+        <div class="mem-bulkbar">
+          <span class="mem-bulkbar-count">${(t('profile.memory.bulkSelected') || '{n} selected').replace('{n}', String(selectedKeys.size))}</span>
+          <select class="input-field mem-vis-select" value=${bulkVis} onChange=${e => setBulkVis(e.target.value)}>
+            ${VIS_OPTIONS.filter(v => v !== 'group').map(v => html`<option key=${v} value=${v}>${t('knowledge.visibility.' + v)}</option>`)}
+            ${groups.map(grp => html`<option key=${grp.id} value=${'group:' + grp.id}>${t('knowledge.visibility.group')}: ${grp.name}</option>`)}
+          </select>
+          <button class="btn-outline btn-sm" onClick=${applyBulkVis}>${t('profile.memory.bulkApply') || 'Change visibility'}</button>
+          <button class="btn-danger btn-sm" onClick=${bulkDelete}>${t('profile.memory.deleteBtn')}</button>
+          <button class="btn-ghost btn-sm" onClick=${() => setSelectedKeys(new Set())}>✕ ${t('profile.memory.bulkClear') || 'Clear selection'}</button>
+        </div>
+      `}
       ${filtered.length === 0
         ? html`<div class="empty">${memories.length > 0 ? (t('tags.noMatch') || 'No items match selected tags') : t('profile.memory.empty')}</div>`
         : groupsOrdered.map(g => {

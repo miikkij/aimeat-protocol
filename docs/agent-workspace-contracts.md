@@ -220,6 +220,7 @@ title):
 {
   "title": "adopt-contract: <contract> → <ws>",
   "description": "Adopt your '<contract>' contract into workspace <ws> of organism <organism_id>: join the organism if needed, provision the contract's spaces (workspace_update add_spaces from your own contract declaration), then complete this task with what was added.",
+  "status": "queued",
   "scope": [
     { "name": "kind",        "value": "adopt-contract", "type": "text" },
     { "name": "organism_id", "value": "<organism_id>",  "type": "text" },
@@ -228,6 +229,11 @@ title):
   ]
 }
 ```
+
+> **`status: "queued"` is required.** The create schema defaults to `draft`, and a draft never
+> auto-activates. A `task-runner`-mode agent flips a queued task straight to `active` (push-delivered
+> over the tunnel, no per-task owner gate); other agent modes keep the standard
+> queued → owner-start gate.
 
 What the agent's `adopt-contract` handler does:
 

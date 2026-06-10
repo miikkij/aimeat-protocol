@@ -1377,7 +1377,13 @@
       "invalidJson": "Invalid JSON — fix it before saving",
       "showAllTags": "Show all ({n})",
       "fewerTags": "Show fewer",
-      "keysOne": "1 key"
+      "keysOne": "1 key",
+      "bulkSelected": "{n} selected",
+      "bulkApply": "Change visibility",
+      "bulkClear": "Clear selection",
+      "bulkDone": "{n} updated",
+      "bulkDeleted": "{n} deleted",
+      "bulkDeleteConfirm": "Delete {n} memory entries? This cannot be undone."
     },
     "files": {
       "title": "Stored Files",

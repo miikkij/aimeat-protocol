@@ -32,6 +32,10 @@ export async function adoptContractTask(agentName, { organismId, ws, contract })
   return createTask(agentName, {
     title: `adopt-contract: ${contract || 'workspace-contract'} → ${ws}`,
     description: `Adopt your '${contract || ''}' contract into workspace ${ws} of organism ${organismId}: join the organism if needed, provision the contract's spaces (workspace_update add_spaces from your own contract declaration), then complete this task with what was added.`,
+    // 'queued' is REQUIRED: without it the task is created as a draft and never auto-activates.
+    // A task-runner-mode agent flips queued → active immediately (push over the tunnel); other
+    // modes keep the standard queued → owner-start gate. (crewaimeat live-test finding 2026-06-10.)
+    status: 'queued',
     scope: [
       { name: 'kind', value: 'adopt-contract', type: 'text' },
       { name: 'organism_id', value: organismId, type: 'text' },

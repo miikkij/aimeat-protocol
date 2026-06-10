@@ -1377,7 +1377,13 @@
       "invalidJson": "Virheellinen JSON — korjaa ennen tallennusta",
       "showAllTags": "Näytä kaikki ({n})",
       "fewerTags": "Näytä vähemmän",
-      "keysOne": "1 avain"
+      "keysOne": "1 avain",
+      "bulkSelected": "{n} valittu",
+      "bulkApply": "Vaihda näkyvyys",
+      "bulkClear": "Tyhjennä valinta",
+      "bulkDone": "{n} päivitetty",
+      "bulkDeleted": "{n} poistettu",
+      "bulkDeleteConfirm": "Poistetaanko {n} muistimerkintää? Ei voi perua."
     },
     "files": {
       "title": "Tallennetut tiedostot",

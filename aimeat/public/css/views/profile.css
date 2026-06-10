@@ -189,6 +189,14 @@
 .pf .mem-item--grouped{padding-left:1.4rem}
 .pf .mem-detail-key{font-family:monospace;font-size:.72rem;color:var(--muted);margin-bottom:.4rem;word-break:break-all}
 .pf .mem-detail-visrow{display:flex;align-items:center;gap:.5rem;margin-top:.5rem}
+.pf .mem-row-check{flex:none;margin:0 .15rem 0 0;cursor:pointer}
+.pf .mem-vis-pop{display:flex;flex-wrap:wrap;gap:.35rem;padding:.5rem .75rem;margin:.25rem 0 .25rem 1.4rem;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-sm)}
+.pf .mem-vis-opt{background:var(--control-bg,var(--card));border:1px solid var(--control-border,var(--border));border-radius:999px;padding:.2rem .65rem;font-size:.76rem;color:var(--text);cursor:pointer}
+.pf .mem-vis-opt:hover{border-color:var(--accent)}
+.pf .mem-vis-opt--current{border-color:var(--accent);font-weight:700}
+.pf .mem-vis-opt--dim{color:var(--text-dim);border-style:dashed}
+.pf .mem-bulkbar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.45rem .75rem;margin-bottom:.5rem;background:var(--bg-surface,var(--bg-dim));border:1px solid var(--border);border-radius:8px}
+.pf .mem-bulkbar-count{font-size:.82rem;font-weight:600;color:var(--text)}
 .pf .mem-actions .mem-delete-btn{margin-left:auto}
 .pf .mem-vis-select{font-size:.72rem;padding:2px 6px;min-width:auto;width:auto}
 .pf .mem-edit-textarea{min-height:280px;resize:vertical;font-family:monospace;font-size:.8rem}
