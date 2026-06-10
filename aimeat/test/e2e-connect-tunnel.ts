@@ -213,6 +213,32 @@ await test('11. request frame missing a path rejected with an error frame', asyn
   await t.close();
 });
 
+await test('11a. SSRF guard — protocol-relative path to an off-host origin rejected', async () => {
+  // `//evil.example/...` passes startsWith('/') but resolves off-loopback. The
+  // manager must reject it (else it would fetch an arbitrary host WITH the
+  // agent's bearer). No error frame leaks the target; it is a BAD_REQUEST_FRAME.
+  const t = await TunnelClient.connect(BASE, fullAgentToken);
+  for (const p of ['//evil.example/v1/memory', '//169.254.169.254/latest/meta-data']) {
+    t.sendRaw(JSON.stringify({ type: 'request', id: `ssrf-${p}`, method: 'GET', path: p }));
+    const err = await t.waitForError(1000);
+    assert(err !== null, `received an error frame for ${p}`);
+    assert(err!.code === 'BAD_REQUEST_FRAME', `error code for ${p}: ${err!.code}`);
+  }
+  // Socket still usable for a legitimate on-host call afterwards.
+  const ok = await t.request('GET', '/v1/memory');
+  assert(ok.status === 200, `still usable after SSRF rejection: ${ok.status}`);
+  await t.close();
+});
+
+await test('11b. Unsupported HTTP method rejected', async () => {
+  const t = await TunnelClient.connect(BASE, fullAgentToken);
+  t.sendRaw(JSON.stringify({ type: 'request', id: 'm1', method: 'CONNECT', path: '/v1/memory' }));
+  const err = await t.waitForError(1000);
+  assert(err !== null, 'received an error frame for bad method');
+  assert(err!.code === 'BAD_REQUEST_FRAME', `error code: ${err!.code}`);
+  await t.close();
+});
+
 await test('12. Heartbeat → heartbeat_ack', async () => {
   const t = await TunnelClient.connect(BASE, fullAgentToken);
   const ack = await t.heartbeat();

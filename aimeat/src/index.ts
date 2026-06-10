@@ -818,7 +818,12 @@ if (subcommand === 'config') {
     const { CONNECT_TUNNEL_PATH } = await import('./services/connect-tunnel.js');
     const tunnelWss = tunnelManager ? new WebSocketServer({ noServer: true }) : null;
     const realtimeWss = realtimeManager ? new WebSocketServer({ noServer: true }) : null;
-    const connectWss = connectTunnelManager ? new WebSocketServer({ noServer: true }) : null;
+    // Cap forward-tunnel frame size (ws defaults to 100 MiB). An authenticated
+    // agent could otherwise buffer huge frames in memory (cheap DoS). Sized a
+    // little above the largest JSON body the routes accept; bulk uploads use
+    // presigned URLs, not the tunnel.
+    const connectMaxPayload = (config.jsonBodyLimitLargeMb + 1) * 1024 * 1024;
+    const connectWss = connectTunnelManager ? new WebSocketServer({ noServer: true, maxPayload: connectMaxPayload }) : null;
 
     // Echat anonymous connection rate limiter (10 connections per IP per minute)
     const echatIpCounts = new Map<string, { count: number; resetAt: number }>();

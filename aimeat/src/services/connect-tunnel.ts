@@ -25,6 +25,11 @@
  *   v1.1.0 — 2026-06-10 — Phase 2: realtime reverse delivery — `deliver` fan-out
  *     from the event-bus delivery channel, `backlog` snapshot on connect
  *     (queued+active tasks + pending messages), `ack` handling + dedup.
+ *   v1.2.0 — 2026-06-10 — Hardening (post-review): SSRF guard (pin forward
+ *     origin to loopback — protocol-relative paths bypassed startsWith('/')),
+ *     HTTP-method allowlist, backlog now reflects storage truth (ack no longer
+ *     suppresses backlog — closes a no-loss hole; ack is in-session dedup only,
+ *     cleared on disconnect), and `token_expires_at` advertised in `welcome`.
  */
 import { WebSocket } from 'ws';
 import { randomUUID } from 'node:crypto';
@@ -96,6 +101,9 @@ export interface ConnectTunnelStats {
  */
 const FORWARDABLE_HEADERS = new Set(['content-type', 'accept', 'idempotency-key', 'x-request-id']);
 
+/** Forward dispatch only accepts these HTTP methods. */
+const FORWARDABLE_METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE']);
+
 export class ConnectTunnelManager {
   private connections = new Map<string, ConnectConnection>();
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
@@ -151,6 +159,9 @@ export class ConnectTunnelManager {
       try { existing.ws.close(1000, 'replaced'); } catch { /* ignore */ }
       this.connections.delete(gaii);
     }
+    // Fresh session → fresh in-session dedup state (the replaced socket's close
+    // handler won't clear it, since the registered ws is now the new one).
+    this.ackedDeliveries.delete(gaii);
 
     const conn: ConnectConnection = { gaii, ws, identity, rawToken, lastHeartbeat: Date.now() };
     this.connections.set(gaii, conn);
@@ -167,6 +178,12 @@ export class ConnectTunnelManager {
         heartbeat_interval_ms: this.config.connectTunnelHeartbeatIntervalMs,
         offline_threshold_ms: this.config.connectTunnelOfflineThresholdMs,
         request_timeout_ms: this.config.connectTunnelRequestTimeoutMs,
+        // Epoch seconds the pinned bearer expires. The forward bearer is this
+        // token verbatim, so the client should reconnect with a fresh token
+        // before this — otherwise forward calls start 401-ing while the socket
+        // stays open (silent breakage). Server does not auto-close at expiry:
+        // agent JWTs run ~90 days, past setTimeout's safe range.
+        token_expires_at: identity.exp,
         reconnect_hint: { strategy: 'exponential_backoff', base_ms: 1000, max_ms: 60000, jitter: true },
       },
       timestamp: new Date().toISOString(),
@@ -192,6 +209,7 @@ export class ConnectTunnelManager {
       // may have already taken its place).
       if (this.connections.get(gaii)?.ws === ws) {
         this.connections.delete(gaii);
+        this.ackedDeliveries.delete(gaii);  // in-session dedup set — bounded, never persisted
         this.stats.activeConnections = this.connections.size;
       }
       logger.info('Connect tunnel disconnected', { event: 'connect_tunnel.disconnect', gaii, active: this.connections.size });
@@ -243,13 +261,36 @@ export class ConnectTunnelManager {
       this.send(conn.ws, { type: 'error', id, code: 'BAD_REQUEST_FRAME', message: 'request requires id, method, and an absolute path' });
       return;
     }
+    if (!FORWARDABLE_METHODS.has(frame.method.toUpperCase())) {
+      this.stats.malformedFramesTotal++;
+      this.send(conn.ws, { type: 'error', id, code: 'BAD_REQUEST_FRAME', message: `Unsupported method: ${frame.method}` });
+      return;
+    }
+
+    // SSRF guard: `path.startsWith('/')` is NOT enough — a protocol-relative path
+    // like `//evil.com/x` (or a backslash variant) resolves against the loopback
+    // scheme to an off-host origin, which would make the server fetch an arbitrary
+    // host AND ship the agent's bearer to it. Pin the resolved origin to loopback.
+    let url: URL;
+    try {
+      url = new URL(frame.path, this.loopbackBase);
+    } catch {
+      this.stats.malformedFramesTotal++;
+      this.send(conn.ws, { type: 'error', id, code: 'BAD_REQUEST_FRAME', message: 'Invalid request path' });
+      return;
+    }
+    if (url.origin !== this.loopbackBase) {
+      this.stats.malformedFramesTotal++;
+      logger.warn('Connect tunnel rejected off-host forward path', { event: 'connect_tunnel.ssrf_block', gaii: conn.gaii, path: frame.path, resolvedOrigin: url.origin });
+      this.send(conn.ws, { type: 'error', id, code: 'BAD_REQUEST_FRAME', message: 'request path must stay on this node (loopback)' });
+      return;
+    }
 
     this.stats.forwardRequestsTotal++;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.config.connectTunnelRequestTimeoutMs);
 
     try {
-      const url = new URL(frame.path, this.loopbackBase);
       if (frame.query) {
         for (const [k, v] of Object.entries(frame.query)) url.searchParams.set(k, String(v));
       }
@@ -299,9 +340,15 @@ export class ConnectTunnelManager {
   }
 
   /**
-   * Agent acknowledges a delivered item. Marks it delivered so it is dropped
-   * from the next backlog snapshot (the durable store stays source of truth
-   * until then). Dedup by id.
+   * Agent acknowledges a live `deliver`. Recorded as an IN-SESSION dedup marker
+   * only (so onDelivery won't re-push the same id while this socket is up) — it
+   * is NOT used to filter the backlog. Rationale: an ack means "I received the
+   * push", not "the task is done". The store is the source of truth — a task
+   * stays `queued`/`active` until its status changes — so the backlog is always
+   * computed from storage. If ack suppressed backlog entries, an agent that
+   * acked then crashed before finishing would never re-learn the task on
+   * reconnect (a hole in the no-loss guarantee). The set is cleared on
+   * disconnect, so it is bounded and never persists across sessions.
    */
   private handleAck(gaii: string, frame: ConnectFrame): void {
     if (!frame.id) return;
@@ -312,28 +359,26 @@ export class ConnectTunnelManager {
   }
 
   /**
-   * On connect, send a snapshot of everything queued for this agent while it was
-   * away — queued + active tasks and pending messages — so nothing is lost
-   * across a disconnect (mirrors TunnelManager.sendMailboxSummary). Acked ids
-   * are excluded. After this the manager live-pushes via `deliver`.
+   * On connect, send a snapshot of everything outstanding for this agent —
+   * queued + active tasks and pending messages — straight from storage (the
+   * source of truth), so nothing is lost across a disconnect (mirrors
+   * TunnelManager.sendMailboxSummary). A task leaves the backlog only when its
+   * status changes (done/failed/etc.), never because of an ack. After this the
+   * manager live-pushes via `deliver`.
    */
   private async sendBacklog(conn: ConnectConnection): Promise<void> {
     try {
       const gaii = conn.gaii;
-      const acked = this.ackedDeliveries.get(gaii);
       const [queued, active, pendingMessages] = await Promise.all([
         this.storage.listAgentTasks(gaii, { status: 'queued' }),
         this.storage.listAgentTasks(gaii, { status: 'active' }),
         this.storage.listPendingMessages(gaii).catch(() => []),
       ]);
-      // Dedup tasks by id (a task can't be both, but guard anyway) and drop acked.
+      // Dedup tasks by id (a task can't be both queued and active, but guard).
       const taskById = new Map<string, unknown>();
-      for (const t of [...queued.tasks, ...active.tasks]) {
-        if (acked?.has(t.id)) continue;
-        taskById.set(t.id, t);
-      }
+      for (const t of [...queued.tasks, ...active.tasks]) taskById.set(t.id, t);
       const tasks = [...taskById.values()];
-      const messages = pendingMessages.filter(m => !acked?.has(m.id));
+      const messages = pendingMessages;
 
       if (conn.ws.readyState !== WebSocket.OPEN) return;
       this.send(conn.ws, {
@@ -375,6 +420,7 @@ export class ConnectTunnelManager {
           logger.warn('Connect tunnel heartbeat timeout', { event: 'connect_tunnel.timeout', gaii, elapsed_ms: now - conn.lastHeartbeat });
           try { conn.ws.close(1000, 'heartbeat_timeout'); } catch { /* ignore */ }
           this.connections.delete(gaii);
+          this.ackedDeliveries.delete(gaii);
         }
       }
       this.stats.activeConnections = this.connections.size;

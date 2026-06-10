@@ -197,6 +197,18 @@ box in a phase is the gate to starting the next. Phases 1–2 are server-only;
       socket; `backlog` snapshot on connect (queued+active tasks + pending
       messages, mirrors `sendMailboxSummary`); `ack` handling + dedup; offline →
       leave `queued` (durable store).
+      **Post-review correction:** backlog now reflects **storage truth** — `ack`
+      does NOT suppress backlog entries (it means "received the push", not
+      "done"; suppressing would lose a task if the agent acked then crashed
+      mid-work). `ack` is an in-session live-dedup marker only, cleared on
+      disconnect (also bounds the map). A task leaves the backlog when its
+      **status** changes (done/failed), not on ack — both behaviours are
+      asserted in the delivery suite.
+      **Security hardening (post-review):** forward dispatch pins the resolved
+      origin to loopback (a protocol-relative path like `//evil/x` passed
+      `startsWith('/')` → **SSRF** with the agent's bearer); HTTP-method
+      allowlist; WS `maxPayload` cap (was the 100 MiB ws default → memory DoS);
+      `welcome` advertises `token_expires_at` for proactive client reconnect.
 - [x] Task create/queue path — `emitDelivery` on create when queued/auto-active;
       pushed live if the agent socket is connected, else durable-queue only.
 - [x] E2E `test/e2e-connect-tunnel-delivery.ts` — connected agent receives

@@ -131,7 +131,10 @@ await test('3. No-loss invariant — task queued while offline arrives via backl
   await t.close();
 });
 
-await test('4. ack drops the task from the next backlog', async () => {
+await test('4. ack does NOT drop a still-queued task (no-loss is storage truth)', async () => {
+  // ack means "I received the push", NOT "the task is done". A still-queued task
+  // must reappear in the backlog on reconnect even after an ack — otherwise an
+  // agent that acked then crashed mid-work would never re-learn it.
   const t = await TunnelClient.connect(BASE, agentToken);
   const bl = await t.waitForBacklog(1500);
   assert(backlogTaskIds(bl).includes(offlineTaskId), 'task present before ack');
@@ -142,11 +145,28 @@ await test('4. ack drops the task from the next backlog', async () => {
   const t2 = await TunnelClient.connect(BASE, agentToken);
   const bl2 = await t2.waitForBacklog(1500);
   assert(bl2 !== null, 'received backlog after ack');
-  assert(!backlogTaskIds(bl2).includes(offlineTaskId), 'acked task dropped from next backlog');
+  assert(backlogTaskIds(bl2).includes(offlineTaskId), 'still-queued task remains in backlog after ack');
   await t2.close();
 });
 
-await test('5. Offline agent gets no live deliver; only backlog carries it', async () => {
+await test('5. A status change (done) is what removes a task from the backlog', async () => {
+  // Drive offlineTaskId through its lifecycle: queued → active (owner start) →
+  // done (agent complete). Only then should it leave the backlog.
+  const start = await json(`/v1/agents/${agentName}/tasks/${offlineTaskId}/start`, { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(start.status === 200, `start status ${start.status}: ${JSON.stringify(start.body)}`);
+  const complete = await json(`/v1/agents/${agentName}/tasks/${offlineTaskId}/complete`, {
+    method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+    body: JSON.stringify({ message: 'done' }),
+  });
+  assert(complete.status === 200, `complete status ${complete.status}: ${JSON.stringify(complete.body)}`);
+  const t = await TunnelClient.connect(BASE, agentToken);
+  const bl = await t.waitForBacklog(1500);
+  assert(bl !== null, 'received backlog after completion');
+  assert(!backlogTaskIds(bl).includes(offlineTaskId), 'completed task is gone from the backlog');
+  await t.close();
+});
+
+await test('6. Offline agent gets no live deliver; only backlog carries it', async () => {
   // A fresh queued task created with NO socket open produces no deliver frame
   // (nothing to push to); it surfaces only on the next connect via backlog.
   const lateTaskId = await createQueuedTask('Late offline task');
