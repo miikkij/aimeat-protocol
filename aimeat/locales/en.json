@@ -1330,7 +1330,6 @@
       "shareSuccess": "Shared to federation",
       "unshareSuccess": "Removed from federation",
       "selectGroup": "Select group",
-      "skipGroup": "Skip",
       "noGroups": "No sharing groups. Create one in the Access tab.",
       "sortLabel": "Sort:",
       "sortUpdated": "Last updated",
@@ -1367,7 +1366,18 @@
       "loadingHome": "Loading home node memories...",
       "errorLocalhost": "Cannot browse this node. Local/development nodes are not reachable from public nodes. Both nodes must be publicly accessible for cross-node browsing to work.",
       "errorPeerNotFound": "Peer node not found in the federation directory. It may have been removed or is no longer active.",
-      "errorPeerUnsupported": "This peer node does not support memory browsing yet. It may be running an older version of AIMEAT."
+      "errorPeerUnsupported": "This peer node does not support memory browsing yet. It may be running an older version of AIMEAT.",
+      "tabOwn": "My memory",
+      "tabPublic": "Public",
+      "tabRemote": "Remote nodes",
+      "keysCount": "{n} keys",
+      "groupOther": "other",
+      "filterType": "Type to filter…",
+      "createGroupBtn": "Create a group →",
+      "invalidJson": "Invalid JSON — fix it before saving",
+      "showAllTags": "Show all ({n})",
+      "fewerTags": "Show fewer",
+      "keysOne": "1 key"
     },
     "files": {
       "title": "Stored Files",

@@ -11,6 +11,20 @@
  *     <Modal> component (Escape/backdrop close + header ✕).
  *   v1.5.0 — 2026-06-02 — Component unification (#1): "Copy URLs" button uses canonical
  *     <CopyButton> (toast preserved via onCopied).
+ *   v2.0.0 — 2026-06-10 — Structural rework: (1) keys render as COLLAPSIBLE GROUPS by first
+ *     segment (organism.<uuid> groups resolve the uuid to the organism's name; remainders
+ *     shortened with '›' + middle-ellipsis, full key in title + expanded detail); (2) the
+ *     per-row click-to-cycle visibility pill is GONE — list shows a static VisibilityPill,
+ *     editing happens in the edit modal (entries) / an explicit select (files), and the
+ *     "Skip → public" fallback was removed; (3) top-level tabs Mine · Public · Remote nodes
+ *     replace the inline browse panels; (4) search is type-to-filter (client-side over
+ *     key/tags/value); (5) tag cloud capped at top-10-by-use with "show all"; (6) shield
+ *     icon only on rows that actually have sharing rules; rules popover shows localized
+ *     visibility from the record's REAL owner (backend fix in permissions.ts); (7) edit
+ *     modal: tall JSON editor + parse validation (invalid JSON can't save; valid JSON is
+ *     stored parsed, not as a string); (8) "no sharing groups" dead end now offers a
+ *     "Create a group →" jump to the Access tab; Delete separated to the row's far right;
+ *     discover/pull copy buttons neutralized.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -26,6 +40,7 @@ import { listPeers } from '/js/services/federation.js';
 import { getKeyPermissions, listConsents, grantConsent, revokeConsent } from '/js/services/consent.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { listGroups } from '/js/services/sharing-groups.js';
+import { listOrganisms } from '/js/services/organisms.js';
 import TagCloud from '/js/components/tag-cloud.js';
 import TagEditor from '/js/components/tag-editor.js';
 import { Modal, useConfirm } from '/components/Modal.js';
@@ -48,10 +63,17 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const [agents, setAgents] = useState([]);
   const [selectedAgent, setSelectedAgent] = useState('');
   const [fedConsents, setFedConsents] = useState({});   // { memoryKey: consentId }
+  const [allConsents, setAllConsents] = useState([]);   // every active consent — drives the per-row shield
   const [togglingFed, setTogglingFed] = useState(null);
   const [groups, setGroups] = useState([]);
-  const [groupPickerFor, setGroupPickerFor] = useState(null);
-  const [browseMode, setBrowseMode] = useState(null); // 'home' | 'remote' | null
+  // Top-level view: own list / public discovery / remote nodes (home node when federated).
+  const [mainTab, setMainTab] = useState('own'); // 'own' | 'discover' | 'remote'
+  const [browseMode, setBrowseMode] = useState(null); // 'home' | 'remote' | 'discover' | null
+  const [filterText, setFilterText] = useState('');
+  const [orgNames, setOrgNames] = useState({});         // organism uuid → display name
+  const [collapsedGroups, setCollapsedGroups] = useState(() => {
+    try { return new Set(JSON.parse(sessionStorage.getItem('aimeat.mem.groups.collapsed') || '[]')); } catch { return new Set(); }
+  });
   const [remoteEntries, setRemoteEntries] = useState(null);
   const [remotePeers, setRemotePeers] = useState([]);
   const [selectedPeer, setSelectedPeer] = useState('');
@@ -67,8 +89,28 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const [expandedDiscover, setExpandedDiscover] = useState(null);
 
   useEffect(() => {
-    if (session) { loadAgents(); loadMemories(); loadFiles(); loadFedConsents(); loadGroups(); }
+    if (session) { loadAgents(); loadMemories(); loadFiles(); loadFedConsents(); loadGroups(); loadOrgNames(); }
   }, [session]);
+
+  // Resolve organism UUIDs to display names for the grouped key list — nobody
+  // recognizes e97781a5… but everyone recognizes "Ultima-V Remake".
+  async function loadOrgNames() {
+    try {
+      const resp = await listOrganisms({ member: session.owner });
+      const map = {};
+      for (const o of (resp?.data?.organisms || [])) map[o.id] = o.name;
+      setOrgNames(map);
+    } catch { /* names are a nicety — ids still render */ }
+  }
+
+  function toggleGroupCollapsed(id) {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      try { sessionStorage.setItem('aimeat.mem.groups.collapsed', JSON.stringify([...next])); } catch { /* noop */ }
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (session) { loadMemories(); }
@@ -76,9 +118,9 @@ export default function MemoryTab({ session, showToast, onStats }) {
 
   async function loadFedConsents() {
     try {
-      const allConsents = await listConsents();
+      const consents = await listConsents();
       const map = {};
-      for (const c of allConsents) {
+      for (const c of consents) {
         if (c.scope === 'federation') {
           const pat = c.data_pattern || c.pattern || '';
           // Direct key match (no wildcard) or exact pattern
@@ -88,7 +130,20 @@ export default function MemoryTab({ session, showToast, onStats }) {
         }
       }
       setFedConsents(map);
+      setAllConsents(consents.filter(c => !c.status || c.status === 'active'));
     } catch { /* ignore */ }
+  }
+
+  // Does any active consent pattern cover this key? Drives the per-row shield:
+  // shown only when rules exist, so its presence carries information.
+  function keyHasRules(key) {
+    return allConsents.some(c => {
+      const pat = c.data_pattern || c.pattern || '';
+      if (!pat) return false;
+      if (pat === '*' || pat === key) return true;
+      if (pat.endsWith('*')) return key.startsWith(pat.slice(0, -1));
+      return false;
+    });
   }
 
   async function handleShareToFederation(key) {
@@ -183,22 +238,18 @@ export default function MemoryTab({ session, showToast, onStats }) {
   }
 
   async function handleSaveEdit(key, value, visibility, version, groupId) {
-    const body = { value, visibility, version };
+    // The editor works on text; a value that parses as JSON is stored as the parsed
+    // object (not a string of JSON) so readers get back what the writer stored.
+    let v = value;
+    const s = String(value || '').trim();
+    if (/^[[{]/.test(s)) { try { v = JSON.parse(s); } catch { /* modal validates; keep raw as fallback */ } }
+    const body = { value: v, visibility, version };
     if (visibility === 'group' && groupId) body.group_id = groupId;
     const resp = await memoryService.updateMemoryFull(key, body);
     if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
     showToast(t('profile.memory.updated'));
     setEditModal(null);
     loadMemories();
-  }
-
-  async function handleSearch(query) {
-    if (!query) { loadMemories(); return; }
-    try {
-      const agentGaii = selectedAgent || undefined;
-      const list = await memoryService.searchMemory(query, agentGaii);
-      setMemories(Array.isArray(list) ? list : []);
-    } catch { showToast(t('profile.memory.searchFailed'), true); }
   }
 
   async function handleUploadFiles(fileItems, visibility, tags) {
@@ -264,20 +315,10 @@ export default function MemoryTab({ session, showToast, onStats }) {
     } catch { setKeyRulesPopover(null); }
   }
 
-  /* ── Cycle visibility: private → owner → group → public → private ── */
-  const cycleVis = ['private', 'owner', 'group', 'public'];
-  const visColor = { private: '#c084fc', owner: '#60a5fa', group: '#10b981', public: '#4ade80' };
-  const visBg = { private: 'rgba(150,100,200,.2)', owner: 'rgba(100,150,255,.2)', group: 'rgba(16,185,129,.2)', public: 'rgba(0,200,100,.2)' };
-
-  async function handleUpdateVisibility(key, newVis, version, groupId) {
-    // Optimistic update — change locally first, then persist
-    setMemories(prev => prev.map(m => m.key === key ? { ...m, visibility: newVis, version: (m.version || 1) + 1 } : m));
-    const resp = await memoryService.updateMemoryVisibility(key, newVis, version, groupId);
-    if (resp.ok === false) {
-      showToast(resp.error?.message || t('profile.error'), true);
-      loadMemories(); // Revert on error
-    }
-  }
+  /* Visibility is edited inside the edit modal (entries) or via an explicit select
+     (files) — the old per-row click-to-cycle pill meant one stray click in the list
+     could publish a memory. The list shows a static badge only. */
+  const VIS_OPTIONS = ['private', 'owner', 'group', 'public'];
 
   async function handleUpdateMemoryTags(key, tags, version) {
     const resp = await memoryService.updateMemoryTags(key, tags, version);
@@ -330,22 +371,59 @@ export default function MemoryTab({ session, showToast, onStats }) {
     }
   }
 
+  /* ── Key grouping helpers: keys are already hierarchical (agents.*, organism.<uuid>.*,
+     notif.*) — render collapsible groups instead of a flat list of near-identical rows. */
+  const shortTok = (tok) => (tok.length >= 18 ? tok.slice(0, 4) + '…' + tok.slice(-5) : tok);
+
+  function groupOfKey(key) {
+    if (key.startsWith('organism.')) {
+      const uuid = key.split('.')[1] || '';
+      return { id: 'organism.' + uuid, kind: 'organism', uuid };
+    }
+    const dot = key.indexOf('.');
+    if (dot < 0) return { id: '_other', kind: 'other' };
+    return { id: key.slice(0, dot), kind: 'plain' };
+  }
+
+  function groupLabel(g) {
+    if (g.kind === 'organism') return 'organism: ' + (orgNames[g.uuid] || shortTok(g.uuid));
+    if (g.kind === 'other') return t('profile.memory.groupOther');
+    return g.id;
+  }
+
+  // Shortened remainder inside a group: strip the group prefix, drop the 'w.' workspace
+  // marker, middle-ellipsize uuid-ish tokens, split the leading container with '›'.
+  // The full key stays in the row's title attribute (and in the expanded detail).
+  function displayRemainder(key, g) {
+    let rest = g.kind === 'organism' ? key.slice(('organism.' + g.uuid + '.').length)
+      : g.kind === 'plain' ? key.slice(g.id.length + 1)
+      : key;
+    if (rest.startsWith('w.')) rest = rest.slice(2);
+    const toks = rest.split('.').map(shortTok);
+    if (toks.length > 1 && toks[0].startsWith('ws-')) return toks[0] + ' › ' + toks.slice(1).join('.');
+    if (toks.length > 1 && toks[toks.length - 1].includes('…')) return toks.slice(0, -1).join('.') + ' › ' + toks[toks.length - 1];
+    return toks.join('.');
+  }
+
   const renderEntries = () => {
-    const searchRef = useRef(null);
     if (!memories) return html`<${Spinner} text=${t('profile.memory.loading')} />`;
 
-    // Collect all unique tags across memories
-    const allMemTags = new Set();
+    // Tag counts across memories — the cloud shows the most-used first, capped at 10.
+    const tagCounts = new Map();
     for (const m of memories) {
-      if (m.tags) for (const tag of m.tags) allMemTags.add(tag);
+      if (m.tags) for (const tag of m.tags) tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
     }
+    const tagsByFreq = [...tagCounts.keys()].sort((a, b) => (tagCounts.get(b) - tagCounts.get(a)) || a.localeCompare(b));
 
-    // Filter by selected tags, then sort
-    const filtered = sortEntries(
-      memTagFilter.size === 0 ? memories : memories.filter(m =>
-        m.tags && [...memTagFilter].every(tag => m.tags.includes(tag))
-      )
-    );
+    // Filter: selected tags AND the live type-to-filter text (key, tags, value).
+    const ft = filterText.trim().toLowerCase();
+    const filtered = sortEntries(memories.filter(m => {
+      if (memTagFilter.size > 0 && !(m.tags && [...memTagFilter].every(tag => m.tags.includes(tag)))) return false;
+      if (!ft) return true;
+      if (m.key.toLowerCase().includes(ft)) return true;
+      if (m.tags && m.tags.some(tag => tag.toLowerCase().includes(ft))) return true;
+      try { return JSON.stringify(m.value).toLowerCase().includes(ft); } catch { return false; }
+    }));
 
     const toggleMemTag = (tag) => {
       setMemTagFilter(prev => {
@@ -355,12 +433,98 @@ export default function MemoryTab({ session, showToast, onStats }) {
       });
     };
 
+    // Group in sorted order (group order = first appearance, so sort semantics hold).
+    const groupsOrdered = [];
+    const byId = new Map();
+    for (const m of filtered) {
+      const g = groupOfKey(m.key);
+      let entry = byId.get(g.id);
+      if (!entry) { entry = { ...g, items: [] }; byId.set(g.id, entry); groupsOrdered.push(entry); }
+      entry.items.push(m);
+    }
+    // An active filter force-expands all groups — a hit hidden in a collapsed group reads as "no hit".
+    const filtering = !!ft || memTagFilter.size > 0;
+
+    const renderRow = (m, g) => html`
+      <div key=${m.key}>
+        <div class="mem-item mem-item--grouped" onClick=${() => setExpandedMem(expandedMem === m.key ? null : m.key)}>
+          <span class="mem-key" title=${m.key}>${escHtml(displayRemainder(m.key, g))}</span>
+          <span class="mem-time" title="${m.created_at ? new Date(m.created_at).toLocaleString() : ''} / ${m.updated_at ? new Date(m.updated_at).toLocaleString() : ''}">
+            ${formatRelativeTime(m.updated_at || m.created_at)}
+          </span>
+          <${VisibilityPill} visibility=${m.visibility || 'private'} />
+          ${keyHasRules(m.key) && html`<span class="shield-icon" title=${t('permissions.sharingRules')} onClick=${(e) => { e.stopPropagation(); loadKeyPerms(m.key); }}>\u{1F6E1}️</span>`}
+          ${fedConsents[m.key] && html`<span class="badge badge-success pf-fed-badge">${t('profile.memory.syncedToFederation')}</span>`}
+        </div>
+        ${expandedMem === m.key && html`
+          <div class="mem-detail">
+            <div class="mem-detail-key" title=${m.key}>${escHtml(m.key)}</div>
+            <pre>${typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || '')}</pre>
+            <div class="mb-half">
+              <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); setEditingMemTags(editingMemTags === m.key ? null : m.key); }}>
+                ${t('tags.editTags') || 'Edit tags'}
+              </button>
+              <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); if (keyRulesPopover?.key === m.key) setKeyRulesPopover(null); else loadKeyPerms(m.key); }}>
+                \u{1F6E1}️ ${t('permissions.sharingRules')}
+              </button>
+            </div>
+            ${editingMemTags === m.key && html`
+              <div class="mb-half">
+                <${TagEditor} tags=${m.tags || []} onSave=${(tags) => handleUpdateMemoryTags(m.key, tags, m.version)} />
+              </div>
+            `}
+            ${editingMemTags !== m.key && m.tags?.length > 0 && html`<div class="text-meta-sm mb-half">${m.tags.join(', ')}</div>`}
+            ${keyRulesPopover && keyRulesPopover.key === m.key && html`
+              <div class="key-rules-box">
+                <div class="flex-between mb-half">
+                  <strong class="text-caption">\u{1F6E1}️ ${t('permissions.sharingRules')}</strong>
+                  <button class="btn-outline btn-sm" onClick=${() => setKeyRulesPopover(null)}>✕</button>
+                </div>
+                <div class="text-meta-sm mb-half">${t('profile.memory.visLabel')} ${t('knowledge.visibility.' + keyRulesPopover.visibility) || keyRulesPopover.visibility}</div>
+                ${keyRulesPopover.rules.length === 0
+                  ? html`<div class="text-meta pf-italic">${t('permissions.noRules')}</div>`
+                  : keyRulesPopover.rules.map(r => html`
+                    <div class="pf-rule-row">
+                      ${recipientBadge(r.recipient)}
+                      <span class="text-code text-meta-sm">${escHtml(r.data_pattern)}</span>
+                      <span class="text-meta-sm pf-ml-auto">${escHtml(r.scope || '-')}</span>
+                    </div>`)
+                }
+              </div>
+            `}
+            <div class="mem-actions">
+              <button class="btn-sm" onClick=${() => setEditModal({ key: m.key, value: typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || ''), visibility: m.visibility || 'private', version: m.version, isJson: typeof m.value === 'object' })}>${t('profile.memory.editBtn')}</button>
+              ${fedConsents[m.key]
+                ? html`<button class="btn-outline btn-sm" disabled=${togglingFed === m.key}
+                    onClick=${() => handleStopSharing(m.key)}>
+                    ${togglingFed === m.key ? '...' : t('profile.memory.stopSharing')}
+                  </button>`
+                : html`<button class="btn-ghost btn-sm" disabled=${togglingFed === m.key}
+                    onClick=${() => handleShareToFederation(m.key)}>
+                    ${togglingFed === m.key ? '...' : t('profile.memory.shareToFederation')}
+                  </button>`
+              }
+              ${session.federated && html`
+                <button class="btn-ghost" onClick=${() => doPull(m.key)} title=${t('profile.memory.pullFromHome')}>
+                  ↓ ${t('profile.memory.pullFromHome')}
+                </button>
+                <button class="btn-ghost" onClick=${() => doPush(m.key)} title=${t('profile.memory.pushToHome')}>
+                  ↑ ${t('profile.memory.pushToHome')}
+                </button>
+              `}
+              <button class="btn-danger mem-delete-btn" onClick=${() => handleDeleteMemory(m.key)}>${t('profile.memory.deleteBtn')}</button>
+            </div>
+          </div>
+        `}
+      </div>
+    `;
+
     return html`
       <div class="action-bar">
         <div class="search-bar">
-          <input type="text" ref=${searchRef} class="input-field" placeholder=${t('profile.memory.search')} onKeyDown=${e => e.key === 'Enter' && handleSearch(e.target.value)} />
-          <button class="btn-sm" onClick=${() => handleSearch(searchRef.current?.value)}>${t('profile.memory.searchBtn')}</button>
-          <button class="btn-outline btn-sm" onClick=${() => { if (searchRef.current) searchRef.current.value = ''; loadMemories(); }}>${t('profile.memory.clearBtn')}</button>
+          <input type="text" class="input-field" placeholder=${t('profile.memory.filterType')}
+            value=${filterText} onInput=${e => setFilterText(e.target.value)} />
+          ${filterText && html`<button class="btn-ghost btn-sm" onClick=${() => setFilterText('')}>✕</button>`}
         </div>
         <div class="mem-sort-bar">
           <label class="text-meta-sm">${t('profile.memory.sortLabel')}</label>
@@ -372,102 +536,24 @@ export default function MemoryTab({ session, showToast, onStats }) {
         </div>
         <button class="btn-primary" onClick=${() => setShowMemForm(!showMemForm)}>${t('profile.memory.newBtn')}</button>
       </div>
-      <${TagCloud} tags=${[...allMemTags]} selected=${memTagFilter} onToggle=${toggleMemTag} onClear=${() => setMemTagFilter(new Set())} />
+      <${TagCloud} tags=${tagsByFreq} selected=${memTagFilter} onToggle=${toggleMemTag} onClear=${() => setMemTagFilter(new Set())} limit=${10} />
       ${showMemForm && html`<${MemoryForm} onSave=${handleCreateMemory} onCancel=${() => setShowMemForm(false)} groups=${groups} />`}
       ${filtered.length === 0
         ? html`<div class="empty">${memories.length > 0 ? (t('tags.noMatch') || 'No items match selected tags') : t('profile.memory.empty')}</div>`
-        : filtered.map(m => html`
-          <div>
-            <div class="mem-item" onClick=${() => setExpandedMem(expandedMem === m.key ? null : m.key)}>
-              <span class="mem-key">${escHtml(m.key)}</span>
-              <span class="mem-time" title="${m.created_at ? new Date(m.created_at).toLocaleString() : ''} / ${m.updated_at ? new Date(m.updated_at).toLocaleString() : ''}">
-                ${formatRelativeTime(m.updated_at || m.created_at)}
-              </span>
-              ${(() => {
-                const vis = m.visibility || 'private';
-                const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % cycleVis.length];
-                return html`<button class="kpkg-vis-pill"
-                  onClick=${(e) => { e.stopPropagation(); if (nextVis === 'group') { setGroupPickerFor(m.key); } else { handleUpdateVisibility(m.key, nextVis, m.version); } }}
-                  title="${t('knowledge.visibility.' + vis)} → ${t('knowledge.visibility.' + nextVis)}"
-                  style="background:${visBg[vis]};color:${visColor[vis]};border-color:${visColor[vis]}"
-                >${t('knowledge.visibility.' + vis)} ▾</button>`;
-              })()}
-              <span class="shield-icon" title=${t('permissions.sharingRules')} onClick=${(e) => { e.stopPropagation(); loadKeyPerms(m.key); }}>\u{1F6E1}\uFE0F</span>
-              ${fedConsents[m.key] && html`<span class="badge badge-success pf-fed-badge">${t('profile.memory.syncedToFederation')}</span>`}
-            </div>
-            ${groupPickerFor === m.key && html`
-              <div class="agd-group-picker" onClick=${(e) => e.stopPropagation()}>
-                <div class="text-caption mb-xs">${t('profile.memory.selectGroup')}</div>
-                ${groups.length === 0
-                  ? html`<div class="text-meta-sm">${t('profile.memory.noGroups')}</div>`
-                  : groups.map(g => html`
-                    <button class="btn-ghost agd-group-option" onClick=${() => {
-                      handleUpdateVisibility(m.key, 'group', m.version, g.id);
-                      setGroupPickerFor(null);
-                    }}>${g.name} (${g.members?.length || 0} ${t('profile.access.sharingGroups.members')})</button>
-                  `)
-                }
-                <button class="btn-outline btn-sm mt-xs" onClick=${() => { setGroupPickerFor(null); handleUpdateVisibility(m.key, 'public', m.version); }}>${t('profile.memory.skipGroup')}</button>
+        : groupsOrdered.map(g => {
+            const collapsed = !filtering && collapsedGroups.has(g.id);
+            return html`
+              <div class="mem-group" key=${g.id}>
+                <button class="mem-group-header" onClick=${() => toggleGroupCollapsed(g.id)}>
+                  <span class="pf-chevron ${collapsed ? '' : 'pf-chevron-open'}">▼</span>
+                  <span class="mem-group-name">${escHtml(groupLabel(g))}</span>
+                  <span class="mem-group-count">${g.items.length === 1 ? (t('profile.memory.keysOne') || '1 key') : (t('profile.memory.keysCount') || '{n} keys').replace('{n}', String(g.items.length))}</span>
+                  ${g.kind === 'organism' && orgNames[g.uuid] && html`<span class="mem-group-sub">${shortTok(g.uuid)}</span>`}
+                </button>
+                ${!collapsed && g.items.map(m => renderRow(m, g))}
               </div>
-            `}
-            ${expandedMem === m.key && html`
-              <div class="mem-detail">
-                <pre>${typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || '')}</pre>
-                <div class="mb-half">
-                  <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); setEditingMemTags(editingMemTags === m.key ? null : m.key); }}>
-                    ${t('tags.editTags') || 'Edit tags'}
-                  </button>
-                </div>
-                ${editingMemTags === m.key && html`
-                  <div class="mb-half">
-                    <${TagEditor} tags=${m.tags || []} onSave=${(tags) => handleUpdateMemoryTags(m.key, tags, m.version)} />
-                  </div>
-                `}
-                ${editingMemTags !== m.key && m.tags?.length > 0 && html`<div class="text-meta-sm mb-half">${m.tags.join(', ')}</div>`}
-                ${keyRulesPopover && keyRulesPopover.key === m.key && html`
-                  <div class="key-rules-box">
-                    <div class="flex-between mb-half">
-                      <strong class="text-caption">\u{1F6E1}\uFE0F ${t('permissions.sharingRules')}</strong>
-                      <button class="btn-outline btn-sm" onClick=${() => setKeyRulesPopover(null)}>\u2715</button>
-                    </div>
-                    <div class="text-meta-sm mb-half">Visibility: ${keyRulesPopover.visibility}</div>
-                    ${keyRulesPopover.rules.length === 0
-                      ? html`<div class="text-meta pf-italic">${t('permissions.noRules')}</div>`
-                      : keyRulesPopover.rules.map(r => html`
-                        <div class="pf-rule-row">
-                          ${recipientBadge(r.recipient)}
-                          <span class="text-code text-meta-sm">${escHtml(r.data_pattern)}</span>
-                          <span class="text-meta-sm pf-ml-auto">${escHtml(r.scope || '-')}</span>
-                        </div>`)
-                    }
-                  </div>
-                `}
-                <div class="mem-actions">
-                  <button class="btn-sm" onClick=${() => setEditModal({ key: m.key, value: typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || ''), visibility: m.visibility || 'private', version: m.version })}>${t('profile.memory.editBtn')}</button>
-                  <button class="btn-danger" onClick=${() => handleDeleteMemory(m.key)}>${t('profile.memory.deleteBtn')}</button>
-                  ${fedConsents[m.key]
-                    ? html`<button class="btn-outline btn-sm" disabled=${togglingFed === m.key}
-                        onClick=${() => handleStopSharing(m.key)}>
-                        ${togglingFed === m.key ? '...' : t('profile.memory.stopSharing')}
-                      </button>`
-                    : html`<button class="btn-ghost btn-sm" disabled=${togglingFed === m.key}
-                        onClick=${() => handleShareToFederation(m.key)}>
-                        ${togglingFed === m.key ? '...' : t('profile.memory.shareToFederation')}
-                      </button>`
-                  }
-                  ${session.federated && html`
-                    <button class="btn-ghost" onClick=${() => doPull(m.key)} title=${t('profile.memory.pullFromHome')}>
-                      ↓ ${t('profile.memory.pullFromHome')}
-                    </button>
-                    <button class="btn-ghost" onClick=${() => doPush(m.key)} title=${t('profile.memory.pushToHome')}>
-                      ↑ ${t('profile.memory.pushToHome')}
-                    </button>
-                  `}
-                </div>
-              </div>
-            `}
-          </div>
-        `)
+            `;
+          })
       }`;
   };
 
@@ -517,7 +603,6 @@ export default function MemoryTab({ session, showToast, onStats }) {
               const fKey = f.key || f.name;
               const isImage = f.mime_type?.startsWith('image');
               const vis = f.visibility || 'private';
-              const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % cycleVis.length];
               return html`
                 <div class="file-card">
                   ${isImage
@@ -528,11 +613,11 @@ export default function MemoryTab({ session, showToast, onStats }) {
                     <div class="file-name">${escHtml(fKey)}</div>
                     <div class="file-meta">
                       ${f.size ? Math.round(f.size / 1024) + ' KB' : ''}
-                      <button class="kpkg-vis-pill"
-                        onClick=${(e) => { e.stopPropagation(); handleUpdateFileVisibility(fKey, nextVis); }}
-                        title="${t('knowledge.visibility.' + vis)} → ${t('knowledge.visibility.' + nextVis)}"
-                        style="background:${visBg[vis]};color:${visColor[vis]};border-color:${visColor[vis]}"
-                      >${t('knowledge.visibility.' + vis)} ▾</button>
+                      <select class="input-field mem-vis-select" value=${vis} title=${t('profile.files.visLabel')}
+                        onClick=${(e) => e.stopPropagation()}
+                        onChange=${(e) => handleUpdateFileVisibility(fKey, e.target.value)}>
+                        ${VIS_OPTIONS.map(v => html`<option key=${v} value=${v}>${t('knowledge.visibility.' + v)}</option>`)}
+                      </select>
                     </div>
                     ${editingFileTags === fKey
                       ? html`<${TagEditor} tags=${f.tags || []} onSave=${(tags) => handleUpdateFileTags(fKey, tags)} />`
@@ -709,10 +794,8 @@ export default function MemoryTab({ session, showToast, onStats }) {
         <div class="mem-browse-panel">
           <div class="mem-browse-header">
             <div>
-              <div class="section-title">${t('profile.memory.discoverTitle')}</div>
               <div class="section-desc">${t('profile.memory.discoverDesc')}</div>
             </div>
-            <button class="btn-outline btn-sm" onClick=${closeBrowse}>${t('profile.memory.cancelBtn')}</button>
           </div>
           <div class="mem-discover-search mb-half">
             <input type="text" class="input-field" placeholder=${t('profile.memory.discoverSearchPlaceholder')}
@@ -749,7 +832,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
                             ${entry.tags?.length > 0 && html`<span class="text-meta-sm mem-browse-tags" title=${entry.tags.join(', ')}>${entry.tags.join(', ')}</span>`}
                             <span class="mem-time">${formatRelativeTime(entry.updated_at || entry.created_at)}</span>
                           </div>
-                          <button class="btn-primary btn-sm"
+                          <button class="btn-outline btn-sm"
                             disabled=${copyingKeys.has(entry.key)}
                             onClick=${(e) => { e.stopPropagation(); handleCopyEntry(entry.owner_gaii, entry.key); }}>
                             ${copyingKeys.has(entry.key) ? '...' : t('profile.memory.discoverCopy')}
@@ -769,17 +852,14 @@ export default function MemoryTab({ session, showToast, onStats }) {
     }
 
     const isHome = browseMode === 'home';
-    const title = isHome ? t('profile.memory.browseHome') : t('profile.memory.browseRemote');
     const desc = isHome ? t('profile.memory.browseHomeDesc') : t('profile.memory.browseRemoteDesc');
 
     return html`
       <div class="mem-browse-panel">
         <div class="mem-browse-header">
           <div>
-            <div class="section-title">${title}</div>
             <div class="section-desc">${desc}</div>
           </div>
-          <button class="btn-outline btn-sm" onClick=${closeBrowse}>${t('profile.memory.cancelBtn')}</button>
         </div>
 
         ${!isHome && !selectedPeer && html`
@@ -822,7 +902,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
                       <${VisibilityPill} visibility=${entry.visibility} />
                       ${entry.tags?.length > 0 && html`<span class="text-meta-sm mem-browse-tags" title=${entry.tags.join(', ')}>${entry.tags.join(', ')}</span>`}
                     </div>
-                    <button class="btn-primary btn-sm"
+                    <button class="btn-outline btn-sm"
                       disabled=${pullingKeys.has(entry.key)}
                       onClick=${() => handlePullRemoteEntry(entry.key)}>
                       ${pullingKeys.has(entry.key) ? '...' : t('profile.memory.pullEntry')}
@@ -836,55 +916,55 @@ export default function MemoryTab({ session, showToast, onStats }) {
     `;
   };
 
+  // Three states of the same list = tabs, not inline panels with their own Cancel buttons.
+  const pickMainTab = (id) => {
+    setMainTab(id);
+    if (id === 'discover') initDiscover();
+    else if (id === 'remote') { if (session.federated) loadBrowseHome(); else initBrowseRemote(); }
+    else closeBrowse();
+  };
+
   return html`
     <div class="section-title">${t('profile.memory.title')}</div>
     <div class="section-desc">${t('profile.memory.desc')}</div>
 
-    <div class="mem-browse-buttons mb-1">
-      <button class="btn-outline btn-sm" onClick=${initDiscover}>
-        ${t('profile.memory.discoverTitle')}
-      </button>
-      ${session.federated && html`
-        <button class="btn-outline btn-sm" onClick=${loadBrowseHome}>
-          ${t('profile.memory.browseHome')}
-        </button>
-      `}
-      ${!session.federated && html`
-        <button class="btn-outline btn-sm" onClick=${initBrowseRemote}>
-          ${t('profile.memory.browseRemote')}
-        </button>
-      `}
+    <div class="sub-tabs">
+      <button class="sub-tab ${mainTab === 'own' ? 'active' : ''}" onClick=${() => pickMainTab('own')}>${t('profile.memory.tabOwn')}</button>
+      <button class="sub-tab ${mainTab === 'discover' ? 'active' : ''}" onClick=${() => pickMainTab('discover')}>${t('profile.memory.tabPublic')}</button>
+      <button class="sub-tab ${mainTab === 'remote' ? 'active' : ''}" onClick=${() => pickMainTab('remote')}>${session.federated ? t('profile.memory.browseHome') : t('profile.memory.tabRemote')}</button>
     </div>
+
     ${session.federated && html`
       <div class="alert alert-info mb-half">
         <span class="alert-msg">${t('profile.memory.federatedSession')}</span>
       </div>
     `}
 
-    ${renderBrowsePanel()}
+    ${mainTab !== 'own' ? renderBrowsePanel() : html`
+      ${agents.length > 1 && html`
+        <div class="agent-selector mb-half">
+          <label class="text-meta pf-mr-half">${t('profile.memory.agent') || 'Agent'}:</label>
+          <select class="input-field pf-select-inline"
+            value=${selectedAgent} onChange=${e => { setSelectedAgent(e.target.value); setExpandedMem(null); setMemTagFilter(new Set()); }}>
+            <option value="">${t('profile.memory.defaultAgent') || 'Default agent'}</option>
+            ${agents.map(a => html`<option key=${a.gaii} value=${a.gaii}>${escHtml(a.name || a.gaii)}${a.display_name ? ` — ${escHtml(a.display_name)}` : ''}</option>`)}
+          </select>
+        </div>
+      `}
 
-    ${agents.length > 1 && html`
-      <div class="agent-selector mb-half">
-        <label class="text-meta pf-mr-half">${t('profile.memory.agent') || 'Agent'}:</label>
-        <select class="input-field pf-select-inline"
-          value=${selectedAgent} onChange=${e => { setSelectedAgent(e.target.value); setExpandedMem(null); setMemTagFilter(new Set()); }}>
-          <option value="">${t('profile.memory.defaultAgent') || 'Default agent'}</option>
-          ${agents.map(a => html`<option key=${a.gaii} value=${a.gaii}>${escHtml(a.name || a.gaii)}${a.display_name ? ` — ${escHtml(a.display_name)}` : ''}</option>`)}
-        </select>
+      <div class="sub-tabs">
+        <button class="sub-tab ${memSubTab === 'entries' ? 'active' : ''}" onClick=${() => setMemSubTab('entries')}>${t('profile.memory.entries')}</button>
+        <button class="sub-tab ${memSubTab === 'files' ? 'active' : ''}" onClick=${() => setMemSubTab('files')}>${t('profile.memory.files')}</button>
       </div>
+      ${memSubTab === 'entries' ? renderEntries() : renderFilesList()}
     `}
-
-    <div class="sub-tabs">
-      <button class="sub-tab ${memSubTab === 'entries' ? 'active' : ''}" onClick=${() => setMemSubTab('entries')}>${t('profile.memory.entries')}</button>
-      <button class="sub-tab ${memSubTab === 'files' ? 'active' : ''}" onClick=${() => setMemSubTab('files')}>${t('profile.memory.files')}</button>
-    </div>
-    ${memSubTab === 'entries' ? renderEntries() : renderFilesList()}
 
     ${editModal && html`<${EditMemoryModal}
       memKey=${editModal.key}
       initialValue=${editModal.value}
       initialVisibility=${editModal.visibility}
       initialVersion=${editModal.version}
+      isJson=${editModal.isJson}
       groups=${groups}
       onSave=${(v, vis, ver, gId) => handleSaveEdit(editModal.key, v, vis, ver, gId)}
       onCancel=${() => setEditModal(null)} />`}
@@ -926,16 +1006,23 @@ function MemoryForm({ onSave, onCancel, groups }) {
         <select class="input-field" value=${vis} onChange=${e => setVis(e.target.value)}>
           <option value="private">${t('profile.memory.visPrivate')}</option>
           <option value="shared">${t('profile.memory.visShared')}</option>
-          <option value="group">Group</option>
+          <option value="group">${t('knowledge.visibility.group')}</option>
           <option value="public">${t('profile.memory.visPublic')}</option>
         </select>
       </div>
       ${vis === 'group' && html`
         <div class="form-row"><label>${t('profile.memory.selectGroup')}</label>
-          <select class="input-field" value=${groupId} onChange=${e => setGroupId(e.target.value)}>
-            <option value="">-- ${t('profile.memory.selectGroup')} --</option>
-            ${(groups || []).map(g => html`<option value=${g.id}>${g.name}</option>`)}
-          </select>
+          ${(groups || []).length === 0
+            ? html`
+              <div class="text-meta-sm mb-xs">${t('profile.memory.noGroups')}</div>
+              <button type="button" class="btn-outline btn-sm" onClick=${() => {
+                window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'access' } }));
+              }}>${t('profile.memory.createGroupBtn')}</button>`
+            : html`
+              <select class="input-field" value=${groupId} onChange=${e => setGroupId(e.target.value)}>
+                <option value="">-- ${t('profile.memory.selectGroup')} --</option>
+                ${(groups || []).map(g => html`<option value=${g.id}>${g.name}</option>`)}
+              </select>`}
         </div>
       `}
       <div class="form-row"><label>${t('profile.memory.tagsLabel')}</label><input class="input-field" placeholder=${t('profile.memory.tagsPlaceholder')} value=${tags} onInput=${e => setTags(e.target.value)} /></div>
@@ -1069,51 +1156,53 @@ function FileUploadForm({ onUpload, onCancel }) {
     </div>`;
 }
 
-function EditMemoryModal({ memKey, initialValue, initialVisibility, initialVersion, onSave, onCancel, groups }) {
+function EditMemoryModal({ memKey, initialValue, initialVisibility, initialVersion, isJson, onSave, onCancel, groups }) {
   const [value, setValue] = useState(initialValue);
   const [vis, setVis] = useState(initialVisibility || 'private');
   const [groupId, setGroupId] = useState('');
-  const [showGroupSelect, setShowGroupSelect] = useState(false);
-  const cycleVis = ['private', 'owner', 'group', 'public'];
-  const visColor = { private: '#c084fc', owner: '#60a5fa', group: '#10b981', public: '#4ade80' };
-  const visBg = { private: 'rgba(150,100,200,.2)', owner: 'rgba(100,150,255,.2)', group: 'rgba(16,185,129,.2)', public: 'rgba(0,200,100,.2)' };
-  const nextVis = cycleVis[(cycleVis.indexOf(vis) + 1) % cycleVis.length];
-  const handleVisCycle = () => {
-    if (nextVis === 'group') {
-      setShowGroupSelect(true);
-    } else {
-      setVis(nextVis);
-      setShowGroupSelect(false);
-      setGroupId('');
-    }
-  };
+
+  // Broken JSON in a memory key crashes the agent that reads it — validate before save.
+  // Validation applies when the stored value was an object, or the draft clearly is one.
+  const looksJson = isJson || /^[[{]/.test(String(value || '').trim());
+  let jsonError = null;
+  if (looksJson) {
+    try { JSON.parse(value); } catch (e) { jsonError = e.message; }
+  }
+  const groupMissing = vis === 'group' && !groupId && (groups || []).length === 0;
+  const canSave = !jsonError && !(vis === 'group' && !groupId);
+
   return html`
     <${Modal} open=${true} onClose=${onCancel} title=${`${t('profile.memory.editTitle')}: ${memKey}`}>
         <div class="form-row flex-row mb-half">
           <label class="pf-label-inline">${t('profile.memory.visLabel')}</label>
-          <button class="kpkg-vis-pill"
-            onClick=${handleVisCycle}
-            title="${t('knowledge.visibility.' + vis)} → ${t('knowledge.visibility.' + nextVis)}"
-            style="background:${visBg[vis]};color:${visColor[vis]};border-color:${visColor[vis]}"
-          >${t('knowledge.visibility.' + vis)} ▾</button>
+          <select class="input-field mem-vis-select" value=${vis}
+            onChange=${e => { setVis(e.target.value); if (e.target.value !== 'group') setGroupId(''); }}>
+            ${['private', 'owner', 'group', 'public'].map(v => html`<option key=${v} value=${v}>${t('knowledge.visibility.' + v)}</option>`)}
+          </select>
         </div>
-        ${showGroupSelect && html`
+        ${vis === 'group' && html`
           <div class="form-row mb-half">
             <label>${t('profile.memory.selectGroup')}</label>
-            <select class="input-field" value=${groupId} onChange=${e => {
-              setGroupId(e.target.value);
-              if (e.target.value) { setVis('group'); setShowGroupSelect(false); }
-            }}>
-              <option value="">-- ${t('profile.memory.selectGroup')} --</option>
-              ${(groups || []).map(g => html`<option value=${g.id}>${g.name}</option>`)}
-            </select>
-            ${(groups || []).length === 0 && html`<div class="text-meta-sm">${t('profile.memory.noGroups')}</div>`}
-            <button class="btn-outline btn-sm mt-xs" onClick=${() => { setVis('public'); setShowGroupSelect(false); setGroupId(''); }}>${t('profile.memory.skipGroup')}</button>
+            ${(groups || []).length === 0
+              ? html`
+                <div class="text-meta-sm mb-xs">${t('profile.memory.noGroups')}</div>
+                <button class="btn-outline btn-sm" onClick=${() => {
+                  onCancel();
+                  window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'access' } }));
+                }}>${t('profile.memory.createGroupBtn')}</button>`
+              : html`
+                <select class="input-field" value=${groupId} onChange=${e => setGroupId(e.target.value)}>
+                  <option value="">-- ${t('profile.memory.selectGroup')} --</option>
+                  ${(groups || []).map(g => html`<option value=${g.id}>${g.name}</option>`)}
+                </select>`}
           </div>
         `}
-        <textarea class="input-field" rows="6" value=${value} onInput=${e => setValue(e.target.value)}></textarea>
+        <textarea class="input-field mem-edit-textarea ${jsonError ? 'mem-edit-textarea--error' : ''}" rows="14"
+          value=${value} onInput=${e => setValue(e.target.value)}></textarea>
+        ${jsonError && html`<div class="mem-json-error">${t('profile.memory.invalidJson')} — ${jsonError}</div>`}
         <div class="form-actions mt-1">
-          <button class="btn-primary" onClick=${() => onSave(value, vis, initialVersion, vis === 'group' ? groupId : undefined)}>${t('profile.save')}</button>
+          <button class="btn-primary" disabled=${!canSave || groupMissing}
+            onClick=${() => onSave(value, vis, initialVersion, vis === 'group' ? groupId : undefined)}>${t('profile.save')}</button>
           <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
         </div>
     <//>`;

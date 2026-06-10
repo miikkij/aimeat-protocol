@@ -9638,6 +9638,13 @@ paths:
                     properties:
                       key:
                         type: string
+                      found:
+                        type: boolean
+                        description: Whether a memory record with this key exists (owner session checks the GHII and all owned agents)
+                      owner_gaii:
+                        type: string
+                        nullable: true
+                        description: The identity (GHII or agent GAII) that actually owns the record, when found
                       visibility:
                         type: string
                       effective_rules:

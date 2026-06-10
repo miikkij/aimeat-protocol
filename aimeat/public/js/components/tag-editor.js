@@ -29,8 +29,8 @@ export default function TagEditor({ tags, onSave, maxTags = 20 }) {
     <div class="tag-editor">
       <div class="tag-editor-pills">
         ${tags.map(tag => html`
-          <span class="tag-pill active" key=${tag} onClick=${() => removeTag(tag)}>
-            ${tag} \u2715
+          <span class="tag-pill tag-removable" key=${tag} onClick=${() => removeTag(tag)}>
+            ${tag} <span class="tag-x">\u2715</span>
           </span>
         `)}
       </div>
