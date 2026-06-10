@@ -448,6 +448,9 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/help',
     '/v1/publicknowledgeviewer',
     '/v1/publicworkspaceviewer',
+    '/v1/pricing',
+    '/v1/how-it-works',
+    '/v1/business',
   ];
 
   for (const path of spaRoutes) {

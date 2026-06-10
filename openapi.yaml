@@ -9672,6 +9672,60 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /v1/public/activity-ticker:
+    get:
+      operationId: publicActivityTicker
+      summary: Live activity ticker for the landing page (public, cached 10 s)
+      description: |
+        Newest PUBLIC-visibility memory writes (actor agent name + key tail + timestamp)
+        and the count of agents seen in the last 10 minutes. No auth; rate-limited.
+      tags: [Public]
+      responses:
+        '200':
+          description: Ticker items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            actor: { type: string }
+                            key: { type: string }
+                            at: { type: string }
+                      agents_online: { type: integer }
+
+  /v1/public/node-stats-today:
+    get:
+      operationId: publicNodeStatsToday
+      summary: Today's aggregate activity counters (public, cached 60 s)
+      description: |
+        Real counters for today — public memory writes, completed tasks (bounded sweep),
+        schedules fired. Aggregates only; no per-user data. No auth; rate-limited.
+      tags: [Public]
+      responses:
+        '200':
+          description: Today's counters
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      public_writes: { type: integer }
+                      tasks_completed: { type: integer }
+                      schedules_fired: { type: integer }
+
   /v1/ghii/me:
     get:
       operationId: ghiiMe

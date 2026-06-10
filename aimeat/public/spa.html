@@ -67,6 +67,7 @@
   <!-- View CSS preloaded so they are ready before any view renders (prevents FOUC) -->
   <!-- hrefs are stamped with ?v=BUILD_ID at serve time by portal.ts serveSpa() -->
   <link rel="stylesheet" href="/css/views/portal.css">
+  <link rel="stylesheet" href="/css/views/landing.css">
   <link rel="stylesheet" href="/css/views/portal-classic.css">
   <link rel="stylesheet" href="/css/views/portal-dev.css">
   <link rel="stylesheet" href="/css/views/profile.css">
@@ -166,6 +167,7 @@
       "/components/Mermaid.js": "/components/Mermaid.js",
       "/components/NotificationBell.js": "/components/NotificationBell.js",
       "/components/CopyButton.js": "/components/CopyButton.js",
+      "/components/ContactCard.js": "/components/ContactCard.js",
       "/components/Spinner.js": "/components/Spinner.js",
       "/components/EmptyState.js": "/components/EmptyState.js",
       "/components/ToggleSwitch.js": "/components/ToggleSwitch.js",
@@ -256,7 +258,13 @@
     // insufficient — modules stay in the module registry for the full session).
     const B = window.__B || '';
     const ROUTES = {
-      '/v1/portal':      () => import('/views/portal.js' + B),
+      // Landing/portal split (2026-06-10): the route serves the logged-out landing;
+      // logged-in visitors are forwarded to /v1/profile by the view itself. The old
+      // portal view stays reachable at /v1/classic (prompt boxes / "Build").
+      '/v1/portal':      () => import('/views/landing.js' + B),
+      '/v1/pricing':     () => import('/views/pricing.js' + B),
+      '/v1/how-it-works': () => import('/views/how-it-works.js' + B),
+      '/v1/business':    () => import('/views/business.js' + B),
       '/v1/profile':     () => import('/views/profile.js' + B),
       '/v1/guides':      () => import('/views/guides.js' + B),
       '/v1/hobbies':     () => import('/views/hobbies.js' + B),
@@ -458,6 +466,7 @@
               onClick=${() => setMenuOpen(o => !o)}>☰</button>
             <div class="topnav-menu ${menuOpen ? 'open' : ''}">
               <a href="/v1/classic" onClick=${(e) => { handleNav(e, '/v1/classic'); setMenuOpen(false); }} class="${currentPath === '/v1/classic' ? 'active' : ''}">${t('nav.try')}</a>
+              <a href="/v1/how-it-works" onClick=${(e) => { handleNav(e, '/v1/how-it-works'); setMenuOpen(false); }} class="${currentPath === '/v1/how-it-works' ? 'active' : ''}">${t('nav.howItWorks') || 'How it works'}</a>
               <a href="/v1/portal?view=dev" onClick=${(e) => { handleNav(e, '/v1/portal?view=dev'); setMenuOpen(false); }}>${t('nav.devView')}</a>
               <a href="/v1/help" onClick=${(e) => { handleNav(e, '/v1/help'); setMenuOpen(false); }} class="${currentPath === '/v1/help' ? 'active' : ''}">${t('nav.help')}</a>
               ${session && html`

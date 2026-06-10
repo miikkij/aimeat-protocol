@@ -45,6 +45,7 @@ import { storageFilesRouter } from '../routes/storage-files.js';
 import { validateRouter } from '../routes/validate.js';
 import { mcpRouter } from '../mcp/index.js';
 import { portalRouter } from '../routes/portal.js';
+import { publicStatsRouter } from '../routes/public-stats.js';
 import { portfolioRouter } from '../routes/portfolio.js';
 import { portalApiRouter } from '../routes/portal-api.js';
 import { csmRouter } from '../routes/csm.js';
@@ -339,6 +340,7 @@ export async function mountRoutes(
   }
   app.use(portalRouter(config, storage));
   app.use(portalApiRouter(config, storage));
+  app.use(publicStatsRouter(config, storage));
   // Phase 1.1 — Email service for verification and magic links
   const emailService = createEmailService(config);
 
