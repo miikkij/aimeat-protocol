@@ -12,11 +12,17 @@
  *   (a stale token for one agent should not silence the rest).
  *
  * @usage Started by `aimeat connect serve` -- one call per loaded agent.
+ *   Since Phase 4 (forward tunnel) this loop is the DEGRADED-MODE fallback in
+ *   the serve daemon: when an agent's tunnel is online, realtime `deliver`/
+ *   `backlog` frames drive the same wake adapter + task-runner hook (see
+ *   mcp/local-server.ts) and no upstream poll runs for that agent. Stdio serve
+ *   (CI/serverless) still polls unconditionally.
  *
  * @version-history
  *   v1.9.4 -- 2026-05-28 -- Name-based message inbox endpoint
  *   v1.9.5 -- 2026-05-28 -- Track IDs (not counts), recursive setTimeout, surface auth failures
  *   v2.0.0 -- 2026-05-29 -- Per-agent poll loop + task-runner hook for subprocess agents
+ *   v2.1.0 -- 2026-06-10 -- Export legacyWakeAdapter for the push path (Phase 4)
  */
 import type { RegisteredAgent } from '../agent-registry.js';
 import { wakeAgent } from './wakeup.js';
@@ -148,9 +154,10 @@ export function startPollerForAgent(agent: RegisteredAgent): void {
 /**
  * Shim for the existing wakeAgent signature which expects `AimeatConnectConfig`.
  * Builds a minimal config from the per-agent config so wakeAgent's per-strategy
- * logic continues to work unchanged.
+ * logic continues to work unchanged. Exported so the tunnel push path
+ * (mcp/local-server.ts) fires the identical wake adapter.
  */
-function legacyWakeAdapter(agent: RegisteredAgent): import('../config.js').AimeatConnectConfig {
+export function legacyWakeAdapter(agent: RegisteredAgent): import('../config.js').AimeatConnectConfig {
   return {
     agent: agent.agent,
     owner: agent.owner,

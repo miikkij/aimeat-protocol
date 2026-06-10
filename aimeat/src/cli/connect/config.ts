@@ -23,6 +23,7 @@
  *   v1.0.0 -- original single-agent config
  *   v1.1.0 -- 2026-05-28 -- Security warning on wake.command (executes via exec)
  *   v2.0.0 -- 2026-05-29 -- Per-agent config layout + runner block + loadAllAgents
+ *   v2.1.0 -- 2026-06-10 -- AIMEAT_HOME env override for the connector home dir
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -30,7 +31,9 @@ import { homedir } from 'node:os';
 import { parse, stringify } from 'yaml';
 import { listAllTokens } from './keychain.js';
 
-const CONFIG_DIR = join(homedir(), '.aimeat');
+// AIMEAT_HOME overrides the connector home (~/.aimeat) — used by tests to run
+// against a throwaway directory and by operators running isolated daemons.
+const CONFIG_DIR = process.env.AIMEAT_HOME ?? join(homedir(), '.aimeat');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.yaml');
 
 export function getConfigDir(): string { return CONFIG_DIR; }

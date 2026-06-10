@@ -221,27 +221,51 @@ box in a phase is the gate to starting the next. Phases 1–2 are server-only;
       Registered in `ALL_SUITES`. **Gate: 8/8 on SQLite + MongoDB.**
 
 ### Phase 3 — Connector tunnel client (Node)
-- [ ] `src/cli/connect/tunnel-client.ts` — `ws` client: auto-reconnect
-      (backoff+jitter), heartbeat with dead-conn detection, `request`/`response`
-      correlation, `forward(method, path, body)`, `onDeliver`/`onEvent` emitter.
-- [ ] Unit tests `test/unit/connect-tunnel-client.test.ts` — correlation,
-      reconnect, heartbeat-timeout, frame parsing. **Gate: unit green.**
+- [x] `src/cli/connect/tunnel-client.ts` — `ws` client: auto-reconnect
+      (backoff+jitter from the `welcome` hint), heartbeat with 3×-interval
+      dead-conn detection, `request`/`response` correlation with synthetic 504
+      on timeout, `forward(method, path, opts)`, `onDeliver` (auto-`ack`) +
+      `onBacklog` emitters, proactive pre-expiry token reconnect
+      (`token_expires_at`, keychain re-read on every (re)connect), auth-failure
+      stop (upgrade 401/403 or forwarded 401) with "Run: aimeat connect"
+      guidance — never hot-loops. `start()` classifies the first attempt
+      (`online|unsupported|auth_failed|unreachable`) for Phase 4 degradation.
+- [x] Unit tests `test/unit/connect-tunnel-client.test.ts` — correlation
+      (incl. out-of-order), reconnect, heartbeat-timeout, frame parsing,
+      deliver→ack, backlog, 401-no-hot-loop, pre-expiry refresh.
+      **Gate: unit green — 16/16 (vitest).**
 
 ### Phase 4 — Connector local serve daemon (loopback proxy)
-- [ ] `api-client.ts` — transport seam so `AimeatClient` runs over
-      `tunnelClient.forward` inside serve (real `fetch` stays for one-shot CLI).
-- [ ] Local server module — Express on `127.0.0.1:<ephemeral>`: local
-      Streamable-HTTP `/v1/mcp` + REST proxy routes (backed by `forward`).
-- [ ] Push cache + loopback long-poll/SSE endpoint fed by `deliver` frames so
-      local clients get tasks in realtime without spinning.
-- [ ] `~/.aimeat/serve.json` discovery file — write on start, remove on clean
-      exit, stale-detect by pid.
-- [ ] `mcp/server.ts` + `poller.ts` — start one tunnel-client per agent; replace
-      the upstream poll loop with a `deliver`/`event` subscription that drives
-      the existing wake adapter + task-runner hook.
-- [ ] E2E / manual — liaison tool call and a REST poll both flow over one
-      upstream socket; queued task reaches a loopback long-poll in realtime.
-      **Gate: no upstream poll in steady state.**
+- [x] `api-client.ts` — transport seam (`Transport` interface +
+      `AimeatClient.setTransport()`) so `AimeatClient` runs over
+      `tunnelClient.forward` inside serve (real `fetch` stays for one-shot CLI
+      and absolute URLs, e.g. presigned uploads).
+- [x] Local server module (`mcp/local-server.ts`, `aimeat connect serve
+      --http`/`--daemon`) — Express on `127.0.0.1:<ephemeral>`: local
+      Streamable-HTTP `/v1/mcp` (fresh McpServer per session, same surface as
+      stdio) + REST proxy `ALL /v1/*` (agent picked via `X-Aimeat-Agent` /
+      `?agent=`, direct-HTTP fallback when degraded).
+- [x] Push cache + loopback long-poll endpoint (`GET /local/tasks/next?wait=ms`)
+      fed by `deliver`/`backlog` frames (per-agent id-dedup), plus
+      `GET /local/status` and `POST /local/shutdown`. (SSE variant deferred —
+      long-poll covers the synchronous-crew case.)
+- [x] `~/.aimeat/serve.json` discovery file — atomic write on start
+      (`schema_version, port, pid, agents[], started_at`), removed on clean
+      exit (signal or `/local/shutdown`), stale-detect by pid; `AIMEAT_HOME`
+      overrides the connector home. Only the daemon writes it — stdio spawns
+      never collide.
+- [x] `mcp/server.ts` + `poller.ts` — daemon starts one tunnel-client per
+      agent; `deliver`/`backlog` drive the existing wake adapter + task-runner
+      hook (exported `legacyWakeAdapter`). Poll loop kept strictly as the
+      degraded fallback (tunnel `unsupported`/`unreachable`); `auth_failed`
+      starts nothing. Stdio serve unchanged.
+- [x] E2E `test/e2e-connect-serve-loopback.ts` (in `ALL_SUITES`) — forward-proxy
+      parity (GET+POST), local MCP tools/list, queued task reaches the loopback
+      long-poll in realtime via `deliver`, single-socket invariant via
+      `/v1/connect/tunnel/stats`, discovery-file lifecycle, degraded fallback
+      against a tunnel-disabled node. 13/13 on SQLite + MongoDB.
+      **Gate: no upstream poll in steady state — met (tunnel mode starts no
+      poller; push answers the long-poll).**
 
 ### Phase 5 — Python CrewAI integration (Option A)
 - [ ] `mcp_client.py` — `serve_params()`: read `~/.aimeat/serve.json`

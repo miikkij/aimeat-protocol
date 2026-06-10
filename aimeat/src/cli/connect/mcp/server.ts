@@ -2,8 +2,11 @@
  * @file server.ts
  * @description MCP server entry point. Loads every credential from
  *   `~/.aimeat/tokens/`, builds an AgentRegistry, registers all MCP tools +
- *   resources against that registry, starts one poll loop per agent, then
- *   connects the stdio transport.
+ *   resources against that registry, then either connects the stdio transport
+ *   (default — preserved for CI/serverless) or, with `--http`/`--daemon`,
+ *   starts the loopback serve daemon (mcp/local-server.ts): one persistent
+ *   tunnel WS per agent, local Streamable-HTTP MCP + REST proxy + long-poll
+ *   push surface on 127.0.0.1, discovery file at `<AIMEAT_HOME>/serve.json`.
  *
  *   Single-agent UX: when only one credential is loaded, MCP tools accept an
  *   optional `agent_name` parameter that defaults to the only loaded agent.
@@ -13,9 +16,9 @@
  * @structure
  *   1. Load all agents via `loadAllAgents()`
  *   2. Build AgentRegistry with one AimeatClient per agent
- *   3. Register MCP tools (registry-aware) and resources
- *   4. Start per-agent pollers (each with its own wake adapter + optional task-runner)
- *   5. Connect StdioServerTransport
+ *   3. `buildMcpServer()` — McpServer with tools (surface-filtered) + resources
+ *   4. Daemon mode → runServeDaemon (tunnel transport, push, no upstream poll)
+ *      Stdio mode → per-agent pollers + StdioServerTransport (unchanged)
  *
  * @usage Called by `aimeat connect serve`.
  *
@@ -24,36 +27,25 @@
  *   v2.0.0 -- 2026-05-29 -- Multi-agent serve: registry-driven, per-agent poller, task-runner hook
  *   v2.1.0 -- 2026-05-30 -- v2 purpose-scoped surfaces: `--surface <appdev|agent|service|admin>`
  *     registers only that surface's tool allowlist (shared catalog/surfaces.ts); default 'all'.
+ *   v2.2.0 -- 2026-06-10 -- Phase 4: `--http`/`--daemon` loopback daemon mode;
+ *     extracted buildMcpServer() so the daemon creates one per local MCP session.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { loadAllAgents } from '../config.js';
-import { buildRegistry } from '../agent-registry.js';
+import { buildRegistry, type AgentRegistry } from '../agent-registry.js';
 import { registerAllTools } from './tools/index.js';
 import { registerResources } from './resources.js';
 import { startPollerForAgent } from './poller.js';
 import { isRunner } from '../task-runner.js';
 import { toolsForSurface, isV2Role, V2_ROLES, type SurfaceRole } from '../../../mcp/catalog/surfaces.js';
 
-export async function runServe(flags: Record<string, string>): Promise<void> {
-  const loaded = await loadAllAgents();
-  if (loaded.length === 0) {
-    console.error('No agents configured. Run: aimeat connect');
-    process.exit(1);
-  }
-
-  const registry = buildRegistry(loaded);
-
-  // v2 purpose-scoped surface: `aimeat connect serve --surface agent` registers ONLY that surface's
-  // tools (same allowlist as the server /v2/mcp/<role>), so a local connector can offer the focused
-  // appdev/agent/service surface. Default 'all' = the full connector toolset (unchanged).
-  const surfaceFlag = flags.surface ?? flags.role ?? 'all';
-  if (surfaceFlag !== 'all' && !isV2Role(surfaceFlag)) {
-    console.error(`Unknown --surface "${surfaceFlag}". Use one of: all, ${V2_ROLES.join(', ')}.`);
-    process.exit(1);
-  }
-  const role = surfaceFlag as SurfaceRole | 'all';
-
+/**
+ * Build a fully tool-registered MCP server for the given surface role. The
+ * stdio path builds exactly one; the loopback daemon builds one per
+ * Streamable-HTTP session (mirrors how the node's /v1/mcp works).
+ */
+export function buildMcpServer(role: SurfaceRole | 'all', registry: AgentRegistry): McpServer {
   const mcp = new McpServer({
     name: role === 'all' ? 'aimeat-connect' : `aimeat-connect-${role}`,
     version: '0.1.0',
@@ -76,6 +68,42 @@ export async function runServe(flags: Record<string, string>): Promise<void> {
     patchable.registerTool = origRegister;
   }
   registerResources(mcp, registry);
+  return mcp;
+}
+
+export async function runServe(flags: Record<string, string>): Promise<void> {
+  const loaded = await loadAllAgents();
+  if (loaded.length === 0) {
+    console.error('No agents configured. Run: aimeat connect');
+    process.exit(1);
+  }
+
+  const registry = buildRegistry(loaded);
+
+  // v2 purpose-scoped surface: `aimeat connect serve --surface agent` registers ONLY that surface's
+  // tools (same allowlist as the server /v2/mcp/<role>), so a local connector can offer the focused
+  // appdev/agent/service surface. Default 'all' = the full connector toolset (unchanged).
+  const surfaceFlag = flags.surface ?? flags.role ?? 'all';
+  if (surfaceFlag !== 'all' && !isV2Role(surfaceFlag)) {
+    console.error(`Unknown --surface "${surfaceFlag}". Use one of: all, ${V2_ROLES.join(', ')}.`);
+    process.exit(1);
+  }
+  const role = surfaceFlag as SurfaceRole | 'all';
+
+  // ── Daemon mode (Phase 4): loopback HTTP surface + one tunnel WS per agent ──
+  // Only the daemon binds a port and writes the discovery file, so per-crew
+  // stdio spawns (the default below) never collide with it.
+  if (flags.http === 'true' || flags.daemon === 'true') {
+    const { runServeDaemon } = await import('./local-server.js');
+    await runServeDaemon({ registry, buildMcp: () => buildMcpServer(role, registry) });
+    if (registry.list().some(isRunner)) {
+      console.error('SECURITY: runner.command in per-agent config is exec\'d on task arrival. Trust your ~/.aimeat/ contents.');
+    }
+    return;
+  }
+
+  // ── Stdio mode (default — preserved for CI/serverless) ──
+  const mcp = buildMcpServer(role, registry);
 
   for (const entry of registry.list()) {
     startPollerForAgent(entry);
