@@ -188,6 +188,7 @@
 .pf .mem-group-sub{font-family:monospace;font-size:.7rem;color:var(--muted)}
 .pf .mem-item--grouped{padding-left:1.4rem}
 .pf .mem-detail-key{font-family:monospace;font-size:.72rem;color:var(--muted);margin-bottom:.4rem;word-break:break-all}
+.pf .mem-detail-visrow{display:flex;align-items:center;gap:.5rem;margin-top:.5rem}
 .pf .mem-actions .mem-delete-btn{margin-left:auto}
 .pf .mem-vis-select{font-size:.72rem;padding:2px 6px;min-width:auto;width:auto}
 .pf .mem-edit-textarea{min-height:280px;resize:vertical;font-family:monospace;font-size:.8rem}
@@ -2101,6 +2102,8 @@
 /* The viewer's own contract-advertising agents (tag 'workspace-contract'), surfaced in the
    workspace People panel so the user sees which of their agents can serve this workspace. */
 .pj-contract-agents { border: 1px solid var(--border); border-radius: 10px; padding: 0.5rem 0.75rem; margin-bottom: 0.6rem; background: var(--card); }
+/* The per-contract one-click adopt action inside a contract-agent chip. */
+.pj-adopt-btn { margin-left: 0.4rem; padding: 0.1rem 0.5rem; font-size: 0.78rem; }
 .pj-draft-form { margin: 0.4rem 0; }
 .pj-drafts { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 0.3rem; }
 .pj-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; }

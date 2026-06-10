@@ -315,10 +315,23 @@ export default function MemoryTab({ session, showToast, onStats }) {
     } catch { setKeyRulesPopover(null); }
   }
 
-  /* Visibility is edited inside the edit modal (entries) or via an explicit select
-     (files) — the old per-row click-to-cycle pill meant one stray click in the list
-     could publish a memory. The list shows a static badge only. */
+  /* Visibility is edited via an explicit select inside the EXPANDED detail (and in the
+     edit modal) — the old per-row click-to-cycle pill meant one stray click in the list
+     could publish a memory. The list rows show a static badge only. */
   const VIS_OPTIONS = ['private', 'owner', 'group', 'public'];
+
+  // Quick visibility change from the expanded detail. 'group' needs a group pick,
+  // so it routes to the edit modal where the group select lives.
+  async function handleQuickVis(m, newVis) {
+    if (newVis === (m.visibility || 'private')) return;
+    if (newVis === 'group') {
+      setEditModal({ key: m.key, value: typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || ''), visibility: 'group', version: m.version, isJson: typeof m.value === 'object' });
+      return;
+    }
+    const resp = await memoryService.updateMemoryVisibility(m.key, newVis, m.version);
+    if (resp.ok === false) showToast(resp.error?.message || t('profile.error'), true);
+    loadMemories();
+  }
 
   async function handleUpdateMemoryTags(key, tags, version) {
     const resp = await memoryService.updateMemoryTags(key, tags, version);
@@ -460,6 +473,14 @@ export default function MemoryTab({ session, showToast, onStats }) {
           <div class="mem-detail">
             <div class="mem-detail-key" title=${m.key}>${escHtml(m.key)}</div>
             <pre>${typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || '')}</pre>
+            <div class="mem-detail-visrow mb-half">
+              <span class="text-meta-sm">${t('profile.memory.visLabel')}</span>
+              <select class="input-field mem-vis-select" value=${m.visibility || 'private'}
+                onClick=${(e) => e.stopPropagation()}
+                onChange=${(e) => handleQuickVis(m, e.target.value)}>
+                ${VIS_OPTIONS.map(v => html`<option key=${v} value=${v}>${t('knowledge.visibility.' + v)}</option>`)}
+              </select>
+            </div>
             <div class="mb-half">
               <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); setEditingMemTags(editingMemTags === m.key ? null : m.key); }}>
                 ${t('tags.editTags') || 'Edit tags'}

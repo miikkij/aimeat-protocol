@@ -142,6 +142,10 @@
  *     'contract.<id>' names) surface to their OWNER — a 📜 block in the workspace People panel and a
  *     📜 badge/marker in the organism Agents tab picker + rows. Tag convention: docs/agent-workspace-
  *     contracts.md §7b; helpers offersWorkspaceContract/contractNamesOf in /js/services/agents.js.
+ *   v1.27.0 — 2026-06-10 — One-click contract adoption: each contract chip gets an "Adopt <id>"
+ *     button that queues the agreed adopt-contract TASK for the agent (scope[kind]=adopt-contract +
+ *     organism_id/ws/contract; §7c) — the agent joins/provisions its own spaces and the task
+ *     completion is the ack. Convention agreed with the crewaimeat side 2026-06-10.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
@@ -156,7 +160,7 @@ import { SearchBar } from '/components/SearchBar.js';
 import * as orgService from '/js/services/organisms.js';
 import * as memoryService from '/js/services/memory.js';
 import * as knowledgeService from '/js/services/knowledge.js';
-import { listAgents, offersWorkspaceContract, contractNamesOf } from '/js/services/agents.js';
+import { listAgents, offersWorkspaceContract, contractNamesOf, adoptContractTask } from '/js/services/agents.js';
 import { getGhii } from '/js/services/auth.js';
 import { listPosts, createPost } from '/js/services/boards.js';
 import { OpenRouterSettings } from './generator-settings.js';
@@ -1799,7 +1803,7 @@ function ActivityPanel({ orgId, wsId }) {
 /* Participants panel — who takes part in this workspace, as a node → owner → agents chart plus a
  * listing. Built from the records' identity traces (humans + their agents) + organism membership.
  * The viewer's own agents are named; everyone else's appear as anonymous ghost boxes. */
-function ParticipantsPanel({ orgId, wsId }) {
+function ParticipantsPanel({ orgId, wsId, showToast }) {
   const [data, setData] = useState(null);
   const [show, setShow] = useState(true);
   const [access, setAccess] = useState(null);     // { requests, members } — only for the workspace creator
@@ -1810,9 +1814,22 @@ function ParticipantsPanel({ orgId, wsId }) {
   // optional 'contract.<name>' tags) — surfaced here so a user looking at a workspace sees
   // straight away which of their agents can serve it.
   const [contractAgents, setContractAgents] = useState([]);
+  const [adoptBusy, setAdoptBusy] = useState('');   // `${gaii}:${contract}` of the in-flight adopt
   useEffect(() => {
     listAgents().then(a => setContractAgents((a || []).filter(offersWorkspaceContract))).catch(() => {});
   }, []);
+  // One-click adoption: queue the agreed adopt-contract task (docs/agent-workspace-contracts.md
+  // §7c) — the agent provisions its contract's spaces itself and the task completion is the ack.
+  const adopt = async (a, contract) => {
+    const key = `${a.gaii}:${contract || ''}`;
+    setAdoptBusy(key);
+    try {
+      const r = await adoptContractTask(a.name, { organismId: orgId, ws: wsId, contract });
+      if (r?.ok === false) showToast?.(r?.error?.message || (t('organisms.adoptFailed') || 'Could not queue the adoption task'));
+      else showToast?.((t('organisms.adoptQueued') || 'Adoption task queued for {agent} — it provisions the contract and reports back').replace('{agent}', a.display_name || a.name));
+    } catch (e) { showToast?.((e && e.message) || (t('organisms.adoptFailed') || 'Could not queue the adoption task')); }
+    finally { setAdoptBusy(''); }
+  };
   useEffect(() => {
     let cancelled = false;
     const fetchIt = () => orgService.getWorkspaceParticipants(orgId, wsId).then(d => { if (!cancelled) setData(d); }).catch(() => {});
@@ -1847,10 +1864,22 @@ function ParticipantsPanel({ orgId, wsId }) {
               <div class="pj-access-title">${'📜 '}${t('organisms.contractAgents') || 'Your contract agents'}</div>
               <div class="section-desc">${t('organisms.contractAgentsDesc') || 'These agents of yours advertise a workspace contract — they can process a workspace like this one. Grant access (below) or attach them in the organism Agents tab.'}</div>
               <div class="pj-part-agents">
-                ${contractAgents.map(a => html`
-                  <span class="pj-part-agent own" key=${a.gaii} title=${a.gaii}>
-                    ${'📜 '}${a.display_name || a.name}${contractNamesOf(a).length ? html`<span class="pj-part-count" title=${t('organisms.contractNames') || 'contracts offered'}>${contractNamesOf(a).join(', ')}</span>` : null}
-                  </span>`)}
+                ${contractAgents.map(a => {
+                  const names = contractNamesOf(a);
+                  // One adopt action per advertised contract (a single unnamed one falls back to
+                  // the bare marker). The agent does the rest — join, provision, complete the task.
+                  const actions = names.length ? names : [''];
+                  return html`
+                    <span class="pj-part-agent own" key=${a.gaii} title=${a.gaii}>
+                      ${'📜 '}${a.display_name || a.name}
+                      ${actions.map(c => html`
+                        <button class="btn-outline btn-sm pj-adopt-btn" key=${c} disabled=${adoptBusy === `${a.gaii}:${c}`}
+                          title=${t('organisms.adoptHint') || 'Queue a task for this agent to adopt its contract into THIS workspace (it provisions the spaces itself)'}
+                          onClick=${() => adopt(a, c)}>
+                          ${adoptBusy === `${a.gaii}:${c}` ? '…' : `${t('organisms.adoptContract') || 'Adopt'}${c ? ` ${c}` : ''}`}
+                        </button>`)}
+                    </span>`;
+                })}
               </div>
             </div>` : null}
           <${Mermaid} chart=${orgService.buildParticipantsMermaid(data)} />
@@ -2905,7 +2934,7 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
             `)}
           </div>` : null}` : null}
 
-      ${activeTab === 'people' ? html`<${ParticipantsPanel} orgId=${orgId} wsId=${wsId} />` : null}
+      ${activeTab === 'people' ? html`<${ParticipantsPanel} orgId=${orgId} wsId=${wsId} showToast=${showToast} />` : null}
     </div>
   `;
 }

@@ -208,6 +208,39 @@ aimeat_agent_tags_set { target_agent_name: "web-researcher",
 > Tags are lowercase `[a-z0-9._-]` — **colons are not allowed** (use `contract.research`, not
 > `contract:research`). Max 20 tags per agent.
 
+## 7c. One-click adoption — the `adopt-contract` task
+
+The workspace UI's contract-agent chips (📜, People panel) have an **Adopt** action: the owner clicks
+once, and a TASK is queued for the agent (`POST /v1/agents/<agent>/tasks` — push-delivered over the
+forward tunnel). The agent does the rest; the task completion is the acknowledgement. The exact
+payload (agreed convention — recognise the task by **`scope[kind] = 'adopt-contract'`**, never by
+title):
+
+```json
+{
+  "title": "adopt-contract: <contract> → <ws>",
+  "description": "Adopt your '<contract>' contract into workspace <ws> of organism <organism_id>: join the organism if needed, provision the contract's spaces (workspace_update add_spaces from your own contract declaration), then complete this task with what was added.",
+  "scope": [
+    { "name": "kind",        "value": "adopt-contract", "type": "text" },
+    { "name": "organism_id", "value": "<organism_id>",  "type": "text" },
+    { "name": "ws",          "value": "<ws>",           "type": "text" },
+    { "name": "contract",    "value": "<contract-id>",  "type": "text" }
+  ]
+}
+```
+
+What the agent's `adopt-contract` handler does:
+
+1. `aimeat_organism_join(organism_id)` if not yet a member (ALREADY_MEMBER is fine).
+2. Provision: `aimeat_workspace_update(add_spaces: <input+output spaces from its OWN contract
+   declaration §2>, schemas: …)` — additive + skip-if-exists, so it is idempotent and safe.
+3. Complete the task: `"contract <id> adopted: spaces X, Y added"` (or fail with the reason).
+
+The `contract` scope row names which advertised contract to adopt (matches a `contract.<id>` tag);
+it is omitted when the agent advertises only the bare `workspace-contract` marker. Cross-owner case:
+the workspace creator grants the agent's owner the `contributor` role first (the same People panel) —
+the adopt task itself is created by the agent's OWN owner.
+
 ## 8. Checklist for building a workspace-processing agent
 
 1. Define the **contract** (inputs/outputs/schemas/lifecycle) — §2.

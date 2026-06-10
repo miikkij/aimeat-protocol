@@ -22,6 +22,25 @@ export const contractNamesOf = (a) => (a?.tags || [])
   .filter(tg => String(tg).startsWith('contract.'))
   .map(tg => String(tg).slice('contract.'.length));
 
+/** One-click contract adoption: queue the agreed adopt-contract TASK for one of the owner's
+ *  agents. The agent recognises it from scope[kind]='adopt-contract' (NOT the title), joins the
+ *  organism if needed, provisions its contract's spaces itself (workspace_update add_spaces from
+ *  its OWN contract declaration — §2 of the guide), and completes the task with what was added.
+ *  Convention: docs/agent-workspace-contracts.md §7c — agreed with the crewaimeat side 2026-06-10. */
+export async function adoptContractTask(agentName, { organismId, ws, contract }) {
+  const { createTask } = await import('/js/services/agent-tasks.js');
+  return createTask(agentName, {
+    title: `adopt-contract: ${contract || 'workspace-contract'} → ${ws}`,
+    description: `Adopt your '${contract || ''}' contract into workspace ${ws} of organism ${organismId}: join the organism if needed, provision the contract's spaces (workspace_update add_spaces from your own contract declaration), then complete this task with what was added.`,
+    scope: [
+      { name: 'kind', value: 'adopt-contract', type: 'text' },
+      { name: 'organism_id', value: organismId, type: 'text' },
+      { name: 'ws', value: ws, type: 'text' },
+      ...(contract ? [{ name: 'contract', value: contract, type: 'text' }] : []),
+    ],
+  });
+}
+
 /** List chat session agents (name starts with 'session-'). */
 export async function listChatSessions(owner) {
   const agents = await listAgents(owner);
