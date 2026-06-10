@@ -144,8 +144,10 @@
  *     contracts.md §7b; helpers offersWorkspaceContract/contractNamesOf in /js/services/agents.js.
  *   v1.27.0 — 2026-06-10 — One-click contract adoption: each contract chip gets an "Adopt <id>"
  *     button that queues the agreed adopt-contract TASK for the agent (scope[kind]=adopt-contract +
- *     organism_id/ws/contract; §7c) — the agent joins/provisions its own spaces and the task
- *     completion is the ack. Convention agreed with the crewaimeat side 2026-06-10.
+ *     organism_id/ws/contract, status:'queued' — the create default is draft and a draft never
+ *     auto-activates; §7c) — the agent joins/provisions its own spaces and the task completion is
+ *     the ack. An agent already working in THIS workspace (per the participants data) shows a
+ *     "✓ active here" badge instead of Adopt. Convention agreed with the crewaimeat side 2026-06-10.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
@@ -1866,13 +1868,19 @@ function ParticipantsPanel({ orgId, wsId, showToast }) {
               <div class="pj-part-agents">
                 ${contractAgents.map(a => {
                   const names = contractNamesOf(a);
+                  // An agent already working in THIS workspace (it appears among the viewer's own
+                  // agents in the participants data) gets a ✓ instead of Adopt buttons — offering
+                  // adoption for an agent that is already here is noise, and the task would be a
+                  // no-op re-provision anyway.
+                  const here = owners.some(o => o.isSelf && (o.agents || []).some(ag => ag.isOwn && ag.name === a.name));
                   // One adopt action per advertised contract (a single unnamed one falls back to
                   // the bare marker). The agent does the rest — join, provision, complete the task.
                   const actions = names.length ? names : [''];
                   return html`
                     <span class="pj-part-agent own" key=${a.gaii} title=${a.gaii}>
                       ${'📜 '}${a.display_name || a.name}
-                      ${actions.map(c => html`
+                      ${here ? html`<span class="badge badge-success pj-mini" title=${t('organisms.contractActiveHint') || 'This agent already works in this workspace'}>${'✓ '}${t('organisms.contractActive') || 'active here'}</span>`
+                        : actions.map(c => html`
                         <button class="btn-outline btn-sm pj-adopt-btn" key=${c} disabled=${adoptBusy === `${a.gaii}:${c}`}
                           title=${t('organisms.adoptHint') || 'Queue a task for this agent to adopt its contract into THIS workspace (it provisions the spaces itself)'}
                           onClick=${() => adopt(a, c)}>

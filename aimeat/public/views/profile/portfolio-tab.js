@@ -1,31 +1,89 @@
 /**
  * @file portfolio-tab.js
- * @description Profile tab providing navigation to the portfolio builder and public view.
+ * @description Profile tab for the portfolio. NOT a landing page: with no published
+ *   portfolio it forwards straight to the builder (an empty two-button page was a wasted
+ *   click); with one published it earns its place — public URL with copy, last updated,
+ *   and Visit / Edit / Unpublish.
  * @version-history
- *   v1.0.0 — 2026-03-16 — Initial portfolio tab
+ *   v2.0.0 — 2026-06-10 — Replace the two-button landing: auto-forward to the builder when
+ *     nothing is published; published state shows URL + last updated + Visit/Edit/Unpublish.
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes
+ *   v1.0.0 — 2026-03-16 — Initial portfolio tab
  */
 import { h } from 'preact';
+import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
+import { apiGet, apiPut } from '/js/api.js';
+import { Spinner } from './shared.js';
+import { CopyButton } from '/components/CopyButton.js';
+import { useConfirm } from '/components/Modal.js';
 
-export default function PortfolioTab({ session, navigate }) {
+export default function PortfolioTab({ session, navigate, showToast }) {
+  const { confirm, ConfirmUI } = useConfirm();
+  // undefined = loading, null = no config, object = config
+  const [cfg, setCfg] = useState(undefined);
+
+  const load = () => apiGet('/v1/portfolio/config')
+    .then(r => setCfg(r?.data?.config || null))
+    .catch(() => setCfg(null));
+  useEffect(() => { load(); }, []);
+
+  // No published portfolio → the builder IS the page. Forward instead of showing
+  // two buttons on 90% whitespace.
+  useEffect(() => {
+    if (cfg !== undefined && !cfg?.enabled) navigate('/v1/portfolio');
+  }, [cfg]);
+
+  if (cfg === undefined) return html`<${Spinner} text=${t('loading') || 'Loading…'} />`;
+  if (!cfg?.enabled) return null; // forwarding to the builder
+
+  const url = `${window.location.origin}/v1/portfolio/${encodeURIComponent(session.owner)}`;
+
+  const handleUnpublish = () => {
+    confirm(t('portfolio.builder.unpublishConfirm') || 'Unpublish your portfolio? The public page stops working until you publish again.', async () => {
+      try {
+        await apiPut('/v1/portfolio/config', { ...cfg, enabled: false, tags: ['portfolio'] });
+        showToast?.(t('portfolio.builder.unpublished') || 'Portfolio unpublished');
+        navigate('/v1/portfolio');
+      } catch (e) { showToast?.(e.message || 'Failed', true); }
+    }, { danger: true });
+  };
+
   return html`
     <div class="tab-content">
-      <div class="portfolio-center">
-        <h3>${t('portfolio.builder.heading')}</h3>
-        <p class="portfolio-subtitle">${t('portfolio.builder.subtitle')}</p>
-        <button class="btn-primary" onClick=${() => navigate('/v1/portfolio')}>
-          ${t('portfolio.builder.heading')}
-        </button>
-        <br/><br/>
-        ${session && html`
-          <a href="/v1/portfolio/${encodeURIComponent(session.owner)}" class="btn-ghost" target="_blank">
-            ${t('portfolio.builder.viewPublic')}
-          </a>
+      <div class="section-title">${t('portfolio.builder.heading')}</div>
+      <div class="section-desc">${t('portfolio.builder.enabled')}</div>
+
+      <div class="card">
+        <div class="mem-item">
+          <span class="mem-key">${t('portfolio.builder.publicUrl') || 'Public URL'}</span>
+          <span class="access-copy-val">
+            <a href=${url} target="_blank">${url}</a>
+            <${CopyButton} text=${url} className="btn-ghost btn-sm" label="📋"
+              onCopied=${() => showToast?.(t('profile.access.copied') || 'Copied')} />
+          </span>
+        </div>
+        ${cfg.publishedAt && html`
+          <div class="mem-item">
+            <span class="mem-key">${t('portfolio.builder.lastUpdated') || 'Last updated'}</span>
+            <span>${new Date(cfg.publishedAt).toLocaleString(getLocale() === 'fi' ? 'fi-FI' : undefined)}</span>
+          </div>
         `}
+        ${cfg.htmlSizeKb && html`
+          <div class="mem-item">
+            <span class="mem-key">${t('portfolio.builder.sizeLabel') || 'Size'}</span>
+            <span>${cfg.htmlSizeKb} KB</span>
+          </div>
+        `}
+        <div class="card-actions">
+          <a class="btn-outline btn-sm" href=${url} target="_blank">${t('portfolio.builder.visitBtn') || 'Visit'}</a>
+          <button class="btn-outline btn-sm" onClick=${() => navigate('/v1/portfolio')}>${t('portfolio.builder.editBtn') || 'Edit in builder'}</button>
+          <button class="btn-danger btn-sm" onClick=${handleUnpublish}>${t('portfolio.builder.unpublish') || 'Unpublish'}</button>
+        </div>
       </div>
+      <${ConfirmUI} />
     </div>
   `;
 }

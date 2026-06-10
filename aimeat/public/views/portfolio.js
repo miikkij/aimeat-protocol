@@ -3,6 +3,12 @@
  * @description Portfolio view — builder (select content, generate AI prompt,
  *   upload HTML) and public viewer (sandboxed iframe render).
  * @version-history
+ *   v1.2.0 — 2026-06-10 — Workflow round: ①②③ flow banner explains the AI-chat round-trip;
+ *     group summaries show selected/total + select-all checkbox; Generate disabled with a hint
+ *     when nothing is selected; "Custom" type and custom auth-gate open describe-textareas that
+ *     feed the prompt; prompt output shows a character count; step 5 shows the publish URL,
+ *     gains a sandboxed preview (same allow-scripts srcdoc sandbox as the public viewer) and an
+ *     Unpublish in the published banner; bottom button says Profile (where it actually goes).
  *   v1.1.0 — 2026-06-02 — Migrate bespoke prompt-copy button to canonical CopyButton component
  */
 import { h } from 'preact';
@@ -65,7 +71,7 @@ function formatMemoryKey(key) {
 }
 
 /* ── Prompt Builder ── */
-function buildPortfolioPrompt({ session, catalog, selectedImages, selectedApps, selectedBoards, selectedCortex, selectedMemories, portfolioType, designStyle, authGates }) {
+function buildPortfolioPrompt({ session, catalog, selectedImages, selectedApps, selectedBoards, selectedCortex, selectedMemories, portfolioType, designStyle, authGates, customTypeDesc, customGateDesc }) {
   const ghii = session.ghii || (session.owner + '@unknown');
   const url = NODE_URL;
 
@@ -132,13 +138,13 @@ The user wants to create a personal portfolio website. Generate a single, self-c
 
   prompt += `
 ## Portfolio Requirements
-- Type: ${typeLabels[portfolioType] || portfolioType}
+- Type: ${typeLabels[portfolioType] || portfolioType}${portfolioType === 'custom' && customTypeDesc ? ` — ${customTypeDesc}` : ''}
 - Design Style: ${styleLabels[designStyle] || designStyle}
 `;
 
   // Auth-gated sections
   if (authGates.length > 0) {
-    const gateLabels = { contact: 'Contact information', projectDetails: 'Project details', downloads: 'Download links', custom: 'Custom sections (ask user)' };
+    const gateLabels = { contact: 'Contact information', projectDetails: 'Project details', downloads: 'Download links', custom: customGateDesc ? `Custom sections: ${customGateDesc}` : 'Custom sections (ask user)' };
     prompt += `- Auth-gated sections (show only to logged-in viewers):\n`;
     for (const gate of authGates) {
       prompt += `  - ${gateLabels[gate] || gate}\n`;
@@ -282,6 +288,30 @@ function PortfolioBuilder({ session, navigate }) {
     });
   };
 
+  // Custom descriptions (step 2 "Custom" type / step 3 "Custom sections")
+  const [customTypeDesc, setCustomTypeDesc] = useState('');
+  const [customGateDesc, setCustomGateDesc] = useState('');
+
+  // Group <summary> with selected/total + a select-all checkbox. The checkbox click
+  // must not toggle the <details> open state (stopPropagation + preventDefault on the
+  // summary's default toggle is handled by stopping the click at the input).
+  const groupSummary = (label, ids, selectedSet, setter) => {
+    const selCount = ids.filter(id => selectedSet.has(id)).length;
+    const all = ids.length > 0 && selCount === ids.length;
+    return html`
+      <summary>
+        <input type="checkbox" class="portfolio-group-checkall" checked=${all}
+          title=${t('portfolio.builder.selectAll') || 'Select all'}
+          onClick=${(e) => e.stopPropagation()}
+          onChange=${() => setter(prev => {
+            const next = new Set(prev);
+            if (all) ids.forEach(i => next.delete(i)); else ids.forEach(i => next.add(i));
+            return next;
+          })} />
+        ${label} — ${(t('portfolio.builder.selectedOf') || '{sel}/{total} selected').replace('{sel}', String(selCount)).replace('{total}', String(ids.length))}
+      </summary>`;
+  };
+
   // Generate prompt
   const handleGenerate = () => {
     if (!catalog) return;
@@ -302,6 +332,8 @@ function PortfolioBuilder({ session, navigate }) {
       portfolioType,
       designStyle,
       authGates: [...authGates],
+      customTypeDesc: customTypeDesc.trim(),
+      customGateDesc: customGateDesc.trim(),
     });
     setGeneratedPrompt(prompt);
 
@@ -333,6 +365,7 @@ function PortfolioBuilder({ session, navigate }) {
 
   // Paste HTML
   const [pastedHtml, setPastedHtml] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
 
   const handlePublishPaste = async () => {
     const text = pastedHtml.trim();
@@ -384,6 +417,19 @@ function PortfolioBuilder({ session, navigate }) {
     setUploading(false);
   };
 
+  // Unpublish: flip enabled off — the public route 404s until the next publish.
+  const handleUnpublish = async () => {
+    setUploading(true);
+    try {
+      await apiPut('/v1/portfolio/config', { ...(existingConfig || {}), enabled: false, tags: ['portfolio'] });
+      setExistingConfig({ ...(existingConfig || {}), enabled: false });
+      setUploadStatus({ ok: true, msg: t('portfolio.builder.unpublished') || 'Portfolio unpublished' });
+    } catch (err) {
+      setUploadStatus({ ok: false, msg: err.message || 'Failed' });
+    }
+    setUploading(false);
+  };
+
   // Upload HTML file (reads text from file, then publishes)
   const handleUpload = async (file) => {
     if (!file || !file.name.endsWith('.html')) {
@@ -408,16 +454,32 @@ function PortfolioBuilder({ session, navigate }) {
 
   const hasContent = catalog && (catalog.images.length || catalog.apps.length || catalog.boards.length || catalog.cortex.length || catalog.memories.length);
 
+  const totalSelected = selectedImages.size + selectedApps.size + selectedBoards.size + selectedCortex.size + selectedMemories.size;
+  const publicUrl = `${NODE_URL}/v1/portfolio/${encodeURIComponent(session.owner)}`;
+
   return html`
     <div class="portfolio-container">
       <h1>${t('portfolio.builder.heading')}</h1>
-      <p style="color:var(--text-dim); margin-bottom:2rem;">${t('portfolio.builder.subtitle')}</p>
+      <p class="portfolio-subtitle-text">${t('portfolio.builder.subtitle')}</p>
+
+      <!-- The loop is the whole point: AIMEAT composes a prompt, YOUR AI chat builds the
+           HTML, you paste it back. Without this banner step 1 gives no hint of steps 4-5. -->
+      <div class="portfolio-flow">
+        <span class="portfolio-flow-step"><span class="portfolio-flow-num">①</span> ${t('portfolio.builder.flow1')}</span>
+        <span class="portfolio-flow-arrow">→</span>
+        <span class="portfolio-flow-step"><span class="portfolio-flow-num">②</span> ${t('portfolio.builder.flow2')}</span>
+        <span class="portfolio-flow-arrow">→</span>
+        <span class="portfolio-flow-step"><span class="portfolio-flow-num">③</span> ${t('portfolio.builder.flow3')}</span>
+      </div>
 
       ${existingConfig?.enabled && html`
-        <div style="margin-bottom:1.5rem; padding:0.75rem 1rem; background:rgba(80,200,120,0.08); border:1px solid rgba(80,200,120,0.2); border-radius:8px; display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
-          <span style="color:#50c878;">●</span>
+        <div class="portfolio-published-bar">
+          <span class="portfolio-published-dot">●</span>
           <span>${t('portfolio.builder.enabled')}</span>
-          <a href="/v1/portfolio/${encodeURIComponent(session.owner)}" target="_blank" style="margin-left:auto;">${t('portfolio.builder.viewPublic')}</a>
+          <a href=${publicUrl} target="_blank" class="portfolio-published-link">${t('portfolio.builder.viewPublic')}</a>
+          <button class="btn btn-ghost btn-sm" disabled=${uploading} onClick=${handleUnpublish}>
+            ${t('portfolio.builder.unpublish')}
+          </button>
         </div>
       `}
 
@@ -431,7 +493,7 @@ function PortfolioBuilder({ session, navigate }) {
 
           ${catalog.images.length > 0 && html`
             <details class="portfolio-source-group" open>
-              <summary>${t('portfolio.builder.imagesGroup')} (${catalog.images.length})</summary>
+              ${groupSummary(t('portfolio.builder.imagesGroup'), catalog.images.map(i => i.key), selectedImages, setSelectedImages)}
               ${(() => {
                 const allImgTags = new Set();
                 for (const img of catalog.images) {
@@ -470,7 +532,7 @@ function PortfolioBuilder({ session, navigate }) {
 
           ${catalog.apps.length > 0 && html`
             <details class="portfolio-source-group">
-              <summary>${t('portfolio.builder.appsGroup')} (${catalog.apps.length})</summary>
+              ${groupSummary(t('portfolio.builder.appsGroup'), catalog.apps.map(a => a.filename), selectedApps, setSelectedApps)}
               <div class="portfolio-source-list">
                 ${catalog.apps.map(app => html`
                   <div class="portfolio-source-item">
@@ -486,7 +548,7 @@ function PortfolioBuilder({ session, navigate }) {
 
           ${catalog.boards.length > 0 && html`
             <details class="portfolio-source-group">
-              <summary>${t('portfolio.builder.boardsGroup')} (${catalog.boards.length})</summary>
+              ${groupSummary(t('portfolio.builder.boardsGroup'), catalog.boards.map(b => b.id), selectedBoards, setSelectedBoards)}
               <div class="portfolio-source-list">
                 ${catalog.boards.map(board => html`
                   <div class="portfolio-source-item">
@@ -502,7 +564,7 @@ function PortfolioBuilder({ session, navigate }) {
 
           ${catalog.cortex.length > 0 && html`
             <details class="portfolio-source-group">
-              <summary>${t('portfolio.builder.cortexGroup')} (${catalog.cortex.length})</summary>
+              ${groupSummary(t('portfolio.builder.cortexGroup'), catalog.cortex.map(c => c.name), selectedCortex, setSelectedCortex)}
               <div class="portfolio-source-list">
                 ${catalog.cortex.map(ext => html`
                   <div class="portfolio-source-item">
@@ -518,7 +580,7 @@ function PortfolioBuilder({ session, navigate }) {
 
           ${catalog.memories.length > 0 && html`
             <details class="portfolio-source-group">
-              <summary>${t('portfolio.builder.memoriesGroup')} (${catalog.memories.length})</summary>
+              ${groupSummary(t('portfolio.builder.memoriesGroup'), catalog.memories.map(m => m.key), selectedMemories, setSelectedMemories)}
               ${(() => {
                 const allMemTags = new Set();
                 for (const mem of catalog.memories) {
@@ -575,6 +637,11 @@ function PortfolioBuilder({ session, navigate }) {
               </div>
             `)}
           </div>
+          ${portfolioType === 'custom' && html`
+            <textarea class="portfolio-custom-desc" rows="3"
+              placeholder=${t('portfolio.builder.customTypePlaceholder') || 'Describe what kind of portfolio you want…'}
+              value=${customTypeDesc} onInput=${(e) => setCustomTypeDesc(e.target.value)}></textarea>
+          `}
 
           <p style="color:var(--text-bright); font-size:0.95rem; margin:1.5rem 0 0.5rem;">${t('portfolio.builder.designStyle')}</p>
           <div class="portfolio-options">
@@ -601,18 +668,29 @@ function PortfolioBuilder({ session, navigate }) {
               </div>
             `)}
           </div>
+          ${authGates.has('custom') && html`
+            <textarea class="portfolio-custom-desc" rows="2"
+              placeholder=${t('portfolio.builder.customGatePlaceholder') || 'Describe the custom auth-gated sections…'}
+              value=${customGateDesc} onInput=${(e) => setCustomGateDesc(e.target.value)}></textarea>
+          `}
         </div>
 
         <!-- Step 4: Generate Prompt -->
         <div class="portfolio-step">
           <h3><span class="portfolio-step-number">4</span> ${t('portfolio.builder.step4Title')}</h3>
 
-          <button class="btn btn-primary" onClick=${handleGenerate} style="margin-bottom:1rem;">
-            ${t('portfolio.builder.generateBtn')}
-          </button>
+          <div class="portfolio-generate-row">
+            <button class="btn btn-primary" disabled=${totalSelected === 0} onClick=${handleGenerate}>
+              ${t('portfolio.builder.generateBtn')}
+            </button>
+            ${totalSelected === 0 && html`
+              <span class="portfolio-generate-hint">${t('portfolio.builder.generateDisabledHint') || 'Select at least one item in step 1'}</span>
+            `}
+          </div>
 
           ${generatedPrompt && html`
             <div class="portfolio-prompt-output">${generatedPrompt}</div>
+            <div class="portfolio-prompt-meta">${(t('portfolio.builder.charCount') || '{n} characters').replace('{n}', generatedPrompt.length.toLocaleString())}</div>
             <div class="portfolio-prompt-actions">
               <${CopyButton} text=${generatedPrompt} className="btn-primary"
                 label=${t('portfolio.builder.copyPrompt')} copiedLabel=${t('portfolio.builder.promptCopied')} />
@@ -636,6 +714,11 @@ function PortfolioBuilder({ session, navigate }) {
         <!-- Step 5: Upload Portfolio HTML -->
         <div class="portfolio-step">
           <h3><span class="portfolio-step-number">5</span> ${t('portfolio.builder.step5Title')}</h3>
+
+          <div class="portfolio-publish-target">
+            ${t('portfolio.builder.publishTarget') || 'Will be published at:'}
+            <a href=${publicUrl} target="_blank" class="portfolio-publish-url">${publicUrl}</a>
+          </div>
 
           <div class="portfolio-upload-zone ${dragover ? 'dragover' : ''}"
             onClick=${() => fileInputRef.current?.click()}
@@ -662,10 +745,20 @@ function PortfolioBuilder({ session, navigate }) {
             rows="6"
           ></textarea>
           ${pastedHtml.trim() && html`
-            <button class="btn btn-primary" style="margin-top:0.5rem;"
-              onClick=${handlePublishPaste} disabled=${uploading}>
-              ${uploading ? '...' : (t('portfolio.builder.publishPaste') || 'Publish pasted HTML')}
-            </button>
+            <div class="portfolio-paste-actions">
+              <button class="btn btn-primary"
+                onClick=${handlePublishPaste} disabled=${uploading}>
+                ${uploading ? '...' : (t('portfolio.builder.publishPaste') || 'Publish pasted HTML')}
+              </button>
+              <button class="btn btn-ghost" onClick=${() => setShowPreview(p => !p)}>
+                ${showPreview ? (t('portfolio.builder.closePreview') || 'Close preview') : (t('portfolio.builder.previewBtn') || 'Preview')}
+              </button>
+            </div>
+          `}
+          ${showPreview && pastedHtml.trim() && html`
+            <!-- Same sandbox as the public viewer: opaque origin, no session access. -->
+            <iframe class="portfolio-viewer-frame portfolio-preview-frame" srcdoc=${pastedHtml}
+              sandbox="allow-scripts"></iframe>
           `}
 
           ${uploadStatus && html`
@@ -682,7 +775,7 @@ function PortfolioBuilder({ session, navigate }) {
 
       <div style="margin-top:2rem;">
         <button class="btn btn-ghost" onClick=${() => navigate('/v1/profile')}>
-          ${t('portfolio.viewer.backToPortal')}
+          ← ${t('portfolio.builder.backToProfile') || 'Profile'}
         </button>
       </div>
     </div>

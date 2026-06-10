@@ -320,3 +320,21 @@
     flex-direction: column;
   }
 }
+
+/* ── Builder workflow round (2026-06-10): flow banner, summaries, preview, publish bits ── */
+.portfolio-subtitle-text { color: var(--text-dim); margin-bottom: 1rem; }
+.portfolio-flow { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; padding: .7rem 1rem; margin-bottom: 1.5rem; background: var(--bg-surface, var(--bg-dim)); border: 1px solid var(--border); border-radius: 10px; font-size: .88rem; color: var(--text); }
+.portfolio-flow-num { font-weight: 700; margin-right: .25rem; }
+.portfolio-flow-arrow { color: var(--text-dim); }
+.portfolio-published-bar { margin-bottom: 1.5rem; padding: .75rem 1rem; background: rgba(80,200,120,.08); border: 1px solid rgba(80,200,120,.25); border-radius: 8px; display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.portfolio-published-dot { color: var(--success-fg, #2E9E5B); }
+.portfolio-published-link { margin-left: auto; }
+.portfolio-group-checkall { margin-right: .4rem; cursor: pointer; }
+.portfolio-custom-desc { width: 100%; margin-top: .6rem; background: var(--control-bg, var(--card)); border: 1px solid var(--control-border, var(--border)); border-radius: 8px; padding: .5rem .65rem; color: var(--text); font: inherit; font-size: .88rem; resize: vertical; }
+.portfolio-generate-row { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.portfolio-generate-hint { font-size: .82rem; color: var(--text-dim); }
+.portfolio-prompt-meta { font-size: .76rem; color: var(--text-dim); margin: .35rem 0 .6rem; }
+.portfolio-publish-target { font-size: .85rem; color: var(--text-dim); margin-bottom: .75rem; }
+.portfolio-publish-url { font-family: monospace; word-break: break-all; }
+.portfolio-paste-actions { display: flex; gap: .6rem; margin-top: .5rem; flex-wrap: wrap; }
+.portfolio-preview-frame { margin-top: .75rem; min-height: 420px; width: 100%; border: 1px solid var(--border); border-radius: 8px; background: #fff; }
