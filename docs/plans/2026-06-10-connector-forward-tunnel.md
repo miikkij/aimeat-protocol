@@ -70,7 +70,7 @@ Frames (JSON, id-correlated where applicable):
 | `request` | C→S | `{ id, method, path, query?, headers?, body? }` |
 | `response` | S→C | `{ id, status, body }` (AIMEAT envelope) |
 | `deliver` | S→C | `{ id, kind: 'task_assigned'\|'message'\|…, payload }` — **full** object, realtime reverse delivery |
-| `ack` | C→S | `{ id }` — agent acknowledges a `deliver` (lets server mark delivered, drop from backlog) |
+| `ack` | C→S | `{ id }` — agent acknowledges a `deliver` (in-session dedup so the live push isn't repeated; does NOT suppress the backlog — see Phase 2 note) |
 | `backlog` | S→C | on-connect snapshot of queued tasks + pending messages (mirrors `sendMailboxSummary`) |
 | `disconnect` | both | graceful close |
 
@@ -103,9 +103,12 @@ queue on connect, then pushes live).
   `queued` in the store. On reconnect the server sends a `backlog` snapshot
   (queued tasks + pending messages) first, then live-pushes. Dedup by task id
   (connector already tracks seen ids).
-- **Acks (phase 2):** the agent's `ack{id}` lets the server mark the task
-  delivered and stop including it in the next `backlog`. Until acks land, the
-  store remains the source of truth and backlog-on-connect covers gaps.
+- **Acks (phase 2):** the agent's `ack{id}` confirms receipt of a live
+  `deliver` and dedups it within the session — it does **NOT** suppress the
+  backlog. The store is always the source of truth: a task stays in
+  backlog-on-connect until its *status* changes (done/failed), so an agent that
+  acked then crashed mid-work still re-learns the task on reconnect (no-loss).
+  (Corrected during Phase 2 review — see the Phase 2 checklist note.)
 - **CrewAI caveat (synchronous pull tools):** the crew can't be interrupted
   mid-kickoff, so on the local hop push becomes either (a) loopback poll
   answered instantly from a `serve` cache populated by upstream `deliver`

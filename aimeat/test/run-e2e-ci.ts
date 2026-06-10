@@ -195,6 +195,10 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_RL_MEMORY: process.env.AIMEAT_RL_MEMORY ?? '1000',
         AIMEAT_RL_BOARDS: process.env.AIMEAT_RL_BOARDS ?? '1000',
         AIMEAT_DEFAULT_AGENT_SCOPES: process.env.AIMEAT_DEFAULT_AGENT_SCOPES ?? '*',
+        // Connector forward tunnel is opt-in (off by default in prod); enable it
+        // for every e2e run so the tunnel suites work in CI too (the .env.test.*
+        // files are gitignored, so they can't carry this for CI).
+        AIMEAT_CONNECT_TUNNEL_ENABLED: process.env.AIMEAT_CONNECT_TUNNEL_ENABLED ?? 'true',
         AIMEAT_ADMIN_PASSWORD: process.env.AIMEAT_ADMIN_PASSWORD ?? 'TestAdminPw123!',
         AIMEAT_ANONYMOUS: process.env.AIMEAT_ANONYMOUS ?? 'true',
         AIMEAT_FEDERATION_AUTH_POLICY: process.env.AIMEAT_FEDERATION_AUTH_POLICY ?? 'all_peers',
