@@ -99,6 +99,7 @@ import { agentWebhookRouter } from '../routes/agent-webhook.js';
 import { agentTelemetryRouter } from '../routes/agent-telemetry.js';
 import { agentSkillBundleRouter } from '../routes/agent-skill-bundle.js';
 import { agentOnboardingRouter } from '../routes/agent-onboarding.js';
+import { connectTunnelRouter } from '../routes/connect-tunnel.js';
 
 // Services needed during route mounting
 import { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
@@ -467,6 +468,11 @@ export async function mountRoutes(
   startSyncScheduler(config, storage, peers);
 
   app.use(specRouter());
+
+  // Connector forward tunnel — operator-only stats route (WS upgrade is in index.ts)
+  if (config.connectTunnelEnabled) {
+    app.use(connectTunnelRouter(config));
+  }
 
   // Personal node management routes
   if (config.personalNodesEnabled) {

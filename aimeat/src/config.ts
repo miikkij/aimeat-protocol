@@ -236,6 +236,12 @@ export interface AimeatConfig {
   personalNodeOfflineThresholdMs: number;
   personalNodeRequestTimeoutMs: number;
 
+  // Connector Forward Tunnel (agent ⇄ server single persistent WS)
+  connectTunnelEnabled: boolean;
+  connectTunnelHeartbeatIntervalMs: number;
+  connectTunnelOfflineThresholdMs: number;
+  connectTunnelRequestTimeoutMs: number;
+
   // Email / SMTP (Phase 1.1)
   smtpHost: string | null;
   smtpPort: number;
@@ -626,6 +632,13 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     personalNodeHeartbeatIntervalMs: parseInt(process.env.AIMEAT_PERSONAL_HEARTBEAT_MS ?? '30000', 10),
     personalNodeOfflineThresholdMs: parseInt(process.env.AIMEAT_PERSONAL_OFFLINE_MS ?? '300000', 10),
     personalNodeRequestTimeoutMs: parseInt(process.env.AIMEAT_PERSONAL_REQUEST_TIMEOUT_MS ?? '60000', 10),
+
+    // Connector Forward Tunnel — on by default; one persistent WS per agent
+    // identity carries forward API calls + realtime reverse delivery.
+    connectTunnelEnabled: process.env.AIMEAT_CONNECT_TUNNEL_ENABLED !== 'false',
+    connectTunnelHeartbeatIntervalMs: parseInt(process.env.AIMEAT_CONNECT_TUNNEL_HEARTBEAT_MS ?? '30000', 10),
+    connectTunnelOfflineThresholdMs: parseInt(process.env.AIMEAT_CONNECT_TUNNEL_OFFLINE_MS ?? '90000', 10),
+    connectTunnelRequestTimeoutMs: parseInt(process.env.AIMEAT_CONNECT_TUNNEL_REQUEST_TIMEOUT_MS ?? '30000', 10),
     smtpHost: process.env.AIMEAT_SMTP_HOST || null,
     smtpPort: parseInt(process.env.AIMEAT_SMTP_PORT ?? '587', 10),
     smtpUser: process.env.AIMEAT_SMTP_USER ?? null,

@@ -703,7 +703,7 @@ if (subcommand === 'config') {
   if (!config.adminPassword) {
     config.adminPassword = randomBytes(16).toString('base64url');
   }
-  const { app, tunnelManager, realtimeManager, storage } = await createServer(config, { envKeys, fileKeys, cliKeys, fileName });
+  const { app, tunnelManager, connectTunnelManager, realtimeManager, storage } = await createServer(config, { envKeys, fileKeys, cliKeys, fileName });
   const server = app.listen(config.port, () => {
     // ── Node type banner ──
     const bannerLabel =
@@ -740,6 +740,9 @@ if (subcommand === 'config') {
     }
     if (realtimeManager) {
       logger.info(`   📡 Realtime P2P rooms: ws://localhost:${config.port}/v1/realtime/ws`);
+    }
+    if (connectTunnelManager) {
+      logger.info(`   🔗 Connector forward tunnel: ws://localhost:${config.port}/v1/connect/tunnel`);
     }
     logger.info(``);
     logger.info(`   Admin Setup: ${config.baseUrl}/v1/admin/setup`);
@@ -807,13 +810,15 @@ if (subcommand === 'config') {
     }).catch(() => { /* ignore */ });
   });
 
-  // WebSocket upgrade handling for personal node tunnels + realtime P2P
-  if (tunnelManager || realtimeManager) {
+  // WebSocket upgrade handling for personal node tunnels + realtime P2P + connector forward tunnel
+  if (tunnelManager || realtimeManager || connectTunnelManager) {
     const { WebSocketServer } = await import('ws');
     const { verifyJWT } = await import('./auth/jwt.js');
     const { isAnonymousMode } = await import('./auth/middleware.js');
+    const { CONNECT_TUNNEL_PATH } = await import('./services/connect-tunnel.js');
     const tunnelWss = tunnelManager ? new WebSocketServer({ noServer: true }) : null;
     const realtimeWss = realtimeManager ? new WebSocketServer({ noServer: true }) : null;
+    const connectWss = connectTunnelManager ? new WebSocketServer({ noServer: true }) : null;
 
     // Echat anonymous connection rate limiter (10 connections per IP per minute)
     const echatIpCounts = new Map<string, { count: number; resetAt: number }>();
@@ -864,6 +869,48 @@ if (subcommand === 'config') {
 
           tunnelWss.handleUpgrade(request, socket, head, (ws) => {
             tunnelManager.handleConnection(ws, personalNode.nodeId, ownerName, personalNode.agentGaiis);
+          });
+        } catch {
+          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+          socket.destroy();
+        }
+        return;
+      }
+
+      // ── Connector forward tunnel upgrade ──
+      // Agent JWT (roles include 'agent') validated here; identity pinned to the
+      // socket and the same raw token reused as the forward bearer. Express
+      // middleware can't run on the raw upgrade, so verify manually like the
+      // personal tunnel above.
+      if (url.pathname === CONNECT_TUNNEL_PATH && connectTunnelManager && connectWss) {
+        const authHeader = request.headers.authorization;
+        const token = authHeader?.startsWith('Bearer ')
+          ? authHeader.slice(7)
+          : url.searchParams.get('token');
+
+        if (!token) {
+          socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+          socket.destroy();
+          return;
+        }
+
+        try {
+          const payload = await verifyJWT(token);
+          if (!payload || !payload.sub) {
+            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+            socket.destroy();
+            return;
+          }
+          // Only agent identities may hold a forward tunnel. Owner/operator
+          // sessions bypass scopes and are not the connector's transport.
+          if (!payload.roles?.includes('agent')) {
+            socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+            socket.destroy();
+            return;
+          }
+
+          connectWss.handleUpgrade(request, socket, head, (ws) => {
+            connectTunnelManager.handleConnection(ws, payload, token);
           });
         } catch {
           socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
@@ -984,6 +1031,7 @@ if (subcommand === 'config') {
 
     if (tunnelManager) logger.info('WebSocket upgrade handler registered for /v1/personal/tunnel');
     if (realtimeManager) logger.info('WebSocket upgrade handler registered for /v1/realtime/ws');
+    if (connectTunnelManager) logger.info('WebSocket upgrade handler registered for /v1/connect/tunnel');
   }
 
   // Graceful shutdown handler -- flush stats and close connections
@@ -993,6 +1041,7 @@ if (subcommand === 'config') {
     const statsInstance = getStatsInstance();
     if (statsInstance) await statsInstance.shutdown();
     if (tunnelManager) await tunnelManager.shutdown();
+    if (connectTunnelManager) await connectTunnelManager.shutdown();
     if (realtimeManager) await realtimeManager.shutdown();
     server.close(() => {
       logger.info('Server closed');
