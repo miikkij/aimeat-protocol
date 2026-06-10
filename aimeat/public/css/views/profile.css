@@ -4,6 +4,8 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v1.13.0 — 2026-06-10 — Workspace renew, phase 2: .pj-ws-head-actions, review
+ *     .pj-ws-banner, .pj-ws-tab-add (+ reuses .pj-org-tabs underline tabs).
  *   v1.12.0 — 2026-06-10 — Organisms list renew, phase 1: compact .pj-org-row list
  *     (avatar, one-line meta, kebab menu, drag-over state), .pj-menu dropdown,
  *     organism home page (.pj-org-home-head, underline .pj-org-tabs, breadcrumb).
@@ -2382,3 +2384,10 @@
 .pj-org-tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
 .pj-org-tab-count { color: var(--muted); font-size: 0.75rem; margin-left: 0.3rem; }
 .pj-org-boardrow { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+
+/* ── Workspace renew (phase 2): header actions, review banner, add-space tab ── */
+.pj-ws-head-actions { margin-left: auto; display: flex; gap: 0.4rem; align-items: center; }
+.pj-ws-banner { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; border: 1px solid var(--border); border-left: 3px solid var(--warn, var(--accent)); border-radius: 10px; background: var(--card); padding: 0.55rem 0.75rem; margin: 0.6rem 0 0.2rem; }
+.pj-ws-banner-text { flex: 1; min-width: 200px; font-size: 0.85rem; color: var(--text); }
+.pj-ws-banner-sub { display: block; font-size: 0.76rem; color: var(--muted); }
+.pj-ws-tab-add { font-weight: 700; padding: 0.45rem 0.45rem; }
