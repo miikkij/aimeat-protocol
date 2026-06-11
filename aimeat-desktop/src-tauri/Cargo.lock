@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "aimeat-desktop"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "getrandom 0.2.17",
