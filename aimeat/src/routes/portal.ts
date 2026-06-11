@@ -27,6 +27,9 @@
  *     the Terms of Service page. Same template substitution + fail-loud guard as
  *     privacy pages (since the ToS identifies the operator as a party to the agreement,
  *     missing operator config blocks it the same way).
+ *   v1.7.0 — 2026-06-11 — Add /v1/start SPA route (diagnosis/onboarding page) and a
+ *     /start → /v1/start redirect that preserves the ?from= entrance slug used in
+ *     LinkedIn posts.
  */
 import { Router } from 'express';
 import { readFileSync, existsSync } from 'node:fs';
@@ -451,7 +454,14 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/pricing',
     '/v1/how-it-works',
     '/v1/business',
+    '/v1/start',
   ];
+
+  // Short link used in LinkedIn posts — preserve the ?from= entrance slug.
+  router.get('/start', (req, res) => {
+    const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+    res.redirect(301, `/v1/start${qs}`);
+  });
 
   for (const path of spaRoutes) {
     router.get(path, (_req, res) => {

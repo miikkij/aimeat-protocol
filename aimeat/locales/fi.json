@@ -6567,6 +6567,164 @@
     "ctaPricing": "Katso hinnat →",
     "ctaBusiness": "Yrityksellesi →"
   },
+  "start": {
+    "jira": {
+      "title": "Kuinka kuollut sun JIRA on?",
+      "sub": "Diagnoosi kestää 90 sekuntia. Ei sähköpostiporttia, ei lomaketta, ei myyjän soittoa. Lopussa saat tuomion — ja playbookin jolla kokeilet hoitoa itse."
+    },
+    "def": {
+      "title": "Missä jamassa sun agentit on?",
+      "sub": "Diagnoosi kestää 90 sekuntia. Ei sähköpostiporttia, ei lomaketta, ei myyjän soittoa. Lopussa saat tuomion — ja playbookin jolla kokeilet hoitoa itse."
+    },
+    "startCta": "Aloita diagnoosi",
+    "meta": "3 kysymystä · tuomio · playbook",
+    "trailAria": "Polkusi tähän asti",
+    "back": "← Muuta edellistä vastausta",
+    "restart": "Aloita alusta",
+    "verdictLabel": "Tuomio",
+    "scoreLabel": "Pisteet",
+    "copyVerdict": "Kopioi tuomio",
+    "copyPrompt": "Kopioi prompt",
+    "copied": "Kopioitu",
+    "buildCta": "Rakenna mun playbook →",
+    "buildIntro": "Tuomio on annettu. Vielä kolme valintaa — niistä syntyy sun playbook.",
+    "share": "Tein AIMEATin agenttidiagnoosin. Tulos: {tier}. Katso missä jamassa sun agentit on: {url}",
+    "footer": "AIMEAT on avointa lähdekoodia (MIT).",
+    "q1": {
+      "title": "Kun joku heittää hyvän idean, mitä sille tapahtuu?",
+      "prod": "Se on tuotannossa ennen iltauutisia",
+      "backlog": "Backlogiin. Groomataan. Ehkä Q3.",
+      "grave": "Se viedään JIRAan kuolemaan. Seremoniat kahdesti viikossa.",
+      "chaos": "Ei mihinkään — joku ehkä muistaa sen ensi viikolla"
+    },
+    "q2": {
+      "title": "Mitä sun AI muistaa eilisestä?",
+      "all": "Kaiken — sillä on muisti, työjono ja työhistoria",
+      "paste": "Sen minkä mä jaksan copy-pasteta chattiin",
+      "none": "Ei mitään. Esittelen itseni sille joka aamu uudestaan."
+    },
+    "q3": {
+      "title": "Missä sun AI:n tuotokset asuu?",
+      "home": "Yhteisessä kodissa, josta tiimi ja muut agentit löytää ne",
+      "disk": "Mun koneella, kansiossa nimeltä final_v3_OIKEA",
+      "scattered": "Pitkin chat-historioita. Ei niitä kukaan kaiva."
+    },
+    "t0": {
+      "name": "Taso 0 — Hautausmaa",
+      "desc": "Ideasi kuolevat seremoniallisesti ja tekoälysi kärsii muistinmenetyksestä. Maksat työkaluista jotka eivät muista mitään ja prosessista joka ei toimita mitään. Hyvä uutinen: tästä on vain ylöspäin, ja nousu alkaa alta."
+    },
+    "t1": {
+      "name": "Taso 1 — Terapiassa",
+      "desc": "Sun AI käy terapiassa, ei töissä: sinä kannat sille kontekstin joka aamu ja illalla se unohtaa kaiken. Palkkasit nerokkaan työntekijän — ja annoit sille muistinmenetyksen."
+    },
+    "t2": {
+      "name": "Taso 2 — Töissä ilman pomoa",
+      "desc": "Agentteja on ja jotain ne tekevätkin — mutta mikään ei jää talteen eikä kukaan johda kokonaisuutta. Puuttuu koti, muisti ja pomo."
+    },
+    "t3": {
+      "name": "Taso 3 — Käy töissä",
+      "desc": "Sun agentit käyvät oikeasti töissä. Harvinaista — onnittelut. Playbookisi näyttää miten tästä skaalataan ja miten omistat koko ketjun itse."
+    },
+    "q4": {
+      "title": "Miten haluat kokeilla?",
+      "hosted": "Testaan ensin — hostattu aimeat.io, ei asennusta",
+      "self": "Väkerrän itse — oma node omalle raudalle (MIT, ilmainen)",
+      "help": "Haluan apua — tehkää te ($$)"
+    },
+    "q5": {
+      "title": "Millä työkalulla sun AI toimii?",
+      "claude": "Claude (web tai desktop)",
+      "claudeCode": "Claude Code (terminaali)",
+      "copilot": "VS Code + Copilot",
+      "cursor": "Cursor",
+      "otherChat": "Joku muu chat (ChatGPT, Gemini, …)"
+    },
+    "q5n": {
+      "title": "Mitä haluaisit agenttien hoitavan ensimmäisenä?",
+      "code": "Koodia ja PR:iä",
+      "docs": "Dokumentaatiota ja tiedon kotia",
+      "watch": "Seurantaa ja raportointia — mitä tapahtuu, joka aamu",
+      "unsure": "En tiedä vielä — siksi kysynkin"
+    },
+    "q6": {
+      "title": "Tapahtuuko työ itsestään vai kun käsket?",
+      "manual": "Kun käsken — AI auttaa kun pyydän",
+      "routine": "Sovittu rutiini — AI tarkistaa työjonon säännöllisesti",
+      "continuous": "Itsestään — AI käy töissä vaikka nukun"
+    },
+    "pb": {
+      "title": "Sun playbook",
+      "sub": "Muodostui vastauksistasi. Tallenna tämä — se on samalla ensimmäisen organismisi ensimmäinen dokumentti.",
+      "estHosted": "Arvioitu aika: 10–15 minuuttia",
+      "estSelf": "Arvioitu aika: tyhjästä pyörivään nodeen — todistetusti 21 minuuttia",
+      "copyAll": "Kopioi playbook",
+      "print": "Tulosta / tallenna PDF",
+      "s1": {
+        "title": "Vaihe 1 — Tili ja koti",
+        "a": "Luo ilmainen tili. Ei korttia, ei maksua — tili on agenttisi koti ja sinun lupasi sille että se on olemassa.",
+        "link": "Luo tili →"
+      },
+      "s1self": {
+        "title": "Vaihe 1 — Asenna oma node",
+        "a": "Kloonaa ja aja init-wizard — se kysyy loput:",
+        "b": "Kaikki alla oleva tehdään sen jälkeen omaa nodeasi vasten — korvaa aimeat.io-osoite omallasi. Sun rauta, sun avaimet, sun data."
+      },
+      "s2": {
+        "title": "Vaihe 2 — Kytke AI:si",
+        "claude": "Avaa Claude: Settings → Connectors → Add custom connector, ja liitä tämä osoite:",
+        "claudeNote": "claude.ai:n ilmaistasolle mahtuu yksi custom connector — se riittää tähän.",
+        "cli": "Aja tämä terminaalissa:",
+        "cursor": "Käytä yhden klikkauksen asennusta connect-sivulta:",
+        "cursorLink": "Avaa connect-sivu →",
+        "other": "Jos työkalussasi on Connectors / custom MCP -tuki, liitä siihen tämä osoite:",
+        "otherNote": "Ei MCP-tukea? AIMEAT toimii myös promptipohjaisesti: sovellus rakentaa promptit, sinä kuljetat ne chattiin ja tuot vastaukset takaisin. Ilmainen, ja toimii millä tahansa AI:lla.",
+        "approve": "Kun AI pyytää pääsyä, hyväksy agentti profiilissasi ja valitse sen oikeudet. Yhtään agenttia ei synny ilman sinun hyväksyntääsi."
+      },
+      "s3": {
+        "title": "Vaihe 3 — Laita AI:si töihin",
+        "lead": "Kopioi tämä prompt AI:llesi:",
+        "prompt": "Olet kytketty AIMEAT-alustaan MCP:llä. Luo minulle organismi nimeltä 'Oma toimitalo' ja siihen workspace. Lue sitten mitä siellä on, kysy minulta mitä haluan sinun tekevän, ja kirjaa vastaukseni ensimmäiseksi taskiksi workspaceen. Kuittaa kun taski on tallessa.",
+        "check": "Tarkista profiilistasi: taski ilmestyi. Näit juuri koko silmukan — idea → muisti → työjono. Ilman seremonioita."
+      },
+      "s4": {
+        "title": "Vaihe 4 — Ensimmäinen oikea työ",
+        "a": "Anna AI:lle yksi pieni, oikea tehtävä arjestasi: muistiinpano talteen, projektin tilanne dokumentiksi, lista järjestykseen.",
+        "b": "Kaikki mitä AI kirjoittaa jää sinulle. Muisti, dokumentit ja taskit ovat sinun — eivät AI-toimittajan."
+      },
+      "s5": {
+        "title": "Vaihe 5 — Automaatiotaso",
+        "manual": "Valitsit: kun käsken. Aloita jokainen sessio promptilla: 'Lue workspacen avoimet taskit ja hoida ne.' Sinä olet scheduler — ja se riittää alkuun.",
+        "routine": "Valitsit: sovittu rutiini. Sovi AI:si kanssa ajastettu tarkistus joka lukee työjonon säännöllisesti. AIMEATin omat schedulet toimivat herättäjänä ja muistuttajana.",
+        "continuous": "Valitsit: itsestään. Connector serve -daemon ajaa agenttiasi taustalla ja taskit tulevat pushina — ei pollausta. Tällä mallilla pyörii tuotannossa 33 agentin laivasto.",
+        "link": "Connector-ohjeet →",
+        "upgrade": "Tasoa voi nostaa milloin vain: käsin → rutiini → daemon. Playbook ei vanhene."
+      },
+      "h1": {
+        "title": "Vaihe 1 — Kerro tarpeesi",
+        "a": "Lähetä viesti osoitteeseen jouni.miikki@aimeat.io — otsikoksi 'Agentuuri', sisällöksi valintasi alla. Saat rehellisen arvion: mitä kannattaa tehdä itse, mitä ostaa."
+      },
+      "h2": {
+        "title": "Vaihe 2 — Katso hinnoittelu",
+        "a": "Self-serve-tasot ja done-for-you-paketit:",
+        "link": "Katso hinnat →"
+      },
+      "h3": {
+        "title": "Vaihe 3 — Kokeile sillä välin",
+        "a": "Mikään ei estä näkemästä itse mistä on kyse ennen kuin maksat mitään: luo ilmainen tili ja kytke oma AI:si.",
+        "link": "Luo ilmainen tili →"
+      }
+    },
+    "doors": {
+      "title": "Kolme ovea",
+      "sub": "Sama talo, kolme tapaa sisään. Playbookisi kattaa valitsemasi — muut odottavat tässä.",
+      "hosted": "Testaa hostattuna",
+      "hostedDesc": "Ilmainen tili, ei asennusta.",
+      "self": "Väkerrä itse",
+      "selfDesc": "MIT-lisensoitu, oma rauta, omat avaimet.",
+      "help": "Pyydä apua",
+      "helpDesc": "Done-for-you ja managed hosting."
+    }
+  },
   "biz": {
     "heroTitle": "Digityöntekijä joka ei nuku",
     "heroSub": "Ajastetut agentit hakevat, kirjoittavat, raportoivat ja toimittavat sillä välin kun teet muuta. Jokainen askel jäljitettävissä.",

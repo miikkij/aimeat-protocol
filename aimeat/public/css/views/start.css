@@ -1,0 +1,91 @@
+/**
+ * @file start.css
+ * @description Styles for the /v1/start diagnosis page (st- prefix): hero,
+ *   question cards with big option buttons, the answer trail, the verdict card,
+ *   the playbook checklist (code blocks, prompt block, doors) and print rules
+ *   so "Print / save as PDF" emits just the playbook. Theme tokens only.
+ * @version-history
+ *   v1.0.0 — 2026-06-11 — Initial (start diagnosis page).
+ */
+
+.st { max-width: 760px; margin: 0 auto; padding: 2rem 1.25rem 3rem; color: var(--text); }
+
+/* ── Hero (intro phase) ── */
+.st-hero { text-align: center; padding: 3rem 0 1.5rem; }
+.st-h1 { font-size: 2.2rem; font-weight: 800; letter-spacing: -0.5px; margin: 0 0 .7rem; }
+.st-hero-sub { color: var(--text-dim); font-size: 1.08rem; margin: 0 auto 1.6rem; max-width: 560px; }
+.st-start-btn { font-size: 1.05rem; padding: .75rem 2rem; }
+.st-hero-meta { margin-top: 1rem; font-size: .85rem; color: var(--muted); }
+
+/* ── Compact header + trail (after intro) ── */
+.st-header { margin-bottom: 1.5rem; }
+.st-header-title { font-size: 1rem; font-weight: 700; color: var(--text-dim); margin-bottom: .6rem; }
+.st-trail { display: flex; flex-wrap: wrap; gap: .4rem; }
+.st-trail-chip { font-size: .78rem; padding: .25rem .6rem; border: 1px solid var(--border); border-radius: 999px; background: var(--card); color: var(--text-dim); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Question card ── */
+.st-q { padding: .5rem 0; }
+.st-q-title { font-size: 1.45rem; font-weight: 800; margin: 0 0 1.2rem; }
+.st-opts { display: flex; flex-direction: column; gap: .7rem; }
+.st-opt { text-align: left; font-size: 1rem; padding: .9rem 1.1rem; border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--text); cursor: pointer; transition: border-color .15s, transform .05s; font-family: inherit; }
+.st-opt:hover { border-color: var(--accent); }
+.st-opt:active { transform: scale(.99); }
+.st-back { margin-top: 1.2rem; background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: .88rem; padding: .3rem 0; font-family: inherit; }
+.st-back:hover { color: var(--text); text-decoration: underline; }
+
+/* ── Verdict ── */
+.st-verdict { text-align: center; padding: .5rem 0; }
+.st-verdict-label { font-size: .85rem; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: .7rem; }
+.st-verdict-card { border: 2px solid var(--accent); border-radius: 14px; background: var(--card); padding: 1.6rem 1.5rem; margin-bottom: 1.2rem; }
+.st-verdict-name { font-size: 1.7rem; font-weight: 800; margin-bottom: .6rem; }
+.st-verdict-desc { color: var(--text-dim); font-size: 1.02rem; margin: 0 auto .8rem; max-width: 540px; }
+.st-verdict-score { font-size: .85rem; color: var(--muted); }
+.st-verdict-actions { display: flex; gap: .8rem; justify-content: center; flex-wrap: wrap; margin-bottom: .9rem; }
+.st-verdict-note { color: var(--text-dim); font-size: .92rem; margin: 0; }
+
+/* ── Playbook ── */
+.st-pb-head { margin-bottom: 1.5rem; }
+.st-pb-title { font-size: 1.7rem; font-weight: 800; margin: 0 0 .4rem; }
+.st-pb-sub { color: var(--text-dim); margin: 0 0 .5rem; }
+.st-pb-tier { font-size: .9rem; font-weight: 700; color: var(--accent); margin: 0; }
+.st-pb-section { margin-bottom: 1.4rem; border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 1rem 1.2rem; }
+.st-pb-section h3 { margin: 0 0 .7rem; font-size: 1.05rem; }
+.st-pb-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .6rem; }
+.st-pb-item { font-size: .95rem; }
+.st-pb-check { display: flex; gap: .55rem; align-items: flex-start; cursor: pointer; }
+.st-pb-check input { margin-top: .25rem; accent-color: var(--accent); flex: none; }
+.st-pb-check input:checked + span { color: var(--text-dim); text-decoration: line-through; }
+.st-pb-quote, .st-pb-prompt blockquote { margin: .3rem 0; padding: .6rem .9rem; border-left: 3px solid var(--accent); background: var(--bg-surface, var(--bg-dim)); border-radius: 6px; font-size: .92rem; }
+.st-pb-code { display: flex; gap: .6rem; align-items: flex-start; margin-top: .4rem; }
+.st-pb-code pre { flex: 1; margin: 0; padding: .65rem .9rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-surface, var(--bg-dim)); font-size: .82rem; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+.st-pb-copy { flex: none; }
+.st-pb-prompt { margin-top: .4rem; }
+.st-pb-prompt .btn-primary { margin-top: .5rem; }
+.st-pb-link { color: var(--accent); font-weight: 700; text-decoration: none; font-size: .92rem; }
+.st-pb-link:hover { text-decoration: underline; }
+.st-pb-actions { display: flex; gap: .8rem; flex-wrap: wrap; align-items: center; margin: 1.4rem 0; }
+
+/* ── Doors ── */
+.st-doors { margin-top: 2rem; padding-top: 1.4rem; border-top: 1px solid var(--border); }
+.st-doors-title { font-size: 1.15rem; margin: 0 0 .3rem; }
+.st-doors-sub { color: var(--text-dim); font-size: .9rem; margin: 0 0 1rem; }
+.st-doors-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .9rem; }
+@media (max-width: 700px) { .st-doors-grid { grid-template-columns: 1fr; } }
+.st-door { display: flex; flex-direction: column; gap: .3rem; border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 1rem 1.1rem; text-decoration: none; color: var(--text); }
+.st-door:hover { border-color: var(--accent); }
+.st-door-name { font-weight: 700; }
+.st-door-desc { font-size: .85rem; color: var(--text-dim); }
+
+/* ── Footer ── */
+.st-footer { margin-top: 2.5rem; padding-top: 1.2rem; border-top: 1px solid var(--border); text-align: center; font-size: .85rem; color: var(--text-dim); }
+.st-footer a { color: var(--text-dim); }
+.st-footer a:hover { color: var(--text); }
+
+/* ── Print: emit only the playbook ── */
+@media print {
+  body * { visibility: hidden; }
+  .st-print-area, .st-print-area * { visibility: visible; }
+  .st-print-area { position: absolute; top: 0; left: 0; width: 100%; }
+  .st-no-print, .st-no-print * { display: none !important; }
+  .st-pb-section { break-inside: avoid; }
+}

@@ -87,6 +87,7 @@
   <link rel="stylesheet" href="/css/views/admin-agent-integration.css">
   <link rel="stylesheet" href="/css/views/public-knowledge-viewer.css">
   <link rel="stylesheet" href="/css/views/public-workspace-viewer.css">
+  <link rel="stylesheet" href="/css/views/start.css">
   <script type="importmap">
   {
     "imports": {
@@ -263,6 +264,7 @@
       // portal view stays reachable at /v1/classic (prompt boxes / "Build").
       '/v1/portal':      () => import('/views/landing.js' + B),
       '/v1/pricing':     () => import('/views/pricing.js' + B),
+      '/v1/start':       () => import('/views/start.js' + B),
       '/v1/how-it-works': () => import('/views/how-it-works.js' + B),
       '/v1/business':    () => import('/views/business.js' + B),
       '/v1/profile':     () => import('/views/profile.js' + B),
