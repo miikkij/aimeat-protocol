@@ -66,7 +66,7 @@ function Verdict({ tier, score, shareText, onContinue, onBack }) {
           label=${tr('start.copyVerdict', 'Copy the verdict')} copiedLabel=${tr('start.copied', 'Copied')} />
         <button type="button" class="btn-primary" onClick=${onContinue}>${tr('start.buildCta', 'Build my playbook →')}</button>
       </div>
-      <p class="st-verdict-note">${tr('start.buildIntro', 'Verdict delivered. Three more choices — they become your playbook.')}</p>
+      <p class="st-verdict-note">${tr('start.buildIntro', 'Verdict delivered. Three more choices: they become your playbook.')}</p>
       <button type="button" class="st-back" onClick=${onBack}>${tr('start.back', '← Change previous answer')}</button>
     </div>
   `;
@@ -102,14 +102,14 @@ function Playbook({ answers, tier, slug, onBack, onRestart }) {
     [sections],
   );
   const estimate = answers.path === 'hosted' ? tr('start.pb.estHosted', 'Estimated time: 10–15 minutes')
-    : answers.path === 'self' ? tr('start.pb.estSelf', 'Estimated time: from zero to a running node — proven in 21 minutes')
+    : answers.path === 'self' ? tr('start.pb.estSelf', 'Estimated time: from zero to a running node, proven in 21 minutes')
     : null;
 
   return html`
     <div class="st-pb st-print-area">
       <div class="st-pb-head">
         <h2 class="st-pb-title">${tr('start.pb.title', 'Your playbook')}</h2>
-        <p class="st-pb-sub">${tr('start.pb.sub', 'Built from your answers. Save it — it doubles as the first document of your first organism.')}</p>
+        <p class="st-pb-sub">${tr('start.pb.sub', 'Built from your answers. Save it: it doubles as the first document of your first organism.')}</p>
         <p class="st-pb-tier">${trr(tier.name)}${estimate ? ` · ${estimate}` : ''}</p>
       </div>
       ${sections.map((s, i) => html`
@@ -129,7 +129,7 @@ function Playbook({ answers, tier, slug, onBack, onRestart }) {
       </div>
       <div class="st-doors st-no-print">
         <h3 class="st-doors-title">${tr('start.doors.title', 'Three doors')}</h3>
-        <p class="st-doors-sub">${tr('start.doors.sub', 'Same house, three ways in. Your playbook covers the one you picked — the others wait here.')}</p>
+        <p class="st-doors-sub">${tr('start.doors.sub', 'Same house, three ways in. Your playbook covers the one you picked, the others wait here.')}</p>
         <div class="st-doors-grid">
           <a class="st-door" href="/v1/portal">
             <span class="st-door-name">${tr('start.doors.hosted', 'Try it hosted')}</span>

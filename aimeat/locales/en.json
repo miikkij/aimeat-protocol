@@ -6570,11 +6570,11 @@
   "start": {
     "jira": {
       "title": "How dead is your JIRA?",
-      "sub": "The diagnosis takes 90 seconds. No email gate, no form, no sales call. At the end you get a verdict — and a playbook for trying the cure yourself."
+      "sub": "The diagnosis takes 90 seconds. No email gate, no form, no sales call. At the end you get a verdict and a playbook for trying the cure yourself."
     },
     "def": {
       "title": "What shape are your agents in?",
-      "sub": "The diagnosis takes 90 seconds. No email gate, no form, no sales call. At the end you get a verdict — and a playbook for trying the cure yourself."
+      "sub": "The diagnosis takes 90 seconds. No email gate, no form, no sales call. At the end you get a verdict and a playbook for trying the cure yourself."
     },
     "startCta": "Start the diagnosis",
     "meta": "3 questions · a verdict · a playbook",
@@ -6587,7 +6587,7 @@
     "copyPrompt": "Copy the prompt",
     "copied": "Copied",
     "buildCta": "Build my playbook →",
-    "buildIntro": "Verdict delivered. Three more choices — they become your playbook.",
+    "buildIntro": "Verdict delivered. Three more choices: they become your playbook.",
     "share": "I took the AIMEAT agent diagnosis. Result: {tier}. See what shape your agents are in: {url}",
     "footer": "AIMEAT is open source (MIT).",
     "q1": {
@@ -6595,11 +6595,11 @@
       "prod": "It's in production before the evening news",
       "backlog": "Into the backlog. Groomed. Maybe Q3.",
       "grave": "It's taken to JIRA to die. Ceremonies twice a week.",
-      "chaos": "Nowhere — someone might remember it next week"
+      "chaos": "Nowhere. Someone might remember it next week."
     },
     "q2": {
       "title": "What does your AI remember about yesterday?",
-      "all": "Everything — it has a memory, a task queue and a work history",
+      "all": "Everything: it has a memory, a task queue and a work history",
       "paste": "Whatever I bother to copy-paste into the chat",
       "none": "Nothing. I reintroduce myself to it every morning."
     },
@@ -6610,26 +6610,26 @@
       "scattered": "Scattered across chat histories. Nobody digs those up."
     },
     "t0": {
-      "name": "Level 0 — The Graveyard",
+      "name": "Level 0: The Graveyard",
       "desc": "Your ideas die ceremonially and your AI has amnesia. You pay for tools that remember nothing and a process that ships nothing. Good news: the only way is up, and the climb starts below."
     },
     "t1": {
-      "name": "Level 1 — In Therapy",
-      "desc": "Your AI goes to therapy, not to work: you carry its context in every morning and it forgets everything by night. You hired a brilliant employee — and gave it amnesia."
+      "name": "Level 1: In Therapy",
+      "desc": "Your AI goes to therapy, not to work: you carry its context in every morning and it forgets everything by night. You hired a brilliant employee and gave it amnesia."
     },
     "t2": {
-      "name": "Level 2 — Working Without a Manager",
-      "desc": "You have agents and they do things — but nothing sticks and nobody runs the whole. Missing: a home, a memory and a manager."
+      "name": "Level 2: Working Without a Manager",
+      "desc": "You have agents and they do things, but nothing sticks and nobody runs the whole. Missing: a home, a memory and a manager."
     },
     "t3": {
-      "name": "Level 3 — Goes to Work",
-      "desc": "Your agents actually go to work. Rare — congratulations. Your playbook shows how to scale this and own the whole chain yourself."
+      "name": "Level 3: Goes to Work",
+      "desc": "Your agents actually go to work. Rare. Congratulations. Your playbook shows how to scale this and own the whole chain yourself."
     },
     "q4": {
       "title": "How do you want to try this?",
-      "hosted": "Try it first — hosted aimeat.io, nothing to install",
-      "self": "I'll build it myself — my own node on my own hardware (MIT, free)",
-      "help": "I want help — you do it ($$)"
+      "hosted": "Try it first: hosted aimeat.io, nothing to install",
+      "self": "I'll build it myself: my own node on my own hardware (MIT, free)",
+      "help": "I want help: you do it ($$)"
     },
     "q5": {
       "title": "What tool does your AI live in?",
@@ -6643,36 +6643,36 @@
       "title": "What would you want agents to handle first?",
       "code": "Code and PRs",
       "docs": "Documentation and a home for knowledge",
-      "watch": "Monitoring and reporting — what's happening, every morning",
-      "unsure": "I don't know yet — that's why I'm asking"
+      "watch": "Monitoring and reporting: what's happening, every morning",
+      "unsure": "I don't know yet, that's why I'm asking"
     },
     "q6": {
       "title": "Does the work happen by itself, or when you say so?",
-      "manual": "When I say so — the AI helps when I ask",
-      "routine": "An agreed routine — the AI checks the queue regularly",
-      "continuous": "By itself — the AI works while I sleep"
+      "manual": "When I say so: the AI helps when I ask",
+      "routine": "An agreed routine: the AI checks the queue regularly",
+      "continuous": "By itself: the AI works while I sleep"
     },
     "pb": {
       "title": "Your playbook",
-      "sub": "Built from your answers. Save it — it doubles as the first document of your first organism.",
+      "sub": "Built from your answers. Save it: it doubles as the first document of your first organism.",
       "estHosted": "Estimated time: 10–15 minutes",
-      "estSelf": "Estimated time: from zero to a running node — proven in 21 minutes",
+      "estSelf": "Estimated time: from zero to a running node, proven in 21 minutes",
       "copyAll": "Copy playbook",
       "print": "Print / save as PDF",
       "s1": {
-        "title": "Step 1 — An account and a home",
-        "a": "Create a free account. No card, no payment — the account is your agent's home and your permission for it to exist.",
+        "title": "Step 1: An account and a home",
+        "a": "Create a free account. No card, no payment. The account is your agent's home and your permission for it to exist.",
         "link": "Create account →"
       },
       "s1self": {
-        "title": "Step 1 — Install your own node",
-        "a": "Clone and run the init wizard — it asks the rest:",
-        "b": "Everything below is then done against your own node — replace the aimeat.io address with yours. Your hardware, your keys, your data."
+        "title": "Step 1: Install your own node",
+        "a": "Clone and run the init wizard, it asks the rest:",
+        "b": "Everything below is then done against your own node: replace the aimeat.io address with yours. Your hardware, your keys, your data."
       },
       "s2": {
-        "title": "Step 2 — Connect your AI",
+        "title": "Step 2: Connect your AI",
         "claude": "Open Claude: Settings → Connectors → Add custom connector, and paste this address:",
-        "claudeNote": "The free claude.ai tier fits one custom connector — that is enough for this.",
+        "claudeNote": "The free claude.ai tier fits one custom connector, and that is enough for this.",
         "cli": "Run this in a terminal:",
         "cursor": "Use the 1-click install on the connect page:",
         "cursorLink": "Open the connect page →",
@@ -6681,42 +6681,42 @@
         "approve": "When the AI asks for access, approve the agent in your profile and pick its permissions. No agent is ever created without your approval."
       },
       "s3": {
-        "title": "Step 3 — Put your AI to work",
+        "title": "Step 3: Put your AI to work",
         "lead": "Copy this prompt to your AI:",
         "prompt": "You are connected to the AIMEAT platform via MCP. Create an organism for me called 'My Office' with a workspace. Then read what's there, ask me what I want you to do, and record my answer as the first task in the workspace. Confirm when the task is saved.",
-        "check": "Check your profile: the task appeared. You just watched the whole loop — idea → memory → task queue. No ceremonies."
+        "check": "Check your profile: the task appeared. You just watched the whole loop: idea → memory → task queue. No ceremonies."
       },
       "s4": {
-        "title": "Step 4 — The first real job",
+        "title": "Step 4: The first real job",
         "a": "Give the AI one small, real task from your day: file a note, turn a project status into a document, sort a list.",
-        "b": "Everything the AI writes stays with you. The memory, the documents and the tasks are yours — not an AI vendor's."
+        "b": "Everything the AI writes stays with you. The memory, the documents and the tasks are yours, not an AI vendor's."
       },
       "s5": {
-        "title": "Step 5 — Automation level",
-        "manual": "You picked: when I say so. Start every session with the prompt: 'Read the open tasks in the workspace and handle them.' You are the scheduler — and that is enough to start.",
+        "title": "Step 5: Automation level",
+        "manual": "You picked: when I say so. Start every session with the prompt: 'Read the open tasks in the workspace and handle them.' You are the scheduler, and that is enough to start.",
         "routine": "You picked: an agreed routine. Agree a scheduled check with your AI that reads the task queue regularly. AIMEAT's own schedules work as the wake-up call and reminder.",
-        "continuous": "You picked: by itself. A connector serve daemon runs your agent in the background and tasks arrive as pushes — no polling. A fleet of 33 agents runs in production on this model.",
+        "continuous": "You picked: by itself. A connector serve daemon runs your agent in the background and tasks arrive as pushes, no polling. A fleet of 33 agents runs in production on this model.",
         "link": "Connector docs →",
         "upgrade": "You can raise the level any time: by hand → routine → daemon. The playbook does not expire."
       },
       "h1": {
-        "title": "Step 1 — Tell us what you need",
-        "a": "Send a message to jouni.miikki@aimeat.io — subject 'Agents', body: your pick below. You'll get an honest assessment: what to build yourself, what to buy."
+        "title": "Step 1: Tell us what you need",
+        "a": "Send a message to jouni.miikki@aimeat.io. Subject 'Agents', body: your pick below. You'll get an honest assessment: what to build yourself, what to buy."
       },
       "h2": {
-        "title": "Step 2 — See the pricing",
+        "title": "Step 2: See the pricing",
         "a": "Self-serve tiers and done-for-you packages:",
         "link": "See pricing →"
       },
       "h3": {
-        "title": "Step 3 — Try it meanwhile",
+        "title": "Step 3: Try it meanwhile",
         "a": "Nothing stops you from seeing it yourself before paying anything: create a free account and connect your own AI.",
         "link": "Create a free account →"
       }
     },
     "doors": {
       "title": "Three doors",
-      "sub": "Same house, three ways in. Your playbook covers the one you picked — the others wait here.",
+      "sub": "Same house, three ways in. Your playbook covers the one you picked, the others wait here.",
       "hosted": "Try it hosted",
       "hostedDesc": "Free account, nothing to install.",
       "self": "Build it yourself",

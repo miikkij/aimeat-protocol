@@ -25,7 +25,7 @@ const Q_IDEA_FATE = {
     { id: 'prod', score: 3, text: { k: 'start.q1.prod', f: "It's in production before the evening news" } },
     { id: 'backlog', score: 1, text: { k: 'start.q1.backlog', f: 'Into the backlog. Groomed. Maybe Q3.' } },
     { id: 'grave', score: 0, text: { k: 'start.q1.grave', f: "It's taken to JIRA to die. Ceremonies twice a week." } },
-    { id: 'chaos', score: 0, text: { k: 'start.q1.chaos', f: 'Nowhere — someone might remember it next week' } },
+    { id: 'chaos', score: 0, text: { k: 'start.q1.chaos', f: 'Nowhere. Someone might remember it next week.' } },
   ],
 };
 
@@ -33,7 +33,7 @@ const Q_AI_MEMORY = {
   id: 'aiMemory',
   title: { k: 'start.q2.title', f: 'What does your AI remember about yesterday?' },
   options: [
-    { id: 'all', score: 3, text: { k: 'start.q2.all', f: 'Everything — it has a memory, a task queue and a work history' } },
+    { id: 'all', score: 3, text: { k: 'start.q2.all', f: 'Everything: it has a memory, a task queue and a work history' } },
     { id: 'paste', score: 1, text: { k: 'start.q2.paste', f: 'Whatever I bother to copy-paste into the chat' } },
     { id: 'none', score: 0, text: { k: 'start.q2.none', f: 'Nothing. I reintroduce myself to it every morning.' } },
   ],
@@ -57,13 +57,13 @@ export const ENTRANCES = {
   jira: {
     id: 'jira',
     title: { k: 'start.jira.title', f: 'How dead is your JIRA?' },
-    sub: { k: 'start.jira.sub', f: 'The diagnosis takes 90 seconds. No email gate, no form, no sales call. At the end you get a verdict — and a playbook for trying the cure yourself.' },
+    sub: { k: 'start.jira.sub', f: 'The diagnosis takes 90 seconds. No email gate, no form, no sales call. At the end you get a verdict and a playbook for trying the cure yourself.' },
     questions: [Q_IDEA_FATE, Q_AI_MEMORY, Q_AGENT_HOME],
   },
   default: {
     id: 'default',
     title: { k: 'start.def.title', f: 'What shape are your agents in?' },
-    sub: { k: 'start.def.sub', f: 'The diagnosis takes 90 seconds. No email gate, no form, no sales call. At the end you get a verdict — and a playbook for trying the cure yourself.' },
+    sub: { k: 'start.def.sub', f: 'The diagnosis takes 90 seconds. No email gate, no form, no sales call. At the end you get a verdict and a playbook for trying the cure yourself.' },
     questions: [Q_IDEA_FATE, Q_AI_MEMORY, Q_AGENT_HOME],
   },
 };
@@ -75,14 +75,14 @@ export function entranceFor(slug) {
 // ── Verdict tiers (max score 9) ──
 
 export const TIERS = [
-  { id: 't0', min: 0, name: { k: 'start.t0.name', f: 'Level 0 — The Graveyard' },
+  { id: 't0', min: 0, name: { k: 'start.t0.name', f: 'Level 0: The Graveyard' },
     desc: { k: 'start.t0.desc', f: 'Your ideas die ceremonially and your AI has amnesia. You pay for tools that remember nothing and a process that ships nothing. Good news: the only way is up, and the climb starts below.' } },
-  { id: 't1', min: 3, name: { k: 'start.t1.name', f: 'Level 1 — In Therapy' },
-    desc: { k: 'start.t1.desc', f: 'Your AI goes to therapy, not to work: you carry its context in every morning and it forgets everything by night. You hired a brilliant employee — and gave it amnesia.' } },
-  { id: 't2', min: 6, name: { k: 'start.t2.name', f: 'Level 2 — Working Without a Manager' },
-    desc: { k: 'start.t2.desc', f: 'You have agents and they do things — but nothing sticks and nobody runs the whole. Missing: a home, a memory and a manager.' } },
-  { id: 't3', min: 8, name: { k: 'start.t3.name', f: 'Level 3 — Goes to Work' },
-    desc: { k: 'start.t3.desc', f: 'Your agents actually go to work. Rare — congratulations. Your playbook shows how to scale this and own the whole chain yourself.' } },
+  { id: 't1', min: 3, name: { k: 'start.t1.name', f: 'Level 1: In Therapy' },
+    desc: { k: 'start.t1.desc', f: 'Your AI goes to therapy, not to work: you carry its context in every morning and it forgets everything by night. You hired a brilliant employee and gave it amnesia.' } },
+  { id: 't2', min: 6, name: { k: 'start.t2.name', f: 'Level 2: Working Without a Manager' },
+    desc: { k: 'start.t2.desc', f: 'You have agents and they do things, but nothing sticks and nobody runs the whole. Missing: a home, a memory and a manager.' } },
+  { id: 't3', min: 8, name: { k: 'start.t3.name', f: 'Level 3: Goes to Work' },
+    desc: { k: 'start.t3.desc', f: 'Your agents actually go to work. Rare. Congratulations. Your playbook shows how to scale this and own the whole chain yourself.' } },
 ];
 
 export function scoreAnswers(questions, answers) {
@@ -106,9 +106,9 @@ export const Q_PATH = {
   id: 'path',
   title: { k: 'start.q4.title', f: 'How do you want to try this?' },
   options: [
-    { id: 'hosted', text: { k: 'start.q4.hosted', f: 'Try it first — hosted aimeat.io, nothing to install' } },
-    { id: 'self', text: { k: 'start.q4.self', f: "I'll build it myself — my own node on my own hardware (MIT, free)" } },
-    { id: 'help', text: { k: 'start.q4.help', f: 'I want help — you do it ($$)' } },
+    { id: 'hosted', text: { k: 'start.q4.hosted', f: 'Try it first: hosted aimeat.io, nothing to install' } },
+    { id: 'self', text: { k: 'start.q4.self', f: "I'll build it myself: my own node on my own hardware (MIT, free)" } },
+    { id: 'help', text: { k: 'start.q4.help', f: 'I want help: you do it ($$)' } },
   ],
 };
 
@@ -130,8 +130,8 @@ export const Q_NEED = {
   options: [
     { id: 'code', text: { k: 'start.q5n.code', f: 'Code and PRs' } },
     { id: 'docs', text: { k: 'start.q5n.docs', f: 'Documentation and a home for knowledge' } },
-    { id: 'watch', text: { k: 'start.q5n.watch', f: "Monitoring and reporting — what's happening, every morning" } },
-    { id: 'unsure', text: { k: 'start.q5n.unsure', f: "I don't know yet — that's why I'm asking" } },
+    { id: 'watch', text: { k: 'start.q5n.watch', f: "Monitoring and reporting: what's happening, every morning" } },
+    { id: 'unsure', text: { k: 'start.q5n.unsure', f: "I don't know yet, that's why I'm asking" } },
   ],
 };
 
@@ -139,9 +139,9 @@ export const Q_AUTOMATION = {
   id: 'automation',
   title: { k: 'start.q6.title', f: 'Does the work happen by itself, or when you say so?' },
   options: [
-    { id: 'manual', text: { k: 'start.q6.manual', f: 'When I say so — the AI helps when I ask' } },
-    { id: 'routine', text: { k: 'start.q6.routine', f: 'An agreed routine — the AI checks the queue regularly' } },
-    { id: 'continuous', text: { k: 'start.q6.continuous', f: 'By itself — the AI works while I sleep' } },
+    { id: 'manual', text: { k: 'start.q6.manual', f: 'When I say so: the AI helps when I ask' } },
+    { id: 'routine', text: { k: 'start.q6.routine', f: 'An agreed routine: the AI checks the queue regularly' } },
+    { id: 'continuous', text: { k: 'start.q6.continuous', f: 'By itself: the AI works while I sleep' } },
   ],
 };
 
@@ -165,21 +165,21 @@ export function buildPlaybook(answers, mcpUrl) {
   if (path === 'help') {
     const needText = { k: `start.q5n.${need}`, f: '' };
     sections.push({
-      title: { k: 'start.pb.h1.title', f: 'Step 1 — Tell us what you need' },
+      title: { k: 'start.pb.h1.title', f: 'Step 1: Tell us what you need' },
       items: [
-        { text: { k: 'start.pb.h1.a', f: "Send a message to jouni.miikki@aimeat.io — subject 'Agents', body: your pick below. You'll get an honest assessment: what to build yourself, what to buy." } },
+        { text: { k: 'start.pb.h1.a', f: "Send a message to jouni.miikki@aimeat.io. Subject 'Agents', body: your pick below. You'll get an honest assessment: what to build yourself, what to buy." } },
         { text: needText, quote: true },
       ],
     });
     sections.push({
-      title: { k: 'start.pb.h2.title', f: 'Step 2 — See the pricing' },
+      title: { k: 'start.pb.h2.title', f: 'Step 2: See the pricing' },
       items: [
         { text: { k: 'start.pb.h2.a', f: 'Self-serve tiers and done-for-you packages:' },
           link: { href: '/v1/pricing', label: { k: 'start.pb.h2.link', f: 'See pricing →' } } },
       ],
     });
     sections.push({
-      title: { k: 'start.pb.h3.title', f: 'Step 3 — Try it meanwhile' },
+      title: { k: 'start.pb.h3.title', f: 'Step 3: Try it meanwhile' },
       items: [
         { text: { k: 'start.pb.h3.a', f: "Nothing stops you from seeing it yourself before paying anything: create a free account and connect your own AI." },
           link: { href: '/v1/portal', label: { k: 'start.pb.h3.link', f: 'Create a free account →' } } },
@@ -191,28 +191,28 @@ export function buildPlaybook(answers, mcpUrl) {
   // Step 1 — account / own node
   if (path === 'self') {
     sections.push({
-      title: { k: 'start.pb.s1self.title', f: 'Step 1 — Install your own node' },
+      title: { k: 'start.pb.s1self.title', f: 'Step 1: Install your own node' },
       items: [
-        { text: { k: 'start.pb.s1self.a', f: 'Clone and run the init wizard — it asks the rest:' },
+        { text: { k: 'start.pb.s1self.a', f: 'Clone and run the init wizard, it asks the rest:' },
           code: 'git clone https://github.com/miikkij/aimeat-protocol\ncd aimeat-protocol\npnpm install && pnpm aimeat init' },
-        { text: { k: 'start.pb.s1self.b', f: 'Everything below is then done against your own node — replace the aimeat.io address with yours. Your hardware, your keys, your data.' } },
+        { text: { k: 'start.pb.s1self.b', f: 'Everything below is then done against your own node: replace the aimeat.io address with yours. Your hardware, your keys, your data.' } },
       ],
     });
   } else {
     sections.push({
-      title: { k: 'start.pb.s1.title', f: 'Step 1 — An account and a home' },
+      title: { k: 'start.pb.s1.title', f: 'Step 1: An account and a home' },
       items: [
-        { text: { k: 'start.pb.s1.a', f: "Create a free account. No card, no payment — the account is your agent's home and your permission for it to exist." },
+        { text: { k: 'start.pb.s1.a', f: "Create a free account. No card, no payment. The account is your agent's home and your permission for it to exist." },
           link: { href: '/v1/portal', label: { k: 'start.pb.s1.link', f: 'Create account →' } } },
       ],
     });
   }
 
   // Step 2 — connect the AI (per tool, commands verbatim from connect.html)
-  const connect = { title: { k: 'start.pb.s2.title', f: 'Step 2 — Connect your AI' }, items: [] };
+  const connect = { title: { k: 'start.pb.s2.title', f: 'Step 2: Connect your AI' }, items: [] };
   if (tool === 'claude') {
     connect.items.push({ text: { k: 'start.pb.s2.claude', f: 'Open Claude: Settings → Connectors → Add custom connector, and paste this address:' }, code: mcpUrl });
-    connect.items.push({ text: { k: 'start.pb.s2.claudeNote', f: 'The free claude.ai tier fits one custom connector — that is enough for this.' } });
+    connect.items.push({ text: { k: 'start.pb.s2.claudeNote', f: 'The free claude.ai tier fits one custom connector, and that is enough for this.' } });
   } else if (tool === 'claudeCode') {
     connect.items.push({ text: { k: 'start.pb.s2.cli', f: 'Run this in a terminal:' }, code: `claude mcp add aimeat --transport http ${mcpUrl}` });
   } else if (tool === 'copilot') {
@@ -229,32 +229,32 @@ export function buildPlaybook(answers, mcpUrl) {
 
   // Step 3 — startup prompt (the conversion: the AI creates the first organism)
   sections.push({
-    title: { k: 'start.pb.s3.title', f: 'Step 3 — Put your AI to work' },
+    title: { k: 'start.pb.s3.title', f: 'Step 3: Put your AI to work' },
     items: [
       { text: { k: 'start.pb.s3.lead', f: 'Copy this prompt to your AI:' },
         prompt: { k: 'start.pb.s3.prompt', f: "You are connected to the AIMEAT platform via MCP. Create an organism for me called 'My Office' with a workspace. Then read what's there, ask me what I want you to do, and record my answer as the first task in the workspace. Confirm when the task is saved." } },
-      { text: { k: 'start.pb.s3.check', f: 'Check your profile: the task appeared. You just watched the whole loop — idea → memory → task queue. No ceremonies.' } },
+      { text: { k: 'start.pb.s3.check', f: 'Check your profile: the task appeared. You just watched the whole loop: idea → memory → task queue. No ceremonies.' } },
     ],
   });
 
   // Step 4 — first real job
   sections.push({
-    title: { k: 'start.pb.s4.title', f: 'Step 4 — The first real job' },
+    title: { k: 'start.pb.s4.title', f: 'Step 4: The first real job' },
     items: [
       { text: { k: 'start.pb.s4.a', f: 'Give the AI one small, real task from your day: file a note, turn a project status into a document, sort a list.' } },
-      { text: { k: 'start.pb.s4.b', f: 'Everything the AI writes stays with you. The memory, the documents and the tasks are yours — not an AI vendor’s.' } },
+      { text: { k: 'start.pb.s4.b', f: 'Everything the AI writes stays with you. The memory, the documents and the tasks are yours, not an AI vendor’s.' } },
     ],
   });
 
   // Step 5 — automation level
-  const auto = { title: { k: 'start.pb.s5.title', f: 'Step 5 — Automation level' }, items: [] };
+  const auto = { title: { k: 'start.pb.s5.title', f: 'Step 5: Automation level' }, items: [] };
   if (automation === 'continuous') {
-    auto.items.push({ text: { k: 'start.pb.s5.continuous', f: 'You picked: by itself. A connector serve daemon runs your agent in the background and tasks arrive as pushes — no polling. A fleet of 33 agents runs in production on this model.' },
+    auto.items.push({ text: { k: 'start.pb.s5.continuous', f: 'You picked: by itself. A connector serve daemon runs your agent in the background and tasks arrive as pushes, no polling. A fleet of 33 agents runs in production on this model.' },
       link: { href: '/v1/connect', label: { k: 'start.pb.s5.link', f: 'Connector docs →' } } });
   } else if (automation === 'routine') {
     auto.items.push({ text: { k: 'start.pb.s5.routine', f: 'You picked: an agreed routine. Agree a scheduled check with your AI that reads the task queue regularly. AIMEAT’s own schedules work as the wake-up call and reminder.' } });
   } else {
-    auto.items.push({ text: { k: 'start.pb.s5.manual', f: "You picked: when I say so. Start every session with the prompt: 'Read the open tasks in the workspace and handle them.' You are the scheduler — and that is enough to start." } });
+    auto.items.push({ text: { k: 'start.pb.s5.manual', f: "You picked: when I say so. Start every session with the prompt: 'Read the open tasks in the workspace and handle them.' You are the scheduler, and that is enough to start." } });
   }
   if (automation !== 'continuous') {
     auto.items.push({ text: { k: 'start.pb.s5.upgrade', f: 'You can raise the level any time: by hand → routine → daemon. The playbook does not expire.' } });
