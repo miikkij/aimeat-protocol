@@ -2,14 +2,19 @@
  * @file sse.ts
  * @description Server-Sent Events transport for live UI updates. Exposes
  *   POST /v1/events/ticket (exchange JWT for a single-use connection ticket)
- *   and GET /v1/events?ticket=... (the event stream). Forwards every
- *   event-bus change to connected clients as an unnamed `data:` SSE message.
+ *   and GET /v1/events?ticket=... (the event stream). Forwards event-bus
+ *   changes to connected clients as a `data:` SSE message, COALESCED to at most
+ *   one signal per second per client (the browser ignores the payload and just
+ *   debounces a re-fetch, so a per-write firehose was wasted bandwidth).
  * @structure sseRouter(config, storage) -> Router
  * @usage app.use(sseRouter(config, storage)); client: EventSource('/v1/events?ticket=...')
  * @version-history
  *   v1.1.0 -- 2026-05-31 -- Flush after each write; SSE is now excluded from the
  *     global compression middleware (which buffered the stream and silently
  *     dropped all live updates).
+ *   v1.2.0 -- 2026-06-11 -- Coalesce change events per client (leading-edge
+ *     throttle, <=1/s): a busy node fired tens of changes/sec to every open
+ *     browser; the client only debounces a re-fetch, so collapse the burst.
  */
 import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
@@ -87,16 +92,38 @@ export function sseRouter(config: AimeatConfig, _storage: Storage): Router {
       flush();
     }, 30_000);
 
-    // Forward change events to this client
-    const handler = (evt: ChangeEvent) => {
-      res.write(`data: ${JSON.stringify(evt)}\n\n`);
+    // Forward change events to this client — COALESCED. The node fires a change
+    // event on virtually every write (~400 emit sites); a busy node (e.g. a
+    // many-agent fleet) is tens of changes/sec, and EVERY connected browser got
+    // EVERY one. The client ignores the payload and just debounces a re-fetch
+    // (public/lib/live-updates.js), so blasting one message per change was pure
+    // waste. Throttle to at most one signal per COALESCE_MS per client: the
+    // first change in a quiet window goes out immediately (low latency), the
+    // rest of the burst collapse into one trailing flush. Same UX, a fraction of
+    // the bytes. The payload is a fixed marker since no consumer reads it.
+    const COALESCE_MS = 1000;
+    let lastSent = 0;
+    let trailingTimer: ReturnType<typeof setTimeout> | null = null;
+    const sendChange = (): void => {
+      lastSent = Date.now();
+      res.write('data: {"t":"change"}\n\n');
       flush();
+    };
+    const handler = (_evt: ChangeEvent): void => {
+      if (trailingTimer) return; // a flush is already scheduled; it covers this event
+      const since = Date.now() - lastSent;
+      if (since >= COALESCE_MS) {
+        sendChange(); // leading edge — first change in a quiet window goes now
+      } else {
+        trailingTimer = setTimeout(() => { trailingTimer = null; sendChange(); }, COALESCE_MS - since);
+      }
     };
     onChangeEvent(handler);
 
     // Cleanup on disconnect
     req.on('close', () => {
       clearInterval(keepalive);
+      if (trailingTimer) clearTimeout(trailingTimer);
       offChangeEvent(handler);
     });
   });
