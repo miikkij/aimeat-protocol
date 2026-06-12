@@ -6,6 +6,26 @@ All notable changes to AIMEAT are documented in this file.
 
 ### Added
 
+- **App-catalog backup: export all + selective import.** A "💾 Backup" menu in
+  the app catalog exports the owner's whole catalog as one ZIP
+  (`GET /v1/apps/backup`, streamed, `aimeat-apps-{owner}-{date}.zip`): EVERY
+  app with EVERY stored version (`apps/{filename}/app.json` +
+  `versions/v{N}.html`) plus the owner's cortex extensions
+  (`ext.json` + `manifest.yaml` + `libs/`), described by a top-level
+  `backup-manifest.json` — openable with any ZIP tool, no AIMEAT needed.
+  Import is two-phase: `POST /v1/apps/backup/inspect` parses the upload
+  (safeUnzip hardening — zip-slip, zip-bomb, format allowlist; rejected ZIPs
+  are quarantined as security incidents) and reports contents + conflicts
+  WITHOUT writing; the catalog then shows a selection table (checkbox per app,
+  expandable per-version selection, select all/none, live summary) and
+  `POST /v1/apps/backup/restore` writes only the selected items with an
+  explicit per-app conflict mode — skip (default), append versions, or import
+  as copy (`-restored` suffix). Nothing is ever silently overwritten; restore
+  always writes into the caller's account (cross-node transfer works — the
+  backup's owner may differ); access codes/tokens are never exported. E2E
+  suite `e2e-apps-backup` (20 tests, green on SQLite + MongoDB) covers the
+  full round-trip with content-hash comparison, selective restore, all
+  conflict modes, hostile-ZIP rejection and cross-owner import.
 - **Subdomain routing (operator-only).** A subdomain (`<sub>.aimeat.io`) can be
   mapped to a published app — the app's HTML is served at the subdomain root
   (same content as `/v1/apps/{owner}/{file}?mode=inline`, no portal chrome) —

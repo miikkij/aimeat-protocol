@@ -2103,6 +2103,80 @@ components:
         changedAt: { type: string, format: date-time }
         changeNote: { type: string }
 
+    AppsBackupInspection:
+      type: object
+      properties:
+        backup_token: { type: string }
+        expires_in_seconds: { type: integer }
+        source:
+          type: object
+          properties:
+            nodeId: { type: string }
+            owner: { type: string }
+        exported_at: { type: string }
+        apps:
+          type: array
+          items:
+            type: object
+            properties:
+              filename: { type: string }
+              name: { type: string }
+              exists: { type: boolean }
+              existing_versions: { type: integer }
+              versions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    version: { type: integer }
+                    size: { type: integer }
+                    created_at: { type: string }
+                    semver: { type: string }
+        extensions:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              exists: { type: boolean }
+        totals:
+          type: object
+          properties:
+            apps: { type: integer }
+            versions: { type: integer }
+            extensions: { type: integer }
+
+    AppsBackupRestoreSummary:
+      type: object
+      properties:
+        apps_created: { type: array, items: { type: string } }
+        apps_appended: { type: array, items: { type: string } }
+        apps_copied:
+          type: array
+          items:
+            type: object
+            properties:
+              from: { type: string }
+              to: { type: string }
+        apps_skipped: { type: array, items: { type: string } }
+        versions_restored: { type: integer }
+        extensions_created: { type: array, items: { type: string } }
+        extensions_copied:
+          type: array
+          items:
+            type: object
+            properties:
+              from: { type: string }
+              to: { type: string }
+        extensions_skipped: { type: array, items: { type: string } }
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              item: { type: string }
+              message: { type: string }
+
     SubdomainSiteRecord:
       type: object
       properties:
@@ -8953,6 +9027,161 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /v1/apps/backup:
+    get:
+      operationId: exportAppsBackup
+      summary: Export the caller's whole app catalog as a ZIP backup
+      description: >
+        Streams a ZIP containing EVERY app published by the calling owner with
+        EVERY stored version (apps/{filename}/app.json + versions/v{N}.html)
+        plus the owner's installed cortex extensions
+        (extensions/{name}/ext.json + manifest.yaml + libs/), described by a
+        top-level backup-manifest.json. Access codes, tokens and keys are never
+        included. Owner role required.
+      tags: [App Store]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: ZIP archive (Content-Disposition attachment)
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/apps/backup/inspect:
+    post:
+      operationId: inspectAppsBackup
+      summary: Inspect an uploaded backup ZIP without writing anything
+      description: >
+        Parses the backup (zip-slip / zip-bomb hardened), reports its contents
+        and which apps/extensions would conflict with the caller's existing
+        data, and returns a short-lived backup_token so the restore call does
+        not need to re-upload the ZIP. Send the ZIP as the raw request body
+        (Content-Type application/zip) or as JSON { zip_base64 }.
+      tags: [App Store]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/zip:
+            schema:
+              type: string
+              format: binary
+          application/json:
+            schema:
+              type: object
+              properties:
+                zip_base64:
+                  type: string
+      responses:
+        '200':
+          description: Backup contents and conflict report
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AppsBackupInspection'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: ZIP rejected by safety checks and quarantined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/apps/backup/restore:
+    post:
+      operationId: restoreAppsBackup
+      summary: Selectively restore apps/extensions from an inspected backup
+      description: >
+        Restores only the selected apps (optionally a subset of versions) and
+        extensions into the CALLER's account. Per-app conflict mode when the
+        app already exists — skip (default), append (backup versions stack on
+        top as new versions) or copy (new filename with a -restored suffix).
+        Nothing is ever silently overwritten.
+      tags: [App Store]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                backup_token:
+                  type: string
+                  description: Token from /v1/apps/backup/inspect (30 min TTL)
+                zip_base64:
+                  type: string
+                  description: Fallback when the token has expired
+                selections:
+                  type: array
+                  items:
+                    type: object
+                    required: [filename]
+                    properties:
+                      filename: { type: string }
+                      versions:
+                        type: array
+                        items: { type: integer }
+                        description: Default — all versions in the backup
+                      conflict:
+                        type: string
+                        enum: [skip, append, copy]
+                        default: skip
+                extensions:
+                  type: array
+                  items:
+                    type: object
+                    required: [name]
+                    properties:
+                      name: { type: string }
+                      conflict:
+                        type: string
+                        enum: [skip, copy]
+                        default: skip
+      responses:
+        '200':
+          description: Restore summary (created / appended / copied / skipped / errors)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AppsBackupRestoreSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: ZIP rejected by safety checks and quarantined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
 
   # ── MCP (Model Context Protocol) ───────────────────────────
 
