@@ -12,6 +12,8 @@
  * @version-history
  *   v1.0.0 — 2026-06-11 — Initial: jira entrance end-to-end (diagnose → verdict
  *     → build → playbook), print/copy support, three doors at the end.
+ *   v1.0.1 — 2026-06-12 — Add body.st-active marker while mounted so start.css print
+ *     rules apply only on this view (they blanked printing everywhere else).
  */
 import { h } from 'preact';
 import { useState, useEffect, useMemo } from 'preact/hooks';
@@ -158,6 +160,14 @@ export default function StartView() {
   const [answers, setAnswers] = useState({});
 
   useEffect(() => { window.scrollTo(0, 0); }, [phase, idx]);
+
+  // Mark the body while this view is mounted so start.css's print rules (which blank everything
+  // except .st-print-area) apply only on this page — view CSS is preloaded globally in spa.html,
+  // so unscoped print rules would blank printing on every other view.
+  useEffect(() => {
+    document.body.classList.add('st-active');
+    return () => document.body.classList.remove('st-active');
+  }, []);
 
   const diagQs = entrance.questions;
   const buildQs = useMemo(() => buildQuestionsFor(answers), [answers]);

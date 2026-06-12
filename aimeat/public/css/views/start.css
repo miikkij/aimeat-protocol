@@ -5,7 +5,10 @@
  *   the playbook checklist (code blocks, prompt block, doors) and print rules
  *   so "Print / save as PDF" emits just the playbook. Theme tokens only.
  * @version-history
- *   v1.0.0 — 2026-06-11 — Initial (start diagnosis page).
+ *   v1.0.0 — 2026-06-11 — Initial: jira entrance styles + print rules.
+ *   v1.0.1 — 2026-06-12 — Scope print rules to body.st-active: view CSS is global (spa.html
+ *     preload), so the unscoped `body * { visibility: hidden }` blanked printing on every view
+ *     (e.g. the public workspace viewer printed 14 empty pages).
  */
 
 .st { max-width: 760px; margin: 0 auto; padding: 2rem 1.25rem 3rem; color: var(--text); }
@@ -81,11 +84,13 @@
 .st-footer a { color: var(--text-dim); }
 .st-footer a:hover { color: var(--text); }
 
-/* ── Print: emit only the playbook ── */
+/* ── Print: emit only the playbook ──
+ * Scoped to body.st-active (added by start.js while the view is mounted): view CSS is preloaded
+ * globally in spa.html, so an unscoped `body *` rule here would blank printing on every view. */
 @media print {
-  body * { visibility: hidden; }
-  .st-print-area, .st-print-area * { visibility: visible; }
-  .st-print-area { position: absolute; top: 0; left: 0; width: 100%; }
-  .st-no-print, .st-no-print * { display: none !important; }
-  .st-pb-section { break-inside: avoid; }
+  body.st-active * { visibility: hidden; }
+  body.st-active .st-print-area, body.st-active .st-print-area * { visibility: visible; }
+  body.st-active .st-print-area { position: absolute; top: 0; left: 0; width: 100%; }
+  body.st-active .st-no-print, body.st-active .st-no-print * { display: none !important; }
+  body.st-active .st-pb-section { break-inside: avoid; }
 }
