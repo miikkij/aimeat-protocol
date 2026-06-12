@@ -165,6 +165,11 @@ export function instancesRouter(config: AimeatConfig, storage: Storage): Router 
     // ── Real install: register each component ────────────────────────
     const registeredComponents: { componentId: string; type: PackageComponentType; registeredAs: string }[] = [];
     const registrationErrors: { componentId: string; error: string }[] = [];
+    // Maps populated as cortex/extension components register; passed to the
+    // app case in registerComponent so it can rewrite hardcoded URLs like
+    // /v1/cortex/comicland-v2/libs/...  →  /v1/cortex/<registeredAs>/libs/...
+    const cortexNameMap = new Map<string, string>();
+    const extensionNameMap = new Map<string, string>();
 
     for (const compId of componentOrder) {
       const comp = componentMap.get(compId)!;
@@ -183,6 +188,7 @@ export function instancesRouter(config: AimeatConfig, storage: Storage): Router 
         packageCategory: pkg.category,
         packageTags: pkg.tags,
         packageDescription: pkg.description,
+        urlRewrites: { cortexNames: cortexNameMap, extensionNames: extensionNameMap },
       });
 
       if (result.success) {
@@ -191,6 +197,14 @@ export function instancesRouter(config: AimeatConfig, storage: Storage): Router 
           type: comp.type,
           registeredAs,
         });
+
+        // Capture the source-manifest short name so any later 'app' component
+        // can have its hardcoded /v1/cortex/<name>/ and /v1/ext/<name>/ URLs
+        // rewritten to the per-instance registeredAs.
+        if (result.originalShortName) {
+          if (comp.type === 'cortex') cortexNameMap.set(result.originalShortName, registeredAs);
+          else if (comp.type === 'extension') extensionNameMap.set(result.originalShortName, registeredAs);
+        }
 
         // Recompute originalHash from native storage to ensure status comparisons match
         const nativeContent = await fetchComponentContent(storage, comp.type, registeredAs, ownerGaii);
