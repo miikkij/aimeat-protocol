@@ -34,6 +34,8 @@ import type {
   PackageInstanceRecord,
   InstalledComponent,
   PackageComponentType,
+  ScheduledJobRecord,
+  ExtensionRecord,
 } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -212,16 +214,45 @@ export function instancesRouter(
           else if (comp.type === 'extension') extensionNameMap.set(result.originalShortName, registeredAs);
         }
 
-        // Fire @activate-cron jobs the same way the manual activate route does
-        // (extensions.ts line ~694). Without this, the extension is marked
-        // active but its init action never runs — so seed memory keys
-        // (config.app, config.genres, prompts, etc.) are missing and the app
-        // 404s on every first read.
+        // Register scheduled jobs AND fire @activate-cron jobs the same way
+        // the manual /v1/extensions/:name/activate route does
+        // (extensions.ts ~668–698). Two steps:
+        //   1) Insert each manifest __schedules entry into the scheduled_jobs
+        //      table so the scheduler (and runActivateJobs lookup) can find it
+        //   2) runActivateJobs(name) — fires every job whose cron === '@activate'
+        //
+        // Without step 1, runActivateJobs sees an empty list and bails — which
+        // is exactly the bug that left Comicland's init action unrun on package
+        // install, leaving config.app / config.genres / config.init missing in
+        // ext-namespace memory.
         if (comp.type === 'extension' && scheduler) {
           try {
+            const ext = await storage.getExtension(registeredAs) as ExtensionRecord | null;
+            const schedules = (ext?.config?.__schedules as Array<Record<string, unknown>> | undefined) ?? [];
+            for (const sched of schedules) {
+              const jobId = `ext:${registeredAs}:${sched.id as string}`;
+              const existing = await storage.getScheduledJob(jobId);
+              if (!existing) {
+                const jobRecord: ScheduledJobRecord = {
+                  id: jobId,
+                  name: (sched.description as string) ?? `${registeredAs}/${sched.id as string}`,
+                  type: 'extension',
+                  extensionName: registeredAs,
+                  actionId: sched.action as string,
+                  cron: sched.cron as string,
+                  enabled: true,
+                  input: (sched.input as Record<string, unknown>) ?? undefined,
+                  createdBy: req.auth!.sub,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                };
+                await storage.createScheduledJob(jobRecord);
+                scheduler.addJob(jobRecord);
+              }
+            }
             await scheduler.runActivateJobs(registeredAs);
           } catch (err) {
-            logger.error(`Failed to run @activate jobs for ${registeredAs}`, { error: String(err) });
+            logger.error(`Failed to register or run @activate jobs for ${registeredAs}`, { error: String(err) });
           }
         }
 

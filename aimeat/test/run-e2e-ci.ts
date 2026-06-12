@@ -49,6 +49,7 @@ const ALL_SUITES = [
     'test/e2e-mcp-organisms.ts',
     'test/e2e-mcp-workspaces.ts',
     'test/e2e-organism-workspace-access.ts',
+    'test/e2e-agent-offers.ts',
     'test/e2e-organism-membership.ts',
     'test/e2e-organism-search.ts',
     'test/e2e-organism-comments.ts',

@@ -58,6 +58,7 @@ import SecurityTab from './profile/security-tab.js';
 import EmailTab from './profile/email-tab.js';
 import KnowledgeTab from './profile/knowledge-tab.js';
 import OrganismsTab from './profile/organisms-tab.js';
+import OffersTab from './profile/offers-tab.js';
 import NotificationsTab from './profile/notifications-tab.js';
 import GeneratorTab from './profile/generator-tab.js';
 import FoundryTab from './profile/foundry-tab.js';
@@ -72,6 +73,7 @@ import SchedulerTab from './profile/scheduler-tab.js';
 const TABS = [
   { id: 'portfolio',     key: 'portfolio.tabLabel',          component: PortfolioTab,      minTier: 'active' },
   { id: 'agents',        key: 'profile.tabs.agents',         component: AgentsTab,         minTier: 'active' },
+  { id: 'offers',        key: 'profile.tabs.offers',         component: OffersTab,         minTier: 'active' },
   { id: 'scheduler',     key: 'profile.tabs.scheduler',      component: SchedulerTab,      minTier: 'active' },
   { id: 'chatsessions',  key: 'profile.tabs.chatSessions',   component: ChatSessionsTab,   minTier: 'active' },
   { id: 'mcp',           key: 'profile.tabs.mcp',            component: McpTab,            minTier: 'active' },
