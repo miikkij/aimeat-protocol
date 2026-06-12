@@ -148,6 +148,15 @@
  *     auto-activates; §7c) — the agent joins/provisions its own spaces and the task completion is
  *     the ack. An agent already working in THIS workspace (per the participants data) shows a
  *     "✓ active here" badge instead of Adopt. Convention agreed with the crewaimeat side 2026-06-10.
+ *   v1.28.0 — 2026-06-12 — Overview landing tab: the whole workspace on one vertical scroll — a
+ *     "what happened here" strip (last 8 activity events, humanized + clickable) above every
+ *     manifest space stacked in order (records: compact rows max 5 + "Show all N →"; documents:
+ *     title + first-line preview; empty space: one row with an Add button; non-memory backing:
+ *     one notice row). Overview is ALWAYS the landing view (tab persistence dropped — it hid
+ *     content). Mobile: sections collapse as accordions and documents expand INLINE (view+edit,
+ *     no popout window). Per-tab unseen badges (gray, never red) from localStorage seen marks vs
+ *     activity events — cleared when the tab opens, surviving across sessions; first visit seeds
+ *     a baseline so history is never "unseen"; own non-agent edits don't count.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
@@ -2077,11 +2086,10 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
     } catch (e) { /* noop */ }
     return null;
   });
-  // Active tab — one tab per manifest space + fixed Review/Activity/People. Persisted per workspace
-  // so an F5 (or back-and-forth) returns to the same tab. '' = not chosen yet → first space.
-  const tabStoreKey = 'aimeat.ws.' + orgId + '.' + wsId + '.tab';
-  const [tab, setTabState] = useState(() => { try { return sessionStorage.getItem(tabStoreKey) || ''; } catch (e) { return ''; } });
-  const setTab = (id) => { setTabState(id); try { sessionStorage.setItem(tabStoreKey, id); } catch (e) { /* noop */ } };
+  // Active tab — Overview first (ALWAYS the landing view: the whole workspace on one scroll),
+  // then one tab per manifest space + fixed Sources/Share/Review/Activity/People. Deliberately
+  // NOT persisted: opening a workspace must show the overview, not whatever tab was last open.
+  const [tab, setTab] = useState('overview');
   const [sectionsByType, setSectionsByType] = useState({});  // { typeName: [{id,name,parentId,documents:[docId]}] }
   const [editingSec, setEditingSec] = useState(null);        // section id currently being renamed inline
   const draggedDoc = useRef(null);                            // { type, id } of the doc being dragged
@@ -2095,16 +2103,50 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
   const [showFlow, setShowFlow] = useState(true);             // the manifest-defined edit-flow chart (first item)
   const [share, setShare] = useState(null);                   // { public, spaces, docs } — lazy-loaded when Settings opens
   const [shareBusy, setShareBusy] = useState(false);
+  const [wsEvents, setWsEvents] = useState([]);               // activity events — Overview strip + per-tab unseen badges
+  const [ovOpen, setOvOpen] = useState({});                   // Overview accordion: { spaceName: bool } (mobile starts collapsed)
+  const [ovDoc, setOvDoc] = useState(null);                   // Overview inline document (mobile): { type, id, mode }
+
+  // ── Unseen-change tracking: per-tab "seen" marks in localStorage (they survive sessions).
+  // A tab's badge counts items changed since the tab was last opened; opening it (or changes
+  // landing while it is open) marks it seen. First-ever visit seeds a baseline at "now", so
+  // history never shows as unseen. Neutral gray badges only — red is reserved for errors.
+  const seenKey = 'aimeat.ws.' + orgId + '.' + wsId + '.seen';
+  const [seen, setSeen] = useState(() => {
+    try { const raw = localStorage.getItem(seenKey); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+  });
+  const markSeen = useCallback((tabId) => setSeen(prev => {
+    const next = { ...(prev || {}), [tabId]: new Date().toISOString() };
+    try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch (e) { /* noop */ }
+    return next;
+  }), [seenKey]);
+  // Items (not raw events) changed since the tab's seen mark. The user's own non-agent edits
+  // are not news to them, so they never count. Event actors come as the BARE owner name from
+  // the version history, so compare against both the bare name and the full GHII.
+  const unseenOf = useCallback((tabId) => {
+    if (!seen) return 0;
+    const base = seen[tabId] || seen.__base;
+    if (!base) return 0;
+    const me = getGhii();
+    const meBare = String(me || '').split('@')[0];
+    const isOwn = (e) => !e.agent && me && (e.actor === me || e.actor === meBare);
+    const match = tabId.startsWith('space:') ? (e) => e.type === tabId.slice(6)
+      : (tabId === 'activity' ? () => true : () => false);
+    const evs = wsEvents.filter(e => (e.at || '') > base && match(e) && !isOwn(e));
+    return new Set(evs.map(e => (e.type || '') + ':' + (e.instance || ''))).size;
+  }, [seen, wsEvents]);
 
   const load = useCallback(async () => {
     const w = await orgService.getWorkspace(orgId, wsId).catch(() => null);
     if (w && w.manifest) {
-      const [ap, cfg, secs] = await Promise.all([
+      const [ap, cfg, secs, act] = await Promise.all([
         orgService.listApprovals(orgId, 'pending').catch(() => []),
         orgService.getConfig(orgId).catch(() => ({})),
         orgService.getAllSections(orgId, wsId).catch(() => ({})),
+        orgService.getWorkspaceActivity(orgId, wsId).catch(() => ({ events: [] })),
       ]);
       setApprovals(ap); setGateOn(!!(cfg?.gates?.publish?.enabled)); setSectionsByType(secs);
+      setWsEvents(act?.events || []);
     }
     setWs(w && w.manifest ? w : null);
   }, [orgId, wsId]);
@@ -2125,6 +2167,22 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, []);
+
+  // First-ever visit: seed the seen baseline once the workspace has loaded — no badges for history.
+  useEffect(() => {
+    if (seen !== null || ws === undefined) return;
+    const next = { __base: new Date().toISOString() };
+    try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch (e) { /* noop */ }
+    setSeen(next);
+  }, [seen, ws]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Changes landing on the tab the user is LOOKING at are seen immediately — otherwise a draft
+  // saved while you're on its space tab would raise that tab's own badge.
+  useEffect(() => {
+    if (!seen || showSettings) return;
+    const cur = tab || 'overview';
+    if (unseenOf(cur) > 0) markSeen(cur);
+  }, [wsEvents, tab, showSettings, seen, unseenOf, markSeen]);
 
   const setup = useCallback(async () => {
     setBusy(true);
@@ -2538,6 +2596,23 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
   const isDocSpace = orgService.isDocSpace;
   const draftsFor = (name) => (ws.drafts && ws.drafts[name]) || [];
   const objectsFor = (name) => (ws.objects && ws.objects[name]) || [];
+  // One entry per id, draft (working copy) taking precedence over its published version —
+  // the index must show the draft badge even when a published `.latest` also exists.
+  const mergedDocs = (ot) => {
+    const byId = new Map();
+    for (const d of objectsFor(ot.name)) byId.set(d.id, { ...d, _draft: false, _published: true });
+    for (const d of draftsFor(ot.name)) {
+      const pub = byId.get(d.id);   // kept on `_pub` for the view's Draft/Published toggle
+      byId.set(d.id, { ...d, _draft: true, _published: !!pub, _pub: pub || null });
+    }
+    return [...byId.values()];
+  };
+  const mergedRecords = (ot) => {
+    const byId = new Map();
+    for (const o of objectsFor(ot.name)) byId.set(o.id, { ...o, _draft: false });
+    for (const d of draftsFor(ot.name)) byId.set(d.id, { ...d, _draft: true });
+    return [...byId.values()];
+  };
 
   // ── Public sharing (meta.share) — what published document-space pages anyone can read via the
   // no-login viewer. Independent of the access roles. Lazy-loaded the first time the panel opens. ──
@@ -2572,17 +2647,7 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
   // tied to a section's documents[] (or unsorted). Edits to the tree persist immediately.
   const renderDocSpace = (ot) => {
     const secs = sectionsByType[ot.name] || [];
-    // One entry per document id. A draft (working copy) takes precedence over its published
-    // version, so the index shows the draft badge even when a published `.latest` also exists.
-    // (Without this, keying docById by id let the published entry overwrite the draft and the
-    // "draft" badge silently disappeared whenever a doc had both versions.)
-    const byId = new Map();
-    for (const d of objectsFor(ot.name)) byId.set(d.id, { ...d, _draft: false, _published: true });
-    for (const d of draftsFor(ot.name)) {
-      const pub = byId.get(d.id);   // the published version, if one exists — kept on `_pub` for the view's Draft/Published toggle
-      byId.set(d.id, { ...d, _draft: true, _published: !!pub, _pub: pub || null });
-    }
-    const docs = [...byId.values()];
+    const docs = mergedDocs(ot);
     const docById = {}; docs.forEach(d => { docById[d.id] = d; });
     const used = new Set(); secs.forEach(s => (s.documents || []).forEach(id => used.add(id)));
     const unsorted = docs.filter(d => !used.has(d.id));
@@ -2737,12 +2802,13 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
     { id: 'activity', label: t('organisms.activity') || 'Activity', count: null },
     { id: 'people', label: t('organisms.tabPeople') || 'People', count: null },
   ];
-  const wsTabs = [...spaceTabs, ...fixedTabs];
+  const wsTabs = [{ id: 'overview', label: t('organisms.tabOverview') || 'Overview', count: null }, ...spaceTabs, ...fixedTabs];
   // Settings REPLACES the tab content: while it is open no tab is active (the previous state — a
   // highlighted tab above settings content — lied about what the user was looking at).
-  const activeTab = showSettings ? '' : (wsTabs.some(tb => tb.id === tab) ? tab : (spaceTabs[0]?.id || 'review'));
+  const activeTab = showSettings ? '' : (wsTabs.some(tb => tb.id === tab) ? tab : 'overview');
   const activeSpace = activeTab.startsWith('space:') ? allTypes.find(ot => ot.name === activeTab.slice(6)) : null;
-  const pickTab = (id) => guardWsDirty(() => { setShowSettings(false); setTab(id); });
+  // Opening a tab clears its unseen badge (the seen mark persists across sessions).
+  const pickTab = (id) => guardWsDirty(() => { setShowSettings(false); setTab(id); markSeen(id); });
 
   // Menu items are VERBS (a click copies to the clipboard; the toast confirms). The contract-agent
   // builder is a different category from the two copy actions, so a divider separates it.
@@ -2752,6 +2818,123 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
     { divider: true },
     { label: t('organisms.contractPrompt') || 'Create contract agent', icon: '⚙️', onClick: copyContractPrompt },
   ];
+
+  // ── Overview (landing tab): the whole workspace on one vertical scroll — a "what happened
+  // here" strip from the activity feed, then every manifest space as its own stacked section.
+  // Tabs stay for focused work; this answers "where is everything and what changed".
+  const isMobileView = () => window.matchMedia('(max-width: 640px)').matches;
+  const shortActor = (a) => String(a || '').split('@')[0];
+  // First non-empty markdown line as a gray preview (heading/list markers stripped).
+  const firstLine = (md) => {
+    const line = String(md || '').split('\n').map(s => s.trim()).find(s => s && !s.startsWith('```'));
+    return line ? line.replace(/^#{1,6}\s+/, '').replace(/^[-*>]\s+/, '').slice(0, 120) : '';
+  };
+  // Strip event → jump straight to the changed item in its space tab.
+  const gotoEvent = (e) => {
+    const target = allTypes.find(o => o.name === e.type);
+    if (!target || !orgService.isMemorySpace(target)) { pickTab('activity'); return; }
+    if (isDocSpace(target)) setActiveDoc({ type: target.name, mode: 'view', page: { id: e.instance } });
+    else setExpandedRec(s => ({ ...s, [target.name + ':' + e.instance]: true }));
+    pickTab('space:' + target.name);
+  };
+  const openOvRec = (ot, r) => { setExpandedRec(s => ({ ...s, [ot.name + ':' + r.id]: true })); pickTab('space:' + ot.name); };
+  // A document opens in its space tab on desktop; on mobile it expands INLINE right here —
+  // view and edit both — so no window juggling is ever needed on a phone.
+  const openOvDoc = (ot, d) => {
+    if (isMobileView()) setOvDoc(v => (v && v.type === ot.name && v.id === d.id) ? null : { type: ot.name, id: d.id, mode: 'view' });
+    else { setActiveDoc({ type: ot.name, mode: 'view', page: { id: d.id } }); pickTab('space:' + ot.name); }
+  };
+  const ovAddNew = (ot, docMode) => {
+    if (docMode) setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' } });
+    else startAdd(ot);
+    pickTab('space:' + ot.name);
+  };
+
+  const renderOvDocInline = (ot, d) => ovDoc.mode === 'edit'
+    ? html`<div class="pj-ov-doc-inline"><${DocumentEditor} key=${'oved-' + d.id} orgId=${orgId} page=${d} busy=${busy}
+        onSave=${(p) => { savePage(ot, p); setOvDoc({ type: ot.name, id: d.id, mode: 'view' }); }}
+        onCancel=${() => setOvDoc({ type: ot.name, id: d.id, mode: 'view' })} /></div>`
+    : html`<div class="pj-ov-doc-inline"><${DocumentView} key=${'ovv-' + d.id} page=${d} busy=${busy}
+        onEdit=${() => setOvDoc({ type: ot.name, id: d.id, mode: 'edit' })}
+        onPublish=${() => publish(ot, d.id)}
+        onWikiLink=${(content) => {
+          const title = String(content).split('#')[0].trim();
+          const targetDoc = title && mergedDocs(ot).find(x => (x.title || '').toLowerCase() === title.toLowerCase());
+          if (targetDoc) setOvDoc({ type: ot.name, id: targetDoc.id, mode: 'view' });
+        }} /></div>`;
+
+  const renderOvSection = (ot) => {
+    const memory = orgService.isMemorySpace(ot);
+    const docMode = memory && isDocSpace(ot);
+    const items = memory ? (docMode ? mergedDocs(ot) : mergedRecords(ot)) : [];
+    const label = cap(wsT('type.' + ot.name) || ot.name);
+    // A space the manifest declares but memory doesn't back → one notice row, never hidden.
+    if (!memory) return html`
+      <div class="pj-ov-row" key=${ot.name}>
+        <button class="pj-ov-name pj-ov-name-link" onClick=${() => pickTab('space:' + ot.name)}>${label}</button>
+        <span class="badge badge-warn">${String(ot.backing)}</span>
+      </div>`;
+    // Empty space → a single compact row (name + none + add), not an empty box.
+    if (items.length === 0) return html`
+      <div class="pj-ov-row" key=${ot.name}>
+        <span class="pj-ov-name">${label}</span>
+        <span class="pj-muted">${t('organisms.noneYet') || 'none yet'}</span>
+        <button class="btn-ghost btn-sm" onClick=${() => ovAddNew(ot, docMode)}>${'+ '}${docMode ? (t('organisms.newPage') || 'New document') : (t('organisms.addDraft') || 'Add draft')}</button>
+      </div>`;
+    const open = ovOpen[ot.name] ?? !isMobileView();
+    const shown = items.slice(0, 5);
+    return html`
+      <div class="pj-ov-sec" key=${ot.name}>
+        <div class="pj-ov-sec-head" onClick=${() => setOvOpen(s => ({ ...s, [ot.name]: !open }))}>
+          <span class="pj-ov-chevron">${open ? '▾' : '▸'}</span>
+          <span class="pj-ov-name">${label}</span>
+          <span class="pj-org-tab-count">${items.length}</span>
+          ${docMode ? html`<span class="pj-doc-tag">${t('organisms.docs') || 'docs'}</span>` : null}
+          <span class="pj-ov-spacer"></span>
+          <button class="btn-ghost btn-sm" onClick=${(ev) => { ev.stopPropagation(); ovAddNew(ot, docMode); }}>${'+ '}${docMode ? (t('organisms.newPage') || 'New document') : (t('organisms.addDraft') || 'Add draft')}</button>
+        </div>
+        ${open ? html`
+          <div class="pj-ov-items">
+            ${shown.map(d => docMode ? html`
+              <div class="pj-ov-doc" key=${d.id}>
+                <button class="pj-ov-item" onClick=${() => openOvDoc(ot, d)}>
+                  ${d._draft ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span>` : null}
+                  <span class="pj-ov-item-title">${d.title || d.id}</span>
+                  <span class="pj-ov-preview">${firstLine(d.markdown)}</span>
+                </button>
+                ${ovDoc && ovDoc.type === ot.name && ovDoc.id === d.id ? renderOvDocInline(ot, d) : null}
+              </div>` : html`
+              <button class="pj-ov-item" key=${d.id} onClick=${() => openOvRec(ot, d)}>
+                ${d._draft ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span>` : null}
+                <span class="pj-ov-item-title">${String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.summary || d.id || '')}</span>
+                ${d.status ? html`<span class="badge badge-info">${String(d.status)}</span>` : null}
+              </button>`)}
+            ${items.length > 5 ? html`
+              <button class="pj-ov-more" onClick=${() => pickTab('space:' + ot.name)}>${(t('organisms.ovShowAll') || 'Show all {n} →').replace('{n}', String(items.length))}</button>` : null}
+          </div>` : null}
+      </div>`;
+  };
+
+  const renderOverview = () => {
+    const recent = wsEvents.slice(0, 8);
+    return html`
+      <div class="pj-ov">
+        ${recent.length > 0 ? html`
+          <div class="pj-ov-strip">
+            <div class="pj-ov-strip-title">${t('organisms.ovRecent') || 'What happened here'}</div>
+            ${recent.map((e, i) => html`
+              <button class="pj-ov-event" key=${i} onClick=${() => gotoEvent(e)}>
+                <span class="pj-act-dot ${e.action}"></span>
+                <span class="pj-ov-event-who">${shortActor(e.actor)}${e.agent ? html` <span class="pj-act-agent" title=${t('organisms.viaAgent') || 'via this agent'}>🤖 ${e.agent}</span>` : null}</span>
+                <span class="pj-ov-event-act">${e.action === 'publish' ? (t('organisms.publishedVerb') || 'published') : (t('organisms.editedVerb') || 'edited')}</span>
+                <span class="pj-ov-event-what">${e.mode === 'document' ? '📄' : '🗂'} ${(wsT('type.' + e.type) || e.type)}${' / '}${e.instance}</span>
+                <span class="pj-ov-event-time">${relTime(e.at)}</span>
+              </button>`)}
+          </div>` : null}
+        ${allTypes.map(renderOvSection)}
+        ${allTypes.length === 0 ? html`<${EmptyState} text=${t('organisms.noneYet') || 'none yet'} />` : null}
+      </div>`;
+  };
 
   return html`
     <div class="pj-ws">
@@ -2778,11 +2961,15 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
         </div>` : null}
 
       <div class="pj-org-tabs" role="tablist">
-        ${wsTabs.map(tb => html`
+        ${wsTabs.map(tb => {
+          const u = activeTab === tb.id ? 0 : unseenOf(tb.id);
+          return html`
           <button class="pj-org-tab ${activeTab === tb.id ? 'active' : ''}" role="tab" aria-selected=${activeTab === tb.id} key=${tb.id}
             onClick=${() => pickTab(tb.id)}>
             ${(tb.label)}${tb.count !== null && tb.count !== undefined ? html`<span class="pj-org-tab-count">${tb.count}</span>` : null}
-          </button>`)}
+            ${u > 0 ? html`<span class="pj-org-tab-unseen" title=${t('organisms.unseenHint') || 'Changed since your last visit'}>${u}</span>` : null}
+          </button>`;
+        })}
         <button class="pj-org-tab pj-ws-tab-add" title=${t('organisms.addDocSpaceTitle') || 'Add a document space'} onClick=${() => guardWsDirty(() => { setShowSettings(false); setShowSpaces(s => !s); })}>+</button>
       </div>
 
@@ -2864,6 +3051,8 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
           </div>
         </div>
       `}
+
+      ${activeTab === 'overview' ? renderOverview() : null}
 
       ${activeSpace
         ? (!orgService.isMemorySpace(activeSpace)

@@ -2386,6 +2386,44 @@
 .md-img { max-width: 100%; height: auto; border-radius: 6px; }
 @media (max-width: 640px) { .pj-docspace { flex-direction: column; } .pj-doc-index { flex: none; width: 100%; } }
 
+/* ───────────────── Workspace Overview tab ─────────────────
+ * The landing view: a "what happened here" strip + every space stacked on one vertical scroll.
+ * Sections collapse as accordions on mobile; documents expand inline there (no popups). */
+.pj-ov { display: flex; flex-direction: column; gap: 0.6rem; }
+.pj-ov-strip { border: 1px solid var(--border); border-radius: 10px; padding: 0.5rem 0.6rem; background: var(--card); }
+.pj-ov-strip-title { font-weight: 600; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.3rem; }
+.pj-ov-event { display: flex; align-items: center; gap: 0.45rem; width: 100%; padding: 0.2rem 0.25rem; border: 0; background: none; border-radius: 6px; cursor: pointer; text-align: left; font-size: 0.85rem; color: var(--text); }
+.pj-ov-event:hover { background: var(--bg-dim); }
+.pj-ov-event-who { font-weight: 600; flex-shrink: 0; }
+.pj-ov-event-act { color: var(--muted); flex-shrink: 0; }
+.pj-ov-event-what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.pj-ov-event-time { margin-left: auto; color: var(--muted); font-size: 0.75rem; flex-shrink: 0; }
+.pj-ov-sec { border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
+.pj-ov-sec-head { display: flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.6rem; cursor: pointer; }
+.pj-ov-chevron { color: var(--muted); font-size: 0.8rem; width: 1em; flex-shrink: 0; }
+.pj-ov-name { font-weight: 600; color: var(--text); font-size: 0.95rem; }
+.pj-ov-name-link { border: 0; background: none; cursor: pointer; padding: 0; text-align: left; }
+.pj-ov-spacer { flex: 1; }
+.pj-ov-items { display: flex; flex-direction: column; gap: 0.1rem; padding: 0 0.6rem 0.5rem 1.5rem; }
+.pj-ov-row { display: flex; align-items: center; gap: 0.5rem; border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.35rem 0.6rem; }
+.pj-ov-row .pj-ov-name { flex-shrink: 0; }
+.pj-ov-item { display: flex; align-items: center; gap: 0.45rem; width: 100%; padding: 0.25rem 0.3rem; border: 0; background: none; border-radius: 6px; cursor: pointer; text-align: left; font-size: 0.88rem; color: var(--text); min-width: 0; }
+.pj-ov-item:hover { background: var(--bg-dim); }
+.pj-ov-item-title { flex-shrink: 0; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pj-ov-preview { color: var(--muted); font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.pj-ov-more { border: 0; background: none; color: var(--accent); cursor: pointer; text-align: left; padding: 0.25rem 0.3rem; font-size: 0.85rem; }
+.pj-ov-more:hover { text-decoration: underline; }
+.pj-ov-doc-inline { border-top: 1px solid var(--border); margin: 0.2rem 0 0.4rem; padding-top: 0.4rem; }
+/* Unseen-changes badge on workspace tabs — neutral gray pill (red is reserved for errors). */
+.pj-org-tab-unseen { background: var(--bg-dim); color: var(--muted); border: 1px solid var(--border); border-radius: 999px; font-size: 0.68rem; padding: 0 0.35rem; margin-left: 0.3rem; line-height: 1.3; }
+@media (max-width: 640px) {
+  .pj-ov-event { flex-wrap: wrap; }                                       /* "what/where" wraps to its own line — never hidden */
+  .pj-ov-event-what { flex-basis: 100%; padding-left: calc(9px + 0.45rem); }
+  .pj-ov-item { flex-wrap: wrap; }
+  .pj-ov-item-title { max-width: none; flex-shrink: 1; white-space: normal; }
+  .pj-ov-preview { flex-basis: 100%; }
+}
+
 /* ───────────────── Organisms list renew (phase 1) ─────────────────
  * Compact list rows + kebab menu + organism home page. All colors via theme tokens. */
 
