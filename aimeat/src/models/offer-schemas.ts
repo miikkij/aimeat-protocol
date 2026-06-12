@@ -1,0 +1,110 @@
+/**
+ * @file offer-schemas.ts
+ * @description Zod validation for an agent's published "offers" — the human-readable face of the
+ *   agent's machine contract ("here's what I can do for you, with an example, the outcome, and a
+ *   sample deliverable"). An agent publishes `agents.{name}.offers`; the profile Offers surface renders
+ *   it (goal-first search → Ask), and the mesh consumes the same record for delegate selection. This is
+ *   the single shared contract — keep it in sync with docs/plans/2026-06-12-agent-offers-surface.md §4.
+ * @structure
+ *   - OfferSchema — one offer (ask/example/cost/latency/verification/dataHandling/requirements/
+ *     consequences/availability/deliverable)
+ *   - OffersDocSchema — the published document { version, updatedAt, offers: Offer[] }
+ * @usage import { OffersDocSchema } from '../models/offer-schemas.js';
+ *   const parsed = OffersDocSchema.safeParse(req.body);
+ * @version-history
+ *   v1.0.0 -- 2026-06-12 -- Initial: offer descriptor (Agent Offers surface v1).
+ *   v2.0.0 -- 2026-06-12 -- Billable offers: price + visibility + callable binding. An offer is a
+ *     billable capability — free for the owner's own use, debited (morsels owner→provider) when a
+ *     different owner invokes it. `visibility:'public'` lists it in the catalogue; `callable` binds it
+ *     to a machine-invocable action/webhook. All v2 fields optional → v1 docs validate unchanged.
+ *     See docs/plans/2026-06-12-services-to-offers-migration.md.
+ */
+import { z } from 'zod';
+
+// ── v2: billable / listable / callable ──────────────────────────────────────
+// Concrete morsel price for cross-owner invocation. `null`/absent = not for sale (self-use only).
+// Distinct from the qualitative `cost` ('free'|'cheap'|'expensive') hint, which stays for goal-search.
+const PriceSchema = z.object({
+  morsels: z.number().int().nonnegative(),
+  unit: z.enum(['per-call', 'per-result', 'subscription']).optional(), // default per-call at the billing site
+}).nullable();
+
+// Machine-invocable binding. Present ⇒ a non-owner can invoke and be billed; absent ⇒ human-prompt/task offer.
+const CallableSchema = z.object({
+  action_id: z.string().max(200).optional(),   // an existing capability/action id that backs this offer
+  webhook_url: z.string().max(500).optional(), // or a direct webhook
+  input_schema: z.record(z.string(), z.unknown()).optional(),
+  output_schema: z.record(z.string(), z.unknown()).optional(),
+}).nullable();
+
+const RequirementSchema = z.object({
+  need: z.string().min(1).max(200),
+  fix: z.string().max(64).optional(),          // a one-click fix chip id (e.g. 'join', 'adopt-contract')
+  instruction: z.string().max(500).optional(), // guidance text when no one-click fix exists (machine-local preconditions)
+});
+
+const ConsequenceSchema = z.object({
+  // Only what SURVIVES the task — persistent / approval / external / host. In-process fan-out is not here.
+  type: z.enum([
+    'creates-agent', 'creates-schedule', 'mutates-host', 'publishes-public',
+    'external-send', 'mutates-live-app', 'delegates-to-agent',
+  ]),
+  persistent: z.boolean().optional(),
+  requiresApproval: z.boolean().optional(),
+  dynamic: z.boolean().optional(),          // the real chain renders live from task events, not the manifest
+  ratesThirdParties: z.boolean().optional(), // a coordinator may write ratings to the agents it delegates to
+  allowlist: z.array(z.string().max(200)).max(50).optional(), // for external-send
+  note: z.string().max(300).optional(),
+});
+
+const AvailabilitySchema = z.object({
+  boundToLastSeen: z.boolean().optional(),
+  // string (human label) OR { scheduleId, human } so Run can trigger the schedule.
+  scheduleBorn: z.union([
+    z.string().max(200),
+    z.object({ scheduleId: z.string().max(100), human: z.string().max(200).optional() }),
+  ]).nullable().optional(),
+}).optional();
+
+const DeliverableSchema = z.object({
+  format: z.enum(['document', 'record', 'board-post', 'file', 'app']),
+  location: z.object({
+    space: z.string().max(200).optional(),
+    key: z.string().max(400).optional(),
+    url: z.string().max(500).optional(),
+    visibility: z.string().max(40).optional(),
+  }).optional(),
+  // A REAL excerpt from the last successful deliverable, or the literal "untested". Object | string.
+  sample: z.union([z.string().max(8000), z.record(z.string(), z.unknown()), z.literal('untested')]).optional(),
+});
+
+export const OfferSchema = z.object({
+  id: z.string().min(1).max(100),
+  title: z.string().min(1).max(120),
+  ask: z.string().min(1).max(500),                         // plain-language invite incl. negative scope
+  example: z.string().max(500).optional(),
+  tags: z.array(z.string().max(64)).max(20).optional(),    // reuse existing machine tags for goal-search
+  cost: z.enum(['free', 'cheap', 'expensive']).optional(),
+  latency: z.enum(['seconds', 'minutes', 'long-running']).optional(),
+  repeatability: z.enum(['idempotent', 'accumulative', 'destructive']).optional(),
+  verification: z.enum(['deterministic', 'gated', 'ungated']).optional(), // deterministic = no LLM in I/O path (strongest)
+  dataHandling: z.enum(['local-only', 'llm-provider', 'third-party']).optional(), // where input data flows
+  availability: AvailabilitySchema,
+  requirements: z.array(RequirementSchema).max(20).optional(),
+  inputs: z.array(z.object({ name: z.string().max(80), required: z.boolean().optional() })).max(20).optional(),
+  consequences: z.array(ConsequenceSchema).max(20).optional(),
+  deliverable: DeliverableSchema,
+  // ── v2 billable/listable/callable (all optional; default to private, not-for-sale, human-driven) ──
+  price: PriceSchema.optional(),
+  visibility: z.enum(['private', 'unlisted', 'public']).optional(), // default 'private' at read/list time
+  callable: CallableSchema.optional(),
+});
+
+export const OffersDocSchema = z.object({
+  version: z.number().int().nonnegative().optional(),
+  updatedAt: z.string().max(40).optional(),
+  offers: z.array(OfferSchema).max(40),
+});
+
+export type Offer = z.infer<typeof OfferSchema>;
+export type OffersDoc = z.infer<typeof OffersDocSchema>;

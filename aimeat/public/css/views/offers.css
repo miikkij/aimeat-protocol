@@ -1,0 +1,75 @@
+/**
+ * @file offers.css
+ * @description Styles for the Agent Offers "Do" surface (offers-tab.js). Prefix `of-`. Uses theme.css
+ *   variables only (no hardcoded colors / no rgba(255,255,255)).
+ * @version-history
+ *   v1.0.0 -- 2026-06-12 -- Initial: Do feed cards, badges, offer detail, provenance footer.
+ *   v1.1.0 -- 2026-06-12 -- Billable offers: price/visibility badges + the Selling editor row.
+ */
+.of { max-width: 920px; }
+.of-search { width: 100%; margin: 0.5rem 0 0.75rem; }
+
+.of-card { border: 1px solid var(--border); background: var(--card); border-radius: 8px; padding: 0.6rem 0.75rem; margin: 0.5rem 0; }
+.of-card--open { border-color: var(--accent, var(--border)); }
+.of-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; cursor: pointer; }
+.of-card-title { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.of-offer-title { font-weight: 600; }
+.of-agent { font-size: 0.82rem; color: var(--muted); display: inline-flex; align-items: center; gap: 0.35rem; }
+.of-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.of-dot--on { background: var(--success, #10b981); }
+.of-dot--off { background: var(--border); }
+
+.of-badges { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: flex-start; }
+.of-badge { font-size: 0.72rem; padding: 0.05rem 0.4rem; border-radius: 10px; background: var(--bg-dim); color: var(--muted); border: 1px solid var(--border); white-space: nowrap; }
+.of-badge--ver { color: var(--success, #10b981); }
+.of-badge--data { color: var(--info, var(--accent)); }
+.of-badge--cost { color: var(--warn, #f59e0b); }
+.of-badge--untested { color: var(--muted); font-style: italic; }
+
+.of-ask { margin: 0.35rem 0 0; color: var(--text); }
+.of-detail { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.4rem; }
+.of-example { font-size: 0.88rem; color: var(--muted); }
+.of-label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
+.of-mini { font-size: 0.8rem; color: var(--muted); }
+
+.of-req-list, .of-conseq-list { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.of-req { font-size: 0.82rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; padding: 0.1rem 0.45rem; }
+.of-fix { color: var(--accent); font-weight: 600; }
+.of-conseq { font-size: 0.78rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.1rem 0.45rem; }
+.of-conseq--warn { color: var(--warn, #f59e0b); border-color: var(--warn, #f59e0b); }
+
+.of-sample { font-size: 0.8rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.6rem; white-space: pre-wrap; overflow-x: auto; max-height: 200px; margin: 0; }
+.of-input { width: 100%; resize: vertical; }
+
+.of-result { margin-top: 0.4rem; padding: 0.5rem 0.6rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; }
+.of-result-msg { font-weight: 600; }
+.of-prov { font-size: 0.78rem; color: var(--muted); margin-top: 0.25rem; }
+
+/* Do/Inbox segment */
+.of-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin: 0.25rem 0 0.75rem; }
+.of-seg-btn { background: var(--card); color: var(--muted); border: none; padding: 0.3rem 0.9rem; cursor: pointer; font-weight: 600; }
+.of-seg-btn--on { background: var(--accent, var(--bg-dim)); color: var(--accent-contrast, var(--text)); }
+
+/* Inbox status badges */
+.of-status { font-size: 0.72rem; padding: 0.05rem 0.5rem; border-radius: 10px; border: 1px solid var(--border); white-space: nowrap; }
+.of-st--done { color: var(--success, #10b981); border-color: var(--success, #10b981); }
+.of-st--failed { color: var(--danger, #ef4444); border-color: var(--danger, #ef4444); }
+.of-st--active { color: var(--info, var(--accent)); }
+.of-st--queued { color: var(--muted); }
+.of-fail { color: var(--danger, #ef4444); font-size: 0.88rem; }
+
+/* Rating */
+.of-rate { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-top: 0.3rem; }
+.of-stars { display: inline-flex; }
+.of-star { background: none; border: none; cursor: pointer; font-size: 1.1rem; line-height: 1; color: var(--muted); padding: 0 0.05rem; }
+.of-star--on { color: var(--warn, #f59e0b); }
+.of-rate-note { flex: 1 1 200px; min-width: 140px; }
+
+/* Billing badges + the Selling editor */
+.of-badge--vis { color: var(--accent); border-color: var(--accent); }
+.of-badge--price { color: var(--warn, #f59e0b); font-weight: 600; }
+.of-bill { margin-top: 0.4rem; padding-top: 0.5rem; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: 0.35rem; }
+.of-bill-row { align-items: center; gap: 0.4rem; }
+.of-bill-vis { flex: 0 1 180px; }
+.of-bill-price { flex: 0 1 110px; }
+.of-warn { color: var(--warn, #f59e0b); }

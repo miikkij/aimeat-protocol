@@ -6,6 +6,24 @@ All notable changes to AIMEAT are documented in this file.
 
 ### Added
 
+- **Billable offers (Offers v2).** An offer is now a *billable capability*: free
+  when you drive your own agent, debited (morsels owner→provider) when a
+  different owner invokes it. The offer descriptor gains three optional fields —
+  `price` (`{ morsels, unit }`), `visibility` (`private`|`unlisted`|`public`),
+  and `callable` (`{ action_id, webhook_url, input/output_schema }`) — so the
+  three legacy "services" concepts (marketplace catalogue, work-exchange actions,
+  onboarding `declare_services`) collapse into projections of one unit: the
+  public catalogue is the `visibility:'public'` slice, the actions layer is the
+  callable binding's invoke/billing engine. New route
+  `POST /v1/agents/{name}/offers/{offerId}/invoke` dispatches a callable offer
+  through the existing capability-invoke proxy and settles on success
+  (debit caller / credit provider minus the marketplace fee, refund on dispatch
+  failure) following the app-store billing pattern; self-use short-circuits free.
+  `name` accepts a bare agent name (own agent) or a full provider GAII
+  (URL-encoded) for cross-owner calls. v1 offer docs validate unchanged (all v2
+  fields default). E2E `e2e-agent-offers` extended to 15 tests (descriptor
+  round-trip + the invoke gates: not-callable 422, private cross-owner 403,
+  missing-capability 404). Plan: `docs/plans/2026-06-12-services-to-offers-migration.md`.
 - **App-catalog backup: export all + selective import.** A "💾 Backup" menu in
   the app catalog exports the owner's whole catalog as one ZIP
   (`GET /v1/apps/backup`, streamed, `aimeat-apps-{owner}-{date}.zip`): EVERY

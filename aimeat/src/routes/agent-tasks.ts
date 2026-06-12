@@ -1305,5 +1305,37 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     }));
   });
 
+  /* ── GET /v1/deliverables — the Offers "Inbox": everything that came back, across ALL agents ──
+   * Owner aggregate of non-draft tasks (queued/active/done/failed/…), newest first, with provenance
+   * (agent, status, timestamps), the deliverable key, the verification expectation, and any existing
+   * rating. The follow-up half of the Offers surface — check + rate without clicking through agents.
+   * Failures are included AS failures (status='failed'); rate the deliverable via the locked
+   * POST /v1/agents/:name/tasks/:id/rate. */
+  router.get('/v1/deliverables', requireAuth(), requireRole('owner'), async (req, res) => {
+    const owner = resolve(req);
+    const all: AgentTaskRecord[] = [];
+    for (let p = 1; p <= 10; p++) {
+      const r = await storage.listAgentTasksByOwner(owner, { page: p, perPage: 200 });
+      all.push(...r.tasks);
+      if (r.tasks.length < 200) break;
+    }
+    const deliverables = all
+      .filter(t => t.status !== 'draft')
+      .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
+      .slice(0, 100)
+      .map(t => ({
+        task_id: t.id,
+        agent: t.agentGaii.split('#')[0],
+        title: t.title,
+        status: t.status,
+        completed_at: t.completedAt ?? null,
+        updated_at: t.updatedAt,
+        deliverable_key: t.deliverableKey ?? null,
+        verification: t.verification?.userExpects ?? null,
+        rating: t.rating ?? null,
+      }));
+    res.json(success(config.nodeId, { deliverables, total: deliverables.length }));
+  });
+
   return router;
 }
