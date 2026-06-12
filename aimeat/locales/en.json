@@ -412,6 +412,7 @@
       "billSaveFailed": "Could not save",
       "billHint": "Others pay {n} morsels per call; you keep it minus the marketplace fee. Your own use is free.",
       "notCallableHint": "Not machine-callable yet — others can find it, but invoking it needs a capability binding (action_id).",
+      "openInbox": "See it in the Inbox →",
       "visibility": { "private": "Private (only me)", "unlisted": "Unlisted (by link)", "public": "Public (listed)" },
       "status": { "done": "done", "failed": "failed", "active": "in progress", "paused": "paused", "stalled": "stalled", "queued": "queued", "revision_requested": "revision requested", "draft": "draft" },
       "verification": { "deterministic": "deterministic", "gated": "verified", "ungated": "unverified" },

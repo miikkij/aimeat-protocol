@@ -9,6 +9,11 @@
  * @version-history
  *   v1.0.0 -- 2026-06-12 -- Initial: Do feed + mode-aware Ask (run / copy-prompt / schedule-trigger).
  *   v1.1.0 -- 2026-06-12 -- Billable offers: setOfferBilling (patch one offer's price + visibility).
+ *   v1.2.0 -- 2026-06-12 -- Inbox fixes: deliverable read from the AGENT namespace (prefix + task-tag
+ *     fallback, returns a string); Ask task title carries the user's request (findable in the queue).
+ *   v1.3.0 -- 2026-06-12 -- Offer task carries ONLY the user's request (title + description); the offer
+ *     is referenced via scope.offer_id/offer_title — no more restuffing offer.ask/example (which made
+ *     the agent treat its own boilerplate as the request).
  */
 import { apiGet, apiPost, apiPut } from '/js/api.js';
 import { copyToClipboard } from '/js/utils.js';
@@ -45,9 +50,37 @@ export async function listDeliverables() {
   return apiGet('/v1/deliverables');
 }
 
-/** Fetch a deliverable's content by its memory key (for inline rendering). */
-export async function getDeliverableContent(key) {
-  return apiGet(`/v1/memory/${encodeURIComponent(key)}`);
+/** Fetch a task's deliverable from the AGENT's memory namespace (owner→agent read).
+ *  Deliverables live under the agent's GAII, not the owner's, so we read via
+ *  `?agent=<gaii>`. Primary handle is the recorded `deliverableKey`; fallback is the
+ *  `task:<id>` tag the runner stamps on every write (works even when the agent never
+ *  set deliverableKey — e.g. CrewAI agents that only publish to memory). Returns the
+ *  deliverable value as a string, or null if nothing was found. Mirrors the proven
+ *  read in agents-tasks-subtab.js. */
+export async function getDeliverableContent({ agentGaii, deliverableKey, taskId }) {
+  if (!agentGaii) return null;
+  const enc = encodeURIComponent;
+  const reqs = [];
+  if (deliverableKey) reqs.push(apiGet(`/v1/memory?agent=${enc(agentGaii)}&prefix=${enc(deliverableKey)}&per_page=5`).catch(() => null));
+  if (taskId) reqs.push(apiGet(`/v1/memory?agent=${enc(agentGaii)}&tags=${enc('task:' + taskId)}&per_page=50`).catch(() => null));
+  const results = await Promise.all(reqs);
+  const items = [];
+  const seen = new Set();
+  for (const r of results) {
+    const list = r?.data?.items || r?.data || [];
+    for (const it of (Array.isArray(list) ? list : [])) {
+      if (it.key && !seen.has(it.key)) { seen.add(it.key); items.push(it); }
+    }
+  }
+  if (!items.length) return null;
+  const len = (v) => (typeof v === 'string' ? v.length : 0);
+  // Prefer the exact deliverableKey, then an *output key, then the longest text value.
+  const pick = items.find(i => i.key === deliverableKey)
+    || items.find(i => /(latest_)?output$/.test(i.key))
+    || items.slice().sort((a, b) => len(b.value) - len(a.value))[0];
+  const v = pick?.value;
+  if (v == null) return null;
+  return typeof v === 'string' ? v : JSON.stringify(v, null, 2);
 }
 
 /** Rate a done task's deliverable via the LOCKED rate endpoint (→ agents.<agent>.statistics.*).
@@ -93,13 +126,20 @@ export async function ask(agentEntry, offer, inputs) {
 
   const mode = agentEntry.mode || 'interactive';
   if (mode === 'task-runner' || mode === 'autonomous') {
+    // The agent ALREADY owns the offer (it published it). Do NOT restuff offer.ask/example into the
+    // task — that makes the agent treat its own boilerplate as the request (e.g. jokes ABOUT four
+    // comedians instead of jokes on the topic). The task carries ONLY the user's request as title +
+    // description; the offer is referenced structurally via scope (the runtime resolves it by offer_id).
+    const reqText = inputs ? String(inputs).trim() : '';
+    const title = reqText ? (reqText.length > 80 ? reqText.slice(0, 80) + '…' : reqText) : offer.title;
     const r = await createTask(agentEntry.agent, {
-      title: offer.title,
-      description: [offer.ask, offer.example ? `Example: ${offer.example}` : '', inputs ? `Request: ${String(inputs).trim()}` : ''].filter(Boolean).join('\n'),
+      title,
+      description: reqText,
       status: 'queued',   // REQUIRED so a task-runner auto-activates it (other modes keep the owner-start gate)
       scope: [
         { name: 'kind', value: 'offer', type: 'text' },
         { name: 'offer_id', value: offer.id, type: 'text' },
+        { name: 'offer_title', value: offer.title, type: 'text' },
       ],
     });
     return { kind: 'task', taskId: r?.data?.task?.id || r?.data?.id, agent: agentEntry.agent, ok: r?.ok !== false, error: r?.error };

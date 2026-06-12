@@ -1326,6 +1326,7 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
       .map(t => ({
         task_id: t.id,
         agent: t.agentGaii.split('#')[0],
+        agent_gaii: t.agentGaii,   // full GAII so the Inbox can read the agent's memory namespace
         title: t.title,
         status: t.status,
         completed_at: t.completedAt ?? null,

@@ -9,6 +9,9 @@
  *   v1.0.0 -- 2026-06-12 -- Initial v1: Do feed + offer detail + mode-aware Ask + provenance footer.
  *   v1.1.0 -- 2026-06-12 -- Billable offers: price/visibility badges + an owner Selling editor (price +
  *     visibility) on the offer card, persisted via setOfferBilling.
+ *   v1.2.0 -- 2026-06-12 -- Inbox shows the real deliverable (read from the agent namespace, markdown-
+ *     rendered) even when deliverableKey is unset; sample rendered as markdown; request box clears after
+ *     Ask; "Requested" links to the Inbox.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -17,6 +20,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
+import { Markdown } from '/components/Markdown.js';
 import { dt } from '/js/format.js';
 import * as offersService from '/js/services/offers.js';
 
@@ -37,7 +41,7 @@ function Badges({ offer }) {
   return html`<span class="of-badges">${chips.map(([k, label]) => html`<span class="of-badge of-badge--${k}" key=${k}>${escHtml(label)}</span>`)}</span>`;
 }
 
-function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged }) {
+function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged, onGoInbox }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [result, setResult] = useState(null);
@@ -55,6 +59,7 @@ function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged 
       if (r.ok === false) { showToast(r.error?.message || (t('profile.offers.askFailed') || 'Ask failed')); setResult(null); }
       else {
         setResult({ ...r, at: new Date().toISOString() });
+        setInput('');   // clear the request box — it has been submitted
         if (r.kind === 'prompt') showToast(t('profile.offers.promptCopied') || 'Prompt copied — paste it into the agent’s chat.');
         else if (r.kind === 'triggered') showToast(t('profile.offers.triggered') || 'Schedule triggered.');
         else if (r.kind === 'task') showToast((t('profile.offers.requested') || 'Requested — task queued for {agent}.').replace('{agent}', entry.agent));
@@ -114,7 +119,9 @@ function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged 
             <div class="of-label">${t('profile.offers.deliverable') || 'You’ll get back'}: ${escHtml(offer.deliverable.format || '')}${offer.deliverable.location?.space ? html` <span class="of-mini">→ ${escHtml(offer.deliverable.location.space)}</span>` : null}</div>
             ${offer.deliverable.sample === 'untested'
               ? html`<span class="of-badge of-badge--untested">${t('profile.offers.untested') || 'untested — no sample yet'}</span>`
-              : html`<pre class="of-sample">${escHtml(typeof offer.deliverable.sample === 'string' ? offer.deliverable.sample : JSON.stringify(offer.deliverable.sample, null, 2))}</pre>`}
+              : (typeof offer.deliverable.sample === 'string'
+                  ? html`<div class="of-md of-sample-md"><${Markdown} text=${offer.deliverable.sample} /></div>`
+                  : html`<pre class="of-sample">${escHtml(JSON.stringify(offer.deliverable.sample, null, 2))}</pre>`)}
           ` : null}
 
           <textarea class="input-field input-sm of-input" rows="2" placeholder=${t('profile.offers.requestPlaceholder') || 'Your request (optional — fills the example)…'} value=${input} onInput=${(e) => setInput(e.target.value)}></textarea>
@@ -142,7 +149,7 @@ function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged 
             <div class="of-result">
               ${result.kind === 'prompt' ? html`<div class="of-result-msg">${t('profile.offers.promptCopied') || 'Prompt copied — paste it into the agent’s chat.'}</div>` : null}
               ${result.kind === 'triggered' ? html`<div class="of-result-msg">${t('profile.offers.triggered') || 'Schedule triggered.'}</div>` : null}
-              ${result.kind === 'task' ? html`<div class="of-result-msg">${(t('profile.offers.requested') || 'Requested — task queued for {agent}.').replace('{agent}', entry.agent)}</div>` : null}
+              ${result.kind === 'task' ? html`<div class="of-result-msg">${(t('profile.offers.requested') || 'Requested — task queued for {agent}.').replace('{agent}', entry.agent)}${onGoInbox ? html` <button class="of-link" onClick=${onGoInbox}>${t('profile.offers.openInbox') || 'See it in the Inbox →'}</button>` : null}</div>` : null}
               <div class="of-prov">${t('profile.offers.provenance') || 'From'}: <b>${escHtml(entry.agent)}</b>${result.taskId ? html` · ${t('profile.offers.task') || 'task'} ${escHtml(String(result.taskId))} · ${t('profile.offers.queued') || 'queued'}` : ''} · ${dt(result.at)}</div>
             </div>
           ` : null}
@@ -168,9 +175,13 @@ function DeliverableRow({ d, showToast, onChanged }) {
 
   const toggle = async () => {
     const next = !open; setOpen(next);
-    if (next && content === undefined && d.deliverable_key) {
-      const r = await offersService.getDeliverableContent(d.deliverable_key).catch(() => null);
-      setContent(r?.data?.value ?? (r?.data ?? null));
+    // Fetch on first open for any non-failed task — the deliverable lives in the
+    // agent's namespace and is found by deliverableKey OR the task:<id> tag, so we
+    // don't gate on deliverable_key (CrewAI agents often never set it).
+    if (next && content === undefined && d.status !== 'failed' && d.agent_gaii) {
+      setContent('loading');
+      const v = await offersService.getDeliverableContent({ agentGaii: d.agent_gaii, deliverableKey: d.deliverable_key, taskId: d.task_id }).catch(() => null);
+      setContent(v ?? null);
     }
   };
   const submitRating = async () => {
@@ -196,12 +207,11 @@ function DeliverableRow({ d, showToast, onChanged }) {
       ${open ? html`
         <div class="of-detail">
           ${d.verification ? html`<div class="of-mini">${t('profile.offers.expected') || 'Expected'}: ${escHtml(d.verification)}</div>` : null}
-          ${d.status === 'failed' ? html`<div class="of-fail">${t('profile.offers.failedMsg') || 'This task failed — no deliverable was produced.'}</div>` : null}
-          ${d.status !== 'failed' && d.deliverable_key
-            ? (content === undefined ? html`<div class="of-mini">…</div>`
-               : content === null ? html`<div class="of-mini">${t('profile.offers.deliverableGone') || 'Deliverable no longer available.'}</div>`
-               : html`<pre class="of-sample">${escHtml(typeof content === 'string' ? content : JSON.stringify(content, null, 2))}</pre>`)
-            : (d.status !== 'failed' ? html`<div class="of-mini">${t('profile.offers.noDeliverableYet') || 'No deliverable yet.'}</div>` : null)}
+          ${d.status === 'failed' ? html`<div class="of-fail">${t('profile.offers.failedMsg') || 'This task failed — no deliverable was produced.'}</div>`
+            : content === undefined ? null
+            : content === 'loading' ? html`<div class="of-mini">…</div>`
+            : content === null ? html`<div class="of-mini">${t('profile.offers.noDeliverableYet') || 'No deliverable yet.'}</div>`
+            : html`<div class="of-md"><${Markdown} text=${content} /></div>`}
 
           <div class="of-prov">${t('profile.offers.provenance') || 'From'}: <b>${escHtml(d.agent)}</b> · ${t('profile.offers.task') || 'task'} ${escHtml(String(d.task_id))} · ${t('profile.offers.status.' + d.status) || d.status} · ${dt(d.updated_at)}</div>
 
@@ -291,7 +301,7 @@ export default function OffersTab({ session, showToast }) {
         ${filtered.map(({ entry, offer }) => html`<${OfferCard}
           key=${entry.agent + '/' + offer.id}
           entry=${entry} offer=${offer}
-          showToast=${showToast} confirm=${confirm} busy=${busy} setBusy=${setBusy} onChanged=${load} />`)}
+          showToast=${showToast} confirm=${confirm} busy=${busy} setBusy=${setBusy} onChanged=${load} onGoInbox=${() => setView('inbox')} />`)}
       `}
 
       <${ConfirmUI} />
