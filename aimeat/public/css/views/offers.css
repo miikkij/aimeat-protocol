@@ -6,6 +6,8 @@
  *   v1.0.0 -- 2026-06-12 -- Initial: Do feed cards, badges, offer detail, provenance footer.
  *   v1.1.0 -- 2026-06-12 -- Billable offers: price/visibility badges + the Selling editor row.
  *   v1.2.0 -- 2026-06-12 -- Markdown deliverable/sample (.of-md) + Inbox deep-link (.of-link).
+ *   v1.2.1 -- 2026-06-12 -- Scope markdown headings/tables/lists to the card (LLM h1 was giant; tables
+ *     now render with borders).
  */
 .of { max-width: 920px; }
 .of-search { width: 100%; margin: 0.5rem 0 0.75rem; }
@@ -80,4 +82,15 @@
 .of-md > :first-child { margin-top: 0; }
 .of-md > :last-child { margin-bottom: 0; }
 .of-sample-md { max-height: 200px; }
+/* Scale headings/tables/lists to the card context (an LLM h1 must not be giant here). */
+.of-md h1, .of-md h2, .of-md h3, .of-md h4, .of-md h5, .of-md h6 { font-size: 0.95rem; font-weight: 700; line-height: 1.3; margin: 0.45rem 0 0.2rem; }
+.of-md h1 { font-size: 1.02rem; }
+.of-md p { margin: 0.3rem 0; }
+.of-md ul, .of-md ol { margin: 0.3rem 0; padding-left: 1.2rem; }
+.of-md li { margin: 0.1rem 0; }
+.of-md table { border-collapse: collapse; font-size: 0.8rem; margin: 0.3rem 0; }
+.of-md th, .of-md td { border: 1px solid var(--border); padding: 0.15rem 0.45rem; text-align: left; }
+.of-md th { background: var(--surface); font-weight: 600; }
+.of-md pre { font-size: 0.8rem; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 0.6rem; overflow-x: auto; }
+.of-md code { font-size: 0.82em; }
 .of-link { background: none; border: none; padding: 0; margin-left: 0.35rem; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
