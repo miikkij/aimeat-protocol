@@ -2103,6 +2103,17 @@ components:
         changedAt: { type: string, format: date-time }
         changeNote: { type: string }
 
+    SubdomainSiteRecord:
+      type: object
+      properties:
+        subdomain: { type: string }
+        kind: { type: string, enum: [app, redirect] }
+        target: { type: string }
+        enabled: { type: boolean }
+        createdBy: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
     # === Package & Template Schemas ===
     PackageComponent:
       type: object
@@ -8769,6 +8780,173 @@ paths:
                         properties:
                           prompt:
                             $ref: '#/components/schemas/SystemPromptRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/admin/subdomains:
+    get:
+      operationId: listSubdomainSites
+      summary: List subdomain mappings (operator only)
+      description: >
+        Lists all operator-managed subdomain → site mappings. A mapping serves a
+        published app at the root of `<subdomain>.<apex>` (kind `app`) or
+        301-redirects to an external URL (kind `redirect`).
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of subdomain mappings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          sites:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/SubdomainSiteRecord'
+                          total:
+                            type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createSubdomainSite
+      summary: Create a subdomain mapping (operator only)
+      description: >
+        Maps a subdomain to a published app (`target` = `owner/filename`) or an
+        external redirect URL. Reserved subdomains (www, mail, api, admin, static,
+        cdn, portal, app, apps, docs, status, mcp) are rejected. Access-code
+        protected and paid apps cannot be mapped.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [subdomain, kind, target]
+              properties:
+                subdomain:
+                  type: string
+                  pattern: '^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$'
+                kind:
+                  type: string
+                  enum: [app, redirect]
+                target:
+                  type: string
+                  description: '"owner/filename" of a published app, or an absolute http(s) URL'
+                enabled:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Mapping created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          site:
+                            $ref: '#/components/schemas/SubdomainSiteRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/admin/subdomains/{subdomain}:
+    patch:
+      operationId: updateSubdomainSite
+      summary: Update a subdomain mapping (operator only)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: subdomain
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kind:
+                  type: string
+                  enum: [app, redirect]
+                target:
+                  type: string
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: Mapping updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          site:
+                            $ref: '#/components/schemas/SubdomainSiteRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteSubdomainSite
+      summary: Delete a subdomain mapping (operator only)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: subdomain
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Mapping deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

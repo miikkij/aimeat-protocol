@@ -12,6 +12,8 @@
  *     `@node` suffix from app ownerName values (bare-name normalization).
  *   v1.2.0 — 2026-06-09 — Add mergeForkedAppBuckets() to consolidate ownerGaii
  *     buckets forked across an owner's identity forms into one canonical bucket.
+ *   v1.3.0 — 2026-06-12 — Add subdomain_sites CRUD (operator-managed
+ *     subdomain → published-app/redirect mappings).
  */
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
@@ -35,6 +37,7 @@ import type {
   CortexExtensionRecord,
   PersonalPushSubscriptionRecord, NotificationPreferences,
   AppRecord, AppListOptions, AppPurchaseRecord,
+  SubdomainSiteRecord,
   NotificationTemplateRecord,
   MemoryLinkRecord, OperatorReviewRecord,
   ScheduledJobRecord,
@@ -4276,6 +4279,66 @@ export class SqliteStorage implements Storage {
       `INSERT INTO app_downloads (ownerGaii, filename, downloads) VALUES (?, ?, 1)
        ON CONFLICT(ownerGaii, filename) DO UPDATE SET downloads = downloads + 1`
     ).run(ownerGaii, filename);
+  }
+
+  // ── Subdomain sites (operator-managed subdomain → app/redirect mappings) ──
+
+  async createSubdomainSite(site: SubdomainSiteRecord): Promise<SubdomainSiteRecord> {
+    this.db.prepare(
+      `INSERT INTO subdomain_sites (subdomain, kind, target, enabled, createdBy, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      site.subdomain, site.kind, site.target, site.enabled ? 1 : 0,
+      site.createdBy, site.createdAt, site.updatedAt,
+    );
+    return site;
+  }
+
+  async getSubdomainSite(subdomain: string): Promise<SubdomainSiteRecord | null> {
+    const row = this.db.prepare('SELECT * FROM subdomain_sites WHERE subdomain = ?')
+      .get(subdomain) as Record<string, unknown> | undefined;
+    return row ? this.deserializeSubdomainSite(row) : null;
+  }
+
+  async listSubdomainSites(): Promise<SubdomainSiteRecord[]> {
+    const rows = this.db.prepare('SELECT * FROM subdomain_sites ORDER BY subdomain')
+      .all() as Record<string, unknown>[];
+    return rows.map(r => this.deserializeSubdomainSite(r));
+  }
+
+  async updateSubdomainSite(
+    subdomain: string,
+    updates: Partial<Pick<SubdomainSiteRecord, 'kind' | 'target' | 'enabled' | 'updatedAt'>>,
+  ): Promise<SubdomainSiteRecord | null> {
+    const sets: string[] = [];
+    const params: unknown[] = [];
+    if (updates.kind !== undefined) { sets.push('kind = ?'); params.push(updates.kind); }
+    if (updates.target !== undefined) { sets.push('target = ?'); params.push(updates.target); }
+    if (updates.enabled !== undefined) { sets.push('enabled = ?'); params.push(updates.enabled ? 1 : 0); }
+    sets.push('updatedAt = ?');
+    params.push(updates.updatedAt ?? new Date().toISOString());
+    params.push(subdomain);
+    const result = this.db.prepare(`UPDATE subdomain_sites SET ${sets.join(', ')} WHERE subdomain = ?`)
+      .run(...params);
+    if (result.changes === 0) return null;
+    return this.getSubdomainSite(subdomain);
+  }
+
+  async deleteSubdomainSite(subdomain: string): Promise<boolean> {
+    const result = this.db.prepare('DELETE FROM subdomain_sites WHERE subdomain = ?').run(subdomain);
+    return result.changes > 0;
+  }
+
+  private deserializeSubdomainSite(row: Record<string, unknown>): SubdomainSiteRecord {
+    return {
+      subdomain: row.subdomain as string,
+      kind: row.kind as SubdomainSiteRecord['kind'],
+      target: row.target as string,
+      enabled: (row.enabled as number) === 1,
+      createdBy: row.createdBy as string,
+      createdAt: row.createdAt as string,
+      updatedAt: row.updatedAt as string,
+    };
   }
 
   async normalizeAppOwnerNames(): Promise<number> {

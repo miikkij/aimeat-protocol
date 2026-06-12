@@ -101,6 +101,7 @@ import { agentTelemetryRouter } from '../routes/agent-telemetry.js';
 import { agentSkillBundleRouter } from '../routes/agent-skill-bundle.js';
 import { agentOnboardingRouter } from '../routes/agent-onboarding.js';
 import { connectTunnelRouter } from '../routes/connect-tunnel.js';
+import { subdomainServeRouter, subdomainAdminRouter } from '../routes/subdomains.js';
 
 // Services needed during route mounting
 import { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
@@ -184,6 +185,9 @@ export async function mountRoutes(
   // always redirecting human visitors to the SPA. Reused by siteRouter below.
   const siteService = new SiteService(config, storage);
   app.use(setupRouter(config, storage, invalidateHasOwnersCache));
+  // Subdomain root serving MUST come before bootstrapRouter — its GET / handles
+  // mapped `<sub>.<apex>` requests; apex requests fall through untouched.
+  app.use(subdomainServeRouter(config, storage));
   app.use(bootstrapRouter(config, storage, tunnelManager ?? undefined, siteService));
   app.use(statsRouter(config, storage, stats, metricsRegistry));
   app.use(wellknownRouter(config, storage));
@@ -440,6 +444,7 @@ export async function mountRoutes(
 
   // System prompts admin routes
   app.use(adminPromptsRouter(config, storage));
+  app.use(subdomainAdminRouter(config, storage));
 
   // Agent tasks + sharing groups admin routes (Phase 1 Agent Dashboard)
   app.use(adminAgentTasksRouter(config, storage));

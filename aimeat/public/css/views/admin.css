@@ -4,6 +4,8 @@
  *   its distinct indigo accent and a permanently-dark sidebar, but all content
  *   surfaces map to global theme.css tokens so they flip with dark/light mode.
  * @version-history
+ *   v1.6.0 — 2026-06-12 — Subdomains tab: .adm-subdomain-form create-form grid
+ *     + .adm-subdomain-modal-actions (right-aligned type-to-confirm buttons).
  *   v1.5.0 — 2026-06-02 — Component unification (#13 tables): strip the dead
  *     `, #E5E7EB` hardcoded fallback from `.adm-breakdown-table th` border
  *     (.adm always maps --glass-border → --border, so the fallback was dead
@@ -576,6 +578,16 @@
 
 /* Subtabs row */
 .adm-subtabs { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+
+/* Subdomains tab — create-form row: subdomain | kind | target (grows) | button */
+.adm-subdomain-form {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) minmax(100px, 140px) 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+.adm-subdomain-form .adm-text-error { grid-column: 1 / -1; }
+.adm-subdomain-modal-actions { justify-content: flex-end; }
 
 /* Active subtab button */
 .adm-btn-active,

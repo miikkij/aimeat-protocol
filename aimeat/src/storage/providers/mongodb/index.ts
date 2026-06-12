@@ -31,6 +31,8 @@
  *   v1.4.0 — 2026-06-09 — Add mergeForkedAppBuckets() to consolidate ownerGaii
  *                          buckets forked across an owner's identity forms into one
  *                          canonical bucket with a unified version line.
+ *   v1.5.0 — 2026-06-12 — Add SubdomainSite CRUD (operator-managed
+ *                          subdomain → published-app/redirect mappings).
  */
 
 import { execSync } from 'node:child_process';
@@ -75,6 +77,7 @@ import type {
     CortexExtensionRecord,
     PersonalPushSubscriptionRecord, NotificationPreferences,
     AppRecord, AppListOptions, AppPurchaseRecord,
+    SubdomainSiteRecord,
     NotificationTemplateRecord,
     MemoryLinkRecord, OperatorReviewRecord,
     ScheduledJobRecord,
@@ -3826,6 +3829,77 @@ export class PrismaStorage implements Storage {
             update: { count: { increment: 1 } },
             create: { ownerGaii, filename, count: 1 },
         });
+    }
+
+    // ── Subdomain sites (operator-managed subdomain → app/redirect mappings) ──
+
+    async createSubdomainSite(site: SubdomainSiteRecord): Promise<SubdomainSiteRecord> {
+        this.ensureReady();
+        const row = await this.prisma.subdomainSite.create({
+            data: {
+                subdomain: site.subdomain,
+                kind: site.kind,
+                target: site.target,
+                enabled: site.enabled,
+                createdBy: site.createdBy,
+                createdAt: new Date(site.createdAt),
+                updatedAt: new Date(site.updatedAt),
+            },
+        });
+        return this.toSubdomainSiteRecord(row);
+    }
+
+    async getSubdomainSite(subdomain: string): Promise<SubdomainSiteRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.subdomainSite.findUnique({ where: { subdomain } });
+        return row ? this.toSubdomainSiteRecord(row) : null;
+    }
+
+    async listSubdomainSites(): Promise<SubdomainSiteRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.subdomainSite.findMany({ orderBy: { subdomain: 'asc' } });
+        return rows.map((r: unknown) => this.toSubdomainSiteRecord(r));
+    }
+
+    async updateSubdomainSite(
+        subdomain: string,
+        updates: Partial<Pick<SubdomainSiteRecord, 'kind' | 'target' | 'enabled' | 'updatedAt'>>,
+    ): Promise<SubdomainSiteRecord | null> {
+        this.ensureReady();
+        const data: Record<string, unknown> = {
+            updatedAt: updates.updatedAt ? new Date(updates.updatedAt) : new Date(),
+        };
+        if (updates.kind !== undefined) data.kind = updates.kind;
+        if (updates.target !== undefined) data.target = updates.target;
+        if (updates.enabled !== undefined) data.enabled = updates.enabled;
+        try {
+            const row = await this.prisma.subdomainSite.update({ where: { subdomain }, data });
+            return this.toSubdomainSiteRecord(row);
+        } catch {
+            return null;
+        }
+    }
+
+    async deleteSubdomainSite(subdomain: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.subdomainSite.delete({ where: { subdomain } });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    private toSubdomainSiteRecord(row: any): SubdomainSiteRecord {
+        return {
+            subdomain: row.subdomain,
+            kind: row.kind as SubdomainSiteRecord['kind'],
+            target: row.target,
+            enabled: row.enabled,
+            createdBy: row.createdBy,
+            createdAt: row.createdAt.toISOString(),
+            updatedAt: row.updatedAt.toISOString(),
+        };
     }
 
     async normalizeAppOwnerNames(): Promise<number> {

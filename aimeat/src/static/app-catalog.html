@@ -1075,7 +1075,8 @@
     /* ── Publish Modal ──────────────────────────────── */
 
     #publish-overlay,
-    #versions-overlay {
+    #versions-overlay,
+    #subdomain-overlay {
       position: fixed;
       inset: 0;
       z-index: 560;
@@ -1089,7 +1090,8 @@
     }
 
     #publish-overlay[hidden],
-    #versions-overlay[hidden] {
+    #versions-overlay[hidden],
+    #subdomain-overlay[hidden] {
       display: none;
     }
 
@@ -1270,6 +1272,43 @@
       background: rgba(245, 158, 11, .10);
       color: #d97706;
       border: 1px solid rgba(245, 158, 11, .25);
+    }
+
+    /* Operator-only subdomain chip on own published cards */
+    .subdomain-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: .7rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      cursor: pointer;
+      background: rgba(99, 102, 241, .10);
+      color: #6366f1;
+      border: 1px solid rgba(99, 102, 241, .25);
+      margin-top: 4px;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .subdomain-chip:hover { background: rgba(99, 102, 241, .2); }
+
+    /* AI-published origin badge on local grid cards */
+    .ai-origin-badge {
+      display: inline-block;
+      font-size: .6rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      padding: 1px 5px;
+      border-radius: 4px;
+      vertical-align: middle;
+      margin-left: 4px;
+      background: rgba(99, 102, 241, .10);
+      color: #6366f1;
+      border: 1px solid rgba(99, 102, 241, .25);
     }
 
     /* ── Cortex Extensions Bar ──────────────────────── */
@@ -1641,6 +1680,25 @@
     </div>
   </div>
 
+  <!-- Subdomain Assign Modal (operator only) -->
+  <div id="subdomain-overlay" hidden>
+    <div class="modal" id="subdomain-modal">
+      <h2 data-i18n="subModal.title">&#x1F310; Assign Subdomain</h2>
+      <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:8px" id="subdomain-app-label"></div>
+      <div class="form-group">
+        <label for="subdomain-input" data-i18n="subModal.label">Subdomain</label>
+        <input type="text" id="subdomain-input" class="modal-input" placeholder="sanomat" autocomplete="off"/>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" data-i18n="subModal.hint">Lowercase letters, numbers and hyphens (2-63 chars). The app is served at the subdomain root.</div>
+      </div>
+      <div id="subdomain-status" style="margin-top:8px;font-size:.85rem;min-height:1.1em"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('subdomain-overlay').hidden = true" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="modal-btn secondary" id="subdomain-unassign-btn" onclick="window._launcher.unassignSubdomain()" data-i18n="subModal.unassign">Unassign</button>
+        <button type="button" class="modal-btn primary" id="subdomain-save-btn" onclick="window._launcher.submitSubdomainAssign()" data-i18n="common.save">Save</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Versions Modal -->
   <div id="versions-overlay" hidden>
     <div class="modal" id="versions-modal">
@@ -1790,6 +1848,14 @@
       'card.versions': '🕑 Versions',
       'card.fork': '⑂ Fork',
       'card.restore': '↺ Restore',
+      'card.subdomain': '🌐 Subdomain',
+      'subModal.title': '🌐 Assign Subdomain',
+      'subModal.label': 'Subdomain',
+      'subModal.hint': 'Lowercase letters, numbers and hyphens (2-63 chars). The app is served at the subdomain root.',
+      'subModal.unassign': 'Unassign',
+      'subModal.assigned': 'Subdomain assigned',
+      'subModal.unassigned': 'Subdomain unassigned',
+      'subModal.saving': 'Saving...',
       'tag.all': 'All',
       'tag.favorites': '⭐ Favorites',
       'empty.noApps': 'No apps yet',
@@ -1902,6 +1968,14 @@
       'card.versions': '🕑 Versiot',
       'card.fork': '⑂ Haaroita',
       'card.restore': '↺ Palauta',
+      'card.subdomain': '🌐 Alidomain',
+      'subModal.title': '🌐 Liitä alidomain',
+      'subModal.label': 'Alidomain',
+      'subModal.hint': 'Pienet kirjaimet, numerot ja viivat (2-63 merkkiä). Appi tarjoillaan alidomainin juuresta.',
+      'subModal.unassign': 'Poista liitos',
+      'subModal.assigned': 'Alidomain liitetty',
+      'subModal.unassigned': 'Liitos poistettu',
+      'subModal.saving': 'Tallennetaan...',
       'tag.all': 'Kaikki',
       'tag.favorites': '⭐ Suosikit',
       'empty.noApps': 'Ei vielä sovelluksia',
@@ -2813,7 +2887,8 @@
               '<button class="card-menu-btn" onclick="event.stopPropagation(); window._launcher.showContextMenu(event, \'' + escapeHtml(app.id) + '\')" title="Menu">\u22EE</button>' +
               '<div class="app-icon">' + escapeHtml(iconDisplay) + '</div>' +
               '<div class="app-name">' + escapeHtml(app.name) + '</div>' +
-              '<div class="app-source">' + sourceLabel(app.source) + '</div>' +
+              '<div class="app-source">' + sourceLabel(app.source) +
+                (app.origin === 'ai-published' ? ' <span class="ai-origin-badge">AI</span>' : '') + '</div>' +
               '<div class="app-actions">' +
                 '<button onclick="event.stopPropagation(); window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'tab\')" title="Open in tab">\u25B6 Tab</button>' +
                 '<button onclick="event.stopPropagation(); window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'iframe\')" title="Open in iframe">\u25FB</button>' +
@@ -2995,6 +3070,9 @@
 
       case 'delete':
         if (confirm('Delete "' + (app.name || 'this app') + '"?')) {
+          // Tombstone published apps so the server copy isn't re-imported as a
+          // "new" AI-published app on the next load.
+          if (app.publishedFilename) addImportIgnore(app.publishedFilename);
           deleteApp(appId).then(function () {
             renderApps();
             loadPublishedApps();
@@ -3663,6 +3741,208 @@
     return !!a && a === bareOwnerName(sessionOwner);
   }
 
+  // ── Operator subdomain mappings ─────────────────
+  // Operators can map a subdomain to a published app (served at the subdomain
+  // root). Mappings are loaded only for operator sessions; everyone else never
+  // sees the controls and the admin API returns 403 anyway.
+
+  function getSessionRoles() {
+    try {
+      var token = getCortexOwnerToken();
+      if (!token) return [];
+      var payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      return payload.roles || [];
+    } catch (e) { return []; }
+  }
+
+  function isOperatorSession() {
+    return getSessionRoles().indexOf('operator') !== -1;
+  }
+
+  // target ("owner/filename") → site record; null until loaded
+  var subdomainsByTarget = null;
+
+  function loadSubdomainSites() {
+    if (!isOperatorSession()) {
+      subdomainsByTarget = null;
+      return Promise.resolve();
+    }
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : '';
+    if (!aimeatUrl) { subdomainsByTarget = null; return Promise.resolve(); }
+    return fetch(aimeatUrl + '/v1/admin/subdomains', {
+      headers: { 'Authorization': 'Bearer ' + getCortexOwnerToken() }
+    })
+      .then(function (resp) { if (!resp.ok) throw new Error('HTTP ' + resp.status); return resp.json(); })
+      .then(function (json) {
+        subdomainsByTarget = {};
+        var sites = (json.data && json.data.sites) || [];
+        for (var i = 0; i < sites.length; i++) {
+          if (sites[i].kind === 'app') subdomainsByTarget[sites[i].target] = sites[i];
+        }
+      })
+      .catch(function () { subdomainsByTarget = null; });
+  }
+
+  function apexHostLabel() {
+    try {
+      var config = loadConfig();
+      return new URL(config.aimeatUrl || window.location.origin).host;
+    } catch (e) { return window.location.host; }
+  }
+
+  // The app target currently open in the subdomain modal: { target, existingSub }
+  var subdomainModalState = null;
+
+  function showSubdomainModal(owner, filename) {
+    var target = bareOwnerName(owner) + '/' + filename;
+    var existing = (subdomainsByTarget && subdomainsByTarget[target]) || null;
+    subdomainModalState = { target: target, existingSub: existing ? existing.subdomain : null };
+    document.getElementById('subdomain-app-label').textContent = target;
+    document.getElementById('subdomain-input').value = existing ? existing.subdomain : '';
+    document.getElementById('subdomain-status').textContent = '';
+    document.getElementById('subdomain-unassign-btn').style.display = existing ? '' : 'none';
+    document.getElementById('subdomain-overlay').hidden = false;
+  }
+
+  function subdomainApiCall(method, path, body) {
+    var config = loadConfig();
+    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
+    return fetch(aimeatUrl + path, {
+      method: method,
+      headers: {
+        'Authorization': 'Bearer ' + getCortexOwnerToken(),
+        'Content-Type': 'application/json'
+      },
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (resp) {
+      return resp.json().then(function (json) {
+        if (!json.ok) {
+          var msg = (json.error && (json.error.message || json.error.code)) || ('HTTP ' + resp.status);
+          throw new Error(msg);
+        }
+        return json;
+      });
+    });
+  }
+
+  function submitSubdomainAssign() {
+    if (!subdomainModalState) return;
+    var sub = document.getElementById('subdomain-input').value.trim().toLowerCase();
+    var statusEl = document.getElementById('subdomain-status');
+    if (!sub) return;
+    if (sub === subdomainModalState.existingSub) {
+      document.getElementById('subdomain-overlay').hidden = true;
+      return;
+    }
+    statusEl.style.color = 'var(--text-muted)';
+    statusEl.textContent = t('subModal.saving');
+    var oldSub = subdomainModalState.existingSub;
+    subdomainApiCall('POST', '/v1/admin/subdomains', {
+      subdomain: sub, kind: 'app', target: subdomainModalState.target
+    })
+      .then(function () {
+        // Re-pointing to a new subdomain: drop the old mapping after the new
+        // one exists, so the app is never left unmapped on failure.
+        if (oldSub) return subdomainApiCall('DELETE', '/v1/admin/subdomains/' + encodeURIComponent(oldSub));
+      })
+      .then(function () {
+        statusEl.style.color = '#34d399';
+        statusEl.textContent = '✔ ' + t('subModal.assigned') + ' — ' + sub + '.' + apexHostLabel();
+        return loadSubdomainSites();
+      })
+      .then(function () { loadPublishedApps(); })
+      .catch(function (err) {
+        statusEl.style.color = '#ef4444';
+        statusEl.textContent = err.message || String(err);
+      });
+  }
+
+  function unassignSubdomain() {
+    if (!subdomainModalState || !subdomainModalState.existingSub) return;
+    var statusEl = document.getElementById('subdomain-status');
+    statusEl.style.color = 'var(--text-muted)';
+    statusEl.textContent = t('subModal.saving');
+    subdomainApiCall('DELETE', '/v1/admin/subdomains/' + encodeURIComponent(subdomainModalState.existingSub))
+      .then(function () {
+        statusEl.style.color = '#34d399';
+        statusEl.textContent = '✔ ' + t('subModal.unassigned');
+        document.getElementById('subdomain-unassign-btn').style.display = 'none';
+        subdomainModalState.existingSub = null;
+        return loadSubdomainSites();
+      })
+      .then(function () { loadPublishedApps(); })
+      .catch(function (err) {
+        statusEl.style.color = '#ef4444';
+        statusEl.textContent = err.message || String(err);
+      });
+  }
+
+  // ── Server → local import (AI-published apps) ────
+  // Apps published under this owner's account via MCP exist only on the server.
+  // Importing them into the local catalog gives them the exact same management
+  // actions (edit, rename, tags, versions, delete) as locally created apps —
+  // one "My Apps" list, with an AI origin badge. A tombstone list prevents a
+  // locally deleted import from resurrecting on the next load.
+
+  var IMPORT_IGNORE_KEY = 'appCatalogImportIgnore';
+
+  function getImportIgnore() {
+    try { return JSON.parse(localStorage.getItem(IMPORT_IGNORE_KEY) || '[]'); } catch (e) { return []; }
+  }
+
+  function addImportIgnore(filename) {
+    var list = getImportIgnore();
+    if (list.indexOf(filename) === -1) {
+      list.push(filename);
+      localStorage.setItem(IMPORT_IGNORE_KEY, JSON.stringify(list));
+    }
+  }
+
+  function removeImportIgnore(filename) {
+    var list = getImportIgnore().filter(function (f) { return f !== filename; });
+    localStorage.setItem(IMPORT_IGNORE_KEY, JSON.stringify(list));
+  }
+
+  function importMissingServerApps(serverApps, localByFilename, aimeatUrl) {
+    var ignore = getImportIgnore();
+    var toImport = serverApps.filter(function (sa) {
+      return sa.filename && !localByFilename[sa.filename] && ignore.indexOf(sa.filename) === -1;
+    });
+    if (toImport.length === 0) return Promise.resolve(false);
+    return Promise.all(toImport.map(function (sa) {
+      var url = aimeatUrl + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(sa.filename) + '?mode=inline';
+      return fetch(url)
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        .then(function (source) {
+          var manifest = sa.manifest || {};
+          var app = {
+            id: generateId(),
+            name: manifest.name || sa.filename,
+            description: manifest.description || '',
+            source: 'aimeat',
+            origin: 'ai-published',
+            url: null,
+            blob: btoa(unescape(encodeURIComponent(source))),
+            tags: manifest.tags || [],
+            openMode: 'tab',
+            icon: manifest.icon || '\u{1F916}',
+            screenshot: null,
+            favorite: false,
+            addedAt: sa.created_at || new Date().toISOString(),
+            lastOpenedAt: null,
+            published: true,
+            publishedFilename: sa.filename,
+            publishedAt: sa.created_at || new Date().toISOString(),
+            publishedUrl: '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(sa.filename),
+            publishedVersionNumber: sa.version_number || 1
+          };
+          return saveApp(app);
+        })
+        .catch(function () { return null; }); // protected/unreachable app — skip silently
+    })).then(function () { return true; });
+  }
+
   // Manifest cache keyed by "owner\nfilename" — lets Restore/Fork reuse the
   // app's metadata (name, description, category, tags, icon) without a re-fetch.
   var serverAppManifests = {};
@@ -3729,8 +4009,16 @@
             ? serverApps.filter(function(a) { return !sameOwner(a.owner, currentOwner); })
             : serverApps;
 
-          renderPublishedApps(localPublished, ownApps, localByFilename, aimeatUrl, section, grid, countEl);
-          renderCommunityApps(communityApps, aimeatUrl, communitySection, communityGrid, communityCountEl, currentOwner);
+          return loadSubdomainSites().then(function () {
+            renderPublishedApps(localPublished, ownApps, localByFilename, aimeatUrl, section, grid, countEl);
+            renderCommunityApps(communityApps, aimeatUrl, communitySection, communityGrid, communityCountEl, currentOwner);
+            // AI-published (server-only) own apps → local catalog, so they get
+            // the same management actions as locally created apps. After an
+            // import the next pass finds them locally and imports nothing.
+            return importMissingServerApps(ownApps, localByFilename, aimeatUrl).then(function (imported) {
+              if (imported) { renderApps(); loadPublishedApps(); }
+            });
+          });
         })
         .catch(function() {
           renderPublishedApps(localPublished, [], localByFilename, aimeatUrl, section, grid, countEl);
@@ -3829,11 +4117,29 @@
     section.style.display = '';
     countEl.textContent = '(' + merged.length + ')';
 
+    // Operator-only: subdomain chip/assign controls on own server-published cards
+    var showSubdomainControls = !!subdomainsByTarget && isOperatorSession();
+
     var html = '';
     for (var i = 0; i < merged.length; i++) {
       var app = merged[i];
       var badgeClass = app.source === 'both' ? 'both' : (app.source === 'server' ? 'server' : 'local');
       var badgeLabel = app.source === 'both' ? 'PORTAL + MCP' : (app.source === 'server' ? 'MCP' : 'PORTAL');
+
+      var subChipHtml = '';
+      var subBtnHtml = '';
+      if (showSubdomainControls && app.isOwn && app.filename) {
+        var targetKey = bareOwnerName(app.owner) + '/' + app.filename;
+        var mapping = subdomainsByTarget[targetKey] || null;
+        var openModal = 'window._launcher.showSubdomainModal(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\')';
+        if (mapping) {
+          subChipHtml = '<div><span class="subdomain-chip" onclick="' + openModal + '" title="' + t('subModal.title') + '">&#x1F310; ' +
+            escapeHtml(mapping.subdomain + '.' + apexHostLabel()) + '</span></div>';
+        } else {
+          subBtnHtml = '<button onclick="' + openModal + '">' + t('card.subdomain') + '</button>';
+        }
+      }
+
       html +=
         '<div class="published-card">' +
           '<div class="published-card-name">' + escapeHtml(app.name) + (app.version ? ' <span style="opacity:.5;font-size:.85em">' + escapeHtml(app.version) + '</span>' : '') +
@@ -3843,9 +4149,11 @@
             '<span>' + escapeHtml(app.filename) + '</span>' +
             '<span>' + app.date + '</span>' +
           '</div>' +
+          subChipHtml +
           '<div class="published-card-actions">' +
             (app.viewUrl ? '<button onclick="window.open(\'' + escapeHtml(app.viewUrl) + '?mode=inline\', \'_blank\')">' + t('card.view') + '</button>' : '') +
             (app.isOwn && app.filename ? '<button onclick="window._launcher.showVersionsModal(\'' + escapeHtml(app.owner || '') + '\', \'' + escapeHtml(app.filename) + '\')">' + t('card.versions') + '</button>' : '') +
+            subBtnHtml +
             (app.localId ? '<button onclick="window._launcher.unpublishApp(\'' + escapeHtml(app.localId) + '\')" class="danger">' + t('card.remove') + '</button>' :
              app.isOwn ? '<button onclick="window._launcher.deleteServerApp(\'' + escapeHtml(app.filename) + '\')" class="danger">' + t('card.remove') + '</button>' : '') +
           '</div>' +
@@ -3875,6 +4183,7 @@
       .then(function(resp) { return resp.json(); })
       .then(function(json) {
         if (json.ok) {
+          removeImportIgnore(app.publishedFilename);
           app.published = false;
           delete app.publishedFilename;
           delete app.publishedAt;
@@ -3906,6 +4215,7 @@
       .then(function(resp) { return resp.json(); })
       .then(function(json) {
         if (json.ok) {
+          removeImportIgnore(filename); // a future republish should import again
           loadPublishedApps();
         } else {
           alert('Failed to delete: ' + (json.error && json.error.message ? json.error.message : 'Unknown error'));
@@ -4886,6 +5196,9 @@
     switchDbMode: switchDbMode,
     unpublishApp: unpublishApp,
     deleteServerApp: deleteServerApp,
+    showSubdomainModal: showSubdomainModal,
+    submitSubdomainAssign: submitSubdomainAssign,
+    unassignSubdomain: unassignSubdomain,
     showVersionsModal: showVersionsModal,
     restoreVersion: restoreVersion,
     forkVersion: forkVersion,
@@ -4997,6 +5310,13 @@
 
     // ── Click versions overlay to close ─────────────
     document.getElementById('versions-overlay').addEventListener('click', function (e) {
+      if (e.target === this) {
+        this.hidden = true;
+      }
+    });
+
+    // ── Click subdomain overlay to close ────────────
+    document.getElementById('subdomain-overlay').addEventListener('click', function (e) {
       if (e.target === this) {
         this.hidden = true;
       }
@@ -5142,6 +5462,8 @@
           document.getElementById('aimeat-import-overlay').hidden = true;
         } else if (!document.getElementById('publish-overlay').hidden) {
           document.getElementById('publish-overlay').hidden = true;
+        } else if (!document.getElementById('subdomain-overlay').hidden) {
+          document.getElementById('subdomain-overlay').hidden = true;
         } else if (!document.getElementById('settings-overlay').hidden) {
           closeSettings();
         } else if (!document.getElementById('modal-overlay').hidden) {

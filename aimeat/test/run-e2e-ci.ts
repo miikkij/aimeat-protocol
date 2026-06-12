@@ -75,6 +75,7 @@ const ALL_SUITES = [
     'test/e2e-portal.ts',
     'test/e2e-security.ts',
     'test/e2e-storage-visibility.ts',
+    'test/e2e-subdomains.ts',
     'test/e2e-capabilities.ts',
     'test/e2e-upload.ts',
     'test/cortex-ui-e2e.ts',

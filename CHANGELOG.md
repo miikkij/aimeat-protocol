@@ -4,6 +4,51 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- **Subdomain routing (operator-only).** A subdomain (`<sub>.aimeat.io`) can be
+  mapped to a published app — the app's HTML is served at the subdomain root
+  (same content as `/v1/apps/{owner}/{file}?mode=inline`, no portal chrome) —
+  or to a 301 redirect. New `subdomain_sites` storage (SQLite + Prisma),
+  `X-Subdomain` middleware (nginx header first, hostname fallback), and a
+  serve handler mounted before the apex `GET /` so apex and all `/v1` routes
+  behave exactly as before. Reserved labels (www, mail, api, admin, static,
+  cdn, portal, app, apps, docs, status, mcp) are not mappable; `www` 301s to
+  the apex; unknown/disabled subdomains 404 without disclosure. Management
+  CRUD lives at `/v1/admin/subdomains` (operator role required), surfaced in
+  two UIs: an admin-dashboard "Subdomains" tab (table, enabled toggle,
+  type-to-confirm delete) and an operator-only "🌐 Subdomain" assign dialog +
+  clickable chip on own published-app cards in the app catalog. E2E suite
+  `e2e-subdomains` (34 tests).
+- **AI-published apps join local app management.** Apps published to the
+  owner's account via MCP previously appeared only in the catalog's
+  "Published Apps" strip with limited actions. The app catalog now auto-imports
+  the owner's server-only published apps into the local "My Apps" grid (an
+  `AI` origin badge marks them), so they get the exact same management actions
+  as locally created apps — edit, source view, tags, favorite, versions,
+  publish, delete. A tombstone list prevents a locally deleted import from
+  resurrecting on the next load; deleting the server copy clears the tombstone
+  so a future republish imports cleanly.
+
+- **Workspace Overview tab — the whole workspace on one scroll.** A new
+  "Overview" / "Yleiskuva" tab is ALWAYS the landing view of a workspace (tab
+  persistence dropped — restoring the last-open tab hid content). It stacks
+  every manifest space vertically in manifest order: record spaces as compact
+  rows (title + draft/status badge, max 5 + "Show all N →" into the space tab),
+  document spaces as title + first-line gray preview, empty spaces as a single
+  row (name + "none yet" + Add), non-memory-backed spaces as a single notice
+  row. A "What happened here" strip on top shows the last 8 activity events
+  humanized (who, did what, where, when) — clicking one jumps straight to the
+  changed document/record. On mobile (≤640px) sections collapse as accordions
+  and documents expand INLINE (view + edit, no pop-out window).
+- **Per-tab unseen badges in the workspace.** Each workspace tab shows a
+  neutral gray badge counting items changed since the user last opened that tab
+  (seen marks in localStorage, surviving sessions; first visit seeds a baseline
+  so history is never "unseen"). The badge clears when the tab opens; changes
+  landing on the tab being viewed are seen immediately; the user's own
+  non-agent edits never count. No time fading, no red (red stays reserved for
+  errors).
+
 ### Fixed
 
 - **An agent can find its home: organism listing includes own memberships.** The

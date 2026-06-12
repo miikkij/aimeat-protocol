@@ -269,3 +269,9 @@ export const getAdminAgentTasks = (params = {}) => {
 
 // ── Sharing Groups (admin) ──
 export const getAdminSharingGroups = () => apiGet('/v1/admin/sharing-groups');
+
+// ── Subdomain mappings (operator) ──
+export const getSubdomainSites   = ()             => apiGet('/v1/admin/subdomains');
+export const createSubdomainSite = (body)         => apiPost('/v1/admin/subdomains', body);
+export const updateSubdomainSite = (sub, updates) => apiPatch(`/v1/admin/subdomains/${encodeURIComponent(sub)}`, updates);
+export const deleteSubdomainSite = (sub)          => apiDelete(`/v1/admin/subdomains/${encodeURIComponent(sub)}`);

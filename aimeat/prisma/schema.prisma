@@ -1447,6 +1447,17 @@ model AgentOnboarding {
   @@index([status])
 }
 
+model SubdomainSite {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  subdomain String   @unique
+  kind      String
+  target    String
+  enabled   Boolean  @default(true)
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+}
+
 model AgentMessage {
   id           String    @id @map("_id")
   agentGaii    String

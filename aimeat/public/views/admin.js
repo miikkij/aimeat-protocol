@@ -52,6 +52,7 @@ import CapabilitiesAdminTab from './admin/capabilities-tab.js';
 import AgentTasksAdminTab from './admin/agent-tasks-tab.js';
 import SharingGroupsAdminTab from './admin/sharing-groups-tab.js';
 import AgentIntegrationAdminTab from './admin/agent-integration-tab.js';
+import SubdomainsAdminTab from './admin/subdomains-tab.js';
 
 // ── Sidebar nav structure ──
 const NAV_GROUPS = [
@@ -64,6 +65,7 @@ const NAV_GROUPS = [
     { id: 'maintenance',  icon: '\u{1F6A7}', key: 'dashboard.maintenance',component: MaintenanceTab },
     { id: 'hooks',        icon: '\u{1F517}', key: 'dashboard.hooks',      component: HooksTab },
     { id: 'portal',       icon: '\u{1F310}', key: 'dashboard.portal',     component: PortalTab },
+    { id: 'subdomains',   icon: '\u{1F517}', key: 'admin.subdomains.title', component: SubdomainsAdminTab },
     { id: 'stats',        icon: '\u{1F4C8}', key: 'dashboard.stats',      component: StatsTab },
     { id: 'prompts',      icon: '\u{1F4DD}', key: 'dashboard.promptsTab', component: PromptsTab },
   ]},

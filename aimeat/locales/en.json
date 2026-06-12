@@ -6341,6 +6341,26 @@
     }
   },
   "admin": {
+    "subdomains": {
+      "title": "Subdomains",
+      "desc": "Map subdomains to published apps or external redirects. A mapped subdomain serves the app's HTML at its root (e.g. sanomat.aimeat.io). Management is operator-only.",
+      "add": "Add mapping",
+      "subdomain": "Subdomain",
+      "kind": "Type",
+      "kindApp": "App",
+      "kindRedirect": "Redirect",
+      "target": "Target",
+      "targetHintApp": "owner/filename.html of a published app",
+      "targetHintRedirect": "https://example.com/path",
+      "enabled": "Enabled",
+      "createdBy": "Created by",
+      "created": "Created",
+      "create": "Create",
+      "empty": "No subdomain mappings yet.",
+      "delete": "Delete",
+      "deleteTitle": "Delete subdomain mapping",
+      "deleteConfirm": "This removes the mapping and the subdomain stops serving immediately. Type the subdomain to confirm:"
+    },
     "security": {
       "title": "Security",
       "desc": "Rejected / quarantined uploads and other security incidents.",

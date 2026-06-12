@@ -795,6 +795,17 @@ export function initializeSchema(db: Database.Database): void {
       PRIMARY KEY (ownerGaii, filename)
     );
 
+    -- ── Subdomain Sites (operator-managed subdomain → app/redirect mappings) ──
+    CREATE TABLE IF NOT EXISTS subdomain_sites (
+      subdomain  TEXT PRIMARY KEY,
+      kind       TEXT NOT NULL CHECK (kind IN ('app','redirect')),
+      target     TEXT NOT NULL,
+      enabled    INTEGER NOT NULL DEFAULT 1,
+      createdBy  TEXT NOT NULL,
+      createdAt  TEXT NOT NULL,
+      updatedAt  TEXT NOT NULL
+    );
+
     -- ── App Marketplace Purchases (immutable receipts) ──
     CREATE TABLE IF NOT EXISTS app_purchases (
       transactionId           TEXT PRIMARY KEY,

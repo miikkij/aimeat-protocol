@@ -8,6 +8,7 @@ import { rateLimit } from './middleware/rate-limit.js';
 import { idempotency } from './middleware/idempotency.js';
 import { cookieConsentMiddleware } from './middleware/cookie-consent.js';
 import { requestIdMiddleware } from './middleware/request-id.js';
+import { subdomainMiddleware } from './middleware/subdomain.js';
 import { agentMeAliasMiddleware } from './middleware/agent-me-alias.js';
 import { logger } from './utils/logger.js';
 import { TunnelManager } from './services/personal-tunnel.js';
@@ -94,6 +95,10 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
 
   // Request ID — assigns a unique ID to every request (uses X-Request-Id if present)
   app.use(requestIdMiddleware());
+
+  // Subdomain resolution — sets req.subdomain from nginx's X-Subdomain header
+  // (hostname fallback for dev). Serving happens in subdomainServeRouter.
+  app.use(subdomainMiddleware(config));
 
   // optionalAuth() runs before CORS so req.auth is available for per-entity origin resolution
   app.use(optionalAuth());

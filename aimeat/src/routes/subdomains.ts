@@ -1,0 +1,228 @@
+/**
+ * @file subdomains.ts
+ * @description Subdomain routing: serves operator-mapped subdomains
+ *              (`<sub>.<apex>` → published app HTML or 301 redirect) and the
+ *              operator-only management CRUD under /v1/admin/subdomains.
+ *              A mapping's target is always an existing published app
+ *              ("owner/filename.html") or an absolute redirect URL — never raw
+ *              HTML, so content stays in one place (app versions).
+ * @structure subdomainServeRouter — root catch (GET /) for subdomain requests;
+ *            subdomainAdminRouter — operator CRUD (list/create/update/delete);
+ *            RESERVED_SUBDOMAINS, SUBDOMAIN_RE — validation primitives.
+ * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
+ *        app.use(subdomainAdminRouter(config, storage));
+ * @version-history
+ *   v1.0.0 — 2026-06-12 — Initial: subdomain routing (operator-only management)
+ */
+import { Router } from 'express';
+import type { Request, Response } from 'express';
+import type { AimeatConfig } from '../config.js';
+import type { Storage, AppRecord, SubdomainSiteRecord } from '../storage/interface.js';
+import { requireAuth, requireRole } from '../auth/middleware.js';
+import { success, error } from '../middleware/envelope.js';
+import { resolveIdentity } from '../utils/gaii.js';
+
+/** Subdomains that can never be mapped (infrastructure / future use). */
+export const RESERVED_SUBDOMAINS = new Set([
+  'www', 'mail', 'api', 'admin', 'static', 'cdn',
+  'portal', 'app', 'apps', 'docs', 'status', 'mcp',
+]);
+
+/** Valid subdomain label: lowercase alphanumeric + hyphens, 2–63 chars, no edge hyphens. */
+export const SUBDOMAIN_RE = /^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/;
+
+/** Same CSP as the /v1/apps inline mode — the subdomain root IS the app. */
+const APP_CSP = "default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*; frame-ancestors 'self'";
+
+/** Resolve an "owner/filename" app target to its latest published record. */
+async function resolveAppTarget(storage: Storage, target: string): Promise<AppRecord | null> {
+  const slash = target.indexOf('/');
+  if (slash <= 0 || slash === target.length - 1) return null;
+  const owner = target.slice(0, slash);
+  const filename = target.slice(slash + 1);
+  let app = await storage.getAppByOwnerName(owner, filename);
+  // Backward-compat: target may carry the full GHII as the owner segment
+  if (!app && owner.includes('@')) {
+    app = await storage.getAppByOwnerName(owner.split('@')[0], filename);
+  }
+  return app;
+}
+
+/** True when the app must not be served openly at a subdomain root. */
+function appIsRestricted(config: AimeatConfig, app: AppRecord): boolean {
+  if (app.accessCode) return true;
+  if (config.marketplaceEnabled && app.manifest.priceMorsels && app.manifest.priceMorsels > 0) return true;
+  return false;
+}
+
+/**
+ * Serves mapped subdomains at their root. Mounted BEFORE bootstrapRouter so a
+ * subdomain request never reaches the apex GET / handler; requests without a
+ * subdomain (or for any other path) fall through untouched, so the apex and
+ * all /v1 routes behave exactly as before.
+ */
+export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Router {
+  const router = Router();
+
+  router.get('/', async (req: Request, res: Response, next) => {
+    const sub = req.subdomain;
+    if (!sub) return next();
+
+    if (sub === 'www') {
+      res.redirect(301, config.baseUrl + req.originalUrl);
+      return;
+    }
+    // Reserved (non-www) and unknown/disabled subdomains all return the same
+    // 404 — no disclosure of which subdomains exist or are reserved.
+    const notFound = () =>
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Unknown subdomain'));
+
+    if (RESERVED_SUBDOMAINS.has(sub) || !SUBDOMAIN_RE.test(sub)) return notFound();
+
+    const site = await storage.getSubdomainSite(sub);
+    if (!site || !site.enabled) return notFound();
+
+    if (site.kind === 'redirect') {
+      res.redirect(301, site.target);
+      return;
+    }
+
+    const app = await resolveAppTarget(storage, site.target);
+    if (!app || appIsRestricted(config, app)) return notFound();
+
+    res.setHeader('Content-Type', app.mimeType);
+    res.setHeader('Content-Length', app.size.toString());
+    res.setHeader('Content-Security-Policy', APP_CSP);
+    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    storage.incrementAppDownloads(app.ownerGaii, app.filename).catch(() => { });
+    res.send(app.data);
+  });
+
+  return router;
+}
+
+/** Operator-only management CRUD for subdomain mappings. */
+export function subdomainAdminRouter(config: AimeatConfig, storage: Storage): Router {
+  const router = Router();
+  const operatorOnly = [requireAuth(), requireRole('operator')] as const;
+
+  // Validates kind+target; sends the error response and returns false on failure.
+  async function validateTarget(res: Response, kind: string, target: string): Promise<boolean> {
+    if (kind === 'redirect') {
+      if (!/^https?:\/\/\S+$/.test(target)) {
+        res.status(400).json(error(config.nodeId, 'INVALID_TARGET', 'Redirect target must be an absolute http(s) URL'));
+        return false;
+      }
+      return true;
+    }
+    // kind === 'app'
+    const app = await resolveAppTarget(storage, target);
+    if (!app) {
+      res.status(404).json(error(config.nodeId, 'APP_NOT_FOUND', `No published app matches target "${target}" (expected "owner/filename")`));
+      return false;
+    }
+    if (appIsRestricted(config, app)) {
+      res.status(400).json(error(config.nodeId, 'APP_RESTRICTED', 'Access-code-protected or paid apps cannot be served at a subdomain root'));
+      return false;
+    }
+    return true;
+  }
+
+  // GET /v1/admin/subdomains — list all mappings
+  router.get('/v1/admin/subdomains', ...operatorOnly, async (_req, res) => {
+    const sites = await storage.listSubdomainSites();
+    res.json(success(config.nodeId, { sites, total: sites.length }));
+  });
+
+  // POST /v1/admin/subdomains — create a mapping
+  router.post('/v1/admin/subdomains', ...operatorOnly, async (req, res) => {
+    const body = req.body ?? {};
+    const subdomain = String(body.subdomain ?? '').trim().toLowerCase();
+    const kind = String(body.kind ?? 'app');
+    const target = String(body.target ?? '').trim();
+    const enabled = body.enabled === undefined ? true : Boolean(body.enabled);
+
+    if (!SUBDOMAIN_RE.test(subdomain)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_SUBDOMAIN',
+        'Subdomain must be 2-63 chars of lowercase a-z, 0-9 and hyphens, not starting or ending with a hyphen'));
+      return;
+    }
+    if (RESERVED_SUBDOMAINS.has(subdomain)) {
+      res.status(400).json(error(config.nodeId, 'RESERVED_SUBDOMAIN', `"${subdomain}" is a reserved subdomain`));
+      return;
+    }
+    if (kind !== 'app' && kind !== 'redirect') {
+      res.status(400).json(error(config.nodeId, 'INVALID_KIND', 'kind must be "app" or "redirect"'));
+      return;
+    }
+    if (!target) {
+      res.status(400).json(error(config.nodeId, 'INVALID_TARGET', 'target is required'));
+      return;
+    }
+    if (!(await validateTarget(res, kind, target))) return;
+
+    if (await storage.getSubdomainSite(subdomain)) {
+      res.status(409).json(error(config.nodeId, 'ALREADY_EXISTS', `Subdomain "${subdomain}" is already mapped`));
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const site: SubdomainSiteRecord = {
+      subdomain, kind, target, enabled,
+      createdBy: resolveIdentity(req.auth!, config.nodeId),
+      createdAt: now, updatedAt: now,
+    };
+    await storage.createSubdomainSite(site);
+    res.status(201).json(success(config.nodeId, { site }));
+  });
+
+  // PATCH /v1/admin/subdomains/:subdomain — update kind/target/enabled
+  router.patch('/v1/admin/subdomains/:subdomain', ...operatorOnly, async (req, res) => {
+    const subdomain = (req.params.subdomain as string).trim().toLowerCase();
+    const existing = await storage.getSubdomainSite(subdomain);
+    if (!existing) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Subdomain "${subdomain}" is not mapped`));
+      return;
+    }
+
+    const body = req.body ?? {};
+    const updates: Partial<Pick<SubdomainSiteRecord, 'kind' | 'target' | 'enabled'>> = {};
+    if (body.kind !== undefined) {
+      if (body.kind !== 'app' && body.kind !== 'redirect') {
+        res.status(400).json(error(config.nodeId, 'INVALID_KIND', 'kind must be "app" or "redirect"'));
+        return;
+      }
+      updates.kind = body.kind;
+    }
+    if (body.target !== undefined) updates.target = String(body.target).trim();
+    if (body.enabled !== undefined) updates.enabled = Boolean(body.enabled);
+
+    // Cross-validate the effective kind/target pair when either changes
+    if (updates.kind !== undefined || updates.target !== undefined) {
+      const kind = updates.kind ?? existing.kind;
+      const target = updates.target ?? existing.target;
+      if (!target) {
+        res.status(400).json(error(config.nodeId, 'INVALID_TARGET', 'target is required'));
+        return;
+      }
+      if (!(await validateTarget(res, kind, target))) return;
+    }
+
+    const site = await storage.updateSubdomainSite(subdomain, updates);
+    res.json(success(config.nodeId, { site }));
+  });
+
+  // DELETE /v1/admin/subdomains/:subdomain — remove a mapping
+  router.delete('/v1/admin/subdomains/:subdomain', ...operatorOnly, async (req, res) => {
+    const subdomain = (req.params.subdomain as string).trim().toLowerCase();
+    const deleted = await storage.deleteSubdomainSite(subdomain);
+    if (!deleted) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Subdomain "${subdomain}" is not mapped`));
+      return;
+    }
+    res.json(success(config.nodeId, { deleted: true, subdomain }));
+  });
+
+  return router;
+}

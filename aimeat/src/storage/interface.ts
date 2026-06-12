@@ -308,6 +308,19 @@ export interface AppListOptions {
   freeOnly?: boolean;
 }
 
+// Subdomain → published-app / redirect mapping (operator-managed).
+// kind 'app': target is "owner/filename.html" of a published app.
+// kind 'redirect': target is an absolute http(s) URL.
+export interface SubdomainSiteRecord {
+  subdomain: string;            // primary key, lowercase
+  kind: 'app' | 'redirect';
+  target: string;
+  enabled: boolean;
+  createdBy: string;            // GHII of the operator who created the mapping
+  createdAt: string;            // ISO timestamp
+  updatedAt: string;            // ISO timestamp
+}
+
 // Phase E — App Marketplace purchase receipts (immutable, self-contained)
 export interface AppPurchaseRecord {
   transactionId: string;          // "mktx_..."
@@ -1869,6 +1882,7 @@ import type { SessionRepository } from './repositories/session.repository.js';
 import type { PatRepository } from './repositories/pat.repository.js';
 import type { AppRepository } from './repositories/app.repository.js';
 import type { AppMarketplaceRepository } from './repositories/app-marketplace.repository.js';
+import type { SubdomainSiteRepository } from './repositories/subdomain-site.repository.js';
 import type { ConfigRepository } from './repositories/config.repository.js';
 import type { NotificationTemplateRepository } from './repositories/notification-template.repository.js';
 import type { KnowledgeRepository } from './repositories/knowledge.repository.js';
@@ -1900,7 +1914,7 @@ export interface Storage extends
   ModerationRepository, OrganismRepository, MarketplaceRepository,
   FederationRepository, NodeRepository, NotificationRepository,
   AuthRepository, SessionRepository, PatRepository,
-  AppRepository, AppMarketplaceRepository, ConfigRepository,
+  AppRepository, AppMarketplaceRepository, SubdomainSiteRepository, ConfigRepository,
   NotificationTemplateRepository,
   KnowledgeRepository, SchedulerRepository,
   ExtensionInstanceRepository, ReplicationQueueRepository,

@@ -6341,6 +6341,26 @@
     }
   },
   "admin": {
+    "subdomains": {
+      "title": "Alidomainit",
+      "desc": "Liitä alidomaineja julkaistuihin appeihin tai uudelleenohjauksiin. Liitetty alidomain tarjoilee appin HTML:n juurestaan (esim. sanomat.aimeat.io). Hallinta on vain operaattorille.",
+      "add": "Lisää liitos",
+      "subdomain": "Alidomain",
+      "kind": "Tyyppi",
+      "kindApp": "Appi",
+      "kindRedirect": "Uudelleenohjaus",
+      "target": "Kohde",
+      "targetHintApp": "julkaistun appin omistaja/tiedostonimi.html",
+      "targetHintRedirect": "https://esimerkki.fi/polku",
+      "enabled": "Käytössä",
+      "createdBy": "Luonut",
+      "created": "Luotu",
+      "create": "Luo",
+      "empty": "Ei alidomain-liitoksia vielä.",
+      "delete": "Poista",
+      "deleteTitle": "Poista alidomain-liitos",
+      "deleteConfirm": "Tämä poistaa liitoksen ja alidomain lakkaa toimimasta heti. Vahvista kirjoittamalla alidomainin nimi:"
+    },
     "security": {
       "title": "Tietoturva",
       "desc": "Hylätyt / karanteeniin laitetut lataukset ja muut tietoturvatapahtumat.",
