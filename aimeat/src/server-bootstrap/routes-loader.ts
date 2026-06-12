@@ -102,6 +102,7 @@ import { agentSkillBundleRouter } from '../routes/agent-skill-bundle.js';
 import { agentOnboardingRouter } from '../routes/agent-onboarding.js';
 import { connectTunnelRouter } from '../routes/connect-tunnel.js';
 import { subdomainServeRouter, subdomainAdminRouter } from '../routes/subdomains.js';
+import { appsBackupRouter } from '../routes/apps-backup.js';
 
 // Services needed during route mounting
 import { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
@@ -409,6 +410,9 @@ export async function mountRoutes(
   app.use(ghiiRouter(config, storage, emailService, notifyDirectoryChange, peers));
   app.use(chatInstancesRouter(config, storage));
   app.use(libsRouter(config, storage));
+  // Backup routes BEFORE appsRouter so /v1/apps/backup/* never collides with
+  // the parameterized /v1/apps/:owner/:filename routes.
+  app.use(appsBackupRouter(config, storage));
   app.use(appsRouter(config, storage, peers));
   app.use(appStoreRouter(config, storage));
   // Node Extensions (Sandboxed)

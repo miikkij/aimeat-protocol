@@ -1074,9 +1074,88 @@
 
     /* ── Publish Modal ──────────────────────────────── */
 
+    /* ── Backup menu + import modal ─────────────────── */
+
+    .backup-menu-wrap { position: relative; }
+
+    .backup-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      z-index: 600;
+      min-width: 220px;
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, .18);
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .backup-menu[hidden] { display: none; }
+
+    .backup-menu button {
+      background: none;
+      border: none;
+      color: var(--text);
+      text-align: left;
+      padding: 8px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: .85rem;
+      white-space: nowrap;
+    }
+
+    .backup-menu button:hover { background: var(--hover); }
+
+    #backup-modal { max-height: 84vh; display: flex; flex-direction: column; }
+    #backup-import-body { overflow-y: auto; flex: 1; min-height: 0; }
+
+    .backup-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .backup-table th {
+      text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em;
+      color: var(--text-muted); padding: 6px 8px; border-bottom: 1px solid var(--border-subtle);
+    }
+    .backup-table td { padding: 6px 8px; border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
+    .backup-table .mono-cell { font-family: monospace; font-size: .78rem; color: var(--text-muted); }
+
+    .backup-versions-toggle {
+      background: none; border: none; color: var(--accent); cursor: pointer;
+      font-size: .78rem; padding: 0; text-decoration: underline;
+    }
+    .backup-version-list { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+    .backup-version-list label { font-size: .78rem; color: var(--text-muted); display: flex; gap: 6px; align-items: center; }
+
+    .backup-conflict-select {
+      background: var(--bg-subtle); color: var(--text); border: 1px solid var(--border-subtle);
+      border-radius: 6px; padding: 4px 6px; font-size: .78rem;
+    }
+
+    .backup-status-badge {
+      display: inline-block; font-size: .62rem; font-weight: 600; text-transform: uppercase;
+      padding: 2px 6px; border-radius: 4px;
+    }
+    .backup-status-new { background: rgba(52, 211, 153, .12); color: #34d399; border: 1px solid rgba(52, 211, 153, .3); }
+    .backup-status-exists { background: rgba(245, 158, 11, .10); color: #d97706; border: 1px solid rgba(245, 158, 11, .25); }
+
+    .backup-toolbar-row {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 8px; margin: 8px 0; flex-wrap: wrap;
+    }
+    .backup-summary-line { font-size: .82rem; color: var(--text-muted); }
+    .backup-link-btn {
+      background: none; border: none; color: var(--accent); cursor: pointer;
+      font-size: .8rem; padding: 0 4px; text-decoration: underline;
+    }
+    .backup-result-list { font-size: .82rem; margin: 4px 0 10px; padding-left: 18px; }
+    .backup-result-errors { color: #ef4444; }
+
     #publish-overlay,
     #versions-overlay,
-    #subdomain-overlay {
+    #subdomain-overlay,
+    #backup-overlay {
       position: fixed;
       inset: 0;
       z-index: 560;
@@ -1091,7 +1170,8 @@
 
     #publish-overlay[hidden],
     #versions-overlay[hidden],
-    #subdomain-overlay[hidden] {
+    #subdomain-overlay[hidden],
+    #backup-overlay[hidden] {
       display: none;
     }
 
@@ -1381,6 +1461,14 @@
       <button class="icon-btn" id="add-btn" data-i18n-title="action.add" title="Add app">+</button>
       <button class="icon-btn" id="generate-btn" data-i18n-title="action.generate" title="Generate with AI">&#x2728;</button>
       <button class="icon-btn" id="homepage-btn" data-i18n-title="action.homepage" title="Generate Homepage">&#x1F3E0;</button>
+      <div class="backup-menu-wrap">
+        <button class="icon-btn" id="backup-btn" data-i18n-title="backup.menu" title="Backup" onclick="window._launcher.toggleBackupMenu(event)">&#x1F4BE;</button>
+        <div id="backup-menu" class="backup-menu" hidden>
+          <button onclick="window._launcher.exportBackupZip()" data-i18n="backup.exportAll">&#x1F4E6; Export all (.zip)</button>
+          <button onclick="window._launcher.importBackupPick()" data-i18n="backup.importFrom">&#x1F4E5; Import from backup...</button>
+        </div>
+      </div>
+      <input type="file" id="backup-file-input" accept=".zip,application/zip,application/x-zip-compressed" hidden />
       <div class="lang-toggle" id="lang-toggle" title="Language / Kieli">
         <button class="lang-btn" data-lang="en" onclick="window._launcher.setLanguage('en')">EN</button>
         <button class="lang-btn" data-lang="fi" onclick="window._launcher.setLanguage('fi')">FI</button>
@@ -1680,6 +1768,19 @@
     </div>
   </div>
 
+  <!-- Backup Import Modal -->
+  <div id="backup-overlay" hidden>
+    <div class="modal" id="backup-modal">
+      <h2 data-i18n="backup.title">&#x1F4E5; Import from backup</h2>
+      <div id="backup-status" style="margin:4px 0;font-size:.85rem;min-height:1.1em"></div>
+      <div id="backup-import-body"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('backup-overlay').hidden = true" data-i18n="common.close">Close</button>
+        <button type="button" class="modal-btn primary" id="backup-restore-btn" onclick="window._launcher.submitBackupRestore()" data-i18n="backup.restore" style="display:none">Restore selected</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Subdomain Assign Modal (operator only) -->
   <div id="subdomain-overlay" hidden>
     <div class="modal" id="subdomain-modal">
@@ -1849,6 +1950,39 @@
       'card.fork': '⑂ Fork',
       'card.restore': '↺ Restore',
       'card.subdomain': '🌐 Subdomain',
+      'backup.menu': 'Backup',
+      'backup.exportAll': '📦 Export all (.zip)',
+      'backup.importFrom': '📥 Import from backup...',
+      'backup.title': '📥 Import from backup',
+      'backup.inspecting': 'Reading backup...',
+      'backup.exporting': 'Building backup...',
+      'backup.from': 'Backup from',
+      'backup.selectAll': 'Select all',
+      'backup.selectNone': 'Select none',
+      'backup.restoring': 'Restoring',
+      'backup.sumApps': 'apps',
+      'backup.sumVersions': 'versions',
+      'backup.sumExts': 'extensions',
+      'backup.colApp': 'App',
+      'backup.colVersions': 'Versions',
+      'backup.colStatus': 'Status',
+      'backup.statusNew': 'new',
+      'backup.statusExists': 'exists',
+      'backup.conflictSkip': 'Skip',
+      'backup.conflictAppend': 'Append versions',
+      'backup.conflictCopy': 'Import as copy',
+      'backup.extensions': '🔌 Extensions',
+      'backup.restore': 'Restore selected',
+      'backup.resultTitle': 'Restore complete',
+      'backup.resCreated': 'Created',
+      'backup.resAppended': 'Versions appended to',
+      'backup.resCopied': 'Imported as copy',
+      'backup.resSkipped': 'Skipped',
+      'backup.resVersions': 'Versions restored',
+      'backup.resErrors': 'Errors',
+      'backup.loginRequired': 'Sign in first to use backups.',
+      'backup.nothingSelected': 'Nothing selected.',
+      'backup.empty': 'The backup contains no apps or extensions.',
       'subModal.title': '🌐 Assign Subdomain',
       'subModal.label': 'Subdomain',
       'subModal.hint': 'Lowercase letters, numbers and hyphens (2-63 chars). The app is served at the subdomain root.',
@@ -1969,6 +2103,39 @@
       'card.fork': '⑂ Haaroita',
       'card.restore': '↺ Palauta',
       'card.subdomain': '🌐 Alidomain',
+      'backup.menu': 'Varmuuskopio',
+      'backup.exportAll': '📦 Vie kaikki (.zip)',
+      'backup.importFrom': '📥 Tuo varmuuskopiosta...',
+      'backup.title': '📥 Tuo varmuuskopiosta',
+      'backup.inspecting': 'Luetaan varmuuskopiota...',
+      'backup.exporting': 'Kootaan varmuuskopiota...',
+      'backup.from': 'Varmuuskopio lähteestä',
+      'backup.selectAll': 'Valitse kaikki',
+      'backup.selectNone': 'Tyhjennä valinta',
+      'backup.restoring': 'Palautetaan',
+      'backup.sumApps': 'appia',
+      'backup.sumVersions': 'versiota',
+      'backup.sumExts': 'laajennusta',
+      'backup.colApp': 'Appi',
+      'backup.colVersions': 'Versiot',
+      'backup.colStatus': 'Tila',
+      'backup.statusNew': 'uusi',
+      'backup.statusExists': 'olemassa',
+      'backup.conflictSkip': 'Ohita',
+      'backup.conflictAppend': 'Lisää versiot päälle',
+      'backup.conflictCopy': 'Tuo kopiona',
+      'backup.extensions': '🔌 Laajennukset',
+      'backup.restore': 'Palauta valitut',
+      'backup.resultTitle': 'Palautus valmis',
+      'backup.resCreated': 'Luotiin',
+      'backup.resAppended': 'Versiot lisätty päälle',
+      'backup.resCopied': 'Tuotu kopiona',
+      'backup.resSkipped': 'Ohitettiin',
+      'backup.resVersions': 'Versioita palautettu',
+      'backup.resErrors': 'Virheet',
+      'backup.loginRequired': 'Kirjaudu ensin sisään käyttääksesi varmuuskopioita.',
+      'backup.nothingSelected': 'Mitään ei ole valittu.',
+      'backup.empty': 'Varmuuskopiossa ei ole appeja eikä laajennuksia.',
       'subModal.title': '🌐 Liitä alidomain',
       'subModal.label': 'Alidomain',
       'subModal.hint': 'Pienet kirjaimet, numerot ja viivat (2-63 merkkiä). Appi tarjoillaan alidomainin juuresta.',
@@ -3878,6 +4045,302 @@
       });
   }
 
+  // ── Backup: export all + selective import ────────
+  // Follows the organism-export bundle model: one ZIP, manifest + per-item
+  // folders, inspect-before-write, explicit conflict modes — never a silent
+  // overwrite.
+
+  function toggleBackupMenu(event) {
+    if (event && event.stopPropagation) event.stopPropagation();
+    var menu = document.getElementById('backup-menu');
+    menu.hidden = !menu.hidden;
+  }
+
+  function backupApiBase() {
+    var config = loadConfig();
+    return (config.aimeatUrl || window.location.origin).replace(/\/+$/, '');
+  }
+
+  function exportBackupZip() {
+    document.getElementById('backup-menu').hidden = true;
+    var token = getCortexOwnerToken();
+    if (!token) { alert(t('backup.loginRequired')); return; }
+    var btn = document.getElementById('backup-btn');
+    btn.disabled = true;
+    fetch(backupApiBase() + '/v1/apps/backup', { headers: { 'Authorization': 'Bearer ' + token } })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        var cd = r.headers.get('Content-Disposition') || '';
+        var m = cd.match(/filename="([^"]+)"/);
+        return r.blob().then(function (b) { return { blob: b, name: m ? m[1] : 'aimeat-apps-backup.zip' }; });
+      })
+      .then(function (o) {
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(o.blob);
+        a.download = o.name;
+        a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+      })
+      .catch(function (e) { alert('Export failed: ' + (e.message || e)); })
+      .finally(function () { btn.disabled = false; });
+  }
+
+  var backupInspectData = null;   // inspect response (apps, extensions, backup_token)
+
+  function importBackupPick() {
+    document.getElementById('backup-menu').hidden = true;
+    var token = getCortexOwnerToken();
+    if (!token) { alert(t('backup.loginRequired')); return; }
+    document.getElementById('backup-file-input').click();
+  }
+
+  function importBackupFile(file) {
+    var overlay = document.getElementById('backup-overlay');
+    var statusEl = document.getElementById('backup-status');
+    var body = document.getElementById('backup-import-body');
+    document.getElementById('backup-restore-btn').style.display = 'none';
+    body.innerHTML = '';
+    statusEl.style.color = 'var(--text-muted)';
+    statusEl.textContent = t('backup.inspecting');
+    overlay.hidden = false;
+
+    file.arrayBuffer()
+      .then(function (buf) {
+        return fetch(backupApiBase() + '/v1/apps/backup/inspect', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + getCortexOwnerToken(),
+            'Content-Type': 'application/zip'
+          },
+          body: buf
+        });
+      })
+      .then(function (r) { return r.json().then(function (j) { return { status: r.status, json: j }; }); })
+      .then(function (o) {
+        if (!o.json.ok) {
+          var msg = (o.json.error && (o.json.error.message || o.json.error.code)) || ('HTTP ' + o.status);
+          throw new Error(msg);
+        }
+        backupInspectData = o.json.data;
+        statusEl.textContent = '';
+        renderBackupSelection();
+      })
+      .catch(function (e) {
+        statusEl.style.color = '#ef4444';
+        statusEl.textContent = e.message || String(e);
+      });
+  }
+
+  function renderBackupSelection() {
+    var d = backupInspectData;
+    var body = document.getElementById('backup-import-body');
+    if (!d || (d.apps.length === 0 && d.extensions.length === 0)) {
+      body.innerHTML = '<p style="color:var(--text-muted)">' + t('backup.empty') + '</p>';
+      return;
+    }
+
+    var conflictOptions =
+      '<option value="skip">' + t('backup.conflictSkip') + '</option>' +
+      '<option value="append">' + t('backup.conflictAppend') + '</option>' +
+      '<option value="copy">' + t('backup.conflictCopy') + '</option>';
+
+    var html =
+      '<div style="font-size:.8rem;color:var(--text-muted)">' + t('backup.from') + ': <span style="font-family:monospace">' +
+        escapeHtml((d.source.owner || '?') + '@' + (d.source.nodeId || '?')) + '</span>' +
+        (d.exported_at ? ' · ' + new Date(d.exported_at).toLocaleString() : '') +
+      '</div>' +
+      '<div class="backup-toolbar-row">' +
+        '<div>' +
+          '<button class="backup-link-btn" onclick="window._launcher.backupSelectAll(true)">' + t('backup.selectAll') + '</button> / ' +
+          '<button class="backup-link-btn" onclick="window._launcher.backupSelectAll(false)">' + t('backup.selectNone') + '</button>' +
+        '</div>' +
+        '<div class="backup-summary-line" id="backup-summary"></div>' +
+      '</div>' +
+      '<table class="backup-table"><thead><tr>' +
+        '<th></th><th>' + t('backup.colApp') + '</th><th>' + t('backup.colVersions') + '</th><th>' + t('backup.colStatus') + '</th>' +
+      '</tr></thead><tbody>';
+
+    for (var i = 0; i < d.apps.length; i++) {
+      var app = d.apps[i];
+      var versionList = '';
+      for (var v = 0; v < app.versions.length; v++) {
+        var ver = app.versions[v];
+        versionList +=
+          '<label><input type="checkbox" class="backup-ver" data-app="' + i + '" data-v="' + ver.version + '" checked ' +
+            'onchange="window._launcher.backupUpdateSummary()"/> v' + ver.version +
+            (ver.semver ? ' (' + escapeHtml(ver.semver) + ')' : '') +
+            ' · ' + (ver.size < 1024 ? ver.size + ' B' : (ver.size / 1024).toFixed(1) + ' KB') +
+            (ver.created_at ? ' · ' + new Date(ver.created_at).toLocaleDateString() : '') +
+          '</label>';
+      }
+      html +=
+        '<tr>' +
+          '<td><input type="checkbox" id="backup-app-' + i + '" checked onchange="window._launcher.backupUpdateSummary()"/></td>' +
+          '<td>' + escapeHtml(app.name || app.filename) +
+            '<div class="mono-cell">' + escapeHtml(app.filename) + '</div></td>' +
+          '<td>' + app.versions.length + ' ' +
+            '<button class="backup-versions-toggle" onclick="var el=document.getElementById(\'backup-app-' + i + '-versions\');el.style.display=el.style.display===\'none\'?\'\':\'none\'">' + t('backup.colVersions').toLowerCase() + ' ▾</button>' +
+            '<div class="backup-version-list" id="backup-app-' + i + '-versions" style="display:none">' + versionList + '</div></td>' +
+          '<td>' +
+            (app.exists
+              ? '<span class="backup-status-badge backup-status-exists">' + t('backup.statusExists') + '</span><br/>' +
+                '<select class="backup-conflict-select" id="backup-app-' + i + '-conflict">' + conflictOptions + '</select>'
+              : '<span class="backup-status-badge backup-status-new">' + t('backup.statusNew') + '</span>') +
+          '</td>' +
+        '</tr>';
+    }
+    html += '</tbody></table>';
+
+    if (d.extensions.length > 0) {
+      html += '<h3 style="font-size:.9rem;margin:14px 0 6px">' + t('backup.extensions') + '</h3>';
+      for (var e = 0; e < d.extensions.length; e++) {
+        var ext = d.extensions[e];
+        html +=
+          '<div style="display:flex;align-items:center;gap:8px;padding:4px 8px;font-size:.85rem">' +
+            '<input type="checkbox" id="backup-ext-' + e + '" checked onchange="window._launcher.backupUpdateSummary()"/>' +
+            '<span style="font-family:monospace">' + escapeHtml(ext.name) + '</span>' +
+            (ext.exists
+              ? '<span class="backup-status-badge backup-status-exists">' + t('backup.statusExists') + '</span>' +
+                '<select class="backup-conflict-select" id="backup-ext-' + e + '-conflict">' +
+                  '<option value="skip">' + t('backup.conflictSkip') + '</option>' +
+                  '<option value="copy">' + t('backup.conflictCopy') + '</option>' +
+                '</select>'
+              : '<span class="backup-status-badge backup-status-new">' + t('backup.statusNew') + '</span>') +
+          '</div>';
+      }
+    }
+
+    body.innerHTML = html;
+    document.getElementById('backup-restore-btn').style.display = '';
+    backupUpdateSummary();
+  }
+
+  // Reads the current selection straight from the DOM — no parallel state to drift.
+  function backupCollectSelections() {
+    var d = backupInspectData;
+    var selections = [];
+    var extensions = [];
+    if (!d) return { selections: selections, extensions: extensions, versionTotal: 0 };
+    var versionTotal = 0;
+    for (var i = 0; i < d.apps.length; i++) {
+      var cb = document.getElementById('backup-app-' + i);
+      if (!cb || !cb.checked) continue;
+      var app = d.apps[i];
+      var checkedVers = [];
+      var verBoxes = document.querySelectorAll('.backup-ver[data-app="' + i + '"]');
+      verBoxes.forEach(function (b) { if (b.checked) checkedVers.push(parseInt(b.getAttribute('data-v'), 10)); });
+      if (checkedVers.length === 0) continue;
+      var sel = { filename: app.filename };
+      if (checkedVers.length !== app.versions.length) sel.versions = checkedVers;
+      if (app.exists) {
+        var conflictEl = document.getElementById('backup-app-' + i + '-conflict');
+        sel.conflict = conflictEl ? conflictEl.value : 'skip';
+      }
+      versionTotal += checkedVers.length;
+      selections.push(sel);
+    }
+    for (var e = 0; e < d.extensions.length; e++) {
+      var ecb = document.getElementById('backup-ext-' + e);
+      if (!ecb || !ecb.checked) continue;
+      var ext = { name: d.extensions[e].name };
+      if (d.extensions[e].exists) {
+        var ecEl = document.getElementById('backup-ext-' + e + '-conflict');
+        ext.conflict = ecEl ? ecEl.value : 'skip';
+      }
+      extensions.push(ext);
+    }
+    return { selections: selections, extensions: extensions, versionTotal: versionTotal };
+  }
+
+  function backupUpdateSummary() {
+    var sel = backupCollectSelections();
+    var el = document.getElementById('backup-summary');
+    if (!el) return;
+    el.textContent = t('backup.restoring') + ': ' + sel.selections.length + ' ' + t('backup.sumApps') +
+      ', ' + sel.versionTotal + ' ' + t('backup.sumVersions') +
+      (sel.extensions.length ? ', ' + sel.extensions.length + ' ' + t('backup.sumExts') : '');
+  }
+
+  function backupSelectAll(checked) {
+    var d = backupInspectData;
+    if (!d) return;
+    for (var i = 0; i < d.apps.length; i++) {
+      var cb = document.getElementById('backup-app-' + i);
+      if (cb) cb.checked = checked;
+      document.querySelectorAll('.backup-ver[data-app="' + i + '"]').forEach(function (b) { b.checked = checked; });
+    }
+    for (var e = 0; e < d.extensions.length; e++) {
+      var ecb = document.getElementById('backup-ext-' + e);
+      if (ecb) ecb.checked = checked;
+    }
+    backupUpdateSummary();
+  }
+
+  function submitBackupRestore() {
+    var sel = backupCollectSelections();
+    var statusEl = document.getElementById('backup-status');
+    if (sel.selections.length === 0 && sel.extensions.length === 0) {
+      statusEl.style.color = '#ef4444';
+      statusEl.textContent = t('backup.nothingSelected');
+      return;
+    }
+    statusEl.style.color = 'var(--text-muted)';
+    statusEl.textContent = t('backup.restoring') + '...';
+    var btn = document.getElementById('backup-restore-btn');
+    btn.disabled = true;
+    fetch(backupApiBase() + '/v1/apps/backup/restore', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + getCortexOwnerToken(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        backup_token: backupInspectData.backup_token,
+        selections: sel.selections,
+        extensions: sel.extensions
+      })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (json) {
+        if (!json.ok) {
+          var msg = (json.error && (json.error.message || json.error.code)) || 'Restore failed';
+          throw new Error(msg);
+        }
+        statusEl.textContent = '';
+        renderBackupResult(json.data);
+        refreshAll();
+      })
+      .catch(function (e) {
+        statusEl.style.color = '#ef4444';
+        statusEl.textContent = e.message || String(e);
+      })
+      .finally(function () { btn.disabled = false; });
+  }
+
+  function renderBackupResult(s) {
+    var body = document.getElementById('backup-import-body');
+    document.getElementById('backup-restore-btn').style.display = 'none';
+    var section = function (label, items) {
+      if (!items || items.length === 0) return '';
+      var rendered = items.map(function (x) {
+        if (typeof x === 'string') return escapeHtml(x);
+        if (x && x.from && x.to) return escapeHtml(x.from) + ' → ' + escapeHtml(x.to);
+        if (x && x.item) return escapeHtml(x.item) + ': ' + escapeHtml(x.message || '');
+        return escapeHtml(JSON.stringify(x));
+      });
+      return '<div style="font-size:.85rem;font-weight:600;margin-top:8px">' + label + ' (' + items.length + ')</div>' +
+        '<ul class="backup-result-list">' + rendered.map(function (r) { return '<li>' + r + '</li>'; }).join('') + '</ul>';
+    };
+    body.innerHTML =
+      '<h3 style="font-size:.95rem;margin:6px 0">✔ ' + t('backup.resultTitle') + '</h3>' +
+      '<div style="font-size:.85rem">' + t('backup.resVersions') + ': ' + s.versions_restored + '</div>' +
+      section(t('backup.resCreated'), s.apps_created.concat(s.extensions_created)) +
+      section(t('backup.resAppended'), s.apps_appended) +
+      section(t('backup.resCopied'), s.apps_copied.concat(s.extensions_copied)) +
+      section(t('backup.resSkipped'), s.apps_skipped.concat(s.extensions_skipped)) +
+      (s.errors.length ? '<div class="backup-result-errors">' + section(t('backup.resErrors'), s.errors) + '</div>' : '');
+  }
+
   // ── Server → local import (AI-published apps) ────
   // Apps published under this owner's account via MCP exist only on the server.
   // Importing them into the local catalog gives them the exact same management
@@ -5199,6 +5662,12 @@
     showSubdomainModal: showSubdomainModal,
     submitSubdomainAssign: submitSubdomainAssign,
     unassignSubdomain: unassignSubdomain,
+    toggleBackupMenu: toggleBackupMenu,
+    exportBackupZip: exportBackupZip,
+    importBackupPick: importBackupPick,
+    backupSelectAll: backupSelectAll,
+    backupUpdateSummary: backupUpdateSummary,
+    submitBackupRestore: submitBackupRestore,
     showVersionsModal: showVersionsModal,
     restoreVersion: restoreVersion,
     forkVersion: forkVersion,
@@ -5319,6 +5788,23 @@
     document.getElementById('subdomain-overlay').addEventListener('click', function (e) {
       if (e.target === this) {
         this.hidden = true;
+      }
+    });
+
+    // ── Backup: file picker + overlay/menu close ────
+    document.getElementById('backup-file-input').addEventListener('change', function () {
+      if (this.files && this.files[0]) importBackupFile(this.files[0]);
+      this.value = '';
+    });
+    document.getElementById('backup-overlay').addEventListener('click', function (e) {
+      if (e.target === this) {
+        this.hidden = true;
+      }
+    });
+    document.addEventListener('click', function (e) {
+      var menu = document.getElementById('backup-menu');
+      if (!menu.hidden && !menu.contains(e.target) && e.target.id !== 'backup-btn') {
+        menu.hidden = true;
       }
     });
 
@@ -5464,6 +5950,8 @@
           document.getElementById('publish-overlay').hidden = true;
         } else if (!document.getElementById('subdomain-overlay').hidden) {
           document.getElementById('subdomain-overlay').hidden = true;
+        } else if (!document.getElementById('backup-overlay').hidden) {
+          document.getElementById('backup-overlay').hidden = true;
         } else if (!document.getElementById('settings-overlay').hidden) {
           closeSettings();
         } else if (!document.getElementById('modal-overlay').hidden) {
