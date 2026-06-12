@@ -5,6 +5,7 @@
  * @version-history
  *   v1.0.0 -- 2026-06-12 -- Initial: Do feed cards, badges, offer detail, provenance footer.
  *   v1.1.0 -- 2026-06-12 -- Billable offers: price/visibility badges + the Selling editor row.
+ *   v1.2.0 -- 2026-06-12 -- Markdown deliverable/sample (.of-md) + Inbox deep-link (.of-link).
  */
 .of { max-width: 920px; }
 .of-search { width: 100%; margin: 0.5rem 0 0.75rem; }
@@ -73,3 +74,10 @@
 .of-bill-vis { flex: 0 1 180px; }
 .of-bill-price { flex: 0 1 110px; }
 .of-warn { color: var(--warn, #f59e0b); }
+
+/* Rendered markdown (deliverable + sample) + the Inbox deep-link */
+.of-md { font-size: 0.86rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.7rem; overflow-x: auto; max-height: 360px; }
+.of-md > :first-child { margin-top: 0; }
+.of-md > :last-child { margin-bottom: 0; }
+.of-sample-md { max-height: 200px; }
+.of-link { background: none; border: none; padding: 0; margin-left: 0.35rem; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }
