@@ -75,6 +75,18 @@ All notable changes to AIMEAT are documented in this file.
 
 ### Fixed
 
+- **Settings → Import JSON no longer creates duplicates or imports blindly.**
+  The legacy local-backup import wrote every app in the file straight into the
+  catalog with a fresh id ("Imported N app(s) successfully"), so re-importing
+  a backup of apps you already had silently duplicated all of them — and there
+  was no way to choose. The import now opens a review modal: every app in the
+  file is compared against the catalog (published filename, or name + content
+  size), duplicates are badged and UNCHECKED by default, new apps checked, and
+  only the explicit selection is imported. Settings (theme/language/server
+  URL) are likewise only applied via an explicit opt-in checkbox instead of
+  silently. A new Settings → "🧹 Remove duplicate apps" cleanup deletes
+  surplus copies left behind by the old behavior (keeps favorites and the
+  oldest copy of each app, type-confirmed with the count before deleting).
 - **An agent can find its home: organism listing includes own memberships.** The
   connector's `aimeat_organism_list` (both the MCP-serve tool and the
   shell-callable `aimeat connect call` handler) called `GET /v1/organisms` bare,

@@ -32,6 +32,8 @@ export interface ComponentRegistrationResult {
   componentId: string;
   registeredAs: string;
   error?: string;
+  /** Short name from the source manifest (only set for cortex + extension). */
+  originalShortName?: string;
 }
 
 export interface ComponentRegistrationInput {
@@ -46,6 +48,21 @@ export interface ComponentRegistrationInput {
   packageCategory?: string;
   packageTags?: string[];
   packageDescription?: string;
+  /**
+   * URL rewrites applied to app HTML content at install time. Built by the
+   * installer from already-registered cortex/extension components in the same
+   * package. Without this, app HTML containing
+   *   loadScript('/v1/cortex/comicland-v2/libs/comicland-v2.js')
+   * would 404 once the cortex is registered as
+   *   comicland-v2-alice-06c4c5af-cortex-comicland-v2
+   * (the package-install scheme).
+   */
+  urlRewrites?: {
+    /** Map<originalShortName, registeredAs> for cortex components. */
+    cortexNames?: Map<string, string>;
+    /** Map<originalShortName, registeredAs> for extension components. */
+    extensionNames?: Map<string, string>;
+  };
 }
 
 // ── Hash utility ─────────────────────────────────────────────────────
@@ -64,6 +81,9 @@ export async function registerComponent(
 ): Promise<ComponentRegistrationResult> {
   const { componentId, type, registeredAs, content, label, owner, ownerGaii, packageName } = input;
   const now = new Date().toISOString();
+  // Set inside cortex / extension cases below; surfaced in the result so the
+  // installer can build a "originalShortName → registeredAs" map for app rewrites.
+  let originalShortName: string | undefined;
 
   try {
     switch (type) {
@@ -104,6 +124,7 @@ export async function registerComponent(
         catch { /* use defaults */ }
 
         const metadata = (meta.metadata ?? meta) as Record<string, unknown>;
+        originalShortName = (metadata.name as string) || undefined;
         const actionsRaw = (meta.actions ?? []) as Array<Record<string, unknown>>;
 
         const actions = actionsRaw.map(a => ({
@@ -146,6 +167,7 @@ export async function registerComponent(
         catch { /* use defaults */ }
 
         const metadata = (meta.metadata ?? meta) as Record<string, unknown>;
+        originalShortName = (metadata.name as string) || undefined;
         const componentsRaw = (meta.components ?? []) as Array<Record<string, unknown>>;
 
         const cortexComponents = componentsRaw.map(c => {
@@ -229,6 +251,35 @@ export async function registerComponent(
       }
 
       case 'app': {
+        // Rewrite hardcoded cortex/extension URLs in the app HTML so they
+        // point at the per-instance registered names. Without this, an app
+        // like comicland that does
+        //   loadScript('/v1/cortex/comicland-v2/libs/comicland-v2.js')
+        // would 404 when the cortex is registered as
+        //   comicland-v2-alice-06c4c5af-cortex-comicland-v2.
+        // Pattern matches a path segment (no slashes) between the route base
+        // and the next slash. We rewrite each known short-name once globally.
+        let rewritten = content;
+        const cortexMap = input.urlRewrites?.cortexNames;
+        if (cortexMap && cortexMap.size > 0) {
+          for (const [shortName, regAs] of cortexMap) {
+            if (!shortName || shortName === regAs) continue;
+            const escaped = shortName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // /v1/cortex/<shortName>(/ or end)
+            const re = new RegExp('(\\/v1\\/cortex\\/)' + escaped + '(?=[\\/?#"\\\'\\s]|$)', 'g');
+            rewritten = rewritten.replace(re, '$1' + regAs);
+          }
+        }
+        const extMap = input.urlRewrites?.extensionNames;
+        if (extMap && extMap.size > 0) {
+          for (const [shortName, regAs] of extMap) {
+            if (!shortName || shortName === regAs) continue;
+            const escaped = shortName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // /v1/ext/<shortName>(/ or end)  — covers the extension action route base
+            const re = new RegExp('(\\/v1\\/ext\\/)' + escaped + '(?=[\\/?#"\\\'\\s]|$)', 'g');
+            rewritten = rewritten.replace(re, '$1' + regAs);
+          }
+        }
         await storage.createApp({
           ownerGaii,
           ownerName: owner,
@@ -246,8 +297,8 @@ export async function registerComponent(
             usesCortex: [],
           },
           mimeType: 'text/html',
-          size: Buffer.byteLength(content, 'utf-8'),
-          data: Buffer.from(content, 'utf-8'),
+          size: Buffer.byteLength(rewritten, 'utf-8'),
+          data: Buffer.from(rewritten, 'utf-8'),
           createdAt: now,
         });
         break;
@@ -340,7 +391,7 @@ export async function registerComponent(
         return { success: false, componentId, registeredAs, error: `Unknown component type: ${type}` };
     }
 
-    return { success: true, componentId, registeredAs };
+    return { success: true, componentId, registeredAs, originalShortName };
   } catch (err: any) {
     return { success: false, componentId, registeredAs, error: err.message ?? String(err) };
   }

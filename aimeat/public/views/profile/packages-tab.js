@@ -36,14 +36,16 @@ import { importPackageToGenerator } from '/js/services/generator-packaging.js';
 // Components produced via packages-install are stored with status:'active'
 // at creation time (see component-registrar.ts), so the green "active" chip
 // here matches reality without re-fetching the underlying extension/cortex.
+// Profile reads ?tab=<id> on mount and routes to the matching tab; hash
+// fragments don't switch tabs. The IDs here are the profile tab IDs.
 const COMP_TYPE_META = {
-  app:         { icon: '\u{1F4F1}', tabHash: '#apps' },
-  extension:   { icon: '\u{1F50C}', tabHash: '#extensions' },
-  cortex:      { icon: '\u{1F9E0}', tabHash: '#extensions' },
-  memory:      { icon: '\u{1F4BE}', tabHash: '#memory' },
-  translation: { icon: '\u{1F310}', tabHash: '#memory' },
-  csm:         { icon: '\u{1F4D0}', tabHash: '#memory' },
-  msm:         { icon: '\u{1F4DC}', tabHash: '#memory' },
+  app:         { icon: '\u{1F4F1}', tabId: 'apps' },
+  extension:   { icon: '\u{1F50C}', tabId: 'extensions' },
+  cortex:      { icon: '\u{1F9E0}', tabId: 'extensions' },
+  memory:      { icon: '\u{1F4BE}', tabId: 'memory' },
+  translation: { icon: '\u{1F310}', tabId: 'memory' },
+  csm:         { icon: '\u{1F4D0}', tabId: 'memory' },
+  msm:         { icon: '\u{1F4DC}', tabId: 'memory' },
 };
 
 function InstanceCard({ inst, session, onCheckUpdate, onRemove, navigate }) {
@@ -66,10 +68,11 @@ function InstanceCard({ inst, session, onCheckUpdate, onRemove, navigate }) {
     if (c.type === 'extension' || c.type === 'cortex') {
       acts.push(html`
         <button class="btn-outline btn-sm" onClick=${() => {
-          // Profile tabs use hash routing — jump to extensions/cortex tab
-          // and let the user find this exact component by its registeredAs.
-          if (typeof navigate === 'function') navigate(meta.tabHash || '#extensions');
-          else window.location.hash = meta.tabHash || '#extensions';
+          // Profile reads ?tab=<id> on mount; this preserves the activeTab
+          // state via the same path the landing-page tab cards use.
+          const url = `/v1/profile?tab=${meta.tabId || 'extensions'}`;
+          if (typeof navigate === 'function') navigate(url);
+          else window.location.href = url;
         }}>
           ${t('packages.manage') || 'Manage'}
         </button>
@@ -78,8 +81,9 @@ function InstanceCard({ inst, session, onCheckUpdate, onRemove, navigate }) {
     if (c.type === 'memory' || c.type === 'translation' || c.type === 'csm' || c.type === 'msm') {
       acts.push(html`
         <button class="btn-outline btn-sm" onClick=${() => {
-          if (typeof navigate === 'function') navigate(meta.tabHash || '#memory');
-          else window.location.hash = meta.tabHash || '#memory';
+          const url = `/v1/profile?tab=${meta.tabId || 'memory'}`;
+          if (typeof navigate === 'function') navigate(url);
+          else window.location.href = url;
         }}>
           ${t('packages.inspect') || 'Inspect'}
         </button>

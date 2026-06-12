@@ -358,6 +358,14 @@
           // Only intercept internal /v1/ links
           if (!href || !href.startsWith('/v1/')) return;
           if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+          // Respect explicit new-tab / new-window targets — without this, an
+          // <a href="/v1/apps/.../launch?mode=inline" target="_blank"> from a
+          // child component would be hijacked, navigated in the same tab via
+          // matchRoute (which doesn't know /v1/apps/...), and dump the user
+          // back on the landing page.
+          const target = a.getAttribute('target');
+          if (target && target !== '_self' && target !== '') return;
+          if (a.hasAttribute('download')) return;
           e.preventDefault();
           navigate(href);
         };

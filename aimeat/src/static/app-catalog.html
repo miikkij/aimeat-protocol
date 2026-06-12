@@ -1173,7 +1173,8 @@
     #versions-overlay,
     #subdomain-overlay,
     #backup-overlay,
-    #server-import-overlay {
+    #server-import-overlay,
+    #json-import-overlay {
       position: fixed;
       inset: 0;
       z-index: 560;
@@ -1190,7 +1191,8 @@
     #versions-overlay[hidden],
     #subdomain-overlay[hidden],
     #backup-overlay[hidden],
-    #server-import-overlay[hidden] {
+    #server-import-overlay[hidden],
+    #json-import-overlay[hidden] {
       display: none;
     }
 
@@ -1732,6 +1734,7 @@
         <div class="settings-backup-actions">
           <button type="button" class="modal-btn secondary" onclick="window._launcher.exportBackup()" data-i18n="settings.exportJson">Export JSON</button>
           <button type="button" class="modal-btn secondary" onclick="document.getElementById('import-file-input').click()" data-i18n="settings.importJson">Import JSON</button>
+          <button type="button" class="modal-btn secondary" onclick="window._launcher.removeDuplicateApps()" data-i18n="dedup.btn">&#x1F9F9; Remove duplicate apps</button>
           <input type="file" id="import-file-input" accept=".json" hidden/>
         </div>
       </div>
@@ -1792,6 +1795,19 @@
       <div class="modal-actions">
         <button type="button" class="modal-btn secondary" onclick="document.getElementById('publish-overlay').hidden = true" data-i18n="common.cancel">Cancel</button>
         <button type="button" class="modal-btn primary" id="publish-submit-btn" onclick="window._launcher.submitPublish()" data-i18n="publish.submit">Publish</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JSON Backup Import Modal (user-selected, duplicate-aware) -->
+  <div id="json-import-overlay" hidden>
+    <div class="modal" id="json-import-modal">
+      <h2 data-i18n="jsonImport.title">&#x1F4E5; Import JSON backup</h2>
+      <div id="json-import-status" style="margin:4px 0;font-size:.85rem;min-height:1.1em"></div>
+      <div id="json-import-body" style="overflow-y:auto;max-height:55vh"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('json-import-overlay').hidden = true" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="modal-btn primary" id="json-import-btn" onclick="window._launcher.submitJsonImport()" data-i18n="srvImport.import">Import selected</button>
       </div>
     </div>
   </div>
@@ -1991,6 +2007,15 @@
       'card.fork': '⑂ Fork',
       'card.restore': '↺ Restore',
       'card.subdomain': '🌐 Subdomain',
+      'jsonImport.title': '📥 Import JSON backup',
+      'jsonImport.desc': 'Choose which apps to import. Apps already in this catalog are marked as duplicates and unchecked — nothing is imported without your selection.',
+      'jsonImport.statusDup': 'duplicate',
+      'jsonImport.config': 'Also import settings (theme, language, server URL)',
+      'jsonImport.done': 'Imported',
+      'dedup.btn': '🧹 Remove duplicate apps',
+      'dedup.none': 'No duplicate apps found.',
+      'dedup.confirm': 'Delete duplicate copies (favorites and oldest copies are kept)? Copies to delete:',
+      'dedup.done': 'Duplicates removed',
       'srvImport.bannerText': 'published apps from your account are not in this catalog.',
       'srvImport.review': '📥 Review & import...',
       'srvImport.dismiss': 'Not now',
@@ -2151,6 +2176,15 @@
       'card.fork': '⑂ Haaroita',
       'card.restore': '↺ Palauta',
       'card.subdomain': '🌐 Alidomain',
+      'jsonImport.title': '📥 Tuo JSON-varmuuskopio',
+      'jsonImport.desc': 'Valitse mitkä appit tuodaan. Katalogissa jo olevat on merkitty duplikaateiksi ja jätetty valitsematta — mitään ei tuoda ilman valintaasi.',
+      'jsonImport.statusDup': 'duplikaatti',
+      'jsonImport.config': 'Tuo myös asetukset (teema, kieli, palvelimen osoite)',
+      'jsonImport.done': 'Tuotu',
+      'dedup.btn': '🧹 Poista duplikaattiappit',
+      'dedup.none': 'Duplikaattiappeja ei löytynyt.',
+      'dedup.confirm': 'Poistetaanko duplikaattikopiot (suosikit ja vanhimmat kopiot säilytetään)? Poistettavia kopioita:',
+      'dedup.done': 'Duplikaatit poistettu',
       'srvImport.bannerText': 'tilisi julkaistua appia puuttuu tästä katalogista.',
       'srvImport.review': '📥 Katso ja tuo...',
       'srvImport.dismiss': 'Ei nyt',
@@ -3584,39 +3618,145 @@
     });
   }
 
+  // Identity key for duplicate detection: a published app is the same app
+  // regardless of its local id; unpublished ones match by name + content size.
+  function localAppKey(a) {
+    if (a.publishedFilename) return 'pf:' + a.publishedFilename;
+    return 'nm:' + (a.name || '') + '|' + (a.blob ? a.blob.length : (a.url || ''));
+  }
+
+  // Parsed JSON backup awaiting user selection: { backup, rows: [{app, isDup}] }
+  var jsonImportState = null;
+
   function handleImportBackup(file) {
     if (!file) return;
     var reader = new FileReader();
     reader.onload = function () {
+      var backup;
       try {
-        var backup = JSON.parse(reader.result);
-        if (!backup.apps || !Array.isArray(backup.apps)) {
-          alert('Invalid backup file: missing apps array');
-          return;
-        }
-        // Import config if present
-        if (backup.config && typeof backup.config === 'object') {
-          var currentConfig = loadConfig();
-          var merged = Object.assign({}, currentConfig, backup.config);
-          saveConfig(merged);
-          applyTheme(merged.theme);
-        }
-        // Import apps with new IDs to avoid conflicts
-        var promises = [];
-        for (var i = 0; i < backup.apps.length; i++) {
-          var app = Object.assign({}, backup.apps[i]);
-          app.id = generateId(); // New ID to avoid conflicts
-          promises.push(saveApp(app));
-        }
-        Promise.all(promises).then(function () {
-          alert('Imported ' + backup.apps.length + ' app(s) successfully');
-          renderApps();
-        });
+        backup = JSON.parse(reader.result);
       } catch (e) {
         alert('Failed to parse backup file: ' + (e.message || e));
+        return;
       }
+      if (!backup.apps || !Array.isArray(backup.apps)) {
+        alert('Invalid backup file: missing apps array');
+        return;
+      }
+      // Inspect-before-write: compare against the current catalog and let the
+      // user choose. Duplicates default to unchecked — nothing is imported
+      // (and no setting is changed) without an explicit selection.
+      getAllApps().then(function (existing) {
+        var existingKeys = {};
+        existing.forEach(function (a) { existingKeys[localAppKey(a)] = true; });
+        jsonImportState = {
+          backup: backup,
+          rows: backup.apps.map(function (a) {
+            return { app: a, isDup: !!existingKeys[localAppKey(a)] };
+          }),
+        };
+        renderJsonImportModal();
+      });
     };
     reader.readAsText(file);
+  }
+
+  function renderJsonImportModal() {
+    var rows = jsonImportState.rows;
+    var body = document.getElementById('json-import-body');
+    var html = '<p style="font-size:.8rem;color:var(--text-muted);margin:4px 0 8px">' + t('jsonImport.desc') + '</p>' +
+      '<div class="backup-toolbar-row"><div>' +
+        '<button class="backup-link-btn" onclick="window._launcher.jsonImportSelectAll(true)">' + t('backup.selectAll') + '</button> / ' +
+        '<button class="backup-link-btn" onclick="window._launcher.jsonImportSelectAll(false)">' + t('backup.selectNone') + '</button>' +
+      '</div></div>' +
+      '<table class="backup-table"><tbody>';
+    for (var i = 0; i < rows.length; i++) {
+      var a = rows[i].app;
+      html +=
+        '<tr>' +
+          '<td><input type="checkbox" class="json-import-cb" data-i="' + i + '"' + (rows[i].isDup ? '' : ' checked') + '/></td>' +
+          '<td>' + escapeHtml(a.name || a.publishedFilename || 'Untitled') +
+            (a.publishedFilename ? '<div class="mono-cell">' + escapeHtml(a.publishedFilename) + '</div>' : '') + '</td>' +
+          '<td>' + sourceLabel(a.source) + '</td>' +
+          '<td>' + (rows[i].isDup
+            ? '<span class="backup-status-badge backup-status-exists">' + t('jsonImport.statusDup') + '</span>'
+            : '<span class="backup-status-badge backup-status-new">' + t('backup.statusNew') + '</span>') + '</td>' +
+        '</tr>';
+    }
+    html += '</tbody></table>';
+    if (jsonImportState.backup.config && typeof jsonImportState.backup.config === 'object') {
+      html += '<label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:.85rem">' +
+        '<input type="checkbox" id="json-import-config"/> ' + t('jsonImport.config') + '</label>';
+    }
+    body.innerHTML = html;
+    document.getElementById('json-import-status').textContent = '';
+    document.getElementById('json-import-btn').style.display = '';
+    document.getElementById('json-import-overlay').hidden = false;
+  }
+
+  function jsonImportSelectAll(checked) {
+    document.querySelectorAll('.json-import-cb').forEach(function (b) { b.checked = checked; });
+  }
+
+  function submitJsonImport() {
+    var statusEl = document.getElementById('json-import-status');
+    var selected = [];
+    document.querySelectorAll('.json-import-cb').forEach(function (b) {
+      if (b.checked) selected.push(jsonImportState.rows[parseInt(b.getAttribute('data-i'), 10)].app);
+    });
+    var configCb = document.getElementById('json-import-config');
+    var importConfig = !!(configCb && configCb.checked);
+    if (selected.length === 0 && !importConfig) {
+      statusEl.style.color = '#ef4444';
+      statusEl.textContent = t('backup.nothingSelected');
+      return;
+    }
+    if (importConfig) {
+      var merged = Object.assign({}, loadConfig(), jsonImportState.backup.config);
+      saveConfig(merged);
+      applyTheme(merged.theme);
+    }
+    Promise.all(selected.map(function (a) {
+      var app = Object.assign({}, a);
+      app.id = generateId(); // new id — the source backup may collide with existing ids
+      return saveApp(app);
+    })).then(function () {
+      statusEl.style.color = '#34d399';
+      statusEl.textContent = '✔ ' + t('jsonImport.done') + ': ' + selected.length;
+      document.getElementById('json-import-btn').style.display = 'none';
+      renderApps();
+      loadPublishedApps();
+    });
+  }
+
+  // ── Remove duplicate apps (cleanup after legacy blind imports) ──
+
+  function removeDuplicateApps() {
+    getAllApps().then(function (apps) {
+      var groups = {};
+      apps.forEach(function (a) {
+        var k = localAppKey(a);
+        (groups[k] = groups[k] || []).push(a);
+      });
+      var toDelete = [];
+      Object.keys(groups).forEach(function (k) {
+        var g = groups[k];
+        if (g.length < 2) return;
+        // Keep the best copy: favorites first, then the earliest added
+        g.sort(function (x, y) {
+          if (!!y.favorite !== !!x.favorite) return (y.favorite ? 1 : 0) - (x.favorite ? 1 : 0);
+          return (x.addedAt || '') < (y.addedAt || '') ? -1 : 1;
+        });
+        toDelete = toDelete.concat(g.slice(1));
+      });
+      if (toDelete.length === 0) { alert(t('dedup.none')); return; }
+      if (!confirm(t('dedup.confirm') + ' ' + toDelete.length)) return;
+      Promise.all(toDelete.map(function (a) { return deleteApp(a.id); })).then(function () {
+        renderApps();
+        loadPublishedApps();
+        alert(t('dedup.done') + ': ' + toDelete.length);
+      });
+    });
   }
 
   // ── Clear All Data ──────────────────────────────
@@ -5802,6 +5942,9 @@
     showSubdomainModal: showSubdomainModal,
     submitSubdomainAssign: submitSubdomainAssign,
     unassignSubdomain: unassignSubdomain,
+    jsonImportSelectAll: jsonImportSelectAll,
+    submitJsonImport: submitJsonImport,
+    removeDuplicateApps: removeDuplicateApps,
     showServerImportModal: showServerImportModal,
     dismissServerImportBanner: dismissServerImportBanner,
     serverImportSelectAll: serverImportSelectAll,
@@ -5946,6 +6089,11 @@
       }
     });
     document.getElementById('server-import-overlay').addEventListener('click', function (e) {
+      if (e.target === this) {
+        this.hidden = true;
+      }
+    });
+    document.getElementById('json-import-overlay').addEventListener('click', function (e) {
       if (e.target === this) {
         this.hidden = true;
       }
@@ -6103,6 +6251,8 @@
           document.getElementById('backup-overlay').hidden = true;
         } else if (!document.getElementById('server-import-overlay').hidden) {
           document.getElementById('server-import-overlay').hidden = true;
+        } else if (!document.getElementById('json-import-overlay').hidden) {
+          document.getElementById('json-import-overlay').hidden = true;
         } else if (!document.getElementById('settings-overlay').hidden) {
           closeSettings();
         } else if (!document.getElementById('modal-overlay').hidden) {
