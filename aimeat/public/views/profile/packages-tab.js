@@ -29,6 +29,118 @@ import { useConfirm } from '/components/Modal.js';
 import * as pkgService from '/js/services/packages.js';
 import { importPackageToGenerator } from '/js/services/generator-packaging.js';
 
+// ─── InstanceCard ───────────────────────────────────────────────────────────
+// Expanded card for one installed package instance: shows every component's
+// status + type, with direct action buttons (Launch an app in a new tab,
+// jump to extensions/cortex tab for management, copy the registered name).
+// Components produced via packages-install are stored with status:'active'
+// at creation time (see component-registrar.ts), so the green "active" chip
+// here matches reality without re-fetching the underlying extension/cortex.
+const COMP_TYPE_META = {
+  app:         { icon: '\u{1F4F1}', tabHash: '#apps' },
+  extension:   { icon: '\u{1F50C}', tabHash: '#extensions' },
+  cortex:      { icon: '\u{1F9E0}', tabHash: '#extensions' },
+  memory:      { icon: '\u{1F4BE}', tabHash: '#memory' },
+  translation: { icon: '\u{1F310}', tabHash: '#memory' },
+  csm:         { icon: '\u{1F4D0}', tabHash: '#memory' },
+  msm:         { icon: '\u{1F4DC}', tabHash: '#memory' },
+};
+
+function InstanceCard({ inst, session, onCheckUpdate, onRemove, navigate }) {
+  const [expanded, setExpanded] = useState(true);
+  const comps = inst.installedComponents || [];
+  const owner = session?.owner || '';
+
+  // Build a deterministic action per component type.
+  function actionsFor(c) {
+    const meta = COMP_TYPE_META[c.type] || {};
+    const acts = [];
+    if (c.type === 'app') {
+      const url = `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(c.registeredAs)}?mode=inline`;
+      acts.push(html`
+        <a class="btn-primary btn-sm pf-no-underline" href=${url} target="_blank" rel="noopener">
+          ${t('packages.launch') || 'Launch'}
+        </a>
+      `);
+    }
+    if (c.type === 'extension' || c.type === 'cortex') {
+      acts.push(html`
+        <button class="btn-outline btn-sm" onClick=${() => {
+          // Profile tabs use hash routing — jump to extensions/cortex tab
+          // and let the user find this exact component by its registeredAs.
+          if (typeof navigate === 'function') navigate(meta.tabHash || '#extensions');
+          else window.location.hash = meta.tabHash || '#extensions';
+        }}>
+          ${t('packages.manage') || 'Manage'}
+        </button>
+      `);
+    }
+    if (c.type === 'memory' || c.type === 'translation' || c.type === 'csm' || c.type === 'msm') {
+      acts.push(html`
+        <button class="btn-outline btn-sm" onClick=${() => {
+          if (typeof navigate === 'function') navigate(meta.tabHash || '#memory');
+          else window.location.hash = meta.tabHash || '#memory';
+        }}>
+          ${t('packages.inspect') || 'Inspect'}
+        </button>
+      `);
+    }
+    // Copy registered name — useful for debugging or wiring up custom things.
+    acts.push(html`
+      <button class="btn-ghost btn-sm" title=${c.registeredAs} onClick=${() => copyToClipboard(c.registeredAs)}>
+        \u{1F4CB}
+      </button>
+    `);
+    return acts;
+  }
+
+  // INSTALLED == installed AND active+running. Show a clarifying sub-label so
+  // the user doesn't confuse it with the two-step extension/cortex lifecycle.
+  const installedSubLabel = inst.status === 'installed'
+    ? (t('packages.statusInstalledActive') || 'active & running')
+    : '';
+
+  return html`
+    <div class="pkg-card pkg-card-expanded" key=${inst.id}>
+      <div class="pkg-card-header">
+        <span class="pkg-card-name">${escHtml(inst.label || inst.packageGroupId)}</span>
+        <span class="pkg-badge pkg-badge-${inst.status}" title=${installedSubLabel}>
+          ${inst.status}${installedSubLabel ? html` <span class="pkg-badge-sub">· ${installedSubLabel}</span>` : ''}
+        </span>
+      </div>
+      <div class="pkg-card-meta">
+        <span class="pkg-card-version">${escHtml(inst.packageVersion)}</span>
+        <span>· ${comps.length} ${t('packages.components') || 'components'}</span>
+        <button class="btn-ghost btn-xs" onClick=${() => setExpanded(v => !v)}>
+          ${expanded ? (t('common.hide') || 'Hide') : (t('common.show') || 'Show')}
+        </button>
+      </div>
+      ${expanded && comps.length > 0 && html`
+        <ul class="pkg-comp-list">
+          ${comps.map(c => html`
+            <li class="pkg-comp" key=${c.componentId}>
+              <span class="pkg-comp-icon">${COMP_TYPE_META[c.type]?.icon || '\u{1F4E6}'}</span>
+              <span class="pkg-comp-id">${escHtml(c.componentId)}</span>
+              <span class="pkg-comp-type">${c.type}</span>
+              <span class="pkg-comp-status">
+                <span class="pkg-dot pkg-dot-active" title=${t('packages.statusActive') || 'Active'}></span>
+                ${c.customized ? html`<span class="pkg-comp-customized" title=${t('packages.customizedHint') || 'Customized after install'}>✏</span>` : ''}
+              </span>
+              <span class="pkg-comp-actions">${actionsFor(c)}</span>
+            </li>
+          `)}
+        </ul>
+      `}
+      <div class="pkg-card-footer">
+        <div class="pkg-card-actions">
+          <button class="btn-outline btn-sm" onClick=${onCheckUpdate}>${t('packages.checkUpdate') || 'Check Update'}</button>
+          <button class="btn-danger btn-sm" onClick=${onRemove}>${t('packages.remove') || 'Remove'}</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 export default function PackagesTab({ session, showToast, navigate, locale }) {
   const { confirm, ConfirmUI } = useConfirm();
   const [instances, setInstances] = useState([]);
@@ -257,22 +369,14 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
           ` : html`
             <div class="pkg-grid">
               ${instances.map(inst => html`
-                <div class="pkg-card" key=${inst.id}>
-                  <div class="pkg-card-header">
-                    <span class="pkg-card-name">${escHtml(inst.label || inst.packageGroupId)}</span>
-                    <span class="pkg-badge pkg-badge-${inst.status}">${inst.status}</span>
-                  </div>
-                  <div class="pkg-card-meta">
-                    <span class="pkg-card-version">${escHtml(inst.packageVersion)}</span>
-                    <span>\u00B7 ${inst.installedComponents?.length ?? 0} ${t('packages.components') || 'components'}</span>
-                  </div>
-                  <div class="pkg-card-footer">
-                    <div class="pkg-card-actions">
-                      <button class="btn-outline btn-sm" onClick=${() => handleCheckUpdate(inst.id)}>${t('packages.checkUpdate') || 'Check Update'}</button>
-                      <button class="btn-danger btn-sm" onClick=${() => handleRemove(inst.id)}>${t('packages.remove') || 'Remove'}</button>
-                    </div>
-                  </div>
-                </div>
+                <${InstanceCard}
+                  key=${inst.id}
+                  inst=${inst}
+                  session=${session}
+                  onCheckUpdate=${() => handleCheckUpdate(inst.id)}
+                  onRemove=${() => handleRemove(inst.id)}
+                  navigate=${navigate}
+                />
               `)}
             </div>
           `}

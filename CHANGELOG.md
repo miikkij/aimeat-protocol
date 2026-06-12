@@ -40,15 +40,19 @@ All notable changes to AIMEAT are documented in this file.
   type-to-confirm delete) and an operator-only "🌐 Subdomain" assign dialog +
   clickable chip on own published-app cards in the app catalog. E2E suite
   `e2e-subdomains` (34 tests).
-- **AI-published apps join local app management.** Apps published to the
-  owner's account via MCP previously appeared only in the catalog's
-  "Published Apps" strip with limited actions. The app catalog now auto-imports
-  the owner's server-only published apps into the local "My Apps" grid (an
-  `AI` origin badge marks them), so they get the exact same management actions
-  as locally created apps — edit, source view, tags, favorite, versions,
-  publish, delete. A tombstone list prevents a locally deleted import from
-  resurrecting on the next load; deleting the server copy clears the tombstone
-  so a future republish imports cleanly.
+- **AI-published apps join local app management (user-selected import).** Apps
+  published to the owner's account via MCP previously appeared only in the
+  catalog's "Published Apps" strip with limited actions. The app catalog now
+  shows a banner when the account has published apps missing from the local
+  catalog ("N published apps from your account are not in this catalog —
+  Review & import..."); the review modal lists them with checkboxes
+  (select all/none) and imports ONLY the selected ones into the local
+  "My Apps" grid (an `AI` origin badge marks them), where they get the exact
+  same management actions as locally created apps — edit, source view, tags,
+  favorite, versions, publish, delete. Nothing is imported automatically.
+  Locally deleted imports are tombstoned so the banner doesn't nag about them;
+  they stay reachable in the modal (unchecked) and importing one again clears
+  the tombstone.
 
 - **Workspace Overview tab — the whole workspace on one scroll.** A new
   "Overview" / "Yleiskuva" tab is ALWAYS the landing view of a workspace (tab

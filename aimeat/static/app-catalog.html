@@ -1152,10 +1152,28 @@
     .backup-result-list { font-size: .82rem; margin: 4px 0 10px; padding-left: 18px; }
     .backup-result-errors { color: #ef4444; }
 
+    .server-import-banner {
+      margin: 0 24px 1rem;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      background: var(--surface-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      font-size: .85rem;
+      position: relative;
+      z-index: 1;
+    }
+    .server-import-banner-actions { display: flex; gap: 8px; }
+
     #publish-overlay,
     #versions-overlay,
     #subdomain-overlay,
-    #backup-overlay {
+    #backup-overlay,
+    #server-import-overlay {
       position: fixed;
       inset: 0;
       z-index: 560;
@@ -1171,7 +1189,8 @@
     #publish-overlay[hidden],
     #versions-overlay[hidden],
     #subdomain-overlay[hidden],
-    #backup-overlay[hidden] {
+    #backup-overlay[hidden],
+    #server-import-overlay[hidden] {
       display: none;
     }
 
@@ -1480,6 +1499,15 @@
 
   <nav id="tag-bar"></nav>
 
+  <!-- Server-published apps missing locally — import is ALWAYS user-selected -->
+  <div id="server-import-banner" class="server-import-banner" style="display:none">
+    <span>&#x1F4E5; <strong id="server-import-count">0</strong> <span data-i18n="srvImport.bannerText">published apps from your account are not in this catalog.</span></span>
+    <div class="server-import-banner-actions">
+      <button class="modal-btn primary" onclick="window._launcher.showServerImportModal()" data-i18n="srvImport.review">Review &amp; import...</button>
+      <button class="modal-btn secondary" onclick="window._launcher.dismissServerImportBanner()" data-i18n="srvImport.dismiss">Not now</button>
+    </div>
+  </div>
+
   <!-- Active Extensions Bar -->
   <div id="cortex-bar" style="display:none;margin:0 24px 1.5rem;position:relative;z-index:1">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
@@ -1768,6 +1796,19 @@
     </div>
   </div>
 
+  <!-- Server Apps Import Modal (user-selected) -->
+  <div id="server-import-overlay" hidden>
+    <div class="modal" id="server-import-modal">
+      <h2 data-i18n="srvImport.title">&#x1F4E5; Import published apps</h2>
+      <div id="server-import-status" style="margin:4px 0;font-size:.85rem;min-height:1.1em"></div>
+      <div id="server-import-body" style="overflow-y:auto;max-height:55vh"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('server-import-overlay').hidden = true" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="modal-btn primary" onclick="window._launcher.submitServerImport()" data-i18n="srvImport.import">Import selected</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Backup Import Modal -->
   <div id="backup-overlay" hidden>
     <div class="modal" id="backup-modal">
@@ -1950,6 +1991,13 @@
       'card.fork': '⑂ Fork',
       'card.restore': '↺ Restore',
       'card.subdomain': '🌐 Subdomain',
+      'srvImport.bannerText': 'published apps from your account are not in this catalog.',
+      'srvImport.review': '📥 Review & import...',
+      'srvImport.dismiss': 'Not now',
+      'srvImport.title': '📥 Import published apps',
+      'srvImport.desc': 'These apps are published under your account on the server but missing from this local catalog. Choose which ones to import — nothing is imported automatically.',
+      'srvImport.import': 'Import selected',
+      'srvImport.importing': 'Importing...',
       'backup.menu': 'Backup',
       'backup.exportAll': '📦 Export all (.zip)',
       'backup.importFrom': '📥 Import from backup...',
@@ -2103,6 +2151,13 @@
       'card.fork': '⑂ Haaroita',
       'card.restore': '↺ Palauta',
       'card.subdomain': '🌐 Alidomain',
+      'srvImport.bannerText': 'tilisi julkaistua appia puuttuu tästä katalogista.',
+      'srvImport.review': '📥 Katso ja tuo...',
+      'srvImport.dismiss': 'Ei nyt',
+      'srvImport.title': '📥 Tuo julkaistut appit',
+      'srvImport.desc': 'Nämä appit on julkaistu tililläsi palvelimella mutta puuttuvat paikallisesta katalogista. Valitse mitkä tuodaan — mitään ei tuoda automaattisesti.',
+      'srvImport.import': 'Tuo valitut',
+      'srvImport.importing': 'Tuodaan...',
       'backup.menu': 'Varmuuskopio',
       'backup.exportAll': '📦 Vie kaikki (.zip)',
       'backup.importFrom': '📥 Tuo varmuuskopiosta...',
@@ -4341,12 +4396,15 @@
       (s.errors.length ? '<div class="backup-result-errors">' + section(t('backup.resErrors'), s.errors) + '</div>' : '');
   }
 
-  // ── Server → local import (AI-published apps) ────
-  // Apps published under this owner's account via MCP exist only on the server.
-  // Importing them into the local catalog gives them the exact same management
-  // actions (edit, rename, tags, versions, delete) as locally created apps —
-  // one "My Apps" list, with an AI origin badge. A tombstone list prevents a
-  // locally deleted import from resurrecting on the next load.
+  // ── Server → local import (user-selected, NEVER automatic) ────
+  // Apps published under this owner's account (e.g. via MCP) may exist only on
+  // the server. Importing one into the local catalog gives it the exact same
+  // management actions (edit, rename, tags, versions, delete) as locally
+  // created apps. The import is ALWAYS user-initiated: a banner reports how
+  // many published apps are missing locally, and a review modal lets the user
+  // pick exactly which ones to import. The tombstone list marks apps the user
+  // deleted locally so the banner doesn't nag about them (they stay reachable
+  // in the modal, unchecked).
 
   var IMPORT_IGNORE_KEY = 'appCatalogImportIgnore';
 
@@ -4367,11 +4425,95 @@
     localStorage.setItem(IMPORT_IGNORE_KEY, JSON.stringify(list));
   }
 
-  function importMissingServerApps(serverApps, localByFilename, aimeatUrl) {
-    var ignore = getImportIgnore();
-    var toImport = serverApps.filter(function (sa) {
-      return sa.filename && !localByFilename[sa.filename] && ignore.indexOf(sa.filename) === -1;
+  // State for the review modal: own server apps with no local copy.
+  var serverImportState = { missing: [], aimeatUrl: '' };
+
+  function updateServerImportState(ownApps, localByFilename, aimeatUrl) {
+    serverImportState.missing = ownApps.filter(function (sa) {
+      return sa.filename && !localByFilename[sa.filename];
     });
+    serverImportState.aimeatUrl = aimeatUrl;
+    renderServerImportBanner();
+  }
+
+  function renderServerImportBanner() {
+    var banner = document.getElementById('server-import-banner');
+    if (!banner) return;
+    var ignore = getImportIgnore();
+    // Tombstoned apps (deleted locally on purpose) don't count toward the nag
+    var fresh = serverImportState.missing.filter(function (sa) { return ignore.indexOf(sa.filename) === -1; });
+    if (fresh.length === 0 || sessionStorage.getItem('aimeatServerImportDismissed') === '1') {
+      banner.style.display = 'none';
+      return;
+    }
+    document.getElementById('server-import-count').textContent = fresh.length;
+    banner.style.display = '';
+  }
+
+  function dismissServerImportBanner() {
+    sessionStorage.setItem('aimeatServerImportDismissed', '1');
+    renderServerImportBanner();
+  }
+
+  function showServerImportModal() {
+    var missing = serverImportState.missing;
+    var body = document.getElementById('server-import-body');
+    var ignore = getImportIgnore();
+    var html = '<p style="font-size:.8rem;color:var(--text-muted);margin:4px 0 8px">' + t('srvImport.desc') + '</p>' +
+      '<div class="backup-toolbar-row"><div>' +
+        '<button class="backup-link-btn" onclick="window._launcher.serverImportSelectAll(true)">' + t('backup.selectAll') + '</button> / ' +
+        '<button class="backup-link-btn" onclick="window._launcher.serverImportSelectAll(false)">' + t('backup.selectNone') + '</button>' +
+      '</div></div>' +
+      '<table class="backup-table"><tbody>';
+    for (var i = 0; i < missing.length; i++) {
+      var sa = missing[i];
+      var name = (sa.manifest && sa.manifest.name) ? sa.manifest.name : sa.filename;
+      // Locally deleted (tombstoned) apps stay reachable here but default to unchecked
+      var checked = ignore.indexOf(sa.filename) === -1 ? ' checked' : '';
+      html +=
+        '<tr>' +
+          '<td><input type="checkbox" class="server-import-cb" data-i="' + i + '"' + checked + '/></td>' +
+          '<td>' + escapeHtml(name) + '<div class="mono-cell">' + escapeHtml(sa.filename) + '</div></td>' +
+          '<td>' + (sa.version_number ? 'v' + sa.version_number : '') + '</td>' +
+          '<td>' + (sa.created_at ? new Date(sa.created_at).toLocaleDateString() : '') + '</td>' +
+        '</tr>';
+    }
+    html += '</tbody></table>';
+    body.innerHTML = html;
+    document.getElementById('server-import-status').textContent = '';
+    document.getElementById('server-import-overlay').hidden = false;
+  }
+
+  function serverImportSelectAll(checked) {
+    document.querySelectorAll('.server-import-cb').forEach(function (b) { b.checked = checked; });
+  }
+
+  function submitServerImport() {
+    var selected = [];
+    document.querySelectorAll('.server-import-cb').forEach(function (b) {
+      if (b.checked) selected.push(serverImportState.missing[parseInt(b.getAttribute('data-i'), 10)]);
+    });
+    var statusEl = document.getElementById('server-import-status');
+    if (selected.length === 0) {
+      statusEl.style.color = '#ef4444';
+      statusEl.textContent = t('backup.nothingSelected');
+      return;
+    }
+    statusEl.style.color = 'var(--text-muted)';
+    statusEl.textContent = t('srvImport.importing');
+    importServerApps(selected, serverImportState.aimeatUrl).then(function () {
+      // Importing an app the user once deleted is an explicit re-opt-in
+      selected.forEach(function (sa) { removeImportIgnore(sa.filename); });
+      document.getElementById('server-import-overlay').hidden = true;
+      renderApps();
+      loadPublishedApps();
+    }).catch(function (e) {
+      statusEl.style.color = '#ef4444';
+      statusEl.textContent = e.message || String(e);
+    });
+  }
+
+  function importServerApps(toImport, aimeatUrl) {
     if (toImport.length === 0) return Promise.resolve(false);
     return Promise.all(toImport.map(function (sa) {
       var url = aimeatUrl + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(sa.filename) + '?mode=inline';
@@ -4475,12 +4617,10 @@
           return loadSubdomainSites().then(function () {
             renderPublishedApps(localPublished, ownApps, localByFilename, aimeatUrl, section, grid, countEl);
             renderCommunityApps(communityApps, aimeatUrl, communitySection, communityGrid, communityCountEl, currentOwner);
-            // AI-published (server-only) own apps → local catalog, so they get
-            // the same management actions as locally created apps. After an
-            // import the next pass finds them locally and imports nothing.
-            return importMissingServerApps(ownApps, localByFilename, aimeatUrl).then(function (imported) {
-              if (imported) { renderApps(); loadPublishedApps(); }
-            });
+            // Server-published own apps missing from the local catalog are
+            // NEVER imported automatically — the banner offers a review modal
+            // where the user picks exactly which ones to import.
+            updateServerImportState(ownApps, localByFilename, aimeatUrl);
           });
         })
         .catch(function() {
@@ -5662,6 +5802,10 @@
     showSubdomainModal: showSubdomainModal,
     submitSubdomainAssign: submitSubdomainAssign,
     unassignSubdomain: unassignSubdomain,
+    showServerImportModal: showServerImportModal,
+    dismissServerImportBanner: dismissServerImportBanner,
+    serverImportSelectAll: serverImportSelectAll,
+    submitServerImport: submitServerImport,
     toggleBackupMenu: toggleBackupMenu,
     exportBackupZip: exportBackupZip,
     importBackupPick: importBackupPick,
@@ -5797,6 +5941,11 @@
       this.value = '';
     });
     document.getElementById('backup-overlay').addEventListener('click', function (e) {
+      if (e.target === this) {
+        this.hidden = true;
+      }
+    });
+    document.getElementById('server-import-overlay').addEventListener('click', function (e) {
       if (e.target === this) {
         this.hidden = true;
       }
@@ -5952,6 +6101,8 @@
           document.getElementById('subdomain-overlay').hidden = true;
         } else if (!document.getElementById('backup-overlay').hidden) {
           document.getElementById('backup-overlay').hidden = true;
+        } else if (!document.getElementById('server-import-overlay').hidden) {
+          document.getElementById('server-import-overlay').hidden = true;
         } else if (!document.getElementById('settings-overlay').hidden) {
           closeSettings();
         } else if (!document.getElementById('modal-overlay').hidden) {
