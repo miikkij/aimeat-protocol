@@ -53,7 +53,6 @@ All notable changes to AIMEAT are documented in this file.
   Locally deleted imports are tombstoned so the banner doesn't nag about them;
   they stay reachable in the modal (unchecked) and importing one again clears
   the tombstone.
-
 - **Workspace Overview tab — the whole workspace on one scroll.** A new
   "Overview" / "Yleiskuva" tab is ALWAYS the landing view of a workspace (tab
   persistence dropped — restoring the last-open tab hid content). It stacks

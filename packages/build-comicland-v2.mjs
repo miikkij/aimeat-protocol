@@ -60,8 +60,27 @@ async function loadExtensionScripts() {
 
 // ─── Build components ─────────────────────────────────────────────────────
 async function buildExtensionComponent() {
-  const manifest = await readText(path.join(EXT_DIR, 'manifest.yaml'));
+  let manifest = await readText(path.join(EXT_DIR, 'manifest.yaml'));
   const scripts = await loadExtensionScripts();
+  // Package-install runtime quirk: only @activate-cron jobs from the manifest
+  // run automatically on install. Comicland's source manifest only schedules
+  // `init` on @activate; `seed-prompts` (which writes the default prompts to
+  // ext-namespace memory) was historically triggered manually by the owner.
+  // For the package flow we must include seed-prompts in @activate too so the
+  // app's "create/series", "create/character" etc. prompts exist on first run.
+  //
+  // We inject it here at packaging time (NOT in the source manifest) so the
+  // upstream Comicland extension stays unchanged and the packaging-specific
+  // tweak is documented in one place.
+  const seedPromptsSchedule = `\n    - id: seed-prompts-on-activate\n      action: seed-prompts\n      cron: "@activate"\n      description: "Seedaa default-promptit (omistaja, idempotent) - package install"\n      instance_scope: false\n      input: {}\n`;
+  if (!manifest.includes('seed-prompts-on-activate')) {
+    // Insert after the init-on-activate block but before trending-cron (or at
+    // end of __schedules) so storage order is: init → seed-prompts → trending.
+    manifest = manifest.replace(
+      /(- id: init-on-activate[\s\S]*?input: \{\}\n)/,
+      `$1${seedPromptsSchedule}`,
+    );
+  }
   // Component-registrar expects extension content as JSON-stringified
   // { manifest: "<YAML>", scripts: { "actions/foo.js": "<code>" } }.
   return {

@@ -72,6 +72,63 @@ export function computeHash(content: string): string {
   return createHash('sha256').update(content).digest('hex');
 }
 
+// ── URL rewriting for package install ────────────────────────────────
+
+/**
+ * Rewrite hardcoded short-name references in a content string so they point
+ * at the per-instance registered component names. Used for both app HTML and
+ * cortex lib JS at install time.
+ *
+ * Patterns covered:
+ *   /v1/cortex/<shortName>/...   → /v1/cortex/<registeredAs>/...
+ *   /v1/ext/<shortName>/...      → /v1/ext/<registeredAs>/...
+ *   "ext:<shortName>" (literal)  → "ext:<registeredAs>"  (memory namespace strings)
+ *   ext%3A<shortName>            → ext%3A<registeredAs>  (URL-encoded variant)
+ */
+function rewriteComponentRefs(
+  content: string,
+  cortexMap: Map<string, string> | undefined,
+  extMap: Map<string, string> | undefined,
+): string {
+  if (!content) return content;
+  const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let out = content;
+  if (cortexMap) {
+    for (const [shortName, regAs] of cortexMap) {
+      if (!shortName || shortName === regAs) continue;
+      const esc = escapeRe(shortName);
+      out = out.replace(
+        new RegExp('(\\/v1\\/cortex\\/)' + esc + '(?=[\\/?#"\\\'\\s]|$)', 'g'),
+        '$1' + regAs,
+      );
+    }
+  }
+  if (extMap) {
+    for (const [shortName, regAs] of extMap) {
+      if (!shortName || shortName === regAs) continue;
+      const esc = escapeRe(shortName);
+      // /v1/ext/<name>(/ or terminator)
+      out = out.replace(
+        new RegExp('(\\/v1\\/ext\\/)' + esc + '(?=[\\/?#"\\\'\\s]|$)', 'g'),
+        '$1' + regAs,
+      );
+      // ext:<name> in memory-namespace strings — common in cortex libs:
+      //   AIMEAT.data.getPublic('ext:comicland-v2', 'config.app')
+      // Terminator is whatever closes the string / next segment.
+      out = out.replace(
+        new RegExp('(ext:)' + esc + '(?=[/"\\\'\\s,\\]}]|$)', 'g'),
+        '$1' + regAs,
+      );
+      // URL-encoded variant for any place that already escapes the colon.
+      out = out.replace(
+        new RegExp('(ext%3A)' + esc + '(?=[%/"\\\'\\s,\\]}]|$)', 'gi'),
+        '$1' + regAs,
+      );
+    }
+  }
+  return out;
+}
+
 // ── Register component ───────────────────────────────────────────────
 
 /** Register a single component in its native storage repository */
@@ -212,9 +269,20 @@ export async function registerComponent(
           },
         });
 
-        // Store lib files
+        // Store lib files — rewrite extension and cortex short-name
+        // references so they hit the per-instance registered names. Without
+        // this, comicland-v2.js's hardcoded
+        //   session.fetch('/v1/ext/comicland-v2/users', ...)
+        //   AIMEAT.data.getPublic('ext:comicland-v2', 'config.app')
+        // would 404 once the extension is registered as
+        //   comicland-v2-alice-cade9406-extension-comicland-v2.
         for (const [libName, libContent] of Object.entries(libs)) {
-          await storage.setCortexLibFile(registeredAs, libName, libContent);
+          const rewrittenLib = rewriteComponentRefs(
+            libContent,
+            input.urlRewrites?.cortexNames,
+            input.urlRewrites?.extensionNames,
+          );
+          await storage.setCortexLibFile(registeredAs, libName, rewrittenLib);
         }
 
         // Auto-activate: process components that need native registration
@@ -251,35 +319,14 @@ export async function registerComponent(
       }
 
       case 'app': {
-        // Rewrite hardcoded cortex/extension URLs in the app HTML so they
-        // point at the per-instance registered names. Without this, an app
-        // like comicland that does
-        //   loadScript('/v1/cortex/comicland-v2/libs/comicland-v2.js')
-        // would 404 when the cortex is registered as
-        //   comicland-v2-alice-06c4c5af-cortex-comicland-v2.
-        // Pattern matches a path segment (no slashes) between the route base
-        // and the next slash. We rewrite each known short-name once globally.
-        let rewritten = content;
-        const cortexMap = input.urlRewrites?.cortexNames;
-        if (cortexMap && cortexMap.size > 0) {
-          for (const [shortName, regAs] of cortexMap) {
-            if (!shortName || shortName === regAs) continue;
-            const escaped = shortName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            // /v1/cortex/<shortName>(/ or end)
-            const re = new RegExp('(\\/v1\\/cortex\\/)' + escaped + '(?=[\\/?#"\\\'\\s]|$)', 'g');
-            rewritten = rewritten.replace(re, '$1' + regAs);
-          }
-        }
-        const extMap = input.urlRewrites?.extensionNames;
-        if (extMap && extMap.size > 0) {
-          for (const [shortName, regAs] of extMap) {
-            if (!shortName || shortName === regAs) continue;
-            const escaped = shortName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            // /v1/ext/<shortName>(/ or end)  — covers the extension action route base
-            const re = new RegExp('(\\/v1\\/ext\\/)' + escaped + '(?=[\\/?#"\\\'\\s]|$)', 'g');
-            rewritten = rewritten.replace(re, '$1' + regAs);
-          }
-        }
+        // Rewrite hardcoded cortex/extension references in the app HTML
+        // (loadScript URLs, fetch URLs, AND ext:<name> memory namespaces) so
+        // they point at the per-instance registered component names.
+        const rewritten = rewriteComponentRefs(
+          content,
+          input.urlRewrites?.cortexNames,
+          input.urlRewrites?.extensionNames,
+        );
         await storage.createApp({
           ownerGaii,
           ownerName: owner,

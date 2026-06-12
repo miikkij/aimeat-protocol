@@ -20,4 +20,6 @@ export interface PackageRepository {
   listVersions(groupId: string, limit?: number, offset?: number): Promise<{ versions: PackageRecord[]; total: number }>;
   updatePackage(id: string, updates: Partial<PackageRecord>): Promise<PackageRecord | null>;
   archivePackage(id: string): Promise<boolean>;
+  /** Archive every non-archived version of a package group. Returns how many rows changed. */
+  archivePackageGroup(groupId: string): Promise<number>;
 }

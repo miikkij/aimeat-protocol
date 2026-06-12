@@ -5199,6 +5199,15 @@ export class PrismaStorage implements Storage {
         }
     }
 
+    async archivePackageGroup(groupId: string): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.package.updateMany({
+            where: { packageGroupId: groupId, status: { not: 'archived' } },
+            data: { status: 'archived', updatedAt: new Date() },
+        });
+        return result.count;
+    }
+
     private toPackageRecord(row: any): PackageRecord {
         return {
             id: row.id,

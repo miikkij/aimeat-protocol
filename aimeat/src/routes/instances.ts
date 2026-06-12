@@ -45,6 +45,8 @@ import {
   computeHash,
 } from '../services/component-registrar.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
+import type { Scheduler } from '../services/scheduler.js';
+import { logger } from '../utils/logger.js';
 
 // ── Types for migration diff ──────────────────────────────────────────
 
@@ -81,7 +83,11 @@ function sortByDependencies(
 
 // ── Router factory ────────────────────────────────────────────────────
 
-export function instancesRouter(config: AimeatConfig, storage: Storage): Router {
+export function instancesRouter(
+  config: AimeatConfig,
+  storage: Storage,
+  scheduler?: Scheduler,
+): Router {
   const router = Router();
 
   // ══════════════════════════════════════════════════════════════════════
@@ -204,6 +210,19 @@ export function instancesRouter(config: AimeatConfig, storage: Storage): Router 
         if (result.originalShortName) {
           if (comp.type === 'cortex') cortexNameMap.set(result.originalShortName, registeredAs);
           else if (comp.type === 'extension') extensionNameMap.set(result.originalShortName, registeredAs);
+        }
+
+        // Fire @activate-cron jobs the same way the manual activate route does
+        // (extensions.ts line ~694). Without this, the extension is marked
+        // active but its init action never runs — so seed memory keys
+        // (config.app, config.genres, prompts, etc.) are missing and the app
+        // 404s on every first read.
+        if (comp.type === 'extension' && scheduler) {
+          try {
+            await scheduler.runActivateJobs(registeredAs);
+          } catch (err) {
+            logger.error(`Failed to run @activate jobs for ${registeredAs}`, { error: String(err) });
+          }
         }
 
         // Recompute originalHash from native storage to ensure status comparisons match

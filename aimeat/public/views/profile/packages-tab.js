@@ -302,6 +302,29 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
     }
   };
 
+  // Archive every version of a package group (own-author only, enforced server-side).
+  // Already-installed instances stay intact — only the package source is removed
+  // from the gallery + browse listings so it can no longer be re-installed.
+  const handleDeletePackage = (groupId, name) => {
+    confirm(
+      (t('packages.confirmDeletePackage') || 'Delete the package "{name}" and all its versions? Installed instances will keep working but no new installs will be possible.').replace('{name}', name || groupId),
+      async () => {
+        try {
+          const res = await pkgService.archivePackageGroup(groupId);
+          if (res.ok) {
+            showToast(t('packages.packageDeleted') || 'Package deleted');
+            loadData();
+          } else {
+            showToast(res.error || (t('packages.deleteFailed') || 'Delete failed'), true);
+          }
+        } catch (e) {
+          showToast(e.message, true);
+        }
+      },
+      { danger: true },
+    );
+  };
+
   const handleSyncFederation = async () => {
     setSyncing(true);
     try {
@@ -447,6 +470,11 @@ export default function PackagesTab({ session, showToast, navigate, locale }) {
                       ${pkg.status === 'published' && !pkg.templateStatus && pkg.author === session?.owner && html`
                         <button class="btn-outline btn-sm" onClick=${() => handleProposeAsTemplate(pkg.packageGroupId)}>
                           ${t('packages.proposeAsTemplate') || 'Propose as Template'}
+                        </button>
+                      `}
+                      ${pkg.author === session?.owner && html`
+                        <button class="btn-danger btn-sm" onClick=${() => handleDeletePackage(pkg.packageGroupId, pkg.name)}>
+                          ${t('packages.delete') || 'Delete'}
                         </button>
                       `}
                     </div>
