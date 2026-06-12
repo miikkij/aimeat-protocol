@@ -667,6 +667,41 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
     emitChange('packages');
   });
 
+  // DELETE /v1/packages/:groupId — archive ALL versions of a package group
+  // Used by the profile UI's "Delete" button on own packages. Author-only.
+  // Does not touch installed instances; only removes the package source itself
+  // from the gallery / browse listings.
+  router.delete('/v1/packages/:groupId', requireAuth(), async (req, res) => {
+    const groupId = decodeURIComponent(req.params.groupId as string);
+    const owner = req.auth!.owner;
+
+    // Find any version to verify ownership. Try the latest published first,
+    // then fall back to any version (drafts/archived) in the group.
+    let pkg = await storage.getLatestPublished(groupId);
+    if (!pkg) {
+      const list = await storage.listVersions(groupId, 1, 0);
+      pkg = list.versions[0] ?? null;
+    }
+    if (!pkg) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Package not found: ${groupId}`));
+      return;
+    }
+    if (pkg.author !== owner) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the package author can delete the package'));
+      return;
+    }
+
+    const count = await storage.archivePackageGroup(groupId);
+    res.json(success(config.nodeId, {
+      archived: true,
+      groupId,
+      versionsArchived: count,
+    }, [
+      { description: 'Browse remaining packages', method: 'GET', url: '/v1/packages' },
+    ]));
+    emitChange('packages');
+  });
+
   // DELETE /v1/packages/:groupId/versions/:version — archive version
   router.delete('/v1/packages/:groupId/versions/:version', requireAuth(), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);

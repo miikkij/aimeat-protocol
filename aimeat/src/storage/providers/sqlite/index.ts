@@ -5498,6 +5498,13 @@ export class SqliteStorage implements Storage {
     return result.changes > 0;
   }
 
+  async archivePackageGroup(groupId: string): Promise<number> {
+    const result = this.db.prepare(
+      `UPDATE packages SET status = 'archived', updatedAt = ? WHERE packageGroupId = ? AND status != 'archived'`
+    ).run(new Date().toISOString(), groupId);
+    return result.changes;
+  }
+
   // ══════════════════════════════════════════════════════════
   // ── Template Listings ──
   // ══════════════════════════════════════════════════════════

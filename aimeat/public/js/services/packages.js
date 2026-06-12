@@ -27,6 +27,7 @@ export const createPackage = (data) => apiPost('/v1/packages', data);
 export const createVersion = (groupId, data) => apiPost(`/v1/packages/${enc(groupId)}/versions`, data);
 export const updatePackage = (groupId, data) => apiPatch(`/v1/packages/${enc(groupId)}`, data);
 export const archiveVersion = (groupId, version) => apiDelete(`/v1/packages/${enc(groupId)}/versions/${enc(version)}`);
+export const archivePackageGroup = (groupId) => apiDelete(`/v1/packages/${enc(groupId)}`);
 
 // ── Instances ──
 export const listInstances = (params) => apiGet('/v1/instances' + buildQuery(params));

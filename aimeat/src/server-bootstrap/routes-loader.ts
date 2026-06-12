@@ -430,7 +430,7 @@ export async function mountRoutes(
   // Packages, Instances & Templates
   if (config.packagesEnabled) {
     app.use(packagesRouter(config, storage));
-    app.use(instancesRouter(config, storage));
+    app.use(instancesRouter(config, storage, scheduler));
   }
   if (config.packagesEnabled && config.templatesEnabled) {
     app.use(templatesRouter(config, storage));
