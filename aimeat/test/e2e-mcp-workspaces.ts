@@ -109,7 +109,7 @@ const root = () => `organism.${orgId}.w.${WS}`;
 await test('Tools appear in tools/list', async () => {
     const { body } = await A.client.rpc('tools/list', {}, 100);
     const names = body.result.tools.map((t: any) => t.name);
-    for (const n of ['aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_write', 'aimeat_workspace_publish', 'aimeat_workspace_object_delete'])
+    for (const n of ['aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_write', 'aimeat_workspace_publish', 'aimeat_workspace_object_delete', 'aimeat_organism_overview', 'aimeat_workspace_overview'])
         assert(names.includes(n), `has ${n}`);
 });
 
@@ -193,6 +193,30 @@ await test('8. workspace_write creates a markdown document draft (document space
     assert(b.result.isError !== true, `error: ${b.result.content?.[0]?.text}`);
     const out = JSON.parse(b.result.content[0].text);
     assert(typeof out.id === 'string' && out.id.startsWith('doc-') && out.mode === 'document', `returns doc id + mode: ${JSON.stringify(out)}`);
+});
+
+await test('8e. workspace_overview returns an OKF-style Markdown map (frontmatter + spaces)', async () => {
+    const b = await A.client.call('aimeat_workspace_overview', { organism_id: orgId, ws: WS }, 1087);
+    assert(b.result.isError !== true, `error: ${b.result.content?.[0]?.text}`);
+    const md = b.result.content[0].text as string;
+    assert(md.includes('okf_type: workspace-structure-overview'), `OKF frontmatter:\n${md}`);
+    assert(md.includes(`workspace_id: ${WS}`), 'frontmatter ws id');
+    assert(md.includes('## note (records)'), `note space header:\n${md}`);
+    assert(md.includes('`n1`'), 'published note id n1 listed');
+});
+
+await test('8f. organism_overview lists the workspace with a breakdown', async () => {
+    const b = await A.client.call('aimeat_organism_overview', { organism_id: orgId }, 1088);
+    assert(b.result.isError !== true, `error: ${b.result.content?.[0]?.text}`);
+    const md = b.result.content[0].text as string;
+    assert(md.includes('okf_type: organism-structure-overview'), `OKF frontmatter:\n${md}`);
+    assert(md.includes(`\`${WS}\``), 'workspace id listed');
+    assert(md.includes('note ('), `note breakdown:\n${md}`);
+});
+
+await test('8g. overview membership gate: A cannot overview owner 2 organism', async () => {
+    const b = await A.client.call('aimeat_organism_overview', { organism_id: otherOrgId }, 1089);
+    assert(b.result.isError === true, 'denied (not a member)');
 });
 
 await test('8b. delete removes a published object (draft + latest + versions)', async () => {

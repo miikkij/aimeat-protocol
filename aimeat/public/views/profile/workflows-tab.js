@@ -257,7 +257,7 @@ function RunView({ id, runId, onBack, showToast }) {
             ${run ? html`<code>${run.workflowId}</code> · ${t('profile.workflows.run')} ${timeAgo(run.startedAt)} · ${run.mode}` : runId.slice(0, 8)}
           </div>
         </div>
-        ${inFlight && html`<button class="btn-danger" disabled=${cancelling} onClick=${doCancel}>${cancelling ? '…' : t('profile.workflows.cancelRun')}</button>`}
+        ${inFlight && html`<button class="btn-danger-solid" disabled=${cancelling} onClick=${doCancel}>${cancelling ? '…' : t('profile.workflows.cancelRun')}</button>`}
         ${run && html`<${StatusBadge} status=${run.status} />`}
       </div>
       ${run && def && loc(def.description) && html`<div class="wf-detail-desc">${loc(def.description)}</div>`}

@@ -2492,6 +2492,14 @@
 .pj-org-tab-count { color: var(--muted); font-size: 0.75rem; margin-left: 0.3rem; }
 .pj-org-boardrow { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 
+/* ── OKF-style structure overview (collapsible Markdown map of an organism / workspace) ── */
+.pj-struct-overview { margin: 0.4rem 0 0.8rem; }
+.pj-struct-toggle { display: inline-flex; align-items: center; gap: 0.4rem; background: none; border: none; padding: 0.3rem 0; font-size: 0.85rem; color: var(--text-dim); cursor: pointer; }
+.pj-struct-toggle:hover { color: var(--text); }
+.pj-struct-caret { color: var(--muted); font-size: 0.8rem; width: 0.8rem; }
+.pj-struct-body { margin-top: 0.4rem; max-height: 28rem; overflow: auto; }
+.pj-struct-body .md-body { font-size: 0.85rem; }
+
 /* ── Workspace renew (phase 2): header actions, review banner, add-space tab ── */
 .pj-ws-head-actions { margin-left: auto; display: flex; gap: 0.4rem; align-items: center; }
 .pj-ws-banner { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; border: 1px solid var(--border); border-left: 3px solid var(--warn, var(--accent)); border-radius: 10px; background: var(--card); padding: 0.55rem 0.75rem; margin: 0.6rem 0 0.2rem; }
