@@ -2497,8 +2497,21 @@
 .pj-struct-toggle { display: inline-flex; align-items: center; gap: 0.4rem; background: none; border: none; padding: 0.3rem 0; font-size: 0.85rem; color: var(--text-dim); cursor: pointer; }
 .pj-struct-toggle:hover { color: var(--text); }
 .pj-struct-caret { color: var(--muted); font-size: 0.8rem; width: 0.8rem; }
-.pj-struct-body { margin-top: 0.4rem; max-height: 28rem; overflow: auto; }
-.pj-struct-body .md-body { font-size: 0.85rem; }
+.pj-struct-body { margin-top: 0.4rem; max-height: 32rem; overflow: auto; padding: 0.75rem 0.9rem; }
+/* Compact, on-theme typography so the rendered map reads as part of the dashboard, not a raw doc. */
+.pj-struct-body .md-body { font-size: 0.85rem; color: var(--text); line-height: 1.5; }
+.pj-struct-body .md-body > :first-child { margin-top: 0; }
+.pj-struct-body .md-body h1 { font-size: 1rem; font-weight: 700; margin: 0 0 0.3rem; color: var(--text); }
+.pj-struct-body .md-body h2 { font-size: 0.92rem; font-weight: 700; margin: 0.95rem 0 0.35rem; padding-top: 0.55rem; border-top: 1px solid var(--border); color: var(--text); }
+.pj-struct-body .md-body h3 { font-size: 0.83rem; font-weight: 600; margin: 0.55rem 0 0.2rem; color: var(--text-dim); text-transform: none; }
+.pj-struct-body .md-body p { margin: 0.2rem 0; }
+.pj-struct-body .md-body blockquote { margin: 0.2rem 0; padding: 0 0 0 0.6rem; border-left: 2px solid var(--border); color: var(--muted); font-size: 0.8rem; }
+.pj-struct-body .md-body blockquote p { margin: 0.1rem 0; }
+.pj-struct-body .md-body ul { margin: 0.2rem 0 0.4rem; padding-left: 1.15rem; }
+.pj-struct-body .md-body li { margin: 0.12rem 0; }
+.pj-struct-body .md-body code { background: var(--bg-dim); border: 1px solid var(--border); border-radius: 4px; padding: 0.02rem 0.32rem; font-size: 0.78rem; }
+.pj-struct-body .md-body strong { font-weight: 600; }
+.pj-struct-body .md-body em { color: var(--muted); font-style: normal; }
 
 /* ── Workspace renew (phase 2): header actions, review banner, add-space tab ── */
 .pj-ws-head-actions { margin-left: auto; display: flex; gap: 0.4rem; align-items: center; }

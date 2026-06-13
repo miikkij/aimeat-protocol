@@ -35,6 +35,7 @@ import type { StatsCollector } from '../services/stats.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { emitChange } from '../services/event-bus.js';
 import { getActiveWorkflowEngine } from '../services/workflow/engine.js';
+import { listOwnerScopeMemory } from '../services/owner-memory.js';
 
 /** Map memory visibility to DMZ zone (Phase 0.6) */
 function visibilityToZone(visibility: string): 'private' | 'dmz' | 'federation' {
@@ -250,27 +251,9 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
     let records: MemoryRecord[];
     if (ownerScope && !agentParam) {
-      // Collect keys from owner's GHII + all agents (any visibility)
-      const callerOwner = req.auth!.owner;
-      const ownerGhii = `${callerOwner}@${config.nodeId}`;
-      const agents = await storage.getAgentsByOwner(callerOwner);
-      const seen = new Set<string>();
-      records = [];
-      // Include GHII's own memory entries first
-      const ghiiRecords = await storage.listMemory(ownerGhii, { prefix, visibility, tags, maxFlags });
-      for (const r of ghiiRecords) {
-        seen.add(r.key);
-        records.push(r);
-      }
-      for (const agent of agents) {
-        const agentRecords = await storage.listMemory(agent.gaii, { prefix, visibility, tags, maxFlags });
-        for (const r of agentRecords) {
-          if (!seen.has(r.key)) {
-            seen.add(r.key);
-            records.push(r);
-          }
-        }
-      }
+      // Owner-scope: GHII + all the owner's agents (deduped, GHII first). Shared helper so the
+      // workflow signal evaluator reads the exact same set (same-owner-access invariant).
+      records = await listOwnerScopeMemory(storage, config.nodeId, req.auth!.owner, { prefix, visibility, tags, maxFlags });
     } else {
       records = await storage.listMemory(gaii, { prefix, visibility, tags, maxFlags });
     }

@@ -255,9 +255,14 @@ function StructureOverview({ load, label }) {
     setOpen(next);
     if (next && md === null && !busy) {
       setBusy(true);
-      // Strip the leading OKF YAML frontmatter for the human view — it is machine metadata (kept in the
-      // raw server/MCP output, just noise when rendered). Everything from the body heading down stays.
-      try { setMd(((await load()) || '').replace(/^---\n[\s\S]*?\n---\n+/, '')); } finally { setBusy(false); }
+      // For the human view, strip the OKF YAML frontmatter (machine metadata — kept in the raw
+      // server/MCP output) AND the leading "# … — structure overview" H1 (the panel toggle already
+      // names it; the page header already shows the org/workspace name). The body starts at the
+      // description / totals line.
+      try {
+        const raw = (await load()) || '';
+        setMd(raw.replace(/^---\n[\s\S]*?\n---\n+/, '').replace(/^#\s+.*\n+/, ''));
+      } finally { setBusy(false); }
     }
   };
   return html`

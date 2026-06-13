@@ -99,6 +99,17 @@ const SBX_OFFER = {
   required_to_function: { kind: 'deterministic', key: 'config.enabled', op: 'exists' },
   success_signal: { kind: 'deterministic', key: 'sbx.out', op: 'nonempty' },
 };
+// Offer whose success_signal spans keys produced by ANOTHER agent (owner + public visibility) —
+// to prove the evaluator reads OWNER-SCOPE (owner GHII + all agents), not the owner keyspace alone.
+const CROSSREAD_OFFER = {
+  id: 'crossread', title: 'Crossread', ask: 'check another agent\'s output',
+  deliverable: { format: 'document', location: { key: 't.crossread.done' } },
+  required_to_function: { kind: 'deterministic', key: 'config.enabled', op: 'exists' },
+  success_signal: { all: [
+    { kind: 'deterministic', key_glob: 't.crossread.out.*', op: 'count_nonempty', min: 12 },
+    { kind: 'deterministic', key: 't.crossread.pub', op: 'nonempty' },
+  ] },
+};
 const WORKFLOW = {
   title: { en_US: 'News pipeline' }, description: { en_US: 'fetch → write' },
   trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
@@ -124,7 +135,7 @@ async function run() {
   });
 
   await test('Publish offers with workflow signals', async () => {
-    const { status, body } = await json(`/v1/agents/${agentName}/offers`, { method: 'PUT', headers: auth, body: JSON.stringify({ offers: [FETCH_OFFER, WRITE_OFFER, SRCFAIL_OFFER, SCHEMA_OFFER, SBX_OFFER] }) });
+    const { status, body } = await json(`/v1/agents/${agentName}/offers`, { method: 'PUT', headers: auth, body: JSON.stringify({ offers: [FETCH_OFFER, WRITE_OFFER, SRCFAIL_OFFER, SCHEMA_OFFER, SBX_OFFER, CROSSREAD_OFFER] }) });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
   });
 
@@ -408,6 +419,34 @@ async function run() {
 
     const again = await json(`/v1/workflows/news/runs/${runId}/cancel`, { method: 'POST', headers: auth, body: '{}' });
     assert(again.status === 409, `re-cancel a finished run should be 409, got ${again.status}`);
+  });
+
+  // ── owner-scope cross-agent read (the BLOCKER fix) ──
+  await test('signal reads OWNER-SCOPE: keys written by ANOTHER agent (owner + public) → GREEN', async () => {
+    // A producer agent (NOT the workflow step's agent) writes the keys into ITS OWN keyspace.
+    const mk = await json('/v1/agents', { method: 'POST', headers: auth, body: JSON.stringify({ name: 'wf-producer', owner: ownerName, capabilities: ['memory'] }) });
+    assert(mk.status === 201, `create producer ${mk.status}: ${JSON.stringify(mk.body)}`);
+    const prodToken = await getToken(mk.body.data.agent.gaii, mk.body.data.private_key, true);
+    const phdr = { Authorization: `Bearer ${prodToken}` };
+    for (let i = 1; i <= 12; i++) {
+      const w = await json('/v1/memory', { method: 'POST', headers: phdr, body: JSON.stringify({ key: `t.crossread.out.${i}`, value: `v${i}`, visibility: 'owner' }) });
+      assert(w.status === 200 || w.status === 201, `producer owner-write ${i}: ${w.status}`);
+    }
+    const wp = await json('/v1/memory', { method: 'POST', headers: phdr, body: JSON.stringify({ key: 't.crossread.pub', value: 'pub', visibility: 'public' }) });
+    assert(wp.status === 200 || wp.status === 201, `producer public-write: ${wp.status}`);
+
+    const put = await json('/v1/workflows/crossread-wf', { method: 'PUT', headers: auth, body: JSON.stringify({
+      title: { en_US: 'Crossread' }, description: { en_US: 'reads another agent\'s keys' },
+      trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
+      steps: [{ id: 'check', agent: agentName, offer: 'crossread', required_to_function: 'none', timeout_min: 10, description: { en_US: 'Check' } }],
+    }) });
+    assert(put.status === 200, `put crossread-wf ${put.status}: ${JSON.stringify(put.body)}`);
+
+    const run = await json('/v1/workflows/crossread-wf/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'signals-only' }) });
+    const r = await json(`/v1/workflows/crossread-wf/runs/${run.body.data.runId}`, { headers: auth });
+    // Before the fix this was output-red (count 0, owner-keyspace-only read). With owner-scope it's GREEN.
+    assert(r.body.data.steps.check.state === 'green',
+      `cross-agent owner-scope signal should be GREEN, got ${r.body.data.steps.check.state} observed=${JSON.stringify(r.body.data.steps.check.outputObserved)}`);
   });
 
   // ── health ──

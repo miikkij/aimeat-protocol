@@ -105,7 +105,9 @@ export const OfferSchema = z.object({
   // when its offer declares these + deliverable.location. See
   // docs/plans/2026-06-13-agent-workflows-node-plan.md §5.
   success_signal: SignalSchema.optional(),
-  required_to_function: SignalSchema.optional(),
+  // `'none'` is allowed here too (not just at the step level) so a genuine SOURCE offer (a fetcher
+  // with no memory input) can declare "no input gate" directly instead of a placeholder signal.
+  required_to_function: z.union([SignalSchema, z.literal('none')]).optional(),
   // ── v2 billable/listable/callable (all optional; default to private, not-for-sale, human-driven) ──
   price: PriceSchema.optional(),
   visibility: z.enum(['private', 'unlisted', 'public']).optional(), // default 'private' at read/list time
