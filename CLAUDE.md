@@ -177,6 +177,17 @@ This is the **AIMEAT Protocol** (AI Memory Exchange and Action Transfer) — an 
 
 1. **Protocol specification** (RFC v1.2) in `docs/` and `openapi.yaml`
 2. **Reference implementation** in `aimeat/` — a Node.js/TypeScript server
+3. **Python liaison + connector PyPI package** in `python/aimeat-crewai/` — `aimeat-crewai`, a
+   pip-installable CrewAI integration (the AIMEAT *liaison* agent + the loopback connector + offers/
+   workflow tooling). **This package is part of THIS project and its maintenance — not an external
+   repo.** When agent-facing capabilities change (offers, workflow signals, onboarding, MCP surface),
+   keep the Python side in sync here too. It has its own version line (`python/aimeat-crewai/
+   pyproject.toml`, tag-triggered PyPI release) independent of the Node version — see the release
+   process. Key modules: `liaison.py` (the CrewAI liaison agent + persona), `mcp_client.py` (stdio/
+   http/serve transports), `daemon.py` (crew daemon), `offers.py` + `workflow_spec.py` (offer build/
+   validate/publish + the signal grammar + the local workflow-compat validator), `cli.py` (the
+   `aimeat-offers` shell command). Mirror the node contract (`aimeat/src/models/offer-schemas.ts`,
+   `workflow-schemas.ts`); the node schema wins on any mismatch.
 
 ### Prompt-Driven Workflow
 

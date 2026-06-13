@@ -43,8 +43,26 @@ from .daemon import (
     BuildCrewCallback,
     DAEMON_DEFAULT_TOOL_FILTER,
 )
+from .workflow_spec import (
+    Sig,
+    NONE,
+    SignalError,
+    validate_signal,
+    assess_offer,
+    assess_offers_doc,
+    is_workflow_compatible,
+)
+from .offers import (
+    build_offer,
+    build_offers_doc,
+    validate_offers_doc,
+    publish_offers,
+    resolve_agent_token,
+    OfferValidationError,
+)
+from .offers_tool import offers_check, offers_publish, offers_tools
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 __all__ = [
     "__version__",
@@ -60,4 +78,21 @@ __all__ = [
     "run_crew_daemon",
     "BuildCrewCallback",
     "DAEMON_DEFAULT_TOOL_FILTER",
+    # Offers + workflow-compatibility (0.5.0)
+    "Sig",
+    "NONE",
+    "SignalError",
+    "validate_signal",
+    "assess_offer",
+    "assess_offers_doc",
+    "is_workflow_compatible",
+    "build_offer",
+    "build_offers_doc",
+    "validate_offers_doc",
+    "publish_offers",
+    "resolve_agent_token",
+    "OfferValidationError",
+    "offers_check",
+    "offers_publish",
+    "offers_tools",
 ]
