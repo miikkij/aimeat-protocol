@@ -12,6 +12,9 @@
  *   v1.2.0 -- 2026-06-12 -- Inbox shows the real deliverable (read from the agent namespace, markdown-
  *     rendered) even when deliverableKey is unset; sample rendered as markdown; request box clears after
  *     Ask; "Requested" links to the Inbox.
+ *   v1.3.0 -- 2026-06-13 -- Image deliverables: the inbox deliverable preview + the offer sample now
+ *     render image values (a /v1/pub URL, data: URI, or { url, mime } object) as inline thumbnails via
+ *     the shared ImageDeliverable renderer (DeliverableBody). Pairs with deliverable.format:"image".
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -20,7 +23,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
-import { Markdown } from '/components/Markdown.js';
+import { DeliverableBody } from '/components/ImageDeliverable.js';
 import { dt } from '/js/format.js';
 import * as offersService from '/js/services/offers.js';
 
@@ -119,9 +122,7 @@ function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged,
             <div class="of-label">${t('profile.offers.deliverable') || 'You’ll get back'}: ${escHtml(offer.deliverable.format || '')}${offer.deliverable.location?.space ? html` <span class="of-mini">→ ${escHtml(offer.deliverable.location.space)}</span>` : null}</div>
             ${offer.deliverable.sample === 'untested'
               ? html`<span class="of-badge of-badge--untested">${t('profile.offers.untested') || 'untested — no sample yet'}</span>`
-              : (typeof offer.deliverable.sample === 'string'
-                  ? html`<div class="of-md of-sample-md"><${Markdown} text=${offer.deliverable.sample} /></div>`
-                  : html`<pre class="of-sample">${escHtml(JSON.stringify(offer.deliverable.sample, null, 2))}</pre>`)}
+              : html`<div class="of-md of-sample-md"><${DeliverableBody} value=${offer.deliverable.sample} alt=${offer.title} /></div>`}
           ` : null}
 
           <textarea class="input-field input-sm of-input" rows="2" placeholder=${t('profile.offers.requestPlaceholder') || 'Your request (optional — fills the example)…'} value=${input} onInput=${(e) => setInput(e.target.value)}></textarea>
@@ -211,7 +212,7 @@ function DeliverableRow({ d, showToast, onChanged }) {
             : content === undefined ? null
             : content === 'loading' ? html`<div class="of-mini">…</div>`
             : content === null ? html`<div class="of-mini">${t('profile.offers.noDeliverableYet') || 'No deliverable yet.'}</div>`
-            : html`<div class="of-md"><${Markdown} text=${content} /></div>`}
+            : html`<div class="of-md"><${DeliverableBody} value=${content} alt=${d.title || d.task_id} /></div>`}
 
           <div class="of-prov">${t('profile.offers.provenance') || 'From'}: <b>${escHtml(d.agent)}</b> · ${t('profile.offers.task') || 'task'} ${escHtml(String(d.task_id))} · ${t('profile.offers.status.' + d.status) || d.status} · ${dt(d.updated_at)}</div>
 

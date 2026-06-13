@@ -1,4 +1,7 @@
 {
+  "imageDeliverable.failed": "Kuvan lataus epäonnistui",
+  "imageDeliverable.loading": "Ladataan kuvaa…",
+  "imageDeliverable.open": "Avaa koko kuva",
   "profile.landing.home": "Etusivu",
   "profile.landing.menu": "Valikko",
   "profile.tabs.workflows": "Työnkulut",

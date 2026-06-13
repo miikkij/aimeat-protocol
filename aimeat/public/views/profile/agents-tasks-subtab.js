@@ -9,6 +9,9 @@
  *   - TaskItem -- task row with expand/collapse, todo list, start button
  *   - RequestChangesModal -- inline modal for owner to send a free-text change request
  * @version-history
+ *   v4.12.0 -- 2026-06-13 -- Render image deliverables: the task deliverable preview + per-task
+ *     memory entries now show image values (a /v1/pub URL or { url, mime } object) as inline
+ *     thumbnails via the shared ImageDeliverable renderer; deliverable value kept raw for detection.
  *   v4.11.0 -- 2026-06-05 -- Show the Delete button on every non-active task
  *     (was queued/draft/revision_requested only) so done/failed/paused/stalled/
  *     archived tasks can be removed; active tasks still use Cancel. The backend
@@ -83,6 +86,7 @@ import { listTasks, deleteTask, startTask, listEvents, requestChanges, createTas
 import { setMaxConcurrentTasks } from '/js/services/agents.js';
 import { useConfirm, Modal } from '/components/Modal.js';
 import { Markdown } from '/components/Markdown.js';
+import { detectImage, ImageView, DeliverableBody } from '/components/ImageDeliverable.js';
 import RateModal from './agents/rate-modal.js';
 
 // Tasks-tab triage buckets (server-derived) + on-demand search time chips.
@@ -318,21 +322,26 @@ function TaskMemoryEntry({ entry }) {
   const [open, setOpen] = useState(false);
   const { json, raw } = parseMemoryValue(entry.value);
   const isJson = json !== undefined;
+  // A memory value that IS an image (a /v1/pub URL string, or a { url, mime:image/* } object such as
+  // crews.image-maker.images.<id>) renders as a thumbnail instead of a JSON/text blob.
+  const image = detectImage(isJson ? json : raw, entry.key);
   return html`
     <div class="pf-agd-task-memory-entry">
       <button class="pf-agd-task-memory-head" onClick=${(e) => { e.stopPropagation(); setOpen(o => !o); }} aria-expanded=${open}>
         <span class="pf-agd-task-memory-caret">${open ? '▼' : '▶'}</span>
         <code class="pf-agd-task-memory-key">${entry.key}</code>
-        ${isJson && html`<span class="pf-agd-task-memory-badge">JSON</span>`}
+        ${image ? html`<span class="pf-agd-task-memory-badge">IMG</span>` : isJson && html`<span class="pf-agd-task-memory-badge">JSON</span>`}
       </button>
       ${open && html`
         <div class="pf-agd-task-memory-body">
-          ${isJson
-            ? html`<${JsonNode} value=${json} />`
-            // Non-JSON values (e.g. an agent's latest_output) are usually
-            // markdown — render them formatted via the shared safe Markdown
-            // component instead of raw text.
-            : html`<div class="pf-agd-task-memory-md"><${Markdown} text=${raw} /></div>`}
+          ${image
+            ? html`<${ImageView} desc=${image} />`
+            : isJson
+              ? html`<${JsonNode} value=${json} />`
+              // Non-JSON values (e.g. an agent's latest_output) are usually
+              // markdown — render them formatted via the shared safe Markdown
+              // component instead of raw text.
+              : html`<div class="pf-agd-task-memory-md"><${Markdown} text=${raw} /></div>`}
         </div>
       `}
     </div>
@@ -382,8 +391,9 @@ function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }) {
       const items = resp?.data?.items || resp?.data || [];
       const found = Array.isArray(items) ? items.find(i => i.key === key) : null;
       if (!found) { setDeliverable({ notFound: true }); return; }
-      const v = found.value;
-      setDeliverable({ value: typeof v === 'string' ? v : JSON.stringify(v, null, 2) });
+      // Keep the RAW value (string OR object) so the shared image detector can recognise an
+      // image deliverable (e.g. { url, mime:"image/*" }); DeliverableBody handles the display.
+      setDeliverable({ value: found.value });
     } catch {
       setDeliverable({ notFound: true });
     }
@@ -640,7 +650,7 @@ function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }) {
                 ? html`<div class="pf-agd-empty">${t('profile.loading')}</div>`
                 : deliverable.notFound
                   ? html`<div class="pf-agd-deliverable-gone">${t('profile.agents.tasks.deliverableGone')}</div>`
-                  : html`<pre class="pf-agd-memory-preview">${deliverable.value}</pre>`}
+                  : html`<div class="pf-agd-memory-preview"><${DeliverableBody} value=${deliverable.value} alt=${task.title || task.description} /></div>`}
             `}
           `}
 

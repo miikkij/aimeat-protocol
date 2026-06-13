@@ -1,0 +1,70 @@
+/**
+ * @file image-deliverable.css
+ * @description Styles for the shared ImageDeliverable renderer (/components/ImageDeliverable.js):
+ *   size-capped, click-to-open image thumbnails plus the loading / failure chips, used across the
+ *   task, memory, offers/inbox, and workflow surfaces. Theme-variable driven (no dark-only rgba).
+ * @usage Linked globally from spa.html; classes prefixed `imgd-`.
+ * @version-history
+ *   v1.0.0 -- 2026-06-13 -- Initial: thumbnail / strip / loading / failure styles.
+ */
+
+/* Click-to-open thumbnail wrapper. */
+.imgd {
+  display: inline-block;
+  max-width: 100%;
+  margin: 0.4em 0;
+  text-decoration: none;
+}
+
+/* The thumbnail itself — lazy-loaded in markup, size-capped here. */
+.imgd-thumb {
+  display: block;
+  max-width: 320px;
+  max-height: 240px;
+  width: auto;
+  height: auto;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-dim);
+  object-fit: contain;
+  cursor: zoom-in;
+}
+
+/* A row of thumbnails (deep-scan / multi-image results). */
+.imgd-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  margin: 0.4em 0;
+}
+
+/* Loading + failure chips — a failed image is never an empty box. */
+.imgd--loading,
+.imgd--fail {
+  display: inline-block;
+  padding: 0.35em 0.6em;
+  border-radius: 6px;
+  font-size: 0.85em;
+  border: 1px solid var(--border);
+}
+
+.imgd--loading {
+  color: var(--text-meta, var(--muted, inherit));
+  background: var(--bg-dim);
+}
+
+.imgd--fail {
+  color: var(--danger, #b00020);
+  background: var(--bg-dim);
+  border-color: var(--danger, #b00020);
+}
+
+/* Text-with-images block: keep markdown spacing tidy when thumbnails follow. */
+.imgd-textblock .imgd-strip { margin-top: 0.6em; }
+
+/* JSON fallback inside a deliverable body. */
+.imgd-json {
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0.4em 0;
+}

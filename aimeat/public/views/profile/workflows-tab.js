@@ -10,6 +10,9 @@
  * @usage Registered in profile.js TABS as { id:'workflows', component: WorkflowsTab }.
  * @version-history
  *   v1.0.0 -- 2026-06-13 -- Phase 9: list + blueprint + runs + run-now + health.
+ *   v1.1.0 -- 2026-06-13 -- Run view renders image deliverables: a step whose observed output / writes
+ *     hold an image (a /v1/pub URL or { url, mime } value) shows inline thumbnails via the shared
+ *     ImageDeliverable renderer (collectImages + ImageStrip).
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -17,6 +20,7 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { listWorkflows, getWorkflow, getBlueprint, getHealth, listRuns, getRun, runWorkflow, cancelRun } from '/js/services/workflows.js';
+import { collectImages, ImageStrip } from '/components/ImageDeliverable.js';
 import WorkflowForm from './workflows-form.js';
 
 const html = htm.bind(h);
@@ -291,6 +295,12 @@ function RunView({ id, runId, onBack, showToast }) {
             ${s.attempt > 0 && html`<span class="wf-muted">${t('profile.workflows.attempt')} ${s.attempt + 1}</span>`}
           </div>
           ${agents && html`<div class="wf-node-agent">${agents} · ${sd.offer}</div>`}
+          ${(() => {
+            // A step whose observed output / writes hold an image (a /v1/pub URL or { url, mime } value)
+            // renders thumbnails next to its observed state in the timeline.
+            const imgs = collectImages([s.outputObserved, s.inputObserved, s.writes], stepId);
+            return imgs.length ? html`<${ImageStrip} images=${imgs} />` : null;
+          })()}
           ${(s.outputObserved || s.inputObserved) && html`<pre class="wf-observed">${JSON.stringify(s.outputObserved || s.inputObserved, null, 2)}</pre>`}
         </div>`;
         })}

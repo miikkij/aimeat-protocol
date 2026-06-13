@@ -6,6 +6,8 @@
  *   rejection + owner-scoping.
  * @version-history
  *   v1.0.0 — 2026-06-12 — Initial: publish/read/aggregate + validation.
+ *   v1.1.0 — 2026-06-13 — Cover deliverable.format "image" round-trip (test 11b) for the inline
+ *     image deliverable rendering feature.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-offers
 
@@ -160,6 +162,29 @@ await test('11. A v2 offer with price/visibility/callable round-trips through pu
     const o = (r.body.data.offers || []).find((x: any) => x.id === 'summarize');
     assert(!!o, 'v2 offer present');
     assert(o.price?.morsels === 25 && o.visibility === 'public' && o.callable?.action_id === 'cap-missing-on-purpose', `v2 fields preserved: ${JSON.stringify(o)}`);
+});
+
+await test('11b. An offer can declare deliverable.format "image" and round-trips', async () => {
+    // The new image deliverable format (rendered inline by the shared image renderer across the
+    // task / memory / offers / workflow surfaces). A real /v1/pub image url is the sample. Republish
+    // ALONGSIDE the v2 offers so the later invoke gates (12–14) still resolve research-topic/summarize.
+    const imgDoc = { offers: [
+        ...v2Doc.offers,
+        {
+            id: 'generate-image', title: 'Generate an image',
+            ask: 'Describe an image; I generate it and return a public URL.',
+            deliverable: {
+                format: 'image',
+                location: { space: 'crews.image-maker.images', visibility: 'owner' },
+                sample: { url: 'https://aimeat.io/v1/pub/x%23o%40n/images/test.jpg', mime: 'image/jpeg' },
+            },
+        },
+    ] };
+    const pub = await json(`/v1/agents/${agentName}/offers`, { method: 'PUT', headers: auth(A.token), body: JSON.stringify(imgDoc) });
+    assert(pub.status === 200, `publish ${pub.status}: ${JSON.stringify(pub.body.error)}`);
+    const r = await json(`/v1/agents/${agentName}/offers`, { headers: auth(A.token) });
+    const o = (r.body.data.offers || []).find((x: any) => x.id === 'generate-image');
+    assert(!!o && o.deliverable?.format === 'image', `image format preserved: ${JSON.stringify(o?.deliverable)}`);
 });
 
 await test('12. Invoking an offer with no callable binding → 422 OFFER_NOT_CALLABLE', async () => {
