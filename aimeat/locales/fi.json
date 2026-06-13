@@ -6833,7 +6833,8 @@
         "cursorLink": "Avaa connect-sivu →",
         "other": "Jos työkalussasi on Connectors / custom MCP -tuki, liitä siihen tämä osoite:",
         "otherNote": "Ei MCP-tukea? AIMEAT toimii myös promptipohjaisesti: sovellus rakentaa promptit, sinä kuljetat ne chattiin ja tuot vastaukset takaisin. Ilmainen, ja toimii millä tahansa AI:lla.",
-        "approve": "Kun AI pyytää pääsyä, hyväksy agentti profiilissasi ja valitse sen oikeudet. Yhtään agenttia ei synny ilman sinun hyväksyntääsi."
+        "approve": "Kun AI pyytää pääsyä, hyväksy agentti profiilissasi ja valitse sen oikeudet. Yhtään agenttia ei synny ilman sinun hyväksyntääsi.",
+        "localhost": "Ajatko AIMEATia omalla koneellasi (localhost)? Pilvi-AI kuten claude.ai ei tavoita localhost-osoitetta MCP:n yli. Asenna connector ja aja `aimeat connect serve` — se siltaa paikallisen nodesi AI:lle."
       },
       "s3": {
         "title": "Vaihe 3: Laita AI:si töihin",
