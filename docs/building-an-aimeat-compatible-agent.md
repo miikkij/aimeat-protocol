@@ -146,6 +146,30 @@ A workflow `save` is **rejected** if any step's offer is not workflow-compatible
 
 ---
 
+## 5b. Python / CrewAI agents — use the `aimeat-crewai` package
+
+If your agent is a CrewAI crew (or any Python agent), the `aimeat-crewai` package in
+`python/aimeat-crewai/` does this for you — no hand-written JSON:
+
+```python
+from aimeat_crewai import Sig, NONE, build_offer, build_offers_doc, publish_offers
+
+offer = build_offer(
+    id="research", title="Research a topic",
+    ask="Ask me to research a topic; I return findings. I do NOT fetch real-time prices.",
+    deliverable={"format": "document", "location": {"key": "research.out"}},
+    success_signal=Sig.count_nonempty(key_glob="research.*", min=1),
+    required_to_function=NONE,                       # a source offer
+)
+publish_offers(build_offers_doc([offer]), agent_name="research-bot")  # writes agents.research-bot.offers
+```
+
+- Check offline before publishing: `aimeat-offers check --file offers.json` (the shell command), or
+  the `aimeat_offers_check` CrewAI tool — both report which levels each offer reaches and what's
+  missing, mirroring the node's gate.
+- The liaison agent's persona already explains this ladder, so a CrewAI liaison can author + publish
+  its own offers.
+
 ## 6. Copy-paste prompt — hand this to the AI that builds the agent
 
 > Fill the three `<…>` blanks (agent name, what it does, the keys it reads/writes), then paste it into

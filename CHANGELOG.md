@@ -304,6 +304,33 @@ this to local clients (CrewAI crews, MCP runtimes) over `127.0.0.1`. Pairs with
   `Host` stripped — the pinned agent JWT is the sole credential); the tunnel WS
   frame size is capped; the local serve surface binds `127.0.0.1` only.
 
+## aimeat-crewai 0.5.0 - 2026-06-13
+
+**Offers + workflow-compatibility, generalised for any agent.** The connector
+gains first-class support for publishing offers and making them
+workflow-compatible — the Python side of the node's offers/workflows feature.
+
+- **`workflow_spec.py`** — `Sig`, a builder for the AIMEAT signal grammar
+  (deterministic-first `exists`/`nonempty`/`json_valid`/`count_nonempty`/
+  `json_schema`/`json_field`, the opt-in `llm` leaf, `all`/`any`/`when`
+  composites, and the `NONE` literal), `validate_signal()`, and
+  `assess_offer()`/`assess_offers_doc()` — the local workflow-compat verdict
+  (offering / workflow-compatible / priced + exactly what's missing), mirroring
+  the node's save-time gate. Pure stdlib.
+- **`offers.py`** — `build_offer()`/`build_offers_doc()`, `validate_offers_doc()`
+  (with an optional required-level gate), and `publish_offers()` which writes to
+  `agents.{name}.offers` over REST (auto-resolves the connector-stored token).
+- **`aimeat-offers` shell command** (`cli.py`) — `check` (offline validator,
+  `--file`/`--stdin`, `--json`) and `publish` (`--agent`, `--node-url`,
+  `--require`).
+- **CrewAI tools** (`offers_tool.py`) — `aimeat_offers_check` / `aimeat_offers_publish`
+  so the liaison can validate offline and publish; the liaison persona now
+  explains the offering → workflow-compatible → priced ladder and points to the
+  guided prompt + handbook page.
+
+Mirrors the node contract (`offer-schemas.ts` / `workflow-schemas.ts`); the node
+schema wins on any mismatch. Full spec: `docs/building-an-aimeat-compatible-agent.md`.
+
 ## aimeat-crewai 0.4.0 - 2026-06-10
 
 **Loopback serve transport (Connector Forward Tunnel, Phase 5).** The CrewAI
