@@ -2946,6 +2946,134 @@ components:
         instance_id: { type: string }
         input: { type: object }
 
+    # === Agent Workflows ===
+    LocalizedString:
+      description: 'A plain string, or a locale-keyed map (e.g. en_US / fi_FI text).'
+      oneOf:
+        - type: string
+        - type: object
+          additionalProperties: { type: string }
+    WorkflowSignal:
+      type: object
+      description: >
+        A signal tree evaluated against owner memory, with {var} templated from the run params.
+        A leaf is deterministic ({ kind: deterministic, key|key_glob, op: exists|nonempty|
+        count_nonempty|json_valid|json_schema|json_field, … }) or llm ({ kind: llm, key|key_glob,
+        ask }); composites are { all: [...] }, { any: [...] }, or { when, then }. See
+        workflow-schemas.ts for the full grammar.
+      additionalProperties: true
+    WorkflowVar:
+      type: object
+      required: [name, type, description]
+      properties:
+        name: { type: string }
+        type: { type: string, description: "'date' | 'enum[a,b]' | 'string' | …" }
+        description: { $ref: '#/components/schemas/LocalizedString' }
+        default: { type: string }
+        example: { type: string }
+    WorkflowStep:
+      type: object
+      required: [id, agent, offer, description, timeout_min]
+      properties:
+        id: { type: string }
+        agent:
+          description: One agent name, or a list (a list runs in parallel within the step).
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: string }
+        offer: { type: string, description: 'Inherit success_signal + required_to_function from this offer.' }
+        after: { type: array, items: { type: string }, description: 'Dependency order (DAG).' }
+        description: { $ref: '#/components/schemas/LocalizedString' }
+        required_to_function:
+          description: "Input gate (consumer-owned). A signal, or the literal 'none'. Inherited from the offer if omitted."
+          oneOf:
+            - $ref: '#/components/schemas/WorkflowSignal'
+            - type: string
+              enum: [none]
+        success_signal: { $ref: '#/components/schemas/WorkflowSignal' }
+        retry:
+          type: object
+          properties:
+            max: { type: integer }
+            backoff_min: { type: number }
+        timeout_min: { type: integer }
+    WorkflowTrigger:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [schedule, manual, event] }
+        cron: { type: string, description: 'schedule kind' }
+        timezone: { type: string }
+        on: { type: string, enum: [memory.write, offer.ordered], description: 'event kind' }
+        match: { type: object, additionalProperties: { type: string }, description: 'event kind' }
+    WorkflowDefInput:
+      type: object
+      required: [title, description, trigger, vars, steps, on_step_fail]
+      properties:
+        title: { $ref: '#/components/schemas/LocalizedString' }
+        description: { $ref: '#/components/schemas/LocalizedString' }
+        trigger: { $ref: '#/components/schemas/WorkflowTrigger' }
+        vars: { type: array, items: { $ref: '#/components/schemas/WorkflowVar' } }
+        steps: { type: array, items: { $ref: '#/components/schemas/WorkflowStep' } }
+        on_step_fail: { type: string, enum: [inspect] }
+        llm:
+          type: object
+          description: Owner consent to use the node OpenRouter for `llm` signal leaves.
+          properties:
+            approved: { type: boolean }
+        costCapMorsels: { type: integer, nullable: true, description: 'Optional per-workflow cap.' }
+    WorkflowDef:
+      allOf:
+        - $ref: '#/components/schemas/WorkflowDefInput'
+        - type: object
+          properties:
+            id: { type: string }
+            createdBy: { type: string, description: 'Author GAII/GHII (audit).' }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+    WorkflowBlueprint:
+      type: object
+      properties:
+        workflowId: { type: string }
+        nodes:
+          type: array
+          items:
+            type: object
+            properties:
+              stepId: { type: string }
+              agents: { type: array, items: { type: string } }
+              offerId: { type: string }
+              reads: { type: array, items: { type: string }, description: 'Key templates the input gate checks.' }
+              writes: { type: array, items: { type: string }, description: 'Key templates the output check + deliverable touch.' }
+        edges:
+          type: array
+          items:
+            type: object
+            properties:
+              from: { type: string }
+              to: { type: string }
+    WorkflowRun:
+      type: object
+      properties:
+        runId: { type: string }
+        workflowId: { type: string }
+        status: { type: string, enum: [running, waiting-step, red, partial, done] }
+        mode: { type: string, enum: [full-live, full-sandbox, signals-only] }
+        vars: { type: object, additionalProperties: { type: string } }
+        steps:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              state: { type: string, enum: [pending, input-red, dispatched, green, output-red, timed-out, skipped] }
+              attempt: { type: integer }
+              taskIds: { type: array, items: { type: string } }
+              reads: { type: array, items: { type: string } }
+              writes: { type: array, items: { type: string } }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: string, format: date-time }
+
   # === Reusable Response Wrappers ===
   responses:
     AimeatSuccess:
@@ -18555,6 +18683,211 @@ paths:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/workflows:
+    get:
+      operationId: listWorkflows
+      summary: List the owner's workflows
+      description: >
+        Agent Workflows are declared, ordered agent pipelines with per-step input/output signals —
+        the abstraction the bare scheduler lacks ("did it produce", not just "did it fire").
+        Definitions live in the owner's own memory (`workflows.def.<id>`). Readable by the owner or
+        an agent holding `workflow:read`.
+      tags: [Workflows]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The owner's workflow definitions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          workflows: { type: array, items: { $ref: '#/components/schemas/WorkflowDef' } }
+                          count: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/workflows/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+        description: Workflow id (lowercase slug)
+    get:
+      operationId: getWorkflow
+      summary: Get one workflow definition
+      tags: [Workflows]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Workflow definition
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WorkflowDef' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: putWorkflow
+      summary: Create or update a workflow (save-time validated)
+      description: >
+        Rejected (400 WORKFLOW_INVALID, `error.details.errors[]`) unless the `after` graph is a DAG
+        and every step's agent/offer is workflow-compatible — i.e. publishes `success_signal` +
+        `required_to_function` + `deliverable.location`. A step using an `llm` signal leaf requires
+        `llm.approved=true` (owner consent to node-LLM use). Authorable by the owner or an agent
+        holding `workflow:write`.
+      tags: [Workflows]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowDefInput'
+      responses:
+        '200':
+          description: Workflow saved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WorkflowDef' }
+        '400':
+          description: Validation failed (error.details.errors[] lists the problems)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      operationId: deleteWorkflow
+      summary: Delete a workflow definition
+      tags: [Workflows]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: withRuns
+          in: query
+          required: false
+          schema: { type: boolean }
+          description: When true, also drop the workflow's run records.
+      responses:
+        '200':
+          description: Workflow deleted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/workflows/{id}/blueprint:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getWorkflowBlueprint
+      summary: The derived "whole workflow" graph
+      description: >
+        Composes the steps into one structural blueprint (nodes + dependency edges + the memory key
+        templates each step reads/writes), derived from the agents' CURRENT offers along the step
+        order — not hand-authored. Returns 409 WORKFLOW_STALE if the workflow no longer resolves
+        against the current offers.
+      tags: [Workflows]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Blueprint
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WorkflowBlueprint' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Workflow no longer resolves against current offers
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+  /v1/workflows/{id}/runs:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: listWorkflowRuns
+      summary: List a workflow's runs
+      description: Newest first. Empty until the deterministic engine ships (Phase 4).
+      tags: [Workflows]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Runs
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          runs: { type: array, items: { $ref: '#/components/schemas/WorkflowRun' } }
+                          count: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/workflows/{id}/runs/{runId}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+      - name: runId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getWorkflowRun
+      summary: Get one workflow run (per-step state + observed values)
+      tags: [Workflows]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Run
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/WorkflowRun' }
         '404':
           $ref: '#/components/responses/NotFound'
   /v1/agents/{name}/schedules:

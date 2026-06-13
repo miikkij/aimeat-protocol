@@ -1,0 +1,82 @@
+/**
+ * @file workflows.css
+ * @description Styles for Profile › Workflows (workflows-tab.js): the list of workflows with a
+ *   health sparkline, the blueprint graph + recent runs detail, and the single-run per-step
+ *   timeline. Prefix: wf-. Theme-token driven (no hardcoded colors) so it flips with dark/light.
+ * @version-history
+ *   v1.0.0 -- 2026-06-13 -- Phase 9: initial workflows tab styles.
+ */
+
+.wf-tab { display: flex; flex-direction: column; gap: 1.1rem; }
+.wf-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.wf-loading, .wf-empty { color: var(--text-dim); padding: 0.75rem 0; font-size: 0.92rem; }
+.wf-error {
+  background: var(--danger-bg); color: var(--danger-fg);
+  border: 1px solid var(--danger-border, var(--border)); border-radius: var(--radius-sm); padding: 0.6rem 0.85rem;
+}
+.wf-muted { color: var(--text-dim); font-size: 0.82rem; }
+.wf-section-title { font-size: 1rem; font-weight: 700; color: var(--text); margin: 0.5rem 0 0.1rem; }
+
+/* ── badges ── */
+.wf-badge {
+  display: inline-block; padding: 0.1rem 0.5rem; border-radius: var(--radius-full, 999px);
+  font-size: 0.72rem; font-weight: 700; line-height: 1.5;
+}
+.wf-badge--ok { background: var(--success-bg); color: var(--success-fg); }
+.wf-badge--err { background: var(--danger-bg); color: var(--danger-fg); }
+.wf-badge--run { background: var(--info-bg); color: var(--info-fg); }
+.wf-badge--muted { background: var(--bg-dim); color: var(--text-dim); }
+
+/* ── list ── */
+.wf-card-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.wf-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.85rem 1rem;
+}
+.wf-card-main { flex: 1; cursor: pointer; display: flex; flex-direction: column; gap: 0.25rem; }
+.wf-card-title { font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 0.5rem; }
+.wf-card-meta { font-size: 0.82rem; color: var(--text-dim); }
+.wf-card-actions { display: flex; gap: 0.4rem; white-space: nowrap; }
+
+/* ── sparkline ── */
+.wf-spark { display: inline-flex; gap: 2px; margin-top: 0.2rem; align-items: flex-end; }
+.wf-spark-bar { width: 7px; height: 14px; border-radius: 2px; display: inline-block; }
+.wf-spark-bar--ok { background: var(--success-fg); }
+.wf-spark-bar--err { background: var(--danger-fg); }
+.wf-spark-bar--none { background: var(--bg-dim); }
+
+/* ── detail ── */
+.wf-detail-head { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.wf-detail-title { font-size: 1.1rem; font-weight: 700; color: var(--text); flex: 1; }
+.wf-detail-actions { display: flex; gap: 0.4rem; }
+
+.wf-graph { display: flex; flex-direction: column; gap: 0.5rem; }
+.wf-node {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 0.6rem 0.8rem; display: flex; flex-direction: column; gap: 0.15rem;
+}
+.wf-node-id { font-weight: 700; color: var(--text); }
+.wf-node-agent { font-size: 0.82rem; color: var(--text-dim); }
+.wf-node-io { font-size: 0.78rem; color: var(--text-dim); font-family: var(--font-mono, monospace); }
+.wf-node-dep { font-size: 0.74rem; color: var(--accent); }
+
+.wf-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.wf-table td { padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); color: var(--text); }
+.wf-run-row { cursor: pointer; }
+.wf-run-row:hover { background: var(--bg-dim); }
+
+/* ── run timeline ── */
+.wf-steps { display: flex; flex-direction: column; gap: 0.5rem; }
+.wf-step {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.55rem 0.8rem;
+}
+.wf-step-row { display: flex; align-items: center; gap: 0.6rem; }
+.wf-step-id { font-weight: 600; color: var(--text); }
+.wf-observed {
+  margin: 0.4rem 0 0; padding: 0.5rem 0.65rem; background: var(--bg-dim); border-radius: var(--radius-sm);
+  font-size: 0.76rem; color: var(--text-dim); overflow-x: auto; white-space: pre-wrap;
+}
+.wf-inspections {
+  margin-top: 0.5rem; padding: 0.5rem 0.7rem; background: var(--warn-bg); color: var(--warn-fg);
+  border-radius: var(--radius-sm); font-size: 0.82rem;
+}
