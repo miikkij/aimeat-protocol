@@ -21,6 +21,10 @@
  *   const md = await buildOrganismOverview(storage, config, { orgId, viewerGaii });
  * @version-history
  *   v1.0.0 — 2026-06-13 — Initial: OKF-style organism + workspace structure overview (Markdown).
+ *   v1.1.0 — 2026-06-13 — Organism overview is now the workspace overviews COMPOSED at the same
+ *     fidelity (each workspace a ## section with its spaces' recent ids+titles) instead of a
+ *     count-only breakdown — shared spaceLines() renders both, so the org view is navigable to a
+ *     record id, not a lossy splat.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -209,16 +213,28 @@ export async function buildWorkspaceOverview(
   if (s.readme) out.push(`> ${s.readme}\n`);
   out.push(`> ${s.totalRecords} records · ${s.totalDocuments} documents · ${s.spaces.length} spaces · last activity ${date(s.lastActivity)}\n`);
   if (!s.spaces.length) out.push('_No spaces with content yet._\n');
-  for (const sp of s.spaces) {
-    out.push(`## ${sp.name} (${sp.mode}) — ${sp.total}\n`);
-    for (const e of sp.recent) out.push(`- **${e.title}**  ·  \`${e.id}\`  ·  ${date(e.updatedAt)}`);
-    if (sp.total > sp.recent.length) out.push(`- _… showing ${sp.recent.length} most recent of ${sp.total} — read the space for the rest_`);
-    out.push('');
-  }
+  for (const sp of s.spaces) out.push(...spaceLines(sp, '##'));
   return { markdown: out.join('\n'), readable: true, summary: s };
 }
 
-/** SHALLOW overview of a whole organism: each workspace's space breakdown + counts + totals. */
+/** Render one space as Markdown lines: a heading (`{hashes} name (mode) — total`) + its most-recent
+ *  entries (title + id + date) up to MAX_ITEMS, with a "N total" hint when more exist. Shared by the
+ *  workspace overview (## spaces) and the organism overview (### spaces under each ## workspace) so
+ *  BOTH carry the same per-entry detail — the organism view is the workspace views composed, not a
+ *  lossy count-only summary. */
+function spaceLines(sp: SpaceSummary, hashes: string): string[] {
+  const lines = [`${hashes} ${sp.name} (${sp.mode}) — ${sp.total}`, ''];
+  for (const e of sp.recent) lines.push(`- **${e.title}**  ·  \`${e.id}\`  ·  ${date(e.updatedAt)}`);
+  if (sp.total === 0) lines.push('- _empty_');
+  else if (sp.total > sp.recent.length) lines.push(`- _… ${sp.recent.length} of ${sp.total} shown — open the space for the rest_`);
+  lines.push('');
+  return lines;
+}
+
+/** Overview of a whole organism — its workspaces COMPOSED at the same fidelity as a single workspace
+ *  overview: each workspace is a `##` section with its spaces (`###`) and the same recent entries
+ *  (ids + titles). Not a count-only splat — a reader (human or agent) can navigate straight to a
+ *  specific record's id from the organism view. Bounded by MAX_ITEMS per space (totals always shown). */
 export async function buildOrganismOverview(
   storage: Storage,
   config: AimeatConfig,
@@ -246,17 +262,14 @@ export async function buildOrganismOverview(
   out.push(`# ${orgName} — structure overview\n`);
   if (org?.description) out.push(`> ${clip(org.description, 200)}\n`);
   out.push(`> ${summaries.length} workspaces · ${totalRecords} records · ${totalDocs} documents\n`);
-  out.push('## Workspaces\n');
   if (!summaries.length) out.push('_No workspaces yet._\n');
   for (const s of summaries) {
-    out.push(`### ${s.name}  ·  \`${s.ws}\``);
+    out.push(`## ${s.name}  ·  \`${s.ws}\``);
     if (!s.readable) { out.push('_no read access_\n'); continue; }
-    if (s.readme) out.push(s.readme);
-    const breakdown = s.spaces.length
-      ? s.spaces.map(sp => `${sp.name} (${sp.total})`).join(' · ')
-      : '_no content yet_';
-    out.push(`**${s.totalRecords + s.totalDocuments} items** — ${breakdown}`);
-    out.push(`_last activity ${date(s.lastActivity)}_\n`);
+    if (s.readme) out.push(`> ${s.readme}`);
+    out.push(`> ${s.totalRecords} records · ${s.totalDocuments} documents · last activity ${date(s.lastActivity)}\n`);
+    if (!s.spaces.length) { out.push('_no content yet_\n'); continue; }
+    for (const sp of s.spaces) out.push(...spaceLines(sp, '###'));
   }
   return { markdown: out.join('\n'), workspaces: summaries.length };
 }

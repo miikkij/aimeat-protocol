@@ -177,6 +177,13 @@ function DetailView({ id, onBack, onOpenRun, onRun, onEdit }) {
     setRuns(rr?.data?.runs || []);
   }, [id]);
   useEffect(() => { load(); }, [load]);
+  // Live updates: re-fetch the blueprint + recent runs as runs advance (engine emitChange → SSE).
+  const liveRef = useRef(load); liveRef.current = load;
+  useEffect(() => {
+    const h = () => liveRef.current();
+    window.addEventListener('aimeat-live-update', h);
+    return () => window.removeEventListener('aimeat-live-update', h);
+  }, []);
 
   const stepDesc = (stepId) => loc((def?.steps || []).find(s => s.id === stepId)?.description);
   const triggerLine = def ? triggerSummary(def.trigger) : '';
@@ -233,6 +240,14 @@ function RunView({ id, runId, onBack, showToast }) {
   const [cancelling, setCancelling] = useState(false);
   const loadRun = useCallback(() => getRun(id, runId).then(r => setRun(r?.data || null)).catch(e => setErr(e.message)), [id, runId]);
   useEffect(() => { loadRun(); }, [loadRun]);
+  // Live updates: the engine emits emitChange('workflows') as the run advances (dispatch → green →
+  // next step → done) → SSE → aimeat-live-update. Re-fetch so the timeline updates without a manual reload.
+  const liveRef = useRef(loadRun); liveRef.current = loadRun;
+  useEffect(() => {
+    const h = () => liveRef.current();
+    window.addEventListener('aimeat-live-update', h);
+    return () => window.removeEventListener('aimeat-live-update', h);
+  }, []);
 
   const inFlight = run && (run.status === 'running' || run.status === 'waiting-step');
   const doCancel = async () => {

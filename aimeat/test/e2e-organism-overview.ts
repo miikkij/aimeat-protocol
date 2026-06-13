@@ -109,8 +109,12 @@ await test('Organism overview: lists the workspace with breakdown + totals', asy
     assert(md.includes('okf_type: organism-structure-overview'), 'OKF frontmatter type');
     assert(md.includes('Overview Org — structure overview'), 'org title heading');
     assert(md.includes('1 workspaces') && md.includes('2 records') && md.includes('1 documents'), `org totals: ${md}`);
-    assert(md.includes(`\`${WS}\``), 'workspace id listed');
-    assert(md.includes('note (2)') && md.includes('page (1)'), `space breakdown: ${md}`);
+    assert(md.includes(`## Main  ·  \`${WS}\``), `workspace section heading with id: ${md}`);
+    // Composed at the SAME fidelity as the workspace overview — per-space headings + item ids/titles,
+    // not a count-only breakdown (the org view must be navigable to a record id).
+    assert(md.includes('### note (records) — 2') && md.includes('### page (document) — 1'), `per-space headings: ${md}`);
+    assert(md.includes('First note') && md.includes('`n1`'), `record item (title + id) in org overview: ${md}`);
+    assert(md.includes('Welcome page') && md.includes('`doc-1`'), `document item (title + id) in org overview: ${md}`);
     assert(r.body.data.workspaces === 1, 'workspaces count in envelope');
 });
 
