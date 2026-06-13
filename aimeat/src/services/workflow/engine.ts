@@ -29,9 +29,10 @@ import type { PushService } from '../push.js';
 import { buildGAII } from '../../utils/gaii.js';
 import { emitChange } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
-import { evaluateSignal, type SignalEvalCtx } from './signal-eval.js';
+import { evaluateSignal, globToRegExp, type SignalEvalCtx } from './signal-eval.js';
 import { buildEvalCtx } from './eval-context.js';
 import { getWorkflow, validateWorkflow, runKey, type ResolvedStep } from './store.js';
+import { readEventTriggers, readActiveRuns, reconcileActiveRun } from './lifecycle.js';
 import type {
   WorkflowDef, WorkflowRun, WorkflowRunStep, WorkflowStep, Signal, LocalizedString,
 } from '../../models/workflow-schemas.js';
@@ -84,14 +85,10 @@ export class WorkflowEngine {
   /** Per-run serialization: advancing the same run from two task completions is a RMW race. */
   private locks = new Map<string, Promise<void>>();
   private sweepTimer?: ReturnType<typeof setInterval>;
-  /** Cross-owner index of in-flight runs (memory is per-owner, so the watchdog needs a roster). */
-  private readonly systemGhii: string;
-  private static readonly ACTIVE_KEY = 'workflows.active';
 
   constructor(config: AimeatConfig, storage: Storage) {
     this.config = config;
     this.storage = storage;
-    this.systemGhii = `system@${config.nodeId}`;
   }
 
   setWebhookDispatcher(d: WebhookDispatcher): void { this.webhookDispatcher = d; }
@@ -127,6 +124,18 @@ export class WorkflowEngine {
     const v = await validateWorkflow(this.storage, this.config, ownerName, def);
     if (!v.ok || !v.resolved) return { error: v.errors };
     const resolved = new Map(v.resolved.map(r => [r.stepId, r]));
+
+    // Overlap guard: a full run that dispatches agents must not run twice at once (the steps share
+    // templated keys). If one is already in flight for this workflow, return it instead of starting a
+    // second. signals-only is read-only, so it always runs fresh.
+    if (opts.mode === 'full-live') {
+      const active = await readActiveRuns(this.storage, this.config.nodeId);
+      const inFlight = active.find(a => a.workflowId === workflowId && a.ownerGhii === ownerGhii);
+      if (inFlight) {
+        logger.info(`workflow "${workflowId}": a run is already in flight (${inFlight.runId}); skipping this start`);
+        return { runId: inFlight.runId };
+      }
+    }
 
     const runId = randomUUID();
     const vars = this.resolveVars(def, opts.vars);
@@ -255,39 +264,9 @@ export class WorkflowEngine {
     });
   }
 
-  // ── active-run index (the cross-owner roster the watchdog + resume read) ────────────
-  private async listActive(): Promise<Array<{ ownerGhii: string; workflowId: string; runId: string }>> {
-    const rec = await this.storage.getMemory(this.systemGhii, WorkflowEngine.ACTIVE_KEY);
-    const arr = rec?.value as Array<{ ownerGhii: string; workflowId: string; runId: string }> | undefined;
-    return Array.isArray(arr) ? arr : [];
-  }
-
-  private async writeActive(entries: Array<{ ownerGhii: string; workflowId: string; runId: string }>): Promise<void> {
-    const existing = await this.storage.getMemory(this.systemGhii, WorkflowEngine.ACTIVE_KEY);
-    const now = new Date().toISOString();
-    await this.storage.setMemory({
-      key: WorkflowEngine.ACTIVE_KEY, ownerGaii: this.systemGhii, value: entries,
-      visibility: 'private', tags: ['workflow-index'], ttlHours: null,
-      version: existing ? existing.version + 1 : 1,
-      createdAt: existing?.createdAt ?? now, updatedAt: now,
-    });
-  }
-
-  /** Reconcile one run's presence in the active-run index based on its status. */
-  private async reconcileActive(ownerGhii: string, run: WorkflowRun): Promise<void> {
-    const inFlight = run.status === 'running' || run.status === 'waiting-step';
-    const entries = await this.listActive();
-    const has = entries.some(e => e.runId === run.runId);
-    if (inFlight && !has) {
-      await this.writeActive([...entries, { ownerGhii, workflowId: run.workflowId, runId: run.runId }]);
-    } else if (!inFlight && has) {
-      await this.writeActive(entries.filter(e => e.runId !== run.runId));
-    }
-  }
-
   // ── watchdog: timeouts + due retries ─────────────────────────────────────────────
   async sweep(): Promise<void> {
-    for (const e of await this.listActive()) {
+    for (const e of await readActiveRuns(this.storage, this.config.nodeId)) {
       const rec = await this.storage.getMemory(e.ownerGhii, runKey(e.workflowId, e.runId));
       if (!rec) { continue; }
       await this.sweepRun(e.ownerGhii, rec.value as WorkflowRun);
@@ -328,10 +307,70 @@ export class WorkflowEngine {
     });
   }
 
-  /** On boot, in-flight runs are advanced by task events + the watchdog; the index survives restart. */
+  // ── event triggers (Phase 8) ──────────────────────────────────────────────────
+  // The descriptor's `trigger.kind:'event'` is registered in a system-namespace index
+  // (lifecycle.ts). These hooks are called from the write/order sites; a match starts a run.
+  // Loop guard: skip if the workflow already has an in-flight run (so a workflow that produces a
+  // key it also listens on doesn't re-trigger itself).
+
+  async onMemoryWrite(ownerGhii: string, key: string): Promise<void> {
+    await this.fireEventTriggers('memory.write', ownerGhii, t => {
+      const pat = t.match.key;
+      return !!pat && globToRegExp(pat).test(key);
+    });
+  }
+
+  async onOfferOrdered(ownerGhii: string, offerId: string): Promise<void> {
+    await this.fireEventTriggers('offer.ordered', ownerGhii, t => {
+      const pat = t.match.offer;
+      return !!pat && globToRegExp(pat).test(offerId);
+    });
+  }
+
+  private async fireEventTriggers(on: 'memory.write' | 'offer.ordered', ownerGhii: string, matches: (t: { match: Record<string, string> }) => boolean): Promise<void> {
+    let triggers;
+    try { triggers = await readEventTriggers(this.storage, this.config.nodeId); }
+    catch (err) { logger.error('readEventTriggers failed', { on, error: String(err) }); return; }
+    const hits = triggers.filter(t => t.on === on && t.ownerGhii === ownerGhii && matches(t));
+    if (hits.length === 0) return;
+    const active = await readActiveRuns(this.storage, this.config.nodeId);
+    for (const t of hits) {
+      if (active.some(a => a.workflowId === t.workflowId)) continue; // loop/overlap guard
+      this.startRun(ownerGhii, ownerGhii.split('@')[0], t.workflowId, { mode: 'full-live' })
+        .catch(err => logger.error('event-triggered workflow run failed', { workflowId: t.workflowId, error: String(err) }));
+    }
+  }
+
+  /**
+   * On boot, re-sync in-flight runs: a step's task may have reached done/failed during the restart
+   * gap (after the HTTP response, before the fire-and-forget onTaskTerminal ran), leaving the step
+   * stuck `dispatched`. Re-check each dispatched step's tasks and advance any that already finished —
+   * otherwise the watchdog would wrongly TIME OUT a step whose task actually succeeded. Remaining
+   * in-flight runs are then carried by live task events + the watchdog.
+   */
   async resumeInflight(): Promise<void> {
-    const active = await this.listActive();
-    if (active.length) logger.info(`WorkflowEngine: ${active.length} in-flight run(s) will be advanced by task events + the watchdog`);
+    const active = await readActiveRuns(this.storage, this.config.nodeId);
+    if (!active.length) return;
+    logger.info(`WorkflowEngine: re-syncing ${active.length} in-flight run(s) after restart`);
+    for (const a of active) {
+      try {
+        const rec = await this.storage.getMemory(a.ownerGhii, runKey(a.workflowId, a.runId));
+        if (!rec) continue;
+        const run = rec.value as WorkflowRun;
+        for (const [, rs] of Object.entries(run.steps)) {
+          if (rs.state !== 'dispatched') continue;
+          for (const tid of rs.taskIds ?? []) {
+            const task = await this.storage.getAgentTask(tid);
+            if (task && (task.status === 'done' || task.status === 'failed')) {
+              await this.onTaskTerminal(task, task.status); // advances the run (re-checks all step tasks)
+              break;
+            }
+          }
+        }
+      } catch (err) {
+        logger.error('resumeInflight re-sync failed', { runId: a.runId, error: String(err) });
+      }
+    }
   }
 
   // ── helpers ──────────────────────────────────────────────────────────────────────
@@ -483,6 +522,6 @@ export class WorkflowEngine {
       version: existing ? existing.version + 1 : 1,
       createdAt: existing?.createdAt ?? now, updatedAt: now,
     });
-    await this.reconcileActive(ownerGhii, run);
+    await reconcileActiveRun(this.storage, this.config.nodeId, ownerGhii, run);
   }
 }

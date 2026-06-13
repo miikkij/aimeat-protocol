@@ -72,6 +72,11 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_extension_activate: 'ext:write',
     aimeat_extension_deactivate: 'ext:write',
     aimeat_extension_delete: 'ext:write',
+
+    // Agent Workflows (REST: PUT/run → workflow:write; GET → workflow:read)
+    aimeat_workflow_save: 'workflow:write',
+    aimeat_workflow_run: 'workflow:write',
+    aimeat_workflow_get: 'workflow:read',
 };
 
 /** The scope required to use a tool, or undefined if the tool is not scope-gated. */

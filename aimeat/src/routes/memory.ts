@@ -34,6 +34,7 @@ function isAnonymousGaii(gaii: string): boolean {
 import type { StatsCollector } from '../services/stats.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { emitChange } from '../services/event-bus.js';
+import { getActiveWorkflowEngine } from '../services/workflow/engine.js';
 
 /** Map memory visibility to DMZ zone (Phase 0.6) */
 function visibilityToZone(visibility: string): 'private' | 'dmz' | 'federation' {
@@ -212,6 +213,10 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
       { description: 'Delete this memory entry', method: 'DELETE', url: `/v1/memory/${encodeURIComponent(key)}` },
     ]));
     emitChange('memory');
+    // Event-triggered workflows: a write to an owner key may start a workflow (engine matches the
+    // owner-GHII namespace, so agent-namespace writes don't fire owner-keyed triggers).
+    getActiveWorkflowEngine()?.onMemoryWrite(gaii, key)
+      .catch(e => logger.error('workflow event trigger (memory.write) failed', { key, error: String(e) }));
   });
 
   // GET /v1/memory — list memory keys (agent auth required)

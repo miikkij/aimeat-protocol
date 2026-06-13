@@ -340,7 +340,12 @@ End-of-plan: full sweep on both backends (Rule 1).
 5. **Inspection hook + guaranteed alert** (§6).
 6. **Test-run modes** (signals-only / full-sandbox / full-live) (§8).
 7. **Migration** of the Sanomat schedules (§9).
-8. **Event triggers** (`memory.write`, `offer.ordered`) (§1.7) — last, additive.
+8. **Event triggers** (`memory.write`, `offer.ordered`) (§1.7) — DONE for memory.write (engine
+   `onMemoryWrite` + a system-namespace event index in `lifecycle.ts`, wired at POST /v1/memory);
+   offer.ordered hook exists, emission point deferred. **MCP authoring surface** also shipped: three
+   tight tools `aimeat_workflow_save` / `_get` / `_run` (catalog + annotations + scopes + agent
+   surface), so agents (crewaimeat) author workflows via MCP. Handbook page "Agent Workflows"
+   published in the dev organism.
 9. **Frontend:** the Workflows tab (§12) — list + blueprint graph + run-health (frontend guide +
    browser-MCP verification, Rule 1b).
 
@@ -385,6 +390,26 @@ Mockups for all three views: see this session's design discussion (list card, bl
 timeline). Verify by driving the browser via Playwright MCP when the tab is done (Rule 1b).
 
 ---
+
+## 13b. Audit findings (2026-06-13, plan-vs-implementation)
+
+Fixed during the audit:
+- **Scheduled-run overlap** — `startRun` (full-live) now returns the in-flight run instead of starting
+  a second when one is already active (the event path already guarded; the schedule path didn't).
+- **Restart recovery** — `resumeInflight` now re-checks dispatched steps' task statuses on boot and
+  advances any whose task finished during the restart gap (was: log-only → the watchdog would wrongly
+  time-out a succeeded step).
+- **Error swallowing** — the fire-and-forget engine hooks (memory.write trigger, onTaskTerminal,
+  readEventTriggers) now LOG on failure instead of an empty `.catch(() => {})`.
+
+Remaining gaps vs the plan (not yet done — owner to prioritize):
+- **Health (§7):** `computeHealth` omits mean duration; health is NOT fed into node-stats.
+- **Per-step reads/writes → data-wallet/consent audit (§7):** recorded in the run, but not wired into
+  the data-wallet (the "for free" claim is aspirational).
+- **Run endpoint `target` (§8):** `POST /run` takes `{mode}` only — no sandbox|live (full-sandbox deferred).
+- **E2E (§10):** the retry path and the timeout→timed-out path are NOT e2e-covered; no end-of-plan
+  full sweep on both backends was run (SQLite targeted suites only).
+- **Frontend create/edit form (§12):** not built — workflows are authored via API/MCP only.
 
 ## 13. Open / deferred (NOT gaps to file — discuss with owner before acting)
 

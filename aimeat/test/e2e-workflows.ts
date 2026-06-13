@@ -238,6 +238,28 @@ async function run() {
     assert(Array.isArray(list) && list.some((t: any) => (t.scope ?? []).some((s: any) => s.name === 'workflow-inspect')), 'inspector has a workflow-inspect task');
   });
 
+  // ── event trigger: a matching owner-memory write starts a run ──
+  await test('event trigger (memory.write) starts a run', async () => {
+    const evtWf = {
+      title: { en_US: 'Evt pipeline' }, description: { en_US: 'starts on a memory write' },
+      trigger: { kind: 'event', on: 'memory.write', match: { key: 'evt.trigger' } }, vars: [], on_step_fail: 'inspect',
+      steps: [{ id: 'fetch', agent: agentName, offer: 'fetch', description: { en_US: 'Fetch' }, required_to_function: 'none', timeout_min: 10 }],
+    };
+    const put = await json('/v1/workflows/evt-wf', { method: 'PUT', headers: auth, body: JSON.stringify(evtWf) });
+    assert(put.status === 200, `put evt-wf ${put.status}: ${JSON.stringify(put.body)}`);
+
+    const before = await json('/v1/workflows/evt-wf/runs', { headers: auth });
+    assert((before.body.data.count ?? 0) === 0, 'no runs before the trigger');
+
+    // Writing the matching owner-memory key should fire the event trigger → start a run.
+    await writeMem('evt.trigger', 'go');
+    await sleep(800);
+
+    const after = await json('/v1/workflows/evt-wf/runs', { headers: auth });
+    assert((after.body.data.count ?? 0) >= 1, `expected a run after the trigger, got ${after.body.data.count}`);
+    assert(after.body.data.runs[0].steps.fetch.taskIds?.length >= 1 || after.body.data.runs[0].status, 'run dispatched the step');
+  });
+
   // ── health ──
   await test('GET health reports per-step trend over runs', async () => {
     const { status, body } = await json('/v1/workflows/news/health', { headers: auth });

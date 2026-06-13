@@ -135,6 +135,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_schedule_update: { title: 'Update Schedule', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_schedule_delete: { title: 'Delete Schedule', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_schedule_report_internal: { title: 'Report Internal Schedules', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_workflow_save: { title: 'Save Workflow', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_workflow_get: { title: 'Get Workflow', readOnlyHint: true },
+    aimeat_workflow_run: { title: 'Run Workflow', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
 
     // ── Work queue ──
     aimeat_work_inbox: { title: 'List Work Inbox', readOnlyHint: true },

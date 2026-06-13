@@ -268,6 +268,33 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_workflow_save',
+        description: 'Create or update an Agent Workflow: a declared, ordered set of steps with per-step input (required_to_function) and output (success_signal) signals, run by ONE trigger, with the signal checked after each step (so you see "did it produce", not just "did it fire"). Use instead of chaining separate schedules when steps depend on each other. Pass the whole descriptor as `definition`; each step names an agent + offer and inherits that offer\'s signals + deliverable location. Rejected at save if the after-graph is not a DAG or an offer is not workflow-compatible (must publish success_signal + required_to_function + deliverable.location). A schedule trigger creates one backing cron; an event trigger fires on a matching memory write / offer order.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            id: { type: 'string', required: true, description: 'Workflow id (lowercase slug); existing id = update.' },
+            definition: { type: 'object', required: true, description: 'The descriptor: { title, description, trigger, vars[], steps[], on_step_fail:"inspect", llm?{approved} }.' },
+        },
+    },
+    {
+        name: 'aimeat_workflow_get',
+        description: 'Inspect workflows. Omit id to list all your workflows; pass an id for its definition + the derived blueprint (the whole input→output flow + the memory keys each step touches) + recent runs. Use before editing or running, and to read a run\'s outcome.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: { id: { type: 'string', description: 'Omit to list; pass for one workflow\'s detail.' } },
+    },
+    {
+        name: 'aimeat_workflow_run',
+        description: 'Run a workflow. mode="signals-only" evaluates every step\'s signals against existing memory with NO dispatch (an instant health check — returns each step\'s verdict inline); mode="full" executes the steps live (dispatches the agent tasks; poll aimeat_workflow_get for progress). Use signals-only to validate a workflow or check a past run cheaply before a full run.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            id: { type: 'string', required: true, description: 'The workflow id.' },
+            mode: { type: 'string', required: true, description: 'signals-only | full', enum: ['signals-only', 'full'] },
+        },
+    },
+    {
         name: 'aimeat_task_list',
         description: 'List the tasks assigned TO this agent (paginated; optional status filter such as queued, active, done, failed). Each entry includes title, status, and todo counts. Poll for queued work, then aimeat_task_get for full detail. To assign a task to another same-owner agent, use aimeat_task_create instead.',
         caller: 'agent',

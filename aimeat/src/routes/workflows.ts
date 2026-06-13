@@ -24,7 +24,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import type { Scheduler } from '../services/scheduler.js';
 import type { WorkflowEngine } from '../services/workflow/engine.js';
 import { success, error } from '../middleware/envelope.js';
@@ -35,10 +35,8 @@ import {
   getWorkflow, listWorkflows, saveWorkflow, deleteWorkflow,
   listRuns, getRun, validateWorkflow, buildBlueprint,
 } from '../services/workflow/store.js';
+import { syncWorkflowTriggers, removeWorkflowTriggers } from '../services/workflow/lifecycle.js';
 import type { WorkflowDef, WorkflowRun } from '../models/workflow-schemas.js';
-
-/** Deterministic id for a workflow's backing cron schedule (so upsert/remove are trivial). */
-const schedIdFor = (workflowId: string): string => `wf-sched:${workflowId}`;
 
 /** Derive a run-health trend from the recent runs (the "did it produce" trend, not just last run). */
 function computeHealth(def: WorkflowDef, runs: WorkflowRun[]) {
@@ -71,40 +69,6 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
   // namespace for storage regardless of whether the caller is the owner or one of their agents.
   const ownerGhiiOf = (req: Request): string => `${req.auth!.owner}@${config.nodeId}`;
 
-  /**
-   * Keep the workflow's backing cron schedule in sync with its trigger. A `schedule` trigger gets a
-   * type:'workflow' ScheduledJobRecord (the scheduler fires it → engine.startRun); manual/event
-   * triggers have none. Reversible by design — see the schedule-migration plan.
-   */
-  const syncBackingSchedule = async (def: WorkflowDef, ownerGhii: string, createdBy: string): Promise<void> => {
-    const schedId = schedIdFor(def.id);
-    const existing = await storage.getScheduledJob(schedId);
-    if (def.trigger.kind === 'schedule') {
-      const now = new Date().toISOString();
-      const record: ScheduledJobRecord = {
-        id: schedId,
-        name: `workflow:${def.id}`,
-        type: 'workflow',
-        cron: def.trigger.cron,
-        timezone: def.trigger.timezone,
-        enabled: true,
-        input: { workflowId: def.id },
-        ownerScope: ownerGhii,
-        displayName: typeof def.title === 'string' ? def.title : (def.title.en_US ?? def.id),
-        createdBy,
-        createdAt: existing?.createdAt ?? now,
-        updatedAt: now,
-      };
-      if (existing) await storage.updateScheduledJob(schedId, record);
-      else await storage.createScheduledJob(record);
-      await scheduler.reschedule(schedId);
-    } else if (existing) {
-      // trigger changed away from schedule → tear the backing cron down.
-      scheduler.removeJob(schedId);
-      await storage.deleteScheduledJob(schedId);
-    }
-  };
-
   // GET /v1/workflows — list the owner's workflows.
   router.get('/v1/workflows', requireAuth(), requireScope('workflow:read'), async (req: Request, res: Response) => {
     const defs = await listWorkflows(storage, ownerGhiiOf(req));
@@ -128,7 +92,7 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
       res.status(400).json(error(config.nodeId, 'WORKFLOW_INVALID', 'Workflow validation failed', undefined, { errors: result.errors }));
       return;
     }
-    await syncBackingSchedule(result.def!, ownerGhiiOf(req), createdBy);
+    await syncWorkflowTriggers(storage, scheduler, config.nodeId, result.def!, ownerGhiiOf(req), createdBy);
     emitChange('workflows');
     res.json(success(config.nodeId, result.def, [
       { description: 'View the blueprint', method: 'GET', url: `/v1/workflows/${id}/blueprint` },
@@ -141,9 +105,7 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
     const withRuns = req.query.withRuns === 'true';
     const ok = await deleteWorkflow(storage, ownerGhiiOf(req), id, { withRuns });
     if (!ok) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Workflow "${id}" not found`)); return; }
-    // Tear down the backing cron schedule, if any.
-    const schedId = schedIdFor(id);
-    if (await storage.getScheduledJob(schedId)) { scheduler.removeJob(schedId); await storage.deleteScheduledJob(schedId); }
+    await removeWorkflowTriggers(storage, scheduler, config.nodeId, id);
     emitChange('workflows');
     res.json(success(config.nodeId, { deleted: id, runsDropped: withRuns }));
   });

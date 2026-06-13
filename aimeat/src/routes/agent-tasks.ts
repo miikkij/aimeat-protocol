@@ -41,6 +41,7 @@ import { requireAuth, requireRole, requireScope, agentNotFoundResponse } from '.
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { emitChange, emitDelivery } from '../services/event-bus.js';
 import { getActiveWorkflowEngine } from '../services/workflow/engine.js';
+import { logger } from '../utils/logger.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { recordTaskStarted, recordTaskCompleted, recordTaskFailed } from '../services/activity-recorder.js';
 import { recomputeAndCacheStatistics } from '../services/agent-statistics.js';
@@ -1009,7 +1010,8 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks');
     // If this task was dispatched by a workflow, advance that run (output check → next step).
-    getActiveWorkflowEngine()?.onTaskTerminal(task, 'done').catch(() => { /* engine advance best-effort */ });
+    getActiveWorkflowEngine()?.onTaskTerminal(task, 'done')
+      .catch(e => logger.error('workflow advance on task done failed', { taskId: id, error: String(e) }));
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/fail -- Fail task (active -> failed) ── */
@@ -1058,7 +1060,8 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
 
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks');
-    getActiveWorkflowEngine()?.onTaskTerminal(task, 'failed').catch(() => { /* engine advance best-effort */ });
+    getActiveWorkflowEngine()?.onTaskTerminal(task, 'failed')
+      .catch(e => logger.error('workflow advance on task fail failed', { taskId: id, error: String(e) }));
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/rate -- Review a completed task's deliverable ──
