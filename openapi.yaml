@@ -3058,7 +3058,7 @@ components:
       properties:
         runId: { type: string }
         workflowId: { type: string }
-        status: { type: string, enum: [running, waiting-step, red, partial, done] }
+        status: { type: string, enum: [running, waiting-step, red, partial, done, cancelled] }
         mode: { type: string, enum: [full-live, full-sandbox, signals-only] }
         vars: { type: object, additionalProperties: { type: string } }
         steps:
@@ -11925,6 +11925,128 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/organisms/{id}/overview:
+    get:
+      operationId: getOrganismOverview
+      summary: OKF-style structure overview of a whole organism (Markdown)
+      description: |
+        A deterministic, size-bounded Markdown map of the whole organism (Open Knowledge Format
+        style: Markdown body + YAML frontmatter). SHALLOW: for each workspace it lists the space
+        breakdown (objectType → instance count) and totals, so an AI agent (or a human) can grasp the
+        whole organism in one read and decide which workspace to drill into — then call
+        `/v1/organisms/{id}/workspace/overview?ws=` for the detail. It is a projection of live state,
+        never persisted, so it cannot drift. Membership-gated; a workspace the caller cannot read is
+        listed by name only.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organism ID
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [md]
+          description: "`md` returns the raw text/markdown body; omit for the JSON envelope."
+      responses:
+        '200':
+          description: The structure overview (JSON envelope, or raw markdown when format=md)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          markdown:
+                            type: string
+                            description: The OKF-style organism structure overview (Markdown + YAML frontmatter)
+                          workspaces:
+                            type: integer
+                            description: Number of workspaces summarised
+            text/markdown:
+              schema:
+                type: string
+        '403':
+          description: Not an active member of this organism
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/organisms/{id}/workspace/overview:
+    get:
+      operationId: getWorkspaceOverview
+      summary: OKF-style structure overview of ONE workspace (Markdown)
+      description: |
+        A deterministic, size-bounded Markdown map of a single workspace (Open Knowledge Format
+        style). DEEP: for each space it lists the most-recently-updated entries (up to 10) with their
+        instance id + title, and always reports the total count (no silent truncation) so a consumer
+        knows when to page deeper. The ids let the next targeted read
+        (`GET /v1/organisms/{id}/workspace?ws=` or the memory API) go straight to the record. Same
+        workspace-level read gate as `GET /v1/organisms/{id}/workspace`: the manifest is the single
+        gate — without read access the body says so and lists nothing.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Organism ID
+        - name: ws
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Workspace id (discover with GET /v1/organisms/{id}/workspaces)
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [md]
+          description: "`md` returns the raw text/markdown body; omit for the JSON envelope."
+      responses:
+        '200':
+          description: The workspace structure overview (JSON envelope, or raw markdown when format=md)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          markdown:
+                            type: string
+                            description: The OKF-style workspace structure overview (Markdown + YAML frontmatter)
+                          ws:
+                            type: string
+                          readable:
+                            type: boolean
+                            description: False when the caller lacks read access (the markdown says so and lists nothing)
+            text/markdown:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: Not an active member of this organism
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /v1/organisms/{id}/workspaces:
     get:
       operationId: discoverOrganismWorkspaces
@@ -18985,6 +19107,38 @@ paths:
                       data: { $ref: '#/components/schemas/WorkflowRun' }
         '404':
           $ref: '#/components/responses/NotFound'
+  /v1/workflows/{id}/runs/{runId}/cancel:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+      - name: runId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      operationId: cancelWorkflowRun
+      summary: Cancel an in-flight workflow run
+      description: >
+        Aborts a stuck / gone-wrong run: its still-open steps are marked skipped, the run becomes
+        `cancelled`, and it leaves the active-run roster so the watchdog stops touching it. Already-
+        dispatched agent tasks are left as-is (if one later finishes it no-ops, no resurrection).
+        Requires `workflow:write` (owners bypass). 409 if the run is unknown or already finished.
+      tags: [Workflows]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Run cancelled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '409':
+          description: Run not found or already finished
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
   /v1/agents/{name}/schedules:
     parameters:
       - name: name

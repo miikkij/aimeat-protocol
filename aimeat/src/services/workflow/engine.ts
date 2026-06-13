@@ -350,6 +350,31 @@ export class WorkflowEngine {
   }
 
   /**
+   * Cancel an in-flight run: mark its still-open steps skipped, set the run `cancelled`, and drop it
+   * from the active-run index so the watchdog stops touching it. Already-dispatched agent tasks are
+   * left alone — if one later finishes, onTaskTerminal finds the step no longer `dispatched` and
+   * no-ops (no resurrection). Returns false if the run is unknown or already terminal.
+   */
+  async cancelRun(ownerGhii: string, workflowId: string, runId: string): Promise<boolean> {
+    return this.withLock(runId, async () => {
+      const rec = await this.storage.getMemory(ownerGhii, runKey(workflowId, runId));
+      if (!rec) return false;
+      const run = rec.value as WorkflowRun;
+      if (run.status !== 'running' && run.status !== 'waiting-step') return false;
+      const now = new Date().toISOString();
+      for (const rs of Object.values(run.steps)) {
+        if (rs.state === 'pending' || rs.state === 'dispatched') { rs.state = 'skipped'; rs.endedAt = now; }
+      }
+      run.status = 'cancelled';
+      run.endedAt = now;
+      await this.persist(ownerGhii, run);
+      emitChange('workflows');
+      logger.info(`workflow ${workflowId} run ${runId} cancelled by owner`);
+      return true;
+    });
+  }
+
+  /**
    * On boot, re-sync in-flight runs: a step's task may have reached done/failed during the restart
    * gap (after the HTTP response, before the fire-and-forget onTaskTerminal ran), leaving the step
    * stuck `dispatched`. Re-check each dispatched step's tasks and advance any that already finished —

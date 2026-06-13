@@ -391,6 +391,25 @@ async function run() {
     assert(real.status === 404, `real sbx.out should be untouched (404), got ${real.status}`);
   });
 
+  // ── cancel an in-flight run ──
+  await test('cancel an in-flight run → cancelled + open steps skipped; re-cancel → 409', async () => {
+    const start = await json('/v1/workflows/news/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'full' }) });
+    const runId = start.body.data.runId;
+    let r = await json(`/v1/workflows/news/runs/${runId}`, { headers: auth });
+    assert(r.body.data.status === 'waiting-step', `expected waiting-step before cancel, got ${r.body.data.status}`);
+
+    const c = await json(`/v1/workflows/news/runs/${runId}/cancel`, { method: 'POST', headers: auth, body: '{}' });
+    assert(c.status === 200, `cancel ${c.status}: ${JSON.stringify(c.body)}`);
+
+    r = await json(`/v1/workflows/news/runs/${runId}`, { headers: auth });
+    assert(r.body.data.status === 'cancelled', `expected cancelled, got ${r.body.data.status}`);
+    assert(r.body.data.steps.fetch.state === 'skipped', `dispatched fetch should be skipped, got ${r.body.data.steps.fetch.state}`);
+    assert(r.body.data.steps.write.state === 'skipped', `pending write should be skipped, got ${r.body.data.steps.write.state}`);
+
+    const again = await json(`/v1/workflows/news/runs/${runId}/cancel`, { method: 'POST', headers: auth, body: '{}' });
+    assert(again.status === 409, `re-cancel a finished run should be 409, got ${again.status}`);
+  });
+
   // ── health ──
   await test('GET health reports per-step trend over runs', async () => {
     const { status, body } = await json('/v1/workflows/news/health', { headers: auth });

@@ -139,6 +139,16 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
     ]));
   });
 
+  // POST /v1/workflows/:id/runs/:runId/cancel — abort an in-flight run (stuck/gone-wrong).
+  router.post('/v1/workflows/:id/runs/:runId/cancel', requireAuth(), requireScope('workflow:write'), async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    const runId = req.params.runId as string;
+    const ok = await engine.cancelRun(ownerGhiiOf(req), id, runId);
+    if (!ok) { res.status(409).json(error(config.nodeId, 'RUN_NOT_CANCELLABLE', 'Run not found or already finished')); return; }
+    emitChange('workflows');
+    res.json(success(config.nodeId, { cancelled: runId }));
+  });
+
   // GET /v1/workflows/:id/health — run-health trend derived from the last N runs.
   router.get('/v1/workflows/:id/health', requireAuth(), requireScope('workflow:read'), async (req: Request, res: Response) => {
     const id = req.params.id as string;

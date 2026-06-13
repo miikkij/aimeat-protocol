@@ -16,7 +16,7 @@ import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
-import { listWorkflows, getWorkflow, getBlueprint, getHealth, listRuns, getRun, runWorkflow } from '/js/services/workflows.js';
+import { listWorkflows, getWorkflow, getBlueprint, getHealth, listRuns, getRun, runWorkflow, cancelRun } from '/js/services/workflows.js';
 import WorkflowForm from './workflows-form.js';
 
 const html = htm.bind(h);
@@ -39,7 +39,7 @@ function triggerSummary(trigger) {
 function statusClass(status) {
   if (status === 'done' || status === 'green') return 'wf-badge--ok';
   if (status === 'partial' || status === 'red' || (typeof status === 'string' && status.endsWith('-red')) || status === 'timed-out') return 'wf-badge--err';
-  if (status === 'skipped') return 'wf-badge--muted';
+  if (status === 'skipped' || status === 'cancelled') return 'wf-badge--muted';
   return 'wf-badge--run';
 }
 
@@ -111,7 +111,7 @@ export default function WorkflowsTab({ showToast }) {
   if (view.name === 'edit') return html`<${EditFormView} id=${view.id} showToast=${showToast}
     onCancel=${() => setView({ name: 'detail', id: view.id })} onSaved=${(id) => setView({ name: 'detail', id })} />`;
   if (view.name === 'detail') return html`<${DetailView} id=${view.id} onBack=${() => { setView({ name: 'list' }); loadList(); }} onOpenRun=${(runId) => setView({ name: 'run', id: view.id, runId })} onRun=${doRun} onEdit=${() => setView({ name: 'edit', id: view.id })} />`;
-  if (view.name === 'run') return html`<${RunView} id=${view.id} runId=${view.runId} onBack=${() => setView({ name: 'detail', id: view.id })} />`;
+  if (view.name === 'run') return html`<${RunView} id=${view.id} runId=${view.runId} showToast=${showToast} onBack=${() => setView({ name: 'detail', id: view.id })} />`;
 
   // ── list ──
   return html`
@@ -161,35 +161,48 @@ function EditFormView({ id, onCancel, onSaved, showToast }) {
 }
 
 function DetailView({ id, onBack, onOpenRun, onRun, onEdit }) {
+  const [def, setDef] = useState(null);
   const [blueprint, setBlueprint] = useState(null);
   const [runs, setRuns] = useState([]);
   const [err, setErr] = useState(null);
 
   const load = useCallback(async () => {
-    const [bp, rr] = await Promise.all([getBlueprint(id).catch(e => ({ _err: e.message })), listRuns(id).catch(() => null)]);
+    const [d, bp, rr] = await Promise.all([
+      getWorkflow(id).catch(() => null),
+      getBlueprint(id).catch(e => ({ _err: e.message })),
+      listRuns(id).catch(() => null),
+    ]);
+    setDef(d?.data || null);
     if (bp?._err) setErr(bp._err); else setBlueprint(bp?.data || null);
     setRuns(rr?.data?.runs || []);
   }, [id]);
   useEffect(() => { load(); }, [load]);
 
+  const stepDesc = (stepId) => loc((def?.steps || []).find(s => s.id === stepId)?.description);
+  const triggerLine = def ? triggerSummary(def.trigger) : '';
+
   return html`
     <div class="wf-tab">
       <div class="wf-detail-head">
         <button class="btn-ghost" onClick=${onBack}>← ${t('profile.workflows.back')}</button>
-        <div class="wf-detail-title">${id}</div>
+        <div class="wf-detail-titlebox">
+          <div class="wf-detail-title">${def ? loc(def.title) || id : id}</div>
+          <div class="wf-detail-sub"><code>${id}</code>${triggerLine ? html` · ${triggerLine}` : ''}</div>
+        </div>
         <div class="wf-detail-actions">
           <button class="btn-ghost" onClick=${onEdit}>${t('profile.workflows.edit')}</button>
           <button class="btn-outline" onClick=${() => onRun(id, 'signals-only')}>${t('profile.workflows.check')}</button>
           <button class="btn-primary" onClick=${() => onRun(id, 'full')}>${t('profile.workflows.run')}</button>
         </div>
       </div>
+      ${def && loc(def.description) && html`<div class="wf-detail-desc">${loc(def.description)}</div>`}
 
       ${err && html`<div class="wf-error">${err}</div>`}
 
       <div class="wf-section-title">${t('profile.workflows.blueprint')}</div>
       ${blueprint && html`<div class="wf-graph">
         ${blueprint.nodes.map(n => html`<div class="wf-node" key=${n.stepId}>
-          <div class="wf-node-id">${n.stepId}</div>
+          <div class="wf-node-id">${n.stepId}${stepDesc(n.stepId) ? html` <span class="wf-node-desc">— ${stepDesc(n.stepId)}</span>` : ''}</div>
           <div class="wf-node-agent">${(n.agents || []).join(', ')} · ${n.offerId}</div>
           ${n.reads.length > 0 && html`<div class="wf-node-io">↘ ${n.reads.join(', ')}</div>`}
           ${n.writes.length > 0 && html`<div class="wf-node-io">↗ ${n.writes.join(', ')}</div>`}
@@ -214,30 +227,58 @@ function DetailView({ id, onBack, onOpenRun, onRun, onEdit }) {
 }
 
 // ── Run: per-step timeline ──────────────────────────────────────────────────────
-function RunView({ id, runId, onBack }) {
+function RunView({ id, runId, onBack, showToast }) {
   const [run, setRun] = useState(null);
   const [err, setErr] = useState(null);
-  useEffect(() => { getRun(id, runId).then(r => setRun(r?.data || null)).catch(e => setErr(e.message)); }, [id, runId]);
+  const [cancelling, setCancelling] = useState(false);
+  const loadRun = useCallback(() => getRun(id, runId).then(r => setRun(r?.data || null)).catch(e => setErr(e.message)), [id, runId]);
+  useEffect(() => { loadRun(); }, [loadRun]);
+
+  const inFlight = run && (run.status === 'running' || run.status === 'waiting-step');
+  const doCancel = async () => {
+    setCancelling(true);
+    try { await cancelRun(id, runId); showToast?.(t('profile.workflows.cancelled'), false); await loadRun(); }
+    catch (e) { showToast?.(e?.message || 'Cancel failed', true); }
+    finally { setCancelling(false); }
+  };
+
+  // The run pins the full definition (defSnapshot), so we can name the workflow + each step
+  // without any extra fetch — and show exactly the def THIS run executed (even if it changed since).
+  const def = run?.defSnapshot;
+  const stepDef = (stepId) => (def?.steps || []).find(s => s.id === stepId);
 
   return html`
     <div class="wf-tab">
       <div class="wf-detail-head">
         <button class="btn-ghost" onClick=${onBack}>← ${t('profile.workflows.back')}</button>
-        <div class="wf-detail-title">${t('profile.workflows.run')} · ${run ? timeAgo(run.startedAt) : runId.slice(0, 8)}</div>
+        <div class="wf-detail-titlebox">
+          <div class="wf-detail-title">${def ? loc(def.title) || run.workflowId : t('profile.workflows.run')}</div>
+          <div class="wf-detail-sub">
+            ${run ? html`<code>${run.workflowId}</code> · ${t('profile.workflows.run')} ${timeAgo(run.startedAt)} · ${run.mode}` : runId.slice(0, 8)}
+          </div>
+        </div>
+        ${inFlight && html`<button class="btn-danger" disabled=${cancelling} onClick=${doCancel}>${cancelling ? '…' : t('profile.workflows.cancelRun')}</button>`}
         ${run && html`<${StatusBadge} status=${run.status} />`}
       </div>
+      ${run && def && loc(def.description) && html`<div class="wf-detail-desc">${loc(def.description)}</div>`}
       ${err && html`<div class="wf-error">${err}</div>`}
       ${run && html`<div class="wf-steps">
-        ${Object.entries(run.steps).map(([stepId, s]) => html`<div class="wf-step" key=${stepId}>
+        ${Object.entries(run.steps).map(([stepId, s]) => {
+          const sd = stepDef(stepId);
+          const agents = sd ? (Array.isArray(sd.agent) ? sd.agent.join(', ') : sd.agent) : null;
+          return html`<div class="wf-step" key=${stepId}>
           <div class="wf-step-row">
             <${StatusBadge} status=${s.state} />
             <span class="wf-step-id">${stepId}</span>
+            ${sd && loc(sd.description) && html`<span class="wf-node-desc">— ${loc(sd.description)}</span>`}
             ${s.reads?.length > 0 && html`<span class="wf-muted">↘ ${s.reads.length}</span>`}
             ${s.writes?.length > 0 && html`<span class="wf-muted">↗ ${s.writes.length}</span>`}
             ${s.attempt > 0 && html`<span class="wf-muted">${t('profile.workflows.attempt')} ${s.attempt + 1}</span>`}
           </div>
+          ${agents && html`<div class="wf-node-agent">${agents} · ${sd.offer}</div>`}
           ${(s.outputObserved || s.inputObserved) && html`<pre class="wf-observed">${JSON.stringify(s.outputObserved || s.inputObserved, null, 2)}</pre>`}
-        </div>`)}
+        </div>`;
+        })}
         ${(run.inspections || []).length > 0 && html`<div class="wf-inspections">${t('profile.workflows.inspectorDispatched', { count: run.inspections.length })}</div>`}
       </div>`}
     </div>`;

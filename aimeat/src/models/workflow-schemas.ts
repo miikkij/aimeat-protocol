@@ -172,7 +172,7 @@ export interface WorkflowRun {
   vars: Record<string, string>;
   mode: 'full-live' | 'full-sandbox' | 'signals-only';
   keyPrefix?: string;                 // 'wf-test.<runId>.' in sandbox mode; '' otherwise
-  status: 'running' | 'waiting-step' | 'red' | 'partial' | 'done';
+  status: 'running' | 'waiting-step' | 'red' | 'partial' | 'done' | 'cancelled';
   steps: Record<string, WorkflowRunStep>;
   /** Inspector tasks dispatched on RED steps (best-effort enrichment; the owner push is guaranteed). */
   inspections?: Array<{ stepId: string; taskId: string; reason: string; at: string }>;
