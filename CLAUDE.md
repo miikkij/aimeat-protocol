@@ -157,6 +157,7 @@ All development standards are collected in `docs/coding-guidelines/`:
 | [MCP Uploads](docs/coding-guidelines/mcp-uploads.md) | Presigned upload URLs, adding upload-capable tools |
 | [Frontend Guide](docs/frontend-development-guide.md) | Preact + HTM SPA, admin dashboard conventions |
 | [App Developer AI Guide](docs/app-developer-ai-guide.md) | How AIMEAT apps use the user's OpenRouter key via `AIMEAT.ai.complete()` (`/v1/libs/aimeat-ai.js`). Patterns, prompt composition, error codes, spend safety, cookbook. **Use this — don't reinvent prompt-engineering boilerplate per app.** |
+| [Building an AIMEAT-compatible Agent](docs/building-an-aimeat-compatible-agent.md) | What we expect from an agent to be AIMEAT-compatible: the offering/billable/workflow-compatible levels, the offer descriptor (`agents.{name}.offers`), pricing, workflow signals (`success_signal`/`required_to_function`/`deliverable.location`), + a copy-paste setup prompt for whoever builds the agent. |
 | [Known Gaps](docs/known_gaps.md) | Deferred technical gaps with structured tracking |
 
 ### Rule 8: Known Gaps Must Be Developer-Approved
