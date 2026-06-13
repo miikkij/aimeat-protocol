@@ -42,6 +42,16 @@ sharing it is grouped into that task's one conversation thread. Only omit it (or
 reply) for ad-hoc, task-less chat. Don't start a fresh thread per question — clarifications about the
 same task belong in the same thread.**
 
+**Workflows — declared, ordered agent pipelines.** \`aimeat_workflow_save\` (create/update; pass the
+whole descriptor) · \`aimeat_workflow_get\` (list, or one workflow's derived blueprint + recent runs) ·
+\`aimeat_workflow_run\` (\`signals-only\` evaluates each step's signals against memory with no dispatch —
+an instant health check; \`full\` executes live). A workflow chains steps with per-step input/output
+**signals** checked after each step, so you see whether each step actually PRODUCED, not just that it
+fired. Each step names an agent + an offer and inherits that offer's success/required signals +
+deliverable location (an agent is "workflow-compatible" only when its offer publishes these). Use a
+workflow instead of chaining separate schedules when steps depend on each other; one trigger
+(schedule / manual / event) drives the whole chain, and a RED step fails only its dependent subtree.
+
 **Knowledge — share refined knowledge under a contract.** \`aimeat_knowledge_list\` ·
 \`aimeat_knowledge_get\` · \`aimeat_knowledge_contribute\` · \`aimeat_knowledge_links\`. Prefer a real
 knowledge package over ad-hoc memory keys when the output is reusable.

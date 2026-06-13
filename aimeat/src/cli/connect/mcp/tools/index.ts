@@ -29,6 +29,7 @@ import { registerKnowledgeTools } from './knowledge.js';
 import { registerOrganismsTools } from './organisms.js';
 import { registerWorkspaceTools } from './workspaces.js';
 import { registerSchedulesTools } from './schedules.js';
+import { registerWorkflowTools } from './workflows.js';
 import { registerConsentTools } from './consent.js';
 import { registerGroupsTools } from './groups.js';
 import { registerInstancesTools } from './instances.js';
@@ -55,6 +56,7 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerOrganismsTools(mcp, registry);
   registerWorkspaceTools(mcp, registry);
   registerSchedulesTools(mcp, registry);
+  registerWorkflowTools(mcp, registry);
   registerConsentTools(mcp, registry);
   registerGroupsTools(mcp, registry);
   registerInstancesTools(mcp, registry);

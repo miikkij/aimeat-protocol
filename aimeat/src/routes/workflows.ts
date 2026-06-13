@@ -119,10 +119,14 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
     res.json(success(config.nodeId, { deleted: id, runsDropped: withRuns }));
   });
 
-  // POST /v1/workflows/:id/run — manual / test run. body: { mode: 'signals-only'|'full', vars?: {} }.
+  // POST /v1/workflows/:id/run — manual / test run.
+  // body: { mode: 'signals-only'|'full', target?: 'sandbox'|'live' (full only), vars?: {} }.
+  // full + target='sandbox' namespaces all keys under wf-test.<runId>. so it never clobbers prod.
   router.post('/v1/workflows/:id/run', requireAuth(), requireScope('workflow:write'), async (req: Request, res: Response) => {
     const id = req.params.id as string;
-    const mode = req.body?.mode === 'full' ? 'full-live' : 'signals-only';
+    const mode = req.body?.mode === 'full'
+      ? (req.body?.target === 'sandbox' ? 'full-sandbox' : 'full-live')
+      : 'signals-only';
     const vars = (req.body?.vars && typeof req.body.vars === 'object') ? req.body.vars as Record<string, string> : undefined;
     const result = await engine.startRun(ownerGhiiOf(req), req.auth!.owner, id, { mode, vars });
     if ('error' in result) {

@@ -2973,7 +2973,7 @@ components:
         example: { type: string }
     WorkflowStep:
       type: object
-      required: [id, agent, offer, description, timeout_min]
+      required: [id, agent, offer, description]
       properties:
         id: { type: string }
         agent:
@@ -2997,7 +2997,7 @@ components:
           properties:
             max: { type: integer }
             backoff_min: { type: number }
-        timeout_min: { type: integer }
+        timeout_min: { type: integer, description: 'Max minutes to wait for this step''s success signal before timed-out. Default 60.' }
     WorkflowTrigger:
       type: object
       required: [kind]
@@ -18857,6 +18857,7 @@ paths:
               required: [mode]
               properties:
                 mode: { type: string, enum: [signals-only, full] }
+                target: { type: string, enum: [sandbox, live], description: 'full only: sandbox namespaces every key under wf-test.<runId>. (never clobbers prod); live writes the real keys (default).' }
                 vars: { type: object, additionalProperties: { type: string }, description: 'Override declared vars for this run.' }
       responses:
         '200':
