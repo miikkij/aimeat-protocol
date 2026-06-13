@@ -84,6 +84,14 @@ const FAILWF = {
     { id: 'use', agent: agentName, offer: 'write', after: ['gen'], description: { en_US: 'Use' }, timeout_min: 10 },
   ],
 };
+// An offer whose success_signal is a json_schema requiring a `title` field — to prove ajv actually
+// validates (a structurally-valid JSON missing `title` must FAIL, not silently pass).
+const SCHEMA_OFFER = {
+  id: 'schematic', title: 'Schematic', ask: 'produce a schema-valid doc',
+  deliverable: { format: 'document', location: { key: 'demo.doc' } },
+  required_to_function: { kind: 'deterministic', key: 'config.enabled', op: 'exists' },
+  success_signal: { kind: 'deterministic', key: 'demo.doc', op: 'json_schema', schema: { type: 'object', required: ['title'], properties: { title: { type: 'string' } } } },
+};
 const WORKFLOW = {
   title: { en_US: 'News pipeline' }, description: { en_US: 'fetch → write' },
   trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
@@ -109,7 +117,7 @@ async function run() {
   });
 
   await test('Publish offers with workflow signals', async () => {
-    const { status, body } = await json(`/v1/agents/${agentName}/offers`, { method: 'PUT', headers: auth, body: JSON.stringify({ offers: [FETCH_OFFER, WRITE_OFFER, SRCFAIL_OFFER] }) });
+    const { status, body } = await json(`/v1/agents/${agentName}/offers`, { method: 'PUT', headers: auth, body: JSON.stringify({ offers: [FETCH_OFFER, WRITE_OFFER, SRCFAIL_OFFER, SCHEMA_OFFER] }) });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
   });
 
@@ -258,6 +266,58 @@ async function run() {
     const after = await json('/v1/workflows/evt-wf/runs', { headers: auth });
     assert((after.body.data.count ?? 0) >= 1, `expected a run after the trigger, got ${after.body.data.count}`);
     assert(after.body.data.runs[0].steps.fetch.taskIds?.length >= 1 || after.body.data.runs[0].status, 'run dispatched the step');
+  });
+
+  // ── json_schema leaf actually validates (no false GREEN) ──
+  await test('json_schema fails schema-invalid output, passes schema-valid', async () => {
+    const wf = {
+      title: { en_US: 'Schema wf' }, description: { en_US: 'json_schema check' },
+      trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
+      steps: [{ id: 'gen', agent: agentName, offer: 'schematic', description: { en_US: 'Gen' }, required_to_function: 'none', timeout_min: 10 }],
+    };
+    const put = await json('/v1/workflows/schema-wf', { method: 'PUT', headers: auth, body: JSON.stringify(wf) });
+    assert(put.status === 200, `put schema-wf ${put.status}: ${JSON.stringify(put.body)}`);
+
+    // structurally-valid JSON but missing the required `title` → must be output-red
+    await writeMem('demo.doc', JSON.stringify({ foo: 'bar' }));
+    let run = await json('/v1/workflows/schema-wf/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'signals-only' }) });
+    let r = await json(`/v1/workflows/schema-wf/runs/${run.body.data.runId}`, { headers: auth });
+    assert(r.body.data.steps.gen.state === 'output-red', `schema-invalid should be output-red, got ${r.body.data.steps.gen.state}`);
+
+    // now schema-valid → green
+    await writeMem('demo.doc', JSON.stringify({ title: 'hello' }));
+    run = await json('/v1/workflows/schema-wf/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'signals-only' }) });
+    r = await json(`/v1/workflows/schema-wf/runs/${run.body.data.runId}`, { headers: auth });
+    assert(r.body.data.steps.gen.state === 'green', `schema-valid should be green, got ${r.body.data.steps.gen.state}`);
+  });
+
+  // ── retry path: a RED output with retries left goes pending (attempt++), not straight to output-red ──
+  await test('output-RED with retry left → step pending + attempt incremented (not output-red)', async () => {
+    const wf = {
+      title: { en_US: 'Retry wf' }, description: { en_US: 'retry before escalation' },
+      trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
+      steps: [{ id: 'gen', agent: agentName, offer: 'srcfail', description: { en_US: 'Gen' }, required_to_function: 'none', retry: { max: 1, backoff_min: 5 }, timeout_min: 10 }],
+    };
+    const put = await json('/v1/workflows/retry-wf', { method: 'PUT', headers: auth, body: JSON.stringify(wf) });
+    assert(put.status === 200, `put retry-wf ${put.status}: ${JSON.stringify(put.body)}`);
+
+    const run = await json('/v1/workflows/retry-wf/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'full' }) });
+    const runId = run.body.data.runId;
+    let r = await json(`/v1/workflows/retry-wf/runs/${runId}`, { headers: auth });
+    const taskId = r.body.data.steps.gen.taskIds?.[0];
+    assert(typeof taskId === 'string', 'gen dispatched');
+
+    // Complete the task with no output (absent.out never written) → success_signal RED, but retry is left.
+    const c = await json(`/v1/agents/${agentName}/tasks/${taskId}/complete`, { method: 'POST', headers: auth, body: JSON.stringify({ message: 'nothing' }) });
+    assert(c.status === 200, `complete ${c.status}`);
+    await sleep(700);
+
+    r = await json(`/v1/workflows/retry-wf/runs/${runId}`, { headers: auth });
+    assert(r.body.data.steps.gen.state === 'pending', `retry should put step back to pending, got ${r.body.data.steps.gen.state}`);
+    assert(r.body.data.steps.gen.attempt === 1, `attempt should be 1, got ${r.body.data.steps.gen.attempt}`);
+    assert(typeof r.body.data.steps.gen.notBefore === 'string', 'a backoff notBefore is set');
+    // NOTE: the timeout→timed-out transition is driven by the 60s watchdog sweep and is not
+    // black-box e2e-able in <1min; it is covered by the engine's sweep logic (unit-level).
   });
 
   // ── health ──

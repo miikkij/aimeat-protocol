@@ -18831,6 +18831,100 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+  /v1/workflows/{id}/run:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      operationId: runWorkflow
+      summary: Start a workflow run (manual / test)
+      description: >
+        `mode=signals-only` evaluates every step's signals against existing memory with NO dispatch
+        (an instant health check — the run completes synchronously) · `mode=full` executes the steps
+        live (dispatches the agent tasks; poll the run for progress). `vars` overrides the workflow's
+        declared variables for this run. Requires `workflow:write` (owners bypass). Returns the runId.
+      tags: [Workflows]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode: { type: string, enum: [signals-only, full] }
+                vars: { type: object, additionalProperties: { type: string }, description: 'Override declared vars for this run.' }
+      responses:
+        '200':
+          description: Run started (signals-only completes synchronously; full dispatches)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          runId: { type: string }
+                          mode: { type: string }
+        '400':
+          description: Could not start the run (error.details.errors[] lists why)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/workflows/{id}/health:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getWorkflowHealth
+      summary: Run-health trend over recent runs
+      description: >
+        The "did it produce" trend derived from the recent runs: per-step green/red counts, last run
+        status + time, last success time, and the mean run duration. Requires `workflow:read`.
+      tags: [Workflows]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Health trend
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          workflowId: { type: string }
+                          sample: { type: integer, description: 'Number of runs sampled.' }
+                          lastStatus: { type: string, nullable: true }
+                          lastRunAt: { type: string, nullable: true, format: date-time }
+                          lastSuccessAt: { type: string, nullable: true, format: date-time }
+                          meanDurationMs: { type: integer, nullable: true }
+                          steps:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                stepId: { type: string }
+                                green: { type: integer }
+                                red: { type: integer }
+                                sample: { type: integer }
+        '404':
+          $ref: '#/components/responses/NotFound'
   /v1/workflows/{id}/runs:
     parameters:
       - name: id

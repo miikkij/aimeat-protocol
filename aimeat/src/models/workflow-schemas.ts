@@ -148,10 +148,25 @@ export interface WorkflowRunStep {
   notBefore?: string;
 }
 
+/**
+ * The effective signals for a step, resolved from its offer AT START TIME and pinned into the run.
+ * The engine evaluates against THIS, never re-resolving against current offers mid-run — so editing
+ * or deleting an offer while a run is in flight can't silently turn a step's check into a false pass.
+ */
+export interface ResolvedStepSignals {
+  stepId: string;
+  agents: string[];
+  offerId: string;
+  success_signal?: Signal;
+  required_to_function?: Signal | 'none';
+  deliverableKey?: string;
+}
+
 export interface WorkflowRun {
   runId: string;
   workflowId: string;
   defSnapshot: WorkflowDef;           // pin the def at run time (interpretable after the def changes)
+  resolved: ResolvedStepSignals[];    // pin the offer-resolved signals at run time (no mid-run re-resolution)
   vars: Record<string, string>;
   mode: 'full-live' | 'full-sandbox' | 'signals-only';
   keyPrefix?: string;                 // 'wf-test.<runId>.' in sandbox mode; '' otherwise

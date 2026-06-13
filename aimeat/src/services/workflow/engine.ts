@@ -123,7 +123,6 @@ export class WorkflowEngine {
 
     const v = await validateWorkflow(this.storage, this.config, ownerName, def);
     if (!v.ok || !v.resolved) return { error: v.errors };
-    const resolved = new Map(v.resolved.map(r => [r.stepId, r]));
 
     // Overlap guard: a full run that dispatches agents must not run twice at once (the steps share
     // templated keys). If one is already in flight for this workflow, return it instead of starting a
@@ -144,21 +143,27 @@ export class WorkflowEngine {
     for (const s of def.steps) steps[s.id] = { state: 'pending', attempt: 0, reads: [], writes: [] };
 
     const run: WorkflowRun = {
-      runId, workflowId, defSnapshot: def, vars,
+      runId, workflowId, defSnapshot: def, resolved: v.resolved, vars,
       mode: opts.mode, keyPrefix: '', status: 'running', steps, startedAt: now,
     };
 
     if (opts.mode === 'signals-only') {
-      await this.runSignalsOnly(ownerGhii, run, resolved);
+      await this.runSignalsOnly(ownerGhii, run);
     } else {
       await this.persist(ownerGhii, run);
-      await this.tick(ownerGhii, run, resolved);
+      await this.tick(ownerGhii, run);
     }
     return { runId };
   }
 
+  /** The pinned per-step resolved signals (from start time) as a lookup. No mid-run re-resolution. */
+  private resolvedMap(run: WorkflowRun): Map<string, ResolvedStep> {
+    return new Map((run.resolved ?? []).map(r => [r.stepId, r as ResolvedStep]));
+  }
+
   /** signals-only: evaluate every step's input + output against existing memory; no dispatch. */
-  private async runSignalsOnly(ownerGhii: string, run: WorkflowRun, resolved: Map<string, ResolvedStep>): Promise<void> {
+  private async runSignalsOnly(ownerGhii: string, run: WorkflowRun): Promise<void> {
+    const resolved = this.resolvedMap(run);
     const ctx = buildEvalCtx(this.storage, this.config, ownerGhii, run);
     for (const step of run.defSnapshot.steps) {
       const r = resolved.get(step.id);
@@ -180,7 +185,8 @@ export class WorkflowEngine {
   }
 
   // ── the advance loop (full-live) ──────────────────────────────────────────────
-  private async tick(ownerGhii: string, run: WorkflowRun, resolved: Map<string, ResolvedStep>): Promise<void> {
+  private async tick(ownerGhii: string, run: WorkflowRun): Promise<void> {
+    const resolved = this.resolvedMap(run);
     const now = new Date().toISOString();
     const ctx = buildEvalCtx(this.storage, this.config, ownerGhii, run);
     let dispatchedAny = false;
@@ -235,9 +241,9 @@ export class WorkflowEngine {
         if (t && t.status !== 'done' && t.status !== 'failed') return; // still in flight
       }
 
-      const v = await validateWorkflow(this.storage, this.config, ownerGhii.split('@')[0], run.defSnapshot);
-      const resolved = new Map((v.resolved ?? []).map(r => [r.stepId, r]));
-      const r = resolved.get(stepId);
+      // Use the signals PINNED at start time (not current offers) — a mid-run offer edit/delete must
+      // not silently turn this output check into a false pass.
+      const r = this.resolvedMap(run).get(stepId);
       const ctx = buildEvalCtx(this.storage, this.config, ownerGhii, run);
       const reads = new Set<string>(rs.reads);
 
@@ -260,7 +266,7 @@ export class WorkflowEngine {
         await this.onStepFail(ownerGhii, run, stepId, 'output-red');
       }
 
-      await this.tick(ownerGhii, run, resolved);
+      await this.tick(ownerGhii, run);
     });
   }
 
@@ -299,11 +305,9 @@ export class WorkflowEngine {
           }
         }
       }
-      // re-tick (fires any now-due pending retries)
-      const v = await validateWorkflow(this.storage, this.config, ownerGhii.split('@')[0], r.defSnapshot);
-      const resolved = new Map((v.resolved ?? []).map(x => [x.stepId, x]));
+      // re-tick (fires any now-due pending retries), using the run's pinned resolved signals.
       if (changed) await this.persist(ownerGhii, r);
-      await this.tick(ownerGhii, r, resolved);
+      await this.tick(ownerGhii, r);
     });
   }
 
@@ -335,7 +339,7 @@ export class WorkflowEngine {
     if (hits.length === 0) return;
     const active = await readActiveRuns(this.storage, this.config.nodeId);
     for (const t of hits) {
-      if (active.some(a => a.workflowId === t.workflowId)) continue; // loop/overlap guard
+      if (active.some(a => a.workflowId === t.workflowId && a.ownerGhii === t.ownerGhii)) continue; // loop/overlap guard (owner-scoped)
       this.startRun(ownerGhii, ownerGhii.split('@')[0], t.workflowId, { mode: 'full-live' })
         .catch(err => logger.error('event-triggered workflow run failed', { workflowId: t.workflowId, error: String(err) }));
     }
