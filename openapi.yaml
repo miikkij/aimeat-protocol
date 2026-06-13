@@ -5304,6 +5304,24 @@ paths:
         '404':
           description: Unknown surface role
 
+  /v1/agents/me/handbook/offerings:
+    get:
+      operationId: getOfferingsHandbook
+      summary: Offerings & Workflows for agents
+      description: >-
+        Returns the agent-facing "Offerings & Workflows" page — the quick how-to for publishing offers
+        (legibility), making an offer workflow-compatible (chainable), and pricing an offer (sellable),
+        with the actual tool calls. node_id / agent_name are substituted from the caller's auth.
+      tags:
+        - Agent Integration
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The offerings & workflows page
+        '401':
+          description: Authentication required
+
   /v1/prompts/draft-offer:
     get:
       operationId: getDraftOfferPrompt
