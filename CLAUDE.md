@@ -671,7 +671,7 @@ AIMEAT's architecture is: **CSM defines data shape + rules → Generic APIs hand
 
 - **Express 5 params:** `req.params.foo` is `string | string[]`. Always cast: `req.params.foo as string`
 - **Route ordering:** Static routes (e.g., `/v1/memory/search`) must be registered before parameterized routes (e.g., `/v1/memory/:key`)
-- **Ed25519 sha512Sync:** Must set `ed.etc.sha512Sync` using `node:crypto` for synchronous operations
+- **Ed25519 sync hash (@noble/ed25519 v3.1+):** For synchronous ops set `ed.hashes.sha512 = (m) => ...` using `node:crypto` (single-message arg). The old `ed.etc.sha512Sync` / `ed.etc.concatBytes` API was removed in v3.1 and `ed.etc` is now frozen. Production code uses the async API (`signAsync`/`verifyAsync`) and needs no hook; only test harnesses set the sync hook.
 - **MultiDiGraph:** If two nodes can have multiple edges (e.g., goal_reached + goal_not_reached), use `MultiDiGraph`, not `DiGraph`
 - **First owner is operator:** The first registered owner automatically gets the `operator` role
 - **BUILD_ID cache busting:** Public JS changes require `pnpm dev` restart — browser caches modules by BUILD_ID

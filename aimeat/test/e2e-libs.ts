@@ -5,8 +5,8 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 
-ed.etc.sha512Sync = (...m: Uint8Array[]) =>
-    new Uint8Array(createHash('sha512').update(ed.etc.concatBytes(...m)).digest());
+ed.hashes.sha512 = (m: Uint8Array) =>
+    new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';

@@ -24,8 +24,8 @@ import type { AimeatConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 
 // ─── Ed25519 setup ───
-ed.etc.sha512Sync = (...m: Uint8Array[]) =>
-    new Uint8Array(createHash('sha512').update(ed.etc.concatBytes(...m)).digest());
+ed.hashes.sha512 = (m: Uint8Array) =>
+    new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(privateKeyB64: string, message: string): Promise<string> {
     const privKey = Buffer.from(privateKeyB64, 'base64');
