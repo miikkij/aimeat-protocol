@@ -9,6 +9,13 @@
 .ld-hero { text-align: center; padding: 2.5rem 0 1.25rem; }
 .ld-h1 { font-size: 2.1rem; font-weight: 800; letter-spacing: -0.5px; margin: 0 0 .6rem; }
 .ld-hero-sub { color: var(--text-dim); font-size: 1.05rem; margin: 0; }
+/* "Ask your own AI what AIMEAT is" prompt box */
+.ld-askai { max-width: 760px; margin: 1.25rem auto 2rem; text-align: center; }
+.ld-askai-title { font-size: 1.25rem; font-weight: 700; margin: 0 0 .4rem; }
+.ld-askai-sub { color: var(--text-dim); font-size: .92rem; margin: 0 auto 1rem; max-width: 620px; }
+.ld-askai-box { border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 1rem 1.1rem; text-align: left; }
+.ld-askai-prompt { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: var(--font-mono, monospace); font-size: .8rem; line-height: 1.5; color: var(--text); max-height: 260px; overflow-y: auto; }
+.ld-askai-copy { margin-top: .9rem; }
 .ld-ticker { display: flex; align-items: center; gap: .5rem; justify-content: center; margin: 1rem auto; max-width: 760px; padding: .45rem .9rem; border: 1px solid var(--border); border-radius: 999px; background: var(--card); font-size: .85rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; }
 .ld-ticker-text { overflow: hidden; text-overflow: ellipsis; }
 .ld-ticker-dot { color: var(--success-fg, #2E9E5B); flex: none; }
