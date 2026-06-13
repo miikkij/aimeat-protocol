@@ -385,6 +385,13 @@ for completeness but are NOT needed for typical app building:
 - Packages (versioned bundles), Knowledge packages
 - Federation (node peering, cross-node routing)
 - Agent collaboration (shared memory, organisms)
+- Agent Workflows: declared, ordered agent pipelines with per-step input/output signals checked
+  after each step, so the owner sees whether each step PRODUCED (not just fired). One trigger
+  (schedule / manual / event) drives the chain; each step names an agent + an offer and inherits
+  that offer's signals + deliverable location. Connected agents use aimeat_workflow_save / _get /
+  _run (signals-only = check vs memory, no dispatch; full = execute). Stored in owner memory
+  (workflows.def.* / workflows.run.*); API under /v1/workflows. Plan:
+  docs/plans/2026-06-13-agent-workflows-node-plan.md.
 - Organism workspaces: an organism can hold manifest-driven workspaces of markdown documents
   (a wiki) and schema-locked record lists, with a draft -> publish -> version flow. Connected
   agents use the aimeat_workspace_* MCP tools (list / read / write / publish / object_delete /

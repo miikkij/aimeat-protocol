@@ -4,8 +4,53 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.24.0] - 2026-06-13
+
 ### Added
 
+- **Agent Workflows.** A *workflow* is a declared, ordered set of steps — one
+  trigger fires the whole chain, each step carries per-step success **signals**,
+  and the signal is checked after each step, so the owner sees **whether each
+  step produced**, not just whether it fired. It replaces brittle "N independent
+  schedules linked only by cron timing". Stored in the owner's own memory
+  (`workflows.def.<id>` / `workflows.run.<id>.<runId>`) — no new storage backend.
+  - **Signals** are a deterministic-first tree over owner memory (`exists` ·
+    `nonempty` · `count_nonempty` · `json_valid` · `json_schema` (ajv-validated) ·
+    `json_field`, plus `all`/`any`/`when` composites), with an opt-in,
+    consent-gated `llm` leaf (node OpenRouter) for "is this real content vs an
+    error/placeholder". Two-sided per step: `required_to_function` (consumer
+    INPUT gate, checked before dispatch) + `success_signal` (producer OUTPUT
+    check, after).
+  - Signals + `deliverable.location` are **inherited from each step's offer**
+    (new optional offer fields); a workflow referencing an offer that doesn't
+    publish them is rejected **at save** (DAG + offer-compatibility validation).
+    A run **pins** its resolved signals at start, so editing/deleting an offer
+    mid-run can't turn a check into a false pass.
+  - The run is an **async persisted state machine**: dispatch a step → park →
+    advance on the dispatched task's terminal transition or a watchdog timeout.
+    Run-fail policy = **partial** (a RED step fails its dependent subtree;
+    independent branches still finish). Deterministic per-step **retry**
+    (`{ max, backoff_min }`) before escalating. On any RED the node **guarantees
+    an owner push**, then best-effort dispatches the crew `workflow-inspector`.
+    `timeout_min` (optional, default 60) bounds the wait for a step's signal.
+    Restart-safe (re-syncs in-flight runs on boot).
+  - **Triggers:** `schedule` (one backing cron, replacing the per-step crons) ·
+    `manual` · `event` (a matching owner-memory write, or an offer order, starts
+    a run).
+  - **Test runs:** `signals-only` (evaluate every step's signals against
+    existing memory, no dispatch — an instant health check) and `full` with
+    `target: live | sandbox` (sandbox namespaces every key under
+    `wf-test.<runId>.`, never clobbering production).
+  - **API:** `GET/PUT/DELETE /v1/workflows[/{id}]`, `/{id}/blueprint` (the
+    derived input→output graph + the keys each step touches),
+    `/{id}/runs[/{runId}]`, `/{id}/health` (per-step green/red trend + mean
+    duration), `POST /{id}/run`. Scopes `workflow:read` / `workflow:write`
+    (owners bypass). Node stats report `workflows: { runs_active, event_triggers }`.
+  - **MCP:** three tight tools — `aimeat_workflow_save` / `aimeat_workflow_get`
+    / `aimeat_workflow_run` — so agents author + operate workflows.
+  - **UI:** a Workflows profile tab (list with a per-step health sparkline ·
+    blueprint graph · per-run timeline with expected-vs-observed · create/edit
+    form). Plan: `docs/plans/2026-06-13-agent-workflows-node-plan.md`.
 - **Billable offers (Offers v2).** An offer is now a *billable capability*: free
   when you drive your own agent, debited (morsels owner→provider) when a
   different owner invokes it. The offer descriptor gains three optional fields —

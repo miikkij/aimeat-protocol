@@ -73,7 +73,10 @@ export function runOutcome(steps: Record<string, WorkflowRunStep>): 'done' | 'pa
 }
 
 export interface StartRunOpts {
-  mode: 'signals-only' | 'full-live';
+  // full-sandbox dispatches like full-live but namespaces every key under `wf-test.<runId>.` so a
+  // test run never clobbers production keys (the dispatched step is told the prefix so a cooperating
+  // agent writes there; signal eval reads/writes under it).
+  mode: 'signals-only' | 'full-live' | 'full-sandbox';
   vars?: Record<string, string>;
 }
 
@@ -144,7 +147,8 @@ export class WorkflowEngine {
 
     const run: WorkflowRun = {
       runId, workflowId, defSnapshot: def, resolved: v.resolved, vars,
-      mode: opts.mode, keyPrefix: '', status: 'running', steps, startedAt: now,
+      mode: opts.mode, keyPrefix: opts.mode === 'full-sandbox' ? `wf-test.${runId}.` : '',
+      status: 'running', steps, startedAt: now,
     };
 
     if (opts.mode === 'signals-only') {
@@ -291,7 +295,7 @@ export class WorkflowEngine {
       for (const step of r.defSnapshot.steps) {
         const rs = r.steps[step.id];
         if (rs.state === 'dispatched' && rs.startedAt) {
-          const deadline = new Date(rs.startedAt).getTime() + step.timeout_min * 60_000;
+          const deadline = new Date(rs.startedAt).getTime() + (step.timeout_min ?? 60) * 60_000;
           if (now >= deadline) {
             if (step.retry && rs.attempt < step.retry.max) {
               rs.attempt += 1; rs.state = 'pending'; rs.taskIds = undefined;
@@ -429,6 +433,9 @@ export class WorkflowEngine {
         { name: 'workflow-run', value: `${run.workflowId}/${run.runId}`, type: 'text', description: step.id },
         { name: 'offer', value: step.offer, type: 'text', description: loc(step.description) },
       ];
+      // Sandbox run: tell the agent the key prefix to write under (signals read under it too), so a
+      // test run doesn't clobber production keys. A cooperating agent honors it; the node can't force it.
+      if (run.keyPrefix) scope.push({ name: 'wf-key-prefix', value: run.keyPrefix, type: 'text', description: 'prefix all deliverable keys with this' });
       const record: AgentTaskRecord = {
         id: randomUUID(), agentGaii, ownerGaii: ownerGhii,
         title: loc(step.description) || `${run.workflowId} · ${step.id}`,

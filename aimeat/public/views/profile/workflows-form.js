@@ -24,7 +24,7 @@ function loc(s) {
   return s.en_US || s.fi_FI || Object.values(s)[0] || '';
 }
 
-const blankStep = () => ({ id: '', agent: '', offer: '', after: [], noInput: false, timeout_min: 10, retryMax: 0, backoffMin: 5, description: '' });
+const blankStep = () => ({ id: '', agent: '', offer: '', after: [], noInput: false, timeout_min: 60, retryMax: 0, backoffMin: 5, description: '' });
 
 export default function WorkflowForm({ existing, onSaved, onCancel, showToast }) {
   const editing = !!existing;
@@ -41,7 +41,7 @@ export default function WorkflowForm({ existing, onSaved, onCancel, showToast })
     existing?.steps?.map(s => ({
       id: s.id, agent: Array.isArray(s.agent) ? s.agent[0] : s.agent, offer: s.offer,
       after: s.after || [], noInput: s.required_to_function === 'none',
-      timeout_min: s.timeout_min, retryMax: s.retry?.max || 0, backoffMin: s.retry?.backoff_min || 5,
+      timeout_min: s.timeout_min ?? 60, retryMax: s.retry?.max || 0, backoffMin: s.retry?.backoff_min || 5,
       description: loc(s.description),
     })) || [blankStep()],
   );
@@ -93,7 +93,7 @@ export default function WorkflowForm({ existing, onSaved, onCancel, showToast })
         description: s.description || s.id,
         ...(s.noInput ? { required_to_function: 'none' } : {}),
         ...(Number(s.retryMax) > 0 ? { retry: { max: Number(s.retryMax), backoff_min: Number(s.backoffMin) || 5 } } : {}),
-        timeout_min: Number(s.timeout_min) || 10,
+        timeout_min: Number(s.timeout_min) || 60,
       })),
       on_step_fail: 'inspect',
       ...(llmApproved ? { llm: { approved: true } } : {}),

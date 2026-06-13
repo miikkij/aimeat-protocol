@@ -108,7 +108,9 @@ export interface WorkflowStep {
   required_to_function?: Signal | 'none'; // INPUT gate (consumer-owned); 'none' = no memory input
   success_signal?: Signal;            // OUTPUT check (producer-owned); inherited from offer if omitted
   retry?: { max: number; backoff_min: number };
-  timeout_min: number;
+  /** Max minutes to WAIT for this step's success signal before declaring it timed-out. A step may
+   *  legitimately run for many minutes; this only bounds how long we wait for its output. Default 60. */
+  timeout_min?: number;
 }
 
 export type WorkflowTrigger =
@@ -204,7 +206,7 @@ const WorkflowStepSchema = z.object({
   required_to_function: z.union([SignalSchema, z.literal('none')]).optional(),
   success_signal: SignalSchema.optional(),
   retry: RetrySchema.optional(),
-  timeout_min: z.number().int().min(1).max(1440),
+  timeout_min: z.number().int().min(1).max(10080).optional(), // minutes to wait for the signal; default 60 (engine), max 7 days
 });
 
 const WorkflowTriggerSchema = z.discriminatedUnion('kind', [

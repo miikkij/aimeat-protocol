@@ -257,6 +257,15 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
       { description: 'List events', method: 'GET', url: `/v1/agents/${agentName}/tasks/${id}/events` },
     ]));
     emitChange('agent-tasks');
+    // Event-triggered workflows: a USER ordering an offer (the offers Ask flow tags the task with an
+    // `offer_id` scope) may start a workflow. The workflow engine's OWN dispatched tasks go through
+    // storage.createAgentTask directly (NOT this route) and use a different scope, so they don't fire
+    // this — only genuine user/agent orders do.
+    const orderedOfferId = record.scope?.find((s: AgentTaskScope) => s.name === 'offer_id')?.value;
+    if (orderedOfferId) {
+      getActiveWorkflowEngine()?.onOfferOrdered(record.ownerGaii, orderedOfferId)
+        .catch(e => logger.error('workflow event trigger (offer.ordered) failed', { offerId: orderedOfferId, error: String(e) }));
+    }
   });
 
   /* ── GET /v1/agents/:name/tasks -- List tasks for an agent ──

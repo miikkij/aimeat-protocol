@@ -409,23 +409,37 @@ Fixed:
 - **Mid-run false-pass** — the run PINS offer-resolved signals at start time (`WorkflowRun.resolved`);
   no mid-run re-resolution, so an offer edited/deleted during a run can't cause a false pass.
 - **Event-trigger loop guard** — owner-scoped (`workflowId` + `ownerGhii`).
-- **E2E** — retry-path + json_schema coverage added; dual-backend sweep run (2170/2171 each; the 1
-  failure is `e2e-admin-features` "POST /v1/admin/email/test" — pre-existing SMTP-env, unrelated;
-  e2e-workflows 16/0 on both).
+- **Run endpoint `target` sandbox|live (§8)** — implemented. `POST /run` `{ mode, target? }`; full +
+  `target:'sandbox'` → `full-sandbox`, keyPrefix `wf-test.<runId>.` (signal eval reads/writes under
+  it; the dispatched step carries a `wf-key-prefix` scope so a cooperating agent writes there).
+  Sandbox runs are prefix-isolated (not overlap-guarded). e2e proves the prod key stays untouched.
+- **offer.ordered event emission (§11.8)** — WIRED. The offers Ask flow creates the order task with
+  an `offer_id` scope via `POST /v1/agents/:name/tasks`; that route now emits
+  `onOfferOrdered(ownerGaii, offerId)`. The workflow engine's OWN dispatched tasks bypass the route
+  (call `storage.createAgentTask` directly) and use an `offer` (not `offer_id`) scope, so they never
+  re-trigger — e2e proves a triggered run dispatches without spawning a second run.
+- **timeout semantics** — `timeout_min` is now OPTIONAL per step, **default 60 min** (it bounds how
+  long we WAIT for the step's success signal; a step may legitimately run 30+ min). The 60s watchdog
+  is just the polling granularity; task completion advances the run event-driven, not on the timer.
+- **E2E** — retry-path + json_schema + sandbox + both event triggers covered; dual-backend sweep run
+  (2170/2171 each; the 1 failure is `e2e-admin-features` "POST /v1/admin/email/test" — pre-existing
+  SMTP-env, unrelated; e2e-workflows 18/0 on both).
+- **timeout→timed-out** — covered by a unit test (`test/unit/workflow-timeout.test.ts`): backdates a
+  dispatched step's `startedAt` to a 5s effective deadline, waits, calls `engine.sweep()` directly,
+  asserts the step → `timed-out` and the run → `partial`. (Not e2e-able in <1min because the live
+  watchdog is a 60s interval and `timeout_min` is minute-granular.)
 
 Remaining (deferred, owner-agreed):
-- **Run endpoint `target` sandbox|live (§8)** — not implemented (signals-only | full-live only);
-  keyPrefix plumbing exists in the run record but is inert (always '').
-- **offer.ordered event emission (§11.8)** — `onOfferOrdered` hook exists; no site calls it yet.
-- **timeout→timed-out e2e (§10)** — driven by the 60s watchdog; not black-box e2e-able in <1min.
 - **data-wallet/consent-audit wiring (§7)** — per-step reads/writes are in the run record but not fed
   to `listConsentAudit`; engine signal reads bypass the consent-audit path. Deferred by owner.
 
 ## 13. Open / deferred (NOT gaps to file — discuss with owner before acting)
 
-- **full-sandbox test mode** (Phase 4 deferred): only `signals-only` + `full-live` shipped. True
-  sandboxing of a full run needs the agent/offer to honor a `wf-test.<runId>.` key prefix, which the
-  node can't force. keyPrefix plumbing is in the run record for when offers opt in.
+- **full-sandbox test mode** — SHIPPED (see §13b). `POST /run { mode:'full', target:'sandbox' }`
+  namespaces keys under `wf-test.<runId>.`; the dispatched step carries a `wf-key-prefix` scope so a
+  cooperating agent writes there (the node still can't FORCE a non-cooperating agent, but signal eval
+  + the contract are in place; e2e proves prod isolation). UI affordance (a sandbox run button) is a
+  small follow-up — currently exposed via REST.
 - **json_schema value-validation** (Phase 4 deferred): the `json_schema` leaf currently degrades to
   `json_valid` (the evaluator's documented fallback). Wire ajv value-validation into the engine's
   eval ctx to enforce the schema.

@@ -92,6 +92,13 @@ const SCHEMA_OFFER = {
   required_to_function: { kind: 'deterministic', key: 'config.enabled', op: 'exists' },
   success_signal: { kind: 'deterministic', key: 'demo.doc', op: 'json_schema', schema: { type: 'object', required: ['title'], properties: { title: { type: 'string' } } } },
 };
+// Unique key never written in the real namespace — to prove full-sandbox reads the prefixed copy.
+const SBX_OFFER = {
+  id: 'sbx', title: 'Sandbox', ask: 'produce sbx.out',
+  deliverable: { format: 'document', location: { key: 'sbx.out' } },
+  required_to_function: { kind: 'deterministic', key: 'config.enabled', op: 'exists' },
+  success_signal: { kind: 'deterministic', key: 'sbx.out', op: 'nonempty' },
+};
 const WORKFLOW = {
   title: { en_US: 'News pipeline' }, description: { en_US: 'fetch → write' },
   trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
@@ -117,7 +124,7 @@ async function run() {
   });
 
   await test('Publish offers with workflow signals', async () => {
-    const { status, body } = await json(`/v1/agents/${agentName}/offers`, { method: 'PUT', headers: auth, body: JSON.stringify({ offers: [FETCH_OFFER, WRITE_OFFER, SRCFAIL_OFFER, SCHEMA_OFFER] }) });
+    const { status, body } = await json(`/v1/agents/${agentName}/offers`, { method: 'PUT', headers: auth, body: JSON.stringify({ offers: [FETCH_OFFER, WRITE_OFFER, SRCFAIL_OFFER, SCHEMA_OFFER, SBX_OFFER] }) });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
   });
 
@@ -268,6 +275,37 @@ async function run() {
     assert(after.body.data.runs[0].steps.fetch.taskIds?.length >= 1 || after.body.data.runs[0].status, 'run dispatched the step');
   });
 
+  // ── event trigger: ordering an offer starts a matching workflow ──
+  await test('event trigger (offer.ordered) starts a run; engine dispatch does NOT re-trigger', async () => {
+    const evtWf = {
+      title: { en_US: 'Offer-evt' }, description: { en_US: 'starts when offer "fetch" is ordered' },
+      trigger: { kind: 'event', on: 'offer.ordered', match: { offer: 'fetch' } }, vars: [], on_step_fail: 'inspect',
+      steps: [{ id: 'fetch', agent: agentName, offer: 'fetch', description: { en_US: 'Fetch' }, required_to_function: 'none', timeout_min: 10 }],
+    };
+    const put = await json('/v1/workflows/offer-evt-wf', { method: 'PUT', headers: auth, body: JSON.stringify(evtWf) });
+    assert(put.status === 200, `put offer-evt-wf ${put.status}: ${JSON.stringify(put.body)}`);
+
+    const before = await json('/v1/workflows/offer-evt-wf/runs', { headers: auth });
+    assert((before.body.data.count ?? 0) === 0, 'no runs before the order');
+
+    // Order the "fetch" offer the way the Tarjoama Ask flow does: a task tagged with an offer_id scope.
+    const order = await json(`/v1/agents/${agentName}/tasks`, {
+      method: 'POST', headers: auth,
+      body: JSON.stringify({
+        title: 'fetch the news', description: 'please fetch', status: 'queued',
+        scope: [{ name: 'kind', value: 'offer', type: 'text' }, { name: 'offer_id', value: 'fetch', type: 'text' }],
+        rules: [], verification: { user_expects: '', technical_checks: [] },
+      }),
+    });
+    assert(order.status === 201, `order task ${order.status}: ${JSON.stringify(order.body)}`);
+    await sleep(800);
+
+    const after = await json('/v1/workflows/offer-evt-wf/runs', { headers: auth });
+    assert((after.body.data.count ?? 0) === 1, `expected exactly 1 run after the order, got ${after.body.data.count}`);
+    // The run dispatched its own fetch step (a task with an `offer` scope, NOT `offer_id`) — which must
+    // NOT have re-triggered a second run. count === 1 proves engine dispatch doesn't loop.
+  });
+
   // ── json_schema leaf actually validates (no false GREEN) ──
   await test('json_schema fails schema-invalid output, passes schema-valid', async () => {
     const wf = {
@@ -318,6 +356,39 @@ async function run() {
     assert(typeof r.body.data.steps.gen.notBefore === 'string', 'a backoff notBefore is set');
     // NOTE: the timeout→timed-out transition is driven by the 60s watchdog sweep and is not
     // black-box e2e-able in <1min; it is covered by the engine's sweep logic (unit-level).
+  });
+
+  // ── full-sandbox namespaces keys, isolated from production ──
+  await test('full-sandbox reads/writes under wf-test.<runId>. (prod key untouched)', async () => {
+    const wf = {
+      title: { en_US: 'Sandbox wf' }, description: { en_US: 'sandbox isolation' },
+      trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
+      steps: [{ id: 'gen', agent: agentName, offer: 'sbx', description: { en_US: 'Gen' }, required_to_function: 'none', timeout_min: 10 }],
+    };
+    const put = await json('/v1/workflows/sandbox-wf', { method: 'PUT', headers: auth, body: JSON.stringify(wf) });
+    assert(put.status === 200, `put sandbox-wf ${put.status}: ${JSON.stringify(put.body)}`);
+
+    const run = await json('/v1/workflows/sandbox-wf/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'full', target: 'sandbox' }) });
+    const runId = run.body.data.runId;
+    assert(run.body.data.mode === 'full-sandbox', `expected full-sandbox, got ${run.body.data.mode}`);
+
+    let r = await json(`/v1/workflows/sandbox-wf/runs/${runId}`, { headers: auth });
+    const prefix = r.body.data.keyPrefix;
+    assert(prefix === `wf-test.${runId}.`, `expected sandbox keyPrefix, got ${prefix}`);
+    const taskId = r.body.data.steps.gen.taskIds?.[0];
+    assert(typeof taskId === 'string', 'gen dispatched');
+
+    // Cooperating agent writes ONLY the prefixed key (the real `sbx.out` stays unwritten).
+    await writeMem(`${prefix}sbx.out`, 'sandbox output');
+    const c = await json(`/v1/agents/${agentName}/tasks/${taskId}/complete`, { method: 'POST', headers: auth, body: JSON.stringify({ message: 'done' }) });
+    assert(c.status === 200, `complete ${c.status}`);
+    await sleep(700);
+
+    r = await json(`/v1/workflows/sandbox-wf/runs/${runId}`, { headers: auth });
+    assert(r.body.data.steps.gen.state === 'green', `gen should be green from the prefixed key, got ${r.body.data.steps.gen.state}`);
+    // Isolation: the real (unprefixed) key was never written by this run.
+    const real = await json('/v1/memory/sbx.out', { headers: auth });
+    assert(real.status === 404, `real sbx.out should be untouched (404), got ${real.status}`);
   });
 
   // ── health ──
