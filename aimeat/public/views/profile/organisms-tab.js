@@ -148,6 +148,11 @@
  *     auto-activates; §7c) — the agent joins/provisions its own spaces and the task completion is
  *     the ack. An agent already working in THIS workspace (per the participants data) shows a
  *     "✓ active here" badge instead of Adopt. Convention agreed with the crewaimeat side 2026-06-10.
+ *   v1.29.0 — 2026-06-13 — OKF-style structure overview: a collapsible <${'StructureOverview'}> panel in
+ *     OrganismHome (📐 Organism structure overview — every workspace's space breakdown + totals) and in
+ *     Workspace (📐 Workspace structure overview — per-space recent ids + titles). Lazy-loads a
+ *     deterministic Markdown map from the server (orgService.getOrganismOverview / getWorkspaceOverview)
+ *     and renders it via the safe Markdown component. Collapsed by default (no cost until opened).
  *   v1.28.0 — 2026-06-12 — Overview landing tab: the whole workspace on one vertical scroll — a
  *     "what happened here" strip (last 8 activity events, humanized + clickable) above every
  *     manifest space stacked in order (records: compact rows max 5 + "Show all N →"; documents:
@@ -237,6 +242,41 @@ function KebabMenu({ items, label, trigger, btnClass }) {
 
 /** Tag chips + inline input — Enter/comma adds, × or Backspace-on-empty removes, blur commits.
  *  Shows immediately how the value parses (vs. a raw "comma separated" text field). */
+/** Collapsible OKF-style structure-overview panel. A button that, on first expand, lazy-loads a
+ *  deterministic Markdown structure map (server projection — never persisted) and renders it via the
+ *  safe Markdown component. Used at organism level (every workspace's space breakdown) and workspace
+ *  level (per-space recent ids + titles). Collapsed by default so it costs nothing until asked for. */
+function StructureOverview({ load, label }) {
+  const [open, setOpen] = useState(false);
+  const [md, setMd] = useState(null);   // null = not loaded yet; '' = loaded but empty/failed
+  const [busy, setBusy] = useState(false);
+  const toggle = async () => {
+    const next = !open;
+    setOpen(next);
+    if (next && md === null && !busy) {
+      setBusy(true);
+      // Strip the leading OKF YAML frontmatter for the human view — it is machine metadata (kept in the
+      // raw server/MCP output, just noise when rendered). Everything from the body heading down stays.
+      try { setMd(((await load()) || '').replace(/^---\n[\s\S]*?\n---\n+/, '')); } finally { setBusy(false); }
+    }
+  };
+  return html`
+    <div class="pj-struct-overview">
+      <button class="pj-struct-toggle" aria-expanded=${open} onClick=${toggle}>
+        <span class="pj-struct-caret">${open ? '▾' : '▸'}</span>
+        <span>${'📐 '}${label}</span>
+      </button>
+      ${open ? html`
+        <div class="pj-struct-body card-detail">
+          ${busy
+            ? html`<${Spinner} text=${t('organisms.loading') || 'Loading...'} />`
+            : (md
+              ? html`<${Markdown} text=${md} />`
+              : html`<div class="section-desc">${t('organisms.structEmpty') || 'No structure to show yet.'}</div>`)}
+        </div>` : null}
+    </div>`;
+}
+
 function TagInput({ tags, onChange, placeholder }) {
   const [val, setVal] = useState('');
   const add = () => { const v = val.trim().replace(/,+$/, ''); if (v && !tags.includes(v)) onChange([...tags, v]); setVal(''); };
@@ -1412,6 +1452,9 @@ function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, onBack,
           <button class="btn-outline btn-sm ${showSettings ? 'pj-org-btn-active' : ''}" onClick=${() => guardDirty(() => setShowSettings(s => !s))}>${'⚙ '}${t('organisms.settings') || 'Settings'}</button>
         </div>
       </div>
+
+      <${StructureOverview} label=${t('organisms.structureOverviewOrg') || 'Organism structure overview'}
+        load=${() => orgService.getOrganismOverview(org.id)} />
 
       <div class="pj-org-tabs" role="tablist">
         ${tabs.map(tb => html`
@@ -2950,6 +2993,9 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
         </span>
       </div>
       ${ws.manifest?.summary ? html`<div class="section-desc">${(ws.manifest.summary)}</div>` : null}
+
+      <${StructureOverview} label=${t('organisms.structureOverviewWs') || 'Workspace structure overview'}
+        load=${() => orgService.getWorkspaceOverview(orgId, wsId)} />
 
       ${approvals.length > 0 && activeTab !== 'review' ? html`
         <div class="pj-ws-banner" role="status">

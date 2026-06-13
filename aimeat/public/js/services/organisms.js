@@ -491,6 +491,24 @@ export async function getWorkspace(orgId, wsId) {
   return resp?.data || null;
 }
 
+/** OKF-style STRUCTURE OVERVIEW (Markdown) of the whole organism — every workspace's space
+ *  breakdown + totals, deterministic, size-bounded. Returns '' on failure (caller shows a notice). */
+export async function getOrganismOverview(orgId) {
+  try {
+    const r = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/overview`);
+    return r?.data?.markdown || '';
+  } catch { return ''; }
+}
+
+/** OKF-style STRUCTURE OVERVIEW (Markdown) of ONE workspace — per space the most-recent entries
+ *  (ids + titles) and totals. Returns '' on failure. */
+export async function getWorkspaceOverview(orgId, wsId) {
+  try {
+    const r = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/overview?ws=${encodeURIComponent(wsId)}`);
+    return r?.data?.markdown || '';
+  } catch { return ''; }
+}
+
 /** Overwrite a workspace's manifest (e.g. edited name/summary/policy from Settings). */
 export async function saveManifest(orgId, wsId, manifest) {
   return apiPost('/v1/memory', { key: `${wsRoot(orgId, wsId)}.meta.manifest`, value: manifest, visibility: 'private' });

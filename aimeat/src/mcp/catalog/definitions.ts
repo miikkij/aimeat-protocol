@@ -1034,6 +1034,23 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_organism_overview',
+        description: 'Get a fast, OKF-style STRUCTURE MAP of a whole organism as Markdown — every workspace, its space breakdown (objectType → instance count), and totals. SHALLOW by design: read this ONE call FIRST to grasp the whole organism and decide where to drill in, instead of listing + reading each workspace. Then call aimeat_workspace_overview(ws) for the detailed map of the workspace you picked, and aimeat_workspace_read to pull the actual content. Member-only.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: { organism_id: { type: 'string', required: true, description: 'Organism identifier.' } },
+    },
+    {
+        name: 'aimeat_workspace_overview',
+        description: 'Get a fast, OKF-style STRUCTURE MAP of ONE workspace as Markdown — per space, the most-recently-updated entries (up to 10) with their instance id + title, and the total count of each space. Read this to find WHICH id you need, then call aimeat_workspace_read (or the memory API) to pull that record. Cheaper than reading the whole workspace when you only need to navigate. Same read access as aimeat_workspace_read; if you lack access the map says so. Member-only.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            ws: { type: 'string', required: true, description: 'Workspace id (from aimeat_workspace_list).' },
+        },
+    },
+    {
         name: 'aimeat_workspace_write',
         description: "Create or overwrite a DRAFT item in a workspace — a record OR a document — in one tool. Give the space NAME (the objectType, e.g. 'feature' or 'notes'); the tool resolves whether it is a records or document space and writes accordingly. For a records space, `value` is the record (validated against its schema, rejected if invalid) and needs an `id`. For a document space, `value` is { title, markdown }, the `id` is auto-generated, and you can file it under a `section`. Drafts are NOT live until published (aimeat_workspace_publish). Embed images with aimeat_storage_upload then ![alt](/v1/storage/<key>). Member-only.",
         caller: 'agent',

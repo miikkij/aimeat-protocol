@@ -49,6 +49,9 @@
  *     (rejects backing 'storage'/'knowledge', infers mode:'document' from kind:'document'); _write
  *     refuses non-memory spaces instead of silently writing records no read path lists; _read uses
  *     the shared isMemoryBackedSpace() predicate (missing backing = memory) instead of its own filter.
+ *   v1.10.0 -- 2026-06-13 -- _organism_overview / _workspace_overview: read-only OKF-style structure
+ *     maps (Markdown) so an agent grasps an organism / workspace in one call and navigates straight to
+ *     the id it needs. Reuse services/structure-overview.ts; viewer = owner GHII (matches _read).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { randomUUID } from 'node:crypto';
@@ -61,6 +64,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { exportWorkspace } from '../services/workspace-export.js';
+import { buildOrganismOverview, buildWorkspaceOverview } from '../services/structure-overview.js';
 import { importWorkspace } from '../services/workspace-import.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { updateWorkspaceMeta, WorkspaceMetaError, normalizeObjectTypes, isMemoryBackedSpace } from '../services/workspace-meta.js';
@@ -277,6 +281,26 @@ export function registerWorkspaceTools(
                 if (drf.length) drafts[ot.name] = drf;
             }
             return ok({ organism_id, ws, manifest, objects, drafts });
+        });
+
+    // ── aimeat_organism_overview ── (OKF-style structure map of the whole organism)
+    mcp.tool('aimeat_organism_overview', descriptionFor('aimeat_organism_overview'),
+        { organism_id: z.string().describe('Organism id') },
+        annotationsFor('aimeat_organism_overview'),
+        async ({ organism_id }): Promise<TextResult> => {
+            const deny = await denyReason(organism_id); if (deny) return fail(deny);
+            const { markdown } = await buildOrganismOverview(storage, config, { orgId: organism_id, viewerGaii: ownerGhii });
+            return { content: [{ type: 'text', text: markdown }] };
+        });
+
+    // ── aimeat_workspace_overview ── (OKF-style structure map of ONE workspace)
+    mcp.tool('aimeat_workspace_overview', descriptionFor('aimeat_workspace_overview'),
+        { organism_id: z.string(), ws: z.string().describe('Workspace id (from aimeat_workspace_list)') },
+        annotationsFor('aimeat_workspace_overview'),
+        async ({ organism_id, ws }): Promise<TextResult> => {
+            const deny = await denyReason(organism_id); if (deny) return fail(deny);
+            const { markdown } = await buildWorkspaceOverview(storage, config, { orgId: organism_id, ws, viewerGaii: ownerGhii });
+            return { content: [{ type: 'text', text: markdown }] };
         });
 
     // ── aimeat_workspace_write_draft ──
