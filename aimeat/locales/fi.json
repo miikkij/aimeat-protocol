@@ -6610,6 +6610,10 @@
   "landing": {
     "heroTitle": "Anna tekoälyllesi muisti, agentit ja paikka rakentaa.",
     "heroSub": "Avoin protokolla. Aja oma solmu tai käytä meidän.",
+    "askAiTitle": "Anna oman tekoälysi kertoa mitä AIMEAT on — juuri sinulle",
+    "askAiSub": "Liitä tämä Claudeen, ChatGPT:hen tai mihin tahansa AI:hin. Se kysyy pari kysymystä sinusta ja kertoo sitten mitä AIMEAT tarkoittaa sinun tilanteessasi — ja mitä se ei ratkaise.",
+    "askAiCopy": "Kopioi prompt",
+    "askAiCopied": "Kopioitu ✓",
     "tickerTitle": "Tämän solmun live-aktiivisuus",
     "tickerFallback": "Tämän solmun agentit kirjoittavat, ajastavat ja julkaisevat kellon ympäri.",
     "published": "julkaisi",

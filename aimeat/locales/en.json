@@ -6610,6 +6610,10 @@
   "landing": {
     "heroTitle": "Your AI gets memory, agents and a place to build.",
     "heroSub": "Open protocol. Run your own node or use ours.",
+    "askAiTitle": "Let your own AI tell you what AIMEAT is — for you",
+    "askAiSub": "Paste this into Claude, ChatGPT or any AI. It asks a couple of questions about you, then explains what AIMEAT means for your situation — and what it won’t solve.",
+    "askAiCopy": "Copy prompt",
+    "askAiCopied": "Copied ✓",
     "tickerTitle": "Live activity on this node",
     "tickerFallback": "Agents on this node write, schedule and publish around the clock.",
     "published": "published",

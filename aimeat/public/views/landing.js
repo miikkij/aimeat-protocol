@@ -149,6 +149,58 @@ function Gallery({ onApps }) {
   `;
 }
 
+// A universal instruction the visitor pastes into their OWN AI — it self-onboards from aimeat.io +
+// the README, asks about the visitor, then answers personally. Kept in English: it tells the AI to
+// answer in the user's language, and points to the canonical facts so a webless AI still answers.
+// NOTE: keep the "Facts (fallback)" block in sync with aimeat.io + the README (one truth, three places).
+const ASK_AI_PROMPT = `I just found aimeat.io and want to know if it's useful for me.
+
+1. If you have web access, read https://aimeat.io and the README at
+   https://github.com/miikkij/aimeat-protocol for current facts.
+   If you don't, use the facts below.
+
+2. Ask me 2-3 short questions about what I do (my work, team size,
+   what tools I pay for, whether I already use AI assistants).
+
+3. Then tell me, in plain language and in my language, based on MY answers:
+   - what AIMEAT is in one paragraph
+   - what concrete benefit it would give ME, with one realistic example
+     from my own work
+   - what it would NOT solve for me (be honest)
+   - the easiest way for me to try it (hosted test, self-host, or paid setup)
+
+Facts (fallback): AIMEAT is an open-source (MIT) platform where AI agents
+and people work together in shared "organisms": agents get persistent
+memory, identity, tasks, schedules and human approval gates. Everything
+runs on your own hardware or a hosted node you control — you own the data,
+the memory and everything the AI produces. Works with any AI (Claude,
+ChatGPT, local models) via MCP or connectors. Federation lets separate
+companies share work by consent. Capabilities are bought once, not rented;
+hosting is the only subscription.`;
+
+// "Let your own AI tell you what AIMEAT is — for you": the visitor's own AI is a trusted advisor, so
+// it sells better than the landing copy, and it feeds structured facts to the AIs that will field
+// "what is AIMEAT" questions later (AI-SEO). Copy button + the prompt.
+function AskYourAI() {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(ASK_AI_PROMPT);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard blocked — the prompt is visible to select manually */ }
+  };
+  return html`
+    <section class="ld-askai">
+      <h2 class="ld-askai-title">${tr('landing.askAiTitle', 'Let your own AI tell you what AIMEAT is — for you')}</h2>
+      <p class="ld-askai-sub">${tr('landing.askAiSub', 'Paste this into Claude, ChatGPT or any AI. It asks a couple of questions about you, then explains what AIMEAT means for your situation — and what it won’t solve.')}</p>
+      <div class="ld-askai-box">
+        <pre class="ld-askai-prompt">${ASK_AI_PROMPT}</pre>
+        <button class="btn-primary ld-askai-copy" onClick=${copy}>${copied ? tr('landing.askAiCopied', 'Copied ✓') : tr('landing.askAiCopy', 'Copy prompt')}</button>
+      </div>
+    </section>`;
+}
+
 export default function Landing({ navigate }) {
   // Logged-in users arriving DIRECTLY (bookmark, external link, address bar) go straight
   // to the Home dashboard. But a deliberate in-app navigation here (brand link, footer)
@@ -184,6 +236,9 @@ export default function Landing({ navigate }) {
         <h1 class="ld-h1">${tr('landing.heroTitle', 'Your AI gets memory, agents and a place to build.')}</h1>
         <p class="ld-hero-sub">${tr('landing.heroSub', 'Open protocol. Run your own node or use ours.')}</p>
       </section>
+
+      <!-- 1.5 Ask your own AI what AIMEAT is — for you -->
+      <${AskYourAI} />
 
       <!-- 2. Live ticker -->
       <${Ticker} />
