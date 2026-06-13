@@ -166,6 +166,7 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
     tunnelManager: services.tunnelManager,
     mailboxNotificationService: services.mailboxNotificationService,
     scheduler: services.scheduler,
+    workflowEngine: services.workflowEngine,
     invalidateHasOwnersCache: guards.invalidateHasOwnersCache,
   });
 

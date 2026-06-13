@@ -755,6 +755,7 @@ const SIDEBAR_GROUPS = [
     { id: 'agents', icon: '\u{1F916}', labelKey: 'profile.tabs.agents' },
     { id: 'offers', icon: '\u{1F9F0}', labelKey: 'profile.tabs.offers' },
     { id: 'scheduler', icon: '⏰', labelKey: 'profile.tabs.scheduler' },
+    { id: 'workflows', icon: '\u{1F500}', labelKey: 'profile.tabs.workflows' },
     { id: 'actions', icon: '\u{1F6E0}️', labelKey: 'profile.tabs.services' },
     { id: 'mcp', icon: '\u{1F517}', labelKey: 'profile.tabs.mcp' },
   ] },

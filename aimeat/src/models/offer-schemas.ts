@@ -18,8 +18,12 @@
  *     different owner invokes it. `visibility:'public'` lists it in the catalogue; `callable` binds it
  *     to a machine-invocable action/webhook. All v2 fields optional → v1 docs validate unchanged.
  *     See docs/plans/2026-06-12-services-to-offers-migration.md.
+ *   v2.1.0 -- 2026-06-13 -- Agent Workflows: optional `success_signal` + `required_to_function`
+ *     (the producer/consumer signal contract a workflow step inherits). Both optional → existing
+ *     offer docs validate unchanged. See docs/plans/2026-06-13-agent-workflows-node-plan.md.
  */
 import { z } from 'zod';
+import { SignalSchema } from './workflow-schemas.js';
 
 // ── v2: billable / listable / callable ──────────────────────────────────────
 // Concrete morsel price for cross-owner invocation. `null`/absent = not for sale (self-use only).
@@ -94,6 +98,14 @@ export const OfferSchema = z.object({
   inputs: z.array(z.object({ name: z.string().max(80), required: z.boolean().optional() })).max(20).optional(),
   consequences: z.array(ConsequenceSchema).max(20).optional(),
   deliverable: DeliverableSchema,
+  // ── Workflow signals (Agent Workflows; all optional → v1/v2 docs validate unchanged) ──
+  // The producer contract ("my output is OK") and the consumer precondition ("the input I need to
+  // start"). A workflow step naming this agent+offer inherits these as its success_signal /
+  // required_to_function defaults (overridable per step). An agent is "workflow-compatible" exactly
+  // when its offer declares these + deliverable.location. See
+  // docs/plans/2026-06-13-agent-workflows-node-plan.md §5.
+  success_signal: SignalSchema.optional(),
+  required_to_function: SignalSchema.optional(),
   // ── v2 billable/listable/callable (all optional; default to private, not-for-sale, human-driven) ──
   price: PriceSchema.optional(),
   visibility: z.enum(['private', 'unlisted', 'public']).optional(), // default 'private' at read/list time

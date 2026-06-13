@@ -944,7 +944,7 @@ export interface ScheduledJobRecord {
    * server-side OpenRouter completion (zero agent involvement); 'agent_task'
    * materialises an AgentTaskRecord into the target agent's queue on each fire.
    */
-  type: 'extension' | 'core' | 'ai' | 'agent_task';
+  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow';
   extensionName?: string;
   instanceId?: string;
   actionId?: string;
@@ -987,7 +987,7 @@ export interface ExecutionLogEntry {
   id: string;
   jobId: string;
   jobName: string;
-  type: 'extension' | 'core' | 'ai' | 'agent_task';
+  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow';
   extensionName?: string;
   actionId?: string;
   trigger: 'cron' | 'manual' | 'activate';

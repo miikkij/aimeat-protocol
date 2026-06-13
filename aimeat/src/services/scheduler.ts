@@ -22,6 +22,7 @@ import type { EmailService } from './email.js';
 import type { PushService } from './push.js';
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
 import { completeForOwner } from './ai-completion.js';
+import { getActiveWorkflowEngine } from './workflow/engine.js';
 import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
 import { emitChange } from './event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
@@ -290,6 +291,8 @@ export class Scheduler {
         run = await this.executeAiJob(job);
       } else if (job.type === 'agent_task') {
         run = await this.executeAgentTaskJob(job, trigger);
+      } else if (job.type === 'workflow') {
+        run = await this.executeWorkflowJob(job);
       }
     } catch (err) {
       result = 'error';
@@ -576,6 +579,22 @@ export class Scheduler {
     emitChange('agent-tasks');
 
     return { reads: [], writes: [], taskId: created.id };
+  }
+
+  /**
+   * `workflow` kind: fire one Agent Workflow run. The schedule is just the trigger; the deterministic
+   * engine owns the run loop (dispatch + two-sided signal checks + advance). `input.workflowId`
+   * names the workflow; `ownerScope` is the owner GHII it belongs to.
+   */
+  private async executeWorkflowJob(job: ScheduledJobRecord): Promise<JobRunResult> {
+    const owner = job.ownerScope;
+    const workflowId = (job.input as { workflowId?: string } | undefined)?.workflowId;
+    if (!owner || !workflowId) throw new Error(`workflow job "${job.id}" missing ownerScope/workflowId`);
+    const engine = getActiveWorkflowEngine();
+    if (!engine) return { reads: [], writes: [], skipped: true, skipReason: 'workflow engine not started' };
+    const result = await engine.startRun(owner, owner.split('@')[0], workflowId, { mode: 'full-live' });
+    if ('error' in result) throw new Error(`workflow run failed to start: ${result.error.join('; ')}`);
+    return { reads: [], writes: [`workflows.run.${workflowId}.${result.runId}`] };
   }
 
   private async executeCoreJob(job: ScheduledJobRecord): Promise<void> {

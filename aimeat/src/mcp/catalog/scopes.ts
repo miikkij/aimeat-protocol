@@ -103,7 +103,7 @@ export function scopeAllowsTool(scopes: string[], toolName: string): boolean {
  */
 export const MCP_SCOPE_PROFILES: Record<string, string[]> = {
     'task-runner': ['memory:read', 'memory:write', 'work:read', 'work:accept'],
-    coordinator: ['memory:read', 'memory:write', 'social:read', 'social:write', 'work:read', 'work:request'],
+    coordinator: ['memory:read', 'memory:write', 'social:read', 'social:write', 'work:read', 'work:request', 'workflow:read', 'workflow:write'],
     appdev: ['memory:read', 'memory:write'],
     'organism-knowledge': ['memory:read', 'memory:write', 'social:read'],
     interactive: ['*'],

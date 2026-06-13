@@ -10,6 +10,7 @@ import type { TunnelManager } from '../services/personal-tunnel.js';
 import { RealtimeManager } from '../services/realtime-manager.js';
 import type { MailboxNotificationService } from '../services/mailbox-notification.js';
 import type { Scheduler } from '../services/scheduler.js';
+import type { WorkflowEngine } from '../services/workflow/engine.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
@@ -88,6 +89,7 @@ import { aiRouter } from '../routes/ai.js';
 import { uploadRouter } from '../routes/upload.js';
 import { agentTasksRouter } from '../routes/agent-tasks.js';
 import { schedulesRouter } from '../routes/schedules.js';
+import { workflowsRouter } from '../routes/workflows.js';
 import { agentIntegrationRouter } from '../routes/agent-integration.js';
 import { agentDirectivesRouter } from '../routes/agent-directives.js';
 import { adminAgentTasksRouter } from '../routes/admin-agent-tasks.js';
@@ -143,6 +145,7 @@ export interface MountRoutesOptions {
   tunnelManager: TunnelManager | null;
   mailboxNotificationService: MailboxNotificationService | null;
   scheduler: Scheduler;
+  workflowEngine: WorkflowEngine;
   invalidateHasOwnersCache: () => void;
 }
 
@@ -163,7 +166,7 @@ export async function mountRoutes(
     rejectForRelay, mirrorReadOnly, maintenanceState,
     provenance, consulService, directoryService,
     peers, networkDirectory, tunnelManager, mailboxNotificationService,
-    scheduler, invalidateHasOwnersCache,
+    scheduler, workflowEngine, invalidateHasOwnersCache,
   } = opts;
 
   // Webhook dispatcher for agent push notifications
@@ -245,6 +248,7 @@ export async function mountRoutes(
   // Agent tasks, directives, capabilities, and integration BEFORE agentsRouter to avoid /v1/agents/:name param conflicts
   app.use(agentTasksRouter(config, storage, webhookDispatcher));
   app.use(schedulesRouter(config, storage, scheduler));
+  app.use(workflowsRouter(config, storage, scheduler, workflowEngine));
   app.use(agentDirectivesRouter(config, storage, webhookDispatcher));
   app.use(agentCapabilitiesRouter(config, storage));
   app.use(agentActivityRouter(config, storage));
@@ -462,6 +466,11 @@ export async function mountRoutes(
   // Wire dispatch + notification deps for ai/agent_task schedules before start.
   scheduler.setWebhookDispatcher(webhookDispatcher);
   scheduler.setPushService(pushService);
+
+  // Wire the workflow engine's deps + start its watchdog (advances in-flight runs after restart).
+  workflowEngine.setWebhookDispatcher(webhookDispatcher);
+  workflowEngine.setPushService(pushService);
+  workflowEngine.start().catch(err => logger.error('WorkflowEngine start failed', { error: String(err) }));
 
   // Start the scheduler (loads enabled jobs from storage)
   scheduler.start().catch(err => logger.error('Scheduler start failed', { error: String(err) }));
