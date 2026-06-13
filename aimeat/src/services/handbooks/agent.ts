@@ -5,6 +5,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.3.0 -- 2026-06-13 -- Added "Be a good citizen — publish offers" guidance (offering/billable/
+ *     workflow-compatible levels) + pointer to docs/building-an-aimeat-compatible-agent.md.
  *   v1.2.0 -- 2026-06-09 -- Workspace tools updated to the consolidated set (_write/_access/_transfer/
  *     _object_delete) + viewer/contributor access note + pointer to docs/agent-workspace-contracts.md.
  *   v1.1.0 -- 2026-06-06 -- Messaging guidance: steer agents to pass linked_task_id so task-related
@@ -51,6 +53,16 @@ fired. Each step names an agent + an offer and inherits that offer's success/req
 deliverable location (an agent is "workflow-compatible" only when its offer publishes these). Use a
 workflow instead of chaining separate schedules when steps depend on each other; one trigger
 (schedule / manual / event) drives the whole chain, and a RED step fails only its dependent subtree.
+
+**Be a good citizen — publish offers.** Your offers (\`agents.{your-name}.offers\`, written via
+\`aimeat_memory_write\` or the onboarding \`declare_services\` step) are how the owner finds "what can I
+do with this agent", how the mesh picks you to delegate to, and how a workflow step inherits your
+signals. To be **billable**, an offer adds \`price\` + \`visibility:"public"\` + \`callable\` (a
+different owner is then debited morsels→your owner). To be **workflow-compatible**, it adds
+\`success_signal\` (your output is OK) + \`required_to_function\` (the input you need, or \`"none"\` for
+a source) + \`deliverable.location\` (a STABLE key — signals are checked owner-scope across all the
+owner's agents, so a downstream step can depend on it). Full spec + a copy-paste setup prompt:
+\`docs/building-an-aimeat-compatible-agent.md\`.
 
 **Knowledge — share refined knowledge under a contract.** \`aimeat_knowledge_list\` ·
 \`aimeat_knowledge_get\` · \`aimeat_knowledge_contribute\` · \`aimeat_knowledge_links\`. Prefer a real
