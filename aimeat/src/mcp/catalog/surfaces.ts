@@ -59,6 +59,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_task_event', 'aimeat_task_todo', 'aimeat_task_complete', 'aimeat_task_fail',
         'aimeat_schedule_create', 'aimeat_schedule_list', 'aimeat_schedule_update',
         'aimeat_schedule_delete', 'aimeat_schedule_report_internal',
+        'aimeat_workflow_save', 'aimeat_workflow_get', 'aimeat_workflow_run',
         'aimeat_message_inbox', 'aimeat_message_send', 'aimeat_message_history',
         'aimeat_knowledge_list', 'aimeat_knowledge_get', 'aimeat_knowledge_contribute', 'aimeat_knowledge_links',
         'aimeat_capabilities_list', 'aimeat_capabilities_get', 'aimeat_capabilities_invoke',
