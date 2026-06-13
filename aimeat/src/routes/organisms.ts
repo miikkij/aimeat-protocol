@@ -44,6 +44,10 @@
  *     local {memory,knowledge,storage} set — one of three divergent backing filters that let
  *     published content go invisible). Non-memory spaces are creation-gated now; legacy ones render
  *     as a placeholder in the UI until their manifest is repaired to backing:'memory'.
+ *   v1.13.0 -- 2026-06-13 -- OKF-style structure overview: GET /:id/overview (whole organism, shallow)
+ *     and GET /:id/workspace/overview?ws= (one workspace, deep) return a deterministic Markdown map
+ *     (Open Knowledge Format: body + YAML frontmatter), ?format=md for raw text. See
+ *     services/structure-overview.ts.
  */
 import { Router, raw, type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -68,6 +72,7 @@ import { canAccessWorkspaceComments, addComment, listComments, commentPrefix } f
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
 import { updateWorkspaceMeta, WorkspaceMetaError } from '../services/workspace-meta.js';
+import { buildOrganismOverview, buildWorkspaceOverview } from '../services/structure-overview.js';
 
 /** Whether a membership role satisfies an approval's required approverRole. */
 function roleSatisfies(approverRole: string, membershipRole: string): boolean {
@@ -1081,6 +1086,54 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       { description: 'Read the manifest directly', method: 'GET', url: `/v1/memory/${encodeURIComponent(`${nsRoot}meta.manifest`)}` },
       { description: 'Write a draft record', method: 'POST', url: '/v1/memory' },
       { description: 'Publish a draft', method: 'POST', url: `/v1/organisms/${id}/publish` },
+    ]));
+  });
+
+  /* ── GET /v1/organisms/:id/overview — OKF-style structure overview (Markdown) ──
+   * A deterministic, size-bounded map of the whole organism: each workspace's space breakdown,
+   * per-space counts and totals. Membership-gated; a workspace the caller can't read is listed by
+   * name only. Generic: any client (an AI agent wanting a fast structural map, the portal UI) renders
+   * the returned Markdown. ?format=md returns raw text/markdown; default returns the envelope. */
+  router.get('/v1/organisms/:id/overview', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const callerSub = req.auth!.sub;
+    const ownerName = req.auth!.owner;
+    let isMember = !!callerSub && organism.agentGaiis.includes(callerSub);
+    if (!isMember && ownerName) { const m = await storage.getMembership(id, ownerName); isMember = !!m && m.status === 'active'; }
+    if (!isMember) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+
+    const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
+    const { markdown, workspaces } = await buildOrganismOverview(storage, config, { orgId: id, viewerGaii });
+    if (req.query.format === 'md') { res.type('text/markdown').send(markdown); return; }
+    res.json(success(config.nodeId, { markdown, workspaces }, [
+      { description: 'Drill into one workspace', method: 'GET', url: `/v1/organisms/${id}/workspace/overview?ws=<ws>` },
+    ]));
+  });
+
+  /* ── GET /v1/organisms/:id/workspace/overview — OKF-style overview of ONE workspace (Markdown) ──
+   * DEEP: per space the last N record/document titles + ids + counts (total always shown), so the
+   * next targeted read goes straight to the id. Same workspace-level read gate as GET /:id/workspace.
+   * Registered BEFORE /:id/workspace would be a concern, but that route has no extra path segment, so
+   * the literal `/workspace/overview` is matched here first by Express. ?format=md → raw markdown. */
+  router.get('/v1/organisms/:id/workspace/overview', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const ws = typeof req.query.ws === 'string' ? req.query.ws : '';
+    if (!ws) { res.status(400).json(error(config.nodeId, 'MISSING_WS', 'Provide ?ws=<workspace id> (list them with GET /v1/organisms/:id/workspaces)')); return; }
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const callerSub = req.auth!.sub;
+    const ownerName = req.auth!.owner;
+    let isMember = !!callerSub && organism.agentGaiis.includes(callerSub);
+    if (!isMember && ownerName) { const m = await storage.getMembership(id, ownerName); isMember = !!m && m.status === 'active'; }
+    if (!isMember) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+
+    const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
+    const { markdown, readable } = await buildWorkspaceOverview(storage, config, { orgId: id, ws, viewerGaii });
+    if (req.query.format === 'md') { res.type('text/markdown').send(markdown); return; }
+    res.json(success(config.nodeId, { markdown, ws, readable }, [
+      { description: 'Read the full workspace', method: 'GET', url: `/v1/organisms/${id}/workspace?ws=${encodeURIComponent(ws)}` },
     ]));
   });
 

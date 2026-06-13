@@ -45,6 +45,8 @@
   "profile.workflows.form.cancel": "Cancel",
   "profile.workflows.form.save": "Save",
   "profile.workflows.form.saved": "Workflow saved",
+  "profile.workflows.cancelRun": "Cancel run",
+  "profile.workflows.cancelled": "Run cancelled",
   "profile.tabs.scheduler": "Scheduler",
   "profile.agents.detail.tabs.schedules": "Schedules",
   "profile.scheduler.title": "Scheduler",

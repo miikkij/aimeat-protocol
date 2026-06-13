@@ -45,6 +45,8 @@
   "profile.workflows.form.cancel": "Peruuta",
   "profile.workflows.form.save": "Tallenna",
   "profile.workflows.form.saved": "Työnkulku tallennettu",
+  "profile.workflows.cancelRun": "Keskeytä ajo",
+  "profile.workflows.cancelled": "Ajo keskeytetty",
   "profile.tabs.scheduler": "Ajastin",
   "profile.agents.detail.tabs.schedules": "Ajastukset",
   "profile.scheduler.title": "Ajastin",

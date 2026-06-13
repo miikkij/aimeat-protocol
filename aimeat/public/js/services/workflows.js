@@ -55,3 +55,8 @@ export async function getRun(id, runId) {
 export async function runWorkflow(id, mode, vars) {
   return apiPost(`/v1/workflows/${encodeURIComponent(id)}/run`, { mode, ...(vars ? { vars } : {}) });
 }
+
+/** Cancel an in-flight run (stuck / gone wrong). */
+export async function cancelRun(id, runId) {
+  return apiPost(`/v1/workflows/${encodeURIComponent(id)}/runs/${encodeURIComponent(runId)}/cancel`, {});
+}
