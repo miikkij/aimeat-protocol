@@ -1165,6 +1165,42 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
         input: { name: { type: 'string', required: true, description: 'Cortex name.' } },
         handler: ({ client }, input) => client.delete(`/v1/cortex/${encodeURIComponent(requiredString(input, 'name'))}`),
     },
+    // ── Agent Workflows (shell-callable parity with the MCP + connector surfaces) ──
+    {
+        name: 'aimeat_workflow_save',
+        description: 'Create/update a workflow. `definition` is the full descriptor (title, description, trigger, vars[], steps[], on_step_fail, llm?); validated against the offer contract + DAG on save.',
+        input: {
+            id: { type: 'string', required: true, description: 'Workflow id (lowercase slug); existing id = update.' },
+            definition: { type: 'object', required: true, description: 'The workflow descriptor.' },
+        },
+        handler: ({ client }, input) => client.put(`/v1/workflows/${encodeURIComponent(requiredString(input, 'id'))}`, requiredRecord(input, 'definition')),
+    },
+    {
+        name: 'aimeat_workflow_get',
+        description: 'Inspect workflows. Omit id to list; pass an id for its definition + derived blueprint + recent runs.',
+        input: { id: { type: 'string', description: 'Omit to list; pass for one workflow.' } },
+        handler: async ({ client }, input) => {
+            const id = optionalString(input, 'id');
+            if (!id) return client.get('/v1/workflows');
+            const enc = encodeURIComponent(id);
+            const [def, bp, runs] = await Promise.all([
+                client.get(`/v1/workflows/${enc}`),
+                client.get(`/v1/workflows/${enc}/blueprint`),
+                client.get(`/v1/workflows/${enc}/runs`),
+            ]);
+            const recentRuns = (((runs.data as { runs?: unknown[] } | undefined)?.runs) ?? []).slice(0, 5);
+            return { ok: def.ok, data: { definition: def.data ?? def, blueprint: bp.ok === false ? null : (bp.data ?? null), recentRuns } } as ApiResponse;
+        },
+    },
+    {
+        name: 'aimeat_workflow_run',
+        description: 'Run a workflow. mode="signals-only" evaluates signals against memory (no dispatch — instant health check); mode="full" executes the steps.',
+        input: {
+            id: { type: 'string', required: true, description: 'The workflow id.' },
+            mode: { type: 'string', required: true, description: 'signals-only | full' },
+        },
+        handler: ({ client }, input) => client.post(`/v1/workflows/${encodeURIComponent(requiredString(input, 'id'))}/run`, { mode: requiredString(input, 'mode') }),
+    },
 ];
 
 function getTool(name: string): ConnectCliToolDefinition | undefined {
