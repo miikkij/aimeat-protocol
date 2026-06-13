@@ -47,6 +47,19 @@ export function clearValidatorCache(): void {
   validatorCache.clear();
 }
 
+/**
+ * Validate a value against a JSON Schema using the shared (cached) ajv. Returns ok + ajv messages.
+ * If the schema itself is invalid, ok:false with the compile error (a bad schema must not pass).
+ * Used by the workflow `json_schema` signal leaf — see services/workflow/eval-context.ts.
+ */
+export function validateValueAgainstSchema(value: unknown, schema: Record<string, unknown>): { ok: boolean; errors?: string[] } {
+  let validate: ValidateFunction;
+  try { validate = getValidator(schema); }
+  catch (err) { return { ok: false, errors: [`invalid schema: ${(err as Error).message}`] }; }
+  const ok = validate(value) as boolean;
+  return ok ? { ok: true } : { ok: false, errors: (validate.errors ?? []).map(e => `${e.instancePath || '/'} ${e.message}`) };
+}
+
 export function removeFromCache(schema: Record<string, unknown>): void {
   validatorCache.delete(JSON.stringify(schema));
 }

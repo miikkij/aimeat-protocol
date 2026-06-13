@@ -13,6 +13,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { completeForOwner } from '../ai-completion.js';
+import { validateValueAgainstSchema } from '../schema-validator.js';
 import { globToRegExp, type SignalEvalCtx } from './signal-eval.js';
 import type { WorkflowRun } from '../../models/workflow-schemas.js';
 
@@ -38,7 +39,7 @@ function makeLlmJudge(storage: Storage, config: AimeatConfig, ownerGhii: string,
 /**
  * Build the signal-eval context bound to the owner namespace (+ keyPrefix for sandbox). The `llm`
  * leaf is enabled only when the workflow def carries owner approval; otherwise it is null and the
- * evaluator degrades llm leaves to a pass. json_schema degrades to json_valid (no validator injected).
+ * evaluator degrades llm leaves to a pass. json_schema is validated with the shared ajv (real check).
  */
 export function buildEvalCtx(storage: Storage, config: AimeatConfig, ownerGhii: string, run: WorkflowRun): SignalEvalCtx {
   const prefix = run.keyPrefix ?? '';
@@ -58,6 +59,8 @@ export function buildEvalCtx(storage: Storage, config: AimeatConfig, ownerGhii: 
     },
     vars: run.vars,
     llm: llmEnabled ? makeLlmJudge(storage, config, ownerGhii, run.workflowId) : null,
-    // validateJsonSchema intentionally omitted → the evaluator degrades json_schema to json_valid.
+    // Real ajv validation for the json_schema leaf — a step must NOT report success while producing
+    // schema-invalid output (previously this degraded to json_valid → a false GREEN).
+    validateJsonSchema: (value, schema) => validateValueAgainstSchema(value, schema),
   };
 }

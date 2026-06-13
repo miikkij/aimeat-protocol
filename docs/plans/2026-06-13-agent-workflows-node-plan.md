@@ -391,25 +391,35 @@ timeline). Verify by driving the browser via Playwright MCP when the tab is done
 
 ---
 
-## 13b. Audit findings (2026-06-13, plan-vs-implementation)
+## 13b. Audit findings (2026-06-13, plan-vs-implementation) — CURRENT
 
-Fixed during the audit:
-- **Scheduled-run overlap** — `startRun` (full-live) now returns the in-flight run instead of starting
-  a second when one is already active (the event path already guarded; the schedule path didn't).
-- **Restart recovery** — `resumeInflight` now re-checks dispatched steps' task statuses on boot and
-  advances any whose task finished during the restart gap (was: log-only → the watchdog would wrongly
-  time-out a succeeded step).
-- **Error swallowing** — the fire-and-forget engine hooks (memory.write trigger, onTaskTerminal,
-  readEventTriggers) now LOG on failure instead of an empty `.catch(() => {})`.
+Fixed:
+- **Scheduled-run overlap** — `startRun` (full-live) returns the in-flight run instead of starting a
+  second when one is already active.
+- **Restart recovery** — `resumeInflight` re-checks dispatched steps' task statuses on boot and
+  advances any whose task finished during the restart gap (was log-only).
+- **Error swallowing** — the fire-and-forget engine hooks LOG on failure (no empty `.catch(() => {})`).
+- **Health (§7)** — `computeHealth` returns `meanDurationMs`; `/v1/stats` reports node-global
+  `workflows: { runs_active, event_triggers }`. (The per-step/duration *trend* lives in the
+  per-workflow `/health` endpoint, not node-global stats — per-owner ≠ node-global, by design.)
+- **Frontend create/edit form (§12)** — shipped (`public/views/profile/workflows-form.js`); browser-verified create + edit.
+- **OpenAPI (Rule 3)** — `POST /v1/workflows/{id}/run` + `GET /v1/workflows/{id}/health` added + types regenerated.
+- **json_schema false-GREEN** — the leaf now validates with the shared ajv (`validateValueAgainstSchema`);
+  schema-invalid output is RED, not a silent pass.
+- **Mid-run false-pass** — the run PINS offer-resolved signals at start time (`WorkflowRun.resolved`);
+  no mid-run re-resolution, so an offer edited/deleted during a run can't cause a false pass.
+- **Event-trigger loop guard** — owner-scoped (`workflowId` + `ownerGhii`).
+- **E2E** — retry-path + json_schema coverage added; dual-backend sweep run (2170/2171 each; the 1
+  failure is `e2e-admin-features` "POST /v1/admin/email/test" — pre-existing SMTP-env, unrelated;
+  e2e-workflows 16/0 on both).
 
-Remaining gaps vs the plan (not yet done — owner to prioritize):
-- **Health (§7):** `computeHealth` omits mean duration; health is NOT fed into node-stats.
-- **Per-step reads/writes → data-wallet/consent audit (§7):** recorded in the run, but not wired into
-  the data-wallet (the "for free" claim is aspirational).
-- **Run endpoint `target` (§8):** `POST /run` takes `{mode}` only — no sandbox|live (full-sandbox deferred).
-- **E2E (§10):** the retry path and the timeout→timed-out path are NOT e2e-covered; no end-of-plan
-  full sweep on both backends was run (SQLite targeted suites only).
-- **Frontend create/edit form (§12):** not built — workflows are authored via API/MCP only.
+Remaining (deferred, owner-agreed):
+- **Run endpoint `target` sandbox|live (§8)** — not implemented (signals-only | full-live only);
+  keyPrefix plumbing exists in the run record but is inert (always '').
+- **offer.ordered event emission (§11.8)** — `onOfferOrdered` hook exists; no site calls it yet.
+- **timeout→timed-out e2e (§10)** — driven by the 60s watchdog; not black-box e2e-able in <1min.
+- **data-wallet/consent-audit wiring (§7)** — per-step reads/writes are in the run record but not fed
+  to `listConsentAudit`; engine signal reads bypass the consent-audit path. Deferred by owner.
 
 ## 13. Open / deferred (NOT gaps to file — discuss with owner before acting)
 
