@@ -1345,6 +1345,28 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     return { ok: true, version: n };
   };
 
+  // Reopen a published record for editing: copy organism.{id}.{ns}.{instance}.latest → .draft so the
+  // existing edit → publish flow applies. The published .latest stays live (and keeps serving readers)
+  // until the edited draft is re-published. Refuses to clobber an in-progress draft.
+  const revertToDraft = async (
+    organismId: string, ws: string | undefined, namespace: string, instance: string, reverter: string,
+  ): Promise<{ ok: true } | { ok: false; code: 'NO_LATEST' | 'DRAFT_EXISTS' }> => {
+    const wsRoot = ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`;
+    const base = `${wsRoot}.${namespace}.${instance}`;
+    const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000 });
+    if (items.find(r => r.key === `${base}.draft`)) return { ok: false, code: 'DRAFT_EXISTS' };
+    // Mirror the workspace read: the published current state is .latest, or the bare key as fallback.
+    const latest = items.find(r => r.key === `${base}.latest`) ?? items.find(r => r.key === base);
+    if (!latest) return { ok: false, code: 'NO_LATEST' };
+    const now = new Date().toISOString();
+    await storage.setMemory({
+      key: `${base}.draft`, ownerGaii: reverter, value: latest.value,
+      visibility: latest.visibility, tags: latest.tags ?? [], ttlHours: null,
+      version: 1, createdAt: now, updatedAt: now,
+    });
+    return { ok: true };
+  };
+
   /* ══ Workspace access (per-workspace, creator-controlled, consent-backed) ══
    * Organism membership lets you SEE the workspace LIST (names + who made each); reading/writing a
    * workspace's CONTENT needs the workspace creator's consent. Flow: discover → request → the
@@ -2188,6 +2210,48 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     res.json(success(config.nodeId, { published: true, namespace, id: instance, version: result.version }, [
       { description: 'View the workspace', method: 'GET', url: `/v1/organisms/${id}/workspace` },
       { description: 'List version history', method: 'GET', url: `/v1/memory?prefix=${encodeURIComponent(`organism.${id}.${namespace}.${instance}.version.`)}` },
+    ]));
+    emitChange('organisms');
+  });
+
+  // POST /v1/organisms/:id/revert — reopen a published record for editing (copy .latest → .draft).
+  // Same write access as publish; not gated (creating a private draft is not a publish).
+  router.post('/v1/organisms/:id/revert', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      return;
+    }
+    const role = await memberRole(req, organism, id);
+    if (!role) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism'));
+      return;
+    }
+    const { namespace, id: instance, ws } = req.body ?? {};
+    const wsId = typeof ws === 'string' ? ws : undefined;
+    if (!namespace || typeof namespace !== 'string' || !instance || typeof instance !== 'string') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'namespace and id (instance) are required'));
+      return;
+    }
+    if (!canWriteNamespace(role, namespace)) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Admin/creator role required to edit in a meta.* namespace'));
+      return;
+    }
+
+    const reverter = resolveIdentity(req.auth!, config.nodeId);
+    const result = await revertToDraft(id, wsId, namespace, instance, reverter);
+    if (!result.ok) {
+      if (result.code === 'NO_LATEST') {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No published record at ${namespace}.${instance} to reopen`));
+      } else {
+        res.status(409).json(error(config.nodeId, 'DRAFT_EXISTS', `A draft already exists for ${namespace}.${instance} — edit it directly`));
+      }
+      return;
+    }
+    res.json(success(config.nodeId, { reopened: true, namespace, id: instance }, [
+      { description: 'View the workspace', method: 'GET', url: `/v1/organisms/${id}/workspace` },
+      { description: 'Publish the edited draft', method: 'POST', url: `/v1/organisms/${id}/publish` },
     ]));
     emitChange('organisms');
   });

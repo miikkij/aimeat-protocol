@@ -5663,6 +5663,8 @@
     "draft": "luonnos",
     "publish": "Julkaise",
     "published": "Julkaistu",
+    "reopened": "Avattu muokattavaksi",
+    "reopenEditHint": "Avaa muokattavaksi — luo muokattavan luonnoksen julkaistusta versiosta",
     "draftVersion": "Luonnos",
     "publishedVersion": "Julkaistu",
     "workspacesDesc": "Tämän organismin työtilat — jokainen on itsenäinen tila omine dokumentteineen, tietueineen ja historioineen.",

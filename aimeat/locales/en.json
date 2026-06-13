@@ -5663,6 +5663,8 @@
     "draft": "draft",
     "publish": "Publish",
     "published": "Published",
+    "reopened": "Reopened for editing",
+    "reopenEditHint": "Reopen for editing — creates an editable draft from the published version",
     "draftVersion": "Draft",
     "publishedVersion": "Published",
     "workspacesDesc": "Workspaces in this organism — each is an independent space with its own documents, records and history.",

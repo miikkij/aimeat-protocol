@@ -2401,6 +2401,18 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
     finally { setBusy(false); }
   }, [orgId, showToast, load]);
 
+  // Reopen a published record for editing: server copies .latest → .draft, then the existing
+  // edit → publish flow applies. The published version stays live until the edit is re-published.
+  const reopen = useCallback(async (ot, instanceId) => {
+    setBusy(true);
+    try {
+      await orgService.revertToDraft(orgId, wsId, ot.namespace, instanceId);
+      showToast(t('organisms.reopened') || 'Reopened for editing');
+      await load();
+    } catch (e) { showToast((e && e.message) || 'Failed to reopen'); }
+    finally { setBusy(false); }
+  }, [orgId, wsId, showToast, load]);
+
   const resolve = useCallback(async (aid, decision) => {
     setBusy(true);
     try { await orgService.resolveApproval(orgId, aid, decision); showToast(decision === 'approve' ? (t('organisms.approved') || 'Approved') : (t('organisms.rejected') || 'Rejected')); await load(); }
@@ -2814,6 +2826,8 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
             <div class="pj-item">
               <button class="pj-rec-title" onClick=${() => toggleExpand(ot, o.id)}>${String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.summary || o.id || '')}</button>
               ${o.status ? html`<span class="badge badge-info">${(o.status)}</span>` : null}
+              ${!draftsFor(ot.name).some(dr => dr.id === o.id) ? html`
+                <button class="btn-ghost btn-sm" title=${t('organisms.reopenEditHint') || 'Reopen for editing — creates an editable draft from the published version'} disabled=${busy} onClick=${() => reopen(ot, o.id)}>${t('organisms.edit') || 'Edit'}</button>` : null}
               <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, o.id, String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.id))}>🗑</button>
             </div>
             ${expandedRec[ot.name + ':' + o.id] ? html`<div class="pj-rec-fields">${recordFields(ot, o)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${o.id} showToast=${showToast} />` : null}
