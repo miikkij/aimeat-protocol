@@ -7,7 +7,21 @@
  * @version-history
  *   v1.0.0 -- 2026-06-13 -- Phase 9: initial workflows service for the profile tab.
  */
-import { apiGet, apiPost } from '/js/api.js';
+import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
+
+/** Create/update a workflow definition (PUT /v1/workflows/:id). Returns the envelope. */
+export async function putWorkflow(id, def) {
+  return apiPut(`/v1/workflows/${encodeURIComponent(id)}`, def);
+}
+
+export async function deleteWorkflow(id) {
+  return apiDelete(`/v1/workflows/${encodeURIComponent(id)}`);
+}
+
+/** Read one agent's published offers (to pick a workflow-compatible offer in the form). */
+export async function getAgentOffers(agentName) {
+  return apiGet(`/v1/agents/${encodeURIComponent(agentName)}/offers`);
+}
 
 /** List the owner's workflow definitions: { workflows, count }. */
 export async function listWorkflows() {

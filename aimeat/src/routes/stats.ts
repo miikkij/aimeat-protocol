@@ -19,6 +19,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { StatsCollector } from '../services/stats.js';
 import { success, error } from '../middleware/envelope.js';
+import { readActiveRuns, readEventTriggers } from '../services/workflow/lifecycle.js';
 
 export function statsRouter(
   config: AimeatConfig,
@@ -72,10 +73,22 @@ export function statsRouter(
       } catch { /* skip owners without consents */ }
     }
 
+    // Agent Workflows — node-global gauges, cheaply read from the system-namespace indexes
+    // (in-flight runs + registered event triggers). Best-effort: never block the stats response.
+    let workflowStats = { runs_active: 0, event_triggers: 0 };
+    try {
+      const [activeRuns, eventTriggers] = await Promise.all([
+        readActiveRuns(storage, config.nodeId),
+        readEventTriggers(storage, config.nodeId),
+      ]);
+      workflowStats = { runs_active: activeRuns.length, event_triggers: eventTriggers.length };
+    } catch { /* indexes absent / unreadable — leave zeros */ }
+
     // Shared fields included in both response paths
     const shared = {
       active_owners: owners.length,
       active_agents: agents.length,
+      workflows: workflowStats,
       push_notifications: {
         enabled: config.pushEnabled && !!config.vapidPublicKey,
         personal_node_support: config.personalNodesEnabled,

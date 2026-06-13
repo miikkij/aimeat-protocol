@@ -16,7 +16,8 @@ import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
-import { listWorkflows, getBlueprint, getHealth, listRuns, getRun, runWorkflow } from '/js/services/workflows.js';
+import { listWorkflows, getWorkflow, getBlueprint, getHealth, listRuns, getRun, runWorkflow } from '/js/services/workflows.js';
+import WorkflowForm from './workflows-form.js';
 
 const html = htm.bind(h);
 
@@ -105,7 +106,11 @@ export default function WorkflowsTab({ showToast }) {
   };
 
   if (loading) return html`<div class="wf-loading">${t('profile.workflows.loading')}</div>`;
-  if (view.name === 'detail') return html`<${DetailView} id=${view.id} onBack=${() => { setView({ name: 'list' }); loadList(); }} onOpenRun=${(runId) => setView({ name: 'run', id: view.id, runId })} onRun=${doRun} />`;
+  if (view.name === 'create') return html`<${WorkflowForm} existing=${null} showToast=${showToast}
+    onCancel=${() => setView({ name: 'list' })} onSaved=${(id) => { setView({ name: 'detail', id }); }} />`;
+  if (view.name === 'edit') return html`<${EditFormView} id=${view.id} showToast=${showToast}
+    onCancel=${() => setView({ name: 'detail', id: view.id })} onSaved=${(id) => setView({ name: 'detail', id })} />`;
+  if (view.name === 'detail') return html`<${DetailView} id=${view.id} onBack=${() => { setView({ name: 'list' }); loadList(); }} onOpenRun=${(runId) => setView({ name: 'run', id: view.id, runId })} onRun=${doRun} onEdit=${() => setView({ name: 'edit', id: view.id })} />`;
   if (view.name === 'run') return html`<${RunView} id=${view.id} runId=${view.runId} onBack=${() => setView({ name: 'detail', id: view.id })} />`;
 
   // ── list ──
@@ -116,6 +121,7 @@ export default function WorkflowsTab({ showToast }) {
           <div class="section-title">${t('profile.workflows.title')}</div>
           <div class="section-desc">${t('profile.workflows.desc')}</div>
         </div>
+        <button class="btn-primary" onClick=${() => setView({ name: 'create' })}>+ ${t('profile.workflows.new')}</button>
       </div>
       ${error && html`<div class="wf-error">${error}</div>`}
       ${items.length === 0
@@ -145,7 +151,16 @@ export default function WorkflowsTab({ showToast }) {
 }
 
 // ── Detail: blueprint + recent runs ─────────────────────────────────────────────
-function DetailView({ id, onBack, onOpenRun, onRun }) {
+function EditFormView({ id, onCancel, onSaved, showToast }) {
+  const [def, setDef] = useState(null);
+  const [err, setErr] = useState(null);
+  useEffect(() => { getWorkflow(id).then(r => setDef(r?.data || null)).catch(e => setErr(e.message)); }, [id]);
+  if (err) return html`<div class="wf-tab"><div class="wf-error">${err}</div></div>`;
+  if (!def) return html`<div class="wf-loading">${t('profile.workflows.loading')}</div>`;
+  return html`<${WorkflowForm} existing=${def} showToast=${showToast} onCancel=${onCancel} onSaved=${onSaved} />`;
+}
+
+function DetailView({ id, onBack, onOpenRun, onRun, onEdit }) {
   const [blueprint, setBlueprint] = useState(null);
   const [runs, setRuns] = useState([]);
   const [err, setErr] = useState(null);
@@ -163,6 +178,7 @@ function DetailView({ id, onBack, onOpenRun, onRun }) {
         <button class="btn-ghost" onClick=${onBack}>← ${t('profile.workflows.back')}</button>
         <div class="wf-detail-title">${id}</div>
         <div class="wf-detail-actions">
+          <button class="btn-ghost" onClick=${onEdit}>${t('profile.workflows.edit')}</button>
           <button class="btn-outline" onClick=${() => onRun(id, 'signals-only')}>${t('profile.workflows.check')}</button>
           <button class="btn-primary" onClick=${() => onRun(id, 'full')}>${t('profile.workflows.run')}</button>
         </div>
