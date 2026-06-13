@@ -3,6 +3,9 @@
  * @description Profile tab for memory entries and file management — CRUD, search,
  *   visibility cycling, tag editing, sharing rules, and file upload with drag-and-drop.
  * @version-history
+ *   v2.2.0 — 2026-06-13 — Render image memory values inline: a value that IS an image (a /v1/pub URL
+ *     string or a { url, mime:image/* } object) shows a thumbnail above its raw JSON, via the shared
+ *     ImageDeliverable renderer.
  *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS utility classes
  *   v1.1.0 — 2026-03-18 — Fix: use AuthImage for thumbnails and authenticated download to avoid 401
  *   v1.2.0 — 2026-05-22 — Add Browse Home / Browse Remote panels for federation memory sync
@@ -40,6 +43,7 @@ import { escHtml } from '/js/utils.js';
 import { Spinner, recipientBadge, VisibilityPill } from './shared.js';
 import * as memoryService from '/js/services/memory.js';
 import AuthImage from '/js/components/auth-image.js';
+import { detectImage, ImageView } from '/components/ImageDeliverable.js';
 import { listAgents } from '/js/services/agents.js';
 import { listPeers } from '/js/services/federation.js';
 import { getKeyPermissions, listConsents, grantConsent, revokeConsent } from '/js/services/consent.js';
@@ -547,6 +551,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
         ${expandedMem === m.key && html`
           <div class="mem-detail">
             <div class="mem-detail-key" title=${m.key}>${escHtml(m.key)}</div>
+            ${(() => { const im = detectImage(m.value, m.key); return im ? html`<${ImageView} desc=${im} />` : null; })()}
             <pre>${typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || '')}</pre>
             <div class="mem-detail-visrow mb-half">
               <span class="text-meta-sm">${t('profile.memory.visLabel')}</span>

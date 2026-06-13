@@ -1,4 +1,7 @@
 {
+  "imageDeliverable.failed": "Image failed to load",
+  "imageDeliverable.loading": "Loading image…",
+  "imageDeliverable.open": "Open full image",
   "profile.landing.home": "Home",
   "profile.landing.menu": "Menu",
   "profile.tabs.workflows": "Workflows",

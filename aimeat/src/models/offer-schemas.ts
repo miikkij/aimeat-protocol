@@ -21,6 +21,9 @@
  *   v2.1.0 -- 2026-06-13 -- Agent Workflows: optional `success_signal` + `required_to_function`
  *     (the producer/consumer signal contract a workflow step inherits). Both optional → existing
  *     offer docs validate unchanged. See docs/plans/2026-06-13-agent-workflows-node-plan.md.
+ *   v2.2.0 -- 2026-06-13 -- Deliverable `format` gains `'image'` so an offer can declare its
+ *     deliverable IS an image (a /v1/pub URL or { url, mime } at the location key); rendered inline
+ *     by the shared image renderer across the agent surfaces. Additive enum → existing docs unchanged.
  */
 import { z } from 'zod';
 import { SignalSchema } from './workflow-schemas.js';
@@ -71,7 +74,9 @@ const AvailabilitySchema = z.object({
 }).optional();
 
 const DeliverableSchema = z.object({
-  format: z.enum(['document', 'record', 'board-post', 'file', 'app']),
+  // 'image' = the deliverable IS an image (a /v1/pub URL or { url, mime:image/* } at the location key);
+  // the Offers/inbox + task + memory + workflow surfaces render it inline via the shared image renderer.
+  format: z.enum(['document', 'record', 'board-post', 'file', 'app', 'image']),
   location: z.object({
     space: z.string().max(200).optional(),
     key: z.string().max(400).optional(),

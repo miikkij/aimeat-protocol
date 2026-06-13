@@ -4943,7 +4943,7 @@ paths:
                         type: object
                         required: [format]
                         properties:
-                          format: { type: string, enum: [document, record, board-post, file, app] }
+                          format: { type: string, enum: [document, record, board-post, file, app, image] }
                           location: { type: object }
                           sample: {}
       responses:
