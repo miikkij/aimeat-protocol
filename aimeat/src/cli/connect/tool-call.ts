@@ -914,6 +914,12 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
         }),
     },
     {
+        name: 'aimeat_workspace_revert_to_draft',
+        handler: ({ client }, input) => client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/revert`, {
+            ws: requiredString(input, 'ws'), namespace: requiredString(input, 'namespace'), id: requiredString(input, 'id'),
+        }),
+    },
+    {
         name: 'aimeat_workspace_update',
         handler: ({ client }, input) => {
             const body: JsonObject = {};
