@@ -1077,6 +1077,18 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_workspace_revert_to_draft',
+        description: 'Reopen a PUBLISHED record for editing — copies its .latest back into .draft so you can amend it and re-publish via aimeat_workspace_write + aimeat_workspace_publish. The published .latest stays live until you re-publish. Refuses if a draft already exists (edit that draft instead). Use this when a published record needs a change. Member-only.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            ws: { type: 'string', required: true, description: 'Workspace id.' },
+            namespace: { type: 'string', required: true, description: 'The instance namespace.' },
+            id: { type: 'string', required: true, description: 'The instance id of the published record to reopen.' },
+        },
+    },
+    {
         name: 'aimeat_workspace_object_delete',
         description: 'Permanently remove ONE object (record or document) from a workspace — its draft, its published .latest, and all .version.N history — and unfile it from any document section. Use this to retract a mistake or clean up a duplicate. Irreversible; member-only. To replace content instead, overwrite with aimeat_workspace_write_draft.',
         caller: 'agent',

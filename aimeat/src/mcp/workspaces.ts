@@ -391,6 +391,24 @@ export function registerWorkspaceTools(
             return ok({ published: base, version: n });
         });
 
+    // ── aimeat_workspace_revert_to_draft ──
+    mcp.tool('aimeat_workspace_revert_to_draft', descriptionFor('aimeat_workspace_revert_to_draft'),
+        { organism_id: z.string(), ws: z.string(), namespace: z.string(), id: z.string() },
+        annotationsFor('aimeat_workspace_revert_to_draft'),
+        async ({ organism_id, ws, namespace, id }): Promise<TextResult> => {
+            const deny = await denyReason(organism_id); if (deny) return fail(deny);
+            const base = `${wsRoot(organism_id, ws)}.${namespace}.${id}`;
+            const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000 });
+            if (items.find(r => r.key === `${base}.draft`)) return fail(`A draft already exists at ${base}.draft — edit it directly instead of reopening.`);
+            // The published current state is .latest, or the bare key as fallback (mirrors the read).
+            const latest = items.find(r => r.key === `${base}.latest`) ?? items.find(r => r.key === base);
+            if (!latest) return fail(`No published record at ${base}.latest to reopen.`);
+            const now = new Date().toISOString();
+            await storage.setMemory({ key: `${base}.draft`, ownerGaii: writerGaii, value: latest.value, visibility: latest.visibility, tags: latest.tags ?? [], ttlHours: null, version: 1, createdAt: now, updatedAt: now });
+            emitChange('organisms');
+            return ok({ reopened: base });
+        });
+
     // ── aimeat_workspace_update ──
     mcp.tool('aimeat_workspace_update', descriptionFor('aimeat_workspace_update'),
         {

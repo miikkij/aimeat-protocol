@@ -109,6 +109,14 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
     });
 
+  mcp.tool('aimeat_workspace_revert_to_draft', descriptionFor('aimeat_workspace_revert_to_draft'),
+    { organism_id: z.string(), ws: z.string(), namespace: z.string(), id: z.string() },
+    annotationsFor('aimeat_workspace_revert_to_draft'),
+    async ({ organism_id, ws, namespace, id }) => {
+      const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/revert`, { ws, namespace, id });
+      return text(resp.ok === false ? (resp.error ?? resp) : (resp.data ?? resp), resp.ok === false);
+    });
+
   mcp.tool('aimeat_workspace_update', descriptionFor('aimeat_workspace_update'),
     {
       organism_id: z.string(), ws: z.string(),
