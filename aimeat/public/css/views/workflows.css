@@ -80,3 +80,32 @@
   margin-top: 0.5rem; padding: 0.5rem 0.7rem; background: var(--warn-bg); color: var(--warn-fg);
   border-radius: var(--radius-sm); font-size: 0.82rem;
 }
+
+/* ── create/edit form ── */
+.wf-form { display: flex; flex-direction: column; gap: 0.8rem; }
+.wf-field { display: flex; flex-direction: column; gap: 0.25rem; }
+.wf-field > span { font-size: 0.82rem; font-weight: 600; color: var(--text-dim); }
+.wf-field input[type="text"], .wf-field input[type="number"], .wf-field select,
+.wf-field-row input, .wf-field-row select {
+  background: var(--bg-input, var(--bg-dim)); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 0.4rem 0.55rem; font: inherit;
+}
+.wf-field-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.wf-field-row > input, .wf-field-row > select { flex: 1; min-width: 8rem; }
+.wf-form-section {
+  border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.7rem 0.85rem;
+  display: flex; flex-direction: column; gap: 0.55rem;
+}
+.wf-form-section-head { display: flex; justify-content: space-between; align-items: center; font-weight: 700; color: var(--text); }
+.wf-step-edit {
+  border-left: 2px solid var(--accent-soft, var(--border)); padding-left: 0.7rem;
+  display: flex; flex-direction: column; gap: 0.4rem;
+}
+.wf-step-opts { font-size: 0.82rem; color: var(--text-dim); }
+.wf-step-after { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; font-size: 0.82rem; }
+.wf-inline { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--text); }
+.wf-inline input[type="number"] { width: 4.5rem; background: var(--bg-input, var(--bg-dim)); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.2rem 0.4rem; }
+.wf-llm-toggle { margin-top: 0.2rem; font-size: 0.9rem; }
+.wf-form-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.4rem; }
+.wf-err-list { margin: 0; padding-left: 1.1rem; }

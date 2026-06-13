@@ -43,6 +43,14 @@ function computeHealth(def: WorkflowDef, runs: WorkflowRun[]) {
   const sample = runs.length;
   const lastRun = runs[0];
   const lastSuccess = runs.find(r => r.status === 'done');
+  // Mean wall-clock duration over completed runs (those with both timestamps).
+  const durations = runs
+    .filter(r => r.endedAt && r.startedAt)
+    .map(r => new Date(r.endedAt!).getTime() - new Date(r.startedAt).getTime())
+    .filter(ms => ms >= 0);
+  const meanDurationMs = durations.length
+    ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+    : null;
   const steps = def.steps.map(s => {
     let green = 0, red = 0;
     for (const run of runs) {
@@ -58,6 +66,7 @@ function computeHealth(def: WorkflowDef, runs: WorkflowRun[]) {
     lastStatus: lastRun?.status ?? null,
     lastRunAt: lastRun?.startedAt ?? null,
     lastSuccessAt: lastSuccess?.startedAt ?? null,
+    meanDurationMs,
     steps,
   };
 }
