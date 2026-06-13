@@ -612,6 +612,8 @@
 
     .modal-input::placeholder {
       color: var(--text-dim);
+      font-style: italic;
+      opacity: .7;
     }
 
     .modal-input:focus {
@@ -1273,6 +1275,7 @@
 
     .published-card-actions {
       display: flex;
+      flex-wrap: wrap;
       gap: 6px;
       margin-top: 4px;
     }
@@ -1845,7 +1848,7 @@
       <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:8px" id="subdomain-app-label"></div>
       <div class="form-group">
         <label for="subdomain-input" data-i18n="subModal.label">Subdomain</label>
-        <input type="text" id="subdomain-input" class="modal-input" placeholder="sanomat" autocomplete="off"/>
+        <input type="text" id="subdomain-input" class="modal-input" placeholder="e.g. sanomat" data-i18n-ph="subModal.ph" autocomplete="off"/>
         <div style="font-size:.75rem;color:var(--text-muted);margin-top:4px" data-i18n="subModal.hint">Lowercase letters, numbers and hyphens (2-63 chars). The app is served at the subdomain root.</div>
       </div>
       <div id="subdomain-status" style="margin-top:8px;font-size:.85rem;min-height:1.1em"></div>
@@ -2063,6 +2066,8 @@
       'subModal.assigned': 'Subdomain assigned',
       'subModal.unassigned': 'Subdomain unassigned',
       'subModal.saving': 'Saving...',
+      'subModal.ph': 'e.g. sanomat',
+      'subModal.empty': 'Enter a subdomain first',
       'tag.all': 'All',
       'tag.favorites': '⭐ Favorites',
       'empty.noApps': 'No apps yet',
@@ -2232,6 +2237,8 @@
       'subModal.assigned': 'Alidomain liitetty',
       'subModal.unassigned': 'Liitos poistettu',
       'subModal.saving': 'Tallennetaan...',
+      'subModal.ph': 'esim. sanomat',
+      'subModal.empty': 'Syötä ensin alidomain',
       'tag.all': 'Kaikki',
       'tag.favorites': '⭐ Suosikit',
       'empty.noApps': 'Ei vielä sovelluksia',
@@ -4192,7 +4199,11 @@
     if (!subdomainModalState) return;
     var sub = document.getElementById('subdomain-input').value.trim().toLowerCase();
     var statusEl = document.getElementById('subdomain-status');
-    if (!sub) return;
+    if (!sub) {
+      statusEl.style.color = '#ef4444';
+      statusEl.textContent = t('subModal.empty');
+      return;
+    }
     if (sub === subdomainModalState.existingSub) {
       document.getElementById('subdomain-overlay').hidden = true;
       return;
