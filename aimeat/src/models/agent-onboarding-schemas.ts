@@ -43,6 +43,9 @@ export const ONBOARDING_STEP_IDS = [
   'publish_commands',
   'publish_config',
   'declare_services',
+  'declare_offerings',
+  'make_workflow_compatible',
+  'price_offer',
 ] as const;
 
 export type OnboardingStepId = typeof ONBOARDING_STEP_IDS[number];
@@ -72,6 +75,9 @@ const STEP_DESCRIPTIONS: Record<string, string> = {
   publish_commands: 'agentOnboarding.stepDescriptions.publish_commands',
   publish_config: 'agentOnboarding.stepDescriptions.publish_config',
   declare_services: 'agentOnboarding.stepDescriptions.declare_services',
+  declare_offerings: 'agentOnboarding.stepDescriptions.declare_offerings',
+  make_workflow_compatible: 'agentOnboarding.stepDescriptions.make_workflow_compatible',
+  price_offer: 'agentOnboarding.stepDescriptions.price_offer',
 };
 
 const STEP_DEFINITIONS: StepDefinition[] = [
@@ -88,6 +94,12 @@ const STEP_DEFINITIONS: StepDefinition[] = [
   { id: 'publish_commands', order: 11, title: 'Publish Slash Commands', description: STEP_DESCRIPTIONS.publish_commands, required: true, validationMethod: 'automatic' },
   { id: 'publish_config', order: 12, title: 'Publish Runtime Config', description: STEP_DESCRIPTIONS.publish_config, required: true, validationMethod: 'automatic' },
   { id: 'declare_services', order: 13, title: 'Declare Services', description: STEP_DESCRIPTIONS.declare_services, required: false, validationMethod: 'api_call' },
+  // ── Offers ladder (all optional, all auto-validated by reading agents.{name}.offers; each teaches
+  //    one level from docs/building-an-aimeat-compatible-agent.md). An agent that publishes no offers
+  //    leaves these pending → marked 'skipped' at completion; they never block readiness. ──
+  { id: 'declare_offerings', order: 14, title: 'Declare Offerings', description: STEP_DESCRIPTIONS.declare_offerings, required: false, validationMethod: 'automatic' },
+  { id: 'make_workflow_compatible', order: 15, title: 'Make an Offer Workflow-Compatible', description: STEP_DESCRIPTIONS.make_workflow_compatible, required: false, validationMethod: 'automatic' },
+  { id: 'price_offer', order: 16, title: 'Price an Offer', description: STEP_DESCRIPTIONS.price_offer, required: false, validationMethod: 'automatic' },
 ];
 
 /**

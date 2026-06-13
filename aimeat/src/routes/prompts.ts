@@ -10,6 +10,8 @@
  *   v1.3.0 -- 2026-05-27 -- Add /v1/agents/me/handbook routes, 301 redirects from old tier1 paths
  *   v1.3.1 -- 2026-05-28 -- Add neutral handbook content aliases and stop advertising owner-only task start to agents
  *   v1.4.0 -- 2026-05-30 -- Add GET /v1/agents/me/handbook/surface/:role serving the v2 per-role surface handbooks
+ *   v1.5.0 -- 2026-06-13 -- Add GET /v1/prompts/draft-offer: guided "draft my offer" prompt (offers/
+ *     workflows liaison), with node_id/gaii/agent_name substituted from the caller's auth.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -20,6 +22,7 @@ import { substituteVariables, resolvePromptContent } from '../services/prompt-va
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { handbookForRole } from '../services/handbooks/index.js';
 import { isV2Role, V2_ROLES } from '../mcp/catalog/surfaces.js';
+import { DRAFT_OFFER_PROMPT } from '../services/draft-offer-prompt.js';
 
 export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -471,6 +474,36 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
       owner: ownerName,
       cortex_extensions_available: cortexExtDescriptions.length,
     }));
+  });
+
+  // GET /v1/prompts/draft-offer — guided "draft my offer" prompt. The agent's own LLM uses it to draft
+  // a valid offer (offering → optional workflow signals → optional pricing) and then publishes it to
+  // agents.{name}.offers itself. Prompt-driven: the node hands out the prompt, never auto-writes.
+  router.get('/v1/prompts/draft-offer', requireAuth(), async (req, res) => {
+    const gaii = req.auth?.sub ?? 'unknown';
+    // Use the agent's bare name when an agent is calling; fall back to the owner for an owner session.
+    let agentName = req.auth?.owner ?? 'your-agent';
+    try {
+      const parsed = parseGaiiLoose(gaii);
+      if (parsed.agent) agentName = parsed.agent;
+    } catch { /* owner session — keep the owner name */ }
+
+    const prompt = substituteVariables(DRAFT_OFFER_PROMPT, {
+      node_id: config.nodeId,
+      gaii,
+      agent_name: agentName,
+    });
+
+    res.json(success(config.nodeId, {
+      id: 'draft-offer',
+      name: 'Draft my offer',
+      description: 'Guided prompt for drafting and publishing an AIMEAT offer (offering / workflow-compatible / priced).',
+      prompt,
+      system_prompt: prompt,
+    }, [
+      { description: 'Publish the drafted offer', method: 'POST', url: '/v1/memory' },
+      { description: 'Full offer + workflow spec', method: 'GET', url: '/v1/agents/me/handbook/surface/agent' },
+    ]));
   });
 
   return router;

@@ -6407,7 +6407,10 @@
       "complete_test_task": "Agent executes and completes the test task",
       "publish_commands": "agents.{name}.commands memory has a non-empty array of { name, description, category }",
       "publish_config": "At least one agents.config.{name}.* memory entry exists describing this runtime",
-      "declare_services": "Agent declares offered services (optional)"
+      "declare_services": "Agent declares offered services (optional)",
+      "declare_offerings": "Agent publishes at least one offer (id + title + ask) to agents.{name}.offers so the owner can find what it does (optional)",
+      "make_workflow_compatible": "At least one offer declares success_signal + required_to_function + deliverable.location, so it can be a step in an Agent Workflow (optional)",
+      "price_offer": "At least one offer is sellable cross-owner: price + visibility public + a callable binding (optional)"
     },
     "errors": {
       "accessDenied": "Access denied",

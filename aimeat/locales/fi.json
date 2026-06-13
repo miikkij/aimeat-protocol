@@ -6407,7 +6407,10 @@
       "complete_test_task": "Agentti suorittaa ja viimeistelee testitehtävän",
       "publish_commands": "agents.{name}.commands -muistissa on epätyhjä { name, description, category } -taulu",
       "publish_config": "Vähintään yksi agents.config.{name}.* -muistitietue kuvaa tätä runtimea",
-      "declare_services": "Agentti ilmoittaa tarjoamansa palvelut (valinnainen)"
+      "declare_services": "Agentti ilmoittaa tarjoamansa palvelut (valinnainen)",
+      "declare_offerings": "Agentti julkaisee vähintään yhden tarjouksen (id + title + ask) avaimeen agents.{name}.offers, jotta omistaja löytää mitä se tekee (valinnainen)",
+      "make_workflow_compatible": "Vähintään yksi tarjous määrittää success_signal + required_to_function + deliverable.location, jolloin se voi olla työnkulun vaihe (valinnainen)",
+      "price_offer": "Vähintään yksi tarjous on myytävissä omistajien välillä: price + visibility public + kutsuttava sidonta (valinnainen)"
     },
     "errors": {
       "accessDenied": "Pääsy estetty",

@@ -147,7 +147,7 @@ console.log('\nPhase 2 -- Start Onboarding');
 
 let testTaskId = '';
 
-await test('2. POST start returns in_progress with 11 steps', async () => {
+await test('2. POST start returns in_progress with 16 steps', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/onboarding/start`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
@@ -155,7 +155,7 @@ await test('2. POST start returns in_progress with 11 steps', async () => {
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     const ob = body.data.onboarding;
     assert(ob.status === 'in_progress', `expected in_progress, got ${ob.status}`);
-    assert(ob.steps.length === 13, `expected 13 steps, got ${ob.steps.length}`);
+    assert(ob.steps.length === 16, `expected 16 steps, got ${ob.steps.length}`);
 
     // First step (authenticate) should already be passed
     const authStep = ob.steps[0];
@@ -221,6 +221,44 @@ await test('7. POST step declare_services passes with empty services', async () 
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.step.status === 'passed', `expected passed, got ${body.data.step.status}`);
+});
+
+await test('7b. Offers ladder auto-passes after the agent publishes an offer', async () => {
+    // The agent publishes one fully level-3 offer to agents.{name}.offers (under its OWN identity).
+    const offersDoc = {
+        version: 1,
+        updatedAt: '2026-06-13',
+        offers: [{
+            id: 'research',
+            title: 'Research a topic',
+            ask: 'Ask me to research a topic; I return findings. I do NOT fetch real-time prices.',
+            deliverable: { format: 'document', location: { key: 'research.out', visibility: 'workspace' } },
+            success_signal: { kind: 'deterministic', key_glob: 'research.*', op: 'count_nonempty', min: 1 },
+            required_to_function: 'none',
+            price: { morsels: 10, unit: 'per-call' },
+            visibility: 'public',
+            callable: { action_id: 'research-run' },
+        }],
+    };
+    const write = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key: `agents.${agentName}.offers`, value: offersDoc }),
+    });
+    assert(write.status === 200 || write.status === 201, `offer write status ${write.status}: ${JSON.stringify(write.body)}`);
+
+    // A GET runs checkAutoSteps; the three optional offers-ladder steps should now be passed.
+    const { status, body } = await json(`/v1/agents/${agentName}/onboarding`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const steps = body.data.onboarding.steps as Array<{ id: string; status: string }>;
+    for (const id of ['declare_offerings', 'make_workflow_compatible', 'price_offer']) {
+        const step = steps.find(s => s.id === id);
+        assert(step !== undefined, `${id} step should exist`);
+        assert(step!.status === 'passed', `${id} should auto-pass after publishing the offer, got ${step!.status}`);
+    }
 });
 
 // ─── Phase 4: Edge cases ───
@@ -330,7 +368,7 @@ await test('14. POST start to get a fresh onboarding with test task', async () =
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     const ob = body.data.onboarding;
     assert(ob.status === 'in_progress', `expected in_progress, got ${ob.status}`);
-    assert(ob.steps.length === 13, `expected 13 steps, got ${ob.steps.length}`);
+    assert(ob.steps.length === 16, `expected 16 steps, got ${ob.steps.length}`);
 
     // Extract the test task ID from step 9 (accept_test_task)
     const taskStep = ob.steps.find((s: any) => s.id === 'accept_test_task');
@@ -570,9 +608,10 @@ await test('26. GET onboarding shows completed status after all steps', async ()
     const ob = body.data.onboarding;
     assert(ob.status === 'completed', `expected completed, got ${ob.status}`);
 
-    // All 13 steps should be passed (12 required + optional declare_services filled in test 24).
+    // All 16 steps should be passed: 12 required + optional declare_services (test 24) + the three
+    // offers-ladder steps (test 7b published a level-3 offer for this agent, which persists).
     const passedSteps = ob.steps.filter((s: any) => s.status === 'passed');
-    assert(passedSteps.length === 13, `expected 13 passed steps, got ${passedSteps.length}`);
+    assert(passedSteps.length === 16, `expected 16 passed steps, got ${passedSteps.length}`);
 
     // completedAt should be set
     assert(typeof ob.completedAt === 'string', `completedAt should be set, got ${ob.completedAt}`);
