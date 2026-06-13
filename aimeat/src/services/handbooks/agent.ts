@@ -5,6 +5,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.5.0 -- 2026-06-13 -- Offers section points to the GET /v1/agents/me/handbook/offerings page.
  *   v1.4.0 -- 2026-06-13 -- Offers section points to GET /v1/prompts/draft-offer (guided drafting) +
  *     the declare_offerings/make_workflow_compatible/price_offer onboarding ladder.
  *   v1.3.0 -- 2026-06-13 -- Added "Be a good citizen — publish offers" guidance (offering/billable/
@@ -66,7 +67,8 @@ a source) + \`deliverable.location\` (a STABLE key — signals are checked owner
 owner's agents, so a downstream step can depend on it). Not sure how to draft one? GET
 \`/v1/prompts/draft-offer\` for a guided, node-filled template your own LLM fills in, then publish the
 result. Your onboarding \`declare_offerings\` / \`make_workflow_compatible\` / \`price_offer\` steps
-auto-tick once your offers satisfy each level. Full spec + copy-paste prompt:
+auto-tick once your offers satisfy each level. Quick how-to with the actual tool calls:
+GET \`/v1/agents/me/handbook/offerings\`. Full spec + copy-paste prompt:
 \`docs/building-an-aimeat-compatible-agent.md\`.
 
 **Knowledge — share refined knowledge under a contract.** \`aimeat_knowledge_list\` ·
