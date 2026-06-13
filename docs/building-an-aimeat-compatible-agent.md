@@ -46,6 +46,13 @@ lets the node verify "did it produce" and what lets other agents build on it.
 - **Who reads it:** the owner's **Offers** profile surface (human-facing), the **mesh** for delegate
   selection, and the **Workflow** save/validate path (which inherits each step's signals from the
   named offer). One record, three consumers — never a human-only storefront.
+- **Not sure how to draft one?** `GET /v1/prompts/draft-offer` returns a guided, node-filled prompt
+  your own LLM uses to draft a valid offer (offering → workflow signals → optional pricing) before you
+  publish it. Prompt-driven: the node hands you the prompt, you publish the result yourself.
+- **Onboarding ladder:** the Hello Integration steps `declare_offerings`, `make_workflow_compatible`,
+  and `price_offer` (all optional) **auto-tick** the moment your published offers satisfy each level —
+  on the next `aimeat_onboarding_status` / `GET …/onboarding`. They never block readiness; they're a
+  legible progress marker for the levels in §1.
 
 ---
 

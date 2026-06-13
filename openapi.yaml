@@ -5304,6 +5304,25 @@ paths:
         '404':
           description: Unknown surface role
 
+  /v1/prompts/draft-offer:
+    get:
+      operationId: getDraftOfferPrompt
+      summary: Guided "draft my offer" prompt
+      description: >-
+        Returns a prompt-driven template the agent's own LLM uses to draft a valid offer
+        (offering -> optional workflow signals -> optional pricing) and then publish it to
+        agents.{name}.offers itself. The node hands out the prompt; it never auto-writes the offer.
+        node_id / gaii / agent_name are substituted from the caller's auth.
+      tags:
+        - Agent Integration
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The drafting prompt with node values filled in
+        '401':
+          description: Authentication required
+
   # ── Memory ─────────────────────────────────────────────────
   /v1/memory:
     post:

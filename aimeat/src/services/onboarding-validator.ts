@@ -16,6 +16,7 @@
 import type { Storage, AgentOnboardingRecord, AgentOnboardingStep } from '../storage/interface.js';
 import type { OnboardingStepId } from '../models/agent-onboarding-schemas.js';
 import { STEP_SCHEMAS } from '../models/agent-onboarding-schemas.js';
+import { OffersDocSchema, type Offer } from '../models/offer-schemas.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 
 export interface StepValidationResult {
@@ -58,6 +59,12 @@ export async function validateStep(
       return validatePublishConfig(agentGaii, storage);
     case 'declare_services':
       return validateDeclareServices(body);
+    case 'declare_offerings':
+      return validateDeclareOfferings(agentGaii, storage);
+    case 'make_workflow_compatible':
+      return validateMakeWorkflowCompatible(agentGaii, storage);
+    case 'price_offer':
+      return validatePriceOffer(agentGaii, storage);
     default:
       return { passed: false, validationMethod: 'automatic', failureReason: `Unknown step: ${stepId}` };
   }
@@ -270,6 +277,76 @@ async function validatePublishConfig(agentGaii: string, storage: Storage): Promi
   };
 }
 
+/**
+ * Reads the agent's published offers (`agents.{name}.offers`) and returns the parsed offer list, or
+ * null when the document is missing/invalid. The offers ladder steps below all key off this — they
+ * verify real published state, never the agent's word (the AIMEAT onboarding invariant).
+ */
+async function readPublishedOffers(agentGaii: string, storage: Storage): Promise<Offer[] | null> {
+  const agentName = parseGaiiLoose(agentGaii).agent;
+  const record = await storage.getMemory(agentGaii, `agents.${agentName}.offers`);
+  if (!record) return null;
+  const parsed = OffersDocSchema.safeParse(record.value);
+  return parsed.success ? parsed.data.offers : null;
+}
+
+/**
+ * declare_offerings (level 1, optional) — passes when the agent has published at least one offer with
+ * the minimum legible shape (id + title + ask). Teaches: an agent becomes findable in the owner's
+ * Offers surface by publishing agents.{name}.offers. See docs/building-an-aimeat-compatible-agent.md.
+ */
+async function validateDeclareOfferings(agentGaii: string, storage: Storage): Promise<StepValidationResult> {
+  const agentName = parseGaiiLoose(agentGaii).agent;
+  const key = `agents.${agentName}.offers`;
+  const offers = await readPublishedOffers(agentGaii, storage);
+  const count = offers?.length ?? 0;
+  return {
+    passed: count > 0,
+    validationMethod: 'automatic',
+    details: { key, offerCount: count },
+    failureReason: count > 0 ? undefined
+      : `Publish at least one offer to ${key} (each with id, title, ask) so the owner can find what this agent does. Optional — see docs/building-an-aimeat-compatible-agent.md.`,
+  };
+}
+
+/**
+ * make_workflow_compatible (level 3, optional) — passes when at least one offer declares the producer
+ * /consumer signal contract: success_signal + required_to_function (a Signal or the literal "none") +
+ * deliverable.location. Only such offers can be a step in an Agent Workflow.
+ */
+async function validateMakeWorkflowCompatible(agentGaii: string, storage: Storage): Promise<StepValidationResult> {
+  const offers = await readPublishedOffers(agentGaii, storage);
+  const compatible = (offers ?? []).filter(o =>
+    o.success_signal !== undefined && o.required_to_function !== undefined && !!o.deliverable?.location,
+  );
+  return {
+    passed: compatible.length > 0,
+    validationMethod: 'automatic',
+    details: { workflowCompatibleCount: compatible.length, ids: compatible.map(o => o.id) },
+    failureReason: compatible.length > 0 ? undefined
+      : 'Add success_signal + required_to_function (or "none") + deliverable.location to at least one offer so it can be a workflow step. Optional — see docs/building-an-aimeat-compatible-agent.md §4.',
+  };
+}
+
+/**
+ * price_offer (level 2, optional) — passes when at least one offer is sellable cross-owner: a non-null
+ * price + visibility "public" + a callable binding (action_id or webhook_url). Most agents skip this.
+ */
+async function validatePriceOffer(agentGaii: string, storage: Storage): Promise<StepValidationResult> {
+  const offers = await readPublishedOffers(agentGaii, storage);
+  const priced = (offers ?? []).filter(o =>
+    o.price != null && o.visibility === 'public'
+    && !!(o.callable && (o.callable.action_id || o.callable.webhook_url)),
+  );
+  return {
+    passed: priced.length > 0,
+    validationMethod: 'automatic',
+    details: { pricedCount: priced.length, ids: priced.map(o => o.id) },
+    failureReason: priced.length > 0 ? undefined
+      : 'Add price + visibility:"public" + callable (action_id or webhook_url) to at least one offer to sell it to other owners. Optional — see docs/building-an-aimeat-compatible-agent.md §3.',
+  };
+}
+
 function validateDeclareServices(body?: Record<string, unknown>): StepValidationResult {
   const schema = STEP_SCHEMAS.declare_services!;
   const result = schema.safeParse(body ?? { services: [] });
@@ -292,6 +369,9 @@ export async function checkAutoSteps(
     'authenticate', 'report_capabilities', 'read_directives', 'send_test_message',
     'configure_delivery', 'report_telemetry', 'accept_test_task', 'complete_test_task',
     'publish_commands', 'publish_config',
+    // Offers ladder — auto-tick the moment the agent publishes a matching offer (so just writing
+    // agents.{name}.offers ticks the step; no separate confirm call needed). Optional → never blocks.
+    'declare_offerings', 'make_workflow_compatible', 'price_offer',
   ];
 
   const updatedSteps = [...onboarding.steps];
