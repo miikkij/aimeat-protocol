@@ -985,6 +985,12 @@ export async function publishDraft(orgId, wsId, namespace, instanceId) {
   return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/publish`, { ws: wsId, namespace, id: instanceId });
 }
 
+/** Reopen a published record for editing: server copies `.latest` → `.draft` (409 if a draft already
+ *  exists). The published version stays live until the edited draft is re-published. */
+export async function revertToDraft(orgId, wsId, namespace, instanceId) {
+  return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/revert`, { ws: wsId, namespace, id: instanceId });
+}
+
 /** Delete one workspace object (record or document) — the bare record key, its draft, published
  *  .latest and all .version.N history. Returns the number of keys removed. Prefix `${base}` (no
  *  trailing dot) catches the bare un-suffixed key (which the workspace read surfaces as current);

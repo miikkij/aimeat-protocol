@@ -12427,6 +12427,38 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { description: Draft does not match the schema }
 
+  /v1/organisms/{id}/revert:
+    post:
+      operationId: revertOrganismRecordToDraft
+      summary: Reopen a published record for editing
+      description: |
+        Copy `organism.{id}.{namespace}.{instance}.latest` back into `.draft` so the published record
+        can be edited and re-published via the normal edit → publish flow. The published `.latest`
+        stays live (and keeps serving readers) until the edited draft is re-published. Refuses with 409
+        if a draft already exists for the instance (edit that draft directly instead of clobbering it).
+        Same write access as publish (active member; admin/creator for a `meta.*` namespace). Not gated.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [namespace, id]
+              properties:
+                namespace: { type: string, description: "Relative namespace, e.g. meta.goals or shared.deliverables" }
+                id: { type: string, description: The instance id of the published record to reopen }
+                ws: { type: string, description: "Workspace id — operates on organism.{id}.w.{ws}.* (omit for the legacy organism-level root)" }
+      responses:
+        '200': { description: Reopened — a .draft was created from .latest }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: No published record at that instance to reopen }
+        '409': { description: A draft already exists for that instance — edit it directly }
+
   /v1/organisms/{id}/approvals:
     post:
       operationId: createOrganismApproval
