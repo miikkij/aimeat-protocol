@@ -12,7 +12,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import { buildZip, parseZip, ZipValidationError } from '../src/services/package-zip.js';
 import type { PackageRecord } from '../src/storage/interface.js';
 
@@ -62,7 +62,7 @@ function makePkg(overrides: Partial<PackageRecord> = {}): PackageRecord {
 /** Build a raw ZIP buffer with arbitrary entries (for negative tests). */
 async function rawZip(entries: Array<{ name: string; content: string }>): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const archive = archiver('zip', { zlib: { level: 0 } });
+    const archive = new ZipArchive({ zlib: { level: 0 } });
     const chunks: Buffer[] = [];
     archive.on('data', (d: Buffer) => chunks.push(d));
     archive.on('end', () => resolve(Buffer.concat(chunks)));

@@ -8,10 +8,11 @@
  *   - GET /v1/agents/:name/skill-bundle/version   -- Version check (lightweight)
  * @version-history
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Integration Phase A
+ *   v1.0.1 -- 2026-06-13 -- archiver v8: archiver('zip') -> new ZipArchive()
  */
 
 import { Router } from 'express';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
@@ -96,7 +97,7 @@ export function agentSkillBundleRouter(config: AimeatConfig, storage: Storage): 
     const ctx = await buildContext(agentName, agentGaii);
     const bundle = generateBundle(ctx, adapter);
 
-    const archive = archiver('zip', { zlib: { level: 6 } });
+    const archive = new ZipArchive({ zlib: { level: 6 } });
     const chunks: Buffer[] = [];
 
     archive.on('data', (chunk: Buffer) => chunks.push(chunk));

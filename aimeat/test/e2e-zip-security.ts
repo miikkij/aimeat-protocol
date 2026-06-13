@@ -25,14 +25,14 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
-import archiver from 'archiver';
-ed.etc.sha512Sync = (...m: Uint8Array[]) => new Uint8Array(createHash('sha512').update(ed.etc.concatBytes(...m)).digest());
+import { ZipArchive } from 'archiver';
+ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, msg: string) { return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64'); }
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 function makeZip(entries: { name: string; data: Buffer | string }[]): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-        const a = archiver('zip', { zlib: { level: 9 } });
+        const a = new ZipArchive({ zlib: { level: 9 } });
         const chunks: Buffer[] = [];
         a.on('data', (c: Buffer) => chunks.push(c)); a.on('end', () => resolve(Buffer.concat(chunks))); a.on('error', reject);
         for (const e of entries) a.append(e.data, { name: e.name });

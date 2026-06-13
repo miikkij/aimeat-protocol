@@ -4,6 +4,43 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [1.24.1] - 2026-06-13
+
+### Changed
+
+- **Dependency modernization.** Updated 28 packages to their latest releases:
+  TypeScript 6.0, archiver 8.0, `@noble/ed25519` 3.1 + `@noble/hashes` 2.2,
+  zod 4.4, vitest / `@vitest/coverage-v8` 4.1, `@modelcontextprotocol/sdk` 1.29,
+  jose 6.2, better-sqlite3 12.10, ws 8.21, eslint 10.5, `@playwright/test` 1.60,
+  ini 7.0, and others. Prisma (`prisma` + `@prisma/client`) stays pinned at
+  6.19.2 — Prisma 7 is a breaking major that the storage layer is not yet
+  validated against.
+- **archiver v8 migration.** archiver 8 is ESM-only and replaces the
+  `archiver('zip', …)` factory with named classes; all call sites now use
+  `new ZipArchive({ … })` (skill-bundle, apps/organism/workspace export,
+  package-zip, and their tests). Output format is unchanged.
+- **`@noble/ed25519` v3.1 sync-hash API.** The removed `ed.etc.sha512Sync`
+  (with `ed.etc.concatBytes`) is replaced by `ed.hashes.sha512 = (m) => …`
+  across the test harness and synthtraces. Production signing already uses the
+  async API (`signAsync` / `verifyAsync`) and is unaffected.
+
+### Security
+
+- **qs → 6.15.2** (pnpm override): closes the only advisory in the production
+  request path (`express > qs`, GHSA-q8mj-m7cp-5q26). Express parses inbound
+  query strings with `qs.parse`; the patched build keeps that path clean.
+- **esbuild → 0.28.1** (pnpm override): removes the binary-integrity advisory
+  from the `vitest > vite > esbuild` dev-tooling chain (GHSA-gv7w-rqvm-qjhr).
+- Remaining audit findings are all confined to build-time / test-runner /
+  CLI tooling (prisma CLI's `effect` + `defu`, vitest's bundled `vite`,
+  `openapi-typescript`'s `brace-expansion`, and the disabled-by-default
+  `consul` chain's `uuid`) — none reach the production runtime.
+
+### Removed
+
+- **`@types/uuid`** — `uuid` v14 ships its own type definitions, so the
+  separate `@types/uuid` package is no longer needed.
+
 ## [1.24.0] - 2026-06-13
 
 ### Added

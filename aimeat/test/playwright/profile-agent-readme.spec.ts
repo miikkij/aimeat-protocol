@@ -15,8 +15,8 @@ const PASSWORD = 'TestPass42!';
 const BASE = process.env.AIMEAT_BASE_URL || 'http://localhost:40251';
 
 // Ed25519 sync-hash shim (same as e2e-agent-messages.ts) so signAsync works.
-ed.etc.sha512Sync = (...m: Uint8Array[]) =>
-  new Uint8Array(createHash('sha512').update(ed.etc.concatBytes(...m)).digest());
+ed.hashes.sha512 = (m: Uint8Array) =>
+  new Uint8Array(createHash('sha512').update(m).digest());
 
 async function loadHarness(page: Page) {
   await page.goto('/v1/libs/test-harness');

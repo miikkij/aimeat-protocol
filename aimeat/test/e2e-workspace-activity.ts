@@ -23,7 +23,7 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
-ed.etc.sha512Sync = (...m: Uint8Array[]) => new Uint8Array(createHash('sha512').update(ed.etc.concatBytes(...m)).digest());
+ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(p: string, m: string) { return Buffer.from(await ed.signAsync(new TextEncoder().encode(m), Buffer.from(p, 'base64'))).toString('base64'); }
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 

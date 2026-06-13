@@ -34,10 +34,10 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import yauzl from 'yauzl';
-ed.etc.sha512Sync = (...m: Uint8Array[]) =>
-    new Uint8Array(createHash('sha512').update(ed.etc.concatBytes(...m)).digest());
+ed.hashes.sha512 = (m: Uint8Array) =>
+    new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(privateKeyB64: string, message: string): Promise<string> {
     const privKey = Buffer.from(privateKeyB64, 'base64');
@@ -51,7 +51,7 @@ function sha256(buf: Buffer | string): string {
 
 /** Build a zip from name→content entries (for crafting hostile zips). */
 function buildZip(entries: Array<{ name: string; content: Buffer | string }>): Promise<Buffer> {
-    const archive = archiver('zip', { zlib: { level: 6 } });
+    const archive = new ZipArchive({ zlib: { level: 6 } });
     const chunks: Buffer[] = [];
     const done = new Promise<Buffer>((resolve, reject) => {
         archive.on('data', (c: Buffer) => chunks.push(c));

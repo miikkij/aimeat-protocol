@@ -10,8 +10,9 @@
  * @usage import { exportAppsBackup } from '../services/apps-backup-export.js';
  * @version-history
  *   v1.0.0 — 2026-06-12 — Initial: owner app-catalog backup (apps + versions + extensions)
+ *   v1.0.1 — 2026-06-13 — archiver v8: archiver('zip') -> new ZipArchive()
  */
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import type { Storage, AppRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 
@@ -46,7 +47,7 @@ export async function exportAppsBackup(
 ): Promise<AppsBackupResult> {
   const { owner, ownerGhii, exportedAt } = opts;
 
-  const archive = archiver('zip', { zlib: { level: 6 } });
+  const archive = new ZipArchive({ zlib: { level: 6 } });
   const chunks: Buffer[] = [];
   const done = new Promise<Buffer>((resolve, reject) => {
     archive.on('error', reject);

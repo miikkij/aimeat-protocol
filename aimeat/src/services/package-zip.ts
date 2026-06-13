@@ -13,10 +13,11 @@
  *   - parseZip(buffer, options) — ZIP Buffer → ParsedPackage (with validation)
  * @version-history
  *   v1.0.0 — 2026-03-20 — Initial implementation
+ *   v1.0.1 — 2026-06-13 — archiver v8: archiver('zip') -> new ZipArchive()
  */
 
 import { createHash } from 'node:crypto';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import yauzl from 'yauzl';
 import YAML from 'yaml';
 import type { PackageRecord, PackageComponentType } from '../storage/interface.js';
@@ -99,7 +100,7 @@ const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
  */
 export async function buildZip(pkg: PackageRecord): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const archive = archiver('zip', { zlib: { level: 6 } });
+    const archive = new ZipArchive({ zlib: { level: 6 } });
     const chunks: Buffer[] = [];
 
     archive.on('data', (chunk: Buffer) => chunks.push(chunk));

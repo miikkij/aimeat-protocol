@@ -8,8 +8,9 @@
  * @structure ORG_EXPORT_VERSION; exportOrganism(storage, config, { orgId, exporterGaii, exportedAt })
  * @version-history
  *   v1.0.0 -- 2026-06-09 -- Initial: organism bundle export (settings + all workspaces).
+ *   v1.0.1 -- 2026-06-13 -- archiver v8: archiver('zip') -> new ZipArchive()
  */
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { collectWorkspace } from './workspace-export.js';
@@ -39,7 +40,7 @@ export async function exportOrganism(
     workspaces: [] as Array<{ ws: string; name: string; folder: string }>,
   };
 
-  const archive = archiver('zip', { zlib: { level: 6 } });
+  const archive = new ZipArchive({ zlib: { level: 6 } });
   const chunks: Buffer[] = [];
   const done = new Promise<Buffer>((resolve, reject) => {
     archive.on('data', (c: Buffer) => chunks.push(c));

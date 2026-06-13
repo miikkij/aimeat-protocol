@@ -24,11 +24,11 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
-import archiver from 'archiver';
+import { ZipArchive } from 'archiver';
 import YAML from 'yaml';
 
-ed.etc.sha512Sync = (...m: Uint8Array[]) =>
-  new Uint8Array(createHash('sha512').update(ed.etc.concatBytes(...m)).digest());
+ed.hashes.sha512 = (m: Uint8Array) =>
+  new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -67,7 +67,7 @@ function authed(token: string) {
 /** Helper: build a valid ZIP buffer from a manifest and component files */
 async function buildTestZip(manifest: Record<string, unknown>, components: { name: string; content: string }[]): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const archive = archiver('zip', { zlib: { level: 6 } });
+    const archive = new ZipArchive({ zlib: { level: 6 } });
     const chunks: Buffer[] = [];
     archive.on('data', (chunk: Buffer) => chunks.push(chunk));
     archive.on('end', () => resolve(Buffer.concat(chunks)));
