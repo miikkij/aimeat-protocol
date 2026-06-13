@@ -6833,7 +6833,8 @@
         "cursorLink": "Open the connect page →",
         "other": "If your tool supports Connectors / custom MCP, paste this address into it:",
         "otherNote": "No MCP support? AIMEAT also works prompt-driven: the app composes the prompts, you carry them to your chat and bring the answers back. Free, and works with any AI.",
-        "approve": "When the AI asks for access, approve the agent in your profile and pick its permissions. No agent is ever created without your approval."
+        "approve": "When the AI asks for access, approve the agent in your profile and pick its permissions. No agent is ever created without your approval.",
+        "localhost": "Running AIMEAT on your own machine (localhost)? A cloud AI like claude.ai can't reach a localhost address over MCP. Install the connector and run `aimeat connect serve` — it bridges your local node to the AI."
       },
       "s3": {
         "title": "Step 3: Put your AI to work",
