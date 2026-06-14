@@ -391,6 +391,7 @@
     },
     "tabs": {
       "agents": "Agentit",
+      "ecosystem": "Ekosysteemisovellukset",
       "offers": "Tarjoama",
       "chatSessions": "Keskustelusessiot",
       "mcp": "MCP",
@@ -476,6 +477,53 @@
         "external-send": "lähettää ulkoisesti",
         "mutates-live-app": "muuttaa live-sovellusta",
         "delegates-to-agent": "delegoi muille agenteille"
+      }
+    },
+    "ecosystem": {
+      "title": "Ekosysteemisovellukset",
+      "desc": "Yhdistä ulkoisia palveluita, jotta agenttisi ja työnkulkusi voivat vaihtaa niiden kanssa dataa, kyvykkyyksiä ja tapahtumia.",
+      "connect": "+ Yhdistä sovellus",
+      "connectNote": "Aja liitin ekosysteemitilassa sovellusta isännöivällä koneella ja hyväksy odottava pyyntö tästä.",
+      "empty": "Ei yhdistettyjä ekosysteemisovelluksia vielä.",
+      "loadError": "Ekosysteemisovelluksia ei voitu ladata.",
+      "approved": "Ekosysteemisovellus hyväksytty.",
+      "approveError": "Pyyntöä ei voitu käsitellä.",
+      "revoked": "Ekosysteemisovellus peruttu.",
+      "revokeError": "Sovellusta ei voitu perua.",
+      "subError": "Tilausta ei voitu päivittää.",
+      "pendingTitle": "Odottavat integraatiopyynnöt",
+      "waiting": "odottaa",
+      "expiresIn": "vanhenee {n} min kuluttua",
+      "grantLevel": "Käyttöoikeustaso",
+      "presetStandard": "Vakio",
+      "presetReadonly": "Vain luku",
+      "presetFull": "Täysi",
+      "approve": "Hyväksy",
+      "deny": "Hylkää",
+      "grants": "Oikeudet",
+      "subscriptions": "Tapahtumatilaukset",
+      "noSubs": "Ei lähteviä tapahtumatilauksia.",
+      "removeSub": "Poista",
+      "addSub": "Tilaa",
+      "binding": "Sidonta",
+      "aimeatSide": "AIMEAT-puoli",
+      "appOrigin": "Sovellus",
+      "keyFp": "Avaimen tunniste",
+      "bindingNote": "Tämä sidonta vain kirjaa kuka vastaa ketäkin. Kumpikaan järjestelmä ei myönnä toisen oikeuksia.",
+      "revoke": "Peru",
+      "revokeTitle": "Peru ekosysteemisovellus",
+      "revokeWarn": "Tämä katkaisee yhteyden ja mitätöi sovelluksen tunnisteen. Kirjoita sovelluksen nimi ({app}) vahvistaaksesi.",
+      "validation": {
+        "validated": "validoitu",
+        "failed": "validointi epäonnistui",
+        "none": ""
+      },
+      "status": {
+        "active": "verkossa",
+        "approved": "hyväksytty",
+        "pending": "odottaa",
+        "validating": "validoidaan",
+        "revoked": "peruttu"
       }
     },
     "agents": {

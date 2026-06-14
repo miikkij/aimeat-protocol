@@ -117,14 +117,15 @@ function deserializeEcoAuth(row: Record<string, unknown>): EcoAuthorizationRecor
     lastPolledAt: row.lastPolledAt as string | undefined,
     pollInterval: row.pollInterval as number,
     approvedBy: row.approvedBy as string | undefined,
+    validationResult: row.validationResult ? JSON.parse(row.validationResult as string) : undefined,
     appCredentials: row.appCredentials ? JSON.parse(row.appCredentials as string) : undefined,
   };
 }
 
 export function createEcoAuth(db: Database.Database, req: EcoAuthorizationRecord): void {
   db.prepare(
-    `INSERT INTO eco_auth (deviceCode, userCode, ownerName, app, displayName, description, status, publicKey, scopes, dataAreas, boundRef, createdAt, expiresAt, lastPolledAt, pollInterval, approvedBy, appCredentials)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO eco_auth (deviceCode, userCode, ownerName, app, displayName, description, status, publicKey, scopes, dataAreas, boundRef, createdAt, expiresAt, lastPolledAt, pollInterval, approvedBy, validationResult, appCredentials)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     req.deviceCode, req.userCode, req.ownerName, req.app,
     req.displayName ?? null, req.description ?? null,
@@ -134,6 +135,7 @@ export function createEcoAuth(db: Database.Database, req: EcoAuthorizationRecord
     req.boundRef ?? null,
     req.createdAt, req.expiresAt, req.lastPolledAt ?? null,
     req.pollInterval, req.approvedBy ?? null,
+    req.validationResult ? JSON.stringify(req.validationResult) : null,
     req.appCredentials ? JSON.stringify(req.appCredentials) : null,
   );
 }

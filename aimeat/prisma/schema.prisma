@@ -1101,6 +1101,7 @@ model EcoAuth {
   lastPolledAt   DateTime?
   pollInterval   Int       @default(5)
   approvedBy     String?
+  validationResult Json?
   appCredentials Json?
 }
 

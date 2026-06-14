@@ -300,6 +300,16 @@ export interface EcoAuthorizationRecord {
   lastPolledAt?: string;
   pollInterval: number;
   approvedBy?: string;
+  /**
+   * Static compatibility-validation result for the submitted manifest (connector profile §5). Set at
+   * hello time when a manifest is provided. The owner approves a known-good integration; an approve is
+   * blocked when this exists and `ok` is false.
+   */
+  validationResult?: {
+    ok: boolean;
+    checks: { name: string; ok: boolean; detail?: string }[];
+    validatedAt: string;
+  };
   appCredentials?: {
     geai: string;
     /** The app's TOFU-pinned verification key (echoed back; the app already holds its private half). */

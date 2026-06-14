@@ -40,6 +40,7 @@ import LandingPage, { computeTier } from './profile/landing-page.js';
 // === Tab modules (lazy-loaded on first visit, stay mounted) ===
 import PortfolioTab from './profile/portfolio-tab.js';
 import AgentsTab from './profile/agents-tab.js';
+import EcosystemTab from './profile/ecosystem-tab.js';
 import ChatSessionsTab from './profile/chat-sessions-tab.js';
 import McpTab from './profile/mcp-tab.js';
 import WalletTab from './profile/wallet-tab.js';
@@ -74,6 +75,7 @@ import WorkflowsTab from './profile/workflows-tab.js';
 const TABS = [
   { id: 'portfolio',     key: 'portfolio.tabLabel',          component: PortfolioTab,      minTier: 'active' },
   { id: 'agents',        key: 'profile.tabs.agents',         component: AgentsTab,         minTier: 'active' },
+  { id: 'ecosystem',     key: 'profile.tabs.ecosystem',      component: EcosystemTab,      minTier: 'active' },
   { id: 'offers',        key: 'profile.tabs.offers',         component: OffersTab,         minTier: 'active' },
   { id: 'scheduler',     key: 'profile.tabs.scheduler',      component: SchedulerTab,      minTier: 'active' },
   { id: 'workflows',     key: 'profile.tabs.workflows',      component: WorkflowsTab,      minTier: 'active' },
@@ -118,7 +120,7 @@ export default function Profile({ navigate, locale }) {
     return initial === 'home' ? new Set() : new Set([initial]);
   });
   const [stats, setStats] = useState({
-    agents: '-', chatSessions: '-', balance: '-', memory: '-',
+    agents: '-', ecosystem: '-', chatSessions: '-', balance: '-', memory: '-',
     services: '-', work: '-', apps: '-', files: '-', nodes: '-',
   });
   const [toast, setToast] = useState(null);

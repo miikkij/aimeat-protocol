@@ -2612,3 +2612,49 @@
 .pf-pw-rules { list-style: none; margin: 0.1rem 0 0.5rem; padding: 0; font-size: 0.78rem; color: var(--muted); }
 .pf-pw-rules li { padding: 0.08rem 0; }
 .pf-pw-rules li.ok { color: var(--success-fg, var(--text)); }
+
+/* ── Ecosystem apps tab (pf-eco-*) — sibling of the agents tab ── */
+.pf-eco-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.pf-eco-count-badge { display: inline-block; min-width: 1.4rem; text-align: center; padding: 0 .4rem; margin-left: .4rem; border-radius: 999px; background: var(--bg-dim); color: var(--text-dim); font-size: .8rem; font-weight: 600; }
+.pf-eco-mono { font-family: var(--font-mono, monospace); font-size: .8rem; color: var(--text-dim); }
+.pf-eco-dim { color: var(--text-dim); font-size: .82rem; }
+.pf-eco-connect { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+.pf-eco-connect-note { color: var(--text-dim); font-size: .85rem; margin: 0 0 .6rem; }
+.pf-eco-cmd-row { display: flex; align-items: center; gap: .5rem; }
+.pf-eco-cmd { flex: 1; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; padding: .5rem .7rem; font-family: var(--font-mono, monospace); font-size: .85rem; overflow-x: auto; }
+.pf-eco-pending { background: var(--surface); border: 1px solid var(--accent); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+.pf-eco-pending-title { font-weight: 700; margin-bottom: .6rem; color: var(--accent); }
+.pf-eco-pending-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; padding: .5rem 0; border-top: 1px solid var(--border); }
+.pf-eco-pending-row:first-of-type { border-top: none; }
+.pf-eco-pending-info { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.pf-eco-pending-grant { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+.pf-eco-pill { background: var(--bg-dim); color: var(--text-dim); border-radius: 999px; padding: 0 .5rem; font-size: .75rem; }
+.pf-eco-valid { border-radius: 999px; padding: 0 .5rem; font-size: .72rem; font-weight: 600; cursor: help; }
+.pf-eco-valid-validated { background: var(--success-bg, var(--bg-dim)); color: var(--success-fg, var(--text)); }
+.pf-eco-valid-failed { background: var(--danger-bg, var(--bg-dim)); color: var(--danger-fg, var(--text-dim)); }
+.pf-eco-select { background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: .3rem .5rem; font-size: .82rem; }
+.pf-eco-empty { color: var(--text-dim); padding: 1.5rem; text-align: center; border: 1px dashed var(--border); border-radius: 8px; }
+.pf-eco-card { border: 1px solid var(--border); border-radius: 8px; margin-bottom: .6rem; background: var(--card); overflow: hidden; }
+.pf-eco-card-revoked { opacity: .6; }
+.pf-eco-card-head { display: flex; align-items: center; gap: .5rem; padding: .7rem .9rem; cursor: pointer; }
+.pf-eco-card-head:hover { background: var(--bg-dim); }
+.pf-eco-caret { color: var(--text-dim); width: 1rem; }
+.pf-eco-name { color: var(--text); }
+.pf-eco-lastseen { margin-left: auto; }
+.pf-eco-status { border-radius: 999px; padding: 0 .55rem; font-size: .72rem; font-weight: 600; }
+.pf-eco-status-active, .pf-eco-status-approved { background: var(--success-bg, var(--bg-dim)); color: var(--success-fg, var(--text)); }
+.pf-eco-status-pending, .pf-eco-status-validating { background: var(--bg-dim); color: var(--text-dim); }
+.pf-eco-status-revoked { background: var(--danger-bg, var(--bg-dim)); color: var(--danger-fg, var(--text-dim)); }
+.pf-eco-card-body { padding: .8rem .9rem; border-top: 1px solid var(--border); }
+.pf-eco-section { padding: .6rem 0; border-top: 1px solid var(--border); }
+.pf-eco-section:first-child { border-top: none; padding-top: 0; }
+.pf-eco-section-title { font-weight: 700; font-size: .9rem; margin-bottom: .5rem; color: var(--accent); }
+.pf-eco-chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+.pf-eco-chip { background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; padding: .1rem .45rem; font-size: .78rem; font-family: var(--font-mono, monospace); }
+.pf-eco-areas { margin-top: .5rem; }
+.pf-eco-area { font-size: .8rem; color: var(--text-dim); padding: .1rem 0; }
+.pf-eco-sub-row { display: flex; align-items: center; gap: .5rem; padding: .25rem 0; }
+.pf-eco-sub-add { display: flex; align-items: center; gap: .4rem; margin-top: .5rem; }
+.pf-eco-binding > div { font-size: .85rem; padding: .12rem 0; }
+.pf-eco-revoke-input { width: 100%; box-sizing: border-box; margin: .6rem 0; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: .5rem .7rem; }
+.pf-eco-revoke-actions { display: flex; justify-content: flex-end; gap: .5rem; }

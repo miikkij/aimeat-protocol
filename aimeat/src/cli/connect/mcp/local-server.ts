@@ -67,10 +67,25 @@ export interface ServeDiscoveryAgent {
   transport: 'tunnel' | 'direct' | 'auth_failed';
 }
 
+/**
+ * Neutral principal entry (connector profile §2.1) — covers both agent (GAII) and ecosystem (GEAI)
+ * principals. `id` is the full identity (`agent#owner@node` or `eco:{app}#{owner}@{node}`).
+ */
+export interface ServeDiscoveryPrincipal {
+  type: 'agent' | 'ecosystem';
+  id: string;
+  owner: string;
+  node_url: string;
+  transport: 'tunnel' | 'direct' | 'auth_failed';
+}
+
 export interface ServeDiscovery {
   schema_version: number;
   port: number;
   pid: number;
+  /** Neutral principal list (agents + ecosystem apps). Prefer this over `agents`. */
+  principals: ServeDiscoveryPrincipal[];
+  /** Transitional alias of the agent-typed principals — kept so existing sidecars keep working. */
   agents: ServeDiscoveryAgent[];
   started_at: string;
 }
@@ -319,6 +334,27 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     });
   });
 
+  // Event long-poll for ecosystem (GEAI) sidecars + any synchronous language (connector profile §2.3).
+  // Same per-principal push channel as /local/tasks/next, shaped as an event: an AIMEAT→ecosystem
+  // deliver payload is the event envelope, so `kind` comes from its `event` field.
+  app.get('/local/events/next', async (req: Request, res: Response) => {
+    let entry: RegisteredAgent;
+    try { entry = resolveAgent(req); }
+    catch (err) {
+      res.status(400).json({ ok: false, error: { code: 'UNKNOWN_PRINCIPAL', message: (err as Error).message } });
+      return;
+    }
+    const rawWait = typeof req.query.wait === 'string' ? parseInt(req.query.wait, 10) : NaN;
+    const waitMs = Math.min(Math.max(Number.isFinite(rawWait) ? rawWait : 25_000, 0), 120_000);
+    const item = await channels.get(entry.agent)!.nextTask(waitMs);
+    if (!item) { res.status(204).end(); return; }
+    const payload = item.task as Record<string, unknown> | undefined;
+    res.json({
+      ok: true,
+      data: { principal: entry.agent, owner: entry.owner, via: item.via, received_at: item.receivedAt, kind: (payload?.event as string) ?? null, payload },
+    });
+  });
+
   // ── Tool-call surface: deterministic shell-callable tool dispatch over the
   // tunnel. Same handler registry as `aimeat connect call`, but routed through
   // the agent's tunnel-backed client — one loopback POST, no per-call subprocess
@@ -359,6 +395,14 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       data: {
         pid: process.pid,
         started_at: startedAt,
+        principals: registry.list().map(e => ({
+          type: e.agent.startsWith('eco:') ? 'ecosystem' : 'agent',
+          id: e.agent,
+          owner: e.owner,
+          node_url: e.config.node_url,
+          transport: channels.get(e.agent)!.transportMode,
+          tunnel_status: channels.get(e.agent)!.tunnel?.getStatus() ?? null,
+        })),
         agents: registry.list().map(e => ({
           agent: e.agent,
           owner: e.owner,
@@ -424,12 +468,22 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   const port = (server.address() as { port: number }).port;
 
   const writeDiscovery = (): void => {
+    const entries = registry.list();
     const doc: ServeDiscovery = {
       schema_version: SERVE_DISCOVERY_SCHEMA_VERSION,
       port,
       pid: process.pid,
       started_at: startedAt,
-      agents: registry.list().map(e => ({
+      // Neutral principal list — an `eco:`-prefixed id is type 'ecosystem', else 'agent'.
+      principals: entries.map(e => ({
+        type: e.agent.startsWith('eco:') ? 'ecosystem' as const : 'agent' as const,
+        id: e.agent,
+        owner: e.owner,
+        node_url: e.config.node_url,
+        transport: channels.get(e.agent)!.transportMode,
+      })),
+      // Transitional alias (agent-typed only) for sidecars that still read `agents`.
+      agents: entries.filter(e => !e.agent.startsWith('eco:')).map(e => ({
         agent: e.agent,
         owner: e.owner,
         node_url: e.config.node_url,

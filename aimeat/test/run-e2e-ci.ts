@@ -106,6 +106,7 @@ const ALL_SUITES = [
     'test/e2e-ecosystem-app-foundation.ts',
     'test/e2e-ecosystem-events.ts',
     'test/e2e-ecosystem-capabilities.ts',
+    'test/e2e-ecosystem-validation.ts',
     'test/e2e-agent-governance.ts',
     'test/e2e-workflows.ts',
 ];
