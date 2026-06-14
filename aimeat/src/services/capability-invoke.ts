@@ -1,12 +1,16 @@
 /**
  * @file capability-invoke.ts
- * @description Invoke proxy: routes capability invocations to the correct underlying system.
+ * @description Invoke proxy: routes capability invocations to the correct underlying system
+ *   (extension localhost fetch, manual webhook, or — new — an ecosystem app over the connect-tunnel).
  * @version-history
  *   v1.0.0 - 2026-05-02 - Initial invoke proxy for extensions and manual webhooks
+ *   v1.1.0 - 2026-06-14 - Add `case 'ecosystem'`: route invocation over the tunnel to a bound GEAI.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord } from '../storage/interface.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
+import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { parseGaiiLoose, buildGEAI } from '../utils/gaii.js';
 
 export interface InvokeResult {
   capability: string;
@@ -101,6 +105,31 @@ export async function invokeCapability(
       } finally {
         clearTimeout(timeout);
       }
+      break;
+    }
+
+    case 'ecosystem': {
+      // ref = 'eco:{app}:{capId}'. Resolve the bound GEAI tunnel for (app, caller's owner) on this
+      // node and forward the invoke over it; the reverse `invoke_result` carries the reply back.
+      // AIMEAT authenticates the caller + may bill, but the ecosystem enforces its OWN ACL — a refusal
+      // returns as a normal { ok: false } reply, mapped to ECOSYSTEM_ERROR.
+      const refParts = capability.source.ref.split(':'); // ['eco', app, capId]
+      const app = refParts[1];
+      const capId = refParts[2] ?? capability.id;
+      if (!app) {
+        throw Object.assign(new Error('Malformed ecosystem capability ref'), { statusCode: 500, code: 'BAD_ECOSYSTEM_REF' });
+      }
+      const owner = parseGaiiLoose(callerGhii).owner;
+      const geai = buildGEAI(app, owner, config.nodeId);
+      const mgr = getActiveConnectTunnelManager();
+      if (!mgr) {
+        throw Object.assign(new Error('Connector tunnel unavailable'), { statusCode: 503, code: 'TUNNEL_UNAVAILABLE' });
+      }
+      const reply = await mgr.invokeOnPrincipal(geai, { capability: capId, input, caller: callerGhii });
+      if (!reply.ok) {
+        throw Object.assign(new Error('The ecosystem app refused or failed the call'), { statusCode: 502, code: 'ECOSYSTEM_ERROR' });
+      }
+      result = reply.result;
       break;
     }
 

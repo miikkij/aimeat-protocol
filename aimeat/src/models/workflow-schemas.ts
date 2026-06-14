@@ -99,10 +99,15 @@ export interface WorkflowVar {
   example?: string;
 }
 
+export type WorkflowStepAction =
+  | { kind: 'agent' }
+  | { kind: 'export-out'; geai: string; capability?: string; from: string }
+  | { kind: 'trigger-geai'; geai: string; capability: string; input?: Record<string, unknown> };
+
 export interface WorkflowStep {
   id: string;                         // stable; marks "what happened where" per run
-  agent: string | string[];          // a list = parallel fan within one step
-  offer: string;                      // inherit success_signal + required_to_function from this offer
+  agent?: string | string[];         // a list = parallel fan within one step (agent steps only)
+  offer?: string;                     // inherit success_signal + required_to_function from this offer (agent steps only)
   after?: string[];                   // DAG deps; same `after` + no mutual dep = parallel
   description: LocalizedString;
   required_to_function?: Signal | 'none'; // INPUT gate (consumer-owned); 'none' = no memory input
@@ -111,6 +116,8 @@ export interface WorkflowStep {
   /** Max minutes to WAIT for this step's success signal before declaring it timed-out. A step may
    *  legitimately run for many minutes; this only bounds how long we wait for its output. Default 60. */
   timeout_min?: number;
+  /** Absent ⇒ default agent-dispatch. export-out/trigger-geai push to / invoke a GEAI over the tunnel. */
+  action?: WorkflowStepAction;
 }
 
 export type WorkflowTrigger =
@@ -201,16 +208,36 @@ const WorkflowVarSchema = z.object({
   example: z.string().max(500).optional(),
 });
 
+// A step's action: absent ⇒ the default agent-dispatch (back-compat). The two ecosystem kinds push
+// to / invoke a GEAI over the tunnel and complete on the reply (onPushTerminal), never an agent task.
+const WorkflowStepActionSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('agent') }),
+  z.object({
+    kind: z.literal('export-out'),
+    geai: z.string().min(1).max(200),                 // the target GEAI (eco:{app}#{owner}@{node})
+    capability: z.string().min(1).max(120).optional(),// the GEAI ingest capability (default '__deposit__')
+    from: z.string().min(1).max(200),                 // owner memory key/glob whose value is pushed
+  }),
+  z.object({
+    kind: z.literal('trigger-geai'),
+    geai: z.string().min(1).max(200),
+    capability: z.string().min(1).max(120),           // the GEAI capability to invoke
+    input: z.record(z.string().max(120), z.unknown()).optional(),
+  }),
+]);
+
 const WorkflowStepSchema = z.object({
   id: z.string().min(1).max(100),
-  agent: z.union([z.string().min(1).max(100), z.array(z.string().min(1).max(100)).min(1).max(20)]),
-  offer: z.string().min(1).max(100),
+  // agent/offer are required for the default agent step but absent for export-out/trigger-geai.
+  agent: z.union([z.string().min(1).max(100), z.array(z.string().min(1).max(100)).min(1).max(20)]).optional(),
+  offer: z.string().min(1).max(100).optional(),
   after: z.array(z.string().min(1).max(100)).max(50).optional(),
   description: LocalizedStringSchema,
   required_to_function: z.union([SignalSchema, z.literal('none')]).optional(),
   success_signal: SignalSchema.optional(),
   retry: RetrySchema.optional(),
   timeout_min: z.number().int().min(1).max(10080).optional(), // minutes to wait for the signal; default 60 (engine), max 7 days
+  action: WorkflowStepActionSchema.optional(),
 });
 
 const WorkflowTriggerSchema = z.discriminatedUnion('kind', [

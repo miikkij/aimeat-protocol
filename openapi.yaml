@@ -3650,6 +3650,38 @@ paths:
         '404':
           description: Ecosystem app not found for this owner.
 
+  /v1/ecosystem/read-through:
+    post:
+      operationId: ecosystemReadThrough
+      summary: Read live content behind an ecosystem_ref
+      description: |
+        Fetch the live content for a stored `ecosystem_ref` (a pointer + schema + cached metadata) by
+        reading through to the ecosystem app over the tunnel ON DEMAND — AIMEAT never persists the live
+        content. If the GEAI is offline or refuses, returns the cached metadata + `read_through_unavailable`.
+        (A capability with `source.type: 'ecosystem'` is invoked via the normal `POST /v1/capabilities/{id}/invoke`,
+        routed over the tunnel.)
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key]
+              properties:
+                key: { type: string, description: The memory key holding the ecosystem_ref. }
+      responses:
+        '200':
+          description: Live content, or the cached metadata + read_through_unavailable when the app is offline.
+        '400':
+          description: key is required.
+        '403':
+          description: Owner role required.
+        '404':
+          description: No ecosystem_ref found at that key.
+
   # ── Bootstrap ──────────────────────────────────────────────
   /:
     get:
