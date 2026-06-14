@@ -918,9 +918,10 @@ if (subcommand === 'config') {
             socket.destroy();
             return;
           }
-          // Only agent identities may hold a forward tunnel. Owner/operator
-          // sessions bypass scopes and are not the connector's transport.
-          if (!payload.roles?.includes('agent')) {
+          // Only scoped external principals (agent OR ecosystem app) may hold a forward tunnel.
+          // Owner/operator sessions bypass scopes and are not the connector's transport. The
+          // tunnel manager keys by identity.sub, so a GEAI tunnel needs no further change.
+          if (!payload.roles?.includes('agent') && !payload.roles?.includes('ecosystem')) {
             socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
             socket.destroy();
             return;

@@ -1019,6 +1019,50 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_device_auth_ownerName ON device_auth(ownerName);
     CREATE INDEX IF NOT EXISTS idx_device_auth_status ON device_auth(status);
 
+    -- ── Ecosystem Applications (GEAI principal) ──
+    -- Mirror of the agents table, minus task/agent-only fields, plus the ecosystem binding fields.
+    CREATE TABLE IF NOT EXISTS ecosystem_apps (
+      geai          TEXT PRIMARY KEY,
+      app           TEXT NOT NULL,
+      owner         TEXT NOT NULL,
+      displayName   TEXT,
+      description   TEXT,
+      publicKey     TEXT NOT NULL,
+      scopes        TEXT NOT NULL DEFAULT '[]',
+      dataAreas     TEXT,
+      boundRef      TEXT,
+      status        TEXT NOT NULL DEFAULT 'pending',
+      morselBalance REAL NOT NULL DEFAULT 0,
+      createdAt     TEXT NOT NULL,
+      lastSeen      TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_ecosystem_apps_owner ON ecosystem_apps(owner);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ecosystem_apps_owner_app ON ecosystem_apps(owner, app);
+
+    -- ── Ecosystem "hello integration" handshake (RFC 8628 analog) ──
+    CREATE TABLE IF NOT EXISTS eco_auth (
+      deviceCode    TEXT PRIMARY KEY,
+      userCode      TEXT NOT NULL UNIQUE,
+      ownerName     TEXT NOT NULL,
+      app           TEXT NOT NULL,
+      displayName   TEXT,
+      description   TEXT,
+      status        TEXT NOT NULL DEFAULT 'pending',
+      publicKey     TEXT,
+      scopes        TEXT,
+      dataAreas     TEXT,
+      boundRef      TEXT,
+      createdAt     TEXT NOT NULL,
+      expiresAt     TEXT NOT NULL,
+      lastPolledAt  TEXT,
+      pollInterval  INTEGER NOT NULL DEFAULT 5,
+      approvedBy    TEXT,
+      appCredentials TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_eco_auth_userCode ON eco_auth(userCode);
+    CREATE INDEX IF NOT EXISTS idx_eco_auth_ownerName ON eco_auth(ownerName);
+    CREATE INDEX IF NOT EXISTS idx_eco_auth_status ON eco_auth(status);
+
     -- ── OAuth 2.1 Persistent State ──
     CREATE TABLE IF NOT EXISTS oauth_clients (
       clientId      TEXT PRIMARY KEY,

@@ -21,6 +21,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type {
   Storage, OwnerRecord, AgentRecord, MemoryRecord,
+  EcosystemAppRecord, EcoAuthorizationRecord,
   ActionRecord, WorkRecord, WalletTransaction,
   BoardRecord, BoardPostRecord, OtkRecord,
   DisputeRecord, DisputeAuditEntry, MicroMemoryRecord,
@@ -75,6 +76,7 @@ import * as sharingGroupRepo from './repos/sharing-group.js';
 import * as agentDirectivesRepo from './repos/agent-directives.js';
 import * as agentActivityRepo from './repos/agent-activity.js';
 import * as agentMessageRepo from './repos/agent-message.js';
+import * as ecosystemAppRepo from './repos/ecosystem-app.js';
 
 export class SqliteStorage implements Storage {
   private db: Database.Database;
@@ -5107,6 +5109,47 @@ export class SqliteStorage implements Storage {
   async deleteDeviceAuthByOwner(ownerName: string): Promise<number> {
     const result = this.db.prepare(`DELETE FROM device_auth WHERE ownerName = ?`).run(ownerName);
     return result.changes;
+  }
+
+  // ── Ecosystem Applications (GEAI) + hello-integration handshake ──
+  async createEcosystemApp(app: EcosystemAppRecord): Promise<EcosystemAppRecord> {
+    return ecosystemAppRepo.createEcosystemApp(this.db, app);
+  }
+  async getEcosystemApp(geai: string): Promise<EcosystemAppRecord | null> {
+    return ecosystemAppRepo.getEcosystemApp(this.db, geai);
+  }
+  async getEcosystemAppByOwnerAndApp(owner: string, app: string): Promise<EcosystemAppRecord | null> {
+    return ecosystemAppRepo.getEcosystemAppByOwnerAndApp(this.db, owner, app);
+  }
+  async getEcosystemAppsByOwner(owner: string): Promise<EcosystemAppRecord[]> {
+    return ecosystemAppRepo.getEcosystemAppsByOwner(this.db, owner);
+  }
+  async updateEcosystemApp(geai: string, updates: Partial<EcosystemAppRecord>): Promise<EcosystemAppRecord | null> {
+    return ecosystemAppRepo.updateEcosystemApp(this.db, geai, updates);
+  }
+  async deleteEcosystemApp(geai: string): Promise<boolean> {
+    return ecosystemAppRepo.deleteEcosystemApp(this.db, geai);
+  }
+  async createEcoAuth(req: EcoAuthorizationRecord): Promise<void> {
+    return ecosystemAppRepo.createEcoAuth(this.db, req);
+  }
+  async getEcoAuthByDeviceCode(deviceCode: string): Promise<EcoAuthorizationRecord | null> {
+    return ecosystemAppRepo.getEcoAuthByDeviceCode(this.db, deviceCode);
+  }
+  async getEcoAuthByUserCode(userCode: string): Promise<EcoAuthorizationRecord | null> {
+    return ecosystemAppRepo.getEcoAuthByUserCode(this.db, userCode);
+  }
+  async updateEcoAuth(deviceCode: string, updates: Partial<EcoAuthorizationRecord>): Promise<void> {
+    return ecosystemAppRepo.updateEcoAuth(this.db, deviceCode, updates);
+  }
+  async countPendingEcoAuthByOwner(ownerName: string): Promise<number> {
+    return ecosystemAppRepo.countPendingEcoAuthByOwner(this.db, ownerName);
+  }
+  async listPendingEcoAuthByOwner(ownerName: string): Promise<EcoAuthorizationRecord[]> {
+    return ecosystemAppRepo.listPendingEcoAuthByOwner(this.db, ownerName);
+  }
+  async cleanupExpiredEcoAuth(): Promise<number> {
+    return ecosystemAppRepo.cleanupExpiredEcoAuth(this.db);
   }
 
   private deserializeDeviceAuth(row: Record<string, unknown>): DeviceAuthorizationRecord {

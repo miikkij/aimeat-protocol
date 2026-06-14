@@ -126,6 +126,7 @@ export interface AimeatConfig {
   anonymousMode: boolean;
   jwtTtlSeconds: number;
   agentJwtTtlSeconds: number;
+  ecoJwtTtlSeconds: number; // GEAI (ecosystem app) credential lifetime
   // Owner session refresh tokens (plan 2026-06-03-owner-session-refresh-tokens)
   accessTtlSeconds: number;     // owner access-token (JWT) lifetime — short
   refreshIdleDays: number;      // sliding idle window for the refresh cookie
@@ -356,6 +357,11 @@ export interface AimeatConfig {
   /** F1: enforce per-agent scopes on the /v1/mcp tool surface (default true; false = warn-only). */
   mcpEnforceScopes: boolean;
 
+  // Ecosystem application (GEAI) scope bounds — parallel to the agent knobs above, so an operator
+  // can bound ecosystem connections independently of agents.
+  defaultEcoScopes: string[];
+  maxEcoScopes: string[];
+
   // Prometheus Metrics
   metricsEnabled: boolean;
   metricsAccess: 'public' | 'authenticated' | 'operator';
@@ -541,6 +547,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     anonymousMode: process.env.AIMEAT_ANONYMOUS === 'true',
     jwtTtlSeconds: parseInt(process.env.AIMEAT_JWT_TTL ?? '3600', 10),
     agentJwtTtlSeconds: parseInt(process.env.AIMEAT_AGENT_JWT_TTL ?? '7776000', 10), // 90 days
+    ecoJwtTtlSeconds: parseInt(process.env.AIMEAT_ECO_JWT_TTL ?? '7776000', 10),     // 90 days
     accessTtlSeconds: parseInt(process.env.AIMEAT_ACCESS_TTL ?? '900', 10),          // 15 min
     refreshIdleDays: parseInt(process.env.AIMEAT_REFRESH_IDLE_DAYS ?? '30', 10),
     refreshAbsoluteDays: parseInt(process.env.AIMEAT_REFRESH_ABSOLUTE_DAYS ?? '90', 10),
@@ -736,6 +743,11 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // Set false for a warn-only rollout: tools are still registered, but would-be-filtered
     // tools are logged so you can measure impact before enforcing.
     mcpEnforceScopes: process.env.AIMEAT_MCP_ENFORCE_SCOPES !== 'false',
+
+    // Ecosystem application (GEAI) scope bounds. Defaults lean read + deposit (ecosystem apps mostly
+    // deposit refined data into owner areas). Events/capability scopes are deferred to later chunks.
+    defaultEcoScopes: (process.env.AIMEAT_DEFAULT_ECO_SCOPES ?? 'memory:read,memory:write,knowledge:contribute,organism:read').split(',').map(s => s.trim()),
+    maxEcoScopes: (process.env.AIMEAT_MAX_ECO_SCOPES ?? '*').split(',').map(s => s.trim()),
 
     // Node Extensions (Sandboxed)
     extensionsEnabled: process.env.AIMEAT_EXTENSIONS_ENABLED !== 'false',

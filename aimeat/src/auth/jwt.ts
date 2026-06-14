@@ -1,3 +1,14 @@
+/**
+ * @file jwt.ts
+ * @description EdDSA JWT minting/verification signed with the node's Ed25519 key, plus storage-backed
+ *   token revocation. Issues credentials for every authenticated principal — owner (GHII), agent
+ *   (GAII), and ecosystem app (GEAI). Optional claims (mcp_client, federated, eco_app, …) are threaded
+ *   conditionally so tokens stay minimal.
+ * @structure initNodeKeys / issueJWT / verifyJWT / generateSessionId / revokeToken / isRevoked
+ * @usage import { issueJWT, verifyJWT } from '../auth/jwt.js';
+ * @version-history
+ *   v1.1.0 — 2026-06-14 — Add optional `eco_app` claim for GEAI (ecosystem app) sessions.
+ */
 import { SignJWT, jwtVerify, importPKCS8, importSPKI, exportPKCS8, exportSPKI } from 'jose';
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
@@ -36,7 +47,7 @@ export async function initNodeKeys(publicKeyBase64: string, privateKeyBase64: st
 }
 
 export interface JWTPayload {
-  sub: string;        // GAII or owner
+  sub: string;        // GAII, GEAI, or owner
   owner: string;
   node: string;
   roles: string[];
@@ -45,6 +56,7 @@ export interface JWTPayload {
   federated?: boolean;  // true for federated login sessions
   homeNode?: string;    // home node ID for federated sessions
   homeUrl?: string;     // home node base URL for federated sessions
+  eco_app?: string;     // ecosystem app global name (e.g. "zendesk") for GEAI (role: ecosystem) sessions
 }
 
 /** Generate a unique session ID for JWT tracking. */
@@ -64,6 +76,7 @@ export async function issueJWT(payload: JWTPayload, ttlSeconds: number, sessionI
     ...(payload.federated ? { federated: true } : {}),
     ...(payload.homeNode ? { homeNode: payload.homeNode } : {}),
     ...(payload.homeUrl ? { homeUrl: payload.homeUrl } : {}),
+    ...(payload.eco_app ? { eco_app: payload.eco_app } : {}),
   })
     .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
     .setSubject(payload.sub)
@@ -91,6 +104,7 @@ export interface VerifiedToken {
   federated?: boolean;  // true for federated login sessions
   homeNode?: string;    // home node ID for federated sessions
   homeUrl?: string;     // home node base URL for federated sessions
+  eco_app?: string;     // ecosystem app global name for GEAI (role: ecosystem) sessions
 }
 
 export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
@@ -112,6 +126,7 @@ export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
       federated: (payload.federated as boolean) ?? false,
       homeNode: payload.homeNode as string | undefined,
       homeUrl: payload.homeUrl as string | undefined,
+      eco_app: payload.eco_app as string | undefined,
     };
   } catch {
     return null;

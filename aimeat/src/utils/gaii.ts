@@ -1,14 +1,37 @@
+/**
+ * @file gaii.ts
+ * @description Identity parsing/validation for the three AIMEAT principal types: GHII (human owner,
+ *   `owner@node`), GAII (AI agent, `agent#owner@node`), and GEAI (ecosystem application,
+ *   `eco:{app}#{owner}@{node}`). Provides the regexes, parsers, validators, builders, and the
+ *   `resolveIdentity()` storage-identity resolver used across every identity-keyed route. The
+ *   `eco:` prefix is the GEAI discriminator: GAII helpers MUST refuse `eco:`-prefixed strings so the
+ *   two namespaces never collide.
+ * @structure
+ *   - GAII: parseGAII / buildGAII / isValidGAII / validateAgentName
+ *   - GEAI: parseGEAI / buildGEAI / isValidGEAI / validateAppName / isGEAI / ECO_PREFIX
+ *   - resolveIdentity (owner→GHII, agent/ecosystem→sub verbatim), parseGaiiLoose, isSameOwner
+ *   - Chat instance + device-auth user-code helpers
+ * @usage import { resolveIdentity, parseGEAI, isGEAI } from '../utils/gaii.js';
+ * @version-history
+ *   v1.1.0 — 2026-06-14 — Add GEAI (ecosystem app) identity helpers; harden GAII parsers to reject
+ *     `eco:`; make parseGaiiLoose/resolveIdentity GEAI-aware (ecosystem-apps foundation, chunk 1).
+ */
 import { randomBytes } from 'node:crypto';
 
 // GAII format: agent#owner@node
 // agent: ^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$
 // owner: ^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$
 // node:  ^aimeat-[a-z]{2,10}-[0-9]{3}-[a-z0-9-]{1,32}$
+// GEAI format: eco:{app}#{owner}@{node}  (the `eco:` prefix is the discriminator)
 
 const AGENT_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
 const OWNER_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
 const NODE_RE = /^aimeat-[a-z]{2,10}-[0-9]{3}-[a-z0-9-]{1,32}$/;
 const GAII_RE = /^([a-z0-9][a-z0-9-]{1,62}[a-z0-9])#([a-z0-9][a-z0-9-]{1,62}[a-z0-9])@(aimeat-[a-z]{2,10}-[0-9]{3}-[a-z0-9-]{1,32})$/;
+
+/** The literal prefix that distinguishes a GEAI (ecosystem app) from a GAII (agent). */
+export const ECO_PREFIX = 'eco:';
+const GEAI_RE = /^eco:([a-z0-9][a-z0-9-]{1,62}[a-z0-9])#([a-z0-9][a-z0-9-]{1,62}[a-z0-9])@(aimeat-[a-z]{2,10}-[0-9]{3}-[a-z0-9-]{1,32})$/;
 
 export const RESERVED_NAMES = new Set([
   'admin', 'system', 'root', 'operator', 'meat', 'aimeat', 'node', 'network',
@@ -24,6 +47,7 @@ export interface ParsedGAII {
 }
 
 export function parseGAII(gaii: string): ParsedGAII | null {
+  if (gaii.startsWith(ECO_PREFIX)) return null; // GEAIs are not GAIIs — never half-accept them
   const match = GAII_RE.exec(gaii);
   if (!match) return null;
   return { agent: match[1], owner: match[2], node: match[3], full: gaii };
@@ -35,6 +59,45 @@ export function buildGAII(agent: string, owner: string, node: string): string {
 
 export function validateAgentName(name: string): string | null {
   if (!AGENT_RE.test(name)) return 'Agent name must be 3-64 lowercase alphanumeric characters with hyphens';
+  if (RESERVED_NAMES.has(name)) return `Name "${name}" is reserved`;
+  return null;
+}
+
+// ── GEAI (ecosystem application) identity ────────────────────────────────
+// A GEAI is a per-user, owner-approved external principal: `eco:{app}#{owner}@{node}`.
+// Structurally the `{app}#{owner}@{node}` tail mirrors a GAII, which is why the tunnel and
+// memory write paths treat a GEAI as "an agent-shaped principal with a different role". The
+// `eco:` prefix is what keeps the two namespaces from ever colliding.
+
+export interface ParsedGEAI {
+  app: string;
+  owner: string;
+  node: string;
+  full: string;
+}
+
+/** True iff the identity is GEAI-shaped (carries the `eco:` discriminator prefix). */
+export function isGEAI(id: string): boolean {
+  return id.startsWith(ECO_PREFIX);
+}
+
+export function parseGEAI(id: string): ParsedGEAI | null {
+  const match = GEAI_RE.exec(id);
+  if (!match) return null;
+  return { app: match[1], owner: match[2], node: match[3], full: id };
+}
+
+export function isValidGEAI(id: string): boolean {
+  return GEAI_RE.test(id);
+}
+
+export function buildGEAI(app: string, owner: string, node: string): string {
+  return `${ECO_PREFIX}${app}#${owner}@${node}`;
+}
+
+/** Validate an ecosystem app's global short name (same charset + reserved rules as an agent name). */
+export function validateAppName(name: string): string | null {
+  if (!AGENT_RE.test(name)) return 'App name must be 3-64 lowercase alphanumeric characters with hyphens';
   if (RESERVED_NAMES.has(name)) return `Name "${name}" is reserved`;
   return null;
 }
@@ -51,6 +114,7 @@ export function validateNodeId(nodeId: string): string | null {
 }
 
 export function isValidGAII(gaii: string): boolean {
+  if (gaii.startsWith(ECO_PREFIX)) return false; // GEAIs are not GAIIs
   return GAII_RE.test(gaii);
 }
 
@@ -58,28 +122,37 @@ export function isValidGAII(gaii: string): boolean {
  * Resolve the effective storage identity from a request's auth context.
  * - Owner sessions (GHII): JWT sub is bare username → returns `owner@nodeId` (GHII format)
  * - Agent sessions (GAII): JWT sub is already full GAII → returns it as-is
+ * - Ecosystem sessions (GEAI): JWT sub is already the full `eco:` identity → returns it as-is.
+ *   This is intentional and load-bearing: a GEAI writes into its OWN `eco:` memory namespace,
+ *   exactly like an agent writes into its GAII namespace, so its writes never collide with the
+ *   owner's keyspace. The owner owns that data via owner-session aggregation (see owner-memory.ts),
+ *   NOT by remapping the GEAI's writes to GHII. Do not add an "ecosystem → GHII" branch here.
  *
  * This MUST be used everywhere data is stored/retrieved by identity (memory, files,
- * consent, knowledge, etc.) to ensure owner sessions use GHII and agents use GAII.
+ * consent, knowledge, etc.) to ensure owner sessions use GHII and agents/ecosystem apps use their sub.
  */
 export function resolveIdentity(auth: { sub: string; owner: string; roles: string[] }, nodeId: string): string {
-  const isOwnerSession = auth.roles.includes('owner') && !auth.roles.includes('agent');
+  const isOwnerSession = auth.roles.includes('owner') &&
+    !auth.roles.includes('agent') && !auth.roles.includes('ecosystem');
   return isOwnerSession ? `${auth.owner}@${nodeId}` : auth.sub;
 }
 
 /**
- * Lenient GAII parser — extracts owner and node without strict validation.
- * Handles both `agent#owner@node` and `owner@node` formats.
+ * Lenient identity parser — extracts owner and node without strict validation.
+ * Handles `agent#owner@node` (GAII), `owner@node` (GHII), and `eco:{app}#owner@node` (GEAI).
+ * For a GEAI the leading `eco:` prefix is stripped so `agent` is the bare app name and `owner`
+ * is the owner (never `eco:app`); this keeps isSameOwner(ghii, geai) correct.
  * Returns empty strings for missing parts instead of null.
  */
 export function parseGaiiLoose(gaii: string): { agent: string; owner: string; node: string } {
-  const hashIdx = gaii.indexOf('#');
-  const atIdx = gaii.lastIndexOf('@');
+  const stripped = gaii.startsWith(ECO_PREFIX) ? gaii.slice(ECO_PREFIX.length) : gaii;
+  const hashIdx = stripped.indexOf('#');
+  const atIdx = stripped.lastIndexOf('@');
   if (atIdx < 0) return { agent: '', owner: '', node: '' };
   return {
-    agent: hashIdx >= 0 ? gaii.slice(0, hashIdx) : '',
-    owner: hashIdx >= 0 ? gaii.slice(hashIdx + 1, atIdx) : gaii.slice(0, atIdx),
-    node: gaii.slice(atIdx + 1),
+    agent: hashIdx >= 0 ? stripped.slice(0, hashIdx) : '',
+    owner: hashIdx >= 0 ? stripped.slice(hashIdx + 1, atIdx) : stripped.slice(0, atIdx),
+    node: stripped.slice(atIdx + 1),
   };
 }
 
