@@ -24,6 +24,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateAppName, validateOwnerName, buildGEAI, generateUserCode } from '../utils/gaii.js';
 import { issueJWT, generateSessionId } from '../auth/jwt.js';
+import { validateEcoManifest } from '../models/ecosystem-manifest.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitEcosystemBindingRevoked } from '../services/ecosystem-events.js';
 
@@ -48,7 +49,7 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage): Rou
   // The body is identical either way: who the owner is, the app's global name, and the app's
   // verification key (pinned TOFU here). Returns RFC-8628-style codes.
   router.post('/v1/ecosystem-apps/hello', async (req, res) => {
-    const { owner, app, display_name, description, public_key, scopes, data_areas, bound_ref } = req.body ?? {};
+    const { owner, app, display_name, description, public_key, scopes, data_areas, bound_ref, manifest } = req.body ?? {};
 
     if (!owner) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'owner is required'));
@@ -93,6 +94,13 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage): Rou
     const now = new Date();
     const expiresAt = new Date(now.getTime() + ECO_AUTH_EXPIRY_MS);
 
+    // Static compatibility validation: if a manifest is provided, validate it now so the owner
+    // approves a known-good integration. Optional (back-compat): no manifest ⇒ no validation gate.
+    const requestedScopes = Array.isArray(scopes) ? scopes : config.defaultEcoScopes;
+    const validationResult = manifest !== undefined
+      ? validateEcoManifest(app, requestedScopes, manifest, config.maxEcoScopes)
+      : undefined;
+
     await storage.createEcoAuth({
       deviceCode,
       userCode,
@@ -108,6 +116,7 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage): Rou
       createdAt: now.toISOString(),
       expiresAt: expiresAt.toISOString(),
       pollInterval: 5,
+      validationResult,
     });
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -122,6 +131,7 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage): Rou
       verification_uri_complete: `${verificationUri}?code=${userCode}`,
       expires_in: Math.floor(ECO_AUTH_EXPIRY_MS / 1000),
       interval: 5,
+      validation: validationResult ? { ok: validationResult.ok, checks: validationResult.checks } : null,
       user_instructions: `Ask the AIMEAT owner "${owner}" to approve this integration in their portal ` +
         `(Profile → Ecosystem apps) using the code ${userCode}. Poll POST /v1/ecosystem-apps/token ` +
         `with the device_code until approved.`,
@@ -218,6 +228,9 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage): Rou
         requested_scopes: r.scopes ?? config.defaultEcoScopes,
         requested_data_areas: r.dataAreas ?? [],
         status: r.status,
+        // Static-validation outcome: 'validated' | 'failed' | 'none' (no manifest submitted).
+        validation: r.validationResult ? (r.validationResult.ok ? 'validated' : 'failed') : 'none',
+        validation_checks: r.validationResult?.checks ?? [],
         created_at: r.createdAt,
         expires_in: Math.max(0, Math.ceil((new Date(r.expiresAt).getTime() - Date.now()) / 1000)),
       })),
@@ -256,6 +269,13 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage): Rou
     }
     if (action !== 'approve') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'action must be "approve" or "deny"'));
+      return;
+    }
+
+    // Compatibility gate: a submitted-but-failed manifest blocks approval (the app must fix + re-hello).
+    if (request.validationResult && !request.validationResult.ok) {
+      const failed = request.validationResult.checks.filter(c => !c.ok).map(c => c.name).join(', ');
+      res.status(409).json(error(config.nodeId, 'VALIDATION_FAILED', `Compatibility validation failed (${failed}); the app must fix its manifest and reconnect`));
       return;
     }
 

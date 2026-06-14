@@ -3417,9 +3417,13 @@ paths:
                   items: { $ref: '#/components/schemas/EcoDataAreaGrant' }
                   description: Requested data-area allowlist (stored at approval; enforcement is a later chunk).
                 bound_ref: { type: string, description: Opaque ecosystem-side account reference (never interpreted by AIMEAT). }
+                manifest:
+                  type: object
+                  additionalProperties: true
+                  description: "Optional app manifest (declared scopes/capabilities/events). When present it is statically validated; a failed validation blocks approval."
       responses:
         '200':
-          description: Pending request created with device + user codes.
+          description: Pending request created with device + user codes (+ a validation result when a manifest was submitted).
         '400':
           description: Missing/invalid owner, app, or public_key.
         '429':

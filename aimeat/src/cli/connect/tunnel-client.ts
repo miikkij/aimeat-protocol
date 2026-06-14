@@ -65,6 +65,12 @@ export interface ConnectTunnelClientOptions {
   /** Base HTTP(S) URL of the AIMEAT node (e.g. https://aimeat.io). */
   nodeUrl: string;
   /**
+   * Full WebSocket endpoint to dial (connector profile §6). When set, it is used verbatim instead of
+   * deriving `{nodeUrl}/v1/connect/tunnel` — lets the same client target a non-AIMEAT, ecosystem-hosted
+   * tunnel endpoint (the AIMEAT→ecosystem initiation direction). Default: derive from `nodeUrl`.
+   */
+  wsUrl?: string;
+  /**
    * Returns the current agent JWT. Called on EVERY (re)connect so a token
    * refreshed via `aimeat connect` is picked up without restarting serve.
    */
@@ -287,7 +293,7 @@ export class ConnectTunnelClient {
 
       let ws: WebSocket;
       try {
-        ws = new WebSocket(wsUrl(this.opts.nodeUrl), { headers: { Authorization: `Bearer ${token}` } });
+        ws = new WebSocket(this.opts.wsUrl ?? wsUrl(this.opts.nodeUrl), { headers: { Authorization: `Bearer ${token}` } });
       } catch {
         this.setStatus('offline');
         settle('unreachable');

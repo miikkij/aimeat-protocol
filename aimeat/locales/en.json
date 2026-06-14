@@ -391,6 +391,7 @@
     },
     "tabs": {
       "agents": "Agents",
+      "ecosystem": "Ecosystem apps",
       "offers": "Offers",
       "chatSessions": "Chat Sessions",
       "mcp": "MCP",
@@ -476,6 +477,53 @@
         "external-send": "sends externally",
         "mutates-live-app": "changes a live app",
         "delegates-to-agent": "delegates to other agents"
+      }
+    },
+    "ecosystem": {
+      "title": "Ecosystem apps",
+      "desc": "Connect external services so your agents and workflows can exchange data, capabilities, and events with them.",
+      "connect": "+ Connect app",
+      "connectNote": "Run the connector in ecosystem mode on the machine hosting the app, then approve the pending request here.",
+      "empty": "No ecosystem apps connected yet.",
+      "loadError": "Could not load ecosystem apps.",
+      "approved": "Ecosystem app approved.",
+      "approveError": "Could not process the request.",
+      "revoked": "Ecosystem app revoked.",
+      "revokeError": "Could not revoke the app.",
+      "subError": "Could not update the subscription.",
+      "pendingTitle": "Pending integration requests",
+      "waiting": "waiting",
+      "expiresIn": "expires in {n} min",
+      "grantLevel": "Grant level",
+      "presetStandard": "Standard",
+      "presetReadonly": "Read-only",
+      "presetFull": "Full",
+      "approve": "Approve",
+      "deny": "Deny",
+      "grants": "Grants",
+      "subscriptions": "Event subscriptions",
+      "noSubs": "No outbound event subscriptions.",
+      "removeSub": "Remove",
+      "addSub": "Subscribe",
+      "binding": "Binding",
+      "aimeatSide": "AIMEAT side",
+      "appOrigin": "App",
+      "keyFp": "Key fingerprint",
+      "bindingNote": "This binding only records who corresponds to whom. Neither system grants the other's permissions.",
+      "revoke": "Revoke",
+      "revokeTitle": "Revoke ecosystem app",
+      "revokeWarn": "This tears down the connection and invalidates the app's credential. Type the app name ({app}) to confirm.",
+      "validation": {
+        "validated": "validated",
+        "failed": "validation failed",
+        "none": ""
+      },
+      "status": {
+        "active": "online",
+        "approved": "approved",
+        "pending": "pending",
+        "validating": "validating",
+        "revoked": "revoked"
       }
     },
     "agents": {

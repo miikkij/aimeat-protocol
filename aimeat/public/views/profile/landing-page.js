@@ -753,6 +753,7 @@ const SIDEBAR_GROUPS = [
   ] },
   { titleKey: 'profile.landing.menuAutomation', items: [    // agents + their infrastructure
     { id: 'agents', icon: '\u{1F916}', labelKey: 'profile.tabs.agents' },
+    { id: 'ecosystem', icon: '\u{1F50C}', labelKey: 'profile.tabs.ecosystem' },
     { id: 'offers', icon: '\u{1F9F0}', labelKey: 'profile.tabs.offers' },
     { id: 'scheduler', icon: '⏰', labelKey: 'profile.tabs.scheduler' },
     { id: 'workflows', icon: '\u{1F500}', labelKey: 'profile.tabs.workflows' },

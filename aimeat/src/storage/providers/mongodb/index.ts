@@ -4864,6 +4864,7 @@ export class PrismaStorage implements Storage {
                 lastPolledAt: req.lastPolledAt ? new Date(req.lastPolledAt) : null,
                 pollInterval: req.pollInterval,
                 approvedBy: req.approvedBy,
+                validationResult: (req.validationResult as any) ?? undefined,
                 appCredentials: (req.appCredentials as any) ?? undefined,
             },
         });
@@ -4956,6 +4957,7 @@ export class PrismaStorage implements Storage {
             lastPolledAt: row.lastPolledAt ? (row.lastPolledAt instanceof Date ? row.lastPolledAt.toISOString() : row.lastPolledAt) : undefined,
             pollInterval: row.pollInterval,
             approvedBy: row.approvedBy ?? undefined,
+            validationResult: row.validationResult ?? undefined,
             appCredentials: row.appCredentials ?? undefined,
         };
     }

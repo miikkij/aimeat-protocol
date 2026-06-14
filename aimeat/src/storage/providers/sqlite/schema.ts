@@ -1057,6 +1057,7 @@ export function initializeSchema(db: Database.Database): void {
       lastPolledAt  TEXT,
       pollInterval  INTEGER NOT NULL DEFAULT 5,
       approvedBy    TEXT,
+      validationResult TEXT,
       appCredentials TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_eco_auth_userCode ON eco_auth(userCode);
