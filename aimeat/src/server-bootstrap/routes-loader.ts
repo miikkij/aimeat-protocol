@@ -24,6 +24,7 @@ import { accessTokensRouter } from '../routes/access-tokens.js';
 import { ownersRouter } from '../routes/owners.js';
 import { agentsRouter } from '../routes/agents.js';
 import { ecosystemAppsRouter } from '../routes/ecosystem-apps.js';
+import { ecosystemEventsRouter } from '../routes/ecosystem-events.js';
 import { schemaRouter } from '../routes/schemas.js';
 import { consentRouter } from '../routes/consent.js';
 import { permissionsRouter } from '../routes/permissions.js';
@@ -261,6 +262,7 @@ export async function mountRoutes(
   app.use(agentIntegrationRouter(config, storage));
   app.use(agentsRouter(config, storage));
   app.use(ecosystemAppsRouter(config, storage));
+  app.use(ecosystemEventsRouter(config, storage));
   const notifyDirectoryChange = () => directoryService.notifyChange();
   app.use(consentRouter(config, storage, stats, notifyDirectoryChange));  // Phase 0.3
   app.use(permissionsRouter(config, storage));  // Phase 0.3 — permission listing API

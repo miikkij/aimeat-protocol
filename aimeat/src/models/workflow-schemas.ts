@@ -116,7 +116,11 @@ export interface WorkflowStep {
 export type WorkflowTrigger =
   | { kind: 'schedule'; cron: string; timezone?: string }
   | { kind: 'manual' }
-  | { kind: 'event'; on: 'memory.write' | 'offer.ordered'; match: Record<string, string> };
+  | { kind: 'event'; on: 'memory.write' | 'offer.ordered'; match: Record<string, string> }
+  // Fires when a bound ecosystem app (GEAI) emits an inbound event. `app` is the bound app name
+  // (e.g. 'zendesk'), `on` the inbound event name (e.g. 'ticket.resolved'). `version` pins the
+  // event's MAJOR version — the trigger is fail-safe (does NOT fire) on a major mismatch.
+  | { kind: 'ecosystem.event'; app: string; on: string; version: number; match?: Record<string, string> };
 
 export interface WorkflowDef {
   id: string;
@@ -213,6 +217,13 @@ const WorkflowTriggerSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('schedule'), cron: z.string().min(1).max(120), timezone: z.string().max(60).optional() }),
   z.object({ kind: z.literal('manual') }),
   z.object({ kind: z.literal('event'), on: z.enum(['memory.write', 'offer.ordered']), match: z.record(z.string().max(120), z.string().max(400)) }),
+  z.object({
+    kind: z.literal('ecosystem.event'),
+    app: z.string().min(1).max(100),                          // the bound app name, e.g. 'zendesk'
+    on: z.string().min(1).max(120),                           // inbound event name, e.g. 'ticket.resolved'
+    version: z.number().int().min(1),                         // pinned MAJOR of the event type; fail-safe (no fire) on major mismatch
+    match: z.record(z.string().max(120), z.string().max(400)).optional(),
+  }),
 ]);
 
 /** The accepted PUT body — server fills id (from the URL), createdBy, createdAt, updatedAt. */

@@ -25,6 +25,7 @@ import { success, error } from '../middleware/envelope.js';
 import { validateAppName, validateOwnerName, buildGEAI, generateUserCode } from '../utils/gaii.js';
 import { issueJWT, generateSessionId } from '../auth/jwt.js';
 import { emitChange } from '../services/event-bus.js';
+import { emitEcosystemBindingRevoked } from '../services/ecosystem-events.js';
 
 /** Hello-integration request codes expire after 30 minutes (parallel to device-auth). */
 const ECO_AUTH_EXPIRY_MS = 1_800_000;
@@ -369,6 +370,10 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage): Rou
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Ecosystem app "${app}" not found under owner "${req.auth!.owner}"`));
       return;
     }
+    // Lifecycle outbound event FIRST (best-effort) — emit while the grant is still active so the
+    // live grant re-check passes; the status flip to 'revoked' then stops all further delivery.
+    const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
+    await emitEcosystemBindingRevoked(storage, config, ownerGhii, record.geai, 'owner_revoked').catch(() => { /* best-effort */ });
     await storage.updateEcosystemApp(record.geai, { status: 'revoked', lastSeen: new Date().toISOString() });
     res.json(success(config.nodeId, { revoked: true, app, geai: record.geai }));
     emitChange('ecosystem-apps');

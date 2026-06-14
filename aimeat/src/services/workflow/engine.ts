@@ -32,7 +32,7 @@ import { logger } from '../../utils/logger.js';
 import { evaluateSignal, globToRegExp, type SignalEvalCtx } from './signal-eval.js';
 import { buildEvalCtx } from './eval-context.js';
 import { getWorkflow, validateWorkflow, runKey, type ResolvedStep } from './store.js';
-import { readEventTriggers, readActiveRuns, reconcileActiveRun } from './lifecycle.js';
+import { readEventTriggers, readEcosystemEventTriggers, readActiveRuns, reconcileActiveRun } from './lifecycle.js';
 import type {
   WorkflowDef, WorkflowRun, WorkflowRunStep, WorkflowStep, Signal, LocalizedString,
 } from '../../models/workflow-schemas.js';
@@ -333,6 +333,40 @@ export class WorkflowEngine {
       const pat = t.match.offer;
       return !!pat && globToRegExp(pat).test(offerId);
     });
+  }
+
+  /**
+   * Inbound ecosystem event (a GEAI emitted `on` for `app`). Fires every `ecosystem.event` trigger
+   * the owner authored that matches {app, on}, whose pinned MAJOR `version` equals the incoming
+   * event's major (fail-safe: a major mismatch does NOT fire), and whose optional `match` globs pass
+   * against the event payload. Same owner-scoped loop guard as the other event triggers.
+   */
+  async onEcosystemEvent(app: string, on: string, version: number, ownerGhii: string, data: Record<string, unknown>): Promise<void> {
+    let triggers;
+    try { triggers = await readEcosystemEventTriggers(this.storage, this.config.nodeId); }
+    catch (err) { logger.error('readEcosystemEventTriggers failed', { app, on, error: String(err) }); return; }
+    const hits = triggers.filter(t =>
+      t.ownerGhii === ownerGhii && t.app === app && t.on === on &&
+      t.version === version &&                                   // fail-safe: skip on major mismatch
+      this.ecoMatchPasses(t.match, data));
+    if (hits.length === 0) return;
+    const active = await readActiveRuns(this.storage, this.config.nodeId);
+    for (const t of hits) {
+      if (active.some(a => a.workflowId === t.workflowId && a.ownerGhii === t.ownerGhii)) continue; // loop/overlap guard
+      this.startRun(ownerGhii, ownerGhii.split('@')[0], t.workflowId, { mode: 'full-live' })
+        .catch(err => logger.error('ecosystem-event-triggered workflow run failed', { workflowId: t.workflowId, error: String(err) }));
+    }
+  }
+
+  /** Each match entry is a glob tested against the same-named field in the event payload (string-coerced). */
+  private ecoMatchPasses(match: Record<string, string> | undefined, data: Record<string, unknown>): boolean {
+    if (!match) return true;
+    for (const [field, pat] of Object.entries(match)) {
+      const val = data[field];
+      if (val === undefined || val === null) return false;
+      if (!globToRegExp(pat).test(String(val))) return false;
+    }
+    return true;
   }
 
   private async fireEventTriggers(on: 'memory.write' | 'offer.ordered', ownerGhii: string, matches: (t: { match: Record<string, string> }) => boolean): Promise<void> {
