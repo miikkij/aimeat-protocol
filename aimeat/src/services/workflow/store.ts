@@ -129,11 +129,12 @@ export interface ResolvedStep {
 async function resolveStep(
   storage: Storage, config: AimeatConfig, ownerName: string, step: WorkflowStep,
 ): Promise<{ resolved: ResolvedStep } | { error: string }> {
-  const agents = Array.isArray(step.agent) ? step.agent : [step.agent];
+  const agents = (Array.isArray(step.agent) ? step.agent : [step.agent]).filter((a): a is string => !!a);
+  const offerId = step.offer ?? '';
   let chosen: OfferLite | undefined;
   for (const agentName of agents) {
     const offers = await readAgentOffers(storage, config, ownerName, agentName);
-    const offer = offers.find(o => o.id === step.offer);
+    const offer = offers.find(o => o.id === offerId);
     if (!offer) return { error: `step "${step.id}": agent "${agentName}" does not publish offer "${step.offer}"` };
     const hasSignals = !!offer.success_signal && !!offer.required_to_function;
     const hasLocation = !!offer.deliverable?.location?.key || !!offer.deliverable?.location?.url;
@@ -147,7 +148,7 @@ async function resolveStep(
     resolved: {
       stepId: step.id,
       agents,
-      offerId: step.offer,
+      offerId,
       success_signal: step.success_signal ?? offer.success_signal,
       required_to_function: step.required_to_function ?? offer.required_to_function,
       deliverableKey: offer.deliverable?.location?.key,
@@ -180,6 +181,25 @@ export async function validateWorkflow(
   const declaredVars = new Set(input.vars.map(v => v.name));
   const resolved: ResolvedStep[] = [];
   for (const step of input.steps) {
+    // export-out / trigger-geai steps don't dispatch an agent offer — they push to / invoke a GEAI.
+    // They carry no offer to resolve; their success is the push-ack / capability-response (+ optional
+    // success_signal). Synthesize a resolved entry from the step's own signals.
+    if (step.action && step.action.kind !== 'agent') {
+      resolved.push({
+        stepId: step.id, agents: [], offerId: '',
+        success_signal: step.success_signal,
+        required_to_function: step.required_to_function ?? 'none',
+      });
+      const keys = [...collectSignalKeys(step.success_signal), ...collectSignalKeys(step.required_to_function === 'none' ? undefined : step.required_to_function)];
+      for (const v of collectVarRefs(keys)) {
+        if (!declaredVars.has(v)) errors.push(`step "${step.id}": signal references undeclared var "{${v}}"`);
+      }
+      continue;
+    }
+    if (!step.agent || !step.offer) {
+      errors.push(`step "${step.id}": an agent step requires both "agent" and "offer"`);
+      continue;
+    }
     const r = await resolveStep(storage, config, ownerName, step);
     if ('error' in r) { errors.push(r.error); continue; }
     resolved.push(r.resolved);
@@ -324,10 +344,11 @@ export function buildBlueprint(def: WorkflowDef, resolved: ResolvedStep[]): Blue
     const r = byId.get(step.id);
     const writes = new Set<string>(collectSignalKeys(r?.success_signal));
     if (r?.deliverableKey) writes.add(r.deliverableKey);
+    const stepAgents = Array.isArray(step.agent) ? step.agent : (step.agent ? [step.agent] : []);
     return {
       stepId: step.id,
-      agents: r?.agents ?? (Array.isArray(step.agent) ? step.agent : [step.agent]),
-      offerId: step.offer,
+      agents: r?.agents ?? stepAgents,
+      offerId: step.offer ?? (step.action && step.action.kind !== 'agent' ? step.action.kind : ''),
       reads: collectSignalKeys(r?.required_to_function),
       writes: [...writes],
     };

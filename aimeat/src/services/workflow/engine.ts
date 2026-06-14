@@ -33,6 +33,7 @@ import { evaluateSignal, globToRegExp, type SignalEvalCtx } from './signal-eval.
 import { buildEvalCtx } from './eval-context.js';
 import { getWorkflow, validateWorkflow, runKey, type ResolvedStep } from './store.js';
 import { readEventTriggers, readEcosystemEventTriggers, readActiveRuns, reconcileActiveRun } from './lifecycle.js';
+import { getActiveConnectTunnelManager } from '../connect-tunnel.js';
 import type {
   WorkflowDef, WorkflowRun, WorkflowRunStep, WorkflowStep, Signal, LocalizedString,
 } from '../../models/workflow-schemas.js';
@@ -155,7 +156,9 @@ export class WorkflowEngine {
       await this.runSignalsOnly(ownerGhii, run);
     } else {
       await this.persist(ownerGhii, run);
-      await this.tick(ownerGhii, run);
+      // Under the run lock: an ecosystem action step's async reply (onPushTerminal, which also locks)
+      // must not advance the run before this initial tick has persisted the 'dispatched' state.
+      await this.withLock(runId, () => this.tick(ownerGhii, run));
     }
     return { runId };
   }
@@ -482,15 +485,21 @@ export class WorkflowEngine {
 
   /** Dispatch a step's agent task(s); tag with the workflow-run scope for onTaskTerminal. */
   private async dispatchStep(ownerGhii: string, run: WorkflowRun, step: WorkflowStep, resolved?: ResolvedStep): Promise<string[]> {
+    // Ecosystem action steps push to / invoke a GEAI over the tunnel; completion arrives via the
+    // async onPushTerminal path, never an agent task. They record no task ids.
+    if (step.action && step.action.kind !== 'agent') {
+      this.dispatchEcosystemStep(ownerGhii, run, step, step.action);
+      return [];
+    }
     const ownerName = ownerGhii.split('@')[0];
-    const agents = Array.isArray(step.agent) ? step.agent : [step.agent];
+    const agents = Array.isArray(step.agent) ? step.agent : (step.agent ? [step.agent] : []);
     const now = new Date().toISOString();
     const ids: string[] = [];
     for (const agentName of agents) {
       const agentGaii = buildGAII(agentName, ownerName, this.config.nodeId);
       const scope: AgentTaskScope[] = [
         { name: 'workflow-run', value: `${run.workflowId}/${run.runId}`, type: 'text', description: step.id },
-        { name: 'offer', value: step.offer, type: 'text', description: loc(step.description) },
+        { name: 'offer', value: step.offer ?? '', type: 'text', description: loc(step.description) },
       ];
       // Sandbox run: tell the agent the key prefix to write under (signals read under it too), so a
       // test run doesn't clobber production keys. A cooperating agent honors it; the node can't force it.
@@ -513,6 +522,74 @@ export class WorkflowEngine {
     }
     void resolved;
     return ids;
+  }
+
+  /**
+   * Fire an ecosystem action step (export-out / trigger-geai) over the connect-tunnel and route its
+   * reply into onPushTerminal. Fire-and-forget: the run was already marked 'dispatched' + persisted
+   * under the lock by tick(), so onPushTerminal (which also locks) advances it safely on the reply.
+   * The workflow owner is the caller GHII (the human pays / is the AIMEAT-side principal).
+   */
+  private dispatchEcosystemStep(ownerGhii: string, run: WorkflowRun, step: WorkflowStep, action: Exclude<WorkflowStep['action'], undefined | { kind: 'agent' }>): void {
+    const { workflowId, runId } = run;
+    const stepId = step.id;
+    const fire = async (): Promise<boolean> => {
+      const mgr = getActiveConnectTunnelManager();
+      if (!mgr) return false;
+      if (action.kind === 'trigger-geai') {
+        const reply = await mgr.invokeOnPrincipal(action.geai, { capability: action.capability, input: action.input ?? {}, caller: ownerGhii });
+        return reply.ok;
+      }
+      // export-out: read the owner-namespace `from` key and push it to the GEAI's ingest capability.
+      const fromKey = this.template(action.from, run.vars);
+      const rec = await this.storage.getMemory(ownerGhii, fromKey);
+      const reply = await mgr.invokeOnPrincipal(action.geai, {
+        capability: action.capability ?? '__deposit__',
+        input: { from: fromKey, data: rec?.value ?? null },
+        caller: ownerGhii,
+      });
+      return reply.ok;
+    };
+    fire()
+      .then(ok => this.onPushTerminal(ownerGhii, workflowId, runId, stepId, ok))
+      .catch(() => this.onPushTerminal(ownerGhii, workflowId, runId, stepId, false));
+  }
+
+  /**
+   * The non-task completion path for ecosystem action steps — the parallel of onTaskTerminal that
+   * reuses the same lock + success_signal evaluation + partial-fail + tick. `ok` is whether the
+   * push-ack / capability-response succeeded; a step is green iff ok AND its success_signal (if any)
+   * passes.
+   */
+  async onPushTerminal(ownerGhii: string, workflowId: string, runId: string, stepId: string, ok: boolean): Promise<void> {
+    await this.withLock(runId, async () => {
+      const rec = await this.storage.getMemory(ownerGhii, runKey(workflowId, runId));
+      if (!rec) return;
+      const run = rec.value as WorkflowRun;
+      const rs = run.steps[stepId];
+      if (!rs || rs.state !== 'dispatched') return; // already resolved / not awaiting
+
+      const r = this.resolvedMap(run).get(stepId);
+      const ctx = buildEvalCtx(this.storage, this.config, ownerGhii, run);
+      const reads = new Set<string>(rs.reads);
+      const output = await this.evalSignal(r?.success_signal, ctx, reads);
+      const now = new Date().toISOString();
+      rs.outputObserved = output.observed;
+      rs.reads = [...reads];
+
+      const stepDef = run.defSnapshot.steps.find(s => s.id === stepId)!;
+      if (ok && output.ok) {
+        rs.state = 'green'; rs.endedAt = now;
+      } else if (stepDef.retry && rs.attempt < stepDef.retry.max) {
+        rs.attempt += 1; rs.state = 'pending'; rs.taskIds = undefined;
+        rs.notBefore = new Date(Date.now() + stepDef.retry.backoff_min * 60_000).toISOString();
+      } else {
+        rs.state = 'output-red'; rs.endedAt = now;
+        this.skipSubtree(run, stepId);
+        await this.onStepFail(ownerGhii, run, stepId, 'output-red');
+      }
+      await this.tick(ownerGhii, run);
+    });
   }
 
   /**

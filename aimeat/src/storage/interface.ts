@@ -1490,7 +1490,8 @@ export interface InstanceFilter {
 // ── Capability Layer ────────────────────────────────────────────────
 
 export interface CapabilitySource {
-  type: 'extension' | 'action' | 'cortex' | 'app' | 'manual';
+  // 'ecosystem' = invocation routed over the connect-tunnel to a bound GEAI; ref = 'eco:{app}:{capId}'.
+  type: 'extension' | 'action' | 'cortex' | 'app' | 'manual' | 'ecosystem';
   ref: string;
   version: string;
 }

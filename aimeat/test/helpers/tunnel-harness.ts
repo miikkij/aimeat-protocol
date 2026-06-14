@@ -29,6 +29,11 @@ export interface TunnelFrame {
   status?: number;
   kind?: string;
   payload?: unknown;
+  capability?: string;
+  input?: unknown;
+  caller?: string;
+  ok?: boolean;
+  result?: unknown;
   code?: string;
   message?: string;
   timestamp?: string;
@@ -48,11 +53,15 @@ export class TunnelClient {
   private pending = new Map<string, (f: TunnelFrame) => void>();
   /** All inbound deliver frames, in arrival order. */
   readonly delivers: TunnelFrame[] = [];
+  /** All inbound server-initiated invoke frames, in arrival order. */
+  readonly invokes: TunnelFrame[] = [];
   /** All inbound backlog frames, in arrival order. */
   readonly backlogs: TunnelFrame[] = [];
   /** All inbound error frames, in arrival order. */
   readonly errors: TunnelFrame[] = [];
   welcome: TunnelFrame | null = null;
+  /** When set, every inbound `invoke` is auto-answered with this function's `{ok, result}`. */
+  private autoInvokeReply?: (f: TunnelFrame) => { ok: boolean; result: unknown };
 
   private constructor(
     private readonly httpBase: string,
@@ -85,6 +94,13 @@ export class TunnelClient {
             break;
           }
           case 'deliver': this.delivers.push(frame); break;
+          case 'invoke':
+            this.invokes.push(frame);
+            if (this.autoInvokeReply) {
+              const r = this.autoInvokeReply(frame);
+              this.ws.send(JSON.stringify({ type: 'invoke_result', id: frame.id, ok: r.ok, result: r.result }));
+            }
+            break;
           case 'backlog': this.backlogs.push(frame); break;
           case 'error': this.errors.push(frame); break;
           default: break;
@@ -121,6 +137,20 @@ export class TunnelClient {
 
   /** Send an ack for a delivered item. */
   ack(id: string): void { this.ws.send(JSON.stringify({ type: 'ack', id })); }
+
+  /** Auto-answer every server-initiated `invoke` frame with the given handler's result. */
+  onInvoke(fn: (f: TunnelFrame) => { ok: boolean; result: unknown }): void { this.autoInvokeReply = fn; }
+
+  /** Manually reply to a server-initiated `invoke` frame. */
+  replyInvoke(id: string, ok: boolean, result: unknown): void {
+    this.ws.send(JSON.stringify({ type: 'invoke_result', id, ok, result }));
+  }
+
+  private invokeCursor = 0;
+  /** Return the next unconsumed server-initiated invoke frame, waiting up to timeoutMs for one. */
+  async waitForInvoke(timeoutMs = 1000): Promise<TunnelFrame | null> {
+    return this.nextFrame(this.invokes, () => this.invokeCursor, (n) => { this.invokeCursor = n; }, timeoutMs);
+  }
 
   // Per-buffer read cursors so each frame is consumed exactly once — independent
   // of whether it arrived before or after the corresponding wait call (the frame

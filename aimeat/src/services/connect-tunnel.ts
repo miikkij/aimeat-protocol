@@ -52,10 +52,12 @@ export interface ConnectFrame {
     | 'response'
     | 'deliver'
     | 'ack'
+    | 'invoke'         // S→C: server invokes a capability ON the connected principal (a GEAI)
+    | 'invoke_result'  // C→S: the principal's reply to an invoke, correlated by id
     | 'backlog'
     | 'disconnect'
     | 'error';
-  /** Correlation id (request↔response, heartbeat↔ack, deliver↔ack). */
+  /** Correlation id (request↔response, heartbeat↔ack, deliver↔ack, invoke↔invoke_result). */
   id?: string;
   // ── request (C→S) ──
   method?: string;
@@ -68,6 +70,12 @@ export interface ConnectFrame {
   // ── deliver (S→C) ──
   kind?: string;
   payload?: unknown;
+  // ── invoke (S→C) / invoke_result (C→S) ──
+  capability?: string;       // invoke: the capability id/name to run on the principal
+  input?: unknown;           // invoke: the input payload
+  caller?: string;           // invoke: the AIMEAT caller GHII (the principal maps this to its account)
+  ok?: boolean;              // invoke_result: whether the principal handled it successfully
+  result?: unknown;          // invoke_result: the capability output
   // ── error (S→C) ──
   code?: string;
   message?: string;
@@ -110,6 +118,8 @@ export class ConnectTunnelManager {
   private readonly loopbackBase: string;
   /** Per-agent set of deliver ids the agent has acked — excluded from later backlogs. */
   private ackedDeliveries = new Map<string, Set<string>>();
+  /** Server-initiated invokes awaiting an `invoke_result` reply, keyed by correlation id. */
+  private pendingInvokes = new Map<string, { resolve: (f: ConnectFrame) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>();
   private readonly deliveryHandler: (evt: DeliveryEvent) => void;
   private stats: ConnectTunnelStats = {
     activeConnections: 0,
@@ -238,6 +248,10 @@ export class ConnectTunnelManager {
         this.handleAck(gaii, frame);
         break;
       }
+      case 'invoke_result': {
+        this.handleInvokeResult(frame);
+        break;
+      }
       case 'disconnect': {
         try { conn.ws.close(1000, 'graceful'); } catch { /* ignore */ }
         break;
@@ -356,6 +370,45 @@ export class ConnectTunnelManager {
     if (!set) { set = new Set(); this.ackedDeliveries.set(gaii, set); }
     set.add(frame.id);
     this.stats.acksTotal++;
+  }
+
+  /**
+   * Server→principal capability invoke: send an `invoke` frame to the connected GEAI and await its
+   * `invoke_result` reply (correlated by id), with a bounded timeout. This is the reverse of the
+   * forward `request`/`response` path — the AIMEAT side is the initiator. The GEAI side maps the
+   * `caller` to its bound account and enforces its OWN ACL; a refusal returns as `{ ok: false }`.
+   * Rejects with a typed error if the principal is offline or does not reply in time.
+   */
+  invokeOnPrincipal(
+    target: string, payload: { capability: string; input: unknown; caller: string }, timeoutMs?: number,
+  ): Promise<{ ok: boolean; result: unknown }> {
+    const conn = this.connections.get(target);
+    if (!conn || conn.ws.readyState !== WebSocket.OPEN) {
+      return Promise.reject(Object.assign(new Error('Ecosystem app is offline'), { statusCode: 502, code: 'ECOSYSTEM_OFFLINE' }));
+    }
+    const id = randomUUID();
+    const ttl = timeoutMs ?? this.config.connectTunnelRequestTimeoutMs;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingInvokes.delete(id);
+        reject(Object.assign(new Error('Ecosystem invoke timed out'), { statusCode: 504, code: 'ECOSYSTEM_TIMEOUT' }));
+      }, ttl);
+      this.pendingInvokes.set(id, {
+        resolve: (f) => resolve({ ok: f.ok === true, result: f.result }),
+        reject,
+        timer,
+      });
+      this.send(conn.ws, { type: 'invoke', id, capability: payload.capability, input: payload.input, caller: payload.caller });
+    });
+  }
+
+  private handleInvokeResult(frame: ConnectFrame): void {
+    if (!frame.id) return;
+    const pending = this.pendingInvokes.get(frame.id);
+    if (!pending) return;
+    clearTimeout(pending.timer);
+    this.pendingInvokes.delete(frame.id);
+    pending.resolve(frame);
   }
 
   /**

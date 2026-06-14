@@ -20,8 +20,10 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { parseGEAI } from '../utils/gaii.js';
+import { parseGEAI, buildGEAI } from '../utils/gaii.js';
 import { getActiveWorkflowEngine } from '../services/workflow/engine.js';
+import { getActiveConnectTunnelManager } from '../services/connect-tunnel.js';
+import { getOwnerScopeMemory } from '../services/owner-memory.js';
 import { ECOSYSTEM_EVENT_VERSION } from '../models/ecosystem-event-schemas.js';
 import {
   listSubscriptions, addSubscription, removeSubscriptions, appendInboundEcosystemLog,
@@ -104,6 +106,47 @@ export function ecosystemEventsRouter(config: AimeatConfig, storage: Storage): R
     };
     const stored = await addSubscription(storage, config.nodeId, sub);
     res.json(success(config.nodeId, { subscription: stored }));
+  });
+
+  // ── POST /v1/ecosystem/read-through — fetch live content behind an ecosystem_ref ──
+  // AIMEAT stores only a reference (pointer + schema + cached metadata), never the live content. This
+  // reads through to the ecosystem app over the tunnel on demand and returns the result WITHOUT
+  // persisting it. If the GEAI is offline, returns the cached metadata + a read_through_unavailable flag.
+  router.post('/v1/ecosystem/read-through', requireAuth(), requireRole('owner'), async (req, res) => {
+    const key = (req.body?.key as string | undefined);
+    if (!key) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key is required'));
+      return;
+    }
+    const rec = await getOwnerScopeMemory(storage, config.nodeId, req.auth!.owner, key);
+    const ref = rec?.value as { _type?: string; app?: string; remoteId?: string; readCapability?: string; schema?: unknown; title?: string; updatedAt?: string } | undefined;
+    if (!ref || ref._type !== 'ecosystem_ref' || !ref.app) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No ecosystem_ref found at that key'));
+      return;
+    }
+    const cached = { app: ref.app, remoteId: ref.remoteId, schema: ref.schema, title: ref.title, updatedAt: ref.updatedAt };
+    const geai = buildGEAI(ref.app, req.auth!.owner, config.nodeId);
+    const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
+    const mgr = getActiveConnectTunnelManager();
+    if (!mgr) {
+      res.json(success(config.nodeId, { read_through_unavailable: true, reason: 'tunnel_unavailable', cached }));
+      return;
+    }
+    try {
+      const reply = await mgr.invokeOnPrincipal(geai, {
+        capability: ref.readCapability ?? '__read__',
+        input: { remoteId: ref.remoteId },
+        caller: ownerGhii,
+      });
+      if (!reply.ok) {
+        res.json(success(config.nodeId, { read_through_unavailable: true, reason: 'ecosystem_refused', cached }));
+        return;
+      }
+      res.json(success(config.nodeId, { content: reply.result, schema: ref.schema, cached }));
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code ?? 'ECOSYSTEM_OFFLINE';
+      res.json(success(config.nodeId, { read_through_unavailable: true, reason: code, cached }));
+    }
   });
 
   // ── DELETE /v1/ecosystem/subscriptions?app=&event= — owner removes subscription(s) ──

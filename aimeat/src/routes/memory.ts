@@ -36,6 +36,7 @@ import { authorizeRead } from '../services/access-guard.js';
 import { emitChange } from '../services/event-bus.js';
 import { getActiveWorkflowEngine } from '../services/workflow/engine.js';
 import { emitEcosystemMemoryWrite } from '../services/ecosystem-events.js';
+import { ecoMayWriteKey } from '../services/ecosystem-access.js';
 import { listOwnerScopeMemory } from '../services/owner-memory.js';
 
 /** Map memory visibility to DMZ zone (Phase 0.6) */
@@ -73,6 +74,14 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
         });
       });
       if (!wsAllowed) return;
+    }
+
+    // Ecosystem (GEAI) data-area allowlist: an organism deposit needs an owner-granted area.
+    if (typeof key === 'string' && req.auth!.roles.includes('ecosystem')) {
+      if (!(await ecoMayWriteKey(storage, req.auth!.sub, key))) {
+        res.status(403).json(error(config.nodeId, 'DATA_AREA_DENIED', `Write to "${key}" is not permitted by this app's data-area allowlist`));
+        return;
+      }
     }
 
     const vis = visibility ?? 'private';
@@ -1164,6 +1173,12 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     // Anonymous namespace enforcement
     if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Anonymous agents can only update keys prefixed with "anonymous."'));
+      return;
+    }
+
+    // Ecosystem (GEAI) data-area allowlist: an organism deposit needs an owner-granted area.
+    if (req.auth!.roles.includes('ecosystem') && !(await ecoMayWriteKey(storage, req.auth!.sub, key))) {
+      res.status(403).json(error(config.nodeId, 'DATA_AREA_DENIED', `Write to "${key}" is not permitted by this app's data-area allowlist`));
       return;
     }
 
