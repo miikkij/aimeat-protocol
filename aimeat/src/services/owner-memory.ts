@@ -13,6 +13,8 @@
  * @version-history
  *   v1.0.0 — 2026-06-13 — Extracted from routes/memory.ts owner-scope branch; reused by the workflow
  *     signal evaluator (fix: signals must read owner-scope, not the owner GHII keyspace alone).
+ *   v1.1.0 — 2026-06-14 — Fold the owner's ecosystem apps (GEAIs) into the owner-scope union
+ *     (ecosystem-apps foundation, chunk 1).
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 
@@ -33,7 +35,11 @@ export async function listOwnerScopeMemory(
 ): Promise<MemoryRecord[]> {
   const ownerGhii = `${ownerName}@${nodeId}`;
   const agents = await storage.getAgentsByOwner(ownerName);
-  const identities = [ownerGhii, ...agents.map(a => a.gaii)];
+  const ecoApps = await storage.getEcosystemAppsByOwner(ownerName);
+  // The owner owns their GEAIs' data the same way they own their agents' — via aggregation. A GEAI
+  // writes into its own eco: namespace (resolveIdentity returns its sub verbatim), so its writes are
+  // only visible to the owner through this union.
+  const identities = [ownerGhii, ...agents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
   const seen = new Set<string>();
   const out: MemoryRecord[] = [];
   for (const id of identities) {
@@ -55,6 +61,11 @@ export async function getOwnerScopeMemory(
   const agents = await storage.getAgentsByOwner(ownerName);
   for (const agent of agents) {
     const rec = await storage.getMemory(agent.gaii, key);
+    if (rec) return rec;
+  }
+  const ecoApps = await storage.getEcosystemAppsByOwner(ownerName);
+  for (const app of ecoApps) {
+    const rec = await storage.getMemory(app.geai, key);
     if (rec) return rec;
   }
   return null;

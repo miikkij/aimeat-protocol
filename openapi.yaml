@@ -138,6 +138,8 @@ tags:
     description: Named groups for sharing memory and files with specific users and agents
   - name: Connector Tunnel
     description: Persistent agent⇄server WebSocket tunnel (forward API calls + realtime reverse delivery)
+  - name: Ecosystem Apps
+    description: GEAI (ecosystem application) principals — per-user, owner-approved external integrations connected via a "hello integration" handshake (RFC 8628 analog)
 
 components:
   securitySchemes:
@@ -165,6 +167,25 @@ components:
       description: One-time key for Tier 0.5 operations
 
   schemas:
+    EcoDataAreaGrant:
+      type: object
+      description: |
+        A data-area grant captured at GEAI approval, expressed in the consent grammar
+        (target area + key/scope pattern + read/write rights). Stored on the binding in chunk 1;
+        enforcement beyond standard scopes is a later capability/data-access chunk.
+      required: [area, pattern, rights]
+      properties:
+        area:
+          type: string
+          description: "What the grant targets: memory | storage | knowledge | organisms."
+        pattern:
+          type: string
+          description: Key prefix / bucket / topic / workspace-id pattern (e.g. "support.*").
+        rights:
+          type: array
+          items:
+            type: string
+            enum: [read, write]
     # === Reusable Enums ===
     WorkStatus:
       type: string
@@ -3362,6 +3383,161 @@ paths:
           description: Operator role required.
         '503':
           description: Connector forward tunnel is not enabled on this node.
+
+  # ── Ecosystem Apps (GEAI) ──────────────────────────────────
+  /v1/ecosystem-apps/hello:
+    post:
+      operationId: ecosystemAppHello
+      summary: Start the "hello integration" handshake
+      description: |
+        Begin connecting an ecosystem application (GEAI) for one owner. Works in both initiation
+        directions (the app dials in, or the owner initiates from AIMEAT) — the body is identical.
+        The app's verification key is pinned TOFU here. Returns RFC-8628-style codes; the owner then
+        approves in their portal and the connector polls `/v1/ecosystem-apps/token`. No auth required.
+      tags: [Ecosystem Apps]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [owner, app, public_key]
+              properties:
+                owner: { type: string, description: Bare owner name this connection belongs to (per-user). }
+                app: { type: string, description: The app's stable global short name (e.g. "zendesk"). }
+                display_name: { type: string }
+                description: { type: string }
+                public_key: { type: string, description: The app's Ed25519 verification key (pinned TOFU). }
+                scopes:
+                  type: array
+                  items: { type: string }
+                  description: Requested scopes (owner may narrow at approval).
+                data_areas:
+                  type: array
+                  items: { $ref: '#/components/schemas/EcoDataAreaGrant' }
+                  description: Requested data-area allowlist (stored at approval; enforcement is a later chunk).
+                bound_ref: { type: string, description: Opaque ecosystem-side account reference (never interpreted by AIMEAT). }
+      responses:
+        '200':
+          description: Pending request created with device + user codes.
+        '400':
+          description: Missing/invalid owner, app, or public_key.
+        '429':
+          description: Too many pending requests for this owner.
+  /v1/ecosystem-apps/token:
+    post:
+      operationId: ecosystemAppToken
+      summary: Poll for the GEAI credential (one-time pickup)
+      description: |
+        The connector polls with the `device_code` until the owner approves. Returns the long-lived
+        GEAI JWT (and the app's pinned public key) exactly once; subsequent polls report already
+        retrieved. Mirrors RFC 8628 `authorization_pending` / `slow_down` / `access_denied` semantics.
+      tags: [Ecosystem Apps]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_code, grant_type]
+              properties:
+                device_code: { type: string }
+                grant_type: { type: string, enum: ['urn:ietf:params:oauth:grant-type:device_code'] }
+      responses:
+        '200':
+          description: Approved — returns access_token, geai, app, scopes, public_key.
+        '400':
+          description: 'OAuth error: authorization_pending, slow_down, access_denied, expired_token, or invalid_grant.'
+  /v1/ecosystem-apps/pending:
+    get:
+      operationId: ecosystemAppsPending
+      summary: List pending hello-integration requests (owner)
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Pending requests for the authenticated owner.
+        '403':
+          description: Owner role required.
+  /v1/ecosystem-apps/{userCode}/approve:
+    post:
+      operationId: ecosystemAppApprove
+      summary: Approve or deny a hello-integration request (owner)
+      description: |
+        The owner approves/denies a pending request, selecting the final scopes (validated against
+        the node's `maxEcoScopes` ceiling) and the data-area allowlist. On approve the GEAI principal
+        is created (or re-approval rotates the pinned key) and the credential becomes issuable.
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userCode
+          in: path
+          required: true
+          schema: { type: string }
+          description: The user code of the pending request.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, enum: [approve, deny] }
+                scopes:
+                  type: array
+                  items: { type: string }
+                data_areas:
+                  type: array
+                  items: { $ref: '#/components/schemas/EcoDataAreaGrant' }
+      responses:
+        '200':
+          description: Approved (returns geai) or denied.
+        '400':
+          description: Invalid action or scopes exceed the node ceiling.
+        '403':
+          description: Owner role required, or request belongs to another owner.
+        '404':
+          description: Authorization request not found.
+        '409':
+          description: Request already processed.
+        '410':
+          description: Request expired.
+  /v1/ecosystem-apps:
+    get:
+      operationId: ecosystemAppsList
+      summary: List the owner's connected GEAIs
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The authenticated owner's ecosystem apps.
+        '403':
+          description: Owner role required.
+  /v1/ecosystem-apps/{app}:
+    delete:
+      operationId: ecosystemAppRevoke
+      summary: Revoke a GEAI (owner)
+      description: Sets the GEAI's status to `revoked`. The owner's refined data is untouched (peer sovereignty).
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: app
+          in: path
+          required: true
+          schema: { type: string }
+          description: The app name of the GEAI to revoke.
+      responses:
+        '200':
+          description: Revoked.
+        '403':
+          description: Owner role required.
+        '404':
+          description: Ecosystem app not found for this owner.
 
   # ── Bootstrap ──────────────────────────────────────────────
   /:

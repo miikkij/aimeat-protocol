@@ -14,7 +14,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { MemoryWriteSchema, MemoryUpdateSchema, validateBody } from '../models/schemas.js';
 import { checkMemoryQuota, checkStorageQuota, chargeOverage } from '../services/quota.js';
@@ -58,7 +58,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
   // POST /v1/memory — write a memory entry (agent auth required)
-  router.post('/v1/memory', requireAuth(), requireRole('agent'), requireScope('memory:write'), validateBody(MemoryWriteSchema, config.nodeId), async (req, res) => {
+  router.post('/v1/memory', requireAuth(), requireExternalPrincipal(), requireScope('memory:write'), validateBody(MemoryWriteSchema, config.nodeId), async (req, res) => {
     const { key, value, visibility, tags, ttl_hours, group_id, agent: agentParam } = req.body ?? {};
 
     // Phase 2.3 — Workspace access check for organism.* keys (key comes from body, not params)
@@ -321,14 +321,18 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
 
     let results: MemoryRecord[];
     if (isOwnerSession && !agentParam) {
-      // Owner session: search across GHII + all agents
+      // Owner session: search across GHII + all agents + all ecosystem apps (GEAIs)
       const callerOwner = req.auth!.owner as string;
       const ownerGhii = `${callerOwner}@${config.nodeId}`;
       const agents = await storage.getAgentsByOwner(callerOwner);
+      const ecoApps = await storage.getEcosystemAppsByOwner(callerOwner);
       results = [];
       results.push(...await storage.searchMemory(ownerGhii, q, { visibility, maxFlags }));
       for (const agent of agents) {
         results.push(...await storage.searchMemory(agent.gaii, q, { visibility, maxFlags }));
+      }
+      for (const app of ecoApps) {
+        results.push(...await storage.searchMemory(app.geai, q, { visibility, maxFlags }));
       }
     } else {
       results = await storage.searchMemory(gaii, q, { visibility, maxFlags });
@@ -1047,7 +1051,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   });
 
   // GET /v1/memory/:key — read a memory entry
-  router.get('/v1/memory/:key', requireAuth(), requireRole('agent'), requireScope('memory:read'), workspaceAccess, async (req, res) => {
+  router.get('/v1/memory/:key', requireAuth(), requireExternalPrincipal(), requireScope('memory:read'), workspaceAccess, async (req, res) => {
     const gaii = resolve(req);
     const key = decodeURIComponent(req.params.key as string);
 
@@ -1090,7 +1094,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   });
 
   // DELETE /v1/memory/:key — delete a memory entry
-  router.delete('/v1/memory/:key', requireAuth(), requireRole('agent'), requireScope('memory:delete'), workspaceAccess, async (req, res) => {
+  router.delete('/v1/memory/:key', requireAuth(), requireExternalPrincipal(), requireScope('memory:delete'), workspaceAccess, async (req, res) => {
     const gaii = resolve(req);
     const key = decodeURIComponent(req.params.key as string);
 
@@ -1148,7 +1152,7 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   });
 
   // PUT /v1/memory/:key — update memory with optimistic locking
-  router.put('/v1/memory/:key', requireAuth(), requireRole('agent'), requireScope('memory:write'), workspaceAccess, validateBody(MemoryUpdateSchema, config.nodeId), async (req, res) => {
+  router.put('/v1/memory/:key', requireAuth(), requireExternalPrincipal(), requireScope('memory:write'), workspaceAccess, validateBody(MemoryUpdateSchema, config.nodeId), async (req, res) => {
     const gaii = resolve(req);
     const key = decodeURIComponent(req.params.key as string);
     const { value, visibility, tags, ttl_hours, version, group_id } = req.body ?? {};

@@ -1063,6 +1063,48 @@ model DeviceAuth {
   mode             String?
 }
 
+// Ecosystem application (GEAI) principal — mirror of Agent, minus task/agent-only fields.
+model EcosystemApp {
+  id            String   @id @default(cuid())
+  geai          String   @unique
+  app           String
+  owner         String
+  displayName   String?
+  description   String?
+  publicKey     String
+  scopes        String[]
+  dataAreas     Json?
+  boundRef      String?
+  status        String   @default("pending")
+  morselBalance Int      @default(0)
+  createdAt     DateTime @default(now())
+  lastSeen      DateTime @default(now())
+
+  @@index([owner])
+}
+
+// Ecosystem "hello integration" handshake — mirror of DeviceAuth.
+model EcoAuth {
+  id             String    @id @default(cuid())
+  deviceCode     String    @unique
+  userCode       String    @unique
+  ownerName      String
+  app            String
+  displayName    String?
+  description    String?
+  status         String    @default("pending")
+  publicKey      String?
+  scopes         String[]
+  dataAreas      Json?
+  boundRef       String?
+  createdAt      DateTime  @default(now())
+  expiresAt      DateTime
+  lastPolledAt   DateTime?
+  pollInterval   Int       @default(5)
+  approvedBy     String?
+  appCredentials Json?
+}
+
 model OAuthClient {
   id           String   @id @default(cuid())
   clientId     String   @unique

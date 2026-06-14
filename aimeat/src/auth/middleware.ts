@@ -23,13 +23,20 @@ const LAST_SEEN_THROTTLE_MS = 5 * 60_000;
 
 function touchAgentLastSeen(auth: VerifiedToken): void {
   if (!_sessionStorage) return;
-  if (!auth.roles.includes('agent')) return;
-  const gaii = auth.sub;
+  const isAgent = auth.roles.includes('agent');
+  const isEco = auth.roles.includes('ecosystem');
+  if (!isAgent && !isEco) return;
+  const id = auth.sub;
   const now = Date.now();
-  const last = _lastSeenCache.get(gaii) ?? 0;
+  const last = _lastSeenCache.get(id) ?? 0;
   if (now - last < LAST_SEEN_THROTTLE_MS) return;
-  _lastSeenCache.set(gaii, now);
-  _sessionStorage.updateAgent(gaii, { lastSeen: new Date(now).toISOString() }).catch(() => {});
+  _lastSeenCache.set(id, now);
+  const iso = new Date(now).toISOString();
+  if (isEco) {
+    _sessionStorage.updateEcosystemApp(id, { lastSeen: iso }).catch(() => {});
+  } else {
+    _sessionStorage.updateAgent(id, { lastSeen: iso }).catch(() => {});
+  }
 }
 
 // Personal Access Tokens are presented as a Bearer credential (Authorization: Bearer
@@ -269,10 +276,14 @@ export function requireRole(role: string) {
       return;
     }
 
-    // Role hierarchy: operator > owner > agent
+    // Role hierarchy: operator > owner > (agent | ecosystem).
+    // `agent` and `ecosystem` are SIBLING external-principal classes: neither satisfies the other.
+    // Owner/operator may act for their own agents AND their own ecosystem connections.
     const hasRole = req.auth.roles.includes(role) ||
       (role === 'agent' && req.auth.roles.includes('owner')) ||
       (role === 'agent' && req.auth.roles.includes('operator')) ||
+      (role === 'ecosystem' && req.auth.roles.includes('owner')) ||
+      (role === 'ecosystem' && req.auth.roles.includes('operator')) ||
       (role === 'owner' && req.auth.roles.includes('operator'));
 
     if (!hasRole) {
@@ -280,6 +291,35 @@ export function requireRole(role: string) {
       return;
     }
 
+    next();
+  };
+}
+
+/**
+ * Require a scoped EXTERNAL principal — an agent (GAII) OR an ecosystem app (GEAI). Owner/operator
+ * also pass (they act for their own external principals, exactly as with requireRole('agent')).
+ * Use this on routes that legitimately serve either external principal (e.g. the memory CRUD a GEAI
+ * uses to deposit refined data). This is a strict SUPERSET of requireRole('agent') — it only widens
+ * access to add the ecosystem role, so agent/owner behavior is unchanged. Scopes are still enforced
+ * separately by requireScope() for both agents and GEAIs.
+ */
+export function requireExternalPrincipal() {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.auth) {
+      const stats = getStats();
+      if (stats) stats.increment('auth_failures_total');
+      const prom = getPromMetrics();
+      if (prom) prom.authFailuresTotal.inc();
+      res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Authentication required'));
+      return;
+    }
+    const roles = req.auth.roles;
+    const ok = roles.includes('agent') || roles.includes('ecosystem') ||
+      roles.includes('owner') || roles.includes('operator');
+    if (!ok) {
+      res.status(403).json(errorEnvelope('ACCESS_DENIED', 'Agent or ecosystem-app principal required'));
+      return;
+    }
     next();
   };
 }
@@ -360,9 +400,11 @@ export function requireScope(...requiredScopes: string[]) {
       return;
     }
 
-    // Owner-role requests bypass scope checks (owners act on behalf of all their agents)
-    // But agent-role requests MUST respect scopes, even if their owner is an operator
-    if (req.auth.roles.includes('owner') && !req.auth.roles.includes('agent')) {
+    // Owner-role requests bypass scope checks (owners act on behalf of all their agents).
+    // But agent- AND ecosystem-role requests MUST respect scopes, even if their owner is an
+    // operator: a GEAI is a scoped external principal and must NEVER receive the owner bypass.
+    if (req.auth.roles.includes('owner') &&
+        !req.auth.roles.includes('agent') && !req.auth.roles.includes('ecosystem')) {
       next();
       return;
     }

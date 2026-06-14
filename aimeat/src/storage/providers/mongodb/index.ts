@@ -85,6 +85,8 @@ import type {
     FederationPeerRecord,
     ReplicationQueueEntry,
     DeviceAuthorizationRecord,
+    EcosystemAppRecord,
+    EcoAuthorizationRecord,
     OAuthClientRecord,
     OAuthRefreshTokenRecord,
     OAuthApprovalRecord,
@@ -4768,6 +4770,194 @@ export class PrismaStorage implements Storage {
         this.ensureReady();
         const result = await this.prisma.deviceAuth.deleteMany({ where: { ownerName } });
         return result.count;
+    }
+
+    // ── Ecosystem Applications (GEAI) + hello-integration handshake ──
+    async createEcosystemApp(app: EcosystemAppRecord): Promise<EcosystemAppRecord> {
+        this.ensureReady();
+        const row = await this.prisma.ecosystemApp.create({
+            data: {
+                geai: app.geai,
+                app: app.app,
+                owner: app.owner,
+                displayName: app.displayName ?? null,
+                description: app.description ?? null,
+                publicKey: app.publicKey,
+                scopes: app.scopes ?? [],
+                dataAreas: (app.dataAreas as any) ?? null,
+                boundRef: app.boundRef ?? null,
+                status: app.status,
+                morselBalance: app.morselBalance ?? 0,
+                createdAt: new Date(app.createdAt),
+                lastSeen: new Date(app.lastSeen),
+            },
+        });
+        return this.toEcosystemAppRecord(row);
+    }
+
+    async getEcosystemApp(geai: string): Promise<EcosystemAppRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.ecosystemApp.findUnique({ where: { geai } });
+        return row ? this.toEcosystemAppRecord(row) : null;
+    }
+
+    async getEcosystemAppByOwnerAndApp(owner: string, app: string): Promise<EcosystemAppRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.ecosystemApp.findFirst({ where: { owner, app } });
+        return row ? this.toEcosystemAppRecord(row) : null;
+    }
+
+    async getEcosystemAppsByOwner(owner: string): Promise<EcosystemAppRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.ecosystemApp.findMany({ where: { owner } });
+        return rows.map((r: any) => this.toEcosystemAppRecord(r));
+    }
+
+    async updateEcosystemApp(geai: string, updates: Partial<EcosystemAppRecord>): Promise<EcosystemAppRecord | null> {
+        this.ensureReady();
+        const data: any = {};
+        if (updates.app !== undefined) data.app = updates.app;
+        if (updates.owner !== undefined) data.owner = updates.owner;
+        if (updates.displayName !== undefined) data.displayName = updates.displayName;
+        if (updates.description !== undefined) data.description = updates.description;
+        if (updates.publicKey !== undefined) data.publicKey = updates.publicKey;
+        if (updates.scopes !== undefined) data.scopes = updates.scopes;
+        if (updates.dataAreas !== undefined) data.dataAreas = (updates.dataAreas as any) ?? null;
+        if (updates.boundRef !== undefined) data.boundRef = updates.boundRef;
+        if (updates.status !== undefined) data.status = updates.status;
+        if (updates.morselBalance !== undefined) data.morselBalance = updates.morselBalance;
+        if (updates.lastSeen !== undefined) data.lastSeen = new Date(updates.lastSeen);
+        try {
+            const row = await this.prisma.ecosystemApp.update({ where: { geai }, data });
+            return this.toEcosystemAppRecord(row);
+        } catch (err) {
+            logger.warn('updateEcosystemApp failed for %s: %s', geai, (err as Error).message);
+            return null;
+        }
+    }
+
+    async deleteEcosystemApp(geai: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await this.prisma.ecosystemApp.delete({ where: { geai } });
+            return true;
+        } catch { return false; }
+    }
+
+    async createEcoAuth(req: EcoAuthorizationRecord): Promise<void> {
+        this.ensureReady();
+        await this.prisma.ecoAuth.create({
+            data: {
+                deviceCode: req.deviceCode,
+                userCode: req.userCode,
+                ownerName: req.ownerName,
+                app: req.app,
+                displayName: req.displayName,
+                description: req.description,
+                status: req.status,
+                publicKey: req.publicKey ?? null,
+                scopes: req.scopes ?? [],
+                dataAreas: (req.dataAreas as any) ?? null,
+                boundRef: req.boundRef ?? null,
+                createdAt: new Date(req.createdAt),
+                expiresAt: new Date(req.expiresAt),
+                lastPolledAt: req.lastPolledAt ? new Date(req.lastPolledAt) : null,
+                pollInterval: req.pollInterval,
+                approvedBy: req.approvedBy,
+                appCredentials: (req.appCredentials as any) ?? undefined,
+            },
+        });
+    }
+
+    async getEcoAuthByDeviceCode(deviceCode: string): Promise<EcoAuthorizationRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.ecoAuth.findUnique({ where: { deviceCode } });
+        return row ? this.toEcoAuthRecord(row) : null;
+    }
+
+    async getEcoAuthByUserCode(userCode: string): Promise<EcoAuthorizationRecord | null> {
+        this.ensureReady();
+        const row = await this.prisma.ecoAuth.findUnique({ where: { userCode } });
+        return row ? this.toEcoAuthRecord(row) : null;
+    }
+
+    async updateEcoAuth(deviceCode: string, updates: Partial<EcoAuthorizationRecord>): Promise<void> {
+        this.ensureReady();
+        const data: any = {};
+        if (updates.status !== undefined) data.status = updates.status;
+        if (updates.scopes !== undefined) data.scopes = updates.scopes;
+        if (updates.dataAreas !== undefined) data.dataAreas = (updates.dataAreas as any) ?? null;
+        if (updates.boundRef !== undefined) data.boundRef = updates.boundRef;
+        if (updates.lastPolledAt !== undefined) data.lastPolledAt = updates.lastPolledAt ? new Date(updates.lastPolledAt) : null;
+        if (updates.pollInterval !== undefined) data.pollInterval = updates.pollInterval;
+        if (updates.approvedBy !== undefined) data.approvedBy = updates.approvedBy;
+        if ('appCredentials' in updates) data.appCredentials = updates.appCredentials ?? null;
+        await this.prisma.ecoAuth.update({ where: { deviceCode }, data });
+    }
+
+    async countPendingEcoAuthByOwner(ownerName: string): Promise<number> {
+        this.ensureReady();
+        return this.prisma.ecoAuth.count({
+            where: { ownerName, status: 'pending', expiresAt: { gt: new Date() } },
+        });
+    }
+
+    async listPendingEcoAuthByOwner(ownerName: string): Promise<EcoAuthorizationRecord[]> {
+        this.ensureReady();
+        const rows = await this.prisma.ecoAuth.findMany({
+            where: { ownerName, status: 'pending', expiresAt: { gt: new Date() } },
+            orderBy: { createdAt: 'desc' },
+        });
+        return rows.map((row: any) => this.toEcoAuthRecord(row));
+    }
+
+    async cleanupExpiredEcoAuth(): Promise<number> {
+        this.ensureReady();
+        const result = await this.prisma.ecoAuth.deleteMany({
+            where: { status: 'pending', expiresAt: { lte: new Date() } },
+        });
+        return result.count;
+    }
+
+    private toEcosystemAppRecord(row: any): EcosystemAppRecord {
+        const record: EcosystemAppRecord = {
+            geai: row.geai,
+            app: row.app,
+            owner: row.owner,
+            publicKey: row.publicKey,
+            scopes: row.scopes ?? [],
+            status: row.status,
+            morselBalance: row.morselBalance ?? 0,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+            lastSeen: row.lastSeen instanceof Date ? row.lastSeen.toISOString() : row.lastSeen,
+        };
+        if (row.displayName) record.displayName = row.displayName;
+        if (row.description) record.description = row.description;
+        if (row.dataAreas) record.dataAreas = row.dataAreas as any;
+        if (row.boundRef) record.boundRef = row.boundRef;
+        return record;
+    }
+
+    private toEcoAuthRecord(row: any): EcoAuthorizationRecord {
+        return {
+            deviceCode: row.deviceCode,
+            userCode: row.userCode,
+            ownerName: row.ownerName,
+            app: row.app,
+            displayName: row.displayName ?? undefined,
+            description: row.description ?? undefined,
+            status: row.status,
+            publicKey: row.publicKey ?? undefined,
+            scopes: row.scopes?.length ? row.scopes : undefined,
+            dataAreas: row.dataAreas ?? undefined,
+            boundRef: row.boundRef ?? undefined,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+            expiresAt: row.expiresAt instanceof Date ? row.expiresAt.toISOString() : row.expiresAt,
+            lastPolledAt: row.lastPolledAt ? (row.lastPolledAt instanceof Date ? row.lastPolledAt.toISOString() : row.lastPolledAt) : undefined,
+            pollInterval: row.pollInterval,
+            approvedBy: row.approvedBy ?? undefined,
+            appCredentials: row.appCredentials ?? undefined,
+        };
     }
 
     private toDeviceAuthRecord(row: any): DeviceAuthorizationRecord {

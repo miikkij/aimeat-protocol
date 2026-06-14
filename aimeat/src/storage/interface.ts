@@ -77,6 +77,52 @@ export interface AgentRecord {
   maxConcurrentTasks?: number;
 }
 
+/**
+ * A data-area grant captured at GEAI approval time. Expressed in the existing consent grammar
+ * (recipient + key/scope pattern + read/write rights) so a later capability/data-access chunk can
+ * enforce it with the same machinery agents use. In chunk 1 this is STORED ONLY — not enforced
+ * beyond standard requireScope.
+ */
+export interface EcoDataAreaGrant {
+  /** What the grant targets: 'memory' | 'storage' | 'knowledge' | 'organisms' (free-form for now). */
+  area: string;
+  /** Key prefix / bucket / topic / workspace id pattern this grant covers (e.g. "support.*"). */
+  pattern: string;
+  /** Rights granted on the target. */
+  rights: ('read' | 'write')[];
+}
+
+/**
+ * EcosystemAppRecord — the GEAI principal, a near-copy of AgentRecord MINUS task/agent-only fields
+ * (no mode, no maxConcurrentTasks, no webhooks, no task queue) PLUS the ecosystem binding fields
+ * (app, boundRef, dataAreas, status). One per (app, owner, node). The morsel balance is always 0 —
+ * like agents, the human (GHII) holds the only balance.
+ */
+export interface EcosystemAppRecord {
+  /** The ecosystem app's stable global short name (e.g. "zendesk"). */
+  app: string;
+  /** Bare owner name this connection belongs to (per-user). */
+  owner: string;
+  /** Full GEAI: eco:{app}#{owner}@{node}. */
+  geai: string;
+  displayName?: string;
+  description?: string;
+  /** The app's Ed25519 verification key, pinned TOFU at first connect (hello). */
+  publicKey: string;
+  /** Owner-approved scopes (same grammar + enforcement as agent scopes). */
+  scopes: string[];
+  /** Owner-selected data-area allowlist captured at approval (stored only in chunk 1). */
+  dataAreas?: EcoDataAreaGrant[];
+  /** Opaque ecosystem-side account reference — the per-user correspondence marker. Never interpreted by AIMEAT. */
+  boundRef?: string;
+  /** Connection lifecycle state. */
+  status: 'validating' | 'pending' | 'approved' | 'active' | 'revoked';
+  /** Always 0 — balance lives on the owner GHII (schema parity with AgentRecord). */
+  morselBalance: number;
+  createdAt: string;
+  lastSeen: string;
+}
+
 export interface MemoryRecord {
   key: string;
   ownerGaii: string;    // the agent GAII that owns this memory
@@ -221,6 +267,42 @@ export interface DeviceAuthorizationRecord {
   agentCredentials?: {
     gaii: string;
     privateKey: string;
+    publicKey: string;
+    token?: string;
+    expires_at?: string;
+  };
+}
+
+/**
+ * EcoAuthorizationRecord — the pending "hello integration" handshake request for an ecosystem app,
+ * a near-copy of DeviceAuthorizationRecord. Carries the eco-specific fields captured before approval
+ * (app name, the TOFU-pinned publicKey, the requested scopes + data-area allowlist, the opaque
+ * boundRef). On approval the GEAI credential is stashed in `appCredentials` for one-time pickup.
+ */
+export interface EcoAuthorizationRecord {
+  deviceCode: string;
+  userCode: string;
+  ownerName: string;
+  app: string;
+  displayName?: string;
+  description?: string;
+  status: 'pending' | 'approved' | 'denied' | 'expired';
+  /** The app's verification key submitted at hello, pinned TOFU. */
+  publicKey?: string;
+  /** Scopes requested by the app (owner may narrow at approval). */
+  scopes?: string[];
+  /** Data-area allowlist requested by the app (owner may edit at approval). */
+  dataAreas?: EcoDataAreaGrant[];
+  /** Opaque ecosystem-side account reference, carried through to the binding record. */
+  boundRef?: string;
+  createdAt: string;
+  expiresAt: string;
+  lastPolledAt?: string;
+  pollInterval: number;
+  approvedBy?: string;
+  appCredentials?: {
+    geai: string;
+    /** The app's TOFU-pinned verification key (echoed back; the app already holds its private half). */
     publicKey: string;
     token?: string;
     expires_at?: string;
@@ -1858,6 +1940,7 @@ export interface AgentOnboardingRecord {
 // ── Domain Repository Interfaces ────────────────────────────────────
 import type { OwnerRepository } from './repositories/owner.repository.js';
 import type { AgentRepository } from './repositories/agent.repository.js';
+import type { EcosystemAppRepository } from './repositories/ecosystem-app.repository.js';
 import type { MemoryRepository } from './repositories/memory.repository.js';
 import type { ActionRepository } from './repositories/action.repository.js';
 import type { WorkRepository } from './repositories/work.repository.js';
@@ -1919,6 +2002,7 @@ export interface Storage extends
   KnowledgeRepository, SchedulerRepository,
   ExtensionInstanceRepository, ReplicationQueueRepository,
   DeviceAuthRepository,
+  EcosystemAppRepository,
   OAuthRepository, SystemPromptRepository,
   PackageRepository, TemplateListingRepository, PackageInstanceRepository,
   CapabilityRepository,
