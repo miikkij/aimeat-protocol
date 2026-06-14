@@ -35,6 +35,7 @@ import type { StatsCollector } from '../services/stats.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { emitChange } from '../services/event-bus.js';
 import { getActiveWorkflowEngine } from '../services/workflow/engine.js';
+import { emitEcosystemMemoryWrite } from '../services/ecosystem-events.js';
 import { listOwnerScopeMemory } from '../services/owner-memory.js';
 
 /** Map memory visibility to DMZ zone (Phase 0.6) */
@@ -218,6 +219,9 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     // owner-GHII namespace, so agent-namespace writes don't fire owner-keyed triggers).
     getActiveWorkflowEngine()?.onMemoryWrite(gaii, key)
       .catch(e => logger.error('workflow event trigger (memory.write) failed', { key, error: String(e) }));
+    // Outbound ecosystem event: push memory.write to any subscribed GEAI of this owner (best-effort).
+    emitEcosystemMemoryWrite(storage, config, gaii, key)
+      .catch(e => logger.error('ecosystem outbound (memory.write) failed', { key, error: String(e) }));
   });
 
   // GET /v1/memory — list memory keys (agent auth required)

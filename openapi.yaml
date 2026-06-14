@@ -3539,6 +3539,117 @@ paths:
         '404':
           description: Ecosystem app not found for this owner.
 
+  # ── Ecosystem Events & Triggers ────────────────────────────
+  /v1/ecosystem/events:
+    post:
+      operationId: ecosystemEventEmit
+      summary: A GEAI emits an inbound event
+      description: |
+        An ecosystem app (GEAI) emits an inbound event. The emitting app + GEAI are taken from the
+        token (pinned at tunnel upgrade), never the body, so an app cannot spoof another's events.
+        The event is audit-logged and replayed into the workflow engine's `ecosystem.event` triggers.
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event]
+              properties:
+                event: { type: string, description: "Inbound event name, e.g. ticket.resolved" }
+                version: { type: integer, minimum: 1, description: Event MAJOR version (default 1). A workflow trigger fail-safe-skips on a major mismatch. }
+                data: { type: object, additionalProperties: true, description: Per-event payload. }
+      responses:
+        '200':
+          description: Accepted (returns app, event, version).
+        '400':
+          description: Invalid event body.
+        '403':
+          description: Requires the `ecosystem` role and the `events:emit` scope.
+  /v1/ecosystem/subscriptions:
+    get:
+      operationId: ecosystemSubscriptionsList
+      summary: List the owner's outbound event subscriptions
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: app
+          in: query
+          required: false
+          schema: { type: string }
+          description: Filter to one app's subscriptions.
+      responses:
+        '200':
+          description: The owner's subscriptions.
+        '403':
+          description: Owner role required.
+    post:
+      operationId: ecosystemSubscribe
+      summary: Subscribe a GEAI to an outbound event
+      description: |
+        Subscribe one of the owner's connected GEAIs to an outbound AIMEAT event (e.g. memory.write),
+        optionally filtered by a glob match. Best-effort tunnel delivery; the GEAI receives a `deliver`
+        frame when online. The owner's grant is the ceiling and is re-checked live at emit time.
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [app, event]
+              properties:
+                app: { type: string, description: The bound app name. }
+                event: { type: string, description: "Outbound event name (e.g. memory.write), or * for all granted." }
+                match:
+                  type: object
+                  additionalProperties: { type: string }
+                  description: "Optional glob filter, e.g. key: crm.*"
+                transport:
+                  type: array
+                  items: { type: string, enum: [tunnel, webhook] }
+                  description: Delivery preference (only 'tunnel' is acted on in this version).
+      responses:
+        '200':
+          description: The stored subscription.
+        '400':
+          description: Invalid body.
+        '403':
+          description: Owner role required.
+        '404':
+          description: Ecosystem app not found for this owner.
+    delete:
+      operationId: ecosystemUnsubscribe
+      summary: Remove subscription(s) for a GEAI
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: app
+          in: query
+          required: true
+          schema: { type: string }
+        - name: event
+          in: query
+          required: false
+          schema: { type: string }
+          description: If omitted, removes all subscriptions for the app.
+      responses:
+        '200':
+          description: Number removed.
+        '400':
+          description: app query parameter is required.
+        '403':
+          description: Owner role required.
+        '404':
+          description: Ecosystem app not found for this owner.
+
   # ── Bootstrap ──────────────────────────────────────────────
   /:
     get:

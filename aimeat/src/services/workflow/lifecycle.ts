@@ -20,6 +20,7 @@ import type { Scheduler } from '../scheduler.js';
 import type { WorkflowDef, WorkflowRun } from '../../models/workflow-schemas.js';
 
 const EVENT_INDEX_KEY = 'workflows.eventindex';
+const ECO_EVENT_INDEX_KEY = 'workflows.ecoeventindex';
 const ACTIVE_KEY = 'workflows.active';
 const schedIdFor = (workflowId: string): string => `wf-sched:${workflowId}`;
 const systemGhiiFor = (nodeId: string): string => `system@${nodeId}`;
@@ -30,6 +31,16 @@ export interface EventTrigger {
   workflowId: string;
   on: 'memory.write' | 'offer.ordered';
   match: Record<string, string>;
+}
+
+/** Sibling of EventTrigger for the `ecosystem.event` kind — keyed by {app, on, version}. */
+export interface EcosystemEventTrigger {
+  ownerGhii: string;
+  workflowId: string;
+  app: string;
+  on: string;
+  version: number;            // pinned MAJOR; engine fail-safe skips on a major mismatch
+  match?: Record<string, string>;
 }
 
 export interface ActiveRun { ownerGhii: string; workflowId: string; runId: string; }
@@ -90,6 +101,32 @@ async function clearEventTrigger(storage: Storage, nodeId: string, workflowId: s
   return next;
 }
 
+// ── ecosystem-event-trigger index (system namespace; the engine's GEAI-event roster) ──────────────
+export async function readEcosystemEventTriggers(storage: Storage, nodeId: string): Promise<EcosystemEventTrigger[]> {
+  const rec = await storage.getMemory(systemGhiiFor(nodeId), ECO_EVENT_INDEX_KEY);
+  const arr = rec?.value as EcosystemEventTrigger[] | undefined;
+  return Array.isArray(arr) ? arr : [];
+}
+
+async function writeEcosystemEventTriggers(storage: Storage, nodeId: string, entries: EcosystemEventTrigger[]): Promise<void> {
+  const systemGhii = systemGhiiFor(nodeId);
+  const existing = await storage.getMemory(systemGhii, ECO_EVENT_INDEX_KEY);
+  const now = new Date().toISOString();
+  await storage.setMemory({
+    key: ECO_EVENT_INDEX_KEY, ownerGaii: systemGhii, value: entries,
+    visibility: 'private', tags: ['workflow-index'], ttlHours: null,
+    version: existing ? existing.version + 1 : 1,
+    createdAt: existing?.createdAt ?? now, updatedAt: now,
+  });
+}
+
+async function clearEcosystemEventTrigger(storage: Storage, nodeId: string, workflowId: string): Promise<EcosystemEventTrigger[]> {
+  const entries = await readEcosystemEventTriggers(storage, nodeId);
+  const next = entries.filter(e => e.workflowId !== workflowId);
+  if (next.length !== entries.length) await writeEcosystemEventTriggers(storage, nodeId, next);
+  return next;
+}
+
 // ── sync on save ─────────────────────────────────────────────────────────────────
 export async function syncWorkflowTriggers(
   storage: Storage, scheduler: Scheduler, nodeId: string, def: WorkflowDef, ownerGhii: string, createdBy: string,
@@ -121,6 +158,16 @@ export async function syncWorkflowTriggers(
     entries.push({ ownerGhii, workflowId: def.id, on: def.trigger.on, match: def.trigger.match });
     await writeEventTriggers(storage, nodeId, entries);
   }
+
+  // 3. Ecosystem-event-trigger index (ecosystem.event trigger only).
+  const ecoEntries = await clearEcosystemEventTrigger(storage, nodeId, def.id);
+  if (def.trigger.kind === 'ecosystem.event') {
+    ecoEntries.push({
+      ownerGhii, workflowId: def.id,
+      app: def.trigger.app, on: def.trigger.on, version: def.trigger.version, match: def.trigger.match,
+    });
+    await writeEcosystemEventTriggers(storage, nodeId, ecoEntries);
+  }
 }
 
 // ── teardown on delete ─────────────────────────────────────────────────────────
@@ -131,4 +178,5 @@ export async function removeWorkflowTriggers(storage: Storage, scheduler: Schedu
     await storage.deleteScheduledJob(schedId);
   }
   await clearEventTrigger(storage, nodeId, workflowId);
+  await clearEcosystemEventTrigger(storage, nodeId, workflowId);
 }
