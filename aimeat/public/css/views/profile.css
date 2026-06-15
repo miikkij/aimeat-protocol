@@ -23,6 +23,11 @@
  *     run-history log expander (.pf-eco-auto-log/-row/-time/-trigger/-dur/-reason, -log-loading/-log-empty).
  *   v1.21.0 — 2026-06-15 — Editable recipe trigger keyGlob: .pf-eco-recipe-trigger-input (text input)
  *     + .pf-eco-recipe-trigger-help (help line).
+ *   v2.0.0 — 2026-06-15 — Ecosystem Automation REWORK into one turnkey flow + status timeline:
+ *     .pf-eco-auto-flow(-intro/-card/-step/-step-disabled/-num/-controls/-email/-advanced/-advanced-body/
+ *     -save), .pf-eco-auto-how(-toggle/-lead/-steps/-doc), .pf-eco-auto-produces(-cap),
+ *     .pf-eco-auto-status(-timeline/-step/-head/-dot/-dot-*/-label/-body/-agents/-note/-chip/-pending-count),
+ *     .pf-eco-auto-status-{ok,wait,off,error}.
  *   v1.14.0 — 2026-06-10 — SchemaForm usability: .pj-field-hint (per-field hint),
  *     .pj-field-invalid (missing-required outline) + .pj-form-error message.
  *   v1.13.0 — 2026-06-10 — Workspace renew, phase 2: .pj-ws-head-actions, review
@@ -2755,3 +2760,46 @@
 .pf-eco-adv-rationale { display: flex; flex-direction: column; gap: .2rem; font-size: .82rem; }
 .pf-eco-adv-actions { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; margin-top: .15rem; }
 .pf-eco-adv-reject { color: var(--danger, var(--text-dim)); }
+
+/* ── Ecosystem Automation — one turnkey flow (pf-eco-auto-flow-*) ── */
+.pf-eco-auto-flow-intro { margin: -.25rem 0 .5rem; }
+.pf-eco-auto-how-toggle { display: flex; align-items: center; gap: .4rem; background: none; border: none; padding: .15rem 0; font-size: .85rem; font-weight: 600; color: var(--text); cursor: pointer; }
+.pf-eco-auto-how-toggle:hover { color: var(--accent); }
+.pf-eco-auto-how { background: var(--bg-dim); border: 1px solid var(--border); border-radius: 8px; padding: .7rem .8rem; margin: .3rem 0 .6rem; }
+.pf-eco-auto-how-lead { margin: 0 0 .4rem; }
+.pf-eco-auto-how-steps { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; color: var(--text); }
+.pf-eco-auto-how-doc { margin: .5rem 0 0; font-size: .78rem; }
+.pf-eco-auto-flow-card { border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: .4rem .9rem; margin: .3rem 0 .9rem; }
+.pf-eco-auto-flow-step { padding: .7rem 0; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: .5rem; }
+.pf-eco-auto-flow-step:first-child { border-top: none; }
+.pf-eco-auto-flow-step-disabled { opacity: .6; }
+.pf-eco-auto-flow-num { font-weight: 700; font-size: .85rem; color: var(--accent); }
+.pf-eco-auto-flow-controls { display: flex; align-items: center; gap: .9rem; flex-wrap: wrap; }
+.pf-eco-auto-produces { display: flex; flex-direction: column; gap: .3rem; }
+.pf-eco-auto-produces-cap { font-weight: 600; }
+.pf-eco-auto-flow-email { margin-top: .2rem; }
+.pf-eco-auto-flow-advanced { gap: .35rem; }
+.pf-eco-auto-flow-advanced-body { display: flex; flex-direction: column; gap: .35rem; padding-left: 1.2rem; }
+.pf-eco-auto-flow-save { padding: .7rem 0; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
+
+/* ── Ecosystem Automation — status timeline (pf-eco-auto-status-*) ── */
+.pf-eco-auto-status { margin-top: .4rem; }
+.pf-eco-auto-status-timeline { display: flex; flex-direction: column; gap: 0; margin-top: .5rem; }
+.pf-eco-auto-status-step { position: relative; padding: 0 0 1rem 1.4rem; border-left: 2px solid var(--border); }
+.pf-eco-auto-status-step:last-child { border-left-color: transparent; padding-bottom: 0; }
+.pf-eco-auto-status-head { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; margin-bottom: .35rem; }
+.pf-eco-auto-status-dot { position: absolute; left: -7px; top: .15rem; width: 12px; height: 12px; border-radius: 50%; background: var(--bg-dim); border: 2px solid var(--border); }
+.pf-eco-auto-status-dot-ok { background: var(--success, var(--accent)); border-color: var(--success, var(--accent)); }
+.pf-eco-auto-status-dot-wait { background: var(--bg-dim); border-color: var(--accent); }
+.pf-eco-auto-status-dot-off { background: var(--bg-dim); border-color: var(--border); }
+.pf-eco-auto-status-dot-error { background: var(--danger, var(--accent)); border-color: var(--danger, var(--accent)); }
+.pf-eco-auto-status-label { font-size: .88rem; color: var(--text); }
+.pf-eco-auto-status-chip { font-family: inherit; }
+.pf-eco-auto-status-ok { background: var(--success-bg, var(--bg-dim)); color: var(--success, var(--accent)); border-color: var(--success, var(--border)); }
+.pf-eco-auto-status-wait { background: var(--bg-dim); color: var(--text-dim); }
+.pf-eco-auto-status-off { background: var(--bg-dim); color: var(--text-dim); }
+.pf-eco-auto-status-error { background: var(--danger-bg, var(--bg-dim)); color: var(--danger-fg, var(--danger, var(--text-dim))); }
+.pf-eco-auto-status-pending-count { background: var(--accent); color: var(--bg, var(--card)); font-family: inherit; font-weight: 600; }
+.pf-eco-auto-status-body { display: flex; flex-direction: column; gap: .4rem; }
+.pf-eco-auto-status-agents { display: flex; flex-wrap: wrap; gap: .35rem; }
+.pf-eco-auto-status-note { margin: 0; font-size: .78rem; }
