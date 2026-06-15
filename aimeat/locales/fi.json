@@ -494,6 +494,8 @@
       "revokeReconnectHint": "Tämän appin yhteys on poistettu. Datasi yllä jää sinulle. Yhdistääksesi uudelleen: yhdistä appi uudestaan sen omasta päästä — AIMEAT kiinnittää sen tunnisteen ja lukee asetukset (tallennusavain, kyvykkyydet) automaattisesti uudelleen.",
       "subError": "Tilausta ei voitu päivittää.",
       "pendingTitle": "Odottavat integraatiopyynnöt",
+      "pendingHint": "Sovellus näyttää saman koodin omassa näkymässään. Tarkista että ne täsmäävät, ja hyväksy — sinun ei tarvitse syöttää koodia mihinkään.",
+      "pendingCode": "Koodi",
       "waiting": "odottaa",
       "expiresIn": "vanhenee {n} min kuluttua",
       "grantLevel": "Käyttöoikeustaso",
