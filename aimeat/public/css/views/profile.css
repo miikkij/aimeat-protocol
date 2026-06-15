@@ -2658,7 +2658,10 @@
 .pf-eco-cmd-row { display: flex; align-items: center; gap: .5rem; }
 .pf-eco-cmd { flex: 1; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; padding: .5rem .7rem; font-family: var(--font-mono, monospace); font-size: .85rem; overflow-x: auto; }
 .pf-eco-pending { background: var(--surface); border: 1px solid var(--accent); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
-.pf-eco-pending-title { font-weight: 700; margin-bottom: .6rem; color: var(--accent); }
+.pf-eco-pending-title { font-weight: 700; margin-bottom: .15rem; color: var(--accent); }
+.pf-eco-pending-hint { font-size: .82rem; margin: 0 0 .6rem; }
+.pf-eco-pending-code { display: inline-flex; align-items: baseline; gap: .35rem; font-size: .82rem; color: var(--text-dim); }
+.pf-eco-pending-code strong { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1rem; letter-spacing: .08em; color: var(--text); background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; padding: .1rem .4rem; }
 .pf-eco-pending-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; padding: .5rem 0; border-top: 1px solid var(--border); }
 .pf-eco-pending-row:first-of-type { border-top: none; }
 .pf-eco-pending-info { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }

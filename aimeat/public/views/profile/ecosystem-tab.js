@@ -1066,10 +1066,12 @@ export default function EcosystemTab({ onStats, showToast }) {
       ${pending.length > 0 && html`
         <div class="pf-eco-pending">
           <div class="pf-eco-pending-title">${t('profile.ecosystem.pendingTitle')}</div>
+          <p class="pf-eco-dim pf-eco-pending-hint">${t('profile.ecosystem.pendingHint')}</p>
           ${pending.map(r => html`
             <div class="pf-eco-pending-row" key=${r.user_code}>
               <div class="pf-eco-pending-info">
                 <strong>${r.display_name || r.app}</strong>
+                ${r.user_code && html`<span class="pf-eco-pending-code">${t('profile.ecosystem.pendingCode')} <strong>${r.user_code}</strong></span>`}
                 <span class="pf-eco-mono">eco:${r.app}</span>
                 <span class="pf-eco-pill">${t('profile.ecosystem.waiting')}</span>
                 ${r.validation && r.validation !== 'none' && html`
