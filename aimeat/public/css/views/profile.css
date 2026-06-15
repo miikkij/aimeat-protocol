@@ -18,6 +18,9 @@
  *     -row/-label/-agents/-agent/-toggle/-radios/-radio/-radio-title/-radio-hint/-foot/-note).
  *   v1.19.0 — 2026-06-15 — Ecosystem "Pending advisories" approval surface (B7/B8): .pf-eco-adv(-list/
  *     -item/-head/-title/-kind/-sev/-sev-*/-meta/-body/-rationale/-actions/-reject).
+ *   v1.20.0 — 2026-06-15 — Ecosystem automation schedule-row UX: .pf-eco-auto-result-skipped,
+ *     .pf-eco-auto-cadence-sel (editable cadence on a row), .pf-eco-auto-lastattempt (Run-now skip note),
+ *     run-history log expander (.pf-eco-auto-log/-row/-time/-trigger/-dur/-reason, -log-loading/-log-empty).
  *   v1.14.0 — 2026-06-10 — SchemaForm usability: .pj-field-hint (per-field hint),
  *     .pj-field-invalid (missing-required outline) + .pj-form-error message.
  *   v1.13.0 — 2026-06-10 — Workspace renew, phase 2: .pj-ws-head-actions, review
@@ -2700,8 +2703,21 @@
 .pf-eco-auto-job-meta { display: flex; flex-wrap: wrap; gap: .75rem; font-size: .78rem; }
 .pf-eco-auto-result-ok, .pf-eco-auto-result-success { color: var(--success, var(--accent)); }
 .pf-eco-auto-result-error { color: var(--danger, var(--accent)); }
+.pf-eco-auto-result-skipped { color: var(--text-dim); }
 .pf-eco-auto-job-actions { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
 .pf-eco-auto-del { color: var(--danger, var(--text-dim)); }
+/* Editable cadence select on an existing schedule row */
+.pf-eco-auto-cadence-sel { flex: 0 0 auto; }
+/* Per-row last Run-now attempt note (a skip stays visible until the next load) */
+.pf-eco-auto-lastattempt { font-size: .78rem; font-style: italic; }
+/* Per-schedule run-history log expander */
+.pf-eco-auto-log-loading, .pf-eco-auto-log-empty { font-size: .78rem; margin-top: .3rem; }
+.pf-eco-auto-log { display: flex; flex-direction: column; gap: .3rem; margin-top: .4rem; padding-top: .4rem; border-top: 1px dashed var(--border); }
+.pf-eco-auto-log-row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; font-size: .78rem; }
+.pf-eco-auto-log-time { flex: 0 0 auto; }
+.pf-eco-auto-log-trigger { font-size: .72rem; opacity: .85; }
+.pf-eco-auto-log-dur { font-size: .72rem; opacity: .85; }
+.pf-eco-auto-log-reason { flex: 1 1 100%; word-break: break-word; }
 /* Automation recipe (B4) */
 .pf-eco-recipe { margin-top: .9rem; padding-top: .7rem; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: .6rem; }
 .pf-eco-recipe-head { font-weight: 700; font-size: .88rem; color: var(--text); }

@@ -32,6 +32,12 @@
  *     dropdown, email toggle, approve/push delivery radio, Enabled master toggle, Save). Lazy-loads the
  *     recipe + the owner's agents + organisms, reflects loaded state, refreshes on aimeat-live-update,
  *     toasts on save. Shows the resolved trigger keyGlob read-only.
+ *   v1.7.0 — 2026-06-15 — Automation schedule-row UX (3 fixes): (1) "Run now" reports the HONEST
+ *     trigger outcome — success/skip(busy)/error — with offline-aware skip wording (the connector
+ *     tunnel hint) instead of a fake green success, + a per-row last-attempt note for skips; (2) a
+ *     per-schedule run-history log expander (<EcoScheduleLog>, GET /v1/schedules/:id) listing recent
+ *     runs incl. SKIPPED ones with their reason/duration/trigger; (3) the read-only cadence chip is
+ *     now an editable <select> that PATCHes the cron of an existing schedule (custom crons preserved).
  *   v1.6.0 — 2026-06-15 — Add the "Pending advisories" approval surface (B7/B8): <EcoPendingAdvisories>
  *     under Automation. Lists the recipe's gated agent-produced advisories awaiting approval; each shows
  *     title + kind/severity chips + effective dates + the body rendered readably via <JsonValue> (never
@@ -51,7 +57,7 @@ import { JsonValue } from '/components/JsonView.js';
 import { Spinner } from './shared.js';
 import { listEcosystemApps, listAppData, listPending, approve, revoke, listSubscriptions, subscribe, unsubscribe, getAutomationRecipe, putAutomationRecipe, listPendingAdvisories, approveAdvisory, rejectAdvisory } from '/js/services/ecosystem.js';
 import { formatUntil } from './schedule-item.js';
-import { listAppSchedules, createCapabilitySchedule, setScheduleEnabled, deleteSchedule, triggerSchedule } from '/js/services/schedules.js';
+import { listAppSchedules, createCapabilitySchedule, setScheduleEnabled, deleteSchedule, triggerSchedule, getScheduleDetail, setScheduleCron } from '/js/services/schedules.js';
 import { listAgents } from '/js/services/agents.js';
 import { listOrganisms, currentGhii } from '/js/services/organisms.js';
 
@@ -106,6 +112,44 @@ const CRON_TO_CADENCE = Object.fromEntries(CADENCES.map(c => [c.cron, c.key]));
 function cronLabel(cron) {
   const key = CRON_TO_CADENCE[cron];
   return key ? t(`profile.ecosystem.automationCadence_${key}`) : cron;
+}
+
+/**
+ * The per-schedule run-history log: lazy-fetches GET /v1/schedules/:id on first
+ * expand (and after a Run-now via the `refreshKey` bump) and renders the recent
+ * runs as a compact list — relative time + a result chip (success/error/skipped)
+ * + error/skip reason + duration + trigger source. SKIPPED runs (offline attempts
+ * that don't advance lastRun) show here with their reason — the whole point.
+ */
+function EcoScheduleLog({ jobId, refreshKey }) {
+  const [runs, setRuns] = useState(undefined); // undefined = loading
+
+  useEffect(() => {
+    let alive = true;
+    setRuns(undefined);
+    getScheduleDetail(jobId)
+      .then(d => { if (alive) setRuns(Array.isArray(d.runs) ? d.runs : []); })
+      .catch(() => { if (alive) setRuns([]); });
+    return () => { alive = false; };
+  }, [jobId, refreshKey]);
+
+  if (runs === undefined) {
+    return html`<div class="pf-eco-dim pf-eco-auto-log-loading"><${Spinner} /> ${t('profile.ecosystem.automationLogLoading')}</div>`;
+  }
+  if (runs.length === 0) {
+    return html`<div class="pf-eco-dim pf-eco-auto-log-empty">${t('profile.ecosystem.automationLogEmpty')}</div>`;
+  }
+  return html`
+    <div class="pf-eco-auto-log">
+      ${runs.map(r => html`
+        <div class="pf-eco-auto-log-row" key=${r.id || r.createdAt}>
+          <span class="pf-eco-dim pf-eco-auto-log-time">${r.createdAt ? timeAgo(r.createdAt) : ''}</span>
+          <span class="pf-eco-chip pf-eco-auto-result-${r.result}">${t(`profile.ecosystem.automationRunResult_${r.result}`)}</span>
+          ${r.trigger && html`<span class="pf-eco-dim pf-eco-auto-log-trigger">${r.trigger}</span>`}
+          ${typeof r.durationMs === 'number' && html`<span class="pf-eco-dim pf-eco-auto-log-dur">${t('profile.ecosystem.automationDuration', { ms: r.durationMs })}</span>`}
+          ${r.errorMessage && html`<span class="pf-eco-dim pf-eco-auto-log-reason">${r.errorMessage}</span>`}
+        </div>`)}
+    </div>`;
 }
 
 /**
@@ -390,6 +434,9 @@ function EcoAutomationSection({ app, showToast }) {
   const [schedules, setSchedules] = useState(undefined); // undefined = never loaded
   const [cadenceByCap, setCadenceByCap] = useState({});  // capabilityId → cadence key
   const [busy, setBusy] = useState({});                  // capabilityId/scheduleId → bool
+  const [openLog, setOpenLog] = useState({});            // scheduleId → bool (log expanded)
+  const [logRefresh, setLogRefresh] = useState({});      // scheduleId → number (re-fetch trigger)
+  const [lastAttempt, setLastAttempt] = useState({});    // scheduleId → { outcome, reason }
 
   const caps = app.capabilities || [];
   // automation.schedulable[].cadences may restrict which cadences a capability allows.
@@ -427,10 +474,10 @@ function EcoAutomationSection({ app, showToast }) {
     setBusy(b => ({ ...b, [capId]: true }));
     try {
       await createCapabilitySchedule(app.app, capId, cron, { displayName: `${app.display_name || app.app} · ${capId}` });
-      showToast?.(t('profile.ecosystem.automationCreated'), 'success');
+      showToast?.(t('profile.ecosystem.automationCreated'), false);
       await load();
     } catch (e) {
-      showToast?.(t('profile.ecosystem.automationError'), 'error');
+      showToast?.(t('profile.ecosystem.automationError'), true);
     } finally {
       setBusy(b => ({ ...b, [capId]: false }));
     }
@@ -442,7 +489,7 @@ function EcoAutomationSection({ app, showToast }) {
       await setScheduleEnabled(job.id, !job.enabled);
       await load();
     } catch (e) {
-      showToast?.(t('profile.ecosystem.automationError'), 'error');
+      showToast?.(t('profile.ecosystem.automationError'), true);
     } finally {
       setBusy(b => ({ ...b, [job.id]: false }));
     }
@@ -451,14 +498,51 @@ function EcoAutomationSection({ app, showToast }) {
   async function onRunNow(job) {
     setBusy(b => ({ ...b, [job.id]: true }));
     try {
-      await triggerSchedule(job.id);
-      showToast?.(t('profile.ecosystem.automationTriggered'), 'success');
+      // The backend tells us what ACTUALLY happened: 'success' (ran), 'busy'
+      // (skipped — e.g. app offline / connect-tunnel unavailable), or 'error'.
+      const res = await triggerSchedule(job.id);
+      const outcome = res.outcome || 'success';
+      const reason = res.reason || '';
+      setLastAttempt(m => ({ ...m, [job.id]: { outcome, reason } }));
+      if (outcome === 'busy') {
+        const offline = /offline|unavailable/i.test(reason);
+        // A skip is not a failure — report it as info (non-error toast) with the
+        // honest wording, never a fake green success.
+        showToast?.(offline
+          ? t('profile.ecosystem.automationRunSkippedOffline')
+          : t('profile.ecosystem.automationRunSkipped', { reason }), false);
+      } else if (outcome === 'error') {
+        showToast?.(t('profile.ecosystem.automationRunFailed', { reason }), true);
+      } else {
+        showToast?.(t('profile.ecosystem.automationRunOk'), false);
+      }
+      // Refresh the run-log (a skip is logged even though it doesn't update lastRun)
+      // and the schedule row state.
+      setLogRefresh(m => ({ ...m, [job.id]: (m[job.id] || 0) + 1 }));
       await load();
     } catch (e) {
-      showToast?.(t('profile.ecosystem.automationError'), 'error');
+      showToast?.(t('profile.ecosystem.automationRunFailed', { reason: e?.message || '' }), true);
     } finally {
       setBusy(b => ({ ...b, [job.id]: false }));
     }
+  }
+
+  // Change the cadence (cron) of an existing schedule and reschedule it.
+  async function onCadenceChange(job, cron) {
+    if (!cron || cron === job.cron) return;
+    setBusy(b => ({ ...b, [job.id]: true }));
+    try {
+      await setScheduleCron(job.id, cron);
+      await load();
+    } catch (e) {
+      showToast?.(t('profile.ecosystem.automationError'), true);
+    } finally {
+      setBusy(b => ({ ...b, [job.id]: false }));
+    }
+  }
+
+  function toggleLog(jobId) {
+    setOpenLog(m => ({ ...m, [jobId]: !m[jobId] }));
   }
 
   async function onDelete(job) {
@@ -467,7 +551,7 @@ function EcoAutomationSection({ app, showToast }) {
       await deleteSchedule(job.id);
       await load();
     } catch (e) {
-      showToast?.(t('profile.ecosystem.automationError'), 'error');
+      showToast?.(t('profile.ecosystem.automationError'), true);
     } finally {
       setBusy(b => ({ ...b, [job.id]: false }));
     }
@@ -507,11 +591,22 @@ function EcoAutomationSection({ app, showToast }) {
           ? html`<div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.automationLoading')}</div>`
           : schedules.length === 0
             ? html`<div class="pf-eco-dim">${t('profile.ecosystem.automationEmpty')}</div>`
-            : schedules.map(job => html`
+            : schedules.map(job => {
+              // Known cron → editable cadence select; an unknown (custom) cron is
+              // preserved as a selected, disabled option so it is never lost silently.
+              const knownCadence = CRON_TO_CADENCE[job.cron];
+              const att = lastAttempt[job.id];
+              return html`
               <div class="pf-eco-auto-job ${job.enabled ? '' : 'pf-eco-auto-job-off'}" key=${job.id}>
                 <div class="pf-eco-auto-job-main">
                   <span class="pf-eco-mono pf-eco-auto-job-cap">${job.input?.capability_id || ''}</span>
-                  <span class="pf-eco-chip pf-eco-auto-cadence-chip">${cronLabel(job.cron)}</span>
+                  <select class="pf-eco-select pf-eco-auto-cadence-sel"
+                    value=${knownCadence || job.cron}
+                    disabled=${!!busy[job.id]}
+                    onChange=${e => onCadenceChange(job, e.target.value)}>
+                    ${CADENCES.map(c => html`<option value=${c.cron} key=${c.key}>${t(`profile.ecosystem.automationCadence_${c.key}`)}</option>`)}
+                    ${!knownCadence && html`<option value=${job.cron} disabled selected>${job.cron}</option>`}
+                  </select>
                   <span class="pf-eco-chip ${job.enabled ? 'pf-eco-auto-on' : 'pf-eco-auto-paused'}">
                     ${job.enabled ? t('profile.ecosystem.automationOn') : t('profile.ecosystem.automationPaused')}
                   </span>
@@ -524,14 +619,25 @@ function EcoAutomationSection({ app, showToast }) {
                   </span>
                   <span class="pf-eco-dim">${t('profile.ecosystem.automationNextRun')}: ${job.enabled ? formatUntil(job.nextRunAt) : '—'}</span>
                 </div>
+                ${att && att.outcome === 'busy' && html`
+                  <div class="pf-eco-dim pf-eco-auto-lastattempt">
+                    ${/offline|unavailable/i.test(att.reason)
+                      ? t('profile.ecosystem.automationRunSkippedOffline')
+                      : t('profile.ecosystem.automationRunSkipped', { reason: att.reason })}
+                  </div>`}
                 <div class="pf-eco-auto-job-actions">
                   <button class="btn-ghost btn-sm" disabled=${!!busy[job.id]} onClick=${() => onRunNow(job)}>${t('profile.ecosystem.automationRunNow')}</button>
                   <button class="btn-ghost btn-sm" disabled=${!!busy[job.id]} onClick=${() => onToggle(job)}>
                     ${job.enabled ? t('profile.ecosystem.automationDisable') : t('profile.ecosystem.automationEnable')}
                   </button>
+                  <button class="btn-ghost btn-sm" aria-expanded=${!!openLog[job.id]} onClick=${() => toggleLog(job.id)}>
+                    ${openLog[job.id] ? t('profile.ecosystem.automationHideLog') : t('profile.ecosystem.automationShowLog')}
+                  </button>
                   <button class="btn-ghost btn-sm pf-eco-auto-del" disabled=${!!busy[job.id]} title=${t('profile.ecosystem.automationDelete')} onClick=${() => onDelete(job)}>✕</button>
                 </div>
-              </div>`)}
+                ${openLog[job.id] && html`<${EcoScheduleLog} jobId=${job.id} refreshKey=${logRefresh[job.id] || 0} />`}
+              </div>`;
+            })}
       </div>
 
       <${EcoRecipeConfig} app=${app} showToast=${showToast} />
