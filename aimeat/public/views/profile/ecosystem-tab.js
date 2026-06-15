@@ -17,6 +17,12 @@
  *     chip + timeAgo; expanded renders the FULL value readably (pretty-printed JSON for objects/arrays,
  *     the shared safe Markdown viewer for markdown-looking strings, a plain block otherwise). Added a
  *     direction caption under "Event subscriptions" clarifying AIMEAT → this app (outbound) delivery.
+ *   v1.3.0 — 2026-06-15 — Render the expanded value via the shared <JsonValue> (components/JsonView.js)
+ *     — a structured key/value TREE for JSON (same as the agent Tasks view), Markdown for strings —
+ *     instead of raw pretty-printed JSON in a <pre>. Human-readable, not raw JSON.
+ *   v1.3.1 — 2026-06-15 — Compact font for the value tree (matches the agent style); the written-data
+ *     section now refreshes ONLY on the aimeat-live-update event (not the 10s timer) and seamlessly
+ *     (spinner only on first load), so a viewed entry never collapses under a poll.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -26,31 +32,17 @@ import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { Modal } from '/components/Modal.js';
-import { Markdown } from '/components/Markdown.js';
+import { JsonValue } from '/components/JsonView.js';
 import { Spinner } from './shared.js';
 import { listEcosystemApps, listAppData, listPending, approve, revoke, listSubscriptions, subscribe, unsubscribe } from '/js/services/ecosystem.js';
 
-/** Heuristic: does a plain string look like markdown worth rendering via the viewer? */
-function looksLikeMarkdown(s) {
-  if (typeof s !== 'string') return false;
-  return /(^|\n)\s{0,3}#{1,6}\s/.test(s)        // headings
-    || /(^|\n)\s*[-*+]\s+/.test(s)              // unordered lists
-    || /(^|\n)\s*\d+\.\s+/.test(s)              // ordered lists
-    || /`[^`]+`/.test(s)                        // inline code
-    || /```/.test(s)                            // fenced code
-    || /\[[^\]]+\]\([^)]+\)/.test(s)            // links
-    || /\*\*[^*]+\*\*/.test(s);                 // bold
-}
-
 /**
  * One "Data this app wrote" entry: collapsed row (key + visibility chip + timeAgo) that expands to
- * the FULL value rendered readably — pretty-printed JSON for objects/arrays, the shared safe Markdown
- * viewer for markdown-looking strings, a plain pre block otherwise.
+ * the FULL value rendered HUMAN-READABLY via the shared <JsonValue> — a key/value tree for JSON
+ * (the same structured renderer the agent Tasks view uses), safe Markdown for non-JSON strings.
  */
 function EcoDataEntry({ entry }) {
   const [open, setOpen] = useState(false);
-  const isObject = entry.value !== null && typeof entry.value === 'object';
-  const isMarkdown = !isObject && looksLikeMarkdown(entry.value);
   return html`
     <div class="pf-eco-data-entry">
       <button class="pf-eco-data-row" onClick=${() => setOpen(o => !o)}
@@ -62,11 +54,7 @@ function EcoDataEntry({ entry }) {
       </button>
       ${open && html`
         <div class="pf-eco-data-body">
-          ${isObject
-            ? html`<pre class="pf-eco-data-pre">${JSON.stringify(entry.value, null, 2)}</pre>`
-            : isMarkdown
-              ? html`<div class="pf-eco-data-md"><${Markdown} text=${String(entry.value)} /></div>`
-              : html`<pre class="pf-eco-data-pre">${String(entry.value == null ? '' : entry.value)}</pre>`}
+          <${JsonValue} value=${entry.value} />
         </div>`}
     </div>`;
 }
@@ -96,36 +84,28 @@ export default function EcosystemTab({ onStats, showToast }) {
   const [revokeApp, setRevokeApp] = useState(null);   // app pending typed-name revoke
   const [revokeInput, setRevokeInput] = useState('');
   const [subForm, setSubForm] = useState({});         // app → { event }
-  const [appData, setAppData] = useState({});         // geai → array of memory entries
-  const [appDataLoading, setAppDataLoading] = useState({}); // geai → bool
+  const [appData, setAppData] = useState({});         // geai → array of memory entries (undefined = never loaded)
 
   // Load (or refresh) the memory a given app wrote. Lazy on first expand, then on the live poll.
   const loadAppData = async (app, geai) => {
-    setAppDataLoading(l => ({ ...l, [geai]: true }));
     try {
       const items = await listAppData(app);
       setAppData(d => ({ ...d, [geai]: items }));
     } catch (e) {
       // Leave the cached value (if any); a transient failure shouldn't blank the section.
-    } finally {
-      setAppDataLoading(l => ({ ...l, [geai]: false }));
     }
   };
 
   const expandedRef = useRef(null);
   expandedRef.current = expanded;
+  const appsRef = useRef([]);
+  appsRef.current = apps;
 
   const loadData = async () => {
     try {
       const [a, p, s] = await Promise.all([listEcosystemApps(), listPending(), listSubscriptions()]);
       setApps(a); setPending(p); setSubs(s);
       onStats?.({ ecosystem: a.length });
-      // Keep the open card's "data this app wrote" section fresh on the live poll.
-      const openGeai = expandedRef.current;
-      if (openGeai) {
-        const openApp = a.find(x => x.geai === openGeai);
-        if (openApp) await loadAppData(openApp.app, openApp.geai);
-      }
     } catch (e) {
       showToast?.(t('profile.ecosystem.loadError'), 'error');
     } finally {
@@ -144,8 +124,21 @@ export default function EcosystemTab({ onStats, showToast }) {
   }
   useEffect(() => {
     loadRef.current();
-    const handler = () => loadRef.current();
+    // Event-driven: when AIMEAT pushes a live update (e.g. the app just deposited data), refresh the
+    // lists AND — seamlessly, without collapsing the open entry — the open card's written data. The
+    // "Data this app wrote" section updates on THIS event, not on a timer.
+    const handler = () => {
+      loadRef.current();
+      const openGeai = expandedRef.current;
+      if (openGeai) {
+        const openApp = appsRef.current.find(x => x.geai === openGeai);
+        if (openApp) loadAppData(openApp.app, openApp.geai);
+      }
+    };
     window.addEventListener('aimeat-live-update', handler);
+    // A slow timer only keeps the app list + pending onboarding requests fresh; it does NOT
+    // re-fetch the written-data section (that is event-driven above), so a viewed entry never
+    // collapses under a poll.
     const poller = setInterval(() => loadRef.current(), 10000);
     return () => { window.removeEventListener('aimeat-live-update', handler); clearInterval(poller); };
   }, []);
@@ -283,13 +276,13 @@ export default function EcosystemTab({ onStats, showToast }) {
 
                   <div class="pf-eco-section">
                     <div class="pf-eco-section-title">${t('profile.ecosystem.dataTitle')}</div>
-                    ${appDataLoading[app.geai]
+                    ${appData[app.geai] === undefined
                       ? html`<div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.dataLoading')}</div>`
-                      : (appData[app.geai] || []).length === 0
+                      : appData[app.geai].length === 0
                         ? html`<div class="pf-eco-dim">${t('profile.ecosystem.dataEmpty')}</div>`
                         : html`
                           <div class="pf-eco-data">
-                            ${(appData[app.geai] || []).map(entry => html`
+                            ${appData[app.geai].map(entry => html`
                               <${EcoDataEntry} entry=${entry} key=${entry.key} />`)}
                           </div>`}
                   </div>
