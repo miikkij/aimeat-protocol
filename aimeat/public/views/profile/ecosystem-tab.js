@@ -69,6 +69,14 @@
  *     when data is published", no fabricated task status); deliver = the pending advisories folded in with
  *     inline Approve/Reject. Lazy-loads schedules+agents+orgs+recipe+advisories on expand, refreshes on
  *     aimeat-live-update. Frontend-only; no backend logic changed. Operator how-to: docs/ecosystem-app-automation-howto.md.
+ *   v2.3.0 — 2026-06-16 — Fix the MCP promo sample prompt: it no longer guesses a raw owner-scoped
+ *     memory key (`eco.<app>.<org>.latest`) the AI-chat principal can't read. It now targets the
+ *     recipe's chosen ORGANISM by its resolved human NAME (where the agent's report actually lands and
+ *     which an owner/member CAN read over MCP) — "open my '<Organism>' organism, read the latest
+ *     analysis, add follow-up notes". When no organism is set yet it shows a "pick an organism first"
+ *     hint instead of a broken prompt, plus an honest access note. EcoSetupPlaybook now loads the
+ *     owner's organisms to resolve id→name. Removed sampleMemoryKey/ownerOrgName + the raw-key i18n
+ *     (mcpSamplePrompt/mcpSampleOrganismFallback/mcpSampleGeneric). Frontend + i18n only.
  *   v2.2.0 — 2026-06-15 — NON-TECHNICAL card redesign (value-first + hide the plumbing). The expanded
  *     card is reordered human-first: friendly name + an "yhdistetty sinuna" subtitle (the scary raw
  *     `eco:…` principal string is REMOVED from the header), a one-line value statement (appValueLine),
@@ -713,28 +721,14 @@ function EcoAutomationSection({ app, showToast }) {
 }
 
 /**
- * The owner's bare org/owner name, used to build a concrete sample memory key (e.g.
- * `feedback.stats.<org>.latest`). Empty string when the session can't be read.
+ * Resolve the recipe's `organism` value (which may be an id OR a name) to a human-readable
+ * display name using the owner's loaded organisms list. Falls back to the raw value when no
+ * match is found, and to '' when nothing is set.
  */
-function ownerOrgName() {
-  return (currentGhii().split('@')[0]) || '';
-}
-
-/**
- * Build the sample memory key the MCP promo invites the operator to query. Mirrors the
- * recipe trigger: prefer the app's deposit KEY PREFIX (`produces_key`), else `produces`, else
- * `eco.<app>`; append the owner's org + `.latest` so it reads as a real, copyable key. Returns
- * `{ key, derived }` — `derived` is false when we had to fall back to a generic example.
- */
-function sampleMemoryKey(app) {
-  const schedulable = app?.automation?.schedulable || [];
-  const entry = schedulable.find(s => s.produces_key) || schedulable.find(s => s.produces);
-  const base = (entry?.produces_key || entry?.produces || '').replace(/[@:].*$/, '').replace(/\*+/g, '').replace(/\.+$/, '');
-  const org = ownerOrgName();
-  if (base) {
-    return { key: org ? `${base}.${org}.latest` : `${base}.latest`, derived: true };
-  }
-  return { key: org ? `eco.${app?.app || 'app'}.${org}.latest` : `eco.${app?.app || 'app'}.latest`, derived: false };
+function resolveOrganismName(organism, orgs) {
+  if (!organism) return '';
+  const match = (orgs || []).find(o => o.id === organism || o.name === organism);
+  return (match && (match.name || match.id)) || organism;
 }
 
 /**
@@ -753,23 +747,31 @@ function sampleMemoryKey(app) {
  *   3. Set up automation — ✅ when a publish schedule is enabled AND the recipe is enabled with agents.
  *   4. Choose an organism — ✅ when the recipe has an organism set.
  *
- * Lazy-loads recipe + schedules + agents on first render, refreshes on aimeat-live-update.
+ * The MCP promo below the steps offers a copyable sample prompt that targets the recipe's chosen
+ * ORGANISM by its resolved human NAME — the reachable home for the agent's report — never a guessed
+ * raw memory key. When no organism is set it shows a "pick an organism first" hint instead.
+ *
+ * Lazy-loads recipe + schedules + agents + organisms on first render, refreshes on aimeat-live-update.
  */
 function EcoSetupPlaybook({ app, showToast }) {
   const [loaded, setLoaded] = useState(false);
   const [recipe, setRecipe] = useState(null);
   const [schedules, setSchedules] = useState([]);
   const [agentCount, setAgentCount] = useState(0);
+  const [orgs, setOrgs] = useState([]);
 
   const load = async () => {
-    const [recipeResp, schedList, agentList] = await Promise.all([
+    const ownerName = (currentGhii().split('@')[0]) || '';
+    const [recipeResp, schedList, agentList, orgResp] = await Promise.all([
       getAutomationRecipe(app.app).catch(() => null),
       listAppSchedules(app.app).catch(() => []),
       listAgents().catch(() => []),
+      (ownerName ? listOrganisms({ member: ownerName }) : Promise.resolve(null)).catch(() => null),
     ]);
     setRecipe(recipeResp);
     setSchedules(Array.isArray(schedList) ? schedList : []);
     setAgentCount((Array.isArray(agentList) ? agentList : []).filter(a => !a.name?.startsWith('session-')).length);
+    setOrgs(orgResp?.data?.organisms || []);
     setLoaded(true);
   };
   const loadRef = useRef(load);
@@ -793,17 +795,20 @@ function EcoSetupPlaybook({ app, showToast }) {
     if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  const sample = sampleMemoryKey(app);
-  const samplePrompt = t('profile.ecosystem.mcpSamplePrompt', {
-    key: sample.key,
-    organism: t('profile.ecosystem.mcpSampleOrganismFallback'),
-  });
-
   // Derived step statuses.
   const hasAgents = !!(recipe && Array.isArray(recipe.agents) && recipe.agents.length > 0);
   const scheduleOn = schedules.some(j => j.enabled);
   const automationOn = scheduleOn && hasAgents && !!(recipe && recipe.enabled);
   const hasOrganism = !!(recipe && recipe.organism);
+
+  // The MCP promo sample prompt targets the ORGANISM (where the agent's human-readable report
+  // lands and which an owner / member can actually read over MCP) — NOT a guessed raw memory key
+  // (which is owner-scoped to another agent and unreachable from the AI-chat principal). When no
+  // organism is set yet we show a "pick an organism first" hint instead of a broken prompt.
+  const organismName = resolveOrganismName(recipe && recipe.organism, orgs);
+  const samplePrompt = organismName
+    ? t('profile.ecosystem.mcpSamplePromptOrg', { organism: organismName })
+    : '';
 
   const steps = [
     { done: true, title: t('profile.ecosystem.setupStep1Title'), why: t('profile.ecosystem.setupStep1Why'), cta: null },
@@ -857,12 +862,15 @@ function EcoSetupPlaybook({ app, showToast }) {
         <p class="pf-eco-dim pf-eco-mcp-sub">${t('profile.ecosystem.mcpSub')}</p>
         <p class="pf-eco-dim pf-eco-mcp-connect">${t('profile.ecosystem.mcpConnect')}</p>
         <div class="pf-eco-mcp-sample">
-          <div class="pf-eco-mcp-sample-label">${t('profile.ecosystem.mcpSampleLabel')}</div>
-          <div class="pf-eco-mcp-sample-row">
-            <code class="pf-eco-mcp-sample-prompt">${samplePrompt}</code>
-            <${CopyButton} className="copy-prompt-btn" text=${samplePrompt} />
-          </div>
-          ${!sample.derived && html`<p class="pf-eco-dim pf-eco-mcp-sample-note">${t('profile.ecosystem.mcpSampleGeneric')}</p>`}
+          ${organismName
+            ? html`
+              <div class="pf-eco-mcp-sample-label">${t('profile.ecosystem.mcpSampleLabel')}</div>
+              <div class="pf-eco-mcp-sample-row">
+                <code class="pf-eco-mcp-sample-prompt">${samplePrompt}</code>
+                <${CopyButton} className="copy-prompt-btn" text=${samplePrompt} />
+              </div>
+              <p class="pf-eco-dim pf-eco-mcp-sample-note">${t('profile.ecosystem.mcpAccessNote')}</p>`
+            : html`<p class="pf-eco-dim pf-eco-mcp-no-organism">${t('profile.ecosystem.mcpNoOrganism')}</p>`}
         </div>
       </div>
     </div>`;
