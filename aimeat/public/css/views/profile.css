@@ -37,6 +37,8 @@
  *     statement), .pf-eco-disconnect/-disconnect-hint (accessible plain disconnect), and the collapsed
  *     Technical-details disclosure .pf-eco-tech(-toggle/-toggle-label/-icon/-body/-hint/-section/
  *     -section-title/-principal/-access) with a subtly distinct faint var(--bg-dim) background.
+ *   v2.3.0 — 2026-06-16 — Ecosystem MCP promo sample prompt now targets the organism (not a raw key):
+ *     added .pf-eco-mcp-no-organism (the "pick an organism first" hint shown when no organism is set).
  *   v1.14.0 — 2026-06-10 — SchemaForm usability: .pj-field-hint (per-field hint),
  *     .pj-field-invalid (missing-required outline) + .pj-form-error message.
  *   v1.13.0 — 2026-06-10 — Workspace renew, phase 2: .pj-ws-head-actions, review
@@ -2839,6 +2841,7 @@
 .pf-eco-mcp-sample-row { display: flex; align-items: flex-start; gap: .5rem; }
 .pf-eco-mcp-sample-prompt { flex: 1 1 auto; min-width: 0; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: .5rem .6rem; font-family: var(--font-mono, monospace); font-size: .78rem; color: var(--text); line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 .pf-eco-mcp-sample-note { margin: 0; font-size: .76rem; }
+.pf-eco-mcp-no-organism { margin: 0; font-size: .8rem; line-height: 1.45; }
 
 /* ── Ecosystem card — value-first human header + one-liner + disconnect (pf-eco-value-*/-head-*/-disconnect) ── */
 .pf-eco-head-title { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
