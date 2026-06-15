@@ -176,18 +176,6 @@ export default function Profile({ navigate, locale }) {
     }
   }, []);
 
-  // In-place tab switch from a child view (e.g. an ecosystem-app card's "Connect an agent" CTA).
-  // Dispatched as window CustomEvent('aimeat-profile-tab', { detail: '<tabId>' }) — avoids a full
-  // ?tab= navigation (which the saved tab / SPA routing can override, leaving you on the same tab).
-  useEffect(() => {
-    const handler = (e) => {
-      const id = e.detail;
-      if (id && TABS.some(t => t.id === id)) switchTab(id);
-    };
-    window.addEventListener('aimeat-profile-tab', handler);
-    return () => window.removeEventListener('aimeat-profile-tab', handler);
-  }, []);
-
   useViewCSS('/css/views/profile.css');
 
   // Load all stats on mount so the stats bar shows counts immediately
