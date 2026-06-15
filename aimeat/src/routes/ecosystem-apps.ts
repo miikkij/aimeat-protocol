@@ -11,10 +11,13 @@
  *   - GET  /v1/ecosystem-apps/pending    — owner lists pending requests
  *   - POST /v1/ecosystem-apps/:userCode/approve — owner approves/denies + selects scopes + data-areas
  *   - GET  /v1/ecosystem-apps            — owner lists their connected GEAIs
+ *   - GET  /v1/ecosystem-apps/:app/data  — owner lists the memory the app wrote (its eco: namespace)
  *   - DELETE /v1/ecosystem-apps/:app     — owner revokes a GEAI (status → revoked)
  * @usage app.use(ecosystemAppsRouter(config, storage));
  * @version-history
  *   v1.0.0 — 2026-06-14 — Created for ecosystem-apps foundation (chunk 1).
+ *   v1.1.0 — 2026-06-15 — Add GET /v1/ecosystem-apps/:app/data — owner-scoped listing of the memory
+ *     entries an ecosystem app wrote into its own eco: namespace (profile "Ecosystem apps" tab).
  */
 import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
@@ -380,6 +383,46 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage): Rou
     }, [
       { description: 'Connect a new ecosystem app', method: 'POST', url: '/v1/ecosystem-apps/hello' },
     ]));
+  });
+
+  // ── GET /v1/ecosystem-apps/:app/data — owner lists the memory this app wrote ──
+  // An ecosystem app deposits under its OWN eco: namespace (resolveIdentity returns the GEAI sub
+  // verbatim). This owner-scoped endpoint reads that namespace so the owner can see exactly what a
+  // connected app has written for them. Generic: any connected app uses the same route.
+  router.get('/v1/ecosystem-apps/:app/data', requireAuth(), requireRole('owner'), async (req, res) => {
+    const app = req.params.app as string;
+    const owner = req.auth!.owner;
+
+    // You can only list data for an app you actually connected.
+    const record = await storage.getEcosystemAppByOwnerAndApp(owner, app);
+    if (!record) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Ecosystem app "${app}" not found under owner "${owner}"`));
+      return;
+    }
+
+    const geai = buildGEAI(app, owner, config.nodeId);
+    const prefix = req.query.prefix as string | undefined;
+    const visibility = req.query.visibility as string | undefined;
+
+    const records = await storage.listMemory(geai, { prefix, visibility });
+    // Newest first by updatedAt (fall back to createdAt), then cap to a sane limit.
+    records.sort((a, b) => {
+      const ta = new Date(a.updatedAt ?? a.createdAt ?? 0).getTime();
+      const tb = new Date(b.updatedAt ?? b.createdAt ?? 0).getTime();
+      return tb - ta;
+    });
+    const total = records.length;
+    const items = records.slice(0, 200).map((r) => ({
+      key: r.key,
+      value: r.value,
+      visibility: r.visibility,
+      tags: r.tags,
+      version: r.version,
+      updated_at: r.updatedAt,
+      created_at: r.createdAt,
+    }));
+
+    res.json(success(config.nodeId, { items, total }));
   });
 
   // ── DELETE /v1/ecosystem-apps/:app — owner revokes a GEAI (status → revoked) ──

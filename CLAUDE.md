@@ -158,6 +158,7 @@ All development standards are collected in `docs/coding-guidelines/`:
 | [Frontend Guide](docs/frontend-development-guide.md) | Preact + HTM SPA, admin dashboard conventions |
 | [App Developer AI Guide](docs/app-developer-ai-guide.md) | How AIMEAT apps use the user's OpenRouter key via `AIMEAT.ai.complete()` (`/v1/libs/aimeat-ai.js`). Patterns, prompt composition, error codes, spend safety, cookbook. **Use this — don't reinvent prompt-engineering boilerplate per app.** |
 | [Building an AIMEAT-compatible Agent](docs/building-an-aimeat-compatible-agent.md) | What we expect from an agent to be AIMEAT-compatible: the offering/billable/workflow-compatible levels, the offer descriptor (`agents.{name}.offers`), pricing, workflow signals (`success_signal`/`required_to_function`/`deliverable.location`), + a copy-paste setup prompt for whoever builds the agent. |
+| [Building an AIMEAT-compatible Ecosystem App](docs/building-an-aimeat-compatible-ecosystem-app.md) | The agent doc's sibling for **external** apps (GEAI `eco:{app}#{owner}@{node}`, role `ecosystem`). Code-grounded developer spec: the real `EcoManifestSchema`, the `/v1/ecosystem-apps/*` hello→approve→token flow, static validation, the bidirectional event envelope, + a copy-paste setup prompt. Clearly separates **built now** vs **design target**. Design rationale: `docs/internal/ecosystem-developer-guide.md`. |
 | [Known Gaps](docs/known_gaps.md) | Deferred technical gaps with structured tracking |
 
 ### Rule 8: Known Gaps Must Be Developer-Approved

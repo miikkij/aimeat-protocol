@@ -3,10 +3,11 @@
  * @description AIMEAT Ecosystem Apps (GEAI) service — the owner-facing API layer for the profile
  *   "Ecosystem apps" tab. Wraps the /v1/ecosystem-apps + /v1/ecosystem endpoints (the GEAI
  *   onboarding handshake, the connected-app list, outbound event subscriptions, and revoke).
- * @structure listEcosystemApps · listPending · approve · revoke · listSubscriptions · subscribe · unsubscribe
+ * @structure listEcosystemApps · listAppData · listPending · approve · revoke · listSubscriptions · subscribe · unsubscribe
  * @usage import { listEcosystemApps, approve } from '/js/services/ecosystem.js';
  * @version-history
  *   v1.0.0 — 2026-06-14 — Created for the Ecosystem apps profile tab (chunk 6).
+ *   v1.1.0 — 2026-06-15 — Add listAppData() — the memory an app wrote (GET /v1/ecosystem-apps/:app/data).
  */
 import { apiGet, apiPost, apiDelete } from '/js/api.js';
 
@@ -14,6 +15,16 @@ import { apiGet, apiPost, apiDelete } from '/js/api.js';
 export async function listEcosystemApps() {
   const data = await apiGet('/v1/ecosystem-apps');
   return data?.data?.ecosystem_apps || [];
+}
+
+/** The memory entries a connected app wrote into its own eco: namespace. Returns an array. */
+export async function listAppData(app, opts = {}) {
+  const params = new URLSearchParams();
+  if (opts.prefix) params.set('prefix', opts.prefix);
+  if (opts.visibility) params.set('visibility', opts.visibility);
+  const q = params.toString() ? `?${params.toString()}` : '';
+  const data = await apiGet(`/v1/ecosystem-apps/${encodeURIComponent(app)}/data${q}`);
+  return data?.data?.items || [];
 }
 
 /** Pending "hello integration" requests awaiting the owner's approval. Returns an array. */

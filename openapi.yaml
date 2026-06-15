@@ -3521,6 +3521,62 @@ paths:
           description: The authenticated owner's ecosystem apps.
         '403':
           description: Owner role required.
+  /v1/ecosystem-apps/{app}/data:
+    get:
+      operationId: ecosystemAppData
+      summary: List the memory an ecosystem app wrote (owner)
+      description: |
+        Lists the memory entries an ecosystem app (GEAI) has written into its own `eco:` namespace
+        for this owner. Owner-scoped: the owner must have connected the app (404 otherwise). Returns
+        the newest entries first (capped at 200).
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: app
+          in: path
+          required: true
+          schema: { type: string }
+          description: The app name of the connected GEAI.
+        - name: prefix
+          in: query
+          required: false
+          schema: { type: string }
+          description: Optional key prefix filter.
+        - name: visibility
+          in: query
+          required: false
+          schema: { type: string, enum: [private, owner, group, public] }
+          description: Optional visibility filter.
+      responses:
+        '200':
+          description: The entries the app wrote.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      total: { type: integer }
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            key: { type: string }
+                            value: {}
+                            visibility: { type: string }
+                            tags: { type: array, items: { type: string } }
+                            version: { type: integer }
+                            updated_at: { type: string, format: date-time }
+                            created_at: { type: string, format: date-time }
+        '403':
+          description: Owner role required.
+        '404':
+          description: Ecosystem app not found for this owner.
   /v1/ecosystem-apps/{app}:
     delete:
       operationId: ecosystemAppRevoke
