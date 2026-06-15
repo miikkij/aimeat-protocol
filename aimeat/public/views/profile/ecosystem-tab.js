@@ -32,6 +32,12 @@
  *     dropdown, email toggle, approve/push delivery radio, Enabled master toggle, Save). Lazy-loads the
  *     recipe + the owner's agents + organisms, reflects loaded state, refreshes on aimeat-live-update,
  *     toasts on save. Shows the resolved trigger keyGlob read-only.
+ *   v1.6.0 — 2026-06-15 — Add the "Pending advisories" approval surface (B7/B8): <EcoPendingAdvisories>
+ *     under Automation. Lists the recipe's gated agent-produced advisories awaiting approval; each shows
+ *     title + kind/severity chips + effective dates + the body rendered readably via <JsonValue> (never
+ *     raw JSON) + source/rationale, with Approve (→ deliver over the tunnel) and Reject (→ confirm-modal,
+ *     then drop). Approve handles the 202 offline-retry/failed case by keeping the row + an info/warning
+ *     toast; delivered/rejected drop the row. Lazy-loads + refreshes on aimeat-live-update.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -43,7 +49,7 @@ import { CopyButton } from '/components/CopyButton.js';
 import { Modal } from '/components/Modal.js';
 import { JsonValue } from '/components/JsonView.js';
 import { Spinner } from './shared.js';
-import { listEcosystemApps, listAppData, listPending, approve, revoke, listSubscriptions, subscribe, unsubscribe, getAutomationRecipe, putAutomationRecipe } from '/js/services/ecosystem.js';
+import { listEcosystemApps, listAppData, listPending, approve, revoke, listSubscriptions, subscribe, unsubscribe, getAutomationRecipe, putAutomationRecipe, listPendingAdvisories, approveAdvisory, rejectAdvisory } from '/js/services/ecosystem.js';
 import { formatUntil } from './schedule-item.js';
 import { listAppSchedules, createCapabilitySchedule, setScheduleEnabled, deleteSchedule, triggerSchedule } from '/js/services/schedules.js';
 import { listAgents } from '/js/services/agents.js';
@@ -251,6 +257,131 @@ function EcoRecipeConfig({ app, showToast }) {
 }
 
 /**
+ * The pending-advisories approval surface (B7/B8): the gated output of the automation recipe.
+ * When the recipe runs with requireApproval:true, each agent-produced `support-advisory@1` payload
+ * is parked awaiting the owner's decision. This block lists those, renders each advisory readably
+ * (title + kind/severity chips + effective dates + the body via the shared <JsonValue>, never raw
+ * JSON), and lets the owner Approve (→ deliver over the tunnel) or Reject (→ drop). Approve may
+ * return 202 offline-retry — then we keep the row and message that it stays pending for retry.
+ * Lazy-loads on mount/expand and refreshes on aimeat-live-update + after each decision.
+ */
+function EcoPendingAdvisories({ app, showToast }) {
+  const [items, setItems] = useState(undefined);  // undefined = never loaded
+  const [busy, setBusy] = useState({});            // advisory id → bool
+  const [confirmId, setConfirmId] = useState(null); // advisory id pending reject confirmation
+
+  const load = async () => {
+    try {
+      const list = await listPendingAdvisories(app.app);
+      setItems(list);
+    } catch (e) {
+      setItems(s => (s === undefined ? [] : s));
+    }
+  };
+
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  useEffect(() => {
+    load();
+    const handler = () => loadRef.current();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, [app.app]);
+
+  async function onApprove(id) {
+    setBusy(b => ({ ...b, [id]: true }));
+    try {
+      const res = await approveAdvisory(app.app, id);
+      const appName = app.display_name || app.app;
+      if (res.delivery === 'delivered') {
+        showToast?.(t('profile.ecosystem.advDelivered', { app: appName }), 'success');
+        // Delivered → it left the pending list server-side; drop the row.
+        setItems(list => (list || []).filter(p => p.id !== id));
+      } else if (res.delivery === 'offline-retry') {
+        // 202 — app offline; the item STAYS pending for retry. Keep the row.
+        showToast?.(t('profile.ecosystem.advOfflineRetry', { app: appName }), 'info');
+      } else {
+        // 202 failed — also stays pending.
+        showToast?.(t('profile.ecosystem.advFailed'), 'warning');
+      }
+    } catch (e) {
+      showToast?.(t('profile.ecosystem.advError'), 'error');
+    } finally {
+      setBusy(b => ({ ...b, [id]: false }));
+    }
+  }
+
+  async function onReject(id) {
+    setConfirmId(null);
+    setBusy(b => ({ ...b, [id]: true }));
+    try {
+      await rejectAdvisory(app.app, id);
+      showToast?.(t('profile.ecosystem.advRejected'), 'success');
+      setItems(list => (list || []).filter(p => p.id !== id));
+    } catch (e) {
+      showToast?.(t('profile.ecosystem.advError'), 'error');
+    } finally {
+      setBusy(b => ({ ...b, [id]: false }));
+    }
+  }
+
+  return html`
+    <div class="pf-eco-adv">
+      <div class="pf-eco-recipe-head">${t('profile.ecosystem.advPendingTitle')}</div>
+      <p class="pf-eco-dim pf-eco-recipe-intro">${t('profile.ecosystem.advPendingIntro')}</p>
+
+      ${items === undefined
+        ? html`<div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.advLoading')}</div>`
+        : items.length === 0
+          ? html`<div class="pf-eco-dim">${t('profile.ecosystem.advPendingEmpty')}</div>`
+          : html`
+            <div class="pf-eco-adv-list">
+              ${items.map(p => {
+                const a = p.advisory || {};
+                return html`
+                  <div class="pf-eco-adv-item" key=${p.id}>
+                    <div class="pf-eco-adv-head">
+                      <strong class="pf-eco-adv-title">${a.title || p.id}</strong>
+                      ${a.kind && html`<span class="pf-eco-chip pf-eco-adv-kind">${t('profile.ecosystem.advKind')}: ${a.kind}</span>`}
+                      ${a.severity && html`<span class="pf-eco-chip pf-eco-adv-sev pf-eco-adv-sev-${a.severity}">${t('profile.ecosystem.advSeverity')}: ${a.severity}</span>`}
+                      ${a.status && html`<span class="pf-eco-chip">${a.status}</span>`}
+                    </div>
+                    ${(a.effective_from || a.effective_until) && html`
+                      <div class="pf-eco-dim pf-eco-adv-meta">
+                        ${t('profile.ecosystem.advEffective')}: ${a.effective_from || '…'} → ${a.effective_until || '…'}
+                      </div>`}
+                    <div class="pf-eco-adv-body">
+                      <${JsonValue} value=${a.body !== undefined ? a.body : a} />
+                    </div>
+                    ${a.source && html`<div class="pf-eco-dim pf-eco-adv-meta">${t('profile.ecosystem.advSource')}: ${a.source}</div>`}
+                    ${a.rationale && html`
+                      <div class="pf-eco-adv-rationale">
+                        <span class="pf-eco-dim">${t('profile.ecosystem.advRationale')}:</span>
+                        <${JsonValue} value=${a.rationale} />
+                      </div>`}
+                    <div class="pf-eco-adv-actions">
+                      <button class="btn-success btn-sm" disabled=${!!busy[p.id]} onClick=${() => onApprove(p.id)}>
+                        ${t('profile.ecosystem.advApprove')}
+                      </button>
+                      <button class="btn-ghost btn-sm pf-eco-adv-reject" disabled=${!!busy[p.id]} onClick=${() => setConfirmId(p.id)}>
+                        ${t('profile.ecosystem.advReject')}
+                      </button>
+                    </div>
+                  </div>`;
+              })}
+            </div>`}
+
+      <${Modal} open=${!!confirmId} onClose=${() => setConfirmId(null)} title=${t('profile.ecosystem.advReject')}>
+        <p>${t('profile.ecosystem.advRejectConfirm')}</p>
+        <div class="pf-eco-revoke-actions">
+          <button class="btn-ghost" onClick=${() => setConfirmId(null)}>${t('common.cancel')}</button>
+          <button class="btn-danger-solid" onClick=${() => onReject(confirmId)}>${t('profile.ecosystem.advReject')}</button>
+        </div>
+      <//>
+    </div>`;
+}
+
+/**
  * The "Automation" section of one expanded GEAI card: per-capability cadence +
  * enable toggle, and the list of the app's existing eco-capability schedules.
  * Lazy-loads on first expand and refreshes on the live-update event.
@@ -404,6 +535,8 @@ function EcoAutomationSection({ app, showToast }) {
       </div>
 
       <${EcoRecipeConfig} app=${app} showToast=${showToast} />
+
+      <${EcoPendingAdvisories} app=${app} showToast=${showToast} />
     </div>`;
 }
 

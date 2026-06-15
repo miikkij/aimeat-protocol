@@ -23,6 +23,11 @@
  * @version-history
  *   v1.0.0 — 2026-06-15 — Initial creation (B4 recipe CRUD + the data-published → agent-task trigger).
  *   v1.1.0 — 2026-06-15 — Add B5 (organism routing) + B6 (email/in-app report on completion) coverage.
+ *   v1.2.0 — 2026-06-15 — Add B7/B8 (advisory outbox drain + approval gate + deliver-advisory) coverage:
+ *     (i) requireApproval=false drains+attempts delivery (offline-retry leaves the outbox key);
+ *     requireApproval=true moves the advisory to pending (payload survives), approve returns 202
+ *     offline-retry + stays pending with no tunnel, reject drops it. Live tunnel needed for a 200
+ *     `delivery: delivered` + the immediate-delivery happy path (documented inline).
  */
 
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ecosystem-automation-recipe
@@ -417,6 +422,159 @@ await test('email:false → completing the task writes NO automation report reco
   await sleep(2500); // give any (incorrect) fire-and-forget write time to land
   const after = (await listReports()).length;
   assert(after === before, `email:false must not write a report: before=${before} after=${after}`);
+});
+
+// ─── (i) B7/B8: advisory outbox drain + approval gate + delivery ───
+// The wisdom agent writes `support-advisory@1` payloads to eco.<app>.advisory.outbox.<id> during its
+// run; the completion hook drains that outbox. We SEED the outbox (the owner writing the same key the
+// agent would) and then complete an automation task to fire the drain.
+//
+// LIVE-TUNNEL NOTE: the harness has no connected GEAI / connect-tunnel, so deliverAdvisory() returns
+// `offline-retry` for every invoke. We therefore assert the DECISION + path, not a live delivery:
+//   - requireApproval=false → drain attempts delivery, gets offline-retry → the outbox key is LEFT for
+//     retry (we assert it survives), and the advisory is NOT moved to pending.
+//   - requireApproval=true  → drain moves the advisory to eco.<app>.advisory.pending.<id> (payload
+//     survives, outbox drained) and it appears in the owner's pending list; approve returns 202
+//     offline-retry and the item STAYS pending (delivery couldn't complete with no tunnel); a separate
+//     reject case resolves + drops without delivery.
+// A live GEAI on the tunnel is needed to fully verify a 200 `delivery: delivered` from approve and the
+// immediate-delivery happy path (outbox key removed on success).
+console.log('\n(i) B7/B8: advisory outbox drain + approval gate (offline-tunnel decision coverage)');
+
+async function readMemoryKey(key: string): Promise<{ status: number; value: any }> {
+  const { status, body } = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+  return { status, value: body.data?.value ?? body.data ?? null };
+}
+async function listPendingAdvisories(): Promise<any[]> {
+  const { body } = await json(`/v1/ecosystem-apps/${APP}/advisories/pending`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+  return (body.data?.pending ?? []) as any[];
+}
+function sampleAdvisory(id: string) {
+  return { id, title: 'Reduce reply latency', body: 'Median first-reply is up 40%.', kind: 'recommendation', severity: 'medium', source: APP };
+}
+// Seed an outbox key, set the recipe's approval flag, then materialise+complete a task to fire the drain.
+async function seedAndDrain(opts: { requireApproval: boolean; advisoryId: string; triggerKey: string }): Promise<void> {
+  // Seed the outbox under the OWNER namespace (the same place + key the wisdom agent writes to).
+  const outboxKey = `eco.${APP}.advisory.outbox.${opts.advisoryId}`;
+  const seed = await json('/v1/memory', {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ key: outboxKey, value: sampleAdvisory(opts.advisoryId), visibility: 'owner' }),
+  });
+  assert(seed.status === 200 || seed.status === 201, `seed outbox status ${seed.status}: ${JSON.stringify(seed.body)}`);
+
+  // Configure the recipe with the desired approval flag, then materialise + complete an automation task.
+  const upd = await json(`/v1/ecosystem-apps/${APP}/automation/recipe`, {
+    method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ agents: [AGENT], trigger: { keyGlob: 'feedback.stats.*' }, organism: null, email: false, require_approval: opts.requireApproval, enabled: true }),
+  });
+  assert(upd.status === 200, `recipe set status ${upd.status}: ${JSON.stringify(upd.body)}`);
+
+  const before = newestMatchingTask(await listTasks());
+  const w = await json('/v1/memory', {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ key: opts.triggerKey, value: { ok: true }, visibility: 'owner' }),
+  });
+  assert(w.status === 200 || w.status === 201, `trigger write status ${w.status}`);
+
+  let task: any;
+  for (let i = 0; i < 24; i++) {
+    await sleep(250);
+    task = newestMatchingTask(await listTasks());
+    if (task && (!before || task.id !== before.id)) break;
+  }
+  assert(!!task && (!before || task.id !== before.id), 'a new automation task was materialised');
+
+  const start = await json(`/v1/agents/${AGENT}/tasks/${task.id}/start`, { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(start.status === 200, `start status ${start.status}`);
+  const done = await json(`/v1/agents/${AGENT}/tasks/${task.id}/complete`, {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ message: 'done' }),
+  });
+  assert(done.status === 200, `complete status ${done.status}: ${JSON.stringify(done.body)}`);
+}
+
+await test('requireApproval=false → drain attempts delivery; with no tunnel the outbox key is LEFT for retry', async () => {
+  const advisoryId = `adv-immediate-${Date.now()}`;
+  await seedAndDrain({ requireApproval: false, advisoryId, triggerKey: 'feedback.stats.advimm' });
+  // The drain runs fire-and-forget after /complete; give it time, then assert the outbox key survived
+  // (offline → left for retry) and was NOT moved to the pending list.
+  await sleep(2500);
+  const outbox = await readMemoryKey(`eco.${APP}.advisory.outbox.${advisoryId}`);
+  assert(outbox.status === 200, `outbox key should remain (offline-retry), got status ${outbox.status}`);
+  assert(outbox.value?.id === advisoryId, `outbox advisory should survive: ${JSON.stringify(outbox.value)}`);
+  const pending = await listPendingAdvisories();
+  assert(!pending.some(p => p.id === advisoryId), 'no-approval advisory must NOT appear in the pending list');
+});
+
+await test('requireApproval=true → completion moves the advisory to pending (payload survives, outbox drained)', async () => {
+  const advisoryId = `adv-gated-${Date.now()}`;
+  await seedAndDrain({ requireApproval: true, advisoryId, triggerKey: 'feedback.stats.advgated' });
+  // Poll the pending list until the drain parks it.
+  let pending: any[] = [];
+  for (let i = 0; i < 24; i++) {
+    await sleep(250);
+    pending = await listPendingAdvisories();
+    if (pending.some(p => p.id === advisoryId)) break;
+  }
+  const mine = pending.find(p => p.id === advisoryId);
+  assert(!!mine, `gated advisory should appear in the pending list: ${JSON.stringify(pending.map(p => p.id))}`);
+  assert(mine.status === 'pending', `pending status: ${mine.status}`);
+  assert(mine.advisory?.title === 'Reduce reply latency', `pending advisory payload survives: ${JSON.stringify(mine.advisory)}`);
+  assert(mine.app === APP, `pending app: ${mine.app}`);
+  // The outbox key was drained (moved to pending).
+  const outbox = await readMemoryKey(`eco.${APP}.advisory.outbox.${advisoryId}`);
+  assert(outbox.status === 404, `outbox key should be drained after gating, got status ${outbox.status}`);
+});
+
+await test('Approve a gated advisory → 202 offline-retry with no tunnel; it STAYS pending (no payload loss)', async () => {
+  const advisoryId = `adv-approve-${Date.now()}`;
+  await seedAndDrain({ requireApproval: true, advisoryId, triggerKey: 'feedback.stats.advapprove' });
+  let pending: any[] = [];
+  for (let i = 0; i < 24; i++) {
+    await sleep(250);
+    pending = await listPendingAdvisories();
+    if (pending.some(p => p.id === advisoryId)) break;
+  }
+  assert(pending.some(p => p.id === advisoryId), 'advisory parked for approval');
+
+  const appr = await json(`/v1/ecosystem-apps/${APP}/advisories/${advisoryId}/approve`, {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  // No connected GEAI/tunnel in the harness → delivery cannot complete → 202, stays pending for retry.
+  assert(appr.status === 202, `expected 202 offline-retry (no tunnel), got ${appr.status}: ${JSON.stringify(appr.body)}`);
+  assert(appr.body.data?.delivery === 'offline-retry' || appr.body.data?.delivery === 'failed', `delivery outcome: ${JSON.stringify(appr.body.data)}`);
+  // It must still be pending (so a later approve, once the app is online, can deliver it).
+  const after = await listPendingAdvisories();
+  assert(after.some(p => p.id === advisoryId), 'a deferred-delivery advisory must remain pending for retry');
+});
+
+await test('Reject a gated advisory → 200 rejected, dropped, NO delivery', async () => {
+  const advisoryId = `adv-reject-${Date.now()}`;
+  await seedAndDrain({ requireApproval: true, advisoryId, triggerKey: 'feedback.stats.advreject' });
+  let pending: any[] = [];
+  for (let i = 0; i < 24; i++) {
+    await sleep(250);
+    pending = await listPendingAdvisories();
+    if (pending.some(p => p.id === advisoryId)) break;
+  }
+  assert(pending.some(p => p.id === advisoryId), 'advisory parked for rejection');
+
+  const rej = await json(`/v1/ecosystem-apps/${APP}/advisories/${advisoryId}/reject`, {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(rej.status === 200, `reject status ${rej.status}: ${JSON.stringify(rej.body)}`);
+  assert(rej.body.data?.status === 'rejected', `expected rejected: ${JSON.stringify(rej.body.data)}`);
+  // Gone from the pending list + the pending memory key removed.
+  const after = await listPendingAdvisories();
+  assert(!after.some(p => p.id === advisoryId), 'rejected advisory must leave the pending list');
+  const pk = await readMemoryKey(`eco.${APP}.advisory.pending.${advisoryId}`);
+  assert(pk.status === 404, `rejected advisory pending key should be deleted, got status ${pk.status}`);
+});
+
+await test('Approve a non-existent advisory → 404', async () => {
+  const { status, body } = await json(`/v1/ecosystem-apps/${APP}/advisories/nope-${Date.now()}/approve`, {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(status === 404, `expected 404, got ${status}: ${JSON.stringify(body)}`);
 });
 
 // ─── (f) DELETE → GET null ───

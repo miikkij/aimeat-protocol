@@ -3668,8 +3668,9 @@ paths:
       description: |
         Returns the per-(owner, app) automation recipe, or `null` if none is set. When a connected
         app publishes refined data on a memory key matching `trigger.keyGlob`, the recipe materialises
-        an agent task for each configured agent (feature B4). The downstream fields
-        (`organism`, `email`, `require_approval`) are stored but not yet enforced (B5/B6/B7).
+        an agent task for each configured agent (feature B4). `organism` (B5), `email` (B6) and
+        `require_approval` (B7) are now enforced: with `require_approval:true` the advisories the
+        agent produces are gated behind owner approval (see `/v1/ecosystem-apps/{app}/advisories/*`).
       tags: [Ecosystem Apps]
       security:
         - BearerAuth: []
@@ -3704,8 +3705,8 @@ paths:
         Upserts the per-(owner, app) automation recipe. `agents` must all be the owner's own agents
         (rejected with `UNKNOWN_AGENT` otherwise). `trigger.keyGlob` defaults server-side from the
         app's declared `automation.schedulable[].produces` hint (or `eco.{app}.*`) when omitted.
-        The app must be connected for this owner (404 `ECO_APP_NOT_FOUND` otherwise). The downstream
-        fields are stored but not enforced yet (B5/B6/B7).
+        The app must be connected for this owner (404 `ECO_APP_NOT_FOUND` otherwise). `organism` (B5),
+        `email` (B6) and `require_approval` (B7) are enforced downstream.
       tags: [Ecosystem Apps]
       security:
         - BearerAuth: []
@@ -3731,9 +3732,9 @@ paths:
                   type: object
                   properties:
                     keyGlob: { type: string, description: 'Memory key glob, e.g. feedback.stats.*' }
-                organism: { type: string, nullable: true, description: 'B5 (stored, not enforced).' }
-                email: { type: boolean, description: 'B6 (stored, not enforced).' }
-                require_approval: { type: boolean, description: 'B7 (stored, not enforced).' }
+                organism: { type: string, nullable: true, description: 'B5 — route the report to this organism (id or name).' }
+                email: { type: boolean, description: 'B6 — email the owner a report on completion.' }
+                require_approval: { type: boolean, description: 'B7 — gate the agent advisories behind owner approval before delivery.' }
                 enabled: { type: boolean, default: true }
       responses:
         '200':
@@ -3774,6 +3775,141 @@ paths:
           description: Owner role required.
         '404':
           description: No automation recipe for this app.
+  /v1/ecosystem-apps/{app}/advisories/pending:
+    get:
+      operationId: ecosystemAppAdvisoriesPending
+      summary: List advisories awaiting owner approval (owner, B7)
+      description: |
+        When the app's automation recipe has `require_approval:true`, advisories the wisdom agent
+        produces are parked at the owner-namespace key `eco.{app}.advisory.pending.{id}` instead of
+        being delivered. This returns those still-pending advisory-delivery items so the owner can
+        approve or reject each one.
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: app
+          in: path
+          required: true
+          schema: { type: string }
+          description: The app name of the connected GEAI.
+      responses:
+        '200':
+          description: The pending advisories (may be empty).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      total: { type: integer }
+                      pending:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: string }
+                            app: { type: string }
+                            recipe_id: { type: string, nullable: true }
+                            advisory: { type: object, description: 'The support-advisory@1 payload.' }
+                            status: { type: string, enum: [pending] }
+                            created_at: { type: string, format: date-time }
+        '403':
+          description: Owner role required.
+        '404':
+          description: Ecosystem app not connected for this owner.
+  /v1/ecosystem-apps/{app}/advisories/{id}/approve:
+    post:
+      operationId: ecosystemAppAdvisoryApprove
+      summary: Approve a gated advisory and deliver it to the app (owner, B8)
+      description: |
+        Approves a pending advisory and delivers it into the app's guidance sink by invoking the app's
+        `deliver-advisory` capability over the connector tunnel. On success the pending record is
+        resolved and removed (200, `delivery: delivered`). If the app is offline/unreachable or refuses,
+        the advisory STAYS pending and a 202 is returned (`delivery: offline-retry | failed`) so the
+        owner can retry once the app reconnects — the payload is not lost.
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: app
+          in: path
+          required: true
+          schema: { type: string }
+          description: The app name of the connected GEAI.
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          description: The advisory id.
+      responses:
+        '200':
+          description: Approved and delivered.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      app: { type: string }
+                      status: { type: string, enum: [approved] }
+                      delivery: { type: string, enum: [delivered] }
+                      delivered_id: { type: string, nullable: true }
+        '202':
+          description: Approved but delivery deferred (app offline or refused); the advisory stays pending for retry.
+        '403':
+          description: Owner role required.
+        '404':
+          description: No pending advisory with this id for this app.
+        '409':
+          description: The advisory was already resolved (ALREADY_RESOLVED).
+  /v1/ecosystem-apps/{app}/advisories/{id}/reject:
+    post:
+      operationId: ecosystemAppAdvisoryReject
+      summary: Reject a gated advisory (owner, B7)
+      description: Rejects a pending advisory. No delivery occurs; the pending record is dropped.
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: app
+          in: path
+          required: true
+          schema: { type: string }
+          description: The app name of the connected GEAI.
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          description: The advisory id.
+      responses:
+        '200':
+          description: Rejected.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      app: { type: string }
+                      status: { type: string, enum: [rejected] }
+        '403':
+          description: Owner role required.
+        '404':
+          description: No pending advisory with this id for this app.
+        '409':
+          description: The advisory was already resolved (ALREADY_RESOLVED).
   /v1/ecosystem-apps/{app}:
     delete:
       operationId: ecosystemAppRevoke
