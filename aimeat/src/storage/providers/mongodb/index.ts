@@ -33,6 +33,11 @@
  *                          canonical bucket with a unified version line.
  *   v1.5.0 — 2026-06-12 — Add SubdomainSite CRUD (operator-managed
  *                          subdomain → published-app/redirect mappings).
+ *   v1.6.0 — 2026-06-15 — Persist ecosystem-app `capabilities` + `automation`
+ *                          (JSON) on EcosystemApp + EcoAuth for the eco-capability
+ *                          scheduler.
+ *   v1.7.0 — 2026-06-15 — Add EcoAutomationRecipe CRUD (feature B4): per-(owner, app)
+ *                          rule materialising agent tasks on a matching data publish.
  */
 
 import { execSync } from 'node:child_process';
@@ -87,6 +92,7 @@ import type {
     DeviceAuthorizationRecord,
     EcosystemAppRecord,
     EcoAuthorizationRecord,
+    EcoAutomationRecipe,
     OAuthClientRecord,
     OAuthRefreshTokenRecord,
     OAuthApprovalRecord,
@@ -4788,6 +4794,8 @@ export class PrismaStorage implements Storage {
                 boundRef: app.boundRef ?? null,
                 status: app.status,
                 morselBalance: app.morselBalance ?? 0,
+                capabilities: (app.capabilities as any) ?? undefined,
+                automation: (app.automation as any) ?? undefined,
                 createdAt: new Date(app.createdAt),
                 lastSeen: new Date(app.lastSeen),
             },
@@ -4826,6 +4834,8 @@ export class PrismaStorage implements Storage {
         if (updates.boundRef !== undefined) data.boundRef = updates.boundRef;
         if (updates.status !== undefined) data.status = updates.status;
         if (updates.morselBalance !== undefined) data.morselBalance = updates.morselBalance;
+        if (updates.capabilities !== undefined) data.capabilities = (updates.capabilities as any) ?? null;
+        if (updates.automation !== undefined) data.automation = (updates.automation as any) ?? null;
         if (updates.lastSeen !== undefined) data.lastSeen = new Date(updates.lastSeen);
         try {
             const row = await this.prisma.ecosystemApp.update({ where: { geai }, data });
@@ -4865,6 +4875,8 @@ export class PrismaStorage implements Storage {
                 pollInterval: req.pollInterval,
                 approvedBy: req.approvedBy,
                 validationResult: (req.validationResult as any) ?? undefined,
+                capabilities: (req.capabilities as any) ?? undefined,
+                automation: (req.automation as any) ?? undefined,
                 appCredentials: (req.appCredentials as any) ?? undefined,
             },
         });
@@ -4920,6 +4932,67 @@ export class PrismaStorage implements Storage {
         return result.count;
     }
 
+    // ── Automation recipes (feature B4). The Prisma client may not be regenerated in
+    // dev (Mongo db:generate can EPERM on the native DLL under the infra ban), so the
+    // ecoAutomationRecipe delegate + JSON columns are accessed via `as any` — same
+    // workaround the Phase-2 capabilities/automation columns use above.
+    async getAutomationRecipe(owner: string, app: string): Promise<EcoAutomationRecipe | null> {
+        this.ensureReady();
+        const row = await (this.prisma as any).ecoAutomationRecipe.findFirst({ where: { owner, app } });
+        return row ? this.toAutomationRecipe(row) : null;
+    }
+
+    async upsertAutomationRecipe(recipe: EcoAutomationRecipe): Promise<EcoAutomationRecipe> {
+        this.ensureReady();
+        const data: any = {
+            owner: recipe.owner,
+            app: recipe.app,
+            trigger: recipe.trigger as any,
+            agents: recipe.agents as any,
+            organism: recipe.organism ?? null,
+            email: !!recipe.email,
+            requireApproval: !!recipe.requireApproval,
+            enabled: recipe.enabled,
+            updatedAt: new Date(recipe.updatedAt),
+        };
+        const row = await (this.prisma as any).ecoAutomationRecipe.upsert({
+            where: { owner_app: { owner: recipe.owner, app: recipe.app } },
+            update: data,
+            create: { ...data, createdAt: new Date(recipe.createdAt) },
+        });
+        return this.toAutomationRecipe(row);
+    }
+
+    async deleteAutomationRecipe(owner: string, app: string): Promise<boolean> {
+        this.ensureReady();
+        try {
+            await (this.prisma as any).ecoAutomationRecipe.delete({ where: { owner_app: { owner, app } } });
+            return true;
+        } catch { return false; }
+    }
+
+    async listAutomationRecipesByOwner(owner: string): Promise<EcoAutomationRecipe[]> {
+        this.ensureReady();
+        const rows = await (this.prisma as any).ecoAutomationRecipe.findMany({ where: { owner } });
+        return rows.map((r: any) => this.toAutomationRecipe(r));
+    }
+
+    private toAutomationRecipe(row: any): EcoAutomationRecipe {
+        return {
+            id: row.id,
+            owner: row.owner,
+            app: row.app,
+            trigger: row.trigger as EcoAutomationRecipe['trigger'],
+            agents: Array.isArray(row.agents) ? row.agents : [],
+            organism: row.organism ?? null,
+            email: !!row.email,
+            requireApproval: !!row.requireApproval,
+            enabled: !!row.enabled,
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+            updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : row.updatedAt,
+        };
+    }
+
     private toEcosystemAppRecord(row: any): EcosystemAppRecord {
         const record: EcosystemAppRecord = {
             geai: row.geai,
@@ -4936,6 +5009,8 @@ export class PrismaStorage implements Storage {
         if (row.description) record.description = row.description;
         if (row.dataAreas) record.dataAreas = row.dataAreas as any;
         if (row.boundRef) record.boundRef = row.boundRef;
+        if (row.capabilities) record.capabilities = row.capabilities as any;
+        if (row.automation) record.automation = row.automation as any;
         return record;
     }
 
@@ -4958,6 +5033,8 @@ export class PrismaStorage implements Storage {
             pollInterval: row.pollInterval,
             approvedBy: row.approvedBy ?? undefined,
             validationResult: row.validationResult ?? undefined,
+            capabilities: row.capabilities ?? undefined,
+            automation: row.automation ?? undefined,
             appCredentials: row.appCredentials ?? undefined,
         };
     }

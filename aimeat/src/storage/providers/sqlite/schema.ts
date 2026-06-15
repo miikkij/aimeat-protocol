@@ -1033,6 +1033,8 @@ export function initializeSchema(db: Database.Database): void {
       boundRef      TEXT,
       status        TEXT NOT NULL DEFAULT 'pending',
       morselBalance REAL NOT NULL DEFAULT 0,
+      capabilities  TEXT,
+      automation    TEXT,
       createdAt     TEXT NOT NULL,
       lastSeen      TEXT NOT NULL
     );
@@ -1058,11 +1060,33 @@ export function initializeSchema(db: Database.Database): void {
       pollInterval  INTEGER NOT NULL DEFAULT 5,
       approvedBy    TEXT,
       validationResult TEXT,
+      capabilities  TEXT,
+      automation    TEXT,
       appCredentials TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_eco_auth_userCode ON eco_auth(userCode);
     CREATE INDEX IF NOT EXISTS idx_eco_auth_ownerName ON eco_auth(ownerName);
     CREATE INDEX IF NOT EXISTS idx_eco_auth_status ON eco_auth(status);
+
+    -- ── Ecosystem-app automation recipes (feature B4) ──
+    -- One rule per (owner, app): when the app publishes data on a memory key matching
+    -- trigger.keyGlob, materialise an agent task for each agent in the agents list. The downstream
+    -- columns (organism/email/requireApproval) are STORED ONLY in B4 (enforced later: B5/B6/B7).
+    CREATE TABLE IF NOT EXISTS eco_automation_recipes (
+      id              TEXT PRIMARY KEY,
+      owner           TEXT NOT NULL,
+      app             TEXT NOT NULL,
+      trigger         TEXT NOT NULL,            -- JSON: { kind, keyGlob }
+      agents          TEXT NOT NULL DEFAULT '[]', -- JSON: string[] of agent names
+      organism        TEXT,
+      email           INTEGER NOT NULL DEFAULT 0,
+      requireApproval INTEGER NOT NULL DEFAULT 0,
+      enabled         INTEGER NOT NULL DEFAULT 1,
+      createdAt       TEXT NOT NULL,
+      updatedAt       TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_eco_automation_recipes_owner ON eco_automation_recipes(owner);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_eco_automation_recipes_owner_app ON eco_automation_recipes(owner, app);
 
     -- ── OAuth 2.1 Persistent State ──
     CREATE TABLE IF NOT EXISTS oauth_clients (
@@ -1570,4 +1594,12 @@ export function initializeSchema(db: Database.Database): void {
   // created as 'interactive', and Hello Integration ran the full 13 steps even
   // when the operator clearly asked for task-runner.
   safeAddColumn('device_auth', 'mode', "TEXT DEFAULT 'interactive'");
+
+  // Ecosystem-app automation — persist the app's declared capabilities + automation
+  // hints (JSON) so an owner can schedule an `eco-capability` job that names a real
+  // capability. Additive/nullable; existing eco rows read back unchanged.
+  safeAddColumn('eco_auth', 'capabilities', 'TEXT');
+  safeAddColumn('eco_auth', 'automation', 'TEXT');
+  safeAddColumn('ecosystem_apps', 'capabilities', 'TEXT');
+  safeAddColumn('ecosystem_apps', 'automation', 'TEXT');
 }

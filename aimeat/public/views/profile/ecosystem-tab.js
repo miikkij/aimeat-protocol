@@ -23,6 +23,10 @@
  *   v1.3.1 — 2026-06-15 — Compact font for the value tree (matches the agent style); the written-data
  *     section now refreshes ONLY on the aimeat-live-update event (not the 10s timer) and seamlessly
  *     (spinner only on first load), so a viewed entry never collapses under a poll.
+ *   v1.4.0 — 2026-06-15 — Add the "Automation" section to the expanded card: schedule a connected app's
+ *     capabilities on a daily/weekly/monthly cadence. Per-capability enable toggle (creates/deletes an
+ *     eco-capability schedule), a list of the app's existing schedules with cadence/enabled/last+next
+ *     run + Run-now + delete, lazy-loaded on expand and refreshed on the live-update event.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -35,6 +39,8 @@ import { Modal } from '/components/Modal.js';
 import { JsonValue } from '/components/JsonView.js';
 import { Spinner } from './shared.js';
 import { listEcosystemApps, listAppData, listPending, approve, revoke, listSubscriptions, subscribe, unsubscribe } from '/js/services/ecosystem.js';
+import { formatUntil } from './schedule-item.js';
+import { listAppSchedules, createCapabilitySchedule, setScheduleEnabled, deleteSchedule, triggerSchedule } from '/js/services/schedules.js';
 
 /**
  * One "Data this app wrote" entry: collapsed row (key + visibility chip + timeAgo) that expands to
@@ -71,6 +77,177 @@ const OUTBOUND_EVENTS = ['memory.write', 'memory.delete', 'offer.ordered', 'work
 function keyFp(pub) {
   if (!pub) return '';
   return pub.length > 12 ? `${pub.slice(0, 8)}…${pub.slice(-4)}` : pub;
+}
+
+// ── Automation: cadence ⇄ cron ──────────────────────────────────────────────
+// The UI offers three coarse cadences; each maps to a fixed 08:00 cron. The
+// reverse map turns a known cron back into a human cadence label for the list.
+const CADENCES = [
+  { key: 'daily', cron: '0 8 * * *' },
+  { key: 'weekly', cron: '0 8 * * 1' },
+  { key: 'monthly', cron: '0 8 1 * *' },
+];
+const CRON_TO_CADENCE = Object.fromEntries(CADENCES.map(c => [c.cron, c.key]));
+
+/** Human label for a cron — one of the known cadences, else the raw cron string. */
+function cronLabel(cron) {
+  const key = CRON_TO_CADENCE[cron];
+  return key ? t(`profile.ecosystem.automationCadence_${key}`) : cron;
+}
+
+/**
+ * The "Automation" section of one expanded GEAI card: per-capability cadence +
+ * enable toggle, and the list of the app's existing eco-capability schedules.
+ * Lazy-loads on first expand and refreshes on the live-update event.
+ */
+function EcoAutomationSection({ app, showToast }) {
+  const [schedules, setSchedules] = useState(undefined); // undefined = never loaded
+  const [cadenceByCap, setCadenceByCap] = useState({});  // capabilityId → cadence key
+  const [busy, setBusy] = useState({});                  // capabilityId/scheduleId → bool
+
+  const caps = app.capabilities || [];
+  // automation.schedulable[].cadences may restrict which cadences a capability allows.
+  const schedulable = (app.automation && app.automation.schedulable) || [];
+  const schedHint = Object.fromEntries(schedulable.map(s => [s.id, s]));
+
+  const load = async () => {
+    try {
+      const list = await listAppSchedules(app.app);
+      setSchedules(list);
+    } catch (e) {
+      setSchedules(s => (s === undefined ? [] : s));
+    }
+  };
+
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  useEffect(() => {
+    load();
+    const handler = () => loadRef.current();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, [app.app]);
+
+  // Allowed cadences for a capability (restricted by automation hint, else all three).
+  function allowedCadences(capId) {
+    const allow = schedHint[capId] && Array.isArray(schedHint[capId].cadences) ? schedHint[capId].cadences : null;
+    return allow ? CADENCES.filter(c => allow.includes(c.key)) : CADENCES;
+  }
+
+  async function onEnable(capId) {
+    const allowed = allowedCadences(capId);
+    const cadenceKey = cadenceByCap[capId] || (allowed[0] && allowed[0].key) || 'weekly';
+    const cron = (CADENCES.find(c => c.key === cadenceKey) || CADENCES[0]).cron;
+    setBusy(b => ({ ...b, [capId]: true }));
+    try {
+      await createCapabilitySchedule(app.app, capId, cron, { displayName: `${app.display_name || app.app} · ${capId}` });
+      showToast?.(t('profile.ecosystem.automationCreated'), 'success');
+      await load();
+    } catch (e) {
+      showToast?.(t('profile.ecosystem.automationError'), 'error');
+    } finally {
+      setBusy(b => ({ ...b, [capId]: false }));
+    }
+  }
+
+  async function onToggle(job) {
+    setBusy(b => ({ ...b, [job.id]: true }));
+    try {
+      await setScheduleEnabled(job.id, !job.enabled);
+      await load();
+    } catch (e) {
+      showToast?.(t('profile.ecosystem.automationError'), 'error');
+    } finally {
+      setBusy(b => ({ ...b, [job.id]: false }));
+    }
+  }
+
+  async function onRunNow(job) {
+    setBusy(b => ({ ...b, [job.id]: true }));
+    try {
+      await triggerSchedule(job.id);
+      showToast?.(t('profile.ecosystem.automationTriggered'), 'success');
+      await load();
+    } catch (e) {
+      showToast?.(t('profile.ecosystem.automationError'), 'error');
+    } finally {
+      setBusy(b => ({ ...b, [job.id]: false }));
+    }
+  }
+
+  async function onDelete(job) {
+    setBusy(b => ({ ...b, [job.id]: true }));
+    try {
+      await deleteSchedule(job.id);
+      await load();
+    } catch (e) {
+      showToast?.(t('profile.ecosystem.automationError'), 'error');
+    } finally {
+      setBusy(b => ({ ...b, [job.id]: false }));
+    }
+  }
+
+  const revoked = app.status === 'revoked';
+
+  return html`
+    <div class="pf-eco-section">
+      <div class="pf-eco-section-title">${t('profile.ecosystem.automationTitle')}</div>
+      <p class="pf-eco-dim pf-eco-auto-intro">${t('profile.ecosystem.automationIntro')}</p>
+
+      ${!revoked && (caps.length === 0
+        ? html`<div class="pf-eco-dim">${t('profile.ecosystem.automationNoCaps')}</div>`
+        : html`
+          <div class="pf-eco-auto-caps">
+            ${caps.map(cap => {
+              const allowed = allowedCadences(cap.id);
+              const selected = cadenceByCap[cap.id] || (allowed[0] && allowed[0].key) || '';
+              return html`
+                <div class="pf-eco-auto-cap" key=${cap.id}>
+                  <span class="pf-eco-mono pf-eco-auto-cap-id">${cap.id}</span>
+                  <select class="pf-eco-select pf-eco-auto-cadence"
+                    value=${selected}
+                    onChange=${e => setCadenceByCap(m => ({ ...m, [cap.id]: e.target.value }))}>
+                    ${allowed.map(c => html`<option value=${c.key} key=${c.key}>${t(`profile.ecosystem.automationCadence_${c.key}`)}</option>`)}
+                  </select>
+                  <button class="btn-outline btn-sm" disabled=${!!busy[cap.id]} onClick=${() => onEnable(cap.id)}>
+                    ${t('profile.ecosystem.automationEnable')}
+                  </button>
+                </div>`;
+            })}
+          </div>`)}
+
+      <div class="pf-eco-auto-list">
+        ${schedules === undefined
+          ? html`<div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.automationLoading')}</div>`
+          : schedules.length === 0
+            ? html`<div class="pf-eco-dim">${t('profile.ecosystem.automationEmpty')}</div>`
+            : schedules.map(job => html`
+              <div class="pf-eco-auto-job ${job.enabled ? '' : 'pf-eco-auto-job-off'}" key=${job.id}>
+                <div class="pf-eco-auto-job-main">
+                  <span class="pf-eco-mono pf-eco-auto-job-cap">${job.input?.capability_id || ''}</span>
+                  <span class="pf-eco-chip pf-eco-auto-cadence-chip">${cronLabel(job.cron)}</span>
+                  <span class="pf-eco-chip ${job.enabled ? 'pf-eco-auto-on' : 'pf-eco-auto-paused'}">
+                    ${job.enabled ? t('profile.ecosystem.automationOn') : t('profile.ecosystem.automationPaused')}
+                  </span>
+                </div>
+                <div class="pf-eco-auto-job-meta">
+                  <span class="pf-eco-dim">
+                    ${t('profile.ecosystem.automationLastRun')}: ${job.lastRunAt
+                      ? html`${timeAgo(job.lastRunAt)}${job.lastRunResult ? html` · <span class="pf-eco-auto-result-${job.lastRunResult}">${job.lastRunResult}</span>` : ''}`
+                      : '—'}
+                  </span>
+                  <span class="pf-eco-dim">${t('profile.ecosystem.automationNextRun')}: ${job.enabled ? formatUntil(job.nextRunAt) : '—'}</span>
+                </div>
+                <div class="pf-eco-auto-job-actions">
+                  <button class="btn-ghost btn-sm" disabled=${!!busy[job.id]} onClick=${() => onRunNow(job)}>${t('profile.ecosystem.automationRunNow')}</button>
+                  <button class="btn-ghost btn-sm" disabled=${!!busy[job.id]} onClick=${() => onToggle(job)}>
+                    ${job.enabled ? t('profile.ecosystem.automationDisable') : t('profile.ecosystem.automationEnable')}
+                  </button>
+                  <button class="btn-ghost btn-sm pf-eco-auto-del" disabled=${!!busy[job.id]} title=${t('profile.ecosystem.automationDelete')} onClick=${() => onDelete(job)}>✕</button>
+                </div>
+              </div>`)}
+      </div>
+    </div>`;
 }
 
 export default function EcosystemTab({ onStats, showToast }) {
@@ -273,6 +450,8 @@ export default function EcosystemTab({ onStats, showToast }) {
                         <button class="btn-outline btn-sm" onClick=${() => onSubscribe(app.app)}>${t('profile.ecosystem.addSub')}</button>
                       </div>`}
                   </div>
+
+                  <${EcoAutomationSection} app=${app} showToast=${showToast} />
 
                   <div class="pf-eco-section">
                     <div class="pf-eco-section-title">${t('profile.ecosystem.dataTitle')}</div>

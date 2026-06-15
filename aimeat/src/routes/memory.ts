@@ -9,6 +9,8 @@
  *   v1.3.0 -- 2026-05-28 -- Include owner_gaii in memory listing responses
  *   v1.4.0 -- 2026-06-07 -- Route public-read through shared authorizeRead() (access-guard) so
  *     memory and file storage share one access decision + audit path.
+ *   v1.5.0 -- 2026-06-15 -- Fire ecosystem-app automation recipes (feature B4) on a successful
+ *     memory write — a data publish on a matching key glob materialises an agent task per agent.
  */
 
 import { Router } from 'express';
@@ -36,6 +38,7 @@ import { authorizeRead } from '../services/access-guard.js';
 import { emitChange } from '../services/event-bus.js';
 import { getActiveWorkflowEngine } from '../services/workflow/engine.js';
 import { emitEcosystemMemoryWrite } from '../services/ecosystem-events.js';
+import { runAutomationRecipesForWrite } from '../services/ecosystem-automation.js';
 import { ecoMayWriteKey } from '../services/ecosystem-access.js';
 import { listOwnerScopeMemory } from '../services/owner-memory.js';
 
@@ -231,6 +234,10 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
     // Outbound ecosystem event: push memory.write to any subscribed GEAI of this owner (best-effort).
     emitEcosystemMemoryWrite(storage, config, gaii, key)
       .catch(e => logger.error('ecosystem outbound (memory.write) failed', { key, error: String(e) }));
+    // Ecosystem automation recipes (feature B4): when a connected app publishes data on a key
+    // matching an enabled recipe's glob, materialise an agent task for each configured agent.
+    runAutomationRecipesForWrite(storage, config, gaii, key)
+      .catch(e => logger.error('ecosystem automation recipe trigger failed', { key, error: String(e) }));
   });
 
   // GET /v1/memory — list memory keys (agent auth required)

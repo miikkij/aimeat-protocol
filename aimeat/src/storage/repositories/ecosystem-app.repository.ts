@@ -7,8 +7,10 @@
  * @usage Part of the composed `Storage` interface (storage/interface.ts).
  * @version-history
  *   v1.0.0 — 2026-06-14 — Created for ecosystem-apps foundation (chunk 1).
+ *   v1.1.0 — 2026-06-15 — Add automation-recipe CRUD (feature B4): per-(owner, app) rule that
+ *     materialises an agent task when the app publishes data on a matching memory key glob.
  */
-import type { EcosystemAppRecord, EcoAuthorizationRecord } from '../interface.js';
+import type { EcosystemAppRecord, EcoAuthorizationRecord, EcoAutomationRecipe } from '../interface.js';
 
 export interface EcosystemAppRepository {
   // ── GEAI principal records (mirror of the agent CRUD, minus tasks) ──
@@ -27,4 +29,10 @@ export interface EcosystemAppRepository {
   countPendingEcoAuthByOwner(ownerName: string): Promise<number>;
   listPendingEcoAuthByOwner(ownerName: string): Promise<EcoAuthorizationRecord[]>;
   cleanupExpiredEcoAuth(): Promise<number>;
+
+  // ── Automation recipes (feature B4): one per (owner, app), keyed by bare owner name ──
+  getAutomationRecipe(owner: string, app: string): Promise<EcoAutomationRecipe | null>;
+  upsertAutomationRecipe(recipe: EcoAutomationRecipe): Promise<EcoAutomationRecipe>;
+  deleteAutomationRecipe(owner: string, app: string): Promise<boolean>;
+  listAutomationRecipesByOwner(owner: string): Promise<EcoAutomationRecipe[]>;
 }

@@ -10,6 +10,8 @@
  * @usage import { validateEcoManifest, EcoManifestSchema } from '../models/ecosystem-manifest.js';
  * @version-history
  *   v1.0.0 — 2026-06-14 — Created for the connector-profile static-validation slice (chunk 4).
+ *   v1.1.0 — 2026-06-15 — Accept an optional `automation` hint (schedulable capabilities + sink)
+ *     for the eco-capability scheduler. Not required; purely a hint.
  */
 import { z } from 'zod';
 import { validateAppName } from '../utils/gaii.js';
@@ -26,6 +28,16 @@ export const EcoManifestSchema = z.object({
   events: z.object({
     emits: z.array(z.string().max(120)).max(100).optional(),
     subscribes: z.array(z.string().max(120)).max(100).optional(),
+  }).optional(),
+  // Optional automation hints: which capabilities are schedulable (+ cadences) and an advisory sink.
+  // A HINT only — never required for an owner to schedule an eco-capability job.
+  automation: z.object({
+    schedulable: z.array(z.object({
+      id: z.string().min(1).max(120),
+      produces: z.string().max(200).optional(),
+      cadences: z.array(z.string().max(120)).max(20).optional(),
+    })).max(100).optional(),
+    advisory_sink: z.string().max(200).optional(),
   }).optional(),
 });
 export type EcoManifest = z.infer<typeof EcoManifestSchema>;

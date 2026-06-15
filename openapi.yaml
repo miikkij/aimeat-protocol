@@ -186,6 +186,33 @@ components:
           items:
             type: string
             enum: [read, write]
+    EcoAutomationRecipe:
+      type: object
+      description: |
+        A per-(owner, app) automation recipe (feature B4). When the connected app publishes refined
+        data on a memory key matching `trigger.keyGlob`, the recipe materialises an agent task for
+        each agent in `agents`. The downstream fields (`organism`, `email`, `require_approval`) are
+        stored but not yet enforced (B5/B6/B7) — only the agent trigger is wired.
+      required: [id, app, trigger, agents, enabled, created_at, updated_at]
+      properties:
+        id: { type: string }
+        app: { type: string, description: The app segment, e.g. feedback-desk. }
+        trigger:
+          type: object
+          required: [kind, keyGlob]
+          properties:
+            kind: { type: string, enum: [data-published] }
+            keyGlob: { type: string, description: 'Memory key glob that fires the recipe, e.g. feedback.stats.*' }
+        agents:
+          type: array
+          items: { type: string }
+          description: Names of the owner's agents to run when the trigger fires.
+        organism: { type: string, nullable: true, description: 'B5 — stored, not yet enforced.' }
+        email: { type: boolean, description: 'B6 — stored, not yet enforced.' }
+        require_approval: { type: boolean, description: 'B7 — stored, not yet enforced.' }
+        enabled: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
     # === Reusable Enums ===
     WorkStatus:
       type: string
@@ -2917,7 +2944,7 @@ components:
       description: A recurring schedule owned by the server clock (reuses ScheduledJobRecord).
       properties:
         id: { type: string }
-        type: { type: string, enum: [extension, core, ai, agent_task] }
+        type: { type: string, enum: [extension, core, ai, agent_task, eco-capability] }
         cron: { type: string }
         enabled: { type: boolean }
         timezone: { type: string, description: IANA timezone }
@@ -2930,7 +2957,7 @@ components:
         createdByAgent: { type: boolean }
         runCount: { type: integer }
         constraints: { type: array, items: { $ref: '#/components/schemas/ScheduleConstraint' } }
-        input: { type: object, description: 'Kind-specific config (ai params, agent_task template, or extension input).' }
+        input: { type: object, description: 'Kind-specific config (ai params, agent_task template, extension input, or eco-capability { app, capability_id, input }).' }
         lastRunAt: { type: string, format: date-time }
         lastRunResult: { type: string, enum: [success, error] }
         nextRunAt: { type: string, format: date-time }
@@ -2941,7 +2968,7 @@ components:
       type: object
       required: [kind, cron, display_name]
       properties:
-        kind: { type: string, enum: [ai, agent_task, extension] }
+        kind: { type: string, enum: [ai, agent_task, extension, eco-capability] }
         cron: { type: string, example: '0 7 * * *' }
         display_name: { type: string }
         timezone: { type: string, example: Europe/Helsinki }
@@ -2965,7 +2992,9 @@ components:
         extension_name: { type: string }
         action_id: { type: string }
         instance_id: { type: string }
-        input: { type: object }
+        app: { type: string, description: 'eco-capability: the connected ecosystem app (GEAI) short name (e.g. "zendesk").' }
+        capability_id: { type: string, description: 'eco-capability: the capability to invoke each fire; must be declared in the app''s manifest.' }
+        input: { type: object, description: 'Kind-specific input payload (extension scheduler input, or the eco-capability invoke input).' }
 
     # === Agent Workflows ===
     LocalizedString:
@@ -3420,7 +3449,7 @@ paths:
                 manifest:
                   type: object
                   additionalProperties: true
-                  description: "Optional app manifest (declared scopes/capabilities/events). When present it is statically validated; a failed validation blocks approval."
+                  description: "Optional app manifest (declared scopes/capabilities/events + an optional automation hint). When present it is statically validated; a failed validation blocks approval. Declared `capabilities` (and `automation`) are persisted and copied onto the connected app at approval so its capabilities can be scheduled (eco-capability)."
       responses:
         '200':
           description: Pending request created with device + user codes (+ a validation result when a manifest was submitted).
@@ -3519,6 +3548,54 @@ paths:
       responses:
         '200':
           description: The authenticated owner's ecosystem apps.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      ecosystem_apps:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            geai: { type: string }
+                            app: { type: string }
+                            owner: { type: string }
+                            display_name: { type: string }
+                            description: { type: string }
+                            scopes: { type: array, items: { type: string } }
+                            data_areas: { type: array, items: { type: object } }
+                            status: { type: string, enum: [validating, pending, approved, active, revoked] }
+                            public_key: { type: string }
+                            capabilities:
+                              type: array
+                              description: The app's declared capabilities (copied from the validated manifest at approval).
+                              items:
+                                type: object
+                                properties:
+                                  id: { type: string }
+                                  inputSchema: { type: object }
+                                  outputSchema: { type: object }
+                            automation:
+                              type: object
+                              nullable: true
+                              description: Optional manifest automation hint (schedulable capabilities + advisory sink).
+                              properties:
+                                schedulable:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      id: { type: string }
+                                      produces: { type: string }
+                                      cadences: { type: array, items: { type: string } }
+                                advisory_sink: { type: string }
+                            created_at: { type: string, format: date-time }
+                            last_seen: { type: string, format: date-time }
         '403':
           description: Owner role required.
   /v1/ecosystem-apps/{app}/data:
@@ -3577,6 +3654,119 @@ paths:
           description: Owner role required.
         '404':
           description: Ecosystem app not found for this owner.
+  /v1/ecosystem-apps/{app}/automation/recipe:
+    get:
+      operationId: ecosystemAppAutomationRecipeGet
+      summary: Get the automation recipe for an app (owner)
+      description: |
+        Returns the per-(owner, app) automation recipe, or `null` if none is set. When a connected
+        app publishes refined data on a memory key matching `trigger.keyGlob`, the recipe materialises
+        an agent task for each configured agent (feature B4). The downstream fields
+        (`organism`, `email`, `require_approval`) are stored but not yet enforced (B5/B6/B7).
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: app
+          in: path
+          required: true
+          schema: { type: string }
+          description: The app name of the connected GEAI.
+      responses:
+        '200':
+          description: The recipe (or null).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      recipe:
+                        oneOf:
+                          - $ref: '#/components/schemas/EcoAutomationRecipe'
+                          - type: 'null'
+        '403':
+          description: Owner role required.
+    put:
+      operationId: ecosystemAppAutomationRecipePut
+      summary: Create or update the automation recipe for an app (owner)
+      description: |
+        Upserts the per-(owner, app) automation recipe. `agents` must all be the owner's own agents
+        (rejected with `UNKNOWN_AGENT` otherwise). `trigger.keyGlob` defaults server-side from the
+        app's declared `automation.schedulable[].produces` hint (or `eco.{app}.*`) when omitted.
+        The app must be connected for this owner (404 `ECO_APP_NOT_FOUND` otherwise). The downstream
+        fields are stored but not enforced yet (B5/B6/B7).
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: app
+          in: path
+          required: true
+          schema: { type: string }
+          description: The app name of the connected GEAI.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agents]
+              properties:
+                agents:
+                  type: array
+                  items: { type: string }
+                  description: Names of the owner's agents to run when the trigger fires.
+                trigger:
+                  type: object
+                  properties:
+                    keyGlob: { type: string, description: 'Memory key glob, e.g. feedback.stats.*' }
+                organism: { type: string, nullable: true, description: 'B5 (stored, not enforced).' }
+                email: { type: boolean, description: 'B6 (stored, not enforced).' }
+                require_approval: { type: boolean, description: 'B7 (stored, not enforced).' }
+                enabled: { type: boolean, default: true }
+      responses:
+        '200':
+          description: The upserted recipe.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      recipe: { $ref: '#/components/schemas/EcoAutomationRecipe' }
+        '400':
+          description: Invalid input (INVALID_INPUT) or a named agent is not the owner's (UNKNOWN_AGENT).
+        '403':
+          description: Owner role required.
+        '404':
+          description: Ecosystem app not connected for this owner (ECO_APP_NOT_FOUND).
+    delete:
+      operationId: ecosystemAppAutomationRecipeDelete
+      summary: Delete the automation recipe for an app (owner)
+      description: Removes the per-(owner, app) automation recipe. 404 if none exists.
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: app
+          in: path
+          required: true
+          schema: { type: string }
+          description: The app name of the connected GEAI.
+      responses:
+        '200':
+          description: Deleted.
+        '403':
+          description: Owner role required.
+        '404':
+          description: No automation recipe for this app.
   /v1/ecosystem-apps/{app}:
     delete:
       operationId: ecosystemAppRevoke

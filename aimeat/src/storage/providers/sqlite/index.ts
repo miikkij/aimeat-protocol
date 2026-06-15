@@ -21,7 +21,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type {
   Storage, OwnerRecord, AgentRecord, MemoryRecord,
-  EcosystemAppRecord, EcoAuthorizationRecord,
+  EcosystemAppRecord, EcoAuthorizationRecord, EcoAutomationRecipe,
   ActionRecord, WorkRecord, WalletTransaction,
   BoardRecord, BoardPostRecord, OtkRecord,
   DisputeRecord, DisputeAuditEntry, MicroMemoryRecord,
@@ -5150,6 +5150,18 @@ export class SqliteStorage implements Storage {
   }
   async cleanupExpiredEcoAuth(): Promise<number> {
     return ecosystemAppRepo.cleanupExpiredEcoAuth(this.db);
+  }
+  async getAutomationRecipe(owner: string, app: string): Promise<EcoAutomationRecipe | null> {
+    return ecosystemAppRepo.getAutomationRecipe(this.db, owner, app);
+  }
+  async upsertAutomationRecipe(recipe: EcoAutomationRecipe): Promise<EcoAutomationRecipe> {
+    return ecosystemAppRepo.upsertAutomationRecipe(this.db, recipe);
+  }
+  async deleteAutomationRecipe(owner: string, app: string): Promise<boolean> {
+    return ecosystemAppRepo.deleteAutomationRecipe(this.db, owner, app);
+  }
+  async listAutomationRecipesByOwner(owner: string): Promise<EcoAutomationRecipe[]> {
+    return ecosystemAppRepo.listAutomationRecipesByOwner(this.db, owner);
   }
 
   private deserializeDeviceAuth(row: Record<string, unknown>): DeviceAuthorizationRecord {
