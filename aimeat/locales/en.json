@@ -484,7 +484,7 @@
       "title": "Ecosystem apps",
       "desc": "Connect external services so your agents and workflows can exchange data, capabilities, and events with them.",
       "connect": "+ Connect app",
-      "connectNote": "An ecosystem app connects itself: start the app, and its own backend sends a connection request to AIMEAT — it appears here for you to approve. You don't run any command here.",
+      "connectNote": "This is for external services that support AIMEAT (like the Feedback Desk demo). Most people don't need to do anything here. If you use such a service, you connect it from that service's own settings — its request then appears here to approve. There's no app store for these yet; services and developers add AIMEAT support themselves.",
       "empty": "No ecosystem apps connected yet.",
       "loadError": "Could not load ecosystem apps.",
       "approved": "Ecosystem app approved.",
