@@ -10,6 +10,10 @@
  *   v1.0.0 -- 2026-06-03 -- Initial: master + per-agent schedule CRUD/trigger
  *   v1.1.0 -- 2026-06-15 -- Add ecosystem-app helpers: listAppSchedules (filtered managed
  *     eco-capability jobs) + createCapabilitySchedule (POST kind:'eco-capability').
+ *   v1.2.0 -- 2026-06-15 -- triggerSchedule now RETURNS the envelope data (honest outcome:
+ *     'success'|'error'|'busy' + reason) so callers can report skips/offline truthfully.
+ *     Add getScheduleDetail (GET /:id → { schedule, runs } run-history log) +
+ *     setScheduleCron (PATCH /:id { cron } — change cadence of an existing schedule).
  */
 import { apiGet, apiPost, apiPatch, apiDelete } from '/js/api.js';
 
@@ -46,8 +50,33 @@ export async function setScheduleEnabled(id, enabled) {
   return apiPatch(`/v1/schedules/${encodeURIComponent(id)}`, { enabled });
 }
 
+/**
+ * Run a schedule now. Returns the trigger result payload (the envelope `data`)
+ * so the caller can branch on the HONEST outcome:
+ *   { triggered, outcome: 'success'|'error'|'busy', reason?, task_id?, schedule }
+ * `'busy'` means the run was SKIPPED (e.g. the eco app is offline / the connect
+ * tunnel is unavailable, or a previous run is still active) — `reason` says why.
+ */
 export async function triggerSchedule(id) {
-  return apiPost(`/v1/schedules/${encodeURIComponent(id)}/trigger`, {});
+  const res = await apiPost(`/v1/schedules/${encodeURIComponent(id)}/trigger`, {});
+  return res?.data || {};
+}
+
+/**
+ * Detail + recent run history for one schedule.
+ * Returns { schedule, runs } where `runs` = up to 20 ExecutionLogEntry records
+ * (newest first): { createdAt, trigger, result: 'success'|'error'|'skipped',
+ * errorMessage?, durationMs, ... }. Skipped runs (offline attempts) appear here
+ * even though they don't advance the schedule's lastRun.
+ */
+export async function getScheduleDetail(id) {
+  const res = await getSchedule(id);
+  return res?.data || { schedule: null, runs: [] };
+}
+
+/** Change the cadence (cron) of an existing schedule and reschedule it. */
+export async function setScheduleCron(id, cron) {
+  return apiPatch(`/v1/schedules/${encodeURIComponent(id)}`, { cron });
 }
 
 export async function deleteSchedule(id) {
