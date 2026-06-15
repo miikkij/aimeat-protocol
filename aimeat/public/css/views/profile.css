@@ -32,6 +32,11 @@
  *     .pf-eco-setup(-lead/-progress/-progress-chip/-steps/-step/-step-done/-dot/-dot-done/-dot-wait/
  *     -step-body/-step-title/-step-why/-step-note/-cta), .pf-eco-mcp(-head/-icon/-title/-sub/-connect/
  *     -sample/-sample-label/-sample-row/-sample-prompt/-sample-note).
+ *   v2.2.0 — 2026-06-15 — Ecosystem NON-TECHNICAL card redesign (value-first + hidden plumbing):
+ *     .pf-eco-head-title/-head-owner (friendly header subtitle), .pf-eco-value-line (one-line value
+ *     statement), .pf-eco-disconnect/-disconnect-hint (accessible plain disconnect), and the collapsed
+ *     Technical-details disclosure .pf-eco-tech(-toggle/-toggle-label/-icon/-body/-hint/-section/
+ *     -section-title/-principal/-access) with a subtly distinct faint var(--bg-dim) background.
  *   v1.14.0 — 2026-06-10 — SchemaForm usability: .pj-field-hint (per-field hint),
  *     .pj-field-invalid (missing-required outline) + .pj-form-error message.
  *   v1.13.0 — 2026-06-10 — Workspace renew, phase 2: .pj-ws-head-actions, review
@@ -2834,3 +2839,23 @@
 .pf-eco-mcp-sample-row { display: flex; align-items: flex-start; gap: .5rem; }
 .pf-eco-mcp-sample-prompt { flex: 1 1 auto; min-width: 0; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: .5rem .6rem; font-family: var(--font-mono, monospace); font-size: .78rem; color: var(--text); line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 .pf-eco-mcp-sample-note { margin: 0; font-size: .76rem; }
+
+/* ── Ecosystem card — value-first human header + one-liner + disconnect (pf-eco-value-*/-head-*/-disconnect) ── */
+.pf-eco-head-title { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
+.pf-eco-head-owner { font-size: .76rem; }
+.pf-eco-value-line { margin: 0 0 .2rem; font-size: .92rem; line-height: 1.5; color: var(--text); }
+.pf-eco-disconnect-hint { margin: -.25rem 0 .55rem; }
+
+/* ── Ecosystem card — collapsed "Technical details" disclosure (pf-eco-tech-*) ── */
+.pf-eco-tech { margin-top: .6rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-dim); overflow: hidden; }
+.pf-eco-tech-toggle { display: flex; align-items: center; gap: .45rem; width: 100%; background: none; border: none; padding: .55rem .75rem; font-size: .82rem; font-weight: 600; color: var(--text-dim); cursor: pointer; text-align: left; }
+.pf-eco-tech-toggle:hover { color: var(--text); }
+.pf-eco-tech-icon { font-size: .95rem; }
+.pf-eco-tech-toggle-label { flex: 1 1 auto; }
+.pf-eco-tech-body { padding: .2rem .75rem .7rem; border-top: 1px solid var(--border); }
+.pf-eco-tech-hint { margin: .5rem 0 .4rem; font-size: .78rem; line-height: 1.45; }
+.pf-eco-tech-section { padding: .6rem 0; border-top: 1px solid var(--border); }
+.pf-eco-tech-section:first-of-type { border-top: none; }
+.pf-eco-tech-section-title { font-weight: 700; font-size: .82rem; margin-bottom: .4rem; color: var(--text-dim); }
+.pf-eco-tech-principal { display: inline-block; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: .3rem .5rem; word-break: break-all; }
+.pf-eco-tech-access { margin: -.15rem 0 .4rem; }
