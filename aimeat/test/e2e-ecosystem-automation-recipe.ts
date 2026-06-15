@@ -9,12 +9,20 @@
  *     (d) THE TRIGGER: with an enabled recipe (keyGlob feedback.stats.*, agents:[the owner's agent]),
  *         write a memory key matching the glob → an agent task is materialised for that agent;
  *     (e) a non-matching key → no task; a disabled recipe → no task;
+ *     (g) B5 ORGANISM ROUTING: a recipe with an organism stamps the materialised task with it (in the
+ *         `automation` metadata, the prompt/description, and a scope entry); a null-organism recipe
+ *         leaves the task with no organism;
+ *     (h) B6 EMAIL/REPORT ON COMPLETION: with email:true, driving the task to DONE (owner start→complete)
+ *         writes an in-app `automation.reports.*` record for the owner; with email:false it writes none.
  *     (f) DELETE → GET null.
  *   The deposit is simulated by the OWNER writing the memory key (owner namespace = owner@node, which
  *   the trigger resolves to the same bare owner the recipe is keyed by). A fully-connected GEAI is NOT
  *   required to exercise the trigger — the recipe is owner-scoped and fires on any matching owner write.
+ *   B6 NOTE: the actual SMTP email needs live SMTP + an owner notification email; without SMTP the node
+ *   logs "email skipped (not configured)" and only writes the in-app report — which is what (h) asserts.
  * @version-history
  *   v1.0.0 — 2026-06-15 — Initial creation (B4 recipe CRUD + the data-published → agent-task trigger).
+ *   v1.1.0 — 2026-06-15 — Add B5 (organism routing) + B6 (email/in-app report on completion) coverage.
  */
 
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ecosystem-automation-recipe
@@ -257,6 +265,158 @@ await test('Disable the recipe → a matching write spawns NO task', async () =>
   await sleep(1500);
   const after = await countTasks();
   assert(after.matching === before.matching, `disabled recipe must not spawn a task: before=${before.matching} after=${after.matching}`);
+});
+
+// ─── (g) B5: organism routing — the materialised task carries the organism ───
+console.log('\n(g) B5: the materialised task carries the recipe organism (metadata + prompt + scope)');
+
+// Fetch the raw task records (the list returns the stored AgentTaskRecord, incl. `automation`).
+async function listTasks(): Promise<any[]> {
+  const { body } = await json(`/v1/agents/${AGENT}/tasks?per_page=200`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+  return (body.data?.tasks ?? []) as any[];
+}
+function newestMatchingTask(tasks: any[]): any | undefined {
+  return tasks
+    .filter(t => /^Process feedbackdesk data:/.test(t.title ?? ''))
+    .sort((a, b) => String(b.updatedAt ?? '').localeCompare(String(a.updatedAt ?? '')))[0];
+}
+
+await test('Re-enable the recipe WITH an organism → matching write stamps the task with it', async () => {
+  const upd = await json(`/v1/ecosystem-apps/${APP}/automation/recipe`, {
+    method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({
+      agents: [AGENT], trigger: { keyGlob: 'feedback.stats.*' },
+      organism: 'support-ops', email: false, enabled: true,
+    }),
+  });
+  assert(upd.status === 200, `re-enable status ${upd.status}: ${JSON.stringify(upd.body)}`);
+
+  const before = newestMatchingTask(await listTasks());
+  const w = await json('/v1/memory', {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ key: 'feedback.stats.monthly', value: { resolved: 7 }, visibility: 'owner' }),
+  });
+  assert(w.status === 200 || w.status === 201, `write status ${w.status}`);
+
+  let task: any;
+  for (let i = 0; i < 24; i++) {
+    await sleep(250);
+    task = newestMatchingTask(await listTasks());
+    if (task && (!before || task.id !== before.id)) break;
+  }
+  assert(!!task && (!before || task.id !== before.id), 'a new task was materialised');
+  // (1) metadata: the task carries the recipe provenance + organism + toggles
+  assert(!!task.automation, `task should carry automation metadata: ${JSON.stringify(task.automation)}`);
+  assert(task.automation.organism === 'support-ops', `automation.organism: ${task.automation?.organism}`);
+  assert(task.automation.app === APP, `automation.app: ${task.automation?.app}`);
+  assert(task.automation.email === false, `automation.email: ${task.automation?.email}`);
+  assert(typeof task.automation.recipeId === 'string' && task.automation.recipeId.length > 0, 'automation.recipeId set');
+  // (2) prompt: the description tells the agent WHERE to write
+  assert(/support-ops/.test(task.description ?? ''), `description should name the organism: ${task.description}`);
+  // (3) scope: an organism scope entry is present
+  const orgScope = (task.scope ?? []).find((s: any) => s.name === 'organism');
+  assert(!!orgScope && orgScope.value === 'support-ops', `organism scope entry: ${JSON.stringify(orgScope)}`);
+});
+
+await test('Recipe with NULL organism → the task carries no organism', async () => {
+  const upd = await json(`/v1/ecosystem-apps/${APP}/automation/recipe`, {
+    method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ agents: [AGENT], trigger: { keyGlob: 'feedback.stats.*' }, organism: null, email: false, enabled: true }),
+  });
+  assert(upd.status === 200, `status ${upd.status}`);
+
+  const before = newestMatchingTask(await listTasks());
+  const w = await json('/v1/memory', {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ key: 'feedback.stats.noorg', value: { x: 1 }, visibility: 'owner' }),
+  });
+  assert(w.status === 200 || w.status === 201, `write status ${w.status}`);
+
+  let task: any;
+  for (let i = 0; i < 24; i++) {
+    await sleep(250);
+    task = newestMatchingTask(await listTasks());
+    if (task && (!before || task.id !== before.id)) break;
+  }
+  assert(!!task && (!before || task.id !== before.id), 'a new task was materialised');
+  assert(!task.automation?.organism, `no organism expected: ${task.automation?.organism}`);
+  assert(!/Write your report and any/.test(task.description ?? ''), 'description must not include the organism routing line');
+});
+
+// ─── (h) B6: email/in-app report on completion ───
+console.log('\n(h) B6: completing an automation task with email:true writes an in-app report record');
+
+// Read the owner's automation report records (the SMTP-free observable; email itself needs SMTP).
+async function listReports(): Promise<any[]> {
+  const { body } = await json('/v1/memory?prefix=automation.reports.', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  return (body.data?.items ?? []) as any[];
+}
+
+// Drive one automation task to completion (owner starts queued→active, then completes active→done).
+async function materialiseAndComplete(emailFlag: boolean, key: string): Promise<{ taskId: string }> {
+  const upd = await json(`/v1/ecosystem-apps/${APP}/automation/recipe`, {
+    method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ agents: [AGENT], trigger: { keyGlob: 'feedback.stats.*' }, organism: 'support-ops', email: emailFlag, enabled: true }),
+  });
+  assert(upd.status === 200, `recipe set status ${upd.status}`);
+
+  const before = newestMatchingTask(await listTasks());
+  const w = await json('/v1/memory', {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ key, value: { ok: true }, visibility: 'owner' }),
+  });
+  assert(w.status === 200 || w.status === 201, `write status ${w.status}`);
+
+  let task: any;
+  for (let i = 0; i < 24; i++) {
+    await sleep(250);
+    task = newestMatchingTask(await listTasks());
+    if (task && (!before || task.id !== before.id)) break;
+  }
+  assert(!!task && (!before || task.id !== before.id), 'a new task was materialised');
+
+  // queued → active
+  const start = await json(`/v1/agents/${AGENT}/tasks/${task.id}/start`, {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(start.status === 200, `start status ${start.status}: ${JSON.stringify(start.body)}`);
+  // active → done (fires B6)
+  const done = await json(`/v1/agents/${AGENT}/tasks/${task.id}/complete`, {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ message: 'Analysis done: 7 tickets, CSAT steady.' }),
+  });
+  assert(done.status === 200, `complete status ${done.status}: ${JSON.stringify(done.body)}`);
+  return { taskId: task.id };
+}
+
+await test('email:true → completing the task writes an automation report record for the owner', async () => {
+  const before = (await listReports()).length;
+  const { taskId } = await materialiseAndComplete(true, 'feedback.stats.report1');
+  // B6 runs fire-and-forget after the complete response; poll the in-app reports.
+  let reports: any[] = [];
+  for (let i = 0; i < 24; i++) {
+    await sleep(250);
+    reports = await listReports();
+    if (reports.length > before) break;
+  }
+  assert(reports.length > before, `expected a new automation report, before=${before} after=${reports.length}`);
+  const mine = reports.find(r => (r.value?.taskId ?? r.taskId) === taskId);
+  assert(!!mine, `the report for task ${taskId} should exist: ${JSON.stringify(reports.map(r => r.key))}`);
+  const v = mine.value ?? mine;
+  assert(v.app === APP, `report.app: ${v.app}`);
+  assert(v.type === 'automation-report', `report.type: ${v.type}`);
+  assert((v.message ?? '').includes('Analysis done'), `report carries the completion message: ${v.message}`);
+  // NOTE: the EMAIL itself needs live SMTP + an owner notification email; without SMTP the node logs
+  // "email skipped (not configured)" and only the in-app record is written. This test asserts the
+  // SMTP-free observable (the report record). The actual email send is covered only with SMTP.
+});
+
+await test('email:false → completing the task writes NO automation report record', async () => {
+  const before = (await listReports()).length;
+  await materialiseAndComplete(false, 'feedback.stats.report2');
+  await sleep(2500); // give any (incorrect) fire-and-forget write time to land
+  const after = (await listReports()).length;
+  assert(after === before, `email:false must not write a report: before=${before} after=${after}`);
 });
 
 // ─── (f) DELETE → GET null ───

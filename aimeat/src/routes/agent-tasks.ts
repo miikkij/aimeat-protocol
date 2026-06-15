@@ -18,6 +18,9 @@
  *   - PATCH  /v1/agents/:name/tasks/:id/todos/:todoId -- Update individual todo status
  *   - GET    /v1/agents/:name/tasks/:id/events -- List events
  * @version-history
+ *   v1.7.0 -- 2026-06-15 -- B6: on /complete, fire notifyAutomationTaskComplete() so an
+ *     automation-recipe task with email:true emails the owner + stores an in-app report
+ *     (best-effort, never blocks completion).
  *   v1.6.0 -- 2026-06-05 -- DELETE now removes any non-active task (not just
  *     draft/queued) -- active tasks must be cancelled/paused first -- and cleans
  *     the task's operational memory traces (live-status keys + cancel marker)
@@ -48,6 +51,7 @@ import { recomputeAndCacheStatistics } from '../services/agent-statistics.js';
 import { AgentTaskCreateSchema, AgentTaskUpdateSchema, AgentTaskEventSchema, AgentTaskTodoUpdateSchema, AgentTaskRequestChangesSchema, AgentTaskRateSchema, AgentTaskTriageSchema } from '../models/agent-task-schemas.js';
 import type { AgentMessageRecord } from '../storage/interface.js';
 import { requireReadiness } from '../middleware/readiness-gate.js';
+import { notifyAutomationTaskComplete } from '../services/ecosystem-automation-notify.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
@@ -1021,6 +1025,11 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     // If this task was dispatched by a workflow, advance that run (output check → next step).
     getActiveWorkflowEngine()?.onTaskTerminal(task, 'done')
       .catch(e => logger.error('workflow advance on task done failed', { taskId: id, error: String(e) }));
+    // B6 — if this task was materialised by an ecosystem-app automation recipe with email:true,
+    // email the owner a short report + store an in-app report record. Best-effort + isolated:
+    // pass the freshly-updated record (carries the deliverableKey the agent just set).
+    void notifyAutomationTaskComplete(storage, config, updated ?? task, message)
+      .catch(e => logger.error('automation completion notify failed', { taskId: id, error: String(e) }));
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/fail -- Fail task (active -> failed) ── */
