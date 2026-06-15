@@ -960,7 +960,6 @@ export default function EcosystemTab({ onStats, showToast }) {
   const [pending, setPending] = useState([]);
   const [subs, setSubs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [connectOpen, setConnectOpen] = useState(false);
   const [expanded, setExpanded] = useState(null);     // expanded geai
   const [presetByCode, setPresetByCode] = useState({}); // userCode → preset
   const [revokeApp, setRevokeApp] = useState(null);   // app pending typed-name revoke
@@ -1061,16 +1060,8 @@ export default function EcosystemTab({ onStats, showToast }) {
         <h3 class="section-title">
           ${t('profile.ecosystem.title')} <span class="pf-eco-count-badge">${apps.length}</span>
         </h3>
-        <button class="${connectOpen ? 'btn-outline btn-sm' : 'btn-primary btn-sm'}" onClick=${() => setConnectOpen(o => !o)}>
-          ${connectOpen ? t('common.close') : t('profile.ecosystem.connect')}
-        </button>
       </div>
       <p class="section-desc">${t('profile.ecosystem.desc')}</p>
-
-      ${connectOpen && html`
-        <div class="pf-eco-connect">
-          <p class="pf-eco-connect-note">${t('profile.ecosystem.connectNote')}</p>
-        </div>`}
 
       ${pending.length > 0 && html`
         <div class="pf-eco-pending">
@@ -1102,7 +1093,10 @@ export default function EcosystemTab({ onStats, showToast }) {
         </div>`}
 
       ${apps.length === 0
-        ? html`<div class="pf-eco-empty">${t('profile.ecosystem.empty')}</div>`
+        ? html`<div class="pf-eco-empty">
+            <p>${t('profile.ecosystem.empty')}</p>
+            <p class="pf-eco-empty-note">${t('profile.ecosystem.connectNote')}</p>
+          </div>`
         : apps.map(app => {
           const isOpen = expanded === app.geai;
           const appSubs = subs.filter(s => s.geai === app.geai);

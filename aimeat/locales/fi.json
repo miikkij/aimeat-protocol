@@ -484,7 +484,7 @@
       "title": "Ekosysteemisovellukset",
       "desc": "Yhdistä ulkoisia palveluita, jotta agenttisi ja työnkulkusi voivat vaihtaa niiden kanssa dataa, kyvykkyyksiä ja tapahtumia.",
       "connect": "+ Yhdistä sovellus",
-      "connectNote": "Ekosysteemisovellus yhdistää itse: käynnistä sovellus, niin sen oma backend lähettää yhteyspyynnön AIMEATiin — se ilmestyy tähän listalle hyväksyttäväksi. Et aja täällä mitään komentoa.",
+      "connectNote": "Tämä on ulkoisille palveluille jotka tukevat AIMEATia (esim. Feedback Desk -demo). Useimpien ei tarvitse tehdä täällä mitään. Jos käytät tällaista palvelua, yhdistät sen kyseisen palvelun omista asetuksista — sen pyyntö ilmestyy tähän hyväksyttäväksi. Valmista appikauppaa ei vielä ole; palvelut ja kehittäjät rakentavat AIMEAT-tuen itse.",
       "empty": "Ei yhdistettyjä ekosysteemisovelluksia vielä.",
       "loadError": "Ekosysteemisovelluksia ei voitu ladata.",
       "approved": "Ekosysteemisovellus hyväksytty.",
