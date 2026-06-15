@@ -18,6 +18,9 @@
  *   - PATCH  /v1/agents/:name/tasks/:id/todos/:todoId -- Update individual todo status
  *   - GET    /v1/agents/:name/tasks/:id/events -- List events
  * @version-history
+ *   v1.8.0 -- 2026-06-15 -- B7/B8: on /complete, also fire processAutomationAdvisories() to drain the
+ *     owner's advisory outbox -- deliver immediately over the connector tunnel (no approval) or gate
+ *     behind owner approval (best-effort, never blocks completion).
  *   v1.7.0 -- 2026-06-15 -- B6: on /complete, fire notifyAutomationTaskComplete() so an
  *     automation-recipe task with email:true emails the owner + stores an in-app report
  *     (best-effort, never blocks completion).
@@ -52,6 +55,7 @@ import { AgentTaskCreateSchema, AgentTaskUpdateSchema, AgentTaskEventSchema, Age
 import type { AgentMessageRecord } from '../storage/interface.js';
 import { requireReadiness } from '../middleware/readiness-gate.js';
 import { notifyAutomationTaskComplete } from '../services/ecosystem-automation-notify.js';
+import { processAutomationAdvisories } from '../services/ecosystem-automation-advisories.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
@@ -1030,6 +1034,10 @@ export function agentTasksRouter(config: AimeatConfig, storage: Storage, webhook
     // pass the freshly-updated record (carries the deliverableKey the agent just set).
     void notifyAutomationTaskComplete(storage, config, updated ?? task, message)
       .catch(e => logger.error('automation completion notify failed', { taskId: id, error: String(e) }));
+    // B7/B8 — drain the owner's advisory outbox for this app: deliver immediately (no approval) over
+    // the connector tunnel, or gate behind owner approval. Best-effort + isolated (sibling to B6).
+    void processAutomationAdvisories(storage, config, updated ?? task)
+      .catch(e => logger.error('automation advisory drain failed', { taskId: id, error: String(e) }));
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/fail -- Fail task (active -> failed) ── */

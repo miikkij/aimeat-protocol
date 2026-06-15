@@ -16,6 +16,8 @@
  *     .pf-eco-auto-on/-paused, .pf-eco-auto-result-*, .pf-eco-auto-del.
  *   v1.18.0 — 2026-06-15 — Ecosystem automation RECIPE block (B4): .pf-eco-recipe(-head/-intro/-trigger/
  *     -row/-label/-agents/-agent/-toggle/-radios/-radio/-radio-title/-radio-hint/-foot/-note).
+ *   v1.19.0 — 2026-06-15 — Ecosystem "Pending advisories" approval surface (B7/B8): .pf-eco-adv(-list/
+ *     -item/-head/-title/-kind/-sev/-sev-*/-meta/-body/-rationale/-actions/-reject).
  *   v1.14.0 — 2026-06-10 — SchemaForm usability: .pj-field-hint (per-field hint),
  *     .pj-field-invalid (missing-required outline) + .pj-form-error message.
  *   v1.13.0 — 2026-06-10 — Workspace renew, phase 2: .pj-ws-head-actions, review
@@ -2718,3 +2720,18 @@
 .pf-eco-recipe-note { margin: 0; font-size: .76rem; }
 .pf-eco-revoke-input { width: 100%; box-sizing: border-box; margin: .6rem 0; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: .5rem .7rem; }
 .pf-eco-revoke-actions { display: flex; justify-content: flex-end; gap: .5rem; }
+/* Pending advisories approval surface (B7/B8) */
+.pf-eco-adv { margin-top: .9rem; padding-top: .7rem; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: .6rem; }
+.pf-eco-adv-list { display: flex; flex-direction: column; gap: .6rem; }
+.pf-eco-adv-item { border: 1px solid var(--border); border-radius: 8px; padding: .6rem .7rem; background: var(--bg-dim); display: flex; flex-direction: column; gap: .4rem; }
+.pf-eco-adv-head { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
+.pf-eco-adv-title { font-size: .92rem; }
+.pf-eco-adv-kind { background: var(--surface); }
+.pf-eco-adv-sev { background: var(--surface); }
+.pf-eco-adv-sev-high, .pf-eco-adv-sev-critical { color: var(--danger, var(--text)); border-color: var(--danger, var(--border)); }
+.pf-eco-adv-sev-medium { color: var(--accent); }
+.pf-eco-adv-meta { font-size: .78rem; }
+.pf-eco-adv-body { font-size: .82rem; }
+.pf-eco-adv-rationale { display: flex; flex-direction: column; gap: .2rem; font-size: .82rem; }
+.pf-eco-adv-actions { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; margin-top: .15rem; }
+.pf-eco-adv-reject { color: var(--danger, var(--text-dim)); }

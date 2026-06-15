@@ -3,13 +3,16 @@
  * @description AIMEAT Ecosystem Apps (GEAI) service — the owner-facing API layer for the profile
  *   "Ecosystem apps" tab. Wraps the /v1/ecosystem-apps + /v1/ecosystem endpoints (the GEAI
  *   onboarding handshake, the connected-app list, outbound event subscriptions, and revoke).
- * @structure listEcosystemApps · listAppData · listPending · approve · revoke · listSubscriptions · subscribe · unsubscribe · getAutomationRecipe · putAutomationRecipe · deleteAutomationRecipe
+ * @structure listEcosystemApps · listAppData · listPending · approve · revoke · listSubscriptions · subscribe · unsubscribe · getAutomationRecipe · putAutomationRecipe · deleteAutomationRecipe · listPendingAdvisories · approveAdvisory · rejectAdvisory
  * @usage import { listEcosystemApps, approve } from '/js/services/ecosystem.js';
  * @version-history
  *   v1.0.0 — 2026-06-14 — Created for the Ecosystem apps profile tab (chunk 6).
  *   v1.1.0 — 2026-06-15 — Add listAppData() — the memory an app wrote (GET /v1/ecosystem-apps/:app/data).
  *   v1.2.0 — 2026-06-15 — Add the per-(owner,app) automation RECIPE (B4): getAutomationRecipe / putAutomationRecipe /
  *     deleteAutomationRecipe wrap GET/PUT/DELETE /v1/ecosystem-apps/:app/automation/recipe.
+ *   v1.3.0 — 2026-06-15 — Add the advisory approval surface (B7/B8): listPendingAdvisories (GET .../advisories/pending),
+ *     approveAdvisory (POST .../advisories/:id/approve — returns the envelope incl. `delivery`, even the 202
+ *     offline-retry which arrives as ok:true so it does NOT throw), rejectAdvisory (POST .../advisories/:id/reject).
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 
@@ -79,4 +82,32 @@ export async function putAutomationRecipe(app, body) {
 /** Delete the automation recipe for an app. */
 export async function deleteAutomationRecipe(app) {
   return apiDelete(`/v1/ecosystem-apps/${encodeURIComponent(app)}/automation/recipe`);
+}
+
+// ── Advisory approval gate (B7) + delivery (B8) ──
+// When a recipe gates delivery (requireApproval:true), each agent-produced `support-advisory@1`
+// payload is parked awaiting the owner's approve/reject decision. These three methods are the
+// owner's surface to that pending list.
+
+/** The advisories awaiting this owner's approval for one app. Returns an array (default []). */
+export async function listPendingAdvisories(app) {
+  const data = await apiGet(`/v1/ecosystem-apps/${encodeURIComponent(app)}/advisories/pending`);
+  return data?.data?.pending || [];
+}
+
+/**
+ * Approve a pending advisory → the server invokes the app's deliver-advisory capability over the
+ * tunnel. Returns the parsed envelope's `data`. On success: { status:'approved', delivery:'delivered',
+ * delivered_id }. If the app is offline the server replies 202 with ok:true (so this does NOT throw):
+ * { status:'pending', delivery:'offline-retry'|'failed', reason } — the item STAYS pending for retry.
+ */
+export async function approveAdvisory(app, id) {
+  const resp = await apiPost(`/v1/ecosystem-apps/${encodeURIComponent(app)}/advisories/${encodeURIComponent(id)}/approve`, {});
+  return resp?.data || {};
+}
+
+/** Reject a pending advisory → it is dropped, no delivery. Returns the parsed envelope's `data`. */
+export async function rejectAdvisory(app, id) {
+  const resp = await apiPost(`/v1/ecosystem-apps/${encodeURIComponent(app)}/advisories/${encodeURIComponent(id)}/reject`, {});
+  return resp?.data || {};
 }
