@@ -489,8 +489,9 @@
       "loadError": "Ekosysteemisovelluksia ei voitu ladata.",
       "approved": "Ekosysteemisovellus hyväksytty.",
       "approveError": "Pyyntöä ei voitu käsitellä.",
-      "revoked": "Ekosysteemisovellus peruttu.",
-      "revokeError": "Sovellusta ei voitu perua.",
+      "revoked": "Yhteys appiin poistettu.",
+      "revokeError": "Yhteyttä ei voitu poistaa.",
+      "revokeReconnectHint": "Tämän appin yhteys on poistettu. Datasi yllä jää sinulle. Yhdistääksesi uudelleen: yhdistä appi uudestaan sen omasta päästä — AIMEAT kiinnittää sen tunnisteen ja lukee asetukset (tallennusavain, kyvykkyydet) automaattisesti uudelleen.",
       "subError": "Tilausta ei voitu päivittää.",
       "pendingTitle": "Odottavat integraatiopyynnöt",
       "waiting": "odottaa",
@@ -648,9 +649,9 @@
       "advSource": "Lähde",
       "advRationale": "Perustelu",
       "advLoading": "Ladataan suosituksia…",
-      "revoke": "Peru",
-      "revokeTitle": "Peru ekosysteemisovellus",
-      "revokeWarn": "Tämä katkaisee yhteyden ja mitätöi sovelluksen tunnisteen. Kirjoita sovelluksen nimi ({app}) vahvistaaksesi.",
+      "revoke": "Poista yhteys",
+      "revokeTitle": "Poista yhteys: {app}",
+      "revokeWarn": "Tämä poistaa appin yhteyden tiliisi. Datasi jää sinulle, ja voit yhdistää appin uudelleen myöhemmin. Kirjoita appin nimi ({app}) vahvistaaksesi.",
       "validation": {
         "validated": "validoitu",
         "failed": "validointi epäonnistui",
@@ -661,7 +662,7 @@
         "approved": "hyväksytty",
         "pending": "odottaa",
         "validating": "validoidaan",
-        "revoked": "peruttu"
+        "revoked": "poistettu"
       }
     },
     "agents": {

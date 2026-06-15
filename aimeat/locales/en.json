@@ -489,8 +489,9 @@
       "loadError": "Could not load ecosystem apps.",
       "approved": "Ecosystem app approved.",
       "approveError": "Could not process the request.",
-      "revoked": "Ecosystem app revoked.",
-      "revokeError": "Could not revoke the app.",
+      "revoked": "Disconnected from the app.",
+      "revokeError": "Could not disconnect the app.",
+      "revokeReconnectHint": "This app is disconnected. Your data above stays yours. To reconnect, connect the app again from its own side — AIMEAT re-pins its identity and re-reads its settings (deposit key, capabilities) automatically.",
       "subError": "Could not update the subscription.",
       "pendingTitle": "Pending integration requests",
       "waiting": "waiting",
@@ -648,9 +649,9 @@
       "advSource": "Source",
       "advRationale": "Rationale",
       "advLoading": "Loading advisories…",
-      "revoke": "Revoke",
-      "revokeTitle": "Revoke ecosystem app",
-      "revokeWarn": "This tears down the connection and invalidates the app's credential. Type the app name ({app}) to confirm.",
+      "revoke": "Disconnect",
+      "revokeTitle": "Disconnect: {app}",
+      "revokeWarn": "This disconnects the app from your account. Your data stays yours, and you can reconnect the app later. Type the app name ({app}) to confirm.",
       "validation": {
         "validated": "validated",
         "failed": "validation failed",
@@ -661,7 +662,7 @@
         "approved": "approved",
         "pending": "pending",
         "validating": "validating",
-        "revoked": "revoked"
+        "revoked": "disconnected"
       }
     },
     "agents": {
