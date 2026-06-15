@@ -48,6 +48,18 @@
  *     raw JSON) + source/rationale, with Approve (→ deliver over the tunnel) and Reject (→ confirm-modal,
  *     then drop). Approve handles the 202 offline-retry/failed case by keeping the row + an info/warning
  *     toast; delivered/rejected drop the row. Lazy-loads + refreshes on aimeat-live-update.
+ *   v2.0.0 — 2026-06-15 — REWORK the Automation section into ONE turnkey flow. The three stacked
+ *     sub-sections (per-capability cadence rows, the schedules list, <EcoRecipeConfig>) and the separate
+ *     <EcoPendingAdvisories> are MERGED into a single <EcoAutomationSection>: a "How this works" 4-hop
+ *     expander, ONE numbered config card (① what the app produces · ② run on a schedule · ③ process with
+ *     agents · ④ store in organism · ⑤ deliver guidance + email · Advanced trigger key), and ONE "Save
+ *     automation" button that performs BOTH backend writes — reconciles the publish eco-capability
+ *     SCHEDULE (create / cadence-patch / pause) to match ② AND PUTs the RECIPE (③④⑤ + keyGlob). Below it,
+ *     a single vertical 3-step STATUS timeline (publish → process → deliver): publish = the schedule's
+ *     last/next run + result + an honest Run-now + run-log; process = the configured agents (honest "runs
+ *     when data is published", no fabricated task status); deliver = the pending advisories folded in with
+ *     inline Approve/Reject. Lazy-loads schedules+agents+orgs+recipe+advisories on expand, refreshes on
+ *     aimeat-live-update. Frontend-only; no backend logic changed. Operator how-to: docs/ecosystem-app-automation-howto.md.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -61,7 +73,7 @@ import { JsonValue } from '/components/JsonView.js';
 import { Spinner } from './shared.js';
 import { listEcosystemApps, listAppData, listPending, approve, revoke, listSubscriptions, subscribe, unsubscribe, getAutomationRecipe, putAutomationRecipe, listPendingAdvisories, approveAdvisory, rejectAdvisory } from '/js/services/ecosystem.js';
 import { formatUntil } from './schedule-item.js';
-import { listAppSchedules, createCapabilitySchedule, setScheduleEnabled, deleteSchedule, triggerSchedule, getScheduleDetail, setScheduleCron } from '/js/services/schedules.js';
+import { listAppSchedules, createCapabilitySchedule, setScheduleEnabled, triggerSchedule, getScheduleDetail, setScheduleCron } from '/js/services/schedules.js';
 import { listAgents } from '/js/services/agents.js';
 import { listOrganisms, currentGhii } from '/js/services/organisms.js';
 
@@ -111,12 +123,6 @@ const CADENCES = [
   { key: 'monthly', cron: '0 8 1 * *' },
 ];
 const CRON_TO_CADENCE = Object.fromEntries(CADENCES.map(c => [c.cron, c.key]));
-
-/** Human label for a cron — one of the known cadences, else the raw cron string. */
-function cronLabel(cron) {
-  const key = CRON_TO_CADENCE[cron];
-  return key ? t(`profile.ecosystem.automationCadence_${key}`) : cron;
-}
 
 /**
  * The per-schedule run-history log: lazy-fetches GET /v1/schedules/:id on first
@@ -171,40 +177,123 @@ function defaultTriggerGlob(app) {
 }
 
 /**
- * The recipe config block (B4): the owner's per-(owner,app) "when this app publishes data" recipe.
- * Process-with-agents checklist (the owner's agents), store-in-organism dropdown (the owner's
- * organisms + None), email toggle, approve/push delivery radio, an Enabled master toggle and Save.
- * Lazy-loads the recipe + agents + organisms when shown and refreshes on the live-update event.
- * organism/email/approval are stored now and take effect as those steps roll out (B5/B6/B7).
+ * Pick the app's PRIMARY schedulable capability — the one the unified flow centres on:
+ * "this app produces X on a schedule". Prefers an entry that declares `produces` (so we can
+ * show what it deposits); falls back to the first schedulable, else null.
  */
-function EcoRecipeConfig({ app, showToast }) {
+function primarySchedulable(app) {
+  const schedulable = (app?.automation && app.automation.schedulable) || [];
+  return schedulable.find(s => s.produces || s.produces_key) || schedulable[0] || null;
+}
+
+/** Allowed cadences for a schedulable entry (restricted by its `cadences`, else all three). */
+function allowedCadencesFor(entry) {
+  const allow = entry && Array.isArray(entry.cadences) ? entry.cadences : null;
+  return allow ? CADENCES.filter(c => allow.includes(c.key)) : CADENCES;
+}
+
+/**
+ * The status-timeline chip for one chain step. `state` is one of:
+ * 'ok' (green), 'wait' (neutral/dimmed), 'off' (paused/dimmed), 'error' (danger).
+ */
+function EcoStatusChip({ state, label }) {
+  return html`<span class="pf-eco-chip pf-eco-auto-status-chip pf-eco-auto-status-${state}">${label}</span>`;
+}
+
+/**
+ * The unified "Automation" section of one expanded GEAI card — ONE turnkey flow.
+ *
+ * The mental model it makes visible: the app and the agents NEVER talk directly. AIMEAT is the
+ * broker. The chain reads top-to-bottom:
+ *   app publishes data → AIMEAT recipe triggers the agent → agent writes results back →
+ *   AIMEAT delivers approved guidance to the app.
+ *
+ * The operator configures ONE coherent card (what the app produces · run on a schedule · process
+ * with agents · store in organism · deliver guidance · advanced trigger key) and hits a single
+ * "Save automation" button. That one Save performs BOTH backend writes:
+ *   (a) the publish eco-capability SCHEDULE — created / cadence-patched / deleted to match the
+ *       "Run on a schedule" toggle + cadence; and
+ *   (b) the automation RECIPE — PUT with the selected agents, organism, email, delivery mode and
+ *       trigger keyGlob.
+ * The user sees one object; two server objects back it.
+ *
+ * Below the config, a single vertical 3-step STATUS timeline (publish → process → deliver)
+ * aggregates everything observable frontend-only so the operator never hops views:
+ *   • Published — the publish schedule's last/next run + result, with an honest "Run now".
+ *   • Processed — the configured agents (runs when data is published; we do NOT fabricate a task
+ *     status we cannot fetch).
+ *   • Delivered — the pending advisories with inline Approve / Reject.
+ *
+ * Lazy-loads everything on first expand and refreshes on aimeat-live-update.
+ */
+function EcoAutomationSection({ app, showToast }) {
+  const revoked = app.status === 'revoked';
+  const primary = primarySchedulable(app);
+  const allowedCadences = allowedCadencesFor(primary);
+
+  // ── loaded reference data ──
   const [loaded, setLoaded] = useState(false);
+  const [schedules, setSchedules] = useState([]);   // this app's eco-capability schedules
   const [agents, setAgents] = useState([]);
   const [orgs, setOrgs] = useState([]);
-  const [triggerGlob, setTriggerGlob] = useState('');   // editable trigger keyGlob (recipe value, else derived default)
-  const [saving, setSaving] = useState(false);
-  // Editable recipe state.
-  const [selAgents, setSelAgents] = useState([]);        // selected agent names
-  const [organism, setOrganism] = useState('');          // '' = None
+  const [advisories, setAdvisories] = useState(undefined); // undefined = never loaded
+
+  // ── editable config (the ONE screen) ──
+  const [scheduleOn, setScheduleOn] = useState(false);
+  const [cadence, setCadence] = useState((allowedCadences[0] && allowedCadences[0].key) || 'weekly');
+  const [selAgents, setSelAgents] = useState([]);
+  const [organism, setOrganism] = useState('');
   const [email, setEmail] = useState(false);
-  const [requireApproval, setRequireApproval] = useState(false); // default push
-  const [enabled, setEnabled] = useState(false);
+  const [requireApproval, setRequireApproval] = useState(false); // default = push
+  const [triggerGlob, setTriggerGlob] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showHow, setShowHow] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // ── status-timeline interaction state ──
+  const [running, setRunning] = useState(false);        // Run-now in flight
+  const [lastAttempt, setLastAttempt] = useState(null); // { outcome, reason } from Run-now
+  const [openLog, setOpenLog] = useState(false);
+  const [logRefresh, setLogRefresh] = useState(0);
+  const [advBusy, setAdvBusy] = useState({});           // advisory id → bool
+  const [confirmId, setConfirmId] = useState(null);     // advisory id pending reject confirm
+
+  // The publish schedule for the primary capability (the one the schedule toggle drives).
+  const primaryJob = primary
+    ? schedules.find(j => j.input?.capability_id === primary.id)
+    : schedules[0];
 
   const load = async () => {
     const ownerName = (currentGhii().split('@')[0]) || '';
-    const [agentList, recipe, orgResp] = await Promise.all([
+    const [schedList, agentList, recipe, orgResp, advList] = await Promise.all([
+      listAppSchedules(app.app).catch(() => []),
       listAgents().catch(() => []),
       getAutomationRecipe(app.app).catch(() => null),
       (ownerName ? listOrganisms({ member: ownerName }) : Promise.resolve(null)).catch(() => null),
+      listPendingAdvisories(app.app).catch(() => null),
     ]);
+    setSchedules(schedList);
     setAgents(agentList.filter(a => !a.name?.startsWith('session-')));
     setOrgs(orgResp?.data?.organisms || []);
+    setAdvisories(advList === null ? [] : advList);
+
+    // Reflect the publish schedule into the "Run on a schedule" controls.
+    const job = primary
+      ? schedList.find(j => j.input?.capability_id === primary.id)
+      : schedList[0];
+    if (job) {
+      setScheduleOn(!!job.enabled);
+      setCadence(CRON_TO_CADENCE[job.cron] || ((allowedCadences[0] && allowedCadences[0].key) || 'weekly'));
+    } else {
+      setScheduleOn(false);
+    }
+
+    // Reflect the recipe into the processing/delivery controls.
     if (recipe) {
       setSelAgents(Array.isArray(recipe.agents) ? recipe.agents : []);
       setOrganism(recipe.organism || '');
       setEmail(!!recipe.email);
       setRequireApproval(!!recipe.require_approval);
-      setEnabled(!!recipe.enabled);
       setTriggerGlob(recipe.trigger?.keyGlob || defaultTriggerGlob(app));
     } else {
       setTriggerGlob(defaultTriggerGlob(app));
@@ -225,316 +314,61 @@ function EcoRecipeConfig({ app, showToast }) {
     setSelAgents(list => list.includes(name) ? list.filter(n => n !== name) : [...list, name]);
   }
 
+  // The ONE Save: reconcile the publish schedule (a) AND PUT the recipe (b).
   async function onSave() {
     setSaving(true);
     try {
+      // (a) Reconcile the publish eco-capability schedule against the schedule controls.
+      if (primary) {
+        const cron = (CADENCES.find(c => c.key === cadence) || CADENCES[0]).cron;
+        const existing = primary
+          ? schedules.find(j => j.input?.capability_id === primary.id)
+          : null;
+        if (scheduleOn) {
+          if (!existing) {
+            await createCapabilitySchedule(app.app, primary.id, cron, {
+              displayName: `${app.display_name || app.app} · ${primary.id}`,
+            });
+          } else {
+            if (existing.cron !== cron) await setScheduleCron(existing.id, cron);
+            if (!existing.enabled) await setScheduleEnabled(existing.id, true);
+          }
+        } else if (existing) {
+          // Turning the schedule off: pause it (keep history) rather than delete.
+          if (existing.enabled) await setScheduleEnabled(existing.id, false);
+        }
+      }
+
+      // (b) PUT the recipe (processing + delivery + trigger).
       await putAutomationRecipe(app.app, {
         agents: selAgents,
         organism: organism || null,
         email,
         require_approval: requireApproval,
-        enabled,
+        enabled: true,
         trigger: { keyGlob: triggerGlob.trim() },
       });
-      showToast?.(t('profile.ecosystem.recipeSaved'), 'success');
+
+      showToast?.(t('profile.ecosystem.autoSaved'), 'success');
       await load();
     } catch (e) {
-      showToast?.(t('profile.ecosystem.recipeError'), 'error');
+      showToast?.(t('profile.ecosystem.autoSaveError'), 'error');
     } finally {
       setSaving(false);
     }
   }
 
-  if (!loaded) {
-    return html`<div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.recipeLoading')}</div>`;
-  }
-
-  return html`
-    <div class="pf-eco-recipe">
-      <div class="pf-eco-recipe-head">${t('profile.ecosystem.recipeTitle')}</div>
-      <p class="pf-eco-dim pf-eco-recipe-intro">${t('profile.ecosystem.recipeIntro')}</p>
-
-      <div class="pf-eco-recipe-row">
-        <label class="pf-eco-recipe-label">${t('profile.ecosystem.recipeTriggerLabel')}</label>
-        <input
-          type="text"
-          class="pf-eco-recipe-trigger-input pf-eco-mono"
-          value=${triggerGlob}
-          placeholder=${defaultTriggerGlob(app)}
-          onInput=${e => setTriggerGlob(e.target.value)}
-        />
-        <p class="pf-eco-dim pf-eco-recipe-trigger-help">${t('profile.ecosystem.recipeTriggerHelp')}</p>
-      </div>
-
-      <div class="pf-eco-recipe-row">
-        <label class="pf-eco-recipe-label">${t('profile.ecosystem.recipeAgents')}</label>
-        ${agents.length === 0
-          ? html`<div class="pf-eco-dim">${t('profile.ecosystem.recipeAgentsEmpty')}</div>`
-          : html`
-            <div class="pf-eco-recipe-agents">
-              ${agents.map(a => html`
-                <label class="pf-eco-recipe-agent" key=${a.name}>
-                  <input type="checkbox" checked=${selAgents.includes(a.name)} onChange=${() => toggleAgent(a.name)} />
-                  <span>${a.name}</span>
-                </label>`)}
-            </div>`}
-      </div>
-
-      <div class="pf-eco-recipe-row">
-        <label class="pf-eco-recipe-label">${t('profile.ecosystem.recipeOrganism')}</label>
-        <select class="pf-eco-select" value=${organism} onChange=${e => setOrganism(e.target.value)}>
-          <option value="">${t('profile.ecosystem.recipeOrganismNone')}</option>
-          ${orgs.map(o => html`<option value=${o.id} key=${o.id}>${o.name || o.id}</option>`)}
-        </select>
-      </div>
-
-      <div class="pf-eco-recipe-row">
-        <label class="pf-eco-recipe-toggle">
-          <input type="checkbox" checked=${email} onChange=${e => setEmail(e.target.checked)} />
-          <span>${t('profile.ecosystem.recipeEmail')}</span>
-        </label>
-      </div>
-
-      <div class="pf-eco-recipe-row">
-        <label class="pf-eco-recipe-label">${t('profile.ecosystem.recipeDelivery')}</label>
-        <div class="pf-eco-recipe-radios">
-          <label class="pf-eco-recipe-radio">
-            <input type="radio" name=${`eco-delivery-${app.app}`} checked=${!requireApproval} onChange=${() => setRequireApproval(false)} />
-            <span>
-              <span class="pf-eco-recipe-radio-title">${t('profile.ecosystem.recipeDeliveryPush')}</span>
-              <span class="pf-eco-dim pf-eco-recipe-radio-hint">${t('profile.ecosystem.recipeDeliveryPushHint')}</span>
-            </span>
-          </label>
-          <label class="pf-eco-recipe-radio">
-            <input type="radio" name=${`eco-delivery-${app.app}`} checked=${requireApproval} onChange=${() => setRequireApproval(true)} />
-            <span>
-              <span class="pf-eco-recipe-radio-title">${t('profile.ecosystem.recipeDeliveryApprove')}</span>
-              <span class="pf-eco-dim pf-eco-recipe-radio-hint">${t('profile.ecosystem.recipeDeliveryApproveHint')}</span>
-            </span>
-          </label>
-        </div>
-      </div>
-
-      <div class="pf-eco-recipe-row pf-eco-recipe-foot">
-        <label class="pf-eco-recipe-toggle">
-          <input type="checkbox" checked=${enabled} onChange=${e => setEnabled(e.target.checked)} />
-          <span>${t('profile.ecosystem.recipeEnabled')}</span>
-        </label>
-        <button class="btn-primary btn-sm" disabled=${saving} onClick=${onSave}>${t('profile.ecosystem.recipeSave')}</button>
-      </div>
-
-      <p class="pf-eco-dim pf-eco-recipe-note">${t('profile.ecosystem.recipeDeferredNote')}</p>
-    </div>`;
-}
-
-/**
- * The pending-advisories approval surface (B7/B8): the gated output of the automation recipe.
- * When the recipe runs with requireApproval:true, each agent-produced `support-advisory@1` payload
- * is parked awaiting the owner's decision. This block lists those, renders each advisory readably
- * (title + kind/severity chips + effective dates + the body via the shared <JsonValue>, never raw
- * JSON), and lets the owner Approve (→ deliver over the tunnel) or Reject (→ drop). Approve may
- * return 202 offline-retry — then we keep the row and message that it stays pending for retry.
- * Lazy-loads on mount/expand and refreshes on aimeat-live-update + after each decision.
- */
-function EcoPendingAdvisories({ app, showToast }) {
-  const [items, setItems] = useState(undefined);  // undefined = never loaded
-  const [busy, setBusy] = useState({});            // advisory id → bool
-  const [confirmId, setConfirmId] = useState(null); // advisory id pending reject confirmation
-
-  const load = async () => {
+  // ── status: Published — Run now ──
+  async function onRunNow() {
+    if (!primaryJob) return;
+    setRunning(true);
     try {
-      const list = await listPendingAdvisories(app.app);
-      setItems(list);
-    } catch (e) {
-      setItems(s => (s === undefined ? [] : s));
-    }
-  };
-
-  const loadRef = useRef(load);
-  loadRef.current = load;
-  useEffect(() => {
-    load();
-    const handler = () => loadRef.current();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [app.app]);
-
-  async function onApprove(id) {
-    setBusy(b => ({ ...b, [id]: true }));
-    try {
-      const res = await approveAdvisory(app.app, id);
-      const appName = app.display_name || app.app;
-      if (res.delivery === 'delivered') {
-        showToast?.(t('profile.ecosystem.advDelivered', { app: appName }), 'success');
-        // Delivered → it left the pending list server-side; drop the row.
-        setItems(list => (list || []).filter(p => p.id !== id));
-      } else if (res.delivery === 'offline-retry') {
-        // 202 — app offline; the item STAYS pending for retry. Keep the row.
-        showToast?.(t('profile.ecosystem.advOfflineRetry', { app: appName }), 'info');
-      } else {
-        // 202 failed — also stays pending.
-        showToast?.(t('profile.ecosystem.advFailed'), 'warning');
-      }
-    } catch (e) {
-      showToast?.(t('profile.ecosystem.advError'), 'error');
-    } finally {
-      setBusy(b => ({ ...b, [id]: false }));
-    }
-  }
-
-  async function onReject(id) {
-    setConfirmId(null);
-    setBusy(b => ({ ...b, [id]: true }));
-    try {
-      await rejectAdvisory(app.app, id);
-      showToast?.(t('profile.ecosystem.advRejected'), 'success');
-      setItems(list => (list || []).filter(p => p.id !== id));
-    } catch (e) {
-      showToast?.(t('profile.ecosystem.advError'), 'error');
-    } finally {
-      setBusy(b => ({ ...b, [id]: false }));
-    }
-  }
-
-  return html`
-    <div class="pf-eco-adv">
-      <div class="pf-eco-recipe-head">${t('profile.ecosystem.advPendingTitle')}</div>
-      <p class="pf-eco-dim pf-eco-recipe-intro">${t('profile.ecosystem.advPendingIntro')}</p>
-
-      ${items === undefined
-        ? html`<div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.advLoading')}</div>`
-        : items.length === 0
-          ? html`<div class="pf-eco-dim">${t('profile.ecosystem.advPendingEmpty')}</div>`
-          : html`
-            <div class="pf-eco-adv-list">
-              ${items.map(p => {
-                const a = p.advisory || {};
-                return html`
-                  <div class="pf-eco-adv-item" key=${p.id}>
-                    <div class="pf-eco-adv-head">
-                      <strong class="pf-eco-adv-title">${a.title || p.id}</strong>
-                      ${a.kind && html`<span class="pf-eco-chip pf-eco-adv-kind">${t('profile.ecosystem.advKind')}: ${a.kind}</span>`}
-                      ${a.severity && html`<span class="pf-eco-chip pf-eco-adv-sev pf-eco-adv-sev-${a.severity}">${t('profile.ecosystem.advSeverity')}: ${a.severity}</span>`}
-                      ${a.status && html`<span class="pf-eco-chip">${a.status}</span>`}
-                    </div>
-                    ${(a.effective_from || a.effective_until) && html`
-                      <div class="pf-eco-dim pf-eco-adv-meta">
-                        ${t('profile.ecosystem.advEffective')}: ${a.effective_from || '…'} → ${a.effective_until || '…'}
-                      </div>`}
-                    <div class="pf-eco-adv-body">
-                      <${JsonValue} value=${a.body !== undefined ? a.body : a} />
-                    </div>
-                    ${a.source && html`<div class="pf-eco-dim pf-eco-adv-meta">${t('profile.ecosystem.advSource')}: ${a.source}</div>`}
-                    ${a.rationale && html`
-                      <div class="pf-eco-adv-rationale">
-                        <span class="pf-eco-dim">${t('profile.ecosystem.advRationale')}:</span>
-                        <${JsonValue} value=${a.rationale} />
-                      </div>`}
-                    <div class="pf-eco-adv-actions">
-                      <button class="btn-success btn-sm" disabled=${!!busy[p.id]} onClick=${() => onApprove(p.id)}>
-                        ${t('profile.ecosystem.advApprove')}
-                      </button>
-                      <button class="btn-ghost btn-sm pf-eco-adv-reject" disabled=${!!busy[p.id]} onClick=${() => setConfirmId(p.id)}>
-                        ${t('profile.ecosystem.advReject')}
-                      </button>
-                    </div>
-                  </div>`;
-              })}
-            </div>`}
-
-      <${Modal} open=${!!confirmId} onClose=${() => setConfirmId(null)} title=${t('profile.ecosystem.advReject')}>
-        <p>${t('profile.ecosystem.advRejectConfirm')}</p>
-        <div class="pf-eco-revoke-actions">
-          <button class="btn-ghost" onClick=${() => setConfirmId(null)}>${t('common.cancel')}</button>
-          <button class="btn-danger-solid" onClick=${() => onReject(confirmId)}>${t('profile.ecosystem.advReject')}</button>
-        </div>
-      <//>
-    </div>`;
-}
-
-/**
- * The "Automation" section of one expanded GEAI card: per-capability cadence +
- * enable toggle, and the list of the app's existing eco-capability schedules.
- * Lazy-loads on first expand and refreshes on the live-update event.
- */
-function EcoAutomationSection({ app, showToast }) {
-  const [schedules, setSchedules] = useState(undefined); // undefined = never loaded
-  const [cadenceByCap, setCadenceByCap] = useState({});  // capabilityId → cadence key
-  const [busy, setBusy] = useState({});                  // capabilityId/scheduleId → bool
-  const [openLog, setOpenLog] = useState({});            // scheduleId → bool (log expanded)
-  const [logRefresh, setLogRefresh] = useState({});      // scheduleId → number (re-fetch trigger)
-  const [lastAttempt, setLastAttempt] = useState({});    // scheduleId → { outcome, reason }
-
-  const caps = app.capabilities || [];
-  // automation.schedulable[].cadences may restrict which cadences a capability allows.
-  const schedulable = (app.automation && app.automation.schedulable) || [];
-  const schedHint = Object.fromEntries(schedulable.map(s => [s.id, s]));
-
-  const load = async () => {
-    try {
-      const list = await listAppSchedules(app.app);
-      setSchedules(list);
-    } catch (e) {
-      setSchedules(s => (s === undefined ? [] : s));
-    }
-  };
-
-  const loadRef = useRef(load);
-  loadRef.current = load;
-  useEffect(() => {
-    load();
-    const handler = () => loadRef.current();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [app.app]);
-
-  // Allowed cadences for a capability (restricted by automation hint, else all three).
-  function allowedCadences(capId) {
-    const allow = schedHint[capId] && Array.isArray(schedHint[capId].cadences) ? schedHint[capId].cadences : null;
-    return allow ? CADENCES.filter(c => allow.includes(c.key)) : CADENCES;
-  }
-
-  async function onEnable(capId) {
-    const allowed = allowedCadences(capId);
-    const cadenceKey = cadenceByCap[capId] || (allowed[0] && allowed[0].key) || 'weekly';
-    const cron = (CADENCES.find(c => c.key === cadenceKey) || CADENCES[0]).cron;
-    setBusy(b => ({ ...b, [capId]: true }));
-    try {
-      await createCapabilitySchedule(app.app, capId, cron, { displayName: `${app.display_name || app.app} · ${capId}` });
-      showToast?.(t('profile.ecosystem.automationCreated'), false);
-      await load();
-    } catch (e) {
-      showToast?.(t('profile.ecosystem.automationError'), true);
-    } finally {
-      setBusy(b => ({ ...b, [capId]: false }));
-    }
-  }
-
-  async function onToggle(job) {
-    setBusy(b => ({ ...b, [job.id]: true }));
-    try {
-      await setScheduleEnabled(job.id, !job.enabled);
-      await load();
-    } catch (e) {
-      showToast?.(t('profile.ecosystem.automationError'), true);
-    } finally {
-      setBusy(b => ({ ...b, [job.id]: false }));
-    }
-  }
-
-  async function onRunNow(job) {
-    setBusy(b => ({ ...b, [job.id]: true }));
-    try {
-      // The backend tells us what ACTUALLY happened: 'success' (ran), 'busy'
-      // (skipped — e.g. app offline / connect-tunnel unavailable), or 'error'.
-      const res = await triggerSchedule(job.id);
+      const res = await triggerSchedule(primaryJob.id);
       const outcome = res.outcome || 'success';
       const reason = res.reason || '';
-      setLastAttempt(m => ({ ...m, [job.id]: { outcome, reason } }));
+      setLastAttempt({ outcome, reason });
       if (outcome === 'busy') {
         const offline = /offline|unavailable/i.test(reason);
-        // A skip is not a failure — report it as info (non-error toast) with the
-        // honest wording, never a fake green success.
         showToast?.(offline
           ? t('profile.ecosystem.automationRunSkippedOffline')
           : t('profile.ecosystem.automationRunSkipped', { reason }), false);
@@ -543,133 +377,320 @@ function EcoAutomationSection({ app, showToast }) {
       } else {
         showToast?.(t('profile.ecosystem.automationRunOk'), false);
       }
-      // Refresh the run-log (a skip is logged even though it doesn't update lastRun)
-      // and the schedule row state.
-      setLogRefresh(m => ({ ...m, [job.id]: (m[job.id] || 0) + 1 }));
+      setLogRefresh(n => n + 1);
       await load();
     } catch (e) {
       showToast?.(t('profile.ecosystem.automationRunFailed', { reason: e?.message || '' }), true);
     } finally {
-      setBusy(b => ({ ...b, [job.id]: false }));
+      setRunning(false);
     }
   }
 
-  // Change the cadence (cron) of an existing schedule and reschedule it.
-  async function onCadenceChange(job, cron) {
-    if (!cron || cron === job.cron) return;
-    setBusy(b => ({ ...b, [job.id]: true }));
+  // ── status: Delivered — approve / reject ──
+  async function onApproveAdv(id) {
+    setAdvBusy(b => ({ ...b, [id]: true }));
     try {
-      await setScheduleCron(job.id, cron);
-      await load();
+      const res = await approveAdvisory(app.app, id);
+      const appName = app.display_name || app.app;
+      if (res.delivery === 'delivered') {
+        showToast?.(t('profile.ecosystem.advDelivered', { app: appName }), 'success');
+        setAdvisories(list => (list || []).filter(p => p.id !== id));
+      } else if (res.delivery === 'offline-retry') {
+        showToast?.(t('profile.ecosystem.advOfflineRetry', { app: appName }), 'info');
+      } else {
+        showToast?.(t('profile.ecosystem.advFailed'), 'warning');
+      }
     } catch (e) {
-      showToast?.(t('profile.ecosystem.automationError'), true);
+      showToast?.(t('profile.ecosystem.advError'), 'error');
     } finally {
-      setBusy(b => ({ ...b, [job.id]: false }));
+      setAdvBusy(b => ({ ...b, [id]: false }));
     }
   }
 
-  function toggleLog(jobId) {
-    setOpenLog(m => ({ ...m, [jobId]: !m[jobId] }));
-  }
-
-  async function onDelete(job) {
-    setBusy(b => ({ ...b, [job.id]: true }));
+  async function onRejectAdv(id) {
+    setConfirmId(null);
+    setAdvBusy(b => ({ ...b, [id]: true }));
     try {
-      await deleteSchedule(job.id);
-      await load();
+      await rejectAdvisory(app.app, id);
+      showToast?.(t('profile.ecosystem.advRejected'), 'success');
+      setAdvisories(list => (list || []).filter(p => p.id !== id));
     } catch (e) {
-      showToast?.(t('profile.ecosystem.automationError'), true);
+      showToast?.(t('profile.ecosystem.advError'), 'error');
     } finally {
-      setBusy(b => ({ ...b, [job.id]: false }));
+      setAdvBusy(b => ({ ...b, [id]: false }));
     }
   }
 
-  const revoked = app.status === 'revoked';
+  if (revoked) {
+    return html`
+      <div class="pf-eco-section">
+        <div class="pf-eco-section-title">${t('profile.ecosystem.automationTitle')}</div>
+        <div class="pf-eco-dim">${t('profile.ecosystem.autoRevoked')}</div>
+      </div>`;
+  }
+
+  if (!loaded) {
+    return html`
+      <div class="pf-eco-section">
+        <div class="pf-eco-section-title">${t('profile.ecosystem.automationTitle')}</div>
+        <div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.automationLoading')}</div>
+      </div>`;
+  }
+
+  // Derived display strings.
+  const producesKey = primary?.produces_key || primary?.produces || '';
+  const pendingCount = (advisories || []).length;
+
+  // Status-step states.
+  const publishState = !primaryJob ? 'wait'
+    : (primaryJob.lastRunResult === 'error' ? 'error'
+      : (primaryJob.enabled ? (primaryJob.lastRunAt ? 'ok' : 'wait') : 'off'));
+  const processState = selAgents.length === 0 ? 'wait' : 'ok';
+  const deliverState = pendingCount > 0 ? 'wait' : 'ok';
 
   return html`
-    <div class="pf-eco-section">
+    <div class="pf-eco-section pf-eco-auto-flow">
       <div class="pf-eco-section-title">${t('profile.ecosystem.automationTitle')}</div>
-      <p class="pf-eco-dim pf-eco-auto-intro">${t('profile.ecosystem.automationIntro')}</p>
+      <p class="pf-eco-dim pf-eco-auto-flow-intro">${t('profile.ecosystem.autoIntro')}</p>
 
-      ${!revoked && (caps.length === 0
-        ? html`<div class="pf-eco-dim">${t('profile.ecosystem.automationNoCaps')}</div>`
-        : html`
-          <div class="pf-eco-auto-caps">
-            ${caps.map(cap => {
-              const allowed = allowedCadences(cap.id);
-              const selected = cadenceByCap[cap.id] || (allowed[0] && allowed[0].key) || '';
-              return html`
-                <div class="pf-eco-auto-cap" key=${cap.id}>
-                  <span class="pf-eco-mono pf-eco-auto-cap-id">${cap.id}</span>
-                  <select class="pf-eco-select pf-eco-auto-cadence"
-                    value=${selected}
-                    onChange=${e => setCadenceByCap(m => ({ ...m, [cap.id]: e.target.value }))}>
-                    ${allowed.map(c => html`<option value=${c.key} key=${c.key}>${t(`profile.ecosystem.automationCadence_${c.key}`)}</option>`)}
-                  </select>
-                  <button class="btn-outline btn-sm" disabled=${!!busy[cap.id]} onClick=${() => onEnable(cap.id)}>
-                    ${t('profile.ecosystem.automationEnable')}
-                  </button>
-                </div>`;
-            })}
-          </div>`)}
+      <button class="pf-eco-auto-how-toggle" aria-expanded=${showHow} onClick=${() => setShowHow(o => !o)}>
+        <span class="pf-eco-caret">${showHow ? '▼' : '▶'}</span>
+        ${t('profile.ecosystem.autoHowTitle')}
+      </button>
+      ${showHow && html`
+        <div class="pf-eco-auto-how">
+          <p class="pf-eco-dim pf-eco-auto-how-lead">${t('profile.ecosystem.autoHowLead')}</p>
+          <ol class="pf-eco-auto-how-steps">
+            <li>${t('profile.ecosystem.autoHowStep1')}</li>
+            <li>${t('profile.ecosystem.autoHowStep2')}</li>
+            <li>${t('profile.ecosystem.autoHowStep3')}</li>
+            <li>${t('profile.ecosystem.autoHowStep4')}</li>
+          </ol>
+          <p class="pf-eco-dim pf-eco-auto-how-doc">${t('profile.ecosystem.autoHowDoc')}</p>
+        </div>`}
 
-      <div class="pf-eco-auto-list">
-        ${schedules === undefined
-          ? html`<div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.automationLoading')}</div>`
-          : schedules.length === 0
-            ? html`<div class="pf-eco-dim">${t('profile.ecosystem.automationEmpty')}</div>`
-            : schedules.map(job => {
-              // Known cron → editable cadence select; an unknown (custom) cron is
-              // preserved as a selected, disabled option so it is never lost silently.
-              const knownCadence = CRON_TO_CADENCE[job.cron];
-              const att = lastAttempt[job.id];
-              return html`
-              <div class="pf-eco-auto-job ${job.enabled ? '' : 'pf-eco-auto-job-off'}" key=${job.id}>
-                <div class="pf-eco-auto-job-main">
-                  <span class="pf-eco-mono pf-eco-auto-job-cap">${job.input?.capability_id || ''}</span>
-                  <select class="pf-eco-select pf-eco-auto-cadence-sel"
-                    value=${knownCadence || job.cron}
-                    disabled=${!!busy[job.id]}
-                    onChange=${e => onCadenceChange(job, e.target.value)}>
-                    ${CADENCES.map(c => html`<option value=${c.cron} key=${c.key}>${t(`profile.ecosystem.automationCadence_${c.key}`)}</option>`)}
-                    ${!knownCadence && html`<option value=${job.cron} disabled selected>${job.cron}</option>`}
-                  </select>
-                  <span class="pf-eco-chip ${job.enabled ? 'pf-eco-auto-on' : 'pf-eco-auto-paused'}">
-                    ${job.enabled ? t('profile.ecosystem.automationOn') : t('profile.ecosystem.automationPaused')}
-                  </span>
-                </div>
-                <div class="pf-eco-auto-job-meta">
-                  <span class="pf-eco-dim">
-                    ${t('profile.ecosystem.automationLastRun')}: ${job.lastRunAt
-                      ? html`${timeAgo(job.lastRunAt)}${job.lastRunResult ? html` · <span class="pf-eco-auto-result-${job.lastRunResult}">${job.lastRunResult}</span>` : ''}`
-                      : '—'}
-                  </span>
-                  <span class="pf-eco-dim">${t('profile.ecosystem.automationNextRun')}: ${job.enabled ? formatUntil(job.nextRunAt) : '—'}</span>
-                </div>
-                ${att && att.outcome === 'busy' && html`
-                  <div class="pf-eco-dim pf-eco-auto-lastattempt">
-                    ${/offline|unavailable/i.test(att.reason)
-                      ? t('profile.ecosystem.automationRunSkippedOffline')
-                      : t('profile.ecosystem.automationRunSkipped', { reason: att.reason })}
-                  </div>`}
-                <div class="pf-eco-auto-job-actions">
-                  <button class="btn-ghost btn-sm" disabled=${!!busy[job.id]} onClick=${() => onRunNow(job)}>${t('profile.ecosystem.automationRunNow')}</button>
-                  <button class="btn-ghost btn-sm" disabled=${!!busy[job.id]} onClick=${() => onToggle(job)}>
-                    ${job.enabled ? t('profile.ecosystem.automationDisable') : t('profile.ecosystem.automationEnable')}
-                  </button>
-                  <button class="btn-ghost btn-sm" aria-expanded=${!!openLog[job.id]} onClick=${() => toggleLog(job.id)}>
-                    ${openLog[job.id] ? t('profile.ecosystem.automationHideLog') : t('profile.ecosystem.automationShowLog')}
-                  </button>
-                  <button class="btn-ghost btn-sm pf-eco-auto-del" disabled=${!!busy[job.id]} title=${t('profile.ecosystem.automationDelete')} onClick=${() => onDelete(job)}>✕</button>
-                </div>
-                ${openLog[job.id] && html`<${EcoScheduleLog} jobId=${job.id} refreshKey=${logRefresh[job.id] || 0} />`}
-              </div>`;
-            })}
+      <!-- ── the ONE config card, read top-to-bottom ── -->
+      <div class="pf-eco-auto-flow-card">
+        <!-- ① What this app produces -->
+        <div class="pf-eco-auto-flow-step">
+          <div class="pf-eco-auto-flow-num">${t('profile.ecosystem.autoStep1')}</div>
+          ${primary
+            ? html`
+              <div class="pf-eco-auto-produces">
+                <span class="pf-eco-mono pf-eco-auto-produces-cap">${primary.id}</span>
+                ${primary.produces && html`<span class="pf-eco-dim">${t('profile.ecosystem.autoProduces')}: <span class="pf-eco-mono">${primary.produces}</span></span>`}
+                ${producesKey && html`<span class="pf-eco-dim">${t('profile.ecosystem.autoDepositKey')}: <span class="pf-eco-mono">${defaultTriggerGlob(app)}</span></span>`}
+              </div>`
+            : html`<div class="pf-eco-dim">${t('profile.ecosystem.automationNoCaps')}</div>`}
+        </div>
+
+        <!-- ② Run on a schedule -->
+        <div class="pf-eco-auto-flow-step ${primary ? '' : 'pf-eco-auto-flow-step-disabled'}">
+          <div class="pf-eco-auto-flow-num">${t('profile.ecosystem.autoStep2')}</div>
+          <div class="pf-eco-auto-flow-controls">
+            <select class="pf-eco-select" value=${cadence} disabled=${!primary}
+              onChange=${e => setCadence(e.target.value)}>
+              ${allowedCadences.map(c => html`<option value=${c.key} key=${c.key}>${t(`profile.ecosystem.automationCadence_${c.key}`)}</option>`)}
+            </select>
+            <label class="pf-eco-recipe-toggle">
+              <input type="checkbox" checked=${scheduleOn} disabled=${!primary} onChange=${e => setScheduleOn(e.target.checked)} />
+              <span>${t('profile.ecosystem.autoScheduleOn')}</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- ③ Process with agent(s) -->
+        <div class="pf-eco-auto-flow-step">
+          <div class="pf-eco-auto-flow-num">${t('profile.ecosystem.autoStep3')}</div>
+          ${agents.length === 0
+            ? html`<div class="pf-eco-dim">${t('profile.ecosystem.recipeAgentsEmpty')}</div>`
+            : html`
+              <div class="pf-eco-recipe-agents">
+                ${agents.map(a => html`
+                  <label class="pf-eco-recipe-agent" key=${a.name}>
+                    <input type="checkbox" checked=${selAgents.includes(a.name)} onChange=${() => toggleAgent(a.name)} />
+                    <span>${a.name}</span>
+                  </label>`)}
+              </div>`}
+        </div>
+
+        <!-- ④ Store results in organism -->
+        <div class="pf-eco-auto-flow-step">
+          <div class="pf-eco-auto-flow-num">${t('profile.ecosystem.autoStep4')}</div>
+          <select class="pf-eco-select" value=${organism} onChange=${e => setOrganism(e.target.value)}>
+            <option value="">${t('profile.ecosystem.recipeOrganismNone')}</option>
+            ${orgs.map(o => html`<option value=${o.id} key=${o.id}>${o.name || o.id}</option>`)}
+          </select>
+        </div>
+
+        <!-- ⑤ Deliver guidance -->
+        <div class="pf-eco-auto-flow-step">
+          <div class="pf-eco-auto-flow-num">${t('profile.ecosystem.autoStep5')}</div>
+          <div class="pf-eco-recipe-radios">
+            <label class="pf-eco-recipe-radio">
+              <input type="radio" name=${`eco-delivery-${app.app}`} checked=${requireApproval} onChange=${() => setRequireApproval(true)} />
+              <span>
+                <span class="pf-eco-recipe-radio-title">${t('profile.ecosystem.recipeDeliveryApprove')}</span>
+                <span class="pf-eco-dim pf-eco-recipe-radio-hint">${t('profile.ecosystem.recipeDeliveryApproveHint')}</span>
+              </span>
+            </label>
+            <label class="pf-eco-recipe-radio">
+              <input type="radio" name=${`eco-delivery-${app.app}`} checked=${!requireApproval} onChange=${() => setRequireApproval(false)} />
+              <span>
+                <span class="pf-eco-recipe-radio-title">${t('profile.ecosystem.recipeDeliveryPush')}</span>
+                <span class="pf-eco-dim pf-eco-recipe-radio-hint">${t('profile.ecosystem.recipeDeliveryPushHint')}</span>
+              </span>
+            </label>
+          </div>
+          <label class="pf-eco-recipe-toggle pf-eco-auto-flow-email">
+            <input type="checkbox" checked=${email} onChange=${e => setEmail(e.target.checked)} />
+            <span>${t('profile.ecosystem.recipeEmail')}</span>
+          </label>
+        </div>
+
+        <!-- Advanced: trigger key -->
+        <div class="pf-eco-auto-flow-step pf-eco-auto-flow-advanced">
+          <button class="pf-eco-auto-how-toggle" aria-expanded=${showAdvanced} onClick=${() => setShowAdvanced(o => !o)}>
+            <span class="pf-eco-caret">${showAdvanced ? '▼' : '▶'}</span>
+            ${t('profile.ecosystem.autoAdvanced')}
+          </button>
+          ${showAdvanced && html`
+            <div class="pf-eco-auto-flow-advanced-body">
+              <label class="pf-eco-recipe-label">${t('profile.ecosystem.recipeTriggerLabel')}</label>
+              <input type="text" class="pf-eco-recipe-trigger-input pf-eco-mono"
+                value=${triggerGlob} placeholder=${defaultTriggerGlob(app)}
+                onInput=${e => setTriggerGlob(e.target.value)} />
+              <p class="pf-eco-dim pf-eco-recipe-trigger-help">${t('profile.ecosystem.recipeTriggerHelp')}</p>
+            </div>`}
+        </div>
+
+        <!-- ONE Save -->
+        <div class="pf-eco-auto-flow-save">
+          <button class="btn-primary btn-sm" disabled=${saving} onClick=${onSave}>${t('profile.ecosystem.autoSave')}</button>
+        </div>
       </div>
 
-      <${EcoRecipeConfig} app=${app} showToast=${showToast} />
+      <!-- ── Status — latest run (publish → process → deliver) ── -->
+      <div class="pf-eco-auto-status">
+        <div class="pf-eco-recipe-head">${t('profile.ecosystem.autoStatusTitle')}</div>
+        <div class="pf-eco-auto-status-timeline">
 
-      <${EcoPendingAdvisories} app=${app} showToast=${showToast} />
+          <!-- publish -->
+          <div class="pf-eco-auto-status-step">
+            <div class="pf-eco-auto-status-head">
+              <span class="pf-eco-auto-status-dot pf-eco-auto-status-dot-${publishState}"></span>
+              <strong class="pf-eco-auto-status-label">${t('profile.ecosystem.autoStatusPublished')}</strong>
+              <${EcoStatusChip} state=${publishState} label=${primaryJob
+                ? (primaryJob.enabled ? t('profile.ecosystem.automationOn') : t('profile.ecosystem.automationPaused'))
+                : t('profile.ecosystem.autoStatusNotScheduled')} />
+            </div>
+            <div class="pf-eco-auto-status-body">
+              ${primaryJob
+                ? html`
+                  <div class="pf-eco-auto-job-meta">
+                    <span class="pf-eco-dim">
+                      ${t('profile.ecosystem.automationLastRun')}: ${primaryJob.lastRunAt
+                        ? html`${timeAgo(primaryJob.lastRunAt)}${primaryJob.lastRunResult ? html` · <span class="pf-eco-auto-result-${primaryJob.lastRunResult}">${primaryJob.lastRunResult}</span>` : ''}`
+                        : '—'}
+                    </span>
+                    <span class="pf-eco-dim">${t('profile.ecosystem.automationNextRun')}: ${primaryJob.enabled ? formatUntil(primaryJob.nextRunAt) : '—'}</span>
+                  </div>
+                  ${lastAttempt && lastAttempt.outcome === 'busy' && html`
+                    <div class="pf-eco-dim pf-eco-auto-lastattempt">
+                      ${/offline|unavailable/i.test(lastAttempt.reason)
+                        ? t('profile.ecosystem.automationRunSkippedOffline')
+                        : t('profile.ecosystem.automationRunSkipped', { reason: lastAttempt.reason })}
+                    </div>`}
+                  <div class="pf-eco-auto-job-actions">
+                    <button class="btn-ghost btn-sm" disabled=${running} onClick=${onRunNow}>${t('profile.ecosystem.automationRunNow')}</button>
+                    <button class="btn-ghost btn-sm" aria-expanded=${openLog} onClick=${() => setOpenLog(o => !o)}>
+                      ${openLog ? t('profile.ecosystem.automationHideLog') : t('profile.ecosystem.automationShowLog')}
+                    </button>
+                  </div>
+                  ${openLog && html`<${EcoScheduleLog} jobId=${primaryJob.id} refreshKey=${logRefresh} />`}`
+                : html`<div class="pf-eco-dim">${t('profile.ecosystem.autoStatusPublishedHint')}</div>`}
+            </div>
+          </div>
+
+          <!-- process -->
+          <div class="pf-eco-auto-status-step">
+            <div class="pf-eco-auto-status-head">
+              <span class="pf-eco-auto-status-dot pf-eco-auto-status-dot-${processState}"></span>
+              <strong class="pf-eco-auto-status-label">${t('profile.ecosystem.autoStatusProcessed')}</strong>
+            </div>
+            <div class="pf-eco-auto-status-body">
+              ${selAgents.length === 0
+                ? html`<div class="pf-eco-dim">${t('profile.ecosystem.autoStatusNoAgents')}</div>`
+                : html`
+                  <div class="pf-eco-auto-status-agents">
+                    ${selAgents.map(name => html`<span class="pf-eco-chip" key=${name}>${name}</span>`)}
+                  </div>
+                  <div class="pf-eco-dim pf-eco-auto-status-note">${t('profile.ecosystem.autoStatusProcessedHint')}</div>`}
+            </div>
+          </div>
+
+          <!-- deliver -->
+          <div class="pf-eco-auto-status-step">
+            <div class="pf-eco-auto-status-head">
+              <span class="pf-eco-auto-status-dot pf-eco-auto-status-dot-${deliverState}"></span>
+              <strong class="pf-eco-auto-status-label">${t('profile.ecosystem.autoStatusDelivered')}</strong>
+              ${pendingCount > 0 && html`<span class="pf-eco-chip pf-eco-auto-status-pending-count">${pendingCount}</span>`}
+            </div>
+            <div class="pf-eco-auto-status-body">
+              <p class="pf-eco-dim pf-eco-auto-status-note">${t('profile.ecosystem.autoStatusDeliveredHint')}</p>
+              ${advisories === undefined
+                ? html`<div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.advLoading')}</div>`
+                : advisories.length === 0
+                  ? html`<div class="pf-eco-dim">${t('profile.ecosystem.advPendingEmpty')}</div>`
+                  : html`
+                    <div class="pf-eco-adv-list">
+                      ${advisories.map(p => {
+                        const a = p.advisory || {};
+                        return html`
+                          <div class="pf-eco-adv-item" key=${p.id}>
+                            <div class="pf-eco-adv-head">
+                              <strong class="pf-eco-adv-title">${a.title || p.id}</strong>
+                              ${a.kind && html`<span class="pf-eco-chip pf-eco-adv-kind">${t('profile.ecosystem.advKind')}: ${a.kind}</span>`}
+                              ${a.severity && html`<span class="pf-eco-chip pf-eco-adv-sev pf-eco-adv-sev-${a.severity}">${t('profile.ecosystem.advSeverity')}: ${a.severity}</span>`}
+                              ${a.status && html`<span class="pf-eco-chip">${a.status}</span>`}
+                            </div>
+                            ${(a.effective_from || a.effective_until) && html`
+                              <div class="pf-eco-dim pf-eco-adv-meta">
+                                ${t('profile.ecosystem.advEffective')}: ${a.effective_from || '…'} → ${a.effective_until || '…'}
+                              </div>`}
+                            <div class="pf-eco-adv-body">
+                              <${JsonValue} value=${a.body !== undefined ? a.body : a} />
+                            </div>
+                            ${a.source && html`<div class="pf-eco-dim pf-eco-adv-meta">${t('profile.ecosystem.advSource')}: ${a.source}</div>`}
+                            ${a.rationale && html`
+                              <div class="pf-eco-adv-rationale">
+                                <span class="pf-eco-dim">${t('profile.ecosystem.advRationale')}:</span>
+                                <${JsonValue} value=${a.rationale} />
+                              </div>`}
+                            <div class="pf-eco-adv-actions">
+                              <button class="btn-success btn-sm" disabled=${!!advBusy[p.id]} onClick=${() => onApproveAdv(p.id)}>
+                                ${t('profile.ecosystem.advApprove')}
+                              </button>
+                              <button class="btn-ghost btn-sm pf-eco-adv-reject" disabled=${!!advBusy[p.id]} onClick=${() => setConfirmId(p.id)}>
+                                ${t('profile.ecosystem.advReject')}
+                              </button>
+                            </div>
+                          </div>`;
+                      })}
+                    </div>`}
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <${Modal} open=${!!confirmId} onClose=${() => setConfirmId(null)} title=${t('profile.ecosystem.advReject')}>
+        <p>${t('profile.ecosystem.advRejectConfirm')}</p>
+        <div class="pf-eco-revoke-actions">
+          <button class="btn-ghost" onClick=${() => setConfirmId(null)}>${t('common.cancel')}</button>
+          <button class="btn-danger-solid" onClick=${() => onRejectAdv(confirmId)}>${t('profile.ecosystem.advReject')}</button>
+        </div>
+      <//>
     </div>`;
 }
 
