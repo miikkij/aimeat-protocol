@@ -552,6 +552,8 @@
       "recipeIntro": "Rakenna automaattinen resepti: kun tämä sovellus julkaisee uutta dataa, anna se agenteillesi, tallenna tulokset halutessasi organismiin ja lähetä raportti sähköpostiisi.",
       "recipeLoading": "Ladataan reseptiä…",
       "recipeTriggerOn": "Laukeaa avaimesta",
+      "recipeTriggerLabel": "Laukaisevan avaimen kuvio",
+      "recipeTriggerHelp": "Resepti suoritetaan, kun tämä sovellus kirjoittaa muistiavaimen, joka vastaa tätä kuviota (esim. feedback.stats.*).",
       "recipeAgents": "Käsittele agenteilla",
       "recipeAgentsEmpty": "Sinulla ei ole vielä agentteja. Yhdistä ensin agentti ja palaa tänne.",
       "recipeOrganism": "Tallenna tulokset organismiin",

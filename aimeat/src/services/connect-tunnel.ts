@@ -1,15 +1,18 @@
 /**
  * @file connect-tunnel.ts
  * @description ConnectTunnelManager — server side of the Connector Forward
- *   Tunnel. Holds one persistent WebSocket per agent identity (GAII) and
- *   multiplexes id-correlated forward API calls (agent→server) plus realtime
- *   reverse delivery (server→agent). Forward `request` frames are dispatched
- *   through the REAL Express stack via a loopback self-`fetch` that reuses the
- *   agent's WS-upgrade JWT as the bearer, so `requireAuth`/`requireScope` and
- *   the AIMEAT envelope apply by construction (Phase 0 decision: Option B).
- *   Mirrors the framing/heartbeat patterns of the personal-node TunnelManager
- *   but is keyed by GAII, executes requests server-side, and is decoupled from
- *   the personal-node anchor/slot/mailbox model.
+ *   Tunnel. Holds one persistent WebSocket per connected PRINCIPAL — an agent
+ *   (a GAII, `agent#owner@node`) OR an ecosystem app (a GEAI, `eco:app#owner@node`).
+ *   GAII and GEAI are DISTINCT identity kinds; this manager is principal-agnostic
+ *   and never conflates them — the map key + every log field is `principal`, which
+ *   holds the full GAII or GEAI verbatim (whatever the upgrade JWT's `sub` is).
+ *   Multiplexes id-correlated forward API calls (principal→server) plus realtime
+ *   reverse delivery + capability `invoke` (server→principal). Forward `request`
+ *   frames are dispatched through the REAL Express stack via a loopback self-`fetch`
+ *   that reuses the principal's WS-upgrade JWT as the bearer, so `requireAuth`/
+ *   `requireScope` and the AIMEAT envelope apply by construction (Phase 0: Option B).
+ *   Keyed by principal, executes requests server-side, decoupled from the
+ *   personal-node anchor/slot/mailbox model.
  * @structure
  *   - ConnectFrame (wire type) — welcome|heartbeat|heartbeat_ack|request|
  *     response|deliver|ack|backlog|disconnect|error
@@ -83,7 +86,7 @@ export interface ConnectFrame {
 }
 
 interface ConnectConnection {
-  gaii: string;
+  principal: string;
   ws: WebSocket;
   identity: VerifiedToken;
   /** The raw agent JWT verified at upgrade, reused verbatim as the forward bearer. */
@@ -156,29 +159,31 @@ export class ConnectTunnelManager {
   }
 
   /**
-   * Register an authenticated agent socket. `identity` is the JWT verified at
-   * upgrade (roles include `agent`); `rawToken` is that same JWT, reused as the
-   * forward bearer. A second connection for the same GAII replaces the first —
-   * enforcing the single-socket-per-agent invariant.
+   * Register an authenticated principal socket — an agent (GAII) or an ecosystem
+   * app (GEAI). `identity` is the JWT verified at upgrade (roles include `agent`
+   * OR `ecosystem`); `rawToken` is that same JWT, reused as the forward bearer.
+   * The principal is the JWT `sub` verbatim (the full GAII or GEAI). A second
+   * connection for the same principal replaces the first — enforcing the
+   * single-socket-per-principal invariant.
    */
   handleConnection(ws: WebSocket, identity: VerifiedToken, rawToken: string): void {
-    const gaii = identity.sub;
+    const principal = identity.sub;
 
-    const existing = this.connections.get(gaii);
+    const existing = this.connections.get(principal);
     if (existing) {
       try { existing.ws.close(1000, 'replaced'); } catch { /* ignore */ }
-      this.connections.delete(gaii);
+      this.connections.delete(principal);
     }
     // Fresh session → fresh in-session dedup state (the replaced socket's close
     // handler won't clear it, since the registered ws is now the new one).
-    this.ackedDeliveries.delete(gaii);
+    this.ackedDeliveries.delete(principal);
 
-    const conn: ConnectConnection = { gaii, ws, identity, rawToken, lastHeartbeat: Date.now() };
-    this.connections.set(gaii, conn);
+    const conn: ConnectConnection = { principal, ws, identity, rawToken, lastHeartbeat: Date.now() };
+    this.connections.set(principal, conn);
     this.stats.connectionsTotal++;
     this.stats.activeConnections = this.connections.size;
 
-    logger.info('Connect tunnel connected', { event: 'connect_tunnel.connect', gaii, active: this.connections.size });
+    logger.info('Connect tunnel connected', { event: 'connect_tunnel.connect', principal, active: this.connections.size });
 
     this.send(ws, {
       type: 'welcome',
@@ -211,27 +216,27 @@ export class ConnectTunnelManager {
         this.send(ws, { type: 'error', code: 'BAD_FRAME', message: 'Frame is not valid JSON' });
         return;
       }
-      this.handleFrame(gaii, frame);
+      this.handleFrame(principal, frame);
     });
 
     ws.on('close', () => {
       // Only forget this socket if it is still the registered one (a replacement
       // may have already taken its place).
-      if (this.connections.get(gaii)?.ws === ws) {
-        this.connections.delete(gaii);
-        this.ackedDeliveries.delete(gaii);  // in-session dedup set — bounded, never persisted
+      if (this.connections.get(principal)?.ws === ws) {
+        this.connections.delete(principal);
+        this.ackedDeliveries.delete(principal);  // in-session dedup set — bounded, never persisted
         this.stats.activeConnections = this.connections.size;
       }
-      logger.info('Connect tunnel disconnected', { event: 'connect_tunnel.disconnect', gaii, active: this.connections.size });
+      logger.info('Connect tunnel disconnected', { event: 'connect_tunnel.disconnect', principal, active: this.connections.size });
     });
 
     ws.on('error', (err) => {
-      logger.error('Connect tunnel WebSocket error', { event: 'connect_tunnel.error', gaii, error: err.message });
+      logger.error('Connect tunnel WebSocket error', { event: 'connect_tunnel.error', principal, error: err.message });
     });
   }
 
-  private handleFrame(gaii: string, frame: ConnectFrame): void {
-    const conn = this.connections.get(gaii);
+  private handleFrame(principal: string, frame: ConnectFrame): void {
+    const conn = this.connections.get(principal);
     if (!conn) return;
 
     switch (frame.type) {
@@ -245,7 +250,7 @@ export class ConnectTunnelManager {
         break;
       }
       case 'ack': {
-        this.handleAck(gaii, frame);
+        this.handleAck(principal, frame);
         break;
       }
       case 'invoke_result': {
@@ -295,7 +300,7 @@ export class ConnectTunnelManager {
     }
     if (url.origin !== this.loopbackBase) {
       this.stats.malformedFramesTotal++;
-      logger.warn('Connect tunnel rejected off-host forward path', { event: 'connect_tunnel.ssrf_block', gaii: conn.gaii, path: frame.path, resolvedOrigin: url.origin });
+      logger.warn('Connect tunnel rejected off-host forward path', { event: 'connect_tunnel.ssrf_block', principal: conn.principal, path: frame.path, resolvedOrigin: url.origin });
       this.send(conn.ws, { type: 'error', id, code: 'BAD_REQUEST_FRAME', message: 'request path must stay on this node (loopback)' });
       return;
     }
@@ -335,7 +340,7 @@ export class ConnectTunnelManager {
     } catch (err) {
       this.stats.forwardErrorsTotal++;
       const aborted = err instanceof Error && err.name === 'AbortError';
-      logger.warn('Connect tunnel forward dispatch failed', { event: 'connect_tunnel.error', gaii: conn.gaii, path: frame.path, error: err instanceof Error ? err.message : String(err) });
+      logger.warn('Connect tunnel forward dispatch failed', { event: 'connect_tunnel.error', principal: conn.principal, path: frame.path, error: err instanceof Error ? err.message : String(err) });
       this.send(conn.ws, {
         type: 'response',
         id,
@@ -364,10 +369,10 @@ export class ConnectTunnelManager {
    * reconnect (a hole in the no-loss guarantee). The set is cleared on
    * disconnect, so it is bounded and never persists across sessions.
    */
-  private handleAck(gaii: string, frame: ConnectFrame): void {
+  private handleAck(principal: string, frame: ConnectFrame): void {
     if (!frame.id) return;
-    let set = this.ackedDeliveries.get(gaii);
-    if (!set) { set = new Set(); this.ackedDeliveries.set(gaii, set); }
+    let set = this.ackedDeliveries.get(principal);
+    if (!set) { set = new Set(); this.ackedDeliveries.set(principal, set); }
     set.add(frame.id);
     this.stats.acksTotal++;
   }
@@ -421,11 +426,11 @@ export class ConnectTunnelManager {
    */
   private async sendBacklog(conn: ConnectConnection): Promise<void> {
     try {
-      const gaii = conn.gaii;
+      const principal = conn.principal;
       const [queued, active, pendingMessages] = await Promise.all([
-        this.storage.listAgentTasks(gaii, { status: 'queued' }),
-        this.storage.listAgentTasks(gaii, { status: 'active' }),
-        this.storage.listPendingMessages(gaii).catch(() => []),
+        this.storage.listAgentTasks(principal, { status: 'queued' }),
+        this.storage.listAgentTasks(principal, { status: 'active' }),
+        this.storage.listPendingMessages(principal).catch(() => []),
       ]);
       // Dedup tasks by id (a task can't be both queued and active, but guard).
       const taskById = new Map<string, unknown>();
@@ -441,13 +446,13 @@ export class ConnectTunnelManager {
         timestamp: new Date().toISOString(),
       });
     } catch (err) {
-      logger.error('Connect tunnel backlog failed', { event: 'connect_tunnel.error', gaii: conn.gaii, error: err instanceof Error ? err.message : String(err) });
+      logger.error('Connect tunnel backlog failed', { event: 'connect_tunnel.error', principal: conn.principal, error: err instanceof Error ? err.message : String(err) });
     }
   }
 
   /** True if the agent currently holds an open tunnel socket. */
-  isOnline(gaii: string): boolean {
-    const conn = this.connections.get(gaii);
+  isOnline(principal: string): boolean {
+    const conn = this.connections.get(principal);
     return !!conn && conn.ws.readyState === WebSocket.OPEN;
   }
 
@@ -468,12 +473,12 @@ export class ConnectTunnelManager {
     const offlineThreshold = this.config.connectTunnelOfflineThresholdMs;
     this.heartbeatInterval = setInterval(() => {
       const now = Date.now();
-      for (const [gaii, conn] of this.connections) {
+      for (const [principal, conn] of this.connections) {
         if (now - conn.lastHeartbeat > offlineThreshold) {
-          logger.warn('Connect tunnel heartbeat timeout', { event: 'connect_tunnel.timeout', gaii, elapsed_ms: now - conn.lastHeartbeat });
+          logger.warn('Connect tunnel heartbeat timeout', { event: 'connect_tunnel.timeout', principal, elapsed_ms: now - conn.lastHeartbeat });
           try { conn.ws.close(1000, 'heartbeat_timeout'); } catch { /* ignore */ }
-          this.connections.delete(gaii);
-          this.ackedDeliveries.delete(gaii);
+          this.connections.delete(principal);
+          this.ackedDeliveries.delete(principal);
         }
       }
       this.stats.activeConnections = this.connections.size;
@@ -487,9 +492,9 @@ export class ConnectTunnelManager {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
     }
-    for (const [gaii, conn] of this.connections) {
+    for (const [principal, conn] of this.connections) {
       try { conn.ws.close(1000, 'shutdown'); } catch { /* ignore */ }
-      this.connections.delete(gaii);
+      this.connections.delete(principal);
     }
     this.stats.activeConnections = 0;
     if (_active === this) _active = null;

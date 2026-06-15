@@ -129,7 +129,7 @@ export interface EcosystemAppRecord {
    * Optional automation hints from the manifest: which capabilities are schedulable (and at what
    * cadences) + an optional advisory sink. A HINT only — never required for an owner to schedule.
    */
-  automation?: { schedulable?: { id: string; produces?: string; cadences?: string[] }[]; advisory_sink?: string };
+  automation?: { schedulable?: { id: string; produces?: string; produces_key?: string; cadences?: string[] }[]; advisory_sink?: string };
   createdAt: string;
   lastSeen: string;
 }
@@ -358,7 +358,7 @@ export interface EcoAuthorizationRecord {
    */
   capabilities?: { id: string; inputSchema?: Record<string, unknown>; outputSchema?: Record<string, unknown> }[];
   /** Optional automation hints from the manifest (schedulable capabilities + advisory sink). */
-  automation?: { schedulable?: { id: string; produces?: string; cadences?: string[] }[]; advisory_sink?: string };
+  automation?: { schedulable?: { id: string; produces?: string; produces_key?: string; cadences?: string[] }[]; advisory_sink?: string };
   appCredentials?: {
     geai: string;
     /** The app's TOFU-pinned verification key (echoed back; the app already holds its private half). */

@@ -21,6 +21,8 @@
  *   v1.20.0 — 2026-06-15 — Ecosystem automation schedule-row UX: .pf-eco-auto-result-skipped,
  *     .pf-eco-auto-cadence-sel (editable cadence on a row), .pf-eco-auto-lastattempt (Run-now skip note),
  *     run-history log expander (.pf-eco-auto-log/-row/-time/-trigger/-dur/-reason, -log-loading/-log-empty).
+ *   v1.21.0 — 2026-06-15 — Editable recipe trigger keyGlob: .pf-eco-recipe-trigger-input (text input)
+ *     + .pf-eco-recipe-trigger-help (help line).
  *   v1.14.0 — 2026-06-10 — SchemaForm usability: .pj-field-hint (per-field hint),
  *     .pj-field-invalid (missing-required outline) + .pj-form-error message.
  *   v1.13.0 — 2026-06-10 — Workspace renew, phase 2: .pj-ws-head-actions, review
@@ -2723,6 +2725,8 @@
 .pf-eco-recipe-head { font-weight: 700; font-size: .88rem; color: var(--text); }
 .pf-eco-recipe-intro { margin: -.3rem 0 0; }
 .pf-eco-recipe-trigger { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; font-size: .8rem; }
+.pf-eco-recipe-trigger-input { background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: .3rem .5rem; width: 100%; box-sizing: border-box; }
+.pf-eco-recipe-trigger-help { margin: 0; font-size: .78rem; }
 .pf-eco-recipe-row { display: flex; flex-direction: column; gap: .35rem; }
 .pf-eco-recipe-label { font-weight: 600; font-size: .82rem; color: var(--text-dim); }
 .pf-eco-recipe-agents { display: flex; flex-wrap: wrap; gap: .4rem .9rem; }

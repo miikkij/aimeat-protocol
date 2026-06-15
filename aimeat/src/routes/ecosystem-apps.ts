@@ -482,12 +482,18 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage): Rou
     };
   }
 
-  /** Default trigger keyGlob from the app's automation hint (first schedulable.produces), else a sane fallback. */
+  /**
+   * Default trigger keyGlob from the app's automation hint, else a sane fallback. Prefers
+   * `produces_key` (the deposit KEY PREFIX, e.g. `feedback.stats`) over `produces` (a SCHEMA ref,
+   * e.g. `feedback-stats@1`, which is NOT a deposit key and won't match the recipe trigger).
+   */
   function defaultKeyGlob(appRecord: EcosystemAppRecord): string {
-    const produces = appRecord.automation?.schedulable?.find(s => s.produces)?.produces;
-    if (produces) {
-      // A `produces` is typically a deposit key (or `schema@1`); turn a bare prefix into a glob.
-      return produces.includes('*') ? produces : `${produces}.*`;
+    const schedulable = appRecord.automation?.schedulable ?? [];
+    const entry = schedulable.find(s => s.produces_key) ?? schedulable.find(s => s.produces);
+    const base = entry?.produces_key ?? entry?.produces;
+    if (base) {
+      // Turn a bare key prefix into a glob (leave it alone if it already contains a wildcard).
+      return base.includes('*') ? base : `${base}.*`;
     }
     return `eco.${appRecord.app}.*`;
   }
