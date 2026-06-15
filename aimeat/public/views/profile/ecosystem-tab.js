@@ -48,6 +48,15 @@
  *     raw JSON) + source/rationale, with Approve (→ deliver over the tunnel) and Reject (→ confirm-modal,
  *     then drop). Approve handles the 202 offline-retry/failed case by keeping the row + an info/warning
  *     toast; delivered/rejected drop the row. Lazy-loads + refreshes on aimeat-live-update.
+ *   v2.1.0 — 2026-06-15 — Add the guided **Setup playbook** ("Käyttöönotto") + the **MCP promo** block
+ *     to the TOP of the expanded card (<EcoSetupPlaybook>). The playbook reads the live recipe / schedule
+ *     / agent state and shows a 4-step checklist with derived statuses (app connected · connect your
+ *     processing agent · set up automation · choose an organism) + overall progress, each with a one-line
+ *     WHY and a CTA. The framing leads with "why AIMEAT": your insights are MCP-reachable from any AI chat,
+ *     the agent is YOURS (the app only recommends a template), and the organism is where insights outlast
+ *     the app. The MCP promo block builds a real sample memory key from the app's produce key + the owner's
+ *     org and offers a copyable "ask it in Claude/Grok/ChatGPT" prompt. Frontend-only; no backend logic.
+ *     Operator how-to: docs/ecosystem-app-automation-howto.md.
  *   v2.0.0 — 2026-06-15 — REWORK the Automation section into ONE turnkey flow. The three stacked
  *     sub-sections (per-capability cadence rows, the schedules list, <EcoRecipeConfig>) and the separate
  *     <EcoPendingAdvisories> are MERGED into a single <EcoAutomationSection>: a "How this works" 4-hop
@@ -449,7 +458,7 @@ function EcoAutomationSection({ app, showToast }) {
   const deliverState = pendingCount > 0 ? 'wait' : 'ok';
 
   return html`
-    <div class="pf-eco-section pf-eco-auto-flow">
+    <div class="pf-eco-section pf-eco-auto-flow" data-eco-auto=${app.app}>
       <div class="pf-eco-section-title">${t('profile.ecosystem.automationTitle')}</div>
       <p class="pf-eco-dim pf-eco-auto-flow-intro">${t('profile.ecosystem.autoIntro')}</p>
 
@@ -694,6 +703,160 @@ function EcoAutomationSection({ app, showToast }) {
     </div>`;
 }
 
+/**
+ * The owner's bare org/owner name, used to build a concrete sample memory key (e.g.
+ * `feedback.stats.<org>.latest`). Empty string when the session can't be read.
+ */
+function ownerOrgName() {
+  return (currentGhii().split('@')[0]) || '';
+}
+
+/**
+ * Build the sample memory key the MCP promo invites the operator to query. Mirrors the
+ * recipe trigger: prefer the app's deposit KEY PREFIX (`produces_key`), else `produces`, else
+ * `eco.<app>`; append the owner's org + `.latest` so it reads as a real, copyable key. Returns
+ * `{ key, derived }` — `derived` is false when we had to fall back to a generic example.
+ */
+function sampleMemoryKey(app) {
+  const schedulable = app?.automation?.schedulable || [];
+  const entry = schedulable.find(s => s.produces_key) || schedulable.find(s => s.produces);
+  const base = (entry?.produces_key || entry?.produces || '').replace(/[@:].*$/, '').replace(/\*+/g, '').replace(/\.+$/, '');
+  const org = ownerOrgName();
+  if (base) {
+    return { key: org ? `${base}.${org}.latest` : `${base}.latest`, derived: true };
+  }
+  return { key: org ? `eco.${app?.app || 'app'}.${org}.latest` : `eco.${app?.app || 'app'}.latest`, derived: false };
+}
+
+/**
+ * The guided **Setup playbook** ("Käyttöönotto") + **MCP promo** that sit at the TOP of an expanded
+ * GEAI card. This is a GUIDE, not a settings panel — the real config lives in <EcoAutomationSection>
+ * below. It reads the live recipe / schedule / agent state and reflects progress.
+ *
+ * The framing leads with the "why AIMEAT" payoff the operator is about to ask for:
+ *   • your insights become reachable from ANY AI chat (Claude / Grok / ChatGPT) over MCP;
+ *   • the processing agent is YOURS — the app only recommends a prompt template, it doesn't own it;
+ *   • results land in an organism, so they outlast the app and get reused everywhere.
+ *
+ * The 4 steps + their derived status:
+ *   1. App connected — always ✅ (the card only renders for a connected app).
+ *   2. Connect your processing agent — ✅ when the recipe has agents selected.
+ *   3. Set up automation — ✅ when a publish schedule is enabled AND the recipe is enabled with agents.
+ *   4. Choose an organism — ✅ when the recipe has an organism set.
+ *
+ * Lazy-loads recipe + schedules + agents on first render, refreshes on aimeat-live-update.
+ */
+function EcoSetupPlaybook({ app, showToast }) {
+  const [loaded, setLoaded] = useState(false);
+  const [recipe, setRecipe] = useState(null);
+  const [schedules, setSchedules] = useState([]);
+  const [agentCount, setAgentCount] = useState(0);
+
+  const load = async () => {
+    const [recipeResp, schedList, agentList] = await Promise.all([
+      getAutomationRecipe(app.app).catch(() => null),
+      listAppSchedules(app.app).catch(() => []),
+      listAgents().catch(() => []),
+    ]);
+    setRecipe(recipeResp);
+    setSchedules(Array.isArray(schedList) ? schedList : []);
+    setAgentCount((Array.isArray(agentList) ? agentList : []).filter(a => !a.name?.startsWith('session-')).length);
+    setLoaded(true);
+  };
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  useEffect(() => {
+    loadRef.current();
+    const handler = () => loadRef.current();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, [app.app]);
+
+  // CTA: jump to the profile Agents tab (deep-link the profile SPA honours on load).
+  function gotoAgents() {
+    window.location.assign(`${window.location.pathname}?tab=agents`);
+  }
+  // CTA: scroll the expanded card's Automation config into view.
+  function focusAutomation() {
+    const card = document.querySelector(`[data-eco-auto="${app.app}"]`);
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  const sample = sampleMemoryKey(app);
+  const samplePrompt = t('profile.ecosystem.mcpSamplePrompt', {
+    key: sample.key,
+    organism: t('profile.ecosystem.mcpSampleOrganismFallback'),
+  });
+
+  // Derived step statuses.
+  const hasAgents = !!(recipe && Array.isArray(recipe.agents) && recipe.agents.length > 0);
+  const scheduleOn = schedules.some(j => j.enabled);
+  const automationOn = scheduleOn && hasAgents && !!(recipe && recipe.enabled);
+  const hasOrganism = !!(recipe && recipe.organism);
+
+  const steps = [
+    { done: true, title: t('profile.ecosystem.setupStep1Title'), why: t('profile.ecosystem.setupStep1Why'), cta: null },
+    {
+      done: hasAgents, title: t('profile.ecosystem.setupStep2Title'), why: t('profile.ecosystem.setupStep2Why'),
+      cta: hasAgents ? null : { label: t('profile.ecosystem.setupStep2Cta'), onClick: gotoAgents },
+      note: agentCount === 0 ? t('profile.ecosystem.setupStep2NoAgents') : null,
+    },
+    {
+      done: automationOn, title: t('profile.ecosystem.setupStep3Title'), why: t('profile.ecosystem.setupStep3Why'),
+      cta: automationOn ? null : { label: t('profile.ecosystem.setupStep3Cta'), onClick: focusAutomation },
+    },
+    {
+      done: hasOrganism, title: t('profile.ecosystem.setupStep4Title'), why: t('profile.ecosystem.setupStep4Why'),
+      cta: hasOrganism ? null : { label: t('profile.ecosystem.setupStep4Cta'), onClick: focusAutomation },
+    },
+  ];
+  const doneCount = steps.filter(s => s.done).length;
+
+  return html`
+    <div class="pf-eco-section pf-eco-setup">
+      <div class="pf-eco-section-title">${t('profile.ecosystem.setupTitle')}</div>
+      <p class="pf-eco-dim pf-eco-setup-lead">${t('profile.ecosystem.setupLead')}</p>
+
+      <div class="pf-eco-setup-progress">
+        <span class="pf-eco-chip pf-eco-setup-progress-chip">${t('profile.ecosystem.setupProgress', { done: doneCount, total: steps.length })}</span>
+      </div>
+
+      ${!loaded
+        ? html`<div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.setupLoading')}</div>`
+        : html`
+          <ol class="pf-eco-setup-steps">
+            ${steps.map((s, i) => html`
+              <li class="pf-eco-setup-step ${s.done ? 'pf-eco-setup-step-done' : ''}" key=${i}>
+                <span class="pf-eco-setup-dot ${s.done ? 'pf-eco-setup-dot-done' : 'pf-eco-setup-dot-wait'}">${s.done ? '✓' : ''}</span>
+                <div class="pf-eco-setup-step-body">
+                  <div class="pf-eco-setup-step-title">${s.title}</div>
+                  <div class="pf-eco-dim pf-eco-setup-step-why">${s.why}</div>
+                  ${s.note && html`<div class="pf-eco-dim pf-eco-setup-step-note">${s.note}</div>`}
+                  ${s.cta && html`<button class="btn-outline btn-sm pf-eco-setup-cta" onClick=${s.cta.onClick}>${s.cta.label}</button>`}
+                </div>
+              </li>`)}
+          </ol>`}
+
+      <!-- MCP promo: ask your insights from any AI chat -->
+      <div class="pf-eco-mcp">
+        <div class="pf-eco-mcp-head">
+          <span class="pf-eco-mcp-icon">💬</span>
+          <strong class="pf-eco-mcp-title">${t('profile.ecosystem.mcpTitle')}</strong>
+        </div>
+        <p class="pf-eco-dim pf-eco-mcp-sub">${t('profile.ecosystem.mcpSub')}</p>
+        <p class="pf-eco-dim pf-eco-mcp-connect">${t('profile.ecosystem.mcpConnect')}</p>
+        <div class="pf-eco-mcp-sample">
+          <div class="pf-eco-mcp-sample-label">${t('profile.ecosystem.mcpSampleLabel')}</div>
+          <div class="pf-eco-mcp-sample-row">
+            <code class="pf-eco-mcp-sample-prompt">${samplePrompt}</code>
+            <${CopyButton} className="copy-prompt-btn" text=${samplePrompt} />
+          </div>
+          ${!sample.derived && html`<p class="pf-eco-dim pf-eco-mcp-sample-note">${t('profile.ecosystem.mcpSampleGeneric')}</p>`}
+        </div>
+      </div>
+    </div>`;
+}
+
 export default function EcosystemTab({ onStats, showToast }) {
   const [apps, setApps] = useState([]);
   const [pending, setPending] = useState([]);
@@ -863,6 +1026,8 @@ export default function EcosystemTab({ onStats, showToast }) {
               </div>
               ${isOpen && html`
                 <div class="pf-eco-card-body">
+                  ${app.status !== 'revoked' && html`<${EcoSetupPlaybook} app=${app} showToast=${showToast} />`}
+
                   <div class="pf-eco-section">
                     <div class="pf-eco-section-title">${t('profile.ecosystem.grants')}</div>
                     <div class="pf-eco-chips">

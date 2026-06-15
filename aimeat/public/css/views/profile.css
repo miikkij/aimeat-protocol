@@ -28,6 +28,10 @@
  *     -save), .pf-eco-auto-how(-toggle/-lead/-steps/-doc), .pf-eco-auto-produces(-cap),
  *     .pf-eco-auto-status(-timeline/-step/-head/-dot/-dot-*/-label/-body/-agents/-note/-chip/-pending-count),
  *     .pf-eco-auto-status-{ok,wait,off,error}.
+ *   v2.1.0 — 2026-06-15 — Ecosystem Setup playbook + MCP promo (top of expanded card):
+ *     .pf-eco-setup(-lead/-progress/-progress-chip/-steps/-step/-step-done/-dot/-dot-done/-dot-wait/
+ *     -step-body/-step-title/-step-why/-step-note/-cta), .pf-eco-mcp(-head/-icon/-title/-sub/-connect/
+ *     -sample/-sample-label/-sample-row/-sample-prompt/-sample-note).
  *   v1.14.0 — 2026-06-10 — SchemaForm usability: .pj-field-hint (per-field hint),
  *     .pj-field-invalid (missing-required outline) + .pj-form-error message.
  *   v1.13.0 — 2026-06-10 — Workspace renew, phase 2: .pj-ws-head-actions, review
@@ -2803,3 +2807,30 @@
 .pf-eco-auto-status-body { display: flex; flex-direction: column; gap: .4rem; }
 .pf-eco-auto-status-agents { display: flex; flex-wrap: wrap; gap: .35rem; }
 .pf-eco-auto-status-note { margin: 0; font-size: .78rem; }
+
+/* ── Ecosystem Setup playbook + MCP promo (pf-eco-setup-* / pf-eco-mcp-*) ── */
+.pf-eco-setup-lead { margin: -.25rem 0 .6rem; line-height: 1.5; }
+.pf-eco-setup-progress { margin-bottom: .6rem; }
+.pf-eco-setup-progress-chip { font-family: inherit; font-weight: 600; background: var(--surface); }
+.pf-eco-setup-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
+.pf-eco-setup-step { display: flex; align-items: flex-start; gap: .6rem; }
+.pf-eco-setup-dot { flex: 0 0 auto; width: 1.25rem; height: 1.25rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 700; margin-top: .1rem; }
+.pf-eco-setup-dot-done { background: var(--success, var(--accent)); color: var(--bg, var(--card)); border: 2px solid var(--success, var(--accent)); }
+.pf-eco-setup-dot-wait { background: var(--bg-dim); border: 2px solid var(--border); }
+.pf-eco-setup-step-body { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+.pf-eco-setup-step-title { font-weight: 600; font-size: .88rem; color: var(--text); }
+.pf-eco-setup-step-done .pf-eco-setup-step-title { color: var(--text-dim); }
+.pf-eco-setup-step-why { font-size: .8rem; line-height: 1.45; }
+.pf-eco-setup-step-note { font-size: .78rem; font-style: italic; }
+.pf-eco-setup-cta { align-self: flex-start; margin-top: .25rem; }
+.pf-eco-mcp { margin-top: .9rem; padding: .8rem .9rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-dim); display: flex; flex-direction: column; gap: .4rem; }
+.pf-eco-mcp-head { display: flex; align-items: center; gap: .5rem; }
+.pf-eco-mcp-icon { font-size: 1.1rem; }
+.pf-eco-mcp-title { font-size: .92rem; color: var(--text); }
+.pf-eco-mcp-sub { margin: 0; font-size: .82rem; line-height: 1.45; }
+.pf-eco-mcp-connect { margin: 0; font-size: .8rem; line-height: 1.45; }
+.pf-eco-mcp-sample { margin-top: .35rem; display: flex; flex-direction: column; gap: .35rem; }
+.pf-eco-mcp-sample-label { font-weight: 600; font-size: .82rem; color: var(--text-dim); }
+.pf-eco-mcp-sample-row { display: flex; align-items: flex-start; gap: .5rem; }
+.pf-eco-mcp-sample-prompt { flex: 1 1 auto; min-width: 0; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: .5rem .6rem; font-family: var(--font-mono, monospace); font-size: .78rem; color: var(--text); line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.pf-eco-mcp-sample-note { margin: 0; font-size: .76rem; }
