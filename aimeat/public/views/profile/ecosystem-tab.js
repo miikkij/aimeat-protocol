@@ -452,6 +452,7 @@ function EcoAutomationSection({ app, showToast }) {
       <div class="pf-eco-section">
         <div class="pf-eco-section-title">${t('profile.ecosystem.automationTitle')}</div>
         <div class="pf-eco-dim">${t('profile.ecosystem.autoRevoked')}</div>
+        <p class="pf-eco-dim pf-eco-reconnect-hint">${t('profile.ecosystem.revokeReconnectHint')}</p>
       </div>`;
   }
 
@@ -1160,7 +1161,7 @@ export default function EcosystemTab({ onStats, showToast }) {
             </div>`;
         })}
 
-      <${Modal} open=${!!revokeApp} onClose=${() => setRevokeApp(null)} title=${t('profile.ecosystem.revokeTitle')}>
+      <${Modal} open=${!!revokeApp} onClose=${() => setRevokeApp(null)} title=${t('profile.ecosystem.revokeTitle', { app: revokeApp || '' })}>
         <p>${t('profile.ecosystem.revokeWarn', { app: revokeApp })}</p>
         <input class="pf-eco-revoke-input" type="text" value=${revokeInput}
           placeholder=${revokeApp || ''} onInput=${e => setRevokeInput(e.target.value)} />
