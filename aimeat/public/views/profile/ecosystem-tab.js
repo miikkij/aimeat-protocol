@@ -781,9 +781,11 @@ function EcoSetupPlaybook({ app, showToast }) {
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [app.app]);
 
-  // CTA: jump to the profile Agents tab (deep-link the profile SPA honours on load).
+  // CTA: switch to the profile Agents tab IN PLACE. The profile shell (profile.js) listens for this
+  // CustomEvent and calls switchTab — same idiom as 'aimeat-live-update'. (A full ?tab= navigation is
+  // unreliable here: the saved tab / SPA routing can win, leaving you on the same tab.)
   function gotoAgents() {
-    window.location.assign(`${window.location.pathname}?tab=agents`);
+    window.dispatchEvent(new CustomEvent('aimeat-profile-tab', { detail: 'agents' }));
   }
   // CTA: scroll the expanded card's Automation config into view.
   function focusAutomation() {
