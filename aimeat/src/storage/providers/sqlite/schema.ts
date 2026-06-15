@@ -1343,7 +1343,8 @@ export function initializeSchema(db: Database.Database): void {
       completedAt     TEXT,
       deliverableKey  TEXT,
       rating          TEXT,
-      triage          TEXT
+      triage          TEXT,
+      automation      TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_agent_tasks_agent ON agent_tasks(agentGaii, status);
     CREATE INDEX IF NOT EXISTS idx_agent_tasks_owner ON agent_tasks(ownerGaii);
@@ -1511,6 +1512,9 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('agent_tasks', 'rating', 'TEXT');
   // Tasks-tab triage bucket: 'kept' | 'archived' | NULL (default/auto)
   safeAddColumn('agent_tasks', 'triage', 'TEXT');
+  // Ecosystem-app automation provenance/routing (B5/B6): JSON
+  // { recipeId, app, organism?, email?, requireApproval? } | NULL
+  safeAddColumn('agent_tasks', 'automation', 'TEXT');
 
   // Package instance status rename: 'active' -> 'installed'
   db.exec("UPDATE package_instances SET status = 'installed' WHERE status = 'active'");

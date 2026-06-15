@@ -610,6 +610,10 @@ export class Scheduler {
     rules?: string[];
     verification?: { userExpects?: string; technicalChecks?: string[] };
     resources?: { knowledgePackages?: string[]; memoryKeys?: string[]; memoryPrefixes?: string[] };
+    /** Ecosystem-app recipe provenance/routing (B5/B6). Stamped onto the task so the agent
+     *  knows WHERE to write its report (organism) and the completion hook knows whether to
+     *  email the owner / gate the output. Omitted for non-automation triggers. */
+    automation?: AgentTaskRecord['automation'];
   }): Promise<string> {
     const agent = await this.storage.getAgent(args.agentGaii);
     const autoActivated = agent?.mode === 'task-runner';
@@ -633,6 +637,7 @@ export class Scheduler {
       createdAt: now,
       updatedAt: now,
       lastEventAt: autoActivated ? now : undefined,
+      ...(args.automation ? { automation: args.automation } : {}),
     };
     const created = await this.storage.createAgentTask(record);
 

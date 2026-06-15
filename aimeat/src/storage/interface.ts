@@ -1774,6 +1774,17 @@ export interface AgentTaskRecord {
   //   'archived' -> owner archived it (or it auto-fell when older than the window)
   //   undefined  -> default: shown in Recent, auto-archives by age if enabled
   triage?: 'kept' | 'archived';
+  // Provenance + routing when this task was materialised by an ecosystem-app
+  // automation recipe (features B5/B6). Tells the agent WHERE to write its report
+  // (organism) and carries the downstream toggles the completion hook reads
+  // (email the owner, gate behind approval). Absent for normal/scheduled tasks.
+  automation?: {
+    recipeId: string;
+    app: string;
+    organism?: string | null;
+    email?: boolean;
+    requireApproval?: boolean;
+  };
 }
 
 export interface AgentTaskEventRecord {
