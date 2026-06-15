@@ -2,6 +2,7 @@
  * @file agent-task.ts
  * @description SQLite implementation for agent task CRUD, events, and stall detection
  * @version-history
+ *   v1.2.0 -- 2026-06-15 -- Persist the `automation` field (ecosystem-app recipe provenance/routing, B5/B6)
  *   v1.1.0 -- 2026-06-05 -- deleteAgentTask now removes any non-active task (was draft/queued only)
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  */
@@ -35,6 +36,7 @@ function deserializeTask(row: Record<string, unknown>): AgentTaskRecord {
   if (row.deliverableKey) record.deliverableKey = row.deliverableKey as string;
   if (row.rating) record.rating = JSON.parse(row.rating as string);
   if (row.triage) record.triage = row.triage as AgentTaskRecord['triage'];
+  if (row.automation) record.automation = JSON.parse(row.automation as string);
   return record;
 }
 
@@ -57,8 +59,8 @@ export function createAgentTask(db: Database.Database, record: AgentTaskRecord):
     `INSERT INTO agent_tasks
      (id, agentGaii, ownerGaii, title, description, scope, rules, verification,
       resources, todos, status, parentTaskId, workTrackingCode, telemetry,
-      lastEventAt, createdAt, updatedAt, completedAt, deliverableKey, rating, triage)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      lastEventAt, createdAt, updatedAt, completedAt, deliverableKey, rating, triage, automation)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     record.id,
     record.agentGaii,
@@ -81,6 +83,7 @@ export function createAgentTask(db: Database.Database, record: AgentTaskRecord):
     record.deliverableKey ?? null,
     record.rating ? JSON.stringify(record.rating) : null,
     record.triage ?? null,
+    record.automation ? JSON.stringify(record.automation) : null,
   );
   return record;
 }
@@ -168,7 +171,8 @@ export function updateAgentTask(
        title = ?, description = ?, scope = ?, rules = ?, verification = ?,
        resources = ?, todos = ?, status = ?, parentTaskId = ?,
        workTrackingCode = ?, telemetry = ?, lastEventAt = ?,
-       updatedAt = ?, completedAt = ?, deliverableKey = ?, rating = ?, triage = ?
+       updatedAt = ?, completedAt = ?, deliverableKey = ?, rating = ?, triage = ?,
+       automation = ?
      WHERE id = ?`
   ).run(
     merged.title,
@@ -188,6 +192,7 @@ export function updateAgentTask(
     merged.deliverableKey ?? null,
     merged.rating ? JSON.stringify(merged.rating) : null,
     merged.triage ?? null,
+    merged.automation ? JSON.stringify(merged.automation) : null,
     id,
   );
 

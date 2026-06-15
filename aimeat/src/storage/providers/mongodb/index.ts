@@ -38,6 +38,8 @@
  *                          scheduler.
  *   v1.7.0 — 2026-06-15 — Add EcoAutomationRecipe CRUD (feature B4): per-(owner, app)
  *                          rule materialising agent tasks on a matching data publish.
+ *   v1.8.0 — 2026-06-15 — Persist AgentTask `automation` (JSON) — ecosystem-app recipe
+ *                          provenance/routing for B5 (organism) + B6 (email on completion).
  */
 
 import { execSync } from 'node:child_process';
@@ -6233,6 +6235,7 @@ export class PrismaStorage implements Storage {
             deliverableKey: row.deliverableKey ?? undefined,
             rating: row.rating as AgentTaskRecord['rating'] ?? undefined,
             triage: (row.triage ?? undefined) as AgentTaskRecord['triage'],
+            automation: (row.automation ?? undefined) as AgentTaskRecord['automation'],
         };
     }
 
@@ -6271,7 +6274,8 @@ export class PrismaStorage implements Storage {
                 deliverableKey: record.deliverableKey ?? null,
                 rating: record.rating as any ?? null,
                 triage: record.triage ?? null,
-            },
+                automation: record.automation as any ?? null,
+            } as any,
         });
         return record;
     }
@@ -6355,7 +6359,8 @@ export class PrismaStorage implements Storage {
                     deliverableKey: merged.deliverableKey ?? null,
                     rating: merged.rating as any ?? null,
                     triage: merged.triage ?? null,
-                },
+                    automation: merged.automation as any ?? null,
+                } as any,
             });
             return this.toTaskRecord(row);
         } catch { return null; }
