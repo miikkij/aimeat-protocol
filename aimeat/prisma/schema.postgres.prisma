@@ -1077,6 +1077,8 @@ model EcosystemApp {
   boundRef      String?
   status        String   @default("pending")
   morselBalance Int      @default(0)
+  capabilities  Json?
+  automation    Json?
   createdAt     DateTime @default(now())
   lastSeen      DateTime @default(now())
 
@@ -1103,7 +1105,27 @@ model EcoAuth {
   pollInterval   Int       @default(5)
   approvedBy     String?
   validationResult Json?
+  capabilities   Json?
+  automation     Json?
   appCredentials Json?
+}
+
+// Ecosystem-app automation recipe (feature B4) — one per (owner, app).
+model EcoAutomationRecipe {
+  id              String   @id @default(cuid())
+  owner           String
+  app             String
+  trigger         Json
+  agents          Json
+  organism        String?
+  email           Boolean  @default(false)
+  requireApproval Boolean  @default(false)
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now())
+
+  @@unique([owner, app])
+  @@index([owner])
 }
 
 model OAuthClient {

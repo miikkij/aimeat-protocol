@@ -12,17 +12,24 @@
  *   - POST /v1/ecosystem-apps/:userCode/approve — owner approves/denies + selects scopes + data-areas
  *   - GET  /v1/ecosystem-apps            — owner lists their connected GEAIs
  *   - GET  /v1/ecosystem-apps/:app/data  — owner lists the memory the app wrote (its eco: namespace)
+ *   - GET/PUT/DELETE /v1/ecosystem-apps/:app/automation/recipe — owner's per-app automation recipe (B4)
  *   - DELETE /v1/ecosystem-apps/:app     — owner revokes a GEAI (status → revoked)
  * @usage app.use(ecosystemAppsRouter(config, storage));
  * @version-history
  *   v1.0.0 — 2026-06-14 — Created for ecosystem-apps foundation (chunk 1).
  *   v1.1.0 — 2026-06-15 — Add GET /v1/ecosystem-apps/:app/data — owner-scoped listing of the memory
  *     entries an ecosystem app wrote into its own eco: namespace (profile "Ecosystem apps" tab).
+ *   v1.2.0 — 2026-06-15 — Persist the manifest's declared `capabilities` (+ optional `automation`
+ *     hint) at hello, copy them onto the EcosystemApp at approve, and return them from
+ *     GET /v1/ecosystem-apps — enables scheduling an app capability on a cadence.
+ *   v1.3.0 — 2026-06-15 — Add the automation-recipe CRUD (feature B4): GET/PUT/DELETE
+ *     /v1/ecosystem-apps/:app/automation/recipe — the per-(owner, app) "data published → run agents"
+ *     rule. The downstream fields (organism/email/require_approval) are stored only (B5/B6/B7 defer).
  */
 import { Router } from 'express';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, EcoDataAreaGrant } from '../storage/interface.js';
+import type { Storage, EcoDataAreaGrant, EcosystemAppRecord, EcoAutomationRecipe } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateAppName, validateOwnerName, buildGEAI, generateUserCode } from '../utils/gaii.js';
@@ -104,6 +111,16 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage): Rou
       ? validateEcoManifest(app, requestedScopes, manifest, config.maxEcoScopes)
       : undefined;
 
+    // Persist the app's declared capabilities (+ optional automation hint) from the manifest so they
+    // carry forward to the EcosystemApp record at approval — the eco-capability scheduler needs them.
+    const manifestObj = (manifest && typeof manifest === 'object') ? manifest as Record<string, unknown> : undefined;
+    const capabilities = Array.isArray(manifestObj?.capabilities)
+      ? (manifestObj!.capabilities as EcosystemAppRecord['capabilities'])
+      : undefined;
+    const automation = (manifestObj?.automation && typeof manifestObj.automation === 'object')
+      ? (manifestObj.automation as EcosystemAppRecord['automation'])
+      : undefined;
+
     await storage.createEcoAuth({
       deviceCode,
       userCode,
@@ -120,6 +137,8 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage): Rou
       expiresAt: expiresAt.toISOString(),
       pollInterval: 5,
       validationResult,
+      capabilities,
+      automation,
     });
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -310,6 +329,9 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage): Rou
         dataAreas: finalAreas,
         boundRef: request.boundRef,
         status: 'active',
+        // Re-pin the capability contract from the (re-)hello manifest, when present.
+        capabilities: request.capabilities ?? existing.capabilities,
+        automation: request.automation ?? existing.automation,
         lastSeen: now,
       });
     } else {
@@ -325,6 +347,8 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage): Rou
         boundRef: request.boundRef,
         status: 'active',
         morselBalance: 0,
+        capabilities: request.capabilities,
+        automation: request.automation,
         createdAt: now,
         lastSeen: now,
       });
@@ -377,6 +401,8 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage): Rou
         data_areas: a.dataAreas ?? [],
         status: a.status,
         public_key: a.publicKey,
+        capabilities: a.capabilities ?? [],
+        automation: a.automation ?? null,
         created_at: a.createdAt,
         last_seen: a.lastSeen,
       })),
@@ -423,6 +449,117 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage): Rou
     }));
 
     res.json(success(config.nodeId, { items, total }));
+  });
+
+  // ── Automation recipe (feature B4): per-(owner, app) "data published → run agents" rule ──
+  // Owner config only (like the rest of the ecosystem tab). Keyed by the bare owner name + app.
+
+  /** Map a stored recipe to its API shape. */
+  function recipeToApi(r: EcoAutomationRecipe) {
+    return {
+      id: r.id,
+      app: r.app,
+      trigger: r.trigger,
+      agents: r.agents,
+      organism: r.organism ?? null,
+      email: !!r.email,
+      require_approval: !!r.requireApproval,
+      enabled: r.enabled,
+      created_at: r.createdAt,
+      updated_at: r.updatedAt,
+    };
+  }
+
+  /** Default trigger keyGlob from the app's automation hint (first schedulable.produces), else a sane fallback. */
+  function defaultKeyGlob(appRecord: EcosystemAppRecord): string {
+    const produces = appRecord.automation?.schedulable?.find(s => s.produces)?.produces;
+    if (produces) {
+      // A `produces` is typically a deposit key (or `schema@1`); turn a bare prefix into a glob.
+      return produces.includes('*') ? produces : `${produces}.*`;
+    }
+    return `eco.${appRecord.app}.*`;
+  }
+
+  // ── GET /v1/ecosystem-apps/:app/automation/recipe — the recipe (or null) ──
+  router.get('/v1/ecosystem-apps/:app/automation/recipe', requireAuth(), requireRole('owner'), async (req, res) => {
+    const app = req.params.app as string;
+    const owner = req.auth!.owner;
+    const recipe = await storage.getAutomationRecipe(owner, app);
+    res.json(success(config.nodeId, { recipe: recipe ? recipeToApi(recipe) : null }));
+  });
+
+  // ── PUT /v1/ecosystem-apps/:app/automation/recipe — upsert the recipe ──
+  router.put('/v1/ecosystem-apps/:app/automation/recipe', requireAuth(), requireRole('owner'), async (req, res) => {
+    const app = req.params.app as string;
+    const owner = req.auth!.owner;
+    const { agents, organism, email, require_approval, enabled, trigger } = req.body ?? {};
+
+    // The app must be one the owner actually connected.
+    const appRecord = await storage.getEcosystemAppByOwnerAndApp(owner, app);
+    if (!appRecord) {
+      res.status(404).json(error(config.nodeId, 'ECO_APP_NOT_FOUND', `Ecosystem app "${app}" not found under owner "${owner}"`));
+      return;
+    }
+
+    if (!Array.isArray(agents) || agents.some(a => typeof a !== 'string')) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'agents must be an array of agent names'));
+      return;
+    }
+    if (enabled !== undefined && typeof enabled !== 'boolean') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'enabled must be a boolean'));
+      return;
+    }
+
+    // Every named agent must be one of the owner's agents.
+    const ownerAgents = await storage.getAgentsByOwner(owner);
+    const knownNames = new Set(ownerAgents.map(a => a.name));
+    const unknown = (agents as string[]).filter(a => !knownNames.has(a));
+    if (unknown.length > 0) {
+      res.status(400).json(error(config.nodeId, 'UNKNOWN_AGENT', `Not your agent(s): ${unknown.join(', ')}`));
+      return;
+    }
+
+    // Resolve the trigger keyGlob: explicit body value wins, else the app's automation hint, else default.
+    let keyGlob: string;
+    if (trigger && typeof trigger === 'object' && typeof trigger.keyGlob === 'string' && trigger.keyGlob.trim()) {
+      keyGlob = trigger.keyGlob.trim();
+    } else {
+      keyGlob = defaultKeyGlob(appRecord);
+    }
+
+    const existing = await storage.getAutomationRecipe(owner, app);
+    const now = new Date().toISOString();
+    const recipe: EcoAutomationRecipe = {
+      id: existing?.id ?? randomUUID(),
+      owner,
+      app,
+      trigger: { kind: 'data-published', keyGlob },
+      agents: agents as string[],
+      organism: organism ?? null,
+      email: !!email,
+      requireApproval: !!require_approval,
+      enabled: enabled === undefined ? true : enabled,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    const saved = await storage.upsertAutomationRecipe(recipe);
+    res.json(success(config.nodeId, { recipe: recipeToApi(saved) }, [
+      { description: 'Read this automation recipe', method: 'GET', url: `/v1/ecosystem-apps/${app}/automation/recipe` },
+    ]));
+    emitChange('ecosystem-apps');
+  });
+
+  // ── DELETE /v1/ecosystem-apps/:app/automation/recipe — delete the recipe ──
+  router.delete('/v1/ecosystem-apps/:app/automation/recipe', requireAuth(), requireRole('owner'), async (req, res) => {
+    const app = req.params.app as string;
+    const owner = req.auth!.owner;
+    const deleted = await storage.deleteAutomationRecipe(owner, app);
+    if (!deleted) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No automation recipe for app "${app}"`));
+      return;
+    }
+    res.json(success(config.nodeId, { deleted: true, app }));
+    emitChange('ecosystem-apps');
   });
 
   // ── DELETE /v1/ecosystem-apps/:app — owner revokes a GEAI (status → revoked) ──

@@ -3,10 +3,11 @@
  * @description Owner-facing REST API for recurring agent/profile schedules. The
  *   server owns the clock (reuses the Scheduler + ScheduledJobRecord); this
  *   router lets the owner (and same-owner agents) create/list/edit/pause/cancel
- *   schedules and trigger them now. Three kinds are supported:
- *     - extension  : run an installed extension action (zero-token)
- *     - ai         : server-side OpenRouter completion over predefined memory keys
- *     - agent_task : materialise a task into an agent's queue on each fire
+ *   schedules and trigger them now. Four kinds are supported:
+ *     - extension       : run an installed extension action (zero-token)
+ *     - ai              : server-side OpenRouter completion over predefined memory keys
+ *     - agent_task      : materialise a task into an agent's queue on each fire
+ *     - eco-capability  : invoke a connected ecosystem app's capability over the connect-tunnel
  *   GET /v1/schedules also aggregates the owner's extension cron jobs and each
  *   agent's self-reported internal scheduler (agents.<name>.scheduler) for the
  *   master Profile › Scheduler view.
@@ -24,6 +25,8 @@
  *   app.use(schedulesRouter(config, storage, scheduler));
  * @version-history
  *   v1.0.0 — 2026-06-03 — Initial: agent/profile recurring schedules
+ *   v1.1.0 — 2026-06-15 — Add the `eco-capability` kind: schedule a connected ecosystem app's
+ *     capability; validates the app is connected and the capability is declared.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -40,8 +43,8 @@ import { emitChange } from '../services/event-bus.js';
 import { mergeConstraintDefaults, knownConstraintTypes } from '../services/schedule-constraints.js';
 import { logger } from '../utils/logger.js';
 
-type ScheduleKind = 'extension' | 'ai' | 'agent_task';
-const VALID_KINDS: ScheduleKind[] = ['extension', 'ai', 'agent_task'];
+type ScheduleKind = 'extension' | 'ai' | 'agent_task' | 'eco-capability';
+const VALID_KINDS: ScheduleKind[] = ['extension', 'ai', 'agent_task', 'eco-capability'];
 
 /** Validate a cron expression (or the @activate sentinel) using croner. */
 function isValidCron(cron: string, timezone?: string): boolean {
@@ -213,6 +216,28 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
           },
           resources: tmpl?.resources,
         },
+      };
+    } else if (kind === 'eco-capability') {
+      // Invoke a connected ecosystem app's capability over the connect-tunnel on each fire.
+      const app = typeof body.app === 'string' ? body.app : '';
+      const capabilityId = typeof body.capability_id === 'string' ? body.capability_id : '';
+      if (!app || !capabilityId) {
+        return { status: 400, code: 'INVALID_ECO_JOB', message: 'app and capability_id are required for eco-capability schedules' };
+      }
+      // The app must be connected under this owner.
+      const ecoApp = await storage.getEcosystemAppByOwnerAndApp(req.auth!.owner as string, app);
+      if (!ecoApp) {
+        return { status: 404, code: 'ECO_APP_NOT_FOUND', message: `Ecosystem app "${app}" is not connected for this owner` };
+      }
+      // The named capability must be one the app actually declared at approval.
+      const declared = (ecoApp.capabilities ?? []).map(c => c.id);
+      if (!declared.includes(capabilityId)) {
+        return { status: 400, code: 'CAPABILITY_NOT_DECLARED', message: `Ecosystem app "${app}" does not declare capability "${capabilityId}"` };
+      }
+      base.input = {
+        app,
+        capability_id: capabilityId,
+        input: (body.input && typeof body.input === 'object') ? body.input as Record<string, unknown> : {},
       };
     }
 

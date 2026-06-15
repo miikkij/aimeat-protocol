@@ -11,6 +11,11 @@
  *     "Run now" can report whether a task was created (and why not); agent_task
  *     overlap guard relaxed for manual triggers (only a genuinely running
  *     active/stalled occurrence defers it; archived tasks never block).
+ *   v2.2.0 — 2026-06-15 — Add the `eco-capability` kind: invoke a connected ecosystem app's
+ *     capability over the connect-tunnel each fire; an offline GEAI is a skip (no hot-loop).
+ *   v2.3.0 — 2026-06-15 — Expose a public materialiseAgentTask() (extracted wake fan-out from
+ *     executeAgentTaskJob) so the ecosystem-app automation recipe (feature B4) can spawn an agent
+ *     task on a data publish without duplicating the dispatch machinery.
  */
 import { Cron } from 'croner';
 import { randomUUID } from 'node:crypto';
@@ -23,6 +28,8 @@ import type { PushService } from './push.js';
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
 import { completeForOwner } from './ai-completion.js';
 import { getActiveWorkflowEngine } from './workflow/engine.js';
+import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { parseGaiiLoose, buildGEAI } from '../utils/gaii.js';
 import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
 import { emitChange } from './event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
@@ -293,6 +300,8 @@ export class Scheduler {
         run = await this.executeAgentTaskJob(job, trigger);
       } else if (job.type === 'workflow') {
         run = await this.executeWorkflowJob(job);
+      } else if (job.type === 'eco-capability') {
+        run = await this.executeEcoCapabilityJob(job);
       }
     } catch (err) {
       result = 'error';
@@ -582,6 +591,81 @@ export class Scheduler {
   }
 
   /**
+   * Materialise a one-off AgentTaskRecord into an agent's queue and wake it via the same
+   * webhook/MCP/SSE fan-out a scheduled `agent_task` uses. Public so other triggers (e.g. the
+   * ecosystem-app automation recipe, feature B4) can reuse the exact wake path without duplicating
+   * the dispatch machinery. `parentRef` is recorded as the task's parentTaskId (a recipe id here) so
+   * the lineage is visible; unlike the scheduled path there is NO overlap guard — each trigger
+   * deposit produces a fresh task occurrence. Best-effort wake (offline agents pick it up on
+   * reconnect). Returns the created task id.
+   */
+  async materialiseAgentTask(args: {
+    owner: string;            // owner GHII (e.g. alice@node)
+    agentGaii: string;        // the target agent's full GAII
+    agentName: string;        // the agent's bare name (for the MCP resource URI)
+    parentRef: string;        // recorded as parentTaskId (the recipe id) for lineage
+    title: string;
+    description?: string;
+    scope?: AgentTaskScope[];
+    rules?: string[];
+    verification?: { userExpects?: string; technicalChecks?: string[] };
+    resources?: { knowledgePackages?: string[]; memoryKeys?: string[]; memoryPrefixes?: string[] };
+  }): Promise<string> {
+    const agent = await this.storage.getAgent(args.agentGaii);
+    const autoActivated = agent?.mode === 'task-runner';
+    const now = new Date().toISOString();
+    const record: AgentTaskRecord = {
+      id: randomUUID(),
+      agentGaii: args.agentGaii,
+      ownerGaii: args.owner,
+      title: args.title,
+      description: args.description ?? '',
+      scope: args.scope ?? [],
+      rules: args.rules ?? [],
+      verification: {
+        userExpects: args.verification?.userExpects ?? '',
+        technicalChecks: args.verification?.technicalChecks ?? [],
+      },
+      resources: args.resources,
+      todos: [],
+      status: autoActivated ? 'active' : 'queued',
+      parentTaskId: args.parentRef,
+      createdAt: now,
+      updatedAt: now,
+      lastEventAt: autoActivated ? now : undefined,
+    };
+    const created = await this.storage.createAgentTask(record);
+
+    if (autoActivated) {
+      await this.storage.appendTaskEvent({
+        id: randomUUID(),
+        taskId: record.id,
+        type: 'started',
+        message: `Task auto-activated from automation recipe "${args.parentRef}"`,
+        timestamp: now,
+      }).catch(() => { /* best-effort */ });
+    }
+
+    const eventName = autoActivated ? 'task.approved' : 'task.queued';
+    if (this.webhookDispatcher) {
+      this.webhookDispatcher.dispatchWebhookEvent(args.agentGaii, eventName, {
+        task_id: record.id,
+        title: record.title,
+        description: record.description ?? '',
+        has_todos: false,
+        todo_count: 0,
+        scope_summary: record.scope.slice(0, 5).map(s => `${s.type || s.name}:${s.value}`),
+        created_at: record.createdAt,
+        auto_activated: autoActivated,
+      });
+    }
+    try { emitResourceUpdated(args.agentGaii, `aimeat://agents/${args.agentName}/tasks`); } catch { /* MCP not connected */ }
+    emitChange('agent-tasks');
+
+    return created.id;
+  }
+
+  /**
    * `workflow` kind: fire one Agent Workflow run. The schedule is just the trigger; the deterministic
    * engine owns the run loop (dispatch + two-sided signal checks + advance). `input.workflowId`
    * names the workflow; `ownerScope` is the owner GHII it belongs to.
@@ -595,6 +679,49 @@ export class Scheduler {
     const result = await engine.startRun(owner, owner.split('@')[0], workflowId, { mode: 'full-live' });
     if ('error' in result) throw new Error(`workflow run failed to start: ${result.error.join('; ')}`);
     return { reads: [], writes: [`workflows.run.${workflowId}.${result.runId}`] };
+  }
+
+  /**
+   * `eco-capability` kind: invoke a connected ecosystem app's (GEAI) capability over the
+   * connect-tunnel on each fire. `input` is `{ app, capability_id, input? }`; `ownerScope` is the
+   * owner GHII whose binding to drive. AIMEAT authenticates the owner as caller; the ecosystem
+   * enforces its OWN ACL. When the GEAI is offline at fire time the run is SKIPPED (not an error) so
+   * it does not hot-loop — the next scheduled fire retries.
+   */
+  private async executeEcoCapabilityJob(job: ScheduledJobRecord): Promise<JobRunResult> {
+    const owner = job.ownerScope;
+    if (!owner) throw new Error(`eco-capability job "${job.id}" missing ownerScope`);
+    const cfg = (job.input ?? {}) as { app?: string; capability_id?: string; input?: Record<string, unknown> };
+    const app = cfg.app;
+    const capabilityId = cfg.capability_id;
+    if (!app || !capabilityId) {
+      throw new Error(`eco-capability job "${job.id}" missing app/capability_id in input`);
+    }
+
+    const ownerName = parseGaiiLoose(owner).owner;
+    const geai = buildGEAI(app, ownerName, this.config.nodeId);
+    const caller = `${ownerName}@${this.config.nodeId}`;
+
+    const mgr = getActiveConnectTunnelManager();
+    if (!mgr) {
+      // No tunnel server running — skip rather than error (nothing to invoke against).
+      return { reads: [], writes: [], skipped: true, skipReason: 'connect-tunnel unavailable' };
+    }
+
+    try {
+      const reply = await mgr.invokeOnPrincipal(geai, { capability: capabilityId, input: cfg.input ?? {}, caller });
+      if (!reply.ok) {
+        throw new Error(`Ecosystem app "${app}" refused or failed capability "${capabilityId}"`);
+      }
+      return { reads: [], writes: [`eco.${app}.${capabilityId}`] };
+    } catch (err) {
+      // The GEAI being offline at fire time is a SKIP, not an error — don't hot-loop; retry next fire.
+      const code = (err as { code?: string }).code;
+      if (code === 'ECOSYSTEM_OFFLINE') {
+        return { reads: [], writes: [], skipped: true, skipReason: `app "${app}" offline` };
+      }
+      throw err;
+    }
   }
 
   private async executeCoreJob(job: ScheduledJobRecord): Promise<void> {

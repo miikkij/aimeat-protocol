@@ -119,8 +119,50 @@ export interface EcosystemAppRecord {
   status: 'validating' | 'pending' | 'approved' | 'active' | 'revoked';
   /** Always 0 — balance lives on the owner GHII (schema parity with AgentRecord). */
   morselBalance: number;
+  /**
+   * The app's declared capabilities, copied from the validated hello manifest at approval. Lets the
+   * node enforce that a scheduled `eco-capability` job names a capability the app actually provides,
+   * and lets the portal render the Automation controls. Stored as a JSON column in both backends.
+   */
+  capabilities?: { id: string; inputSchema?: Record<string, unknown>; outputSchema?: Record<string, unknown> }[];
+  /**
+   * Optional automation hints from the manifest: which capabilities are schedulable (and at what
+   * cadences) + an optional advisory sink. A HINT only — never required for an owner to schedule.
+   */
+  automation?: { schedulable?: { id: string; produces?: string; cadences?: string[] }[]; advisory_sink?: string };
   createdAt: string;
   lastSeen: string;
+}
+
+/**
+ * EcoAutomationRecipe — a per-(owner, app) automation rule (feature B4). When a connected ecosystem
+ * app publishes refined data (a memory write whose key matches `trigger.keyGlob`), the recipe
+ * materialises an agent task for EACH configured agent so the owner's agents reason over the fresh
+ * data. The downstream fields (`organism`, `email`, `requireApproval`) are STORED here but their
+ * enforcement is deferred to B5/B6/B7 — only the agent trigger is wired in B4. Keyed by bare owner
+ * name + app (one recipe per app per owner). `trigger`/`agents` persist as JSON columns in both
+ * backends, mirroring how EcosystemAppRecord.capabilities/automation are stored.
+ */
+export interface EcoAutomationRecipe {
+  id: string;
+  /** Bare owner name this recipe belongs to (membership/identity keyed by bare owner, per CLAUDE.md). */
+  owner: string;
+  /** The ecosystem app's {app} segment, e.g. 'feedback-desk'. */
+  app: string;
+  /** What fires the recipe: a memory write (the app's data deposit) matching `keyGlob`. */
+  trigger: { kind: 'data-published'; keyGlob: string };
+  /** Names of the owner's agents to run when the trigger fires. */
+  agents: string[];
+  /** B5 (deferred) — organism/workspace to route the agent's output to. Stored, not yet enforced. */
+  organism?: string | null;
+  /** B6 (deferred) — email the report to the owner. Stored, not yet enforced. */
+  email?: boolean;
+  /** B7 (deferred) — gate the agent's advisory output behind owner approval. Stored, not yet enforced. */
+  requireApproval?: boolean;
+  /** When false, the trigger never materialises tasks for this recipe. */
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface MemoryRecord {
@@ -310,6 +352,13 @@ export interface EcoAuthorizationRecord {
     checks: { name: string; ok: boolean; detail?: string }[];
     validatedAt: string;
   };
+  /**
+   * The capabilities declared in the submitted manifest (stored at hello, copied onto the
+   * EcosystemAppRecord at approval). Lets the binding carry the capability contract forward.
+   */
+  capabilities?: { id: string; inputSchema?: Record<string, unknown>; outputSchema?: Record<string, unknown> }[];
+  /** Optional automation hints from the manifest (schedulable capabilities + advisory sink). */
+  automation?: { schedulable?: { id: string; produces?: string; cadences?: string[] }[]; advisory_sink?: string };
   appCredentials?: {
     geai: string;
     /** The app's TOFU-pinned verification key (echoed back; the app already holds its private half). */
@@ -1035,8 +1084,11 @@ export interface ScheduledJobRecord {
    * 'core'/'extension' are the original server-run kinds. 'ai' runs a
    * server-side OpenRouter completion (zero agent involvement); 'agent_task'
    * materialises an AgentTaskRecord into the target agent's queue on each fire.
+   * 'eco-capability' invokes a connected ecosystem app's (GEAI) capability over
+   * the connect-tunnel on each fire — its `input` is
+   * `{ app: string; capability_id: string; input?: Record<string,unknown> }`.
    */
-  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow';
+  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow' | 'eco-capability';
   extensionName?: string;
   instanceId?: string;
   actionId?: string;
@@ -1079,7 +1131,7 @@ export interface ExecutionLogEntry {
   id: string;
   jobId: string;
   jobName: string;
-  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow';
+  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow' | 'eco-capability';
   extensionName?: string;
   actionId?: string;
   trigger: 'cron' | 'manual' | 'activate';
