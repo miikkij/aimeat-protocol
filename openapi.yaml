@@ -3913,9 +3913,16 @@ paths:
           description: The advisory was already resolved (ALREADY_RESOLVED).
   /v1/ecosystem-apps/{app}:
     delete:
-      operationId: ecosystemAppRevoke
-      summary: Revoke a GEAI (owner)
-      description: Sets the GEAI's status to `revoked`. The owner's refined data is untouched (peer sovereignty).
+      operationId: ecosystemAppDelete
+      summary: Disconnect (hard-delete) a GEAI binding (owner)
+      description: |
+        HARD-DELETES the GEAI binding: emits `binding.revoked` to the app first (so it drops its side),
+        then removes the GEAI principal row entirely — the app disappears from `GET /v1/ecosystem-apps`
+        (no lingering `revoked` ghost). The app's owned automation config is also cleaned up: its
+        automation recipe, its `eco-capability` schedules, and any pending (awaiting-approval) advisories.
+        The owner's DEPOSITED refined data (the app's `eco:` writes into the owner's Memory, e.g.
+        `feedback.stats.*`) is PRESERVED (peer sovereignty). Re-onboarding the app later starts over
+        from scratch (a brand-new record). Returns `{ deleted: true, app, geai }`.
       tags: [Ecosystem Apps]
       security:
         - BearerAuth: []
@@ -3924,10 +3931,10 @@ paths:
           in: path
           required: true
           schema: { type: string }
-          description: The app name of the GEAI to revoke.
+          description: The app name of the GEAI to disconnect.
       responses:
         '200':
-          description: Revoked.
+          description: Deleted. Response data is `{ deleted: true, app, geai }`.
         '403':
           description: Owner role required.
         '404':

@@ -489,7 +489,7 @@
       "loadError": "Ekosysteemisovelluksia ei voitu ladata.",
       "approved": "Ekosysteemisovellus hyväksytty.",
       "approveError": "Pyyntöä ei voitu käsitellä.",
-      "revoked": "Yhteys appiin poistettu.",
+      "revoked": "Appi poistettu.",
       "revokeError": "Yhteyttä ei voitu poistaa.",
       "revokeReconnectHint": "Tämän appin yhteys on poistettu. Datasi yllä jää sinulle. Yhdistääksesi uudelleen: yhdistä appi uudestaan sen omasta päästä — AIMEAT kiinnittää sen tunnisteen ja lukee asetukset (tallennusavain, kyvykkyydet) automaattisesti uudelleen.",
       "subError": "Tilausta ei voitu päivittää.",
@@ -651,7 +651,7 @@
       "advLoading": "Ladataan suosituksia…",
       "revoke": "Poista yhteys",
       "revokeTitle": "Poista yhteys: {app}",
-      "revokeWarn": "Tämä poistaa appin yhteyden tiliisi. Datasi jää sinulle, ja voit yhdistää appin uudelleen myöhemmin. Kirjoita appin nimi ({app}) vahvistaaksesi.",
+      "revokeWarn": "Tämä poistaa appin kokonaan listalta. Datasi säilyy Muistissasi. Voit yhdistää sen myöhemmin uudelleen appin omasta päästä — silloin se aloittaa puhtaalta pöydältä. Kirjoita appin nimi ({app}) vahvistaaksesi.",
       "validation": {
         "validated": "validoitu",
         "failed": "validointi epäonnistui",

@@ -16,8 +16,9 @@
  *   - GET  /v1/ecosystem-apps/:app/advisories/pending — owner lists gated advisories awaiting approval (B7)
  *   - POST /v1/ecosystem-apps/:app/advisories/:id/approve — approve → deliver over the tunnel (B8)
  *   - POST /v1/ecosystem-apps/:app/advisories/:id/reject  — reject → drop the advisory (B7)
- *   - DELETE /v1/ecosystem-apps/:app     — owner revokes a GEAI (status → revoked)
- * @usage app.use(ecosystemAppsRouter(config, storage));
+ *   - DELETE /v1/ecosystem-apps/:app     — owner HARD-DELETES a GEAI binding (row removed + recipe/
+ *     eco-capability schedules/pending advisories cleaned up; deposited data preserved)
+ * @usage app.use(ecosystemAppsRouter(config, storage, scheduler));
  * @version-history
  *   v1.0.0 — 2026-06-14 — Created for ecosystem-apps foundation (chunk 1).
  *   v1.1.0 — 2026-06-15 — Add GET /v1/ecosystem-apps/:app/data — owner-scoped listing of the memory
@@ -33,11 +34,17 @@
  *     invokes the app's `deliver-advisory` capability over the connector tunnel; reject drops it. The
  *     pending list is owner-namespace memory (eco.<app>.advisory.pending.<id>) drained by
  *     ecosystem-automation-advisories.ts on task completion — reuses the existing surface, not a new inbox.
+ *   v1.5.0 — 2026-06-16 — DELETE /v1/ecosystem-apps/:app is now a HARD DELETE: emit binding.revoked,
+ *     remove the GEAI principal row (so the card disappears — no 'revoked' ghost), and clean up the
+ *     app-owned automation config (recipe + eco-capability schedules + pending advisories). The
+ *     owner's deposited insight data is preserved. Re-onboarding starts over from scratch. The router
+ *     now takes the Scheduler to cancel the app's eco-capability cron jobs.
  */
 import { Router } from 'express';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, EcoDataAreaGrant, EcosystemAppRecord, EcoAutomationRecipe } from '../storage/interface.js';
+import type { Scheduler } from '../services/scheduler.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateAppName, validateOwnerName, buildGEAI, generateUserCode } from '../utils/gaii.js';
@@ -63,7 +70,7 @@ function scopesWithinCeiling(requested: string[], ceiling: string[]): string[] {
   });
 }
 
-export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage): Router {
+export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, scheduler: Scheduler): Router {
   const router = Router();
 
   // ── POST /v1/ecosystem-apps/hello — start the "hello integration" handshake ──
@@ -687,20 +694,51 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage): Rou
     emitChange('ecosystem-apps');
   });
 
-  // ── DELETE /v1/ecosystem-apps/:app — owner revokes a GEAI (status → revoked) ──
+  // ── DELETE /v1/ecosystem-apps/:app — owner HARD-DELETES a GEAI binding ──
+  // "When I delete, it deletes — I never see it again; reconnecting starts over from scratch."
+  // We (1) tell the app FIRST so its side drops the binding, (2) remove the principal row so the
+  // card vanishes from the list (no lingering 'revoked' ghost), and (3) clean up the app-owned
+  // automation config (recipe + eco-capability schedules + pending advisories). The owner's
+  // DEPOSITED insight data (e.g. feedback.stats.*) is the owner's refined data and is PRESERVED.
   router.delete('/v1/ecosystem-apps/:app', requireAuth(), requireRole('owner'), async (req, res) => {
     const app = req.params.app as string;
-    const record = await storage.getEcosystemAppByOwnerAndApp(req.auth!.owner, app);
+    const owner = req.auth!.owner;
+    const record = await storage.getEcosystemAppByOwnerAndApp(owner, app);
     if (!record) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Ecosystem app "${app}" not found under owner "${req.auth!.owner}"`));
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Ecosystem app "${app}" not found under owner "${owner}"`));
       return;
     }
-    // Lifecycle outbound event FIRST (best-effort) — emit while the grant is still active so the
-    // live grant re-check passes; the status flip to 'revoked' then stops all further delivery.
-    const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
+    const ownerGhii = `${owner}@${config.nodeId}`;
+
+    // 1) Lifecycle outbound event FIRST (best-effort) — emit while the grant is still present so the
+    //    live grant re-check passes; the connected app/desk reacts to binding.revoked and drops its side.
     await emitEcosystemBindingRevoked(storage, config, ownerGhii, record.geai, 'owner_revoked').catch(() => { /* best-effort */ });
-    await storage.updateEcosystemApp(record.geai, { status: 'revoked', lastSeen: new Date().toISOString() });
-    res.json(success(config.nodeId, { revoked: true, app, geai: record.geai }));
+
+    // 2) Hard-delete the GEAI principal row → the app disappears from GET /v1/ecosystem-apps entirely.
+    await storage.deleteEcosystemApp(record.geai);
+
+    // 3a) Remove the app's automation recipe (the "data published → run agents" rule), if any.
+    await storage.deleteAutomationRecipe(owner, app).catch(() => { /* best-effort */ });
+
+    // 3b) Remove the app's eco-capability schedules (cron jobs that invoke this app's capability).
+    const jobs = await storage.listScheduledJobs({ type: 'eco-capability', ownerScope: ownerGhii }).catch(() => []);
+    for (const job of jobs) {
+      if ((job.input as { app?: string } | undefined)?.app === app) {
+        scheduler.removeJob(job.id);
+        await storage.deleteScheduledJob(job.id).catch(() => { /* best-effort */ });
+      }
+    }
+
+    // 3c) Drop any pending (awaiting-approval) advisories parked in owner memory for this app.
+    const pendingItems = await storage.listMemory(ownerGhii, { prefix: pendingPrefix(app) }).catch(() => []);
+    for (const item of pendingItems) {
+      await storage.deleteMemory(ownerGhii, item.key).catch(() => { /* best-effort */ });
+    }
+
+    // NOTE: the app's DEPOSITED insight data (its eco: namespace writes into the owner's Memory)
+    // is the owner's refined data and is intentionally LEFT IN PLACE.
+
+    res.json(success(config.nodeId, { deleted: true, app, geai: record.geai }));
     emitChange('ecosystem-apps');
   });
 
