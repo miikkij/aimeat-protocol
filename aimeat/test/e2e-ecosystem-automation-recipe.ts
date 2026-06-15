@@ -28,6 +28,10 @@
  *     requireApproval=true moves the advisory to pending (payload survives), approve returns 202
  *     offline-retry + stays pending with no tunnel, reject drops it. Live tunnel needed for a 200
  *     `delivery: delivered` + the immediate-delivery happy path (documented inline).
+ *   v1.3.0 — 2026-06-15 — The hello manifest now carries automation.schedulable[].produces_key
+ *     ('feedback.stats', the deposit KEY PREFIX) alongside produces ('feedback-stats@1', a schema ref);
+ *     added a test asserting a PUT with NO trigger derives the default keyGlob from produces_key
+ *     (so the recipe actually fires on the app's deposit key).
  */
 
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ecosystem-automation-recipe
@@ -118,7 +122,9 @@ await test('App says hello with an automation hint', async () => {
       manifest: {
         app: APP, scopes: ['memory:read', 'memory:write'],
         capabilities: [{ id: 'publish-stats' }],
-        automation: { schedulable: [{ id: 'publish-stats', produces: 'feedback.stats', cadences: ['weekly'] }] },
+        // `produces` is a SCHEMA ref (NOT a deposit key); `produces_key` is the deposit KEY PREFIX.
+        // The node's defaultKeyGlob must prefer produces_key so the trigger glob actually matches.
+        automation: { schedulable: [{ id: 'publish-stats', produces: 'feedback-stats@1', produces_key: 'feedback.stats', cadences: ['weekly'] }] },
       },
     }),
   });
@@ -186,6 +192,18 @@ await test('PUT again (upsert) keeps the same recipe id', async () => {
   });
   assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
   assert(body.data.recipe.id === id1, `upsert should keep id ${id1}, got ${body.data.recipe.id}`);
+});
+
+await test('PUT with NO trigger → default keyGlob derives from automation produces_key', async () => {
+  // Omit trigger entirely: the node must derive the default glob from the app's automation hint,
+  // preferring produces_key ('feedback.stats') over produces ('feedback-stats@1', a schema ref).
+  const { status, body } = await json(`/v1/ecosystem-apps/${APP}/automation/recipe`, {
+    method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ agents: [AGENT], enabled: true }),
+  });
+  assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  assert(body.data.recipe.trigger.keyGlob === 'feedback.stats.*',
+    `default keyGlob must come from produces_key, got: ${body.data.recipe.trigger.keyGlob}`);
 });
 
 // ─── (b) Unknown agent → rejected ───

@@ -552,6 +552,8 @@
       "recipeIntro": "Build an automatic recipe: when this app publishes new data, hand it to your agents, optionally store the results in an organism and email you the report.",
       "recipeLoading": "Loading recipe…",
       "recipeTriggerOn": "Triggers on",
+      "recipeTriggerLabel": "Trigger key pattern",
+      "recipeTriggerHelp": "The recipe runs when this app writes a memory key matching this pattern (e.g. feedback.stats.*).",
       "recipeAgents": "Process with agents",
       "recipeAgentsEmpty": "You have no agents yet. Connect an agent first, then return here.",
       "recipeOrganism": "Store results in organism",

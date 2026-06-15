@@ -38,6 +38,10 @@
  *     per-schedule run-history log expander (<EcoScheduleLog>, GET /v1/schedules/:id) listing recent
  *     runs incl. SKIPPED ones with their reason/duration/trigger; (3) the read-only cadence chip is
  *     now an editable <select> that PATCHes the cron of an existing schedule (custom crons preserved).
+ *   v1.8.0 — 2026-06-15 — Make the recipe trigger keyGlob EDITABLE: the read-only "Triggers on" line is
+ *     now a text input prefilled from the recipe's stored keyGlob, else derived from the app's automation
+ *     hint (defaultTriggerGlob — prefers produces_key over produces), with a help line. Save now sends
+ *     trigger:{keyGlob}. Fixes recipes never firing because the default glob didn't match the deposit key.
  *   v1.6.0 — 2026-06-15 — Add the "Pending advisories" approval surface (B7/B8): <EcoPendingAdvisories>
  *     under Automation. Lists the recipe's gated agent-produced advisories awaiting approval; each shows
  *     title + kind/severity chips + effective dates + the body rendered readably via <JsonValue> (never
@@ -153,6 +157,20 @@ function EcoScheduleLog({ jobId, refreshKey }) {
 }
 
 /**
+ * Derive the default trigger keyGlob from the app's automation hint. Mirrors the node's
+ * defaultKeyGlob (routes/ecosystem-apps.ts): prefer `produces_key` (the deposit KEY PREFIX,
+ * e.g. `feedback.stats`) over `produces` (a SCHEMA ref, e.g. `feedback-stats@1`, which is NOT a
+ * deposit key); turn a bare prefix into a glob, else fall back to `eco.{app}.*`.
+ */
+function defaultTriggerGlob(app) {
+  const schedulable = app?.automation?.schedulable || [];
+  const entry = schedulable.find(s => s.produces_key) || schedulable.find(s => s.produces);
+  const base = entry?.produces_key || entry?.produces;
+  if (base) return base.includes('*') ? base : `${base}.*`;
+  return `eco.${app?.app}.*`;
+}
+
+/**
  * The recipe config block (B4): the owner's per-(owner,app) "when this app publishes data" recipe.
  * Process-with-agents checklist (the owner's agents), store-in-organism dropdown (the owner's
  * organisms + None), email toggle, approve/push delivery radio, an Enabled master toggle and Save.
@@ -163,7 +181,7 @@ function EcoRecipeConfig({ app, showToast }) {
   const [loaded, setLoaded] = useState(false);
   const [agents, setAgents] = useState([]);
   const [orgs, setOrgs] = useState([]);
-  const [triggerGlob, setTriggerGlob] = useState('');   // resolved server-side keyGlob (read-only)
+  const [triggerGlob, setTriggerGlob] = useState('');   // editable trigger keyGlob (recipe value, else derived default)
   const [saving, setSaving] = useState(false);
   // Editable recipe state.
   const [selAgents, setSelAgents] = useState([]);        // selected agent names
@@ -187,7 +205,9 @@ function EcoRecipeConfig({ app, showToast }) {
       setEmail(!!recipe.email);
       setRequireApproval(!!recipe.require_approval);
       setEnabled(!!recipe.enabled);
-      setTriggerGlob(recipe.trigger?.keyGlob || '');
+      setTriggerGlob(recipe.trigger?.keyGlob || defaultTriggerGlob(app));
+    } else {
+      setTriggerGlob(defaultTriggerGlob(app));
     }
     setLoaded(true);
   };
@@ -214,6 +234,7 @@ function EcoRecipeConfig({ app, showToast }) {
         email,
         require_approval: requireApproval,
         enabled,
+        trigger: { keyGlob: triggerGlob.trim() },
       });
       showToast?.(t('profile.ecosystem.recipeSaved'), 'success');
       await load();
@@ -233,11 +254,17 @@ function EcoRecipeConfig({ app, showToast }) {
       <div class="pf-eco-recipe-head">${t('profile.ecosystem.recipeTitle')}</div>
       <p class="pf-eco-dim pf-eco-recipe-intro">${t('profile.ecosystem.recipeIntro')}</p>
 
-      ${triggerGlob && html`
-        <div class="pf-eco-recipe-trigger">
-          <span class="pf-eco-dim">${t('profile.ecosystem.recipeTriggerOn')}:</span>
-          <span class="pf-eco-mono">${triggerGlob}</span>
-        </div>`}
+      <div class="pf-eco-recipe-row">
+        <label class="pf-eco-recipe-label">${t('profile.ecosystem.recipeTriggerLabel')}</label>
+        <input
+          type="text"
+          class="pf-eco-recipe-trigger-input pf-eco-mono"
+          value=${triggerGlob}
+          placeholder=${defaultTriggerGlob(app)}
+          onInput=${e => setTriggerGlob(e.target.value)}
+        />
+        <p class="pf-eco-dim pf-eco-recipe-trigger-help">${t('profile.ecosystem.recipeTriggerHelp')}</p>
+      </div>
 
       <div class="pf-eco-recipe-row">
         <label class="pf-eco-recipe-label">${t('profile.ecosystem.recipeAgents')}</label>

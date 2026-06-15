@@ -3598,7 +3598,8 @@ paths:
                                     type: object
                                     properties:
                                       id: { type: string }
-                                      produces: { type: string }
+                                      produces: { type: string, description: "Schema ref the capability emits (e.g. `feedback-stats@1`)." }
+                                      produces_key: { type: string, description: "Deposit key prefix the capability writes to (e.g. `feedback.stats`). Used to derive the automation-recipe trigger keyGlob." }
                                       cadences: { type: array, items: { type: string } }
                                 advisory_sink: { type: string }
                             created_at: { type: string, format: date-time }

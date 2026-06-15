@@ -12,6 +12,8 @@
  *   v1.0.0 — 2026-06-14 — Created for the connector-profile static-validation slice (chunk 4).
  *   v1.1.0 — 2026-06-15 — Accept an optional `automation` hint (schedulable capabilities + sink)
  *     for the eco-capability scheduler. Not required; purely a hint.
+ *   v1.2.0 — 2026-06-15 — Accept `automation.schedulable[].produces_key` (deposit key prefix) so the
+ *     node can derive the automation-recipe trigger keyGlob correctly.
  */
 import { z } from 'zod';
 import { validateAppName } from '../utils/gaii.js';
@@ -35,6 +37,9 @@ export const EcoManifestSchema = z.object({
     schedulable: z.array(z.object({
       id: z.string().min(1).max(120),
       produces: z.string().max(200).optional(),
+      // The deposit KEY PREFIX this capability writes to (e.g. `feedback.stats`), used to derive the
+      // automation-recipe trigger keyGlob. Distinct from `produces` (a SCHEMA ref, e.g. `feedback-stats@1`).
+      produces_key: z.string().max(200).optional(),
       cadences: z.array(z.string().max(120)).max(20).optional(),
     })).max(100).optional(),
     advisory_sink: z.string().max(200).optional(),
