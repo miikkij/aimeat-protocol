@@ -3,13 +3,15 @@
  * @description AIMEAT Ecosystem Apps (GEAI) service — the owner-facing API layer for the profile
  *   "Ecosystem apps" tab. Wraps the /v1/ecosystem-apps + /v1/ecosystem endpoints (the GEAI
  *   onboarding handshake, the connected-app list, outbound event subscriptions, and revoke).
- * @structure listEcosystemApps · listAppData · listPending · approve · revoke · listSubscriptions · subscribe · unsubscribe
+ * @structure listEcosystemApps · listAppData · listPending · approve · revoke · listSubscriptions · subscribe · unsubscribe · getAutomationRecipe · putAutomationRecipe · deleteAutomationRecipe
  * @usage import { listEcosystemApps, approve } from '/js/services/ecosystem.js';
  * @version-history
  *   v1.0.0 — 2026-06-14 — Created for the Ecosystem apps profile tab (chunk 6).
  *   v1.1.0 — 2026-06-15 — Add listAppData() — the memory an app wrote (GET /v1/ecosystem-apps/:app/data).
+ *   v1.2.0 — 2026-06-15 — Add the per-(owner,app) automation RECIPE (B4): getAutomationRecipe / putAutomationRecipe /
+ *     deleteAutomationRecipe wrap GET/PUT/DELETE /v1/ecosystem-apps/:app/automation/recipe.
  */
-import { apiGet, apiPost, apiDelete } from '/js/api.js';
+import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 
 /** The owner's connected GEAIs. Returns an array. */
 export async function listEcosystemApps() {
@@ -59,4 +61,22 @@ export async function subscribe(app, event, match) {
 export async function unsubscribe(app, event) {
   const q = `?app=${encodeURIComponent(app)}${event ? `&event=${encodeURIComponent(event)}` : ''}`;
   return apiDelete(`/v1/ecosystem/subscriptions${q}`);
+}
+
+// ── Automation recipe (B4): the per-(owner,app) "when this app publishes data" recipe ──
+
+/** The owner's automation recipe for one app, or null if none is configured yet. */
+export async function getAutomationRecipe(app) {
+  const data = await apiGet(`/v1/ecosystem-apps/${encodeURIComponent(app)}/automation/recipe`);
+  return data?.data?.recipe ?? null;
+}
+
+/** Upsert the automation recipe for an app. body: { agents, organism?, email?, requireApproval?, enabled, trigger? }. */
+export async function putAutomationRecipe(app, body) {
+  return apiPut(`/v1/ecosystem-apps/${encodeURIComponent(app)}/automation/recipe`, body);
+}
+
+/** Delete the automation recipe for an app. */
+export async function deleteAutomationRecipe(app) {
+  return apiDelete(`/v1/ecosystem-apps/${encodeURIComponent(app)}/automation/recipe`);
 }

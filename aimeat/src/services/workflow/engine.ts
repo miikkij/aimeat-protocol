@@ -20,14 +20,18 @@
  * @version-history
  *   v1.0.0 — 2026-06-13 — Phase 4: state machine (signals-only + full-live), dispatch, task-terminal
  *     advance, notBefore-backoff retry + timeout via the watchdog sweep, restart recovery.
+ *   v1.1.0 — 2026-06-15 — Finish notification: terminal full-live runs of a notify_on_finish workflow
+ *     drop an in-app + (when configured) email notification with outcome + per-step log, once.
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskScope } from '../../storage/interface.js';
 import type { createWebhookDispatcher } from '../webhook-dispatcher.js';
 import type { PushService } from '../push.js';
+import type { EmailService } from '../email.js';
 import { buildGAII } from '../../utils/gaii.js';
 import { emitChange } from '../event-bus.js';
+import { notify } from '../notify.js';
 import { logger } from '../../utils/logger.js';
 import { evaluateSignal, globToRegExp, type SignalEvalCtx } from './signal-eval.js';
 import { buildEvalCtx } from './eval-context.js';
@@ -86,6 +90,7 @@ export class WorkflowEngine {
   private storage: Storage;
   private webhookDispatcher?: WebhookDispatcher;
   private pushService?: PushService;
+  private emailService?: EmailService;
   /** Per-run serialization: advancing the same run from two task completions is a RMW race. */
   private locks = new Map<string, Promise<void>>();
   private sweepTimer?: ReturnType<typeof setInterval>;
@@ -97,6 +102,7 @@ export class WorkflowEngine {
 
   setWebhookDispatcher(d: WebhookDispatcher): void { this.webhookDispatcher = d; }
   setPushService(p: PushService): void { this.pushService = p; }
+  setEmailService(e: EmailService): void { this.emailService = e; }
 
   /** Start the watchdog (timeouts + due retries). Idempotent; the timer is unref'd. */
   async start(): Promise<void> {
@@ -659,7 +665,74 @@ export class WorkflowEngine {
     return record.id;
   }
 
+  private static readonly TERMINAL_RUN = new Set<WorkflowRun['status']>(['done', 'partial', 'red', 'cancelled']);
+  private static readonly FAILED_STEP = new Set<WorkflowRunStep['state']>(['input-red', 'output-red', 'timed-out']);
+
+  /**
+   * Finish-notification (Rule: owner opt-in). When a full-live run reaches a terminal state AND the
+   * owner ticked `notify_on_finish` on the workflow, drop a single notification — the in-app inbox
+   * always, plus an email when the owner has a notification email and SMTP is configured — telling
+   * them whether the run succeeded or failed and a per-step log of how it went. Fires for BOTH
+   * outcomes (success and failure). Idempotent via run.notifiedFinish; fully best-effort so a
+   * notification/email problem never disturbs the run. Returns whether the run was mutated (so the
+   * caller persists the notifiedFinish flag).
+   */
+  private async onRunFinished(ownerGhii: string, run: WorkflowRun): Promise<boolean> {
+    if (run.mode !== 'full-live') return false;
+    if (!run.defSnapshot.notify_on_finish) return false;
+    if (run.notifiedFinish) return false;
+    if (!WorkflowEngine.TERMINAL_RUN.has(run.status)) return false;
+    run.notifiedFinish = true;
+
+    const name = loc(run.defSnapshot.title) || run.workflowId;
+    const succeeded = run.status === 'done';
+    const outcome = succeeded ? 'succeeded'
+      : run.status === 'cancelled' ? 'was cancelled'
+      : 'finished with failures';
+    const title = `Workflow "${name}" ${succeeded ? 'succeeded' : run.status === 'cancelled' ? 'cancelled' : 'failed'}`;
+
+    // Per-step log + a short header (duration, failed-step roster).
+    const stepLog = run.defSnapshot.steps
+      .map(s => `• ${s.id}: ${run.steps[s.id]?.state ?? 'unknown'}`)
+      .join('\n');
+    const failedSteps = run.defSnapshot.steps
+      .filter(s => WorkflowEngine.FAILED_STEP.has(run.steps[s.id]?.state))
+      .map(s => s.id);
+    const durMin = run.endedAt && run.startedAt
+      ? Math.max(0, Math.round((new Date(run.endedAt).getTime() - new Date(run.startedAt).getTime()) / 60_000))
+      : null;
+    const header = [
+      `Workflow "${name}" ${outcome}.`,
+      durMin !== null ? `Duration: ~${durMin} min.` : null,
+      failedSteps.length ? `Failed steps: ${failedSteps.join(', ')}.` : null,
+    ].filter(Boolean).join(' ');
+    const body = `${header}\n\nRun log:\n${stepLog}`;
+    const link = '/v1/profile?tab=workflows';
+
+    // 1. In-app inbox (the notification system) — always, best-effort (never throws).
+    await notify(this.storage, ownerGhii, {
+      type: succeeded ? 'workflow_finished' : 'workflow_failed',
+      title, body, link,
+    });
+
+    // 2. Email — only when configured AND the owner set a notification email.
+    try {
+      if (this.emailService?.enabled) {
+        const ghii = await this.storage.getGHII(ownerGhii);
+        if (ghii?.notificationEmail) {
+          await this.emailService.sendNotification(ghii.notificationEmail, title, body);
+        }
+      }
+    } catch (err) {
+      logger.warn('workflow finish email failed', { workflowId: run.workflowId, runId: run.runId, error: String(err) });
+    }
+    return true;
+  }
+
   private async persist(ownerGhii: string, run: WorkflowRun): Promise<void> {
+    // Terminal-run finish notification (owner opt-in) — mutates run.notifiedFinish so it's persisted
+    // below and fires exactly once across every terminal path (tick / cancelRun / sweep).
+    await this.onRunFinished(ownerGhii, run);
     const key = runKey(run.workflowId, run.runId);
     const existing = await this.storage.getMemory(ownerGhii, key);
     const now = new Date().toISOString();

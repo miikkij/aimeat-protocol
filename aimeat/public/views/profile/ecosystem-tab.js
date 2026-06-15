@@ -27,6 +27,11 @@
  *     capabilities on a daily/weekly/monthly cadence. Per-capability enable toggle (creates/deletes an
  *     eco-capability schedule), a list of the app's existing schedules with cadence/enabled/last+next
  *     run + Run-now + delete, lazy-loaded on expand and refreshed on the live-update event.
+ *   v1.5.0 — 2026-06-15 — Add the recipe config block (B4) under Automation: <EcoRecipeConfig> — a
+ *     per-(owner,app) "when this app publishes data" recipe (process-with-agents checklist, store-in-organism
+ *     dropdown, email toggle, approve/push delivery radio, Enabled master toggle, Save). Lazy-loads the
+ *     recipe + the owner's agents + organisms, reflects loaded state, refreshes on aimeat-live-update,
+ *     toasts on save. Shows the resolved trigger keyGlob read-only.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -38,9 +43,11 @@ import { CopyButton } from '/components/CopyButton.js';
 import { Modal } from '/components/Modal.js';
 import { JsonValue } from '/components/JsonView.js';
 import { Spinner } from './shared.js';
-import { listEcosystemApps, listAppData, listPending, approve, revoke, listSubscriptions, subscribe, unsubscribe } from '/js/services/ecosystem.js';
+import { listEcosystemApps, listAppData, listPending, approve, revoke, listSubscriptions, subscribe, unsubscribe, getAutomationRecipe, putAutomationRecipe } from '/js/services/ecosystem.js';
 import { formatUntil } from './schedule-item.js';
 import { listAppSchedules, createCapabilitySchedule, setScheduleEnabled, deleteSchedule, triggerSchedule } from '/js/services/schedules.js';
+import { listAgents } from '/js/services/agents.js';
+import { listOrganisms, currentGhii } from '/js/services/organisms.js';
 
 /**
  * One "Data this app wrote" entry: collapsed row (key + visibility chip + timeAgo) that expands to
@@ -93,6 +100,154 @@ const CRON_TO_CADENCE = Object.fromEntries(CADENCES.map(c => [c.cron, c.key]));
 function cronLabel(cron) {
   const key = CRON_TO_CADENCE[cron];
   return key ? t(`profile.ecosystem.automationCadence_${key}`) : cron;
+}
+
+/**
+ * The recipe config block (B4): the owner's per-(owner,app) "when this app publishes data" recipe.
+ * Process-with-agents checklist (the owner's agents), store-in-organism dropdown (the owner's
+ * organisms + None), email toggle, approve/push delivery radio, an Enabled master toggle and Save.
+ * Lazy-loads the recipe + agents + organisms when shown and refreshes on the live-update event.
+ * organism/email/approval are stored now and take effect as those steps roll out (B5/B6/B7).
+ */
+function EcoRecipeConfig({ app, showToast }) {
+  const [loaded, setLoaded] = useState(false);
+  const [agents, setAgents] = useState([]);
+  const [orgs, setOrgs] = useState([]);
+  const [triggerGlob, setTriggerGlob] = useState('');   // resolved server-side keyGlob (read-only)
+  const [saving, setSaving] = useState(false);
+  // Editable recipe state.
+  const [selAgents, setSelAgents] = useState([]);        // selected agent names
+  const [organism, setOrganism] = useState('');          // '' = None
+  const [email, setEmail] = useState(false);
+  const [requireApproval, setRequireApproval] = useState(false); // default push
+  const [enabled, setEnabled] = useState(false);
+
+  const load = async () => {
+    const ownerName = (currentGhii().split('@')[0]) || '';
+    const [agentList, recipe, orgResp] = await Promise.all([
+      listAgents().catch(() => []),
+      getAutomationRecipe(app.app).catch(() => null),
+      (ownerName ? listOrganisms({ member: ownerName }) : Promise.resolve(null)).catch(() => null),
+    ]);
+    setAgents(agentList.filter(a => !a.name?.startsWith('session-')));
+    setOrgs(orgResp?.data?.organisms || []);
+    if (recipe) {
+      setSelAgents(Array.isArray(recipe.agents) ? recipe.agents : []);
+      setOrganism(recipe.organism || '');
+      setEmail(!!recipe.email);
+      setRequireApproval(!!recipe.require_approval);
+      setEnabled(!!recipe.enabled);
+      setTriggerGlob(recipe.trigger?.keyGlob || '');
+    }
+    setLoaded(true);
+  };
+
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  useEffect(() => {
+    loadRef.current();
+    const handler = () => loadRef.current();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, [app.app]);
+
+  function toggleAgent(name) {
+    setSelAgents(list => list.includes(name) ? list.filter(n => n !== name) : [...list, name]);
+  }
+
+  async function onSave() {
+    setSaving(true);
+    try {
+      await putAutomationRecipe(app.app, {
+        agents: selAgents,
+        organism: organism || null,
+        email,
+        require_approval: requireApproval,
+        enabled,
+      });
+      showToast?.(t('profile.ecosystem.recipeSaved'), 'success');
+      await load();
+    } catch (e) {
+      showToast?.(t('profile.ecosystem.recipeError'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!loaded) {
+    return html`<div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.recipeLoading')}</div>`;
+  }
+
+  return html`
+    <div class="pf-eco-recipe">
+      <div class="pf-eco-recipe-head">${t('profile.ecosystem.recipeTitle')}</div>
+      <p class="pf-eco-dim pf-eco-recipe-intro">${t('profile.ecosystem.recipeIntro')}</p>
+
+      ${triggerGlob && html`
+        <div class="pf-eco-recipe-trigger">
+          <span class="pf-eco-dim">${t('profile.ecosystem.recipeTriggerOn')}:</span>
+          <span class="pf-eco-mono">${triggerGlob}</span>
+        </div>`}
+
+      <div class="pf-eco-recipe-row">
+        <label class="pf-eco-recipe-label">${t('profile.ecosystem.recipeAgents')}</label>
+        ${agents.length === 0
+          ? html`<div class="pf-eco-dim">${t('profile.ecosystem.recipeAgentsEmpty')}</div>`
+          : html`
+            <div class="pf-eco-recipe-agents">
+              ${agents.map(a => html`
+                <label class="pf-eco-recipe-agent" key=${a.name}>
+                  <input type="checkbox" checked=${selAgents.includes(a.name)} onChange=${() => toggleAgent(a.name)} />
+                  <span>${a.name}</span>
+                </label>`)}
+            </div>`}
+      </div>
+
+      <div class="pf-eco-recipe-row">
+        <label class="pf-eco-recipe-label">${t('profile.ecosystem.recipeOrganism')}</label>
+        <select class="pf-eco-select" value=${organism} onChange=${e => setOrganism(e.target.value)}>
+          <option value="">${t('profile.ecosystem.recipeOrganismNone')}</option>
+          ${orgs.map(o => html`<option value=${o.id} key=${o.id}>${o.name || o.id}</option>`)}
+        </select>
+      </div>
+
+      <div class="pf-eco-recipe-row">
+        <label class="pf-eco-recipe-toggle">
+          <input type="checkbox" checked=${email} onChange=${e => setEmail(e.target.checked)} />
+          <span>${t('profile.ecosystem.recipeEmail')}</span>
+        </label>
+      </div>
+
+      <div class="pf-eco-recipe-row">
+        <label class="pf-eco-recipe-label">${t('profile.ecosystem.recipeDelivery')}</label>
+        <div class="pf-eco-recipe-radios">
+          <label class="pf-eco-recipe-radio">
+            <input type="radio" name=${`eco-delivery-${app.app}`} checked=${!requireApproval} onChange=${() => setRequireApproval(false)} />
+            <span>
+              <span class="pf-eco-recipe-radio-title">${t('profile.ecosystem.recipeDeliveryPush')}</span>
+              <span class="pf-eco-dim pf-eco-recipe-radio-hint">${t('profile.ecosystem.recipeDeliveryPushHint')}</span>
+            </span>
+          </label>
+          <label class="pf-eco-recipe-radio">
+            <input type="radio" name=${`eco-delivery-${app.app}`} checked=${requireApproval} onChange=${() => setRequireApproval(true)} />
+            <span>
+              <span class="pf-eco-recipe-radio-title">${t('profile.ecosystem.recipeDeliveryApprove')}</span>
+              <span class="pf-eco-dim pf-eco-recipe-radio-hint">${t('profile.ecosystem.recipeDeliveryApproveHint')}</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div class="pf-eco-recipe-row pf-eco-recipe-foot">
+        <label class="pf-eco-recipe-toggle">
+          <input type="checkbox" checked=${enabled} onChange=${e => setEnabled(e.target.checked)} />
+          <span>${t('profile.ecosystem.recipeEnabled')}</span>
+        </label>
+        <button class="btn-primary btn-sm" disabled=${saving} onClick=${onSave}>${t('profile.ecosystem.recipeSave')}</button>
+      </div>
+
+      <p class="pf-eco-dim pf-eco-recipe-note">${t('profile.ecosystem.recipeDeferredNote')}</p>
+    </div>`;
 }
 
 /**
@@ -247,6 +402,8 @@ function EcoAutomationSection({ app, showToast }) {
                 </div>
               </div>`)}
       </div>
+
+      <${EcoRecipeConfig} app=${app} showToast=${showToast} />
     </div>`;
 }
 
