@@ -16,6 +16,8 @@
  *   v2.3.0 — 2026-06-15 — Expose a public materialiseAgentTask() (extracted wake fan-out from
  *     executeAgentTaskJob) so the ecosystem-app automation recipe (feature B4) can spawn an agent
  *     task on a data publish without duplicating the dispatch machinery.
+ *   v2.4.0 — 2026-06-15 — materialiseAgentTask() accepts an `automation` arg and stamps it onto the
+ *     AgentTaskRecord (B5/B6): recipe provenance + organism routing + email/approval toggles.
  */
 import { Cron } from 'croner';
 import { randomUUID } from 'node:crypto';

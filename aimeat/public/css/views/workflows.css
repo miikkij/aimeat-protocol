@@ -5,6 +5,9 @@
  *   timeline. Prefix: wf-. Theme-token driven (no hardcoded colors) so it flips with dark/light.
  * @version-history
  *   v1.0.0 -- 2026-06-13 -- Phase 9: initial workflows tab styles.
+ *   v1.1.0 -- 2026-06-15 -- Form contrast fix: fields use --control-bg/--control-border (not
+ *     --bg-input, which = page --bg in light theme) + focus rings, grouped section surfaces,
+ *     carded step editors, branded accent checkboxes.
  */
 
 .wf-tab { display: flex; flex-direction: column; gap: 1.1rem; }
@@ -87,30 +90,70 @@
 }
 
 /* ── create/edit form ── */
-.wf-form { display: flex; flex-direction: column; gap: 0.8rem; }
-.wf-field { display: flex; flex-direction: column; gap: 0.25rem; }
-.wf-field > span { font-size: 0.82rem; font-weight: 600; color: var(--text-dim); }
+/* Fields use the dedicated control tokens (--control-bg / --control-border), NOT --bg-input
+   (which equals the page --bg in light theme and makes every field melt into the background). */
+.wf-form { display: flex; flex-direction: column; gap: 1rem; }
+.wf-field { display: flex; flex-direction: column; gap: 0.3rem; }
+.wf-field > span { font-size: 0.78rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* The shared control look — applied to every text/number/select in the form. */
 .wf-field input[type="text"], .wf-field input[type="number"], .wf-field select,
-.wf-field-row input, .wf-field-row select {
-  background: var(--bg-input, var(--bg-dim)); color: var(--text);
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
-  padding: 0.4rem 0.55rem; font: inherit;
+.wf-field-row input, .wf-field-row select,
+.wf-inline input[type="number"] {
+  background: var(--control-bg); color: var(--text);
+  border: 1.5px solid var(--control-border); border-radius: var(--radius-sm);
+  padding: 0.5rem 0.65rem; font: inherit; outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
+.wf-field input::placeholder, .wf-field-row input::placeholder { color: var(--text-muted); }
+.wf-field input:focus, .wf-field select:focus,
+.wf-field-row input:focus, .wf-field-row select:focus,
+.wf-inline input[type="number"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+  background: var(--bg-input-focus, var(--control-bg));
+}
+.wf-field input:hover:not(:focus), .wf-field select:hover:not(:focus),
+.wf-field-row input:hover:not(:focus), .wf-field-row select:hover:not(:focus) {
+  border-color: var(--text-muted);
+}
+.wf-field input:disabled, .wf-field-row input:disabled, .wf-field select:disabled {
+  opacity: 0.6; cursor: not-allowed; background: var(--bg-surface);
+}
+
 .wf-field-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
 .wf-field-row > input, .wf-field-row > select { flex: 1; min-width: 8rem; }
+
+/* Grouped sections sit on a faint surface so the field cluster reads as one block. */
 .wf-form-section {
-  border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.7rem 0.85rem;
-  display: flex; flex-direction: column; gap: 0.55rem;
+  border: 1px solid var(--border); border-radius: var(--radius); padding: 0.9rem 1rem;
+  background: var(--bg-surface);
+  display: flex; flex-direction: column; gap: 0.7rem;
 }
 .wf-form-section-head { display: flex; justify-content: space-between; align-items: center; font-weight: 700; color: var(--text); }
+
+/* Each step is a real card with an accent spine — not just an indented text block. */
 .wf-step-edit {
-  border-left: 2px solid var(--accent-soft, var(--border)); padding-left: 0.7rem;
-  display: flex; flex-direction: column; gap: 0.4rem;
+  border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm); padding: 0.75rem 0.85rem;
+  background: var(--bg-card);
+  display: flex; flex-direction: column; gap: 0.55rem;
 }
 .wf-step-opts { font-size: 0.82rem; color: var(--text-dim); }
-.wf-step-after { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; font-size: 0.82rem; }
-.wf-inline { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--text); }
-.wf-inline input[type="number"] { width: 4.5rem; background: var(--bg-input, var(--bg-dim)); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.2rem 0.4rem; }
-.wf-llm-toggle, .wf-notify-toggle { margin-top: 0.2rem; font-size: 0.9rem; }
+.wf-step-after {
+  display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; font-size: 0.82rem;
+  padding-top: 0.5rem; border-top: 1px dashed var(--border);
+}
+.wf-inline { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--text); }
+.wf-inline input[type="number"] { width: 4.5rem; padding: 0.3rem 0.45rem; }
+/* Branded, comfortably-sized checkboxes so toggles are obvious. */
+.wf-inline input[type="checkbox"], .wf-llm-toggle input[type="checkbox"], .wf-notify-toggle input[type="checkbox"] {
+  width: 1.05rem; height: 1.05rem; accent-color: var(--accent); cursor: pointer; flex-shrink: 0;
+}
+.wf-llm-toggle, .wf-notify-toggle {
+  margin-top: 0.1rem; font-size: 0.9rem; gap: 0.5rem;
+  padding: 0.6rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg-surface); cursor: pointer;
+}
 .wf-form-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.4rem; }
 .wf-err-list { margin: 0; padding-left: 1.1rem; }

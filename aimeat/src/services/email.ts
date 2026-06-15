@@ -16,6 +16,8 @@
  *   v1.0.0 -- 2026-04-10 -- Initial email service with SMTP transport
  *   v1.1.0 -- 2026-05-01 -- Add retry logic, match suggestion emails, raw send
  *   v1.2.0 -- 2026-05-21 -- Add stats counter instrumentation (email_sent, email_failed, email_retried)
+ *   v1.3.0 -- 2026-06-15 -- Add a process-wide active-service handle (set/getActiveEmailService) so the
+ *     agent-task completion hook (B6) can reuse the configured transport without re-threading it.
  */
 
 import { createTransport, type Transporter } from 'nodemailer';
@@ -39,6 +41,15 @@ export interface EmailService {
   sendMatchSuggestion(to: string, matches: import('./email-templates.js').MatchSuggestion[], locale?: string): Promise<boolean>;
   sendRaw(to: string, subject: string, html: string, text: string): Promise<boolean>;
 }
+
+/**
+ * Process-wide handle to the active EmailService, set once during service init. Lets per-request
+ * surfaces that aren't threaded the instance (e.g. the agent-task completion hook, B6) reuse the
+ * single configured transport instead of constructing a parallel one. Mirrors getActiveScheduler().
+ */
+let _activeEmailService: EmailService | null = null;
+export function setActiveEmailService(svc: EmailService): void { _activeEmailService = svc; }
+export function getActiveEmailService(): EmailService | null { return _activeEmailService; }
 
 // ── Retry helper ─────────────────────────────────────────
 

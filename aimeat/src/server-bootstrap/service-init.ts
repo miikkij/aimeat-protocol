@@ -37,7 +37,7 @@ import { RealtimeManager } from '../services/realtime-manager.js';
 import { MailboxNotificationService } from '../services/mailbox-notification.js';
 import { Scheduler, setActiveScheduler } from '../services/scheduler.js';
 import { WorkflowEngine, setActiveWorkflowEngine } from '../services/workflow/engine.js';
-import { createEmailService } from '../services/email.js';
+import { createEmailService, setActiveEmailService } from '../services/email.js';
 import { enqueueCatalogueSync } from '../services/catalogue-sync.js';
 import { initializeNode } from '../auth/node-keys.js';
 import { logger } from '../utils/logger.js';
@@ -81,6 +81,7 @@ export async function initializeServices(
 
   // Internal Scheduler System — centralized cron-based job scheduler
   const emailService = createEmailService(config);
+  setActiveEmailService(emailService);
   const scheduler = new Scheduler(config, storage, emailService);
   setActiveScheduler(scheduler);
 
