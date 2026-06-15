@@ -4,6 +4,11 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v1.15.0 — 2026-06-15 — Ecosystem apps "Data this app wrote" section: .pf-eco-data,
+ *     .pf-eco-data-row/-key/-val/-vis/-time, .pf-eco-data-loading.
+ *   v1.16.0 — 2026-06-15 — Ecosystem "Data this app wrote" rows expandable: .pf-eco-data-entry,
+ *     .pf-eco-data-body/-pre/-md (readable JSON/markdown value blocks); row is now a button.
+ *     Removed .pf-eco-data-val (one-line preview). Added .pf-eco-sub-direction caption.
  *   v1.14.0 — 2026-06-10 — SchemaForm usability: .pj-field-hint (per-field hint),
  *     .pj-field-invalid (missing-required outline) + .pj-form-error message.
  *   v1.13.0 — 2026-06-10 — Workspace renew, phase 2: .pj-ws-head-actions, review
@@ -2656,5 +2661,18 @@
 .pf-eco-sub-row { display: flex; align-items: center; gap: .5rem; padding: .25rem 0; }
 .pf-eco-sub-add { display: flex; align-items: center; gap: .4rem; margin-top: .5rem; }
 .pf-eco-binding > div { font-size: .85rem; padding: .12rem 0; }
+.pf-eco-data { display: flex; flex-direction: column; gap: .3rem; }
+.pf-eco-data-loading { display: flex; align-items: center; gap: .4rem; }
+.pf-eco-data-entry { border-top: 1px solid var(--border); }
+.pf-eco-data-entry:first-child { border-top: none; }
+.pf-eco-data-row { display: flex; align-items: center; gap: .5rem; width: 100%; font-size: .8rem; padding: .35rem 0; background: none; border: none; text-align: left; color: inherit; cursor: pointer; }
+.pf-eco-data-row:hover { color: var(--accent); }
+.pf-eco-data-key { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-eco-data-vis { flex: 0 0 auto; }
+.pf-eco-data-time { flex: 0 0 auto; margin-left: auto; white-space: nowrap; }
+.pf-eco-data-body { padding: 0 0 .5rem 1.2rem; }
+.pf-eco-data-pre { margin: 0; padding: .6rem .7rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; font-family: var(--font-mono, monospace); font-size: .78rem; color: var(--text); white-space: pre-wrap; word-break: break-word; max-height: 22rem; overflow: auto; }
+.pf-eco-data-md { padding: .4rem .6rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; font-size: .82rem; color: var(--text); max-height: 22rem; overflow: auto; }
+.pf-eco-sub-direction { margin: -.25rem 0 .5rem; }
 .pf-eco-revoke-input { width: 100%; box-sizing: border-box; margin: .6rem 0; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: .5rem .7rem; }
 .pf-eco-revoke-actions { display: flex; justify-content: flex-end; gap: .5rem; }

@@ -8,6 +8,8 @@
  *   agent path is unaffected (regression covered by e2e-agent-onboarding).
  * @version-history
  *   v1.0.0 — 2026-06-14 — Initial creation (ecosystem-apps foundation, chunk 1).
+ *   v1.1.0 — 2026-06-15 — Add Phase 5 for GET /v1/ecosystem-apps/:app/data — owner lists the memory
+ *     an app wrote (happy path) + 404 for an app the owner never connected.
  */
 
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ecosystem-app-foundation
@@ -280,6 +282,31 @@ await test('Polling token before approval → authorization_pending', async () =
   });
   assert(status === 400, `expected 400, got ${status}`);
   assert(body.error === 'authorization_pending', `expected authorization_pending, got ${body.error}`);
+});
+
+// ─── Phase 5: owner lists the memory the app wrote (GET /:app/data) ───
+console.log('\nPhase 5 — Owner lists the app\'s written data');
+
+await test('Owner GET /v1/ecosystem-apps/:app/data → sees the GEAI write', async () => {
+  const { status, body } = await json(`/v1/ecosystem-apps/${encodeURIComponent(APP)}/data`, {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  assert(body.ok === true, `data list failed: ${JSON.stringify(body.error)}`);
+  const items = body.data.items as any[];
+  const found = items.find(i => i.key === MEM_KEY);
+  assert(!!found, `app data must include the written key ${MEM_KEY}`);
+  assert(found.value?.ticket === 'resolved', `value mismatch: ${JSON.stringify(found.value)}`);
+  assert(found.visibility === 'private', `visibility mismatch: ${found.visibility}`);
+  assert(typeof body.data.total === 'number' && body.data.total >= 1, `total should be >= 1, got ${body.data.total}`);
+});
+
+await test('Owner GET data for an app they never connected → 404', async () => {
+  const { status, body } = await json('/v1/ecosystem-apps/neverconnected/data', {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(status === 404, `expected 404, got ${status}: ${JSON.stringify(body)}`);
+  assert(body.error?.code === 'NOT_FOUND', `expected NOT_FOUND, got ${body.error?.code}`);
 });
 
 // ─── Summary ───

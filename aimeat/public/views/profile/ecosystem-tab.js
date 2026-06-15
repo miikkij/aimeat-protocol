@@ -11,6 +11,12 @@
  *   v1.0.0 — 2026-06-14 — Initial Ecosystem apps tab (chunk 6): pending approve/deny, connected list,
  *     grants, subscriptions, binding + typed-name revoke. Full card sub-tabs + workflow-authoring
  *     additions deferred to a follow-up.
+ *   v1.1.0 — 2026-06-15 — Add "Data this app wrote" section to the expanded card: lazy-loads the app's
+ *     eco: memory on first expand, refreshes on the live poll, renders key/value/visibility/time rows.
+ *   v1.2.0 — 2026-06-15 — "Data this app wrote" rows are now expandable: collapsed shows key + visibility
+ *     chip + timeAgo; expanded renders the FULL value readably (pretty-printed JSON for objects/arrays,
+ *     the shared safe Markdown viewer for markdown-looking strings, a plain block otherwise). Added a
+ *     direction caption under "Event subscriptions" clarifying AIMEAT → this app (outbound) delivery.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -20,8 +26,50 @@ import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { Modal } from '/components/Modal.js';
+import { Markdown } from '/components/Markdown.js';
 import { Spinner } from './shared.js';
-import { listEcosystemApps, listPending, approve, revoke, listSubscriptions, subscribe, unsubscribe } from '/js/services/ecosystem.js';
+import { listEcosystemApps, listAppData, listPending, approve, revoke, listSubscriptions, subscribe, unsubscribe } from '/js/services/ecosystem.js';
+
+/** Heuristic: does a plain string look like markdown worth rendering via the viewer? */
+function looksLikeMarkdown(s) {
+  if (typeof s !== 'string') return false;
+  return /(^|\n)\s{0,3}#{1,6}\s/.test(s)        // headings
+    || /(^|\n)\s*[-*+]\s+/.test(s)              // unordered lists
+    || /(^|\n)\s*\d+\.\s+/.test(s)              // ordered lists
+    || /`[^`]+`/.test(s)                        // inline code
+    || /```/.test(s)                            // fenced code
+    || /\[[^\]]+\]\([^)]+\)/.test(s)            // links
+    || /\*\*[^*]+\*\*/.test(s);                 // bold
+}
+
+/**
+ * One "Data this app wrote" entry: collapsed row (key + visibility chip + timeAgo) that expands to
+ * the FULL value rendered readably — pretty-printed JSON for objects/arrays, the shared safe Markdown
+ * viewer for markdown-looking strings, a plain pre block otherwise.
+ */
+function EcoDataEntry({ entry }) {
+  const [open, setOpen] = useState(false);
+  const isObject = entry.value !== null && typeof entry.value === 'object';
+  const isMarkdown = !isObject && looksLikeMarkdown(entry.value);
+  return html`
+    <div class="pf-eco-data-entry">
+      <button class="pf-eco-data-row" onClick=${() => setOpen(o => !o)}
+        aria-expanded=${open} title=${open ? t('profile.ecosystem.dataCollapse') : t('profile.ecosystem.dataExpand')}>
+        <span class="pf-eco-caret">${open ? '▼' : '▶'}</span>
+        <span class="pf-eco-mono pf-eco-data-key">${entry.key}</span>
+        <span class="pf-eco-chip pf-eco-data-vis">${entry.visibility}</span>
+        <span class="pf-eco-dim pf-eco-data-time">${entry.updated_at ? timeAgo(entry.updated_at) : ''}</span>
+      </button>
+      ${open && html`
+        <div class="pf-eco-data-body">
+          ${isObject
+            ? html`<pre class="pf-eco-data-pre">${JSON.stringify(entry.value, null, 2)}</pre>`
+            : isMarkdown
+              ? html`<div class="pf-eco-data-md"><${Markdown} text=${String(entry.value)} /></div>`
+              : html`<pre class="pf-eco-data-pre">${String(entry.value == null ? '' : entry.value)}</pre>`}
+        </div>`}
+    </div>`;
+}
 
 // Scope presets the owner picks at approval — lean read + deposit (ecosystem apps mostly deposit
 // refined data + subscribe to events). 'full' grants the wildcard.
@@ -48,12 +96,36 @@ export default function EcosystemTab({ onStats, showToast }) {
   const [revokeApp, setRevokeApp] = useState(null);   // app pending typed-name revoke
   const [revokeInput, setRevokeInput] = useState('');
   const [subForm, setSubForm] = useState({});         // app → { event }
+  const [appData, setAppData] = useState({});         // geai → array of memory entries
+  const [appDataLoading, setAppDataLoading] = useState({}); // geai → bool
+
+  // Load (or refresh) the memory a given app wrote. Lazy on first expand, then on the live poll.
+  const loadAppData = async (app, geai) => {
+    setAppDataLoading(l => ({ ...l, [geai]: true }));
+    try {
+      const items = await listAppData(app);
+      setAppData(d => ({ ...d, [geai]: items }));
+    } catch (e) {
+      // Leave the cached value (if any); a transient failure shouldn't blank the section.
+    } finally {
+      setAppDataLoading(l => ({ ...l, [geai]: false }));
+    }
+  };
+
+  const expandedRef = useRef(null);
+  expandedRef.current = expanded;
 
   const loadData = async () => {
     try {
       const [a, p, s] = await Promise.all([listEcosystemApps(), listPending(), listSubscriptions()]);
       setApps(a); setPending(p); setSubs(s);
       onStats?.({ ecosystem: a.length });
+      // Keep the open card's "data this app wrote" section fresh on the live poll.
+      const openGeai = expandedRef.current;
+      if (openGeai) {
+        const openApp = a.find(x => x.geai === openGeai);
+        if (openApp) await loadAppData(openApp.app, openApp.geai);
+      }
     } catch (e) {
       showToast?.(t('profile.ecosystem.loadError'), 'error');
     } finally {
@@ -63,6 +135,13 @@ export default function EcosystemTab({ onStats, showToast }) {
 
   const loadRef = useRef(loadData);
   loadRef.current = loadData;
+
+  // Toggle a card; lazy-load its written data the first time it opens.
+  function toggleCard(app) {
+    if (expanded === app.geai) { setExpanded(null); return; }
+    setExpanded(app.geai);
+    if (appData[app.geai] === undefined) loadAppData(app.app, app.geai);
+  }
   useEffect(() => {
     loadRef.current();
     const handler = () => loadRef.current();
@@ -160,7 +239,7 @@ export default function EcosystemTab({ onStats, showToast }) {
           const appSubs = subs.filter(s => s.geai === app.geai);
           return html`
             <div class="pf-eco-card ${app.status === 'revoked' ? 'pf-eco-card-revoked' : ''}" key=${app.geai}>
-              <div class="pf-eco-card-head" onClick=${() => setExpanded(isOpen ? null : app.geai)}>
+              <div class="pf-eco-card-head" onClick=${() => toggleCard(app)}>
                 <span class="pf-eco-caret">${isOpen ? '▼' : '▶'}</span>
                 <span class="pf-eco-icon">🔌</span>
                 <strong class="pf-eco-name">${app.display_name || app.app}</strong>
@@ -184,6 +263,7 @@ export default function EcosystemTab({ onStats, showToast }) {
 
                   <div class="pf-eco-section">
                     <div class="pf-eco-section-title">${t('profile.ecosystem.subscriptions')}</div>
+                    <p class="pf-eco-dim pf-eco-sub-direction">${t('profile.ecosystem.subscriptionsDirection')}</p>
                     ${appSubs.length === 0
                       ? html`<div class="pf-eco-dim">${t('profile.ecosystem.noSubs')}</div>`
                       : appSubs.map(s => html`
@@ -199,6 +279,19 @@ export default function EcosystemTab({ onStats, showToast }) {
                         </select>
                         <button class="btn-outline btn-sm" onClick=${() => onSubscribe(app.app)}>${t('profile.ecosystem.addSub')}</button>
                       </div>`}
+                  </div>
+
+                  <div class="pf-eco-section">
+                    <div class="pf-eco-section-title">${t('profile.ecosystem.dataTitle')}</div>
+                    ${appDataLoading[app.geai]
+                      ? html`<div class="pf-eco-dim pf-eco-data-loading"><${Spinner} /> ${t('profile.ecosystem.dataLoading')}</div>`
+                      : (appData[app.geai] || []).length === 0
+                        ? html`<div class="pf-eco-dim">${t('profile.ecosystem.dataEmpty')}</div>`
+                        : html`
+                          <div class="pf-eco-data">
+                            ${(appData[app.geai] || []).map(entry => html`
+                              <${EcoDataEntry} entry=${entry} key=${entry.key} />`)}
+                          </div>`}
                   </div>
 
                   <div class="pf-eco-section">
