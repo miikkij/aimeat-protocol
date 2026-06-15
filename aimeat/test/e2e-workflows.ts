@@ -7,6 +7,7 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workflows
  * @version-history
  *   v1.0.0 — 2026-06-13 — Initial Phase 4 coverage.
+ *   v1.1.0 — 2026-06-15 — notify_on_finish: opt-in gate + success/failure finish-notification coverage.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -447,6 +448,71 @@ async function run() {
     // Before the fix this was output-red (count 0, owner-keyspace-only read). With owner-scope it's GREEN.
     assert(r.body.data.steps.check.state === 'green',
       `cross-agent owner-scope signal should be GREEN, got ${r.body.data.steps.check.state} observed=${JSON.stringify(r.body.data.steps.check.outputObserved)}`);
+  });
+
+  // ── finish notification (notify_on_finish opt-in) ──
+  const finishNotifs = async () => {
+    const { body } = await json('/v1/notifications', { headers: auth });
+    const list = (body.data?.notifications ?? []) as Array<{ type: string; title: string; body: string }>;
+    return list.filter(n => n.type === 'workflow_finished' || n.type === 'workflow_failed');
+  };
+
+  await test('runs WITHOUT notify_on_finish produced NO finish notification (gate holds)', async () => {
+    // The earlier full-live `news` run + `failwf` run did NOT opt in → no finish notifications yet.
+    const fn = await finishNotifs();
+    assert(fn.length === 0, `expected 0 finish notifications before opt-in, got ${fn.length}: ${JSON.stringify(fn)}`);
+  });
+
+  await test('notify_on_finish: a successful full-live run drops a workflow_finished notification', async () => {
+    const wf = { ...WORKFLOW, title: { en_US: 'Notify success' }, notify_on_finish: true };
+    const put = await json('/v1/workflows/notify-ok', { method: 'PUT', headers: auth, body: JSON.stringify(wf) });
+    assert(put.status === 200, `put notify-ok ${put.status}: ${JSON.stringify(put.body)}`);
+
+    await json('/v1/memory/news.raw', { method: 'DELETE', headers: auth });
+    await json('/v1/memory/news.article', { method: 'DELETE', headers: auth });
+
+    const run = await json('/v1/workflows/notify-ok/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'full' }) });
+    const runId = run.body.data.runId;
+    let r = await json(`/v1/workflows/notify-ok/runs/${runId}`, { headers: auth });
+    const fetchTaskId = r.body.data.steps.fetch.taskIds?.[0];
+    await writeMem('news.raw', 'fresh raw news');
+    await json(`/v1/agents/${agentName}/tasks/${fetchTaskId}/complete`, { method: 'POST', headers: auth, body: JSON.stringify({ message: 'done' }) });
+    await sleep(700);
+    r = await json(`/v1/workflows/notify-ok/runs/${runId}`, { headers: auth });
+    const writeTaskId = r.body.data.steps.write.taskIds?.[0];
+    await writeMem('news.article', 'the generated article');
+    await json(`/v1/agents/${agentName}/tasks/${writeTaskId}/complete`, { method: 'POST', headers: auth, body: JSON.stringify({ message: 'done' }) });
+    await sleep(800);
+
+    r = await json(`/v1/workflows/notify-ok/runs/${runId}`, { headers: auth });
+    assert(r.body.data.status === 'done', `expected done, got ${r.body.data.status}`);
+
+    const fn = await finishNotifs();
+    const ok = fn.find(n => n.type === 'workflow_finished' && n.title.includes('succeeded'));
+    assert(!!ok, `expected a workflow_finished 'succeeded' notification, got ${JSON.stringify(fn)}`);
+    assert(ok!.body.includes('fetch:') && ok!.body.includes('write:'), `notification body should carry the per-step log, got: ${ok!.body}`);
+  });
+
+  await test('notify_on_finish: a failing run drops a workflow_failed notification', async () => {
+    const wf = { ...FAILWF, title: { en_US: 'Notify fail' }, notify_on_finish: true };
+    const put = await json('/v1/workflows/notify-fail', { method: 'PUT', headers: auth, body: JSON.stringify(wf) });
+    assert(put.status === 200, `put notify-fail ${put.status}: ${JSON.stringify(put.body)}`);
+
+    const run = await json('/v1/workflows/notify-fail/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'full' }) });
+    const runId = run.body.data.runId;
+    const r0 = await json(`/v1/workflows/notify-fail/runs/${runId}`, { headers: auth });
+    const genTaskId = r0.body.data.steps.gen.taskIds?.[0];
+    // Complete gen without producing absent.out → output-red → run partial.
+    await json(`/v1/agents/${agentName}/tasks/${genTaskId}/complete`, { method: 'POST', headers: auth, body: JSON.stringify({ message: 'nothing' }) });
+    await sleep(800);
+
+    const r = await json(`/v1/workflows/notify-fail/runs/${runId}`, { headers: auth });
+    assert(r.body.data.status === 'partial', `expected partial, got ${r.body.data.status}`);
+
+    const fn = await finishNotifs();
+    const failed = fn.find(n => n.type === 'workflow_failed' && n.title.includes('failed'));
+    assert(!!failed, `expected a workflow_failed notification, got ${JSON.stringify(fn)}`);
+    assert(failed!.body.includes('Failed steps: gen'), `notification body should name the failed step, got: ${failed!.body}`);
   });
 
   // ── health ──

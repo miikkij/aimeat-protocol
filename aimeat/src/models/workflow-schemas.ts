@@ -16,6 +16,8 @@
  * @version-history
  *   v1.0.0 — 2026-06-13 — Initial: signal grammar (shared with offers) + descriptor/run types.
  *   v1.1.0 — 2026-06-13 — Phase 3: Zod for the descriptor (WorkflowDefInputSchema) — CRUD validation.
+ *   v1.2.0 — 2026-06-15 — Add WorkflowDef.notify_on_finish (owner opt-in finish notification) +
+ *     WorkflowRun.notifiedFinish (fire-once guard).
  */
 import { z } from 'zod';
 
@@ -137,6 +139,10 @@ export interface WorkflowDef {
   vars: WorkflowVar[];
   steps: WorkflowStep[];
   on_step_fail: 'inspect';
+  /** Owner opt-in: when a (full-live) run reaches a terminal state — done / partial / cancelled —
+   *  drop a finish notification (in-app inbox + email when configured) summarizing outcome + a
+   *  per-step log. Default false (no finish notification). */
+  notify_on_finish?: boolean;
   llm?: { approved: boolean };        // owner consent to use the node OpenRouter for `llm` leaves
   costCapMorsels?: number | null;     // optional per-workflow cap (OpenRouter also caps per key)
   createdBy: string;                  // GAII/GHII of the author (audit)
@@ -187,6 +193,9 @@ export interface WorkflowRun {
   steps: Record<string, WorkflowRunStep>;
   /** Inspector tasks dispatched on RED steps (best-effort enrichment; the owner push is guaranteed). */
   inspections?: Array<{ stepId: string; taskId: string; reason: string; at: string }>;
+  /** Set once the finish notification (notify_on_finish) has been sent, so it fires exactly once even
+   *  if the run is re-persisted (retries, restart re-sync). */
+  notifiedFinish?: boolean;
   startedAt: string;
   endedAt?: string;
 }
@@ -261,6 +270,7 @@ export const WorkflowDefInputSchema = z.object({
   vars: z.array(WorkflowVarSchema).max(30),
   steps: z.array(WorkflowStepSchema).min(1).max(50),
   on_step_fail: z.literal('inspect'),
+  notify_on_finish: z.boolean().optional(),
   llm: z.object({ approved: z.boolean() }).optional(),
   costCapMorsels: z.number().int().nonnegative().nullable().optional(),
 });

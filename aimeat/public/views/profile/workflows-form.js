@@ -8,6 +8,7 @@
  * @structure WorkflowForm({ existing, onSaved, onCancel, showToast })
  * @version-history
  *   v1.0.0 -- 2026-06-13 -- Phase 9b: create/edit form (closes the §12 form gap).
+ *   v1.1.0 -- 2026-06-15 -- Add the "notify on finish" opt-in toggle (notify_on_finish).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -46,6 +47,7 @@ export default function WorkflowForm({ existing, onSaved, onCancel, showToast })
     })) || [blankStep()],
   );
   const [llmApproved, setLlmApproved] = useState(!!existing?.llm?.approved);
+  const [notifyOnFinish, setNotifyOnFinish] = useState(!!existing?.notify_on_finish);
   const [agents, setAgents] = useState([]);
   const [offersByAgent, setOffersByAgent] = useState({});
   const [errors, setErrors] = useState([]);
@@ -96,6 +98,7 @@ export default function WorkflowForm({ existing, onSaved, onCancel, showToast })
         timeout_min: Number(s.timeout_min) || 60,
       })),
       on_step_fail: 'inspect',
+      ...(notifyOnFinish ? { notify_on_finish: true } : {}),
       ...(llmApproved ? { llm: { approved: true } } : {}),
     };
     setSaving(true);
@@ -205,6 +208,11 @@ export default function WorkflowForm({ existing, onSaved, onCancel, showToast })
             </div>`}
           </div>`)}
         </div>
+
+        <label class="wf-inline wf-notify-toggle">
+          <input type="checkbox" checked=${notifyOnFinish} onChange=${e => setNotifyOnFinish(e.target.checked)} />
+          ${t('profile.workflows.form.notifyOnFinish')}
+        </label>
 
         <label class="wf-inline wf-llm-toggle">
           <input type="checkbox" checked=${llmApproved} onChange=${e => setLlmApproved(e.target.checked)} />

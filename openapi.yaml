@@ -3067,6 +3067,13 @@ components:
         vars: { type: array, items: { $ref: '#/components/schemas/WorkflowVar' } }
         steps: { type: array, items: { $ref: '#/components/schemas/WorkflowStep' } }
         on_step_fail: { type: string, enum: [inspect] }
+        notify_on_finish:
+          type: boolean
+          description: >-
+            Owner opt-in. When true, a full-live run reaching a terminal state (done / partial /
+            cancelled) drops a finish notification — the in-app inbox always, plus an email when the
+            owner has a notification email and SMTP is configured — with the outcome and a per-step
+            log. Fires for both success and failure. Default false.
         llm:
           type: object
           description: Owner consent to use the node OpenRouter for `llm` signal leaves.

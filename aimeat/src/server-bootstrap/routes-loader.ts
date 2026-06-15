@@ -474,6 +474,7 @@ export async function mountRoutes(
   // Wire the workflow engine's deps + start its watchdog (advances in-flight runs after restart).
   workflowEngine.setWebhookDispatcher(webhookDispatcher);
   workflowEngine.setPushService(pushService);
+  workflowEngine.setEmailService(emailService);
   workflowEngine.start().catch(err => logger.error('WorkflowEngine start failed', { error: String(err) }));
 
   // Start the scheduler (loads enabled jobs from storage)
