@@ -1,7 +1,19 @@
 # Ecosystem App Automation — operator how-to
 
-This is a short, plain guide for setting up **automation** for an ecosystem app on your AIMEAT
-node — the screen at **Profile → Ecosystem apps → (expand an app) → Automation**.
+This is a short, plain guide for setting up an ecosystem app on your AIMEAT node — the
+**Setup playbook** ("Käyttöönotto") and the **Automation** section at
+**Profile → Ecosystem apps → (expand an app)**.
+
+## The four roles
+
+There are exactly four roles, and they map cleanly onto what you see on the card:
+
+| Role | Who | Job |
+|------|-----|-----|
+| **App** | the external ecosystem app (`eco:{app}#…`) | produces refined data (e.g. feedback stats) |
+| **AIMEAT** | your node — MCP-reachable, under your control | the broker / hub; everything routes through it |
+| **Agent** | YOUR agent (e.g. Claude with your own key) | analyses the app's data into recommendations |
+| **Organism** | a group/space you own | where results live so they're reusable everywhere |
 
 ## The model: AIMEAT is the broker
 
@@ -22,6 +34,47 @@ The chain runs top to bottom:
 
 So: `app → AIMEAT → agent → AIMEAT → app`. You configure the two AIMEAT hops; the app and the
 agent only ever touch AIMEAT.
+
+## Why route through AIMEAT?
+
+It would be simpler for an app to bundle its own AI agent and answer your questions inside the
+app. The reason **not** to is everything that costs you the moment you do:
+
+- **It's your data, in one place.** The app deposits its refined data into *your* AIMEAT, not into
+  a vendor silo. You can read it, export it, and point other apps and agents at it.
+- **The agent is YOURS.** AIMEAT runs *your* agent (e.g. Claude with your own key) over the app's
+  data. The app only **recommends a prompt template** — it never owns the agent, the key, or the
+  output. The same agent works across all your apps.
+- **Reachable from any AI chat (MCP).** Because the data and the results live in AIMEAT, you can
+  query them from Claude, Grok, or ChatGPT by connecting aimeat.io as an MCP server — no per-app
+  integration, no export dance.
+- **Results outlast the app.** When the agent saves its analysis to an **organism**, those insights
+  are reusable for marketing copy, reports, and other apps, and shareable with your team. They don't
+  evaporate when you stop using the feedback tool.
+
+The bundled-agent alternative gives you a silo and lock-in: the insights are trapped in one tool,
+the agent is the vendor's, and you can't reach any of it from your own AI chat.
+
+## Use your insights from any AI chat (MCP)
+
+Once data flows through AIMEAT, the payoff is that you can **ask your insights in plain language
+from your AI chat** — Claude, Grok, or ChatGPT — instead of logging into the app.
+
+1. **Connect aimeat.io as an MCP server.** In your AI chat's settings, add aimeat.io as an MCP
+   connector and authenticate. (The exact steps depend on your AI chat; follow its "add MCP
+   connector / custom connector" flow.)
+2. **Read what the app produced.** For an app that deposits under `feedback.stats`, try:
+   > *Read my AIMEAT memory key `feedback.stats.<org>.latest` and summarise the top issues and
+   > trends.*
+3. **Save your research to an organism** so it's reusable later:
+   > *Save your analysis to my `<organism>` organism so I can track whether these issues improve.*
+4. **Follow up later** and close the loop:
+   > *Compare last month's `feedback.stats.<org>.latest` with this month's and tell me whether the
+   > issues we flagged actually improved.*
+
+The loop: **get info → explore → save to an organism → check later whether it happened as
+expected.** The card's MCP block builds the exact sample key for your app and gives you a copyable
+prompt.
 
 ## Set it up (once)
 
@@ -45,6 +98,25 @@ agent only ever touch AIMEAT.
 5. **Hit "Save automation".** That single button does both writes: it creates/updates the publish
    **schedule** (step ②) and saves the processing/delivery **recipe** (steps ③–⑤). You see one
    save; AIMEAT keeps two objects in sync behind it.
+
+## The Setup playbook on the card
+
+At the **top** of the expanded card there's a guided **Setup** ("Käyttöönotto") checklist that
+tracks your progress and tells you *why* each step matters. It mirrors the steps above:
+
+1. **App connected** — ✅ as soon as the app is connected (the card only exists for connected apps).
+   *AIMEAT now holds this app's link under your account.*
+2. **Connect your processing agent** — ✅ once your recipe has at least one agent. *Your agent —
+   e.g. Claude with your own key — analyses the data; it's YOUR agent, the app just recommends a
+   prompt template.* CTA: jumps to the Agents tab.
+3. **Set up automation** — ✅ once a publish schedule is enabled and the recipe is enabled with
+   agents. *When the app publishes data, AIMEAT runs your agent automatically.* CTA: scrolls to the
+   Automation section.
+4. **Choose an organism (recommended)** — ✅ once the recipe has an organism. *Results land in an
+   organism, so they're MCP-reachable, reusable, and shareable — not locked in the app.*
+
+Below the checklist, the **"Ask your insights in Claude, Grok, or ChatGPT"** block gives you a
+copyable sample prompt built from this app's real deposit key (see the MCP section above).
 
 ## Watch the chain
 
