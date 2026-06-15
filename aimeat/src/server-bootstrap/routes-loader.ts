@@ -261,7 +261,7 @@ export async function mountRoutes(
   app.use(agentOnboardingRouter(config, storage, webhookDispatcher));
   app.use(agentIntegrationRouter(config, storage));
   app.use(agentsRouter(config, storage));
-  app.use(ecosystemAppsRouter(config, storage));
+  app.use(ecosystemAppsRouter(config, storage, scheduler));
   app.use(ecosystemEventsRouter(config, storage));
   const notifyDirectoryChange = () => directoryService.notifyChange();
   app.use(consentRouter(config, storage, stats, notifyDirectoryChange));  // Phase 0.3

@@ -13,6 +13,8 @@
  *   v1.3.0 — 2026-06-15 — Add the advisory approval surface (B7/B8): listPendingAdvisories (GET .../advisories/pending),
  *     approveAdvisory (POST .../advisories/:id/approve — returns the envelope incl. `delivery`, even the 202
  *     offline-retry which arrives as ok:true so it does NOT throw), rejectAdvisory (POST .../advisories/:id/reject).
+ *   v1.4.0 — 2026-06-16 — revoke() is now a HARD DELETE: the server removes the binding entirely (card
+ *     disappears — no 'revoked' ghost) and cleans up the app's automation config; deposited data is kept.
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 
@@ -43,7 +45,12 @@ export async function approve(userCode, { action, scopes, data_areas } = {}) {
   return apiPost(`/v1/ecosystem-apps/${encodeURIComponent(userCode)}/approve`, { action, scopes, data_areas });
 }
 
-/** Revoke a connected GEAI by its app name (status → revoked; the tunnel is torn down server-side). */
+/**
+ * Disconnect (HARD-DELETE) a connected GEAI by its app name. The server emits binding.revoked, then
+ * removes the principal row entirely (the card disappears — no 'revoked' ghost) and cleans up the
+ * app's automation recipe / eco-capability schedules / pending advisories. The owner's deposited
+ * data is preserved. Reconnecting later starts over from scratch. Returns { deleted, app, geai }.
+ */
 export async function revoke(app) {
   return apiDelete(`/v1/ecosystem-apps/${encodeURIComponent(app)}`);
 }

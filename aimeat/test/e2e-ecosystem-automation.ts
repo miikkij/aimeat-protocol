@@ -9,6 +9,10 @@
  *   connected GEAI; the schedule CRUD + validation + capabilities-stored surface is the testable part.
  * @version-history
  *   v1.0.0 — 2026-06-15 — Initial creation (eco-capability scheduling).
+ *   v1.1.0 — 2026-06-16 — Phase 5: hard-delete (disconnect) coverage. Deposit owner data + create a
+ *     recipe, then DELETE the app and assert: the app is gone from the list (not status:revoked),
+ *     the recipe + eco-capability schedule are removed, the deposited data is preserved, and a
+ *     re-onboard creates a fresh record from scratch.
  */
 
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ecosystem-automation
@@ -81,9 +85,11 @@ const GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
 const ownerName = `ecoauto${Date.now()}`;
 let ownerToken = '';
 let geai = '';
+let geaiToken = '';
 const APP = 'statsapp';
 const CAP = 'publish-stats';
 const APP_PUBKEY = Buffer.from('eco-auto-verification-key-placeholder').toString('base64');
+const DEPOSITED_KEY = 'service.statsapp.feedback.stats';
 
 console.log('\n=== AIMEAT Ecosystem-App Automation E2E Test ===\n');
 console.log(`Base: ${BASE}`);
@@ -159,6 +165,7 @@ await test('App polls token → receives the GEAI credential', async () => {
   });
   assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
   assert(typeof body.access_token === 'string' && body.access_token.length > 0, 'got GEAI access_token');
+  geaiToken = body.access_token;
 });
 
 // ─── Phase 2: GET /v1/ecosystem-apps returns the stored capabilities ───
@@ -267,6 +274,104 @@ await test('Missing capability_id → 400 INVALID_ECO_JOB', async () => {
   });
   assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
   assert(body.error?.code === 'INVALID_ECO_JOB', `expected INVALID_ECO_JOB, got ${body.error?.code}`);
+});
+
+// ─── Phase 5: hard delete (disconnect) cleans up the binding + app-owned config, preserves data ───
+console.log('\nPhase 5 — Hard delete (disconnect) + cleanup + data preservation');
+
+await test('Deposited insight data lands in the owner Memory (preserved across delete)', async () => {
+  // The app's refined output is the OWNER's data, living in the owner's GHII namespace — exactly the
+  // data the disconnect must NOT touch. We write it directly so the post-delete read is unambiguous
+  // (a GEAI-namespace write would be hidden once the app record is gone, even though the row survives).
+  void geaiToken; // the GEAI credential is exercised elsewhere; the deposit here models owner-owned data
+  const { status, body } = await json('/v1/memory', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ key: DEPOSITED_KEY, value: { score: 4.7, n: 120 }, visibility: 'owner' }),
+  });
+  assert(status === 200 || status === 201, `status ${status}: ${JSON.stringify(body)}`);
+  assert(body.ok === true, `deposit write failed: ${JSON.stringify(body.error)}`);
+});
+
+await test('Owner creates an automation recipe for the app', async () => {
+  const { status, body } = await json(`/v1/ecosystem-apps/${encodeURIComponent(APP)}/automation/recipe`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ agents: [], enabled: true }),
+  });
+  assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  assert(body.ok === true, `recipe upsert failed: ${JSON.stringify(body.error)}`);
+});
+
+await test('DELETE /v1/ecosystem-apps/:app → 200 { deleted: true }', async () => {
+  const { status, body } = await json(`/v1/ecosystem-apps/${encodeURIComponent(APP)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  assert(body.data.deleted === true, `expected deleted:true, got ${JSON.stringify(body.data)}`);
+  assert(body.data.geai === geai, `geai mismatch: ${body.data.geai}`);
+});
+
+await test('GET /v1/ecosystem-apps no longer lists the app (gone, not status:revoked)', async () => {
+  const { status, body } = await json('/v1/ecosystem-apps', {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  const apps = body.data.ecosystem_apps as any[];
+  const rec = apps.find(a => a.geai === geai || a.app === APP);
+  assert(!rec, `app must be gone entirely, but found: ${JSON.stringify(rec)}`);
+});
+
+await test('The automation recipe is gone (getAutomationRecipe → null)', async () => {
+  const { status, body } = await json(`/v1/ecosystem-apps/${encodeURIComponent(APP)}/automation/recipe`, {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  // The route returns { recipe: null } for a non-existent recipe (200, not 404).
+  assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  assert(body.data.recipe === null, `recipe should be null after delete, got ${JSON.stringify(body.data.recipe)}`);
+});
+
+await test('The eco-capability schedule is gone', async () => {
+  const { status, body } = await json('/v1/schedules', {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  const all = (body.data.managed ?? []) as any[];
+  const found = all.find((s: any) => s.id === scheduleId);
+  assert(!found, `schedule ${scheduleId} should be deleted, but it is still listed`);
+});
+
+await test('The deposited data key is PRESERVED in the owner Memory', async () => {
+  const { status, body } = await json(`/v1/memory/${encodeURIComponent(DEPOSITED_KEY)}`, {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(status === 200, `expected 200 (data preserved), got ${status}: ${JSON.stringify(body)}`);
+  assert(body.data.value?.score === 4.7, `deposited value should survive delete, got ${JSON.stringify(body.data.value)}`);
+});
+
+await test('Re-onboarding after delete creates a FRESH record (existing_app=false path)', async () => {
+  // A brand-new hello → approve must succeed and produce the same GEAI shape from scratch.
+  const hello = await json('/v1/ecosystem-apps/hello', {
+    method: 'POST',
+    body: JSON.stringify({
+      owner: ownerName, app: APP, display_name: 'Stats App (re)', public_key: APP_PUBKEY,
+      scopes: ['memory:read', 'memory:write'],
+      manifest: { app: APP, scopes: ['memory:read', 'memory:write'], capabilities: [{ id: CAP }] },
+    }),
+  });
+  assert(hello.body.ok === true, `re-hello failed: ${JSON.stringify(hello.body.error)}`);
+  const approve = await json(`/v1/ecosystem-apps/${hello.body.data.user_code}/approve`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ action: 'approve', scopes: ['memory:read', 'memory:write'] }),
+  });
+  assert(approve.status === 200, `re-approve status ${approve.status}: ${JSON.stringify(approve.body)}`);
+  assert(approve.body.data.geai === geai, `re-onboard geai mismatch: ${approve.body.data.geai}`);
+  // It now lists again as a fresh active record (no recipe/schedule carried over).
+  const list = await json('/v1/ecosystem-apps', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  const rec = (list.body.data.ecosystem_apps as any[]).find(a => a.geai === geai);
+  assert(!!rec && rec.status === 'active', `re-onboarded app should be active, got ${JSON.stringify(rec)}`);
 });
 
 // ─── Summary ───
