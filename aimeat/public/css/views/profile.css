@@ -9,6 +9,8 @@
  *   v1.16.0 — 2026-06-15 — Ecosystem "Data this app wrote" rows expandable: .pf-eco-data-entry,
  *     .pf-eco-data-body/-pre/-md (readable JSON/markdown value blocks); row is now a button.
  *     Removed .pf-eco-data-val (one-line preview). Added .pf-eco-sub-direction caption.
+ *   v1.16.1 — 2026-06-15 — Compact font on .pf-eco-data-body so the shared <JsonValue> tree matches
+ *     the agent-style sizing (the pf-agd-json-* tree inherits this size).
  *   v1.14.0 — 2026-06-10 — SchemaForm usability: .pj-field-hint (per-field hint),
  *     .pj-field-invalid (missing-required outline) + .pj-form-error message.
  *   v1.13.0 — 2026-06-10 — Workspace renew, phase 2: .pj-ws-head-actions, review
@@ -2670,7 +2672,7 @@
 .pf-eco-data-key { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pf-eco-data-vis { flex: 0 0 auto; }
 .pf-eco-data-time { flex: 0 0 auto; margin-left: auto; white-space: nowrap; }
-.pf-eco-data-body { padding: 0 0 .5rem 1.2rem; }
+.pf-eco-data-body { padding: 0 0 .5rem 1.2rem; font-size: .78rem; line-height: 1.5; }
 .pf-eco-data-pre { margin: 0; padding: .6rem .7rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; font-family: var(--font-mono, monospace); font-size: .78rem; color: var(--text); white-space: pre-wrap; word-break: break-word; max-height: 22rem; overflow: auto; }
 .pf-eco-data-md { padding: .4rem .6rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 6px; font-size: .82rem; color: var(--text); max-height: 22rem; overflow: auto; }
 .pf-eco-sub-direction { margin: -.25rem 0 .5rem; }
