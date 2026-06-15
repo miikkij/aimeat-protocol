@@ -1055,8 +1055,6 @@ export default function EcosystemTab({ onStats, showToast }) {
 
   if (loading) return html`<div class="pf-eco"><${Spinner} /></div>`;
 
-  const connectorCmd = 'aimeat connect serve --ecosystem';
-
   return html`
     <div class="pf-eco">
       <div class="pf-eco-head">
@@ -1072,10 +1070,6 @@ export default function EcosystemTab({ onStats, showToast }) {
       ${connectOpen && html`
         <div class="pf-eco-connect">
           <p class="pf-eco-connect-note">${t('profile.ecosystem.connectNote')}</p>
-          <div class="pf-eco-cmd-row">
-            <code class="pf-eco-cmd">${connectorCmd}</code>
-            <${CopyButton} className="copy-prompt-btn" text=${connectorCmd} />
-          </div>
         </div>`}
 
       ${pending.length > 0 && html`
