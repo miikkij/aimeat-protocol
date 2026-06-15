@@ -69,6 +69,15 @@
  *     when data is published", no fabricated task status); deliver = the pending advisories folded in with
  *     inline Approve/Reject. Lazy-loads schedules+agents+orgs+recipe+advisories on expand, refreshes on
  *     aimeat-live-update. Frontend-only; no backend logic changed. Operator how-to: docs/ecosystem-app-automation-howto.md.
+ *   v2.2.0 — 2026-06-15 — NON-TECHNICAL card redesign (value-first + hide the plumbing). The expanded
+ *     card is reordered human-first: friendly name + an "yhdistetty sinuna" subtitle (the scary raw
+ *     `eco:…` principal string is REMOVED from the header), a one-line value statement (appValueLine),
+ *     then the value-first Setup playbook → Automation → "what this app saved" → an accessible plain
+ *     "Poista yhteys" disconnect. All the plumbing — the GEAI principal, raw grants/scopes (incl. `*`),
+ *     event subscriptions and the binding — is relocated into ONE new collapsed <EcoTechDetails>
+ *     ("Tekniset tiedot") disclosure with a subtly distinct faint background + 🔧 label at the very
+ *     bottom. Subscribe/unsubscribe still work, just relocated. Copy is reworded benefit-first in i18n
+ *     (no "resepti", no raw scope strings in the human area). Frontend + i18n only; no backend logic.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -857,6 +866,84 @@ function EcoSetupPlaybook({ app, showToast }) {
     </div>`;
 }
 
+/**
+ * The collapsed **"Technical details" ("Tekniset tiedot")** disclosure at the very bottom of an
+ * expanded GEAI card. Default CLOSED, with a subtly distinct faint background so it reads as
+ * optional under-the-hood info, not something a non-technical user must touch.
+ *
+ * It holds the plumbing relocated out of the human/value-first area:
+ *   • the GEAI principal string (`eco:…`),
+ *   • the raw grants / scopes (incl. the `*` wildcard) — with a plain "access" one-liner above,
+ *   • the outbound event subscriptions (the memory.write select + Tilaa, still fully functional),
+ *   • the binding (AIMEAT side / app / key fingerprint + its explanation).
+ *
+ * All the existing functionality (subscribe / unsubscribe) is preserved here verbatim — only
+ * relocated. The toggle is independent per card and resets when the card is collapsed/re-expanded.
+ */
+function EcoTechDetails({ app, appSubs, onUnsubscribe, onSubscribe, subForm, setSubForm }) {
+  const [open, setOpen] = useState(false);
+  return html`
+    <div class="pf-eco-tech">
+      <button class="pf-eco-tech-toggle" aria-expanded=${open} onClick=${() => setOpen(o => !o)}>
+        <span class="pf-eco-caret">${open ? '▼' : '▶'}</span>
+        <span class="pf-eco-tech-icon">🔧</span>
+        <span class="pf-eco-tech-toggle-label">${t('profile.ecosystem.techDetailsTitle')}</span>
+      </button>
+      ${open && html`
+        <div class="pf-eco-tech-body">
+          <p class="pf-eco-dim pf-eco-tech-hint">${t('profile.ecosystem.techDetailsHint')}</p>
+
+          <div class="pf-eco-tech-section">
+            <div class="pf-eco-tech-section-title">${t('profile.ecosystem.principalTitle')}</div>
+            <code class="pf-eco-mono pf-eco-tech-principal">${app.geai}</code>
+          </div>
+
+          <div class="pf-eco-tech-section">
+            <div class="pf-eco-tech-section-title">${t('profile.ecosystem.grants')}</div>
+            <p class="pf-eco-dim pf-eco-tech-access">${t('profile.ecosystem.accessPlain')}</p>
+            <div class="pf-eco-chips">
+              ${(app.scopes || []).map(s => html`<span class="pf-eco-chip" key=${s}>${s}</span>`)}
+            </div>
+            ${(app.data_areas || []).length > 0 && html`
+              <div class="pf-eco-areas">
+                ${app.data_areas.map((g, i) => html`
+                  <div class="pf-eco-area" key=${i}>${g.area}: <span class="pf-eco-mono">${g.pattern}</span> (${(g.rights || []).join(', ')})</div>`)}
+              </div>`}
+          </div>
+
+          <div class="pf-eco-tech-section">
+            <div class="pf-eco-tech-section-title">${t('profile.ecosystem.subscriptions')}</div>
+            <p class="pf-eco-dim pf-eco-sub-direction">${t('profile.ecosystem.subscriptionsDirection')}</p>
+            ${appSubs.length === 0
+              ? html`<div class="pf-eco-dim">${t('profile.ecosystem.noSubs')}</div>`
+              : appSubs.map(s => html`
+                <div class="pf-eco-sub-row" key=${s.event + (s.createdAt || '')}>
+                  <span class="pf-eco-mono">${s.event}</span>
+                  ${s.match && html`<span class="pf-eco-dim">${JSON.stringify(s.match)}</span>`}
+                  <button class="btn-ghost btn-sm" onClick=${() => onUnsubscribe(app.app, s.event)}>${t('profile.ecosystem.removeSub')}</button>
+                </div>`)}
+            ${app.status !== 'revoked' && html`
+              <div class="pf-eco-sub-add">
+                <select class="pf-eco-select" onChange=${e => setSubForm(f => ({ ...f, [app.app]: { event: e.target.value } }))}>
+                  ${OUTBOUND_EVENTS.map(ev => html`<option value=${ev} key=${ev}>${ev}</option>`)}
+                </select>
+                <button class="btn-outline btn-sm" onClick=${() => onSubscribe(app.app)}>${t('profile.ecosystem.addSub')}</button>
+              </div>`}
+          </div>
+
+          <div class="pf-eco-tech-section">
+            <div class="pf-eco-tech-section-title">${t('profile.ecosystem.binding')}</div>
+            <div class="pf-eco-binding">
+              <div>${t('profile.ecosystem.aimeatSide')}: <span class="pf-eco-mono">${app.owner}</span></div>
+              <div>${t('profile.ecosystem.appOrigin')}: <span class="pf-eco-mono">${app.app}</span></div>
+              <div>${t('profile.ecosystem.keyFp')}: <span class="pf-eco-mono">${keyFp(app.public_key)}</span></div>
+              <p class="pf-eco-dim">${t('profile.ecosystem.bindingNote')}</p>
+            </div>
+          </div>
+        </div>`}
+    </div>`;
+}
+
 export default function EcosystemTab({ onStats, showToast }) {
   const [apps, setApps] = useState([]);
   const [pending, setPending] = useState([]);
@@ -1019,46 +1106,18 @@ export default function EcosystemTab({ onStats, showToast }) {
               <div class="pf-eco-card-head" onClick=${() => toggleCard(app)}>
                 <span class="pf-eco-caret">${isOpen ? '▼' : '▶'}</span>
                 <span class="pf-eco-icon">🔌</span>
-                <strong class="pf-eco-name">${app.display_name || app.app}</strong>
-                <span class="pf-eco-mono">${app.geai}</span>
+                <span class="pf-eco-head-title">
+                  <strong class="pf-eco-name">${app.display_name || app.app}</strong>
+                  ${app.owner && html`<span class="pf-eco-dim pf-eco-head-owner">${t('profile.ecosystem.connectedAsYou', { owner: app.owner })}</span>`}
+                </span>
                 <span class="pf-eco-status pf-eco-status-${app.status}">${t(`profile.ecosystem.status.${app.status}`)}</span>
                 <span class="pf-eco-dim pf-eco-lastseen">${app.last_seen ? timeAgo(app.last_seen) : ''}</span>
               </div>
               ${isOpen && html`
                 <div class="pf-eco-card-body">
+                  <p class="pf-eco-value-line">${t('profile.ecosystem.appValueLine')}</p>
+
                   ${app.status !== 'revoked' && html`<${EcoSetupPlaybook} app=${app} showToast=${showToast} />`}
-
-                  <div class="pf-eco-section">
-                    <div class="pf-eco-section-title">${t('profile.ecosystem.grants')}</div>
-                    <div class="pf-eco-chips">
-                      ${(app.scopes || []).map(s => html`<span class="pf-eco-chip" key=${s}>${s}</span>`)}
-                    </div>
-                    ${(app.data_areas || []).length > 0 && html`
-                      <div class="pf-eco-areas">
-                        ${app.data_areas.map((g, i) => html`
-                          <div class="pf-eco-area" key=${i}>${g.area}: <span class="pf-eco-mono">${g.pattern}</span> (${(g.rights || []).join(', ')})</div>`)}
-                      </div>`}
-                  </div>
-
-                  <div class="pf-eco-section">
-                    <div class="pf-eco-section-title">${t('profile.ecosystem.subscriptions')}</div>
-                    <p class="pf-eco-dim pf-eco-sub-direction">${t('profile.ecosystem.subscriptionsDirection')}</p>
-                    ${appSubs.length === 0
-                      ? html`<div class="pf-eco-dim">${t('profile.ecosystem.noSubs')}</div>`
-                      : appSubs.map(s => html`
-                        <div class="pf-eco-sub-row" key=${s.event + (s.createdAt || '')}>
-                          <span class="pf-eco-mono">${s.event}</span>
-                          ${s.match && html`<span class="pf-eco-dim">${JSON.stringify(s.match)}</span>`}
-                          <button class="btn-ghost btn-sm" onClick=${() => onUnsubscribe(app.app, s.event)}>${t('profile.ecosystem.removeSub')}</button>
-                        </div>`)}
-                    ${app.status !== 'revoked' && html`
-                      <div class="pf-eco-sub-add">
-                        <select class="pf-eco-select" onChange=${e => setSubForm(f => ({ ...f, [app.app]: { event: e.target.value } }))}>
-                          ${OUTBOUND_EVENTS.map(ev => html`<option value=${ev} key=${ev}>${ev}</option>`)}
-                        </select>
-                        <button class="btn-outline btn-sm" onClick=${() => onSubscribe(app.app)}>${t('profile.ecosystem.addSub')}</button>
-                      </div>`}
-                  </div>
 
                   <${EcoAutomationSection} app=${app} showToast=${showToast} />
 
@@ -1075,19 +1134,18 @@ export default function EcosystemTab({ onStats, showToast }) {
                           </div>`}
                   </div>
 
-                  <div class="pf-eco-section">
-                    <div class="pf-eco-section-title">${t('profile.ecosystem.binding')}</div>
-                    <div class="pf-eco-binding">
-                      <div>${t('profile.ecosystem.aimeatSide')}: <span class="pf-eco-mono">${app.owner}</span></div>
-                      <div>${t('profile.ecosystem.appOrigin')}: <span class="pf-eco-mono">${app.app}</span></div>
-                      <div>${t('profile.ecosystem.keyFp')}: <span class="pf-eco-mono">${keyFp(app.public_key)}</span></div>
-                      <p class="pf-eco-dim">${t('profile.ecosystem.bindingNote')}</p>
-                    </div>
-                    ${app.status !== 'revoked' && html`
+                  ${app.status !== 'revoked' && html`
+                    <div class="pf-eco-section pf-eco-disconnect">
+                      <div class="pf-eco-section-title">${t('profile.ecosystem.disconnectTitle')}</div>
+                      <p class="pf-eco-dim pf-eco-disconnect-hint">${t('profile.ecosystem.disconnectHint')}</p>
                       <button class="btn-danger-solid btn-sm" onClick=${() => { setRevokeApp(app.app); setRevokeInput(''); }}>
-                        ${t('profile.ecosystem.revoke')}
-                      </button>`}
-                  </div>
+                        ${t('profile.ecosystem.disconnect')}
+                      </button>
+                    </div>`}
+
+                  <${EcoTechDetails} app=${app} appSubs=${appSubs}
+                    onUnsubscribe=${onUnsubscribe} onSubscribe=${onSubscribe}
+                    subForm=${subForm} setSubForm=${setSubForm} />
                 </div>`}
             </div>`;
         })}
