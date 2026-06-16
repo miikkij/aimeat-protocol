@@ -1608,11 +1608,15 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
           try { o.prereq = await evaluateOfferPrereqs(storage, config, owner, a.name, offer); }
           catch { /* a prereq-eval error must never break the whole feed */ }
         }
-        // Bundling workflows (a multi-step chain this offer is a step of).
+        // Bundling workflows (a multi-step chain this offer is a step of). Each carries `scheduled`
+        // (the workflow fires on a cron) so the client can surface "runs automatically" standing.
         const bundles = workflows
           .filter(w => (w.steps?.length ?? 0) > 1 && w.steps.some(s => agentInStep(s, a.name) && s.offer === offer.id))
-          .map(w => ({ id: w.id, title: w.title }));
+          .map(w => ({ id: w.id, title: w.title, scheduled: w.trigger?.kind === 'schedule' }));
         if (bundles.length) o.workflows = bundles;
+        // `auto`: this offer produces on a cadence — schedule-born, or a step of a scheduled workflow.
+        // Drives the "⏱ Automatiikassa" pin + standing sort (value ≠ run-count).
+        o.auto = !!(offer.availability?.scheduleBorn) || bundles.some(b => b.scheduled);
         enriched.push(o);
       }
 
