@@ -18,7 +18,9 @@
  *   v1.4.0 -- 2026-06-16 -- Richer Offerings card: structured (JSON) sample via DeliverableBody format;
  *     per-offer "Recent runs" (lazy-fetched, reuses DeliverableRow); prerequisites — SHOW ("needs
  *     first"), GATE (disable Ask + reason when a hard prereq is unmet, from offer.prereq), and BUNDLE
- *     (run a whole workflow this offer is a step of, from offer.workflows).
+ *     (this offer is a step of a workflow, from offer.workflows).
+ *   v1.4.1 -- 2026-06-16 -- BUNDLE navigates to the Workflows tab (aimeat-open-tab event) instead of
+ *     launching the run, so the user reviews + runs the chain deliberately there.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -87,14 +89,12 @@ function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged,
     }
   };
 
-  const runBundle = async (wf) => {
-    setBusy(true);
-    try {
-      const r = await offersService.runWorkflow(wf.id);
-      if (r?.ok === false) showToast(r?.error?.message || (t('profile.offers.bundleFailed') || 'Could not start the workflow'));
-      else showToast((t('profile.offers.bundleStarted') || 'Workflow “{wf}” started.').replace('{wf}', locTitle(wf.title) || wf.id));
-    } catch (e) { showToast((e && e.message) || (t('profile.offers.bundleFailed') || 'Could not start the workflow')); }
-    finally { setBusy(false); }
+  // Bundle: don't launch the chain from here — take the user to the Workflows tab, where they can
+  // review the whole workflow (blueprint + steps + run history) and run it deliberately. Uses the
+  // profile SPA's cross-tab navigation event (LandingPage listens and opens the tab inline).
+  const openWorkflow = (wf) => {
+    window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'workflows' } }));
+    showToast((t('profile.offers.bundleOpened') || 'Opening “{wf}” in Workflows…').replace('{wf}', locTitle(wf.title) || wf.id));
   };
 
   const doAsk = async () => {
@@ -185,9 +185,9 @@ function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged,
 
           ${bundles.length ? html`
             <div class="of-bundle">
-              <div class="of-mini">${t('profile.offers.bundleHint') || 'This is a step of a workflow — run the whole chain as one:'}</div>
+              <div class="of-mini">${t('profile.offers.bundleHint') || 'This is a step of a workflow — open it to run the whole chain:'}</div>
               <div class="flex-row-wrap">${bundles.map(wf => html`
-                <button class="btn-outline btn-sm" key=${wf.id} disabled=${busy} onClick=${() => runBundle(wf)}>▶▶ ${escHtml(locTitle(wf.title) || wf.id)}</button>`)}</div>
+                <button class="btn-outline btn-sm" key=${wf.id} onClick=${() => openWorkflow(wf)}>🔀 ${escHtml(locTitle(wf.title) || wf.id)} →</button>`)}</div>
             </div>
           ` : null}
 
