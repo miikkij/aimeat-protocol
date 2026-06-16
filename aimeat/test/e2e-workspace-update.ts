@@ -5,6 +5,8 @@
  *   are untouched. Creator-only (a plain member gets 403); empty update is rejected.
  * @version-history
  *   v1.0.0 — 2026-06-09 — Initial.
+ *   v1.1.0 — 2026-06-16 — add_spaces round-trips the optional `contract` + `description` fields
+ *     (the workspace UI groups spaces by `contract`); a no-namespace entry is still rejected.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workspace-update
 
@@ -105,6 +107,30 @@ await test('2c. add_spaces UNIONS new spaces (defaults filled), skips existing, 
     // re-running the same add is idempotent (everything skipped, nothing added)
     const r2 = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { method: 'PUT', headers: auth(creatorTok), body: JSON.stringify({ add_spaces: [{ name: 'risk', namespace: 'shared.risks', mode: 'records' }] }) });
     assert(r2.status === 200 && (r2.body.data.added || []).length === 0 && r2.body.data.skipped?.includes('risk'), `idempotent re-add: ${JSON.stringify(r2.body.data)}`);
+});
+
+await test('2d. add_spaces preserves a `contract` + `description` field (UI grouping data)', async () => {
+    // A contract agent stamps `contract` (so the workspace UI groups the spaces) + a one-line description.
+    const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { method: 'PUT', headers: auth(creatorTok), body: JSON.stringify({
+        add_spaces: [
+            { name: 'research-request', namespace: 'shared.research-requests', mode: 'records', contract: 'research', description: 'Briefs awaiting work' },
+            { name: 'research-result', namespace: 'shared.research-results', mode: 'records', contract: 'research', description: 'Findings returned' },
+        ],
+    }) });
+    assert(r.status === 200, `add_spaces ${r.status}: ${JSON.stringify(r.body)}`);
+    assert(r.body.data.added?.includes('research-request') && r.body.data.added?.includes('research-result'), `added: ${JSON.stringify(r.body.data.added)}`);
+    const man = (await json(`/v1/memory/${encodeURIComponent(`${root()}.meta.manifest`)}`, { headers: auth(creatorTok) })).body.data.value;
+    const req = man.objectTypes.find((o: any) => o.name === 'research-request');
+    const res = man.objectTypes.find((o: any) => o.name === 'research-result');
+    assert(req?.contract === 'research' && res?.contract === 'research', `contract preserved: ${JSON.stringify({ req: req?.contract, res: res?.contract })}`);
+    assert(req?.description === 'Briefs awaiting work', `description preserved: ${JSON.stringify(req?.description)}`);
+});
+
+await test('2e. failure: add_spaces entry without a namespace is rejected', async () => {
+    const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { method: 'PUT', headers: auth(creatorTok), body: JSON.stringify({
+        add_spaces: [{ name: 'broken', mode: 'records', contract: 'research' }],
+    }) });
+    assert(r.status === 400, `expected 400, got ${r.status}: ${JSON.stringify(r.body)}`);
 });
 
 await test('3. empty update (no name/readme) is rejected', async () => {

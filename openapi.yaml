@@ -128,6 +128,8 @@ tags:
     description: Per-agent directives — purpose, rules, memory areas, and resources
   - name: Agent Messages
     description: Bidirectional messaging between owners and agents with thread support
+  - name: Direct Messages
+    description: Human↔human (GHII↔GHII) direct messaging with first-contact consent, federation delivery, and media attachments
   - name: Agent Webhooks
     description: Webhook registration, testing, and delivery log for push-based agent notifications
   - name: Agent Telemetry
@@ -2875,6 +2877,121 @@ components:
         processedAt:
           type: string
           format: date-time
+
+    DirectMessageAttachment:
+      type: object
+      description: A media object referenced by a direct message (inline via cid:{id} or appended).
+      properties:
+        id: { type: string }
+        inline: { type: boolean }
+        storageKey: { type: string }
+        ownerGhii: { type: string }
+        originNodeId: { type: string }
+        mode:
+          type: string
+          enum: [reference, duplicate]
+          description: duplicate = recipient's local copy (the norm); reference = transient (pending/awaiting quota).
+        localKey: { type: string }
+        mime: { type: string }
+        size: { type: integer }
+        name: { type: string }
+        kind:
+          type: string
+          enum: [image, audio, video, file]
+
+    DirectMessageRecord:
+      type: object
+      description: One mailbox copy of a human↔human direct message.
+      properties:
+        id: { type: string, format: uuid }
+        ownerGhii: { type: string, description: Whose mailbox copy this row is. }
+        conversationId: { type: string }
+        senderGhii: { type: string }
+        recipientGhii: { type: string }
+        body:
+          type: string
+          description: 'GFM markdown; inline media via cid:{attachmentId}.'
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/DirectMessageAttachment'
+        status:
+          type: string
+          enum: [queued, sent, delivered, read, failed, undeliverable]
+        direction:
+          type: string
+          enum: [inbound, outbound]
+        replyToId: { type: string, format: uuid }
+        origin:
+          type: string
+          enum: [local, federation]
+        originNodeId: { type: string }
+        error: { type: string }
+        createdAt: { type: string, format: date-time }
+        deliveredAt: { type: string, format: date-time }
+        readAt: { type: string, format: date-time }
+
+    DirectMessageWire:
+      type: object
+      description: The message payload carried in a federation delivery (subset of the record).
+      properties:
+        id: { type: string, format: uuid }
+        conversationId: { type: string }
+        senderGhii: { type: string }
+        recipientGhii: { type: string }
+        body: { type: string }
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/DirectMessageAttachment'
+        replyToId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+
+    DirectMessageSend:
+      type: object
+      description: Request body for sending a direct message.
+      required: [to]
+      properties:
+        to: { type: string, description: Recipient human GHII (owner@node). }
+        body: { type: string, description: GFM markdown. May be empty if attachment-only. }
+        reply_to: { type: string, format: uuid }
+        attachments:
+          type: array
+          items:
+            type: object
+            required: [storage_key, mime, size, kind]
+            properties:
+              storage_key: { type: string }
+              mime: { type: string }
+              size: { type: integer }
+              kind: { type: string, enum: [image, audio, video, file] }
+              name: { type: string }
+              inline: { type: boolean }
+              id: { type: string }
+
+    ConversationSummary:
+      type: object
+      properties:
+        conversationId: { type: string }
+        peerGhii: { type: string }
+        lastMessage: { type: string }
+        lastDirection: { type: string, enum: [inbound, outbound] }
+        messageCount: { type: integer }
+        unread: { type: integer }
+        updatedAt: { type: string, format: date-time }
+
+    ContactConsentRecord:
+      type: object
+      description: Per-pair first-contact consent state (the messaging gate).
+      properties:
+        ownerGhii: { type: string }
+        contactId: { type: string }
+        state:
+          type: string
+          enum: [pending, accepted, blocked]
+        firstMessageId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
 
     AgentOnboardingRecord:
       type: object
@@ -21458,6 +21575,463 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  # ============================================================
+  # Direct Messages (human↔human GHII messaging + federation)
+  # ============================================================
+
+  /v1/messages:
+    post:
+      operationId: sendDirectMessage
+      summary: Send a direct message
+      description: >-
+        Send a human↔human direct message to a recipient GHII (owner@node). Sender may be an owner
+        (GHII), agent (GAII) or ecosystem app (GEAI, scope messages:send). Local recipients are
+        delivered immediately; remote recipients are delivered over federation (queued + retried if
+        the peer is unreachable). First contact from an unknown sender is held as a request on the
+        recipient side. Body is GFM markdown; attachments are storage-object descriptors.
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DirectMessageSend'
+      responses:
+        '201':
+          description: Message created (sender copy)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            $ref: '#/components/schemas/DirectMessageRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Recipient is not accepting messages from the sender (blocked)
+        '404':
+          description: Recipient not found
+
+  /v1/messages/inbox:
+    get:
+      operationId: listInbox
+      summary: List inbox (inbound messages from accepted contacts)
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: unread
+          in: query
+          schema: { type: boolean }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: per_page
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: Inbox page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          messages:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/DirectMessageRecord'
+                          total: { type: integer }
+                          unread: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/messages/conversations:
+    get:
+      operationId: listConversations
+      summary: List conversation threads (accepted)
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Conversation summaries
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          conversations:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/ConversationSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/messages/conversations/{conversationId}:
+    get:
+      operationId: getConversation
+      summary: Get a full conversation thread
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: per_page
+          in: query
+          schema: { type: integer, default: 50 }
+      responses:
+        '200':
+          description: Thread messages
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          messages:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/DirectMessageRecord'
+                          total: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/messages/conversations/{conversationId}/read:
+    post:
+      operationId: markConversationRead
+      summary: Mark a conversation read (fires read receipts)
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Number of messages marked read
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/messages/{id}/read:
+    patch:
+      operationId: markMessageRead
+      summary: Mark a single message read (fires a read receipt)
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Updated message
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          message:
+                            $ref: '#/components/schemas/DirectMessageRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/messages/{id}:
+    delete:
+      operationId: deleteDirectMessage
+      summary: Delete the caller's copy of a message
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/messages/requests:
+    get:
+      operationId: listMessageRequests
+      summary: List pending first-contact requests
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Pending requests
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          requests:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                contactId: { type: string }
+                                conversationId: { type: string }
+                                preview: { type: string }
+                                createdAt: { type: string, format: date-time }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/messages/requests/{contactId}/accept:
+    post:
+      operationId: acceptMessageRequest
+      summary: Accept a first-contact request
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: contactId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Contact accepted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          contact:
+                            $ref: '#/components/schemas/ContactConsentRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/messages/contacts/{contactId}/block:
+    post:
+      operationId: blockContact
+      summary: Block a contact (or proactively hard-block)
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: contactId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Contact blocked
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          contact:
+                            $ref: '#/components/schemas/ContactConsentRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/messages/contacts:
+    get:
+      operationId: listContacts
+      summary: List contacts and their states
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: state
+          in: query
+          schema: { type: string, enum: [pending, accepted, blocked] }
+      responses:
+        '200':
+          description: Contacts
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          contacts:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/ContactConsentRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/federation/message:
+    post:
+      operationId: receiveFederatedMessage
+      summary: Receive a direct message from a peer node (signed)
+      description: >-
+        Node-to-node delivery of a human↔human direct message. The payload is signed with the source
+        node's Ed25519 key and verified against the peer's public key. The recipient must be a human
+        GHII hosted on this node; the first-contact gate applies. Not for client use.
+      tags: [Federation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_node, message, signature]
+              properties:
+                source_node: { type: string }
+                timestamp: { type: string, format: date-time }
+                signature: { type: string }
+                message:
+                  $ref: '#/components/schemas/DirectMessageWire'
+      responses:
+        '200':
+          description: Delivered
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Missing or invalid signature
+        '403':
+          description: Source not an active peer, or recipient blocked the sender
+        '404':
+          description: Recipient not hosted on this node
+
+  /v1/federation/message/receipt:
+    post:
+      operationId: receiveFederatedMessageReceipt
+      summary: Receive a delivery/read receipt from a peer node (signed)
+      tags: [Federation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_node, message_id, kind, signature]
+              properties:
+                source_node: { type: string }
+                message_id: { type: string, format: uuid }
+                kind: { type: string, enum: [read, accepted, blocked] }
+                timestamp: { type: string, format: date-time }
+                signature: { type: string }
+      responses:
+        '200':
+          description: Receipt applied
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Missing or invalid signature
+        '403':
+          description: Source not an active peer
+
+  /v1/federation/storage/grant:
+    post:
+      operationId: grantMessageAttachment
+      summary: Mint a presigned download for a direct-message attachment (signed)
+      description: >-
+        The origin node verifies the requesting peer's signature AND that the named message was sent
+        to the requesting recipient and references this storage key, then returns a short-lived,
+        single-file presigned download URL. Used by a recipient node to duplicate cross-node
+        attachments. Not for client use.
+      tags: [Federation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_node, message_id, storage_key, owner_ghii, recipient_ghii, signature]
+              properties:
+                source_node: { type: string }
+                message_id: { type: string, format: uuid }
+                conversation_id: { type: string }
+                storage_key: { type: string }
+                owner_ghii: { type: string }
+                recipient_ghii: { type: string }
+                timestamp: { type: string, format: date-time }
+                signature: { type: string }
+      responses:
+        '200':
+          description: Download grant
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          download_url: { type: string }
+                          expires_in_seconds: { type: integer }
+        '401':
+          description: Missing or invalid signature
+        '403':
+          description: Source not an active peer, or no matching message/attachment
+        '404':
+          description: Attachment file not found
 
   # ============================================================
   # Agent Capabilities & Activity

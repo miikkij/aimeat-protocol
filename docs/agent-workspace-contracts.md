@@ -103,8 +103,8 @@ aimeat_workspace_read({ organism_id, ws })            → manifest.objectTypes (
 aimeat_workspace_update({
   organism_id, ws,
   add_spaces: [
-    { name: "research-request", namespace: "shared.research-requests", mode: "records" },
-    { name: "research-result",  namespace: "shared.research-results",  mode: "records" }
+    { name: "research-request", namespace: "shared.research-requests", mode: "records", contract: "research", description: "Research briefs awaiting work" },
+    { name: "research-result",  namespace: "shared.research-results",  mode: "records", contract: "research", description: "Findings + sources the agent returns" }
   ],
   schemas: {
     "shared.research-requests": <jsonSchema>,
@@ -116,6 +116,15 @@ aimeat_workspace_update({
 POST /v1/organisms/:id/workspace-access/grant   { ws, grantee: "<agent-owner | agent#owner@node>", role: "contributor" }
 #    (or, if the agent requested access, approve it as contributor via aimeat_workspace_access decide)
 ```
+
+> **Stamp `contract` (recommended).** Give every space the contract provisions the SAME `contract: "<id>"`
+> (matching the contract's `id` from §2), and an optional one-line `description`. The workspace UI then
+> groups all spaces sharing a `contract` into one self-contained unit (its own nav group), and shows the
+> `description` (or its localized `type.<name>.desc`) under each space — so a reader knows what belongs
+> where. Spaces with no `contract` fall into the generic Records / Document-spaces groups. Existing
+> workspaces provisioned before this convention show no contract group until re-provisioned (re-running
+> `add_spaces` with `contract` only updates new spaces — to tag already-present spaces, the creator edits
+> the manifest and adds the field). 
 
 > `add_spaces` is the safe path — it can only ADD (never remove/rename), and a contract agent only ever
 > needs to add. To rename/remove a space or change the publish gate, send a full replacement `manifest`.

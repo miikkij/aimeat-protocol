@@ -6,6 +6,9 @@
  *   resolve gate approvals.
  * @usage import * as orgService from '/js/services/organisms.js';
  * @version-history
+ *   v1.2.0 — 2026-06-16 — Generator prompt: each objectType gets a one-line "description" and a
+ *     matching "type.<name>.desc" i18n key, so generated workspaces are self-describing (the
+ *     workspace UI shows the description under each space's title).
  *   v1.1.0 — 2026-06-10 — Generator prompt: per-property "description", "readOnly": true for
  *     agent-filled result fields (never required), "x-default": "currentUser" for requester
  *     fields, and a manifest "i18n" block (en + request language) with flat "{ns}.{field}",
@@ -251,6 +254,7 @@ Respond with this shape:
 
 Give every objectType all of these fields:
 - "name": a short singular noun, e.g. "milestone" or "design-doc".
+- "description": one short sentence on what this space is for — the workspace UI shows it under the space's title so a reader knows what belongs here.
 - "schemaRef": a label string you choose, e.g. "schema:milestone@1". Include it for every type, documents included.
 - "namespace": exactly "shared.<plural>" for collaborative data, or "meta.<plural>" for owner-controlled data — e.g. "shared.milestones", "meta.decisions". The namespace is just that prefix plus the plural name; keep it to those two forms.
 - "backing": "memory".
@@ -271,8 +275,9 @@ Inside "manifest", add an "i18n" object with UI labels: one entry per language �
 - "<namespace>.<field>": a short human label for that field
 - "<namespace>.<field>.hint": one short sentence telling the user what to enter
 - "type.<objectType name>": a short plural label for that type's tab
-Example: "i18n": { "en": { "shared.milestones.title": "Title", "shared.milestones.title.hint": "A short name for the milestone", "type.milestone": "Milestones" }, "fi": { "shared.milestones.title": "Otsikko", "shared.milestones.title.hint": "Lyhyt nimi virstanpylväälle", "type.milestone": "Virstanpylväät" } }
-Cover every field of every RECORDS type (labels + hints) and every objectType (type.<name>) in every language you include.
+- "type.<objectType name>.desc": one short sentence on what this space is for (the localized form of the objectType "description")
+Example: "i18n": { "en": { "shared.milestones.title": "Title", "shared.milestones.title.hint": "A short name for the milestone", "type.milestone": "Milestones", "type.milestone.desc": "Project milestones and their status" }, "fi": { "shared.milestones.title": "Otsikko", "shared.milestones.title.hint": "Lyhyt nimi virstanpylväälle", "type.milestone": "Virstanpylväät", "type.milestone.desc": "Projektin virstanpylväät ja niiden tila" } }
+Cover every field of every RECORDS type (labels + hints) and every objectType (type.<name> + type.<name>.desc) in every language you include.
 
 For each DOCUMENT type, the content is free markdown — keep it out of "schemas" and "examples" (a document needs neither).
 
@@ -283,12 +288,12 @@ Worked example — request "track game milestones plus free-form design docs":
   "manifest": {
     "manifestVersion": "1.0", "id": "", "name": "Game Project", "kind": "game-dev", "status": "active",
     "objectTypes": [
-      { "name": "milestone", "schemaRef": "schema:milestone@1", "namespace": "shared.milestones", "backing": "memory", "writeRole": "member", "cardinality": "many", "versioned": true, "mode": "records" },
-      { "name": "design-doc", "schemaRef": "schema:design-doc@1", "namespace": "shared.design-docs", "backing": "memory", "writeRole": "member", "cardinality": "many", "versioned": true, "mode": "document" }
+      { "name": "milestone", "description": "Project milestones and their status", "schemaRef": "schema:milestone@1", "namespace": "shared.milestones", "backing": "memory", "writeRole": "member", "cardinality": "many", "versioned": true, "mode": "records" },
+      { "name": "design-doc", "description": "Free-form design documents", "schemaRef": "schema:design-doc@1", "namespace": "shared.design-docs", "backing": "memory", "writeRole": "member", "cardinality": "many", "versioned": true, "mode": "document" }
     ],
     "i18n": {
-      "en": { "type.milestone": "Milestones", "type.design-doc": "Design docs", "shared.milestones.title": "Title", "shared.milestones.title.hint": "A short name for the milestone", "shared.milestones.status": "Status", "shared.milestones.status.hint": "Where this milestone stands", "shared.milestones.due_date": "Due date", "shared.milestones.due_date.hint": "When this should be done" },
-      "fi": { "type.milestone": "Virstanpylväät", "type.design-doc": "Suunnitteludokumentit", "shared.milestones.title": "Otsikko", "shared.milestones.title.hint": "Lyhyt nimi virstanpylväälle", "shared.milestones.status": "Tila", "shared.milestones.status.hint": "Missä vaiheessa tämä on", "shared.milestones.due_date": "Määräpäivä", "shared.milestones.due_date.hint": "Milloin tämän pitäisi olla valmis" }
+      "en": { "type.milestone": "Milestones", "type.milestone.desc": "Project milestones and their status", "type.design-doc": "Design docs", "type.design-doc.desc": "Free-form design documents", "shared.milestones.title": "Title", "shared.milestones.title.hint": "A short name for the milestone", "shared.milestones.status": "Status", "shared.milestones.status.hint": "Where this milestone stands", "shared.milestones.due_date": "Due date", "shared.milestones.due_date.hint": "When this should be done" },
+      "fi": { "type.milestone": "Virstanpylväät", "type.milestone.desc": "Projektin virstanpylväät ja niiden tila", "type.design-doc": "Suunnitteludokumentit", "type.design-doc.desc": "Vapaamuotoiset suunnitteludokumentit", "shared.milestones.title": "Otsikko", "shared.milestones.title.hint": "Lyhyt nimi virstanpylväälle", "shared.milestones.status": "Tila", "shared.milestones.status.hint": "Missä vaiheessa tämä on", "shared.milestones.due_date": "Määräpäivä", "shared.milestones.due_date.hint": "Milloin tämän pitäisi olla valmis" }
     },
     "policy": { "agentAutonomy": "L3", "alwaysGate": [] }
   },

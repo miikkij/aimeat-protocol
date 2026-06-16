@@ -256,6 +256,20 @@
 .inbox-textarea { resize: vertical; min-height: 42px; }
 .inbox-input:focus, .inbox-textarea:focus { outline: none; border-color: var(--border-focus); }
 
+/* Toast UI editor host + markdown fallback. */
+.inbox-editor { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.inbox-editor .toastui-editor-defaultUI { border: none; }
+.inbox-md-fallback { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 760px) { .inbox-md-fallback { grid-template-columns: 1fr; } }
+.inbox-md-preview {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  overflow: auto;
+  max-height: 160px;
+  font-size: 14px;
+}
+
 .inbox-composer-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .inbox-attach-btn {
   display: inline-flex;

@@ -164,6 +164,13 @@
  *     no popout window). Per-tab unseen badges (gray, never red) from localStorage seen marks vs
  *     activity events — cleared when the tab opens, surviving across sessions; first visit seeds
  *     a baseline so history is never "unseen"; own non-agent edits don't count.
+ *   v1.31.0 — 2026-06-16 — Grouped workspace nav: the flat tab row is organised into clusters —
+ *     "Workspace" (Overview/Activity/People/Share/Sources/Review), "Records" and "Document spaces"
+ *     (object types with no contract), then ONE group per contract (spaces sharing an objectType
+ *     `contract` id travel together). Opening a content group stacks its member sections (reusing
+ *     renderOvSection); clicking a single space scrolls to (and expands) its section. Spaces and the
+ *     static tabs now show a description (manifest `type.<name>.desc`/objectType `description`, or a
+ *     static i18n string) under their title.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
@@ -2156,6 +2163,7 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
   const [wsEvents, setWsEvents] = useState([]);               // activity events — Overview strip + per-tab unseen badges
   const [ovOpen, setOvOpen] = useState({});                   // Overview accordion: { spaceName: bool } (mobile starts collapsed)
   const [ovDoc, setOvDoc] = useState(null);                   // Overview inline document (mobile): { type, id, mode }
+  const [pendingScroll, setPendingScroll] = useState(null);   // a space name to scroll to inside the active stacked-group view
 
   // ── Unseen-change tracking: per-tab "seen" marks in localStorage (they survive sessions).
   // A tab's badge counts items changed since the tab was last opened; opening it (or changes
@@ -2217,6 +2225,21 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, []);
+
+  // Clicking a single space inside a stacked group view opens that group, then scrolls to (and
+  // expands) the clicked space's section. The anchor wrapper is id="ws-sec-<name>"; a short timeout
+  // lets the group content render before we look for it.
+  useEffect(() => {
+    if (!pendingScroll || !String(tab).startsWith('group:')) return;
+    const name = pendingScroll;
+    setOvOpen(s => ({ ...s, [name]: true }));
+    const id = setTimeout(() => {
+      const el = document.getElementById('ws-sec-' + name);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
+    setPendingScroll(null);
+    return () => clearTimeout(id);
+  }, [pendingScroll, tab]);
 
   // First-ever visit: seed the seen baseline once the workspace has loaded — no badges for history.
   useEffect(() => {
@@ -2752,10 +2775,11 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
     return html`
       <div class="pj-section" key=${ot.name}>
         <div class="pj-section-head">
-          <span class="pj-section-title">${(ot.name)}<span class="pj-doc-tag">${t('organisms.docs') || 'docs'}</span></span>
+          <span class="pj-section-title">${(wsT('type.' + ot.name) || ot.name)}<span class="pj-doc-tag">${t('organisms.docs') || 'docs'}</span></span>
           <button class="btn-outline btn-sm" onClick=${() => addSection(ot.name, null)}>${'+ '}${t('organisms.section') || 'Section'}</button>
           <button class="btn-outline btn-sm" onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' } })}>${'+ '}${t('organisms.newPage') || 'New document'}</button>
         </div>
+        ${spaceDesc(ot) ? html`<div class="section-desc">${spaceDesc(ot)}</div>` : null}
         <div class="pj-docspace">
           <div class="pj-doc-index">
             ${childrenOf(null).map(renderSection)}
@@ -2801,6 +2825,7 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
         <span class="pj-section-title">${(wsT('type.' + ot.name) || ot.name)}</span>
         ${ot.append ? null : html`<button class="btn-outline btn-sm" onClick=${() => startAdd(ot)}>${'+ '}${t('organisms.addDraft') || 'Add draft'}</button>`}
       </div>
+      ${spaceDesc(ot) ? html`<div class="section-desc">${spaceDesc(ot)}</div>` : null}
 
       ${adding === ot.name && (addingSchema
         ? html`<${SchemaForm} key=${'sf-' + (addingId || 'new')} schema=${addingSchema} busy=${busy} initial=${addingInitial}
@@ -2850,29 +2875,70 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
         : (t('organisms.spaceBackingUnsupported') || 'This space’s backing is not supported, so its content is not shown here. Edit the workspace (manifest) and set this space’s backing to "memory" to restore it — files and knowledge packages attach via Sources or document images instead.')}</div>
     </div>`;
 
-  // ── Tabs: one per declared manifest space (memory-backed or not), then the fixed tabs.
-  // The "+" pseudo-tab opens the add-space form, so adding spaces stays one click away.
+  // ── Grouped tabs. The flat row got unwieldy as workspaces grew many spaces, so the nav is now
+  // organised into groups (in this order): "Workspace related" (the static panels), "Records" and
+  // "Document spaces" (memory-backed object types with no contract), then ONE group per contract —
+  // each contract is a self-contained unit, so its spaces travel together. A space declaring a
+  // `contract` id appears ONLY in that contract's group (never duplicated under Records/Documents).
   // Space labels are capitalized so the row reads uniformly next to the fixed tabs.
   const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
   const spaceCount = (name) => new Set([...draftsFor(name), ...objectsFor(name)].map(d => d.id)).size;
-  const spaceTabs = allTypes.map(ot => ({
+  // What a space is for — shown under its title when opened, so a bare "Gap" record reads in context.
+  // Manifest i18n "type.<name>.desc" wins; the objectType's own `description` is the fallback.
+  const spaceDesc = (ot) => wsT('type.' + ot.name + '.desc') || (typeof ot.description === 'string' ? ot.description : '');
+  const spaceTab = (ot) => ({
     id: 'space:' + ot.name, ot, label: cap(wsT('type.' + ot.name) || ot.name),
     count: orgService.isMemorySpace(ot) ? spaceCount(ot.name) : null,
-  }));
-  const fixedTabs = [
-    { id: 'sources', label: t('organisms.sources') || 'Sources', count: null },
-    { id: 'share', label: t('organisms.share') || 'Share', count: null },
-    { id: 'review', label: t('organisms.tabReview') || 'Review', count: approvals.length || null },
+  });
+
+  // Distinct contract ids in first-seen manifest order; the rest split by mode.
+  const contractIds = [];
+  for (const ot of allTypes) { if (ot.contract && !contractIds.includes(ot.contract)) contractIds.push(ot.contract); }
+  const noContract = allTypes.filter(ot => !ot.contract);
+  const recordTypes = noContract.filter(ot => !isDocSpace(ot));
+  const docSpaceTypes = noContract.filter(ot => isDocSpace(ot));
+
+  const relatedMembers = [
+    { id: 'overview', label: t('organisms.tabOverview') || 'Overview', count: null },
     { id: 'activity', label: t('organisms.activity') || 'Activity', count: null },
     { id: 'people', label: t('organisms.tabPeople') || 'People', count: null },
+    { id: 'share', label: t('organisms.share') || 'Share', count: null },
+    { id: 'sources', label: t('organisms.sources') || 'Sources', count: null },
+    { id: 'review', label: t('organisms.tabReview') || 'Review', count: approvals.length || null },
   ];
-  const wsTabs = [{ id: 'overview', label: t('organisms.tabOverview') || 'Overview', count: null }, ...spaceTabs, ...fixedTabs];
+  const stackedGroup = (id, label, desc, spaces) => ({
+    id, kind: 'stacked', label, desc, spaces, members: spaces.map(spaceTab),
+    count: spaces.reduce((n, ot) => n + (orgService.isMemorySpace(ot) ? spaceCount(ot.name) : 0), 0) || null,
+  });
+  const groups = [{ id: 'related', kind: 'related', label: t('organisms.groupRelated') || 'Workspace', members: relatedMembers }];
+  if (recordTypes.length) groups.push(stackedGroup('group:records', t('organisms.groupRecords') || 'Records', t('organisms.groupRecordsDesc') || '', recordTypes));
+  if (docSpaceTypes.length) groups.push(stackedGroup('group:documents', t('organisms.groupDocs') || 'Document spaces', t('organisms.groupDocsDesc') || '', docSpaceTypes));
+  for (const cid of contractIds) {
+    groups.push(stackedGroup('group:contract:' + cid, cid,
+      (t('organisms.groupContractDesc') || 'Spaces provided by the {id} contract.').replace('{id}', cid),
+      allTypes.filter(ot => ot.contract === cid)));
+  }
+
+  // Valid ids: overview + the static panels, a focused single space ("space:<name>"), or a stacked group.
+  const validTabIds = new Set(['overview', ...relatedMembers.map(m => m.id), ...allTypes.map(ot => 'space:' + ot.name), ...groups.filter(g => g.kind === 'stacked').map(g => g.id)]);
   // Settings REPLACES the tab content: while it is open no tab is active (the previous state — a
   // highlighted tab above settings content — lied about what the user was looking at).
-  const activeTab = showSettings ? '' : (wsTabs.some(tb => tb.id === tab) ? tab : 'overview');
+  const activeTab = showSettings ? '' : (validTabIds.has(tab) ? tab : 'overview');
   const activeSpace = activeTab.startsWith('space:') ? allTypes.find(ot => ot.name === activeTab.slice(6)) : null;
+  const activeGroup = activeTab.startsWith('group:') ? groups.find(g => g.id === activeTab) : null;
   // Opening a tab clears its unseen badge (the seen mark persists across sessions).
   const pickTab = (id) => guardWsDirty(() => { setShowSettings(false); setTab(id); markSeen(id); });
+  // A stacked group opens at its top; clicking one of its spaces opens it scrolled to that section.
+  const openGroup = (id) => pickTab(id);
+  const scrollToSpace = (gid, name) => guardWsDirty(() => { setShowSettings(false); setTab(gid); setPendingScroll(name); markSeen(gid); });
+
+  // Static one-line descriptions for the related panels that don't already carry their own.
+  const REL_DESC = {
+    overview: t('organisms.descOverview') || '',
+    activity: t('organisms.descActivity') || '',
+    sources: t('organisms.descSources') || '',
+    review: t('organisms.descReview') || '',
+  };
 
   // Menu items are VERBS (a click copies to the clipboard; the toast confirms). The contract-agent
   // builder is a different category from the two copy actions, so a divider separates it.
@@ -2958,6 +3024,7 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
           <button class="btn-ghost btn-sm" onClick=${(ev) => { ev.stopPropagation(); ovAddNew(ot, docMode); }}>${'+ '}${docMode ? (t('organisms.newPage') || 'New document') : (t('organisms.addDraft') || 'Add draft')}</button>
         </div>
         ${open ? html`
+          ${spaceDesc(ot) ? html`<div class="section-desc pj-ov-desc">${spaceDesc(ot)}</div>` : null}
           <div class="pj-ov-items">
             ${shown.map(d => docMode ? html`
               <div class="pj-ov-doc" key=${d.id}>
@@ -3027,15 +3094,31 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
           <button class="btn-outline btn-sm" onClick=${() => setTab('review')}>${t('organisms.reviewQueue') || 'Review queue'}</button>
         </div>` : null}
 
-      <div class="pj-org-tabs" role="tablist">
-        ${wsTabs.map(tb => {
-          const u = activeTab === tb.id ? 0 : unseenOf(tb.id);
+      <div class="pj-org-groups" role="tablist">
+        ${groups.map(g => {
+          const stacked = g.kind === 'stacked';
+          const groupActive = activeTab === g.id;
           return html`
-          <button class="pj-org-tab ${activeTab === tb.id ? 'active' : ''}" role="tab" aria-selected=${activeTab === tb.id} key=${tb.id}
-            onClick=${() => pickTab(tb.id)}>
-            ${(tb.label)}${tb.count !== null && tb.count !== undefined ? html`<span class="pj-org-tab-count">${tb.count}</span>` : null}
-            ${u > 0 ? html`<span class="pj-org-tab-unseen" title=${t('organisms.unseenHint') || 'Changed since your last visit'}>${u}</span>` : null}
-          </button>`;
+            <div class="pj-org-group ${groupActive ? 'active' : ''}" key=${g.id}>
+              ${stacked
+                ? html`<button class="pj-org-group-cap ${groupActive ? 'active' : ''}" title=${g.desc || ''} onClick=${() => openGroup(g.id)}>
+                    ${g.label}${g.count !== null && g.count !== undefined ? html`<span class="pj-org-tab-count">${g.count}</span>` : null}
+                  </button>`
+                : html`<span class="pj-org-group-cap pj-org-group-cap-static">${g.label}</span>`}
+              <div class="pj-org-group-tabs">
+                ${g.members.map(tb => {
+                  // Related members are independent panels; a stacked member scrolls within its group.
+                  const isActive = activeTab === tb.id;
+                  const u = isActive ? 0 : unseenOf(tb.id);
+                  const onClick = stacked ? () => scrollToSpace(g.id, tb.ot.name) : () => pickTab(tb.id);
+                  return html`
+                    <button class="pj-org-tab ${isActive ? 'active' : ''}" role="tab" aria-selected=${isActive} key=${tb.id} onClick=${onClick}>
+                      ${(tb.label)}${tb.count !== null && tb.count !== undefined ? html`<span class="pj-org-tab-count">${tb.count}</span>` : null}
+                      ${u > 0 ? html`<span class="pj-org-tab-unseen" title=${t('organisms.unseenHint') || 'Changed since your last visit'}>${u}</span>` : null}
+                    </button>`;
+                })}
+              </div>
+            </div>`;
         })}
         <button class="pj-org-tab pj-ws-tab-add" title=${t('organisms.addDocSpaceTitle') || 'Add a document space'} onClick=${() => guardWsDirty(() => { setShowSettings(false); setShowSpaces(s => !s); })}>+</button>
       </div>
@@ -3119,7 +3202,20 @@ function Workspace({ org, wsId, showToast, onBack, onBackToList }) {
         </div>
       `}
 
+      ${REL_DESC[activeTab] ? html`<div class="section-desc pj-tab-desc">${REL_DESC[activeTab]}</div>` : null}
+
       ${activeTab === 'overview' ? renderOverview() : null}
+
+      ${activeGroup ? html`
+        <div class="pj-ov pj-group-view">
+          <div class="pj-group-head">
+            <div class="section-title">${activeGroup.label}</div>
+            ${activeGroup.desc ? html`<div class="section-desc">${activeGroup.desc}</div>` : null}
+          </div>
+          ${activeGroup.spaces.map(ot => html`
+            <div class="pj-group-sec" id=${'ws-sec-' + ot.name} key=${'gs-' + ot.name}>${renderOvSection(ot)}</div>`)}
+          ${activeGroup.spaces.length === 0 ? html`<${EmptyState} text=${t('organisms.noneYet') || 'none yet'} />` : null}
+        </div>` : null}
 
       ${activeSpace
         ? (!orgService.isMemorySpace(activeSpace)
