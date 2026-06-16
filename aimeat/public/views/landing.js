@@ -1,11 +1,15 @@
 /**
  * @file landing.js
- * @description Logged-out landing page: one story, proven live. Hero → live activity
- *   ticker → today's real node stats + ownership line (the sales core) → three audience
- *   path cards → the 3-step prompt loop → build-your-app prompt box → proof gallery → footer.
- *   Logged-in visitors are forwarded to the profile Home dashboard. No protocol terms
- *   (GHII/GAII/CSM/federation) in the hero or path cards; numbers do the selling.
- * @structure default export Landing({ navigate }) + StatsPanel/PathCards/BuildAppPrompt/Gallery
+ * @description Logged-out landing page: reward first, explanation second. Hero is a
+ *   newspaper-framed teaser for tonight's Sanomat that opens the REAL app in one click —
+ *   no iframe (mobile-friendly) and no fake image: a designed masthead card by default,
+ *   auto-upgrading to a real screenshot if/when one is uploaded (apps API screenshot_url
+ *   only). Two CTAs (try it free · get your own) → proof gallery → live activity feed →
+ *   the 3-step build loop + build prompt → "ask your own AI" → today's node stats +
+ *   ownership line (the sales close) → footer. Logged-in visitors are forwarded to the
+ *   profile Home dashboard. No protocol terms (GHII/GAII/CSM/federation) above the fold;
+ *   a working result does the selling.
+ * @structure default export Landing({ navigate }) + Hero/StatsPanel/BuildAppPrompt/AskYourAI/Gallery
  * @usage routed at /v1/portal (and '/' for browsers) by spa.html
  * @version-history
  *   v1.0.0 — 2026-06-10 — Initial: landing/portal split (owner spec).
@@ -13,6 +17,10 @@
  *   v1.2.0 — 2026-06-16 — Embed PublicActivityFeed (3 real-time tabs) after the proof gallery.
  *   v1.3.0 — 2026-06-16 — Move PublicActivityFeed directly under the hero; remove the now-redundant
  *     one-line Ticker (the full feed supersedes it).
+ *   v2.0.0 — 2026-06-16 — Reward-first restructure (owner spec): new Hero (newspaper-framed
+ *     Sanomat teaser — designed masthead card now, real screenshot when one exists — + two CTAs)
+ *     replaces the text hero; gallery moved up; 3 audience path cards dropped (the two hero CTAs
+ *     are the fork); AskYourAI + StatsPanel moved below the build loop.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -274,6 +282,41 @@ function AskYourAI() {
     </section>`;
 }
 
+/* ── Hero v2 — reward first: a REAL screenshot of tonight's Sanomat (no iframe, so it
+   works on mobile), framed as a newspaper that opens the REAL app in one click. No fake
+   image: it shows a designed masthead card by default and auto-upgrades to a real
+   screenshot the day one is uploaded (we trust ONLY the apps API's screenshot_url, never a
+   guessed URL — every app currently has none, so the card is what shows). The two CTAs are
+   the only fork (experience it now · own it). ── */
+function Hero({ navigate, sanomat, tryHref }) {
+  const shot = sanomat?.screenshot_url || null; // only a real, API-reported screenshot
+  return html`
+    <section class="ld-hero2">
+      <p class="ld-hero2-kicker">${tr('landing.heroKicker', 'Tonight’s paper wrote itself.')}</p>
+      <h1 class="ld-hero2-title">${tr('landing.heroLead', 'Six agents. Zero human hours.')}</h1>
+      <a class="ld-hero2-shot" href=${tryHref} target="_blank" rel="noopener"
+        aria-label=${tr('landing.heroOpenPaper', 'Open tonight’s paper')}>
+        ${shot ? html`
+          <img class="ld-hero2-img" src=${shot} loading="lazy"
+            alt=${tr('landing.heroShotAlt', 'AIMEAT Sanomat — tonight’s edition')} />
+        ` : html`
+          <div class="ld-hero2-paper">
+            <span class="ld-hero2-masthead">AIMEAT Sanomat</span>
+            <span class="ld-hero2-paper-rule"></span>
+            <span class="ld-hero2-paper-line">${tr('landing.heroPaperLine', 'Tonight’s edition · written entirely by agents')}</span>
+          </div>
+        `}
+        <span class="ld-hero2-openbar">${tr('landing.cardACta', 'Read tonight’s paper →')}</span>
+      </a>
+      <p class="ld-hero2-sub">${tr('landing.heroSub2', 'A real app, built and run by AI on AIMEAT — look before you sign up.')}</p>
+      <div class="ld-hero2-cta">
+        <a class="btn-primary" href=${tryHref} target="_blank" rel="noopener">${tr('landing.heroTryFree', 'Try it free →')}</a>
+        <a class="btn-outline" href="/v1/pricing" onClick=${(e) => { e.preventDefault(); navigate('/v1/pricing'); }}>${tr('landing.heroGetOwn', 'Get your own →')}</a>
+      </div>
+    </section>
+  `;
+}
+
 export default function Landing({ navigate }) {
   // Logged-in users arriving DIRECTLY (bookmark, external link, address bar) go straight
   // to the Home dashboard. But a deliberate in-app navigation here (brand link, footer)
@@ -304,41 +347,16 @@ export default function Landing({ navigate }) {
 
   return html`
     <div class="ld">
-      <!-- 1. Hero — no protocol terms here. -->
-      <section class="ld-hero">
-        <h1 class="ld-h1">${tr('landing.heroTitle', 'Your AI gets memory, agents and a place to build.')}</h1>
-        <p class="ld-hero-sub">${tr('landing.heroSub', 'Open protocol. Run your own node or use ours.')}</p>
-      </section>
+      <!-- 1. Hero — reward first: a real, mobile-friendly Sanomat screenshot + the two CTAs. -->
+      <${Hero} navigate=${navigate} sanomat=${sanomat} tryHref=${tryHref} />
 
-      <!-- 1.2 Public activity feed — 3 real-time tabs (apps / organisms / agents), right under the hero -->
+      <!-- 2. Proof gallery — more apps to try instantly, no login (moved up: the reward, not the footer). -->
+      <${Gallery} onApps=${setApps} />
+
+      <!-- 3. Public activity feed — live proof it's happening right now. -->
       <${PublicActivityFeed} />
 
-      <!-- 1.5 Ask your own AI what AIMEAT is — for you -->
-      <${AskYourAI} />
-
-      <!-- 3. Today's stats + ownership line -->
-      <${StatsPanel} navigate=${navigate} />
-
-      <!-- 4. Three path cards -->
-      <div class="ld-paths">
-        <div class="ld-path">
-          <h3>${tr('landing.cardATitle', 'Try the apps')}</h3>
-          <p>${tr('landing.cardAText', 'Play instantly, no login. All built with an AI chat.')}</p>
-          <a class="ld-path-cta" href=${tryHref} target="_blank">${tr('landing.cardACta', 'Read tonight’s paper →')}</a>
-        </div>
-        <div class="ld-path ld-path--hot">
-          <h3>${tr('landing.cardBTitle', 'Build with your AI chat')}</h3>
-          <p>${tr('landing.cardBText', 'Claude or ChatGPT interviews you and builds the app. AIMEAT is the server.')}</p>
-          <a class="ld-path-cta" href="/v1/classic" onClick=${(e) => { e.preventDefault(); navigate('/v1/classic'); }}>${tr('landing.cardBCta', 'Start building →')}</a>
-        </div>
-        <div class="ld-path">
-          <h3>${tr('landing.cardCTitle', 'A digital employee that never sleeps')}</h3>
-          <p>${tr('landing.cardCText', 'Scheduled agents fetch, write and report while you work. Ready-made packages for small businesses.')}</p>
-          <a class="ld-path-cta" href="/v1/business" onClick=${(e) => { e.preventDefault(); navigate('/v1/business'); }}>${tr('landing.cardCCta', 'See packages →')}</a>
-        </div>
-      </div>
-
-      <!-- 5. The prompt loop -->
+      <!-- 4. How building works: the 3-step loop + the copyable build prompt. -->
       <div class="ld-loop">
         <span class="ld-loop-step">① ${tr('landing.loop1', 'Copy the prompt into your AI chat')}</span>
         <span class="ld-loop-arrow">→</span>
@@ -346,12 +364,13 @@ export default function Landing({ navigate }) {
         <span class="ld-loop-arrow">→</span>
         <span class="ld-loop-step">③ ${tr('landing.loop3', 'The app lives on your node. Share the link.')}</span>
       </div>
-
-      <!-- 5b. Build-your-app prompt — the actual prompt to copy, matching app-catalog's Generate App Prompt -->
       <${BuildAppPrompt} />
 
-      <!-- 6. Proof gallery -->
-      <${Gallery} onApps=${setApps} />
+      <!-- 5. Ask your own AI what AIMEAT is — for you (a homework path, for the already-curious). -->
+      <${AskYourAI} />
+
+      <!-- 6. Today's stats + ownership line — the sales close. -->
+      <${StatsPanel} navigate=${navigate} />
 
       <!-- 7. Footer -->
       <footer class="ld-footer">
