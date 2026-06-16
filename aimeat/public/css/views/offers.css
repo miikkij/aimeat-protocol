@@ -140,9 +140,12 @@
 .of-group-count { font-size: 0.72rem; color: var(--muted); background: var(--bg-dim); border: 1px solid var(--border); border-radius: 10px; padding: 0.02rem 0.45rem; }
 .of-group-body { padding-top: 0.25rem; }
 
-/* Mermaid orientation map */
+/* Mermaid map */
 .of-mapwrap { margin: 0.5rem 0; padding: 0.5rem; border: 1px solid var(--border); border-radius: 8px; background: var(--card); overflow-x: auto; }
 .of-mapwrap .mmd { display: flex; justify-content: center; }
+/* Clickable nodes (handled by our own overlay listener — Mermaid stays securityLevel:'strict'). */
+.of-mapwrap--clickable .mmd .node { cursor: pointer; }
+.of-mapwrap--clickable .mmd .node:hover { opacity: 0.82; }
 
 /* AI need-router results */
 .of-ai-results { margin-top: 0.5rem; }

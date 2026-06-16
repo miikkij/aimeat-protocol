@@ -473,7 +473,7 @@
       "segMap": "Map",
       "mapTitle": "Map of what you can do",
       "mapDesc": "A bird’s-eye map of your offers, grouped — orient here, act in the list.",
-      "mapNote": "Orientation only — switch to Do to open a card.",
+      "mapNote": "Click a node to open its card.",
       "groupBy": "Group",
       "sortBy": "Sort",
       "clearFilters": "Clear",
