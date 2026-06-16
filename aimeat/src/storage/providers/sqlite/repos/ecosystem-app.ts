@@ -12,6 +12,8 @@
  *     columns) on both eco_auth and ecosystem_apps for the eco-capability schedule kind.
  *   v1.2.0 — 2026-06-15 — Add automation-recipe CRUD (feature B4): the eco_automation_recipes table
  *     (one per owner+app) with upsert/get/delete/list-by-owner.
+ *   v1.3.0 — 2026-06-16 — Persist the app's OWN bilingual Markdown `setup` guide ({ fi, en }) as a
+ *     JSON column on both eco_auth and ecosystem_apps (mirrors capabilities/automation).
  */
 import type Database from 'better-sqlite3';
 import type { EcosystemAppRecord, EcoAuthorizationRecord, EcoAutomationRecipe } from '../../../interface.js';
@@ -36,14 +38,15 @@ function deserializeEcosystemApp(row: Record<string, unknown>): EcosystemAppReco
   if (row.boundRef) record.boundRef = row.boundRef as string;
   if (row.capabilities) record.capabilities = JSON.parse(row.capabilities as string);
   if (row.automation) record.automation = JSON.parse(row.automation as string);
+  if (row.setup) record.setup = JSON.parse(row.setup as string);
   return record;
 }
 
 export function createEcosystemApp(db: Database.Database, app: EcosystemAppRecord): EcosystemAppRecord {
   try {
     db.prepare(
-      `INSERT INTO ecosystem_apps (geai, app, owner, displayName, description, publicKey, scopes, dataAreas, boundRef, status, morselBalance, capabilities, automation, createdAt, lastSeen)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO ecosystem_apps (geai, app, owner, displayName, description, publicKey, scopes, dataAreas, boundRef, status, morselBalance, capabilities, automation, setup, createdAt, lastSeen)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       app.geai, app.app, app.owner,
       app.displayName ?? null, app.description ?? null,
@@ -54,6 +57,7 @@ export function createEcosystemApp(db: Database.Database, app: EcosystemAppRecor
       app.status, app.morselBalance ?? 0,
       app.capabilities ? JSON.stringify(app.capabilities) : null,
       app.automation ? JSON.stringify(app.automation) : null,
+      app.setup ? JSON.stringify(app.setup) : null,
       app.createdAt, app.lastSeen,
     );
     return app;
@@ -84,7 +88,7 @@ export function updateEcosystemApp(db: Database.Database, geai: string, updates:
   const updated = { ...existing, ...updates };
   db.prepare(
     `UPDATE ecosystem_apps SET app = ?, owner = ?, displayName = ?, description = ?, publicKey = ?,
-     scopes = ?, dataAreas = ?, boundRef = ?, status = ?, morselBalance = ?, capabilities = ?, automation = ?, createdAt = ?, lastSeen = ?
+     scopes = ?, dataAreas = ?, boundRef = ?, status = ?, morselBalance = ?, capabilities = ?, automation = ?, setup = ?, createdAt = ?, lastSeen = ?
      WHERE geai = ?`
   ).run(
     updated.app, updated.owner,
@@ -96,6 +100,7 @@ export function updateEcosystemApp(db: Database.Database, geai: string, updates:
     updated.status, updated.morselBalance ?? 0,
     updated.capabilities ? JSON.stringify(updated.capabilities) : null,
     updated.automation ? JSON.stringify(updated.automation) : null,
+    updated.setup ? JSON.stringify(updated.setup) : null,
     updated.createdAt, updated.lastSeen,
     geai,
   );
@@ -130,14 +135,15 @@ function deserializeEcoAuth(row: Record<string, unknown>): EcoAuthorizationRecor
     validationResult: row.validationResult ? JSON.parse(row.validationResult as string) : undefined,
     capabilities: row.capabilities ? JSON.parse(row.capabilities as string) : undefined,
     automation: row.automation ? JSON.parse(row.automation as string) : undefined,
+    setup: row.setup ? JSON.parse(row.setup as string) : undefined,
     appCredentials: row.appCredentials ? JSON.parse(row.appCredentials as string) : undefined,
   };
 }
 
 export function createEcoAuth(db: Database.Database, req: EcoAuthorizationRecord): void {
   db.prepare(
-    `INSERT INTO eco_auth (deviceCode, userCode, ownerName, app, displayName, description, status, publicKey, scopes, dataAreas, boundRef, createdAt, expiresAt, lastPolledAt, pollInterval, approvedBy, validationResult, capabilities, automation, appCredentials)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO eco_auth (deviceCode, userCode, ownerName, app, displayName, description, status, publicKey, scopes, dataAreas, boundRef, createdAt, expiresAt, lastPolledAt, pollInterval, approvedBy, validationResult, capabilities, automation, setup, appCredentials)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     req.deviceCode, req.userCode, req.ownerName, req.app,
     req.displayName ?? null, req.description ?? null,
@@ -150,6 +156,7 @@ export function createEcoAuth(db: Database.Database, req: EcoAuthorizationRecord
     req.validationResult ? JSON.stringify(req.validationResult) : null,
     req.capabilities ? JSON.stringify(req.capabilities) : null,
     req.automation ? JSON.stringify(req.automation) : null,
+    req.setup ? JSON.stringify(req.setup) : null,
     req.appCredentials ? JSON.stringify(req.appCredentials) : null,
   );
 }

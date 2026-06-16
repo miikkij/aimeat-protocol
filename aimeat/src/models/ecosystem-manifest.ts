@@ -14,6 +14,9 @@
  *     for the eco-capability scheduler. Not required; purely a hint.
  *   v1.2.0 — 2026-06-15 — Accept `automation.schedulable[].produces_key` (deposit key prefix) so the
  *     node can derive the automation-recipe trigger keyGlob correctly.
+ *   v1.3.0 — 2026-06-16 — Accept an optional top-level `setup: { fi, en }` — the app's OWN bilingual
+ *     Markdown setup guide (what's needed, why, where, including required agents), rendered to the
+ *     owner in the Ecosystem-apps card. The app owns this guidance; the node only stores + returns it.
  */
 import { z } from 'zod';
 import { validateAppName } from '../utils/gaii.js';
@@ -43,6 +46,12 @@ export const EcoManifestSchema = z.object({
       cadences: z.array(z.string().max(120)).max(20).optional(),
     })).max(100).optional(),
     advisory_sink: z.string().max(200).optional(),
+  }).optional(),
+  // The app's OWN bilingual Markdown setup guide for the owner (what's needed, why, where, including
+  // required agents). Optional + back-compat: an app that omits it gets the in-portal fallback note.
+  setup: z.object({
+    fi: z.string().max(20000),
+    en: z.string().max(20000),
   }).optional(),
 });
 export type EcoManifest = z.infer<typeof EcoManifestSchema>;

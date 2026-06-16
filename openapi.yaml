@@ -3456,7 +3456,7 @@ paths:
                 manifest:
                   type: object
                   additionalProperties: true
-                  description: "Optional app manifest (declared scopes/capabilities/events + an optional automation hint). When present it is statically validated; a failed validation blocks approval. Declared `capabilities` (and `automation`) are persisted and copied onto the connected app at approval so its capabilities can be scheduled (eco-capability)."
+                  description: "Optional app manifest (declared scopes/capabilities/events + an optional automation hint + an optional bilingual Markdown `setup: { fi, en }` guide). When present it is statically validated; a failed validation blocks approval. Declared `capabilities`, `automation`, and `setup` are persisted and copied onto the connected app at approval — `setup` is the app's OWN setup guidance rendered to the owner in the app card; capabilities can be scheduled (eco-capability)."
       responses:
         '200':
           description: Pending request created with device + user codes (+ a validation result when a manifest was submitted).
@@ -3602,6 +3602,13 @@ paths:
                                       produces_key: { type: string, description: "Deposit key prefix the capability writes to (e.g. `feedback.stats`). Used to derive the automation-recipe trigger keyGlob." }
                                       cadences: { type: array, items: { type: string } }
                                 advisory_sink: { type: string }
+                            setup:
+                              type: object
+                              nullable: true
+                              description: The app's OWN bilingual Markdown setup guide for the owner (copied from the validated manifest at approval). Rendered (locale-appropriate) in the app card. Null for apps that onboarded before this field existed.
+                              properties:
+                                fi: { type: string, description: Finnish Markdown setup guide. }
+                                en: { type: string, description: English Markdown setup guide. }
                             created_at: { type: string, format: date-time }
                             last_seen: { type: string, format: date-time }
         '403':

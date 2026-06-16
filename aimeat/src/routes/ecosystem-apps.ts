@@ -39,6 +39,9 @@
  *     app-owned automation config (recipe + eco-capability schedules + pending advisories). The
  *     owner's deposited insight data is preserved. Re-onboarding starts over from scratch. The router
  *     now takes the Scheduler to cancel the app's eco-capability cron jobs.
+ *   v1.6.0 — 2026-06-16 — Persist + return the app's OWN bilingual Markdown `setup` guide ({ fi, en }):
+ *     stored at /hello, copied onto the EcosystemApp at /approve, returned from GET /v1/ecosystem-apps.
+ *     The portal renders it (locale-appropriate) as the app's own setup guidance in the card.
  */
 import { Router } from 'express';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -139,6 +142,11 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
     const automation = (manifestObj?.automation && typeof manifestObj.automation === 'object')
       ? (manifestObj.automation as EcosystemAppRecord['automation'])
       : undefined;
+    // The app's OWN bilingual Markdown setup guide ({ fi, en }) — stored verbatim, rendered to the
+    // owner in the app card. Carries forward to the EcosystemApp record at approval like automation.
+    const setup = (manifestObj?.setup && typeof manifestObj.setup === 'object')
+      ? (manifestObj.setup as EcosystemAppRecord['setup'])
+      : undefined;
 
     await storage.createEcoAuth({
       deviceCode,
@@ -158,6 +166,7 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
       validationResult,
       capabilities,
       automation,
+      setup,
     });
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
@@ -348,9 +357,10 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
         dataAreas: finalAreas,
         boundRef: request.boundRef,
         status: 'active',
-        // Re-pin the capability contract from the (re-)hello manifest, when present.
+        // Re-pin the capability contract + the app's setup guide from the (re-)hello manifest, when present.
         capabilities: request.capabilities ?? existing.capabilities,
         automation: request.automation ?? existing.automation,
+        setup: request.setup ?? existing.setup,
         lastSeen: now,
       });
     } else {
@@ -368,6 +378,7 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
         morselBalance: 0,
         capabilities: request.capabilities,
         automation: request.automation,
+        setup: request.setup,
         createdAt: now,
         lastSeen: now,
       });
@@ -422,6 +433,7 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
         public_key: a.publicKey,
         capabilities: a.capabilities ?? [],
         automation: a.automation ?? null,
+        setup: a.setup ?? null,
         created_at: a.createdAt,
         last_seen: a.lastSeen,
       })),

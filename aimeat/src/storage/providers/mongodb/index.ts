@@ -4798,9 +4798,10 @@ export class PrismaStorage implements Storage {
                 morselBalance: app.morselBalance ?? 0,
                 capabilities: (app.capabilities as any) ?? undefined,
                 automation: (app.automation as any) ?? undefined,
+                setup: (app.setup as any) ?? undefined,
                 createdAt: new Date(app.createdAt),
                 lastSeen: new Date(app.lastSeen),
-            },
+            } as any,
         });
         return this.toEcosystemAppRecord(row);
     }
@@ -4838,6 +4839,7 @@ export class PrismaStorage implements Storage {
         if (updates.morselBalance !== undefined) data.morselBalance = updates.morselBalance;
         if (updates.capabilities !== undefined) data.capabilities = (updates.capabilities as any) ?? null;
         if (updates.automation !== undefined) data.automation = (updates.automation as any) ?? null;
+        if (updates.setup !== undefined) data.setup = (updates.setup as any) ?? null;
         if (updates.lastSeen !== undefined) data.lastSeen = new Date(updates.lastSeen);
         try {
             const row = await this.prisma.ecosystemApp.update({ where: { geai }, data });
@@ -4879,8 +4881,9 @@ export class PrismaStorage implements Storage {
                 validationResult: (req.validationResult as any) ?? undefined,
                 capabilities: (req.capabilities as any) ?? undefined,
                 automation: (req.automation as any) ?? undefined,
+                setup: (req.setup as any) ?? undefined,
                 appCredentials: (req.appCredentials as any) ?? undefined,
-            },
+            } as any,
         });
     }
 
@@ -5013,6 +5016,7 @@ export class PrismaStorage implements Storage {
         if (row.boundRef) record.boundRef = row.boundRef;
         if (row.capabilities) record.capabilities = row.capabilities as any;
         if (row.automation) record.automation = row.automation as any;
+        if (row.setup) record.setup = row.setup as any;
         return record;
     }
 
@@ -5037,6 +5041,7 @@ export class PrismaStorage implements Storage {
             validationResult: row.validationResult ?? undefined,
             capabilities: row.capabilities ?? undefined,
             automation: row.automation ?? undefined,
+            setup: row.setup ?? undefined,
             appCredentials: row.appCredentials ?? undefined,
         };
     }

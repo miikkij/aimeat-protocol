@@ -130,6 +130,12 @@ export interface EcosystemAppRecord {
    * cadences) + an optional advisory sink. A HINT only — never required for an owner to schedule.
    */
   automation?: { schedulable?: { id: string; produces?: string; produces_key?: string; cadences?: string[] }[]; advisory_sink?: string };
+  /**
+   * The app's OWN bilingual Markdown setup guide for the owner, copied from the validated hello
+   * manifest at approval. The portal renders the locale-appropriate guide in the app card (replacing
+   * the old hardcoded playbook). Stored as a JSON column in both backends, mirroring `automation`.
+   */
+  setup?: { fi: string; en: string };
   createdAt: string;
   lastSeen: string;
 }
@@ -359,6 +365,8 @@ export interface EcoAuthorizationRecord {
   capabilities?: { id: string; inputSchema?: Record<string, unknown>; outputSchema?: Record<string, unknown> }[];
   /** Optional automation hints from the manifest (schedulable capabilities + advisory sink). */
   automation?: { schedulable?: { id: string; produces?: string; produces_key?: string; cadences?: string[] }[]; advisory_sink?: string };
+  /** The app's OWN bilingual Markdown setup guide (stored at hello, copied onto the EcosystemApp at approval). */
+  setup?: { fi: string; en: string };
   appCredentials?: {
     geai: string;
     /** The app's TOFU-pinned verification key (echoed back; the app already holds its private half). */
