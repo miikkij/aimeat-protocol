@@ -48,6 +48,8 @@
  *     and GET /:id/workspace/overview?ws= (one workspace, deep) return a deterministic Markdown map
  *     (Open Knowledge Format: body + YAML frontmatter), ?format=md for raw text. See
  *     services/structure-overview.ts.
+ *   v1.14.0 -- 2026-06-16 -- Record public-activity-feed events: on public organism
+ *     create, and on the private→public edge of a workspace share (whole/space/doc).
  */
 import { Router, raw, type Request, type Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -56,6 +58,7 @@ import type { Storage, MemoryRecord, PendingApprovalRecord, OrganismRecord } fro
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, optionalAuth } from '../auth/middleware.js';
 import { emitChange } from '../services/event-bus.js';
+import { recordPublicActivity } from '../services/public-activity.js';
 import { resolveIdentity, parseGaiiLoose, isSameOwner } from '../utils/gaii.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { shouldGate, gatePolicyFromManifest, type Risk } from '../services/gate-policy.js';
@@ -155,6 +158,16 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
       { description: 'List members', method: 'GET', url: `/v1/organisms/${id}/members` },
     ]));
     emitChange('organisms');
+    // Public landing feed — only public organisms are discoverable, so only they announce.
+    if (vis === 'public') {
+      void recordPublicActivity(storage, config, {
+        category: 'organisms',
+        actor: ghii,
+        summary: `Organism "${name.trim()}" created`,
+        detail: description || '',
+        link: `/v1/organisms/${id}`,
+      }).catch(() => { /* feed is best-effort */ });
+    }
   });
 
   /* ── GET /v1/organisms — List organisms ── */
@@ -1945,6 +1958,22 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
     });
     emitChange('organisms');
     res.json(success(config.nodeId, { organism_id: id, ws, share: next }));
+    // Public landing feed — fire once on the FIRST public edge of this PUT: the whole
+    // workspace, any space, or any document transitioning private→public ("publish to feed").
+    const newlyPublic = (
+      (next.public === true && prev.public === false) ||
+      Object.entries(next.spaces).some(([k, v]) => v === true && prev.spaces[k] !== true) ||
+      Object.entries(next.docs).some(([k, v]) => v === true && prev.docs[k] !== true)
+    );
+    if (newlyPublic) {
+      void recordPublicActivity(storage, config, {
+        category: 'organisms',
+        actor: req.auth!.owner as string,
+        summary: `Workspace "${entry.name ?? ws}" published publicly`,
+        detail: organism.name ? `In organism "${organism.name}"` : '',
+        link: `/v1/publicworkspaceviewer?org=${encodeURIComponent(id)}&ws=${encodeURIComponent(ws)}`,
+      }).catch(() => { /* feed is best-effort */ });
+    }
   });
 
   /* ── GET /v1/organisms/:id/workspace/export?ws= — download a full-fidelity ZIP backup of a

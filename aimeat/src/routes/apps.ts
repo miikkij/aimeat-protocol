@@ -31,6 +31,7 @@
  *     form (dashboard bare name vs MCP/PAT full GHII), which forked the same
  *     owner's app into two buckets with independent version counters. The
  *     startup mergeForkedAppBuckets() migration consolidates pre-existing forks.
+ *   v1.4.0 -- 2026-06-16 -- Record a public-activity-feed event on publish/update.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -39,6 +40,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
+import { recordPublicActivity } from '../services/public-activity.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
@@ -472,6 +474,14 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
             { description: 'View all versions', method: 'GET', url: `${downloadUrl}/versions` },
         ]));
         emitChange('apps');
+        // Public landing feed — apps are public artifacts, so every publish/update qualifies.
+        void recordPublicActivity(storage, config, {
+            category: 'apps',
+            actor: callerGaii,
+            summary: `App ${manifest.name || filename} ${isUpdate ? 'updated' : 'published'} (v${newVersion})`,
+            detail: manifest.description || '',
+            link: `${downloadUrl}?mode=inline`,
+        }).catch(() => { /* feed is best-effort */ });
     });
 
     // PATCH /v1/apps/:filename — Update access code on an app you own (requires auth)
