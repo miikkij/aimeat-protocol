@@ -1,0 +1,177 @@
+/**
+ * @file inbox.css
+ * @description Styles for the profile Inbox tab (human↔human direct messaging): request cards,
+ *   conversation list, thread bubbles, attachment chips, and the composer. All colors/spacing use
+ *   theme.css variables so the view flips correctly in dark mode. Classes are `inbox-` prefixed.
+ * @usage useViewCSS('/css/views/inbox.css') in views/profile/inbox-tab.js
+ * @version-history
+ *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 5).
+ */
+
+.inbox-tab { display: flex; flex-direction: column; gap: 12px; }
+
+.inbox-toolbar { display: flex; gap: 8px; }
+
+.inbox-compose,
+.inbox-reply {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+}
+
+.inbox-input,
+.inbox-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 8px 10px;
+  font: inherit;
+  color: inherit;
+}
+.inbox-textarea { resize: vertical; }
+
+.inbox-compose-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Two-column layout: conversation/request list + thread. */
+.inbox-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) 1fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .inbox-grid { grid-template-columns: 1fr; }
+}
+
+.inbox-list { display: flex; flex-direction: column; gap: 6px; }
+
+.inbox-list-section {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  margin-top: 8px;
+}
+
+.inbox-empty { color: var(--text-dim); padding: 12px 4px; font-size: 14px; }
+
+/* Request cards (first-contact gate). */
+.inbox-request {
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  background: var(--accent-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.inbox-request-preview { color: var(--text-dim); font-size: 13px; }
+.inbox-request-actions { display: flex; gap: 8px; }
+
+/* Conversation rows. */
+.inbox-conv {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  cursor: pointer;
+  position: relative;
+}
+.inbox-conv:hover { border-color: var(--accent); }
+.inbox-conv--active { border-color: var(--accent); background: var(--accent-subtle); }
+.inbox-conv-peer { font-weight: 600; font-size: 14px; }
+.inbox-conv-preview {
+  color: var(--text-dim);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.inbox-conv-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  min-width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+}
+
+.inbox-peer { font-weight: 600; font-size: 14px; }
+
+/* Thread. */
+.inbox-thread {
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
+}
+.inbox-thread-head {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-weight: 600;
+}
+.inbox-thread-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  flex: 1;
+}
+.inbox-reply {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 0;
+}
+
+/* Message bubbles. */
+.inbox-bubble {
+  max-width: 78%;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  border: 1px solid var(--card-border);
+}
+.inbox-bubble--theirs { align-self: flex-start; background: var(--card-bg-alt); }
+.inbox-bubble--mine { align-self: flex-end; background: var(--accent-subtle); border-color: var(--accent-border); }
+.inbox-bubble-body { font-size: 14px; }
+.inbox-bubble-meta { margin-top: 4px; font-size: 11px; color: var(--text-dim); }
+
+.inbox-attach-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.inbox-attach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  text-decoration: none;
+  color: inherit;
+}
+.inbox-attach-chip--pending { opacity: 0.6; pointer-events: none; }
+.inbox-attach-pending { color: var(--text-dim); }

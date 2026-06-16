@@ -22,6 +22,11 @@ import { validateOutboundUrl } from '../utils/url-validator.js';
 import type { RouteHop, RouteManifest } from '../types/route-manifest.js';
 import { buildHopSigningMessage } from '../types/route-manifest.js';
 import { emitChange } from '../services/event-bus.js';
+import { notify } from '../services/notify.js';
+import { parseGaiiLoose, isSameOwner } from '../utils/gaii.js';
+import { messagePreview } from '../utils/messaging.js';
+import { generateDownloadToken } from '../services/download-token.js';
+import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
 
 export function federationSyncRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
@@ -133,6 +138,185 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
             conflict: !!existing,
         }));
         emitChange('federation');
+    });
+
+    // POST /v1/federation/message — Receive a human↔human direct message from a peer node.
+    // Mirrors /v1/federation/replicate's signed-peer verification. Recipient must be a local human.
+    router.post('/v1/federation/message', async (req, res) => {
+        const { source_node, message, timestamp, signature } = req.body ?? {};
+        if (!source_node || !message || !message.id || !message.senderGhii || !message.recipientGhii) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_node and message{id,senderGhii,recipientGhii} are required'));
+            return;
+        }
+
+        const peer = [...peers.values()].find(p => p.nodeId === source_node);
+        if (!peer || peer.status !== 'active') {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Source node is not an active peer'));
+            return;
+        }
+        if (!signature) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature on message'));
+            return;
+        }
+        if (!peer.publicKey) {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Peer has no public key on file for signature verification'));
+            return;
+        }
+        const messagePayload = JSON.stringify({ source_node, message, timestamp });
+        if (!await verify(peer.publicKey, messagePayload, signature)) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on message'));
+            return;
+        }
+
+        // Recipient must be a human GHII hosted on THIS node.
+        const recipientGhii: string = message.recipientGhii;
+        const parsedRecipient = parseGaiiLoose(recipientGhii);
+        if (parsedRecipient.node !== config.nodeId) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Recipient is not hosted on this node'));
+            return;
+        }
+        const ownerRec = await storage.getOwner(parsedRecipient.owner);
+        if (!ownerRec) {
+            res.status(404).json(error(config.nodeId, 'RECIPIENT_NOT_FOUND', `No such recipient: ${recipientGhii}`));
+            return;
+        }
+
+        // First-contact gate (recipient side).
+        const contact = await storage.getContact(recipientGhii, message.senderGhii);
+        if (contact?.state === 'blocked') {
+            res.status(403).json(error(config.nodeId, 'BLOCKED', 'Recipient is not accepting messages from this sender'));
+            return;
+        }
+        let state = contact?.state;
+        if (!state) {
+            const autoAccept = isSameOwner(message.senderGhii, recipientGhii);
+            state = autoAccept ? 'accepted' : 'pending';
+            await storage.setContactState(recipientGhii, message.senderGhii, state, message.id);
+        }
+        const isRequest = state === 'pending';
+
+        // Idempotent: a retried delivery must not create a duplicate inbox copy.
+        const existingCopy = await storage.getDirectMessage(message.id, recipientGhii);
+        if (!existingCopy) {
+            const now = new Date().toISOString();
+            await storage.createDirectMessage({
+                id: message.id,
+                ownerGhii: recipientGhii,
+                conversationId: message.conversationId,
+                senderGhii: message.senderGhii,
+                recipientGhii,
+                body: message.body ?? '',
+                attachments: message.attachments ?? undefined,
+                status: 'delivered',
+                direction: 'inbound',
+                replyToId: message.replyToId ?? undefined,
+                origin: 'federation',
+                originNodeId: source_node,
+                createdAt: message.createdAt ?? now,
+                deliveredAt: now,
+            });
+            // Accepted contact → pull the attachment bytes into the recipient's storage now; a
+            // pending request leaves them as reference until accepted (DECISION #3).
+            if (!isRequest && message.attachments?.length) {
+                const recCopy = await storage.getDirectMessage(message.id, recipientGhii);
+                if (recCopy) {
+                    const dup = await duplicateMessageAttachments({ config, storage, peers }, recipientGhii, recCopy);
+                    if (dup.changed) await storage.updateMessageAttachments(message.id, recipientGhii, dup.attachments);
+                }
+            }
+
+            await notify(storage, recipientGhii, {
+                type: isRequest ? 'direct_message_request' : 'direct_message',
+                title: isRequest ? `${message.senderGhii} wants to message you` : `New message from ${message.senderGhii}`,
+                body: messagePreview(message.body ?? ''),
+                link: isRequest ? '/v1/profile#inbox/requests' : '/v1/profile#inbox',
+            });
+            emitChange('messages');
+        }
+
+        res.json(success(config.nodeId, { delivered: true, state }));
+    });
+
+    // POST /v1/federation/message/receipt — Receive a delivery/read receipt from the recipient node.
+    router.post('/v1/federation/message/receipt', async (req, res) => {
+        const { source_node, message_id, kind, timestamp, signature } = req.body ?? {};
+        if (!source_node || !message_id || !kind) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_node, message_id, and kind are required'));
+            return;
+        }
+        const peer = [...peers.values()].find(p => p.nodeId === source_node);
+        if (!peer || peer.status !== 'active') {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Source node is not an active peer'));
+            return;
+        }
+        if (!signature || !peer.publicKey) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature or peer public key'));
+            return;
+        }
+        const receiptPayload = JSON.stringify({ source_node, message_id, kind, timestamp });
+        if (!await verify(peer.publicKey, receiptPayload, signature)) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on receipt'));
+            return;
+        }
+
+        if (kind === 'read') {
+            await storage.setMessageReadReceipt(message_id, timestamp ?? new Date().toISOString());
+            emitChange('messages');
+        }
+        res.json(success(config.nodeId, { ok: true }));
+    });
+
+    // POST /v1/federation/storage/grant — Mint a presigned download for a direct-message attachment.
+    // The origin node is the authority over its own storage: it verifies the peer signature AND that
+    // the message relationship is real (a message with this id was sent to recipient_ghii and lists
+    // this storage_key) before issuing a short-lived, single-file download capability (DECISION #5).
+    router.post('/v1/federation/storage/grant', async (req, res) => {
+        const { source_node, message_id, conversation_id, storage_key, owner_ghii, recipient_ghii, timestamp, signature } = req.body ?? {};
+        if (!source_node || !message_id || !storage_key || !owner_ghii || !recipient_ghii) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_node, message_id, storage_key, owner_ghii, recipient_ghii are required'));
+            return;
+        }
+        const peer = [...peers.values()].find(p => p.nodeId === source_node);
+        if (!peer || peer.status !== 'active') {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Source node is not an active peer'));
+            return;
+        }
+        if (!signature || !peer.publicKey) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature or peer public key'));
+            return;
+        }
+        const grantPayload = JSON.stringify({ source_node, message_id, conversation_id, storage_key, owner_ghii, recipient_ghii, timestamp });
+        if (!await verify(peer.publicKey, grantPayload, signature)) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on storage grant'));
+            return;
+        }
+
+        // Authority check: this node must hold the sender's copy of that message, addressed to the
+        // requesting recipient, and it must actually reference this storage key.
+        const msg = await storage.getDirectMessage(message_id, owner_ghii);
+        if (!msg || msg.recipientGhii !== recipient_ghii) {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'No matching message for this grant'));
+            return;
+        }
+        const att = msg.attachments?.find(a => a.storageKey === storage_key);
+        if (!att) {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Attachment not part of this message'));
+            return;
+        }
+        const file = await storage.getStorageFile(owner_ghii, storage_key);
+        if (!file) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Attachment file not found'));
+            return;
+        }
+
+        const token = await generateDownloadToken(
+            { sub: owner_ghii, key: storage_key, mimeType: file.mimeType, size: file.size },
+            300,
+        );
+        res.json(success(config.nodeId, {
+            download_url: `${config.baseUrl}/v1/download/${token}`,
+            expires_in_seconds: 300,
+        }));
     });
 
     // POST /v1/federation/catalogue-sync — Receive catalogue updates from peer

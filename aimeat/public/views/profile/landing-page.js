@@ -64,6 +64,7 @@ import { listAllSchedules } from '/js/services/schedules.js';
 import * as orgService from '/js/services/organisms.js';
 import { listRecents } from '/js/recents.js';
 import { getMemory, createMemory } from '/js/services/memory.js';
+import { listInbox } from '/js/services/messages.js';
 import { Spinner } from './shared.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
 
@@ -718,6 +719,28 @@ function MenuItem({ icon, label, badge, badgeMuted, primary, indigo, active, onC
   `;
 }
 
+/* ───── Inbox nav button — fixed under Home (non-movable), with an unread badge ───── */
+
+function InboxNavButton({ active, onClick }) {
+  const [unread, setUnread] = useState(0);
+  const load = useCallback(async () => {
+    try { const d = await listInbox(); setUnread(d?.unread || 0); } catch { /* noop */ }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const ref = useRef(load); ref.current = load;
+  useEffect(() => {
+    const h = () => ref.current();
+    window.addEventListener('aimeat-live-update', h);
+    return () => window.removeEventListener('aimeat-live-update', h);
+  }, []);
+  return html`
+    <button class="pf-side-item${active ? ' pf-side-item--active' : ''}" onClick=${onClick}>
+      <span class="pf-side-ico">${'\u{1F4EC}'}</span>
+      <span class="pf-side-label">${t('profile.tabs.inbox')}</span>
+      ${unread > 0 ? html`<span class="pf-side-badge">${unread}</span>` : null}
+    </button>`;
+}
+
 /* ───── Inline view wrapper — renders tab content below its trigger ───── */
 
 function InlineView({ tabId, label, onClose, renderTab }) {
@@ -959,6 +982,11 @@ export default function LandingPage({ tier, stats, session, navigate, showToast,
           onClick=${() => { close(); setDrawerOpen(false); }}>
           <span class="pf-side-ico">\u{1F3E0}</span><span class="pf-side-label">${t('profile.landing.home')}</span>
         </button>
+
+        <${InboxNavButton}
+          active=${isOpen('messages')}
+          onClick=${() => { open('messages', 'main'); setDrawerOpen(false); }}
+        />
 
         ${(() => {
           const renderItem = (it, pinned) => html`

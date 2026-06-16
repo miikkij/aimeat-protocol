@@ -308,6 +308,10 @@ export interface AimeatConfig {
   replicationQueueTtlHours: number;
   maxConcurrentSyncs: number;
   federationTimeoutMs: number;
+  // Direct-message federation delivery retry (DECISION #6): retry queued cross-node messages
+  // ~every interval, giving up (→ undeliverable) after the TTL. Only reachable peers are attempted.
+  messageRetryIntervalMs: number;
+  messageRetryTtlHours: number;
   genesisMemoryCache: boolean;
   genesisMemoryCacheTtlHours: number;
 
@@ -699,6 +703,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     replicationQueueTtlHours: parseInt(process.env.AIMEAT_REPLICATION_QUEUE_TTL_HOURS ?? '72', 10),
     maxConcurrentSyncs: parseInt(process.env.AIMEAT_MAX_CONCURRENT_SYNCS ?? '5', 10),
     federationTimeoutMs: parseInt(process.env.AIMEAT_FEDERATION_TIMEOUT_MS ?? '10000', 10),
+    messageRetryIntervalMs: parseInt(process.env.AIMEAT_MESSAGE_RETRY_INTERVAL_MS ?? '60000', 10),
+    messageRetryTtlHours: parseInt(process.env.AIMEAT_MESSAGE_RETRY_TTL_HOURS ?? '168', 10),
     genesisMemoryCache: process.env.AIMEAT_GENESIS_MEMORY_CACHE === 'true',
     genesisMemoryCacheTtlHours: parseInt(process.env.AIMEAT_GENESIS_MEMORY_CACHE_TTL_HOURS ?? '4', 10),
     cookieConsentEnabled: process.env.AIMEAT_COOKIE_CONSENT_ENABLED === 'true',

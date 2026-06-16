@@ -170,8 +170,50 @@ await test('8. Conversation now appears for Bob and unread cleared', async () =>
     assert(c.peerGhii === alice.ghii, `peer should be alice, got ${c.peerGhii}`);
 });
 
-console.log('\nPhase 4 -- Block (failure mode)');
-await test('9. Bob blocks Mallory proactively; Mallory send is rejected', async () => {
+console.log('\nPhase 4 -- Attachment duplication (local, accepted contact)');
+let attKey = '';
+let attMsgId = '';
+await test('9. Alice uploads an image to storage', async () => {
+    attKey = `dm-img-${stamp}.png`;
+    const data = Buffer.from('fake-png-bytes').toString('base64');
+    const up = await json('/v1/storage', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ key: attKey, data, mime_type: 'image/png', visibility: 'private' }),
+    });
+    assert(up.body.ok === true, `upload: ${JSON.stringify(up.body)}`);
+});
+
+await test('10. Alice sends message with attachment; Bob gets a DUPLICATED copy', async () => {
+    const send = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({
+            to: bob.ghii,
+            body: 'Here is a photo ![pic](cid:a1)',
+            attachments: [{ storage_key: attKey, mime: 'image/png', size: 14, kind: 'image', inline: true, id: 'a1' }],
+        }),
+    });
+    assert(send.status === 201, `send status ${send.status}: ${JSON.stringify(send.body)}`);
+    attMsgId = send.body.data.message.id;
+
+    const conv = await json(`/v1/messages/conversations/${convId}`, { headers: { Authorization: `Bearer ${bob.token}` } });
+    const bm = conv.body.data.messages.find((m: any) => m.id === attMsgId);
+    assert(bm !== undefined, 'Bob has the attachment message');
+    const att = bm.attachments?.[0];
+    assert(att?.mode === 'duplicate', `Bob attachment should be duplicate, got ${att?.mode}`);
+    assert(typeof att?.localKey === 'string' && att.localKey.length > 0, 'Bob copy has a localKey');
+});
+
+await test('11. The duplicated file exists in Bob storage', async () => {
+    const files = await json('/v1/storage', { headers: { Authorization: `Bearer ${bob.token}` } });
+    const conv = await json(`/v1/messages/conversations/${convId}`, { headers: { Authorization: `Bearer ${bob.token}` } });
+    const localKey = conv.body.data.messages.find((m: any) => m.id === attMsgId).attachments[0].localKey;
+    const found = files.body.data.files.find((f: any) => f.key === localKey);
+    assert(found !== undefined, `Bob storage should contain ${localKey}`);
+    assert(found.size === 14, `duplicated size should be 14, got ${found.size}`);
+});
+
+console.log('\nPhase 5 -- Block (failure mode)');
+await test('12. Bob blocks Mallory proactively; Mallory send is rejected', async () => {
     const block = await json(`/v1/messages/contacts/${encodeURIComponent(mal.ghii)}/block`, {
         method: 'POST', headers: { Authorization: `Bearer ${bob.token}` },
     });
@@ -189,8 +231,8 @@ await test('9. Bob blocks Mallory proactively; Mallory send is rejected', async 
     assert(reqs.body.data.requests.find((x: any) => x.contactId === mal.ghii) === undefined, 'no request from blocked Mallory');
 });
 
-console.log('\nPhase 5 -- Validation');
-await test('10. Sending to a non-existent local recipient 404s', async () => {
+console.log('\nPhase 6 -- Validation');
+await test('13. Sending to a non-existent local recipient 404s', async () => {
     const { status, body } = await json('/v1/messages', {
         method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
         body: JSON.stringify({ to: `nobodyhere${stamp}@${NODE_ID}`, body: 'hello?' }),
@@ -199,7 +241,7 @@ await test('10. Sending to a non-existent local recipient 404s', async () => {
     assert(body.error?.code === 'RECIPIENT_NOT_FOUND', `code: ${body.error?.code}`);
 });
 
-await test('11. Empty message (no body, no attachments) is rejected', async () => {
+await test('14. Empty message (no body, no attachments) is rejected', async () => {
     const { status } = await json('/v1/messages', {
         method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
         body: JSON.stringify({ to: bob.ghii, body: '   ' }),
@@ -207,7 +249,7 @@ await test('11. Empty message (no body, no attachments) is rejected', async () =
     assert(status === 400, `status ${status}`);
 });
 
-await test('12. Cannot message yourself', async () => {
+await test('15. Cannot message yourself', async () => {
     const { status } = await json('/v1/messages', {
         method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
         body: JSON.stringify({ to: alice.ghii, body: 'note to self' }),

@@ -281,3 +281,41 @@ Configuration comes from multiple sources (in priority order):
 See `.env.example` for all 80+ configuration options with documentation.
 
 See `docs/b-config.md` for the complete configuration schema reference.
+
+---
+
+## Backend is protocol-only — SSR removal history
+
+The AIMEAT backend never renders HTML (see the "NO Server-Side Rendering" rule in `CLAUDE.md`). This section records how the codebase reached that state.
+
+### SSR removal — COMPLETED (2026-03-03)
+
+6 SSR backend files (~9,000 lines) were removed and replaced with static HTML files in `aimeat/public/`:
+
+| Deleted backend file | Replaced by | Lines removed |
+|---------------------|-------------|---------------|
+| `portal-hobbies.ts` | `public/hobbies.html` | 1,153 |
+| `portal-marketplace.ts` | `public/marketplace.html` | 910 |
+| `portal-human.ts` | `public/human.html` | 2,546 |
+| `profile.ts` | `public/profile.html` | 2,048 |
+| `guides.ts` | `public/guides.html` | 1,793 |
+| `aimeat-os.ts` | `public/aimeat-os.html` | 551 |
+
+**Remaining exceptions (kept intentionally):**
+- `admin-dashboard.ts` — operator tooling (will migrate to SPA later)
+- `portal.ts` — landing page entry point (serves static HTML inline at `/v1/portal`) + dev portal SSR (`?view=dev`)
+- `personal.ts` — pure JSON API, NOT SSR
+- `portal-api.ts` — pure JSON API (extracted from portal-human.ts)
+- `setup.ts` — pure JSON API for first-run node initialization
+
+**Static HTML URL routing (2026-03-04):**
+- Static HTML files in `public/` are NOT directly accessible by filename.
+- They are served inline at canonical `/v1/` URLs via backward-compatible routes in `portal.ts`.
+- Direct access to e.g. `/human.html` returns 301 redirect to `/v1/portal`.
+- Route map: `/v1/portal` → human.html, `/v1/profile` → profile.html, `/v1/guides` → guides.html, `/v1/aimeat-os` → aimeat-os.html, `/v1/hobbies` → hobbies.html, `/v1/marketplace` → marketplace.html
+
+**Phase 1 gap closure (2026-03-04):**
+- `setup.ts` + `public/wizard.html` — first-run web wizard (5-step node setup)
+- Memory `flagCount` field + `max_flags` query filter — Phase 1.5 flag integration
+- `profile.html` Data Wallet tab — consents list, audit report, GDPR export
+- `hobbies.html` #matches view — shows people with shared interests

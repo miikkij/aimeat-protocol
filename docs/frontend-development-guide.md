@@ -862,3 +862,64 @@ Admin translation keys live under `dashboard.*` in the locale files. Conventions
 - Use `escHtml()` **only** for user-provided data (owner names, agent IDs, descriptions)
 - Do **NOT** use `escHtml()` on `t()` translations — Preact's virtual DOM handles escaping automatically
 - Double-escaping issue: `escHtml()` in htm templates causes `<=` to render as `&lt;=` because Preact already escapes text nodes
+
+---
+
+## ES Module Cache Busting (Importmap + BUILD_ID)
+
+**Problem:** ES modules stay in the browser's module registry for the entire SPA session. HTTP `no-cache` + ETag is insufficient — once a module is loaded, the browser reuses it without re-fetching, even after a server restart deploys new code.
+
+**Solution:** `portal.ts` generates a `BUILD_ID` (timestamp) on every server restart and stamps all importmap values with `?v=BUILD_ID`. The importmap in `spa.html` maps module paths to themselves (identity mapping), and `serveSpa()` rewrites the values with the version suffix using a generic regex.
+
+**How it works:**
+1. `spa.html` has an importmap with entries like `"/js/services/foo.js": "/js/services/foo.js"`
+2. `portal.ts` `serveSpa()` rewrites ALL importmap values starting with `/` to append `?v=BUILD_ID`
+3. Dynamic route imports use `+ window.__B` suffix (also injected by `serveSpa()`)
+4. Result: every module gets a unique URL per server restart → fresh fetch guaranteed
+
+**Rule: When adding a new shared JS module** (absolute import path like `/js/services/foo.js`, `/components/Bar.js`, `/lib/baz.js`):
+1. Add an identity entry to the importmap in `public/spa.html`: `"/js/services/foo.js": "/js/services/foo.js"`
+2. That's it — `portal.ts` stamps it automatically via generic regex. No manual `.replace()` needed.
+
+**What does NOT need importmap entries:**
+- Relative imports (`./profile/some-tab.js`) — resolved relative to parent module which is already cache-busted
+- Bare specifiers already in the map (`preact`, `htm`) — already handled
+- CSS files — stamped by a separate generic regex in `serveSpa()`
+
+**Key files:** `public/spa.html` (importmap definition), `src/routes/portal.ts` (`serveSpa()` with BUILD_ID stamping).
+
+> Note: public JS changes require a `pnpm dev` restart — the browser caches modules by BUILD_ID.
+
+---
+
+## SSE Live Updates (Real-Time UI Refresh)
+
+**Problem:** When data changes on the server (another user, an API call, a scheduled job), the UI must reflect it without manual page reload.
+
+**Solution:** Singleton SSE (Server-Sent Events) connection with debounced `CustomEvent` broadcasting.
+
+**How it works:**
+1. `public/lib/live-updates.js` — singleton EventSource connection with reference counting
+   - `connect(getJwt)` — opens SSE via `POST /v1/events/ticket` → `GET /v1/events?ticket=...`
+   - `onUpdate(callback)` — registers listener (debounced 2s to batch rapid changes)
+   - `disconnect()` — decrements refcount, closes when 0
+2. `public/views/profile.js` — connects on mount, dispatches `aimeat-live-update` CustomEvent
+3. Tab components listen for the event and re-fetch their data
+
+**Rule: Every profile/admin tab that displays server data MUST listen for live updates:**
+```javascript
+useEffect(() => {
+  const handler = () => { loadData(); };
+  window.addEventListener('aimeat-live-update', handler);
+  return () => window.removeEventListener('aimeat-live-update', handler);
+}, []);
+```
+
+**Exceptions (no live updates needed):**
+- Tabs showing only static/local data (e.g., access-tab with session keys)
+- Tabs that are pure navigation (e.g., portfolio-tab redirect)
+- Push notification preference tabs (user-initiated only)
+
+**Currently listening (13 tabs):** agents, boards, chat-sessions, data-wallet, extensions, federation, knowledge, mcp, memory, node-stats, nodes, organisms, wallet.
+
+**Key files:** `public/lib/live-updates.js` (SSE connection singleton), `public/views/profile.js` (event dispatcher).

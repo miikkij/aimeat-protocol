@@ -68,11 +68,13 @@ import PackagesTab from './profile/packages-tab.js';
 import CapabilitiesTab from './profile/capabilities-tab.js';
 import SchedulerTab from './profile/scheduler-tab.js';
 import WorkflowsTab from './profile/workflows-tab.js';
+import InboxTab from './profile/inbox-tab.js';
 
 // Each tab has a minTier: 'new' | 'active' | 'experienced'
 // Tabs with minTier <= current tier are visible in the tab bar.
 // Deep links (?tab=X) bypass tier filtering.
 const TABS = [
+  { id: 'messages',      key: 'profile.tabs.inbox',          component: InboxTab,          minTier: 'new' },
   { id: 'portfolio',     key: 'portfolio.tabLabel',          component: PortfolioTab,      minTier: 'active' },
   { id: 'agents',        key: 'profile.tabs.agents',         component: AgentsTab,         minTier: 'active' },
   { id: 'ecosystem',     key: 'profile.tabs.ecosystem',      component: EcosystemTab,      minTier: 'active' },

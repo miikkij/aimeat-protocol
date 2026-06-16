@@ -2,492 +2,213 @@
 
 ## MANDATORY RULES (HIGHEST PRIORITY)
 
-These rules MUST be followed at all times during development. They override any conflicting default behavior.
+These rules MUST be followed at all times. They override any conflicting default behavior. Each links to its full guide — read it before working in that area.
 
 ### Rule 1: E2E Tests Must Pass After Major Changes
 
-**Valid backends: SQLite and MongoDB ONLY.** The in-memory backend (`pnpm test:e2e`, `pnpm test:e2e:memory`) is deprecated and produces stale failures — SQLite with `:memory:` covers the same fast-iteration role. Do not use the memory commands for verification, and do not report their failures as findings.
+**Valid backends: SQLite and MongoDB ONLY.** The in-memory backend (`pnpm test:e2e`, `pnpm test:e2e:memory`) is deprecated — do not use it for verification or report its failures.
 
-When any feature, bugfix, or structural change is completed:
-
-1. **Run only the suites your change can plausibly affect** — not the whole sweep. Use the filter runner (must `cd aimeat` first because the runner uses relative paths):
+1. **Run only the suites your change can plausibly affect**, not the whole sweep. Filter runner (must `cd aimeat` first — relative paths):
    ```bash
    cd aimeat
-
-   # Single suite, SQLite backend:
-   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding
-
-   # Multiple suites at once:
-   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding --test=agent-skill-bundle
+   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding [--test=...]
    ```
-   For CLI-only changes (e.g. `src/cli/`), the server suites do not exercise CLI code — say so explicitly instead of running them just to fill the report.
-
-2. **End of a multi-step plan: full sweep on both persistent backends** (from project root):
-   ```bash
-   pnpm test:e2e:sqlite
-   pnpm test:e2e:mongodb
-   ```
-
-3. **Target: 0 failures in the suites you ran.** If something fails:
-   - In an area your change touches → the change is NOT complete; fix it.
-   - In an unrelated suite → check `git status` and `git log -1` first to confirm the failure pre-exists on `main`. If it does, mention it but don't try to "fix" it as part of the current work.
-   - Complicated or ambiguous → ask the user before continuing.
-
-4. **New features must include E2E tests** covering the happy path and at least one failure mode.
+   For CLI-only changes (`src/cli/`), server suites don't exercise CLI code — say so instead of running them to fill a report.
+2. **End of a multi-step plan: full sweep on both persistent backends** (from root): `pnpm test:e2e:sqlite` then `pnpm test:e2e:mongodb`.
+3. **Target: 0 failures in suites you ran.** Failure in an area you touched → not done, fix it. Failure in an unrelated suite → confirm it pre-exists on `main` (check `git status`/`git log -1`); mention but don't "fix" it. Ambiguous → ask.
+4. **New features must include E2E tests** (happy path + at least one failure mode).
 5. **Never claim work is done without running tests.** Evidence before assertions.
 
 Full guide: `docs/coding-guidelines/testing-requirements.md`
 
-### Rule 1b: Frontend Changes Must Be Verified by Driving the Browser via Playwright MCP
+### Rule 1b: Frontend Changes Verified by Driving the Browser via Playwright MCP
 
-**Do NOT write or run the `.spec.ts` Playwright suite (`pnpm test:playwright:*`).** That suite is unreliable and is not the verification path for frontend work. Instead, the agent drives a real browser through the **Playwright MCP server** (configured in `.mcp.json`) — open the page, log in, click through the actual feature, and observe that it works.
+**Do NOT write or run the `.spec.ts` Playwright suite (`pnpm test:playwright:*`)** — it's unreliable. Instead drive a real browser through the **Playwright MCP server** (`.mcp.json`).
 
-When frontend work is **finished** (a view, component, or feature is done — not mid-development):
+When a frontend change is **finished** (a view/component/feature is done, not mid-development): against the running dev server (`pnpm dev`, port 40050), navigate to the page, reach the authenticated state, perform the real interactions (click/type/submit), and confirm the expected result actually happens (elements appear, data persists, edits/deletes take effect) — not just that the page didn't crash. Screenshot as evidence when useful.
 
-1. **Verify against the running dev server** (`pnpm dev`, port 40050) by driving Chrome through the Playwright MCP tools:
-   - Navigate to the relevant page (e.g. `/v1/profile#agents`).
-   - Log in / reach the authenticated state the feature needs.
-   - Perform the real user interactions (click, type, submit) that exercise the change.
-   - Confirm the expected result actually happens — elements appear, data loads/persists, edits and deletes take effect — not just that the page didn't crash.
-   - Take a snapshot/screenshot as evidence when useful.
-
-2. **Trigger:** Any completed change to `public/views/`, `public/components/`, `public/js/`, `public/css/`, `public/locales/`, or `*.html` files.
-
-3. **New frontend features must be exercised end-to-end via the browser MCP** — confirm the feature renders, navigates, and behaves correctly through real interaction, not just that it loads without error.
-
-4. **Report what you actually observed.** Evidence before assertions: describe the interactions performed and the observed outcome. If you could not drive the browser (MCP unavailable, server down, no credentials), say so explicitly rather than claiming it works.
+**Trigger:** any completed change to `public/views/`, `public/components/`, `public/js/`, `public/css/`, `public/locales/`, or `*.html`. **Report what you actually observed**; if you couldn't drive the browser (MCP unavailable, server down, no creds), say so rather than claiming it works.
 
 ### Rule 2: Source File Headers Required
 
-Every source code file (`.ts`, `.js`, `.css`) must have a descriptive header comment:
-
-- `@file` — filename
-- `@description` — what the file does and its role in the system
-- `@structure` — key exports/sections (recommended)
-- `@usage` — import example or how it's consumed (recommended)
-- `@version-history` — dated changelog: `v{major}.{minor}.{patch} — {date} — {reason}`
-
-**Campsite rule:** Add headers to files as you touch them. Update version history when modifying files. Headers may be outdated — they reliably tell at minimum what the file is for.
-
-Full format: `docs/coding-guidelines/file-headers.md`
+Every source file (`.ts`, `.js`, `.css`) needs a header comment: `@file`, `@description`, plus recommended `@structure`, `@usage`, `@version-history` (`v{major}.{minor}.{patch} — {date} — {reason}`). **Campsite rule:** add/update headers on files you touch. Full format: `docs/coding-guidelines/file-headers.md`
 
 ### Rule 3: OpenAPI Spec Must Stay In Sync
 
-`openapi.yaml` is the canonical API contract. It MUST reflect the actual implementation:
-
-1. **When adding a new route**, add it to `openapi.yaml` in the same PR/commit.
-2. **When modifying a route** (params, response shape, auth), update the spec immediately.
-3. **When removing a route**, remove it from the spec.
-4. **Campsite rule applies**: if you notice an undocumented route while working nearby, document it.
-5. **Generate types after spec changes**: `pnpm generate:types`
-
-Full sync plan: `docs/plans/openapi-sync-plan.md`
+`openapi.yaml` is the canonical API contract. Add/modify/remove routes there in the **same commit** as the code; campsite rule applies to undocumented routes you pass. Run `pnpm generate:types` after spec changes. Full plan: `docs/plans/openapi-sync-plan.md`
 
 ### Rule 4: i18n Files Must Stay In Sync
 
-Both `locales/en.json` and `locales/fi.json` must be updated together:
-
-1. **Every new translation key** must be added to BOTH files simultaneously.
-2. **Never add a key to one file without the other.** If unsure of the Finnish translation, use the English text as a placeholder with a `[TODO:fi]` prefix.
-3. **Frontend locale files** (`public/locales/`) follow the same rule if they exist.
-4. **Verify sync** by checking both files have the same key structure.
+`locales/en.json` and `locales/fi.json` (and `public/locales/` if present) are updated **together** — never add a key to one without the other. If unsure of the Finnish, use the English text with a `[TODO:fi]` prefix. Verify both files share the same key structure.
 
 ### Rule 5: Dependency Management
 
-Before adding any new npm package:
+Before adding any npm package: check license (MIT/Apache-2.0/ISC/BSD OK; GPL/AGPL need user approval), prefer small actively-maintained libs, run `pnpm audit` after and fix high/critical, and never add without justification (can an existing dep or Node built-in do it?). Full guide: `docs/coding-guidelines/dependency-management.md`
 
-1. **Check license compatibility** — MIT, Apache-2.0, ISC, BSD are acceptable. GPL/AGPL require user approval.
-2. **Prefer small, focused libraries** with active maintenance and good security track records.
-3. **Run `pnpm audit`** after adding dependencies. Fix any high/critical vulnerabilities.
-4. **If audit finds problems**, investigate, research alternatives, and present options to the user.
-5. **Never add packages without justification** — check if existing dependencies or Node.js built-ins can do the job.
+### Rule 6: Always Use Opus for Subagents
 
-Full guide: `docs/coding-guidelines/dependency-management.md`
-
-### Rule 6: Always Use Opus 4.6 for Subagents
-
-All Agent tool calls MUST use `model: "opus"` or omit the model parameter (which inherits the parent model). NEVER set `model: "sonnet"` or `model: "haiku"` for any subagent. The quality difference matters — Sonnet does not follow complex format instructions reliably.
+All Agent tool calls MUST use `model: "opus"` or omit the model param (inherits parent). NEVER `sonnet`/`haiku` — they don't follow complex format instructions reliably.
 
 ### Rule 7: ESLint Must Pass
 
-All code changes must pass linting (from project root):
+All changes must pass `pnpm lint` (from root). See `docs/coding-guidelines/code-style.md`.
 
-```bash
-pnpm lint
-```
+### Rule 8: Frontend Styling Follows the Frontend Development Guide
 
-Lint rules enforce code quality, style consistency, and prevent common errors. See `docs/coding-guidelines/code-style.md`.
+All frontend work must follow `docs/frontend-development-guide.md`. Key mandatory rules:
+1. No inline `style=""` for layout/colors/spacing/typography — use CSS classes.
+2. No inline CSS constants in JS — all CSS in external `.css` files.
+3. Use CSS variables from `theme.css` for all colors/spacing/typography — never hardcode `#E8564A` etc. in JS.
+4. Prefix view CSS classes (`pf-` profile, `gn-` portal, `adm-` admin).
+5. Canonical section header pattern in profile tabs: `.section-title` + `.section-desc`.
+6. Use existing button classes (`.btn-primary`, `.btn-outline`, `.btn-ghost`, `.btn-danger`, `.btn-success`, `.btn-info`, `.btn-danger-solid`) — **never `class="btn btn-*"`** (no `.btn` base class), never inline button colors.
+7. Use the existing component library (`/components/`) + shared components (`views/profile/shared.js`, `views/admin/shared.js`).
+8. All user-visible text uses `t()` — no hardcoded strings.
+9. No `rgba(255,255,255,...)` in CSS (dark-theme-only) — use `var(--card)`, `var(--border)`, `var(--bg-dim)`, `var(--surface)`.
 
-### Rule 7: Frontend Styling Must Follow the Frontend Development Guide
+**Campsite rule:** fix inline styles, `btn btn-*`, and `rgba(255,255,255)` in files you touch.
 
-All frontend work (HTML, CSS, JS views/components) **must** follow `docs/frontend-development-guide.md`. Before writing or modifying any frontend code, review the relevant sections. Key mandatory rules:
+### Rule 9: Known Gaps Must Be Developer-Approved
 
-1. **No inline `style=""` attributes** for layout, colors, spacing, or typography — use CSS classes instead.
-2. **No inline CSS constants** in JS files — all CSS goes in external `.css` files.
-3. **Use CSS variables** from `theme.css` for all colors, spacing, and typography — never hardcode values like `#E8564A` or `#6B7280` directly in JS.
-4. **Prefix all view CSS classes** to avoid collisions (e.g., `pf-` for profile, `gn-` for portal, `adm-` for admin).
-5. **Use the canonical section header pattern** in profile tabs: `.section-title` + `.section-desc` — not raw `<h3>` or `<p>` with inline styles.
-6. **Use existing button classes** (`.btn-primary`, `.btn-outline`, `.btn-ghost`, `.btn-danger`, `.btn-success`, `.btn-info`, `.btn-danger-solid`) — never set button colors via inline styles. **Never use `class="btn btn-*"`** — the design guide classes are self-contained, there is no `.btn` base class.
-7. **Use existing component library** (`/components/`) and shared components (`views/profile/shared.js`, `views/admin/shared.js`) — don't reinvent.
-8. **All user-visible text** must use `t()` i18n function — no hardcoded strings in any language.
-9. **No `rgba(255,255,255,...)` in CSS** — these are dark-theme-only values. Use CSS variables: `var(--card)`, `var(--border)`, `var(--bg-dim)`, `var(--surface)`.
-
-**Campsite rule:** If you encounter inline styles, `btn btn-*` classes, or `rgba(255,255,255)` values while working on a file, fix them.
-
-Full guide: `docs/frontend-development-guide.md`
-Style analysis: `docs/design/style-analysis.md`
+`docs/known_gaps.md` tracks deferred gaps. **Never add entries on your own** — inform the developer, they decide. Every entry needs all fields (ID, Discovered, Related to, Description, Impact, Severity+justification, What needs doing, Why deferred, Revisit when). Remove entries when fixed (don't mark "done"). "Why deferred" must be a real reason, not "low priority."
 
 ---
 
 ## Coding Guidelines Reference
 
-All development standards are collected in `docs/coding-guidelines/`:
+All standards live in `docs/coding-guidelines/`:
 
 | Guide | Purpose |
 |-------|---------|
-| [Testing Requirements](docs/coding-guidelines/testing-requirements.md) | E2E testing rules, multi-backend testing, writing tests |
-| [File Headers](docs/coding-guidelines/file-headers.md) | Source file header format, version history |
-| [Code Style](docs/coding-guidelines/code-style.md) | TypeScript/JS conventions, route patterns, i18n |
-| [Architecture](docs/coding-guidelines/architecture.md) | System design, core vs extended, directory structure, storage layer |
-| [Security](docs/coding-guidelines/security.md) | Auth, input validation, XSS, rate limiting, GDPR |
-| [Getting Started](docs/coding-guidelines/getting-started.md) | Installation, setup, development workflow |
-| [Dependency Management](docs/coding-guidelines/dependency-management.md) | Adding packages, license checks, security audits |
+| [Testing Requirements](docs/coding-guidelines/testing-requirements.md) | E2E rules, multi-backend testing, writing tests |
+| [File Headers](docs/coding-guidelines/file-headers.md) | Header format, version history |
+| [Code Style](docs/coding-guidelines/code-style.md) | TS/JS conventions, route patterns, i18n |
+| [Architecture](docs/coding-guidelines/architecture.md) | System design, storage layer, SSR-removal history |
+| [Identity Model](docs/coding-guidelines/identity-model.md) | GHII/GAII full reference, aggregation pattern, morsel economy |
+| [Security](docs/coding-guidelines/security.md) | Auth, validation, XSS, rate limiting, GDPR |
+| [Getting Started](docs/coding-guidelines/getting-started.md) | Install, setup, dev workflow |
+| [Dependency Management](docs/coding-guidelines/dependency-management.md) | Adding packages, licenses, audits |
 | [Environment Configs](docs/coding-guidelines/environment-configs.md) | Node type configs (full, personal, relay, mirror) |
-| [Storage Sync](docs/coding-guidelines/storage-sync.md) | Multi-backend sync process, adding fields/tables |
-| [MCP Uploads](docs/coding-guidelines/mcp-uploads.md) | Presigned upload URLs, adding upload-capable tools |
-| [Frontend Guide](docs/frontend-development-guide.md) | Preact + HTM SPA, admin dashboard conventions |
-| [App Developer AI Guide](docs/app-developer-ai-guide.md) | How AIMEAT apps use the user's OpenRouter key via `AIMEAT.ai.complete()` (`/v1/libs/aimeat-ai.js`). Patterns, prompt composition, error codes, spend safety, cookbook. **Use this — don't reinvent prompt-engineering boilerplate per app.** |
-| [Building an AIMEAT-compatible Agent](docs/building-an-aimeat-compatible-agent.md) | What we expect from an agent to be AIMEAT-compatible: the offering/billable/workflow-compatible levels, the offer descriptor (`agents.{name}.offers`), pricing, workflow signals (`success_signal`/`required_to_function`/`deliverable.location`), + a copy-paste setup prompt for whoever builds the agent. |
-| [Building an AIMEAT-compatible Ecosystem App](docs/building-an-aimeat-compatible-ecosystem-app.md) | The agent doc's sibling for **external** apps (GEAI `eco:{app}#{owner}@{node}`, role `ecosystem`). Code-grounded developer spec: the real `EcoManifestSchema`, the `/v1/ecosystem-apps/*` hello→approve→token flow, static validation, the bidirectional event envelope, + a copy-paste setup prompt. Clearly separates **built now** vs **design target**. Design rationale: `docs/internal/ecosystem-developer-guide.md`. |
-| [Known Gaps](docs/known_gaps.md) | Deferred technical gaps with structured tracking |
-
-### Rule 8: Known Gaps Must Be Developer-Approved
-
-`docs/known_gaps.md` tracks deferred technical gaps. Rules:
-
-1. **Never add entries on your own.** If you discover a gap during development, inform the developer. They decide whether to add it or fix it now.
-2. **Every entry requires all fields:** ID, Discovered date, Related to, Description, Impact, Severity (with justification), What needs to be done, Why deferred, Revisit when. No partial entries.
-3. **Remove entries when fixed.** If a gap is resolved, delete it from the file. Do not mark it as "done" -- just remove it.
-4. **The "Why deferred" field must have a real reason** from the developer -- not "will do later" or "low priority."
+| [Storage Sync](docs/coding-guidelines/storage-sync.md) | Multi-backend sync, adding fields/tables |
+| [MCP Uploads](docs/coding-guidelines/mcp-uploads.md) | Presigned upload URLs |
+| [Init Wizard](docs/coding-guidelines/init-wizard.md) | `aimeat init` maintenance checklist |
+| [Frontend Guide](docs/frontend-development-guide.md) | Preact + HTM SPA, cache-busting, SSE, admin conventions |
+| [App Developer AI Guide](docs/app-developer-ai-guide.md) | Apps using the user's OpenRouter key via `AIMEAT.ai.complete()` |
+| [Building an AIMEAT-compatible Agent](docs/building-an-aimeat-compatible-agent.md) | Offer descriptor, pricing, workflow signals + setup prompt |
+| [Building an AIMEAT-compatible Ecosystem App](docs/building-an-aimeat-compatible-ecosystem-app.md) | External apps (GEAI `eco:{app}#{owner}@{node}`), hello→approve→token flow |
+| [Known Gaps](docs/known_gaps.md) | Deferred technical gaps |
 
 ---
 
 ## Project Overview
 
-This is the **AIMEAT Protocol** (AI Memory Exchange and Action Transfer) — an open protocol for AI agent infrastructure. The repo contains:
+The **AIMEAT Protocol** (AI Memory Exchange and Action Transfer) — an open protocol for AI agent infrastructure. The repo contains:
 
-1. **Protocol specification** (RFC v1.2) in `docs/` and `openapi.yaml`
+1. **Protocol specification** (RFC) in `docs/` and `openapi.yaml`
 2. **Reference implementation** in `aimeat/` — a Node.js/TypeScript server
-3. **Python liaison + connector PyPI package** in `python/aimeat-crewai/` — `aimeat-crewai`, a
-   pip-installable CrewAI integration (the AIMEAT *liaison* agent + the loopback connector + offers/
-   workflow tooling). **This package is part of THIS project and its maintenance — not an external
-   repo.** When agent-facing capabilities change (offers, workflow signals, onboarding, MCP surface),
-   keep the Python side in sync here too. It has its own version line (`python/aimeat-crewai/
-   pyproject.toml`, tag-triggered PyPI release) independent of the Node version — see the release
-   process. Key modules: `liaison.py` (the CrewAI liaison agent + persona), `mcp_client.py` (stdio/
-   http/serve transports), `daemon.py` (crew daemon), `offers.py` + `workflow_spec.py` (offer build/
-   validate/publish + the signal grammar + the local workflow-compat validator), `cli.py` (the
-   `aimeat-offers` shell command). Mirror the node contract (`aimeat/src/models/offer-schemas.ts`,
-   `workflow-schemas.ts`); the node schema wins on any mismatch.
+3. **Python liaison + connector PyPI package** in `python/aimeat-crewai/` — `aimeat-crewai`, a pip-installable CrewAI integration. **Part of THIS project, not an external repo.** When agent-facing capabilities change (offers, workflow signals, onboarding, MCP surface), keep the Python side in sync. It has its own version line (tag-triggered PyPI release) independent of the Node version. Key modules: `liaison.py`, `mcp_client.py`, `daemon.py`, `offers.py` + `workflow_spec.py`, `cli.py`. Mirror the node contract (`aimeat/src/models/offer-schemas.ts`, `workflow-schemas.ts`); **the node schema wins on any mismatch.**
 
 ### Prompt-Driven Workflow
 
-AIMEAT uses a **prompt-driven workflow** (promptipohjainen työnkulku) as its core interaction pattern. The application generates ready-made prompts, the user copies them to their chosen AI chat, and brings the results back. Previous results feed into subsequent prompts.
-
-This pattern is used because it is (1) **free** — users use their own AI chats, (2) **safe** — users see everything AI produces before submitting it to the system, and (3) **AI-agnostic** — any AI works (Claude, ChatGPT, Gemini, etc.).
-
-**When adding features to the generator pipeline**, the work happens in the prompt text — not in UI buttons or backend logic. The app's job is to compose prompts, show them for copying, accept and validate responses, and thread relevant parts of previous responses into subsequent prompts.
+AIMEAT's core interaction pattern: the app generates ready-made prompts, the user copies them to their chosen AI chat, and brings results back; previous results feed subsequent prompts. It's (1) free — users use their own AI chats, (2) safe — users see everything before submitting, (3) AI-agnostic. **When adding to the generator pipeline, the work is in the prompt text** — not UI buttons or backend logic. The app composes prompts, shows them, accepts/validates responses, threads previous responses into later prompts.
 
 ## AIMEAT Development Organism (dogfood) — session rituals
 
-AIMEAT's own development is tracked in an **AIMEAT organism** on aimeat.io
-(id `fbb51de5-56d5-4143-9871-b998a1187655`), reachable via the **appdev MCP**
-(`mcp__claude_ai_AIMEAT_APPDEV__*`). It is the source of truth for **coordination + working context**;
-the repo stays source of truth for **code + spec**. Full design: `docs/internal/aimeat-dev-organism-plan.md`.
+AIMEAT's development is tracked in an **AIMEAT organism** on aimeat.io (id `fbb51de5-56d5-4143-9871-b998a1187655`) via the **appdev MCP** (`mcp__claude_ai_AIMEAT_APPDEV__*`) — source of truth for **coordination + working context**; the repo stays source of truth for **code + spec**. Full design: `docs/internal/aimeat-dev-organism-plan.md`.
 
-**These rituals apply ONLY when the appdev AIMEAT MCP is connected.** If it isn't, skip them silently —
-do not try to install or invoke it.
+**These rituals apply ONLY when the appdev MCP is connected.** If not, skip silently.
 
-Workspaces: **Development** (`ws-mq664uyfz21`) — `goal`/`roadmap-item`/`feature`/`bug`/`decision`(gate)/`known-gap`(gate)
-+ `context`/`notes` docs · **Handbook** (`ws-mq6653ry24h`) — `handbook` pages + `invariant`(gate) ·
-**Protocol** (`ws-mq665ahqc6b`) — `rfc` pages + `spec-decision`(gate).
+Workspaces: **Development** (`ws-mq664uyfz21`), **Handbook** (`ws-mq6653ry24h`), **Protocol** (`ws-mq665ahqc6b`).
 
-1. **Session start — read the standup (cheap, bounded).** Read the `context` doc **`main-context`** in
-   Development + the last few `decision`s + the activity feed delta. That's it — do NOT ingest the whole
-   organism. main-context lists the open contexts and where each thread is.
-2. **Planning a task — read just-in-time, scoped.** When you pick work on area X, read X's Handbook
-   page(s) + the open `feature`/`bug` records in that area + the relevant `decision`/`invariant`. Read
-   when you pick the task, not upfront.
-3. **Finishing significant work — log it back.** Update the `feature`/`bug`; log a `decision` (a choice)
-   or `known-gap` (a deferral) — both **gated** (the publish is held for human approval); update the
-   `handbook` page if a subsystem changed; update the relevant **sub-context** `context` doc's current-state.
-4. **Milestones (the gate).** A sub-context's **draft** is the live current-state — edit it freely. A
-   **publish** is a **milestone** (a working state). **Publish a milestone ONLY after the developer's
-   explicit go-ahead in this session.** The agent performs the publish; never auto-publish a milestone.
-   The `.version.N` history is the milestone log.
-5. **Sync.** Keep `docs/known_gaps.md` + the roadmap in two-way sync with the organism
-   (`pnpm organism:sync`, once it exists).
+1. **Session start:** read the `context` doc **`main-context`** in Development + last few `decision`s + the activity feed delta. Don't ingest the whole organism.
+2. **Planning a task:** read just-in-time — the area's Handbook page(s) + open `feature`/`bug` records + relevant `decision`/`invariant`.
+3. **Finishing significant work:** update the `feature`/`bug`; log a `decision` or `known-gap` (both **gated** — publish held for human approval); update the `handbook` page + the sub-context `context` doc's current-state.
+4. **Milestones (the gate):** a sub-context draft is the live current-state (edit freely); a **publish is a milestone** — perform it **ONLY after the developer's explicit go-ahead in this session**. Never auto-publish.
+5. **Sync:** keep `docs/known_gaps.md` + the roadmap in two-way sync (`pnpm organism:sync`, once it exists).
 
-Rule 8 still holds: never add a `known-gap` on your own — developer-approved only.
+Rule 9 still holds: never add a `known-gap` on your own.
 
 ## Architecture
 
 - **Runtime:** Node.js 24.x, ESM (`"type": "module"`)
-- **Framework:** Express 5.2.1 — note: `req.params` returns `string | string[]`, cast with `as string`
-- **Language:** TypeScript 5.9.3, strict mode, ES2022 target, NodeNext module resolution
-- **Crypto:** @noble/ed25519 3.0 for key generation/signing, jose 6.1 for EdDSA JWTs
-- **Package manager:** pnpm
-- **Port:** 40050
+- **Framework:** Express 5.2.1 — `req.params` returns `string | string[]`, cast with `as string`
+- **Language:** TypeScript 5.9.3, strict, ES2022, NodeNext
+- **Crypto:** @noble/ed25519 3.0, jose 6.1 (EdDSA JWTs)
+- **Package manager:** pnpm · **Port:** 40050
 
 ## Identity Model — GHII vs GAII (CRITICAL)
 
-Two distinct identity types. **Never confuse them.**
+Two distinct identity types. **Never confuse them.** Full reference (auth paths, aggregation pattern, morsel economy, ownership checks): `docs/coding-guidelines/identity-model.md`.
 
 | Identity | Format | Example | What it is |
 |----------|--------|---------|------------|
-| **GHII** | `owner@node-id` | `alice@aimeat-fi-001-genesis` | Human user. Owns everything. Has morsel balance, profile, trust score. |
-| **GAII** | `agent#owner@node-id` | `claude#alice@aimeat-fi-001-genesis` | AI agent. Scoped permissions. Has its own morsel balance and trust score. |
+| **GHII** | `owner@node-id` | `alice@aimeat-fi-001-genesis` | Human user. Owns everything (morsel balance, profile, trust). |
+| **GAII** | `agent#owner@node-id` | `claude#alice@aimeat-fi-001-genesis` | AI agent. Scoped permissions. Own trust score. |
 
-There is also a bare **Owner** name (`alice`) which is the account layer. It appears in `req.auth!.sub` for owner JWTs and `req.auth!.owner` for both.
+A bare **Owner** name (`alice`) is the account layer — appears in `req.auth!.sub` for owner JWTs, `req.auth!.owner` for both.
 
-### Authentication Paths
+**MANDATORY:** Every route that stores/retrieves data by identity MUST use `resolveIdentity(req.auth!, config.nodeId)` from `src/utils/gaii.ts`, **not** raw `req.auth!.sub`. Owner sessions → bare name becomes GHII (`alice` → `alice@node-id`); agent sessions → `sub` returned as-is (already full GAII). Without it, owner data is stored under the bare `alice` and becomes invisible to list/search/update. Compare ownership against `resolve(req)`, never `req.auth!.sub`.
 
-| Path | JWT `sub` | JWT `roles` | Scopes |
-|------|-----------|-------------|--------|
-| **GHII login** (password/TOTP) | `alice` (bare owner name) | `['owner']` or `['owner','operator']` | Bypassed — owners can do anything |
-| **Agent device auth** (RFC 8628) | `claude#alice@node-id` (full GAII) | `['agent']` | Enforced per agent's scope list |
+**Morsels:** single balance on `GHIIRecord.morselBalance` (the human pays; `AgentRecord.morselBalance` is always 0). `debitBalance`/`creditBalance`/`transferBalance` resolve any GAII/GHII/bare-name → owner GHII internally.
 
-### Identity Resolution in Routes — `resolveIdentity()`
+**Agents are never created implicitly** — registration creates only the owner + GHII; agents connect later via device auth (RFC 8628) where the owner approves each and selects scopes.
 
-**MANDATORY:** Every route that stores or retrieves data by identity MUST use `resolveIdentity()` from `src/utils/gaii.ts`, not raw `req.auth!.sub`.
-
-```typescript
-import { resolveIdentity } from '../utils/gaii.js';
-
-// Inside router function:
-const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
-
-// In route handler:
-const gaii = resolve(req);  // Returns GHII for owners, GAII for agents
-```
-
-**What it does:**
-- Owner session (`roles: ['owner']`, no `'agent'`) → converts bare username to GHII: `alice` → `alice@node-id`
-- Agent session (`roles: ['agent']`) → returns `req.auth!.sub` as-is (already full GAII)
-
-**Why this matters:** Owner JWT `sub` is a bare username (`alice`), not a valid storage identity. Without `resolveIdentity()`, data gets stored under `alice` instead of `alice@node-id`, making it invisible to list/search/update operations.
-
-### Owner Sessions — Aggregation Pattern
-
-For **list** endpoints where the owner should see all their data (GHII + all agents):
-
-```typescript
-const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-if (isOwnerSession) {
-  const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
-  const agents = await storage.getAgentsByOwner(req.auth!.owner);
-  // ALWAYS include GHII's own data first
-  results.push(...await storage.listMemory(ownerGhii));
-  for (const agent of agents) {
-    results.push(...await storage.listMemory(agent.gaii));
-  }
-}
-```
-
-For **single-key** operations (GET/PUT/DELETE by key), `resolveIdentity()` handles it — the owner's data is stored under GHII.
-
-### Morsel Economy — Single Balance (GHII)
-
-All morsels belong to the owner (GHII), not individual agents. Agents are tools — the human pays.
-
-- **Balance location:** `GHIIRecord.morselBalance` — the only balance in the system
-- **Agent balance field:** `AgentRecord.morselBalance` exists in schema for backward compat but is always 0. Never write to it.
-- **Balance operations:** `storage.debitBalance(gaii, amount)` internally resolves any GAII/GHII/bare-name → owner → GHII record. Routes don't need dual-path logic.
-- **`storage.creditBalance()`**, **`creditBalanceCapped()`**, **`transferBalance()`** — same internal resolution.
-- **Transactions:** Keyed to GHII identity (`owner@nodeId`)
-- **Wallet API:** Returns single GHII balance, no aggregation needed
-- **Per-agent spending limits:** Optional `AgentRecord.dailySpendLimit` (not yet enforced, field ready)
-- **Welcome bonus:** Granted to GHII during owner registration (`ghii.ts`), NOT during agent creation
-
-### Ownership Checks
-
-When comparing stored `ownerGaii` against the current user:
-```typescript
-// CORRECT — compare against resolved identity
-if (record.ownerGaii !== resolve(req)) { ... }
-
-// WRONG — bare username won't match stored GHII/GAII
-if (record.ownerGaii !== req.auth!.sub) { ... }
-```
-
-### Key Files
-
-| File | Purpose |
-|------|---------|
-| `src/utils/gaii.ts` | `resolveIdentity()`, GAII parsing/validation |
-| `src/routes/ghii.ts` | Human auth (password/TOTP login) |
-| `src/routes/agents.ts` | Agent device auth (RFC 8628) |
-| `src/auth/middleware.ts` | Role hierarchy, scope enforcement |
-| `src/routes/libs.ts` | Browser auth library |
-
-**Agents are never created implicitly.** Registration/login creates only the owner + GHII profile. Agents connect later through device auth, where the owner explicitly approves each agent and selects its scopes.
+Key files: `src/utils/gaii.ts`, `src/routes/ghii.ts`, `src/routes/agents.ts`, `src/auth/middleware.ts`, `src/routes/libs.ts`.
 
 ## Extension & Cortex Memory Architecture (CRITICAL)
 
-Full guide: `docs/coding-guidelines/extension-memory-architecture.md`
-
-Three namespaces exist. **Never confuse them.**
+Full guide: `docs/coding-guidelines/extension-memory-architecture.md`. Three namespaces — **never confuse them:**
 
 | Namespace | Who writes | Who reads | Example |
 |-----------|-----------|-----------|---------|
 | **Owner** (`testuser@node-id`) | User via API (auth) | User (auth), extensions (`ctx.memory.getPublic(gaii, key)`) | `i18n.fi`, `settings.config` |
 | **Extension** (`ext:{name}`) | Only the extension (`ctx.memory.set()`) | Anyone (public, no auth) | `ext:prh/watchlist.items` |
 
-### Layer access rules
+- **Extension** (WASM sandbox): owns `ext:{name}`; reads owner data via `ctx.memory.getPublic(ctx.caller.gaii, key)`; external APIs via `ctx.fetch()`.
+- **Cortex** (browser IIFE): reads ext data via `AIMEAT.data.getPublic('ext:name', key)`; reads/writes user data via `AIMEAT.data.get/set()`; calls ext actions via `session.fetch('/v1/ext/name/actionId')`.
+- **Translations and settings are USER data** — cortex reads them via `AIMEAT.data.get('service.i18n.fi')`, NEVER via `getPublic('ext:...')`.
+- **App** (browser): calls cortex public methods ONLY — never `callExt`, `readExtMemory`, `/v1/ext/`, or `/v1/memory/ext:`.
 
-- **Extension** (WASM sandbox): owns `ext:{name}`. Reads owner data via `ctx.memory.getPublic(ctx.caller.gaii, key)`. Fetches external APIs via `ctx.fetch()`.
-- **Cortex** (browser IIFE): reads ext data via `AIMEAT.data.getPublic('ext:name', key)`. Reads/writes user data via `AIMEAT.data.get/set()`. Calls extension actions via `session.fetch('/v1/ext/name/actionId')`.
-- **CRITICAL: Translations and settings are USER data** — cortex reads them via `AIMEAT.data.get('service.i18n.fi')`, NEVER via `getPublic('ext:...')`. The extension init action does NOT need to copy them.
-- **App** (browser): calls cortex public methods ONLY. NEVER calls `callExt`, `readExtMemory`, `/v1/ext/`, or `/v1/memory/ext:` directly.
+**Trust principle:** the extension is sovereign (decides storage/format/return); cortex trusts the ext API; app trusts cortex. No layer bypasses the one below.
 
-### Trust principle
-
-The extension is sovereign — it decides what to store, in what format, and what to return. Cortex trusts the extension's API contract. App trusts cortex. No layer bypasses the one below it.
-
-### Common mistakes (prevent these)
-
-1. **Wrong callExt path**: `/v1/ext/name/action` (correct), NOT `/v1/extensions/name/actions/action`
-2. **session.fetch returns parsed JSON**: use `resp.data` directly, do NOT call `resp.json()`
-3. **Cortex register API**: `{ libs: { "file.js": code } }`, NOT `{ lib: { filename, code } }`
-4. **Cortex re-activate**: must deactivate first, then activate (idempotent skip if already active)
-5. **Flat translation keys**: generator produces `"tab.search": "Haku"` — `t()` must check flat key before nested path
+**Common mistakes:** (1) callExt path is `/v1/ext/name/action`, NOT `/v1/extensions/name/actions/action`. (2) `session.fetch` returns parsed JSON — use `resp.data`, don't call `resp.json()`. (3) Cortex register API: `{ libs: { "file.js": code } }`, NOT `{ lib: {...} }`. (4) Cortex re-activate: deactivate first, then activate. (5) Flat translation keys: generator produces `"tab.search": "Haku"` — `t()` must check flat key before nested path.
 
 ## MCP Presigned Upload (File Transfer)
 
-MCP tools that accept file content (`aimeat_app_publish`, `aimeat_storage_upload`,
-`aimeat_extension_install`, `aimeat_cortex_install`) support a presigned upload mode.
-When content parameters are omitted, the tool returns an `upload_url`. The agent PUTs
-the raw file to that URL -- the file goes directly from disk to server without passing
-through the AI context window.
-
-- **App/Storage:** PUT the raw file (HTML, binary, etc.)
-- **Extension/Cortex:** PUT a ZIP containing `manifest.yaml` + `scripts/` or `libs/`
-- **Token:** Single-use, 60 min TTL, size-capped
-- **Inline fallback:** Providing content inline still works (backward-compatible)
-
-Full guide: `docs/coding-guidelines/mcp-uploads.md`
+MCP tools accepting file content (`aimeat_app_publish`, `aimeat_storage_upload`, `aimeat_extension_install`, `aimeat_cortex_install`) support presigned upload: omit content params → tool returns an `upload_url`; the agent PUTs the raw file (App/Storage) or a ZIP with `manifest.yaml` + `scripts/`/`libs/` (Extension/Cortex). Token is single-use, 60-min TTL, size-capped. Inline content still works (backward-compatible). Full guide: `docs/coding-guidelines/mcp-uploads.md`
 
 ## Key Commands
 
+All commands from **project root** (root `package.json` proxies to `aimeat/`).
+
 ```bash
-# All commands from PROJECT ROOT (not aimeat/ subfolder)
-# Root package.json proxies all scripts to aimeat/
-
-# Dev server (auto-reload)
-pnpm dev
-
-# Type-check (no emit)
-pnpm typecheck           # or: npx tsc --noEmit
-
-# Lint
+pnpm dev                 # Dev server (auto-reload), port 40050
+pnpm typecheck           # tsc --noEmit
 pnpm lint
-
-# ── E2E API tests (starts server automatically) ──
-# Memory backend is DEPRECATED -- do not use `pnpm test:e2e` or `pnpm test:e2e:memory`.
-pnpm test:e2e:sqlite     # SQLite -- fast iteration, the new default
-pnpm test:e2e:mongodb    # MongoDB -- realistic, run before end-of-plan
-
-# Single suite (faster than full sweep -- prefer this during iteration):
-cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding
-
-# ── Playwright browser tests (starts server automatically) ──
-# Memory backend is DEPRECATED -- do not use `pnpm test:playwright`.
-pnpm test:playwright:sqlite       # SQLite -- fast iteration
-pnpm test:playwright:mongodb      # MongoDB -- realistic, run before end-of-plan
-
-# Single test file:
-pnpm test:playwright -- profile-agents
-
-# Single test by name:
-pnpm test:playwright -- --grep "shows agent cards"
-
-# Headed mode (see the browser):
-pnpm test:playwright -- --headed
-
-# ── Build & start ──
-pnpm build
-pnpm start
-pnpm start -- --db mongodb --db-url mongodb://localhost:27017/aimeat
+pnpm test:e2e:sqlite     # E2E, SQLite (fast iteration, default)
+pnpm test:e2e:mongodb    # E2E, MongoDB (run before end-of-plan)
+pnpm build && pnpm start
 pnpm start -- --db sqlite --db-path ./data/aimeat.db
-pnpm start -- --config production.ini
+pnpm start -- --db mongodb --db-url mongodb://localhost:27017/aimeat
 ```
+
+Single suite (preferred during iteration): `cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding`. Memory-backend test commands are **deprecated** — don't use them.
 
 ## Code Conventions
 
-### Response Envelope
-
-Every response uses the AIMEAT envelope via `success()` / `error()` from `src/middleware/envelope.ts`:
-
+**Response envelope** — every response uses `success()` / `error()` from `src/middleware/envelope.ts`:
 ```typescript
-import { success, error } from '../middleware/envelope.js';
-
-// Success with hints
-res.json(success(config.nodeId, { data: 'here' }, [
-  { description: 'Next action', method: 'GET', url: '/v1/endpoint' },
-]));
-
-// Error
+res.json(success(config.nodeId, { data: 'here' }, [{ description: 'Next', method: 'GET', url: '/v1/endpoint' }]));
 res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Resource not found'));
 ```
 
-### Auth Middleware
+**Auth middleware** — `requireAuth()`, `requireRole('owner'|'agent')`, `requireScope('memory:write')` from `src/auth/middleware.js`. Owner endpoints: `req.auth!.sub` is the bare owner name, scopes bypassed. Agent endpoints: `req.auth!.sub` is the full GAII, `req.auth!.owner` the owner name.
 
-```typescript
-import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
+**Route registration** — routers follow `export function myRouter(config, storage): Router { ... }`, mounted in `src/server.ts` via `app.use(myRouter(config, storage))`.
 
-// Owner-only endpoint (human users — scopes bypassed)
-router.get('/v1/endpoint', requireAuth(), requireRole('owner'), async (req, res) => {
-  const owner = req.auth!.sub;      // Owner name (e.g., "alice")
-  const roles = req.auth!.roles;    // ['owner'] or ['owner', 'operator']
-});
+**Storage** — all access through the `Storage` interface (`src/storage/interface.ts`); two backends (SQLite better-sqlite3, MongoDB Prisma). New data types/fields must update ALL backends — see `docs/coding-guidelines/storage-sync.md`.
 
-// Agent endpoint with scope enforcement
-router.post('/v1/endpoint', requireAuth(), requireRole('agent'), requireScope('memory:write'), async (req, res) => {
-  const gaii = req.auth!.sub;       // Agent GAII (e.g., "claude#alice@node")
-  const owner = req.auth!.owner;    // Owner name
-});
-```
-
-### Route Registration
-
-All routes are mounted in `src/server.ts`. New routers follow the pattern:
-
-```typescript
-export function myRouter(config: AimeatConfig, storage: Storage): Router {
-  const router = Router();
-  router.get('/v1/myendpoint', ...);
-  return router;
-}
-```
-
-Then in server.ts: `app.use(myRouter(config, storage));`
-
-### Storage Layer
-
-All data access goes through the `Storage` interface (`src/storage/interface.ts`). Two backend implementations:
-
-- **SQLite** (better-sqlite3) — for memory mode (`:memory:`), dev, and personal nodes
-- **MongoDB** (Prisma) — for production deployments
-
-When adding new data types or fields, ALL backends must be updated. See `docs/coding-guidelines/storage-sync.md` for the complete checklist.
-
-### Import Extensions
-
-Always use `.js` extensions in imports (ESM requirement):
-```typescript
-import { foo } from '../services/foo.js';  // ✅
-import { foo } from '../services/foo';     // ❌
-```
+**Imports** — always use `.js` extensions (ESM): `import { foo } from '../services/foo.js';`
 
 ## File Organization
 
@@ -501,220 +222,76 @@ import { foo } from '../services/foo';     // ❌
 | `src/cli/` | CLI wizards (init wizard) |
 | `src/utils/` | GAII utilities, logger |
 | `locales/` | i18n translations (en.json, fi.json) |
-| `public/views/admin/` | Admin dashboard tab components (Preact + HTM) |
-| `public/views/admin/shared.js` | Shared admin components (Badge, ExpandableHelp, etc.) |
+| `public/views/admin/` | Admin dashboard tabs (Preact + HTM); `shared.js` = shared components |
 | `public/js/services/admin.js` | Admin API service layer |
-| `public/css/views/admin.css` | Admin dashboard styles (adm-* prefix) |
+| `public/css/views/admin.css` | Admin styles (adm-* prefix) |
 | `test/` | E2E test suite |
 
 ## Frontend
 
-The frontend is a Preact + HTM SPA with no build step. See `docs/frontend-development-guide.md` for complete architecture, component library, admin dashboard tab conventions, and CSS patterns.
+Preact + HTM SPA, no build step. Full architecture, component library, admin conventions, **ES-module cache-busting (importmap + BUILD_ID)**, and **SSE live updates**: `docs/frontend-development-guide.md`.
 
-### ES Module Cache Busting (Importmap + BUILD_ID)
-
-**Problem:** ES modules stay in the browser's module registry for the entire SPA session. HTTP `no-cache` + ETag is insufficient — once a module is loaded, the browser reuses it without re-fetching, even after a server restart deploys new code.
-
-**Solution:** `portal.ts` generates a `BUILD_ID` (timestamp) on every server restart and stamps all importmap values with `?v=BUILD_ID`. The importmap in `spa.html` maps module paths to themselves (identity mapping), and `serveSpa()` rewrites the values with the version suffix using a generic regex.
-
-**How it works:**
-1. `spa.html` has an importmap with entries like `"/js/services/foo.js": "/js/services/foo.js"`
-2. `portal.ts` `serveSpa()` rewrites ALL importmap values starting with `/` to append `?v=BUILD_ID`
-3. Dynamic route imports use `+ window.__B` suffix (also injected by `serveSpa()`)
-4. Result: every module gets a unique URL per server restart → fresh fetch guaranteed
-
-**Rule: When adding a new shared JS module** (absolute import path like `/js/services/foo.js`, `/components/Bar.js`, `/lib/baz.js`):
-1. Add an identity entry to the importmap in `public/spa.html`: `"/js/services/foo.js": "/js/services/foo.js"`
-2. That's it — `portal.ts` stamps it automatically via generic regex. No manual `.replace()` needed.
-
-**What does NOT need importmap entries:**
-- Relative imports (`./profile/some-tab.js`) — resolved relative to parent module which is already cache-busted
-- Bare specifiers already in the map (`preact`, `htm`) — already handled
-- CSS files — stamped by a separate generic regex in `serveSpa()`
-
-**Key files:**
-- `public/spa.html` — importmap definition
-- `src/routes/portal.ts` — `serveSpa()` with BUILD_ID stamping
-
-### SSE Live Updates (Real-Time UI Refresh)
-
-**Problem:** When data changes on the server (another user, an API call, a scheduled job), the UI must reflect it without manual page reload.
-
-**Solution:** Singleton SSE (Server-Sent Events) connection with debounced `CustomEvent` broadcasting.
-
-**How it works:**
-1. `public/lib/live-updates.js` — singleton EventSource connection with reference counting
-   - `connect(getJwt)` — opens SSE via `POST /v1/events/ticket` → `GET /v1/events?ticket=...`
-   - `onUpdate(callback)` — registers listener (debounced 2s to batch rapid changes)
-   - `disconnect()` — decrements refcount, closes when 0
-2. `public/views/profile.js` — connects on mount, dispatches `aimeat-live-update` CustomEvent
-3. Tab components listen for the event and re-fetch their data
-
-**Rule: Every profile/admin tab that displays server data MUST listen for live updates:**
-```javascript
-useEffect(() => {
-  const handler = () => { loadData(); };
-  window.addEventListener('aimeat-live-update', handler);
-  return () => window.removeEventListener('aimeat-live-update', handler);
-}, []);
-```
-
-**Exceptions (no live updates needed):**
-- Tabs showing only static/local data (e.g., access-tab with session keys)
-- Tabs that are pure navigation (e.g., portfolio-tab redirect)
-- Push notification preference tabs (user-initiated only)
-
-**Currently listening (13 tabs):** agents, boards, chat-sessions, data-wallet, extensions, federation, knowledge, mcp, memory, node-stats, nodes, organisms, wallet.
-
-**Key files:**
-- `public/lib/live-updates.js` — SSE connection singleton
-- `public/views/profile.js` — event dispatcher
-
-## Testing
-
-The API integration test file (`test/api-full.ts`) runs 35 tests across 6 phases + GDPR. Tests run against a live server on port 40251. The test creates its own owner/agents and cleans up via cascade delete at the end. There are 19 E2E test suites covering security, federation, concurrency, storage visibility, and more.
-
-**Always run `npx tsc --noEmit` after changes** to verify the build compiles cleanly.
-
-**After major changes, run `pnpm test:e2e:mongodb` and `pnpm test:e2e:sqlite`** — see Mandatory Rule 1 above.
-
-Full testing guide: `docs/coding-guidelines/testing-requirements.md`
+Two rules from those mechanisms that bite often:
+- **New shared JS module** (absolute path like `/js/services/foo.js`): add an identity entry to the importmap in `public/spa.html` (`"/js/services/foo.js": "/js/services/foo.js"`). `portal.ts` stamps `?v=BUILD_ID` automatically. Relative imports, bare specifiers, and CSS need no entry.
+- **Every profile/admin tab showing server data** must re-fetch on the `aimeat-live-update` window event (except static-data, pure-nav, and push-pref tabs):
+  ```javascript
+  useEffect(() => {
+    const handler = () => loadData();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, []);
+  ```
 
 ## Spec Documents
 
-- `openapi.yaml` — The canonical API contract (MUST be kept in sync — see Mandatory Rule 3)
-- `docs/aimeat-implementation-prompt.md` — Detailed implementation guidance
-- `docs/01-core.md` through `docs/09-community.md` — RFC sections
-- `docs/a-endpoints.md` — Quick endpoint reference
-- `docs/b-config.md` — Node configuration schema
-- `docs/c-platform-notes.md` — AI platform compatibility
-- `docs/AIMEAT-RFC-v3.0-full.md` — Full protocol specification v3.0
-- `docs/AIMEAT-IO-Implementation-Guide-v3.0.md` — Reference implementation guide v3.0
+`openapi.yaml` (canonical API contract — keep in sync, Rule 3); `docs/aimeat-implementation-prompt.md`; `docs/01-core.md`…`docs/09-community.md` (RFC sections); `docs/a-endpoints.md` (endpoint reference); `docs/b-config.md` (config schema); `docs/c-platform-notes.md` (AI platform compat); `docs/AIMEAT-RFC-v3.0-full.md` + `docs/AIMEAT-IO-Implementation-Guide-v3.0.md` (v3.0).
 
 ## AI Agent Prompts — Where They Live
 
-User-facing prompt texts (the copy-pasteable instructions shown to users for connecting AI agents) live in the frontend:
+User-facing copy-pasteable connect instructions live in the frontend:
 
 | Location | What it is |
 |----------|-----------|
-| `public/views/profile/agents-tab.js` → `buildAgentPrompt()` | "Connect a new agent" prompt shown in the profile Agents tab — uses device-auth flow (RFC 8628) |
-| `public/views/profile/agents-tab.js` → `PLATFORMS` object | Platform-specific setup instructions (Windows/Mac/Linux, OpenClaw, Claude, etc.) |
-| `aimeat/src/routes/bootstrap.ts` | Machine-readable getting-started guide returned at `GET /` — used by AI agents discovering the node |
-| `aimeat/src/routes/prompts.ts` | Managed system prompts stored in DB, served at `/v1/prompts/:name` (tier1, tier2, etc.) |
+| `public/views/profile/agents-tab.js` → `buildAgentPrompt()` | "Connect a new agent" prompt (device-auth flow, RFC 8628) |
+| `public/views/profile/agents-tab.js` → `PLATFORMS` | Platform-specific setup instructions |
+| `aimeat/src/routes/bootstrap.ts` | Machine-readable getting-started guide at `GET /` (node discovery) |
+| `aimeat/src/routes/prompts.ts` | Managed system prompts in DB, served at `/v1/prompts/:name` |
 
-**Agent registration flow (current):** Device authorization (RFC 8628) — agent calls `POST /v1/agents/device-authorize`, owner approves in the profile Agents tab, agent polls for approval. The old connectivity key flow was removed in v1.1.0.
+**Agent registration (current):** device authorization (RFC 8628) — agent calls `POST /v1/agents/device-authorize`, owner approves in the profile Agents tab, agent polls. The old connectivity-key flow was removed in v1.1.0.
 
 ## Backend Architecture Rule — NO Server-Side Rendering
 
-**The AIMEAT backend is protocol-only.** Every route in `src/routes/` must provide a generic, reusable API endpoint. The backend NEVER renders HTML, builds UI, or serves page templates.
+**The AIMEAT backend is protocol-only.** Every route in `src/routes/` provides a generic, reusable API endpoint. The backend NEVER renders HTML, builds UI, or serves page templates.
 
-### Why
+**Why:** AIMEAT's architecture is **CSM defines data shape + rules → generic APIs handle storage/consent/validation → clients (AI chats, SPAs, apps) render UI.** Any service (hobby directory, marketplace, dating, news) is just a client reading a CSM definition and talking to generic APIs.
 
-AIMEAT's architecture is: **CSM defines data shape + rules → Generic APIs handle storage/consent/validation → Clients (AI chats, portal SPAs, apps) render UI.** Any service (hobby directory, marketplace, dating, news) is just a client reading a CSM definition and talking to generic APIs. No per-service backend code.
+**Rules:** (1) No SSR — never `res.send('<html>...')` or build HTML in handlers; UIs are client-side SPAs or static files. (2) Every new route must be generic — "would a second, different service use this?" If no, it doesn't belong. (3) No per-service backend files (`portal-hobbies.ts` etc.). (4) Admin dashboard is the ONE exception (operator tooling; migrating to SPA). (5) If data is already available via an existing API, don't wrap it.
 
-### Rules
+**Core generic APIs (the only backend you need):** Memory, Schema Locking, Consent, Directory/Catalogue, Flags, Auth/GHII, Stats, Boards, Organisms, Wallet, CSM/MSM.
 
-1. **No SSR in routes.** Never `res.send('<html>...')` or build HTML strings in route handlers. If you need a UI, it's a client-side SPA or a static file.
-2. **Every new route must be generic.** Ask: "Would a second, different service also use this endpoint?" If no, it doesn't belong in the backend.
-3. **No per-service backend files.** Never create `portal-hobbies.ts`, `portal-marketplace.ts`, etc. The CSM format + generic APIs (memory, consent, directory, flags, schemas) cover all service types.
-4. **Admin dashboard is the ONE exception** — operator tooling may render HTML, but should migrate toward client-side SPA over time.
-5. **If data is available via an existing API, don't wrap it.** A route that calls `storage.getMemory()` and renders HTML is redundant — the client should call `GET /v1/memory` directly.
-
-### Core Generic APIs (the only backend you need)
-
-| API | Purpose |
-|-----|---------|
-| Memory | Store/read any key-value data |
-| Schema Locking | Validate data shape (CSM-defined rules) |
-| Consent | Control who sees what + audit trail |
-| Directory/Catalogue | Search by city/interest/geo |
-| Flags | Content moderation |
-| Auth/GHII | Identity + login + TOTP |
-| Stats | Usage counters |
-| Boards | Social discussion |
-| Organisms | Group management |
-| Wallet | Morsel economy |
-| CSM/MSM | Service manifest registration |
-
-### SSR Removal — COMPLETED (2026-03-03)
-
-6 SSR backend files (~9,000 lines) were removed and replaced with static HTML files in `aimeat/public/`:
-
-| Deleted backend file | Replaced by | Lines removed |
-|---------------------|-------------|---------------|
-| `portal-hobbies.ts` | `public/hobbies.html` | 1,153 |
-| `portal-marketplace.ts` | `public/marketplace.html` | 910 |
-| `portal-human.ts` | `public/human.html` | 2,546 |
-| `profile.ts` | `public/profile.html` | 2,048 |
-| `guides.ts` | `public/guides.html` | 1,793 |
-| `aimeat-os.ts` | `public/aimeat-os.html` | 551 |
-
-**Remaining exceptions (kept intentionally):**
-- `admin-dashboard.ts` — operator tooling (will migrate to SPA later)
-- `portal.ts` — landing page entry point (serves static HTML inline at `/v1/portal`) + dev portal SSR (`?view=dev`)
-- `personal.ts` — pure JSON API, NOT SSR
-- `portal-api.ts` — pure JSON API (extracted from portal-human.ts)
-- `setup.ts` — pure JSON API for first-run node initialization
-
-**Static HTML URL routing (2026-03-04):**
-- Static HTML files in `public/` are NOT directly accessible by filename
-- They are served inline at canonical `/v1/` URLs via backward-compatible routes in `portal.ts`
-- Direct access to e.g. `/human.html` returns 301 redirect to `/v1/portal`
-- Route map: `/v1/portal` → human.html, `/v1/profile` → profile.html, `/v1/guides` → guides.html, `/v1/aimeat-os` → aimeat-os.html, `/v1/hobbies` → hobbies.html, `/v1/marketplace` → marketplace.html
-
-**Phase 1 gap closure (2026-03-04):**
-- `setup.ts` + `public/wizard.html` — first-run web wizard (5-step node setup)
-- Memory `flagCount` field + `max_flags` query filter — Phase 1.5 flag integration
-- `profile.html` Data Wallet tab — consents list, audit report, GDPR export
-- `hobbies.html` #matches view — shows people with shared interests
+SSR-removal history (6 files / ~9,000 lines removed 2026-03-03, static-HTML URL routing, Phase 1 gap closure): `docs/coding-guidelines/architecture.md`.
 
 ## Common Pitfalls
 
-- **Express 5 params:** `req.params.foo` is `string | string[]`. Always cast: `req.params.foo as string`
-- **Route ordering:** Static routes (e.g., `/v1/memory/search`) must be registered before parameterized routes (e.g., `/v1/memory/:key`)
-- **Ed25519 sync hash (@noble/ed25519 v3.1+):** For synchronous ops set `ed.hashes.sha512 = (m) => ...` using `node:crypto` (single-message arg). The old `ed.etc.sha512Sync` / `ed.etc.concatBytes` API was removed in v3.1 and `ed.etc` is now frozen. Production code uses the async API (`signAsync`/`verifyAsync`) and needs no hook; only test harnesses set the sync hook.
-- **MultiDiGraph:** If two nodes can have multiple edges (e.g., goal_reached + goal_not_reached), use `MultiDiGraph`, not `DiGraph`
-- **First owner is operator:** The first registered owner automatically gets the `operator` role
-- **BUILD_ID cache busting:** Public JS changes require `pnpm dev` restart — browser caches modules by BUILD_ID
-- **`buildComponentPrompt()` is async** — all call sites must `await` it (generator-detail.js, use-autopilot.js, use-test-execution.js)
-- **Platform UI APIs:** Tabs uses `onChange` (not `onSelect`), DataTable has no `onRowClick`, Input/Select return `{el, getValue()}` objects
+- **Express 5 params:** `req.params.foo` is `string | string[]` — cast `as string`.
+- **Route ordering:** static routes (`/v1/memory/search`) before parameterized (`/v1/memory/:key`).
+- **Ed25519 sync hash (@noble/ed25519 v3.1+):** for sync ops set `ed.hashes.sha512 = (m) => ...` via `node:crypto`. `ed.etc.sha512Sync`/`concatBytes` were removed and `ed.etc` is frozen. Production uses async (`signAsync`/`verifyAsync`) and needs no hook; only test harnesses set the sync hook.
+- **MultiDiGraph:** if two nodes can have multiple edges, use `MultiDiGraph`, not `DiGraph`.
+- **First owner is operator** automatically.
+- **BUILD_ID cache busting:** public JS changes need a `pnpm dev` restart.
+- **`buildComponentPrompt()` is async** — all call sites must `await` it.
+- **Platform UI APIs:** Tabs uses `onChange` (not `onSelect`); DataTable has no `onRowClick`; Input/Select return `{el, getValue()}`.
 
-### Generator Prompt Template Rules
+### Generator pipeline notes
 
-When modifying generator prompt templates (`public/js/services/generator-prompts-*.js`):
-1. **Verify every API claim** against actual source code in `src/routes/lib-*.ts` and `public/cortex-bundled/*.js`
-2. **Extension data** (watchlist, cache, changes) → `getPublic('ext:name', key)` — correct
-3. **User data** (translations, settings) → `AIMEAT.data.get(key)` — correct
-4. **NEVER tell cortex to read translations from ext: namespace** — they live in owner namespace
-5. **Extension actions must use** `export default async function(ctx, input) { ... }` — the sandbox requires ES module default export
+When modifying generator prompt templates (`public/js/services/generator-prompts-*.js`): verify every API claim against `src/routes/lib-*.ts` + `public/cortex-bundled/*.js`; extension data → `getPublic('ext:name', key)`; user data (translations/settings) → `AIMEAT.data.get(key)` (NEVER tell cortex to read translations from `ext:`); extension actions must `export default async function(ctx, input) { ... }`.
 
-### Generator Pipeline — Known Phase 4/5 Bugs
-
-Before enabling component cortex, app-domain cortex, or app phases, fix these bugs documented in `docs/superpowers/plans/2026-04-02-phase3-cortex-checklist.md`:
-- **Component/app-domain cortex test uses wrong prompt** — `generator-autopilot.ts` line ~618 checks `wrapsExtension` (only data cortex has it), so component and app-domain cortexes fall through to the extension test prompt (server-side, wrong environment). Fix: check `compType === 'cortex'` instead.
-- **App not tested** — `generator-autopilot.ts` line ~609 only tests extension and cortex, app is skipped entirely. Fix: add `'app'` to the test gate.
+Known Phase 4/5 bugs to fix before enabling component/app-domain cortex or app phases are documented in `docs/superpowers/plans/2026-04-02-phase3-cortex-checklist.md` (wrong test prompt for non-data cortex; app not tested).
 
 ## Naming Convention — AIMEAT Only
 
-**Never use `MEAT` as a standalone prefix.** The project has been fully renamed to `AIMEAT`:
+**Never use `MEAT` as a standalone prefix.** Types `AimeatConfig`/`AimeatResponse`, env vars `AIMEAT_*`, default node id `aimeat-local-001-dev`. Rename any remaining `Meat`-prefixed identifiers to `Aimeat`.
 
-- Type names: `AimeatConfig`, `AimeatResponse` (not ~~MeatConfig~~, ~~MeatResponse~~)
-- Env vars: `AIMEAT_*` prefix (not ~~MEAT_*~~)
-- Default node ID: `aimeat-local-001-dev` (not ~~meat-local-001-dev~~)
+## Init Wizard (`aimeat init`)
 
-If you find any remaining `Meat`-prefixed identifiers, rename them to `Aimeat`.
-
-## Init Wizard Maintenance (`aimeat init`)
-
-The interactive setup wizard lives in `src/cli/init-wizard.ts` and uses `@clack/prompts` for the UI. When adding new config options:
-
-1. **Add the env var to `src/config.ts`** in the `AimeatConfig` interface and `loadConfig()`
-2. **Add translations** to both `locales/en.json` and `locales/fi.json` under the `"init"` section — field label, hint text, validation error message
-3. **Add the prompt** to the wizard in `src/cli/init-wizard.ts`:
-   - Decide which use cases need it (public / personal / dev / custom)
-   - Add to `askCoreSettings()` or `askEconomySettings()` or `askAllAdvancedSettings()`
-   - Add the env var key to `CONFIG_DEFAULTS` for summary comparison
-4. **Update `.env.example`** with the new variable, default, and comment
-5. **Update `src/utils/env-config.ts`** to display the setting in `aimeat config`
-6. **Update `src/utils/env-validator.ts`** if the setting needs validation rules
-7. Run `npx tsc --noEmit` and `pnpm build` to verify
+Lives in `src/cli/init-wizard.ts` (`@clack/prompts`). Adding a config option touches several layers (config.ts, both locale files, the wizard prompt + `CONFIG_DEFAULTS`, `.env.example`, `env-config.ts`, `env-validator.ts`) — full checklist: `docs/coding-guidelines/init-wizard.md`.
