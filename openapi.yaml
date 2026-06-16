@@ -3590,7 +3590,7 @@ paths:
                             automation:
                               type: object
                               nullable: true
-                              description: Optional manifest automation hint (schedulable capabilities + advisory sink).
+                              description: Optional manifest automation hint (schedulable capabilities + advisory sink + recommended agents).
                               properties:
                                 schedulable:
                                   type: array
@@ -3602,6 +3602,21 @@ paths:
                                       produces_key: { type: string, description: "Deposit key prefix the capability writes to (e.g. `feedback.stats`). Used to derive the automation-recipe trigger keyGlob." }
                                       cadences: { type: array, items: { type: string } }
                                 advisory_sink: { type: string }
+                                recommended_agents:
+                                  type: array
+                                  description: "Agent(s) this app works best with. The portal marks the owner's matching agents \"★ Recommended\" and lists them first in the agent picker. An owner agent matches if its name equals `name` OR ANY of `match_tags` appears in its tags or declared capabilities."
+                                  items:
+                                    type: object
+                                    required: [why]
+                                    properties:
+                                      name: { type: string, description: "A specific compatible agent's name (matched exactly against an owner agent)." }
+                                      match_tags: { type: array, items: { type: string }, description: "Capability/tag strings; an owner agent matches if ANY appears in its tags or declared capabilities." }
+                                      why:
+                                        type: object
+                                        description: Bilingual one-liner shown next to the recommended agent.
+                                        properties:
+                                          fi: { type: string }
+                                          en: { type: string }
                             setup:
                               type: object
                               nullable: true

@@ -32,6 +32,9 @@
  *     ('feedback.stats', the deposit KEY PREFIX) alongside produces ('feedback-stats@1', a schema ref);
  *     added a test asserting a PUT with NO trigger derives the default keyGlob from produces_key
  *     (so the recipe actually fires on the app's deposit key).
+ *   v1.4.0 — 2026-06-16 — B6 report content: seed `support-advisory@1` payloads into the owner outbox
+ *     before completing a task and assert the in-app report now carries advisoryCount + the advisory
+ *     titles + a rendered body embedding the count/titles + the routed organism (the richer report).
  */
 
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ecosystem-automation-recipe
@@ -432,6 +435,51 @@ await test('email:true → completing the task writes an automation report recor
   // NOTE: the EMAIL itself needs live SMTP + an owner notification email; without SMTP the node logs
   // "email skipped (not configured)" and only the in-app record is written. This test asserts the
   // SMTP-free observable (the report record). The actual email send is covered only with SMTP.
+});
+
+await test('email:true + seeded advisories → the report carries the advisory count + titles', async () => {
+  // Seed two `support-advisory@1` payloads into the OWNER outbox (the same key the wisdom agent
+  // writes), then drive a task to DONE. B6 is fired before the B7/B8 drain in the completion route,
+  // and with no live tunnel the drain leaves the outbox in place (offline-retry), so B6 reads them.
+  const recipe = await json(`/v1/ecosystem-apps/${APP}/automation/recipe`, {
+    method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ agents: [AGENT], trigger: { keyGlob: 'feedback.stats.*' }, organism: 'support-ops', email: true, requireApproval: false, enabled: true }),
+  });
+  assert(recipe.status === 200, `recipe set status ${recipe.status}`);
+
+  const adv = [
+    { id: 'adv-rep-1', title: "Rising 'account' complaints", body: 'Account-related tickets up 40%.', kind: 'recommendation', severity: 'warning', source: APP },
+    { id: 'adv-rep-2', title: 'CSAT dip on weekends', body: 'Weekend CSAT 12% below weekday.', kind: 'insight', severity: 'medium', source: APP },
+  ];
+  for (const a of adv) {
+    const seed = await json('/v1/memory', {
+      method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+      body: JSON.stringify({ key: `eco.${APP}.advisory.outbox.${a.id}`, value: a, visibility: 'owner' }),
+    });
+    assert(seed.status === 200 || seed.status === 201, `seed advisory status ${seed.status}`);
+  }
+
+  const before = (await listReports()).length;
+  const { taskId } = await materialiseAndComplete(true, 'feedback.stats.advreport');
+  let reports: any[] = [];
+  for (let i = 0; i < 24; i++) {
+    await sleep(250);
+    reports = await listReports();
+    if (reports.length > before) break;
+  }
+  const mine = reports.find(r => (r.value?.taskId ?? r.taskId) === taskId);
+  assert(!!mine, `the report for task ${taskId} should exist: ${JSON.stringify(reports.map(r => r.key))}`);
+  const v = mine.value ?? mine;
+  // The report now carries a real summary of what the agent produced.
+  assert(v.advisoryCount === 2, `report.advisoryCount should be 2: ${v.advisoryCount}`);
+  assert(Array.isArray(v.advisories) && v.advisories.length === 2, `report.advisories array: ${JSON.stringify(v.advisories)}`);
+  const titles = (v.advisories ?? []).map((a: any) => a.title);
+  assert(titles.includes("Rising 'account' complaints"), `advisory titles include first: ${JSON.stringify(titles)}`);
+  assert(titles.includes('CSAT dip on weekends'), `advisory titles include second: ${JSON.stringify(titles)}`);
+  // The rendered body (email + in-app) embeds the count + titles + the routed organism.
+  assert(typeof v.body === 'string' && /2 advisories:/.test(v.body), `body has the advisory count line: ${v.body}`);
+  assert(/Rising 'account' complaints/.test(v.body), `body lists the first advisory title: ${v.body}`);
+  assert(/organism "support-ops"/.test(v.body), `body mentions the routed organism: ${v.body}`);
 });
 
 await test('email:false → completing the task writes NO automation report record', async () => {
