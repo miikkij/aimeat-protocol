@@ -26,6 +26,9 @@
  *     orientation map (Kartta); crew-forge "build for this need" empty-state; and an AI need-router
  *     (✨ Find by need) that ranks the catalogue and proposes a builder brief when nothing fits. Pure
  *     grouping logic in /js/services/offers-grouping.js; AI via offers.js rankOffersByNeed.
+ *   v1.5.1 -- 2026-06-16 -- Clickable Mermaid map: a node click opens that offer's card (auto-open +
+ *     scroll-into-view). Done via our OWN SVG-overlay listener reading the node id we generated
+ *     (g{group}o{offer}) — Mermaid stays securityLevel:'strict' (no global loosening, no XSS surface).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -64,8 +67,17 @@ function Badges({ offer }) {
   return html`<span class="of-badges">${chips.map(([k, label]) => html`<span class="of-badge of-badge--${k}" key=${k}>${escHtml(label)}</span>`)}</span>`;
 }
 
-function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged, onGoInbox }) {
+function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged, onGoInbox, autoOpen, onAutoOpened }) {
   const [open, setOpen] = useState(false);
+  const cardRef = useRef(null);
+  // Map-click → open this card + scroll it into view (the safe alternative to enabling Mermaid's own
+  // click handlers, which would require loosening the global securityLevel). Fires once per request.
+  useEffect(() => {
+    if (!autoOpen) return;
+    setOpen(true);
+    requestAnimationFrame(() => cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+    onAutoOpened?.();
+  }, [autoOpen]);
   const [input, setInput] = useState('');
   const [result, setResult] = useState(null);
   const [vis, setVis] = useState(offer.visibility || 'private');
@@ -140,7 +152,7 @@ function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged,
   };
 
   return html`
-    <div class="of-card ${open ? 'of-card--open' : ''}">
+    <div class="of-card ${open ? 'of-card--open' : ''}" ref=${cardRef}>
       <div class="of-card-head" onClick=${() => setOpen(o => !o)}>
         <div class="of-card-title">
           <span class="of-offer-title">${escHtml(offer.title)}</span>
@@ -365,6 +377,7 @@ export default function OffersTab({ session, showToast }) {
   const [collapsed, setCollapsed] = useState(() => new Set());
   const [aiOn, setAiOn] = useState(false);
   const [aiResult, setAiResult] = useState(null);   // null | 'loading' | { ranked, noMatch, brief }
+  const [pendingOpen, setPendingOpen] = useState(null);  // offer key to auto-open after a map click
 
   const load = useCallback(async () => {
     try {
@@ -437,10 +450,14 @@ export default function OffersTab({ session, showToast }) {
   };
   const clearAi = () => setAiResult(null);
 
-  const renderCard = (it) => html`<${OfferCard}
-    key=${it.agent + '/' + it.offer.id}
-    entry=${it.entry} offer=${it.offer}
-    showToast=${showToast} confirm=${confirm} busy=${busy} setBusy=${setBusy} onChanged=${load} onGoInbox=${() => setView('inbox')} />`;
+  const renderCard = (it) => {
+    const key = it.agent + '/' + it.offer.id;
+    return html`<${OfferCard}
+      key=${key}
+      entry=${it.entry} offer=${it.offer}
+      autoOpen=${pendingOpen === key} onAutoOpened=${() => setPendingOpen(null)}
+      showToast=${showToast} confirm=${confirm} busy=${busy} setBusy=${setBusy} onChanged=${load} onGoInbox=${() => setView('inbox')} />`;
+  };
 
   // Sections for the "Do" browse view: a pinned ⏱ Automatiikassa group, then grouped-by-axis (rest).
   const autoItems = grouping.sortOffers(filtered.filter(it => grouping.isAuto(it.offer)), sortMode);
@@ -450,6 +467,26 @@ export default function OffersTab({ session, showToast }) {
   // Mermaid map source (orientation): groups by the chosen axis over the filtered set.
   const mapGroups = grouping.groupByAxis(filtered, axis).map(g => ({ label: axisKeyLabel(axis, g.key), items: g.items }));
   const mermaidSrc = grouping.buildMermaid(t('profile.offers.title') || 'What can I do?', mapGroups);
+
+  // Clickable map WITHOUT loosening Mermaid's global securityLevel: we keep strict (no Mermaid click
+  // handlers, no HTML labels) and instead read the clicked SVG node's id — which we generated in
+  // buildMermaid as `g{groupIndex}o{offerIndex}` — to resolve the offer from OUR own mapGroups. No
+  // attacker-controlled data is executed; navigation is our own code.
+  const onMapClick = (e) => {
+    const node = e.target?.closest?.('.node');
+    const id = node?.id || '';
+    const leaf = /g(\d+)o(\d+)/.exec(id);
+    if (leaf) {
+      const it = mapGroups[+leaf[1]]?.items?.[+leaf[2]];
+      if (!it) return;
+      setView('do');
+      setCollapsed(new Set());                       // expand all so the target card is visible
+      setPendingOpen(it.agent + '/' + it.offer.id);  // OfferCard opens + scrolls itself into view
+      return;
+    }
+    // A group/“+N” node (g{gi}, g{gi}more) — no specific offer; just drop into the Do list.
+    if (/(^|[-_])g\d+([a-z-_]|$)/.test(id)) setView('do');
+  };
 
   const titleByView = view === 'inbox' ? (t('profile.offers.inboxTitle') || 'What came back')
     : view === 'map' ? (t('profile.offers.mapTitle') || 'Map of what you can do')
@@ -514,9 +551,9 @@ export default function OffersTab({ session, showToast }) {
         ${feed !== null && items.length === 0 ? html`<div class="empty">${t('profile.offers.empty') || 'None of your agents publish offers yet.'}</div>` : null}
 
         ${view === 'map' && items.length > 0 ? html`
-          <div class="of-mapwrap">
+          <div class="of-mapwrap of-mapwrap--clickable" onClick=${onMapClick}>
             <${Mermaid} chart=${mermaidSrc} />
-            <div class="of-mini">${t('profile.offers.mapNote') || 'Orientation only — switch to Do to open a card.'}</div>
+            <div class="of-mini">${t('profile.offers.mapNote') || 'Click a node to open its card.'}</div>
           </div>
         ` : null}
 

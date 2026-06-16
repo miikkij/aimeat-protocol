@@ -473,7 +473,7 @@
       "segMap": "Kartta",
       "mapTitle": "Kartta siitä mitä voit tehdä",
       "mapDesc": "Lintuperspektiivi tarjouksistasi ryhmiteltynä — hahmota tästä, toimi listassa.",
-      "mapNote": "Vain hahmottamiseen — vaihda Tee-näkymään avataksesi kortin.",
+      "mapNote": "Klikkaa solmua avataksesi sen kortin.",
       "groupBy": "Ryhmittele",
       "sortBy": "Järjestä",
       "clearFilters": "Tyhjennä",

@@ -76,8 +76,13 @@ export interface DirectMessageRecord {
   conversationId: string;     // stable per (sorted pair of GHIIs); groups a thread
   senderGhii: string;         // owner@node
   recipientGhii: string;      // owner@node
-  body: string;               // text content (may be empty if attachment-only)
-  attachments?: DirectMessageAttachment[];
+  body: string;               // GFM markdown (rendered by existing public/components/Markdown.js).
+                              // Inline media referenced as ![alt](cid:{attachmentId}); resolved at
+                              // render time to the recipient-LOCAL url via attachments[]. May be
+                              // empty if attachment-only. (DECISION #11)
+  attachments?: DirectMessageAttachment[];  // EVERY referenced storage object — inline (cid:) or
+                              // appended — is one entry here: single source of truth for the
+                              // duplication / grant / quota / ownership lifecycle.
   // Delivery lifecycle (mirrors agent-message status semantics):
   status: 'queued' | 'sent' | 'delivered' | 'read' | 'failed' | 'undeliverable';
   direction: 'inbound' | 'outbound';   // relative to the row's owner copy (see storage model)
@@ -91,6 +96,8 @@ export interface DirectMessageRecord {
 }
 
 export interface DirectMessageAttachment {
+  id: string;                 // short id used by cid:{id} inline references in the markdown body
+  inline: boolean;            // true = embedded in body via cid:; false = appended attachment
   storageKey: string;         // key in the storage-files system
   ownerGhii: string;          // who owns the storage object (origin owner)
   originNodeId: string;       // node hosting the original bytes
@@ -271,6 +278,13 @@ copies. This drops the node-permanence signal entirely (no longer needed) and is
 - **Visibility/consent:** the origin attachment must be readable by the recipient. Use the existing
   `PATCH /v1/storage/:key/visibility` + consent/`authorizeRead` machinery — grant the recipient GHII
   read access (visibility `group`/explicit grant) rather than making media public.
+- **Quota (DECISION #10 — resolved):** the **text body is always delivered** (negligible size); only
+  the attachment is gated by quota. Before duplicating, the recipient node checks `quota.ts`. If it
+  would exceed quota: do **not** pull bytes, keep the attachment as `reference`, `notify()` the
+  recipient, and hold for the same **7-day grace** as the retry TTL (#6) — re-check each retry cycle,
+  duplicate the instant quota frees, and after 7 days the **attachment** expires (the message keeps
+  its text + an "attachment expired" marker). Recommended granularity: hold the attachment only, not
+  the whole message (confirm at build).
 
 **Cross-node fetch primitive (DECISION #5 — resolved): dedicated signed `POST /v1/federation/storage/grant`.**
 The recipient node calls this endpoint **on the origin node**, signed with the recipient node's
@@ -293,6 +307,26 @@ narrow per-request capability, never made public). Reference mode re-grants lazi
 are short-lived); duplicate mode pulls once at receive so the message survives the origin going
 offline.
 
+### Markdown body + inline media (DECISION #11 — resolved)
+
+- **Body is GFM markdown**, rendered with the **existing `public/components/Markdown.js`** (vnode-based,
+  no `innerHTML` → inherently XSS-safe; already used by workspace documents). No new renderer, no
+  external sanitizer.
+- **Inline media uses a `cid:{attachmentId}` reference** (email Content-ID convention):
+  `![alt](cid:att1)`. The body never hard-codes a node URL (unlike workspace docs, which embed raw
+  `/v1/storage/{key}` — fine same-node, broken cross-node). Every `cid:` target is an entry in
+  `attachments[]` with `inline: true`.
+- **Render-time resolution:** the message view replaces each `cid:{id}` with the **recipient-LOCAL**
+  relative URL (`/v1/storage/{localKey}` after duplication, served by the recipient's own node) before
+  passing text to `Markdown.js`. Relative URLs already pass its `sanitizeImgSrc()`, so `Markdown.js`
+  is untouched. While an attachment is still `reference` (pending request / awaiting quota), show a
+  placeholder until it duplicates.
+- **Tracking-pixel defense:** message bodies render markdown **text/links normally but only allow
+  `cid:` images** — arbitrary external `http(s)` `<img>` are stripped/neutralized so a sender can't
+  embed a tracking pixel that leaks the recipient's IP / open-status. (Confirm at build; this is the
+  recommended default.) Implement as a small pre-pass over the body before `Markdown.js`, or a
+  message-scoped `sanitizeImgSrc` variant.
+
 ---
 
 ## 8. Notifications & real-time
@@ -304,6 +338,12 @@ offline.
   POST a signed `/v1/federation/message/receipt` back to the origin node (or update locally for
   same-node) to flip the sender's row to `read` and set `readAt`. The sender's thread view shows the
   read state. Same signing/verification as the message receive endpoint.
+- **Acceptance/block propagation (DECISION #9 — resolved):** the **same** signed
+  `/v1/federation/message/receipt` endpoint carries a status `kind` (`accepted` | `blocked` |
+  `read`). When the recipient accepts/blocks a first-contact request, a signed receipt updates the
+  sender's row/contact-state for UI. **Not security-critical:** gating is enforced recipient-side on
+  every inbound message regardless, so a lost signal never weakens the gate — it only updates the
+  sender's view.
 
 ---
 
@@ -353,9 +393,10 @@ Per `docs/frontend-development-guide.md` + the profile-tab + SSE conventions.
   Include a **Requests** sub-section/badge for pending first-contacts (§9).
 - Prefix CSS classes (e.g. `inbox-` / `msg-`), styles in `public/css/views/` (or profile css),
   CSS variables only, no inline styles, existing `.btn-*` classes.
-- Views: conversation list (left), thread view (right), composer (recipient GHII picker + body +
-  attachment upload), unread badges. Attachment rendering by `kind` (image preview, audio/video
-  player, file download link) using presigned download URLs.
+- Views: conversation list (left), thread view (right), composer (recipient GHII picker + markdown
+  body + attachment upload), unread badges. **Body rendered via the existing `Markdown.js`** with
+  `cid:` inline media resolved to recipient-local URLs (§7 / DECISION #11). Appended (non-inline)
+  attachments render by `kind` (image preview, audio/video player, file download link).
 - All strings via `t()`; add keys to `locales/en.json` + `locales/fi.json` **and** the frontend
   `public/locales/` files together (Rule 4).
 - New shared JS modules get importmap identity entries in `public/spa.html` (cache-busting rule).
@@ -420,9 +461,25 @@ Even building the whole feature, land it in verifiable layers (each compiles + t
    ecosystem GEAI (scope `messages:send`). Agent→own-owner stays in the existing `agent-messages`
    channel; this DM inbox is for cross-party delivery. (§2)
 
-### Remaining clarifications (non-blocking, decide during build)
+### Follow-up decisions — RESOLVED (2026-06-16)
 
-- Acceptance propagation across federation: implicit (first reply) vs an explicit federated
-  `accepted` signal — pick during §6/§9 implementation (noted in §3).
-- Per-recipient inbound storage **quota** behaviour when duplication would exceed quota (queue,
-  reject, or charge overage via existing `quota.ts`).
+9. **Acceptance/block propagation across nodes:** **Explicit signal over the existing signed receipt
+   channel** (`/v1/federation/message/receipt`), extended with a status kind (`accepted` | `blocked`
+   | `read`). Chosen because gating is enforced **recipient-side** regardless, so the signal is a
+   UI/state nicety, not a security dependency — and it adds no new infrastructure (the receipt
+   endpoint already exists for read receipts, #4). Implicit-via-first-reply rejected (can't convey
+   accept-without-reply or block). (§8, §9)
+10. **Quota exceeded on inbound duplication:** the **text body is always delivered** (negligible
+    size); only the **attachment** is gated. If duplicating an attachment would exceed the
+    recipient's quota: do **not** pull bytes, keep it as `reference`, **notify** the recipient, and
+    hold for the same **7-day grace** as the retry TTL — re-check each cycle, duplicate as soon as
+    quota frees, and after 7 days the **attachment** expires (message keeps text + an
+    "attachment expired" marker). Quota check runs where duplication happens: on **accept**
+    (first-contact) or **on receive** (already-accepted contact). Reuses `quota.ts`.
+    *(Open micro-choice for build: hold attachment-only — recommended — vs. hold the whole message as
+    one unit.)* (§7)
+11. **Message content format:** **GFM markdown body** rendered by the existing XSS-safe `Markdown.js`.
+    Inline media via `cid:{attachmentId}` (resolved at render to recipient-local URLs); every inline
+    or appended media object is one `attachments[]` entry (single lifecycle source of truth).
+    **Tracking-pixel defense:** allow only `cid:` images, strip external `http(s)` `<img>` (confirm at
+    build). (§3, §7, §10)
