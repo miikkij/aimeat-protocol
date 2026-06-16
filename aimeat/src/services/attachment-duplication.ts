@@ -105,6 +105,7 @@ export async function duplicateMessageAttachments(
 
   for (const att of atts) {
     if (att.mode === 'duplicate' && att.localKey) { result.push(att); continue; }
+    if (att.expired) { result.push(att); continue; }   // terminal — never retried
 
     const quota = await checkStorageQuota(ctx.config, ctx.storage, recipientGhii, att.size);
     if (!quota.allowed) {
@@ -141,4 +142,41 @@ export async function duplicateMessageAttachments(
   }
 
   return { attachments: result, changed };
+}
+
+/**
+ * Periodic sweep (DECISION #10): re-attempt attachments that are still `reference` (held because the
+ * recipient was over quota or the bytes were briefly unavailable), and — once a held attachment is
+ * older than the retry TTL — mark it `expired` so it stops retrying. The message text is unaffected;
+ * the recipient just sees an "attachment expired" marker. Runs alongside the message retry job.
+ * Returns counts for logging. Never throws.
+ */
+export async function sweepReferenceAttachments(ctx: AttachmentCtx): Promise<{ retried: number; expired: number }> {
+  const ttlMs = ctx.config.messageRetryTtlHours * 3600_000;
+  const now = Date.now();
+  let retried = 0, expired = 0;
+
+  const msgs = await ctx.storage.listInboundWithAttachments(200).catch(() => []);
+  for (const m of msgs) {
+    const atts = m.attachments || [];
+    const held = atts.some(a => a.mode === 'reference' && !a.expired);
+    if (!held) continue;
+
+    if (now - new Date(m.createdAt).getTime() > ttlMs) {
+      const updated = atts.map(a => (a.mode === 'reference' && !a.expired) ? { ...a, expired: true } : a);
+      await ctx.storage.updateMessageAttachments(m.id, m.ownerGhii, updated).catch(() => {});
+      expired++;
+      await notify(ctx.storage, m.ownerGhii, {
+        type: 'direct_message_attachment_expired',
+        title: 'An attachment expired',
+        body: `An attachment from ${m.senderGhii} could not be received in time and was dropped.`,
+        link: `/v1/profile#inbox/${m.conversationId}`,
+      });
+      continue;
+    }
+
+    const dup = await duplicateMessageAttachments(ctx, m.ownerGhii, m);
+    if (dup.changed) { await ctx.storage.updateMessageAttachments(m.id, m.ownerGhii, dup.attachments).catch(() => {}); retried++; }
+  }
+  return { retried, expired };
 }

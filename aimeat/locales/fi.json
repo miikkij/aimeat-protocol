@@ -17,6 +17,7 @@
   "inbox.noThread": "Ei viestejä tässä keskustelussa vielä.",
   "inbox.empty": "Ei mitään vielä.",
   "inbox.attachmentPending": "liite odottaa",
+  "inbox.attachmentExpired": "liite vanhentui",
   "inbox.attach": "Liitä tiedosto",
   "inbox.today": "Tänään",
   "inbox.yesterday": "Eilen",

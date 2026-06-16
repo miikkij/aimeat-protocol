@@ -48,6 +48,8 @@ export interface DirectMessageRepository {
   setMessageReadReceipt(id: string, readAt: string): Promise<DirectMessageRecord | null>;
   /** Outbound copies still awaiting cross-node delivery (status queued/failed), oldest first. */
   listOutboundForRetry(limit?: number): Promise<DirectMessageRecord[]>;
+  /** Inbound copies that carry attachments (for the attachment duplication/expiry sweep). */
+  listInboundWithAttachments(limit?: number): Promise<DirectMessageRecord[]>;
   /** Persist (re)resolved attachment descriptors after duplication/quota handling. */
   updateMessageAttachments(id: string, ownerGhii: string, attachments: DirectMessageRecord['attachments']): Promise<DirectMessageRecord | null>;
   deleteDirectMessage(id: string, ownerGhii: string): Promise<boolean>;

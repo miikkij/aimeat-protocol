@@ -19,6 +19,7 @@ import type { PeerInfo } from './federation.js';
 import { sign } from '../auth/keypair.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
+import { sweepReferenceAttachments } from './attachment-duplication.js';
 
 export interface DeliveryCtx {
   config: AimeatConfig;
@@ -145,6 +146,8 @@ export function startMessageRetryJob(config: AimeatConfig, storage: Storage, pee
       }
       await deliverDirectMessage(ctx, msg);
     }
+    // Also re-attempt / expire held (reference) attachments on the recipient side (DECISION #10).
+    await sweepReferenceAttachments(ctx).catch(err => logger.error('attachment sweep failed', { error: (err as Error).message }));
   }
 
   return setInterval(() => {
